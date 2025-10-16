@@ -926,7 +926,11 @@ export class MemberService {
     return result;
   }
 
-  async updateAccessLevel({ memberUids, accessLevel }: UpdateAccessLevelDto): Promise<{ updatedCount: number }> {
+  async updateAccessLevel({
+    memberUids,
+    accessLevel,
+    sendRejectEmail = false,
+  }: UpdateAccessLevelDto): Promise<{ updatedCount: number }> {
     // Fetch members whose current access level is L0, L1, or Rejected
     const notApprovedMembers = await this.prisma.member.findMany({
       where: {
@@ -1001,8 +1005,8 @@ export class MemberService {
         }
       }
 
-      // Send rejection emails for members marked as Rejected
-      if (accessLevel === AccessLevel.REJECTED) {
+      // Send rejection emails for members marked as Rejected only if sendRejectEmail is true
+      if (sendRejectEmail && accessLevel === AccessLevel.REJECTED) {
         for (const member of notApprovedMembers) {
           if (!member.email) {
             this.logger.error(
@@ -1121,15 +1125,36 @@ export class MemberService {
       ...rest,
     };
 
-    if (dto.accessLevel) {
-      const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(dto.accessLevel as AccessLevel);
-      data.isVerified = isVerified;
-      data.plnFriend = plnFriend;
-    }
+    // NEW: used later for post-transaction handling
+    let existingMember: any;
+    let isEmailChanged = false;
 
     let updatedMember;
 
     await this.prisma.$transaction(async (tx) => {
+      this.logger.info(`Admin updateMemberByAdmin - init, uid -> ${uid}`);
+
+      // get existing member (for comparing email and externalId)
+      existingMember = await tx.member.findUniqueOrThrow({ where: { uid } });
+
+      if (dto.accessLevel) {
+        const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(dto.accessLevel as AccessLevel);
+        data.isVerified = isVerified;
+        data.plnFriend = plnFriend;
+      }
+
+      // handle email change with normalization and validation
+      if (dto.email) {
+        this.logger.info(`Admin updateMemberByAdmin - email change requested, uid -> ${uid}, old -> ${existingMember.email}, new -> ${dto.email}`);
+        isEmailChanged = await this.checkIfEmailChanged({ email: dto.email }, existingMember, tx);
+        data.email = dto.email.toLowerCase().trim();
+        if (isEmailChanged && existingMember.externalId) {
+          // detach external account if email is changed (same as in user flow)
+          data.externalId = null;
+          this.logger.info(`Admin updateMemberByAdmin - externalId will be cleared due to email change, uid -> ${uid}`);
+        }
+      }
+
       if (joinDate) {
         data.plnStartDate = new Date(joinDate);
       }
@@ -1177,7 +1202,6 @@ export class MemberService {
             : existingMember?.investorProfile?.secRulesAcceptedAt;
 
         if (existingMember?.investorProfileId) {
-          // Update existing investor profile
           await tx.investorProfile.update({
             where: { uid: existingMember.investorProfileId },
             data: {
@@ -1214,7 +1238,21 @@ export class MemberService {
         where: { uid },
         data,
       });
+
+      this.logger.info(`Admin updateMemberByAdmin - updated, uid -> ${updatedMember.uid}, isEmailChanged -> ${isEmailChanged}`);
     });
+
+    // post-processing of email change (delete external account and log)
+    if (isEmailChanged) {
+      await this.updateMemberEmailChange(
+        uid,
+        true,
+        Boolean(existingMember?.externalId),
+        { email: dto.email },
+        existingMember
+      );
+      this.logger.info(`Admin updateMemberByAdmin - post email-change handled, uid -> ${uid}`);
+    }
 
     return updatedMember.uid;
   }

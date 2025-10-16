@@ -7,7 +7,6 @@ import { Level0Icon, Level1Icon, Level2Icon } from '../icons';
 import { useUpdateMembersStatus } from '../../../../hooks/members/useUpdateMembersStatus';
 import { format } from 'date-fns';
 import { ConfirmDialog } from '../ConfirmDialog';
-import { useToggle } from 'react-use';
 import { toast } from 'react-toastify';
 
 const options = [
@@ -95,6 +94,7 @@ const options = [
 
 export const StatusCell = ({ member, authToken }: { member: Member; authToken: string }) => {
   const [val, setVal] = useState(null);
+  const [sendRejectEmail, setSendRejectEmail] = useState(false);
   const _value = useMemo(() => {
     const val = options.find((option) => option.value === member.accessLevel);
 
@@ -112,10 +112,12 @@ export const StatusCell = ({ member, authToken }: { member: Member; authToken: s
 
   const handleSubmit = async (val) => {
     setVal(null);
+    setSendRejectEmail(false);
     const res = await mutateAsync({
       authToken,
       memberUids: [member.uid],
       accessLevel: val.value,
+      sendRejectEmail,
     });
 
     if (res.status === 200) {
@@ -244,8 +246,14 @@ export const StatusCell = ({ member, authToken }: { member: Member; authToken: s
         <ConfirmDialog
           title="Warning"
           desc="Are you sure you want to change access level of selected user to Rejected? This operation can be reverted later on."
-          onClose={() => setVal(null)}
+          onClose={() => {
+            setVal(null);
+            setSendRejectEmail(false);
+          }}
           onSubmit={() => handleSubmit(val)}
+          checkboxLabel="Send email"
+          checkboxChecked={sendRejectEmail}
+          onCheckboxChange={setSendRejectEmail}
         />
       )}
     </div>

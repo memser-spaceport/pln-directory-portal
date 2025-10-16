@@ -12,6 +12,7 @@ import { UploadParticipantsModal } from '../../components/demo-days/UploadPartic
 import { UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
 import clsx from 'clsx';
+import { toast } from 'react-toastify';
 
 import s from './styles.module.scss';
 
@@ -62,6 +63,8 @@ const DemoDayDetailPage = () => {
     switch (status) {
       case 'ACTIVE':
         return 'text-green-600 bg-green-100';
+      case 'EARLY_ACCESS':
+        return 'text-orange-600 bg-orange-100';
       case 'PENDING':
         return 'text-yellow-600 bg-yellow-100';
       case 'COMPLETED':
@@ -132,6 +135,67 @@ const DemoDayDetailPage = () => {
     } catch (error) {
       console.error('Error updating participant status:', error);
       alert('Failed to update participant status. Please try again.');
+    }
+  };
+
+  const handleUpdateParticipantType = async (
+    participantUid: string,
+    participantName: string,
+    newType: 'INVESTOR' | 'FOUNDER'
+  ) => {
+    if (!authToken || !uid) return;
+
+    const newTabName = newType === 'INVESTOR' ? 'Investors' : 'Founders';
+
+    try {
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: uid as string,
+        participantUid,
+        data: { type: newType },
+      });
+      toast.success(`Successfully moved ${participantName} to ${newTabName}`);
+    } catch (error) {
+      console.error('Error moving participant:', error);
+      toast.error(`Failed to move ${participantName}. Please try again.`);
+    }
+  };
+
+  const handleUpdateParticipantEarlyAccess = async (participantUid: string, hasEarlyAccess: boolean) => {
+    if (!authToken || !uid) return;
+
+    try {
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: uid as string,
+        participantUid,
+        data: { hasEarlyAccess },
+      });
+    } catch (error) {
+      console.error('Error updating early access:', error);
+      toast.error('Failed to update early access. Please try again.');
+    }
+  };
+
+  const handleUpdateParticipantTeam = async (
+    participantUid: string,
+    participantName: string,
+    teamUid: string,
+    teamName: string
+  ) => {
+    if (!authToken || !uid) return;
+
+    try {
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: uid as string,
+        participantUid,
+        data: { teamUid: teamUid || undefined },
+      });
+      toast.success(`Successfully updated team for ${participantName} to ${teamName}`);
+    } catch (error) {
+      console.error('Error updating team:', error);
+      toast.error(`Failed to update team for ${participantName}. Please try again.`);
     }
   };
 
@@ -251,6 +315,7 @@ const DemoDayDetailPage = () => {
                     className={s.fieldInput}
                   >
                     <option value="UPCOMING">Upcoming</option>
+                    <option value="EARLY_ACCESS">Early Access</option>
                     <option value="ACTIVE">Active</option>
                     <option value="COMPLETED">Completed</option>
                   </select>
@@ -356,10 +421,26 @@ const DemoDayDetailPage = () => {
                 <div className={clsx(s.tableRow, s.tableHeader)}>
                   <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
                   <div className={clsx(s.headerCell, s.flexible)}>Team</div>
-                  {activeTab === 'investors' && <div className={clsx(s.headerCell, s.flexible)}>Investor Type</div>}
-                  {activeTab === 'founders' && <div className={clsx(s.headerCell, s.flexible)}>Pitch Materials</div>}
+                  {activeTab === 'investors' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 200 }}>
+                      Investor Type
+                    </div>
+                  )}
+                  {activeTab === 'investors' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                      Early Access
+                    </div>
+                  )}
+                  {activeTab === 'founders' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 200 }}>
+                      Pitch Materials
+                    </div>
+                  )}
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Invite Accepted
+                  </div>
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                    Type
                   </div>
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Status
@@ -389,41 +470,91 @@ const DemoDayDetailPage = () => {
                       </div>
                     </div>
                     <div className={clsx(s.bodyCell, s.flexible)}>
-                      {(() => {
-                        // For founders, use participant.team
-                        // For investors, use member.teamMemberRoles[0].team
-                        let team;
+                      {activeTab === 'founders' ? (
+                        (() => {
+                          const memberTeams = participant.member?.teamMemberRoles || [];
+                          const currentTeamUid = participant.teamUid || '';
 
-                        if (activeTab === 'founders') {
-                          team = participant.team;
-                        } else {
-                          team =
+                          if (memberTeams.length === 0) {
+                            return <span className="text-gray-400">No teams</span>;
+                          }
+
+                          return (
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={currentTeamUid}
+                                onChange={(e) => {
+                                  const selectedTeam = memberTeams.find((role) => role.team.uid === e.target.value);
+                                  if (selectedTeam) {
+                                    handleUpdateParticipantTeam(
+                                      participant.uid,
+                                      participant.member?.name || participant.name,
+                                      e.target.value,
+                                      selectedTeam.team.name
+                                    );
+                                  }
+                                }}
+                                disabled={updateParticipantMutation.isPending}
+                                className={`flex-1 rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                                  currentTeamUid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                                } disabled:opacity-50`}
+                              >
+                                <option value="">Select team...</option>
+                                {memberTeams.map((role) => (
+                                  <option key={role.team.uid} value={role.team.uid}>
+                                    {role.team.name}
+                                    {role.mainTeam ? ' (Main)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              {currentTeamUid && (
+                                <a
+                                  href={`${WEB_UI_BASE_URL}/teams/${currentTeamUid}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                                  title="Open team page"
+                                >
+                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                                    <path
+                                      d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
+                                      fill="currentColor"
+                                    />
+                                  </svg>
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        (() => {
+                          const team =
                             participant.member?.teamMemberRoles.find((role) => role.mainTeam)?.team ||
                             participant.member?.teamMemberRoles[0]?.team;
-                        }
 
-                        return team ? (
-                          <a
-                            href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-                          >
-                            {team.name}
-                            <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
-                              <path
-                                d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
-                                fill="currentColor"
-                              />
-                            </svg>
-                          </a>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        );
-                      })()}
+                          return team ? (
+                            <a
+                              href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                            >
+                              {team.name}
+                              <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                                <path
+                                  d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
+                                  fill="currentColor"
+                                />
+                              </svg>
+                            </a>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          );
+                        })()
+                      )}
                     </div>
                     {activeTab === 'founders' && (
-                      <div className={clsx(s.bodyCell, s.flexible)}>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
                         {(() => {
                           const team = participant.team;
                           if (!team) {
@@ -473,7 +604,7 @@ const DemoDayDetailPage = () => {
                       </div>
                     )}
                     {activeTab === 'investors' && (
-                      <div className={clsx(s.bodyCell, s.flexible)}>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
                         {(() => {
                           const profileType = participant.member?.investorProfile?.type;
                           if (!profileType) {
@@ -508,6 +639,24 @@ const DemoDayDetailPage = () => {
                         })()}
                       </div>
                     )}
+                    {activeTab === 'investors' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        <select
+                          value={participant.hasEarlyAccess ? 'yes' : 'no'}
+                          onChange={(e) =>
+                            handleUpdateParticipantEarlyAccess(participant.uid, e.target.value === 'yes')
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={clsx(
+                            'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
+                            participant.hasEarlyAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          )}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                    )}
                     <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
                       {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
                         <svg
@@ -528,6 +677,28 @@ const DemoDayDetailPage = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       )}
+                    </div>
+
+                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                      <select
+                        value={participant.type}
+                        onChange={(e) =>
+                          handleUpdateParticipantType(
+                            participant.uid,
+                            participant.member?.name || participant.name,
+                            e.target.value as 'INVESTOR' | 'FOUNDER'
+                          )
+                        }
+                        disabled={updateParticipantMutation.isPending}
+                        className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                          participant.type === 'INVESTOR'
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-blue-100 text-blue-800'
+                        } disabled:opacity-50`}
+                      >
+                        <option value="INVESTOR">Investor</option>
+                        <option value="FOUNDER">Founder</option>
+                      </select>
                     </div>
 
                     <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
