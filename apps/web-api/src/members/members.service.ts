@@ -2029,6 +2029,7 @@ export class MembersService {
                   {
                     teamMemberRoles: {
                       some: {
+                        investmentTeam: true,
                         team: {
                           isFund: true,
                         },
