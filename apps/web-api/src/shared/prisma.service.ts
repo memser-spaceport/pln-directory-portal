@@ -1,8 +1,12 @@
 import { INestApplication, Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { HuskyDataIngestionService } from './husky-data-ingestion.service';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
+  constructor(private ingestionService: HuskyDataIngestionService) {
+    super();
+  }
   async onModuleInit() {
     await this.$connect();
     // Setting up Prisma Middleware for handling Team updates
@@ -10,6 +14,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       const result = await next(params);
       if (params.model === 'Team' && params.action === 'update') {
         await this.createTeamFocusAreaVersionHistory(params);
+      }
+      // Emit CUD events to Queue for selected entities
+      try {
+        await this.emitCUDEvents(params, result);
+      } catch (e) {
+        // swallow to not block db operation
+        // eslint-disable-next-line no-console
+        console.error('Error occured in emitting CUD events to Queue', e);
       }
       return result;
     });
@@ -153,5 +165,39 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       return result.filter((focusArea) => focusArea.version === recentVersion);
     }
     return [];
+  }
+
+  /**
+   * Emits Create, Update, Delete (CUD) events to DynamoDB ingestion table
+   * Tracks changes for specified entities and writes them to the ingestion table
+   * 
+   * @param params - Prisma middleware parameters containing model and action information
+   * @param result - The result of the database operation containing the uid
+   * @private
+   */
+  private async emitCUDEvents(params, result) {
+    const models = process.env.TRACKED_DB_ENTITIES 
+      ? process.env.TRACKED_DB_ENTITIES.split(',').map(model => model.trim())
+      : ['Member', 'Team', 'PLEvent', 'Project'];
+    const actions = ['create', 'update', 'delete'];
+    const { action, model } = params;
+    const { uid } = result;
+    
+    // Validate that we have all required data and that the entity is tracked
+    if (!(model && models.includes(model) && action && actions.includes(action) && uid)) {
+      return;
+    }
+    
+    // Write to DynamoDB ingestion table
+    await this.ingestionService.ingestRecord({
+      entity: model,
+      action,
+      data: {
+        uid
+      },
+      options: {
+        timestamp: new Date().toISOString()
+      }
+    });
   }
 }
