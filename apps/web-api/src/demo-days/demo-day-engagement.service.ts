@@ -343,6 +343,7 @@ export class DemoDayEngagementService {
           teamUid: fundraisingProfile.teamUid,
           teamName: fundraisingProfile.team.name,
           interestType,
+          isPrepDemoDay,
         },
       });
     }, 500);

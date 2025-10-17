@@ -484,6 +484,7 @@ export class DemoDaysAdminService {
           demoDayUid: demoDayUid,
           memberUid: userId,
           teamFundraisingProfileUid: { in: profilesWithFounders.map((p) => p.uid) },
+          isPrepDemoDay: true,
         },
         select: {
           teamFundraisingProfileUid: true,
