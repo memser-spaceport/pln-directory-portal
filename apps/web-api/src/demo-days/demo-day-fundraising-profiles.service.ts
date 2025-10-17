@@ -568,6 +568,7 @@ export class DemoDayFundraisingProfilesService {
         demoDayUid: demoDay.uid,
         memberUid: participantUid,
         teamFundraisingProfileUid: { in: filtered.map((p) => p.uid) },
+        isPrepDemoDay: false,
       },
       select: {
         teamFundraisingProfileUid: true,
