@@ -484,12 +484,14 @@ export class DemoDaysAdminService {
           demoDayUid: demoDayUid,
           memberUid: userId,
           teamFundraisingProfileUid: { in: profilesWithFounders.map((p) => p.uid) },
+          isPrepDemoDay: true,
         },
         select: {
           teamFundraisingProfileUid: true,
           liked: true,
           connected: true,
           invested: true,
+          referral: true,
         },
       });
 
@@ -498,15 +500,17 @@ export class DemoDaysAdminService {
           liked: !!it.liked,
           connected: !!it.connected,
           invested: !!it.invested,
+          referral: !!it.referral,
         };
         return acc;
-      }, {} as Record<string, { liked: boolean; connected: boolean; invested: boolean }>);
+      }, {} as Record<string, { liked: boolean; connected: boolean; invested: boolean; referral: boolean }>);
 
       for (const p of profilesWithFounders) {
-        const f = byProfile[p.uid] || { liked: false, connected: false, invested: false };
+        const f = byProfile[p.uid] || { liked: false, connected: false, invested: false, referral: false };
         (p as any).liked = f.liked;
         (p as any).connected = f.connected;
         (p as any).invested = f.invested;
+        (p as any).referral = f.referral;
       }
     }
 

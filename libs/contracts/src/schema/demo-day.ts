@@ -19,8 +19,15 @@ export class UpdateFundraisingDescriptionDto extends createZodDto(UpdateFundrais
 
 export const ExpressInterestSchema = z.object({
   teamFundraisingProfileUid: z.string(),
-  interestType: z.enum(['like', 'connect', 'invest']),
+  interestType: z.enum(['like', 'connect', 'invest', 'referral']),
   isPrepDemoDay: z.boolean().optional(),
+  referralData: z
+    .object({
+      investorName: z.string().optional(),
+      investorEmail: z.string().optional(),
+      message: z.string().optional(),
+    })
+    .optional(),
 });
 
 export class ExpressInterestDto extends createZodDto(ExpressInterestSchema) {}

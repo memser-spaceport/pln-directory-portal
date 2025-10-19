@@ -3,6 +3,8 @@ import { DemoDay, DemoDayStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 
+type ExpressInterestStats = { liked: number; connected: number; invested: number; referral: number; total: number };
+
 @Injectable()
 export class DemoDaysService {
   constructor(private readonly prisma: PrismaService, private readonly analyticsService: AnalyticsService) {}
@@ -373,5 +375,31 @@ export class DemoDaysService {
     }
 
     return demoDayStatus.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
+  }
+
+  async getCurrentExpressInterestStats(isPrepDemoDay: boolean): Promise<ExpressInterestStats> {
+    const demoDay = await this.getCurrentDemoDay();
+    if (!demoDay) return { liked: 0, connected: 0, invested: 0, referral: 0, total: 0 };
+
+    const agg = await this.prisma.demoDayExpressInterestStatistic.aggregate({
+      where: {
+        demoDayUid: demoDay.uid,
+        isPrepDemoDay,
+      },
+      _sum: {
+        likedCount: true,
+        connectedCount: true,
+        investedCount: true,
+        referralCount: true,
+      },
+    });
+
+    const liked = agg._sum.likedCount ?? 0;
+    const connected = agg._sum.connectedCount ?? 0;
+    const invested = agg._sum.investedCount ?? 0;
+    const referral = agg._sum.referralCount ?? 0;
+    const total = liked + connected + invested + referral;
+
+    return { liked, connected, invested, referral, total };
   }
 }

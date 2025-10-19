@@ -436,11 +436,12 @@ export class DemoDayParticipantsService {
               updateData.telegramHandler = normalizedTelegram;
             }
 
-            // Update investor profile if it exists
+            // Update investor profile if it exists - only set type if explicitly provided
             if (existingMember.investorProfile) {
+              const updatedInvestorType = participantData.investmentType || existingMember.investorProfile.type;
               updateData.investorProfile = {
                 update: {
-                  type: participantData.investmentType || existingMember.investorProfile.type,
+                  type: updatedInvestorType,
                   ...(isTeamInvestorProfile
                     ? {
                         secRulesAccepted:
@@ -472,8 +473,13 @@ export class DemoDayParticipantsService {
             });
             summary.updatedUsers++;
           } else {
-            // Create new member
-            const investorType = participantData.investmentType || (participantData.organization ? 'FUND' : 'ANGEL');
+            // Create new member - default investor type logic
+            let investorType = participantData.investmentType; // Keep as provided, or undefined if not provided
+
+            // Only set to ANGEL if T&C is accepted (secRulesAccepted is true)
+            if (!investorType && participantData.secRulesAccepted) {
+              investorType = 'ANGEL';
+            }
 
             const createData: any = {
               name: participantData.name,
@@ -484,13 +490,13 @@ export class DemoDayParticipantsService {
               investorProfile: isTeamInvestorProfile
                 ? {
                     create: {
-                      type: investorType,
+                      type: investorType || undefined, // Keep as null if not provided
                       secRulesAccepted: participantData.secRulesAccepted || false,
                     },
                   }
                 : {
                     create: {
-                      type: investorType,
+                      type: investorType || undefined, // Keep as null if not provided
                       typicalCheckSize: participantData.typicalCheckSize || undefined,
                       investInStartupStages: participantData.investInStartupStages || undefined,
                       secRulesAccepted: participantData.secRulesAccepted || false,
@@ -553,6 +559,7 @@ export class DemoDayParticipantsService {
                   team = await tx.team.update({
                     where: { uid: team.uid },
                     data: {
+                      name: orgName,
                       contactMethod: participantData.organizationEmail,
                     },
                   });
@@ -564,9 +571,13 @@ export class DemoDayParticipantsService {
             }
 
             if (isTeamInvestorProfile) {
-              if (team.investorProfileId) {
+              const teamInvestorProfile = await tx.investorProfile.findUnique({
+                where: { teamUid: team.uid },
+              });
+
+              if (teamInvestorProfile) {
                 await tx.investorProfile.update({
-                  where: { uid: team.investorProfileId },
+                  where: { uid: teamInvestorProfile.uid },
                   data: {
                     typicalCheckSize: participantData.typicalCheckSize || undefined,
                     investInStartupStages: participantData.investInStartupStages || undefined,
@@ -582,7 +593,7 @@ export class DemoDayParticipantsService {
                 });
                 await tx.team.update({
                   where: { uid: team.uid },
-                  data: { investorProfileId: newInvestorProfile.uid },
+                  data: { investorProfileId: newInvestorProfile.uid, name: team.name },
                 });
               }
             }

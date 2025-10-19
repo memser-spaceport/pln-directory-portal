@@ -1,35 +1,38 @@
 import {
-  Controller,
-  Get,
-  UseGuards,
-  Req,
-  Put,
-  Delete,
-  Patch,
   Body,
-  UseInterceptors,
-  UploadedFiles,
-  UploadedFile,
-  UsePipes,
-  Query,
+  Controller,
+  Delete,
+  Get,
+  Patch,
   Post,
+  Put,
+  Query,
+  Req,
+  UploadedFile,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+  UsePipes,
 } from '@nestjs/common';
-import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
-import { ZodValidationPipe } from '@abitia/zod-dto';
-import { DemoDaysService } from './demo-days.service';
-import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profiles.service';
-import { DemoDayEngagementService } from './demo-day-engagement.service';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
-import { UserTokenValidation } from '../guards/user-token-validation.guard';
-import { UploadsService } from '../uploads/uploads.service';
-import { UploadKind, UploadScopeType } from '@prisma/client';
-import { NoCache } from '../decorators/no-cache.decorator';
+import {FileFieldsInterceptor, FileInterceptor} from '@nestjs/platform-express';
+import {ApiBody, ApiConsumes, ApiTags} from '@nestjs/swagger';
+import {ZodValidationPipe} from '@abitia/zod-dto';
+import {DemoDaysService} from './demo-days.service';
+import {DemoDayFundraisingProfilesService} from './demo-day-fundraising-profiles.service';
+import {DemoDayEngagementService} from './demo-day-engagement.service';
+import {UserTokenCheckGuard} from '../guards/user-token-check.guard';
+import {UserTokenValidation} from '../guards/user-token-validation.guard';
+import {UploadsService} from '../uploads/uploads.service';
+import {UploadKind, UploadScopeType} from '@prisma/client';
+import {NoCache} from '../decorators/no-cache.decorator';
 import {
-  UpdateFundraisingTeamDto,
-  UpdateFundraisingDescriptionDto,
   ExpressInterestDto,
+  UpdateFundraisingDescriptionDto,
+  UpdateFundraisingTeamDto,
 } from 'libs/contracts/src/schema';
+
+const cache = new Map<string, { data: any; expires: number }>();
+const TTL = 30_000; // 30 seconds
 
 @ApiTags('Demo Days')
 @Controller('v1/demo-days')
@@ -173,6 +176,20 @@ export class DemoDaysController {
       body.interestType,
       body.isPrepDemoDay
     );
+  }
+
+  @NoCache()//turn off global cache
+  @Get('current/express-interest/stats')
+  async getExpressInterestStats(@Query('prep') prep?: string) {
+    const isPrepDemoDay = (prep ?? '').toString().toLowerCase() === 'true';
+    const key = `express-interest:${isPrepDemoDay}`;
+    const now = Date.now();
+
+    const cached = cache.get(key);
+    if (cached && cached.expires > now) return cached.data; // cache hit
+    const data = await this.demoDaysService.getCurrentExpressInterestStats(isPrepDemoDay);
+    cache.set(key, { data, expires: now + TTL });
+    return data;
   }
 
   // Direct S3 upload endpoints
