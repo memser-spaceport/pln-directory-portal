@@ -115,8 +115,13 @@ export class DemoDayEngagementService {
   async expressInterest(
     memberEmail: string,
     teamFundraisingProfileUid: string,
-    interestType: 'like' | 'connect' | 'invest',
-    isPrepDemoDay = false
+    interestType: 'like' | 'connect' | 'invest' | 'referral',
+    isPrepDemoDay = false,
+    referralData?: {
+      investorName?: string;
+      investorEmail?: string;
+      message?: string;
+    }
   ) {
     // Validate that the caller is an enabled demo day participant (investor)
     const demoDay = await this.getCurrentDemoDay();
@@ -217,6 +222,10 @@ export class DemoDayEngagementService {
         templateName: 'DEMO_DAY_INVEST_COMPANY_EMAIL',
         actionType: 'INVEST_COMPANY',
       },
+      referral: {
+        templateName: 'DEMO_DAY_REFERRAL_COMPANY_EMAIL',
+        actionType: 'REFERRAL_COMPANY',
+      },
     };
 
     const template = templateMap[interestType];
@@ -247,13 +256,14 @@ export class DemoDayEngagementService {
       templateName: template.templateName,
       recipientsInfo: {
         from: process.env.DEMO_DAY_EMAIL,
-        to: founderEmails,
+        to: [...founderEmails, referralData?.investorEmail].filter(Boolean),
         cc: [member.email],
         bcc: [process.env.DEMO_DAY_EMAIL],
       },
       deliveryPayload: {
         body: {
           demoDayName: demoDay.title || 'PL F25 Demo Day',
+          demoDayLink: `${process.env.WEB_UI_BASE_URL}/demoday`,
           subjectPrefix: isPrepDemoDay ? '[DEMO DAY PREP - PRACTICE EMAIL] ' : '',
           teamsSubject: teamsSubject,
           founderNames: founders.map((f) => f.member.name).join(', '),
@@ -262,6 +272,14 @@ export class DemoDayEngagementService {
           investorTeamName: investorTeamName,
           fromInvestorTeamName: investorTeamNameLink ? `from ${investorTeamNameLink}` : '',
           investorNameLink,
+          ...(referralData
+            ? {
+                referralTeamName: fundraisingProfile.team.name,
+                referralInvestorName: referralData.investorName,
+                referralInvestorEmail: referralData.investorEmail,
+                referralMessage: referralData.message,
+              }
+            : {}),
         },
       },
       entityType: 'DEMO_DAY',
@@ -304,13 +322,19 @@ export class DemoDayEngagementService {
           teamName: fundraisingProfile.team.name,
           interestType,
           isPrepDemoDay,
+          ...(referralData
+            ? {
+                referralInvestorName: referralData.investorName,
+                referralInvestorEmail: referralData.investorEmail,
+                referralMessage: referralData.message,
+              }
+            : {}),
         },
       });
     }, 500);
 
     return { success: true };
   }
-
 
   /**
    * Upserts the user's interest row and increments aggregate counters
@@ -322,14 +346,15 @@ export class DemoDayEngagementService {
     memberUid: string;
     teamFundraisingProfileUid: string;
     isPrepDemoDay: boolean;
-    interestType: 'like' | 'connect' | 'invest';
+    interestType: 'like' | 'connect' | 'invest' | 'referral';
   }) {
     const { demoDayUid, memberUid, teamFundraisingProfileUid, isPrepDemoDay, interestType } = args;
 
     const patch = {
-      liked:    interestType === 'like',
+      liked: interestType === 'like',
       connected: interestType === 'connect',
-      invested:  interestType === 'invest',
+      invested: interestType === 'invest',
+      referral: interestType === 'referral',
     };
 
     await this.prisma.$transaction(async (tx) => {
@@ -343,19 +368,21 @@ export class DemoDayEngagementService {
             isPrepDemoDay,
           },
         },
-        select: { uid: true, liked: true, connected: true, invested: true },
+        select: { uid: true, liked: true, connected: true, invested: true, referral: true },
       });
 
       // Next sticky booleans (once true — stays true)
       const nextLiked = (existing?.liked ?? false) || patch.liked;
       const nextConnected = (existing?.connected ?? false) || patch.connected;
       const nextInvested = (existing?.invested ?? false) || patch.invested;
+      const nextReferral = (existing?.referral ?? false) || patch.referral;
 
       // Deltas: +1 only when flipping false -> true in this call
-      const dLiked = (!existing?.liked && patch.liked) ? 1 : 0;
-      const dConnected = (!existing?.connected && patch.connected) ? 1 : 0;
-      const dInvested = (!existing?.invested && patch.invested) ? 1 : 0;
-      const dTotal = dLiked + dConnected + dInvested;
+      const dLiked = !existing?.liked && patch.liked ? 1 : 0;
+      const dConnected = !existing?.connected && patch.connected ? 1 : 0;
+      const dInvested = !existing?.invested && patch.invested ? 1 : 0;
+      const dReferral = !existing?.referral && patch.referral ? 1 : 0;
+      const dTotal = dLiked + dConnected + dInvested + dReferral;
 
       if (!existing) {
         // First interaction for this (demoDay, member, profile, prep)
@@ -369,6 +396,7 @@ export class DemoDayEngagementService {
             liked: nextLiked,
             connected: nextConnected,
             invested: nextInvested,
+            referral: nextReferral,
             likedCount: dLiked,
             connectedCount: dConnected,
             investedCount: dInvested,
@@ -384,9 +412,11 @@ export class DemoDayEngagementService {
             liked: nextLiked,
             connected: nextConnected,
             invested: nextInvested,
+            referral: nextReferral,
             ...(dLiked > 0 ? { likedCount: { increment: dLiked } } : {}),
             ...(dConnected > 0 ? { connectedCount: { increment: dConnected } } : {}),
             ...(dInvested > 0 ? { investedCount: { increment: dInvested } } : {}),
+            ...(dReferral > 0 ? { referralCount: { increment: dReferral } } : {}),
             ...(dTotal > 0 ? { totalCount: { increment: dTotal } } : {}),
           },
           select: { uid: true },

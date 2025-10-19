@@ -1057,10 +1057,12 @@ model DemoDayExpressInterestStatistic {
   liked     Boolean @default(false)
   connected Boolean @default(false)
   invested  Boolean @default(false)
+  referral  Boolean @default(false)
 
   likedCount     Int @default(0)
   connectedCount Int @default(0)
   investedCount  Int @default(0)
+  referralCount  Int @default(0)
   totalCount     Int @default(0)
 
   createdAt DateTime @default(now())
