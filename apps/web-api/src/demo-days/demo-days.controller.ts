@@ -173,7 +173,8 @@ export class DemoDaysController {
       req.userEmail,
       body.teamFundraisingProfileUid,
       body.interestType,
-      body.isPrepDemoDay
+      body.isPrepDemoDay,
+      body.referralData
     );
   }
 
