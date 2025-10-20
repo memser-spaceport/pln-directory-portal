@@ -8,23 +8,22 @@ import {
   Put,
   Query,
   Req,
-  UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common';
-import {FileFieldsInterceptor, FileInterceptor} from '@nestjs/platform-express';
-import {ApiBody, ApiConsumes, ApiTags} from '@nestjs/swagger';
-import {ZodValidationPipe} from '@abitia/zod-dto';
-import {DemoDaysService} from './demo-days.service';
-import {DemoDayFundraisingProfilesService} from './demo-day-fundraising-profiles.service';
-import {DemoDayEngagementService} from './demo-day-engagement.service';
-import {UserTokenCheckGuard} from '../guards/user-token-check.guard';
-import {UserTokenValidation} from '../guards/user-token-validation.guard';
-import {UploadsService} from '../uploads/uploads.service';
-import {UploadKind, UploadScopeType} from '@prisma/client';
-import {NoCache} from '../decorators/no-cache.decorator';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { ZodValidationPipe } from '@abitia/zod-dto';
+import { DemoDaysService } from './demo-days.service';
+import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profiles.service';
+import { DemoDayEngagementService } from './demo-day-engagement.service';
+import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { UploadsService } from '../uploads/uploads.service';
+import { UploadKind, UploadScopeType } from '@prisma/client';
+import { NoCache } from '../decorators/no-cache.decorator';
 import {
   ExpressInterestDto,
   UpdateFundraisingDescriptionDto,
@@ -178,7 +177,7 @@ export class DemoDaysController {
     );
   }
 
-  @NoCache()//turn off global cache
+  @NoCache() //turn off global cache
   @Get('current/express-interest/stats')
   async getExpressInterestStats(@Query('prep') prep?: string) {
     const isPrepDemoDay = (prep ?? '').toString().toLowerCase() === 'true';
@@ -255,16 +254,33 @@ export class DemoDaysController {
       type: 'object',
       properties: {
         previewImage: { type: 'string', format: 'binary' },
+        previewImageSmall: { type: 'string', format: 'binary' },
       },
     },
   })
-  @UseInterceptors(FileInterceptor('previewImage'))
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'previewImage', maxCount: 1 },
+      { name: 'previewImageSmall', maxCount: 1 },
+    ])
+  )
   @NoCache()
-  async uploadOnePagerPreview(@Req() req, @UploadedFile() file: Express.Multer.File) {
-    if (!file) {
+  async uploadOnePagerPreview(
+    @Req() req,
+    @UploadedFiles()
+    files: {
+      previewImage?: Express.Multer.File[];
+      previewImageSmall?: Express.Multer.File[];
+    }
+  ) {
+    if (!files.previewImage?.[0]) {
       throw new Error('previewImage is required');
     }
 
-    return this.demoDayFundraisingProfilesService.uploadOnePagerPreview(req.userEmail, file);
+    return this.demoDayFundraisingProfilesService.uploadOnePagerPreviewByMember(
+      req.userEmail,
+      files.previewImage[0],
+      files.previewImageSmall?.[0]
+    );
   }
 }
