@@ -1,5 +1,6 @@
 type SelfUpdatePayload = {
   // allowed for any user:
+  memberUid?: string;
   role?: string | null;
   investmentTeam: boolean;
 
@@ -12,4 +13,3 @@ type SelfUpdatePayload = {
     typicalCheckSize?: number | null;
   } | null;
 };
-

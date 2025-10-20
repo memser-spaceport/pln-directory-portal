@@ -1281,7 +1281,19 @@ export class TeamsService {
    */
   async updateTeamMemberRoleAndInvestorProfile(teamUid: string, body: SelfUpdatePayload, requestorEmail: string) {
     // Resolve the calling member by email
-    const member = await this.membersService.findMemberByEmail(requestorEmail);
+    const requestorMember = await this.membersService.findMemberByEmail(requestorEmail);
+    if (!requestorMember) {
+      throw new ForbiddenException('Requestor not found');
+    }
+
+    if (!requestorMember.isDirectoryAdmin && body.memberUid && requestorMember.uid !== body.memberUid) {
+      throw new ForbiddenException('Only directory admin can update other members role');
+    }
+
+    const member =
+      requestorMember.uid === body.memberUid || !body.memberUid
+        ? requestorMember
+        : await this.membersService.findMemberByUid(body.memberUid);
     if (!member) throw new NotFoundException('Member not found');
 
     const { role, investmentTeam, isFund, investorProfile } = body ?? {};
@@ -1325,10 +1337,10 @@ export class TeamsService {
       if (wantsPrivileged) {
         // Check caller's role in this team: must be teamLead === true
         const myRole = await tx.teamMemberRole.findUnique({
-          where: { memberUid_teamUid: { memberUid: member.uid, teamUid } },
+          where: { memberUid_teamUid: { memberUid: requestorMember.uid, teamUid } },
           select: { teamLead: true },
         });
-        if (!myRole?.teamLead && !member.isDirectoryAdmin) {
+        if (!myRole?.teamLead && !requestorMember.isDirectoryAdmin) {
           throw new ForbiddenException('Only team lead or directory admin can update investor settings');
         }
 
