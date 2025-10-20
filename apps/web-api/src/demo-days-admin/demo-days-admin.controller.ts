@@ -11,12 +11,11 @@ import {
   Query,
   Req,
   UploadedFiles,
-  UploadedFile,
   UseGuards,
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common';
-import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { DemoDaysAdminService } from './demo-days-admin.service';
@@ -27,6 +26,7 @@ import { MembersService } from '../members/members.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { Member, UploadKind, UploadScopeType } from '@prisma/client';
 import { DemoDaysService } from '../demo-days/demo-days.service';
+import { DemoDayFundraisingProfilesService } from '../demo-days/demo-day-fundraising-profiles.service';
 
 @ApiTags('Demo Days Admin')
 @Controller('v1/admin/demo-days')
@@ -34,6 +34,7 @@ export class DemoDaysAdminController {
   constructor(
     private readonly demoDaysService: DemoDaysService,
     private readonly demoDaysAdminService: DemoDaysAdminService,
+    private readonly demoDayFundraisingProfilesService: DemoDayFundraisingProfilesService,
     private readonly memberService: MembersService,
     private readonly uploadsService: UploadsService
   ) {}
@@ -101,23 +102,37 @@ export class DemoDaysAdminController {
       type: 'object',
       properties: {
         previewImage: { type: 'string', format: 'binary' },
+        previewImageSmall: { type: 'string', format: 'binary' },
       },
     },
   })
-  @UseInterceptors(FileInterceptor('previewImage'))
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'previewImage', maxCount: 1 },
+      { name: 'previewImageSmall', maxCount: 1 },
+    ])
+  )
   @NoCache()
   async uploadOnePagerPreviewByTeamUid(
     @Req() req,
     @Param('teamUid') teamUid: string,
-    @UploadedFile() file: Express.Multer.File
+    @UploadedFiles()
+    files: {
+      previewImage?: Express.Multer.File[];
+      previewImageSmall?: Express.Multer.File[];
+    }
   ) {
     await this.checkAdminAccess(req.userEmail);
 
-    if (!file) {
+    if (!files.previewImage?.[0]) {
       throw new Error('previewImage is required');
     }
 
-    return this.demoDaysAdminService.uploadOnePagerPreview(teamUid, file);
+    return this.demoDayFundraisingProfilesService.uploadOnePagerPreviewByTeam(
+      teamUid,
+      files.previewImage[0],
+      files.previewImageSmall?.[0]
+    );
   }
 
   @Put('current/teams/:teamUid/fundraising-profile/description')

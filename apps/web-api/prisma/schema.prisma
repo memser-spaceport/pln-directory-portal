@@ -893,16 +893,17 @@ model Upload {
   uploaderUid String?
   uploader    Member? @relation("MemberUploads", fields: [uploaderUid], references: [uid])
 
-  bucket          String?
-  key             String?
-  cid             String?
-  url             String
-  filename        String
-  mimetype        String
-  size            Int
-  checksum        String?
-  meta            Json?
-  previewImageUrl String?
+  bucket               String?
+  key                  String?
+  cid                  String?
+  url                  String
+  filename             String
+  mimetype             String
+  size                 Int
+  checksum             String?
+  meta                 Json?
+  previewImageUrl      String?
+  previewImageSmallUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
