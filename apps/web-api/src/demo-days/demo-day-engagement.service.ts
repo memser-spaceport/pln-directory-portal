@@ -263,7 +263,7 @@ export class DemoDayEngagementService {
       deliveryPayload: {
         body: {
           demoDayName: demoDay.title || 'PL F25 Demo Day',
-          demoDayLink: `${process.env.WEB_UI_BASE_URL}/demoday`,
+          demoDayLink: `${process.env.WEB_UI_BASE_URL}/demoday?utm_source=email_intro`,
           subjectPrefix: isPrepDemoDay ? '[DEMO DAY PREP - PRACTICE EMAIL] ' : '',
           teamsSubject: teamsSubject,
           founderNames: founders.map((f) => f.member.name).join(', '),
@@ -275,7 +275,7 @@ export class DemoDayEngagementService {
           ...(referralData
             ? {
                 referralTeamName: fundraisingProfile.team.name,
-                referralInvestorName: referralData.investorName,
+                referralInvestorName: referralData.investorName || 'there',
                 referralInvestorEmail: referralData.investorEmail,
                 referralMessage: referralData.message,
               }
@@ -324,8 +324,8 @@ export class DemoDayEngagementService {
           isPrepDemoDay,
           ...(referralData
             ? {
-                referralInvestorName: referralData.investorName,
-                referralInvestorEmail: referralData.investorEmail,
+                referralName: referralData.investorName,
+                referralEmail: referralData.investorEmail,
                 referralMessage: referralData.message,
               }
             : {}),
