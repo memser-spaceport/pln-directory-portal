@@ -23,11 +23,12 @@ export const ExpressInterestSchema = z.object({
   isPrepDemoDay: z.boolean().optional(),
   referralData: z
     .object({
-      investorName: z.string().optional(),
-      investorEmail: z.string().optional(),
-      message: z.string().optional(),
+      investorName: z.string().optional().nullable(),
+      investorEmail: z.string().optional().nullable(),
+      message: z.string().optional().nullable(),
     })
-    .optional(),
+    .optional()
+    .nullable(),
 });
 
 export class ExpressInterestDto extends createZodDto(ExpressInterestSchema) {}
