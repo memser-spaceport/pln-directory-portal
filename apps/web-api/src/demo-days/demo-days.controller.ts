@@ -146,6 +146,17 @@ export class DemoDaysController {
     return this.demoDayFundraisingProfilesService.updateFundraisingTeam(req.userEmail, body);
   }
 
+  @Patch('current/confidentiality-policy')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async updateConfidentialityAcceptance(@Req() req, @Body() body: { accepted: boolean }) {
+    if (typeof body.accepted !== 'boolean') {
+      throw new Error('accepted must be a boolean');
+    }
+
+    return this.demoDaysService.updateConfidentialityAcceptance(req.userEmail, body.accepted);
+  }
+
   // Engagement endpoints
 
   @Get('current/engagement')

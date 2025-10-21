@@ -980,23 +980,24 @@ model DemoDay {
 }
 
 model DemoDayParticipant {
-  id              Int                      @id @default(autoincrement())
-  uid             String                   @unique @default(cuid())
-  demoDayUid      String
-  demoDay         DemoDay                  @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
-  memberUid       String
-  member          Member                   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
-  type            DemoDayParticipantType
-  status          DemoDayParticipantStatus @default(INVITED)
-  isDemoDayAdmin  Boolean                  @default(false)
-  hasEarlyAccess  Boolean                  @default(false)
-  teamUid         String?
-  team            Team?                    @relation(fields: [teamUid], references: [uid])
-  statusUpdatedAt DateTime                 @default(now())
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  isDeleted       Boolean                  @default(false)
-  deletedAt       DateTime?
+  id                      Int                      @id @default(autoincrement())
+  uid                     String                   @unique @default(cuid())
+  demoDayUid              String
+  demoDay                 DemoDay                  @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
+  memberUid               String
+  member                  Member                   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  type                    DemoDayParticipantType
+  status                  DemoDayParticipantStatus @default(INVITED)
+  isDemoDayAdmin          Boolean                  @default(false)
+  hasEarlyAccess          Boolean                  @default(false)
+  confidentialityAccepted Boolean                  @default(false)
+  teamUid                 String?
+  team                    Team?                    @relation(fields: [teamUid], references: [uid])
+  statusUpdatedAt         DateTime                 @default(now())
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  isDeleted               Boolean                  @default(false)
+  deletedAt               DateTime?
 
   @@unique([demoDayUid, memberUid])
 }
