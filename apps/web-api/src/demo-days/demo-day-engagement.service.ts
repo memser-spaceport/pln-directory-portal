@@ -118,10 +118,10 @@ export class DemoDayEngagementService {
     interestType: 'like' | 'connect' | 'invest' | 'referral',
     isPrepDemoDay = false,
     referralData?: {
-      investorName?: string;
-      investorEmail?: string;
-      message?: string;
-    }
+      investorName?: string | null;
+      investorEmail?: string | null;
+      message?: string | null;
+    } | null
   ) {
     // Validate that the caller is an enabled demo day participant (investor)
     const demoDay = await this.getCurrentDemoDay();
