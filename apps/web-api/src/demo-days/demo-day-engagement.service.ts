@@ -17,7 +17,9 @@ export class DemoDayEngagementService {
   private async getCurrentDemoDay(): Promise<DemoDay> {
     const demoDay = await this.prisma.demoDay.findFirst({
       where: {
-        status: { in: [DemoDayStatus.UPCOMING, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED] },
+        status: {
+          in: [DemoDayStatus.UPCOMING, DemoDayStatus.EARLY_ACCESS, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED],
+        },
         isDeleted: false,
       },
       orderBy: { createdAt: 'desc' },
