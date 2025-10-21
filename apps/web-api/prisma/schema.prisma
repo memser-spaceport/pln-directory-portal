@@ -893,16 +893,17 @@ model Upload {
   uploaderUid String?
   uploader    Member? @relation("MemberUploads", fields: [uploaderUid], references: [uid])
 
-  bucket          String?
-  key             String?
-  cid             String?
-  url             String
-  filename        String
-  mimetype        String
-  size            Int
-  checksum        String?
-  meta            Json?
-  previewImageUrl String?
+  bucket               String?
+  key                  String?
+  cid                  String?
+  url                  String
+  filename             String
+  mimetype             String
+  size                 Int
+  checksum             String?
+  meta                 Json?
+  previewImageUrl      String?
+  previewImageSmallUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -979,23 +980,24 @@ model DemoDay {
 }
 
 model DemoDayParticipant {
-  id              Int                      @id @default(autoincrement())
-  uid             String                   @unique @default(cuid())
-  demoDayUid      String
-  demoDay         DemoDay                  @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
-  memberUid       String
-  member          Member                   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
-  type            DemoDayParticipantType
-  status          DemoDayParticipantStatus @default(INVITED)
-  isDemoDayAdmin  Boolean                  @default(false)
-  hasEarlyAccess  Boolean                  @default(false)
-  teamUid         String?
-  team            Team?                    @relation(fields: [teamUid], references: [uid])
-  statusUpdatedAt DateTime                 @default(now())
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  isDeleted       Boolean                  @default(false)
-  deletedAt       DateTime?
+  id                      Int                      @id @default(autoincrement())
+  uid                     String                   @unique @default(cuid())
+  demoDayUid              String
+  demoDay                 DemoDay                  @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
+  memberUid               String
+  member                  Member                   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  type                    DemoDayParticipantType
+  status                  DemoDayParticipantStatus @default(INVITED)
+  isDemoDayAdmin          Boolean                  @default(false)
+  hasEarlyAccess          Boolean                  @default(false)
+  confidentialityAccepted Boolean                  @default(false)
+  teamUid                 String?
+  team                    Team?                    @relation(fields: [teamUid], references: [uid])
+  statusUpdatedAt         DateTime                 @default(now())
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  isDeleted               Boolean                  @default(false)
+  deletedAt               DateTime?
 
   @@unique([demoDayUid, memberUid])
 }
@@ -1057,6 +1059,13 @@ model DemoDayExpressInterestStatistic {
   liked     Boolean @default(false)
   connected Boolean @default(false)
   invested  Boolean @default(false)
+  referral  Boolean @default(false)
+
+  likedCount     Int @default(0)
+  connectedCount Int @default(0)
+  investedCount  Int @default(0)
+  referralCount  Int @default(0)
+  totalCount     Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

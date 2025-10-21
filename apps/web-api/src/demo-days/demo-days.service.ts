@@ -3,6 +3,8 @@ import { DemoDay, DemoDayStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 
+type ExpressInterestStats = { liked: number; connected: number; invested: number; referral: number; total: number };
+
 @Injectable()
 export class DemoDaysService {
   constructor(private readonly prisma: PrismaService, private readonly analyticsService: AnalyticsService) {}
@@ -32,6 +34,7 @@ export class DemoDaysService {
     investorsCount?: number;
     isDemoDayAdmin?: boolean;
     isEarlyAccess?: boolean;
+    confidentialityAccepted?: boolean;
   }> {
     const demoDay = await this.getCurrentDemoDay();
     if (!demoDay) {
@@ -40,6 +43,7 @@ export class DemoDaysService {
         status: 'NONE',
         teamsCount: 0,
         investorsCount: 0,
+        confidentialityAccepted: false,
       };
     }
 
@@ -53,6 +57,7 @@ export class DemoDaysService {
         description: demoDay.description,
         teamsCount: 0,
         investorsCount: 0,
+        confidentialityAccepted: false,
       };
     }
 
@@ -106,6 +111,7 @@ export class DemoDaysService {
               type: true,
               isDemoDayAdmin: true,
               hasEarlyAccess: true,
+              confidentialityAccepted: true,
             },
           },
         },
@@ -134,6 +140,7 @@ export class DemoDaysService {
         description: demoDay.description,
         teamsCount,
         investorsCount,
+        confidentialityAccepted: participant.confidentialityAccepted,
       };
     }
 
@@ -161,6 +168,7 @@ export class DemoDaysService {
         ),
         isEarlyAccess: demoDay.status === DemoDayStatus.EARLY_ACCESS,
         isDemoDayAdmin: participant.isDemoDayAdmin || isDirectoryAdmin,
+        confidentialityAccepted: participant.confidentialityAccepted,
         teamsCount,
         investorsCount,
       };
@@ -174,6 +182,7 @@ export class DemoDaysService {
       description: demoDay.description,
       teamsCount,
       investorsCount,
+      confidentialityAccepted: false,
     };
   }
 
@@ -373,5 +382,65 @@ export class DemoDaysService {
     }
 
     return demoDayStatus.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
+  }
+
+  async getCurrentExpressInterestStats(isPrepDemoDay: boolean): Promise<ExpressInterestStats> {
+    const demoDay = await this.getCurrentDemoDay();
+    if (!demoDay) return { liked: 0, connected: 0, invested: 0, referral: 0, total: 0 };
+
+    const agg = await this.prisma.demoDayExpressInterestStatistic.aggregate({
+      where: {
+        demoDayUid: demoDay.uid,
+        isPrepDemoDay,
+      },
+      _sum: {
+        likedCount: true,
+        connectedCount: true,
+        investedCount: true,
+        referralCount: true,
+      },
+    });
+
+    const liked = agg._sum.likedCount ?? 0;
+    const connected = agg._sum.connectedCount ?? 0;
+    const invested = agg._sum.investedCount ?? 0;
+    const referral = agg._sum.referralCount ?? 0;
+    const total = liked + connected + invested + referral;
+
+    return { liked, connected, invested, referral, total };
+  }
+
+  async updateConfidentialityAcceptance(memberEmail: string, accepted: boolean): Promise<{ success: boolean }> {
+    const demoDay = await this.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new NotFoundException('No current demo day found');
+    }
+
+    const member = await this.prisma.member.findUnique({
+      where: { email: memberEmail },
+      select: { uid: true },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+
+    const existingParticipant = await this.prisma.demoDayParticipant.findUnique({
+      where: {
+        demoDayUid_memberUid: {
+          demoDayUid: demoDay.uid,
+          memberUid: member.uid,
+        },
+      },
+    });
+
+    if (existingParticipant) {
+      await this.prisma.demoDayParticipant.update({
+        where: { uid: existingParticipant.uid },
+        data: { confidentialityAccepted: accepted },
+      });
+    }
+
+    return { success: true };
   }
 }

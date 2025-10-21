@@ -1,20 +1,19 @@
 import {
-  Controller,
-  Get,
-  UseGuards,
-  Req,
-  Put,
-  Delete,
-  Patch,
   Body,
-  UseInterceptors,
-  UploadedFiles,
-  UploadedFile,
-  UsePipes,
-  Query,
+  Controller,
+  Delete,
+  Get,
+  Patch,
   Post,
+  Put,
+  Query,
+  Req,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+  UsePipes,
 } from '@nestjs/common';
-import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { DemoDaysService } from './demo-days.service';
@@ -26,10 +25,13 @@ import { UploadsService } from '../uploads/uploads.service';
 import { UploadKind, UploadScopeType } from '@prisma/client';
 import { NoCache } from '../decorators/no-cache.decorator';
 import {
-  UpdateFundraisingTeamDto,
-  UpdateFundraisingDescriptionDto,
   ExpressInterestDto,
+  UpdateFundraisingDescriptionDto,
+  UpdateFundraisingTeamDto,
 } from 'libs/contracts/src/schema';
+
+const cache = new Map<string, { data: any; expires: number }>();
+const TTL = 30_000; // 30 seconds
 
 @ApiTags('Demo Days')
 @Controller('v1/demo-days')
@@ -144,6 +146,17 @@ export class DemoDaysController {
     return this.demoDayFundraisingProfilesService.updateFundraisingTeam(req.userEmail, body);
   }
 
+  @Patch('current/confidentiality-policy')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async updateConfidentialityAcceptance(@Req() req, @Body() body: { accepted: boolean }) {
+    if (typeof body.accepted !== 'boolean') {
+      throw new Error('accepted must be a boolean');
+    }
+
+    return this.demoDaysService.updateConfidentialityAcceptance(req.userEmail, body.accepted);
+  }
+
   // Engagement endpoints
 
   @Get('current/engagement')
@@ -171,8 +184,23 @@ export class DemoDaysController {
       req.userEmail,
       body.teamFundraisingProfileUid,
       body.interestType,
-      body.isPrepDemoDay
+      body.isPrepDemoDay,
+      body.referralData
     );
+  }
+
+  @NoCache() //turn off global cache
+  @Get('current/express-interest/stats')
+  async getExpressInterestStats(@Query('prep') prep?: string) {
+    const isPrepDemoDay = (prep ?? '').toString().toLowerCase() === 'true';
+    const key = `express-interest:${isPrepDemoDay}`;
+    const now = Date.now();
+
+    const cached = cache.get(key);
+    if (cached && cached.expires > now) return cached.data; // cache hit
+    const data = await this.demoDaysService.getCurrentExpressInterestStats(isPrepDemoDay);
+    cache.set(key, { data, expires: now + TTL });
+    return data;
   }
 
   // Direct S3 upload endpoints
@@ -238,16 +266,33 @@ export class DemoDaysController {
       type: 'object',
       properties: {
         previewImage: { type: 'string', format: 'binary' },
+        previewImageSmall: { type: 'string', format: 'binary' },
       },
     },
   })
-  @UseInterceptors(FileInterceptor('previewImage'))
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'previewImage', maxCount: 1 },
+      { name: 'previewImageSmall', maxCount: 1 },
+    ])
+  )
   @NoCache()
-  async uploadOnePagerPreview(@Req() req, @UploadedFile() file: Express.Multer.File) {
-    if (!file) {
+  async uploadOnePagerPreview(
+    @Req() req,
+    @UploadedFiles()
+    files: {
+      previewImage?: Express.Multer.File[];
+      previewImageSmall?: Express.Multer.File[];
+    }
+  ) {
+    if (!files.previewImage?.[0]) {
       throw new Error('previewImage is required');
     }
 
-    return this.demoDayFundraisingProfilesService.uploadOnePagerPreview(req.userEmail, file);
+    return this.demoDayFundraisingProfilesService.uploadOnePagerPreviewByMember(
+      req.userEmail,
+      files.previewImage[0],
+      files.previewImageSmall?.[0]
+    );
   }
 }

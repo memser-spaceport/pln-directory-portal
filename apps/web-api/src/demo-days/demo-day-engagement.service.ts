@@ -17,7 +17,9 @@ export class DemoDayEngagementService {
   private async getCurrentDemoDay(): Promise<DemoDay> {
     const demoDay = await this.prisma.demoDay.findFirst({
       where: {
-        status: { in: [DemoDayStatus.UPCOMING, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED] },
+        status: {
+          in: [DemoDayStatus.UPCOMING, DemoDayStatus.EARLY_ACCESS, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED],
+        },
         isDeleted: false,
       },
       orderBy: { createdAt: 'desc' },
@@ -115,8 +117,13 @@ export class DemoDayEngagementService {
   async expressInterest(
     memberEmail: string,
     teamFundraisingProfileUid: string,
-    interestType: 'like' | 'connect' | 'invest',
-    isPrepDemoDay = false
+    interestType: 'like' | 'connect' | 'invest' | 'referral',
+    isPrepDemoDay = false,
+    referralData?: {
+      investorName?: string | null;
+      investorEmail?: string | null;
+      message?: string | null;
+    } | null
   ) {
     // Validate that the caller is an enabled demo day participant (investor)
     const demoDay = await this.getCurrentDemoDay();
@@ -217,6 +224,10 @@ export class DemoDayEngagementService {
         templateName: 'DEMO_DAY_INVEST_COMPANY_EMAIL',
         actionType: 'INVEST_COMPANY',
       },
+      referral: {
+        templateName: 'DEMO_DAY_REFERRAL_COMPANY_EMAIL',
+        actionType: 'REFERRAL_COMPANY',
+      },
     };
 
     const template = templateMap[interestType];
@@ -247,13 +258,14 @@ export class DemoDayEngagementService {
       templateName: template.templateName,
       recipientsInfo: {
         from: process.env.DEMO_DAY_EMAIL,
-        to: founderEmails,
+        to: [...founderEmails, referralData?.investorEmail].filter(Boolean),
         cc: [member.email],
         bcc: [process.env.DEMO_DAY_EMAIL],
       },
       deliveryPayload: {
         body: {
           demoDayName: demoDay.title || 'PL F25 Demo Day',
+          demoDayLink: `${process.env.WEB_UI_BASE_URL}/demoday?utm_source=email_intro`,
           subjectPrefix: isPrepDemoDay ? '[DEMO DAY PREP - PRACTICE EMAIL] ' : '',
           teamsSubject: teamsSubject,
           founderNames: founders.map((f) => f.member.name).join(', '),
@@ -262,6 +274,14 @@ export class DemoDayEngagementService {
           investorTeamName: investorTeamName,
           fromInvestorTeamName: investorTeamNameLink ? `from ${investorTeamNameLink}` : '',
           investorNameLink,
+          ...(referralData
+            ? {
+                referralTeamName: fundraisingProfile.team.name,
+                referralInvestorName: referralData.investorName || 'there',
+                referralInvestorEmail: referralData.investorEmail,
+                referralMessage: referralData.message,
+              }
+            : {}),
         },
       },
       entityType: 'DEMO_DAY',
@@ -279,56 +299,16 @@ export class DemoDayEngagementService {
       },
     });
 
-    const interestPatch = {
-      liked: interestType === 'like',
-      connected: interestType === 'connect',
-      invested: interestType === 'invest',
-    };
-
-    const existing = await this.prisma.demoDayExpressInterestStatistic.findUnique({
-      where: {
-        demoDayUid_memberUid_teamFundraisingProfileUid_isPrepDemoDay: {
-          demoDayUid: fundraisingProfile.demoDayUid,
-          memberUid: member.uid,
-          teamFundraisingProfileUid,
-          isPrepDemoDay,
-        },
-      },
-      select: {
-        liked: true,
-        connected: true,
-        invested: true,
-      },
+    // Increment sticky flags & counters (+1 only on the first activation of each flag)
+    await this.upsertInterestWithCounters({
+      demoDayUid: fundraisingProfile.demoDayUid,
+      memberUid: member.uid,
+      teamFundraisingProfileUid,
+      isPrepDemoDay,
+      interestType,
     });
 
-    await this.prisma.demoDayExpressInterestStatistic.upsert({
-      where: {
-        demoDayUid_memberUid_teamFundraisingProfileUid_isPrepDemoDay: {
-          demoDayUid: fundraisingProfile.demoDayUid,
-          memberUid: member.uid,
-          teamFundraisingProfileUid,
-          isPrepDemoDay,
-        },
-      },
-      update: {
-        liked: existing ? existing.liked || interestPatch.liked : interestPatch.liked,
-        connected: existing ? existing.connected || interestPatch.connected : interestPatch.connected,
-        invested: existing ? existing.invested || interestPatch.invested : interestPatch.invested,
-      },
-      create: {
-        uid: cuid(),
-        demoDayUid: fundraisingProfile.demoDayUid,
-        memberUid: member.uid,
-        teamFundraisingProfileUid,
-        isPrepDemoDay,
-        liked: interestPatch.liked,
-        connected: interestPatch.connected,
-        invested: interestPatch.invested,
-      },
-      select: { uid: true },
-    });
-
-    // use setTimeout to not block the response
+    // Fire analytics (non-blocking)
     setTimeout(async () => {
       await this.analyticsService.trackEvent({
         name: 'demo-day-express-interest',
@@ -343,10 +323,107 @@ export class DemoDayEngagementService {
           teamUid: fundraisingProfile.teamUid,
           teamName: fundraisingProfile.team.name,
           interestType,
+          isPrepDemoDay,
+          ...(referralData
+            ? {
+                referralName: referralData.investorName,
+                referralEmail: referralData.investorEmail,
+                referralMessage: referralData.message,
+              }
+            : {}),
         },
       });
     }, 500);
 
     return { success: true };
+  }
+
+  /**
+   * Upserts the user's interest row and increments aggregate counters
+   * (+1 only on the first time a given flag flips false -> true).
+   * All changes happen atomically inside a single transaction.
+   */
+  private async upsertInterestWithCounters(args: {
+    demoDayUid: string;
+    memberUid: string;
+    teamFundraisingProfileUid: string;
+    isPrepDemoDay: boolean;
+    interestType: 'like' | 'connect' | 'invest' | 'referral';
+  }) {
+    const { demoDayUid, memberUid, teamFundraisingProfileUid, isPrepDemoDay, interestType } = args;
+
+    const patch = {
+      liked: interestType === 'like',
+      connected: interestType === 'connect',
+      invested: interestType === 'invest',
+      referral: interestType === 'referral',
+    };
+
+    await this.prisma.$transaction(async (tx) => {
+      // Load existing (if any)
+      const existing = await tx.demoDayExpressInterestStatistic.findUnique({
+        where: {
+          demoDayUid_memberUid_teamFundraisingProfileUid_isPrepDemoDay: {
+            demoDayUid,
+            memberUid,
+            teamFundraisingProfileUid,
+            isPrepDemoDay,
+          },
+        },
+        select: { uid: true, liked: true, connected: true, invested: true, referral: true },
+      });
+
+      // Next sticky booleans (once true — stays true)
+      const nextLiked = (existing?.liked ?? false) || patch.liked;
+      const nextConnected = (existing?.connected ?? false) || patch.connected;
+      const nextInvested = (existing?.invested ?? false) || patch.invested;
+      const nextReferral = (existing?.referral ?? false) || patch.referral;
+
+      // Deltas: +1 only when flipping false -> true in this call
+      const dLiked = !existing?.liked && patch.liked ? 1 : 0;
+      const dConnected = !existing?.connected && patch.connected ? 1 : 0;
+      const dInvested = !existing?.invested && patch.invested ? 1 : 0;
+      const dReferral = !existing?.referral && patch.referral ? 1 : 0;
+      const dTotal = dLiked + dConnected + dInvested + dReferral;
+
+      if (!existing) {
+        // First interaction for this (demoDay, member, profile, prep)
+        await tx.demoDayExpressInterestStatistic.create({
+          data: {
+            uid: cuid(),
+            demoDayUid,
+            memberUid,
+            teamFundraisingProfileUid,
+            isPrepDemoDay,
+            liked: nextLiked,
+            connected: nextConnected,
+            invested: nextInvested,
+            referral: nextReferral,
+            likedCount: dLiked,
+            connectedCount: dConnected,
+            investedCount: dInvested,
+            totalCount: dTotal,
+          },
+          select: { uid: true },
+        });
+      } else {
+        // Update booleans and increment counters conditionally
+        await tx.demoDayExpressInterestStatistic.update({
+          where: { uid: existing.uid },
+          data: {
+            liked: nextLiked,
+            connected: nextConnected,
+            invested: nextInvested,
+            referral: nextReferral,
+            ...(dLiked > 0 ? { likedCount: { increment: dLiked } } : {}),
+            ...(dConnected > 0 ? { connectedCount: { increment: dConnected } } : {}),
+            ...(dInvested > 0 ? { investedCount: { increment: dInvested } } : {}),
+            ...(dReferral > 0 ? { referralCount: { increment: dReferral } } : {}),
+            ...(dTotal > 0 ? { totalCount: { increment: dTotal } } : {}),
+          },
+          select: { uid: true },
+        });
+      }
+    });
   }
 }

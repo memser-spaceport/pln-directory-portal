@@ -1,4 +1,4 @@
-import { Controller, Req } from '@nestjs/common';
+import { CacheTTL, Controller, Req } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -15,6 +15,7 @@ import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { FundingStagesService } from './funding-stages.service';
+import { QueryCache } from '../decorators/query-cache.decorator';
 
 const server = initNestServer(apiFundingStages);
 type RouteShape = typeof server.routeShapes;
@@ -26,10 +27,10 @@ export class FundingStagesController {
   @Api(server.route.getFundingStages)
   @ApiQueryFromZod(FundingStageQueryParams)
   @ApiOkResponseFromZod(ResponseFundingStageSchema.array())
+  @QueryCache()
+  @CacheTTL(60)
   findAll(@Req() request: Request) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseFundingStageSchema
-    );
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseFundingStageSchema);
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
     return this.fundingStagesService.findAll(builtQuery);
@@ -40,17 +41,9 @@ export class FundingStagesController {
   @ApiQueryFromZod(FundingStageDetailQueryParams)
   @ApiOkResponseFromZod(ResponseFundingStageSchema)
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
-  findOne(
-    @Req() request: Request,
-    @ApiDecorator() { params: { uid } }: RouteShape['getFundingStage']
-  ) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseFundingStageSchema
-    );
-    const builder = new PrismaQueryBuilder(
-      queryableFields,
-      ENABLED_RETRIEVAL_PROFILE
-    );
+  findOne(@Req() request: Request, @ApiDecorator() { params: { uid } }: RouteShape['getFundingStage']) {
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseFundingStageSchema);
+    const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
     const builtQuery = builder.build(request.query);
     return this.fundingStagesService.findOne(uid, builtQuery);
   }
