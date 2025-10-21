@@ -277,7 +277,7 @@ export class DemoDayEngagementService {
           ...(referralData
             ? {
                 referralTeamName: fundraisingProfile.team.name,
-                referralInvestorName: referralData.investorName || 'there',
+                referralInvestorName: referralData.investorName || referralData.investorEmail,
                 referralInvestorEmail: referralData.investorEmail,
                 referralMessage: referralData.message,
               }
