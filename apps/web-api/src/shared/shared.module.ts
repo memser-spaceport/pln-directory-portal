@@ -11,7 +11,8 @@ import { ImagesController } from '../images/images.controller';
 import { ImagesService } from '../images/images.service';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { FileEncryptionService } from '../utils/file-encryption/file-encryption.service';
-import { CacheService } from '../utils/cache/cache.service'; 
+import { CacheService } from '../utils/cache/cache.service';
+import { HuskyDataIngestionService } from './husky-data-ingestion.service'; 
 
 @Global()
 @Module({
@@ -29,7 +30,8 @@ import { CacheService } from '../utils/cache/cache.service';
     ImagesService,
     FileUploadService,
     FileEncryptionService,
-    CacheService
+    CacheService,
+    HuskyDataIngestionService
   ],
   exports: [
     PrismaService,
@@ -44,7 +46,8 @@ import { CacheService } from '../utils/cache/cache.service';
     ImagesService,
     FileUploadService,
     FileEncryptionService,
-    CacheService
+    CacheService,
+    HuskyDataIngestionService
   ],
 })
 export class SharedModule {}
