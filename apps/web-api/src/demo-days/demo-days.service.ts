@@ -64,12 +64,146 @@ export class DemoDaysService {
     const [investorsCount, teamsCount, member] = await Promise.all([
       this.prisma.member.count({
         where: {
-          accessLevel: {
-            in: ['L5', 'L6'],
-          },
-          investorProfile: {
-            type: { not: null },
-          },
+          AND: [
+            {
+              accessLevel: {
+                in: ['L5', 'L6'],
+              },
+            },
+            {
+              OR: [
+                {
+                  investorProfile: {
+                    secRulesAccepted: true,
+                  },
+                },
+                {
+                  investorProfile: {
+                    type: { not: null },
+                  },
+                },
+              ],
+            },
+            // If InvestorProfile.type = 'FUND', member must belong to a team with isFund = true
+            {
+              OR: [
+                // Allow if not FUND type
+                {
+                  investorProfile: {
+                    OR: [{ type: { not: 'FUND' } }, { type: { equals: null } }],
+                  },
+                },
+                // Or if FUND type, require member to be in a team with isFund = true
+                {
+                  AND: [
+                    {
+                      investorProfile: {
+                        type: 'FUND',
+                      },
+                    },
+                    {
+                      teamMemberRoles: {
+                        some: {
+                          investmentTeam: true,
+                          team: {
+                            isFund: true,
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+            // If InvestorProfile.type = 'ANGEL', at least one field must be filled
+            {
+              OR: [
+                // Allow if not ANGEL type
+                {
+                  investorProfile: {
+                    OR: [{ type: { not: 'ANGEL' } }, { type: { equals: null } }],
+                  },
+                },
+                // Or if ANGEL type, at least one field must be filled
+                {
+                  AND: [
+                    {
+                      investorProfile: {
+                        type: 'ANGEL',
+                      },
+                    },
+                    {
+                      investorProfile: {
+                        OR: [
+                          {
+                            investInStartupStages: { isEmpty: false },
+                          },
+                          {
+                            typicalCheckSize: { not: null, gt: 0 },
+                          },
+                          {
+                            investmentFocus: { isEmpty: false },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+            // If InvestorProfile.type = 'ANGEL_AND_FUND', must satisfy at least one of FUND or ANGEL requirements
+            {
+              OR: [
+                // Allow if not ANGEL_AND_FUND type
+                {
+                  investorProfile: {
+                    OR: [{ type: { not: 'ANGEL_AND_FUND' } }, { type: { equals: null } }],
+                  },
+                },
+                // Or if ANGEL_AND_FUND type, must satisfy at least one requirement
+                {
+                  AND: [
+                    {
+                      investorProfile: {
+                        type: 'ANGEL_AND_FUND',
+                      },
+                    },
+                    {
+                      OR: [
+                        // FUND requirement: member must be in a team with isFund = true and investmentTeam = true
+                        {
+                          teamMemberRoles: {
+                            some: {
+                              investmentTeam: true,
+                              team: {
+                                isFund: true,
+                              },
+                            },
+                          },
+                        },
+                        // ANGEL requirement: at least one field must be filled
+                        {
+                          investorProfile: {
+                            OR: [
+                              {
+                                investInStartupStages: { isEmpty: false },
+                              },
+                              {
+                                typicalCheckSize: { not: null, gt: 0 },
+                              },
+                              {
+                                investmentFocus: { isEmpty: false },
+                              },
+                            ],
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
         },
       }),
       this.prisma.teamFundraisingProfile.count({
