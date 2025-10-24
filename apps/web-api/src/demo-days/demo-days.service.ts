@@ -118,7 +118,7 @@ export class DemoDaysService {
       }),
     ]);
 
-    if (!member) {
+    if (!member || ['L0', 'L1', 'Rejected'].includes(member?.accessLevel ?? '')) {
       return {
         access: 'none',
         status: this.getExternalDemoDayStatus(demoDay.status),
@@ -442,5 +442,160 @@ export class DemoDaysService {
     }
 
     return { success: true };
+  }
+
+  async getTeamAnalytics(teamUid: string) {
+    const demoDay = await this.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new NotFoundException('No active demo day found');
+    }
+
+    // Find the fundraising profile for this team
+    const fundraisingProfile = await this.prisma.teamFundraisingProfile.findUnique({
+      where: {
+        teamUid_demoDayUid: {
+          teamUid,
+          demoDayUid: demoDay.uid,
+        },
+      },
+      select: {
+        uid: true,
+        team: {
+          select: {
+            uid: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!fundraisingProfile) {
+      throw new NotFoundException('Team fundraising profile not found for current demo day');
+    }
+
+    // Get all interest statistics for this team's fundraising profile
+    const allStats = await this.prisma.demoDayExpressInterestStatistic.findMany({
+      where: {
+        demoDayUid: demoDay.uid,
+        teamFundraisingProfileUid: fundraisingProfile.uid,
+      },
+      include: {
+        member: {
+          select: {
+            uid: true,
+            name: true,
+            email: true,
+            teamMemberRoles: {
+              where: {
+                investmentTeam: true,
+              },
+              include: {
+                team: {
+                  select: {
+                    uid: true,
+                    name: true,
+                    isFund: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+
+    // Calculate summary statistics
+    const uniqueInvestors = new Set(allStats.map((s) => s.memberUid)).size;
+    const totalLikes = allStats.filter((s) => s.liked).length;
+    const totalConnections = allStats.filter((s) => s.connected).length;
+    const totalInvestments = allStats.filter((s) => s.invested).length;
+    const totalReferrals = allStats.filter((s) => s.referral).length;
+    const totalEngagement = allStats.reduce((sum, s) => sum + s.totalCount, 0);
+
+    // Build investor activity list
+    const investorActivity = allStats
+      .filter((s) => s.totalCount > 0) // Only show investors who have engaged
+      .map((stat) => {
+        const investmentTeamRole = stat.member.teamMemberRoles.find((role) => role.investmentTeam);
+        const fundOrAngel = investmentTeamRole?.team;
+
+        return {
+          investorUid: stat.member.uid,
+          investorName: stat.member.name,
+          investorEmail: stat.member.email,
+          fundOrAngel: fundOrAngel
+            ? {
+                uid: fundOrAngel.uid,
+                name: fundOrAngel.name,
+                isFund: fundOrAngel.isFund,
+              }
+            : null,
+          activity: {
+            liked: stat.liked,
+            connected: stat.connected,
+            invested: stat.invested,
+            referral: stat.referral,
+          },
+          date: stat.updatedAt,
+        };
+      });
+
+    // Group engagement by time
+    // Use Event table for time-series data, but only count first occurrence of each action per investor
+    const engagementOverTime = await this.prisma.$queryRaw<
+      Array<{ hour: Date; likes: bigint; connects: bigint; invests: bigint; referrals: bigint }>
+    >`
+      WITH first_events AS (
+        SELECT DISTINCT ON ("userId", props->>'teamUid', props->>'interestType')
+          "userId",
+          props->>'interestType' as interest_type,
+          props->>'teamUid' as team_uid,
+          ts
+        FROM "Event"
+        WHERE "eventType" = 'demo-day-express-interest'
+          AND props->>'demoDayUid' = ${demoDay.uid}
+          AND props->>'teamUid' = ${fundraisingProfile.team.uid}
+        ORDER BY "userId", props->>'teamUid', props->>'interestType', ts
+      )
+      SELECT
+        DATE_TRUNC('hour', ts) as hour,
+        COUNT(*) FILTER (WHERE interest_type = 'like') as likes,
+        COUNT(*) FILTER (WHERE interest_type = 'connect') as connects,
+        COUNT(*) FILTER (WHERE interest_type = 'invest') as invests,
+        COUNT(*) FILTER (WHERE interest_type = 'referral') as referrals
+      FROM first_events
+      GROUP BY DATE_TRUNC('hour', ts)
+      ORDER BY hour
+    `;
+
+    return {
+      team: {
+        uid: fundraisingProfile.team.uid,
+        name: fundraisingProfile.team.name,
+      },
+      demoDay: {
+        uid: demoDay.uid,
+        title: demoDay.title,
+      },
+      summary: {
+        totalEngagement,
+        uniqueInvestors,
+        likes: totalLikes,
+        connections: totalConnections,
+        investments: totalInvestments,
+        referrals: totalReferrals,
+      },
+      engagementOverTime: engagementOverTime.map((row) => ({
+        timestamp: row.hour,
+        likes: Number(row.likes),
+        connects: Number(row.connects),
+        invests: Number(row.invests),
+        referrals: Number(row.referrals),
+      })),
+      investorActivity,
+    };
   }
 }
