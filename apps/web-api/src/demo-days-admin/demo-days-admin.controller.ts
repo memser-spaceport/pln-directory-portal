@@ -254,6 +254,14 @@ export class DemoDaysAdminController {
     return this.demoDaysAdminService.confirmOnePagerUpload(teamUid, body.uploadUid);
   }
 
+  @Get('current/teams/:teamUid/analytics')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getTeamAnalytics(@Req() req, @Param('teamUid') teamUid: string) {
+    await this.checkAdminAccess(req.userEmail, true);
+    return this.demoDaysService.getTeamAnalytics(teamUid);
+  }
+
   private async checkAdminAccess(userEmail: string, viewOnlyAccess = false): Promise<Member> {
     const requestor = await this.memberService.findMemberByEmail(userEmail);
 
