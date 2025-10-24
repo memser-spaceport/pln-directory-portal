@@ -118,7 +118,7 @@ export class DemoDaysService {
       }),
     ]);
 
-    if (!member) {
+    if (!member || ['L0', 'L1', 'Rejected'].includes(member?.accessLevel ?? '')) {
       return {
         access: 'none',
         status: this.getExternalDemoDayStatus(demoDay.status),
