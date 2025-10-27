@@ -1417,7 +1417,12 @@ export class TeamsService {
     if (!team.investorProfileId) {
       await tx.team.update({
         where: { uid: teamUid },
-        data: { investorProfileId: investorProfile.uid },
+        data: { investorProfileId: investorProfile.uid, isFund: true },
+      });
+    } else {
+      await tx.team.update({
+        where: { uid: teamUid },
+        data: { isFund: true },
       });
     }
   }
