@@ -24,6 +24,7 @@ export class DemoDayFundraisingProfilesService {
         uid: true,
         name: true,
         shortDescription: true,
+        website: true,
         industryTags: {
           select: {
             uid: true,
@@ -497,6 +498,7 @@ export class DemoDayFundraisingProfilesService {
     data: {
       name?: string;
       shortDescription?: string;
+      website?: string | null;
       industryTags?: string[];
       fundingStage?: string;
       logo?: string;
@@ -512,6 +514,10 @@ export class DemoDayFundraisingProfilesService {
 
     if (data.shortDescription) {
       updateData.shortDescription = data.shortDescription;
+    }
+
+    if (data.website) {
+      updateData.website = data.website;
     }
 
     if (data.logo) {
