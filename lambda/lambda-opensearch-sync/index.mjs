@@ -601,6 +601,7 @@ export const handler = async () => {
     // PG side
     await deleteRejectedMembersFromOpenSearch();
     await deleteDeletedProjectsFromOpenSearch();
+    await deleteOrphanTeamsFromOpenSearch();
 
     const m = await indexMembers(lastCheckpoint);
     const t = await indexTeams(lastCheckpoint);
@@ -684,3 +685,134 @@ function buildEventUrl(canonicalSlug, base) {
   const b = (base || '').replace(/\/+$/, '');
   return `${b}/program/#${canonicalSlug}`;
 }
+
+// ----- OpenSearch cleanup: delete orphans for Team
+async function deleteOrphanTeamsFromOpenSearch() {
+  const INDEX = 'team';
+  const PAGE_SIZE = 1000;
+  const BULK_CHUNK = 1000;
+
+  function safeJson(obj, max = 4000) {
+    try {
+      const s = JSON.stringify(obj, null, 2);
+      return s.length > max ? s.slice(0, max) + '…(truncated)' : s;
+    } catch {
+      return String(obj);
+    }
+  }
+
+  async function getAllIdsViaSearchAfterAoss(index, pageSize) {
+    const ids = [];
+    let searchAfter = undefined;
+    let page = 0;
+
+    while (true) {
+      const resp = await osClient.search({
+        index,
+        size: pageSize,
+        _source: false,
+        body: {
+          query: { match_all: {} },
+          sort: [{ "_id": "asc" }],
+          ...(searchAfter ? { search_after: searchAfter } : {})
+        }
+      });
+
+      const hits = resp?.body?.hits?.hits ?? [];
+      page++;
+      console.log(`[${index}] page ${page}: got ${hits.length} hits`);
+
+      if (!hits.length) break;
+
+      for (const h of hits) ids.push(String(h._id));
+      searchAfter = hits[hits.length - 1].sort;
+    }
+    return ids;
+  }
+
+  console.log(`[${INDEX}] orphan cleanup: start`);
+
+  let dbUids = new Set();
+  try {
+    const r = await pgClient.query(
+      `SELECT uid FROM "Team" WHERE "accessLevel" NOT IN ('L0','Rejected')`
+    );
+    dbUids = new Set(r.rows.map((x) => String(x.uid)));
+    console.log(`[${INDEX}] DB active count: ${dbUids.size}`);
+  } catch (err) {
+    console.error(`[${INDEX}] failed to read DB uids:`, err?.message || err);
+    return { scanned: 0, dbActive: 0, toDelete: 0, deleted: 0, failed: 0, error: 'db_read_failed' };
+  }
+
+  let osIds = [];
+  try {
+    osIds = await getAllIdsViaSearchAfterAoss(INDEX, PAGE_SIZE);
+    console.log(`[${INDEX}] OS docs scanned: ${osIds.length}`);
+  } catch (err) {
+    const status = err?.statusCode || err?.status || 'n/a';
+    const body = err?.meta?.body;
+    console.error(
+      `[${INDEX}] search_after failed: status=${status} name=${err?.name || 'n/a'} reason=${body?.error?.reason || 'n/a'}`
+    );
+    if (body?.error) console.error(`[${INDEX}] body.error=`, safeJson(body.error));
+    if (err?.stack) console.error(`[${INDEX}] stack:\n` + String(err.stack).split('\n').slice(0, 8).join('\n'));
+    return { scanned: 0, dbActive: dbUids.size, toDelete: 0, deleted: 0, failed: 0, error: 'search_after_failed' };
+  }
+
+  const orphanIds = osIds.filter(id => !dbUids.has(id));
+  if (!orphanIds.length) {
+    console.log(`[${INDEX}] no orphan documents found — in sync ✅`);
+    return { scanned: osIds.length, dbActive: dbUids.size, toDelete: 0, deleted: 0, failed: 0 };
+  }
+  console.log(
+    `[${INDEX}] orphan docs to delete: ${orphanIds.length}` +
+    (orphanIds.length <= 10 ? ` → [${orphanIds.join(', ')}]` : ` (sample: ${orphanIds.slice(0, 10).join(', ')})`)
+  );
+
+  let deleted = 0;
+  let failed = 0;
+  const chunks = Math.ceil(orphanIds.length / BULK_CHUNK);
+
+  for (let i = 0; i < chunks; i++) {
+    const slice = orphanIds.slice(i * BULK_CHUNK, (i + 1) * BULK_CHUNK);
+    const body = slice.flatMap(id => [{ delete: { _index: INDEX, _id: id } }]);
+
+    try {
+      const resp = await osClient.bulk({ body, refresh: false });
+      if (resp?.body?.errors) {
+        const items = resp.body.items || [];
+        const failedItems = items.filter(it => it.delete && it.delete.error);
+        failed += failedItems.length;
+        deleted += slice.length - failedItems.length;
+
+        if (failedItems.length) {
+          console.error(
+            `[${INDEX}] bulk delete errors in chunk ${i + 1}/${chunks}: ${failedItems.length} (sample 5):`,
+            safeJson(failedItems.slice(0, 5))
+          );
+        }
+      } else {
+        deleted += slice.length;
+      }
+      console.log(`[${INDEX}] bulk ${i + 1}/${chunks}: processed=${slice.length}, deleted=${deleted}, failed=${failed}`);
+    } catch (err) {
+      const status = err?.statusCode || err?.status || 'n/a';
+      const body = err?.meta?.body;
+      console.error(
+        `[${INDEX}] bulk delete failed on chunk ${i + 1}/${chunks}: status=${status} name=${err?.name || 'n/a'} reason=${body?.error?.reason || 'n/a'}`
+      );
+      if (body?.error) console.error(`[${INDEX}] body.error=`, safeJson(body.error));
+      if (err?.stack) console.error(`[${INDEX}] stack:\n` + String(err.stack).split('\n').slice(0, 8).join('\n'));
+      failed += slice.length;
+    }
+  }
+
+  console.log(
+    `[${INDEX}] orphan cleanup completed: scanned=${osIds.length}, dbActive=${dbUids.size}, ` +
+    `toDelete=${orphanIds.length}, deleted=${deleted}, failed=${failed}` +
+    (failed ? ' ⚠️' : ' ✅')
+  );
+
+  return { scanned: osIds.length, dbActive: dbUids.size, toDelete: orphanIds.length, deleted, failed };
+}
+
