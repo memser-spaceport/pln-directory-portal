@@ -677,6 +677,7 @@ export class DemoDayFundraisingProfilesService {
               uid: true,
               name: true,
               shortDescription: true,
+              website: true,
               industryTags: {
                 select: {
                   uid: true,
