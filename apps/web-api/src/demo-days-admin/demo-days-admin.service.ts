@@ -260,6 +260,7 @@ export class DemoDaysAdminService {
     data: {
       name?: string;
       shortDescription?: string;
+      website?: string | null;
       industryTags?: string[];
       fundingStage?: string;
       logo?: string;
@@ -311,6 +312,10 @@ export class DemoDaysAdminService {
       updateData.shortDescription = data.shortDescription;
     }
 
+    if (data.website) {
+      updateData.website = data.website;
+    }
+
     if (data.logo) {
       updateData.logoUid = data.logo;
     }
@@ -338,6 +343,7 @@ export class DemoDaysAdminService {
               uid: true,
               name: true,
               shortDescription: true,
+              website: true,
               industryTags: {
                 select: {
                   uid: true,
