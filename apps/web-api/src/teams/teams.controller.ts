@@ -3,8 +3,9 @@ import { Controller, Req, UseGuards, Body, Param, UsePipes, Patch } from '@nestj
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
+import { z } from 'zod';
 import { apiTeam } from 'libs/contracts/src/lib/contract-team';
-import { ResponseTeamWithRelationsSchema, TeamDetailQueryParams, TeamQueryParams } from 'libs/contracts/src/schema';
+import { ResponseTeamWithRelationsSchema, TeamDetailQueryParams, TeamQueryParams, TeamFilterQueryParams } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { NOT_FOUND_GLOBAL_RESPONSE_SCHEMA } from '../utils/constants';
@@ -151,5 +152,19 @@ export class TeamsController {
   @NoCache()
   async memberSelfUpdate(@Param('uid') teamUid: string, @Body() body: any, @Req() req: Request) {
     return this.teamsService.updateTeamMemberRoleAndInvestorProfile(teamUid, body, req['userEmail']);
+  }
+
+  /**
+   * Advanced team search with filtering by isFund, typicalCheckSize range, and investmentFocus.
+   *
+   * @param request - HTTP request object containing query parameters
+   * @returns Paginated search results with teams and metadata
+   */
+  @Api(server.route.searchTeams)
+  @ApiQueryFromZod(TeamFilterQueryParams.optional())
+  @NoCache()
+  async searchTeams(@Req() request: Request) {
+    const params = request.query as unknown as z.infer<typeof TeamFilterQueryParams>;
+    return await this.teamsService.searchTeams(params || {});
   }
 }
