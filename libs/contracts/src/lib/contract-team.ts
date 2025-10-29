@@ -1,8 +1,10 @@
 import { initContract } from '@ts-rest/core';
+import { z } from 'zod';
 import {
   ResponseTeamWithRelationsSchema,
   TeamDetailQueryParams,
   TeamQueryParams,
+  TeamFilterQueryParams,
 } from '../schema/team';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -54,5 +56,19 @@ export const apiTeam = contract.router({
       200: contract.response<any>(),
     },
     summary: "Modify team's Ask",
-  }
+  },
+  searchTeams: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/teams-search`,
+    query: TeamFilterQueryParams,
+    responses: {
+      200: z.object({
+        teams: ResponseTeamWithRelationsSchema.array(),
+        total: z.number(),
+        page: z.number(),
+        hasMore: z.boolean(),
+      }),
+    },
+    summary: 'Search teams with advanced filters',
+  },
 });

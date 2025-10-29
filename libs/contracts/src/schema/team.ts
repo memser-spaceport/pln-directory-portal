@@ -78,8 +78,21 @@ export const TeamDetailQueryParams = TeamQueryParams.unwrap()
   .pick(RETRIEVAL_QUERY_FILTERS)
   .optional();
 
+export const TeamFilterQueryParams = z.object({
+  search: z.string().optional(),
+  isFund: z.boolean().optional(),
+  minTypicalCheckSize: z.number().min(0).optional(),
+  maxTypicalCheckSize: z.number().min(0).optional(),
+  investmentFocus: z.array(z.string()).optional(),
+  sort: z.enum(['name:asc', 'name:desc']).optional(),
+  page: z.number().positive().optional(),
+  limit: z.number().positive().max(100).optional(),
+});
+
 export class TeamDto extends createZodDto(TeamSchema) {}
 
 export class CreateTeamSchemaDto extends createZodDto(CreateTeamSchema) {}
+
+export class TeamFilterQueryParamsDto extends createZodDto(TeamFilterQueryParams) {}
 
 export type TTeamResponse = z.infer<typeof ResponseTeamWithRelationsSchema>;
