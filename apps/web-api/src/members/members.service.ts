@@ -1150,9 +1150,20 @@ export class MembersService {
     });
     const rolesToCreate = memberData.teamAndRoles.filter((t: any) => !oldTeamUids.includes(t.teamUid));
 
-    // Handle mainTeam changes: if a team is being set as main team, unset all others
-    const newMainTeam = memberData.teamAndRoles.find((t: any) => t.mainTeam === true);
-    if (newMainTeam) {
+    let mainTeamIndex = memberData.teamAndRoles.findIndex((t: any) => t.mainTeam === true);
+
+    if (mainTeamIndex === -1) {
+      mainTeamIndex = 0;
+    }
+
+    // Ensure only one team is marked as mainTeam in the input data
+    memberData.teamAndRoles.forEach((team: any, index: number) => {
+      team.mainTeam = index === mainTeamIndex;
+    });
+
+    // Unset mainTeam for all existing teams that are not the new main team
+    if (memberData.teamAndRoles.length > 0) {
+      const newMainTeam = memberData.teamAndRoles[mainTeamIndex];
       await tx.teamMemberRole.updateMany({
         where: {
           memberUid,
