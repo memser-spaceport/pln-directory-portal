@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 import { Controller, Req, UseGuards, Body, Param, UsePipes, Patch } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
-import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
+import { Api, ApiDecorator, initNestServer, TsRest } from '@ts-rest/nest';
 import { Request } from 'express';
 import { z } from 'zod';
 import { apiTeam } from 'libs/contracts/src/lib/contract-team';
@@ -160,7 +160,7 @@ export class TeamsController {
    * @param request - HTTP request object containing query parameters
    * @returns Paginated search results with teams and metadata
    */
-  @Api(server.route.searchTeams)
+  @TsRest(server.route.searchTeams)
   @ApiQueryFromZod(TeamFilterQueryParams.optional())
   @NoCache()
   async searchTeams(@Req() request: Request) {
