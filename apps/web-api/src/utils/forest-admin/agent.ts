@@ -10,11 +10,13 @@ import { APP_ENV } from '../constants';
 import { FileEncryptionService } from '../file-encryption/file-encryption.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { AwsService } from '../aws/aws.service';
+import { HuskyDataIngestionService } from '../../shared/husky-data-ingestion.service';
 import { LocationTransferService } from '../location-transfer/location-transfer.service';
 import { generateUid } from './generated-uid';
 import { resetCacheAfterCreateOrUpdateOrDelete } from './reset-cache-after-cud';
+import { LogService } from '../../shared/log.service';
 
-const prismaService = new PrismaService();
+const prismaService = new PrismaService(new HuskyDataIngestionService(new AwsService()), new LogService());
 
 async function executeImageUpload(context) {
   const file = context.formValues.Image;
@@ -31,7 +33,7 @@ async function executeImageUpload(context) {
     path: file.name,
     stream: Readable.from(file.buffer),
   };
-  const prismaService = new PrismaService();
+  const prismaService = new PrismaService(new HuskyDataIngestionService(new AwsService()), new LogService());
   const uploadController = new ImagesController(
     new ImagesService(prismaService),
     new FileUploadService(new FileEncryptionService(), new AwsService())
