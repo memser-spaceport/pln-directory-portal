@@ -1130,7 +1130,7 @@ export class MembersService {
       const foundIndex = existingMember.teamMemberRoles.findIndex((v: any) => v.teamUid === t.teamUid);
       if (foundIndex > -1) {
         const foundValue = existingMember.teamMemberRoles[foundIndex];
-        if (foundValue.role !== t.role) {
+        if (foundValue.role !== t.role || foundValue.mainTeam !== t.mainTeam) {
           let foundDefaultRoleTag = false;
           // Check if there's a default member role tag
           foundValue.roleTags?.some((tag: any) => {
@@ -1149,6 +1149,20 @@ export class MembersService {
       return false;
     });
     const rolesToCreate = memberData.teamAndRoles.filter((t: any) => !oldTeamUids.includes(t.teamUid));
+
+    // Handle mainTeam changes: if a team is being set as main team, unset all others
+    const newMainTeam = memberData.teamAndRoles.find((t: any) => t.mainTeam === true);
+    if (newMainTeam) {
+      await tx.teamMemberRole.updateMany({
+        where: {
+          memberUid,
+          teamUid: { not: newMainTeam.teamUid },
+          mainTeam: true,
+        },
+        data: { mainTeam: false },
+      });
+    }
+
     // Process deletions, updates, and creations
     await this.deleteTeamMemberRoles(tx, rolesToDelete, memberUid);
     await this.modifyTeamMemberRoles(tx, rolesToUpdate, memberUid);
@@ -1170,7 +1184,7 @@ export class MembersService {
     if (rolesToCreate.length > 0) {
       const rolesToCreateData = rolesToCreate.map((t: any) => ({
         role: t.role?.trim(),
-        mainTeam: false, // Set your default values here if needed
+        mainTeam: t.mainTeam || false,
         teamLead: false, // Set your default values here if needed
         teamUid: t.teamUid,
         memberUid,
@@ -1220,7 +1234,11 @@ export class MembersService {
               memberUid,
             },
           },
-          data: { role: roleToUpdate.role?.trim(), roleTags: roleToUpdate.roleTags },
+          data: {
+            role: roleToUpdate.role?.trim(),
+            roleTags: roleToUpdate.roleTags,
+            mainTeam: roleToUpdate.mainTeam,
+          },
         })
       );
       await Promise.all(updatePromises);
@@ -1237,7 +1255,7 @@ export class MembersService {
       createMany: {
         data: memberData.teamAndRoles.map((t) => ({
           role: t.role?.trim(),
-          mainTeam: false,
+          mainTeam: t.mainTeam || false,
           teamLead: false,
           teamUid: t.teamUid,
           roleTags: t.role?.split(',')?.map((item) => item.trim()),
