@@ -5,12 +5,13 @@ import { AuthModule } from '../auth/auth.module'
 import { MembersController } from './members.controller';
 import { MembersModule } from '../members/members.module';
 import { CacheController } from './cache.controller';
-import { InternalsController } from './internals.controller';
 import { InternalsService } from './internals.service';
 import { HuskyModule } from '../husky/husky.module';
+import { TeamsInternalController } from './teams.controller';
+import { ProjectsInternalController } from './projects.controller';
 
 @Module({
-  controllers: [PLEventsInternalController, MembersController, CacheController, InternalsController],
+  controllers: [PLEventsInternalController, MembersController, CacheController, TeamsInternalController, ProjectsInternalController],
   providers: [InternalsService],
   exports: [InternalsService],
   imports:[PLEventsModule, AuthModule, MembersModule]

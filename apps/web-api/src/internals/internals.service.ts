@@ -3,6 +3,11 @@ import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { Prisma } from '@prisma/client';
 
+/**
+ * Service responsible for retrieving detailed information about core entities.
+ * Provides methods to fetch Member, Team, Project, and IRL Event details with complete relationships.
+ * Handles database operations and error management for internal data access operations.
+ */
 @Injectable()
 export class InternalsService {
   constructor(
