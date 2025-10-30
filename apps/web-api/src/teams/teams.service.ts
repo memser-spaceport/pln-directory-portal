@@ -104,6 +104,32 @@ export class TeamsService {
   }
 
   /**
+   * Soft deletes a team by marking it as L0 (inactive).
+   * Teams with L0 access level are not visible in queries.
+   * Only users with DIRECTORYADMIN role can soft delete teams.
+   *
+   * @param teamUid - Unique identifier for the team to soft delete
+   * @returns The updated team with L0 access level
+   * @throws {NotFoundException} If the team with the given UID is not found
+   */
+  async softDeleteTeam(teamUid: string): Promise<Team> {
+    try {
+      const team = await this.prisma.team.update({
+        where: { uid: teamUid },
+        data: {
+          accessLevel: 'L0',
+          accessLevelUpdatedAt: new Date(),
+        },
+      });
+
+      this.logger.info(`Team ${teamUid} has been soft deleted (marked as L0)`);
+      return team;
+    } catch (err) {
+      return this.handleErrors(err, teamUid);
+    }
+  }
+
+  /**
    * Find a single team by its unique identifier (UID).
    * Retrieves detailed information about the team,
    * including related data like projects, technologies, and team focus areas.

@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
-import { Controller, Req, UseGuards, Body, Param, UsePipes, Patch } from '@nestjs/common';
+import { Controller, Req, UseGuards, Body, Param, UsePipes, Patch, ForbiddenException } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
-import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
+import { Api, ApiDecorator, initNestServer, TsRest } from '@ts-rest/nest';
 import { Request } from 'express';
 import { apiTeam } from 'libs/contracts/src/lib/contract-team';
 import { ResponseTeamWithRelationsSchema, TeamDetailQueryParams, TeamQueryParams } from 'libs/contracts/src/schema';
@@ -18,12 +18,16 @@ import { ParticipantsReqValidationPipe } from '../pipes/participant-request-vali
 import { AccessLevelsGuard } from '../guards/access-levels.guard';
 import { AccessLevels } from '../decorators/access-levels.decorator';
 import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
+import { MembersService } from '../members/members.service';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
 @Controller()
 export class TeamsController {
-  constructor(private readonly teamsService: TeamsService) {}
+  constructor(
+    private readonly teamsService: TeamsService,
+    private readonly membersService: MembersService
+  ) {}
 
   @Api(server.route.teamFilters)
   @ApiQueryFromZod(TeamQueryParams)
@@ -151,5 +155,30 @@ export class TeamsController {
   @NoCache()
   async memberSelfUpdate(@Param('uid') teamUid: string, @Body() body: any, @Req() req: Request) {
     return this.teamsService.updateTeamMemberRoleAndInvestorProfile(teamUid, body, req['userEmail']);
+  }
+
+  /**
+   * Soft deletes a team by marking it as L0 (inactive).
+   * Only users with a DIRECTORYADMIN role can delete teams.
+   * L0 teams are not visible in queries.
+   */
+  @TsRest(server.route.deleteTeam)
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async deleteTeam(@Param('uid') teamUid: string, @Req() req: Request) {
+    const userEmail = req['userEmail'];
+    const requestor = await this.membersService.findMemberByEmail(userEmail);
+
+    if (!requestor) {
+      throw new ForbiddenException(`Member with email ${userEmail} not found`);
+    }
+
+    const isDirectoryAdmin = this.membersService.checkIfAdminUser(requestor);
+
+    if (!isDirectoryAdmin) {
+      throw new ForbiddenException(`Member with email ${userEmail} isn't admin to delete the team`);
+    }
+
+    return this.teamsService.softDeleteTeam(teamUid);
   }
 }
