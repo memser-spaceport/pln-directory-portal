@@ -3121,4 +3121,81 @@ export class MembersService {
       };
     }
   }
+
+  /**
+   * Updates a member's access level between L4 and L6.
+   * When upgrading to L6, the member becomes an investor.
+   * When downgrading to L4, the investor status is removed.
+   *
+   * @param memberUid - The UID of the member
+   * @param newAccessLevel - The new access level (L4 or L6)
+   * @returns The updated member with relations
+   */
+  async updateMemberAccessLevel(memberUid: string, newAccessLevel: 'L4' | 'L6') {
+    try {
+      const member = await this.prisma.member.findUnique({
+        where: { uid: memberUid },
+        select: {
+          uid: true,
+          accessLevel: true,
+          investorProfileId: true,
+        },
+      });
+
+      if (!member) {
+        throw new NotFoundException('Member not found');
+      }
+
+      // Validate access level change
+      if (newAccessLevel !== 'L4' && newAccessLevel !== 'L6') {
+        throw new BadRequestException('Access level must be either L4 or L6');
+      }
+
+      // If already at the requested level, return member as-is
+      if (member.accessLevel === newAccessLevel) {
+        return await this.findOne(memberUid, {
+          include: {
+            image: true,
+            location: true,
+            skills: true,
+            teamMemberRoles: {
+              include: {
+                team: true,
+              },
+            },
+          },
+        });
+      }
+
+      // Update the member's access level
+      const updatedMember = await this.prisma.member.update({
+        where: { uid: memberUid },
+        data: { accessLevel: newAccessLevel },
+        include: {
+          image: true,
+          location: true,
+          skills: true,
+          teamMemberRoles: {
+            include: {
+              team: true,
+            },
+          },
+          projectContributions: true,
+          experiences: true,
+        },
+      });
+
+      // Reset cache after update
+      await this.cacheService.reset({ service: 'members' });
+
+      this.logger.info(
+        `Member access level updated: memberUid=${memberUid}, oldLevel=${member.accessLevel}, newLevel=${newAccessLevel}`
+      );
+
+      return updatedMember;
+    } catch (error) {
+      this.logger.error(`Error updating member access level: memberUid=${memberUid}`, error);
+      throw error;
+    }
+  }
 }
