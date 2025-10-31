@@ -28,6 +28,7 @@ import {
   MemberFilterQueryParams,
   AutocompleteQueryParams,
   MembersForNodebbRequestDto,
+  UpdateMemberAccessLevelRequestDto,
 } from 'libs/contracts/src/schema';
 import { apiMembers } from '../../../../libs/contracts/src/lib/contract-member';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
@@ -481,5 +482,44 @@ export class MemberController {
     }
 
     return await this.investorProfileService.getInvestorProfile(uid);
+  }
+
+  /**
+   * Updates a member's access level between L4 and L6.
+   * Users can upgrade to L6 (investor) or downgrade to L4 (remove investor status).
+   * Available for L2-L6 users to change their own access level.
+   *
+   * @param uid - UID of the member
+   * @param body - Request body containing the new access level (L4 or L6)
+   * @param req - HTTP request object containing user information
+   * @returns The updated member with relations
+   */
+  @Api(server.route.updateMemberAccessLevel)
+  @UsePipes(ZodValidationPipe)
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async updateMemberAccessLevel(
+    @Param('uid') uid: string,
+    @Body() body: UpdateMemberAccessLevelRequestDto,
+    @Req() req
+  ) {
+    const member = await this.membersService.findMemberByEmail(req.userEmail);
+
+    if (!member) {
+      throw new NotFoundException(`Member not found for ${req.userEmail}`);
+    }
+
+    // Check if a member has permission to update this access level
+    if (!member.isDirectoryAdmin && member.uid !== uid) {
+      throw new ForbiddenException('You can only update your own access level');
+    }
+
+    // Check if a member has sufficient access level (L2-L6)
+    const allowedLevels = ['L2', 'L3', 'L4', 'L5', 'L6'];
+    if (!allowedLevels.includes(member.accessLevel)) {
+      throw new ForbiddenException('Your access level does not allow this operation');
+    }
+
+    return await this.membersService.updateMemberAccessLevel(uid, body.accessLevel);
   }
 }

@@ -11,6 +11,7 @@ import {
   AutocompleteResponse,
   MembersForNodebbSchema,
   MembersForNodebbRequestSchema,
+  UpdateMemberAccessLevelRequestSchema,
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -191,5 +192,17 @@ export const apiMembers = contract.router({
     responses: {
       200: contract.response<unknown>(),
     },
+  },
+  updateMemberAccessLevel: {
+    method: 'PUT',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/access-level`,
+    body: UpdateMemberAccessLevelRequestSchema,
+    responses: {
+      200: ResponseMemberWithRelationsSchema,
+      400: z.object({ message: z.string() }),
+      403: z.object({ message: z.string() }),
+      404: z.object({ message: z.string() }),
+    },
+    summary: 'Update member access level (L4 or L6)',
   },
 });
