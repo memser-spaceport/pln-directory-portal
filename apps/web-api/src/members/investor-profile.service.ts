@@ -11,6 +11,7 @@ export class InvestorProfileService {
   /**
    * Creates or updates an investor profile for a member
    * Only L5 and L6 members can create/update their own investor profile
+   * Automatically upgrades L2-L4 members to L6 when they provide an investor type
    *
    * @param memberUid - The UID of the member
    * @param memberAccessLevel - The access level of the member
@@ -33,11 +34,29 @@ export class InvestorProfileService {
     try {
       const member = await this.prisma.member.findUnique({
         where: { uid: memberUid },
-        select: { investorProfileId: true, investorProfile: true },
+        select: { investorProfileId: true, investorProfile: true, accessLevel: true },
       });
 
       if (!member) {
         throw new NotFoundException('Member not found');
+      }
+
+      // Auto-upgrade L2-L4 members to L6 if they provide an investor type
+      const investorTypes: InvestorProfileType[] = ['ANGEL', 'FUND', 'ANGEL_AND_FUND'];
+      const shouldUpgradeToL6 =
+        investorProfileData.type &&
+        investorTypes.includes(investorProfileData.type) &&
+        member.accessLevel &&
+        ['L2', 'L3', 'L4'].includes(member.accessLevel);
+
+      if (shouldUpgradeToL6) {
+        await this.prisma.member.update({
+          where: { uid: memberUid },
+          data: { accessLevel: 'L6' },
+        });
+        this.logger.info(
+          `Member access level upgraded to L6: memberUid=${memberUid}, oldLevel=${member.accessLevel}, investorType=${investorProfileData.type}`
+        );
       }
 
       let result;

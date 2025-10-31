@@ -245,3 +245,10 @@ export const MembersForNodebbSchema = ResponseMemberSchema.pick({
 });
 
 export class MembersForNodebbRequestDto extends createZodDto(MembersForNodebbRequestSchema) {}
+
+// Access level change schema
+export const UpdateMemberAccessLevelRequestSchema = z.object({
+  accessLevel: z.enum(['L4', 'L6']),
+});
+
+export class UpdateMemberAccessLevelRequestDto extends createZodDto(UpdateMemberAccessLevelRequestSchema) {}
