@@ -22,7 +22,7 @@ import { EventsModule } from '../events/events.module';
     forwardRef(() => AdminModule),
     forwardRef(() => NotificationsModule),
     MemberSubscriptionsModule,
-    AuthModule,
+    forwardRef(() => AuthModule),
     forwardRef(() => TeamsModule),
     forwardRef(() => EventsModule),
   ],
