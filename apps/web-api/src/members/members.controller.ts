@@ -486,11 +486,9 @@ export class MemberController {
   }
 
   /**
-   * Updates a member's investor settings.
-   * Sets isInvestor flag and automatically adjusts access level:
-   * - When isInvestor=true: upgrades L2-L4 members to L6
-   * - When isInvestor=false: downgrades L6 members to L4
-   * Available for L2-L6 users to change their own setting.
+   * Updates a member's investor setting.
+   * Only changes the isInvestor flag.
+   * Available for L2-L6 users.
    *
    * @param uid - UID of the member
    * @param body - Request body containing isInvestor boolean
