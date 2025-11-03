@@ -246,9 +246,14 @@ export const MembersForNodebbSchema = ResponseMemberSchema.pick({
 
 export class MembersForNodebbRequestDto extends createZodDto(MembersForNodebbRequestSchema) {}
 
-// Access level change schema
-export const UpdateMemberAccessLevelRequestSchema = z.object({
-  accessLevel: z.enum(['L4', 'L6']),
+// Investor setting schema
+export const UpdateMemberInvestorSettingRequestSchema = z.object({
+  isInvestor: z.boolean(),
 });
 
-export class UpdateMemberAccessLevelRequestDto extends createZodDto(UpdateMemberAccessLevelRequestSchema) {}
+export const MemberInvestorSettingResponseSchema = z.object({
+  isInvestor: z.boolean(),
+});
+
+export class UpdateMemberInvestorSettingRequestDto extends createZodDto(UpdateMemberInvestorSettingRequestSchema) {}
+export class MemberInvestorSettingResponseDto extends createZodDto(MemberInvestorSettingResponseSchema) {}

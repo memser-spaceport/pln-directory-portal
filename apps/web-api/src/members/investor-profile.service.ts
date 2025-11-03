@@ -41,7 +41,7 @@ export class InvestorProfileService {
         throw new NotFoundException('Member not found');
       }
 
-      // Auto-upgrade L2-L4 members to L6 if they provide an investor type
+      // Auto-upgrade L2-L4 members to L6 and set isInvestor if they provide an investor type
       const investorTypes: InvestorProfileType[] = ['ANGEL', 'FUND', 'ANGEL_AND_FUND'];
       const shouldUpgradeToL6 =
         investorProfileData.type &&
@@ -52,11 +52,21 @@ export class InvestorProfileService {
       if (shouldUpgradeToL6) {
         await this.prisma.member.update({
           where: { uid: memberUid },
-          data: { accessLevel: 'L6' },
+          data: {
+            accessLevel: 'L6',
+            isInvestor: true,
+          },
         });
         this.logger.info(
-          `Member access level upgraded to L6: memberUid=${memberUid}, oldLevel=${member.accessLevel}, investorType=${investorProfileData.type}`
+          `Member upgraded to investor: memberUid=${memberUid}, oldLevel=${member.accessLevel}, investorType=${investorProfileData.type}`
         );
+      } else if (investorProfileData.type && investorTypes.includes(investorProfileData.type)) {
+        // For L5 and L6 members, just set isInvestor flag
+        await this.prisma.member.update({
+          where: { uid: memberUid },
+          data: { isInvestor: true },
+        });
+        this.logger.info(`Member isInvestor flag set: memberUid=${memberUid}, investorType=${investorProfileData.type}`);
       }
 
       let result;

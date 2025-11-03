@@ -11,7 +11,8 @@ import {
   AutocompleteResponse,
   MembersForNodebbSchema,
   MembersForNodebbRequestSchema,
-  UpdateMemberAccessLevelRequestSchema,
+  UpdateMemberInvestorSettingRequestSchema,
+  MemberInvestorSettingResponseSchema,
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -193,16 +194,26 @@ export const apiMembers = contract.router({
       200: contract.response<unknown>(),
     },
   },
-  updateMemberAccessLevel: {
+  updateMemberInvestorSetting: {
     method: 'PUT',
-    path: `${getAPIVersionAsPath('1')}/members/:uid/access-level`,
-    body: UpdateMemberAccessLevelRequestSchema,
+    path: `${getAPIVersionAsPath('1')}/members/:uid/investor-settings`,
+    body: UpdateMemberInvestorSettingRequestSchema,
     responses: {
-      200: ResponseMemberWithRelationsSchema,
+      200: MemberInvestorSettingResponseSchema,
       400: z.object({ message: z.string() }),
       403: z.object({ message: z.string() }),
       404: z.object({ message: z.string() }),
     },
-    summary: 'Update member access level (L4 or L6)',
+    summary: 'Update member investor setting',
+  },
+  getMemberInvestorSetting: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/investor-settings`,
+    responses: {
+      200: MemberInvestorSettingResponseSchema,
+      403: z.object({ message: z.string() }),
+      404: z.object({ message: z.string() }),
+    },
+    summary: 'Get member investor setting',
   },
 });
