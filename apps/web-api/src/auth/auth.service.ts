@@ -2,6 +2,7 @@ import {
   BadRequestException,
   CACHE_MANAGER,
   ForbiddenException,
+  forwardRef,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -20,6 +21,7 @@ import { ANALYTICS_EVENTS } from '../utils/constants';
 import { PrismaService } from '../shared/prisma.service';
 import { AuthMetrics, extractErrorCode, statusClassOf } from '../metrics/auth.metrics';
 import { TeamsService } from '../teams/teams.service';
+import { NotificationServiceClient } from '../notifications/notification-service.client';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -31,7 +33,8 @@ export class AuthService implements OnModuleInit {
     private logger: LogService,
     @Inject(CACHE_MANAGER) private cacheService: Cache,
     private analyticsService: AnalyticsService,
-    private prisma: PrismaService
+    private prisma: PrismaService,
+    private notificationServiceClient: NotificationServiceClient
   ) {}
 
   onModuleInit() {
@@ -541,5 +544,41 @@ export class AuthService implements OnModuleInit {
         newAccessLevel,
       },
     });
+  }
+
+  async reportAuthLinkIssue(name: string, email: string) {
+    const adminEmailIdsFromEnv = process.env.SES_ADMIN_EMAIL_IDS;
+    const adminEmailIds = adminEmailIdsFromEnv?.split('|') ?? [];
+
+    const payload = {
+      isPriority: true,
+      deliveryChannel: 'EMAIL',
+      templateName: 'AUTH_LINK_ISSUE_REPORT',
+      recipientsInfo: {
+        to: adminEmailIds,
+      },
+      deliveryPayload: {
+        body: {
+          name: name || 'Unknown Name',
+          email: email || 'Unknown Email',
+        },
+      },
+      entityType: 'AUTH',
+      actionType: 'LINK_ISSUE_REPORT',
+      sourceMeta: {
+        activityId: '',
+        activityType: 'AUTH_LINK_ISSUE',
+        activityUserId: '',
+        activityUserName: name,
+      },
+      targetMeta: {
+        emailId: email,
+        userId: '',
+        userName: name,
+      },
+    };
+
+    await this.notificationServiceClient.sendNotification(payload);
+    return { message: 'Issue reported successfully' };
   }
 }
