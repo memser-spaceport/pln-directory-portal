@@ -3121,4 +3121,98 @@ export class MembersService {
       };
     }
   }
+
+  /**
+   * Updates a member's investor settings.
+   * Automatically adjusts access level based on isInvestor flag:
+   * - When isInvestor=true: upgrades L2-L4 members to L6
+   * - When isInvestor=false: downgrades L6 members to L4
+   *
+   * @param memberUid - The UID of the member
+   * @param isInvestor - Whether the member should be marked as an investor
+   * @returns The updated investor setting
+   */
+  async updateMemberInvestorSetting(memberUid: string, isInvestor: boolean) {
+    try {
+      const member = await this.prisma.member.findUnique({
+        where: { uid: memberUid },
+        select: {
+          uid: true,
+          accessLevel: true,
+          isInvestor: true,
+        },
+      });
+
+      if (!member) {
+        throw new NotFoundException('Member not found');
+      }
+
+      // If already at the requested setting, return as-is
+      if (member.isInvestor === isInvestor) {
+        return { isInvestor: member.isInvestor ?? false };
+      }
+
+      // Determine new access level based on isInvestor flag
+      let newAccessLevel = member.accessLevel;
+
+      if (isInvestor) {
+        // Upgrade L2-L4 members to L6 when becoming an investor
+        if (member.accessLevel && ['L2', 'L3', 'L4'].includes(member.accessLevel)) {
+          newAccessLevel = 'L6';
+        }
+      } else {
+        // Downgrade L6 members to L4 when removing investor status
+        if (member.accessLevel === 'L6') {
+          newAccessLevel = 'L4';
+        }
+      }
+
+      // Update the member's investor setting and access level
+      await this.prisma.member.update({
+        where: { uid: memberUid },
+        data: {
+          isInvestor,
+          ...(newAccessLevel !== member.accessLevel && { accessLevel: newAccessLevel }),
+        },
+      });
+
+      // Reset cache after update
+      await this.cacheService.reset({ service: 'members' });
+
+      this.logger.info(
+        `Member investor setting updated: memberUid=${memberUid}, isInvestor=${isInvestor}, oldLevel=${member.accessLevel}, newLevel=${newAccessLevel}`
+      );
+
+      return { isInvestor };
+    } catch (error) {
+      this.logger.error(`Error updating member investor setting: memberUid=${memberUid}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets a member's investor settings.
+   *
+   * @param memberUid - The UID of the member
+   * @returns The member's investor setting
+   */
+  async getMemberInvestorSetting(memberUid: string) {
+    try {
+      const member = await this.prisma.member.findUnique({
+        where: { uid: memberUid },
+        select: {
+          isInvestor: true,
+        },
+      });
+
+      if (!member) {
+        throw new NotFoundException('Member not found');
+      }
+
+      return { isInvestor: member.isInvestor ?? false };
+    } catch (error) {
+      this.logger.error(`Error getting member investor setting: memberUid=${memberUid}`, error);
+      throw error;
+    }
+  }
 }
