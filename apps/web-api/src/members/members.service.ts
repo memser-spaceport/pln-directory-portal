@@ -2020,9 +2020,18 @@ export class MembersService {
       whereConditions.push({
         AND: [
           {
-            accessLevel: {
-              in: ['L5', 'L6'],
-            },
+            AND: [
+              // Members explicitly marked as investors
+              {
+                isInvestor: true,
+              },
+              // Members with L5/L6 access level
+              {
+                accessLevel: {
+                  in: ['L5', 'L6'],
+                },
+              },
+            ],
           },
           {
             OR: [
@@ -3123,10 +3132,8 @@ export class MembersService {
   }
 
   /**
-   * Updates a member's investor settings.
-   * Automatically adjusts access level based on isInvestor flag:
-   * - When isInvestor=true: upgrades L2-L4 members to L6
-   * - When isInvestor=false: downgrades L6 members to L4
+   * Updates a member's investor setting.
+   * Only changes the isInvestor flag.
    *
    * @param memberUid - The UID of the member
    * @param isInvestor - Whether the member should be marked as an investor
@@ -3138,7 +3145,6 @@ export class MembersService {
         where: { uid: memberUid },
         select: {
           uid: true,
-          accessLevel: true,
           isInvestor: true,
         },
       });
@@ -3152,36 +3158,18 @@ export class MembersService {
         return { isInvestor: member.isInvestor ?? false };
       }
 
-      // Determine new access level based on isInvestor flag
-      let newAccessLevel = member.accessLevel;
-
-      if (isInvestor) {
-        // Upgrade L2-L4 members to L6 when becoming an investor
-        if (member.accessLevel && ['L2', 'L3', 'L4'].includes(member.accessLevel)) {
-          newAccessLevel = 'L6';
-        }
-      } else {
-        // Downgrade L6 members to L4 when removing investor status
-        if (member.accessLevel === 'L6') {
-          newAccessLevel = 'L4';
-        }
-      }
-
-      // Update the member's investor setting and access level
+      // Update only the member's investor setting
       await this.prisma.member.update({
         where: { uid: memberUid },
         data: {
           isInvestor,
-          ...(newAccessLevel !== member.accessLevel && { accessLevel: newAccessLevel }),
         },
       });
 
       // Reset cache after update
       await this.cacheService.reset({ service: 'members' });
 
-      this.logger.info(
-        `Member investor setting updated: memberUid=${memberUid}, isInvestor=${isInvestor}, oldLevel=${member.accessLevel}, newLevel=${newAccessLevel}`
-      );
+      this.logger.info(`Member investor setting updated: memberUid=${memberUid}, isInvestor=${isInvestor}`);
 
       return { isInvestor };
     } catch (error) {
