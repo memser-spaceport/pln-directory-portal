@@ -3123,22 +3123,23 @@ export class MembersService {
   }
 
   /**
-   * Updates a member's access level between L4 and L6.
-   * When upgrading to L6, the member becomes an investor.
-   * When downgrading to L4, the investor status is removed.
+   * Updates a member's investor settings.
+   * Automatically adjusts access level based on isInvestor flag:
+   * - When isInvestor=true: upgrades L2-L4 members to L6
+   * - When isInvestor=false: downgrades L6 members to L4
    *
    * @param memberUid - The UID of the member
-   * @param newAccessLevel - The new access level (L4 or L6)
-   * @returns The updated member with relations
+   * @param isInvestor - Whether the member should be marked as an investor
+   * @returns The updated investor setting
    */
-  async updateMemberAccessLevel(memberUid: string, newAccessLevel: 'L4' | 'L6') {
+  async updateMemberInvestorSetting(memberUid: string, isInvestor: boolean) {
     try {
       const member = await this.prisma.member.findUnique({
         where: { uid: memberUid },
         select: {
           uid: true,
           accessLevel: true,
-          investorProfileId: true,
+          isInvestor: true,
         },
       });
 
@@ -3146,42 +3147,32 @@ export class MembersService {
         throw new NotFoundException('Member not found');
       }
 
-      // Validate access level change
-      if (newAccessLevel !== 'L4' && newAccessLevel !== 'L6') {
-        throw new BadRequestException('Access level must be either L4 or L6');
+      // If already at the requested setting, return as-is
+      if (member.isInvestor === isInvestor) {
+        return { isInvestor: member.isInvestor ?? false };
       }
 
-      // If already at the requested level, return member as-is
-      if (member.accessLevel === newAccessLevel) {
-        return await this.findOne(memberUid, {
-          include: {
-            image: true,
-            location: true,
-            skills: true,
-            teamMemberRoles: {
-              include: {
-                team: true,
-              },
-            },
-          },
-        });
+      // Determine new access level based on isInvestor flag
+      let newAccessLevel = member.accessLevel;
+
+      if (isInvestor) {
+        // Upgrade L2-L4 members to L6 when becoming an investor
+        if (member.accessLevel && ['L2', 'L3', 'L4'].includes(member.accessLevel)) {
+          newAccessLevel = 'L6';
+        }
+      } else {
+        // Downgrade L6 members to L4 when removing investor status
+        if (member.accessLevel === 'L6') {
+          newAccessLevel = 'L4';
+        }
       }
 
-      // Update the member's access level
-      const updatedMember = await this.prisma.member.update({
+      // Update the member's investor setting and access level
+      await this.prisma.member.update({
         where: { uid: memberUid },
-        data: { accessLevel: newAccessLevel },
-        include: {
-          image: true,
-          location: true,
-          skills: true,
-          teamMemberRoles: {
-            include: {
-              team: true,
-            },
-          },
-          projectContributions: true,
-          experiences: true,
+        data: {
+          isInvestor,
+          ...(newAccessLevel !== member.accessLevel && { accessLevel: newAccessLevel }),
         },
       });
 
@@ -3189,12 +3180,38 @@ export class MembersService {
       await this.cacheService.reset({ service: 'members' });
 
       this.logger.info(
-        `Member access level updated: memberUid=${memberUid}, oldLevel=${member.accessLevel}, newLevel=${newAccessLevel}`
+        `Member investor setting updated: memberUid=${memberUid}, isInvestor=${isInvestor}, oldLevel=${member.accessLevel}, newLevel=${newAccessLevel}`
       );
 
-      return updatedMember;
+      return { isInvestor };
     } catch (error) {
-      this.logger.error(`Error updating member access level: memberUid=${memberUid}`, error);
+      this.logger.error(`Error updating member investor setting: memberUid=${memberUid}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets a member's investor settings.
+   *
+   * @param memberUid - The UID of the member
+   * @returns The member's investor setting
+   */
+  async getMemberInvestorSetting(memberUid: string) {
+    try {
+      const member = await this.prisma.member.findUnique({
+        where: { uid: memberUid },
+        select: {
+          isInvestor: true,
+        },
+      });
+
+      if (!member) {
+        throw new NotFoundException('Member not found');
+      }
+
+      return { isInvestor: member.isInvestor ?? false };
+    } catch (error) {
+      this.logger.error(`Error getting member investor setting: memberUid=${memberUid}`, error);
       throw error;
     }
   }
