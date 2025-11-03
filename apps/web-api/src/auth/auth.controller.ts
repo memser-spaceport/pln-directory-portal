@@ -12,7 +12,7 @@ import {
   Redirect,
   UsePipes,
   Put,
-  Param
+  Param,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { NoCache } from '../decorators/no-cache.decorator';
@@ -20,20 +20,26 @@ import { UserAccessTokenValidateGuard } from '../guards/user-access-token-valida
 import { LogService } from '../shared/log.service';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { UserAuthTokenValidation } from '../guards/user-authtoken-validation.guard';
-import { AuthRequestDto, DeleteUserAccountDto, ResendOtpRequestDto, SendOtpRequestDto, TokenRequestDto, VerifyOtpRequestDto } from 'libs/contracts/src/schema/auth';
-
+import {
+  AuthRequestDto,
+  AuthLinkIssueReportDto,
+  DeleteUserAccountDto,
+  ResendOtpRequestDto,
+  SendOtpRequestDto,
+  TokenRequestDto,
+  VerifyOtpRequestDto,
+} from 'libs/contracts/src/schema/auth';
 
 @Controller('v1/auth')
 export class AuthController {
-  constructor(
-    private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Post('/otp')
   @NoCache()
   @UseGuards(UserAuthTokenValidation)
   @UsePipes(ZodValidationPipe)
   async sendOtp(@Body() sendOtpRequest: SendOtpRequestDto) {
-    return await this.authService.verifyAndSendEmailOtp(sendOtpRequest.email)
+    return await this.authService.verifyAndSendEmailOtp(sendOtpRequest.email);
   }
 
   @Put('/otp')
@@ -41,7 +47,7 @@ export class AuthController {
   @UseGuards(UserAuthTokenValidation)
   @UsePipes(ZodValidationPipe)
   async resendOtp(@Body() resendOtpRequest: ResendOtpRequestDto) {
-    return await this.authService.resendEmailOtp(resendOtpRequest.otpToken)
+    return await this.authService.resendEmailOtp(resendOtpRequest.otpToken);
   }
 
   @Post('/otp/verify')
@@ -49,7 +55,11 @@ export class AuthController {
   @UseGuards(UserAuthTokenValidation)
   @UsePipes(ZodValidationPipe)
   async verifyOtp(@Body() verifyOtpRequest: VerifyOtpRequestDto) {
-    return await this.authService.verifyEmailOtpAndLinkAccount(verifyOtpRequest.otp, verifyOtpRequest.otpToken, verifyOtpRequest.idToken)
+    return await this.authService.verifyEmailOtpAndLinkAccount(
+      verifyOtpRequest.otp,
+      verifyOtpRequest.otpToken,
+      verifyOtpRequest.idToken
+    );
   }
 
   @Post()
@@ -71,6 +81,13 @@ export class AuthController {
   @UsePipes(ZodValidationPipe)
   async deleteUserAccount(@Body() deleteRequest: DeleteUserAccountDto, @Param() params) {
     await this.authService.deleteUserAccount(deleteRequest.token, params.id);
-    return { message: 'Deleted successfully'};
+    return { message: 'Deleted successfully' };
+  }
+
+  @Post('/report-link-issue')
+  @NoCache()
+  @UsePipes(ZodValidationPipe)
+  async reportAuthLinkIssue(@Body() reportRequest: AuthLinkIssueReportDto) {
+    return await this.authService.reportAuthLinkIssue(reportRequest.name, reportRequest.email);
   }
 }
