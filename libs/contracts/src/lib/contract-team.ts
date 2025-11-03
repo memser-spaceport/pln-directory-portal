@@ -54,5 +54,14 @@ export const apiTeam = contract.router({
       200: contract.response<any>(),
     },
     summary: "Modify team's Ask",
+  },
+  deleteTeam: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/teams/:uid`,
+    body: contract.body<any>(),
+    responses: {
+      200: contract.response<any>(),
+    },
+    summary: 'Soft delete a team by marking it as L0',
   }
 });
