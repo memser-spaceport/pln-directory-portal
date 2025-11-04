@@ -453,10 +453,9 @@ export class MemberController {
    */
   @Api(server.route.createOrUpdateInvestorProfile)
   @UsePipes(ZodValidationPipe)
-  //@UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenValidation)
   @NoCache()
   async createOrUpdateInvestorProfile(@Param('uid') uid: string, @Body() body, @Req() req) {
-    req.userEmail = 'nick.shevelov@magicpowered.io';
     const member = await this.membersService.findMemberByEmail(req.userEmail);
     if (!member || (!member.isDirectoryAdmin && member.uid !== uid)) {
       throw new ForbiddenException('You can only manage your own investor profile');
