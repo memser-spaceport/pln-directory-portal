@@ -160,6 +160,7 @@ model Member {
   demoDayParticipants              DemoDayParticipant[]
   demoDayEngagements               DemoDayEngagement[]
   demoDayExpressInterestStatistics DemoDayExpressInterestStatistic[]
+  demoDayFeedbacks                 DemoDayFeedback[]
 }
 
 model MemberRole {
@@ -978,6 +979,7 @@ model DemoDay {
   fundraisingProfiles       TeamFundraisingProfile[]
   engagements               DemoDayEngagement[]
   expressInterestStatistics DemoDayExpressInterestStatistic[]
+  feedbacks                 DemoDayFeedback[]
 }
 
 model DemoDayParticipant {
@@ -1073,5 +1075,22 @@ model DemoDayExpressInterestStatistic {
 
   @@unique([demoDayUid, memberUid, teamFundraisingProfileUid, isPrepDemoDay])
   @@index([memberUid, teamFundraisingProfileUid])
+  @@index([demoDayUid])
+}
+
+model DemoDayFeedback {
+  id         Int      @id @default(autoincrement())
+  uid        String   @unique @default(cuid())
+  demoDayUid String
+  demoDay    DemoDay  @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
+  memberUid  String
+  member     Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  rating     Int // 1-5 scale (1 = Not Valuable, 5 = Extremely Valuable)
+  comment    String? // Optional feedback text
+  issues     String[] // Array of issue types: predefined ("TECHNICAL_ISSUES", "ACCESS_ISSUES", "NETWORKING_ISSUES") or custom text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([demoDayUid, memberUid])
   @@index([demoDayUid])
 }

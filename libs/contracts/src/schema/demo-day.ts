@@ -33,3 +33,17 @@ export const ExpressInterestSchema = z.object({
 });
 
 export class ExpressInterestDto extends createZodDto(ExpressInterestSchema) {}
+
+export const DemoDayFeedbackIssueType = z.enum([
+  'TECHNICAL_ISSUES',
+  'ACCESS_ISSUES',
+  'NETWORKING_ISSUES',
+]);
+
+export const CreateDemoDayFeedbackSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().optional().nullable(),
+  issues: z.array(z.union([DemoDayFeedbackIssueType, z.string()])).default([]),
+});
+
+export class CreateDemoDayFeedbackDto extends createZodDto(CreateDemoDayFeedbackSchema) {}
