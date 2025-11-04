@@ -2020,16 +2020,32 @@ export class MembersService {
       whereConditions.push({
         AND: [
           {
-            AND: [
-              // Members explicitly marked as investors
+            OR: [
+              // Members explicitly marked as investors with L5/L6 access level
               {
-                isInvestor: true,
+                AND: [
+                  {
+                    isInvestor: true,
+                  },
+                  {
+                    accessLevel: {
+                      in: ['L5', 'L6'],
+                    },
+                  },
+                ],
               },
-              // Members with L5/L6 access level
+              // Members with L5/L6 access level when isInvestor is null (legacy support)
               {
-                accessLevel: {
-                  in: ['L5', 'L6'],
-                },
+                AND: [
+                  {
+                    accessLevel: {
+                      in: ['L5', 'L6'],
+                    },
+                  },
+                  {
+                    isInvestor: null,
+                  },
+                ],
               },
             ],
           },
