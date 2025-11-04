@@ -77,6 +77,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
     },
     linkedInDetails: {},
     accessLevel,
+    isInvestor: null,
     scheduleMeetingCount: 0,
     accessLevelUpdatedAt: faker.date.past(),
     deletedAt: accessLevel === 'Rejected' ? new Date() : null,

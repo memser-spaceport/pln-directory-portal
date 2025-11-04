@@ -11,6 +11,8 @@ import {
   AutocompleteResponse,
   MembersForNodebbSchema,
   MembersForNodebbRequestSchema,
+  UpdateMemberInvestorSettingRequestSchema,
+  MemberInvestorSettingResponseSchema,
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -191,5 +193,27 @@ export const apiMembers = contract.router({
     responses: {
       200: contract.response<unknown>(),
     },
+  },
+  updateMemberInvestorSetting: {
+    method: 'PUT',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/investor-settings`,
+    body: UpdateMemberInvestorSettingRequestSchema,
+    responses: {
+      200: MemberInvestorSettingResponseSchema,
+      400: z.object({ message: z.string() }),
+      403: z.object({ message: z.string() }),
+      404: z.object({ message: z.string() }),
+    },
+    summary: 'Update member investor setting',
+  },
+  getMemberInvestorSetting: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/investor-settings`,
+    responses: {
+      200: MemberInvestorSettingResponseSchema,
+      403: z.object({ message: z.string() }),
+      404: z.object({ message: z.string() }),
+    },
+    summary: 'Get member investor setting',
   },
 });

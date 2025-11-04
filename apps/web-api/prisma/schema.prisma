@@ -147,6 +147,7 @@ model Member {
   notificationSetting              NotificationSetting?
   linkedinProfile                  LinkedInProfile?
   accessLevel                      String?
+  isInvestor                       Boolean?
   scheduleMeetingCount             Int                               @default(0)
   createdAdjustments               MemberInteractionAdjustment[]     @relation("AdjustmentCreatedBy")
   accessLevelUpdatedAt             DateTime                          @default(now())

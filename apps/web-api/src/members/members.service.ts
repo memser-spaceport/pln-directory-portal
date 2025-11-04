@@ -2020,9 +2020,34 @@ export class MembersService {
       whereConditions.push({
         AND: [
           {
-            accessLevel: {
-              in: ['L5', 'L6'],
-            },
+            OR: [
+              // Members explicitly marked as investors with L5/L6 access level
+              {
+                AND: [
+                  {
+                    isInvestor: true,
+                  },
+                  {
+                    accessLevel: {
+                      in: ['L5', 'L6'],
+                    },
+                  },
+                ],
+              },
+              // Members with L5/L6 access level when isInvestor is null (legacy support)
+              {
+                AND: [
+                  {
+                    accessLevel: {
+                      in: ['L5', 'L6'],
+                    },
+                  },
+                  {
+                    isInvestor: null,
+                  },
+                ],
+              },
+            ],
           },
           {
             OR: [
@@ -3119,6 +3144,79 @@ export class MembersService {
         oldTeamUid: founderParticipants[0]?.teamUid ?? null,
         newTeamUid: null,
       };
+    }
+  }
+
+  /**
+   * Updates a member's investor setting.
+   * Only changes the isInvestor flag.
+   *
+   * @param memberUid - The UID of the member
+   * @param isInvestor - Whether the member should be marked as an investor
+   * @returns The updated investor setting
+   */
+  async updateMemberInvestorSetting(memberUid: string, isInvestor: boolean) {
+    try {
+      const member = await this.prisma.member.findUnique({
+        where: { uid: memberUid },
+        select: {
+          uid: true,
+          isInvestor: true,
+        },
+      });
+
+      if (!member) {
+        throw new NotFoundException('Member not found');
+      }
+
+      // If already at the requested setting, return as-is
+      if (member.isInvestor === isInvestor) {
+        return { isInvestor: member.isInvestor ?? false };
+      }
+
+      // Update only the member's investor setting
+      await this.prisma.member.update({
+        where: { uid: memberUid },
+        data: {
+          isInvestor,
+        },
+      });
+
+      // Reset cache after update
+      await this.cacheService.reset({ service: 'members' });
+
+      this.logger.info(`Member investor setting updated: memberUid=${memberUid}, isInvestor=${isInvestor}`);
+
+      return { isInvestor };
+    } catch (error) {
+      this.logger.error(`Error updating member investor setting: memberUid=${memberUid}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets a member's investor settings.
+   *
+   * @param memberUid - The UID of the member
+   * @returns The member's investor setting
+   */
+  async getMemberInvestorSetting(memberUid: string) {
+    try {
+      const member = await this.prisma.member.findUnique({
+        where: { uid: memberUid },
+        select: {
+          isInvestor: true,
+        },
+      });
+
+      if (!member) {
+        throw new NotFoundException('Member not found');
+      }
+
+      return { isInvestor: member.isInvestor ?? false };
+    } catch (error) {
+      this.logger.error(`Error getting member investor setting: memberUid=${memberUid}`, error);
+      throw error;
     }
   }
 }

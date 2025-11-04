@@ -1452,4 +1452,181 @@ export class TeamsService {
       });
     }
   }
+
+  /**
+   * Advanced team search with filtering
+   * @param filters - Filter parameters including isFund, typicalCheckSize range, and investmentFocus
+   * @returns Paginated search results with teams and metadata
+   */
+  async searchTeams(filters: {
+    search?: string;
+    isFund?: boolean | string;
+    minTypicalCheckSize?: number | string;
+    maxTypicalCheckSize?: number | string;
+    investmentFocus?: string[];
+    sort?: 'name:asc' | 'name:desc';
+    page?: number | string;
+    limit?: number | string;
+  }) {
+    const page = Number(filters.page) || 1;
+    const limit = Math.min(Number(filters.limit) || 20, 100);
+    const skip = (page - 1) * limit;
+
+    // Base where clause excluding L0 access level
+    const baseWhere: Prisma.TeamWhereInput = {
+      accessLevel: {
+        not: 'L0',
+      },
+    };
+
+    const whereConditions: Prisma.TeamWhereInput[] = [baseWhere];
+
+    // isFund filter - convert string to boolean
+    if (filters.isFund !== undefined) {
+      const isFundValue = typeof filters.isFund === 'string'
+        ? filters.isFund === 'true'
+        : filters.isFund;
+      whereConditions.push({
+        isFund: isFundValue,
+      });
+    }
+
+    // Search filter - search by team name
+    if (filters.search && filters.search.trim()) {
+      const searchTerm = filters.search.trim();
+      whereConditions.push({
+        name: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      });
+    }
+
+    // Typical check size filter
+    if (
+      (filters.minTypicalCheckSize && Number(filters.minTypicalCheckSize) > 0) ||
+      (filters.maxTypicalCheckSize && Number(filters.maxTypicalCheckSize) > 0)
+    ) {
+      const checkSizeFilter: any = {};
+
+      if (filters.minTypicalCheckSize && Number(filters.minTypicalCheckSize) > 0) {
+        checkSizeFilter.gte = Number(filters.minTypicalCheckSize);
+      }
+
+      if (filters.maxTypicalCheckSize && Number(filters.maxTypicalCheckSize) > 0) {
+        checkSizeFilter.lte = Number(filters.maxTypicalCheckSize);
+      }
+
+      whereConditions.push({
+        investorProfile: {
+          typicalCheckSize: checkSizeFilter,
+        },
+      });
+    }
+
+    // Investment focus filter - using substring matching
+    if (filters.investmentFocus && filters.investmentFocus.length > 0) {
+      // Ensure investmentFocus is always an array (query params might come as string)
+      const focusArray = Array.isArray(filters.investmentFocus) ? filters.investmentFocus : [filters.investmentFocus];
+
+      // Get team IDs that match investment focus using substring matching
+      const matchingTeamIds = await this.prisma.$queryRaw<{ id: number }[]>`
+        SELECT DISTINCT t.id FROM "Team" t
+        INNER JOIN "InvestorProfile" ip ON t."investorProfileId" = ip.uid
+        WHERE ${Prisma.raw(
+          focusArray
+            .map(
+              (focus) => `
+              EXISTS (
+                SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item
+                WHERE LOWER(focus_item) LIKE LOWER('%${focus.replace(/'/g, "''")}%')
+              )
+            `
+            )
+            .join(' OR ')
+        )}
+      `;
+
+      if (matchingTeamIds.length > 0) {
+        whereConditions.push({
+          id: {
+            in: matchingTeamIds.map((row) => row.id),
+          },
+        });
+      } else {
+        // If no teams match, add an impossible condition to return no results
+        whereConditions.push({
+          id: {
+            in: [],
+          },
+        });
+      }
+    }
+
+    const where: Prisma.TeamWhereInput = {
+      AND: whereConditions,
+    };
+
+    // Sorting
+    const orderBy: Prisma.TeamOrderByWithRelationInput = {};
+    if (filters.sort === 'name:desc') {
+      orderBy.name = 'desc';
+    } else {
+      orderBy.name = 'asc'; // Default to ascending
+    }
+
+    try {
+      const [teams, total] = await Promise.all([
+        this.prisma.team.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: {
+            uid: true,
+            name: true,
+            isFund: true,
+            shortDescription: true,
+            website: true,
+            logo: {
+              select: {
+                uid: true,
+                url: true,
+              },
+            },
+            investorProfile: {
+              select: {
+                uid: true,
+                investmentFocus: true,
+                typicalCheckSize: true,
+                investInStartupStages: true,
+                type: true,
+              },
+            },
+            industryTags: {
+              select: {
+                title: true,
+              },
+            },
+            fundingStage: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        }),
+        this.prisma.team.count({ where }),
+      ]);
+
+      return {
+        teams,
+        total,
+        page,
+        hasMore: skip + teams.length < total,
+      };
+    } catch (error) {
+      this.logger.error('Error searching teams:', error);
+      throw error;
+    }
+  }
 }
