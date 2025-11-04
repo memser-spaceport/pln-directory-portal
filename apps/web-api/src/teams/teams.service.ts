@@ -778,6 +778,10 @@ export class TeamsService {
     this.buildOfficeHoursFilter(officeHours, filter);
     this.buildRecentTeamsFilter(queryParams, filter);
     this.buildAskTagFilter(queryParams, filter);
+
+    const tierFilter = this.buildTierFilter(queryParams.tiers);
+    if (Object.keys(tierFilter).length) filter.push(tierFilter);
+
     filter.push(this.buildParticipationTypeFilter(queryParams));
     return {
       AND: filter,
@@ -926,6 +930,19 @@ export class TeamsService {
       filter.push(recentFilter);
     }
     return {};
+  }
+
+  buildTierFilter(tiersCsv?: string) {
+    if (!tiersCsv) return {};
+    const tiers = tiersCsv
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => s !== '')
+      .map(n => Number(n))
+      .filter(n => !Number.isNaN(n));
+
+    if (tiers.length === 0) return {};
+    return { tier: { in: tiers } };
   }
 
   buildAskTagFilter(queryParams, filter?) {
@@ -1091,7 +1108,7 @@ export class TeamsService {
    * @returns Set of industry tags, membership sources, funding stages
    * and technologies that contains atleast one team.
    */
-  async getTeamFilters(queryParams) {
+  async getTeamFilters(queryParams, userEmail: string | null) {
     const [industryTags, membershipSources, fundingStages, technologies, askTags] = await Promise.all([
       this.prisma.industryTag.findMany({
         where: {
@@ -1147,12 +1164,16 @@ export class TeamsService {
       }),
     ]);
 
+    const canSee = await this.canSeeTiers(userEmail || undefined);
+    const tiers = canSee ? await this.getTierCounts(queryParams.where ?? {}) : undefined;
+
     return {
       industryTags: industryTags.map((tag) => tag.title),
       membershipSources: membershipSources.map((source) => source.title),
       fundingStages: fundingStages.map((stage) => stage.title),
       technologies: technologies.map((tech) => tech.title),
       askTags: this.askService.formatAskFilterResponse(askTags),
+      ...(canSee ? { tiers } : {}),
     };
   }
 
@@ -1467,6 +1488,7 @@ export class TeamsService {
     sort?: 'name:asc' | 'name:desc';
     page?: number | string;
     limit?: number | string;
+    tiers?: string | number[]
   }) {
     const page = Number(filters.page) || 1;
     const limit = Math.min(Number(filters.limit) || 20, 100);
@@ -1523,6 +1545,17 @@ export class TeamsService {
         },
       });
     }
+
+    if (filters.tiers) {
+      const tiersCsv = Array.isArray(filters.tiers)
+        ? filters.tiers.join(',')
+        : (filters.tiers as string);
+      const tierWhere = this.buildTierFilter(tiersCsv);
+      if (Object.keys(tierWhere).length) {
+        whereConditions.push(tierWhere);
+      }
+    }
+
 
     // Investment focus filter - using substring matching
     if (filters.investmentFocus && filters.investmentFocus.length > 0) {
@@ -1587,6 +1620,7 @@ export class TeamsService {
             name: true,
             isFund: true,
             shortDescription: true,
+            tier: true,
             website: true,
             logo: {
               select: {
@@ -1628,5 +1662,44 @@ export class TeamsService {
       this.logger.error('Error searching teams:', error);
       throw error;
     }
+  }
+
+  async getTierCounts(where: Prisma.TeamWhereInput) {
+    const baseWhere: Prisma.TeamWhereInput = {
+      accessLevel: { not: 'L0' },
+      ...where,
+    };
+
+    const grouped = await this.prisma.team.groupBy({
+      by: ['tier'],
+      where: baseWhere,
+      _count: { _all: true },
+    });
+
+    const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+    for (const row of grouped) {
+      const t = (row.tier ?? 0) as number;
+      if (t >= 0 && t <= 4) counts[t] = row._count._all;
+    }
+
+    return [
+      { tier: 0, count: counts[0] },
+      { tier: 1, count: counts[1] },
+      { tier: 2, count: counts[2] },
+      { tier: 3, count: counts[3] },
+      { tier: 4, count: counts[4] },
+    ];
+  }
+
+  private async canSeeTiers(actorEmail?: string): Promise<boolean> {
+    if (!actorEmail) return false;
+
+    const member = await this.membersService.findMemberByEmail(actorEmail);
+    if (!member) return false;
+
+    const isDirectoryAdmin =
+      !!member.memberRoles?.some(r => r?.name === 'DIRECTORYADMIN');
+
+    return !!member.isTierViewer || isDirectoryAdmin;
   }
 }

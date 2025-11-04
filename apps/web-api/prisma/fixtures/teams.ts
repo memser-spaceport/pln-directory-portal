@@ -17,18 +17,19 @@ const getUidsFrom = async (model, where = {}) => {
   });
 };
 
+const randTier = () => [1, 2, 3, 4][Math.floor(Math.random() * 4)];
+
 const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) => {
   onCreate(async (team) => {
-    const fundingStageUids = await (await getUidsFrom(Prisma.ModelName.FundingStage)).map((result) => result.uid);
+    const fundingStageUids = (await getUidsFrom(Prisma.ModelName.FundingStage)).map(r => r.uid);
     team.fundingStageUid = sample(fundingStageUids) || '';
-    const imageUids = await (
-      await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })
-    ).map((result) => result.uid);
+    const imageUids = (await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })).map(r => r.uid);
     team.logoUid = sample(imageUids) || '';
     return team;
   });
 
   const companyName = faker.helpers.unique(faker.company.name);
+
   return {
     uid: faker.helpers.slugify(`uid-${companyName.toLowerCase()}`),
     name: companyName,
@@ -54,6 +55,7 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) =
     isFund: faker.datatype.boolean(),
     accessLevel: 'L1',
     accessLevelUpdatedAt: faker.date.past(),
+    tier: randTier(),
   };
 });
 
@@ -68,19 +70,11 @@ export const teamRelations = async (teams) => {
     const randomTechnologies = sampleSize(technologyUids, random(0, technologyUids.length));
 
     return {
-      where: {
-        uid: team.uid,
-      },
+      where: { uid: team.uid },
       data: {
-        industryTags: {
-          connect: sampleSize(industryTagUids, 3),
-        },
-        membershipSources: {
-          connect: sampleSize(membershipSourceUids, 3),
-        },
-        ...(randomTechnologies.length && {
-          technologies: { connect: randomTechnologies },
-        }),
+        industryTags: { connect: sampleSize(industryTagUids, 3) },
+        membershipSources: { connect: sampleSize(membershipSourceUids, 3) },
+        ...(randomTechnologies.length && { technologies: { connect: randomTechnologies } }),
       },
     };
   });

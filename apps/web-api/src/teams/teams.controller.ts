@@ -20,6 +20,7 @@ import { AccessLevelsGuard } from '../guards/access-levels.guard';
 import { AccessLevels } from '../decorators/access-levels.decorator';
 import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import { MembersService } from '../members/members.service';
+import {UserTokenCheckGuard} from "../guards/user-token-check.guard";
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
@@ -33,7 +34,8 @@ export class TeamsController {
   @Api(server.route.teamFilters)
   @ApiQueryFromZod(TeamQueryParams)
   @NoCache()
-  async getTeamFilters(@Req() request: Request) {
+  @UseGuards(UserTokenCheckGuard)
+  async getTeamFilters(@Req() request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
@@ -51,7 +53,7 @@ export class TeamsController {
         this.teamsService.buildAskTagFilter(request.query),
       ],
     };
-    return await this.teamsService.getTeamFilters(builtQuery);
+    return await this.teamsService.getTeamFilters(builtQuery, request?.userEmail || null);
   }
 
   @Api(server.route.getTeams)
@@ -75,6 +77,7 @@ export class TeamsController {
         this.teamsService.buildRecentTeamsFilter(request.query),
         this.teamsService.buildParticipationTypeFilter(request.query),
         this.teamsService.buildAskTagFilter(request.query),
+        this.teamsService.buildTierFilter(request.query['tiers'] as string),
       ],
     };
     // Check for the office hours blank when OH not null is passed

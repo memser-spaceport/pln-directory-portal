@@ -47,6 +47,7 @@ export async function createTeam({ amount }: TestFactorySeederParams) {
       isFund: false,
       accessLevel: 'L1',
       accessLevelUpdatedAt: new Date(),
+      tier: 1
     };
 
     return team;
