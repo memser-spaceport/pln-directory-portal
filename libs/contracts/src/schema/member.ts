@@ -245,3 +245,15 @@ export const MembersForNodebbSchema = ResponseMemberSchema.pick({
 });
 
 export class MembersForNodebbRequestDto extends createZodDto(MembersForNodebbRequestSchema) {}
+
+// Investor setting schema
+export const UpdateMemberInvestorSettingRequestSchema = z.object({
+  isInvestor: z.boolean(),
+});
+
+export const MemberInvestorSettingResponseSchema = z.object({
+  isInvestor: z.boolean(),
+});
+
+export class UpdateMemberInvestorSettingRequestDto extends createZodDto(UpdateMemberInvestorSettingRequestSchema) {}
+export class MemberInvestorSettingResponseDto extends createZodDto(MemberInvestorSettingResponseSchema) {}
