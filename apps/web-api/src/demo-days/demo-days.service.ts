@@ -735,7 +735,13 @@ export class DemoDaysService {
 
   async createFeedback(
     memberEmail: string,
-    feedbackData: { rating: number; comment?: string | null; issues: string[] }
+    feedbackData: {
+      rating: number;
+      qualityComments?: string | null;
+      improvementComments?: string | null;
+      comment?: string | null;
+      issues: string[];
+    }
   ) {
     const demoDay = await this.getCurrentDemoDay();
     if (!demoDay) {
@@ -771,6 +777,8 @@ export class DemoDaysService {
         demoDayUid: demoDay.uid,
         memberUid: member.uid,
         rating: feedbackData.rating,
+        qualityComments: feedbackData.qualityComments || null,
+        improvementComments: feedbackData.improvementComments || null,
         comment: feedbackData.comment || null,
         issues: feedbackData.issues,
       },
@@ -785,6 +793,10 @@ export class DemoDaysService {
         feedbackUid: feedback.uid,
         rating: feedback.rating,
         hasComment: !!feedback.comment,
+        hasQualityComments: !!feedback.qualityComments,
+        hasImprovementComments: !!feedback.improvementComments,
+        qualityComments: feedback.qualityComments,
+        improvementComments: feedback.improvementComments,
         issuesCount: feedback.issues.length,
         issues: feedback.issues,
       },
