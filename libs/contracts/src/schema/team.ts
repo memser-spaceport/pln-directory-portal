@@ -87,6 +87,7 @@ export const TeamFilterQueryParams = z.object({
   sort: z.enum(['name:asc', 'name:desc']).optional(),
   page: z.number().positive().optional(),
   limit: z.number().positive().max(100).optional(),
+  tiers: z.union([z.string(), z.array(z.number())]).optional(),
 });
 
 export class TeamDto extends createZodDto(TeamSchema) {}

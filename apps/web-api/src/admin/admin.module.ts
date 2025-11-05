@@ -17,6 +17,8 @@ import { NotificationSettingsModule } from '../notification-settings/notificatio
 import { AdminDemoDaysController } from './demo-day.controller';
 import { DemoDaysModule } from '../demo-days/demo-days.module';
 import {AnalyticsModule} from "../analytics/analytics.module";
+import {AdminTeamsController} from "./admin-teams.controller";
+import { AdminTeamsService } from './admin-teams.service';
 
 @Module({
   imports: [
@@ -38,8 +40,9 @@ import {AnalyticsModule} from "../analytics/analytics.module";
     MemberController,
     RecommendationsController,
     AdminDemoDaysController,
+    AdminTeamsController
   ],
   exports: [MemberService],
-  providers: [AdminService, MemberService, JwtService],
+  providers: [AdminService, MemberService, JwtService, AdminTeamsService],
 })
 export class AdminModule {}

@@ -30,6 +30,7 @@ model Team {
   telegramHandler              String?
   shortDescription             String?
   longDescription              String?
+  tier                         Int?
   plnFriend                    Boolean                       @default(false)
   isFeatured                   Boolean?                      @default(false)
   isFund                       Boolean                       @default(false)
@@ -110,6 +111,7 @@ model Member {
   externalId                       String?                           @unique
   openToWork                       Boolean?                          @default(false)
   isFeatured                       Boolean?                          @default(false)
+  isTierViewer                     Boolean?                          @default(false)
   isVerified                       Boolean?                          @default(false)
   signUpSource                     String?
   signUpMedium                     String?
