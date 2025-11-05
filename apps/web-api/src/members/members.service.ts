@@ -3213,7 +3213,7 @@ export class MembersService {
         throw new NotFoundException('Member not found');
       }
 
-      return { isInvestor: member.isInvestor ?? false };
+      return { isInvestor: typeof member.isInvestor === 'boolean' ? member.isInvestor : null };
     } catch (error) {
       this.logger.error(`Error getting member investor setting: memberUid=${memberUid}`, error);
       throw error;
