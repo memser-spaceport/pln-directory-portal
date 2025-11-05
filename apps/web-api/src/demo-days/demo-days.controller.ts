@@ -28,6 +28,7 @@ import {
   ExpressInterestDto,
   UpdateFundraisingDescriptionDto,
   UpdateFundraisingTeamDto,
+  CreateDemoDayFeedbackDto,
 } from 'libs/contracts/src/schema';
 
 const cache = new Map<string, { data: any; expires: number }>();
@@ -294,5 +295,13 @@ export class DemoDaysController {
       files.previewImage[0],
       files.previewImageSmall?.[0]
     );
+  }
+
+  @Post('current/feedback')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async submitFeedback(@Req() req, @Body() body: CreateDemoDayFeedbackDto) {
+    return this.demoDaysService.createFeedback(req.userEmail, body);
   }
 }

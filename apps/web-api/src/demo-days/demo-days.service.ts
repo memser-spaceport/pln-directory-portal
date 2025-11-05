@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { DemoDay, DemoDayStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
@@ -731,5 +731,77 @@ export class DemoDaysService {
       })),
       investorActivity,
     };
+  }
+
+  async createFeedback(
+    memberEmail: string,
+    feedbackData: {
+      rating: number;
+      qualityComments?: string | null;
+      improvementComments?: string | null;
+      comment?: string | null;
+      issues: string[];
+    }
+  ) {
+    const demoDay = await this.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new NotFoundException('No current demo day found');
+    }
+
+    const member = await this.prisma.member.findUnique({
+      where: { email: memberEmail },
+      select: { uid: true },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+
+    // Check if feedback already exists
+    const existingFeedback = await this.prisma.demoDayFeedback.findUnique({
+      where: {
+        demoDayUid_memberUid: {
+          demoDayUid: demoDay.uid,
+          memberUid: member.uid,
+        },
+      },
+    });
+
+    if (existingFeedback) {
+      throw new ConflictException('Feedback already submitted for this Demo Day');
+    }
+
+    // Create feedback
+    const feedback = await this.prisma.demoDayFeedback.create({
+      data: {
+        demoDayUid: demoDay.uid,
+        memberUid: member.uid,
+        rating: feedbackData.rating,
+        qualityComments: feedbackData.qualityComments || null,
+        improvementComments: feedbackData.improvementComments || null,
+        comment: feedbackData.comment || null,
+        issues: feedbackData.issues,
+      },
+    });
+
+    // Track analytics event
+    await this.analyticsService.trackEvent({
+      name: 'demo-day-feedback-submitted',
+      distinctId: member.uid,
+      properties: {
+        demoDayUid: demoDay.uid,
+        feedbackUid: feedback.uid,
+        rating: feedback.rating,
+        hasComment: !!feedback.comment,
+        hasQualityComments: !!feedback.qualityComments,
+        hasImprovementComments: !!feedback.improvementComments,
+        qualityComments: feedback.qualityComments,
+        improvementComments: feedback.improvementComments,
+        issuesCount: feedback.issues.length,
+        issues: feedback.issues,
+      },
+    });
+
+    return feedback;
   }
 }
