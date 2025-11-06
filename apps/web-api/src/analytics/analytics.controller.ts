@@ -3,6 +3,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req } from '@
 import { Request } from 'express';
 import { AnalyticsService } from './service/analytics.service';
 import {AnalyticsReadService} from "./service/analytics.read.service";
+import { SkipThrottle } from '@nestjs/throttler';
 
 class TrackEventDto {
   name!: string;
@@ -38,6 +39,7 @@ export class AnalyticsController {
   ) {}
 
   @Post('track')
+  @SkipThrottle()
   @HttpCode(HttpStatus.OK)
   async track(@Body() dto: TrackEventDto, @Req() req: Request) {
     const ip =
@@ -62,6 +64,7 @@ export class AnalyticsController {
   }
 
   @Post('batch')
+  @SkipThrottle()
   @HttpCode(HttpStatus.OK)
   async batch(@Body() dto: BatchTrackDto, @Req() req: Request) {
     const ip =
