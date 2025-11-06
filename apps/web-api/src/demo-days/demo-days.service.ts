@@ -757,21 +757,7 @@ export class DemoDaysService {
       throw new NotFoundException('Member not found');
     }
 
-    // Check if feedback already exists
-    const existingFeedback = await this.prisma.demoDayFeedback.findUnique({
-      where: {
-        demoDayUid_memberUid: {
-          demoDayUid: demoDay.uid,
-          memberUid: member.uid,
-        },
-      },
-    });
-
-    if (existingFeedback) {
-      throw new ConflictException('Feedback already submitted for this Demo Day');
-    }
-
-    // Create feedback
+    // Create feedback (multiple submissions allowed)
     const feedback = await this.prisma.demoDayFeedback.create({
       data: {
         demoDayUid: demoDay.uid,
