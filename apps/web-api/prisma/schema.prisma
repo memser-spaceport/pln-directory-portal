@@ -1095,6 +1095,6 @@ model DemoDayFeedback {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  @@unique([demoDayUid, memberUid])
   @@index([demoDayUid])
+  @@index([memberUid, demoDayUid])
 }
