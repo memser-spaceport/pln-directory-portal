@@ -173,12 +173,13 @@ export class AppModule {
         {
           path: 'v1/admin/demo-days/current/teams/:teamUid/fundraising-profile/one-pager/preview',
           method: RequestMethod.POST,
-        }
+        },
+        { path: 'v1/admin/teams/tiers/upload', method: RequestMethod.POST },
       )
       .forRoutes(
         { path: '*', method: RequestMethod.POST },
         { path: '*', method: RequestMethod.PUT },
-        { path: '*', method: RequestMethod.PATCH }
+        { path: '*', method: RequestMethod.PATCH },
       );
 
     consumer

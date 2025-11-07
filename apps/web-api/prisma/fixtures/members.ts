@@ -75,6 +75,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
       showTwitter: true,
       showSubscription: true,
     },
+    isTierViewer: false,
     linkedInDetails: {},
     accessLevel,
     isInvestor: null,

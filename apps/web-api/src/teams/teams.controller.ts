@@ -1,10 +1,11 @@
 /* eslint-disable prettier/prettier */
-import { Controller, Req, UseGuards, Body, Param, UsePipes, Patch } from '@nestjs/common';
+import { Controller, Req, UseGuards, Body, Param, UsePipes, Patch, ForbiddenException } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
-import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
+import { Api, ApiDecorator, initNestServer, TsRest } from '@ts-rest/nest';
 import { Request } from 'express';
+import { z } from 'zod';
 import { apiTeam } from 'libs/contracts/src/lib/contract-team';
-import { ResponseTeamWithRelationsSchema, TeamDetailQueryParams, TeamQueryParams } from 'libs/contracts/src/schema';
+import { ResponseTeamWithRelationsSchema, TeamDetailQueryParams, TeamQueryParams, TeamFilterQueryParams } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { NOT_FOUND_GLOBAL_RESPONSE_SCHEMA } from '../utils/constants';
@@ -18,17 +19,23 @@ import { ParticipantsReqValidationPipe } from '../pipes/participant-request-vali
 import { AccessLevelsGuard } from '../guards/access-levels.guard';
 import { AccessLevels } from '../decorators/access-levels.decorator';
 import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
+import { MembersService } from '../members/members.service';
+import {UserTokenCheckGuard} from "../guards/user-token-check.guard";
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
 @Controller()
 export class TeamsController {
-  constructor(private readonly teamsService: TeamsService) {}
+  constructor(
+    private readonly teamsService: TeamsService,
+    private readonly membersService: MembersService
+  ) {}
 
   @Api(server.route.teamFilters)
   @ApiQueryFromZod(TeamQueryParams)
   @NoCache()
-  async getTeamFilters(@Req() request: Request) {
+  @UseGuards(UserTokenCheckGuard)
+  async getTeamFilters(@Req() request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
@@ -46,7 +53,7 @@ export class TeamsController {
         this.teamsService.buildAskTagFilter(request.query),
       ],
     };
-    return await this.teamsService.getTeamFilters(builtQuery);
+    return await this.teamsService.getTeamFilters(builtQuery, request?.userEmail || null);
   }
 
   @Api(server.route.getTeams)
@@ -70,6 +77,7 @@ export class TeamsController {
         this.teamsService.buildRecentTeamsFilter(request.query),
         this.teamsService.buildParticipationTypeFilter(request.query),
         this.teamsService.buildAskTagFilter(request.query),
+        this.teamsService.buildTierFilter(request.query['tiers'] as string),
       ],
     };
     // Check for the office hours blank when OH not null is passed
@@ -151,5 +159,44 @@ export class TeamsController {
   @NoCache()
   async memberSelfUpdate(@Param('uid') teamUid: string, @Body() body: any, @Req() req: Request) {
     return this.teamsService.updateTeamMemberRoleAndInvestorProfile(teamUid, body, req['userEmail']);
+  }
+
+  /**
+   * Soft deletes a team by marking it as L0 (inactive).
+   * Only users with a DIRECTORYADMIN role can delete teams.
+   * L0 teams are not visible in queries.
+   */
+  @TsRest(server.route.deleteTeam)
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async deleteTeam(@Param('uid') teamUid: string, @Req() req: Request) {
+    const userEmail = req['userEmail'];
+    const requestor = await this.membersService.findMemberByEmail(userEmail);
+
+    if (!requestor) {
+      throw new ForbiddenException(`Member with email ${userEmail} not found`);
+    }
+
+    const isDirectoryAdmin = this.membersService.checkIfAdminUser(requestor);
+
+    if (!isDirectoryAdmin) {
+      throw new ForbiddenException(`Member with email ${userEmail} isn't admin to delete the team`);
+    }
+
+    return this.teamsService.softDeleteTeam(teamUid);
+  }
+
+  /**
+   * Advanced team search with filtering by isFund, typicalCheckSize range, and investmentFocus.
+   *
+   * @param request - HTTP request object containing query parameters
+   * @returns Paginated search results with teams and metadata
+   */
+  @TsRest(server.route.searchTeams)
+  @ApiQueryFromZod(TeamFilterQueryParams.optional())
+  @NoCache()
+  async searchTeams(@Req() request: Request) {
+    const params = request.query as unknown as z.infer<typeof TeamFilterQueryParams>;
+    return await this.teamsService.searchTeams(params || {});
   }
 }
