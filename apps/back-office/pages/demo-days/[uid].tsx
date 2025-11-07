@@ -11,6 +11,7 @@ import { AddParticipantModal } from '../../components/demo-days/AddParticipantMo
 import { UploadParticipantsModal } from '../../components/demo-days/UploadParticipantsModal';
 import { UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
+import { RichText } from '../../components/common/rich-text';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
 
@@ -346,7 +347,7 @@ const DemoDayDetailPage = () => {
                     className={s.fieldTextarea}
                   />
                 ) : (
-                  <div className={s.fieldValue}>{demoDay.description}</div>
+                  <RichText text={demoDay.description} className={s.fieldValue} />
                 )}
               </div>
             </div>
