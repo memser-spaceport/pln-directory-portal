@@ -21,7 +21,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       }
       // Emit CUD events to Queue for selected entities
       try {
-        await this.emitCUDEvents(params, result);
+        if (process.env.ENABLE_DB_EVENT_TRACKING === 'true') {
+          await this.emitCUDEvents(params, result);
+        }
       } catch (error) {
         // swallow to not block db operation
         this.logger.error('Error occurred in emitting CUD events to Queue', (error as any)?.stack, PrismaService.name);
