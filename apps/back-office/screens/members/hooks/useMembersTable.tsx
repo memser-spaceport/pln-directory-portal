@@ -14,7 +14,7 @@ import MemberCell from '../components/MemberCell/MemberCell';
 import { Member } from '../types/member';
 import ProjectsCell from '../components/ProjectsCell/ProjectsCell';
 import LinkedinCell from '../components/LinkedinCell/LinkedinCell';
-import NewsCell from '../components/NewsCell/NewsCell';
+import SignUpSourceCell from '../components/SignUpSourceCell/SignUpSourceCell';
 import EditCell from '../components/EditCell/EditCell';
 import StatusCell from '../components/StatusCell/StatusCell';
 import { Row } from '@tanstack/table-core/src/types';
@@ -98,15 +98,12 @@ export function useMembersTable({
           align: 'center',
         },
       }),
-      columnHelper.accessor('isSubscribedToNewsletter', {
-        header: 'News',
-        cell: (info) => <NewsCell member={info.row.original} />,
-        size: 80,
+      columnHelper.accessor('signUpSource', {
+        header: 'Sign Up Source',
+        cell: (info) => <SignUpSourceCell member={info.row.original} />,
+        size: 150,
         enableResizing: false,
-        enableSorting: false,
-        meta: {
-          align: 'center',
-        },
+        enableSorting: true,
       }),
       columnHelper.accessor('accessLevel', {
         header: 'Status',
