@@ -10,6 +10,7 @@ export type Member = {
   teamMemberRoles: { team: { uid: string; name: string } }[];
   teamOrProjectURL: string;
   uid: string;
+  signUpSource: string | null;
 };
 
 export type TMemberForm = {
