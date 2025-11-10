@@ -373,6 +373,13 @@ export class PLEventGuestsService {
         return guest;
       });
     }
+    else if (!isUserLoggedIn && eventGuests) {
+      eventGuests = eventGuests.map((guest: any) => {
+        delete guest.member.telegramHandler;
+        delete guest.telegramId;
+        return guest;
+      });
+    }
     return eventGuests;
   }
 
