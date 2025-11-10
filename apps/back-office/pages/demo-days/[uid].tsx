@@ -95,6 +95,7 @@ const DemoDayDetailPage = () => {
     setEditFormData({
       title: demoDay.title,
       description: demoDay.description,
+      shortDescription: demoDay.shortDescription,
       startDate: demoDay.startDate,
       status: demoDay.status,
     });
@@ -335,6 +336,19 @@ const DemoDayDetailPage = () => {
                   />
                 ) : (
                   <div className={s.fieldValue}>{demoDay.title}</div>
+                )}
+              </div>
+              <div className={clsx(s.overviewField, s.fullWidth)}>
+                <label className={s.fieldLabel}>Short Description</label>
+                {isEditing ? (
+                  <textarea
+                    value={editFormData.shortDescription || ''}
+                    onChange={(e) => handleEditFormChange('shortDescription', e.target.value)}
+                    rows={2}
+                    className={s.fieldTextarea}
+                  />
+                ) : (
+                  <RichText text={demoDay.shortDescription || ''} className={s.fieldValue} />
                 )}
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>

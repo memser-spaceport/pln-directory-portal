@@ -972,6 +972,7 @@ model DemoDay {
   startDate                 DateTime
   title                     String
   description               String
+  shortDescription          String?
   status                    DemoDayStatus                     @default(UPCOMING)
   createdAt                 DateTime                          @default(now())
   updatedAt                 DateTime                          @updatedAt

@@ -2,6 +2,7 @@ export interface DemoDay {
   uid: string;
   title: string;
   description: string;
+  shortDescription?: string;
   startDate: string;
   status: 'UPCOMING' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED';
   createdAt: string;
@@ -11,6 +12,7 @@ export interface DemoDay {
 export interface CreateDemoDayDto {
   title: string;
   description: string;
+  shortDescription?: string;
   startDate: string;
   status: 'UPCOMING' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED';
 }
@@ -18,6 +20,7 @@ export interface CreateDemoDayDto {
 export interface UpdateDemoDayDto {
   title?: string;
   description?: string;
+  shortDescription?: string;
   startDate?: string;
   status?: 'UPCOMING' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED';
 }

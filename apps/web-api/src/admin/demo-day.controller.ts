@@ -39,6 +39,7 @@ export class AdminDemoDaysController {
         startDate: new Date(body.startDate),
         title: body.title,
         description: body.description,
+        shortDescription: body.shortDescription,
         status: body.status.toUpperCase() as DemoDayStatus,
       },
       req.userEmail
@@ -71,6 +72,7 @@ export class AdminDemoDaysController {
         startDate: body.startDate ? new Date(body.startDate) : undefined,
         title: body.title,
         description: body.description,
+        shortDescription: body.shortDescription,
         status: body.status?.toUpperCase() as DemoDayStatus,
       },
       req.userEmail

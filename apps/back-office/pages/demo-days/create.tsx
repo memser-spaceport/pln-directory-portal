@@ -13,6 +13,7 @@ const CreateDemoDayPage = () => {
   const [formData, setFormData] = useState<CreateDemoDayDto>({
     title: '',
     description: '',
+    shortDescription: '',
     startDate: '',
     status: 'UPCOMING',
   });
@@ -77,6 +78,21 @@ const CreateDemoDayPage = () => {
                 onChange={handleInputChange}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter demo day title"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="shortDescription" className="mb-2 block text-sm font-medium text-gray-700">
+                Short Description
+              </label>
+              <textarea
+                id="shortDescription"
+                name="shortDescription"
+                value={formData.shortDescription}
+                onChange={handleInputChange}
+                rows={2}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter a brief description"
               />
             </div>
 

@@ -327,6 +327,7 @@ export class DemoDaysService {
       startDate: Date;
       title: string;
       description: string;
+      shortDescription?: string;
       status: DemoDayStatus;
     },
     actorEmail?: string
@@ -343,6 +344,7 @@ export class DemoDaysService {
         startDate: data.startDate,
         title: data.title,
         description: data.description,
+        shortDescription: data.shortDescription,
         status: data.status,
       },
     });
@@ -355,6 +357,7 @@ export class DemoDaysService {
         demoDayUid: created.uid,
         title: created.title,
         description: created.description,
+        shortDescription: created.shortDescription,
         startDate: created.startDate?.toISOString?.() || null,
         status: created.status,
         actorUid: actorUid || null,
@@ -374,6 +377,7 @@ export class DemoDaysService {
         startDate: true,
         title: true,
         description: true,
+        shortDescription: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -393,6 +397,7 @@ export class DemoDaysService {
         startDate: true,
         title: true,
         description: true,
+        shortDescription: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -414,6 +419,7 @@ export class DemoDaysService {
       startDate?: Date;
       title?: string;
       description?: string;
+      shortDescription?: string;
       status?: DemoDayStatus;
     },
     actorEmail?: string
@@ -439,6 +445,9 @@ export class DemoDaysService {
     if (data.description !== undefined) {
       updateData.description = data.description;
     }
+    if (data.shortDescription !== undefined) {
+      updateData.shortDescription = data.shortDescription;
+    }
     if (data.status !== undefined) {
       updateData.status = data.status;
     }
@@ -452,6 +461,7 @@ export class DemoDaysService {
         startDate: true,
         title: true,
         description: true,
+        shortDescription: true,
         status: true,
         createdAt: true,
         updatedAt: true,
