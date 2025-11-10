@@ -138,8 +138,11 @@ const CreateDemoDayPage = () => {
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="UPCOMING">Upcoming</option>
+                <option value="REGISTRATION_OPEN">Registration Open</option>
+                <option value="EARLY_ACCESS">Early Access</option>
                 <option value="ACTIVE">Active</option>
                 <option value="COMPLETED">Completed</option>
+                <option value="ARCHIVED">Archived</option>
               </select>
             </div>
 

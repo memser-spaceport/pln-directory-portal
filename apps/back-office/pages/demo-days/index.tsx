@@ -23,10 +23,16 @@ const DemoDaysPage = () => {
     switch (status) {
       case 'ACTIVE':
         return 'text-green-600 bg-green-100';
+      case 'REGISTRATION_OPEN':
+        return 'text-emerald-600 bg-emerald-100';
+      case 'EARLY_ACCESS':
+        return 'text-orange-600 bg-orange-100';
       case 'UPCOMING':
         return 'text-yellow-600 bg-yellow-100';
       case 'COMPLETED':
         return 'text-blue-600 bg-blue-100';
+      case 'ARCHIVED':
+        return 'text-gray-600 bg-gray-100';
       default:
         return 'text-gray-600 bg-gray-100';
     }

@@ -64,6 +64,8 @@ const DemoDayDetailPage = () => {
     switch (status) {
       case 'ACTIVE':
         return 'text-green-600 bg-green-100';
+      case 'REGISTRATION_OPEN':
+        return 'text-emerald-600 bg-emerald-100';
       case 'EARLY_ACCESS':
         return 'text-orange-600 bg-orange-100';
       case 'PENDING':
@@ -317,9 +319,11 @@ const DemoDayDetailPage = () => {
                     className={s.fieldInput}
                   >
                     <option value="UPCOMING">Upcoming</option>
+                    <option value="REGISTRATION_OPEN">Registration Open</option>
                     <option value="EARLY_ACCESS">Early Access</option>
                     <option value="ACTIVE">Active</option>
                     <option value="COMPLETED">Completed</option>
+                    <option value="ARCHIVED">Archived</option>
                   </select>
                 ) : (
                   <div className={s.fieldValue}>{demoDay.status}</div>

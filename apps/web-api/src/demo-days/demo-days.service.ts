@@ -13,7 +13,14 @@ export class DemoDaysService {
     const demoDay = await this.prisma.demoDay.findFirst({
       where: {
         status: {
-          in: [DemoDayStatus.UPCOMING, DemoDayStatus.EARLY_ACCESS, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED],
+          in: [
+            DemoDayStatus.UPCOMING,
+            DemoDayStatus.REGISTRATION_OPEN,
+            DemoDayStatus.EARLY_ACCESS,
+            DemoDayStatus.ACTIVE,
+            DemoDayStatus.COMPLETED,
+            DemoDayStatus.ARCHIVED,
+          ],
         },
         isDeleted: false,
       },
@@ -327,7 +334,7 @@ export class DemoDaysService {
       startDate: Date;
       title: string;
       description: string;
-      shortDescription?: string;
+      shortDescription?: string | null;
       status: DemoDayStatus;
     },
     actorEmail?: string
@@ -419,7 +426,7 @@ export class DemoDaysService {
       startDate?: Date;
       title?: string;
       description?: string;
-      shortDescription?: string;
+      shortDescription?: string | null;
       status?: DemoDayStatus;
     },
     actorEmail?: string
@@ -517,7 +524,7 @@ export class DemoDaysService {
     hasEarlyAccess = false
   ): 'UPCOMING' | 'ACTIVE' | 'COMPLETED' {
     // Never return EARLY_ACCESS to frontend - if hasEarlyAccess is true, return ACTIVE, otherwise return UPCOMING
-    if (demoDayStatus === DemoDayStatus.EARLY_ACCESS) {
+    if (demoDayStatus === DemoDayStatus.EARLY_ACCESS || demoDayStatus === DemoDayStatus.REGISTRATION_OPEN) {
       if (hasEarlyAccess) {
         return 'ACTIVE';
       } else {

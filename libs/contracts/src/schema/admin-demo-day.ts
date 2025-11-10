@@ -6,8 +6,8 @@ export const CreateDemoDaySchema = z.object({
   startDate: z.string(),
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
-  shortDescription: z.string().optional(),
-  status: z.enum(['UPCOMING', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED']),
+  shortDescription: z.string().optional().nullable(),
+  status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']),
 });
 
 export class CreateDemoDayDto extends createZodDto(CreateDemoDaySchema) {}
@@ -17,8 +17,8 @@ export const UpdateDemoDaySchema = z.object({
   startDate: z.string().optional(),
   title: z.string().min(1, 'Title is required').optional(),
   description: z.string().min(1, 'Description is required').optional(),
-  shortDescription: z.string().optional(),
-  status: z.enum(['UPCOMING', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED']).optional(),
+  shortDescription: z.string().optional().nullable(),
+  status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']).optional(),
 });
 
 export class UpdateDemoDayDto extends createZodDto(UpdateDemoDaySchema) {}
@@ -93,7 +93,7 @@ export const ResponseDemoDaySchema = z.object({
   title: z.string(),
   description: z.string(),
   shortDescription: z.string().nullable(),
-  status: z.enum(['UPCOMING', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED']),
+  status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']),
   createdAt: z.date(),
   updatedAt: z.date(),
   isDeleted: z.boolean(),

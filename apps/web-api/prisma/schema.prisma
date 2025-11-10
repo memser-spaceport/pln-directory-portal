@@ -950,9 +950,11 @@ model InvestorProfile {
 
 enum DemoDayStatus {
   UPCOMING
+  REGISTRATION_OPEN
   EARLY_ACCESS
   ACTIVE
   COMPLETED
+  ARCHIVED
 }
 
 enum DemoDayParticipantType {
