@@ -833,6 +833,7 @@ export class MemberService {
         },
         email: true,
         isSubscribedToNewsletter: true,
+        signUpSource: true,
         accessLevel: true,
         teamOrProjectURL: true,
         locationUid: true,
