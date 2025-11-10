@@ -15,6 +15,7 @@ const CreateDemoDayPage = () => {
     description: '',
     shortDescription: '',
     startDate: '',
+    endDate: '',
     status: 'UPCOMING',
   });
 
@@ -33,6 +34,7 @@ const CreateDemoDayPage = () => {
       const payload = {
         ...formData,
         startDate: new Date(formData.startDate).toISOString(),
+        endDate: new Date(formData.endDate).toISOString(),
       };
 
       await api.post(API_ROUTE.ADMIN_DEMO_DAYS, payload, config);
@@ -121,6 +123,21 @@ const CreateDemoDayPage = () => {
                 name="startDate"
                 required
                 value={formData.startDate}
+                onChange={handleInputChange}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="endDate" className="mb-2 block text-sm font-medium text-gray-700">
+                End Date *
+              </label>
+              <input
+                type="datetime-local"
+                id="endDate"
+                name="endDate"
+                required
+                value={formData.endDate}
                 onChange={handleInputChange}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />

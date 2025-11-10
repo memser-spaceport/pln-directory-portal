@@ -4,6 +4,7 @@ export interface DemoDay {
   description: string;
   shortDescription?: string;
   startDate: string;
+  endDate: string;
   status: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
   createdAt: string;
   updatedAt: string;
@@ -14,6 +15,7 @@ export interface CreateDemoDayDto {
   description: string;
   shortDescription?: string;
   startDate: string;
+  endDate: string;
   status: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 }
 
@@ -22,6 +24,7 @@ export interface UpdateDemoDayDto {
   description?: string;
   shortDescription?: string;
   startDate?: string;
+  endDate?: string;
   status?: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 }
 

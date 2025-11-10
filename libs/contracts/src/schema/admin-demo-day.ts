@@ -4,6 +4,7 @@ import { z } from 'zod';
 // Create Demo Day Schema
 export const CreateDemoDaySchema = z.object({
   startDate: z.string(),
+  endDate: z.string(),
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
   shortDescription: z.string().optional().nullable(),
@@ -15,6 +16,7 @@ export class CreateDemoDayDto extends createZodDto(CreateDemoDaySchema) {}
 // Update Demo Day Schema
 export const UpdateDemoDaySchema = z.object({
   startDate: z.string().optional(),
+  endDate: z.string().optional(),
   title: z.string().min(1, 'Title is required').optional(),
   description: z.string().min(1, 'Description is required').optional(),
   shortDescription: z.string().optional().nullable(),
@@ -90,6 +92,7 @@ export const ResponseDemoDaySchema = z.object({
   id: z.number(),
   uid: z.string(),
   startDate: z.date(),
+  endDate: z.date(),
   title: z.string(),
   description: z.string(),
   shortDescription: z.string().nullable(),

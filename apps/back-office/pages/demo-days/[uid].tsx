@@ -99,6 +99,7 @@ const DemoDayDetailPage = () => {
       description: demoDay.description,
       shortDescription: demoDay.shortDescription,
       startDate: demoDay.startDate,
+      endDate: demoDay.endDate,
       status: demoDay.status,
     });
     setIsEditing(true);
@@ -308,6 +309,19 @@ const DemoDayDetailPage = () => {
                   />
                 ) : (
                   <div className={s.fieldValue}>{formatDate(demoDay.startDate)}</div>
+                )}
+              </div>
+              <div className={s.overviewField}>
+                <label className={s.fieldLabel}>End Date</label>
+                {isEditing ? (
+                  <input
+                    type="datetime-local"
+                    value={editFormData.endDate ? new Date(editFormData.endDate).toISOString().slice(0, 16) : ''}
+                    onChange={(e) => handleEditFormChange('endDate', e.target.value)}
+                    className={s.fieldInput}
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{formatDate(demoDay.endDate)}</div>
                 )}
               </div>
               <div className={s.overviewField}>

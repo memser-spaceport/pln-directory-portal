@@ -72,6 +72,7 @@ const DemoDaysPage = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Title</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Start Date (UTC)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">End Date (UTC)</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Actions</th>
                 </tr>
@@ -85,6 +86,9 @@ const DemoDaysPage = () => {
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <div className="text-sm text-gray-900">{formatDate(demoDay.startDate)}</div>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <div className="text-sm text-gray-900">{formatDate(demoDay.endDate)}</div>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <span

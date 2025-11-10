@@ -972,6 +972,7 @@ model DemoDay {
   id                        Int                               @id @default(autoincrement())
   uid                       String                            @unique @default(cuid())
   startDate                 DateTime
+  endDate                   DateTime
   title                     String
   description               String
   shortDescription          String?

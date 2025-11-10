@@ -332,6 +332,7 @@ export class DemoDaysService {
   async createDemoDay(
     data: {
       startDate: Date;
+      endDate: Date;
       title: string;
       description: string;
       shortDescription?: string | null;
@@ -349,6 +350,7 @@ export class DemoDaysService {
     const created = await this.prisma.demoDay.create({
       data: {
         startDate: data.startDate,
+        endDate: data.endDate,
         title: data.title,
         description: data.description,
         shortDescription: data.shortDescription,
@@ -366,6 +368,7 @@ export class DemoDaysService {
         description: created.description,
         shortDescription: created.shortDescription,
         startDate: created.startDate?.toISOString?.() || null,
+        endDate: created.endDate?.toISOString?.() || null,
         status: created.status,
         actorUid: actorUid || null,
         actorEmail: actorEmail || null,
@@ -382,6 +385,7 @@ export class DemoDaysService {
         id: true,
         uid: true,
         startDate: true,
+        endDate: true,
         title: true,
         description: true,
         shortDescription: true,
@@ -402,6 +406,7 @@ export class DemoDaysService {
         id: true,
         uid: true,
         startDate: true,
+        endDate: true,
         title: true,
         description: true,
         shortDescription: true,
@@ -424,6 +429,7 @@ export class DemoDaysService {
     uid: string,
     data: {
       startDate?: Date;
+      endDate?: Date;
       title?: string;
       description?: string;
       shortDescription?: string | null;
@@ -446,6 +452,9 @@ export class DemoDaysService {
     if (data.startDate !== undefined) {
       updateData.startDate = data.startDate;
     }
+    if (data.endDate !== undefined) {
+      updateData.endDate = data.endDate;
+    }
     if (data.title !== undefined) {
       updateData.title = data.title;
     }
@@ -466,6 +475,7 @@ export class DemoDaysService {
         id: true,
         uid: true,
         startDate: true,
+        endDate: true,
         title: true,
         description: true,
         shortDescription: true,
@@ -477,13 +487,15 @@ export class DemoDaysService {
       },
     });
 
-    // Track "details updated" (name/description/startDate) only if any changed
+    // Track "details updated" (name/description/startDate/endDate) only if any changed
     const detailsChanged: string[] = [];
     if (updateData.title !== undefined && before.title !== updated.title) detailsChanged.push('title');
     if (updateData.description !== undefined && before.description !== updated.description)
       detailsChanged.push('description');
     if (updateData.startDate !== undefined && before.startDate?.toISOString?.() !== updated.startDate?.toISOString?.())
       detailsChanged.push('startDate');
+    if (updateData.endDate !== undefined && before.endDate?.toISOString?.() !== updated.endDate?.toISOString?.())
+      detailsChanged.push('endDate');
 
     if (detailsChanged.length > 0) {
       await this.analyticsService.trackEvent({
