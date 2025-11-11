@@ -10,8 +10,10 @@ const CreateDemoDayPage = () => {
   const router = useRouter();
   const [authToken] = useCookie('plnadmin');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [slugError, setSlugError] = useState<string>('');
   const [formData, setFormData] = useState<CreateDemoDayDto>({
     title: '',
+    slugURL: '',
     description: '',
     shortDescription: '',
     startDate: '',
@@ -24,6 +26,7 @@ const CreateDemoDayPage = () => {
     if (!authToken) return;
 
     setIsSubmitting(true);
+    setSlugError('');
     try {
       const config = {
         headers: {
@@ -39,20 +42,52 @@ const CreateDemoDayPage = () => {
 
       await api.post(API_ROUTE.ADMIN_DEMO_DAYS, payload, config);
       router.push('/demo-days');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating demo day:', error);
-      alert('Failed to create demo day. Please try again.');
+
+      // Check if it's a conflict error (409) for duplicate slug
+      if (error?.response?.status === 409) {
+        const errorMessage = error?.response?.data?.message || `A demo day with slug "${formData.slugURL}" already exists.`;
+        setSlugError(errorMessage);
+      } else {
+        alert('Failed to create demo day. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const slugify = (text: string) => {
+    return text
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w-]+/g, '')
+      .replace(/--+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '');
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+
+    // Clear slug error when user modifies the slug or title
+    if (name === 'slugURL' || name === 'title') {
+      setSlugError('');
+    }
+
+    setFormData((prev) => {
+      const updates: any = { [name]: value };
+
+      // Auto-generate slugURL when title changes
+      if (name === 'title') {
+        updates.slugURL = slugify(value);
+      }
+
+      return {
+        ...prev,
+        ...updates,
+      };
+    });
   };
 
   return (
@@ -81,6 +116,33 @@ const CreateDemoDayPage = () => {
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter demo day title"
               />
+            </div>
+
+            <div>
+              <label htmlFor="slugURL" className="mb-2 block text-sm font-medium text-gray-700">
+                URL Slug *
+              </label>
+              <input
+                type="text"
+                id="slugURL"
+                name="slugURL"
+                required
+                value={formData.slugURL}
+                onChange={handleInputChange}
+                className={`w-full rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 ${
+                  slugError
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                    : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                }`}
+                placeholder="demo-day-slug"
+              />
+              {slugError ? (
+                <p className="mt-1 text-sm text-red-600">{slugError}</p>
+              ) : (
+                <p className="mt-1 text-sm text-gray-500">
+                  This will be used in the URL: /demo-days/{formData.slugURL || 'demo-day-slug'}
+                </p>
+              )}
             </div>
 
             <div>

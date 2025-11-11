@@ -334,6 +334,7 @@ export class DemoDaysService {
       startDate: Date;
       endDate: Date;
       title: string;
+      slugURL: string;
       description: string;
       shortDescription?: string | null;
       status: DemoDayStatus;
@@ -347,6 +348,15 @@ export class DemoDaysService {
       actorUid = actor?.uid;
     }
 
+    // Check if slug already exists
+    const slugURL = data.slugURL;
+    const existingDemoDay = await this.prisma.demoDay.findFirst({ where: { slugURL, isDeleted: false } });
+    if (existingDemoDay) {
+      throw new ConflictException(
+        `A demo day with slug "${slugURL}" already exists. Please choose a different title or slug.`
+      );
+    }
+
     const created = await this.prisma.demoDay.create({
       data: {
         startDate: data.startDate,
@@ -355,6 +365,7 @@ export class DemoDaysService {
         description: data.description,
         shortDescription: data.shortDescription,
         status: data.status,
+        slugURL,
       },
     });
 
@@ -384,6 +395,7 @@ export class DemoDaysService {
       select: {
         id: true,
         uid: true,
+        slugURL: true,
         startDate: true,
         endDate: true,
         title: true,
@@ -405,6 +417,7 @@ export class DemoDaysService {
       select: {
         id: true,
         uid: true,
+        slugURL: true,
         startDate: true,
         endDate: true,
         title: true,
@@ -420,6 +433,33 @@ export class DemoDaysService {
 
     if (!demoDay) {
       throw new NotFoundException(`Demo day with uid ${uid} not found`);
+    }
+
+    return demoDay;
+  }
+
+  async getDemoDayBySlugURL(slugURL: string): Promise<DemoDay> {
+    const demoDay = await this.prisma.demoDay.findFirst({
+      where: { slugURL, isDeleted: false },
+      select: {
+        id: true,
+        uid: true,
+        slugURL: true,
+        startDate: true,
+        endDate: true,
+        title: true,
+        description: true,
+        shortDescription: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        isDeleted: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!demoDay) {
+      throw new NotFoundException(`Demo day with slug ${slugURL} not found`);
     }
 
     return demoDay;
@@ -474,6 +514,7 @@ export class DemoDaysService {
       select: {
         id: true,
         uid: true,
+        slugURL: true,
         startDate: true,
         endDate: true,
         title: true,

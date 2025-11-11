@@ -6,6 +6,7 @@ export const CreateDemoDaySchema = z.object({
   startDate: z.string(),
   endDate: z.string(),
   title: z.string().min(1, 'Title is required'),
+  slugURL: z.string().min(1, 'URL slug is required'),
   description: z.string().min(1, 'Description is required'),
   shortDescription: z.string().optional().nullable(),
   status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']),
@@ -91,6 +92,7 @@ export class UpdateParticipantDto extends createZodDto(UpdateParticipantSchema) 
 export const ResponseDemoDaySchema = z.object({
   id: z.number(),
   uid: z.string(),
+  slugURL: z.string(),
   startDate: z.date(),
   endDate: z.date(),
   title: z.string(),

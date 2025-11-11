@@ -1,5 +1,6 @@
 export interface DemoDay {
   uid: string;
+  slugURL: string;
   title: string;
   description: string;
   shortDescription?: string;
@@ -12,6 +13,7 @@ export interface DemoDay {
 
 export interface CreateDemoDayDto {
   title: string;
+  slugURL: string;
   description: string;
   shortDescription?: string;
   startDate: string;

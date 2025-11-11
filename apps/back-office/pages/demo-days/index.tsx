@@ -100,7 +100,7 @@ const DemoDaysPage = () => {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                      <Link href={`/demo-days/${demoDay.uid}`}>
+                      <Link href={`/demo-days/${demoDay.slugURL}`}>
                         <a className="text-blue-600 hover:text-blue-900">View Details</a>
                       </Link>
                     </td>

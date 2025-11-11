@@ -971,6 +971,7 @@ enum DemoDayParticipantStatus {
 model DemoDay {
   id                        Int                               @id @default(autoincrement())
   uid                       String                            @unique @default(cuid())
+  slugURL                   String                            @unique
   startDate                 DateTime
   endDate                   DateTime
   title                     String

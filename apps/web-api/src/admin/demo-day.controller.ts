@@ -39,6 +39,7 @@ export class AdminDemoDaysController {
         startDate: new Date(body.startDate),
         endDate: new Date(body.endDate),
         title: body.title,
+        slugURL: body.slugURL,
         description: body.description,
         shortDescription: body.shortDescription,
         status: body.status.toUpperCase() as DemoDayStatus,
@@ -53,10 +54,11 @@ export class AdminDemoDaysController {
     return this.demoDaysService.getAllDemoDays();
   }
 
-  @Get(':uid')
+  // This endpoint uses slugURL for browser-friendly URLs (e.g., /demo-days/crypto-day)
+  @Get(':slugURL')
   @NoCache()
-  async getDemoDayDetails(@Param('uid') uid: string): Promise<ResponseDemoDayDto> {
-    return this.demoDaysService.getDemoDayByUid(uid);
+  async getDemoDayDetails(@Param('slugURL') slugURL: string): Promise<ResponseDemoDayDto> {
+    return this.demoDaysService.getDemoDayBySlugURL(slugURL);
   }
 
   @Patch(':uid')

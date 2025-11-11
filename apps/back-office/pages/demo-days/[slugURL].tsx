@@ -19,7 +19,7 @@ import s from './styles.module.scss';
 
 const DemoDayDetailPage = () => {
   const router = useRouter();
-  const { uid } = router.query;
+  const { slugURL } = router.query;
   const [authToken] = useCookie('plnadmin');
   const [activeTab, setActiveTab] = useState<'investors' | 'founders'>('investors');
   const [isEditing, setIsEditing] = useState(false);
@@ -35,12 +35,12 @@ const DemoDayDetailPage = () => {
 
   const { data: demoDay, isLoading: demoDayLoading } = useDemoDayDetails({
     authToken,
-    uid: uid as string,
+    slugURL: slugURL as string,
   });
 
   const { data: participants, isLoading: participantsLoading } = useDemoDayParticipants({
     authToken,
-    demoDayUid: uid as string,
+    demoDayUid: demoDay?.uid as string,
     query: {
       type: activeTab === 'investors' ? 'INVESTOR' : 'FOUNDER',
       search: searchTerm || undefined,
@@ -111,12 +111,12 @@ const DemoDayDetailPage = () => {
   };
 
   const handleSaveDemoDay = async () => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     try {
       await updateDemoDayMutation.mutateAsync({
         authToken,
-        uid: uid as string,
+        uid: demoDay.uid,
         data: editFormData,
       });
       setIsEditing(false);
@@ -128,12 +128,12 @@ const DemoDayDetailPage = () => {
   };
 
   const handleUpdateParticipantStatus = async (participantUid: string, status: 'INVITED' | 'ENABLED' | 'DISABLED') => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { status },
       });
@@ -148,14 +148,14 @@ const DemoDayDetailPage = () => {
     participantName: string,
     newType: 'INVESTOR' | 'FOUNDER'
   ) => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     const newTabName = newType === 'INVESTOR' ? 'Investors' : 'Founders';
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { type: newType },
       });
@@ -167,12 +167,12 @@ const DemoDayDetailPage = () => {
   };
 
   const handleUpdateParticipantEarlyAccess = async (participantUid: string, hasEarlyAccess: boolean) => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { hasEarlyAccess },
       });
@@ -188,12 +188,12 @@ const DemoDayDetailPage = () => {
     teamUid: string,
     teamName: string
   ) => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { teamUid: teamUid || undefined },
       });
@@ -798,13 +798,13 @@ const DemoDayDetailPage = () => {
         <AddParticipantModal
           isOpen={showAddParticipantModal}
           onClose={() => setShowAddParticipantModal(false)}
-          demoDayUid={uid as string}
+          demoDayUid={demoDay.uid}
         />
 
         <UploadParticipantsModal
           isOpen={showUploadModal}
           onClose={() => setShowUploadModal(false)}
-          demoDayUid={uid as string}
+          demoDayUid={demoDay.uid}
         />
       </div>
     </ApprovalLayout>
