@@ -671,6 +671,31 @@ export class MembersService {
     };
   }
 
+  async setMemberRole(memberUid: string, roleName: string, modifiedByUid?: string) {
+    
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+    });
+
+    if (!member) {
+      throw new NotFoundException(`Member with uid=${memberUid} not found`);
+    }
+
+    const updated = await this.prisma.member.update({
+      where: { uid: memberUid },
+      data: {
+        role: roleName,
+        updatedAt: new Date(),
+      },
+    });
+
+    this.logger.info(
+      `Member role changed: uid=${memberUid}, from="${member.role}", to="${roleName}", by=${modifiedByUid}`
+    );
+
+    return updated;
+  }
+
   /**
    * Updates the external ID for the member identified by the provided email address.
    * This method normalizes the email address before updating the external ID in the database.
