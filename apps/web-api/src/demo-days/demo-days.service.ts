@@ -32,7 +32,7 @@ export class DemoDaysService {
 
   async getCurrentDemoDayAccess(memberEmail: string | null): Promise<{
     access: 'none' | 'INVESTOR' | 'FOUNDER';
-    status: 'NONE' | 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
+    status: 'NONE' | 'UPCOMING' | 'REGISTRATION_OPEN' | 'ACTIVE' | 'COMPLETED';
     uid?: string;
     date?: string;
     title?: string;
@@ -575,9 +575,13 @@ export class DemoDaysService {
   private getExternalDemoDayStatus(
     demoDayStatus: DemoDayStatus,
     hasEarlyAccess = false
-  ): 'UPCOMING' | 'ACTIVE' | 'COMPLETED' {
+  ): 'UPCOMING' | 'REGISTRATION_OPEN' | 'ACTIVE' | 'COMPLETED' {
+    if (demoDayStatus === DemoDayStatus.REGISTRATION_OPEN) {
+      return 'REGISTRATION_OPEN';
+    }
+
     // Never return EARLY_ACCESS to frontend - if hasEarlyAccess is true, return ACTIVE, otherwise return UPCOMING
-    if (demoDayStatus === DemoDayStatus.EARLY_ACCESS || demoDayStatus === DemoDayStatus.REGISTRATION_OPEN) {
+    if (demoDayStatus === DemoDayStatus.EARLY_ACCESS) {
       if (hasEarlyAccess) {
         return 'ACTIVE';
       } else {
