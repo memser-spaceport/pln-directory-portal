@@ -57,6 +57,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
     plnStartDate: faker.date.past(),
     updatedAt: faker.date.recent(),
     locationUid: '',
+    role: faker.name.jobTitle(),
     signUpSource: faker.company.name(),
     signUpCampaign: faker.company.name(),
     signUpMedium: faker.company.name(),
