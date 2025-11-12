@@ -389,9 +389,19 @@ export class DemoDaysService {
     return created;
   }
 
-  async getAllDemoDays(): Promise<DemoDay[]> {
+  async getAllDemoDays(excludeArchived = false): Promise<DemoDay[]> {
+    const whereClause: any = {
+      isDeleted: false,
+    };
+
+    if (excludeArchived) {
+      whereClause.status = {
+        not: DemoDayStatus.ARCHIVED,
+      };
+    }
+
     return this.prisma.demoDay.findMany({
-      where: { isDeleted: false },
+      where: whereClause,
       select: {
         id: true,
         uid: true,

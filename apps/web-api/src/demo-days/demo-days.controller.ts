@@ -44,6 +44,12 @@ export class DemoDaysController {
     private readonly demoDayEngagementService: DemoDayEngagementService
   ) {}
 
+  @Get()
+  @NoCache()
+  async getAllDemoDays() {
+    return this.demoDaysService.getAllDemoDays(true);
+  }
+
   @Get('current')
   @UseGuards(UserTokenCheckGuard)
   @NoCache()
