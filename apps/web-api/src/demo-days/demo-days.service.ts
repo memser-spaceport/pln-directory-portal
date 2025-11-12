@@ -389,14 +389,21 @@ export class DemoDaysService {
     return created;
   }
 
-  async getAllDemoDays(excludeArchived = false): Promise<DemoDay[]> {
+  async getAllDemoDays(excludeInactive = false): Promise<DemoDay[]> {
     const whereClause: any = {
       isDeleted: false,
     };
 
-    if (excludeArchived) {
+    if (excludeInactive) {
       whereClause.status = {
         not: DemoDayStatus.ARCHIVED,
+      };
+      whereClause.teamFundraisingProfiles = {
+        some: {
+          status: {
+            not: 'DISABLED',
+          },
+        },
       };
     }
 

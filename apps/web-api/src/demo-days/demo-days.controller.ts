@@ -45,7 +45,6 @@ export class DemoDaysController {
   ) {}
 
   @Get()
-  @UseGuards(UserTokenValidation)
   @NoCache()
   async getAllDemoDays() {
     return this.demoDaysService.getAllDemoDays(true);
