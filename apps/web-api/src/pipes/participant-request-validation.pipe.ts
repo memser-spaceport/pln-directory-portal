@@ -29,7 +29,7 @@ export class ParticipantsReqValidationPipe implements PipeTransform {
       participantType === 'TEAM' &&
       body?.newData &&
       typeof body.newData.name === 'string' &&
-      Object.keys(body.newData).every((k) => k === 'name')
+      Object.keys(body.newData).every((k) => ['name', 'website'].includes(k))
     ) {
       body.uniqueIdentifier = body.uniqueIdentifier ?? body.newData.name;
       return body;
