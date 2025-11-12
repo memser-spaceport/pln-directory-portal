@@ -950,9 +950,11 @@ model InvestorProfile {
 
 enum DemoDayStatus {
   UPCOMING
+  REGISTRATION_OPEN
   EARLY_ACCESS
   ACTIVE
   COMPLETED
+  ARCHIVED
 }
 
 enum DemoDayParticipantType {
@@ -969,9 +971,12 @@ enum DemoDayParticipantStatus {
 model DemoDay {
   id                        Int                               @id @default(autoincrement())
   uid                       String                            @unique @default(cuid())
+  slugURL                   String                            @unique
   startDate                 DateTime
+  endDate                   DateTime
   title                     String
   description               String
+  shortDescription          String?
   status                    DemoDayStatus                     @default(UPCOMING)
   createdAt                 DateTime                          @default(now())
   updatedAt                 DateTime                          @updatedAt

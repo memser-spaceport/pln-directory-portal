@@ -1,25 +1,33 @@
 export interface DemoDay {
   uid: string;
+  slugURL: string;
   title: string;
   description: string;
+  shortDescription?: string;
   startDate: string;
-  status: 'UPCOMING' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED';
+  endDate: string;
+  status: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateDemoDayDto {
   title: string;
+  slugURL: string;
   description: string;
+  shortDescription?: string;
   startDate: string;
-  status: 'UPCOMING' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED';
+  endDate: string;
+  status: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 }
 
 export interface UpdateDemoDayDto {
   title?: string;
   description?: string;
+  shortDescription?: string;
   startDate?: string;
-  status?: 'UPCOMING' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED';
+  endDate?: string;
+  status?: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 }
 
 export interface DemoDayParticipant {

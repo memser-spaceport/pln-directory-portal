@@ -11,6 +11,7 @@ import { AddParticipantModal } from '../../components/demo-days/AddParticipantMo
 import { UploadParticipantsModal } from '../../components/demo-days/UploadParticipantsModal';
 import { UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
+import { RichText } from '../../components/common/rich-text';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
 
@@ -18,7 +19,7 @@ import s from './styles.module.scss';
 
 const DemoDayDetailPage = () => {
   const router = useRouter();
-  const { uid } = router.query;
+  const { slugURL } = router.query;
   const [authToken] = useCookie('plnadmin');
   const [activeTab, setActiveTab] = useState<'investors' | 'founders'>('investors');
   const [isEditing, setIsEditing] = useState(false);
@@ -34,12 +35,12 @@ const DemoDayDetailPage = () => {
 
   const { data: demoDay, isLoading: demoDayLoading } = useDemoDayDetails({
     authToken,
-    uid: uid as string,
+    slugURL: slugURL as string,
   });
 
   const { data: participants, isLoading: participantsLoading } = useDemoDayParticipants({
     authToken,
-    demoDayUid: uid as string,
+    demoDayUid: demoDay?.uid as string,
     query: {
       type: activeTab === 'investors' ? 'INVESTOR' : 'FOUNDER',
       search: searchTerm || undefined,
@@ -63,6 +64,8 @@ const DemoDayDetailPage = () => {
     switch (status) {
       case 'ACTIVE':
         return 'text-green-600 bg-green-100';
+      case 'REGISTRATION_OPEN':
+        return 'text-emerald-600 bg-emerald-100';
       case 'EARLY_ACCESS':
         return 'text-orange-600 bg-orange-100';
       case 'PENDING':
@@ -94,7 +97,9 @@ const DemoDayDetailPage = () => {
     setEditFormData({
       title: demoDay.title,
       description: demoDay.description,
+      shortDescription: demoDay.shortDescription,
       startDate: demoDay.startDate,
+      endDate: demoDay.endDate,
       status: demoDay.status,
     });
     setIsEditing(true);
@@ -106,12 +111,12 @@ const DemoDayDetailPage = () => {
   };
 
   const handleSaveDemoDay = async () => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     try {
       await updateDemoDayMutation.mutateAsync({
         authToken,
-        uid: uid as string,
+        uid: demoDay.uid,
         data: editFormData,
       });
       setIsEditing(false);
@@ -123,12 +128,12 @@ const DemoDayDetailPage = () => {
   };
 
   const handleUpdateParticipantStatus = async (participantUid: string, status: 'INVITED' | 'ENABLED' | 'DISABLED') => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { status },
       });
@@ -143,14 +148,14 @@ const DemoDayDetailPage = () => {
     participantName: string,
     newType: 'INVESTOR' | 'FOUNDER'
   ) => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     const newTabName = newType === 'INVESTOR' ? 'Investors' : 'Founders';
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { type: newType },
       });
@@ -162,12 +167,12 @@ const DemoDayDetailPage = () => {
   };
 
   const handleUpdateParticipantEarlyAccess = async (participantUid: string, hasEarlyAccess: boolean) => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { hasEarlyAccess },
       });
@@ -183,12 +188,12 @@ const DemoDayDetailPage = () => {
     teamUid: string,
     teamName: string
   ) => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { teamUid: teamUid || undefined },
       });
@@ -307,6 +312,19 @@ const DemoDayDetailPage = () => {
                 )}
               </div>
               <div className={s.overviewField}>
+                <label className={s.fieldLabel}>End Date</label>
+                {isEditing ? (
+                  <input
+                    type="datetime-local"
+                    value={editFormData.endDate ? new Date(editFormData.endDate).toISOString().slice(0, 16) : ''}
+                    onChange={(e) => handleEditFormChange('endDate', e.target.value)}
+                    className={s.fieldInput}
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{formatDate(demoDay.endDate)}</div>
+                )}
+              </div>
+              <div className={s.overviewField}>
                 <label className={s.fieldLabel}>Status</label>
                 {isEditing ? (
                   <select
@@ -315,9 +333,11 @@ const DemoDayDetailPage = () => {
                     className={s.fieldInput}
                   >
                     <option value="UPCOMING">Upcoming</option>
+                    <option value="REGISTRATION_OPEN">Registration Open</option>
                     <option value="EARLY_ACCESS">Early Access</option>
                     <option value="ACTIVE">Active</option>
                     <option value="COMPLETED">Completed</option>
+                    <option value="ARCHIVED">Archived</option>
                   </select>
                 ) : (
                   <div className={s.fieldValue}>{demoDay.status}</div>
@@ -337,6 +357,19 @@ const DemoDayDetailPage = () => {
                 )}
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
+                <label className={s.fieldLabel}>Short Description</label>
+                {isEditing ? (
+                  <textarea
+                    value={editFormData.shortDescription || ''}
+                    onChange={(e) => handleEditFormChange('shortDescription', e.target.value)}
+                    rows={2}
+                    className={s.fieldTextarea}
+                  />
+                ) : (
+                  <RichText text={demoDay.shortDescription || ''} className={s.fieldValue} />
+                )}
+              </div>
+              <div className={clsx(s.overviewField, s.fullWidth)}>
                 <label className={s.fieldLabel}>Description</label>
                 {isEditing ? (
                   <textarea
@@ -346,7 +379,7 @@ const DemoDayDetailPage = () => {
                     className={s.fieldTextarea}
                   />
                 ) : (
-                  <div className={s.fieldValue}>{demoDay.description}</div>
+                  <RichText text={demoDay.description} className={s.fieldValue} />
                 )}
               </div>
             </div>
@@ -765,13 +798,13 @@ const DemoDayDetailPage = () => {
         <AddParticipantModal
           isOpen={showAddParticipantModal}
           onClose={() => setShowAddParticipantModal(false)}
-          demoDayUid={uid as string}
+          demoDayUid={demoDay.uid}
         />
 
         <UploadParticipantsModal
           isOpen={showUploadModal}
           onClose={() => setShowUploadModal(false)}
-          demoDayUid={uid as string}
+          demoDayUid={demoDay.uid}
         />
       </div>
     </ApprovalLayout>

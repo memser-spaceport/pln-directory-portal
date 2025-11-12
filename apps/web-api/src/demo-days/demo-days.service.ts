@@ -13,7 +13,14 @@ export class DemoDaysService {
     const demoDay = await this.prisma.demoDay.findFirst({
       where: {
         status: {
-          in: [DemoDayStatus.UPCOMING, DemoDayStatus.EARLY_ACCESS, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED],
+          in: [
+            DemoDayStatus.UPCOMING,
+            DemoDayStatus.REGISTRATION_OPEN,
+            DemoDayStatus.EARLY_ACCESS,
+            DemoDayStatus.ACTIVE,
+            DemoDayStatus.COMPLETED,
+            DemoDayStatus.ARCHIVED,
+          ],
         },
         isDeleted: false,
       },
@@ -25,7 +32,7 @@ export class DemoDaysService {
 
   async getCurrentDemoDayAccess(memberEmail: string | null): Promise<{
     access: 'none' | 'INVESTOR' | 'FOUNDER';
-    status: 'NONE' | 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
+    status: 'NONE' | 'UPCOMING' | 'REGISTRATION_OPEN' | 'ACTIVE' | 'COMPLETED';
     uid?: string;
     date?: string;
     title?: string;
@@ -325,8 +332,11 @@ export class DemoDaysService {
   async createDemoDay(
     data: {
       startDate: Date;
+      endDate: Date;
       title: string;
+      slugURL: string;
       description: string;
+      shortDescription?: string | null;
       status: DemoDayStatus;
     },
     actorEmail?: string
@@ -338,12 +348,24 @@ export class DemoDaysService {
       actorUid = actor?.uid;
     }
 
+    // Check if slug already exists
+    const slugURL = data.slugURL;
+    const existingDemoDay = await this.prisma.demoDay.findFirst({ where: { slugURL, isDeleted: false } });
+    if (existingDemoDay) {
+      throw new ConflictException(
+        `A demo day with slug "${slugURL}" already exists. Please choose a different title or slug.`
+      );
+    }
+
     const created = await this.prisma.demoDay.create({
       data: {
         startDate: data.startDate,
+        endDate: data.endDate,
         title: data.title,
         description: data.description,
+        shortDescription: data.shortDescription,
         status: data.status,
+        slugURL,
       },
     });
 
@@ -355,7 +377,9 @@ export class DemoDaysService {
         demoDayUid: created.uid,
         title: created.title,
         description: created.description,
+        shortDescription: created.shortDescription,
         startDate: created.startDate?.toISOString?.() || null,
+        endDate: created.endDate?.toISOString?.() || null,
         status: created.status,
         actorUid: actorUid || null,
         actorEmail: actorEmail || null,
@@ -371,9 +395,12 @@ export class DemoDaysService {
       select: {
         id: true,
         uid: true,
+        slugURL: true,
         startDate: true,
+        endDate: true,
         title: true,
         description: true,
+        shortDescription: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -390,9 +417,12 @@ export class DemoDaysService {
       select: {
         id: true,
         uid: true,
+        slugURL: true,
         startDate: true,
+        endDate: true,
         title: true,
         description: true,
+        shortDescription: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -408,12 +438,41 @@ export class DemoDaysService {
     return demoDay;
   }
 
+  async getDemoDayBySlugURL(slugURL: string): Promise<DemoDay> {
+    const demoDay = await this.prisma.demoDay.findFirst({
+      where: { slugURL, isDeleted: false },
+      select: {
+        id: true,
+        uid: true,
+        slugURL: true,
+        startDate: true,
+        endDate: true,
+        title: true,
+        description: true,
+        shortDescription: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        isDeleted: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!demoDay) {
+      throw new NotFoundException(`Demo day with slug ${slugURL} not found`);
+    }
+
+    return demoDay;
+  }
+
   async updateDemoDay(
     uid: string,
     data: {
       startDate?: Date;
+      endDate?: Date;
       title?: string;
       description?: string;
+      shortDescription?: string | null;
       status?: DemoDayStatus;
     },
     actorEmail?: string
@@ -433,11 +492,17 @@ export class DemoDaysService {
     if (data.startDate !== undefined) {
       updateData.startDate = data.startDate;
     }
+    if (data.endDate !== undefined) {
+      updateData.endDate = data.endDate;
+    }
     if (data.title !== undefined) {
       updateData.title = data.title;
     }
     if (data.description !== undefined) {
       updateData.description = data.description;
+    }
+    if (data.shortDescription !== undefined) {
+      updateData.shortDescription = data.shortDescription;
     }
     if (data.status !== undefined) {
       updateData.status = data.status;
@@ -449,9 +514,12 @@ export class DemoDaysService {
       select: {
         id: true,
         uid: true,
+        slugURL: true,
         startDate: true,
+        endDate: true,
         title: true,
         description: true,
+        shortDescription: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -460,13 +528,15 @@ export class DemoDaysService {
       },
     });
 
-    // Track "details updated" (name/description/startDate) only if any changed
+    // Track "details updated" (name/description/startDate/endDate) only if any changed
     const detailsChanged: string[] = [];
     if (updateData.title !== undefined && before.title !== updated.title) detailsChanged.push('title');
     if (updateData.description !== undefined && before.description !== updated.description)
       detailsChanged.push('description');
     if (updateData.startDate !== undefined && before.startDate?.toISOString?.() !== updated.startDate?.toISOString?.())
       detailsChanged.push('startDate');
+    if (updateData.endDate !== undefined && before.endDate?.toISOString?.() !== updated.endDate?.toISOString?.())
+      detailsChanged.push('endDate');
 
     if (detailsChanged.length > 0) {
       await this.analyticsService.trackEvent({
@@ -505,7 +575,11 @@ export class DemoDaysService {
   private getExternalDemoDayStatus(
     demoDayStatus: DemoDayStatus,
     hasEarlyAccess = false
-  ): 'UPCOMING' | 'ACTIVE' | 'COMPLETED' {
+  ): 'UPCOMING' | 'REGISTRATION_OPEN' | 'ACTIVE' | 'COMPLETED' {
+    if (demoDayStatus === DemoDayStatus.REGISTRATION_OPEN) {
+      return 'REGISTRATION_OPEN';
+    }
+
     // Never return EARLY_ACCESS to frontend - if hasEarlyAccess is true, return ACTIVE, otherwise return UPCOMING
     if (demoDayStatus === DemoDayStatus.EARLY_ACCESS) {
       if (hasEarlyAccess) {
