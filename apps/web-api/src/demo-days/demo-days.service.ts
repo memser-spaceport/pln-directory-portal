@@ -1,13 +1,18 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { DemoDay, DemoDayStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
+import { MembersService } from '../members/members.service';
 
 type ExpressInterestStats = { liked: number; connected: number; invested: number; referral: number; total: number };
 
 @Injectable()
 export class DemoDaysService {
-  constructor(private readonly prisma: PrismaService, private readonly analyticsService: AnalyticsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly analyticsService: AnalyticsService,
+    private readonly membersService: MembersService
+  ) {}
 
   async getCurrentDemoDay(): Promise<DemoDay | null> {
     const demoDay = await this.prisma.demoDay.findFirst({
@@ -880,5 +885,77 @@ export class DemoDaysService {
     });
 
     return feedback;
+  }
+
+  /**
+   * Check if a member has access to a specific demo day and determine their access level
+   * @param memberEmail - Email of the member to check
+   * @param demoDayUid - UID of the demo day
+   * @returns Participant UID and admin status
+   * @throws ForbiddenException if the member has no access
+   */
+  async checkDemoDayAccess(
+    memberEmail: string,
+    demoDayUid: string
+  ): Promise<{ participantUid: string; isAdmin: boolean }> {
+    const member = await this.membersService.findMemberByEmail(memberEmail);
+
+    if (!member) {
+      throw new ForbiddenException('No demo day access');
+    }
+
+    // Check if a user is a directory admin
+    const isDirectoryAdmin = this.membersService.checkIfAdminUser(member);
+    if (isDirectoryAdmin) {
+      return { participantUid: member.uid, isAdmin: true };
+    }
+
+    // Check if a user is a demo day admin or founder with admin privileges
+    const hasViewOnlyAdminAccess = await this.isViewOnlyAdminAccess(member.uid, demoDayUid);
+    if (hasViewOnlyAdminAccess) {
+      return { participantUid: member.uid, isAdmin: true };
+    }
+
+    // Check if user is a participant
+    const participantAccess = await this.prisma.member.findUnique({
+      where: { uid: member.uid },
+      select: {
+        demoDayParticipants: {
+          where: {
+            demoDayUid: demoDayUid,
+            isDeleted: false,
+            status: 'ENABLED',
+          },
+          select: { uid: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (participantAccess && participantAccess.demoDayParticipants.length > 0) {
+      return { participantUid: member.uid, isAdmin: false };
+    }
+
+    // No access
+    throw new ForbiddenException('No demo day access');
+  }
+
+  /**
+   * Check if a member has view-only admin access to a demo day
+   * @param memberUid - UID of the member
+   * @param demoDayUid - UID of the demo day
+   * @returns True if the member has admin access
+   */
+  private async isViewOnlyAdminAccess(memberUid: string, demoDayUid: string): Promise<boolean> {
+    const participant = await this.prisma.demoDayParticipant.findFirst({
+      where: {
+        demoDayUid: demoDayUid,
+        memberUid: memberUid,
+        status: 'ENABLED',
+        isDeleted: false,
+      },
+    });
+
+    return participant?.isDemoDayAdmin || participant?.type === 'FOUNDER' || false;
   }
 }

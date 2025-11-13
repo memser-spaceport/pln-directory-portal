@@ -73,15 +73,20 @@ export class DemoDaysController {
     @Req() req,
     @Query('stage') stage?: string[] | string,
     @Query('industry') industry?: string[] | string,
-    @Query('search') search?: string
+    @Query('search') search?: string,
+    @Query('showDraft') showDraft?: string
   ) {
     const normalize = (v: string | string[] | undefined) => (!v ? undefined : Array.isArray(v) ? v : v.split(','));
 
-    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfiles(req.userEmail, {
-      stage: normalize(stage),
-      industry: normalize(industry),
-      search,
-    });
+    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfiles(
+      req.userEmail,
+      {
+        stage: normalize(stage),
+        industry: normalize(industry),
+        search,
+      },
+      showDraft === 'true'
+    );
   }
 
   @Put('current/fundraising-profile/one-pager')

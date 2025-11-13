@@ -546,20 +546,19 @@ export class DemoDayFundraisingProfilesService {
 
   async getCurrentDemoDayFundraisingProfiles(
     memberEmail: string,
-    params?: { stage?: string[]; industry?: string[]; search?: string }
+    params?: { stage?: string[]; industry?: string[]; search?: string },
+    showDraft = false
   ): Promise<any[]> {
     const demoDay = await this.demoDaysService.getCurrentDemoDay();
     if (!demoDay) {
       throw new ForbiddenException('No demo day access');
     }
 
-    const participantUid = await this.ensureParticipantAccess(memberEmail, demoDay.uid);
-    if (!participantUid) {
-      throw new ForbiddenException('No demo day access');
-    }
+    // Check access and get user info - throws if no access
+    const { participantUid, isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
 
-    // Only include PUBLISHED profiles that have both uploads present
-    const where = this.buildProfilesWhere(params, demoDay.uid);
+    //Condition #1: admins with showDraft get all profiles - otherwise only published ones
+    const where = this.buildProfilesWhere(params, demoDay.uid, isAdmin, showDraft);
 
     const profiles = await this.fetchProfiles(where);
     if (profiles.length === 0) return [];
@@ -574,7 +573,7 @@ export class DemoDayFundraisingProfilesService {
         demoDayUid: demoDay.uid,
         memberUid: participantUid,
         teamFundraisingProfileUid: { in: filtered.map((p) => p.uid) },
-        isPrepDemoDay: false,
+        isPrepDemoDay: isAdmin,
       },
       select: {
         teamFundraisingProfileUid: true,
@@ -595,46 +594,32 @@ export class DemoDayFundraisingProfilesService {
     }, {} as Record<string, { liked: boolean; connected: boolean; invested: boolean; referral: boolean }>);
     for (const p of filtered) {
       const f = flagsByProfile[p.uid] || { liked: false, connected: false, invested: false, referral: false };
-      (p as any).liked = !!f.liked;
-      (p as any).connected = !!f.connected;
-      (p as any).invested = !!f.invested;
-      (p as any).referral = !!f.referral;
+      (p as any).liked = f.liked;
+      (p as any).connected = f.connected;
+      (p as any).invested = f.invested;
+      (p as any).referral = f.referral;
     }
 
     // Stable personalized order based on user email
     return this.sortProfilesForUser(participantUid, filtered);
   }
 
-  private async ensureParticipantAccess(memberEmail: string, demoDayUid: string): Promise<string | null> {
-    const access = await this.prisma.member.findUnique({
-      where: { email: memberEmail },
-      select: {
-        uid: true,
-        demoDayParticipants: {
-          where: {
-            demoDayUid: demoDayUid,
-            isDeleted: false,
-            status: 'ENABLED',
-          },
-          select: { uid: true },
-          take: 1,
-        },
-      },
-    });
-
-    return access && access.demoDayParticipants.length > 0 ? access.uid : null;
-  }
-
   private buildProfilesWhere(
     params: { stage?: string | string[]; industry?: string | string[]; search?: string } | undefined,
-    demoDayUid: string
+    demoDayUid: string,
+    isAdmin = false,
+    showDraft = false
   ): any {
     const where: any = {
       demoDayUid: demoDayUid,
-      status: 'PUBLISHED', // Condition #1: exclude DISABLED or DRAFT
-      onePagerUploadUid: { not: null }, // Condition #1: onePager must be uploaded
-      videoUploadUid: { not: null }, // Condition #1: video must be uploaded
     };
+
+    // show all profiles if admin and showDraft parameter are presented
+    if (!(isAdmin && showDraft)) {
+      where.status = 'PUBLISHED'; // Condition #1: exclude DISABLED or DRAFT
+      where.onePagerUploadUid = { not: null }; // Condition #1: onePager must be uploaded
+      where.videoUploadUid = { not: null }; // Condition #1: video must be uploaded
+    }
 
     if (params?.stage || params?.industry || params?.search) {
       where.team = { ...(where.team || {}) };
