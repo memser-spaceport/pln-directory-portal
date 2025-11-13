@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Param,
   Patch,
   Post,
   Put,
@@ -25,10 +26,10 @@ import { UploadsService } from '../uploads/uploads.service';
 import { UploadKind, UploadScopeType } from '@prisma/client';
 import { NoCache } from '../decorators/no-cache.decorator';
 import {
+  CreateDemoDayFeedbackDto,
   ExpressInterestDto,
   UpdateFundraisingDescriptionDto,
   UpdateFundraisingTeamDto,
-  CreateDemoDayFeedbackDto,
 } from 'libs/contracts/src/schema';
 
 const cache = new Map<string, { data: any; expires: number }>();
@@ -89,11 +90,15 @@ export class DemoDaysController {
     );
   }
 
-  @Put('current/fundraising-profile/one-pager')
+  @Put('current/teams/:teamUid/fundraising-profile/one-pager')
   @UseGuards(UserTokenValidation)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'onePagerFile', maxCount: 1 }]))
   @NoCache()
-  async updateOnePager(@Req() req, @UploadedFiles() files: { onePagerFile?: Express.Multer.File[] }) {
+  async updateOnePagerByTeam(
+    @Req() req,
+    @Param('teamUid') teamUid: string,
+    @UploadedFiles() files: { onePagerFile?: Express.Multer.File[] }
+  ) {
     if (!files.onePagerFile?.[0]) {
       throw new Error('onePagerFile is required');
     }
@@ -104,21 +109,25 @@ export class DemoDaysController {
       scopeType: UploadScopeType.NONE,
     });
 
-    return this.demoDayFundraisingProfilesService.updateFundraisingOnePager(req.userEmail, upload.uid);
+    return this.demoDayFundraisingProfilesService.updateFundraisingOnePager(req.userEmail, teamUid, upload.uid);
   }
 
-  @Delete('current/fundraising-profile/one-pager')
+  @Delete('current/teams/:teamUid/fundraising-profile/one-pager')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async deleteOnePager(@Req() req) {
-    return this.demoDayFundraisingProfilesService.deleteFundraisingOnePager(req.userEmail);
+  async deleteOnePagerByTeam(@Req() req, @Param('teamUid') teamUid: string) {
+    return this.demoDayFundraisingProfilesService.deleteFundraisingOnePager(req.userEmail, teamUid);
   }
 
-  @Put('current/fundraising-profile/video')
+  @Put('current/teams/:teamUid/fundraising-profile/video')
   @UseGuards(UserTokenValidation)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'videoFile', maxCount: 1 }]))
   @NoCache()
-  async updateVideo(@Req() req, @UploadedFiles() files: { videoFile?: Express.Multer.File[] }) {
+  async updateVideoByTeam(
+    @Req() req,
+    @Param('teamUid') teamUid: string,
+    @UploadedFiles() files: { videoFile?: Express.Multer.File[] }
+  ) {
     if (!files.videoFile?.[0]) {
       throw new Error('videoFile is required');
     }
@@ -129,33 +138,41 @@ export class DemoDaysController {
       scopeType: UploadScopeType.NONE,
     });
 
-    return this.demoDayFundraisingProfilesService.updateFundraisingVideo(req.userEmail, upload.uid);
+    return this.demoDayFundraisingProfilesService.updateFundraisingVideo(req.userEmail, teamUid, upload.uid);
   }
 
-  @Put('current/fundraising-profile/description')
+  @Put('current/teams/:teamUid/fundraising-profile/description')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async updateDescription(@Req() req, @Body() body: UpdateFundraisingDescriptionDto) {
+  async updateDescriptionByTeam(
+    @Req() req,
+    @Param('teamUid') teamUid: string,
+    @Body() body: UpdateFundraisingDescriptionDto
+  ) {
     if (!body.description || body.description.trim() === '') {
       throw new Error('description is required');
     }
 
-    return this.demoDayFundraisingProfilesService.updateFundraisingDescription(req.userEmail, body.description);
+    return this.demoDayFundraisingProfilesService.updateFundraisingDescription(
+      req.userEmail,
+      teamUid,
+      body.description
+    );
   }
 
-  @Delete('current/fundraising-profile/video')
+  @Delete('current/teams/:teamUid/fundraising-profile/video')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async deleteVideo(@Req() req) {
-    return this.demoDayFundraisingProfilesService.deleteFundraisingVideo(req.userEmail);
+  async deleteVideoByTeam(@Req() req, @Param('teamUid') teamUid: string) {
+    return this.demoDayFundraisingProfilesService.deleteFundraisingVideo(req.userEmail, teamUid);
   }
 
-  @Patch('current/fundraising-profile/team')
+  @Patch('current/teams/:teamUid/fundraising-profile/team')
   @UseGuards(UserTokenValidation)
   @UsePipes(ZodValidationPipe)
   @NoCache()
-  async updateTeam(@Req() req, @Body() body: UpdateFundraisingTeamDto) {
-    return this.demoDayFundraisingProfilesService.updateFundraisingTeam(req.userEmail, body);
+  async updateTeamByTeam(@Req() req, @Param('teamUid') teamUid: string, @Body() body: UpdateFundraisingTeamDto) {
+    return this.demoDayFundraisingProfilesService.updateFundraisingTeam(req.userEmail, teamUid, body);
   }
 
   @Patch('current/confidentiality-policy')
@@ -216,61 +233,71 @@ export class DemoDaysController {
   }
 
   // Direct S3 upload endpoints
-  @Post('current/fundraising-profile/video/upload-url')
+  @Post('current/teams/:teamUid/fundraising-profile/video/upload-url')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async getVideoUploadUrl(@Req() req, @Body() body: { filename: string; filesize: number; mimetype: string }) {
+  async getVideoUploadUrl(
+    @Req() req,
+    @Param('teamUid') teamUid: string,
+    @Body() body: { filename: string; filesize: number; mimetype: string }
+  ) {
     if (!body.filename || !body.filesize || !body.mimetype) {
       throw new Error('filename, filesize, and mimetype are required');
     }
 
     return this.demoDayFundraisingProfilesService.generateVideoUploadUrl(
       req.userEmail,
+      teamUid,
       body.filename,
       body.filesize,
       body.mimetype
     );
   }
 
-  @Post('current/fundraising-profile/video/confirm')
+  @Post('current/teams/:teamUid/fundraising-profile/video/confirm')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async confirmVideoUpload(@Req() req, @Body() body: { uploadUid: string }) {
+  async confirmVideoUpload(@Req() req, @Param('teamUid') teamUid: string, @Body() body: { uploadUid: string }) {
     if (!body.uploadUid) {
       throw new Error('uploadUid is required');
     }
 
-    return this.demoDayFundraisingProfilesService.confirmVideoUpload(req.userEmail, body.uploadUid);
+    return this.demoDayFundraisingProfilesService.confirmVideoUpload(req.userEmail, teamUid, body.uploadUid);
   }
 
-  @Post('current/fundraising-profile/one-pager/upload-url')
+  @Post('current/teams/:teamUid/fundraising-profile/one-pager/upload-url')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async getOnePagerUploadUrl(@Req() req, @Body() body: { filename: string; filesize: number; mimetype: string }) {
+  async getOnePagerUploadUrl(
+    @Req() req,
+    @Param('teamUid') teamUid: string,
+    @Body() body: { filename: string; filesize: number; mimetype: string }
+  ) {
     if (!body.filename || !body.filesize || !body.mimetype) {
       throw new Error('filename, filesize, and mimetype are required');
     }
 
     return this.demoDayFundraisingProfilesService.generateOnePagerUploadUrl(
       req.userEmail,
+      teamUid,
       body.filename,
       body.filesize,
       body.mimetype
     );
   }
 
-  @Post('current/fundraising-profile/one-pager/confirm')
+  @Post('current/teams/:teamUid/fundraising-profile/one-pager/confirm')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async confirmOnePagerUpload(@Req() req, @Body() body: { uploadUid: string }) {
+  async confirmOnePagerUpload(@Req() req, @Param('teamUid') teamUid: string, @Body() body: { uploadUid: string }) {
     if (!body.uploadUid) {
       throw new Error('uploadUid is required');
     }
 
-    return this.demoDayFundraisingProfilesService.confirmOnePagerUpload(req.userEmail, body.uploadUid);
+    return this.demoDayFundraisingProfilesService.confirmOnePagerUpload(req.userEmail, teamUid, body.uploadUid);
   }
 
-  @Post('current/fundraising-profile/one-pager/preview')
+  @Post('current/teams/:teamUid/fundraising-profile/one-pager/preview')
   @UseGuards(UserTokenValidation)
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -291,6 +318,7 @@ export class DemoDaysController {
   @NoCache()
   async uploadOnePagerPreview(
     @Req() req,
+    @Param('teamUid') teamUid: string,
     @UploadedFiles()
     files: {
       previewImage?: Express.Multer.File[];
@@ -303,9 +331,17 @@ export class DemoDaysController {
 
     return this.demoDayFundraisingProfilesService.uploadOnePagerPreviewByMember(
       req.userEmail,
+      teamUid,
       files.previewImage[0],
       files.previewImageSmall?.[0]
     );
+  }
+
+  @Get('current/teams/:teamUid/analytics')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getTeamAnalytics(@Req() req, @Param('teamUid') teamUid: string) {
+    return this.demoDaysService.getTeamAnalytics(teamUid);
   }
 
   @Post('current/feedback')

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DemoDay, DemoDayStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
@@ -911,12 +911,12 @@ export class DemoDaysService {
     }
 
     // Check if a user is a demo day admin or founder with admin privileges
-    const hasViewOnlyAdminAccess = await this.isViewOnlyAdminAccess(member.uid, demoDayUid);
+    const hasViewOnlyAdminAccess = await this.isDemoDayAdmin(member.uid, demoDayUid);
     if (hasViewOnlyAdminAccess) {
       return { participantUid: member.uid, isAdmin: true };
     }
 
-    // Check if user is a participant
+    // Check if a user is a participant
     const participantAccess = await this.prisma.member.findUnique({
       where: { uid: member.uid },
       select: {
@@ -941,12 +941,12 @@ export class DemoDaysService {
   }
 
   /**
-   * Check if a member has view-only admin access to a demo day
+   * Check if a member has admin access to a demo day
    * @param memberUid - UID of the member
    * @param demoDayUid - UID of the demo day
    * @returns True if the member has admin access
    */
-  private async isViewOnlyAdminAccess(memberUid: string, demoDayUid: string): Promise<boolean> {
+  private async isDemoDayAdmin(memberUid: string, demoDayUid: string): Promise<boolean> {
     const participant = await this.prisma.demoDayParticipant.findFirst({
       where: {
         demoDayUid: demoDayUid,
@@ -956,6 +956,6 @@ export class DemoDaysService {
       },
     });
 
-    return participant?.isDemoDayAdmin || participant?.type === 'FOUNDER' || false;
+    return participant?.isDemoDayAdmin || false;
   }
 }
