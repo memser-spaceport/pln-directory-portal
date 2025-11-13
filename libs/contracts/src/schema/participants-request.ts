@@ -66,12 +66,12 @@ const newDataMemberSchema = z.object({
 
 const newDataTeamSchema = z.object({
   name: z.string(),
-  contactMethod: z.string(),
-  industryTags: z.array(industrTagsMappingSchema).nonempty(),
-  fundingStage: fundingStageMappingSchema,
-  technologies: z.array(TechnologiesMappingSchema),
+  website: z.string(),
+  contactMethod: z.string().optional().nullable(),
+  industryTags: z.array(industrTagsMappingSchema).default([]),
+  fundingStage: fundingStageMappingSchema.nullable().optional(),
+  technologies: z.array(TechnologiesMappingSchema).default([]),
   membershipSources: z.array(membershipSourcesMappingSchema).optional().nullable(),
-  website: z.string().optional().nullable(),
   blog: z.string().optional().nullable(),
   shortDescription: z.string().optional().nullable(),
   longDescription: z.string().optional().nullable(),
@@ -84,10 +84,10 @@ const newDataTeamSchema = z.object({
   isFund: z.boolean().optional().default(false),
   investorProfile: z
     .object({
-      investmentFocus: z.array(z.string()).optional(),
+      investmentFocus: z.array(z.string()).optional().default([]),
       typicalCheckSize: z.number().nullable().optional(),
-      investInStartupStages: z.array(z.string()).optional(),
-      investInFundTypes: z.array(z.string()).optional(),
+      investInStartupStages: z.array(z.string()).optional().default([]),
+      investInFundTypes: z.array(z.string()).optional().default([]),
     })
     .optional(),
 });
