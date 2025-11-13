@@ -11,6 +11,7 @@ import { AuthModule } from '../auth/auth.module';
 import { HuskyModule } from '../husky/husky.module';
 import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
 import { OfficeHoursModule } from '../office-hours/office-hours.module';
+import {TeamsModule} from "../teams/teams.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { OfficeHoursModule } from '../office-hours/office-hours.module';
     HuskyModule,
     forwardRef(() => NotificationSettingsModule),
     forwardRef(() => OfficeHoursModule),
+    forwardRef(() => TeamsModule)
   ],
   providers: [MembersService, MembersHooksService, InvestorProfileService, OnboardingRemindersJob],
   controllers: [MemberController],
