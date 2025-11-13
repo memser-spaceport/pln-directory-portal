@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - develop   # Triggers Dev deployment
+      - fix/zod-schema-for-new-team-flow
 jobs:
   dev-deploy:
     name: Deploy Helm Chart to EKS preprod
