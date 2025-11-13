@@ -65,6 +65,7 @@ export class ParticipantsRequestController {
           ? body.team.website
           : body.website,
       requestorEmail: body?.newData?.email || body?.email || undefined,
+      project: body.project,
     });
 
     return result;

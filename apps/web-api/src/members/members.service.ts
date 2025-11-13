@@ -3260,6 +3260,7 @@ export class MembersService {
       isTeamNew?: boolean;
       website?: string | null;
       requestorEmail?: string;
+      project?: { projectUid?: string } | string;
     }
   ): Promise<{ uid: string }> {
     // create a new member with accessLevel=L0 (existing flow)
@@ -3277,6 +3278,7 @@ export class MembersService {
 
       // create/resolve team and upsert TeamMemberRole
       await this.attachTeamAndRoleTx(tx, member.uid, options);
+      await this.attachProjectTx(tx, member.uid, options.project, options.role);
     });
 
     return { uid: member.uid };
@@ -3376,6 +3378,40 @@ export class MembersService {
       name: team.name?.trim(),
       website: team.website?.trim(),
     };
+  }
+
+  private async attachProjectTx(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    project?: { projectUid?: string } | string,
+    role?: string,
+  ): Promise<void> {
+    if (!project) return;
+
+    const projectUid =
+      typeof project === 'string'
+        ? project.trim()
+        : project.projectUid?.trim();
+
+    if (!projectUid) return;
+
+    const exists = await tx.project.findUnique({
+      where: { uid: projectUid },
+      select: { uid: true },
+    });
+
+    if (!exists) {
+      this.logger.info(`attachProjectTx: project ${projectUid} not found, skipping`);
+      return;
+    }
+
+    await tx.projectContribution.create({
+      data: {
+        memberUid,
+        projectUid,
+        role: role ?? null,
+      },
+    });
   }
 
 }
