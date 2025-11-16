@@ -381,6 +381,7 @@ export class AuthService implements OnModuleInit {
       leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.teamUid),
       mainTeamName: team?.name,
       accessLevel: memberInfo.accessLevel,
+      isTierViewer: memberInfo.isTierViewer ?? false,
     };
   }
 

@@ -54,7 +54,7 @@ export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
   fundingStage: ResponseFundingStageSchema.optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
   technologies: ResponseTechnologySchema.array().optional(),
-  asks: ResponseAskSchemaWithRelationsSchema.array().optional()
+  asks: ResponseAskSchemaWithRelationsSchema.array().optional(),
 });
 
 export const TeamQueryableFields = ResponseTeamSchema.keyof();
@@ -66,7 +66,7 @@ export const TeamRelationalFields = ResponseTeamWithRelationsSchema.pick({
   fundingStage: true,
   teamMemberRoles: true,
   technologies: true,
-  asks: true
+  asks: true,
 }).strip();
 
 export const TeamQueryParams = QueryParams({
@@ -74,12 +74,14 @@ export const TeamQueryParams = QueryParams({
   relationalFields: TeamRelationalFields,
 });
 
-export const TeamDetailQueryParams = TeamQueryParams.unwrap()
-  .pick(RETRIEVAL_QUERY_FILTERS)
-  .optional();
+export const TeamDetailQueryParams = TeamQueryParams.unwrap().pick(RETRIEVAL_QUERY_FILTERS).optional();
 
 export const TeamFilterQueryParams = z.object({
-  search: z.string().optional(),
+  searchBy: z.string().optional(),
+  membershipSources: z.string().optional(),
+  focusAreas: z.string().optional(),
+  tags: z.string().optional(),
+  fundingStage: z.string().optional(),
   isFund: z.boolean().optional(),
   minTypicalCheckSize: z.number().min(0).optional(),
   maxTypicalCheckSize: z.number().min(0).optional(),
