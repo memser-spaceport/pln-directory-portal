@@ -66,7 +66,7 @@ const newDataMemberSchema = z.object({
 
 const newDataTeamSchema = z.object({
   name: z.string(),
-  website: z.string(),
+  website: z.string().optional().nullable(),
   project: z
     .object({
       projectUid: z.string().optional().nullable()

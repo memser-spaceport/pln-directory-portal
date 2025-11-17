@@ -1,19 +1,59 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { TEAM } from '../utils/constants';
 
 @Injectable()
 export class FundingStagesService {
   constructor(private prisma: PrismaService) {}
 
-  findAll(queryOptions: Prisma.FundingStageFindManyArgs) {
-    return this.prisma.fundingStage.findMany(queryOptions);
+  async findAll(query: any) {
+    const { type } = query;
+    return this.prisma.fundingStage.findMany({
+      select: {
+        uid: true,
+        title: true,
+        ...this.buildTeamsFilterByType(type, query),
+      },
+      orderBy: {
+        title: 'asc',
+      },
+    });
   }
 
-  findOne(
-    uid: string,
-    queryOptions: Omit<Prisma.FundingStageFindUniqueArgsBase, 'where'> = {}
-  ) {
+  private buildTeamsFilterByType(type: any, query: any): any {
+    if (type === TEAM) {
+      const { plnFriend } = query;
+      const whereClause: any = {
+        accessLevel: {
+          not: 'L0',
+        },
+      };
+
+      // Add plnFriend filter if specified
+      if (plnFriend !== 'true') {
+        whereClause.plnFriend = false;
+      }
+
+      return {
+        teams: {
+          where: whereClause,
+          select: {
+            uid: true,
+            name: true,
+            logo: {
+              select: {
+                url: true,
+              },
+            },
+          },
+        },
+      };
+    }
+    return {};
+  }
+
+  findOne(uid: string, queryOptions: Omit<Prisma.FundingStageFindUniqueArgsBase, 'where'> = {}) {
     return this.prisma.fundingStage.findUniqueOrThrow({
       where: { uid },
       ...queryOptions,
