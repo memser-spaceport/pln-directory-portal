@@ -1,20 +1,62 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { IAirtableIndustryTag } from '@protocol-labs-network/airtable';
 import { PrismaService } from '../shared/prisma.service';
+import { TeamsService } from '../teams/teams.service';
+import { TEAM } from '../utils/constants';
 
 @Injectable()
 export class IndustryTagsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => TeamsService))
+    private teamsService: TeamsService
+  ) {}
 
-  findAll(queryOptions: Prisma.IndustryTagFindManyArgs) {
-    return this.prisma.industryTag.findMany(queryOptions);
+  async findAll(query: any) {
+    const { type } = query;
+    return this.prisma.industryTag.findMany({
+      select: {
+        uid: true,
+        title: true,
+        definition: true,
+        industryCategoryUid: true,
+        industryCategory: true,
+        ...this.buildTeamsFilterByType(type, query),
+      },
+      orderBy: {
+        title: 'asc',
+      },
+    });
   }
 
-  findOne(
-    uid: string,
-    queryOptions: Omit<Prisma.IndustryTagFindUniqueArgsBase, 'where'> = {}
-  ) {
+  private buildTeamsFilterByType(type: any, query: any): any {
+    if (type === TEAM) {
+      return {
+        teams: {
+          where: {
+            ...this.buildTeamFilter(query),
+          },
+          select: {
+            uid: true,
+            name: true,
+            logo: {
+              select: {
+                url: true,
+              },
+            },
+          },
+        },
+      };
+    }
+    return {};
+  }
+
+  private buildTeamFilter(queryParams: any) {
+    return this.teamsService.buildTeamFilter(queryParams);
+  }
+
+  findOne(uid: string, queryOptions: Omit<Prisma.IndustryTagFindUniqueArgsBase, 'where'> = {}) {
     return this.prisma.industryTag.findUniqueOrThrow({
       where: { uid },
       ...queryOptions,
@@ -25,13 +67,9 @@ export class IndustryTagsService {
     const industryCategories = await this.prisma.industryCategory.findMany();
     return this.prisma.$transaction(
       airtableIndustryTags.map((industryTag) => {
-        const airtableCategory = !!industryTag.fields.Categories
-          ? industryTag.fields.Categories[0]
-          : '';
+        const airtableCategory = !!industryTag.fields.Categories ? industryTag.fields.Categories[0] : '';
         const relatedCategory = !!industryTag.fields.Categories?.length
-          ? industryCategories.find(
-              (category) => category.title === airtableCategory
-            )
+          ? industryCategories.find((category) => category.title === airtableCategory)
           : null;
 
         return this.prisma.industryTag.upsert({

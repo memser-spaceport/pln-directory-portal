@@ -10,7 +10,17 @@ export const FundingStageSchema = z.object({
   updatedAt: z.string(),
 });
 
-export const ResponseFundingStageSchema = FundingStageSchema.omit({
+const SimpleTeamSchema = z.object({
+  uid: z.string(),
+  name: z.string(),
+  logo: z.object({
+    url: z.string(),
+  }).optional().nullable(),
+});
+
+export const ResponseFundingStageSchema = FundingStageSchema.extend({
+  teams: z.array(SimpleTeamSchema).optional(),
+}).omit({
   id: true,
 }).strict();
 
@@ -19,10 +29,17 @@ export const CreateFundingStageSchema = FundingStageSchema.pick({
   title: true,
 });
 
-export const FundingStageQueryableFields = ResponseFundingStageSchema.keyof();
+export const FundingStageRelationalFields = ResponseFundingStageSchema.pick({
+  teams: true,
+}).strip();
+
+export const FundingStageQueryableFields = ResponseFundingStageSchema.omit({
+  teams: true,
+}).keyof();
 
 export const FundingStageQueryParams = QueryParams({
   queryableFields: FundingStageQueryableFields,
+  relationalFields: FundingStageRelationalFields,
 });
 
 export const FundingStageDetailQueryParams = FundingStageQueryParams.unwrap()
