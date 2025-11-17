@@ -879,7 +879,7 @@ export class DemoDaysService {
     }
 
     // Check if demo day is accepting applications (REGISTRATION_OPEN status)
-    if (demoDay.status !== DemoDayStatus.REGISTRATION_OPEN) {
+    if (demoDay.status !== DemoDayStatus.REGISTRATION_OPEN && demoDay.status !== DemoDayStatus.EARLY_ACCESS) {
       throw new BadRequestException('Demo day is not currently accepting applications');
     }
 

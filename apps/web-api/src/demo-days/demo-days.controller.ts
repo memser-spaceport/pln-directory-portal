@@ -307,6 +307,7 @@ export class DemoDaysController {
   }
 
   @Post('current/investor-application')
+  @UseGuards(UserTokenValidation)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async submitInvestorApplication(@Body() body: CreateDemoDayInvestorApplicationDto) {

@@ -9,6 +9,7 @@ import { useUpdateDemoDay } from '../../hooks/demo-days/useUpdateDemoDay';
 import { useUpdateParticipant } from '../../hooks/demo-days/useUpdateParticipant';
 import { AddParticipantModal } from '../../components/demo-days/AddParticipantModal';
 import { UploadParticipantsModal } from '../../components/demo-days/UploadParticipantsModal';
+import { ApproveParticipantModal } from '../../components/demo-days/ApproveParticipantModal';
 import { UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
 import { RichText } from '../../components/common/rich-text';
@@ -21,7 +22,7 @@ const DemoDayDetailPage = () => {
   const router = useRouter();
   const { slugURL } = router.query;
   const [authToken] = useCookie('plnadmin');
-  const [activeTab, setActiveTab] = useState<'investors' | 'founders'>('investors');
+  const [activeTab, setActiveTab] = useState<'investors' | 'founders' | 'applications'>('applications');
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -29,6 +30,12 @@ const DemoDayDetailPage = () => {
   const [editFormData, setEditFormData] = useState<UpdateDemoDayDto>({});
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [selectedParticipantForApproval, setSelectedParticipantForApproval] = useState<{
+    uid: string;
+    name: string;
+    email: string;
+  } | null>(null);
 
   const updateDemoDayMutation = useUpdateDemoDay();
   const updateParticipantMutation = useUpdateParticipant();
@@ -42,9 +49,9 @@ const DemoDayDetailPage = () => {
     authToken,
     demoDayUid: demoDay?.uid as string,
     query: {
-      type: activeTab === 'investors' ? 'INVESTOR' : 'FOUNDER',
+      type: activeTab === 'applications' ? undefined : (activeTab === 'investors' ? 'INVESTOR' : 'FOUNDER'),
       search: searchTerm || undefined,
-      status: (statusFilter as 'INVITED' | 'ENABLED' | 'DISABLED') || undefined,
+      status: activeTab === 'applications' ? 'INVITED' : ((statusFilter as 'INVITED' | 'ENABLED' | 'DISABLED') || undefined),
       page: currentPage,
       limit: 50,
     },
@@ -209,6 +216,61 @@ const DemoDayDetailPage = () => {
       ...prev,
       [field]: value,
     }));
+  };
+
+  const handleApproveClick = (participant: any) => {
+    setSelectedParticipantForApproval({
+      uid: participant.uid,
+      name: participant.member?.name || participant.name,
+      email: participant.member?.email || participant.email,
+    });
+    setShowApproveModal(true);
+  };
+
+  const handleApprove = async (participantUid: string, type: 'INVESTOR' | 'FOUNDER') => {
+    if (!authToken || !demoDay) return;
+
+    try {
+      // Update both type and status to ENABLED
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: demoDay.uid,
+        participantUid,
+        data: {
+          type,
+          status: 'ENABLED'
+        },
+      });
+      toast.success('Application approved successfully');
+      setShowApproveModal(false);
+      setSelectedParticipantForApproval(null);
+    } catch (error) {
+      console.error('Error approving participant:', error);
+      toast.error('Failed to approve application. Please try again.');
+    }
+  };
+
+  const handleReject = async (participantUid: string, participantName: string) => {
+    if (!authToken || !demoDay) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to reject ${participantName}'s application?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: demoDay.uid,
+        participantUid,
+        data: { status: 'DISABLED' },
+      });
+      toast.success('Application rejected');
+    } catch (error) {
+      console.error('Error rejecting participant:', error);
+      toast.error('Failed to reject application. Please try again.');
+    }
   };
 
   const handleNextPage = () => {
@@ -406,6 +468,12 @@ const DemoDayDetailPage = () => {
               {/* Tabs */}
               <div className={s.tabs}>
                 <button
+                  className={clsx(s.tab, { [s.active]: activeTab === 'applications' })}
+                  onClick={() => setActiveTab('applications')}
+                >
+                  Applications {participants && activeTab === 'applications' && `(${participants.total})`}
+                </button>
+                <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'investors' })}
                   onClick={() => setActiveTab('investors')}
                 >
@@ -428,16 +496,18 @@ const DemoDayDetailPage = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className={clsx(s.input)}
                 />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className={s.filterSelect}
-                >
-                  <option value="">All Statuses</option>
-                  <option value="INVITED">Invited</option>
-                  <option value="ENABLED">Enabled</option>
-                  <option value="DISABLED">Disabled</option>
-                </select>
+                {activeTab !== 'applications' && (
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className={s.filterSelect}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="INVITED">Invited</option>
+                    <option value="ENABLED">Enabled</option>
+                    <option value="DISABLED">Disabled</option>
+                  </select>
+                )}
               </div>
             </div>
           </div>
@@ -453,7 +523,9 @@ const DemoDayDetailPage = () => {
                 {/* Header */}
                 <div className={clsx(s.tableRow, s.tableHeader)}>
                   <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
-                  <div className={clsx(s.headerCell, s.flexible)}>Team</div>
+                  {activeTab !== 'applications' && (
+                    <div className={clsx(s.headerCell, s.flexible)}>Team</div>
+                  )}
                   {activeTab === 'investors' && (
                     <div className={clsx(s.headerCell, s.fixed)} style={{ width: 200 }}>
                       Investor Type
@@ -469,14 +541,18 @@ const DemoDayDetailPage = () => {
                       Pitch Materials
                     </div>
                   )}
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
-                    Invite Accepted
-                  </div>
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
-                    Type
-                  </div>
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
-                    Status
+                  {activeTab !== 'applications' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                      Invite Accepted
+                    </div>
+                  )}
+                  {activeTab !== 'applications' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                      Type
+                    </div>
+                  )}
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: activeTab === 'applications' ? 200 : 150 }}>
+                    {activeTab === 'applications' ? 'Action' : 'Status'}
                   </div>
                 </div>
 
@@ -502,8 +578,9 @@ const DemoDayDetailPage = () => {
                         </div>
                       </div>
                     </div>
-                    <div className={clsx(s.bodyCell, s.flexible)}>
-                      {activeTab === 'founders' ? (
+                    {activeTab !== 'applications' && (
+                      <div className={clsx(s.bodyCell, s.flexible)}>
+                        {activeTab === 'founders' ? (
                         (() => {
                           const memberTeams = participant.member?.teamMemberRoles || [];
                           const currentTeamUid = participant.teamUid || '';
@@ -585,7 +662,8 @@ const DemoDayDetailPage = () => {
                           );
                         })()
                       )}
-                    </div>
+                      </div>
+                    )}
                     {activeTab === 'founders' && (
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
                         {(() => {
@@ -690,72 +768,97 @@ const DemoDayDetailPage = () => {
                         </select>
                       </div>
                     )}
-                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                      {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
-                        <svg
-                          className="mx-auto h-5 w-5 text-red-500"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="mx-auto h-5 w-5 text-green-500"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-
-                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                      <select
-                        value={participant.type}
-                        onChange={(e) =>
-                          handleUpdateParticipantType(
-                            participant.uid,
-                            participant.member?.name || participant.name,
-                            e.target.value as 'INVESTOR' | 'FOUNDER'
-                          )
-                        }
-                        disabled={updateParticipantMutation.isPending}
-                        className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
-                          participant.type === 'INVESTOR'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-blue-100 text-blue-800'
-                        } disabled:opacity-50`}
-                      >
-                        <option value="INVESTOR">Investor</option>
-                        <option value="FOUNDER">Founder</option>
-                      </select>
-                    </div>
-
-                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                      <select
-                        value={participant.status}
-                        onChange={(e) =>
-                          handleUpdateParticipantStatus(
-                            participant.uid,
-                            e.target.value as 'INVITED' | 'ENABLED' | 'DISABLED'
-                          )
-                        }
-                        disabled={updateParticipantMutation.isPending}
-                        className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${getParticipantStatusColor(
-                          participant.status
-                        )} disabled:opacity-50`}
-                      >
+                    {activeTab !== 'applications' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
                         {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
-                          <option value="INVITED">Invited</option>
+                          <svg
+                            className="mx-auto h-5 w-5 text-red-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
                         ) : (
-                          ''
+                          <svg
+                            className="mx-auto h-5 w-5 text-green-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
                         )}
-                        <option value="ENABLED">Enabled</option>
-                        <option value="DISABLED">Disabled</option>
-                      </select>
+                      </div>
+                    )}
+
+                    {activeTab !== 'applications' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        <select
+                          value={participant.type}
+                          onChange={(e) =>
+                            handleUpdateParticipantType(
+                              participant.uid,
+                              participant.member?.name || participant.name,
+                              e.target.value as 'INVESTOR' | 'FOUNDER'
+                            )
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                            participant.type === 'INVESTOR'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                          } disabled:opacity-50`}
+                        >
+                          <option value="INVESTOR">Investor</option>
+                          <option value="FOUNDER">Founder</option>
+                        </select>
+                      </div>
+                    )}
+
+                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: activeTab === 'applications' ? 200 : 150 }}>
+                      {activeTab === 'applications' ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleApproveClick(participant)}
+                            disabled={updateParticipantMutation.isPending}
+                            className="flex-1 rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Approve application"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleReject(participant.uid, participant.member?.name || participant.name)}
+                            disabled={updateParticipantMutation.isPending}
+                            className="flex-1 rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Reject application"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          value={participant.status}
+                          onChange={(e) =>
+                            handleUpdateParticipantStatus(
+                              participant.uid,
+                              e.target.value as 'INVITED' | 'ENABLED' | 'DISABLED'
+                            )
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${getParticipantStatusColor(
+                            participant.status
+                          )} disabled:opacity-50`}
+                        >
+                          {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
+                            <option value="INVITED">Invited</option>
+                          ) : (
+                            ''
+                          )}
+                          <option value="ENABLED">Enabled</option>
+                          <option value="DISABLED">Disabled</option>
+                        </select>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -764,12 +867,12 @@ const DemoDayDetailPage = () => {
           </div>
 
           {/* Pagination Controls */}
-          {participants?.totalPages && participants.totalPages > 1 && (
+          {participants?.totalPages && participants.totalPages > 1 && participants.total > 0 && (
             <div className={s.pagination}>
               <div className={s.paginationInfo}>
                 Showing {(participants.page - 1) * participants.limit + 1} to{' '}
                 {Math.min(participants.page * participants.limit, participants.total)} of {participants.total}{' '}
-                {activeTab === 'investors' ? 'investors' : 'founders'}
+                {activeTab === 'applications' ? 'applications' : activeTab === 'investors' ? 'investors' : 'founders'}
               </div>
               <div className={s.paginationControls}>
                 <button
@@ -805,6 +908,17 @@ const DemoDayDetailPage = () => {
           isOpen={showUploadModal}
           onClose={() => setShowUploadModal(false)}
           demoDayUid={demoDay.uid}
+        />
+
+        <ApproveParticipantModal
+          isOpen={showApproveModal}
+          onClose={() => {
+            setShowApproveModal(false);
+            setSelectedParticipantForApproval(null);
+          }}
+          participant={selectedParticipantForApproval}
+          onApprove={handleApprove}
+          isLoading={updateParticipantMutation.isPending}
         />
       </div>
     </ApprovalLayout>
