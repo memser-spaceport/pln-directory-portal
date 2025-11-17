@@ -477,13 +477,13 @@ const DemoDayDetailPage = () => {
                   className={clsx(s.tab, { [s.active]: activeTab === 'investors' })}
                   onClick={() => setActiveTab('investors')}
                 >
-                  Investors
+                  Investors {participants && activeTab === 'investors' && `(${participants.total})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'founders' })}
                   onClick={() => setActiveTab('founders')}
                 >
-                  Founders
+                  Founders {participants && activeTab === 'founders' && `(${participants.total})`}
                 </button>
               </div>
 
@@ -867,7 +867,7 @@ const DemoDayDetailPage = () => {
           </div>
 
           {/* Pagination Controls */}
-          {participants?.totalPages && participants.totalPages > 1 && participants.total > 0 && (
+          {participants?.totalPages > 1 && participants.total > 0 && (
             <div className={s.pagination}>
               <div className={s.paginationInfo}>
                 Showing {(participants.page - 1) * participants.limit + 1} to{' '}
