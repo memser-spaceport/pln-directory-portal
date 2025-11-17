@@ -1,17 +1,12 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { IAirtableIndustryTag } from '@protocol-labs-network/airtable';
 import { PrismaService } from '../shared/prisma.service';
-import { TeamsService } from '../teams/teams.service';
 import { TEAM } from '../utils/constants';
 
 @Injectable()
 export class IndustryTagsService {
-  constructor(
-    private prisma: PrismaService,
-    @Inject(forwardRef(() => TeamsService))
-    private teamsService: TeamsService
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   async findAll(query: any) {
     const { type } = query;
@@ -22,7 +17,7 @@ export class IndustryTagsService {
         definition: true,
         industryCategoryUid: true,
         industryCategory: true,
-        ...this.buildTeamsFilterByType(type, query),
+        ...this.buildTeamsFilterByType(type),
       },
       orderBy: {
         title: 'asc',
@@ -30,12 +25,14 @@ export class IndustryTagsService {
     });
   }
 
-  private buildTeamsFilterByType(type: any, query: any): any {
+  private buildTeamsFilterByType(type: any): any {
     if (type === TEAM) {
       return {
         teams: {
           where: {
-            ...this.buildTeamFilter(query),
+            accessLevel: {
+              not: 'L0',
+            },
           },
           select: {
             uid: true,
@@ -50,10 +47,6 @@ export class IndustryTagsService {
       };
     }
     return {};
-  }
-
-  private buildTeamFilter(queryParams: any) {
-    return this.teamsService.buildTeamFilter(queryParams);
   }
 
   findOne(uid: string, queryOptions: Omit<Prisma.IndustryTagFindUniqueArgsBase, 'where'> = {}) {
