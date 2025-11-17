@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
-import { TeamsService } from '../teams/teams.service'; 
+import { TeamsService } from '../teams/teams.service';
 import { ProjectsService } from '../projects/projects.service';
 import { PROJECT, TEAM } from '../utils/constants';
 @Injectable()
 export class FocusAreasService {
-  constructor(private prisma: PrismaService, private teamsService: TeamsService, private projectService: ProjectsService) {}
+  constructor(
+    private prisma: PrismaService,
+    private teamsService: TeamsService,
+    private projectService: ProjectsService
+  ) {}
 
   async findAll(query) {
     const { type } = query;
@@ -16,10 +20,10 @@ export class FocusAreasService {
         description: true,
         parentUid: true,
         children: this.buildQueryByLevel(4, type, query), // level denotes depth of children.
-        ...this.buildAncestorFocusAreasFilterByType(type, query)
+        ...this.buildAncestorFocusAreasFilterByType(type, query),
       },
       orderBy: {
-        createdAt: "desc"
+        createdAt: 'desc',
       },
     });
     return result;
@@ -34,11 +38,11 @@ export class FocusAreasService {
           description: true,
           parentUid: true,
           children: true,
-          ...this.buildAncestorFocusAreasFilterByType(type, query)
+          ...this.buildAncestorFocusAreasFilterByType(type, query),
         },
         orderBy: {
-          createdAt: "desc"
-        }
+          createdAt: 'desc',
+        },
       };
     }
     return {
@@ -48,22 +52,24 @@ export class FocusAreasService {
         description: true,
         parentUid: true,
         children: this.buildQueryByLevel(level - 1, type, query),
-        ...this.buildAncestorFocusAreasFilterByType(type, query)
+        ...this.buildAncestorFocusAreasFilterByType(type, query),
       },
       orderBy: {
-        createdAt: "desc"
-      }
+        createdAt: 'desc',
+      },
     };
   }
 
-  buildAncestorFocusAreasFilterByType(type, query):any {
+  buildAncestorFocusAreasFilterByType(type, query): any {
     if (type === TEAM) {
-      return  {
+      return {
         teamAncestorFocusAreas: {
           where: {
             team: {
-              ...this.buildTeamFilter(query)
-            }
+              accessLevel: {
+                not: 'L0',
+              },
+            },
           },
           select: {
             team: {
@@ -72,23 +78,23 @@ export class FocusAreasService {
                 name: true,
                 logo: {
                   select: {
-                    url: true
-                  }
-                }
-              }
-            }
+                    url: true,
+                  },
+                },
+              },
+            },
           },
-          distinct: "teamUid"
-        }
-      }
+          distinct: 'teamUid',
+        },
+      };
     }
     if (type === PROJECT) {
       return {
         projectAncestorFocusAreas: {
           where: {
             project: {
-              ...this.buildProjectFilter(query)
-            }
+              ...this.buildProjectFilter(query),
+            },
           },
           select: {
             project: {
@@ -97,19 +103,19 @@ export class FocusAreasService {
                 name: true,
                 logo: {
                   select: {
-                    url: true
-                  }
-                }
-              }
-            }
+                    url: true,
+                  },
+                },
+              },
+            },
           },
-          distinct: "projectUid"
-        }
-      }
+          distinct: 'projectUid',
+        },
+      };
     }
-    return {}
+    return {};
   }
-  
+
   buildTeamFilter(queryParams) {
     return this.teamsService.buildTeamFilter(queryParams);
   }

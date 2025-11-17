@@ -55,11 +55,20 @@ export class ParticipantsRequestController {
     // the addRequest method that adds data into the ParticipantsRequests table should be removed
     // when we are sure new RBAC system with L0, L1, L2, L3, L4 access levels is working
     // and there are no dependencies on ParticipantRequest table
-    const member = await this.memberService.createMemberFromSignUpData(body.newData);
+    // Create member and (optionally) attach to team with role inside the service layer
+    const result = await this.memberService.createMemberAndAttach(body.newData, {
+      role: body.role,
+      team: body.team,
+      isTeamNew: body.isTeamNew,
+      website:
+        (typeof body.team === 'object' && body.team?.website)
+          ? body.team.website
+          : body.website,
+      requestorEmail: body?.newData?.email || body?.email || undefined,
+      project: body.project,
+    });
 
-    return {
-      uid: member.uid,
-    };
+    return result;
   }
 
   /**
