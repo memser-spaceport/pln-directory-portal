@@ -17,7 +17,7 @@ export class IndustryTagsService {
         definition: true,
         industryCategoryUid: true,
         industryCategory: true,
-        ...this.buildTeamsFilterByType(type),
+        ...this.buildTeamsFilterByType(type, query),
       },
       orderBy: {
         title: 'asc',
@@ -25,15 +25,23 @@ export class IndustryTagsService {
     });
   }
 
-  private buildTeamsFilterByType(type: any): any {
+  private buildTeamsFilterByType(type: any, query: any): any {
     if (type === TEAM) {
+      const { plnFriend } = query;
+      const whereClause: any = {
+        accessLevel: {
+          not: 'L0',
+        },
+      };
+
+      // Add plnFriend filter if specified
+      if (plnFriend !== 'true') {
+        whereClause.plnFriend = false;
+      }
+
       return {
         teams: {
-          where: {
-            accessLevel: {
-              not: 'L0',
-            },
-          },
+          where: whereClause,
           select: {
             uid: true,
             name: true,
