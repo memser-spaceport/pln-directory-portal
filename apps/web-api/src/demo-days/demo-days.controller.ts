@@ -29,6 +29,7 @@ import {
   UpdateFundraisingDescriptionDto,
   UpdateFundraisingTeamDto,
   CreateDemoDayFeedbackDto,
+  CreateDemoDayInvestorApplicationDto,
 } from 'libs/contracts/src/schema';
 
 const cache = new Map<string, { data: any; expires: number }>();
@@ -303,5 +304,12 @@ export class DemoDaysController {
   @NoCache()
   async submitFeedback(@Req() req, @Body() body: CreateDemoDayFeedbackDto) {
     return this.demoDaysService.createFeedback(req.userEmail, body);
+  }
+
+  @Post('current/investor-application')
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async submitInvestorApplication(@Body() body: CreateDemoDayInvestorApplicationDto) {
+    return this.demoDaysService.submitInvestorApplication(body);
   }
 }

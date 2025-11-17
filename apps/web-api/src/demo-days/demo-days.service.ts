@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { DemoDay, DemoDayStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
@@ -863,5 +863,136 @@ export class DemoDaysService {
     });
 
     return feedback;
+  }
+
+  async submitInvestorApplication(applicationData: {
+    email: string;
+    name: string;
+    linkedinProfile: string;
+    role: string;
+    organisationFundName: string;
+    isAccreditedInvestor?: boolean;
+  }) {
+    const demoDay = await this.getCurrentDemoDay();
+    if (!demoDay) {
+      throw new NotFoundException('No current demo day found');
+    }
+
+    // Check if demo day is accepting applications (REGISTRATION_OPEN status)
+    if (demoDay.status !== DemoDayStatus.REGISTRATION_OPEN) {
+      throw new BadRequestException('Demo day is not currently accepting applications');
+    }
+
+    const normalizedEmail = applicationData.email.toLowerCase().trim();
+
+    // Check if member already exists
+    let member = await this.prisma.member.findUnique({
+      where: { email: normalizedEmail },
+      select: {
+        uid: true,
+        email: true,
+        accessLevel: true,
+        investorProfile: true,
+        demoDayParticipants: {
+          where: {
+            demoDayUid: demoDay.uid,
+            isDeleted: false,
+          },
+        },
+      },
+    });
+
+    let isNewMember = false;
+
+    // If member doesn't exist, create a new one with L0 access level
+    if (!member) {
+      isNewMember = true;
+      member = await this.prisma.member.create({
+        data: {
+          email: normalizedEmail,
+          name: applicationData.name,
+          accessLevel: 'L0',
+          signUpSource: `demoday-${demoDay.slugURL}`,
+          linkedinHandler: applicationData.linkedinProfile,
+        },
+        select: {
+          uid: true,
+          email: true,
+          accessLevel: true,
+          investorProfile: true,
+          demoDayParticipants: {
+            where: {
+              demoDayUid: demoDay.uid,
+              isDeleted: false,
+            },
+          },
+        },
+      });
+    }
+
+    // Create or update investor profile
+    if (!member.investorProfile) {
+      const investorProfile = await this.prisma.investorProfile.create({
+        data: {
+          memberUid: member.uid,
+          investmentFocus: [], // Will be filled in later by the investor
+          secRulesAccepted: applicationData.isAccreditedInvestor ?? false,
+          secRulesAcceptedAt: applicationData.isAccreditedInvestor ? new Date() : null,
+        },
+      });
+
+      // Link investor profile to member
+      await this.prisma.member.update({
+        where: { uid: member.uid },
+        data: { investorProfileId: investorProfile.uid },
+      });
+    } else if (applicationData.isAccreditedInvestor && !member.investorProfile.secRulesAccepted) {
+      // Update existing profile if user accepted accredited investor terms
+      await this.prisma.investorProfile.update({
+        where: { uid: member.investorProfile.uid },
+        data: {
+          secRulesAccepted: true,
+          secRulesAcceptedAt: new Date(),
+        },
+      });
+    }
+
+    // Check if already a participant for this demo day
+    if (member.demoDayParticipants && member.demoDayParticipants.length > 0) {
+      throw new BadRequestException('You have already submitted an application for this demo day');
+    }
+
+    // Create demo day participant with INVITED status (pending approval)
+    const participant = await this.prisma.demoDayParticipant.create({
+      data: {
+        demoDayUid: demoDay.uid,
+        memberUid: member.uid,
+        type: 'INVESTOR',
+        status: 'INVITED', // Pending approval from admin
+      },
+    });
+
+    // Track analytics event
+    await this.analyticsService.trackEvent({
+      name: 'demo-day-investor-application-submitted',
+      distinctId: member.uid,
+      properties: {
+        demoDayUid: demoDay.uid,
+        participantUid: participant.uid,
+        email: normalizedEmail,
+        name: applicationData.name,
+        role: applicationData.role,
+        organisationFundName: applicationData.organisationFundName,
+        linkedinProfile: applicationData.linkedinProfile,
+        isAccreditedInvestor: applicationData.isAccreditedInvestor ?? false,
+        isNewMember,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Your application has been submitted successfully. You will be notified once it is reviewed.',
+      participantUid: participant.uid,
+    };
   }
 }
