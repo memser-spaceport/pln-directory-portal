@@ -5,7 +5,12 @@ import { Api, ApiDecorator, initNestServer, TsRest } from '@ts-rest/nest';
 import { Request } from 'express';
 import { z } from 'zod';
 import { apiTeam } from 'libs/contracts/src/lib/contract-team';
-import { ResponseTeamWithRelationsSchema, TeamDetailQueryParams, TeamQueryParams, TeamFilterQueryParams } from 'libs/contracts/src/schema';
+import {
+  ResponseTeamWithRelationsSchema,
+  TeamDetailQueryParams,
+  TeamQueryParams,
+  TeamFilterQueryParams,
+} from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { NOT_FOUND_GLOBAL_RESPONSE_SCHEMA } from '../utils/constants';
@@ -20,16 +25,13 @@ import { AccessLevelsGuard } from '../guards/access-levels.guard';
 import { AccessLevels } from '../decorators/access-levels.decorator';
 import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import { MembersService } from '../members/members.service';
-import {UserTokenCheckGuard} from "../guards/user-token-check.guard";
+import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
 @Controller()
 export class TeamsController {
-  constructor(
-    private readonly teamsService: TeamsService,
-    private readonly membersService: MembersService
-  ) {}
+  constructor(private readonly teamsService: TeamsService, private readonly membersService: MembersService) {}
 
   @Api(server.route.teamFilters)
   @ApiQueryFromZod(TeamQueryParams)
