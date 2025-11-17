@@ -14,8 +14,17 @@ export const IndustryTagSchema = z.object({
   industryCategoryUid: z.string(),
 });
 
+const SimpleTeamSchema = z.object({
+  uid: z.string(),
+  name: z.string(),
+  logo: z.object({
+    url: z.string(),
+  }).optional().nullable(),
+});
+
 export const ResponseIndustryTagSchema = IndustryTagSchema.extend({
   industryCategory: ResponseIndustryCategorySchema.optional(),
+  teams: z.array(SimpleTeamSchema).optional(),
 })
   .omit({ id: true })
   .strict();
@@ -28,10 +37,12 @@ export const CreateIndustryTagSchema = IndustryTagSchema.pick({
 
 export const IndustryTagRelationalFields = ResponseIndustryTagSchema.pick({
   industryCategory: true,
+  teams: true,
 }).strip();
 
 export const IndustryTagQueryableFields = ResponseIndustryTagSchema.omit({
   industryCategory: true,
+  teams: true,
 }).keyof();
 
 export const IndustryTagQueryParams = QueryParams({
