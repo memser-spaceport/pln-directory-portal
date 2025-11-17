@@ -56,6 +56,7 @@ export class AdminDemoDaysController {
 
   // This endpoint uses slugURL for browser-friendly URLs (e.g., /demo-days/crypto-day)
   @Get(':slugURL')
+  @UsePipes(ZodValidationPipe)
   @NoCache()
   async getDemoDayDetails(@Param('slugURL') slugURL: string): Promise<ResponseDemoDayDto> {
     return this.demoDaysService.getDemoDayBySlugURL(slugURL);
