@@ -1,4 +1,4 @@
-import { CacheTTL, Controller, Req } from '@nestjs/common';
+import { Controller, Req } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -15,7 +15,7 @@ import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { FundingStagesService } from './funding-stages.service';
-import { QueryCache } from '../decorators/query-cache.decorator';
+import { NoCache } from '../decorators/no-cache.decorator';
 
 const server = initNestServer(apiFundingStages);
 type RouteShape = typeof server.routeShapes;
@@ -27,13 +27,9 @@ export class FundingStagesController {
   @Api(server.route.getFundingStages)
   @ApiQueryFromZod(FundingStageQueryParams)
   @ApiOkResponseFromZod(ResponseFundingStageSchema.array())
-  @QueryCache()
-  @CacheTTL(60)
+  @NoCache()
   findAll(@Req() request: Request) {
-    const queryableFields = prismaQueryableFieldsFromZod(ResponseFundingStageSchema);
-    const builder = new PrismaQueryBuilder(queryableFields);
-    const builtQuery = builder.build(request.query);
-    return this.fundingStagesService.findAll(builtQuery);
+    return this.fundingStagesService.findAll(request.query);
   }
 
   @Api(server.route.getFundingStage)
