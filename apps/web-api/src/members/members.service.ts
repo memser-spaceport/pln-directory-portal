@@ -28,7 +28,7 @@ import { MembersHooksService } from './members.hooks.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
-import {TeamsService} from "../teams/teams.service";
+import { TeamsService } from '../teams/teams.service';
 
 @Injectable()
 export class MembersService {
@@ -675,7 +675,6 @@ export class MembersService {
   }
 
   async setMemberRole(memberUid: string, roleName: string, modifiedByUid?: string) {
-
     const member = await this.prisma.member.findUnique({
       where: { uid: memberUid },
     });
@@ -2304,6 +2303,7 @@ export class MembersService {
             ohHelpWith: true,
             openToWork: true,
             scheduleMeetingCount: true,
+            role: true,
             image: {
               select: {
                 uid: true,
@@ -3311,9 +3311,7 @@ export class MembersService {
     let targetTeamUid: string;
 
     if (isTeamNew) {
-      const name =
-        (norm.name && norm.name.trim()) ||
-        `team-${memberUid}`;
+      const name = (norm.name && norm.name.trim()) || `team-${memberUid}`;
       const website = (norm.website ?? opts.website) || null;
 
       const created = await this.teamService.createTeam(
@@ -3346,7 +3344,7 @@ export class MembersService {
     const finalRole = (role ?? 'member').trim();
     const roleTags = finalRole
       .split(',')
-      .map(s => s.trim())
+      .map((s) => s.trim())
       .filter(Boolean);
 
     await tx.teamMemberRole.upsert({
@@ -3367,9 +3365,11 @@ export class MembersService {
   }
 
   /** Accepts string (treated as name) or object with { uid|name|website } */
-  private normalizeTeamInput(
-    team: { uid?: string; name?: string; website?: string } | string
-  ): { uid?: string; name?: string; website?: string } {
+  private normalizeTeamInput(team: { uid?: string; name?: string; website?: string } | string): {
+    uid?: string;
+    name?: string;
+    website?: string;
+  } {
     if (typeof team === 'string') {
       return { name: team.trim() };
     }
@@ -3384,14 +3384,11 @@ export class MembersService {
     tx: Prisma.TransactionClient,
     memberUid: string,
     project?: { projectUid?: string } | string,
-    role?: string,
+    role?: string
   ): Promise<void> {
     if (!project) return;
 
-    const projectUid =
-      typeof project === 'string'
-        ? project.trim()
-        : project.projectUid?.trim();
+    const projectUid = typeof project === 'string' ? project.trim() : project.projectUid?.trim();
 
     if (!projectUid) return;
 
@@ -3413,5 +3410,4 @@ export class MembersService {
       },
     });
   }
-
 }
