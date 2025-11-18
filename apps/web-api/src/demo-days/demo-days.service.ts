@@ -955,6 +955,45 @@ export class DemoDaysService {
           },
         },
       });
+
+      // If an organisationFundName is provided, match it to a Team and create TeamMemberRole
+      if (applicationData.organisationFundName) {
+        const team = await this.prisma.team.findFirst({
+          where: {
+            name: {
+              equals: applicationData.organisationFundName,
+              mode: 'insensitive',
+            },
+          },
+          select: {
+            uid: true,
+          },
+        });
+
+        if (team) {
+          // Check if TeamMemberRole already exists for this member-team combination
+          const existingRole = await this.prisma.teamMemberRole.findUnique({
+            where: {
+              memberUid_teamUid: {
+                memberUid: member.uid,
+                teamUid: team.uid,
+              },
+            },
+          });
+
+          // Only create if it doesn't exist
+          if (!existingRole) {
+            await this.prisma.teamMemberRole.create({
+              data: {
+                memberUid: member.uid,
+                teamUid: team.uid,
+                role: applicationData.role,
+                investmentTeam: true,
+              },
+            });
+          }
+        }
+      }
     }
 
     // Create or update investor profile
@@ -989,7 +1028,7 @@ export class DemoDaysService {
       throw new BadRequestException('You have already submitted an application for this demo day');
     }
 
-    // Create demo day participant with INVITED status (pending approval)
+    // Create a demo day participant with INVITED status (pending approval)
     const participant = await this.prisma.demoDayParticipant.create({
       data: {
         demoDayUid: demoDay.uid,
