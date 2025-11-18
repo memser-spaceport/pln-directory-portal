@@ -560,7 +560,9 @@ const DemoDayDetailPage = () => {
                 </div>
 
                 {/* Body */}
-                {participants.participants.map((participant) => (
+                {participants.participants
+                  .filter((participant) => activeTab === 'applications' || participant.status !== 'PENDING')
+                  .map((participant) => (
                   <div key={participant.uid} className={s.tableRow}>
                     <div className={clsx(s.bodyCell, s.first, s.flexible)}>
                       <div className="flex items-center">
