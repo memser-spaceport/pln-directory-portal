@@ -69,7 +69,7 @@ export class AddParticipantsBulkDto extends createZodDto(AddParticipantsBulkSche
 export const GetParticipantsQuerySchema = z.object({
   page: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
   limit: z.string().regex(/^\d+$/).transform(Number).optional().default('20'),
-  status: z.enum(['INVITED', 'ENABLED', 'DISABLED']).optional(),
+  status: z.enum(['PENDING', 'INVITED', 'ENABLED', 'DISABLED']).optional(),
   type: z.enum(['INVESTOR', 'FOUNDER']).optional(),
   search: z.string().optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'statusUpdatedAt', 'type', 'status']).optional(),
@@ -80,7 +80,7 @@ export class GetParticipantsQueryDto extends createZodDto(GetParticipantsQuerySc
 
 // Update Participant Schema
 export const UpdateParticipantSchema = z.object({
-  status: z.enum(['INVITED', 'ENABLED', 'DISABLED']).optional(),
+  status: z.enum(['PENDING', 'INVITED', 'ENABLED', 'DISABLED']).optional(),
   teamUid: z.string().optional(),
   type: z.enum(['INVESTOR', 'FOUNDER']).optional(),
   hasEarlyAccess: z.boolean().optional(),
@@ -113,7 +113,7 @@ export const ResponseParticipantSchema = z.object({
   demoDayUid: z.string(),
   memberUid: z.string(),
   type: z.enum(['INVESTOR', 'FOUNDER']),
-  status: z.enum(['INVITED', 'ENABLED', 'DISABLED']),
+  status: z.enum(['PENDING', 'INVITED', 'ENABLED', 'DISABLED']),
   hasEarlyAccess: z.boolean(),
   teamUid: z.string().nullable(),
   statusUpdatedAt: z.date(),

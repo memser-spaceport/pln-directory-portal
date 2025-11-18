@@ -890,9 +890,9 @@ export class DemoDaysService {
   async submitInvestorApplication(applicationData: {
     email: string;
     name: string;
-    linkedinProfile: string;
-    role: string;
-    organisationFundName: string;
+    linkedinProfile?: string;
+    role?: string;
+    organisationFundName?: string;
     isAccreditedInvestor?: boolean;
   }) {
     const demoDay = await this.getCurrentDemoDay();
@@ -1028,13 +1028,13 @@ export class DemoDaysService {
       throw new BadRequestException('You have already submitted an application for this demo day');
     }
 
-    // Create a demo day participant with INVITED status (pending approval)
+    // Create a demo day participant with PENDING status
     const participant = await this.prisma.demoDayParticipant.create({
       data: {
         demoDayUid: demoDay.uid,
         memberUid: member.uid,
         type: 'INVESTOR',
-        status: 'INVITED', // Pending approval from admin
+        status: 'PENDING', // Pending approval from admin
       },
     });
 

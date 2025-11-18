@@ -51,7 +51,7 @@ const DemoDayDetailPage = () => {
     query: {
       type: activeTab === 'applications' ? undefined : (activeTab === 'investors' ? 'INVESTOR' : 'FOUNDER'),
       search: searchTerm || undefined,
-      status: activeTab === 'applications' ? 'INVITED' : ((statusFilter as 'INVITED' | 'ENABLED' | 'DISABLED') || undefined),
+      status: activeTab === 'applications' ? 'PENDING' : ((statusFilter as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED') || undefined),
       page: currentPage,
       limit: 50,
     },
@@ -92,6 +92,8 @@ const DemoDayDetailPage = () => {
         return 'text-green-600 bg-green-100';
       case 'INVITED':
         return 'text-blue-600 bg-blue-100';
+      case 'PENDING':
+        return 'text-yellow-600 bg-yellow-100';
       case 'DISABLED':
         return 'text-red-600 bg-red-100';
       default:
@@ -134,7 +136,7 @@ const DemoDayDetailPage = () => {
     }
   };
 
-  const handleUpdateParticipantStatus = async (participantUid: string, status: 'INVITED' | 'ENABLED' | 'DISABLED') => {
+  const handleUpdateParticipantStatus = async (participantUid: string, status: 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED') => {
     if (!authToken || !demoDay) return;
 
     try {
@@ -503,6 +505,7 @@ const DemoDayDetailPage = () => {
                     className={s.filterSelect}
                   >
                     <option value="">All Statuses</option>
+                    <option value="PENDING">Pending</option>
                     <option value="INVITED">Invited</option>
                     <option value="ENABLED">Enabled</option>
                     <option value="DISABLED">Disabled</option>
@@ -842,7 +845,7 @@ const DemoDayDetailPage = () => {
                           onChange={(e) =>
                             handleUpdateParticipantStatus(
                               participant.uid,
-                              e.target.value as 'INVITED' | 'ENABLED' | 'DISABLED'
+                              e.target.value as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED'
                             )
                           }
                           disabled={updateParticipantMutation.isPending}
@@ -850,6 +853,7 @@ const DemoDayDetailPage = () => {
                             participant.status
                           )} disabled:opacity-50`}
                         >
+                          <option value="PENDING">Pending</option>
                           {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
                             <option value="INVITED">Invited</option>
                           ) : (

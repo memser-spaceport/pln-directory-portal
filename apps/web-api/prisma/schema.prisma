@@ -963,6 +963,7 @@ enum DemoDayParticipantType {
 }
 
 enum DemoDayParticipantStatus {
+  PENDING
   INVITED
   ENABLED
   DISABLED
