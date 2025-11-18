@@ -907,9 +907,14 @@ export class DemoDaysService {
 
     const normalizedEmail = applicationData.email.toLowerCase().trim();
 
-    // Check if member already exists
-    let member = await this.prisma.member.findUnique({
-      where: { email: normalizedEmail },
+    // Check if a member already exists
+    let member = await this.prisma.member.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: 'insensitive',
+        },
+      },
       select: {
         uid: true,
         email: true,
@@ -926,7 +931,7 @@ export class DemoDaysService {
 
     let isNewMember = false;
 
-    // If member doesn't exist, create a new one with L0 access level
+    // If a member doesn't exist, create a new one with L0 access level
     if (!member) {
       isNewMember = true;
       member = await this.prisma.member.create({
