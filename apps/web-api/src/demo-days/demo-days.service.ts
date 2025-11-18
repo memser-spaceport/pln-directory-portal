@@ -403,7 +403,7 @@ export class DemoDaysService {
       whereClause.status = {
         not: DemoDayStatus.ARCHIVED,
       };
-      whereClause.teamFundraisingProfiles = {
+      whereClause.fundraisingProfiles = {
         some: {
           status: {
             not: 'DISABLED',
