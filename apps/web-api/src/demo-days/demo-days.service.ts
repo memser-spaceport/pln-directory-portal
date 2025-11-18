@@ -1056,9 +1056,8 @@ export class DemoDaysService {
     });
 
     return {
-      success: true,
-      message: 'Your application has been submitted successfully. You will be notified once it is reviewed.',
       participantUid: participant.uid,
+      isNewMember: isNewMember,
     };
   }
 
