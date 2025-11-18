@@ -45,3 +45,14 @@ export const CreateDemoDayFeedbackSchema = z.object({
 });
 
 export class CreateDemoDayFeedbackDto extends createZodDto(CreateDemoDayFeedbackSchema) {}
+
+export const CreateDemoDayInvestorApplicationSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  name: z.string().min(1, 'Name is required'),
+  linkedinProfile: z.string().url('Invalid LinkedIn URL').min(1, 'LinkedIn profile is required'),
+  role: z.string().min(1, 'Role is required'),
+  organisationFundName: z.string().min(1, 'Organisation/Fund name is required'),
+  isAccreditedInvestor: z.boolean().optional(),
+});
+
+export class CreateDemoDayInvestorApplicationDto extends createZodDto(CreateDemoDayInvestorApplicationSchema) {}

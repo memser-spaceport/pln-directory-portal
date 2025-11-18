@@ -27,6 +27,7 @@ import { UploadKind, UploadScopeType } from '@prisma/client';
 import { NoCache } from '../decorators/no-cache.decorator';
 import {
   CreateDemoDayFeedbackDto,
+  CreateDemoDayInvestorApplicationDto,
   ExpressInterestDto,
   UpdateFundraisingDescriptionDto,
   UpdateFundraisingTeamDto,
@@ -350,5 +351,13 @@ export class DemoDaysController {
   @NoCache()
   async submitFeedback(@Req() req, @Body() body: CreateDemoDayFeedbackDto) {
     return this.demoDaysService.createFeedback(req.userEmail, body);
+  }
+
+  @Post('current/investor-application')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async submitInvestorApplication(@Body() body: CreateDemoDayInvestorApplicationDto) {
+    return this.demoDaysService.submitInvestorApplication(body);
   }
 }
