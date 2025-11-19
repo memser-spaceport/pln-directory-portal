@@ -462,9 +462,9 @@ export class DemoDayFundraisingProfilesService {
     memberEmail: string,
     teamUid: string,
     description: string,
-    demoDayUid: string
+    demoDayUidOrSlug: string
   ): Promise<any> {
-    const demoDay = await this.demoDaysService.getDemoDayByUid(demoDayUid);
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -1127,11 +1127,11 @@ export class DemoDayFundraisingProfilesService {
 
   async uploadOnePagerPreviewByTeam(
     teamUid: string,
-    demoDayUid: string,
+    demoDayUidOrSlug: string,
     previewImage: Express.Multer.File,
     previewImageSmall?: Express.Multer.File
   ): Promise<any> {
-    const demoDay = await this.demoDaysService.getDemoDayByUid(demoDayUid);
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }

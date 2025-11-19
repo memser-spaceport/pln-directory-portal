@@ -160,11 +160,11 @@ export class DemoDaysController {
     );
   }
 
-  @Put(':demoDayUid/teams/:teamUid/fundraising-profile/description')
+  @Put(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/description')
   @UseGuards(UserTokenValidation)
   @NoCache()
   async updateDescriptionByTeam(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
     @Param('teamUid') teamUid: string,
     @Body() body: UpdateFundraisingDescriptionDto
@@ -177,7 +177,7 @@ export class DemoDaysController {
       req.userEmail,
       teamUid,
       body.description,
-      demoDayUid
+      demoDayUidOrSlug
     );
   }
 

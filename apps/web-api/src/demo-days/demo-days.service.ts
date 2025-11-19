@@ -444,7 +444,7 @@ export class DemoDaysService {
     });
 
     if (!demoDay) {
-      throw new NotFoundException(`Demo day with uid ${uid} not found`);
+      throw new NotFoundException(`Demo day with uid or slug ${uidOrSlug} not found`);
     }
 
     return demoDay;
@@ -490,7 +490,7 @@ export class DemoDaysService {
     actorEmail?: string
   ): Promise<DemoDay> {
     // First check if demo day exists
-    const before = await this.getDemoDayByUid(uid);
+    const before = await this.getDemoDayByUidOrSlug(uid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
