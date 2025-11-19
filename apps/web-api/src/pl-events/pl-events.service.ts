@@ -38,13 +38,15 @@ export class PLEventsService {
    *
    * @param event The event creation payload containing the required event details, such as name, type, description,
    *             startDate, endDate, resources, and locationUid.
+   * @param tx - The transaction object.
    * @returns The newly created event object with details such as name, type, start and end dates, and location.
    */
-  async createPLEvent(event, requestorEmail) {
+  async createPLEvent(event, tx?) {
     try {
-      const createdEvent = await this.prisma.pLEvent.create({
+      const createdEvent = await (tx || this.prisma).pLEvent.create({
         data: event
       });
+      await this.cacheService.reset({ service: 'PLEventGuest' });
       return createdEvent;
     } catch (error) {
       this.handleErrors(error);
@@ -391,21 +393,45 @@ export class PLEventsService {
     return notification;
   }
 
-  async deleteEvent(locationUid: string, eventUid: string) {
+  /**
+   * This method updates an event by its unique identifier.
+   * @param uid - The unique identifier of the event to update.
+   * @param event - The event data containing the updated information.
+   * @param tx - The transaction object.
+   * @returns The updated event object.
+   */
+  async updateEventByUid(uid: string, event: Prisma.PLEventUncheckedUpdateInput, tx?) {
     try {
-      const deletedEvent = await this.prisma.pLEvent.update({
-        where: { uid: eventUid },
+      const updatedEvent = await (tx || this.prisma).pLEvent.update({
+        where: { uid },
+        data: event
+      });
+      this.cacheService.reset({ service: 'PLEventGuest' });
+      return updatedEvent;
+    } catch (error) {
+      this.handleErrors(error);
+    }
+  }
+
+  /**
+   * This method deletes an event by its unique identifier.
+   * @param uid - The unique identifier of the event to delete.
+   * @param tx - The transaction object.
+   * @returns The deleted event object.
+   */
+  async deleteEventByUid(uid: string, tx?) {
+    try {
+      const deletedEvent = await (tx || this.prisma).pLEvent.update({
+        where: { uid },
         data: {
           isDeleted: true
         }
       });
-      await this.eventsToolingService.deleteEvent(deletedEvent.externalId ?? '');
       this.cacheService.reset({ service: 'PLEventGuest' });
       return deletedEvent;
     } catch (error) {
       this.handleErrors(error);
     }
   }
-
 }
 

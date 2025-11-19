@@ -201,6 +201,7 @@ export const NOTIFICATION_CHANNEL: { [key: string]: string } = {
 export const CREATE = "CREATE";
 export const UPDATE = "UPDATE";
 export const DELETE = "DELETE";
+export const UPSERT = "UPSERT";
 
 export const  EventInvitationToMember ="EventInvitationToMember";
 export const  EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME = "EventGuestPresenceRequest";
