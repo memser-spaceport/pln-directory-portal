@@ -19,22 +19,34 @@ export class ParticipantsReqValidationPipe implements PipeTransform {
    * @returns The validated value or throws an exception if validation fails
    */
   transform(value: any, metadata: ArgumentMetadata): any {
-    if (metadata.type !== 'body') {
-      return value;
+    if (metadata.type !== 'body') return value;
+
+    const body = { ...value };
+    const { participantType } = body;
+
+    // SKIP validation for minimal TEAM request: only name provided
+    if (
+      participantType === 'TEAM' &&
+      body?.newData &&
+      typeof body.newData.name === 'string' &&
+      Object.keys(body.newData).every((k) => ['name', 'website'].includes(k))
+    ) {
+      body.uniqueIdentifier = body.uniqueIdentifier ?? body.newData.name;
+      return body;
     }
+
     try {
-      const { participantType } = value;
       if (participantType === 'MEMBER') {
-        ParticipantRequestMemberSchema.parse(value);
+        ParticipantRequestMemberSchema.parse(body);
       } else if (participantType === 'TEAM') {
-        ParticipantRequestTeamSchema.parse(value);
+        ParticipantRequestTeamSchema.parse(body);
       } else {
         throw new BadRequestException({
           statusCode: 400,
           message: `Invalid participant request type ${participantType}`,
         });
       }
-      return value;
+      return body;
     } catch (error) {
       if (error instanceof ZodError) {
         throw new BadRequestException({

@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import * as path from 'path';
 import { z } from 'zod';
-import { isEmpty } from 'lodash';
+import { filter, isEmpty } from 'lodash';
 import { Prisma, Team, Member, ParticipantsRequest, AskStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
@@ -936,10 +936,10 @@ export class TeamsService {
     if (!tiersCsv) return {};
     const tiers = tiersCsv
       .split(',')
-      .map(s => s.trim())
-      .filter(s => s !== '')
-      .map(n => Number(n))
-      .filter(n => !Number.isNaN(n));
+      .map((s) => s.trim())
+      .filter((s) => s !== '')
+      .map((n) => Number(n))
+      .filter((n) => !Number.isNaN(n));
 
     if (tiers.length === 0) return {};
     return { tier: { in: tiers } };
@@ -1480,7 +1480,11 @@ export class TeamsService {
    * @returns Paginated search results with teams and metadata
    */
   async searchTeams(filters: {
-    search?: string;
+    searchBy?: string;
+    membershipSources?: string;
+    focusAreas?: string;
+    fundingStage?: string;
+    tags?: string;
     isFund?: boolean | string;
     minTypicalCheckSize?: number | string;
     maxTypicalCheckSize?: number | string;
@@ -1488,7 +1492,7 @@ export class TeamsService {
     sort?: 'name:asc' | 'name:desc';
     page?: number | string;
     limit?: number | string;
-    tiers?: string | number[]
+    tiers?: string | number[];
   }) {
     const page = Number(filters.page) || 1;
     const limit = Math.min(Number(filters.limit) || 20, 100);
@@ -1505,21 +1509,72 @@ export class TeamsService {
 
     // isFund filter - convert string to boolean
     if (filters.isFund !== undefined) {
-      const isFundValue = typeof filters.isFund === 'string'
-        ? filters.isFund === 'true'
-        : filters.isFund;
+      const isFundValue = typeof filters.isFund === 'string' ? filters.isFund === 'true' : filters.isFund;
       whereConditions.push({
         isFund: isFundValue,
       });
     }
 
     // Search filter - search by team name
-    if (filters.search && filters.search.trim()) {
-      const searchTerm = filters.search.trim();
+    if (filters.searchBy && filters.searchBy.trim()) {
+      const searchTerm = filters.searchBy.trim();
       whereConditions.push({
         name: {
           contains: searchTerm,
           mode: 'insensitive',
+        },
+      });
+    }
+
+    if (filters.membershipSources && filters.membershipSources.length > 0) {
+      whereConditions.push({
+        membershipSources: {
+          some: {
+            title: {
+              in: filters.membershipSources.split('|'),
+              mode: 'insensitive',
+            },
+          },
+        },
+      });
+    }
+
+    if (filters.focusAreas && filters.focusAreas.length > 0) {
+      console.log('filters.focusAreas', filters.focusAreas);
+      whereConditions.push({
+        teamFocusAreas: {
+          some: {
+            ancestorArea: {
+              title: {
+                in: filters.focusAreas.split('|'),
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      });
+    }
+
+    if (filters.tags && filters.tags.length > 0) {
+      whereConditions.push({
+        industryTags: {
+          some: {
+            title: {
+              in: filters.tags.split('|'),
+              mode: 'insensitive',
+            },
+          },
+        },
+      });
+    }
+
+    if (filters.fundingStage && filters.fundingStage.length > 0) {
+      whereConditions.push({
+        fundingStage: {
+          title: {
+            in: filters.fundingStage.split('|'),
+            mode: 'insensitive',
+          },
         },
       });
     }
@@ -1547,15 +1602,12 @@ export class TeamsService {
     }
 
     if (filters.tiers) {
-      const tiersCsv = Array.isArray(filters.tiers)
-        ? filters.tiers.join(',')
-        : (filters.tiers as string);
+      const tiersCsv = Array.isArray(filters.tiers) ? filters.tiers.join(',') : (filters.tiers as string);
       const tierWhere = this.buildTierFilter(tiersCsv);
       if (Object.keys(tierWhere).length) {
         whereConditions.push(tierWhere);
       }
     }
-
 
     // Investment focus filter - using substring matching
     if (filters.investmentFocus && filters.investmentFocus.length > 0) {
@@ -1678,8 +1730,10 @@ export class TeamsService {
 
     const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
     for (const row of grouped) {
-      const t = (row.tier ?? 0) as number;
-      if (t >= 0 && t <= 4) counts[t] = row._count._all;
+      if (row.tier !== null) {
+        const t = (row.tier ?? 0) as number;
+        if (t >= 0 && t <= 4) counts[t] = row._count._all;
+      }
     }
 
     return [
@@ -1697,8 +1751,7 @@ export class TeamsService {
     const member = await this.membersService.findMemberByEmail(actorEmail);
     if (!member) return false;
 
-    const isDirectoryAdmin =
-      !!member.memberRoles?.some(r => r?.name === 'DIRECTORYADMIN');
+    const isDirectoryAdmin = !!member.memberRoles?.some((r) => r?.name === 'DIRECTORYADMIN');
 
     return !!member.isTierViewer || isDirectoryAdmin;
   }

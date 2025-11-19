@@ -15,6 +15,7 @@ import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { IndustryTagsService } from './industry-tags.service';
+import { NoCache } from '../decorators/no-cache.decorator';
 
 const server = initNestServer(apiIndustryTags);
 type RouteShape = typeof server.routeShapes;
@@ -26,13 +27,9 @@ export class IndustryTagsController {
   @Api(server.route.getIndustryTags)
   @ApiQueryFromZod(IndustryTagQueryParams)
   @ApiOkResponseFromZod(ResponseIndustryTagSchema.array())
+  @NoCache()
   async findAll(@Req() request: Request) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseIndustryTagSchema
-    );
-    const builder = new PrismaQueryBuilder(queryableFields);
-    const builtQuery = builder.build(request.query);
-    return this.industryTagsService.findAll(builtQuery);
+    return this.industryTagsService.findAll(request.query);
   }
 
   @Api(server.route.getIndustryTag)

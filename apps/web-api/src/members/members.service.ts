@@ -28,6 +28,7 @@ import { MembersHooksService } from './members.hooks.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
+import { TeamsService } from '../teams/teams.service';
 
 @Injectable()
 export class MembersService {
@@ -43,6 +44,8 @@ export class MembersService {
     @Inject(forwardRef(() => NotificationService))
     private notificationService: NotificationService,
     private cacheService: CacheService,
+    @Inject(forwardRef(() => TeamsService))
+    private teamService: TeamsService,
     private membersHooksService: MembersHooksService,
     @Inject(forwardRef(() => NotificationSettingsService))
     private notificationSettingsService: NotificationSettingsService,
@@ -669,6 +672,30 @@ export class MembersService {
       leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.teamUid) ?? [],
       accessLevel: memberInfo.accessLevel,
     };
+  }
+
+  async setMemberRole(memberUid: string, roleName: string, modifiedByUid?: string) {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+    });
+
+    if (!member) {
+      throw new NotFoundException(`Member with uid=${memberUid} not found`);
+    }
+
+    const updated = await this.prisma.member.update({
+      where: { uid: memberUid },
+      data: {
+        role: roleName,
+        updatedAt: new Date(),
+      },
+    });
+
+    this.logger.info(
+      `Member role changed: uid=${memberUid}, from="${member.role}", to="${roleName}", by=${modifiedByUid}`
+    );
+
+    return updated;
   }
 
   /**
@@ -2276,6 +2303,7 @@ export class MembersService {
             ohHelpWith: true,
             openToWork: true,
             scheduleMeetingCount: true,
+            role: true,
             image: {
               select: {
                 uid: true,
@@ -3218,5 +3246,168 @@ export class MembersService {
       this.logger.error(`Error getting member investor setting: memberUid=${memberUid}`, error);
       throw error;
     }
+  }
+
+  /**
+   * Creates a member (L0) from sign-up data and, if requested,
+   * sets Member.role, creates/links a Team, and assigns a free-text team role.
+   */
+  public async createMemberAndAttach(
+    signUpDto: any,
+    options: {
+      role?: string;
+      team?: { uid?: string; name?: string; website?: string } | string;
+      isTeamNew?: boolean;
+      website?: string | null;
+      requestorEmail?: string;
+      project?: { projectUid?: string } | string;
+    }
+  ): Promise<{ uid: string }> {
+    // create a new member with accessLevel=L0 (existing flow)
+    const member = await this.createMemberFromSignUpData(signUpDto);
+
+    // in one txn — persist Member.role (if provided) and handle team + role
+    await this.prisma.$transaction(async (tx) => {
+      // persist Member.role from request (even if no team is provided)
+      if (options?.role) {
+        await tx.member.update({
+          where: { uid: member.uid },
+          data: { role: options.role.trim() },
+        });
+      }
+
+      // create/resolve team and upsert TeamMemberRole
+      await this.attachTeamAndRoleTx(tx, member.uid, options);
+      await this.attachProjectTx(tx, member.uid, options.project, options.role);
+    });
+
+    return { uid: member.uid };
+  }
+
+  /**
+   * Within a transaction: create OR resolve team and upsert TeamMemberRole (free-text role).
+   * - If no team provided -> nothing to do.
+   * - If isTeamNew -> create Team via TeamsService.createTeam
+   * - Else -> resolve by uid or name
+   * - Finally -> upsert teamMemberRole (memberUid, teamUid)
+   */
+  private async attachTeamAndRoleTx(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    opts: {
+      role?: string;
+      team?: { uid?: string; name?: string; website?: string } | string;
+      isTeamNew?: boolean;
+      website?: string | null;
+      requestorEmail?: string;
+    }
+  ): Promise<void> {
+    const { team, isTeamNew, role } = opts ?? {};
+    if (!team) return; // nothing to link
+
+    const norm = this.normalizeTeamInput(team);
+
+    // Resolve or create team
+    let targetTeamUid: string;
+
+    if (isTeamNew) {
+      const name = (norm.name && norm.name.trim()) || `team-${memberUid}`;
+      const website = (norm.website ?? opts.website) || null;
+
+      const created = await this.teamService.createTeam(
+        {
+          name,
+          website: website || undefined,
+          accessLevel: 'L1',
+          accessLevelUpdatedAt: new Date(),
+        },
+        tx,
+        opts.requestorEmail || ''
+      );
+      targetTeamUid = created.uid;
+    } else {
+      // try by uid then by name
+      let existing: { uid: string } | null = null;
+      if (norm.uid) {
+        existing = await this.teamService.findTeamByUid(norm.uid).catch(() => null);
+      }
+      if (!existing && norm.name) {
+        existing = await this.teamService.findTeamByName(norm.name).catch(() => null);
+      }
+      if (!existing) {
+        throw new NotFoundException('Existing team not found by uid or name');
+      }
+      targetTeamUid = existing.uid;
+    }
+
+    // Upsert TeamMemberRole
+    const finalRole = (role ?? 'member').trim();
+    const roleTags = finalRole
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    await tx.teamMemberRole.upsert({
+      where: { memberUid_teamUid: { memberUid, teamUid: targetTeamUid } },
+      create: {
+        memberUid,
+        teamUid: targetTeamUid,
+        role: finalRole,
+        roleTags,
+        mainTeam: false,
+        teamLead: false,
+      },
+      update: {
+        role: finalRole,
+        roleTags,
+      },
+    });
+  }
+
+  /** Accepts string (treated as name) or object with { uid|name|website } */
+  private normalizeTeamInput(team: { uid?: string; name?: string; website?: string } | string): {
+    uid?: string;
+    name?: string;
+    website?: string;
+  } {
+    if (typeof team === 'string') {
+      return { name: team.trim() };
+    }
+    return {
+      uid: team.uid?.trim(),
+      name: team.name?.trim(),
+      website: team.website?.trim(),
+    };
+  }
+
+  private async attachProjectTx(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    project?: { projectUid?: string } | string,
+    role?: string
+  ): Promise<void> {
+    if (!project) return;
+
+    const projectUid = typeof project === 'string' ? project.trim() : project.projectUid?.trim();
+
+    if (!projectUid) return;
+
+    const exists = await tx.project.findUnique({
+      where: { uid: projectUid },
+      select: { uid: true },
+    });
+
+    if (!exists) {
+      this.logger.info(`attachProjectTx: project ${projectUid} not found, skipping`);
+      return;
+    }
+
+    await tx.projectContribution.create({
+      data: {
+        memberUid,
+        projectUid,
+        role: role ?? null,
+      },
+    });
   }
 }
