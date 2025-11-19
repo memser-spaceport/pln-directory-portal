@@ -52,27 +52,27 @@ export class DemoDaysController {
     return this.demoDaysService.getAllDemoDays(true);
   }
 
-  @Get(':demoDayUid')
+  @Get(':demoDayUidOrSlug')
   @UseGuards(UserTokenCheckGuard)
   @NoCache()
-  async getCurrentDemoDay(@Param('demoDayUid') demoDayUid: string, @Req() req) {
-    return this.demoDaysService.getDemoDayAccess(req.userEmail || null, demoDayUid);
+  async getCurrentDemoDay(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
+    return this.demoDaysService.getDemoDayAccess(req.userEmail || null, demoDayUidOrSlug);
   }
 
   // Fundraising endpoints
 
-  @Get(':demoDayUid/fundraising-profile')
+  @Get(':demoDayUidOrSlug/fundraising-profile')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async getCurrentDemoDayFundraisingProfile(@Param('demoDayUid') demoDayUid: string, @Req() req) {
-    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfile(req.userEmail, demoDayUid);
+  async getCurrentDemoDayFundraisingProfile(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
+    return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfile(req.userEmail, demoDayUidOrSlug);
   }
 
-  @Get(':demoDayUid/fundraising-profiles')
+  @Get(':demoDayUidOrSlug/fundraising-profiles')
   @UseGuards(UserTokenValidation)
   @NoCache()
   async getCurrentDemoDayFundraisingProfiles(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
     @Query('stage') stage?: string[] | string,
     @Query('industry') industry?: string[] | string,
@@ -83,7 +83,7 @@ export class DemoDaysController {
 
     return this.demoDayFundraisingProfilesService.getCurrentDemoDayFundraisingProfiles(
       req.userEmail,
-      demoDayUid,
+      demoDayUidOrSlug,
       {
         stage: normalize(stage),
         industry: normalize(industry),
@@ -93,12 +93,12 @@ export class DemoDaysController {
     );
   }
 
-  @Put(':demoDayUid/teams/:teamUid/fundraising-profile/one-pager')
+  @Put(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/one-pager')
   @UseGuards(UserTokenValidation)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'onePagerFile', maxCount: 1 }]))
   @NoCache()
   async updateOnePagerByTeam(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
     @Param('teamUid') teamUid: string,
     @UploadedFiles() files: { onePagerFile?: Express.Multer.File[] }
@@ -117,23 +117,27 @@ export class DemoDaysController {
       req.userEmail,
       teamUid,
       upload.uid,
-      demoDayUid
+      demoDayUidOrSlug
     );
   }
 
-  @Delete(':demoDayUid/teams/:teamUid/fundraising-profile/one-pager')
+  @Delete(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/one-pager')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async deleteOnePagerByTeam(@Param('demoDayUid') demoDayUid: string, @Req() req, @Param('teamUid') teamUid: string) {
-    return this.demoDayFundraisingProfilesService.deleteFundraisingOnePager(req.userEmail, teamUid, demoDayUid);
+  async deleteOnePagerByTeam(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Param('teamUid') teamUid: string
+  ) {
+    return this.demoDayFundraisingProfilesService.deleteFundraisingOnePager(req.userEmail, teamUid, demoDayUidOrSlug);
   }
 
-  @Put(':demoDayUid/teams/:teamUid/fundraising-profile/video')
+  @Put(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/video')
   @UseGuards(UserTokenValidation)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'videoFile', maxCount: 1 }]))
   @NoCache()
   async updateVideoByTeam(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
     @Param('teamUid') teamUid: string,
     @UploadedFiles() files: { videoFile?: Express.Multer.File[] }
@@ -152,7 +156,7 @@ export class DemoDaysController {
       req.userEmail,
       teamUid,
       upload.uid,
-      demoDayUid
+      demoDayUidOrSlug
     );
   }
 
@@ -177,31 +181,35 @@ export class DemoDaysController {
     );
   }
 
-  @Delete(':demoDayUid/teams/:teamUid/fundraising-profile/video')
+  @Delete(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/video')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async deleteVideoByTeam(@Param('demoDayUid') demoDayUid: string, @Req() req, @Param('teamUid') teamUid: string) {
-    return this.demoDayFundraisingProfilesService.deleteFundraisingVideo(req.userEmail, teamUid, demoDayUid);
+  async deleteVideoByTeam(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Param('teamUid') teamUid: string
+  ) {
+    return this.demoDayFundraisingProfilesService.deleteFundraisingVideo(req.userEmail, teamUid, demoDayUidOrSlug);
   }
 
-  @Patch(':demoDayUid/teams/:teamUid/fundraising-profile/team')
+  @Patch(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/team')
   @UseGuards(UserTokenValidation)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async updateTeamByTeam(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
     @Param('teamUid') teamUid: string,
     @Body() body: UpdateFundraisingTeamDto
   ) {
-    return this.demoDayFundraisingProfilesService.updateFundraisingTeam(req.userEmail, teamUid, body, demoDayUid);
+    return this.demoDayFundraisingProfilesService.updateFundraisingTeam(req.userEmail, teamUid, body, demoDayUidOrSlug);
   }
 
-  @Patch(':demoDayUid/confidentiality-policy')
+  @Patch(':demoDayUidOrSlug/confidentiality-policy')
   @UseGuards(UserTokenValidation)
   @NoCache()
   async updateConfidentialityAcceptance(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
     @Body() body: { accepted: boolean }
   ) {
@@ -209,35 +217,39 @@ export class DemoDaysController {
       throw new Error('accepted must be a boolean');
     }
 
-    return this.demoDaysService.updateConfidentialityAcceptance(req.userEmail, body.accepted, demoDayUid);
+    return this.demoDaysService.updateConfidentialityAcceptance(req.userEmail, body.accepted, demoDayUidOrSlug);
   }
 
   // Engagement endpoints
 
-  @Get(':demoDayUid/engagement')
+  @Get(':demoDayUidOrSlug/engagement')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async getCurrentEngagement(@Param('demoDayUid') demoDayUid: string, @Req() req) {
+  async getCurrentEngagement(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
     // Returns minimal engagement state for the UI
-    return this.demoDayEngagementService.getCurrentEngagement(req.userEmail, demoDayUid);
+    return this.demoDayEngagementService.getCurrentEngagement(req.userEmail, demoDayUidOrSlug);
   }
 
-  @Post(':demoDayUid/engagement/calendar-added')
+  @Post(':demoDayUidOrSlug/engagement/calendar-added')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async markCalendarAdded(@Param('demoDayUid') demoDayUid: string, @Req() req) {
+  async markCalendarAdded(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
     // Tracks the "Add to Calendar" click (.ics button)
-    return this.demoDayEngagementService.markCalendarAdded(req.userEmail, demoDayUid);
+    return this.demoDayEngagementService.markCalendarAdded(req.userEmail, demoDayUidOrSlug);
   }
 
-  @Post(':demoDayUid/express-interest')
+  @Post(':demoDayUidOrSlug/express-interest')
   @UseGuards(UserTokenValidation)
   @UsePipes(ZodValidationPipe)
   @NoCache()
-  async expressInterest(@Param('demoDayUid') demoDayUid: string, @Req() req, @Body() body: ExpressInterestDto) {
+  async expressInterest(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Body() body: ExpressInterestDto
+  ) {
     return this.demoDayEngagementService.expressInterest(
       req.userEmail,
-      demoDayUid,
+      demoDayUidOrSlug,
       body.teamFundraisingProfileUid,
       body.interestType,
       body.isPrepDemoDay,
@@ -246,25 +258,25 @@ export class DemoDaysController {
   }
 
   @NoCache() //turn off global cache
-  @Get(':demoDayUid/express-interest/stats')
-  async getExpressInterestStats(@Param('demoDayUid') demoDayUid: string, @Query('prep') prep?: string) {
+  @Get(':demoDayUidOrSlug/express-interest/stats')
+  async getExpressInterestStats(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Query('prep') prep?: string) {
     const isPrepDemoDay = (prep ?? '').toString().toLowerCase() === 'true';
-    const key = `express-interest:${demoDayUid}:${isPrepDemoDay}`;
+    const key = `express-interest:${demoDayUidOrSlug}:${isPrepDemoDay}`;
     const now = Date.now();
 
     const cached = cache.get(key);
     if (cached && cached.expires > now) return cached.data; // cache hit
-    const data = await this.demoDaysService.getCurrentExpressInterestStats(isPrepDemoDay, demoDayUid);
+    const data = await this.demoDaysService.getCurrentExpressInterestStats(isPrepDemoDay, demoDayUidOrSlug);
     cache.set(key, { data, expires: now + TTL });
     return data;
   }
 
   // Direct S3 upload endpoints
-  @Post(':demoDayUid/teams/:teamUid/fundraising-profile/video/upload-url')
+  @Post(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/video/upload-url')
   @UseGuards(UserTokenValidation)
   @NoCache()
   async getVideoUploadUrl(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
     @Param('teamUid') teamUid: string,
     @Body() body: { filename: string; filesize: number; mimetype: string }
@@ -279,15 +291,15 @@ export class DemoDaysController {
       body.filename,
       body.filesize,
       body.mimetype,
-      demoDayUid
+      demoDayUidOrSlug
     );
   }
 
-  @Post(':demoDayUid/teams/:teamUid/fundraising-profile/video/confirm')
+  @Post(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/video/confirm')
   @UseGuards(UserTokenValidation)
   @NoCache()
   async confirmVideoUpload(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
     @Param('teamUid') teamUid: string,
     @Body() body: { uploadUid: string }
@@ -300,15 +312,15 @@ export class DemoDaysController {
       req.userEmail,
       teamUid,
       body.uploadUid,
-      demoDayUid
+      demoDayUidOrSlug
     );
   }
 
-  @Post(':demoDayUid/teams/:teamUid/fundraising-profile/one-pager/upload-url')
+  @Post(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/one-pager/upload-url')
   @UseGuards(UserTokenValidation)
   @NoCache()
   async getOnePagerUploadUrl(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
     @Param('teamUid') teamUid: string,
     @Body() body: { filename: string; filesize: number; mimetype: string }
@@ -323,15 +335,15 @@ export class DemoDaysController {
       body.filename,
       body.filesize,
       body.mimetype,
-      demoDayUid
+      demoDayUidOrSlug
     );
   }
 
-  @Post(':demoDayUid/teams/:teamUid/fundraising-profile/one-pager/confirm')
+  @Post(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/one-pager/confirm')
   @UseGuards(UserTokenValidation)
   @NoCache()
   async confirmOnePagerUpload(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
     @Param('teamUid') teamUid: string,
     @Body() body: { uploadUid: string }
@@ -344,11 +356,11 @@ export class DemoDaysController {
       req.userEmail,
       teamUid,
       body.uploadUid,
-      demoDayUid
+      demoDayUidOrSlug
     );
   }
 
-  @Post(':demoDayUid/teams/:teamUid/fundraising-profile/one-pager/preview')
+  @Post(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/one-pager/preview')
   @UseGuards(UserTokenValidation)
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -368,7 +380,7 @@ export class DemoDaysController {
   )
   @NoCache()
   async uploadOnePagerPreview(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
     @Param('teamUid') teamUid: string,
     @UploadedFiles()
@@ -386,32 +398,40 @@ export class DemoDaysController {
       teamUid,
       files.previewImage[0],
       files.previewImageSmall?.[0],
-      demoDayUid
+      demoDayUidOrSlug
     );
   }
 
-  @Get(':demoDayUid/teams/:teamUid/analytics')
+  @Get(':demoDayUidOrSlug/teams/:teamUid/analytics')
   @UseGuards(UserTokenValidation)
   @NoCache()
-  async getTeamAnalytics(@Param('demoDayUid') demoDayUid: string, @Req() req, @Param('teamUid') teamUid: string) {
-    return this.demoDaysService.getTeamAnalytics(teamUid, demoDayUid);
+  async getTeamAnalytics(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Param('teamUid') teamUid: string
+  ) {
+    return this.demoDaysService.getTeamAnalytics(teamUid, demoDayUidOrSlug);
   }
 
-  @Post(':demoDayUid/feedback')
+  @Post(':demoDayUidOrSlug/feedback')
   @UseGuards(UserTokenValidation)
   @UsePipes(ZodValidationPipe)
   @NoCache()
-  async submitFeedback(@Param('demoDayUid') demoDayUid: string, @Req() req, @Body() body: CreateDemoDayFeedbackDto) {
-    return this.demoDaysService.createFeedback(req.userEmail, body, demoDayUid);
+  async submitFeedback(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Body() body: CreateDemoDayFeedbackDto
+  ) {
+    return this.demoDaysService.createFeedback(req.userEmail, body, demoDayUidOrSlug);
   }
 
-  @Post(':demoDayUid/investor-application')
+  @Post(':demoDayUidOrSlug/investor-application')
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async submitInvestorApplication(
-    @Param('demoDayUid') demoDayUid: string,
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Body() body: CreateDemoDayInvestorApplicationDto
   ) {
-    return this.demoDaysService.submitInvestorApplication(body, demoDayUid);
+    return this.demoDaysService.submitInvestorApplication(body, demoDayUidOrSlug);
   }
 }

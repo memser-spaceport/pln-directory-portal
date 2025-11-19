@@ -23,8 +23,8 @@ export class DemoDayEngagementService {
   ) {}
 
   // Read engagement state for UI
-  async getCurrentEngagement(memberEmail: string, demoDayUid: string) {
-    const demoDay = await this.demoDaysService.getDemoDayByUid(demoDayUid);
+  async getCurrentEngagement(memberEmail: string, demoDayUidOrSlug: string) {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     if (!demoDay) {
       throw new ForbiddenException('No demo day access');
@@ -59,8 +59,8 @@ export class DemoDayEngagementService {
   }
 
   // Mark Add to Calendar click
-  async markCalendarAdded(memberEmail: string, demoDayUid: string) {
-    const demoDay = await this.demoDaysService.getDemoDayByUid(demoDayUid);
+  async markCalendarAdded(memberEmail: string, demoDayUidOrSlug: string) {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     if (!demoDay) {
       throw new ForbiddenException('No demo day access');
@@ -114,7 +114,7 @@ export class DemoDayEngagementService {
   // Express interest in a fundraising profile
   async expressInterest(
     memberEmail: string,
-    demoDayUid: string,
+    demoDayUidOrSlug: string,
     teamFundraisingProfileUid: string,
     interestType: 'like' | 'connect' | 'invest' | 'referral',
     isPrepDemoDay = false,
@@ -125,7 +125,7 @@ export class DemoDayEngagementService {
     } | null
   ) {
     // Validate that the caller is an enabled demo day participant (investor)
-    const demoDay = await this.demoDaysService.getDemoDayByUid(demoDayUid);
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     if (!demoDay) {
       throw new ForbiddenException('No demo day access');
