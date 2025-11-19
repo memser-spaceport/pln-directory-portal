@@ -12,7 +12,7 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
-  CacheTTL,
+  CacheTTL, Patch,
 } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
@@ -267,6 +267,26 @@ export class MemberController {
   async updatePrefernce(@Param('uid') id, @Body() body) {
     const preference = body;
     return await this.membersService.updatePreference(id, preference);
+  }
+
+  @Api(server.route.updateRole)
+  @UseGuards(UserTokenValidation)
+  @Patch('/members/:uid/self-role')
+  async updateOwnRole(@Param('uid') uid: string, @Body() body: any, @Req() req: any) {
+    this.logger.info(`Member self-role update request - Initiated by -> ${req.userEmail}`);
+
+    const requestor = await this.membersService.findMemberByEmail(req.userEmail);
+    if (!requestor) {
+      throw new NotFoundException(`Requestor not found for ${req.userEmail}`);
+    }
+
+    if (typeof body.role !== 'string' || body.role.trim() === '') {
+      throw new BadRequestException('role must be a non-empty string');
+    }
+
+    const roleName = body.role.trim();
+
+    return await this.membersService.setMemberRole(uid, roleName);
   }
 
   @Api(server.route.updateMember)

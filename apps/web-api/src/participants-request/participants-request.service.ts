@@ -303,12 +303,14 @@ export class ParticipantsRequestService {
   ): Promise<ParticipantsRequest> {
     const uniqueIdentifier = this.getUniqueIdentifier(requestData);
     const postData = { ...requestData, uniqueIdentifier };
-
+    const AUTO_APPROVE_LEVELS = ['L2','L3','L4', 'L5', 'L6'];
     // Check if requester is L5/L6 and participantType is TEAM for auto-approval
+
     const isInvestor = requesterUser?.accessLevel === 'L5' || requesterUser?.accessLevel === 'L6';
+    const isAutoApprove = requesterUser && AUTO_APPROVE_LEVELS.includes(requesterUser.accessLevel);
     const isTeamRequest = requestData.participantType === ParticipantType.TEAM;
 
-    if (requesterUser && isInvestor && isTeamRequest) {
+    if ((requesterUser && isInvestor && isTeamRequest) || isAutoApprove) {
       // Auto-approve the request
       const result: ParticipantsRequest = await this.add(
         {

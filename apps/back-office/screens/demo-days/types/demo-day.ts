@@ -37,7 +37,7 @@ export interface DemoDayParticipant {
   email: string;
   name: string;
   type: 'INVESTOR' | 'FOUNDER';
-  status: 'INVITED' | 'ENABLED' | 'DISABLED';
+  status: 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED';
   hasEarlyAccess: boolean;
   teamUid?: string;
   createdAt: string;
@@ -135,7 +135,7 @@ export interface BulkParticipantsResponse {
 export interface GetParticipantsQueryDto {
   page?: number;
   limit?: number;
-  status?: 'INVITED' | 'ENABLED' | 'DISABLED';
+  status?: 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED';
   type?: 'INVESTOR' | 'FOUNDER';
   search?: string;
   sortBy?: string;
@@ -151,7 +151,7 @@ export interface ParticipantsListResponse {
 }
 
 export interface UpdateParticipantDto {
-  status?: 'INVITED' | 'ENABLED' | 'DISABLED';
+  status?: 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED';
   teamUid?: string;
   type?: 'INVESTOR' | 'FOUNDER';
   hasEarlyAccess?: boolean;

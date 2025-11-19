@@ -19,6 +19,10 @@ import { getAPIVersionAsPath } from '../utils/versioned-path';
 const contract = initContract();
 import { z } from 'zod';
 
+const RoleUpdateBody = z.object({
+  role: z.string().min(1),
+});
+
 export const apiMembers = contract.router({
   getMembers: {
     method: 'GET',
@@ -82,6 +86,19 @@ export const apiMembers = contract.router({
       200: contract.response<unknown>(),
     },
     summary: 'Update member',
+  },
+  updateRole: {
+    method: 'PATCH',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/self-role`,
+    body: RoleUpdateBody,
+    responses: {
+      200: ResponseMemberWithRelationsSchema,
+      400: z.object({ message: z.string() }),
+      403: z.object({ message: z.string() }),
+      404: z.object({ message: z.string() }),
+    },
+    pathParams: z.object({ uid: z.string() }),
+    summary: 'Allow member to set their  role',
   },
   getMemberPreferences: {
     method: 'GET',

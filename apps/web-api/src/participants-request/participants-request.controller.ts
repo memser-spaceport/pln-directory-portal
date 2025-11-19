@@ -1,13 +1,13 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common';
-import { ParticipantsRequestService } from './participants-request.service';
-import { NoCache } from '../decorators/no-cache.decorator';
-import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
-import { FindUniqueIdentiferDto } from 'libs/contracts/src/schema/participants-request';
-import { MembersService } from '../members/members.service';
-import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
-import { AccessLevelsGuard } from '../guards/access-levels.guard';
-import { AccessLevels } from '../decorators/access-levels.decorator';
-import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
+import {Body, Controller, Get, Post, Query, Req, UseGuards, UsePipes} from '@nestjs/common';
+import {ParticipantsRequestService} from './participants-request.service';
+import {NoCache} from '../decorators/no-cache.decorator';
+import {ParticipantsReqValidationPipe} from '../pipes/participant-request-validation.pipe';
+import {FindUniqueIdentiferDto} from 'libs/contracts/src/schema/participants-request';
+import {MembersService} from '../members/members.service';
+import {UserAuthValidateGuard} from '../guards/user-auth-validate.guard';
+import {AccessLevelsGuard} from '../guards/access-levels.guard';
+import {AccessLevels} from '../decorators/access-levels.decorator';
+import {AccessLevel} from '../../../../libs/contracts/src/schema/admin-member';
 
 @Controller('v1/participants-request')
 @NoCache()
@@ -25,7 +25,7 @@ export class ParticipantsRequestController {
   @Post('/')
   @UsePipes(new ParticipantsReqValidationPipe())
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @AccessLevels(AccessLevel.L0, AccessLevel.L1, AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   async addRequest(@Body() body, @Req() request: Request) {
     const uniqueIdentifier = this.participantsRequestService.getUniqueIdentifier(body);
     // Validate unique identifier existence
@@ -55,11 +55,20 @@ export class ParticipantsRequestController {
     // the addRequest method that adds data into the ParticipantsRequests table should be removed
     // when we are sure new RBAC system with L0, L1, L2, L3, L4 access levels is working
     // and there are no dependencies on ParticipantRequest table
-    const member = await this.memberService.createMemberFromSignUpData(body.newData);
+    // Create member and (optionally) attach to team with role inside the service layer
+    const result = await this.memberService.createMemberAndAttach(body.newData, {
+      role: body.role,
+      team: body.team,
+      isTeamNew: body.isTeamNew,
+      website:
+        (typeof body.team === 'object' && body.team?.website)
+          ? body.team.website
+          : body.website,
+      requestorEmail: body?.newData?.email || body?.email || undefined,
+      project: body.project,
+    });
 
-    return {
-      uid: member.uid,
-    };
+    return result;
   }
 
   /**

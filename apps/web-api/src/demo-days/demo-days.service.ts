@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { DemoDay, DemoDayStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
@@ -14,31 +20,14 @@ export class DemoDaysService {
     private readonly membersService: MembersService
   ) {}
 
-  async getCurrentDemoDay(): Promise<DemoDay | null> {
-    const demoDay = await this.prisma.demoDay.findFirst({
-      where: {
-        status: {
-          in: [
-            DemoDayStatus.UPCOMING,
-            DemoDayStatus.REGISTRATION_OPEN,
-            DemoDayStatus.EARLY_ACCESS,
-            DemoDayStatus.ACTIVE,
-            DemoDayStatus.COMPLETED,
-            DemoDayStatus.ARCHIVED,
-          ],
-        },
-        isDeleted: false,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return demoDay;
-  }
-
-  async getCurrentDemoDayAccess(memberEmail: string | null): Promise<{
+  async getDemoDayAccess(
+    memberEmail: string | null,
+    demoDayUidOrSlug: string
+  ): Promise<{
     access: 'none' | 'INVESTOR' | 'FOUNDER';
     status: 'NONE' | 'UPCOMING' | 'REGISTRATION_OPEN' | 'ACTIVE' | 'COMPLETED';
     uid?: string;
+    slugURL?: string;
     date?: string;
     title?: string;
     description?: string;
@@ -48,7 +37,7 @@ export class DemoDaysService {
     isEarlyAccess?: boolean;
     confidentialityAccepted?: boolean;
   }> {
-    const demoDay = await this.getCurrentDemoDay();
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       return {
         access: 'none',
@@ -305,6 +294,7 @@ export class DemoDaysService {
       return {
         access,
         uid: demoDay.uid,
+        slugURL: demoDay.slugURL,
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
@@ -403,7 +393,7 @@ export class DemoDaysService {
       whereClause.status = {
         not: DemoDayStatus.ARCHIVED,
       };
-      whereClause.teamFundraisingProfiles = {
+      whereClause.fundraisingProfiles = {
         some: {
           status: {
             not: 'DISABLED',
@@ -433,9 +423,9 @@ export class DemoDaysService {
     });
   }
 
-  async getDemoDayByUid(uid: string): Promise<DemoDay> {
+  async getDemoDayByUidOrSlug(uidOrSlug: string): Promise<DemoDay> {
     const demoDay = await this.prisma.demoDay.findFirst({
-      where: { uid, isDeleted: false },
+      where: { OR: [{ uid: uidOrSlug }, { slugURL: uidOrSlug }], isDeleted: false },
       select: {
         id: true,
         uid: true,
@@ -614,9 +604,11 @@ export class DemoDaysService {
     return demoDayStatus.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
   }
 
-  async getCurrentExpressInterestStats(isPrepDemoDay: boolean): Promise<ExpressInterestStats> {
-    const demoDay = await this.getCurrentDemoDay();
-    if (!demoDay) return { liked: 0, connected: 0, invested: 0, referral: 0, total: 0 };
+  async getCurrentExpressInterestStats(
+    isPrepDemoDay: boolean,
+    demoDayUidOrSlug: string
+  ): Promise<ExpressInterestStats> {
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     const agg = await this.prisma.demoDayExpressInterestStatistic.aggregate({
       where: {
@@ -640,11 +632,12 @@ export class DemoDaysService {
     return { liked, connected, invested, referral, total };
   }
 
-  async updateConfidentialityAcceptance(memberEmail: string, accepted: boolean): Promise<{ success: boolean }> {
-    const demoDay = await this.getCurrentDemoDay();
-    if (!demoDay) {
-      throw new NotFoundException('No current demo day found');
-    }
+  async updateConfidentialityAcceptance(
+    memberEmail: string,
+    accepted: boolean,
+    demoDayUidOrSlug: string
+  ): Promise<{ success: boolean }> {
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     const member = await this.prisma.member.findUnique({
       where: { email: memberEmail },
@@ -674,11 +667,8 @@ export class DemoDaysService {
     return { success: true };
   }
 
-  async getTeamAnalytics(teamUid: string) {
-    const demoDay = await this.getCurrentDemoDay();
-    if (!demoDay) {
-      throw new NotFoundException('No active demo day found');
-    }
+  async getTeamAnalytics(teamUid: string, demoDayUidOrSlug: string) {
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     // Find the fundraising profile for this team
     const fundraisingProfile = await this.prisma.teamFundraisingProfile.findUnique({
@@ -837,12 +827,10 @@ export class DemoDaysService {
       improvementComments?: string | null;
       comment?: string | null;
       issues: string[];
-    }
+    },
+    demoDayUidOrSlug: string
   ) {
-    const demoDay = await this.getCurrentDemoDay();
-    if (!demoDay) {
-      throw new NotFoundException('No current demo day found');
-    }
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     const member = await this.prisma.member.findUnique({
       where: { email: memberEmail },
@@ -887,18 +875,18 @@ export class DemoDaysService {
     return feedback;
   }
 
-  async submitInvestorApplication(applicationData: {
-    email: string;
-    name: string;
-    linkedinProfile: string;
-    role: string;
-    organisationFundName: string;
-    isAccreditedInvestor?: boolean;
-  }) {
-    const demoDay = await this.getCurrentDemoDay();
-    if (!demoDay) {
-      throw new NotFoundException('No current demo day found');
-    }
+  async submitInvestorApplication(
+    applicationData: {
+      email: string;
+      name: string;
+      linkedinProfile?: string;
+      role?: string;
+      organisationFundName?: string;
+      isAccreditedInvestor?: boolean;
+    },
+    demoDayUidOrSlug: string
+  ) {
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     // Check if demo day is accepting applications (REGISTRATION_OPEN status)
     if (demoDay.status !== DemoDayStatus.REGISTRATION_OPEN && demoDay.status !== DemoDayStatus.EARLY_ACCESS) {
@@ -1028,13 +1016,13 @@ export class DemoDaysService {
       throw new BadRequestException('You have already submitted an application for this demo day');
     }
 
-    // Create a demo day participant with INVITED status (pending approval)
+    // Create a demo day participant with PENDING status
     const participant = await this.prisma.demoDayParticipant.create({
       data: {
         demoDayUid: demoDay.uid,
         memberUid: member.uid,
         type: 'INVESTOR',
-        status: 'INVITED', // Pending approval from admin
+        status: 'PENDING', // Pending approval from admin
       },
     });
 
@@ -1056,9 +1044,8 @@ export class DemoDaysService {
     });
 
     return {
-      success: true,
-      message: 'Your application has been submitted successfully. You will be notified once it is reviewed.',
       participantUid: participant.uid,
+      isNewMember: isNewMember,
     };
   }
 

@@ -138,8 +138,8 @@ export class DemoDayFundraisingProfilesService {
     };
   }
 
-  async getCurrentDemoDayFundraisingProfile(memberEmail: string): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+  async getCurrentDemoDayFundraisingProfile(memberEmail: string, demoDayUidOrSlug: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day access');
     }
@@ -311,8 +311,13 @@ export class DemoDayFundraisingProfilesService {
     }
   }
 
-  async updateFundraisingOnePager(memberEmail: string, teamUid: string, onePagerUploadUid: string): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+  async updateFundraisingOnePager(
+    memberEmail: string,
+    teamUid: string,
+    onePagerUploadUid: string,
+    demoDayUidOrSlug: string
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -357,8 +362,8 @@ export class DemoDayFundraisingProfilesService {
     return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
-  async deleteFundraisingOnePager(memberEmail: string, teamUid: string): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+  async deleteFundraisingOnePager(memberEmail: string, teamUid: string, demoDayUidOrSlug: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -402,8 +407,13 @@ export class DemoDayFundraisingProfilesService {
     return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
-  async updateFundraisingVideo(memberEmail: string, teamUid: string, videoUploadUid: string): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+  async updateFundraisingVideo(
+    memberEmail: string,
+    teamUid: string,
+    videoUploadUid: string,
+    demoDayUidOrSlug: string
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -448,8 +458,13 @@ export class DemoDayFundraisingProfilesService {
     return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
-  async updateFundraisingDescription(memberEmail: string, teamUid: string, description: string): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+  async updateFundraisingDescription(
+    memberEmail: string,
+    teamUid: string,
+    description: string,
+    demoDayUid: string
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUid(demoDayUid);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -484,8 +499,8 @@ export class DemoDayFundraisingProfilesService {
     return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
-  async deleteFundraisingVideo(memberEmail: string, teamUid: string): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+  async deleteFundraisingVideo(memberEmail: string, teamUid: string, demoDayUidOrSlug: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -539,9 +554,10 @@ export class DemoDayFundraisingProfilesService {
       industryTags?: string[];
       fundingStage?: string;
       logo?: string;
-    }
+    },
+    demoDayUidOrSlug: string
   ): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -593,10 +609,11 @@ export class DemoDayFundraisingProfilesService {
 
   async getCurrentDemoDayFundraisingProfiles(
     memberEmail: string,
+    demoDayUidOrSlug: string,
     params?: { stage?: string[]; industry?: string[]; search?: string },
     showDraft = false
   ): Promise<any[]> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day access');
     }
@@ -847,9 +864,10 @@ export class DemoDayFundraisingProfilesService {
     teamUid: string,
     filename: string,
     filesize: number,
-    mimetype: string
+    mimetype: string,
+    demoDayUidOrSlug: string
   ): Promise<{ uploadUid: string; presignedUrl: string; s3Key: string; expiresAt: string }> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -904,8 +922,13 @@ export class DemoDayFundraisingProfilesService {
     };
   }
 
-  async confirmVideoUpload(memberEmail: string, teamUid: string, uploadUid: string): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+  async confirmVideoUpload(
+    memberEmail: string,
+    teamUid: string,
+    uploadUid: string,
+    demoDayUidOrSlug: string
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -955,9 +978,10 @@ export class DemoDayFundraisingProfilesService {
     teamUid: string,
     filename: string,
     filesize: number,
-    mimetype: string
+    mimetype: string,
+    demoDayUidOrSlug: string
   ): Promise<{ uploadUid: string; presignedUrl: string; s3Key: string; expiresAt: string }> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -1012,8 +1036,13 @@ export class DemoDayFundraisingProfilesService {
     };
   }
 
-  async confirmOnePagerUpload(memberEmail: string, teamUid: string, uploadUid: string): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+  async confirmOnePagerUpload(
+    memberEmail: string,
+    teamUid: string,
+    uploadUid: string,
+    demoDayUidOrSlug: string
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -1063,9 +1092,10 @@ export class DemoDayFundraisingProfilesService {
     memberEmail: string,
     teamUid: string,
     previewImage: Express.Multer.File,
-    previewImageSmall?: Express.Multer.File
+    previewImageSmall: Express.Multer.File | undefined,
+    demoDayUidOrSlug: string
   ): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
@@ -1097,10 +1127,11 @@ export class DemoDayFundraisingProfilesService {
 
   async uploadOnePagerPreviewByTeam(
     teamUid: string,
+    demoDayUid: string,
     previewImage: Express.Multer.File,
     previewImageSmall?: Express.Multer.File
   ): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    const demoDay = await this.demoDaysService.getDemoDayByUid(demoDayUid);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }
