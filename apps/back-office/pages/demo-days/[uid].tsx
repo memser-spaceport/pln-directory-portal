@@ -177,6 +177,22 @@ const DemoDayDetailPage = () => {
     }
   };
 
+  const handleUpdateParticipantPrepAccess = async (participantUid: string, isDemoDayAdmin: boolean) => {
+    if (!authToken || !uid) return;
+
+    try {
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: uid as string,
+        participantUid,
+        data: { isDemoDayAdmin },
+      });
+    } catch (error) {
+      console.error('Error updating prep access:', error);
+      toast.error('Failed to update prep access. Please try again.');
+    }
+  };
+
   const handleUpdateParticipantTeam = async (
     participantUid: string,
     participantName: string,
@@ -431,6 +447,11 @@ const DemoDayDetailPage = () => {
                       Early Access
                     </div>
                   )}
+                  {activeTab === 'investors' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                      Prep Access
+                    </div>
+                  )}
                   {activeTab === 'founders' && (
                     <div className={clsx(s.headerCell, s.fixed)} style={{ width: 200 }}>
                       Pitch Materials
@@ -650,6 +671,24 @@ const DemoDayDetailPage = () => {
                           className={clsx(
                             'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
                             participant.hasEarlyAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          )}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                    )}
+                    {activeTab === 'investors' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        <select
+                          value={participant.isDemoDayAdmin ? 'yes' : 'no'}
+                          onChange={(e) =>
+                            handleUpdateParticipantPrepAccess(participant.uid, e.target.value === 'yes')
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={clsx(
+                            'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
+                            participant.isDemoDayAdmin ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           )}
                         >
                           <option value="yes">Yes</option>

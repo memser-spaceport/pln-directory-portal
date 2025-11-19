@@ -148,6 +148,7 @@ export class AdminDemoDaysController {
         teamUid: body.teamUid,
         type: body.type?.toUpperCase() as 'INVESTOR' | 'FOUNDER',
         hasEarlyAccess: body.hasEarlyAccess,
+        isDemoDayAdmin: body.isDemoDayAdmin,
       },
       req.userEmail
     );
