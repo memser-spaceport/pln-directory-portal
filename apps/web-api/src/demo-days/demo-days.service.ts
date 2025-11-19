@@ -384,19 +384,9 @@ export class DemoDaysService {
     return created;
   }
 
-  async getAllDemoDays(excludeInactive = false): Promise<DemoDay[]> {
-    const whereClause: any = {
-      isDeleted: false,
-    };
-
-    if (excludeInactive) {
-      whereClause.status = {
-        not: DemoDayStatus.ARCHIVED,
-      };
-    }
-
+  async getAllDemoDays(): Promise<DemoDay[]> {
     return this.prisma.demoDay.findMany({
-      where: whereClause,
+      where: { isDeleted: false },
       select: {
         id: true,
         uid: true,
@@ -414,6 +404,11 @@ export class DemoDaysService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async getAllDemoDaysPublic(memberEmail?: string | null) {
+    // TODO return a list of all demo days similar to getDemoDayAccess
+    return null;
   }
 
   async getDemoDayByUidOrSlug(uidOrSlug: string): Promise<DemoDay> {

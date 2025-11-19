@@ -47,9 +47,10 @@ export class DemoDaysController {
   ) {}
 
   @Get()
+  @UseGuards(UserTokenCheckGuard)
   @NoCache()
-  async getAllDemoDays() {
-    return this.demoDaysService.getAllDemoDays(true);
+  async getAllDemoDays(@Req() req) {
+    return this.demoDaysService.getAllDemoDaysPublic(req.userEmail || null);
   }
 
   @Get(':demoDayUidOrSlug')
