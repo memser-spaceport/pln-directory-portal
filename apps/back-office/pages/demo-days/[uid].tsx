@@ -457,6 +457,11 @@ const DemoDayDetailPage = () => {
                       Pitch Materials
                     </div>
                   )}
+                  {activeTab === 'founders' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                      Prep Access
+                    </div>
+                  )}
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Invite Accepted
                   </div>
@@ -622,6 +627,24 @@ const DemoDayDetailPage = () => {
                             </span>
                           );
                         })()}
+                      </div>
+                    )}
+                    {activeTab === 'founders' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        <select
+                          value={participant.isDemoDayAdmin ? 'yes' : 'no'}
+                          onChange={(e) =>
+                            handleUpdateParticipantPrepAccess(participant.uid, e.target.value === 'yes')
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={clsx(
+                            'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
+                            participant.isDemoDayAdmin ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          )}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
                       </div>
                     )}
                     {activeTab === 'investors' && (
