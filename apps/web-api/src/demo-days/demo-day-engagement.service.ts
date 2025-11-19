@@ -1,40 +1,34 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  forwardRef,
+  Inject,
+} from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
-import { DemoDay, DemoDayStatus } from '@prisma/client';
 import cuid from 'cuid';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { DemoDaysService } from './demo-days.service';
 
 @Injectable()
 export class DemoDayEngagementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly analyticsService: AnalyticsService,
-    private readonly notificationServiceClient: NotificationServiceClient
+    private readonly notificationServiceClient: NotificationServiceClient,
+    @Inject(forwardRef(() => DemoDaysService))
+    private readonly demoDaysService: DemoDaysService
   ) {}
 
-  // Get current demo day or throw if none exists
-  private async getCurrentDemoDay(): Promise<DemoDay> {
-    const demoDay = await this.prisma.demoDay.findFirst({
-      where: {
-        status: {
-          in: [DemoDayStatus.UPCOMING, DemoDayStatus.EARLY_ACCESS, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED],
-        },
-        isDeleted: false,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  // Read engagement state for UI
+  async getCurrentEngagement(memberEmail: string, demoDayUid: string) {
+    const demoDay = await this.demoDaysService.getDemoDayByUid(demoDayUid);
 
     if (!demoDay) {
-      throw new NotFoundException('No active demo day found');
+      throw new ForbiddenException('No demo day access');
     }
-
-    return demoDay;
-  }
-
-  // Read engagement state for UI
-  async getCurrentEngagement(memberEmail: string) {
-    const demoDay = await this.getCurrentDemoDay();
 
     const member = await this.prisma.member.findUnique({
       where: { email: memberEmail },
@@ -65,8 +59,12 @@ export class DemoDayEngagementService {
   }
 
   // Mark Add to Calendar click
-  async markCalendarAdded(memberEmail: string) {
-    const demoDay = await this.getCurrentDemoDay();
+  async markCalendarAdded(memberEmail: string, demoDayUid: string) {
+    const demoDay = await this.demoDaysService.getDemoDayByUid(demoDayUid);
+
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day access');
+    }
 
     const member = await this.prisma.member.findUnique({
       where: { email: memberEmail },
@@ -116,6 +114,7 @@ export class DemoDayEngagementService {
   // Express interest in a fundraising profile
   async expressInterest(
     memberEmail: string,
+    demoDayUid: string,
     teamFundraisingProfileUid: string,
     interestType: 'like' | 'connect' | 'invest' | 'referral',
     isPrepDemoDay = false,
@@ -126,7 +125,11 @@ export class DemoDayEngagementService {
     } | null
   ) {
     // Validate that the caller is an enabled demo day participant (investor)
-    const demoDay = await this.getCurrentDemoDay();
+    const demoDay = await this.demoDaysService.getDemoDayByUid(demoDayUid);
+
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day access');
+    }
 
     const member = await this.prisma.member.findUnique({
       where: { email: memberEmail },
