@@ -393,13 +393,6 @@ export class DemoDaysService {
       whereClause.status = {
         not: DemoDayStatus.ARCHIVED,
       };
-      whereClause.fundraisingProfiles = {
-        some: {
-          status: {
-            not: 'DISABLED',
-          },
-        },
-      };
     }
 
     return this.prisma.demoDay.findMany({
