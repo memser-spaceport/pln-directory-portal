@@ -1,9 +1,9 @@
 import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
-  ConflictException,
-  BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { DemoDay, DemoDayStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
@@ -19,6 +19,8 @@ export class DemoDaysService {
     private readonly analyticsService: AnalyticsService,
     private readonly membersService: MembersService
   ) {}
+
+  // Public methods
 
   async getDemoDayAccess(
     memberEmail: string | null,
@@ -64,194 +66,9 @@ export class DemoDaysService {
     }
 
     const [investorsCount, teamsCount, member] = await Promise.all([
-      this.prisma.member.count({
-        where: {
-          AND: [
-            {
-              accessLevel: {
-                in: ['L5', 'L6'],
-              },
-            },
-            {
-              OR: [
-                {
-                  investorProfile: {
-                    secRulesAccepted: true,
-                  },
-                },
-                {
-                  investorProfile: {
-                    type: { not: null },
-                  },
-                },
-              ],
-            },
-            // If InvestorProfile.type = 'FUND', member must belong to a team with isFund = true
-            {
-              OR: [
-                // Allow if not FUND type
-                {
-                  investorProfile: {
-                    OR: [{ type: { not: 'FUND' } }, { type: { equals: null } }],
-                  },
-                },
-                // Or if FUND type, require member to be in a team with isFund = true
-                {
-                  AND: [
-                    {
-                      investorProfile: {
-                        type: 'FUND',
-                      },
-                    },
-                    {
-                      teamMemberRoles: {
-                        some: {
-                          investmentTeam: true,
-                          team: {
-                            isFund: true,
-                          },
-                        },
-                      },
-                    },
-                  ],
-                },
-              ],
-            },
-            // If InvestorProfile.type = 'ANGEL', at least one field must be filled
-            {
-              OR: [
-                // Allow if not ANGEL type
-                {
-                  investorProfile: {
-                    OR: [{ type: { not: 'ANGEL' } }, { type: { equals: null } }],
-                  },
-                },
-                // Or if ANGEL type, at least one field must be filled
-                {
-                  AND: [
-                    {
-                      investorProfile: {
-                        type: 'ANGEL',
-                      },
-                    },
-                    {
-                      investorProfile: {
-                        OR: [
-                          {
-                            investInStartupStages: { isEmpty: false },
-                          },
-                          {
-                            typicalCheckSize: { not: null, gt: 0 },
-                          },
-                          {
-                            investmentFocus: { isEmpty: false },
-                          },
-                        ],
-                      },
-                    },
-                  ],
-                },
-              ],
-            },
-            // If InvestorProfile.type = 'ANGEL_AND_FUND', must satisfy at least one of FUND or ANGEL requirements
-            {
-              OR: [
-                // Allow if not ANGEL_AND_FUND type
-                {
-                  investorProfile: {
-                    OR: [{ type: { not: 'ANGEL_AND_FUND' } }, { type: { equals: null } }],
-                  },
-                },
-                // Or if ANGEL_AND_FUND type, must satisfy at least one requirement
-                {
-                  AND: [
-                    {
-                      investorProfile: {
-                        type: 'ANGEL_AND_FUND',
-                      },
-                    },
-                    {
-                      OR: [
-                        // FUND requirement: member must be in a team with isFund = true and investmentTeam = true
-                        {
-                          teamMemberRoles: {
-                            some: {
-                              investmentTeam: true,
-                              team: {
-                                isFund: true,
-                              },
-                            },
-                          },
-                        },
-                        // ANGEL requirement: at least one field must be filled
-                        {
-                          investorProfile: {
-                            OR: [
-                              {
-                                investInStartupStages: { isEmpty: false },
-                              },
-                              {
-                                typicalCheckSize: { not: null, gt: 0 },
-                              },
-                              {
-                                investmentFocus: { isEmpty: false },
-                              },
-                            ],
-                          },
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      }),
-      this.prisma.teamFundraisingProfile.count({
-        where: {
-          demoDayUid: demoDay.uid,
-          status: 'PUBLISHED',
-          onePagerUploadUid: { not: null },
-          videoUploadUid: { not: null },
-          team: {
-            demoDayParticipants: {
-              some: {
-                demoDayUid: demoDay.uid,
-                isDeleted: false,
-                status: 'ENABLED',
-                type: 'FOUNDER',
-              },
-            },
-          },
-        },
-      }),
-      this.prisma.member.findUnique({
-        where: { email: memberEmail },
-        select: {
-          uid: true,
-          accessLevel: true,
-          memberRoles: {
-            select: {
-              name: true,
-            },
-          },
-          demoDayParticipants: {
-            where: {
-              demoDayUid: demoDay.uid,
-              isDeleted: false,
-            },
-            select: {
-              uid: true,
-              status: true,
-              type: true,
-              isDemoDayAdmin: true,
-              hasEarlyAccess: true,
-              confidentialityAccepted: true,
-            },
-          },
-        },
-      }),
+      this.getQualifiedInvestorsCount(),
+      this.getTeamsCountForDemoDay(demoDay.uid),
+      this.getMemberWithDemoDayParticipants(memberEmail, demoDay.uid),
     ]);
 
     if (!member || ['L0', 'L1', 'Rejected'].includes(member?.accessLevel ?? '')) {
@@ -262,8 +79,7 @@ export class DemoDaysService {
     }
 
     // Check if member is directory admin
-    const roleNames = member.memberRoles.map((role) => role.name);
-    const isDirectoryAdmin = roleNames.includes('DIRECTORYADMIN');
+    const isDirectoryAdmin = this.isDirectoryAdmin(member);
 
     // Check demo day participant
     const participant = member.demoDayParticipants[0];
@@ -408,206 +224,22 @@ export class DemoDaysService {
   }
 
   async getAllDemoDaysPublic(memberEmail?: string | null) {
-    // Get all demo days
-    const demoDays = await this.prisma.demoDay.findMany({
-      where: { isDeleted: false },
-      orderBy: { createdAt: 'desc' },
-    });
+    // Get all demo days and member info in parallel
+    const [demoDays, member, investorsCount] = await Promise.all([
+      this.prisma.demoDay.findMany({
+        where: { isDeleted: false },
+        orderBy: { createdAt: 'desc' },
+      }),
+      memberEmail ? this.getMemberWithDemoDayParticipants(memberEmail) : Promise.resolve(null),
+      this.getQualifiedInvestorsCount(),
+    ]);
 
-    // Get member info if email provided
-    let member: any = null;
-    let isDirectoryAdmin = false;
-
-    if (memberEmail) {
-      member = await this.prisma.member.findUnique({
-        where: { email: memberEmail },
-        select: {
-          uid: true,
-          accessLevel: true,
-          memberRoles: {
-            select: {
-              name: true,
-            },
-          },
-          demoDayParticipants: {
-            where: {
-              isDeleted: false,
-            },
-            select: {
-              uid: true,
-              demoDayUid: true,
-              status: true,
-              type: true,
-              isDemoDayAdmin: true,
-              hasEarlyAccess: true,
-              confidentialityAccepted: true,
-            },
-          },
-        },
-      });
-
-      if (member) {
-        const roleNames = member.memberRoles.map((role) => role.name);
-        isDirectoryAdmin = roleNames.includes('DIRECTORYADMIN');
-      }
-    }
-
-    // Get investor count once (not demo day specific, same logic as in getDemoDayAccess)
-    const investorsCount = await this.prisma.member.count({
-      where: {
-        AND: [
-          {
-            accessLevel: {
-              in: ['L5', 'L6'],
-            },
-          },
-          {
-            OR: [
-              {
-                investorProfile: {
-                  secRulesAccepted: true,
-                },
-              },
-              {
-                investorProfile: {
-                  type: { not: null },
-                },
-              },
-            ],
-          },
-          {
-            OR: [
-              {
-                investorProfile: {
-                  OR: [{ type: { not: 'FUND' } }, { type: { equals: null } }],
-                },
-              },
-              {
-                AND: [
-                  {
-                    investorProfile: {
-                      type: 'FUND',
-                    },
-                  },
-                  {
-                    teamMemberRoles: {
-                      some: {
-                        investmentTeam: true,
-                        team: {
-                          isFund: true,
-                        },
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            OR: [
-              {
-                investorProfile: {
-                  OR: [{ type: { not: 'ANGEL' } }, { type: { equals: null } }],
-                },
-              },
-              {
-                AND: [
-                  {
-                    investorProfile: {
-                      type: 'ANGEL',
-                    },
-                  },
-                  {
-                    investorProfile: {
-                      OR: [
-                        {
-                          investInStartupStages: { isEmpty: false },
-                        },
-                        {
-                          typicalCheckSize: { not: null, gt: 0 },
-                        },
-                        {
-                          investmentFocus: { isEmpty: false },
-                        },
-                      ],
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            OR: [
-              {
-                investorProfile: {
-                  OR: [{ type: { not: 'ANGEL_AND_FUND' } }, { type: { equals: null } }],
-                },
-              },
-              {
-                AND: [
-                  {
-                    investorProfile: {
-                      type: 'ANGEL_AND_FUND',
-                    },
-                  },
-                  {
-                    OR: [
-                      {
-                        teamMemberRoles: {
-                          some: {
-                            investmentTeam: true,
-                            team: {
-                              isFund: true,
-                            },
-                          },
-                        },
-                      },
-                      {
-                        investorProfile: {
-                          OR: [
-                            {
-                              investInStartupStages: { isEmpty: false },
-                            },
-                            {
-                              typicalCheckSize: { not: null, gt: 0 },
-                            },
-                            {
-                              investmentFocus: { isEmpty: false },
-                            },
-                          ],
-                        },
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    });
+    const isDirectoryAdmin = member ? this.isDirectoryAdmin(member) : false;
 
     // For each demo day, get counts and determine access
     return await Promise.all(
       demoDays.map(async (demoDay) => {
-        const teamsCount = await this.prisma.teamFundraisingProfile.count({
-          where: {
-            demoDayUid: demoDay.uid,
-            status: 'PUBLISHED',
-            onePagerUploadUid: { not: null },
-            videoUploadUid: { not: null },
-            team: {
-              demoDayParticipants: {
-                some: {
-                  demoDayUid: demoDay.uid,
-                  isDeleted: false,
-                  status: 'ENABLED',
-                  type: 'FOUNDER',
-                },
-              },
-            },
-          },
-        });
+        const teamsCount = await this.getTeamsCountForDemoDay(demoDay.uid);
 
         // Determine access for this demo day
         let access: 'none' | 'INVESTOR' | 'FOUNDER' = 'none';
@@ -1340,6 +972,204 @@ export class DemoDaysService {
 
     // No access
     throw new ForbiddenException('No demo day access');
+  }
+
+  // Private helper methods
+
+  private async getQualifiedInvestorsCount(): Promise<number> {
+    return this.prisma.member.count({
+      where: {
+        AND: [
+          {
+            accessLevel: {
+              in: ['L5', 'L6'],
+            },
+          },
+          {
+            OR: [
+              {
+                investorProfile: {
+                  secRulesAccepted: true,
+                },
+              },
+              {
+                investorProfile: {
+                  type: { not: null },
+                },
+              },
+            ],
+          },
+          {
+            OR: [
+              {
+                investorProfile: {
+                  OR: [{ type: { not: 'FUND' } }, { type: { equals: null } }],
+                },
+              },
+              {
+                AND: [
+                  {
+                    investorProfile: {
+                      type: 'FUND',
+                    },
+                  },
+                  {
+                    teamMemberRoles: {
+                      some: {
+                        investmentTeam: true,
+                        team: {
+                          isFund: true,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            OR: [
+              {
+                investorProfile: {
+                  OR: [{ type: { not: 'ANGEL' } }, { type: { equals: null } }],
+                },
+              },
+              {
+                AND: [
+                  {
+                    investorProfile: {
+                      type: 'ANGEL',
+                    },
+                  },
+                  {
+                    investorProfile: {
+                      OR: [
+                        {
+                          investInStartupStages: { isEmpty: false },
+                        },
+                        {
+                          typicalCheckSize: { not: null, gt: 0 },
+                        },
+                        {
+                          investmentFocus: { isEmpty: false },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            OR: [
+              {
+                investorProfile: {
+                  OR: [{ type: { not: 'ANGEL_AND_FUND' } }, { type: { equals: null } }],
+                },
+              },
+              {
+                AND: [
+                  {
+                    investorProfile: {
+                      type: 'ANGEL_AND_FUND',
+                    },
+                  },
+                  {
+                    OR: [
+                      {
+                        teamMemberRoles: {
+                          some: {
+                            investmentTeam: true,
+                            team: {
+                              isFund: true,
+                            },
+                          },
+                        },
+                      },
+                      {
+                        investorProfile: {
+                          OR: [
+                            {
+                              investInStartupStages: { isEmpty: false },
+                            },
+                            {
+                              typicalCheckSize: { not: null, gt: 0 },
+                            },
+                            {
+                              investmentFocus: { isEmpty: false },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+  }
+
+  private async getTeamsCountForDemoDay(demoDayUid: string): Promise<number> {
+    return this.prisma.teamFundraisingProfile.count({
+      where: {
+        demoDayUid,
+        status: 'PUBLISHED',
+        onePagerUploadUid: { not: null },
+        videoUploadUid: { not: null },
+        team: {
+          demoDayParticipants: {
+            some: {
+              demoDayUid,
+              isDeleted: false,
+              status: 'ENABLED',
+              type: 'FOUNDER',
+            },
+          },
+        },
+      },
+    });
+  }
+
+  private async getMemberWithDemoDayParticipants(memberEmail: string, demoDayUid?: string) {
+    return this.prisma.member.findUnique({
+      where: { email: memberEmail },
+      select: {
+        uid: true,
+        accessLevel: true,
+        memberRoles: {
+          select: {
+            name: true,
+          },
+        },
+        demoDayParticipants: {
+          where: demoDayUid
+            ? {
+                demoDayUid,
+                isDeleted: false,
+              }
+            : {
+                isDeleted: false,
+              },
+          select: {
+            uid: true,
+            demoDayUid: true,
+            status: true,
+            type: true,
+            isDemoDayAdmin: true,
+            hasEarlyAccess: true,
+            confidentialityAccepted: true,
+          },
+        },
+      },
+    });
+  }
+
+  private isDirectoryAdmin(member: { memberRoles: Array<{ name: string }> }): boolean {
+    const roleNames = member.memberRoles.map((role) => role.name);
+    return roleNames.includes('DIRECTORYADMIN');
   }
 
   /**
