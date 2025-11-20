@@ -7,6 +7,7 @@ import { PLEventsModule } from '../pl-events/pl-events.module';
 import { EventsToolingService } from './events-tooling.service';
 import { EventConsumerHelper } from './event-consumer.helper';
 import { AuthModule }  from '../auth/auth.module';
+import { SharedModule } from '../shared/shared.module';
 
 @Module({
   controllers: [EventsController],
@@ -24,7 +25,8 @@ import { AuthModule }  from '../auth/auth.module';
       producers: [],
     }),
     forwardRef(() => PLEventsModule),
-    AuthModule
+    AuthModule,
+    SharedModule
   ],
   exports: [EventsToolingService, EventsService]
 })

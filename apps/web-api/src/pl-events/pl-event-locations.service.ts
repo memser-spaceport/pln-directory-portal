@@ -1,6 +1,6 @@
 import moment from 'moment-timezone';
 import { PLEventLocation, Prisma, SubscriptionEntityType } from '@prisma/client';
-import { forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberSubscriptionService } from '../member-subscriptions/member-subscriptions.service';
@@ -742,5 +742,122 @@ export class PLEventLocationsService {
       this.handleErrors(error);
     }  
   }
+
+  /**
+   * Retrieves all PLEventLocations with optional filtering.
+   * Includes location associations and their corresponding events.
+   * 
+   * @param queryOptions - Optional Prisma query options for filtering and pagination.
+   * @returns An array of locations with locationAssociations and events.
+   */
+  async findAllPLEventLocations(queryOptions?: Prisma.PLEventLocationFindManyArgs) {
+    try {
+      return await this.prisma.pLEventLocation.findMany({
+        where: {
+          ...queryOptions?.where,
+          isDeleted: false,
+        },
+        include: {
+          locationAssociations: {
+            where: { isDeleted: false },
+            include: {
+              PLEvent: {
+                where: { isDeleted: false }
+              }
+            }
+          }
+        }
+      });
+    } catch (error) {
+      this.logger.error(`Error fetching locations: ${error.message}`, error.stack, 'PLEventLocationsService');
+      throw new BadRequestException(`Failed to fetch locations: ${error.message}`);
+    }
+  }
+
+  /**
+   * Retrieves a single PLEventLocation by UID.
+   * 
+   * @param uid - The unique identifier of the location.
+   * @returns The location object.
+   * @throws {NotFoundException} - If the location is not found.
+   */
+  async findOnePLEventLocation(uid: string) {
+    try {
+      const location = await this.prisma.pLEventLocation.findFirst({
+        where: {
+          uid,
+          isDeleted: false
+        }
+      });
+      if (!location) {
+        throw new NotFoundException(`Location with UID ${uid} not found.`);
+      }
+      return location;
+    } catch (error) {
+      this.logger.error(`Error fetching location: ${error.message}`);
+      this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Updates a PLEventLocation by UID.
+   * 
+   * @param uid - The unique identifier of the location to update.
+   * @param data - The data to update.
+   * @returns The updated location object.
+   * @throws {NotFoundException} - If the location is not found.
+   */
+  async updatePLEventLocation(uid: string, data: Prisma.PLEventLocationUpdateInput) {
+    try {
+      // Check if location exists
+      const existing = await this.prisma.pLEventLocation.findFirst({
+        where: { uid, isDeleted: false }
+      });
+      if (!existing) {
+        throw new NotFoundException(`Location with UID ${uid} not found.`);
+      }
+
+      const location = await this.prisma.pLEventLocation.update({
+        where: { uid },
+        data
+      });
+      this.logger.info(`Updated location: ${location.uid}`, 'PLEventLocationsService');
+      return location;
+    } catch (error) {
+      this.logger.error(`Error updating location: ${error.message}`);
+      this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Soft deletes a PLEventLocation by UID.
+   * 
+   * @param uid - The unique identifier of the location to delete.
+   * @returns The deleted location object.
+   * @throws {NotFoundException} - If the location is not found.
+   */
+  async deletePLEventLocation(uid: string) {
+    try {
+      // Check if location exists
+      const existing = await this.prisma.pLEventLocation.findFirst({
+        where: { uid, isDeleted: false }
+      });
+      if (!existing) {
+        throw new NotFoundException(`Location with UID ${uid} not found.`);
+      }
+
+      const location = await this.prisma.pLEventLocation.update({
+        where: { uid },
+        data: { isDeleted: true }
+      });
+      this.logger.info(`Deleted location: ${location.uid}`, 'PLEventLocationsService');
+      return location;
+    } catch (error) {
+     this.logger.error(`Error deleting location: ${error.message}`);
+     this.handleErrors(error);
+    }
+  }
+
+  
 
 }
