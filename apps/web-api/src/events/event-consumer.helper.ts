@@ -24,47 +24,64 @@ export class EventConsumerHelper {
    * @param tx - Optional transaction object
    * @returns Promise<{ locationUid?: string; associationUid?: string }>
    */
-  async handleLocationAndAssociation(location, tx?: any): Promise<{ locationUid?: string; associationUid?: string }> {
-    let locationUid = location?.uid;
-    let associationUid: string | undefined = undefined;
-    // Handle location creation if it's a new location
-    if (!locationUid && location?.location) {
-      const createdLocation = await this.createEventLocation(location, tx);
-      if (createdLocation) {
-        locationUid = createdLocation.uid;
-      }
-    }
-    if (locationUid) {
-      if (location.isInferred) {
-        // Use existing association for inferred locations
-        const existingAssociation = await this.locationAssociationService.findAssociation({
-          where: {
-            locationUid,
-            city: location.city ?? null,
-            state: location.state ?? null,
-            country: location.country ?? null,
-            isDeleted: false,
-          },
-          orderBy: { createdAt: 'desc' }, // Get the most recent association
-          select: { uid: true }
-        }, tx);
-        associationUid = existingAssociation?.uid;
+  async handleLocationAndAssociation(
+    location,
+    tx?: any
+  ): Promise<{
+    locationUid?: string; 
+    associationUid?: string 
+  }> {
+    const locationUid = location?.uid;
+    let associationUid: string | undefined;
+    // Common filters for city/state/country
+    const locationCriteria = {
+      city: location.city ?? null,
+      state: location.state ?? null,
+      country: location.country ?? null,
+    };
+    if (location.isInferred) {
+      // Use existing association for inferred locations (most recent, not deleted)
+      const existingAssociation = await this.locationAssociationService.findAssociation(
+        {
+          where: { ...locationCriteria, locationUid, isDeleted: false },
+          orderBy: { createdAt: 'desc' },
+          select: { uid: true },
+        },
+        tx
+      );
+      associationUid = existingAssociation?.uid;
+    } else {
+      const association = await this.locationAssociationService.findAssociation(
+        {
+          where: locationCriteria,
+          orderBy: { createdAt: 'desc' },
+          select: { uid: true },
+        },
+        tx
+      );
+      if (association?.uid && locationUid) {
+        // Update existing association with new location uid
+        await this.locationAssociationService.updatePLEventLocationAssociation(
+          association.uid,
+          { locationUid },
+          tx
+        );
+        associationUid = association.uid;
       } else {
-        await this.softDeleteAssociations({
-          city: location.city ?? null,
-          state: location.state ?? null,
-          country: location.country ?? null
-        }, tx);
-        const association = await this.createAssociation({
-          locationUid,
-          googlePlaceId: location.googlePlaceId,
-          locationName: location.address,
-          city: location.city,
-          state: location.state,
-          country: location.country,
-          region: location.region,
-        }, tx);
-        associationUid = association?.uid;
+        // Create a new association
+        const newAssociation = await this.locationAssociationService.createLocationAssociation(
+          {
+            locationUid,
+            googlePlaceId: location.googlePlaceId as unknown as string,
+            locationName: location.address as unknown as string,
+            city: location.city,
+            state: location.state,
+            country: location.country,
+            region: location.region,
+          },
+          tx
+        );
+        associationUid = newAssociation.uid;
       }
     }
     return { locationUid, associationUid };
