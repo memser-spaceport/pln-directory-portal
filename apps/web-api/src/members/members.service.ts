@@ -10,7 +10,7 @@ import {
 import { z } from 'zod';
 import axios from 'axios';
 import * as path from 'path';
-import { Member, ParticipantsRequest, Prisma } from '@prisma/client';
+import {ApprovalStatus, Member, ParticipantsRequest, ParticipantType, Prisma} from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
@@ -3302,51 +3302,145 @@ export class MembersService {
       requestorEmail?: string;
     }
   ): Promise<void> {
+    this.logger.info(
+      `[attachTeamAndRoleTx] Start. memberUid=${memberUid}, opts=${JSON.stringify(
+        opts
+      )}`
+    );
+
     const { team, isTeamNew, role } = opts ?? {};
-    if (!team) return; // nothing to link
+    if (!team) {
+      this.logger.info(
+        `[attachTeamAndRoleTx] No team provided → exiting without changes`
+      );
+      return;
+    }
 
     const norm = this.normalizeTeamInput(team);
 
-    // Resolve or create team
-    let targetTeamUid: string;
-
+    // ==================================================
+    // CASE 1: User requests to create a NEW TEAM (isTeamNew = true)
+    // ==================================================
     if (isTeamNew) {
-      const name = (norm.name && norm.name.trim()) || `team-${memberUid}`;
+      this.logger.info(
+        `[attachTeamAndRoleTx] Creating NEW TEAM request instead of direct team creation`
+      );
+
+      const name =
+        (norm.name && norm.name.trim()) || `team-${memberUid}`; // fallback name
       const website = (norm.website ?? opts.website) || null;
 
-      const created = await this.teamService.createTeam(
-        {
-          name,
-          website: website || undefined,
-          accessLevel: 'L1',
-          accessLevelUpdatedAt: new Date(),
-        },
-        tx,
-        opts.requestorEmail || ''
+      if (!opts.requestorEmail) {
+        this.logger.error(
+          `[attachTeamAndRoleTx] Missing requesterEmail → cannot proceed`
+        );
+        throw new BadRequestException(
+          'Requester email is required to create a new team request'
+        );
+      }
+
+      const requesterEmail = opts.requestorEmail.toLowerCase().trim();
+
+      this.logger.info(
+        `[attachTeamAndRoleTx] Validating unique team identifier: ${name}`
       );
-      targetTeamUid = created.uid;
-    } else {
-      // try by uid then by name
-      let existing: { uid: string } | null = null;
-      if (norm.uid) {
-        existing = await this.teamService.findTeamByUid(norm.uid).catch(() => null);
-      }
-      if (!existing && norm.name) {
-        existing = await this.teamService.findTeamByName(norm.name).catch(() => null);
-      }
-      if (!existing) {
-        throw new NotFoundException('Existing team not found by uid or name');
-      }
-      targetTeamUid = existing.uid;
+
+      // Ensure team name is unique across Teams + ParticipantsRequest
+      await this.participantsRequestService.validateUniqueIdentifier(
+        ParticipantType.TEAM,
+        name
+      );
+
+      this.logger.info(
+        `[attachTeamAndRoleTx] Creating ParticipantsRequest: TEAM / PENDING`
+      );
+
+      // Create PENDING Team Request (instead of creating team directly)
+      await this.participantsRequestService.addRequest(
+        {
+          participantType: ParticipantType.TEAM,
+          status: ApprovalStatus.PENDING,
+          requesterEmailId: requesterEmail,
+          uniqueIdentifier: name,
+          newData: {
+            name,
+            website: website || undefined,
+          } as any,
+        } as any,
+        undefined, // requesterUser (undefined → no auto-approval)
+        false,     // disableNotification = false → send notifications
+        tx
+      );
+
+      this.logger.info(
+        `[attachTeamAndRoleTx] NEW TEAM REQUEST created successfully (PENDING). name=${name}`
+      );
+
+      // IMPORTANT:
+      // We DO NOT attach a role, because the team is not created yet.
+      this.logger.info(
+        `[attachTeamAndRoleTx] Exiting — team is pending approval, no TeamMemberRole created`
+      );
+
+      return;
     }
 
-    // Upsert TeamMemberRole
+    // ==================================================
+    // CASE 2: Attach MEMBER to EXISTING TEAM
+    // ==================================================
+    this.logger.info(
+      `[attachTeamAndRoleTx] Attaching member to EXISTING team`
+    );
+
+    let targetTeamUid: string;
+
+    // Try lookup by UID
+    let existing: { uid: string } | null = null;
+    if (norm.uid) {
+      this.logger.info(
+        `[attachTeamAndRoleTx] Searching team by UID=${norm.uid}`
+      );
+      existing = await this.teamService
+        .findTeamByUid(norm.uid)
+        .catch(() => null);
+    }
+
+    if (!existing && norm.name) {
+      this.logger.info(
+        `[attachTeamAndRoleTx] Searching team by NAME=${norm.name}`
+      );
+      existing = await this.teamService
+        .findTeamByName(norm.name)
+        .catch(() => null);
+    }
+
+    if (!existing) {
+      this.logger.error(
+        `[attachTeamAndRoleTx] Team not found by uid or name. norm=${JSON.stringify(
+          norm
+        )}`
+      );
+      throw new NotFoundException('Existing team not found by uid or name');
+    }
+
+    targetTeamUid = existing.uid;
+
+    this.logger.info(
+      `[attachTeamAndRoleTx] Existing team resolved. teamUid=${targetTeamUid}`
+    );
+
+    // Prepare role
     const finalRole = (role ?? 'member').trim();
     const roleTags = finalRole
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
 
+    this.logger.info(
+      `[attachTeamAndRoleTx] Upserting TeamMemberRole for memberUid=${memberUid}, teamUid=${targetTeamUid}, role=${finalRole}`
+    );
+
+    // Upsert (create or update) role
     await tx.teamMemberRole.upsert({
       where: { memberUid_teamUid: { memberUid, teamUid: targetTeamUid } },
       create: {
@@ -3362,6 +3456,10 @@ export class MembersService {
         roleTags,
       },
     });
+
+    this.logger.info(
+      `[attachTeamAndRoleTx] TeamMemberRole updated successfully for teamUid=${targetTeamUid}`
+    );
   }
 
   /** Accepts string (treated as name) or object with { uid|name|website } */
