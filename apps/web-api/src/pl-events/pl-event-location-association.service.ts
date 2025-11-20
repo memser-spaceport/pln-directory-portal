@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { PLEventLocationAssociation, Prisma } from '@prisma/client';
@@ -128,6 +128,29 @@ export class PLEventLocationAssociationService {
   }
 
   /**
+   * Creates a new PLEventLocationAssociation.
+   * Public method that includes location relation.
+   * 
+   * @param data - The location association data to be created.
+   * @returns The created location association object with location relation.
+   */
+  async createPLEventLocationAssociation(data: Prisma.PLEventLocationAssociationUncheckedCreateInput) {
+    try {
+      const association = await this.prisma.pLEventLocationAssociation.create({
+        data,
+        include: {
+          location: true
+        }
+      });
+      this.logger.info(`Created location association: ${association.uid}`, 'PLEventLocationAssociationService');
+      return association;
+    } catch (error) {
+      this.logger.error(`Error creating location association: ${error.message}`);
+      this.handleErrors(error);
+    }
+  }
+
+  /**
    * Find association by query.
    * @param query - Query object.
    * @param tx - The transaction object.
@@ -145,5 +168,166 @@ export class PLEventLocationAssociationService {
    */
   async updateAssociations(query: Prisma.PLEventLocationAssociationUpdateManyArgs, tx?) {
     return (tx || this.prisma).pLEventLocationAssociation.updateMany(query);
+  }
+
+
+  /**
+   * Retrieves all PLEventLocationAssociations with optional filtering.
+   * 
+   * @param queryOptions - Optional Prisma query options for filtering and pagination.
+   * @returns An array of location associations with location relation.
+   */
+  async findAllPLEventLocationAssociations(queryOptions?: Prisma.PLEventLocationAssociationFindManyArgs) {
+    try {
+      const where = {
+        ...queryOptions?.where,
+        isDeleted: false
+      };
+      return await this.prisma.pLEventLocationAssociation.findMany({
+        ...queryOptions,
+        where,
+        include: {
+          location: true
+        }
+      });
+    } catch (error) {
+      this.logger.error(`Error finding all location associations: ${error.message}`);
+      this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Retrieves a single PLEventLocationAssociation by UID.
+   * 
+   * @param uid - The unique identifier of the location association.
+   * @returns The location association object with location relation.
+   * @throws {NotFoundException} - If the location association is not found.
+   */
+  async findLocationAssociationByUid(uid: string) {
+    try {
+      const association = await this.prisma.pLEventLocationAssociation.findFirst({
+        where: {
+          uid,
+          isDeleted: false
+        },
+        include: {
+          location: true
+        }
+      });
+      if (!association) {
+        throw new NotFoundException(`Location association with UID ${uid} not found.`);
+      }
+      return association;
+    } catch (error) {
+      this.logger.error(`Error finding location association by UID: ${error.message}`);
+      this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Updates a PLEventLocationAssociation by UID.
+   * If the locationUid is changed, updates all related events' locationUid accordingly.
+   * 
+   * @param uid - The unique identifier of the location association to update.
+   * @param data - The data to update.
+   * @returns The updated location association object with location relation.
+   * @throws {NotFoundException} - If the location association is not found.
+   * @throws {BadRequestException} - If the locationUid doesn't exist.
+   */
+  async updatePLEventLocationAssociation(uid: string, data) {
+    try {
+      // Check if association exists
+      const existing = await this.prisma.pLEventLocationAssociation.findFirst({
+        where: { uid, isDeleted: false }
+      });
+      if (!existing) {
+        throw new NotFoundException(`Location association with UID ${uid} not found.`);
+      }
+
+      // Use transaction to ensure atomicity
+      return await this.prisma.$transaction(async (tx) => {
+        // Update the association
+        const association = await tx.pLEventLocationAssociation.update({
+          where: { uid },
+          data,
+          include: {
+            location: true
+          }
+        });
+
+        // If locationUid changed, update all related events' locationUid
+        if (data.locationUid !== undefined && data.locationUid !== existing.locationUid) {
+          await tx.pLEvent.updateMany({
+            where: {
+              pLEventLocationAssociationUid: uid,
+              isDeleted: false
+            },
+            data: {
+              locationUid: data.locationUid
+            }
+          });
+
+        }
+        this.logger.info(`Updated location association: ${association.uid}`);
+        return association;
+      });
+    } catch (error) {
+      this.logger.error(`Error updating location association: ${error.message}`);
+      this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Delete's a PLEventLocationAssociation by UID.
+   * 
+   * @param uid - The unique identifier of the location association to delete.
+   * @returns The deleted location association object with location relation.
+   * @throws {NotFoundException} - If the location association is not found.
+   */
+  async deletePLEventLocationAssociation(uid: string) {
+    try {
+      // Check if association exists
+      const existing = await this.prisma.pLEventLocationAssociation.findFirst({
+        where: { uid, isDeleted: false }
+      });
+      if (!existing) {
+        throw new NotFoundException(`Location association with UID ${uid} not found.`);
+      }
+
+      const association = await this.prisma.pLEventLocationAssociation.update({
+        where: { uid },
+        data: { isDeleted: true },
+        include: {
+          location: true
+        }
+      });
+      this.logger.info(`Deleted location association: ${association.uid}`, 'PLEventLocationAssociationService');
+      return association;
+    } catch (error) {
+      this.logger.error(`Error deleting location association: ${error.message}`); 
+      this.handleErrors(error);
+    }
+  }
+
+  private handleErrors(error, message?: string) {
+    this.logger.error(error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      switch (error?.code) {
+        case 'P2002':
+          const fieldName = (error.meta as any)?.target?.[0] || 'field';
+          throw new ConflictException(`This ${fieldName} is already in the system.`);
+        case 'P2003':
+          throw new BadRequestException('Foreign key constraint error on Location Rule', error.message);
+        case 'P2025':
+          throw new NotFoundException('Location Rule not found with uid: ' + message);
+        default:
+          throw error;
+      }
+    } else if (error instanceof Prisma.PrismaClientValidationError) {
+      throw new BadRequestException('Database field validation error on Location Rule', error.message);
+    } else {
+      throw error;
+    }
+    return error;
   }
 } 
