@@ -74,9 +74,28 @@ export const UpdateIRLAggregatedPriority = z.object({
 });
 
 export const UpdatePLEventLocationSchema = z.object({
-  location: z.string().optional()
+  location: z.string().optional(),
+  country: z.string().optional().nullable(),
+  latitude: z.string().optional().nullable(),
+  longitude: z.string().optional().nullable(),
+  flag: z.string().optional().nullable(),
+  icon: z.string().optional().nullable(),
+  resources: z.array(
+    z.object({ 
+      name: z.string(), 
+      link: z.string().url(),
+      description: z.string().optional()
+    })
+  ).optional(),
+  additionalInfo: z.any().optional(),
+  priority: z.number().int().optional().nullable(),
+  timezone: z.string().optional(),
+  isFeatured: z.boolean().optional().nullable(),
+  isAggregated: z.boolean().optional(),
+  aggregatedPriority: z.number().int().optional().nullable(),
 });
 
+export class CreatePLEventLocationSchemaDto extends createZodDto(PLCreateEventLocationSchema) {}
 export class UpdatePLEventLocationSchemaDto extends createZodDto(UpdatePLEventLocationSchema) {}
 
 export class UpdateIRLAggregatedPriorityDto extends createZodDto(UpdateIRLAggregatedPriority) {}
