@@ -1,4 +1,5 @@
 import { Controller, UseGuards, Req, Param, Body, UsePipes } from '@nestjs/common';
+import { Controller, UseGuards, Req, Param, Body, UsePipes } from '@nestjs/common';
 import { ApiParam } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Api, initNestServer, ApiDecorator } from '@ts-rest/nest';
@@ -13,9 +14,21 @@ import {
   UpdatePLEventLocationSchemaDto,
   ResponsePLEventLocationSchema
 } from 'libs/contracts/src/schema';
+import { 
+  ResponsePLEventGuestSchemaWithRelationsSchema, 
+  ResponsePLEventSchemaWithRelationsSchema,
+  createLocationAssociationSchemaDto,
+  UpdatePLEventLocationAssociationSchemaDto,
+  ResponsePLEventLocationAssociationWithRelationsSchema,
+  CreatePLEventLocationSchemaDto,
+  UpdatePLEventLocationSchemaDto,
+  ResponsePLEventLocationSchema
+} from 'libs/contracts/src/schema';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
+import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
+import { PLEventLocationAssociationService } from '../pl-events/pl-event-location-association.service';
 import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
 import { PLEventLocationAssociationService } from '../pl-events/pl-event-location-association.service';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';

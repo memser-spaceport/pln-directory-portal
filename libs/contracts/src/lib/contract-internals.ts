@@ -15,6 +15,18 @@ import {
   CreatePLEventLocationSchemaDto,
   UpdatePLEventLocationSchemaDto,
   ResponsePLEventLocationSchema
+  ResponsePLEventGuestSchemaWithRelationsSchema,
+  ResponseMemberWithRelationsSchema,
+  ResponseTeamWithRelationsSchema,
+  ResponseProjectWithRelationsSchema,
+  ResponsePLEventSchemaWithRelationsSchema,
+  createLocationAssociationSchemaDto,
+  UpdatePLEventLocationAssociationSchemaDto,
+  ResponsePLEventLocationAssociationSchemaDto,
+  ResponsePLEventLocationAssociationWithRelationsSchema,
+  CreatePLEventLocationSchemaDto,
+  UpdatePLEventLocationSchemaDto,
+  ResponsePLEventLocationSchema
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
