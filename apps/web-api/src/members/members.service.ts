@@ -10,7 +10,7 @@ import {
 import { z } from 'zod';
 import axios from 'axios';
 import * as path from 'path';
-import { Member, ParticipantsRequest, Prisma } from '@prisma/client';
+import {ApprovalStatus, Member, ParticipantsRequest, ParticipantType, Prisma} from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
@@ -28,6 +28,7 @@ import { MembersHooksService } from './members.hooks.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
+import { TeamsService } from '../teams/teams.service';
 
 @Injectable()
 export class MembersService {
@@ -43,6 +44,8 @@ export class MembersService {
     @Inject(forwardRef(() => NotificationService))
     private notificationService: NotificationService,
     private cacheService: CacheService,
+    @Inject(forwardRef(() => TeamsService))
+    private teamService: TeamsService,
     private membersHooksService: MembersHooksService,
     @Inject(forwardRef(() => NotificationSettingsService))
     private notificationSettingsService: NotificationSettingsService,
@@ -669,6 +672,30 @@ export class MembersService {
       leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.teamUid) ?? [],
       accessLevel: memberInfo.accessLevel,
     };
+  }
+
+  async setMemberRole(memberUid: string, roleName: string, modifiedByUid?: string) {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+    });
+
+    if (!member) {
+      throw new NotFoundException(`Member with uid=${memberUid} not found`);
+    }
+
+    const updated = await this.prisma.member.update({
+      where: { uid: memberUid },
+      data: {
+        role: roleName,
+        updatedAt: new Date(),
+      },
+    });
+
+    this.logger.info(
+      `Member role changed: uid=${memberUid}, from="${member.role}", to="${roleName}", by=${modifiedByUid}`
+    );
+
+    return updated;
   }
 
   /**
@@ -2276,6 +2303,7 @@ export class MembersService {
             ohHelpWith: true,
             openToWork: true,
             scheduleMeetingCount: true,
+            role: true,
             image: {
               select: {
                 uid: true,
@@ -3218,5 +3246,266 @@ export class MembersService {
       this.logger.error(`Error getting member investor setting: memberUid=${memberUid}`, error);
       throw error;
     }
+  }
+
+  /**
+   * Creates a member (L0) from sign-up data and, if requested,
+   * sets Member.role, creates/links a Team, and assigns a free-text team role.
+   */
+  public async createMemberAndAttach(
+    signUpDto: any,
+    options: {
+      role?: string;
+      team?: { uid?: string; name?: string; website?: string } | string;
+      isTeamNew?: boolean;
+      website?: string | null;
+      requestorEmail?: string;
+      project?: { projectUid?: string } | string;
+    }
+  ): Promise<{ uid: string }> {
+    // create a new member with accessLevel=L0 (existing flow)
+    const member = await this.createMemberFromSignUpData(signUpDto);
+
+    // in one txn — persist Member.role (if provided) and handle team + role
+    await this.prisma.$transaction(async (tx) => {
+      // persist Member.role from request (even if no team is provided)
+      if (options?.role) {
+        await tx.member.update({
+          where: { uid: member.uid },
+          data: { role: options.role.trim() },
+        });
+      }
+
+      // create/resolve team and upsert TeamMemberRole
+      await this.attachTeamAndRoleTx(tx, member.uid, options);
+      await this.attachProjectTx(tx, member.uid, options.project, options.role);
+    });
+
+    return { uid: member.uid };
+  }
+
+  /**
+   * Within a transaction: create OR resolve team and upsert TeamMemberRole (free-text role).
+   * - If no team provided -> nothing to do.
+   * - If isTeamNew -> create Team via TeamsService.createTeam
+   * - Else -> resolve by uid or name
+   * - Finally -> upsert teamMemberRole (memberUid, teamUid)
+   */
+  private async attachTeamAndRoleTx(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    opts: {
+      role?: string;
+      team?: { uid?: string; name?: string; website?: string } | string;
+      isTeamNew?: boolean;
+      website?: string | null;
+      requestorEmail?: string;
+    }
+  ): Promise<void> {
+    this.logger.info(
+      `[attachTeamAndRoleTx] Start. memberUid=${memberUid}, opts=${JSON.stringify(
+        opts
+      )}`
+    );
+
+    const { team, isTeamNew, role } = opts ?? {};
+    if (!team) {
+      this.logger.info(
+        `[attachTeamAndRoleTx] No team provided → exiting without changes`
+      );
+      return;
+    }
+
+    const norm = this.normalizeTeamInput(team);
+
+    // ==================================================
+    // CASE 1: User requests to create a NEW TEAM (isTeamNew = true)
+    // ==================================================
+    if (isTeamNew) {
+      this.logger.info(
+        `[attachTeamAndRoleTx] Creating NEW TEAM request instead of direct team creation`
+      );
+
+      const name =
+        (norm.name && norm.name.trim()) || `team-${memberUid}`; // fallback name
+      const website = (norm.website ?? opts.website) || null;
+
+      if (!opts.requestorEmail) {
+        this.logger.error(
+          `[attachTeamAndRoleTx] Missing requesterEmail → cannot proceed`
+        );
+        throw new BadRequestException(
+          'Requester email is required to create a new team request'
+        );
+      }
+
+      const requesterEmail = opts.requestorEmail.toLowerCase().trim();
+
+      this.logger.info(
+        `[attachTeamAndRoleTx] Validating unique team identifier: ${name}`
+      );
+
+      // Ensure team name is unique across Teams + ParticipantsRequest
+      await this.participantsRequestService.validateUniqueIdentifier(
+        ParticipantType.TEAM,
+        name
+      );
+
+      this.logger.info(
+        `[attachTeamAndRoleTx] Creating ParticipantsRequest: TEAM / PENDING`
+      );
+
+      // Create PENDING Team Request (instead of creating team directly)
+      await this.participantsRequestService.addRequest(
+        {
+          participantType: ParticipantType.TEAM,
+          status: ApprovalStatus.PENDING,
+          requesterEmailId: requesterEmail,
+          uniqueIdentifier: name,
+          newData: {
+            name,
+            website: website || undefined,
+          } as any,
+        } as any,
+        undefined, // requesterUser (undefined → no auto-approval)
+        false,     // disableNotification = false → send notifications
+        tx
+      );
+
+      this.logger.info(
+        `[attachTeamAndRoleTx] NEW TEAM REQUEST created successfully (PENDING). name=${name}`
+      );
+
+      // IMPORTANT:
+      // We DO NOT attach a role, because the team is not created yet.
+      this.logger.info(
+        `[attachTeamAndRoleTx] Exiting — team is pending approval, no TeamMemberRole created`
+      );
+
+      return;
+    }
+
+    // ==================================================
+    // CASE 2: Attach MEMBER to EXISTING TEAM
+    // ==================================================
+    this.logger.info(
+      `[attachTeamAndRoleTx] Attaching member to EXISTING team`
+    );
+
+    let targetTeamUid: string;
+
+    // Try lookup by UID
+    let existing: { uid: string } | null = null;
+    if (norm.uid) {
+      this.logger.info(
+        `[attachTeamAndRoleTx] Searching team by UID=${norm.uid}`
+      );
+      existing = await this.teamService
+        .findTeamByUid(norm.uid)
+        .catch(() => null);
+    }
+
+    if (!existing && norm.name) {
+      this.logger.info(
+        `[attachTeamAndRoleTx] Searching team by NAME=${norm.name}`
+      );
+      existing = await this.teamService
+        .findTeamByName(norm.name)
+        .catch(() => null);
+    }
+
+    if (!existing) {
+      this.logger.error(
+        `[attachTeamAndRoleTx] Team not found by uid or name. norm=${JSON.stringify(
+          norm
+        )}`
+      );
+      throw new NotFoundException('Existing team not found by uid or name');
+    }
+
+    targetTeamUid = existing.uid;
+
+    this.logger.info(
+      `[attachTeamAndRoleTx] Existing team resolved. teamUid=${targetTeamUid}`
+    );
+
+    // Prepare role
+    const finalRole = (role ?? 'member').trim();
+    const roleTags = finalRole
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    this.logger.info(
+      `[attachTeamAndRoleTx] Upserting TeamMemberRole for memberUid=${memberUid}, teamUid=${targetTeamUid}, role=${finalRole}`
+    );
+
+    // Upsert (create or update) role
+    await tx.teamMemberRole.upsert({
+      where: { memberUid_teamUid: { memberUid, teamUid: targetTeamUid } },
+      create: {
+        memberUid,
+        teamUid: targetTeamUid,
+        role: finalRole,
+        roleTags,
+        mainTeam: false,
+        teamLead: false,
+      },
+      update: {
+        role: finalRole,
+        roleTags,
+      },
+    });
+
+    this.logger.info(
+      `[attachTeamAndRoleTx] TeamMemberRole updated successfully for teamUid=${targetTeamUid}`
+    );
+  }
+
+  /** Accepts string (treated as name) or object with { uid|name|website } */
+  private normalizeTeamInput(team: { uid?: string; name?: string; website?: string } | string): {
+    uid?: string;
+    name?: string;
+    website?: string;
+  } {
+    if (typeof team === 'string') {
+      return { name: team.trim() };
+    }
+    return {
+      uid: team.uid?.trim(),
+      name: team.name?.trim(),
+      website: team.website?.trim(),
+    };
+  }
+
+  private async attachProjectTx(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    project?: { projectUid?: string } | string,
+    role?: string
+  ): Promise<void> {
+    if (!project) return;
+
+    const projectUid = typeof project === 'string' ? project.trim() : project.projectUid?.trim();
+
+    if (!projectUid) return;
+
+    const exists = await tx.project.findUnique({
+      where: { uid: projectUid },
+      select: { uid: true },
+    });
+
+    if (!exists) {
+      this.logger.info(`attachProjectTx: project ${projectUid} not found, skipping`);
+      return;
+    }
+
+    await tx.projectContribution.create({
+      data: {
+        memberUid,
+        projectUid,
+        role: role ?? null,
+      },
+    });
   }
 }

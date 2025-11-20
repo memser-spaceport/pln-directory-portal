@@ -1,19 +1,59 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { TEAM } from '../utils/constants';
 
 @Injectable()
 export class MembershipSourcesService {
   constructor(private prisma: PrismaService) {}
 
-  findAll(queryOptions: Prisma.MembershipSourceFindManyArgs) {
-    return this.prisma.membershipSource.findMany(queryOptions);
+  async findAll(query: any) {
+    const { type } = query;
+    return this.prisma.membershipSource.findMany({
+      select: {
+        uid: true,
+        title: true,
+        ...this.buildTeamsFilterByType(type, query),
+      },
+      orderBy: {
+        title: 'asc',
+      },
+    });
   }
 
-  findOne(
-    uid: string,
-    queryOptions: Omit<Prisma.MembershipSourceFindUniqueArgsBase, 'where'> = {}
-  ) {
+  private buildTeamsFilterByType(type: any, query: any): any {
+    if (type === TEAM) {
+      const { plnFriend } = query;
+      const whereClause: any = {
+        accessLevel: {
+          not: 'L0',
+        },
+      };
+
+      // Add plnFriend filter if specified
+      if (plnFriend !== 'true') {
+        whereClause.plnFriend = false;
+      }
+
+      return {
+        teams: {
+          where: whereClause,
+          select: {
+            uid: true,
+            name: true,
+            logo: {
+              select: {
+                url: true,
+              },
+            },
+          },
+        },
+      };
+    }
+    return {};
+  }
+
+  findOne(uid: string, queryOptions: Omit<Prisma.MembershipSourceFindUniqueArgsBase, 'where'> = {}) {
     return this.prisma.membershipSource.findUniqueOrThrow({
       where: { uid },
       ...queryOptions,

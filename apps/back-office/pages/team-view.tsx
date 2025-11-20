@@ -421,45 +421,58 @@ export const getServerSideProps = async (context) => {
       shortDescription: team?.shortDescription ?? '',
       longDescription: team?.longDescription ?? '',
       requestorEmail: requestDetailResponse.data.requesterEmailId ?? '',
-      technologies: team?.technologies?.map((item) => {
-        return { value: item.uid, label: item.title };
-      }),
+
+      technologies:
+        team?.technologies?.map((item) => ({
+          value: item.uid,
+          label: item.title,
+        })) ?? [],
+
       fundingStage: {
-        value: team.fundingStage?.uid,
-        label: team.fundingStage?.title,
+        value: team?.fundingStage?.uid ?? null,
+        label: team?.fundingStage?.title ?? '',
       },
+
       membershipSources:
-        team.membershipSources?.map((item) => {
-          return { value: item.uid, label: item.title };
-        }) ?? [],
-      industryTags: team.industryTags?.map((item) => {
-        return { value: item.uid, label: item.title };
-      }),
-      contactMethod: team.contactMethod ?? '',
-      website: team.website ?? '',
-      linkedinHandler: team.linkedinHandler ?? '',
-      twitterHandler: team.twitterHandler ?? '',
-      telegramHandler: team.telegramHandler ?? '',
-      blog: team.blog ?? '',
-      officeHours: team.officeHours ?? '',
+        team?.membershipSources?.map((item) => ({
+          value: item.uid,
+          label: item.title,
+        })) ?? [],
+
+      industryTags:
+        team?.industryTags?.map((item) => ({
+          value: item.uid,
+          label: item.title,
+        })) ?? [],
+
+      contactMethod: team?.contactMethod ?? '',
+      website: team?.website ?? '',
+      linkedinHandler: team?.linkedinHandler ?? '',
+      twitterHandler: team?.twitterHandler ?? '',
+      telegramHandler: team?.telegramHandler ?? '',
+      blog: team?.blog ?? '',
+      officeHours: team?.officeHours ?? '',
       isFund: Boolean(team?.isFund),
+
       investmentFocus:
         team?.investorProfile?.investmentFocus?.map((item: string) => ({
           value: item,
           label: item,
         })) ?? [],
+
       investInStartupStages:
         team?.investorProfile?.investInStartupStages?.map((item: string) => ({
           value: item,
           label: item,
         })) ?? [],
+
       investInFundTypes:
         team?.investorProfile?.investInFundTypes?.map((item: string) => ({
           value: item,
           label: item,
         })) ?? [],
+
       typicalCheckSize: team?.investorProfile?.typicalCheckSize ?? null,
-      // focusAreas: team?.focusAreas ?? []
     };
     imageUrl = team?.logoUrl ?? '';
 

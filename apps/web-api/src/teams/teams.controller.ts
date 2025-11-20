@@ -1,11 +1,16 @@
 /* eslint-disable prettier/prettier */
-import { Controller, Req, UseGuards, Body, Param, UsePipes, Patch, ForbiddenException } from '@nestjs/common';
+import { Controller, Req, UseGuards, Body, Param, UsePipes, Patch, ForbiddenException, CacheTTL } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer, TsRest } from '@ts-rest/nest';
 import { Request } from 'express';
 import { z } from 'zod';
 import { apiTeam } from 'libs/contracts/src/lib/contract-team';
-import { ResponseTeamWithRelationsSchema, TeamDetailQueryParams, TeamQueryParams, TeamFilterQueryParams } from 'libs/contracts/src/schema';
+import {
+  ResponseTeamWithRelationsSchema,
+  TeamDetailQueryParams,
+  TeamQueryParams,
+  TeamFilterQueryParams,
+} from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
 import { NOT_FOUND_GLOBAL_RESPONSE_SCHEMA } from '../utils/constants';
@@ -20,20 +25,19 @@ import { AccessLevelsGuard } from '../guards/access-levels.guard';
 import { AccessLevels } from '../decorators/access-levels.decorator';
 import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import { MembersService } from '../members/members.service';
-import {UserTokenCheckGuard} from "../guards/user-token-check.guard";
+import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { QueryCache } from '../decorators/query-cache.decorator';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
 @Controller()
 export class TeamsController {
-  constructor(
-    private readonly teamsService: TeamsService,
-    private readonly membersService: MembersService
-  ) {}
+  constructor(private readonly teamsService: TeamsService, private readonly membersService: MembersService) {}
 
   @Api(server.route.teamFilters)
   @ApiQueryFromZod(TeamQueryParams)
-  @NoCache()
+  @QueryCache()
+  @CacheTTL(300)
   @UseGuards(UserTokenCheckGuard)
   async getTeamFilters(@Req() request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
@@ -194,7 +198,8 @@ export class TeamsController {
    */
   @TsRest(server.route.searchTeams)
   @ApiQueryFromZod(TeamFilterQueryParams.optional())
-  @NoCache()
+  @QueryCache()
+  @CacheTTL(60)
   async searchTeams(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof TeamFilterQueryParams>;
     return await this.teamsService.searchTeams(params || {});
