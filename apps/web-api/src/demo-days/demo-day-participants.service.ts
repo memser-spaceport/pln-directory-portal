@@ -550,6 +550,7 @@ export class DemoDayParticipantsService {
                     isFund,
                     accessLevel: 'L0',
                     accessLevelUpdatedAt: new Date(),
+                    tier: -1,
                   },
                 });
                 summary.createdTeams++;
