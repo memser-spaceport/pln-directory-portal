@@ -271,6 +271,7 @@ export class TeamsService {
         ...team,
         accessLevel: team.accessLevel || 'L1',
         accessLevelUpdatedAt: new Date(),
+        tier: -1,
       };
 
       const createdTeam = await tx.team.create({
@@ -1656,8 +1657,10 @@ export class TeamsService {
     const orderBy: Prisma.TeamOrderByWithRelationInput = {};
     if (filters.sort === 'name:desc') {
       orderBy.name = 'desc';
+    } else if (filters.sort === 'name:asc') {
+      orderBy.name = 'asc';
     } else {
-      orderBy.name = 'asc'; // Default to ascending
+      orderBy.tier = 'desc'; // Default to descending tier order
     }
 
     try {
