@@ -1168,10 +1168,13 @@ export class TeamsService {
     const canSee = await this.canSeeTiers(userEmail || undefined);
     const tiers = canSee ? await this.getTierCounts(queryParams.where ?? {}) : undefined;
 
+    // Sort funding stages using universal sorting logic
+    const sortedFundingStages = this.sortFundingStages(fundingStages.map((stage) => stage.title));
+
     return {
       industryTags: industryTags.map((tag) => tag.title),
       membershipSources: membershipSources.map((source) => source.title),
-      fundingStages: fundingStages.map((stage) => stage.title),
+      fundingStages: sortedFundingStages,
       technologies: technologies.map((tech) => tech.title),
       askTags: this.askService.formatAskFilterResponse(askTags),
       ...(canSee ? { tiers } : {}),
@@ -1757,5 +1760,49 @@ export class TeamsService {
     const isDirectoryAdmin = !!member.memberRoles?.some((r) => r?.name === 'DIRECTORYADMIN');
 
     return !!member.isTierViewer || isDirectoryAdmin;
+  }
+
+  /**
+   * Sorts funding stages in the following order:
+   * 1. Pre-seed
+   * 2. Seed
+   * 3. Series A-Z (alphabetically)
+   * 4. Others (alphabetically)
+   *
+   * @param stages - Array of funding stage titles to sort
+   * @returns Sorted array of funding stage titles
+   */
+  private sortFundingStages(stages: string[]): string[] {
+    return stages.sort((a, b) => {
+      const aLower = a.toLowerCase();
+      const bLower = b.toLowerCase();
+
+      // Pre-seed always comes first
+      if (aLower === 'pre-seed') return -1;
+      if (bLower === 'pre-seed') return 1;
+
+      // Seed comes second
+      if (aLower === 'seed') return -1;
+      if (bLower === 'seed') return 1;
+
+      // Extract Series letter (e.g., "Series A" -> "A")
+      const seriesRegex = /^series\s+([a-z])$/i;
+      const aMatch = a.match(seriesRegex);
+      const bMatch = b.match(seriesRegex);
+
+      // Both are Series - sort by letter
+      if (aMatch && bMatch) {
+        return aMatch[1].localeCompare(bMatch[1]);
+      }
+
+      // Only a is Series - a comes before b
+      if (aMatch) return -1;
+
+      // Only b is Series - b comes before a
+      if (bMatch) return 1;
+
+      // Neither is Pre-seed, Seed, or Series - sort alphabetically
+      return a.localeCompare(b);
+    });
   }
 }
