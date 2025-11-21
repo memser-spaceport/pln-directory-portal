@@ -22,7 +22,7 @@ export class DemoDayParticipantsService {
     },
     actorEmail?: string
   ): Promise<DemoDayParticipant> {
-    await this.demoDaysService.getDemoDayByUid(demoDayUid);
+    await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
@@ -264,7 +264,7 @@ export class DemoDayParticipantsService {
       teamId?: string;
     }>;
   }> {
-    await this.demoDaysService.getDemoDayByUid(demoDayUid);
+    await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
@@ -763,7 +763,7 @@ export class DemoDayParticipantsService {
     limit: number;
     totalPages: number;
   }> {
-    await this.demoDaysService.getDemoDayByUid(demoDayUid);
+    await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
 
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -926,7 +926,7 @@ export class DemoDayParticipantsService {
     },
     actorEmail?: string
   ): Promise<DemoDayParticipant> {
-    await this.demoDaysService.getDemoDayByUid(demoDayUid);
+    await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;

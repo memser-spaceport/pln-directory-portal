@@ -6,7 +6,7 @@ import { DemoDay } from '../../screens/demo-days/types/demo-day';
 
 interface QueryParams {
   authToken: string | undefined;
-  uid: string;
+  slugURL: string;
 }
 
 async function fetcher(params: QueryParams): Promise<DemoDay> {
@@ -16,14 +16,14 @@ async function fetcher(params: QueryParams): Promise<DemoDay> {
     },
   };
 
-  const { data } = await api.get<DemoDay>(`${API_ROUTE.ADMIN_DEMO_DAYS}/${params.uid}`, config);
+  const { data } = await api.get<DemoDay>(`${API_ROUTE.ADMIN_DEMO_DAYS}/${params.slugURL}`, config);
   return data;
 }
 
 export function useDemoDayDetails(params: QueryParams) {
   return useQuery({
-    queryKey: [DemoDaysQueryKeys.GET_DEMO_DAY_DETAILS, params.authToken, params.uid],
+    queryKey: [DemoDaysQueryKeys.GET_DEMO_DAY_DETAILS, params.authToken, params.slugURL],
     queryFn: () => fetcher(params),
-    enabled: !!params.authToken && !!params.uid,
+    enabled: !!params.authToken && !!params.slugURL,
   });
 }

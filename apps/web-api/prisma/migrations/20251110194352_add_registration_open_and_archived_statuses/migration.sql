@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "DemoDayStatus" ADD VALUE 'REGISTRATION_OPEN';
+
+-- AlterEnum
+ALTER TYPE "DemoDayStatus" ADD VALUE 'ARCHIVED';
