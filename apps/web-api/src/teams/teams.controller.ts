@@ -198,8 +198,7 @@ export class TeamsController {
    */
   @TsRest(server.route.searchTeams)
   @ApiQueryFromZod(TeamFilterQueryParams.optional())
-  @QueryCache()
-  @CacheTTL(60)
+  @NoCache()
   async searchTeams(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof TeamFilterQueryParams>;
     return await this.teamsService.searchTeams(params || {});
