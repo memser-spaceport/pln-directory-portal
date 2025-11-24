@@ -9,18 +9,23 @@ import { useUpdateDemoDay } from '../../hooks/demo-days/useUpdateDemoDay';
 import { useUpdateParticipant } from '../../hooks/demo-days/useUpdateParticipant';
 import { AddParticipantModal } from '../../components/demo-days/AddParticipantModal';
 import { UploadParticipantsModal } from '../../components/demo-days/UploadParticipantsModal';
+import { ApproveParticipantModal } from '../../components/demo-days/ApproveParticipantModal';
 import { UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
+import { RichText } from '../../components/common/rich-text';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
+import dynamic from 'next/dynamic';
 
 import s from './styles.module.scss';
 
+const RichTextEditor = dynamic(() => import('../../components/common/rich-text-editor'), { ssr: false });
+
 const DemoDayDetailPage = () => {
   const router = useRouter();
-  const { uid } = router.query;
+  const { slugURL } = router.query;
   const [authToken] = useCookie('plnadmin');
-  const [activeTab, setActiveTab] = useState<'investors' | 'founders'>('investors');
+  const [activeTab, setActiveTab] = useState<'investors' | 'founders' | 'applications'>('applications');
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -28,22 +33,28 @@ const DemoDayDetailPage = () => {
   const [editFormData, setEditFormData] = useState<UpdateDemoDayDto>({});
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [selectedParticipantForApproval, setSelectedParticipantForApproval] = useState<{
+    uid: string;
+    name: string;
+    email: string;
+  } | null>(null);
 
   const updateDemoDayMutation = useUpdateDemoDay();
   const updateParticipantMutation = useUpdateParticipant();
 
   const { data: demoDay, isLoading: demoDayLoading } = useDemoDayDetails({
     authToken,
-    uid: uid as string,
+    slugURL: slugURL as string,
   });
 
   const { data: participants, isLoading: participantsLoading } = useDemoDayParticipants({
     authToken,
-    demoDayUid: uid as string,
+    demoDayUid: demoDay?.uid as string,
     query: {
-      type: activeTab === 'investors' ? 'INVESTOR' : 'FOUNDER',
+      type: activeTab === 'applications' ? undefined : (activeTab === 'investors' ? 'INVESTOR' : 'FOUNDER'),
       search: searchTerm || undefined,
-      status: (statusFilter as 'INVITED' | 'ENABLED' | 'DISABLED') || undefined,
+      status: activeTab === 'applications' ? 'PENDING' : ((statusFilter as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED') || undefined),
       page: currentPage,
       limit: 50,
     },
@@ -63,6 +74,8 @@ const DemoDayDetailPage = () => {
     switch (status) {
       case 'ACTIVE':
         return 'text-green-600 bg-green-100';
+      case 'REGISTRATION_OPEN':
+        return 'text-emerald-600 bg-emerald-100';
       case 'EARLY_ACCESS':
         return 'text-orange-600 bg-orange-100';
       case 'PENDING':
@@ -82,6 +95,8 @@ const DemoDayDetailPage = () => {
         return 'text-green-600 bg-green-100';
       case 'INVITED':
         return 'text-blue-600 bg-blue-100';
+      case 'PENDING':
+        return 'text-yellow-600 bg-yellow-100';
       case 'DISABLED':
         return 'text-red-600 bg-red-100';
       default:
@@ -94,7 +109,9 @@ const DemoDayDetailPage = () => {
     setEditFormData({
       title: demoDay.title,
       description: demoDay.description,
+      shortDescription: demoDay.shortDescription,
       startDate: demoDay.startDate,
+      endDate: demoDay.endDate,
       status: demoDay.status,
     });
     setIsEditing(true);
@@ -106,12 +123,12 @@ const DemoDayDetailPage = () => {
   };
 
   const handleSaveDemoDay = async () => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     try {
       await updateDemoDayMutation.mutateAsync({
         authToken,
-        uid: uid as string,
+        uid: demoDay.uid,
         data: editFormData,
       });
       setIsEditing(false);
@@ -122,13 +139,13 @@ const DemoDayDetailPage = () => {
     }
   };
 
-  const handleUpdateParticipantStatus = async (participantUid: string, status: 'INVITED' | 'ENABLED' | 'DISABLED') => {
-    if (!authToken || !uid) return;
+  const handleUpdateParticipantStatus = async (participantUid: string, status: 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED') => {
+    if (!authToken || !demoDay) return;
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { status },
       });
@@ -143,14 +160,14 @@ const DemoDayDetailPage = () => {
     participantName: string,
     newType: 'INVESTOR' | 'FOUNDER'
   ) => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     const newTabName = newType === 'INVESTOR' ? 'Investors' : 'Founders';
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { type: newType },
       });
@@ -162,12 +179,12 @@ const DemoDayDetailPage = () => {
   };
 
   const handleUpdateParticipantEarlyAccess = async (participantUid: string, hasEarlyAccess: boolean) => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { hasEarlyAccess },
       });
@@ -183,12 +200,12 @@ const DemoDayDetailPage = () => {
     teamUid: string,
     teamName: string
   ) => {
-    if (!authToken || !uid) return;
+    if (!authToken || !demoDay) return;
 
     try {
       await updateParticipantMutation.mutateAsync({
         authToken,
-        demoDayUid: uid as string,
+        demoDayUid: demoDay.uid,
         participantUid,
         data: { teamUid: teamUid || undefined },
       });
@@ -204,6 +221,61 @@ const DemoDayDetailPage = () => {
       ...prev,
       [field]: value,
     }));
+  };
+
+  const handleApproveClick = (participant: any) => {
+    setSelectedParticipantForApproval({
+      uid: participant.uid,
+      name: participant.member?.name || participant.name,
+      email: participant.member?.email || participant.email,
+    });
+    setShowApproveModal(true);
+  };
+
+  const handleApprove = async (participantUid: string, type: 'INVESTOR' | 'FOUNDER') => {
+    if (!authToken || !demoDay) return;
+
+    try {
+      // Update both type and status to ENABLED
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: demoDay.uid,
+        participantUid,
+        data: {
+          type,
+          status: 'ENABLED'
+        },
+      });
+      toast.success('Application approved successfully');
+      setShowApproveModal(false);
+      setSelectedParticipantForApproval(null);
+    } catch (error) {
+      console.error('Error approving participant:', error);
+      toast.error('Failed to approve application. Please try again.');
+    }
+  };
+
+  const handleReject = async (participantUid: string, participantName: string) => {
+    if (!authToken || !demoDay) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to reject ${participantName}'s application?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: demoDay.uid,
+        participantUid,
+        data: { status: 'DISABLED' },
+      });
+      toast.success('Application rejected');
+    } catch (error) {
+      console.error('Error rejecting participant:', error);
+      toast.error('Failed to reject application. Please try again.');
+    }
   };
 
   const handleNextPage = () => {
@@ -307,6 +379,19 @@ const DemoDayDetailPage = () => {
                 )}
               </div>
               <div className={s.overviewField}>
+                <label className={s.fieldLabel}>End Date</label>
+                {isEditing ? (
+                  <input
+                    type="datetime-local"
+                    value={editFormData.endDate ? new Date(editFormData.endDate).toISOString().slice(0, 16) : ''}
+                    onChange={(e) => handleEditFormChange('endDate', e.target.value)}
+                    className={s.fieldInput}
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{formatDate(demoDay.endDate)}</div>
+                )}
+              </div>
+              <div className={s.overviewField}>
                 <label className={s.fieldLabel}>Status</label>
                 {isEditing ? (
                   <select
@@ -315,9 +400,11 @@ const DemoDayDetailPage = () => {
                     className={s.fieldInput}
                   >
                     <option value="UPCOMING">Upcoming</option>
+                    <option value="REGISTRATION_OPEN">Registration Open</option>
                     <option value="EARLY_ACCESS">Early Access</option>
                     <option value="ACTIVE">Active</option>
                     <option value="COMPLETED">Completed</option>
+                    <option value="ARCHIVED">Archived</option>
                   </select>
                 ) : (
                   <div className={s.fieldValue}>{demoDay.status}</div>
@@ -337,16 +424,25 @@ const DemoDayDetailPage = () => {
                 )}
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
-                <label className={s.fieldLabel}>Description</label>
+                <label className={s.fieldLabel}>Short Description</label>
                 {isEditing ? (
-                  <textarea
-                    value={editFormData.description || ''}
-                    onChange={(e) => handleEditFormChange('description', e.target.value)}
-                    rows={3}
-                    className={s.fieldTextarea}
+                  <RichTextEditor
+                    value={editFormData.shortDescription || ''}
+                    onChange={(value) => handleEditFormChange('shortDescription', value)}
                   />
                 ) : (
-                  <div className={s.fieldValue}>{demoDay.description}</div>
+                  <RichText text={demoDay.shortDescription || ''} className={s.fieldValue} />
+                )}
+              </div>
+              <div className={clsx(s.overviewField, s.fullWidth)}>
+                <label className={s.fieldLabel}>Description</label>
+                {isEditing ? (
+                  <RichTextEditor
+                    value={editFormData.description || ''}
+                    onChange={(value) => handleEditFormChange('description', value)}
+                  />
+                ) : (
+                  <RichText text={demoDay.description} className={s.fieldValue} />
                 )}
               </div>
             </div>
@@ -373,16 +469,22 @@ const DemoDayDetailPage = () => {
               {/* Tabs */}
               <div className={s.tabs}>
                 <button
+                  className={clsx(s.tab, { [s.active]: activeTab === 'applications' })}
+                  onClick={() => setActiveTab('applications')}
+                >
+                  Applications {participants && activeTab === 'applications' && `(${participants.total})`}
+                </button>
+                <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'investors' })}
                   onClick={() => setActiveTab('investors')}
                 >
-                  Investors
+                  Investors {participants && activeTab === 'investors' && `(${participants.total})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'founders' })}
                   onClick={() => setActiveTab('founders')}
                 >
-                  Founders
+                  Founders {participants && activeTab === 'founders' && `(${participants.total})`}
                 </button>
               </div>
 
@@ -395,16 +497,19 @@ const DemoDayDetailPage = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className={clsx(s.input)}
                 />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className={s.filterSelect}
-                >
-                  <option value="">All Statuses</option>
-                  <option value="INVITED">Invited</option>
-                  <option value="ENABLED">Enabled</option>
-                  <option value="DISABLED">Disabled</option>
-                </select>
+                {activeTab !== 'applications' && (
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className={s.filterSelect}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="INVITED">Invited</option>
+                    <option value="ENABLED">Enabled</option>
+                    <option value="DISABLED">Disabled</option>
+                  </select>
+                )}
               </div>
             </div>
           </div>
@@ -420,7 +525,9 @@ const DemoDayDetailPage = () => {
                 {/* Header */}
                 <div className={clsx(s.tableRow, s.tableHeader)}>
                   <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
-                  <div className={clsx(s.headerCell, s.flexible)}>Team</div>
+                  {activeTab !== 'applications' && (
+                    <div className={clsx(s.headerCell, s.flexible)}>Team</div>
+                  )}
                   {activeTab === 'investors' && (
                     <div className={clsx(s.headerCell, s.fixed)} style={{ width: 200 }}>
                       Investor Type
@@ -436,19 +543,25 @@ const DemoDayDetailPage = () => {
                       Pitch Materials
                     </div>
                   )}
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
-                    Invite Accepted
-                  </div>
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
-                    Type
-                  </div>
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
-                    Status
+                  {activeTab !== 'applications' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                      Invite Accepted
+                    </div>
+                  )}
+                  {activeTab !== 'applications' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                      Type
+                    </div>
+                  )}
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: activeTab === 'applications' ? 200 : 150 }}>
+                    {activeTab === 'applications' ? 'Action' : 'Status'}
                   </div>
                 </div>
 
                 {/* Body */}
-                {participants.participants.map((participant) => (
+                {participants.participants
+                  .filter((participant) => activeTab === 'applications' || participant.status !== 'PENDING')
+                  .map((participant) => (
                   <div key={participant.uid} className={s.tableRow}>
                     <div className={clsx(s.bodyCell, s.first, s.flexible)}>
                       <div className="flex items-center">
@@ -469,8 +582,9 @@ const DemoDayDetailPage = () => {
                         </div>
                       </div>
                     </div>
-                    <div className={clsx(s.bodyCell, s.flexible)}>
-                      {activeTab === 'founders' ? (
+                    {activeTab !== 'applications' && (
+                      <div className={clsx(s.bodyCell, s.flexible)}>
+                        {activeTab === 'founders' ? (
                         (() => {
                           const memberTeams = participant.member?.teamMemberRoles || [];
                           const currentTeamUid = participant.teamUid || '';
@@ -552,7 +666,8 @@ const DemoDayDetailPage = () => {
                           );
                         })()
                       )}
-                    </div>
+                      </div>
+                    )}
                     {activeTab === 'founders' && (
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
                         {(() => {
@@ -657,72 +772,98 @@ const DemoDayDetailPage = () => {
                         </select>
                       </div>
                     )}
-                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                      {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
-                        <svg
-                          className="mx-auto h-5 w-5 text-red-500"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="mx-auto h-5 w-5 text-green-500"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-
-                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                      <select
-                        value={participant.type}
-                        onChange={(e) =>
-                          handleUpdateParticipantType(
-                            participant.uid,
-                            participant.member?.name || participant.name,
-                            e.target.value as 'INVESTOR' | 'FOUNDER'
-                          )
-                        }
-                        disabled={updateParticipantMutation.isPending}
-                        className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
-                          participant.type === 'INVESTOR'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-blue-100 text-blue-800'
-                        } disabled:opacity-50`}
-                      >
-                        <option value="INVESTOR">Investor</option>
-                        <option value="FOUNDER">Founder</option>
-                      </select>
-                    </div>
-
-                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                      <select
-                        value={participant.status}
-                        onChange={(e) =>
-                          handleUpdateParticipantStatus(
-                            participant.uid,
-                            e.target.value as 'INVITED' | 'ENABLED' | 'DISABLED'
-                          )
-                        }
-                        disabled={updateParticipantMutation.isPending}
-                        className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${getParticipantStatusColor(
-                          participant.status
-                        )} disabled:opacity-50`}
-                      >
+                    {activeTab !== 'applications' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
                         {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
-                          <option value="INVITED">Invited</option>
+                          <svg
+                            className="mx-auto h-5 w-5 text-red-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
                         ) : (
-                          ''
+                          <svg
+                            className="mx-auto h-5 w-5 text-green-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
                         )}
-                        <option value="ENABLED">Enabled</option>
-                        <option value="DISABLED">Disabled</option>
-                      </select>
+                      </div>
+                    )}
+
+                    {activeTab !== 'applications' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        <select
+                          value={participant.type}
+                          onChange={(e) =>
+                            handleUpdateParticipantType(
+                              participant.uid,
+                              participant.member?.name || participant.name,
+                              e.target.value as 'INVESTOR' | 'FOUNDER'
+                            )
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                            participant.type === 'INVESTOR'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                          } disabled:opacity-50`}
+                        >
+                          <option value="INVESTOR">Investor</option>
+                          <option value="FOUNDER">Founder</option>
+                        </select>
+                      </div>
+                    )}
+
+                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: activeTab === 'applications' ? 200 : 150 }}>
+                      {activeTab === 'applications' ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleApproveClick(participant)}
+                            disabled={updateParticipantMutation.isPending}
+                            className="flex-1 rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Approve application"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleReject(participant.uid, participant.member?.name || participant.name)}
+                            disabled={updateParticipantMutation.isPending}
+                            className="flex-1 rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Reject application"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          value={participant.status}
+                          onChange={(e) =>
+                            handleUpdateParticipantStatus(
+                              participant.uid,
+                              e.target.value as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED'
+                            )
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${getParticipantStatusColor(
+                            participant.status
+                          )} disabled:opacity-50`}
+                        >
+                          <option value="PENDING">Pending</option>
+                          {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
+                            <option value="INVITED">Invited</option>
+                          ) : (
+                            ''
+                          )}
+                          <option value="ENABLED">Enabled</option>
+                          <option value="DISABLED">Disabled</option>
+                        </select>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -731,12 +872,12 @@ const DemoDayDetailPage = () => {
           </div>
 
           {/* Pagination Controls */}
-          {participants?.totalPages && participants.totalPages > 1 && (
+          {participants?.totalPages > 1 && participants.total > 0 && (
             <div className={s.pagination}>
               <div className={s.paginationInfo}>
                 Showing {(participants.page - 1) * participants.limit + 1} to{' '}
                 {Math.min(participants.page * participants.limit, participants.total)} of {participants.total}{' '}
-                {activeTab === 'investors' ? 'investors' : 'founders'}
+                {activeTab === 'applications' ? 'applications' : activeTab === 'investors' ? 'investors' : 'founders'}
               </div>
               <div className={s.paginationControls}>
                 <button
@@ -765,13 +906,24 @@ const DemoDayDetailPage = () => {
         <AddParticipantModal
           isOpen={showAddParticipantModal}
           onClose={() => setShowAddParticipantModal(false)}
-          demoDayUid={uid as string}
+          demoDayUid={demoDay.uid}
         />
 
         <UploadParticipantsModal
           isOpen={showUploadModal}
           onClose={() => setShowUploadModal(false)}
-          demoDayUid={uid as string}
+          demoDayUid={demoDay.uid}
+        />
+
+        <ApproveParticipantModal
+          isOpen={showApproveModal}
+          onClose={() => {
+            setShowApproveModal(false);
+            setSelectedParticipantForApproval(null);
+          }}
+          participant={selectedParticipantForApproval}
+          onApprove={handleApprove}
+          isLoading={updateParticipantMutation.isPending}
         />
       </div>
     </ApprovalLayout>

@@ -176,6 +176,7 @@
   border-radius: 10px;
   border: 1px solid #ddd;
   padding: 24px;
+  padding-bottom: 40px;
 }
 
 .overviewHeader {
@@ -227,7 +228,8 @@
 .overviewGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  row-gap: 24px;
+  column-gap: 24px;
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
@@ -238,17 +240,29 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 0;
+  overflow: visible;
 
   &.fullWidth {
     grid-column: 1 / -1;
+    isolation: isolate;
   }
 }
 
 .fieldLabel {
+  display: block;
   color: var(--foreground-neutral-secondary, #455468);
   font-size: 14px;
   font-weight: 500;
   line-height: 20px;
+  margin-bottom: 8px;
+  margin-top: 0;
+  min-height: 20px;
+  width: 100%;
+  position: relative;
+  z-index: 2;
 }
 
 .fieldValue {

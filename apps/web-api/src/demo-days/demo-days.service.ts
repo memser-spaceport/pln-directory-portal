@@ -1,32 +1,35 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { DemoDay, DemoDayStatus } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { DemoDay, DemoDayParticipantStatus, DemoDayStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
+import { MembersService } from '../members/members.service';
 
 type ExpressInterestStats = { liked: number; connected: number; invested: number; referral: number; total: number };
 
 @Injectable()
 export class DemoDaysService {
-  constructor(private readonly prisma: PrismaService, private readonly analyticsService: AnalyticsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly analyticsService: AnalyticsService,
+    private readonly membersService: MembersService
+  ) {}
 
-  async getCurrentDemoDay(): Promise<DemoDay | null> {
-    const demoDay = await this.prisma.demoDay.findFirst({
-      where: {
-        status: {
-          in: [DemoDayStatus.UPCOMING, DemoDayStatus.EARLY_ACCESS, DemoDayStatus.ACTIVE, DemoDayStatus.COMPLETED],
-        },
-        isDeleted: false,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  // Public methods
 
-    return demoDay;
-  }
-
-  async getCurrentDemoDayAccess(memberEmail: string | null): Promise<{
+  async getDemoDayAccess(
+    memberEmail: string | null,
+    demoDayUidOrSlug: string
+  ): Promise<{
     access: 'none' | 'INVESTOR' | 'FOUNDER';
-    status: 'NONE' | 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
+    status: 'NONE' | 'UPCOMING' | 'REGISTRATION_OPEN' | 'ACTIVE' | 'COMPLETED';
     uid?: string;
+    slugURL?: string;
     date?: string;
     title?: string;
     description?: string;
@@ -34,9 +37,10 @@ export class DemoDaysService {
     investorsCount?: number;
     isDemoDayAdmin?: boolean;
     isEarlyAccess?: boolean;
+    isPending?: boolean;
     confidentialityAccepted?: boolean;
   }> {
-    const demoDay = await this.getCurrentDemoDay();
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       return {
         access: 'none',
@@ -44,6 +48,7 @@ export class DemoDaysService {
         teamsCount: 0,
         investorsCount: 0,
         confidentialityAccepted: false,
+        isPending: false,
       };
     }
 
@@ -51,6 +56,7 @@ export class DemoDaysService {
     if (!memberEmail) {
       return {
         access: 'none',
+        slugURL: demoDay.slugURL,
         status: this.getExternalDemoDayStatus(demoDay.status),
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
@@ -58,210 +64,26 @@ export class DemoDaysService {
         teamsCount: 0,
         investorsCount: 0,
         confidentialityAccepted: false,
+        isPending: false,
       };
     }
 
     const [investorsCount, teamsCount, member] = await Promise.all([
-      this.prisma.member.count({
-        where: {
-          AND: [
-            {
-              accessLevel: {
-                in: ['L5', 'L6'],
-              },
-            },
-            {
-              OR: [
-                {
-                  investorProfile: {
-                    secRulesAccepted: true,
-                  },
-                },
-                {
-                  investorProfile: {
-                    type: { not: null },
-                  },
-                },
-              ],
-            },
-            // If InvestorProfile.type = 'FUND', member must belong to a team with isFund = true
-            {
-              OR: [
-                // Allow if not FUND type
-                {
-                  investorProfile: {
-                    OR: [{ type: { not: 'FUND' } }, { type: { equals: null } }],
-                  },
-                },
-                // Or if FUND type, require member to be in a team with isFund = true
-                {
-                  AND: [
-                    {
-                      investorProfile: {
-                        type: 'FUND',
-                      },
-                    },
-                    {
-                      teamMemberRoles: {
-                        some: {
-                          investmentTeam: true,
-                          team: {
-                            isFund: true,
-                          },
-                        },
-                      },
-                    },
-                  ],
-                },
-              ],
-            },
-            // If InvestorProfile.type = 'ANGEL', at least one field must be filled
-            {
-              OR: [
-                // Allow if not ANGEL type
-                {
-                  investorProfile: {
-                    OR: [{ type: { not: 'ANGEL' } }, { type: { equals: null } }],
-                  },
-                },
-                // Or if ANGEL type, at least one field must be filled
-                {
-                  AND: [
-                    {
-                      investorProfile: {
-                        type: 'ANGEL',
-                      },
-                    },
-                    {
-                      investorProfile: {
-                        OR: [
-                          {
-                            investInStartupStages: { isEmpty: false },
-                          },
-                          {
-                            typicalCheckSize: { not: null, gt: 0 },
-                          },
-                          {
-                            investmentFocus: { isEmpty: false },
-                          },
-                        ],
-                      },
-                    },
-                  ],
-                },
-              ],
-            },
-            // If InvestorProfile.type = 'ANGEL_AND_FUND', must satisfy at least one of FUND or ANGEL requirements
-            {
-              OR: [
-                // Allow if not ANGEL_AND_FUND type
-                {
-                  investorProfile: {
-                    OR: [{ type: { not: 'ANGEL_AND_FUND' } }, { type: { equals: null } }],
-                  },
-                },
-                // Or if ANGEL_AND_FUND type, must satisfy at least one requirement
-                {
-                  AND: [
-                    {
-                      investorProfile: {
-                        type: 'ANGEL_AND_FUND',
-                      },
-                    },
-                    {
-                      OR: [
-                        // FUND requirement: member must be in a team with isFund = true and investmentTeam = true
-                        {
-                          teamMemberRoles: {
-                            some: {
-                              investmentTeam: true,
-                              team: {
-                                isFund: true,
-                              },
-                            },
-                          },
-                        },
-                        // ANGEL requirement: at least one field must be filled
-                        {
-                          investorProfile: {
-                            OR: [
-                              {
-                                investInStartupStages: { isEmpty: false },
-                              },
-                              {
-                                typicalCheckSize: { not: null, gt: 0 },
-                              },
-                              {
-                                investmentFocus: { isEmpty: false },
-                              },
-                            ],
-                          },
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      }),
-      this.prisma.teamFundraisingProfile.count({
-        where: {
-          demoDayUid: demoDay.uid,
-          status: 'PUBLISHED',
-          onePagerUploadUid: { not: null },
-          videoUploadUid: { not: null },
-          team: {
-            demoDayParticipants: {
-              some: {
-                demoDayUid: demoDay.uid,
-                isDeleted: false,
-                status: 'ENABLED',
-                type: 'FOUNDER',
-              },
-            },
-          },
-        },
-      }),
-      this.prisma.member.findUnique({
-        where: { email: memberEmail },
-        select: {
-          uid: true,
-          accessLevel: true,
-          memberRoles: {
-            select: {
-              name: true,
-            },
-          },
-          demoDayParticipants: {
-            where: {
-              demoDayUid: demoDay.uid,
-              isDeleted: false,
-            },
-            select: {
-              uid: true,
-              status: true,
-              type: true,
-              isDemoDayAdmin: true,
-              hasEarlyAccess: true,
-              confidentialityAccepted: true,
-            },
-          },
-        },
-      }),
+      this.getQualifiedInvestorsCount(),
+      this.getTeamsCountForDemoDay(demoDay.uid),
+      this.getMemberWithDemoDayParticipants(memberEmail, demoDay.uid),
     ]);
 
-    if (!member || ['L0', 'L1', 'Rejected'].includes(member?.accessLevel ?? '')) {
+    if (!member || ['Rejected'].includes(member?.accessLevel ?? '')) {
       return {
         access: 'none',
         status: this.getExternalDemoDayStatus(demoDay.status),
+        isPending: false,
       };
     }
 
     // Check if member is directory admin
-    const roleNames = member.memberRoles.map((role) => role.name);
-    const isDirectoryAdmin = roleNames.includes('DIRECTORYADMIN');
+    const isDirectoryAdmin = this.isDirectoryAdmin(member);
 
     // Check demo day participant
     const participant = member.demoDayParticipants[0];
@@ -275,6 +97,7 @@ export class DemoDaysService {
         teamsCount,
         investorsCount,
         confidentialityAccepted: participant.confidentialityAccepted,
+        isPending: participant.status === DemoDayParticipantStatus.PENDING,
       };
     }
 
@@ -293,6 +116,7 @@ export class DemoDaysService {
       return {
         access,
         uid: demoDay.uid,
+        slugURL: demoDay.slugURL,
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
@@ -305,6 +129,7 @@ export class DemoDaysService {
         confidentialityAccepted: participant.confidentialityAccepted,
         teamsCount,
         investorsCount,
+        isPending: false,
       };
     }
 
@@ -317,6 +142,7 @@ export class DemoDaysService {
       teamsCount,
       investorsCount,
       confidentialityAccepted: false,
+      isPending: false,
     };
   }
 
@@ -325,8 +151,11 @@ export class DemoDaysService {
   async createDemoDay(
     data: {
       startDate: Date;
+      endDate: Date;
       title: string;
+      slugURL: string;
       description: string;
+      shortDescription?: string | null;
       status: DemoDayStatus;
     },
     actorEmail?: string
@@ -338,12 +167,24 @@ export class DemoDaysService {
       actorUid = actor?.uid;
     }
 
+    // Check if slug already exists
+    const slugURL = data.slugURL;
+    const existingDemoDay = await this.prisma.demoDay.findFirst({ where: { slugURL, isDeleted: false } });
+    if (existingDemoDay) {
+      throw new ConflictException(
+        `A demo day with slug "${slugURL}" already exists. Please choose a different title or slug.`
+      );
+    }
+
     const created = await this.prisma.demoDay.create({
       data: {
         startDate: data.startDate,
+        endDate: data.endDate,
         title: data.title,
         description: data.description,
+        shortDescription: data.shortDescription,
         status: data.status,
+        slugURL,
       },
     });
 
@@ -355,7 +196,9 @@ export class DemoDaysService {
         demoDayUid: created.uid,
         title: created.title,
         description: created.description,
+        shortDescription: created.shortDescription,
         startDate: created.startDate?.toISOString?.() || null,
+        endDate: created.endDate?.toISOString?.() || null,
         status: created.status,
         actorUid: actorUid || null,
         actorEmail: actorEmail || null,
@@ -371,9 +214,12 @@ export class DemoDaysService {
       select: {
         id: true,
         uid: true,
+        slugURL: true,
         startDate: true,
+        endDate: true,
         title: true,
         description: true,
+        shortDescription: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -384,15 +230,106 @@ export class DemoDaysService {
     });
   }
 
-  async getDemoDayByUid(uid: string): Promise<DemoDay> {
+  async getAllDemoDaysPublic(memberEmail?: string | null) {
+    // Get all demo days and member info in parallel
+    const [demoDays, member, investorsCount] = await Promise.all([
+      this.prisma.demoDay.findMany({
+        where: { isDeleted: false },
+        orderBy: { createdAt: 'desc' },
+      }),
+      memberEmail ? this.getMemberWithDemoDayParticipants(memberEmail) : Promise.resolve(null),
+      this.getQualifiedInvestorsCount(),
+    ]);
+
+    const isDirectoryAdmin = member ? this.isDirectoryAdmin(member) : false;
+
+    // For each demo day, get counts and determine access
+    return await Promise.all(
+      demoDays
+        .sort((a, b) => {
+          // If one is COMPLETED and one is not, COMPLETED goes last
+          const aCompleted = a.status === DemoDayStatus.COMPLETED;
+          const bCompleted = b.status === DemoDayStatus.COMPLETED;
+          if (aCompleted && !bCompleted) return 1;
+          if (!aCompleted && bCompleted) return -1;
+          // Otherwise, sort by startDate ascending (soonest first)
+          const aDate = a.startDate instanceof Date ? a.startDate.getTime() : new Date(a.startDate).getTime();
+          const bDate = b.startDate instanceof Date ? b.startDate.getTime() : new Date(b.startDate).getTime();
+          return aDate - bDate;
+        })
+        .map(async (demoDay) => {
+          const teamsCount = await this.getTeamsCountForDemoDay(demoDay.uid);
+
+          // Determine access for this demo day
+          let access: 'none' | 'INVESTOR' | 'FOUNDER' = 'none';
+          let isDemoDayAdmin = false;
+          let isEarlyAccess = false;
+          let isPending = false;
+          let confidentialityAccepted = false;
+
+          if (member && !['L0', 'L1', 'Rejected'].includes(member.accessLevel ?? '')) {
+            const participant = member.demoDayParticipants.find(
+              (p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid
+            );
+
+            if (participant && participant.status === 'ENABLED') {
+              access = participant.type === 'INVESTOR' ? 'INVESTOR' : 'FOUNDER';
+              isDemoDayAdmin = participant.isDemoDayAdmin || isDirectoryAdmin;
+              isEarlyAccess = demoDay.status === DemoDayStatus.EARLY_ACCESS;
+              confidentialityAccepted = participant.confidentialityAccepted;
+            }
+
+            isPending = participant?.status === DemoDayParticipantStatus.PENDING;
+          }
+
+          // Return different data based on access level (similar to getDemoDayAccess)
+          const baseResponse = {
+            slugURL: demoDay.slugURL,
+            date: demoDay.startDate.toISOString(),
+            title: demoDay.title,
+            description: demoDay.description,
+            access,
+            status: this.getExternalDemoDayStatus(
+              demoDay.status,
+              access === 'FOUNDER' ||
+                (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
+                  ?.hasEarlyAccess ??
+                  false)
+            ),
+            teamsCount: access !== 'none' ? teamsCount : 0,
+            investorsCount: access !== 'none' ? investorsCount : 0,
+            confidentialityAccepted,
+          };
+
+          // Only include these fields for authorized users
+          if (access !== 'none') {
+            return {
+              ...baseResponse,
+              uid: demoDay.uid,
+              shortDescription: demoDay.shortDescription,
+              isDemoDayAdmin,
+              isEarlyAccess,
+              isPending,
+            };
+          }
+
+          return baseResponse;
+        })
+    );
+  }
+
+  async getDemoDayByUidOrSlug(uidOrSlug: string): Promise<DemoDay> {
     const demoDay = await this.prisma.demoDay.findFirst({
-      where: { uid, isDeleted: false },
+      where: { OR: [{ uid: uidOrSlug }, { slugURL: uidOrSlug }], isDeleted: false },
       select: {
         id: true,
         uid: true,
+        slugURL: true,
         startDate: true,
+        endDate: true,
         title: true,
         description: true,
+        shortDescription: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -402,7 +339,34 @@ export class DemoDaysService {
     });
 
     if (!demoDay) {
-      throw new NotFoundException(`Demo day with uid ${uid} not found`);
+      throw new NotFoundException(`Demo day with uid or slug ${uidOrSlug} not found`);
+    }
+
+    return demoDay;
+  }
+
+  async getDemoDayBySlugURL(slugURL: string): Promise<DemoDay> {
+    const demoDay = await this.prisma.demoDay.findFirst({
+      where: { slugURL, isDeleted: false },
+      select: {
+        id: true,
+        uid: true,
+        slugURL: true,
+        startDate: true,
+        endDate: true,
+        title: true,
+        description: true,
+        shortDescription: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        isDeleted: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!demoDay) {
+      throw new NotFoundException(`Demo day with slug ${slugURL} not found`);
     }
 
     return demoDay;
@@ -412,14 +376,16 @@ export class DemoDaysService {
     uid: string,
     data: {
       startDate?: Date;
+      endDate?: Date;
       title?: string;
       description?: string;
+      shortDescription?: string | null;
       status?: DemoDayStatus;
     },
     actorEmail?: string
   ): Promise<DemoDay> {
     // First check if demo day exists
-    const before = await this.getDemoDayByUid(uid);
+    const before = await this.getDemoDayByUidOrSlug(uid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
@@ -433,11 +399,17 @@ export class DemoDaysService {
     if (data.startDate !== undefined) {
       updateData.startDate = data.startDate;
     }
+    if (data.endDate !== undefined) {
+      updateData.endDate = data.endDate;
+    }
     if (data.title !== undefined) {
       updateData.title = data.title;
     }
     if (data.description !== undefined) {
       updateData.description = data.description;
+    }
+    if (data.shortDescription !== undefined) {
+      updateData.shortDescription = data.shortDescription;
     }
     if (data.status !== undefined) {
       updateData.status = data.status;
@@ -449,9 +421,12 @@ export class DemoDaysService {
       select: {
         id: true,
         uid: true,
+        slugURL: true,
         startDate: true,
+        endDate: true,
         title: true,
         description: true,
+        shortDescription: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -460,13 +435,15 @@ export class DemoDaysService {
       },
     });
 
-    // Track "details updated" (name/description/startDate) only if any changed
+    // Track "details updated" (name/description/startDate/endDate) only if any changed
     const detailsChanged: string[] = [];
     if (updateData.title !== undefined && before.title !== updated.title) detailsChanged.push('title');
     if (updateData.description !== undefined && before.description !== updated.description)
       detailsChanged.push('description');
     if (updateData.startDate !== undefined && before.startDate?.toISOString?.() !== updated.startDate?.toISOString?.())
       detailsChanged.push('startDate');
+    if (updateData.endDate !== undefined && before.endDate?.toISOString?.() !== updated.endDate?.toISOString?.())
+      detailsChanged.push('endDate');
 
     if (detailsChanged.length > 0) {
       await this.analyticsService.trackEvent({
@@ -505,7 +482,11 @@ export class DemoDaysService {
   private getExternalDemoDayStatus(
     demoDayStatus: DemoDayStatus,
     hasEarlyAccess = false
-  ): 'UPCOMING' | 'ACTIVE' | 'COMPLETED' {
+  ): 'UPCOMING' | 'REGISTRATION_OPEN' | 'ACTIVE' | 'COMPLETED' {
+    if (demoDayStatus === DemoDayStatus.REGISTRATION_OPEN) {
+      return 'REGISTRATION_OPEN';
+    }
+
     // Never return EARLY_ACCESS to frontend - if hasEarlyAccess is true, return ACTIVE, otherwise return UPCOMING
     if (demoDayStatus === DemoDayStatus.EARLY_ACCESS) {
       if (hasEarlyAccess) {
@@ -518,9 +499,11 @@ export class DemoDaysService {
     return demoDayStatus.toUpperCase() as 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
   }
 
-  async getCurrentExpressInterestStats(isPrepDemoDay: boolean): Promise<ExpressInterestStats> {
-    const demoDay = await this.getCurrentDemoDay();
-    if (!demoDay) return { liked: 0, connected: 0, invested: 0, referral: 0, total: 0 };
+  async getCurrentExpressInterestStats(
+    isPrepDemoDay: boolean,
+    demoDayUidOrSlug: string
+  ): Promise<ExpressInterestStats> {
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     const agg = await this.prisma.demoDayExpressInterestStatistic.aggregate({
       where: {
@@ -544,11 +527,12 @@ export class DemoDaysService {
     return { liked, connected, invested, referral, total };
   }
 
-  async updateConfidentialityAcceptance(memberEmail: string, accepted: boolean): Promise<{ success: boolean }> {
-    const demoDay = await this.getCurrentDemoDay();
-    if (!demoDay) {
-      throw new NotFoundException('No current demo day found');
-    }
+  async updateConfidentialityAcceptance(
+    memberEmail: string,
+    accepted: boolean,
+    demoDayUidOrSlug: string
+  ): Promise<{ success: boolean }> {
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     const member = await this.prisma.member.findUnique({
       where: { email: memberEmail },
@@ -578,11 +562,8 @@ export class DemoDaysService {
     return { success: true };
   }
 
-  async getTeamAnalytics(teamUid: string) {
-    const demoDay = await this.getCurrentDemoDay();
-    if (!demoDay) {
-      throw new NotFoundException('No active demo day found');
-    }
+  async getTeamAnalytics(teamUid: string, demoDayUidOrSlug: string) {
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     // Find the fundraising profile for this team
     const fundraisingProfile = await this.prisma.teamFundraisingProfile.findUnique({
@@ -741,12 +722,10 @@ export class DemoDaysService {
       improvementComments?: string | null;
       comment?: string | null;
       issues: string[];
-    }
+    },
+    demoDayUidOrSlug: string
   ) {
-    const demoDay = await this.getCurrentDemoDay();
-    if (!demoDay) {
-      throw new NotFoundException('No current demo day found');
-    }
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     const member = await this.prisma.member.findUnique({
       where: { email: memberEmail },
@@ -789,5 +768,449 @@ export class DemoDaysService {
     });
 
     return feedback;
+  }
+
+  async submitInvestorApplication(
+    applicationData: {
+      email: string;
+      name: string;
+      linkedinProfile?: string;
+      role?: string;
+      organisationFundName?: string;
+      isAccreditedInvestor?: boolean;
+    },
+    demoDayUidOrSlug: string
+  ) {
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+
+    // Check if demo day is accepting applications (REGISTRATION_OPEN status)
+    if (demoDay.status !== DemoDayStatus.REGISTRATION_OPEN && demoDay.status !== DemoDayStatus.EARLY_ACCESS) {
+      throw new BadRequestException('Demo day is not currently accepting applications');
+    }
+
+    const normalizedEmail = applicationData.email.toLowerCase().trim();
+
+    // Check if a member already exists
+    let member = await this.prisma.member.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        uid: true,
+        email: true,
+        accessLevel: true,
+        investorProfile: true,
+        demoDayParticipants: {
+          where: {
+            demoDayUid: demoDay.uid,
+            isDeleted: false,
+          },
+        },
+      },
+    });
+
+    let isNewMember = false;
+
+    // If a member doesn't exist, create a new one with L0 access level
+    if (!member) {
+      isNewMember = true;
+      member = await this.prisma.member.create({
+        data: {
+          email: normalizedEmail,
+          name: applicationData.name,
+          accessLevel: 'L0',
+          signUpSource: `demoday-${demoDay.slugURL}`,
+          linkedinHandler: applicationData.linkedinProfile,
+        },
+        select: {
+          uid: true,
+          email: true,
+          accessLevel: true,
+          investorProfile: true,
+          demoDayParticipants: {
+            where: {
+              demoDayUid: demoDay.uid,
+              isDeleted: false,
+            },
+          },
+        },
+      });
+
+      // If an organisationFundName is provided, match it to a Team and create TeamMemberRole
+      if (applicationData.organisationFundName) {
+        const team = await this.prisma.team.findFirst({
+          where: {
+            name: {
+              equals: applicationData.organisationFundName,
+              mode: 'insensitive',
+            },
+          },
+          select: {
+            uid: true,
+          },
+        });
+
+        if (team) {
+          // Check if TeamMemberRole already exists for this member-team combination
+          const existingRole = await this.prisma.teamMemberRole.findUnique({
+            where: {
+              memberUid_teamUid: {
+                memberUid: member.uid,
+                teamUid: team.uid,
+              },
+            },
+          });
+
+          // Only create if it doesn't exist
+          if (!existingRole) {
+            await this.prisma.teamMemberRole.create({
+              data: {
+                memberUid: member.uid,
+                teamUid: team.uid,
+                role: applicationData.role,
+                investmentTeam: true,
+              },
+            });
+          }
+        }
+      }
+    }
+
+    // Create or update investor profile
+    if (!member.investorProfile) {
+      const investorProfile = await this.prisma.investorProfile.create({
+        data: {
+          memberUid: member.uid,
+          investmentFocus: [], // Will be filled in later by the investor
+          secRulesAccepted: applicationData.isAccreditedInvestor ?? false,
+          secRulesAcceptedAt: applicationData.isAccreditedInvestor ? new Date() : null,
+        },
+      });
+
+      // Link investor profile to member
+      await this.prisma.member.update({
+        where: { uid: member.uid },
+        data: { investorProfileId: investorProfile.uid },
+      });
+    } else if (applicationData.isAccreditedInvestor && !member.investorProfile.secRulesAccepted) {
+      // Update existing profile if user accepted accredited investor terms
+      await this.prisma.investorProfile.update({
+        where: { uid: member.investorProfile.uid },
+        data: {
+          secRulesAccepted: true,
+          secRulesAcceptedAt: new Date(),
+        },
+      });
+    }
+
+    // Check if already a participant for this demo day
+    if (member.demoDayParticipants && member.demoDayParticipants.length > 0) {
+      throw new BadRequestException('You have already submitted an application for this demo day');
+    }
+
+    // Create a demo day participant with PENDING status
+    const participant = await this.prisma.demoDayParticipant.create({
+      data: {
+        demoDayUid: demoDay.uid,
+        memberUid: member.uid,
+        type: 'INVESTOR',
+        status: 'PENDING', // Pending approval from admin
+      },
+    });
+
+    // Track analytics event
+    await this.analyticsService.trackEvent({
+      name: 'demo-day-investor-application-submitted',
+      distinctId: member.uid,
+      properties: {
+        demoDayUid: demoDay.uid,
+        participantUid: participant.uid,
+        email: normalizedEmail,
+        name: applicationData.name,
+        role: applicationData.role,
+        organisationFundName: applicationData.organisationFundName,
+        linkedinProfile: applicationData.linkedinProfile,
+        isAccreditedInvestor: applicationData.isAccreditedInvestor ?? false,
+        isNewMember,
+      },
+    });
+
+    return {
+      participantUid: participant.uid,
+      isNewMember: isNewMember,
+    };
+  }
+
+  /**
+   * Check if a member has access to a specific demo day and determine their access level
+   * @param memberEmail - Email of the member to check
+   * @param demoDayUid - UID of the demo day
+   * @returns Participant UID and admin status
+   * @throws ForbiddenException if the member has no access
+   */
+  async checkDemoDayAccess(
+    memberEmail: string,
+    demoDayUid: string
+  ): Promise<{ participantUid: string; isAdmin: boolean }> {
+    const member = await this.membersService.findMemberByEmail(memberEmail);
+
+    if (!member) {
+      throw new ForbiddenException('No demo day access');
+    }
+
+    // Check if a user is a directory admin
+    const isDirectoryAdmin = this.membersService.checkIfAdminUser(member);
+    if (isDirectoryAdmin) {
+      return { participantUid: member.uid, isAdmin: true };
+    }
+
+    // Check if a user is a demo day admin or founder with admin privileges
+    const hasViewOnlyAdminAccess = await this.isDemoDayAdmin(member.uid, demoDayUid);
+    if (hasViewOnlyAdminAccess) {
+      return { participantUid: member.uid, isAdmin: true };
+    }
+
+    // Check if a user is a participant
+    const participantAccess = await this.prisma.member.findUnique({
+      where: { uid: member.uid },
+      select: {
+        demoDayParticipants: {
+          where: {
+            demoDayUid: demoDayUid,
+            isDeleted: false,
+            status: 'ENABLED',
+          },
+          select: { uid: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (participantAccess && participantAccess.demoDayParticipants.length > 0) {
+      return { participantUid: member.uid, isAdmin: false };
+    }
+
+    // No access
+    throw new ForbiddenException('No demo day access');
+  }
+
+  // Private helper methods
+
+  private async getQualifiedInvestorsCount(): Promise<number> {
+    return this.prisma.member.count({
+      where: {
+        AND: [
+          {
+            accessLevel: {
+              in: ['L5', 'L6'],
+            },
+          },
+          {
+            OR: [
+              {
+                investorProfile: {
+                  secRulesAccepted: true,
+                },
+              },
+              {
+                investorProfile: {
+                  type: { not: null },
+                },
+              },
+            ],
+          },
+          {
+            OR: [
+              {
+                investorProfile: {
+                  OR: [{ type: { not: 'FUND' } }, { type: { equals: null } }],
+                },
+              },
+              {
+                AND: [
+                  {
+                    investorProfile: {
+                      type: 'FUND',
+                    },
+                  },
+                  {
+                    teamMemberRoles: {
+                      some: {
+                        investmentTeam: true,
+                        team: {
+                          isFund: true,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            OR: [
+              {
+                investorProfile: {
+                  OR: [{ type: { not: 'ANGEL' } }, { type: { equals: null } }],
+                },
+              },
+              {
+                AND: [
+                  {
+                    investorProfile: {
+                      type: 'ANGEL',
+                    },
+                  },
+                  {
+                    investorProfile: {
+                      OR: [
+                        {
+                          investInStartupStages: { isEmpty: false },
+                        },
+                        {
+                          typicalCheckSize: { not: null, gt: 0 },
+                        },
+                        {
+                          investmentFocus: { isEmpty: false },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            OR: [
+              {
+                investorProfile: {
+                  OR: [{ type: { not: 'ANGEL_AND_FUND' } }, { type: { equals: null } }],
+                },
+              },
+              {
+                AND: [
+                  {
+                    investorProfile: {
+                      type: 'ANGEL_AND_FUND',
+                    },
+                  },
+                  {
+                    OR: [
+                      {
+                        teamMemberRoles: {
+                          some: {
+                            investmentTeam: true,
+                            team: {
+                              isFund: true,
+                            },
+                          },
+                        },
+                      },
+                      {
+                        investorProfile: {
+                          OR: [
+                            {
+                              investInStartupStages: { isEmpty: false },
+                            },
+                            {
+                              typicalCheckSize: { not: null, gt: 0 },
+                            },
+                            {
+                              investmentFocus: { isEmpty: false },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+  }
+
+  private async getTeamsCountForDemoDay(demoDayUid: string): Promise<number> {
+    return this.prisma.teamFundraisingProfile.count({
+      where: {
+        demoDayUid,
+        status: 'PUBLISHED',
+        onePagerUploadUid: { not: null },
+        videoUploadUid: { not: null },
+        team: {
+          demoDayParticipants: {
+            some: {
+              demoDayUid,
+              isDeleted: false,
+              status: 'ENABLED',
+              type: 'FOUNDER',
+            },
+          },
+        },
+      },
+    });
+  }
+
+  private async getMemberWithDemoDayParticipants(memberEmail: string, demoDayUid?: string) {
+    return this.prisma.member.findUnique({
+      where: { email: memberEmail },
+      select: {
+        uid: true,
+        accessLevel: true,
+        memberRoles: {
+          select: {
+            name: true,
+          },
+        },
+        demoDayParticipants: {
+          where: demoDayUid
+            ? {
+                demoDayUid,
+                isDeleted: false,
+              }
+            : {
+                isDeleted: false,
+              },
+          select: {
+            uid: true,
+            demoDayUid: true,
+            status: true,
+            type: true,
+            isDemoDayAdmin: true,
+            hasEarlyAccess: true,
+            confidentialityAccepted: true,
+          },
+        },
+      },
+    });
+  }
+
+  private isDirectoryAdmin(member: { memberRoles: Array<{ name: string }> }): boolean {
+    const roleNames = member.memberRoles.map((role) => role.name);
+    return roleNames.includes('DIRECTORYADMIN');
+  }
+
+  /**
+   * Check if a member has admin access to a demo day
+   * @param memberUid - UID of the member
+   * @param demoDayUid - UID of the demo day
+   * @returns True if the member has admin access
+   */
+  private async isDemoDayAdmin(memberUid: string, demoDayUid: string): Promise<boolean> {
+    const participant = await this.prisma.demoDayParticipant.findFirst({
+      where: {
+        demoDayUid: demoDayUid,
+        memberUid: memberUid,
+        status: 'ENABLED',
+        isDeleted: false,
+      },
+    });
+
+    return participant?.isDemoDayAdmin || false;
   }
 }

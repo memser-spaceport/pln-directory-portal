@@ -37,8 +37,11 @@ export class AdminDemoDaysController {
     return this.demoDaysService.createDemoDay(
       {
         startDate: new Date(body.startDate),
+        endDate: new Date(body.endDate),
         title: body.title,
+        slugURL: body.slugURL,
         description: body.description,
+        shortDescription: body.shortDescription,
         status: body.status.toUpperCase() as DemoDayStatus,
       },
       req.userEmail
@@ -51,10 +54,12 @@ export class AdminDemoDaysController {
     return this.demoDaysService.getAllDemoDays();
   }
 
-  @Get(':uid')
+  // This endpoint uses slugURL for browser-friendly URLs (e.g., /demo-days/crypto-day)
+  @Get(':slugURL')
+  @UsePipes(ZodValidationPipe)
   @NoCache()
-  async getDemoDayDetails(@Param('uid') uid: string): Promise<ResponseDemoDayDto> {
-    return this.demoDaysService.getDemoDayByUid(uid);
+  async getDemoDayDetails(@Param('slugURL') slugURL: string): Promise<ResponseDemoDayDto> {
+    return this.demoDaysService.getDemoDayBySlugURL(slugURL);
   }
 
   @Patch(':uid')
@@ -69,8 +74,10 @@ export class AdminDemoDaysController {
       uid,
       {
         startDate: body.startDate ? new Date(body.startDate) : undefined,
+        endDate: body.endDate ? new Date(body.endDate) : undefined,
         title: body.title,
         description: body.description,
+        shortDescription: body.shortDescription,
         status: body.status?.toUpperCase() as DemoDayStatus,
       },
       req.userEmail
