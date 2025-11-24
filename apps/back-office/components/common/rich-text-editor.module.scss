@@ -4,9 +4,14 @@
   gap: 4px;
   width: 100%;
   border-radius: 8px;
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  contain: layout;
 
   &:focus-within {
     box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12) !important;
+    z-index: 3;
 
     :global(.ql-toolbar) {
       border-color: #5e718d;
@@ -37,6 +42,10 @@
 }
 
 .editor {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+
   :global(.ql-toolbar) {
     border-color: rgba(203, 213, 225, 0.5);
     border-radius: 8px 8px 0 0;
@@ -47,12 +56,20 @@
     border-color: rgba(203, 213, 225, 0.5);
     border-radius: 0 0 8px 8px;
     background-color: white;
+    display: flex;
+    flex-direction: column;
+    height: 150px;
   }
 
   :global(.ql-editor) {
+    min-height: 100px;
+    max-height: 150px;
+    height: 100%;
     font-size: 16px;
     overflow-wrap: break-word;
     word-break: break-word;
+    overflow-y: auto;
+    flex: 1;
 
     h1 {
       font-size: 22px;
