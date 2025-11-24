@@ -34,7 +34,6 @@
   font-style: normal;
   font-weight: 500;
   line-height: 20px;
-  margin-top: 2px;
 }
 
 .editor {
@@ -51,7 +50,6 @@
   }
 
   :global(.ql-editor) {
-    min-height: 100px;
     font-size: 16px;
     overflow-wrap: break-word;
     word-break: break-word;

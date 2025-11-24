@@ -176,6 +176,7 @@
   border-radius: 10px;
   border: 1px solid #ddd;
   padding: 24px;
+  padding-bottom: 70px;
 }
 
 .overviewHeader {
@@ -227,7 +228,7 @@
 .overviewGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 48px;
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
@@ -241,14 +242,19 @@
 
   &.fullWidth {
     grid-column: 1 / -1;
+    & + .fullWidth {
+      margin-top: 16px;
+    }
   }
 }
 
 .fieldLabel {
+  display: block;
   color: var(--foreground-neutral-secondary, #455468);
   font-size: 14px;
   font-weight: 500;
   line-height: 20px;
+  margin-bottom: 8px;
 }
 
 .fieldValue {
