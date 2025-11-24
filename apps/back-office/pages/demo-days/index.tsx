@@ -19,6 +19,14 @@ const DemoDaysPage = () => {
     });
   };
 
+  const stripHtml = (html: string) => {
+    if (!html) return '';
+    // Remove HTML tags and decode HTML entities
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ACTIVE':
@@ -82,7 +90,9 @@ const DemoDaysPage = () => {
                   <tr key={demoDay.uid} className="cursor-pointer hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">{demoDay.title}</div>
-                      <div className="line-clamp-2 max-w-md text-sm text-gray-500">{demoDay.description}</div>
+                      <div className="line-clamp-2 max-w-md text-sm text-gray-500">
+                        {stripHtml(demoDay.shortDescription || demoDay.description)}
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <div className="text-sm text-gray-900">{formatDate(demoDay.startDate)}</div>
