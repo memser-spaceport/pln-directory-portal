@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DemoDay, DemoDayStatus } from '@prisma/client';
+import { DemoDay, DemoDayParticipantStatus, DemoDayStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
@@ -37,6 +37,7 @@ export class DemoDaysService {
     investorsCount?: number;
     isDemoDayAdmin?: boolean;
     isEarlyAccess?: boolean;
+    isPending?: boolean;
     confidentialityAccepted?: boolean;
   }> {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
@@ -47,6 +48,7 @@ export class DemoDaysService {
         teamsCount: 0,
         investorsCount: 0,
         confidentialityAccepted: false,
+        isPending: false,
       };
     }
 
@@ -62,6 +64,7 @@ export class DemoDaysService {
         teamsCount: 0,
         investorsCount: 0,
         confidentialityAccepted: false,
+        isPending: false,
       };
     }
 
@@ -71,10 +74,11 @@ export class DemoDaysService {
       this.getMemberWithDemoDayParticipants(memberEmail, demoDay.uid),
     ]);
 
-    if (!member || ['L0', 'L1', 'Rejected'].includes(member?.accessLevel ?? '')) {
+    if (!member || ['Rejected'].includes(member?.accessLevel ?? '')) {
       return {
         access: 'none',
         status: this.getExternalDemoDayStatus(demoDay.status),
+        isPending: false,
       };
     }
 
@@ -93,6 +97,7 @@ export class DemoDaysService {
         teamsCount,
         investorsCount,
         confidentialityAccepted: participant.confidentialityAccepted,
+        isPending: participant.status === DemoDayParticipantStatus.PENDING,
       };
     }
 
@@ -124,6 +129,7 @@ export class DemoDaysService {
         confidentialityAccepted: participant.confidentialityAccepted,
         teamsCount,
         investorsCount,
+        isPending: false,
       };
     }
 
@@ -136,6 +142,7 @@ export class DemoDaysService {
       teamsCount,
       investorsCount,
       confidentialityAccepted: false,
+      isPending: false,
     };
   }
 
@@ -238,60 +245,76 @@ export class DemoDaysService {
 
     // For each demo day, get counts and determine access
     return await Promise.all(
-      demoDays.map(async (demoDay) => {
-        const teamsCount = await this.getTeamsCountForDemoDay(demoDay.uid);
+      demoDays
+        .sort((a, b) => {
+          // If one is COMPLETED and one is not, COMPLETED goes last
+          const aCompleted = a.status === DemoDayStatus.COMPLETED;
+          const bCompleted = b.status === DemoDayStatus.COMPLETED;
+          if (aCompleted && !bCompleted) return 1;
+          if (!aCompleted && bCompleted) return -1;
+          // Otherwise, sort by startDate ascending (soonest first)
+          const aDate = a.startDate instanceof Date ? a.startDate.getTime() : new Date(a.startDate).getTime();
+          const bDate = b.startDate instanceof Date ? b.startDate.getTime() : new Date(b.startDate).getTime();
+          return aDate - bDate;
+        })
+        .map(async (demoDay) => {
+          const teamsCount = await this.getTeamsCountForDemoDay(demoDay.uid);
 
-        // Determine access for this demo day
-        let access: 'none' | 'INVESTOR' | 'FOUNDER' = 'none';
-        let isDemoDayAdmin = false;
-        let isEarlyAccess = false;
-        let confidentialityAccepted = false;
+          // Determine access for this demo day
+          let access: 'none' | 'INVESTOR' | 'FOUNDER' = 'none';
+          let isDemoDayAdmin = false;
+          let isEarlyAccess = false;
+          let isPending = false;
+          let confidentialityAccepted = false;
 
-        if (member && !['L0', 'L1', 'Rejected'].includes(member.accessLevel ?? '')) {
-          const participant = member.demoDayParticipants.find(
-            (p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid
-          );
+          if (member && !['L0', 'L1', 'Rejected'].includes(member.accessLevel ?? '')) {
+            const participant = member.demoDayParticipants.find(
+              (p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid
+            );
 
-          if (participant && participant.status === 'ENABLED') {
-            access = participant.type === 'INVESTOR' ? 'INVESTOR' : 'FOUNDER';
-            isDemoDayAdmin = participant.isDemoDayAdmin || isDirectoryAdmin;
-            isEarlyAccess = demoDay.status === DemoDayStatus.EARLY_ACCESS;
-            confidentialityAccepted = participant.confidentialityAccepted;
+            if (participant && participant.status === 'ENABLED') {
+              access = participant.type === 'INVESTOR' ? 'INVESTOR' : 'FOUNDER';
+              isDemoDayAdmin = participant.isDemoDayAdmin || isDirectoryAdmin;
+              isEarlyAccess = demoDay.status === DemoDayStatus.EARLY_ACCESS;
+              confidentialityAccepted = participant.confidentialityAccepted;
+            }
+
+            isPending = participant?.status === DemoDayParticipantStatus.PENDING;
           }
-        }
 
-        // Return different data based on access level (similar to getDemoDayAccess)
-        const baseResponse = {
-          slugURL: demoDay.slugURL,
-          date: demoDay.startDate.toISOString(),
-          title: demoDay.title,
-          description: demoDay.description,
-          access,
-          status: this.getExternalDemoDayStatus(
-            demoDay.status,
-            access === 'FOUNDER' ||
-              (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
-                ?.hasEarlyAccess ??
-                false)
-          ),
-          teamsCount: access !== 'none' ? teamsCount : 0,
-          investorsCount: access !== 'none' ? investorsCount : 0,
-          confidentialityAccepted,
-        };
-
-        // Only include these fields for authorized users
-        if (access !== 'none') {
-          return {
-            ...baseResponse,
-            uid: demoDay.uid,
-            shortDescription: demoDay.shortDescription,
-            isDemoDayAdmin,
-            isEarlyAccess,
+          // Return different data based on access level (similar to getDemoDayAccess)
+          const baseResponse = {
+            slugURL: demoDay.slugURL,
+            date: demoDay.startDate.toISOString(),
+            title: demoDay.title,
+            description: demoDay.description,
+            access,
+            status: this.getExternalDemoDayStatus(
+              demoDay.status,
+              access === 'FOUNDER' ||
+                (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
+                  ?.hasEarlyAccess ??
+                  false)
+            ),
+            teamsCount: access !== 'none' ? teamsCount : 0,
+            investorsCount: access !== 'none' ? investorsCount : 0,
+            confidentialityAccepted,
           };
-        }
 
-        return baseResponse;
-      })
+          // Only include these fields for authorized users
+          if (access !== 'none') {
+            return {
+              ...baseResponse,
+              uid: demoDay.uid,
+              shortDescription: demoDay.shortDescription,
+              isDemoDayAdmin,
+              isEarlyAccess,
+              isPending,
+            };
+          }
+
+          return baseResponse;
+        })
     );
   }
 
