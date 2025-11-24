@@ -1,0 +1,82 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  border-radius: 8px;
+
+  &:focus-within {
+    box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12) !important;
+
+    :global(.ql-toolbar) {
+      border-color: #5e718d;
+    }
+
+    :global(.ql-container) {
+      border-color: #5e718d;
+    }
+  }
+
+  &.error {
+    :global(.ql-toolbar) {
+      border-color: darkred;
+    }
+
+    :global(.ql-container) {
+      border-color: darkred;
+    }
+  }
+}
+
+.errorMessage {
+  font-size: 12px;
+  color: darkred;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.editor {
+  :global(.ql-toolbar) {
+    border-color: rgba(203, 213, 225, 0.5);
+    border-radius: 8px 8px 0 0;
+    background-color: #f9fafb;
+  }
+
+  :global(.ql-container) {
+    border-color: rgba(203, 213, 225, 0.5);
+    border-radius: 0 0 8px 8px;
+    background-color: white;
+  }
+
+  :global(.ql-editor) {
+    font-size: 16px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 34px;
+      letter-spacing: -0.4px;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 27px;
+      letter-spacing: -0.3px;
+    }
+
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 24px;
+      letter-spacing: -0.3px;
+    }
+  }
+
+  :global(.ql-formats.ql-formats) {
+    margin-right: 8px;
+  }
+}

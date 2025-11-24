@@ -5,6 +5,9 @@ import { useCookie } from 'react-use';
 import api from '../../utils/api';
 import { API_ROUTE } from '../../utils/constants';
 import { CreateDemoDayDto } from '../../screens/demo-days/types/demo-day';
+import dynamic from 'next/dynamic';
+
+const RichTextEditor = dynamic(() => import('../../components/common/rich-text-editor'), { ssr: false });
 
 const CreateDemoDayPage = () => {
   const router = useRouter();
@@ -90,6 +93,13 @@ const CreateDemoDayPage = () => {
     });
   };
 
+  const handleRichTextChange = (field: keyof CreateDemoDayDto, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
   return (
     <ApprovalLayout>
       <div className="mx-auto max-w-2xl p-6">
@@ -149,13 +159,10 @@ const CreateDemoDayPage = () => {
               <label htmlFor="shortDescription" className="mb-2 block text-sm font-medium text-gray-700">
                 Short Description
               </label>
-              <textarea
+              <RichTextEditor
                 id="shortDescription"
-                name="shortDescription"
-                value={formData.shortDescription}
-                onChange={handleInputChange}
-                rows={2}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={formData.shortDescription || ''}
+                onChange={(value) => handleRichTextChange('shortDescription', value)}
                 placeholder="Enter a brief description"
               />
             </div>
@@ -164,13 +171,10 @@ const CreateDemoDayPage = () => {
               <label htmlFor="description" className="mb-2 block text-sm font-medium text-gray-700">
                 Description
               </label>
-              <textarea
+              <RichTextEditor
                 id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                rows={4}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={formData.description || ''}
+                onChange={(value) => handleRichTextChange('description', value)}
                 placeholder="Enter demo day description"
               />
             </div>

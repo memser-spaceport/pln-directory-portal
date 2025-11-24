@@ -15,8 +15,11 @@ import { WEB_UI_BASE_URL } from '../../utils/constants';
 import { RichText } from '../../components/common/rich-text';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
+import dynamic from 'next/dynamic';
 
 import s from './styles.module.scss';
+
+const RichTextEditor = dynamic(() => import('../../components/common/rich-text-editor'), { ssr: false });
 
 const DemoDayDetailPage = () => {
   const router = useRouter();
@@ -423,11 +426,9 @@ const DemoDayDetailPage = () => {
               <div className={clsx(s.overviewField, s.fullWidth)}>
                 <label className={s.fieldLabel}>Short Description</label>
                 {isEditing ? (
-                  <textarea
+                  <RichTextEditor
                     value={editFormData.shortDescription || ''}
-                    onChange={(e) => handleEditFormChange('shortDescription', e.target.value)}
-                    rows={2}
-                    className={s.fieldTextarea}
+                    onChange={(value) => handleEditFormChange('shortDescription', value)}
                   />
                 ) : (
                   <RichText text={demoDay.shortDescription || ''} className={s.fieldValue} />
@@ -436,11 +437,9 @@ const DemoDayDetailPage = () => {
               <div className={clsx(s.overviewField, s.fullWidth)}>
                 <label className={s.fieldLabel}>Description</label>
                 {isEditing ? (
-                  <textarea
+                  <RichTextEditor
                     value={editFormData.description || ''}
-                    onChange={(e) => handleEditFormChange('description', e.target.value)}
-                    rows={3}
-                    className={s.fieldTextarea}
+                    onChange={(value) => handleEditFormChange('description', value)}
                   />
                 ) : (
                   <RichText text={demoDay.description} className={s.fieldValue} />
