@@ -296,6 +296,7 @@ export class DemoDaysService {
             date: demoDay.startDate.toISOString(),
             title: demoDay.title,
             description: demoDay.description,
+            shortDescription: demoDay.shortDescription,
             approximateStartDate: demoDay.approximateStartDate,
             access,
             status: this.getExternalDemoDayStatus(
@@ -315,7 +316,6 @@ export class DemoDaysService {
             return {
               ...baseResponse,
               uid: demoDay.uid,
-              shortDescription: demoDay.shortDescription,
               isDemoDayAdmin,
               isEarlyAccess,
               isPending,
