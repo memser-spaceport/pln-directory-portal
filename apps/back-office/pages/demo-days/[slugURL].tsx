@@ -10,7 +10,8 @@ import { useUpdateParticipant } from '../../hooks/demo-days/useUpdateParticipant
 import { AddParticipantModal } from '../../components/demo-days/AddParticipantModal';
 import { UploadParticipantsModal } from '../../components/demo-days/UploadParticipantsModal';
 import { ApproveParticipantModal } from '../../components/demo-days/ApproveParticipantModal';
-import { UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
+import { ApplicationDetailsModal } from '../../components/demo-days/ApplicationDetailsModal';
+import { DemoDayParticipant, UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
 import { RichText } from '../../components/common/rich-text';
 import clsx from 'clsx';
@@ -34,11 +35,13 @@ const DemoDayDetailPage = () => {
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showApplicationDetailsModal, setShowApplicationDetailsModal] = useState(false);
   const [selectedParticipantForApproval, setSelectedParticipantForApproval] = useState<{
     uid: string;
     name: string;
     email: string;
   } | null>(null);
+  const [selectedParticipantForDetails, setSelectedParticipantForDetails] = useState<DemoDayParticipant | null>(null);
 
   const updateDemoDayMutation = useUpdateDemoDay();
   const updateParticipantMutation = useUpdateParticipant();
@@ -587,7 +590,7 @@ const DemoDayDetailPage = () => {
                   )}
                   <div
                     className={clsx(s.headerCell, s.fixed)}
-                    style={{ width: activeTab === 'applications' ? 200 : 150 }}
+                    style={{ width: activeTab === 'applications' ? 250 : 150 }}
                   >
                     {activeTab === 'applications' ? 'Action' : 'Status'}
                   </div>
@@ -864,10 +867,20 @@ const DemoDayDetailPage = () => {
 
                       <div
                         className={clsx(s.bodyCell, s.fixed)}
-                        style={{ width: activeTab === 'applications' ? 200 : 150 }}
+                        style={{ width: activeTab === 'applications' ? 250 : 150 }}
                       >
                         {activeTab === 'applications' ? (
                           <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedParticipantForDetails(participant);
+                                setShowApplicationDetailsModal(true);
+                              }}
+                              className="flex-1 rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                              title="View application details"
+                            >
+                              View
+                            </button>
                             <button
                               onClick={() => handleApproveClick(participant)}
                               disabled={updateParticipantMutation.isPending}
@@ -971,6 +984,15 @@ const DemoDayDetailPage = () => {
           participant={selectedParticipantForApproval}
           onApprove={handleApprove}
           isLoading={updateParticipantMutation.isPending}
+        />
+
+        <ApplicationDetailsModal
+          isOpen={showApplicationDetailsModal}
+          onClose={() => {
+            setShowApplicationDetailsModal(false);
+            setSelectedParticipantForDetails(null);
+          }}
+          participant={selectedParticipantForDetails}
         />
       </div>
     </ApprovalLayout>

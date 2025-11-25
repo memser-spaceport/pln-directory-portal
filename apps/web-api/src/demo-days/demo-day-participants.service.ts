@@ -847,6 +847,7 @@ export class DemoDayParticipantsService {
               email: true,
               accessLevel: true,
               accessLevelUpdatedAt: true,
+              linkedinHandler: true,
               teamMemberRoles: {
                 select: {
                   mainTeam: true,
