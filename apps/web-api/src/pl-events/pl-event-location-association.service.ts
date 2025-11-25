@@ -116,10 +116,24 @@ export class PLEventLocationAssociationService {
    */
   async createLocationAssociation(data: Prisma.PLEventLocationAssociationUncheckedCreateInput, tx?): Promise<PLEventLocationAssociation> {
     try {
+      
+      // Verify locationUid exists if provided
+      if (data.locationUid) {
+        const locationExists = await (tx || this.prisma).pLEventLocation.findUnique({
+          where: { uid: data.locationUid },
+          select: { uid: true }
+        });
+        if (!locationExists) {
+          this.logger.error(`Location with uid ${data.locationUid} does not exist`, 'PLEventLocationAssociationService');
+          throw new NotFoundException(`Location with uid ${data.locationUid} does not exist. Cannot create association.`);
+        }
+        this.logger.info(`Verified location exists: ${data.locationUid}`, 'PLEventLocationAssociationService');
+      }
+      
       const association = await (tx || this.prisma).pLEventLocationAssociation.create({
         data
       });
-      this.logger.info(`Created location association: ${association.uid}`, 'PLEventLocationAssociationService');
+      this.logger.info(`Created location association: ${association.uid} with locationUid: ${association.locationUid}`, 'PLEventLocationAssociationService');
       return association;
     } catch (error) {
       this.logger.error(`Error creating location association: ${error.message}`, error.stack, 'PLEventLocationAssociationService');
@@ -234,7 +248,7 @@ export class PLEventLocationAssociationService {
    * @throws {NotFoundException} - If the location association is not found.
    * @throws {BadRequestException} - If the locationUid doesn't exist.
    */
-  async updatePLEventLocationAssociation(uid: string, data) {
+  async updatePLEventLocationAssociation(uid: string, data, tx?) {
     try {
       // Check if association exists
       const existing = await this.prisma.pLEventLocationAssociation.findFirst({
@@ -257,22 +271,37 @@ export class PLEventLocationAssociationService {
 
         // If locationUid changed, update all related events' locationUid
         if (data.locationUid !== undefined && data.locationUid !== existing.locationUid) {
-          await tx.pLEvent.updateMany({
-            where: {
-              pLEventLocationAssociationUid: uid,
-              isDeleted: false
-            },
-            data: {
-              locationUid: data.locationUid
-            }
-          });
-
+          await this.updateRelatedEventsLocationUid(uid, data.locationUid, tx);
         }
         this.logger.info(`Updated location association: ${association.uid}`);
         return association;
       });
     } catch (error) {
       this.logger.error(`Error updating location association: ${error.message}`);
+      this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Updates all related events' locationUid when the association's locationUid changes.
+   * 
+   * @param associationUid - The unique identifier of the location association.
+   * @param locationUid - The new location UID to update events with.
+   * @param tx - The transaction object (optional).
+   */
+  private async updateRelatedEventsLocationUid(associationUid: string, locationUid: string, tx?: any) {
+    try {
+       await (tx || this.prisma).pLEvent.updateMany({
+      where: {
+        pLEventLocationAssociationUid: associationUid,
+        isDeleted: false
+      },
+      data: {
+        locationUid: locationUid
+      }
+    });
+    } catch (error) {
+      this.logger.error(`Error updating related events locationUid: ${error.message}`);
       this.handleErrors(error);
     }
   }
