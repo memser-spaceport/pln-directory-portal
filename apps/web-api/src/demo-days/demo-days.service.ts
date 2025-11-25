@@ -33,6 +33,7 @@ export class DemoDaysService {
     date?: string;
     title?: string;
     description?: string;
+    shortDescription?: string | null;
     approximateStartDate?: string | null;
     teamsCount?: number;
     investorsCount?: number;
@@ -62,6 +63,7 @@ export class DemoDaysService {
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
+        shortDescription: demoDay.shortDescription,
         approximateStartDate: demoDay.approximateStartDate,
         teamsCount: 0,
         investorsCount: 0,
@@ -96,6 +98,7 @@ export class DemoDaysService {
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
+        shortDescription: demoDay.shortDescription,
         approximateStartDate: demoDay.approximateStartDate,
         teamsCount,
         investorsCount,
@@ -123,6 +126,7 @@ export class DemoDaysService {
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
+        shortDescription: demoDay.shortDescription,
         approximateStartDate: demoDay.approximateStartDate,
         status: this.getExternalDemoDayStatus(
           demoDay.status,
@@ -143,6 +147,7 @@ export class DemoDaysService {
       date: demoDay.startDate.toISOString(),
       title: demoDay.title,
       description: demoDay.description,
+      shortDescription: demoDay.shortDescription,
       approximateStartDate: demoDay.approximateStartDate,
       teamsCount,
       investorsCount,
@@ -296,6 +301,7 @@ export class DemoDaysService {
             date: demoDay.startDate.toISOString(),
             title: demoDay.title,
             description: demoDay.description,
+            shortDescription: demoDay.shortDescription,
             approximateStartDate: demoDay.approximateStartDate,
             access,
             status: this.getExternalDemoDayStatus(
@@ -315,7 +321,6 @@ export class DemoDaysService {
             return {
               ...baseResponse,
               uid: demoDay.uid,
-              shortDescription: demoDay.shortDescription,
               isDemoDayAdmin,
               isEarlyAccess,
               isPending,
