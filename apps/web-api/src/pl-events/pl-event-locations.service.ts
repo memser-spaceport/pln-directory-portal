@@ -203,10 +203,13 @@ export class PLEventLocationsService {
    * @returns The formatted location object with pastEvents and upcomingEvents fields
    *   - Events are classified as past or upcoming based on whether their end date is before or after the current time in UTC.
    *   - The method delegates event segregation to segregateEventsByTime and spreads the result into the location object.
+   *   - Events are classified as past or upcoming based on whether their end date is before or after the current time in UTC.
+   *   - The method delegates event segregation to segregateEventsByTime and spreads the result into the location object.
    */
   private formatLocation(location: PLEventLocationWithEvents): FormattedLocationWithEvents {
     return {
       ...location,
+      ...this.segregateEventsByTime(location.events)
       ...this.segregateEventsByTime(location.events)
     }
   };
@@ -848,6 +851,26 @@ export class PLEventLocationsService {
         throw new NotFoundException(`Location with UID ${uid} not found.`);
       }
 
+      // Soft delete location and all associated location associations in a transaction
+      return await this.prisma.$transaction(async (tx) => {
+        // Soft delete all associated location associations
+        const associationsResult = await tx.pLEventLocationAssociation.updateMany({
+          where: {
+            locationUid: uid,
+            isDeleted: false
+          },
+          data: {
+            isDeleted: true
+          }
+        });
+
+        const location = await tx.pLEventLocation.update({
+          where: { uid },
+          data: { isDeleted: true }
+        });
+        this.logger.info(`Deleted location: ${location.uid} and all its location-associations`, 'PLEventLocationsService');
+        return location;
+      });
       // Soft delete location and all associated location associations in a transaction
       return await this.prisma.$transaction(async (tx) => {
         // Soft delete all associated location associations
