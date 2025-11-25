@@ -46,7 +46,7 @@ export class PLEventsService {
       const createdEvent = await (tx || this.prisma).pLEvent.create({
         data: event
       });
-      await this.cacheService.reset({ service: 'PLEventGuest' });
+      this.cacheService.reset({ service: 'PLEventGuest' });
       return createdEvent;
     } catch (error) {
       this.handleErrors(error);
@@ -56,10 +56,11 @@ export class PLEventsService {
   /**
    * This method retrieves multiple events based on the provided query options.
    * @param queryOptions Options for querying events, including filters and sorting
+   * @param tx - Optional transaction object
    * @returns An array of event objects with additional details such as logo, banner, event guests, and location.
    */
-  async getPLEvents(queryOptions: Prisma.PLEventFindManyArgs): Promise<PLEvent[]> {
-    return await this.prisma.pLEvent.findMany({
+  async getPLEvents(queryOptions: Prisma.PLEventFindManyArgs, tx?): Promise<PLEvent[]> {
+    return await (tx || this.prisma).pLEvent.findMany({
       ...queryOptions,
       where: {
         ...queryOptions.where,

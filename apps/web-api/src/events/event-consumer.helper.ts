@@ -53,7 +53,7 @@ export class EventConsumerHelper {
     } else {
       const association = await this.locationAssociationService.findAssociation(
         {
-          where: locationCriteria,
+          where: { ...locationCriteria, isDeleted: false },
           orderBy: { createdAt: 'desc' },
           select: { uid: true },
         },
@@ -139,12 +139,12 @@ export class EventConsumerHelper {
    * @returns Promise<PLEvent> - Found event
    * @throws Error if event not found
    */
-  async findEventByExternalId(externalId: string): Promise<PLEvent | null> {
+  async findEventByExternalId(externalId: string, tx?): Promise<PLEvent | null> {
     const events = await this.plEventsService.getPLEvents({
       where: {
         externalId
       }
-    });
+    }, tx);
     return events.length ? events[0] : null;
   }
 

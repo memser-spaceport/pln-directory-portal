@@ -200,12 +200,13 @@ export class PLEventLocationsService {
    * This method formats the event location object and segregates its events into past and upcoming events.
    * @param location The event location object retrieved from the database
    * @returns The formatted location object with pastEvents and upcomingEvents fields
-   *   - Past and upcoming events are based on the current date and the location's timezone.
+   *   - Events are classified as past or upcoming based on whether their end date is before or after the current time in UTC.
+   *   - The method delegates event segregation to segregateEventsByTime and spreads the result into the location object.
    */
   private formatLocation(location: PLEventLocationWithEvents): FormattedLocationWithEvents {
     return {
       ...location,
-      ...this.segregateEventsByTime(location.events, location.timezone)
+      ...this.segregateEventsByTime(location.events)
     }
   };
 
@@ -846,12 +847,26 @@ export class PLEventLocationsService {
         throw new NotFoundException(`Location with UID ${uid} not found.`);
       }
 
-      const location = await this.prisma.pLEventLocation.update({
-        where: { uid },
-        data: { isDeleted: true }
+      // Soft delete location and all associated location associations in a transaction
+      return await this.prisma.$transaction(async (tx) => {
+        // Soft delete all associated location associations
+        const associationsResult = await tx.pLEventLocationAssociation.updateMany({
+          where: {
+            locationUid: uid,
+            isDeleted: false
+          },
+          data: {
+            isDeleted: true
+          }
+        });
+
+        const location = await tx.pLEventLocation.update({
+          where: { uid },
+          data: { isDeleted: true }
+        });
+        this.logger.info(`Deleted location: ${location.uid} and all its location-associations`, 'PLEventLocationsService');
+        return location;
       });
-      this.logger.info(`Deleted location: ${location.uid}`, 'PLEventLocationsService');
-      return location;
     } catch (error) {
      this.logger.error(`Error deleting location: ${error.message}`);
      this.handleErrors(error);
