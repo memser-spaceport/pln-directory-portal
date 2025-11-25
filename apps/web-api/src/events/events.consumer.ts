@@ -77,7 +77,7 @@ export class EventsConsumer {
         const associationUid = result.associationUid;
         const locationStatus = location.isInferred ? PLEventLocationStatus.AUTO_MAPPED : PLEventLocationStatus.MANUALLY_MAPPED;
         // Try to find by externalId first
-        let existingEvent = await this.helperService.findEventByExternalId(event.externalId);
+        let existingEvent = await this.helperService.findEventByExternalId(event.externalId, tx);
         if (existingEvent) {
           await this.plEventsService.updateEventByUid(existingEvent.uid, {
             ...event,
