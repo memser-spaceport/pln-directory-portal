@@ -51,7 +51,7 @@ export class DemoDaysController {
   @Get()
   @UseGuards(UserTokenCheckGuard)
   @QueryCache()
-  @CacheTTL(600) // 10 minutes
+  @CacheTTL(300) // 5 minutes
   async getAllDemoDays(@Req() req) {
     return this.demoDaysService.getAllDemoDaysPublic(req.userEmail || null);
   }
