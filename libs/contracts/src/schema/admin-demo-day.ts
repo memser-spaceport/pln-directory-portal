@@ -9,6 +9,7 @@ export const CreateDemoDaySchema = z.object({
   slugURL: z.string().min(1, 'URL slug is required'),
   description: z.string().min(1, 'Description is required'),
   shortDescription: z.string().optional().nullable(),
+  approximateStartDate: z.string().optional().nullable(),
   status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']),
 });
 
@@ -19,8 +20,10 @@ export const UpdateDemoDaySchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   title: z.string().min(1, 'Title is required').optional(),
+  slugURL: z.string().min(1, 'URL slug is required').optional(),
   description: z.string().min(1, 'Description is required').optional(),
   shortDescription: z.string().optional().nullable(),
+  approximateStartDate: z.string().optional().nullable(),
   status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']).optional(),
 });
 
@@ -98,6 +101,7 @@ export const ResponseDemoDaySchema = z.object({
   title: z.string(),
   description: z.string(),
   shortDescription: z.string().nullable(),
+  approximateStartDate: z.string().nullable(),
   status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']),
   createdAt: z.date(),
   updatedAt: z.date(),

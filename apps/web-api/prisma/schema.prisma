@@ -976,6 +976,7 @@ model DemoDay {
   slugURL                   String                            @unique
   startDate                 DateTime
   endDate                   DateTime
+  approximateStartDate      String?
   title                     String
   description               String
   shortDescription          String?

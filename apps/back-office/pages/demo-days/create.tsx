@@ -50,7 +50,8 @@ const CreateDemoDayPage = () => {
 
       // Check if it's a conflict error (409) for duplicate slug
       if (error?.response?.status === 409) {
-        const errorMessage = error?.response?.data?.message || `A demo day with slug "${formData.slugURL}" already exists.`;
+        const errorMessage =
+          error?.response?.data?.message || `A demo day with slug "${formData.slugURL}" already exists.`;
         setSlugError(errorMessage);
       } else {
         alert('Failed to create demo day. Please try again.');
@@ -206,6 +207,21 @@ const CreateDemoDayPage = () => {
                 value={formData.endDate}
                 onChange={handleInputChange}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="approximateStartDate" className="mb-2 block text-sm font-medium text-gray-700">
+                Approximate Start Date
+              </label>
+              <input
+                type="text"
+                id="approximateStartDate"
+                name="approximateStartDate"
+                value={formData.approximateStartDate || ''}
+                onChange={handleInputChange}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., Q1 2025, Spring 2025"
               />
             </div>
 

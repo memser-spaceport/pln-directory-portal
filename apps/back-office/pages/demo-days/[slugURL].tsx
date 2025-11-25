@@ -52,9 +52,12 @@ const DemoDayDetailPage = () => {
     authToken,
     demoDayUid: demoDay?.uid as string,
     query: {
-      type: activeTab === 'applications' ? undefined : (activeTab === 'investors' ? 'INVESTOR' : 'FOUNDER'),
+      type: activeTab === 'applications' ? undefined : activeTab === 'investors' ? 'INVESTOR' : 'FOUNDER',
       search: searchTerm || undefined,
-      status: activeTab === 'applications' ? 'PENDING' : ((statusFilter as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED') || undefined),
+      status:
+        activeTab === 'applications'
+          ? 'PENDING'
+          : (statusFilter as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED') || undefined,
       page: currentPage,
       limit: 50,
     },
@@ -108,10 +111,12 @@ const DemoDayDetailPage = () => {
     if (!demoDay) return;
     setEditFormData({
       title: demoDay.title,
+      slugURL: demoDay.slugURL,
       description: demoDay.description,
       shortDescription: demoDay.shortDescription,
       startDate: demoDay.startDate,
       endDate: demoDay.endDate,
+      approximateStartDate: demoDay.approximateStartDate,
       status: demoDay.status,
     });
     setIsEditing(true);
@@ -139,7 +144,10 @@ const DemoDayDetailPage = () => {
     }
   };
 
-  const handleUpdateParticipantStatus = async (participantUid: string, status: 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED') => {
+  const handleUpdateParticipantStatus = async (
+    participantUid: string,
+    status: 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED'
+  ) => {
     if (!authToken || !demoDay) return;
 
     try {
@@ -243,7 +251,7 @@ const DemoDayDetailPage = () => {
         participantUid,
         data: {
           type,
-          status: 'ENABLED'
+          status: 'ENABLED',
         },
       });
       toast.success('Application approved successfully');
@@ -258,9 +266,7 @@ const DemoDayDetailPage = () => {
   const handleReject = async (participantUid: string, participantName: string) => {
     if (!authToken || !demoDay) return;
 
-    const confirmed = window.confirm(
-      `Are you sure you want to reject ${participantName}'s application?`
-    );
+    const confirmed = window.confirm(`Are you sure you want to reject ${participantName}'s application?`);
 
     if (!confirmed) return;
 
@@ -392,6 +398,20 @@ const DemoDayDetailPage = () => {
                 )}
               </div>
               <div className={s.overviewField}>
+                <label className={s.fieldLabel}>Approximate Start Date</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editFormData.approximateStartDate || ''}
+                    onChange={(e) => handleEditFormChange('approximateStartDate', e.target.value)}
+                    className={s.fieldInput}
+                    placeholder="e.g., Q1 2025, Spring 2025"
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{demoDay.approximateStartDate || '-'}</div>
+                )}
+              </div>
+              <div className={s.overviewField}>
                 <label className={s.fieldLabel}>Status</label>
                 {isEditing ? (
                   <select
@@ -410,7 +430,7 @@ const DemoDayDetailPage = () => {
                   <div className={s.fieldValue}>{demoDay.status}</div>
                 )}
               </div>
-              <div className={clsx(s.overviewField, s.fullWidth)}>
+              <div className={clsx(s.overviewField)}>
                 <label className={s.fieldLabel}>Title</label>
                 {isEditing ? (
                   <input
@@ -421,6 +441,20 @@ const DemoDayDetailPage = () => {
                   />
                 ) : (
                   <div className={s.fieldValue}>{demoDay.title}</div>
+                )}
+              </div>
+              <div className={clsx(s.overviewField)}>
+                <label className={s.fieldLabel}>URL Slug</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editFormData.slugURL || ''}
+                    onChange={(e) => handleEditFormChange('slugURL', e.target.value)}
+                    className={s.fieldInput}
+                    placeholder="e.g., crypto-day-2025"
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{demoDay.slugURL}</div>
                 )}
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
@@ -525,9 +559,7 @@ const DemoDayDetailPage = () => {
                 {/* Header */}
                 <div className={clsx(s.tableRow, s.tableHeader)}>
                   <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
-                  {activeTab !== 'applications' && (
-                    <div className={clsx(s.headerCell, s.flexible)}>Team</div>
-                  )}
+                  {activeTab !== 'applications' && <div className={clsx(s.headerCell, s.flexible)}>Team</div>}
                   {activeTab === 'investors' && (
                     <div className={clsx(s.headerCell, s.fixed)} style={{ width: 200 }}>
                       Investor Type
@@ -553,7 +585,10 @@ const DemoDayDetailPage = () => {
                       Type
                     </div>
                   )}
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: activeTab === 'applications' ? 200 : 150 }}>
+                  <div
+                    className={clsx(s.headerCell, s.fixed)}
+                    style={{ width: activeTab === 'applications' ? 200 : 150 }}
+                  >
                     {activeTab === 'applications' ? 'Action' : 'Status'}
                   </div>
                 </div>
@@ -562,311 +597,323 @@ const DemoDayDetailPage = () => {
                 {participants.participants
                   .filter((participant) => activeTab === 'applications' || participant.status !== 'PENDING')
                   .map((participant) => (
-                  <div key={participant.uid} className={s.tableRow}>
-                    <div className={clsx(s.bodyCell, s.first, s.flexible)}>
-                      <div className="flex items-center">
-                        {participant.member?.profilePicture && (
-                          <Image
-                            className="mr-3 h-8 w-8 rounded-full"
-                            src={participant.member.profilePicture}
-                            alt=""
-                            width={32}
-                            height={32}
-                          />
-                        )}
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {participant.member?.name || participant.name}
-                          </div>
-                          <div className="text-sm text-gray-500">{participant.member?.email || participant.email}</div>
-                        </div>
-                      </div>
-                    </div>
-                    {activeTab !== 'applications' && (
-                      <div className={clsx(s.bodyCell, s.flexible)}>
-                        {activeTab === 'founders' ? (
-                        (() => {
-                          const memberTeams = participant.member?.teamMemberRoles || [];
-                          const currentTeamUid = participant.teamUid || '';
-
-                          if (memberTeams.length === 0) {
-                            return <span className="text-gray-400">No teams</span>;
-                          }
-
-                          return (
-                            <div className="flex items-center gap-2">
-                              <select
-                                value={currentTeamUid}
-                                onChange={(e) => {
-                                  const selectedTeam = memberTeams.find((role) => role.team.uid === e.target.value);
-                                  if (selectedTeam) {
-                                    handleUpdateParticipantTeam(
-                                      participant.uid,
-                                      participant.member?.name || participant.name,
-                                      e.target.value,
-                                      selectedTeam.team.name
-                                    );
-                                  }
-                                }}
-                                disabled={updateParticipantMutation.isPending}
-                                className={`flex-1 rounded-full border-0 px-2 py-1 text-xs font-semibold ${
-                                  currentTeamUid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                                } disabled:opacity-50`}
-                              >
-                                <option value="">Select team...</option>
-                                {memberTeams.map((role) => (
-                                  <option key={role.team.uid} value={role.team.uid}>
-                                    {role.team.name}
-                                    {role.mainTeam ? ' (Main)' : ''}
-                                  </option>
-                                ))}
-                              </select>
-                              {currentTeamUid && (
-                                <a
-                                  href={`${WEB_UI_BASE_URL}/teams/${currentTeamUid}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center text-blue-600 hover:text-blue-800"
-                                  title="Open team page"
-                                >
-                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
-                                    <path
-                                      d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
-                                      fill="currentColor"
-                                    />
-                                  </svg>
-                                </a>
-                              )}
+                    <div key={participant.uid} className={s.tableRow}>
+                      <div className={clsx(s.bodyCell, s.first, s.flexible)}>
+                        <div className="flex items-center">
+                          {participant.member?.profilePicture && (
+                            <Image
+                              className="mr-3 h-8 w-8 rounded-full"
+                              src={participant.member.profilePicture}
+                              alt=""
+                              width={32}
+                              height={32}
+                            />
+                          )}
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {participant.member?.name || participant.name}
                             </div>
-                          );
-                        })()
-                      ) : (
-                        (() => {
-                          const team =
-                            participant.member?.teamMemberRoles.find((role) => role.mainTeam)?.team ||
-                            participant.member?.teamMemberRoles[0]?.team;
+                            <div className="text-sm text-gray-500">
+                              {participant.member?.email || participant.email}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {activeTab !== 'applications' && (
+                        <div className={clsx(s.bodyCell, s.flexible)}>
+                          {activeTab === 'founders'
+                            ? (() => {
+                                const memberTeams = participant.member?.teamMemberRoles || [];
+                                const currentTeamUid = participant.teamUid || '';
 
-                          return team ? (
-                            <a
-                              href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-                            >
-                              {team.name}
-                              <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
-                                <path
-                                  d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
-                                  fill="currentColor"
-                                />
-                              </svg>
-                            </a>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          );
-                        })()
+                                if (memberTeams.length === 0) {
+                                  return <span className="text-gray-400">No teams</span>;
+                                }
+
+                                return (
+                                  <div className="flex items-center gap-2">
+                                    <select
+                                      value={currentTeamUid}
+                                      onChange={(e) => {
+                                        const selectedTeam = memberTeams.find(
+                                          (role) => role.team.uid === e.target.value
+                                        );
+                                        if (selectedTeam) {
+                                          handleUpdateParticipantTeam(
+                                            participant.uid,
+                                            participant.member?.name || participant.name,
+                                            e.target.value,
+                                            selectedTeam.team.name
+                                          );
+                                        }
+                                      }}
+                                      disabled={updateParticipantMutation.isPending}
+                                      className={`flex-1 rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                                        currentTeamUid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                                      } disabled:opacity-50`}
+                                    >
+                                      <option value="">Select team...</option>
+                                      {memberTeams.map((role) => (
+                                        <option key={role.team.uid} value={role.team.uid}>
+                                          {role.team.name}
+                                          {role.mainTeam ? ' (Main)' : ''}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {currentTeamUid && (
+                                      <a
+                                        href={`${WEB_UI_BASE_URL}/teams/${currentTeamUid}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                                        title="Open team page"
+                                      >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                                          <path
+                                            d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
+                                            fill="currentColor"
+                                          />
+                                        </svg>
+                                      </a>
+                                    )}
+                                  </div>
+                                );
+                              })()
+                            : (() => {
+                                const team =
+                                  participant.member?.teamMemberRoles.find((role) => role.mainTeam)?.team ||
+                                  participant.member?.teamMemberRoles[0]?.team;
+
+                                return team ? (
+                                  <a
+                                    href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                                  >
+                                    {team.name}
+                                    <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                                      <path
+                                        d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
+                                        fill="currentColor"
+                                      />
+                                    </svg>
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                );
+                              })()}
+                        </div>
                       )}
-                      </div>
-                    )}
-                    {activeTab === 'founders' && (
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
-                        {(() => {
-                          const team = participant.team;
-                          if (!team) {
-                            return <span className="text-gray-400">-</span>;
-                          }
+                      {activeTab === 'founders' && (
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
+                          {(() => {
+                            const team = participant.team;
+                            if (!team) {
+                              return <span className="text-gray-400">-</span>;
+                            }
 
-                          const fundraisingProfile = team.fundraisingProfiles?.[0];
-                          if (!fundraisingProfile) {
+                            const fundraisingProfile = team.fundraisingProfiles?.[0];
+                            if (!fundraisingProfile) {
+                              return (
+                                <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
+                                  not provided
+                                </span>
+                              );
+                            }
+
+                            const hasOnePager = !!fundraisingProfile.onePagerUpload;
+                            const hasVideo = !!fundraisingProfile.videoUpload;
+
+                            let label = '';
+                            let bgColor = 'bg-gray-100';
+                            let textColor = 'text-gray-600';
+
+                            if (hasOnePager && hasVideo) {
+                              label = 'pitch deck, pitch video';
+                              bgColor = 'bg-green-100';
+                              textColor = 'text-green-800';
+                            } else if (hasOnePager) {
+                              label = 'pitch deck';
+                              bgColor = 'bg-blue-100';
+                              textColor = 'text-blue-800';
+                            } else if (hasVideo) {
+                              label = 'pitch video';
+                              bgColor = 'bg-purple-100';
+                              textColor = 'text-purple-800';
+                            } else {
+                              label = 'not provided';
+                            }
+
                             return (
-                              <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
-                                not provided
+                              <span
+                                className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${bgColor} ${textColor}`}
+                              >
+                                {label}
                               </span>
                             );
-                          }
+                          })()}
+                        </div>
+                      )}
+                      {activeTab === 'investors' && (
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
+                          {(() => {
+                            const profileType = participant.member?.investorProfile?.type;
+                            if (!profileType) {
+                              return (
+                                <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
+                                  not provided
+                                </span>
+                              );
+                            }
 
-                          const hasOnePager = !!fundraisingProfile.onePagerUpload;
-                          const hasVideo = !!fundraisingProfile.videoUpload;
+                            const typeConfig = {
+                              ANGEL: { label: 'Angel', bgColor: 'bg-blue-100', textColor: 'text-blue-800' },
+                              FUND: { label: 'Fund', bgColor: 'bg-green-100', textColor: 'text-green-800' },
+                              ANGEL_AND_FUND: {
+                                label: 'Angel + Fund',
+                                bgColor: 'bg-purple-100',
+                                textColor: 'text-purple-800',
+                              },
+                            };
 
-                          let label = '';
-                          let bgColor = 'bg-gray-100';
-                          let textColor = 'text-gray-600';
+                            const config = typeConfig[profileType as keyof typeof typeConfig];
 
-                          if (hasOnePager && hasVideo) {
-                            label = 'pitch deck, pitch video';
-                            bgColor = 'bg-green-100';
-                            textColor = 'text-green-800';
-                          } else if (hasOnePager) {
-                            label = 'pitch deck';
-                            bgColor = 'bg-blue-100';
-                            textColor = 'text-blue-800';
-                          } else if (hasVideo) {
-                            label = 'pitch video';
-                            bgColor = 'bg-purple-100';
-                            textColor = 'text-purple-800';
-                          } else {
-                            label = 'not provided';
-                          }
-
-                          return (
-                            <span
-                              className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${bgColor} ${textColor}`}
-                            >
-                              {label}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    )}
-                    {activeTab === 'investors' && (
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
-                        {(() => {
-                          const profileType = participant.member?.investorProfile?.type;
-                          if (!profileType) {
                             return (
-                              <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
-                                not provided
+                              <span
+                                className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                                  config?.bgColor || 'bg-gray-100'
+                                } ${config?.textColor || 'text-gray-600'}`}
+                              >
+                                {config?.label || profileType}
                               </span>
                             );
-                          }
-
-                          const typeConfig = {
-                            ANGEL: { label: 'Angel', bgColor: 'bg-blue-100', textColor: 'text-blue-800' },
-                            FUND: { label: 'Fund', bgColor: 'bg-green-100', textColor: 'text-green-800' },
-                            ANGEL_AND_FUND: {
-                              label: 'Angel + Fund',
-                              bgColor: 'bg-purple-100',
-                              textColor: 'text-purple-800',
-                            },
-                          };
-
-                          const config = typeConfig[profileType as keyof typeof typeConfig];
-
-                          return (
-                            <span
-                              className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                                config?.bgColor || 'bg-gray-100'
-                              } ${config?.textColor || 'text-gray-600'}`}
+                          })()}
+                        </div>
+                      )}
+                      {activeTab === 'investors' && (
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                          <select
+                            value={participant.hasEarlyAccess ? 'yes' : 'no'}
+                            onChange={(e) =>
+                              handleUpdateParticipantEarlyAccess(participant.uid, e.target.value === 'yes')
+                            }
+                            disabled={updateParticipantMutation.isPending}
+                            className={clsx(
+                              'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
+                              participant.hasEarlyAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            )}
+                          >
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      )}
+                      {activeTab !== 'applications' && (
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                          {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
+                            <svg
+                              className="mx-auto h-5 w-5 text-red-500"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
                             >
-                              {config?.label || profileType}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    )}
-                    {activeTab === 'investors' && (
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                        <select
-                          value={participant.hasEarlyAccess ? 'yes' : 'no'}
-                          onChange={(e) =>
-                            handleUpdateParticipantEarlyAccess(participant.uid, e.target.value === 'yes')
-                          }
-                          disabled={updateParticipantMutation.isPending}
-                          className={clsx(
-                            'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
-                            participant.hasEarlyAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          ) : (
+                            <svg
+                              className="mx-auto h-5 w-5 text-green-500"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
                           )}
-                        >
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
-                    )}
-                    {activeTab !== 'applications' && (
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                        {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
-                          <svg
-                            className="mx-auto h-5 w-5 text-red-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                        </div>
+                      )}
+
+                      {activeTab !== 'applications' && (
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                          <select
+                            value={participant.type}
+                            onChange={(e) =>
+                              handleUpdateParticipantType(
+                                participant.uid,
+                                participant.member?.name || participant.name,
+                                e.target.value as 'INVESTOR' | 'FOUNDER'
+                              )
+                            }
+                            disabled={updateParticipantMutation.isPending}
+                            className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                              participant.type === 'INVESTOR'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-blue-100 text-blue-800'
+                            } disabled:opacity-50`}
                           >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
+                            <option value="INVESTOR">Investor</option>
+                            <option value="FOUNDER">Founder</option>
+                          </select>
+                        </div>
+                      )}
+
+                      <div
+                        className={clsx(s.bodyCell, s.fixed)}
+                        style={{ width: activeTab === 'applications' ? 200 : 150 }}
+                      >
+                        {activeTab === 'applications' ? (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleApproveClick(participant)}
+                              disabled={updateParticipantMutation.isPending}
+                              className="flex-1 rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              title="Approve application"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleReject(participant.uid, participant.member?.name || participant.name)
+                              }
+                              disabled={updateParticipantMutation.isPending}
+                              className="flex-1 rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              title="Reject application"
+                            >
+                              Reject
+                            </button>
+                          </div>
                         ) : (
-                          <svg
-                            className="mx-auto h-5 w-5 text-green-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                          <select
+                            value={participant.status}
+                            onChange={(e) =>
+                              handleUpdateParticipantStatus(
+                                participant.uid,
+                                e.target.value as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED'
+                              )
+                            }
+                            disabled={updateParticipantMutation.isPending}
+                            className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${getParticipantStatusColor(
+                              participant.status
+                            )} disabled:opacity-50`}
                           >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+                            <option value="PENDING">Pending</option>
+                            {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
+                              <option value="INVITED">Invited</option>
+                            ) : (
+                              ''
+                            )}
+                            <option value="ENABLED">Enabled</option>
+                            <option value="DISABLED">Disabled</option>
+                          </select>
                         )}
                       </div>
-                    )}
-
-                    {activeTab !== 'applications' && (
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                        <select
-                          value={participant.type}
-                          onChange={(e) =>
-                            handleUpdateParticipantType(
-                              participant.uid,
-                              participant.member?.name || participant.name,
-                              e.target.value as 'INVESTOR' | 'FOUNDER'
-                            )
-                          }
-                          disabled={updateParticipantMutation.isPending}
-                          className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
-                            participant.type === 'INVESTOR'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-blue-100 text-blue-800'
-                          } disabled:opacity-50`}
-                        >
-                          <option value="INVESTOR">Investor</option>
-                          <option value="FOUNDER">Founder</option>
-                        </select>
-                      </div>
-                    )}
-
-                    <div className={clsx(s.bodyCell, s.fixed)} style={{ width: activeTab === 'applications' ? 200 : 150 }}>
-                      {activeTab === 'applications' ? (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleApproveClick(participant)}
-                            disabled={updateParticipantMutation.isPending}
-                            className="flex-1 rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Approve application"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleReject(participant.uid, participant.member?.name || participant.name)}
-                            disabled={updateParticipantMutation.isPending}
-                            className="flex-1 rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Reject application"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      ) : (
-                        <select
-                          value={participant.status}
-                          onChange={(e) =>
-                            handleUpdateParticipantStatus(
-                              participant.uid,
-                              e.target.value as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED'
-                            )
-                          }
-                          disabled={updateParticipantMutation.isPending}
-                          className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${getParticipantStatusColor(
-                            participant.status
-                          )} disabled:opacity-50`}
-                        >
-                          <option value="PENDING">Pending</option>
-                          {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
-                            <option value="INVITED">Invited</option>
-                          ) : (
-                            ''
-                          )}
-                          <option value="ENABLED">Enabled</option>
-                          <option value="DISABLED">Disabled</option>
-                        </select>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             )}
           </div>

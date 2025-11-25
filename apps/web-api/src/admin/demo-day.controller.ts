@@ -42,6 +42,7 @@ export class AdminDemoDaysController {
         slugURL: body.slugURL,
         description: body.description,
         shortDescription: body.shortDescription,
+        approximateStartDate: body.approximateStartDate,
         status: body.status.toUpperCase() as DemoDayStatus,
       },
       req.userEmail
@@ -76,8 +77,10 @@ export class AdminDemoDaysController {
         startDate: body.startDate ? new Date(body.startDate) : undefined,
         endDate: body.endDate ? new Date(body.endDate) : undefined,
         title: body.title,
+        slugURL: body.slugURL,
         description: body.description,
         shortDescription: body.shortDescription,
+        approximateStartDate: body.approximateStartDate,
         status: body.status?.toUpperCase() as DemoDayStatus,
       },
       req.userEmail

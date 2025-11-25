@@ -33,6 +33,7 @@ export class DemoDaysService {
     date?: string;
     title?: string;
     description?: string;
+    approximateStartDate?: string | null;
     teamsCount?: number;
     investorsCount?: number;
     isDemoDayAdmin?: boolean;
@@ -61,6 +62,7 @@ export class DemoDaysService {
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
+        approximateStartDate: demoDay.approximateStartDate,
         teamsCount: 0,
         investorsCount: 0,
         confidentialityAccepted: false,
@@ -94,6 +96,7 @@ export class DemoDaysService {
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
+        approximateStartDate: demoDay.approximateStartDate,
         teamsCount,
         investorsCount,
         confidentialityAccepted: participant.confidentialityAccepted,
@@ -120,6 +123,7 @@ export class DemoDaysService {
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
+        approximateStartDate: demoDay.approximateStartDate,
         status: this.getExternalDemoDayStatus(
           demoDay.status,
           participant.type === 'FOUNDER' || participant.hasEarlyAccess
@@ -139,6 +143,7 @@ export class DemoDaysService {
       date: demoDay.startDate.toISOString(),
       title: demoDay.title,
       description: demoDay.description,
+      approximateStartDate: demoDay.approximateStartDate,
       teamsCount,
       investorsCount,
       confidentialityAccepted: false,
@@ -156,6 +161,7 @@ export class DemoDaysService {
       slugURL: string;
       description: string;
       shortDescription?: string | null;
+      approximateStartDate?: string | null;
       status: DemoDayStatus;
     },
     actorEmail?: string
@@ -183,6 +189,7 @@ export class DemoDaysService {
         title: data.title,
         description: data.description,
         shortDescription: data.shortDescription,
+        approximateStartDate: data.approximateStartDate,
         status: data.status,
         slugURL,
       },
@@ -217,6 +224,7 @@ export class DemoDaysService {
         slugURL: true,
         startDate: true,
         endDate: true,
+        approximateStartDate: true,
         title: true,
         description: true,
         shortDescription: true,
@@ -288,6 +296,7 @@ export class DemoDaysService {
             date: demoDay.startDate.toISOString(),
             title: demoDay.title,
             description: demoDay.description,
+            approximateStartDate: demoDay.approximateStartDate,
             access,
             status: this.getExternalDemoDayStatus(
               demoDay.status,
@@ -327,6 +336,7 @@ export class DemoDaysService {
         slugURL: true,
         startDate: true,
         endDate: true,
+        approximateStartDate: true,
         title: true,
         description: true,
         shortDescription: true,
@@ -354,6 +364,7 @@ export class DemoDaysService {
         slugURL: true,
         startDate: true,
         endDate: true,
+        approximateStartDate: true,
         title: true,
         description: true,
         shortDescription: true,
@@ -378,8 +389,10 @@ export class DemoDaysService {
       startDate?: Date;
       endDate?: Date;
       title?: string;
+      slugURL?: string;
       description?: string;
       shortDescription?: string | null;
+      approximateStartDate?: string | null;
       status?: DemoDayStatus;
     },
     actorEmail?: string
@@ -394,6 +407,18 @@ export class DemoDaysService {
       actorUid = actor?.uid;
     }
 
+    // Check if slugURL is being updated and if it conflicts with existing demo day
+    if (data.slugURL !== undefined && data.slugURL !== before.slugURL) {
+      const existingDemoDay = await this.prisma.demoDay.findFirst({
+        where: { slugURL: data.slugURL, isDeleted: false, uid: { not: uid } },
+      });
+      if (existingDemoDay) {
+        throw new ConflictException(
+          `A demo day with slug "${data.slugURL}" already exists. Please choose a different slug.`
+        );
+      }
+    }
+
     const updateData: any = {};
 
     if (data.startDate !== undefined) {
@@ -405,11 +430,17 @@ export class DemoDaysService {
     if (data.title !== undefined) {
       updateData.title = data.title;
     }
+    if (data.slugURL !== undefined) {
+      updateData.slugURL = data.slugURL;
+    }
     if (data.description !== undefined) {
       updateData.description = data.description;
     }
     if (data.shortDescription !== undefined) {
       updateData.shortDescription = data.shortDescription;
+    }
+    if (data.approximateStartDate !== undefined) {
+      updateData.approximateStartDate = data.approximateStartDate;
     }
     if (data.status !== undefined) {
       updateData.status = data.status;
@@ -424,6 +455,7 @@ export class DemoDaysService {
         slugURL: true,
         startDate: true,
         endDate: true,
+        approximateStartDate: true,
         title: true,
         description: true,
         shortDescription: true,
@@ -435,9 +467,10 @@ export class DemoDaysService {
       },
     });
 
-    // Track "details updated" (name/description/startDate/endDate) only if any changed
+    // Track "details updated" (name/description/startDate/endDate/slugURL) only if any changed
     const detailsChanged: string[] = [];
     if (updateData.title !== undefined && before.title !== updated.title) detailsChanged.push('title');
+    if (updateData.slugURL !== undefined && before.slugURL !== updated.slugURL) detailsChanged.push('slugURL');
     if (updateData.description !== undefined && before.description !== updated.description)
       detailsChanged.push('description');
     if (updateData.startDate !== undefined && before.startDate?.toISOString?.() !== updated.startDate?.toISOString?.())
