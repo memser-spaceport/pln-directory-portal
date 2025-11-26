@@ -218,6 +218,11 @@ enum DiscoveryQuestionType {
   FOLLOW_UP
 }
 
+enum PLEventLocationStatus {
+  AUTO_MAPPED
+  MANUALLY_MAPPED
+}
+
 model ParticipantsRequest {
   id               Int             @id @default(autoincrement())
   uid              String          @unique @default(cuid())
@@ -424,60 +429,82 @@ model Project {
 }
 
 model PLEventLocation {
-  id                 Int       @id @default(autoincrement())
-  uid                String    @unique @default(cuid())
-  location           String
-  country            String?
-  timezone           String
-  latitude           String
-  longitude          String
-  flag               String?
-  icon               String?
-  resources          Json[]
-  additionalInfo     Json?
-  priority           Int?
-  events             PLEvent[]
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  isFeatured         Boolean?  @default(false)
-  isAggregated       Boolean   @default(false)
-  aggregatedPriority Int?
+  id                   Int                          @id @default(autoincrement())
+  uid                  String                       @unique @default(cuid())
+  location             String
+  country              String?
+  timezone             String
+  latitude             String?
+  longitude            String?
+  flag                 String?
+  icon                 String?
+  resources            Json[]
+  additionalInfo       Json?
+  priority             Int?
+  events               PLEvent[]
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  isFeatured           Boolean?                     @default(false)
+  isAggregated         Boolean                      @default(false)
+  isDeleted            Boolean                      @default(false)
+  aggregatedPriority   Int?
+  locationAssociations PLEventLocationAssociation[]
+}
 
-  @@unique([latitude, longitude])
+model PLEventLocationAssociation {
+  id            Int             @id @default(autoincrement())
+  uid           String          @unique @default(cuid())
+  locationUid   String
+  location      PLEventLocation @relation(fields: [locationUid], references: [uid], onDelete: Cascade)
+  googlePlaceId String
+  locationName  String
+  city          String?
+  state         String?
+  country       String?
+  region        String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  isDeleted     Boolean         @default(false)
+  PLEvent       PLEvent[]
 }
 
 model PLEvent {
-  id                 Int                 @id @default(autoincrement())
-  uid                String              @unique @default(cuid())
-  type               PLEventType?
-  eventsCount        Int?
-  telegramId         String?
-  logoUid            String?
-  logo               Image?              @relation("logo", fields: [logoUid], references: [uid])
-  bannerUid          String?
-  banner             Image?              @relation("banner", fields: [bannerUid], references: [uid])
-  name               String
-  description        String?
-  shortDescription   String?
-  websiteURL         String?
-  externalId         String?
-  isFeatured         Boolean?            @default(false)
-  isAggregated       Boolean             @default(false)
-  slugURL            String              @unique
-  resources          Json[]
-  priority           Int?
-  additionalInfo     Json?
-  startDate          DateTime
-  endDate            DateTime
-  isDeleted          Boolean             @default(false)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  syncedAt           DateTime?
-  relatedQuestions   DiscoveryQuestion[] @relation("PLEventRelatedDiscoveryQuestions")
-  locationUid        String?
-  location           PLEventLocation?    @relation(fields: [locationUid], references: [uid])
-  eventGuests        PLEventGuest[]
-  aggregatedPriority Int?
+  id                            Int                         @id @default(autoincrement())
+  uid                           String                      @unique @default(cuid())
+  type                          PLEventType?
+  eventsCount                   Int?
+  telegramId                    String?
+  logoUid                       String?
+  logo                          Image?                      @relation("logo", fields: [logoUid], references: [uid])
+  bannerUid                     String?
+  banner                        Image?                      @relation("banner", fields: [bannerUid], references: [uid])
+  name                          String
+  description                   String?
+  shortDescription              String?
+  websiteURL                    String?
+  externalId                    String?
+  isFeatured                    Boolean?                    @default(false)
+  isAggregated                  Boolean                     @default(false)
+  slugURL                       String                      @unique
+  resources                     Json[]
+  priority                      Int?
+  additionalInfo                Json?
+  startDate                     DateTime
+  endDate                       DateTime
+  isDeleted                     Boolean                     @default(false)
+  createdAt                     DateTime                    @default(now())
+  updatedAt                     DateTime                    @updatedAt
+  syncedAt                      DateTime?
+  relatedQuestions              DiscoveryQuestion[]         @relation("PLEventRelatedDiscoveryQuestions")
+  locationUid                   String?
+  location                      PLEventLocation?            @relation(fields: [locationUid], references: [uid])
+  locationStatus                PLEventLocationStatus?
+  eventGuests                   PLEventGuest[]
+  reviewer                      Member?                     @relation("PLEventReviewer", fields: [reviewerUid], references: [uid])
+  reviewerUid                   String?
+  aggregatedPriority            Int?
+  pLEventLocationAssociationUid String?
+  pLEventLocationAssociation    PLEventLocationAssociation? @relation(fields: [pLEventLocationAssociationUid], references: [uid])
 }
 
 model PLEventGuest {
