@@ -1,9 +1,7 @@
 import { CacheModule, forwardRef, Module } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtService } from '../utils/jwt/jwt.service';
-import { ParticipantsRequestModule } from '../participants-request/participants-request.module';
 import { SharedModule } from '../shared/shared.module';
-import { AdminParticipantsRequestController } from './participants-request.controller';
 import { AdminAuthController } from './auth.controller';
 import { MemberController } from './member.controller';
 import { MembersModule } from '../members/members.module';
@@ -19,6 +17,7 @@ import { DemoDaysModule } from '../demo-days/demo-days.module';
 import {AnalyticsModule} from "../analytics/analytics.module";
 import {AdminTeamsController} from "./admin-teams.controller";
 import { AdminTeamsService } from './admin-teams.service';
+import {ParticipantsRequestModule} from "../participants-request/participants-request.module";
 
 @Module({
   imports: [
@@ -35,7 +34,6 @@ import { AdminTeamsService } from './admin-teams.service';
     AnalyticsModule
   ],
   controllers: [
-    AdminParticipantsRequestController,
     AdminAuthController,
     MemberController,
     RecommendationsController,

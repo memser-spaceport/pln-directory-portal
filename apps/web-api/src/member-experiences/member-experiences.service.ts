@@ -94,7 +94,6 @@ export class MemberExperiencesService {
    */
   async update(uid: string, updateMemberExperiencedto: UpdateMemberExperienceDto, requesterEmailId: string) {
     try {
-      const existingExperience = await this.findOne(uid);
       const { memberUid, ...experienceData } = updateMemberExperiencedto;
 
       // Trim title and company fields if they exist
@@ -115,20 +114,6 @@ export class MemberExperiencesService {
           where: { uid },
           data: updateData,
         });
-
-        //logging into participant request
-        await this.participantsRequestService.add(
-          {
-            status: 'AUTOAPPROVED',
-            requesterEmailId,
-            referenceUid: uid,
-            uniqueIdentifier: updatedExperience.title,
-            participantType: 'MEMBER',
-            newData: updatedExperience as any,
-            oldData: existingExperience as any,
-          },
-          tx
-        );
 
         return updatedExperience;
       });

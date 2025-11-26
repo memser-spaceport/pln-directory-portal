@@ -81,3 +81,4 @@ export class MemberController {
     return await this.memberService.updateMemberFromParticipantsRequest(uid, participantsRequest, requestorEmail, true);
   }
 }
+
