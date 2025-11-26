@@ -486,7 +486,6 @@ export class MemberController {
 
   /**
    * Retrieves the investor profile for the authenticated member.
-   * Only L5 and L6 members can view their investor profile.
    *
    * @param uid - UID of the member
    * @param req - HTTP request object containing user information

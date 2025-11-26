@@ -126,10 +126,8 @@ export class InvestorProfileService {
 
   /**
    * Gets the investor profile for a member
-   * Only L5 and L6 members can view their own investor profile
    *
    * @param memberUid - The UID of the member
-   * @param memberAccessLevel - The access level of the member
    * @returns The investor profile or null if not found
    */
   async getInvestorProfile(memberUid: string) {
@@ -139,7 +137,7 @@ export class InvestorProfileService {
         select: { investorProfileId: true, accessLevel: true },
       });
 
-      if (!member?.investorProfileId || (member.accessLevel !== 'L5' && member.accessLevel !== 'L6')) {
+      if (!member?.investorProfileId) {
         return null;
       }
 
