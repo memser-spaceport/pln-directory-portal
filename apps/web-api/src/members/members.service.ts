@@ -5,12 +5,12 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException,
+  NotFoundException
 } from '@nestjs/common';
 import { z } from 'zod';
 import axios from 'axios';
 import * as path from 'path';
-import {ApprovalStatus, Member, ParticipantsRequest, ParticipantType, Prisma} from '@prisma/client';
+import { ApprovalStatus, Member, ParticipantsRequest, ParticipantType, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
@@ -444,13 +444,7 @@ export class MembersService {
         },
       });
 
-      // Only return investor profile for L5 and L6 members
-      const memberData = { ...(member as any) };
-      if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
-        delete memberData.investorProfile;
-      }
-
-      return memberData;
+      return { ...(member as any) };
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -2944,7 +2938,7 @@ export class MembersService {
   }
 
   async findByExternalId(externalId: string) {
-    const member = await this.prisma.member.findFirst({
+    return this.prisma.member.findFirst({
       where: { externalId },
       include: {
         image: true,
@@ -2966,16 +2960,6 @@ export class MembersService {
         investorProfile: true,
       },
     });
-
-    if (member) {
-      // Only return investor profile for L5 and L6 members
-      if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
-        return { ...member, investorProfile: null };
-      }
-      return member;
-    }
-
-    return member;
   }
 
   /**
@@ -3074,13 +3058,7 @@ export class MembersService {
         },
       });
 
-      // Apply conditional logic to only return investor profile for L5 and L6 members
-      return members.map((member) => {
-        if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
-          return { ...member, investorProfile: null };
-        }
-        return member;
-      });
+      return members;
     } catch (error) {
       return this.handleErrors(error);
     }
