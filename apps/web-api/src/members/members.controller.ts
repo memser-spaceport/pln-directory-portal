@@ -533,10 +533,9 @@ export class MemberController {
       throw new ForbiddenException('You can only update your own investor setting');
     }
 
-    // Check if a member has sufficient access level (L2-L6)
-    const allowedLevels = ['L2', 'L3', 'L4', 'L5', 'L6'];
-    if (!allowedLevels.includes(member.accessLevel)) {
-      throw new ForbiddenException('Your access level does not allow this operation');
+    // Check if a member is not rejected
+    if (member.accessLevel === 'Rejected') {
+      throw new ForbiddenException('Your application to join the Protocol Labs network was not approved');
     }
 
     return await this.membersService.updateMemberInvestorSetting(uid, body.isInvestor);
