@@ -255,9 +255,8 @@ export class TeamsController {
    * GET /teams?includeL0=true|false
    */
   @Get('v1/admin/teams')
-  async getTeams(@Query('includeL0') includeL0?: string) {
-    const include = includeL0 !== 'false';
-    const teams = await this.teamsService.findAllForAdmin(include);
+  async getTeams() {
+    const teams = await this.teamsService.findAllForAdmin();
     return { teams };
   }
 }
