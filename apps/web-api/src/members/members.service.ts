@@ -5,7 +5,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException,
+  NotFoundException
 } from '@nestjs/common';
 import {z} from 'zod';
 import axios from 'axios';
@@ -29,7 +29,6 @@ import {AccessLevel} from '../../../../libs/contracts/src/schema/admin-member';
 import {OfficeHoursService} from '../office-hours/office-hours.service';
 import {TeamsService} from '../teams/teams.service';
 import {ParticipantsRequest} from "./members.dto";
-
 
 @Injectable()
 export class MembersService {
@@ -443,13 +442,7 @@ export class MembersService {
         },
       });
 
-      // Only return investor profile for L5 and L6 members
-      const memberData = { ...(member as any) };
-      if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
-        delete memberData.investorProfile;
-      }
-
-      return memberData;
+      return { ...(member as any) };
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -2841,7 +2834,7 @@ async updateMemberFromParticipantsRequest(
   }
 
   async findByExternalId(externalId: string) {
-    const member = await this.prisma.member.findFirst({
+    return this.prisma.member.findFirst({
       where: { externalId },
       include: {
         image: true,
@@ -2863,16 +2856,6 @@ async updateMemberFromParticipantsRequest(
         investorProfile: true,
       },
     });
-
-    if (member) {
-      // Only return investor profile for L5 and L6 members
-      if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
-        return { ...member, investorProfile: null };
-      }
-      return member;
-    }
-
-    return member;
   }
 
   /**
@@ -2971,13 +2954,7 @@ async updateMemberFromParticipantsRequest(
         },
       });
 
-      // Apply conditional logic to only return investor profile for L5 and L6 members
-      return members.map((member) => {
-        if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
-          return { ...member, investorProfile: null };
-        }
-        return member;
-      });
+      return members;
     } catch (error) {
       return this.handleErrors(error);
     }

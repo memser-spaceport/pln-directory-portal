@@ -247,7 +247,7 @@ export class DemoDaysService {
     // Get all demo days and member info in parallel
     const [demoDays, member, investorsCount] = await Promise.all([
       this.prisma.demoDay.findMany({
-        where: { isDeleted: false },
+        where: { isDeleted: false, status: { not: DemoDayStatus.ARCHIVED } },
         orderBy: { createdAt: 'desc' },
       }),
       memberEmail ? this.getMemberWithDemoDayParticipants(memberEmail) : Promise.resolve(null),

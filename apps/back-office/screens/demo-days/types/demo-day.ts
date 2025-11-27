@@ -53,6 +53,7 @@ export interface DemoDayParticipant {
     profilePicture?: string;
     accessLevel?: string;
     externalId?: string;
+    linkedinHandler?: string;
     teamMemberRoles?: {
       mainTeam: boolean;
       teamLead: boolean;
