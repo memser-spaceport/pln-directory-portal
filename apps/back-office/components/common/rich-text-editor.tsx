@@ -1,6 +1,6 @@
 'use client';
 
-import React, { forwardRef, useEffect, useMemo, useRef } from 'react';
+import React, { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import ReactQuill from 'react-quill';
 import clsx from 'clsx';
 
@@ -24,6 +24,16 @@ const RichTextEditor = forwardRef<ReactQuill, Props>((props, ref) => {
   const { value, maxLength, onChange, className, errorMessage, id, disabled, autoFocus, placeholder } = props;
 
   const quillRef = useRef<any>(null);
+  const [charCount, setCharCount] = useState(0);
+
+  // Update character count when value changes
+  useEffect(() => {
+    const editor = quillRef.current?.getEditor();
+    if (editor) {
+      // Quill adds a trailing newline, so subtract 1
+      setCharCount(Math.max(0, editor.getLength() - 1));
+    }
+  }, [value]);
 
   // Custom link handler to ensure URLs have protocols
   const handleLink = React.useCallback((value: any) => {
@@ -111,7 +121,14 @@ const RichTextEditor = forwardRef<ReactQuill, Props>((props, ref) => {
         modules={modules}
         placeholder={placeholder}
       />
-      {errorMessage && <div className={s.errorMessage}>{errorMessage}</div>}
+      <div className={s.footer}>
+        {errorMessage && <div className={s.errorMessage}>{errorMessage}</div>}
+        {maxLength && (
+          <div className={clsx(s.charCounter, { [s.limit]: charCount >= maxLength })}>
+            {charCount}/{maxLength}
+          </div>
+        )}
+      </div>
     </div>
   );
 });
