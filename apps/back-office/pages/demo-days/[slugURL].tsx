@@ -73,7 +73,21 @@ const DemoDayDetailPage = () => {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: 'UTC',
     });
+  };
+
+  // Convert ISO date string to datetime-local format in UTC
+  const toDateTimeLocal = (isoString: string) => {
+    if (!isoString) return '';
+    // ISO string is already in UTC, just extract the date/time part
+    return isoString.slice(0, 16);
+  };
+
+  // Convert datetime-local value to ISO string (treating input as UTC)
+  const fromDateTimeLocal = (localValue: string) => {
+    if (!localValue) return '';
+    return `${localValue}:00.000Z`;
   };
 
   const getStatusColor = (status: string) => {
@@ -375,12 +389,12 @@ const DemoDayDetailPage = () => {
 
             <div className={s.overviewGrid}>
               <div className={s.overviewField}>
-                <label className={s.fieldLabel}>Start Date</label>
+                <label className={s.fieldLabel}>Start Date (UTC)</label>
                 {isEditing ? (
                   <input
                     type="datetime-local"
-                    value={editFormData.startDate ? new Date(editFormData.startDate).toISOString().slice(0, 16) : ''}
-                    onChange={(e) => handleEditFormChange('startDate', e.target.value)}
+                    value={toDateTimeLocal(editFormData.startDate || '')}
+                    onChange={(e) => handleEditFormChange('startDate', fromDateTimeLocal(e.target.value))}
                     className={s.fieldInput}
                   />
                 ) : (
@@ -388,12 +402,12 @@ const DemoDayDetailPage = () => {
                 )}
               </div>
               <div className={s.overviewField}>
-                <label className={s.fieldLabel}>End Date</label>
+                <label className={s.fieldLabel}>End Date (UTC)</label>
                 {isEditing ? (
                   <input
                     type="datetime-local"
-                    value={editFormData.endDate ? new Date(editFormData.endDate).toISOString().slice(0, 16) : ''}
-                    onChange={(e) => handleEditFormChange('endDate', e.target.value)}
+                    value={toDateTimeLocal(editFormData.endDate || '')}
+                    onChange={(e) => handleEditFormChange('endDate', fromDateTimeLocal(e.target.value))}
                     className={s.fieldInput}
                   />
                 ) : (

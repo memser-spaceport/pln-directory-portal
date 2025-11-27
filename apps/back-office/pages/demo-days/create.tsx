@@ -39,8 +39,9 @@ const CreateDemoDayPage = () => {
 
       const payload = {
         ...formData,
-        startDate: new Date(formData.startDate).toISOString(),
-        endDate: new Date(formData.endDate).toISOString(),
+        // Treat datetime-local input as UTC
+        startDate: `${formData.startDate}:00.000Z`,
+        endDate: `${formData.endDate}:00.000Z`,
       };
 
       await api.post(API_ROUTE.ADMIN_DEMO_DAYS, payload, config);
@@ -183,7 +184,7 @@ const CreateDemoDayPage = () => {
 
             <div>
               <label htmlFor="startDate" className="mb-2 block text-sm font-medium text-gray-700">
-                Start Date *
+                Start Date (UTC) *
               </label>
               <input
                 type="datetime-local"
@@ -198,7 +199,7 @@ const CreateDemoDayPage = () => {
 
             <div>
               <label htmlFor="endDate" className="mb-2 block text-sm font-medium text-gray-700">
-                End Date *
+                End Date (UTC) *
               </label>
               <input
                 type="datetime-local"
