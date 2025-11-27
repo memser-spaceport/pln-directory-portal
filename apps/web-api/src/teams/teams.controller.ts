@@ -225,6 +225,7 @@ export class TeamsController {
    * body: { accessLevel: "L0" | "L1" | ... }
    */
   @Patch('v1/teams/:uid/access-level')
+  @NoCache()
   async updateTeamAccessLevel(
     @Param('uid') uid: string,
     @Body() body: UpdateTeamAccessLevelDto
@@ -238,6 +239,7 @@ export class TeamsController {
   @Patch('v1/admin/teams/:uid/full')
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
   @AccessLevels(AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @NoCache()
   async adminUpdateTeamFull(
     @Param('uid') teamUid: string,
     @Body() body: ParticipantsRequest,
@@ -255,6 +257,7 @@ export class TeamsController {
    * GET /teams?includeL0=true|false
    */
   @Get('v1/admin/teams')
+  @NoCache()
   async getTeams() {
     const teams = await this.teamsService.findAllForAdmin();
     return { teams };
