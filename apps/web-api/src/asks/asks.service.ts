@@ -104,7 +104,6 @@ export class AskService {
             status: AskStatus.OPEN,
           },
         });
-        await this.logIntoParticipantRequest(tx, createdAsk, teamAsks, team.name, requesterEmailId);
         await this.notifyForAskStatusChange({
           ask: createdAsk,
           requester,
@@ -188,7 +187,6 @@ export class AskService {
             data: updateData,
           });
 
-          await this.logIntoParticipantRequest(tx, updatedAsk, teamAsks, team.name, requesterEmailId);
           await this.notifyForAskStatusChange({
             ask: updatedAsk,
             requester,
@@ -240,7 +238,6 @@ export class AskService {
           await tx.ask.delete({
             where: { uid },
           });
-          await this.logIntoParticipantRequest(tx, ask, teamAsks, team.name, requesterEmailId);
         });
 
         await this.cacheService.reset({ service: 'teams' });
@@ -257,38 +254,6 @@ export class AskService {
     }
   }
 
-  /**
-   * Logs the ask into the participant request service.
-   *
-   * @param {Prisma.TransactionClient} tx - The transaction client.
-   * @param {Ask} ask - The ask to log.
-   * @param {Ask[]} teamAsks - The team asks to log.
-   * @param {string} teamName - The name of the team.
-   * @param {string} requesterEmailId - The email ID of the requester.
-   */
-  async logIntoParticipantRequest(
-    tx: Prisma.TransactionClient,
-    ask: Ask,
-    teamAsks: Ask[],
-    teamName: string,
-    requesterEmailId: string
-  ) {
-    const teamAsksAfter = await tx.ask.findMany({
-      where: { teamUid: ask.teamUid },
-    });
-    await this.participantsRequestService.add(
-      {
-        status: 'AUTOAPPROVED',
-        requesterEmailId,
-        referenceUid: ask.teamUid,
-        uniqueIdentifier: teamName,
-        participantType: 'TEAM',
-        newData: teamAsksAfter as any,
-        oldData: teamAsks as any,
-      },
-      tx
-    );
-  }
 
   async notifyForAskStatusChange({
     ask,

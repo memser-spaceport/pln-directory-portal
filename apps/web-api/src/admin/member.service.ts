@@ -8,9 +8,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
-import { InvestorProfileType, Location, Member, ParticipantsRequest, Prisma } from '@prisma/client';
+import { InvestorProfileType, Location, Member, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
-import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { NotificationService } from '../utils/notification/notification.service';
 import { LogService } from '../shared/log.service';
@@ -28,6 +27,7 @@ import {
 } from '../../../../libs/contracts/src/schema/admin-member';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { MembersHooksService } from '../members/members.hooks.service';
+import {ParticipantsRequest} from "./members.dto";
 
 @Injectable()
 export class MemberService {
@@ -36,8 +36,6 @@ export class MemberService {
     private locationTransferService: LocationTransferService,
     private membersHooksService: MembersHooksService,
     private logger: LogService,
-    @Inject(forwardRef(() => ParticipantsRequestService))
-    private participantsRequestService: ParticipantsRequestService,
     @Inject(forwardRef(() => NotificationService))
     private notificationService: NotificationService,
     private cacheService: CacheService,
@@ -150,7 +148,6 @@ export class MemberService {
         tx
       );
       await this.updateMemberEmailChange(memberUid, isEmailChanged, isExternalIdAvailable, memberData, existingMember);
-      await this.logParticipantRequest(requestorEmail, memberData, existingMember.uid, tx);
 
       // Handle investor profile updates
       if (investorProfileData) {
@@ -684,32 +681,6 @@ export class MemberService {
     }
   }
 
-  /**
-   * Logs the participant request in the participants request table for audit and tracking purposes.
-   *
-   * @param tx - The transaction client to ensure atomicity
-   * @param requestorEmail - Email of the requestor who is updating the team
-   * @param newMemberData - The new data being applied to the team
-   * @param referenceUid - Unique identifier of the existing team to be referenced
-   */
-  private async logParticipantRequest(
-    requestorEmail: string,
-    newMemberData,
-    referenceUid: string,
-    tx: Prisma.TransactionClient
-  ): Promise<void> {
-    await this.participantsRequestService.add(
-      {
-        status: 'AUTOAPPROVED',
-        requesterEmailId: requestorEmail,
-        referenceUid,
-        uniqueIdentifier: newMemberData?.email || '',
-        participantType: 'MEMBER',
-        newData: { ...newMemberData },
-      },
-      tx
-    );
-  }
 
   /**
    * Verify the list of members and log into participant request.
@@ -731,30 +702,6 @@ export class MemberService {
 
       // enables recommendation feature for new users
       await this.notificationSettingsService.enableRecommendationsFor(memberIds);
-
-      const members = await tx.member.findMany({
-        where: { uid: { in: memberIds } },
-      });
-      await Promise.all(
-        members.map(async (member) => {
-          await this.participantsRequestService.add(
-            {
-              status: 'AUTOAPPROVED',
-              requesterEmailId: userEmail,
-              referenceUid: member.uid,
-              uniqueIdentifier: member?.email || '',
-              participantType: 'MEMBER',
-              oldData: {
-                isVerified: false,
-              },
-              newData: {
-                isVerified: true,
-              },
-            },
-            tx
-          );
-        })
-      );
 
       return result;
     });
