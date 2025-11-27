@@ -165,6 +165,7 @@ const CreateDemoDayPage = () => {
                 value={formData.shortDescription || ''}
                 onChange={(value) => handleRichTextChange('shortDescription', value)}
                 placeholder="Enter a brief description"
+                maxLength={250}
               />
             </div>
 

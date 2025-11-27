@@ -466,6 +466,7 @@ const DemoDayDetailPage = () => {
                   <RichTextEditor
                     value={editFormData.shortDescription || ''}
                     onChange={(value) => handleEditFormChange('shortDescription', value)}
+                    maxLength={250}
                   />
                 ) : (
                   <RichText text={demoDay.shortDescription || ''} className={s.fieldValue} />
