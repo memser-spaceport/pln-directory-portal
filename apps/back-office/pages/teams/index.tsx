@@ -45,7 +45,7 @@ const TeamsPage: React.FC = () => {
       const config = {
         headers: { authorization: `Bearer ${cookies.plnadmin}` },
       };
-      const res = await api.get('/v1/admin/teams?includeL0=true', config);
+      const res = await api.get('/v1/admin/teams', config);
       const data = res.data?.teams ?? [];
       setTeams(data);
     } catch (e) {

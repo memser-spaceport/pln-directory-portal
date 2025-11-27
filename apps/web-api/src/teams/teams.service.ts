@@ -1750,18 +1750,9 @@ export class TeamsService {
    * If includeL0 = true → returns all teams, including L0.
    * If includeL0 = false → excludes L0.
    */
-  async findAllForAdmin(includeL0 = true): Promise<Team[]> {
+  async findAllForAdmin(): Promise<Team[]> {
     try {
-      const where: Prisma.TeamWhereInput = includeL0
-        ? {}
-        : {
-          accessLevel: {
-            not: 'L0',
-          },
-        };
-
       return await this.prisma.team.findMany({
-        where,
         orderBy: { createdAt: 'desc' },
       });
     } catch (err) {
