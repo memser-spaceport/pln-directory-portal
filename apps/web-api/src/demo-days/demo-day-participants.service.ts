@@ -18,7 +18,7 @@ export class DemoDayParticipantsService {
       memberUid?: string;
       email?: string;
       name?: string;
-      type: 'INVESTOR' | 'FOUNDER';
+      type: 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
     },
     actorEmail?: string
   ): Promise<DemoDayParticipant> {
@@ -922,7 +922,7 @@ export class DemoDayParticipantsService {
     data: {
       status?: 'INVITED' | 'ENABLED' | 'DISABLED';
       teamUid?: string;
-      type?: 'INVESTOR' | 'FOUNDER';
+      type?: 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
       hasEarlyAccess?: boolean;
     },
     actorEmail?: string
@@ -971,14 +971,51 @@ export class DemoDayParticipantsService {
     if (data.status) {
       updateData.status = data.status;
       updateData.statusUpdatedAt = new Date();
+
+      // Update member access level when approving (status changes to ENABLED)
+      if (data.status === 'ENABLED' && participant.status !== 'ENABLED') {
+        const memberAccessLevel = participant.member?.accessLevel;
+        const participantType = data.type || participant.type;
+        let newAccessLevel: string | null = null;
+
+        if (participantType === 'INVESTOR') {
+          // Investor: L0 -> L5, L2-L4 -> L6
+          if (memberAccessLevel === 'L0') {
+            newAccessLevel = 'L5';
+          } else if (['L2', 'L3', 'L4'].includes(memberAccessLevel || '')) {
+            newAccessLevel = 'L6';
+          }
+        } else if (participantType === 'FOUNDER') {
+          // Founder: L0 -> L4
+          if (memberAccessLevel === 'L0') {
+            newAccessLevel = 'L4';
+          }
+        } else if (participantType === 'SUPPORT') {
+          // Support: L0 -> L2
+          if (memberAccessLevel === 'L0') {
+            newAccessLevel = 'L2';
+          }
+        }
+
+        if (newAccessLevel && participant.memberUid) {
+          await this.prisma.member.update({
+            where: { uid: participant.memberUid },
+            data: {
+              accessLevel: newAccessLevel,
+              accessLevelUpdatedAt: new Date(),
+              isVerified: true,
+            },
+          });
+        }
+      }
     }
 
     // Handle type change and auto-assign/remove teamUid
     if (data.type && data.type !== participant.type) {
       updateData.type = data.type;
 
-      // If changing from INVESTOR to FOUNDER, auto-assign main team
-      if (data.type === 'FOUNDER' && participant.type === 'INVESTOR') {
+      // If changing from INVESTOR or SUPPORT to FOUNDER, auto-assign main team
+      if (data.type === 'FOUNDER' && (participant.type === 'INVESTOR' || participant.type === 'SUPPORT')) {
         const mainTeam = participant.member?.teamMemberRoles.find((role) => role.mainTeam);
         const teamUid = mainTeam?.team.uid || participant.member?.teamMemberRoles[0]?.team.uid;
 
@@ -987,8 +1024,8 @@ export class DemoDayParticipantsService {
         }
       }
 
-      // If changing from FOUNDER to INVESTOR, remove team
-      if (data.type === 'INVESTOR' && participant.type === 'FOUNDER') {
+      // If changing from FOUNDER to non-FOUNDER (INVESTOR or SUPPORT), remove the team
+      if (data.type !== 'FOUNDER' && participant.type === 'FOUNDER') {
         updateData.team = { disconnect: true };
       }
     }

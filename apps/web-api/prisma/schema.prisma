@@ -947,6 +947,7 @@ enum DemoDayStatus {
 enum DemoDayParticipantType {
   INVESTOR
   FOUNDER
+  SUPPORT
 }
 
 enum DemoDayParticipantStatus {

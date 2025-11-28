@@ -10,7 +10,7 @@ interface ApproveParticipantModalProps {
     name: string;
     email: string;
   } | null;
-  onApprove: (participantUid: string, type: 'INVESTOR' | 'FOUNDER') => Promise<void>;
+  onApprove: (participantUid: string, type: 'INVESTOR' | 'FOUNDER' | 'SUPPORT') => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -21,7 +21,7 @@ export const ApproveParticipantModal: React.FC<ApproveParticipantModalProps> = (
   onApprove,
   isLoading = false,
 }) => {
-  const [selectedType, setSelectedType] = useState<'INVESTOR' | 'FOUNDER'>('INVESTOR');
+  const [selectedType, setSelectedType] = useState<'INVESTOR' | 'FOUNDER' | 'SUPPORT'>('INVESTOR');
 
   const handleApprove = async () => {
     if (!participant) return;
@@ -79,7 +79,7 @@ export const ApproveParticipantModal: React.FC<ApproveParticipantModalProps> = (
                   name="participantType"
                   value="INVESTOR"
                   checked={selectedType === 'INVESTOR'}
-                  onChange={(e) => setSelectedType(e.target.value as 'INVESTOR' | 'FOUNDER')}
+                  onChange={(e) => setSelectedType(e.target.value as 'INVESTOR' | 'FOUNDER' | 'SUPPORT')}
                   className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
                   disabled={isLoading}
                 />
@@ -91,11 +91,23 @@ export const ApproveParticipantModal: React.FC<ApproveParticipantModalProps> = (
                   name="participantType"
                   value="FOUNDER"
                   checked={selectedType === 'FOUNDER'}
-                  onChange={(e) => setSelectedType(e.target.value as 'INVESTOR' | 'FOUNDER')}
+                  onChange={(e) => setSelectedType(e.target.value as 'INVESTOR' | 'FOUNDER' | 'SUPPORT')}
                   className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
                   disabled={isLoading}
                 />
                 <span className="ml-2 text-sm text-gray-700">Founder</span>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="participantType"
+                  value="SUPPORT"
+                  checked={selectedType === 'SUPPORT'}
+                  onChange={(e) => setSelectedType(e.target.value as 'INVESTOR' | 'FOUNDER' | 'SUPPORT')}
+                  className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                  disabled={isLoading}
+                />
+                <span className="ml-2 text-sm text-gray-700">Support</span>
               </label>
             </div>
           </div>
