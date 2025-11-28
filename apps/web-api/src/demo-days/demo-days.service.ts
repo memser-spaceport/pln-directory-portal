@@ -814,7 +814,7 @@ export class DemoDaysService {
       name: string;
       linkedinProfile?: string;
       role?: string;
-      organisationFundName?: string;
+      teamUid?: string;
       isAccreditedInvestor?: boolean;
     },
     demoDayUidOrSlug: string
@@ -877,42 +877,28 @@ export class DemoDaysService {
         },
       });
 
-      // If an organisationFundName is provided, match it to a Team and create TeamMemberRole
-      if (applicationData.organisationFundName) {
-        const team = await this.prisma.team.findFirst({
+      // If a teamUid is provided, create TeamMemberRole
+      if (applicationData.teamUid) {
+        // Check if TeamMemberRole already exists for this member-team combination
+        const existingRole = await this.prisma.teamMemberRole.findUnique({
           where: {
-            name: {
-              equals: applicationData.organisationFundName,
-              mode: 'insensitive',
+            memberUid_teamUid: {
+              memberUid: member.uid,
+              teamUid: applicationData.teamUid,
             },
-          },
-          select: {
-            uid: true,
           },
         });
 
-        if (team) {
-          // Check if TeamMemberRole already exists for this member-team combination
-          const existingRole = await this.prisma.teamMemberRole.findUnique({
-            where: {
-              memberUid_teamUid: {
-                memberUid: member.uid,
-                teamUid: team.uid,
-              },
+        // Only create if it doesn't exist
+        if (!existingRole) {
+          await this.prisma.teamMemberRole.create({
+            data: {
+              memberUid: member.uid,
+              teamUid: applicationData.teamUid,
+              role: applicationData.role,
+              investmentTeam: true,
             },
           });
-
-          // Only create if it doesn't exist
-          if (!existingRole) {
-            await this.prisma.teamMemberRole.create({
-              data: {
-                memberUid: member.uid,
-                teamUid: team.uid,
-                role: applicationData.role,
-                investmentTeam: true,
-              },
-            });
-          }
         }
       }
     }
@@ -969,7 +955,7 @@ export class DemoDaysService {
         email: normalizedEmail,
         name: applicationData.name,
         role: applicationData.role,
-        organisationFundName: applicationData.organisationFundName,
+        teamUid: applicationData.teamUid,
         linkedinProfile: applicationData.linkedinProfile,
         isAccreditedInvestor: applicationData.isAccreditedInvestor ?? false,
         isNewMember,

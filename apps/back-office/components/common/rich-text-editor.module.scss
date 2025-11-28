@@ -33,12 +33,31 @@
   }
 }
 
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 20px;
+}
+
 .errorMessage {
   font-size: 12px;
   color: darkred;
   font-style: normal;
   font-weight: 500;
   line-height: 20px;
+}
+
+.charCounter {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  line-height: 20px;
+  margin-left: auto;
+
+  &.limit {
+    color: #dc2626;
+  }
 }
 
 .editor {

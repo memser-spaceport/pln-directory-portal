@@ -622,7 +622,7 @@ export class DemoDayFundraisingProfilesService {
     const { participantUid, isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
 
     //Condition #1: admins with showDraft get all profiles - otherwise only published ones
-    const where = this.buildProfilesWhere(params, demoDay.uid, isAdmin, showDraft);
+    const where = this.buildProfilesWhere(params, demoDay.uid, showDraft);
 
     const profiles = await this.fetchProfiles(where);
     if (profiles.length === 0) return [];
@@ -671,7 +671,6 @@ export class DemoDayFundraisingProfilesService {
   private buildProfilesWhere(
     params: { stage?: string | string[]; industry?: string | string[]; search?: string } | undefined,
     demoDayUid: string,
-    isAdmin = false,
     showDraft = false
   ): any {
     const where: any = {
@@ -679,7 +678,7 @@ export class DemoDayFundraisingProfilesService {
     };
 
     // show all profiles if admin and showDraft parameter are presented
-    if (!(isAdmin && showDraft)) {
+    if (!showDraft) {
       where.status = 'PUBLISHED'; // Condition #1: exclude DISABLED or DRAFT
       where.onePagerUploadUid = { not: null }; // Condition #1: onePager must be uploaded
       where.videoUploadUid = { not: null }; // Condition #1: video must be uploaded
