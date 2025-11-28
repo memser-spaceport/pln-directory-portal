@@ -1810,7 +1810,8 @@ export class TeamsService {
       );
 
       // Force L0 access level for newly created teams in this flow
-      formattedTeam.accessLevel = 'L0';
+      formattedTeam.accessLevel =
+        !requesterUser?.accessLevel || ['L0', 'L1'].includes(requesterUser?.accessLevel) ? 'L0' : 'L1';
       formattedTeam.accessLevelUpdatedAt = new Date();
 
       const createdTeam = await this.createTeam(formattedTeam, tx, requesterEmailId || newData?.requestorEmail || '');
