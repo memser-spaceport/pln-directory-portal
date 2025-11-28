@@ -530,13 +530,13 @@ const DemoDayDetailPage = () => {
                   className={clsx(s.tab, { [s.active]: activeTab === 'investors' })}
                   onClick={() => setActiveTab('investors')}
                 >
-                  Investors {participants && activeTab === 'investors' && `(${participants.total})`}
+                  Investors {participants && activeTab === 'investors' && `(${participants.participants.filter(p => p.status !== 'PENDING').length})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'founders' })}
                   onClick={() => setActiveTab('founders')}
                 >
-                  Founders {participants && activeTab === 'founders' && `(${participants.total})`}
+                  Founders {participants && activeTab === 'founders' && `(${participants.participants.filter(p => p.status !== 'PENDING').length})`}
                 </button>
               </div>
 
@@ -556,7 +556,6 @@ const DemoDayDetailPage = () => {
                     className={s.filterSelect}
                   >
                     <option value="">All Statuses</option>
-                    <option value="PENDING">Pending</option>
                     <option value="INVITED">Invited</option>
                     <option value="ENABLED">Enabled</option>
                     <option value="DISABLED">Disabled</option>
@@ -921,7 +920,7 @@ const DemoDayDetailPage = () => {
                             onChange={(e) =>
                               handleUpdateParticipantStatus(
                                 participant.uid,
-                                e.target.value as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED'
+                                e.target.value as 'INVITED' | 'ENABLED' | 'DISABLED'
                               )
                             }
                             disabled={updateParticipantMutation.isPending}
@@ -929,7 +928,6 @@ const DemoDayDetailPage = () => {
                               participant.status
                             )} disabled:opacity-50`}
                           >
-                            <option value="PENDING">Pending</option>
                             {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
                               <option value="INVITED">Invited</option>
                             ) : (
