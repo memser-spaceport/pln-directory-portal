@@ -1,37 +1,37 @@
 import {
-  Injectable,
+  BadRequestException,
   ConflictException,
   ForbiddenException,
-  BadRequestException,
-  NotFoundException,
   forwardRef,
   Inject,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import * as path from 'path';
-import { z } from 'zod';
-import { filter, isEmpty } from 'lodash';
-import { Prisma, Team, Member, ParticipantsRequest, AskStatus } from '@prisma/client';
-import { PrismaService } from '../shared/prisma.service';
-import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
-import { FileMigrationService } from '../utils/file-migration/file-migration.service';
-import { NotificationService } from '../utils/notification/notification.service';
-import { ParticipantsRequestService } from '../participants-request/participants-request.service';
-import { hashFileName } from '../utils/hashing';
-import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
-import { MembersService } from '../members/members.service';
-import { LogService } from '../shared/log.service';
-import { copyObj, buildMultiRelationMapping, buildRelationMapping } from '../utils/helper/helper';
-import { CacheService } from '../utils/cache/cache.service';
-import { AskService } from '../asks/asks.service';
-import { TeamsHooksService } from './teams.hooks.service';
+import {z} from 'zod';
+import {isEmpty} from 'lodash';
+import {AskStatus, Member, Prisma, Team} from '@prisma/client';
+import {PrismaService} from '../shared/prisma.service';
+import {AirtableTeamSchema} from '../utils/airtable/schema/airtable-team.schema';
+import {FileMigrationService} from '../utils/file-migration/file-migration.service';
+import {NotificationService} from '../utils/notification/notification.service';
+import {hashFileName} from '../utils/hashing';
+import {ForestAdminService} from '../utils/forest-admin/forest-admin.service';
+import {MembersService} from '../members/members.service';
+import {LogService} from '../shared/log.service';
+import {buildMultiRelationMapping, buildRelationMapping, copyObj} from '../utils/helper/helper';
+import {CacheService} from '../utils/cache/cache.service';
+import {AskService} from '../asks/asks.service';
+import {TeamsHooksService} from './teams.hooks.service';
+import {ParticipantsRequest} from "./dto/members.dto";
+import {SelfUpdatePayload} from "./dto/teams.dto";
+
 
 @Injectable()
 export class TeamsService {
   constructor(
     private prisma: PrismaService,
     private fileMigrationService: FileMigrationService,
-    @Inject(forwardRef(() => ParticipantsRequestService))
-    private participantsRequestService: ParticipantsRequestService,
     @Inject(forwardRef(() => MembersService))
     private membersService: MembersService,
     private logger: LogService,
@@ -54,9 +54,9 @@ export class TeamsService {
     try {
       const whereClause = {
         ...queryOptions.where,
-        accessLevel: {
-          not: 'L0',
-        },
+        // accessLevel: {
+        //   not: 'L0',
+        // },
       };
 
       const [teams, teamsCount] = await Promise.all([
@@ -253,36 +253,6 @@ export class TeamsService {
     }
   }
 
-  /**
-   * Creates a new team in the database within a transaction.
-   *
-   * @param team - The data for the new team to be created
-   * @param tx - The transaction client to ensure atomicity
-   * @param requestorEmail - Email of the person creating the team
-   * @returns The created team record
-   */
-  async createTeam(
-    team: Prisma.TeamUncheckedCreateInput,
-    tx: Prisma.TransactionClient,
-    requestorEmail: string
-  ): Promise<Team> {
-    try {
-      const teamData = {
-        ...team,
-        accessLevel: team.accessLevel || 'L1',
-        accessLevelUpdatedAt: new Date(),
-        tier: -1,
-      };
-
-      const createdTeam = await tx.team.create({
-        data: teamData,
-      });
-      await this.teamsHooksService.postCreateActions(createdTeam, requestorEmail);
-      return createdTeam;
-    } catch (err) {
-      return this.handleErrors(err);
-    }
-  }
 
   /**
    * Updates the team data in the database within a transaction.
@@ -310,6 +280,27 @@ export class TeamsService {
     }
   }
 
+
+  async findTeamByNameSafe(name: string): Promise<Team | null> {
+    const normalized = String(name || '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    try {
+      return await this.prisma.team.findFirst({
+        where: { name: normalized },
+      });
+    } catch (e) {
+      this.logger.error(
+        '[findTeamByNameSafe] Failed to find team by name="' + normalized + '"',
+        e as any,
+      );
+      return null;
+    }
+  }
+
+
   /**
    * Updates the existing team with new information.
    * updates the team, logs the update in the participants request table,
@@ -326,7 +317,6 @@ export class TeamsService {
     requestorEmail: string
   ): Promise<Team> {
     const updatedTeam: any = teamParticipantRequest.newData;
-    const existingTeam = await this.findTeamByUid(teamUid);
     let result;
     this.logger.info(`Going to update information about the '${teamUid}' team`);
     const requestor = await this.membersService.findMemberByEmail(requestorEmail);
@@ -371,7 +361,6 @@ export class TeamsService {
         await this.updateTeamInvestorProfile(teamUid, investorProfileData, tx, requestor.accessLevel);
       }
 
-      await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
     });
     await this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
     return result;
@@ -425,33 +414,6 @@ export class TeamsService {
     });
   }
 
-  /**
-   * Creates a new team from the participants request data.
-   * resets the cache, and triggers post-update actions like Airtable synchronization.
-   * @param teamParticipantRequest - The request containing the team details.
-   * @param requestorEmail - The email of the requestor.
-   * @returns The newly created team.
-   */
-  async createTeamFromParticipantsRequest(
-    teamParticipantRequest: ParticipantsRequest,
-    tx: Prisma.TransactionClient
-  ): Promise<Team> {
-    const newTeam: any = teamParticipantRequest.newData;
-    this.logger.info(`Creating team from participant request with data: ${JSON.stringify(newTeam)}`);
-    const { team: formattedTeam, investorProfileData } = await this.formatTeam(null, newTeam, tx);
-    this.logger.info(`Formatted team data, investorProfileData: ${JSON.stringify(investorProfileData)}`);
-    const createdTeam = await this.createTeam(formattedTeam, tx, teamParticipantRequest.requesterEmailId);
-
-    // Handle investor profile creation for teams
-    if (investorProfileData) {
-      this.logger.info(`Creating investor profile for team ${createdTeam.uid}`);
-      await this.updateTeamInvestorProfile(createdTeam.uid, investorProfileData, tx);
-    } else {
-      this.logger.info(`No investor profile data to process for team ${createdTeam.uid}`);
-    }
-
-    return createdTeam;
-  }
 
   /**
    * Format team data for creation or update
@@ -655,33 +617,6 @@ export class TeamsService {
       uniqueFocusAreas[uid] = { uid, title };
     });
     return Object.values(uniqueFocusAreas);
-  }
-
-  /**
-   * Logs the participant request in the participants request table for audit and tracking purposes.
-   *
-   * @param requestorEmail - Email of the requestor who is updating the team
-   * @param newTeamData - The new data being applied to the team
-   * @param referenceUid - Unique identifier of the existing team to be referenced
-   * @param tx - The transaction client to ensure atomicity
-   */
-  private async logParticipantRequest(
-    requestorEmail: string,
-    newTeamData,
-    referenceUid: string,
-    tx: Prisma.TransactionClient
-  ): Promise<void> {
-    await this.participantsRequestService.add(
-      {
-        status: 'AUTOAPPROVED',
-        requesterEmailId: requestorEmail,
-        referenceUid,
-        uniqueIdentifier: newTeamData?.name || '',
-        participantType: 'TEAM',
-        newData: { ...newTeamData },
-      },
-      tx
-    );
   }
 
   /**
@@ -1243,20 +1178,6 @@ export class TeamsService {
         const teamAsksAfter = await tx.ask.findMany({
           where: { teamUid },
         });
-
-        //logging into participant request
-        await this.participantsRequestService.add(
-          {
-            status: 'AUTOAPPROVED',
-            requesterEmailId,
-            referenceUid: teamUid,
-            uniqueIdentifier: teamName,
-            participantType: 'TEAM',
-            newData: teamAsksAfter as any,
-            oldData: teamAsks as any,
-          },
-          tx
-        );
       });
 
       //notifying the team edit
@@ -1504,9 +1425,9 @@ export class TeamsService {
 
     // Base where clause excluding L0 access level
     const baseWhere: Prisma.TeamWhereInput = {
-      accessLevel: {
-        not: 'L0',
-      },
+      // accessLevel: {
+      //   not: 'L0',
+      // },
     };
 
     const whereConditions: Prisma.TeamWhereInput[] = [baseWhere];
@@ -1805,4 +1726,38 @@ export class TeamsService {
       return a.localeCompare(b);
     });
   }
+
+  /**
+   * Directly updates team's accessLevel (admin action).
+   * Used by back-office to control team visibility and tiering.
+   */
+  async updateAccessLevel(uid: string, accessLevel: string): Promise<Team> {
+    try {
+      return await this.prisma.team.update({
+        where: { uid },
+        data: {
+          accessLevel,
+          accessLevelUpdatedAt: new Date(),
+        },
+      });
+    } catch (err) {
+      return this.handleErrors(err, uid);
+    }
+  }
+
+  /**
+   * Returns teams for back-office.
+   * If includeL0 = true → returns all teams, including L0.
+   * If includeL0 = false → excludes L0.
+   */
+  async findAllForAdmin(): Promise<Team[]> {
+    try {
+      return await this.prisma.team.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (err) {
+      return this.handleErrors(err);
+    }
+  }
+
 }

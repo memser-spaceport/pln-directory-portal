@@ -1,6 +1,5 @@
 import {
   Body,
-  CacheTTL,
   Controller,
   Delete,
   Get,
@@ -33,7 +32,6 @@ import {
   UpdateFundraisingDescriptionDto,
   UpdateFundraisingTeamDto,
 } from 'libs/contracts/src/schema';
-import { QueryCache } from '../decorators/query-cache.decorator';
 
 const cache = new Map<string, { data: any; expires: number }>();
 const TTL = 30_000; // 30 seconds
@@ -50,8 +48,7 @@ export class DemoDaysController {
 
   @Get()
   @UseGuards(UserTokenCheckGuard)
-  @QueryCache()
-  @CacheTTL(300) // 5 minutes
+  @NoCache()
   async getAllDemoDays(@Req() req) {
     return this.demoDaysService.getAllDemoDaysPublic(req.userEmail || null);
   }

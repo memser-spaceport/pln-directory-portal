@@ -1,86 +1,21 @@
-import {Body, Controller, Get, Post, Query, Req, UseGuards, UsePipes} from '@nestjs/common';
-import {ParticipantsRequestService} from './participants-request.service';
-import {NoCache} from '../decorators/no-cache.decorator';
-import {ParticipantsReqValidationPipe} from '../pipes/participant-request-validation.pipe';
-import {FindUniqueIdentiferDto} from 'libs/contracts/src/schema/participants-request';
-import {MembersService} from '../members/members.service';
-import {UserAuthValidateGuard} from '../guards/user-auth-validate.guard';
-import {AccessLevelsGuard} from '../guards/access-levels.guard';
-import {AccessLevels} from '../decorators/access-levels.decorator';
-import {AccessLevel} from '../../../../libs/contracts/src/schema/admin-member';
+import { Body, Controller, Post } from '@nestjs/common';
+import { ParticipantsRequestService } from './participants-request.service';
 
 @Controller('v1/participants-request')
-@NoCache()
 export class ParticipantsRequestController {
-  constructor(
-    private readonly participantsRequestService: ParticipantsRequestService,
-    private readonly memberService: MembersService
-  ) {}
+  constructor(private readonly participantsRequestService: ParticipantsRequestService) {}
 
   /**
-   * Add a new entry to the Participants request table.
-   * @param body - The request data to be added to the participants request table.
-   * @returns A promise with the participants request entry that was added.
+   * New simplified flow:
+   *  - validate body
+   *  - create/reuse Member
+   *  - create/reuse Team (if isTeamNew = true → new team with L0/L1)
+   *  - attach member to team
+   *
+   * Old "participants_request" table and statuses are removed.
    */
-  @Post('/')
-  @UsePipes(new ParticipantsReqValidationPipe())
-  @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L0, AccessLevel.L1, AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
-  async addRequest(@Body() body, @Req() request: Request) {
-    const uniqueIdentifier = this.participantsRequestService.getUniqueIdentifier(body);
-    // Validate unique identifier existence
-    await this.participantsRequestService.validateUniqueIdentifier(body.participantType, uniqueIdentifier);
-    await this.participantsRequestService.validateParticipantRequest(body);
-
-    // Load requester user
-    const requesterUser = await this.memberService.findMemberByEmail(request['userEmail']);
-
-    return await this.participantsRequestService.addRequest(body, requesterUser);
-  }
-
-  /**
-   * Add a new entry to the Participants request table.
-   * @param body - The request data to be added to the participants request table.
-   * @returns A promise with the participants request entry that was added.
-   */
-  @Post('/member')
-  @UsePipes(new ParticipantsReqValidationPipe())
-  async addMemberRequest(@Body() body) {
-    const uniqueIdentifier = this.participantsRequestService.getUniqueIdentifier(body);
-    // Validate unique identifier existence
-    await this.participantsRequestService.validateUniqueIdentifier(body.participantType, uniqueIdentifier);
-    await this.participantsRequestService.validateParticipantRequest(body);
-
-    // adding a member with L0 access level into the Member table
-    // the addRequest method that adds data into the ParticipantsRequests table should be removed
-    // when we are sure new RBAC system with L0, L1, L2, L3, L4 access levels is working
-    // and there are no dependencies on ParticipantRequest table
-    // Create member and (optionally) attach to team with role inside the service layer
-    const result = await this.memberService.createMemberAndAttach(body.newData, {
-      role: body.role,
-      team: body.team,
-      isTeamNew: body.isTeamNew,
-      website:
-        (typeof body.team === 'object' && body.team?.website)
-          ? body.team.website
-          : body.website,
-      requestorEmail: body?.newData?.email || body?.email || undefined,
-      project: body.project,
-    });
-
-    return result;
-  }
-
-  /**
-   * Check if the given identifier already exists in participants-request, members, or teams tables.
-   * @param queryParams - The query parameters containing the identifier and its type.
-   * @returns A promise indicating whether the identifier already exists.
-   */
-  @Get('/unique-identifier')
-  async findMatchingIdentifier(@Query() queryParams: FindUniqueIdentiferDto) {
-    return await this.participantsRequestService.checkIfIdentifierAlreadyExist(
-      queryParams.type,
-      queryParams.identifier
-    );
+  @Post('member')
+  async createMemberParticipantRequest(@Body() body: any): Promise<any> {
+    return this.participantsRequestService.handleMemberRequest(body);
   }
 }

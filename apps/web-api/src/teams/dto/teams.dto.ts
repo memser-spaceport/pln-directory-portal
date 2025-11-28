@@ -1,4 +1,4 @@
-type SelfUpdatePayload = {
+export type SelfUpdatePayload = {
   // allowed for any user:
   memberUid?: string;
   role?: string | null;
@@ -13,3 +13,8 @@ type SelfUpdatePayload = {
     typicalCheckSize?: number | null;
   } | null;
 };
+
+
+export class UpdateTeamAccessLevelDto {
+  accessLevel: string;
+}
