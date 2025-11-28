@@ -167,3 +167,5 @@ export const TeamAccessLevelSelect = ({ value, onChange, disabled }: Props) => {
     </div>
   );
 };
+
+export default TeamAccessLevelSelect;
