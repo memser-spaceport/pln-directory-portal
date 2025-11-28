@@ -971,6 +971,43 @@ export class DemoDayParticipantsService {
     if (data.status) {
       updateData.status = data.status;
       updateData.statusUpdatedAt = new Date();
+
+      // Update member access level when approving (status changes to ENABLED)
+      if (data.status === 'ENABLED' && participant.status !== 'ENABLED') {
+        const memberAccessLevel = participant.member?.accessLevel;
+        const participantType = data.type || participant.type;
+        let newAccessLevel: string | null = null;
+
+        if (participantType === 'INVESTOR') {
+          // Investor: L0 -> L5, L2-L4 -> L6
+          if (memberAccessLevel === 'L0') {
+            newAccessLevel = 'L5';
+          } else if (['L2', 'L3', 'L4'].includes(memberAccessLevel || '')) {
+            newAccessLevel = 'L6';
+          }
+        } else if (participantType === 'FOUNDER') {
+          // Founder: L0 -> L4
+          if (memberAccessLevel === 'L0') {
+            newAccessLevel = 'L4';
+          }
+        } else if (participantType === 'SUPPORT') {
+          // Support: L0 -> L2
+          if (memberAccessLevel === 'L0') {
+            newAccessLevel = 'L2';
+          }
+        }
+
+        if (newAccessLevel && participant.memberUid) {
+          await this.prisma.member.update({
+            where: { uid: participant.memberUid },
+            data: {
+              accessLevel: newAccessLevel,
+              accessLevelUpdatedAt: new Date(),
+              isVerified: true,
+            },
+          });
+        }
+      }
     }
 
     // Handle type change and auto-assign/remove teamUid
