@@ -1,10 +1,16 @@
-/* eslint-disable prettier/prettier */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
 import { GetServerSideProps } from 'next';
 import { parseCookies } from 'nookies';
+import { AnimatePresence, motion } from 'framer-motion';
+import { toast } from 'react-toastify';
 
 import { ApprovalLayout } from '../../layout/approval-layout';
 import api from '../../utils/api';
+import s from './styles.module.scss';
+import clsx from 'clsx';
+import { CloseIcon } from '../../screens/members/components/icons';
+import { TeamAccessLevelSelect } from './components/TeamAccessLevelSelect';
 
 // Access levels we allow to set for teams
 type AccessLevel = 'L0' | 'L1';
@@ -23,7 +29,11 @@ type TeamRow = {
   updatedAt: string;
 };
 
-const ACCESS_LEVELS: AccessLevel[] = ['L0', 'L1'];
+const fade = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1 },
+  exit: { opacity: 0 },
+};
 
 const TeamsPage: React.FC = () => {
   const [teams, setTeams] = useState<TeamRow[]>([]);
@@ -60,12 +70,9 @@ const TeamsPage: React.FC = () => {
       const rawTeams: any[] = res.data?.teams ?? [];
 
       // Normalise tier to number | null, to avoid "undefined" issues
-      const data: TeamRow[] = rawTeams.map(t => ({
+      const data: TeamRow[] = rawTeams.map((t) => ({
         ...t,
-        tier:
-          t.tier === undefined || t.tier === null || t.tier === ''
-            ? null
-            : Number(t.tier),
+        tier: t.tier === undefined || t.tier === null || t.tier === '' ? null : Number(t.tier),
       }));
 
       setTeams(data);
@@ -83,6 +90,8 @@ const TeamsPage: React.FC = () => {
   async function updateAccessLevel(teamUid: string, accessLevel: AccessLevel) {
     if (!accessLevel) return;
 
+    const teamName = teams.find((t) => t.uid === teamUid)?.name || 'Team';
+
     try {
       setSavingUid(teamUid);
       const cookies = parseCookies();
@@ -90,20 +99,15 @@ const TeamsPage: React.FC = () => {
         headers: { authorization: `Bearer ${cookies.plnadmin}` },
       };
 
-      await api.patch(
-        `/v1/teams/${teamUid}/access-level`,
-        { accessLevel },
-        config,
-      );
+      await api.patch(`/v1/teams/${teamUid}/access-level`, { accessLevel }, config);
+
+      toast.success(`Successfully updated access level for ${teamName} to ${accessLevel}`);
 
       // Optimistic UI update
-      setTeams(prev =>
-        prev.map(t =>
-          t.uid === teamUid ? { ...t, accessLevel } : t,
-        ),
-      );
+      setTeams((prev) => prev.map((t) => (t.uid === teamUid ? { ...t, accessLevel } : t)));
     } catch (e) {
       console.error('Failed to update access level', e);
+      toast.error(`Failed to update access level for ${teamName}`);
     } finally {
       setSavingUid(null);
     }
@@ -135,7 +139,7 @@ const TeamsPage: React.FC = () => {
    * Generic change handler for editor fields.
    */
   function onFieldChange<K extends keyof TeamRow>(field: K, value: TeamRow[K]) {
-    setEditForm(prev => ({
+    setEditForm((prev) => ({
       ...prev,
       [field]: value,
     }));
@@ -167,10 +171,7 @@ const TeamsPage: React.FC = () => {
 
       const name = (editForm.name ?? '').toString().trim();
 
-      const tierValue =
-        editForm.tier === undefined || editForm.tier === null
-          ? null
-          : Number(editForm.tier);
+      const tierValue = editForm.tier === undefined || editForm.tier === null ? null : Number(editForm.tier);
 
       const newData: any = {
         name,
@@ -194,40 +195,24 @@ const TeamsPage: React.FC = () => {
         newData,
       };
 
-      await api.patch(
-        `/v1/admin/teams/${selectedTeamUid}/full`,
-        payload,
-        config,
-      );
+      await api.patch(`/v1/admin/teams/${selectedTeamUid}/full`, payload, config);
 
       // Optimistic local update (including tier)
-      setTeams(prev =>
-        prev.map(t =>
+      setTeams((prev) =>
+        prev.map((t) =>
           t.uid === selectedTeamUid
             ? {
-              ...t,
-              name: newData.name ?? t.name,
-              website:
-                newData.website !== undefined ? newData.website : t.website,
-              shortDescription:
-                newData.shortDescription !== undefined
-                  ? newData.shortDescription
-                  : t.shortDescription,
-              longDescription:
-                newData.longDescription !== undefined
-                  ? newData.longDescription
-                  : t.longDescription,
-              plnFriend:
-                newData.plnFriend !== undefined
-                  ? newData.plnFriend
-                  : t.plnFriend,
-              tier:
-                tierValue !== null
-                  ? tierValue
-                  : t.tier, // if no tier sent, keep previous value
-            }
-            : t,
-        ),
+                ...t,
+                name: newData.name ?? t.name,
+                website: newData.website !== undefined ? newData.website : t.website,
+                shortDescription:
+                  newData.shortDescription !== undefined ? newData.shortDescription : t.shortDescription,
+                longDescription: newData.longDescription !== undefined ? newData.longDescription : t.longDescription,
+                plnFriend: newData.plnFriend !== undefined ? newData.plnFriend : t.plnFriend,
+                tier: tierValue !== null ? tierValue : t.tier, // if no tier sent, keep previous value
+              }
+            : t
+        )
       );
 
       closeEditor();
@@ -238,309 +223,204 @@ const TeamsPage: React.FC = () => {
     }
   }
 
-  const filteredTeams = teams.filter(t => {
+  const filteredTeams = teams.filter((t) => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
-    return (
-      t.name.toLowerCase().includes(q) ||
-      (t.website ?? '').toLowerCase().includes(q)
-    );
+    return t.name.toLowerCase().includes(q) || (t.website ?? '').toLowerCase().includes(q);
   });
 
-  const selectedTeam = teams.find(t => t.uid === selectedTeamUid) || null;
+  const selectedTeam = teams.find((t) => t.uid === selectedTeamUid) || null;
 
   return (
     <ApprovalLayout>
-      <div className="flex h-full">
-        {/* Left side: Teams table */}
-        <div className="flex-1 px-6 pt-6">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <h1 className="text-xl font-semibold">Teams</h1>
+      <div className={s.root}>
+        <div className={s.header}>
+          <span className={s.title}>Teams</span>
+          <span className={s.filters}>
             <input
-              className="border rounded-full px-4 py-2 text-sm w-72 shadow-sm bg-white"
-              placeholder="Search by team name..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by team name..."
+              className={s.input}
             />
-          </div>
-
-          {loading && <div>Loading teams…</div>}
-
-          {!loading && (
-            <div className="border rounded-2xl bg-white overflow-hidden shadow-sm">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-500">
-                    Team
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500">
-                    Access level
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500">
-                    PLN friend
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500">
-                    Is fund
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500">
-                    Created
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500">
-                    Updated
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500 text-right">
-                    Info
-                  </th>
-                </tr>
-                </thead>
-                <tbody>
-                {filteredTeams.map(team => (
-                  <tr
-                    key={team.uid}
-                    className="border-t hover:bg-gray-50 cursor-pointer"
-                    onClick={() => openEditor(team)}
-                  >
-                    <td className="px-6 py-3">
-                      <div className="flex flex-col">
-                          <span className="font-medium text-gray-900">
-                            {team.name}
-                          </span>
-                        {team.website && (
-                          <span className="text-xs text-gray-500">
-                              {team.website}
-                            </span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Access level dropdown — styled similar to Members page */}
-                    <td
-                      className="px-4 py-3"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <div className="relative inline-block">
-                        <select
-                          className="appearance-none w-[140px] border rounded-full px-3 py-1 text-sm pr-8 bg-white cursor-pointer shadow-sm
-                                       focus:outline-none focus:ring-2 focus:ring-gray-200"
-                          value={team.accessLevel ?? 'L0'}
-                          disabled={savingUid === team.uid}
-                          onChange={e =>
-                            updateAccessLevel(
-                              team.uid,
-                              e.target.value as AccessLevel,
-                            )
-                          }
-                        >
-                          {ACCESS_LEVELS.map(lvl => (
-                            <option key={lvl} value={lvl}>
-                              {lvl}
-                            </option>
-                          ))}
-                        </select>
-                        {/* Custom arrow so there is only one chevron */}
-                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                            ▼
-                          </span>
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3">
-                      {team.plnFriend ? 'Yes' : 'No'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {team.isFund ? 'Yes' : 'No'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {new Date(team.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {new Date(team.updatedAt).toLocaleDateString()}
-                    </td>
-
-                    {/* Info / Edit button, similar to Members table */}
-                    <td
-                      className="px-4 py-3 text-right"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <button
-                        className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 hover:bg-gray-200"
-                        onClick={() => openEditor(team)}
-                      >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 20 20"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M4 13.5L4.5 11L11.5 4L14 6.5L7 13.5L4 13.5Z"
-                            stroke="#4B5563"
-                            strokeWidth="1.4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <path
-                            d="M10.5 4L13 6.5"
-                            stroke="#4B5563"
-                            strokeWidth="1.4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-
-                {filteredTeams.length === 0 && (
-                  <tr>
-                    <td
-                      className="px-6 py-8 text-center text-gray-500"
-                      colSpan={7}
-                    >
-                      No teams found
-                    </td>
-                  </tr>
-                )}
-                </tbody>
-              </table>
-            </div>
-          )}
+          </span>
         </div>
 
-        {/* Right side: editor panel */}
-        {selectedTeamUid && selectedTeam && (
-          <div className="w-[420px] border-l bg-white px-6 py-6 flex flex-col">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Edit team
-                </h2>
-                <p className="text-xs text-gray-500 mt-1">
-                  {selectedTeam.website || ''}
-                </p>
-              </div>
-              <button
-                className="text-sm text-gray-500 hover:text-gray-800"
-                onClick={closeEditor}
-              >
-                Close
-              </button>
+        <div className={s.body}>
+          <div className={s.table}>
+            {/* Header */}
+            <div className={clsx(s.tableRow, s.tableHeader)}>
+              <div className={clsx(s.headerCell, s.first, s.teamNameColumn)}>Team</div>
+              <div className={clsx(s.headerCell, s.accessLevelColumn)}>Access level</div>
+              <div className={clsx(s.headerCell, s.booleanColumn)}>PLN friend</div>
+              <div className={clsx(s.headerCell, s.booleanColumn)}>Is fund</div>
+              <div className={clsx(s.headerCell, s.dateColumn)}>Created</div>
+              <div className={clsx(s.headerCell, s.dateColumn)}>Updated</div>
+              <div className={clsx(s.headerCell, s.infoColumn)}>Info</div>
             </div>
 
-            {/* Form fields */}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Name
-                </label>
-                <input
-                  className="w-full border rounded-md px-3 py-2 text-sm"
-                  value={editForm.name ?? ''}
-                  onChange={e => onFieldChange('name', e.target.value as any)}
-                />
-              </div>
+            {/* Body */}
+            {loading && <div className={s.loading}>Loading teams…</div>}
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Website
-                </label>
-                <input
-                  className="w-full border rounded-md px-3 py-2 text-sm"
-                  value={editForm.website ?? ''}
-                  onChange={e =>
-                    onFieldChange('website', e.target.value as any)
-                  }
-                />
-              </div>
+            {!loading && filteredTeams.length === 0 && <div className={s.emptyState}>No teams found</div>}
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Short description
-                </label>
-                <textarea
-                  className="w-full border rounded-md px-3 py-2 text-sm min-h-[60px]"
-                  value={editForm.shortDescription ?? ''}
-                  onChange={e =>
-                    onFieldChange('shortDescription', e.target.value as any)
-                  }
-                />
-              </div>
+            {!loading &&
+              filteredTeams.map((team) => (
+                <div
+                  key={team.uid}
+                  className={s.tableRow}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => openEditor(team)}
+                >
+                  <div className={clsx(s.bodyCell, s.first, s.teamNameColumn)}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: 500, color: 'var(--foreground-neutral-primary, #0A0C11)' }}>
+                        {team.name}
+                      </span>
+                      {team.website && (
+                        <span style={{ fontSize: '12px', color: 'var(--foreground-neutral-secondary, #455468)' }}>
+                          {team.website}
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Long description
-                </label>
-                <textarea
-                  className="w-full border rounded-md px-3 py-2 text-sm min-h-[80px]"
-                  value={editForm.longDescription ?? ''}
-                  onChange={e =>
-                    onFieldChange('longDescription', e.target.value as any)
-                  }
-                />
-              </div>
+                  <div className={clsx(s.bodyCell, s.accessLevelColumn)} onClick={(e) => e.stopPropagation()}>
+                    <TeamAccessLevelSelect
+                      value={team.accessLevel ?? 'L0'}
+                      onChange={(val) => updateAccessLevel(team.uid, val)}
+                      disabled={savingUid === team.uid}
+                    />
+                  </div>
 
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={!!editForm.plnFriend}
-                    onChange={e =>
-                      onFieldChange('plnFriend', e.target.checked as any)
-                    }
-                  />
-                  PLN friend
-                </label>
-              </div>
+                  <div className={clsx(s.bodyCell, s.booleanColumn)}>{team.plnFriend ? 'Yes' : 'No'}</div>
+                  <div className={clsx(s.bodyCell, s.booleanColumn)}>{team.isFund ? 'Yes' : 'No'}</div>
+                  <div className={clsx(s.bodyCell, s.dateColumn)}>{new Date(team.createdAt).toLocaleDateString()}</div>
+                  <div className={clsx(s.bodyCell, s.dateColumn)}>{new Date(team.updatedAt).toLocaleDateString()}</div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Tier
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={4}
-                  className="w-full border rounded-md px-3 py-2 text-sm"
-                  value={
-                    editForm.tier === null || editForm.tier === undefined
-                      ? ''
-                      : String(editForm.tier)
-                  }
-                  onChange={e => {
-                    const raw = e.target.value;
-                    if (raw === '') {
-                      onFieldChange('tier', null as any);
-                    } else {
-                      const num = Number(raw);
-                      onFieldChange('tier', (isNaN(num) ? null : num) as any);
-                    }
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Action buttons directly under the form (not stuck to the bottom) */}
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                className="text-sm px-3 py-1 border rounded-md"
-                onClick={closeEditor}
-              >
-                Cancel
-              </button>
-              <button
-                className="text-sm px-4 py-1 rounded-md bg-blue-600 text-white disabled:opacity-60"
-                disabled={savingTeam}
-                onClick={saveTeam}
-              >
-                {savingTeam ? 'Saving…' : 'Save'}
-              </button>
-            </div>
+                  <div className={clsx(s.bodyCell, s.infoColumn)} onClick={(e) => e.stopPropagation()}>
+                    <button className={s.editButton} onClick={() => openEditor(team)}>
+                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                          d="M4 13.5L4.5 11L11.5 4L14 6.5L7 13.5L4 13.5Z"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M10.5 4L13 6.5"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              ))}
           </div>
-        )}
+
+          {/* Modal editor panel */}
+          <AnimatePresence>
+            {selectedTeamUid && selectedTeam && (
+              <motion.div className={s.modal} initial="hidden" animate="visible" exit="exit" variants={fade}>
+                <div className={s.modalContent}>
+                  <div className={s.modalHeader}>
+                    <h2 className={s.modalTitle}>Edit team</h2>
+                    {selectedTeam.website && <p className={s.modalSubtitle}>{selectedTeam.website}</p>}
+                    <button className={s.closeButton} onClick={closeEditor}>
+                      <CloseIcon />
+                    </button>
+                  </div>
+
+                  <div className={s.formFields}>
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Name</label>
+                      <input
+                        className={s.formInput}
+                        value={editForm.name ?? ''}
+                        onChange={(e) => onFieldChange('name', e.target.value as any)}
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Website</label>
+                      <input
+                        className={s.formInput}
+                        value={editForm.website ?? ''}
+                        onChange={(e) => onFieldChange('website', e.target.value as any)}
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Short description</label>
+                      <textarea
+                        className={s.formTextarea}
+                        style={{ minHeight: '60px' }}
+                        value={editForm.shortDescription ?? ''}
+                        onChange={(e) => onFieldChange('shortDescription', e.target.value as any)}
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Long description</label>
+                      <textarea
+                        className={s.formTextarea}
+                        style={{ minHeight: '80px' }}
+                        value={editForm.longDescription ?? ''}
+                        onChange={(e) => onFieldChange('longDescription', e.target.value as any)}
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <div className={s.checkboxContainer}>
+                        <input
+                          type="checkbox"
+                          className={s.checkbox}
+                          checked={!!editForm.plnFriend}
+                          onChange={(e) => onFieldChange('plnFriend', e.target.checked as any)}
+                        />
+                        <label className={s.checkboxLabel}>PLN friend</label>
+                      </div>
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Tier</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={4}
+                        className={s.formInput}
+                        value={editForm.tier === null || editForm.tier === undefined ? '' : String(editForm.tier)}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === '') {
+                            onFieldChange('tier', null as any);
+                          } else {
+                            const num = Number(raw);
+                            onFieldChange('tier', (isNaN(num) ? null : num) as any);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={s.actionButtons}>
+                    <button className={s.cancelButton} onClick={closeEditor}>
+                      Cancel
+                    </button>
+                    <button className={s.saveButton} disabled={savingTeam} onClick={saveTeam}>
+                      {savingTeam ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </ApprovalLayout>
   );
@@ -552,7 +432,7 @@ export default TeamsPage;
  * Server-side guard:
  * if there is no `plnadmin` cookie, redirect to login (same behaviour as other BO pages).
  */
-export const getServerSideProps: GetServerSideProps = async ctx => {
+export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const { plnadmin } = parseCookies(ctx);
 
   if (!plnadmin) {
