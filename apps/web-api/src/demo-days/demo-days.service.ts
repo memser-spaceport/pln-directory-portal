@@ -54,6 +54,11 @@ export class DemoDaysService {
       };
     }
 
+    const [investorsCount, teamsCount] = await Promise.all([
+      this.getQualifiedInvestorsCount(),
+      this.getTeamsCountForDemoDay(demoDay.uid),
+    ]);
+
     // Handle unauthorized users
     if (!memberEmail) {
       return {
@@ -65,18 +70,14 @@ export class DemoDaysService {
         description: demoDay.description,
         shortDescription: demoDay.shortDescription,
         approximateStartDate: demoDay.approximateStartDate,
-        teamsCount: 0,
-        investorsCount: 0,
+        teamsCount: teamsCount,
+        investorsCount: investorsCount,
         confidentialityAccepted: false,
         isPending: false,
       };
     }
 
-    const [investorsCount, teamsCount, member] = await Promise.all([
-      this.getQualifiedInvestorsCount(),
-      this.getTeamsCountForDemoDay(demoDay.uid),
-      this.getMemberWithDemoDayParticipants(memberEmail, demoDay.uid),
-    ]);
+    const member = await this.getMemberWithDemoDayParticipants(memberEmail, demoDay.uid);
 
     if (!member || ['Rejected'].includes(member?.accessLevel ?? '')) {
       return {
