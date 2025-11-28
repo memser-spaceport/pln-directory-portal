@@ -260,12 +260,23 @@ export class DemoDaysService {
     return await Promise.all(
       demoDays
         .sort((a, b) => {
-          // If one is COMPLETED and one is not, COMPLETED goes last
-          const aCompleted = a.status === DemoDayStatus.COMPLETED;
-          const bCompleted = b.status === DemoDayStatus.COMPLETED;
-          if (aCompleted && !bCompleted) return 1;
-          if (!aCompleted && bCompleted) return -1;
-          // Otherwise, sort by startDate ascending (soonest first)
+          // Define sort order: ACTIVE(0), EARLY_ACCESS(1), REGISTRATION_OPENED(2), UPCOMING(3), COMPLETED(4)
+          const statusOrder = {
+            [DemoDayStatus.ACTIVE]: 0,
+            [DemoDayStatus.EARLY_ACCESS]: 1,
+            [DemoDayStatus.REGISTRATION_OPEN]: 2,
+            [DemoDayStatus.UPCOMING]: 3,
+            [DemoDayStatus.COMPLETED]: 4,
+          };
+
+          const aOrder = statusOrder[a.status] !== undefined ? statusOrder[a.status] : 999;
+          const bOrder = statusOrder[b.status] !== undefined ? statusOrder[b.status] : 999;
+
+          if (aOrder !== bOrder) {
+            return aOrder - bOrder;
+          }
+
+          // Same status: sort by startDate ascending
           const aDate = a.startDate instanceof Date ? a.startDate.getTime() : new Date(a.startDate).getTime();
           const bDate = b.startDate instanceof Date ? b.startDate.getTime() : new Date(b.startDate).getTime();
           return aDate - bDate;
@@ -315,6 +326,8 @@ export class DemoDaysService {
             investorsCount: access !== 'none' ? investorsCount : 0,
             confidentialityAccepted,
           };
+
+          console.log(demoDay.slugURL, access);
 
           // Only include these fields for authorized users
           if (access !== 'none') {
@@ -530,7 +543,7 @@ export class DemoDaysService {
       if (hasEarlyAccess) {
         return 'ACTIVE';
       } else {
-        return 'UPCOMING';
+        return 'REGISTRATION_OPEN';
       }
     }
 
