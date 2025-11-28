@@ -81,8 +81,25 @@ export class TeamsService {
    * @param tx - Optional transaction client
    * @returns The updated team
    */
-  async updateTeamAccessLevel(teamUid: string, tx?: Prisma.TransactionClient): Promise<Team> {
+  async updateTeamAccessLevel(
+    teamUid: string,
+    tx?: Prisma.TransactionClient,
+    accessLevel?: string,
+  ): Promise<Team> {
     const prisma = tx || this.prisma;
+
+    // If caller explicitly passed accessLevel → always use it
+    if (accessLevel !== undefined) {
+      return prisma.team.update({
+        where: { uid: teamUid },
+        data: {
+          accessLevel,
+          accessLevelUpdatedAt: new Date(),
+        },
+      });
+    }
+
+    // If accessLevel wasn't passed
     const activeMemberCount = await prisma.teamMemberRole.count({
       where: {
         teamUid,
@@ -94,10 +111,12 @@ export class TeamsService {
       },
     });
 
-    return await prisma.team.update({
+    const computedLevel = activeMemberCount > 0 ? 'L1' : null;
+
+    return prisma.team.update({
       where: { uid: teamUid },
       data: {
-        accessLevel: activeMemberCount > 0 ? 'L1' : undefined,
+        accessLevel: computedLevel,
         accessLevelUpdatedAt: new Date(),
       },
     });
@@ -140,7 +159,7 @@ export class TeamsService {
    * @returns The team object with all related information or throws an error if not found
    * @throws {NotFoundException} If the team with the given UID is not found
    */
-  async findTeamByUid(uid: string, queryOptions: Omit<Prisma.TeamFindUniqueArgsBase, 'where'> = {}): Promise<Team> {
+  async findTeamByUid(uid: string, userEmail?: string, queryOptions: Omit<Prisma.TeamFindUniqueArgsBase, 'where'> = {}): Promise<Team> {
     try {
       const team = await this.prisma.team.findUniqueOrThrow({
         where: { uid },
@@ -228,7 +247,11 @@ export class TeamsService {
         },
       });
       if (team.accessLevel === 'L0') {
-        throw new ForbiddenException('Team is inactive');
+        if (!userEmail) {
+          throw new ForbiddenException('Team is inactive');
+        } else {
+          await this.validateRequestor(userEmail, team.uid);
+        }
       }
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
       return team;
@@ -236,6 +259,7 @@ export class TeamsService {
       return this.handleErrors(err, uid);
     }
   }
+
 
   /**
    * Find a team by its name.
@@ -453,6 +477,7 @@ export class TeamsService {
       'longDescription',
       'moreDetails',
       'isFund',
+      'tier'
     ];
     copyObj(teamData, team, directFields);
     // Handle one-to-one or one-to-many mappings

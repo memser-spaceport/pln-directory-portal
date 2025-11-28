@@ -1,9 +1,19 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
+import { GetServerSideProps } from 'next';
+import { parseCookies } from 'nookies';
+import { AnimatePresence, motion } from 'framer-motion';
+import { toast } from 'react-toastify';
+
 import { ApprovalLayout } from '../../layout/approval-layout';
 import api from '../../utils/api';
-import { parseCookies } from 'nookies';
+import s from './styles.module.scss';
+import clsx from 'clsx';
+import { CloseIcon } from '../../screens/members/components/icons';
+import { TeamAccessLevelSelect } from './components/TeamAccessLevelSelect';
 
-type AccessLevel = 'L0' | 'L1' ;
+// Access levels we allow to set for teams
+type AccessLevel = 'L0' | 'L1';
 
 type TeamRow = {
   uid: string;
@@ -14,30 +24,41 @@ type TeamRow = {
   website?: string | null;
   shortDescription?: string | null;
   longDescription?: string | null;
-  tier?: number | null;
+  tier: number | null; // make it always present (null if not set)
   createdAt: string;
   updatedAt: string;
 };
 
-const ACCESS_LEVELS: Exclude<AccessLevel, null>[] = [
-  'L0',
-  'L1',
-];
+const fade = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1 },
+  exit: { opacity: 0 },
+};
 
 const TeamsPage: React.FC = () => {
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Access-level saving state
   const [savingUid, setSavingUid] = useState<string | null>(null);
+
+  // Search state
   const [search, setSearch] = useState('');
 
+  // Right-side editor state
   const [selectedTeamUid, setSelectedTeamUid] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<TeamRow>>({});
   const [savingTeam, setSavingTeam] = useState(false);
 
+  // Load teams on mount
   useEffect(() => {
     loadTeams();
   }, []);
 
+  /**
+   * Loads all teams from the admin endpoint.
+   * Uses the same backend as before: GET /v1/admin/teams
+   */
   async function loadTeams() {
     try {
       setLoading(true);
@@ -46,7 +67,14 @@ const TeamsPage: React.FC = () => {
         headers: { authorization: `Bearer ${cookies.plnadmin}` },
       };
       const res = await api.get('/v1/admin/teams', config);
-      const data = res.data?.teams ?? [];
+      const rawTeams: any[] = res.data?.teams ?? [];
+
+      // Normalise tier to number | null, to avoid "undefined" issues
+      const data: TeamRow[] = rawTeams.map((t) => ({
+        ...t,
+        tier: t.tier === undefined || t.tier === null || t.tier === '' ? null : Number(t.tier),
+      }));
+
       setTeams(data);
     } catch (e) {
       console.error('Failed to load teams', e);
@@ -55,31 +83,39 @@ const TeamsPage: React.FC = () => {
     }
   }
 
+  /**
+   * Updates access level for a single team.
+   * PATCH /v1/teams/:uid/access-level { accessLevel }
+   */
   async function updateAccessLevel(teamUid: string, accessLevel: AccessLevel) {
     if (!accessLevel) return;
+
+    const teamName = teams.find((t) => t.uid === teamUid)?.name || 'Team';
+
     try {
       setSavingUid(teamUid);
       const cookies = parseCookies();
       const config = {
         headers: { authorization: `Bearer ${cookies.plnadmin}` },
       };
-      // PATCH /v1/teams/:uid/access-level { accessLevel }
-      await api.patch(
-        `/v1/teams/${teamUid}/access-level`,
-        { accessLevel },
-        config,
-      );
 
-      setTeams((prev) =>
-        prev.map((t) => (t.uid === teamUid ? { ...t, accessLevel } : t)),
-      );
+      await api.patch(`/v1/teams/${teamUid}/access-level`, { accessLevel }, config);
+
+      toast.success(`Successfully updated access level for ${teamName} to ${accessLevel}`);
+
+      // Optimistic UI update
+      setTeams((prev) => prev.map((t) => (t.uid === teamUid ? { ...t, accessLevel } : t)));
     } catch (e) {
       console.error('Failed to update access level', e);
+      toast.error(`Failed to update access level for ${teamName}`);
     } finally {
       setSavingUid(null);
     }
   }
 
+  /**
+   * Opens the right-hand editor panel for the given team.
+   */
   function openEditor(team: TeamRow) {
     setSelectedTeamUid(team.uid);
     setEditForm({
@@ -89,8 +125,8 @@ const TeamsPage: React.FC = () => {
       shortDescription: team.shortDescription ?? '',
       longDescription: team.longDescription ?? '',
       plnFriend: team.plnFriend,
-      isFund: team.isFund,
-      tier: team.tier ?? undefined,
+      // keep tier as number | null; if null — input will be empty
+      tier: team.tier,
     });
   }
 
@@ -99,6 +135,9 @@ const TeamsPage: React.FC = () => {
     setEditForm({});
   }
 
+  /**
+   * Generic change handler for editor fields.
+   */
   function onFieldChange<K extends keyof TeamRow>(field: K, value: TeamRow[K]) {
     setEditForm((prev) => ({
       ...prev,
@@ -107,19 +146,22 @@ const TeamsPage: React.FC = () => {
   }
 
   /**
-   * Save handler:
-   * builds payload in old ParticipantsRequest-style:
+   * Saves the team using the "legacy" style payload:
    * {
    *   participantType: "TEAM",
+   *   requesterEmailId: "...",
    *   uniqueIdentifier: name,
    *   newData: { ...fields... }
    * }
    *
-   * and sends it to:
+   * Endpoint:
    * PATCH /v1/admin/teams/:uid/full
+   *
+   * Backend reuses updateTeamFromParticipantsRequest under the hood.
    */
   async function saveTeam() {
     if (!selectedTeamUid) return;
+
     try {
       setSavingTeam(true);
       const cookies = parseCookies();
@@ -129,17 +171,21 @@ const TeamsPage: React.FC = () => {
 
       const name = (editForm.name ?? '').toString().trim();
 
+      const tierValue = editForm.tier === undefined || editForm.tier === null ? null : Number(editForm.tier);
+
       const newData: any = {
         name,
         website: editForm.website ?? '',
         shortDescription: editForm.shortDescription ?? '',
         longDescription: editForm.longDescription ?? '',
         plnFriend: !!editForm.plnFriend,
-        isFund: !!editForm.isFund,
+        // isFund is intentionally NOT editable on the right panel now
       };
 
-      if (editForm.tier !== undefined && editForm.tier !== null && editForm.tier !== ('' as any)) {
-        newData.tier = Number(editForm.tier);
+      // Only send tier when user set it explicitly;
+      // if null — backend may treat as "clear" or ignore, depending on mapping.
+      if (tierValue !== null) {
+        newData.tier = tierValue;
       }
 
       const payload = {
@@ -149,44 +195,24 @@ const TeamsPage: React.FC = () => {
         newData,
       };
 
-      // REUSE old mapping on backend:
-      // this.teamsService.updateTeamFromParticipantsRequest(teamUid, body, req.userEmail)
-      await api.patch(
-        `/v1/admin/teams/${selectedTeamUid}/full`,
-        payload,
-        config,
-      );
+      await api.patch(`/v1/admin/teams/${selectedTeamUid}/full`, payload, config);
 
-      // optimistic local update
+      // Optimistic local update (including tier)
       setTeams((prev) =>
         prev.map((t) =>
           t.uid === selectedTeamUid
             ? {
-              ...t,
-              name: newData.name ?? t.name,
-              website:
-                newData.website !== undefined ? newData.website : t.website,
-              shortDescription:
-                newData.shortDescription !== undefined
-                  ? newData.shortDescription
-                  : t.shortDescription,
-              longDescription:
-                newData.longDescription !== undefined
-                  ? newData.longDescription
-                  : t.longDescription,
-              plnFriend:
-                newData.plnFriend !== undefined
-                  ? newData.plnFriend
-                  : t.plnFriend,
-              isFund:
-                newData.isFund !== undefined ? newData.isFund : t.isFund,
-              tier:
-                newData.tier !== undefined
-                  ? newData.tier
-                  : t.tier ?? null,
-            }
-            : t,
-        ),
+                ...t,
+                name: newData.name ?? t.name,
+                website: newData.website !== undefined ? newData.website : t.website,
+                shortDescription:
+                  newData.shortDescription !== undefined ? newData.shortDescription : t.shortDescription,
+                longDescription: newData.longDescription !== undefined ? newData.longDescription : t.longDescription,
+                plnFriend: newData.plnFriend !== undefined ? newData.plnFriend : t.plnFriend,
+                tier: tierValue !== null ? tierValue : t.tier, // if no tier sent, keep previous value
+              }
+            : t
+        )
       );
 
       closeEditor();
@@ -200,237 +226,227 @@ const TeamsPage: React.FC = () => {
   const filteredTeams = teams.filter((t) => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
-    return t.name.toLowerCase().includes(q);
+    return t.name.toLowerCase().includes(q) || (t.website ?? '').toLowerCase().includes(q);
   });
+
+  const selectedTeam = teams.find((t) => t.uid === selectedTeamUid) || null;
 
   return (
     <ApprovalLayout>
-      <div className="flex h-full">
-        {/* Left side: table */}
-        <div className="flex-1 px-6 pt-6">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <h1 className="text-xl font-semibold">Teams</h1>
+      <div className={s.root}>
+        <div className={s.header}>
+          <span className={s.title}>Teams</span>
+          <span className={s.filters}>
             <input
-              className="border rounded px-2 py-1 text-sm"
-              placeholder="Search by name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by team name..."
+              className={s.input}
             />
-          </div>
-
-          {loading && <div>Loading teams…</div>}
-
-          {!loading && (
-            <div className="border rounded-md bg-white overflow-hidden">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left">Name</th>
-                  <th className="px-3 py-2 text-left">Access level</th>
-                  <th className="px-3 py-2 text-left">PLN friend</th>
-                  <th className="px-3 py-2 text-left">Is fund</th>
-                  <th className="px-3 py-2 text-left">Created</th>
-                  <th className="px-3 py-2 text-left">Updated</th>
-                </tr>
-                </thead>
-                <tbody>
-                {filteredTeams.map((team) => (
-                  <tr
-                    key={team.uid}
-                    className="border-t cursor-pointer hover:bg-gray-50"
-                    onClick={() => openEditor(team)}
-                  >
-                    <td className="px-3 py-2">{team.name}</td>
-                    <td
-                      className="px-3 py-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <select
-                        className="border rounded px-2 py-1 text-xs"
-                        value={team.accessLevel ?? 'L0'}
-                        disabled={savingUid === team.uid}
-                        onChange={(e) =>
-                          updateAccessLevel(
-                            team.uid,
-                            e.target.value as AccessLevel,
-                          )
-                        }
-                      >
-                        {ACCESS_LEVELS.map((lvl) => (
-                          <option key={lvl} value={lvl}>
-                            {lvl}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      {team.plnFriend ? 'Yes' : 'No'}
-                    </td>
-                    <td className="px-3 py-2">
-                      {team.isFund ? 'Yes' : 'No'}
-                    </td>
-                    <td className="px-3 py-2">
-                      {new Date(team.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-3 py-2">
-                      {new Date(team.updatedAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-
-                {filteredTeams.length === 0 && (
-                  <tr>
-                    <td
-                      className="px-3 py-6 text-center text-gray-500"
-                      colSpan={6}
-                    >
-                      No teams found
-                    </td>
-                  </tr>
-                )}
-                </tbody>
-              </table>
-            </div>
-          )}
+          </span>
         </div>
 
-        {/* Right side: editor panel */}
-        {selectedTeamUid && (
-          <div className="w-[380px] border-l bg-white px-4 pt-6 pb-4 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Edit team</h2>
-              <button
-                className="text-sm text-gray-500 hover:text-gray-800"
-                onClick={closeEditor}
-              >
-                Close
-              </button>
+        <div className={s.body}>
+          <div className={s.table}>
+            {/* Header */}
+            <div className={clsx(s.tableRow, s.tableHeader)}>
+              <div className={clsx(s.headerCell, s.first, s.teamNameColumn)}>Team</div>
+              <div className={clsx(s.headerCell, s.accessLevelColumn)}>Access level</div>
+              <div className={clsx(s.headerCell, s.booleanColumn)}>PLN friend</div>
+              <div className={clsx(s.headerCell, s.booleanColumn)}>Is fund</div>
+              <div className={clsx(s.headerCell, s.dateColumn)}>Created</div>
+              <div className={clsx(s.headerCell, s.dateColumn)}>Updated</div>
+              <div className={clsx(s.headerCell, s.infoColumn)}>Info</div>
             </div>
 
-            <div className="space-y-3 flex-1 overflow-auto pr-1">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Name
-                </label>
-                <input
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={editForm.name ?? ''}
-                  onChange={(e) => onFieldChange('name', e.target.value as any)}
-                />
-              </div>
+            {/* Body */}
+            {loading && <div className={s.loading}>Loading teams…</div>}
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Website
-                </label>
-                <input
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={editForm.website ?? ''}
-                  onChange={(e) =>
-                    onFieldChange('website', e.target.value as any)
-                  }
-                />
-              </div>
+            {!loading && filteredTeams.length === 0 && <div className={s.emptyState}>No teams found</div>}
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Short description
-                </label>
-                <textarea
-                  className="w-full border rounded px-2 py-1 text-sm min-h-[60px]"
-                  value={editForm.shortDescription ?? ''}
-                  onChange={(e) =>
-                    onFieldChange(
-                      'shortDescription',
-                      e.target.value as any,
-                    )
-                  }
-                />
-              </div>
+            {!loading &&
+              filteredTeams.map((team) => (
+                <div
+                  key={team.uid}
+                  className={s.tableRow}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => openEditor(team)}
+                >
+                  <div className={clsx(s.bodyCell, s.first, s.teamNameColumn)}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: 500, color: 'var(--foreground-neutral-primary, #0A0C11)' }}>
+                        {team.name}
+                      </span>
+                      {team.website && (
+                        <span style={{ fontSize: '12px', color: 'var(--foreground-neutral-secondary, #455468)' }}>
+                          {team.website}
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Long description
-                </label>
-                <textarea
-                  className="w-full border rounded px-2 py-1 text-sm min-h-[80px]"
-                  value={editForm.longDescription ?? ''}
-                  onChange={(e) =>
-                    onFieldChange('longDescription', e.target.value as any)
-                  }
-                />
-              </div>
+                  <div className={clsx(s.bodyCell, s.accessLevelColumn)} onClick={(e) => e.stopPropagation()}>
+                    <TeamAccessLevelSelect
+                      value={team.accessLevel ?? 'L0'}
+                      onChange={(val) => updateAccessLevel(team.uid, val)}
+                      disabled={savingUid === team.uid}
+                    />
+                  </div>
 
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={!!editForm.plnFriend}
-                    onChange={(e) =>
-                      onFieldChange('plnFriend', e.target.checked as any)
-                    }
-                  />
-                  PLN friend
-                </label>
+                  <div className={clsx(s.bodyCell, s.booleanColumn)}>{team.plnFriend ? 'Yes' : 'No'}</div>
+                  <div className={clsx(s.bodyCell, s.booleanColumn)}>{team.isFund ? 'Yes' : 'No'}</div>
+                  <div className={clsx(s.bodyCell, s.dateColumn)}>{new Date(team.createdAt).toLocaleDateString()}</div>
+                  <div className={clsx(s.bodyCell, s.dateColumn)}>{new Date(team.updatedAt).toLocaleDateString()}</div>
 
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={!!editForm.isFund}
-                    onChange={(e) =>
-                      onFieldChange('isFund', e.target.checked as any)
-                    }
-                  />
-                  Is fund
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Tier
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={4}
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={
-                    editForm.tier !== undefined && editForm.tier !== null
-                      ? editForm.tier
-                      : ''
-                  }
-                  onChange={(e) =>
-                    onFieldChange(
-                      'tier',
-                      e.target.value === ''
-                        ? (undefined as any)
-                        : (Number(e.target.value) as any),
-                    )
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="pt-4 flex justify-end gap-2 border-t mt-4">
-              <button
-                className="text-sm px-3 py-1 border rounded"
-                onClick={closeEditor}
-              >
-                Cancel
-              </button>
-              <button
-                className="text-sm px-4 py-1 rounded bg-blue-600 text-white disabled:opacity-60"
-                disabled={savingTeam}
-                onClick={saveTeam}
-              >
-                {savingTeam ? 'Saving…' : 'Save'}
-              </button>
-            </div>
+                  <div className={clsx(s.bodyCell, s.infoColumn)} onClick={(e) => e.stopPropagation()}>
+                    <button className={s.editButton} onClick={() => openEditor(team)}>
+                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                          d="M4 13.5L4.5 11L11.5 4L14 6.5L7 13.5L4 13.5Z"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M10.5 4L13 6.5"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              ))}
           </div>
-        )}
+
+          {/* Modal editor panel */}
+          <AnimatePresence>
+            {selectedTeamUid && selectedTeam && (
+              <motion.div className={s.modal} initial="hidden" animate="visible" exit="exit" variants={fade}>
+                <div className={s.modalContent}>
+                  <div className={s.modalHeader}>
+                    <h2 className={s.modalTitle}>Edit team</h2>
+                    {selectedTeam.website && <p className={s.modalSubtitle}>{selectedTeam.website}</p>}
+                    <button className={s.closeButton} onClick={closeEditor}>
+                      <CloseIcon />
+                    </button>
+                  </div>
+
+                  <div className={s.formFields}>
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Name</label>
+                      <input
+                        className={s.formInput}
+                        value={editForm.name ?? ''}
+                        onChange={(e) => onFieldChange('name', e.target.value as any)}
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Website</label>
+                      <input
+                        className={s.formInput}
+                        value={editForm.website ?? ''}
+                        onChange={(e) => onFieldChange('website', e.target.value as any)}
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Short description</label>
+                      <textarea
+                        className={s.formTextarea}
+                        style={{ minHeight: '60px' }}
+                        value={editForm.shortDescription ?? ''}
+                        onChange={(e) => onFieldChange('shortDescription', e.target.value as any)}
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Long description</label>
+                      <textarea
+                        className={s.formTextarea}
+                        style={{ minHeight: '80px' }}
+                        value={editForm.longDescription ?? ''}
+                        onChange={(e) => onFieldChange('longDescription', e.target.value as any)}
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <div className={s.checkboxContainer}>
+                        <input
+                          type="checkbox"
+                          className={s.checkbox}
+                          checked={!!editForm.plnFriend}
+                          onChange={(e) => onFieldChange('plnFriend', e.target.checked as any)}
+                        />
+                        <label className={s.checkboxLabel}>PLN friend</label>
+                      </div>
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Tier</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={4}
+                        className={s.formInput}
+                        value={editForm.tier === null || editForm.tier === undefined ? '' : String(editForm.tier)}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === '') {
+                            onFieldChange('tier', null as any);
+                          } else {
+                            const num = Number(raw);
+                            onFieldChange('tier', (isNaN(num) ? null : num) as any);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={s.actionButtons}>
+                    <button className={s.cancelButton} onClick={closeEditor}>
+                      Cancel
+                    </button>
+                    <button className={s.saveButton} disabled={savingTeam} onClick={saveTeam}>
+                      {savingTeam ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </ApprovalLayout>
   );
 };
 
 export default TeamsPage;
+
+/**
+ * Server-side guard:
+ * if there is no `plnadmin` cookie, redirect to login (same behaviour as other BO pages).
+ */
+export const getServerSideProps: GetServerSideProps = async (ctx) => {
+  const { plnadmin } = parseCookies(ctx);
+
+  if (!plnadmin) {
+    const currentUrl = ctx.resolvedUrl;
+    const loginUrl = `/?backlink=${currentUrl}`;
+    return {
+      redirect: {
+        destination: loginUrl,
+        permanent: false,
+      },
+    };
+  }
+
+  return {
+    props: {},
+  };
+};
