@@ -46,20 +46,12 @@ export const CreateDemoDayFeedbackSchema = z.object({
 
 export class CreateDemoDayFeedbackDto extends createZodDto(CreateDemoDayFeedbackSchema) {}
 
-const optionalString = z.preprocess(
-  (val) => (val === '' || val === null ? undefined : val),
-  z.string().optional()
-);
-
-const optionalUrl = z.preprocess(
-  (val) => (val === '' || val === null ? undefined : val),
-  z.string().url('Invalid LinkedIn URL').optional()
-);
+const optionalString = z.preprocess((val) => (val === '' || val === null ? undefined : val), z.string().optional());
 
 export const CreateDemoDayInvestorApplicationSchema = z.object({
   email: z.string().email('Invalid email address'),
   name: z.string().min(1, 'Name is required'),
-  linkedinProfile: optionalUrl,
+  linkedinProfile: optionalString,
   role: optionalString,
   teamUid: optionalString,
   isAccreditedInvestor: z.boolean().optional(),
