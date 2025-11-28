@@ -6,40 +6,41 @@ import {
   ForbiddenException,
   Get,
   Param,
-  Patch, Query,
+  Patch,
+  Query,
   Req,
   UseGuards,
-  UsePipes
+  UsePipes,
 } from '@nestjs/common';
-import {ApiNotFoundResponse, ApiParam} from '@nestjs/swagger';
-import {Api, ApiDecorator, initNestServer, TsRest} from '@ts-rest/nest';
-import {Request} from 'express';
-import {z} from 'zod';
-import {apiTeam} from 'libs/contracts/src/lib/contract-team';
+import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
+import { Api, ApiDecorator, initNestServer, TsRest } from '@ts-rest/nest';
+import { Request } from 'express';
+import { z } from 'zod';
+import { apiTeam } from 'libs/contracts/src/lib/contract-team';
 import {
   ResponseTeamWithRelationsSchema,
   TeamDetailQueryParams,
   TeamFilterQueryParams,
   TeamQueryParams,
 } from 'libs/contracts/src/schema';
-import {ApiQueryFromZod} from '../decorators/api-query-from-zod';
-import {ApiOkResponseFromZod} from '../decorators/api-response-from-zod';
-import {NOT_FOUND_GLOBAL_RESPONSE_SCHEMA} from '../utils/constants';
-import {PrismaQueryBuilder} from '../utils/prisma-query-builder';
-import {ENABLED_RETRIEVAL_PROFILE} from '../utils/prisma-query-builder/profile/defaults';
-import {prismaQueryableFieldsFromZod} from '../utils/prisma-queryable-fields-from-zod';
-import {TeamsService} from './teams.service';
-import {NoCache} from '../decorators/no-cache.decorator';
-import {UserTokenValidation} from '../guards/user-token-validation.guard';
-import {ParticipantsReqValidationPipe} from '../pipes/participant-request-validation.pipe';
-import {AccessLevelsGuard} from '../guards/access-levels.guard';
-import {AccessLevels} from '../decorators/access-levels.decorator';
-import {AccessLevel} from '../../../../libs/contracts/src/schema/admin-member';
-import {MembersService} from '../members/members.service';
-import {UserTokenCheckGuard} from '../guards/user-token-check.guard';
-import {QueryCache} from '../decorators/query-cache.decorator';
-import {UpdateTeamAccessLevelDto} from "./dto/teams.dto";
-import {ParticipantsRequest} from "./dto/members.dto";
+import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
+import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
+import { NOT_FOUND_GLOBAL_RESPONSE_SCHEMA } from '../utils/constants';
+import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
+import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
+import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
+import { TeamsService } from './teams.service';
+import { NoCache } from '../decorators/no-cache.decorator';
+import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
+import { AccessLevelsGuard } from '../guards/access-levels.guard';
+import { AccessLevels } from '../decorators/access-levels.decorator';
+import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
+import { MembersService } from '../members/members.service';
+import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { QueryCache } from '../decorators/query-cache.decorator';
+import { UpdateTeamAccessLevelDto } from './dto/teams.dto';
+import { ParticipantsRequest } from './dto/members.dto';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
@@ -50,7 +51,7 @@ export class TeamsController {
   @Api(server.route.teamFilters)
   @ApiQueryFromZod(TeamQueryParams)
   @QueryCache()
-  @CacheTTL(300)
+  @NoCache()
   @UseGuards(UserTokenCheckGuard)
   async getTeamFilters(@Req() request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
@@ -227,10 +228,7 @@ export class TeamsController {
    */
   @Patch('v1/teams/:uid/access-level')
   @NoCache()
-  async updateTeamAccessLevel(
-    @Param('uid') uid: string,
-    @Body() body: UpdateTeamAccessLevelDto
-  ) {
+  async updateTeamAccessLevel(@Param('uid') uid: string, @Body() body: UpdateTeamAccessLevelDto) {
     return await this.teamsService.updateAccessLevel(uid, body.accessLevel);
   }
 
@@ -241,16 +239,8 @@ export class TeamsController {
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
   @AccessLevels(AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
   @NoCache()
-  async adminUpdateTeamFull(
-    @Param('uid') teamUid: string,
-    @Body() body: ParticipantsRequest,
-    @Req() req: Request,
-  ) {
-    return this.teamsService.updateTeamFromParticipantsRequest(
-      teamUid,
-      body,
-      req['userEmail'],
-    );
+  async adminUpdateTeamFull(@Param('uid') teamUid: string, @Body() body: ParticipantsRequest, @Req() req: Request) {
+    return this.teamsService.updateTeamFromParticipantsRequest(teamUid, body, req['userEmail']);
   }
 
   /**
