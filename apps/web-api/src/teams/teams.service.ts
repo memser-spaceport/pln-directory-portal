@@ -1785,4 +1785,114 @@ export class TeamsService {
     }
   }
 
+  /**
+   * Creates a new Team from a "legacy" participants request payload,
+   * but WITHOUT using the participants_request table.
+   *
+   * This is used by the new ParticipantsRequestService.processImmediateRequest()
+   * to support the old /v1/participants-request endpoint while:
+   *  - directly creating a Team entity
+   *  - setting accessLevel = 'L0' (inactive / soft-created)
+   *  - optionally attaching the requester as a team member (team lead)
+   *
+   * @param payload.newData - Raw team data from the request
+   * @param payload.requesterEmailId - Email of the requester
+   * @param requesterUser - Member entity for the requester (if available)
+   */
+  async createTeamFromLegacyRequest(
+    payload: { newData: any; requesterEmailId?: string },
+    requesterUser?: any,
+  ): Promise<Team> {
+    const { newData, requesterEmailId } = payload;
+
+    this.logger.info(
+      `[TeamsService.createTeamFromLegacyRequest] Creating team from legacy request, name=${newData?.name}`,
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      // Reuse existing team formatting logic so industryTags, technologies, etc. work as before
+      const { team: formattedTeam, investorProfileData } = await this.formatTeam(
+        null,
+        newData,
+        tx,
+        'Create', // keep the semantics consistent with existing code
+      );
+
+      // Force L0 access level for newly created teams in this flow
+      formattedTeam.accessLevel = 'L0';
+      formattedTeam.accessLevelUpdatedAt = new Date();
+
+      const createdTeam = await this.createTeam(
+        formattedTeam,
+        tx,
+        requesterEmailId || newData?.requestorEmail || '',
+      );
+
+      // Handle investor profile if present in newData
+      if (investorProfileData) {
+        this.logger.info(
+          `[TeamsService.createTeamFromLegacyRequest] Updating investor profile for team ${createdTeam.uid}`,
+        );
+        await this.updateTeamInvestorProfile(
+          createdTeam.uid,
+          investorProfileData,
+          tx,
+          requesterUser?.accessLevel,
+        );
+      }
+
+      // Optionally add requester as a team member (team lead, investment team flag, etc.)
+      if (requesterUser) {
+        const role = newData?.role || 'Lead';
+        const investmentTeam = newData?.investmentTeam || false;
+
+        this.logger.info(
+          `[TeamsService.createTeamFromLegacyRequest] Adding requester ${requesterUser.uid} as team member for team ${createdTeam.uid}`,
+        );
+
+        await tx.teamMemberRole.create({
+          data: {
+            teamUid: createdTeam.uid,
+            memberUid: requesterUser.uid,
+            role,
+            teamLead: true,
+            investmentTeam,
+          },
+        });
+      }
+
+      return createdTeam;
+    });
+  }
+
+  /**
+   * Creates a new team in the database within a transaction.
+   *
+   * @param team - The data for the new team to be created
+   * @param tx - The transaction client to ensure atomicity
+   * @param requestorEmail - Email of the person creating the team
+   * @returns The created team record
+   */
+  async createTeam(
+    team: Prisma.TeamUncheckedCreateInput,
+    tx: Prisma.TransactionClient,
+    requestorEmail: string
+  ): Promise<Team> {
+    try {
+      const teamData = {
+        ...team,
+        accessLevel: team.accessLevel || 'L1',
+        accessLevelUpdatedAt: new Date(),
+        tier: -1,
+      };
+
+      const createdTeam = await tx.team.create({
+        data: teamData,
+      });
+      await this.teamsHooksService.postCreateActions(createdTeam, requestorEmail);
+      return createdTeam;
+    } catch (err) {
+      return this.handleErrors(err);
+    }
+  }
 }

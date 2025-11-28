@@ -142,7 +142,7 @@ export class TeamsController {
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   @ApiQueryFromZod(TeamDetailQueryParams)
   @NoCache()
-  @UseGuards(UserTokenValidation)
+  @UseGuards(UserTokenCheckGuard)
   findOne(@Req() request, @ApiDecorator() { params: { uid } }: RouteShape['getTeam']) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
