@@ -1,5 +1,6 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import {Body, Controller, Get, Post, Query} from '@nestjs/common';
 import { ParticipantsRequestService } from './participants-request.service';
+import {FindUniqueIdentiferDto} from "@protocol-labs-network/contracts";
 
 @Controller('v1/participants-request')
 export class ParticipantsRequestController {
@@ -17,5 +18,18 @@ export class ParticipantsRequestController {
   @Post('member')
   async createMemberParticipantRequest(@Body() body: any): Promise<any> {
     return this.participantsRequestService.handleMemberRequest(body);
+  }
+
+  /**
+   * Check if the given identifier already exists in participants-request, members, or teams tables.
+   * @param queryParams - The query parameters containing the identifier and its type.
+   * @returns A promise indicating whether the identifier already exists.
+   */
+  @Get('/unique-identifier')
+  async findMatchingIdentifier(@Query() queryParams: FindUniqueIdentiferDto) {
+    return await this.participantsRequestService.checkIfIdentifierAlreadyExist(
+      queryParams.type,
+      queryParams.identifier
+    );
   }
 }

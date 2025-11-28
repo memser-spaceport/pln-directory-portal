@@ -18,6 +18,9 @@ import {AnalyticsModule} from "../analytics/analytics.module";
 import {AdminTeamsController} from "./admin-teams.controller";
 import { AdminTeamsService } from './admin-teams.service';
 import {ParticipantsRequestModule} from "../participants-request/participants-request.module";
+import {TeamsModule} from "../teams/teams.module";
+import {TeamsService} from "../teams/teams.service";
+import {AskModule} from "../asks/asks.module";
 
 @Module({
   imports: [
@@ -25,8 +28,10 @@ import {ParticipantsRequestModule} from "../participants-request/participants-re
     SharedModule,
     RecommendationsModule,
     AuthModule,
+    AskModule,
     OtpModule,
     forwardRef(() => ParticipantsRequestModule),
+    forwardRef(() => TeamsModule),
     HuskyModule,
     NotificationSettingsModule,
     forwardRef(() => MembersModule),
@@ -41,6 +46,6 @@ import {ParticipantsRequestModule} from "../participants-request/participants-re
     AdminTeamsController
   ],
   exports: [MemberService],
-  providers: [AdminService, MemberService, JwtService, AdminTeamsService],
+  providers: [AdminService, MemberService, JwtService, AdminTeamsService, TeamsService],
 })
 export class AdminModule {}

@@ -28,6 +28,7 @@ import {
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { MembersHooksService } from '../members/members.hooks.service';
 import {ParticipantsRequest} from "./members.dto";
+import {TeamsService} from "../teams/teams.service";
 
 @Injectable()
 export class MemberService {
@@ -41,7 +42,9 @@ export class MemberService {
     private cacheService: CacheService,
     @Inject(forwardRef(() => NotificationSettingsService))
     private notificationSettingsService: NotificationSettingsService,
-    private forestAdminService: ForestAdminService
+    private forestAdminService: ForestAdminService,
+    @Inject(forwardRef(() => TeamsService))
+    private teamService: TeamsService,
   ) {}
 
   /**
@@ -890,6 +893,16 @@ export class MemberService {
         name: true,
         email: true,
         accessLevel: true,
+        teamMemberRoles: {
+          where: {
+            team: {
+              accessLevel: 'L0',
+            },
+          },
+          select: {
+            teamUid: true,
+          },
+        }
       },
     });
 
@@ -926,9 +939,34 @@ export class MemberService {
     // Create investor profiles for L5/L6 members who don't have one
     await this.createInvestorProfileForHighLevelMembers(memberUids, this.prisma);
 
-    // Notify users based on the new access level
+
     if (result.count > 0) {
-      // Send approval emails for L2, L3, L4
+      const teamUidsToUpdate = Array.from(
+        new Set(
+          notApprovedMembers.flatMap((m) =>
+            m.teamMemberRoles?.map((r) => r.teamUid) ?? [],
+          ),
+        ),
+      );
+
+      if (
+        [
+          AccessLevel.L1,
+          AccessLevel.L2,
+          AccessLevel.L3,
+          AccessLevel.L4,
+          AccessLevel.L5,
+          AccessLevel.L6,
+        ].includes(accessLevel as AccessLevel)
+      ) {
+        await Promise.all(
+          teamUidsToUpdate.map((teamUid) =>
+            this.teamService.updateTeamAccessLevel(teamUid, undefined, 'L1'),
+          ),
+        );
+      }
+
+      // Notify users based on the new access level
       if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(accessLevel as AccessLevel)) {
         for (const member of notApprovedMembers) {
           if (!member.email) {
@@ -972,7 +1010,6 @@ export class MemberService {
 
     return { updatedCount: result.count };
   }
-
   async createMemberByAdmin(memberData: CreateMemberDto): Promise<Member> {
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {
