@@ -18,7 +18,7 @@ export class DemoDayParticipantsService {
       memberUid?: string;
       email?: string;
       name?: string;
-      type: 'INVESTOR' | 'FOUNDER';
+      type: 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
     },
     actorEmail?: string
   ): Promise<DemoDayParticipant> {
@@ -922,7 +922,7 @@ export class DemoDayParticipantsService {
     data: {
       status?: 'INVITED' | 'ENABLED' | 'DISABLED';
       teamUid?: string;
-      type?: 'INVESTOR' | 'FOUNDER';
+      type?: 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
       hasEarlyAccess?: boolean;
     },
     actorEmail?: string
@@ -977,8 +977,8 @@ export class DemoDayParticipantsService {
     if (data.type && data.type !== participant.type) {
       updateData.type = data.type;
 
-      // If changing from INVESTOR to FOUNDER, auto-assign main team
-      if (data.type === 'FOUNDER' && participant.type === 'INVESTOR') {
+      // If changing from INVESTOR or SUPPORT to FOUNDER, auto-assign main team
+      if (data.type === 'FOUNDER' && (participant.type === 'INVESTOR' || participant.type === 'SUPPORT')) {
         const mainTeam = participant.member?.teamMemberRoles.find((role) => role.mainTeam);
         const teamUid = mainTeam?.team.uid || participant.member?.teamMemberRoles[0]?.team.uid;
 
@@ -987,8 +987,8 @@ export class DemoDayParticipantsService {
         }
       }
 
-      // If changing from FOUNDER to INVESTOR, remove team
-      if (data.type === 'INVESTOR' && participant.type === 'FOUNDER') {
+      // If changing from FOUNDER to non-FOUNDER (INVESTOR or SUPPORT), remove the team
+      if (data.type !== 'FOUNDER' && participant.type === 'FOUNDER') {
         updateData.team = { disconnect: true };
       }
     }

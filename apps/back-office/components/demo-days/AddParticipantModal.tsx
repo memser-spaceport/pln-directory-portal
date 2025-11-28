@@ -15,7 +15,7 @@ interface AddParticipantModalProps {
 export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen, onClose, demoDayUid }) => {
   const [authToken] = useCookie('plnadmin');
 
-  const [participantType, setParticipantType] = useState<'INVESTOR' | 'FOUNDER'>('INVESTOR');
+  const [participantType, setParticipantType] = useState<'INVESTOR' | 'FOUNDER' | 'SUPPORT'>('INVESTOR');
   const [addMethod, setAddMethod] = useState<'existing' | 'email'>('existing');
   const [selectedMemberUid, setSelectedMemberUid] = useState<string>('');
   const [email, setEmail] = useState('');
@@ -115,7 +115,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Participant Type <span className="text-red-500">*</span>
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <label
                   className={clsx(
                     'flex cursor-pointer items-center justify-center rounded-lg border px-4 py-3 transition-all',
@@ -128,7 +128,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                     type="radio"
                     value="INVESTOR"
                     checked={participantType === 'INVESTOR'}
-                    onChange={(e) => setParticipantType(e.target.value as 'INVESTOR' | 'FOUNDER')}
+                    onChange={(e) => setParticipantType(e.target.value as 'INVESTOR' | 'FOUNDER' | 'SUPPORT')}
                     className="sr-only"
                   />
                   <div className="flex items-center">
@@ -150,7 +150,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                     type="radio"
                     value="FOUNDER"
                     checked={participantType === 'FOUNDER'}
-                    onChange={(e) => setParticipantType(e.target.value as 'INVESTOR' | 'FOUNDER')}
+                    onChange={(e) => setParticipantType(e.target.value as 'INVESTOR' | 'FOUNDER' | 'SUPPORT')}
                     className="sr-only"
                   />
                   <div className="flex items-center">
@@ -158,6 +158,28 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
                       {participantType === 'FOUNDER' && <div className="h-2 w-2 rounded-full bg-current"></div>}
                     </div>
                     Founder
+                  </div>
+                </label>
+                <label
+                  className={clsx(
+                    'flex cursor-pointer items-center justify-center rounded-lg border px-4 py-3 transition-all',
+                    participantType === 'SUPPORT'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                  )}
+                >
+                  <input
+                    type="radio"
+                    value="SUPPORT"
+                    checked={participantType === 'SUPPORT'}
+                    onChange={(e) => setParticipantType(e.target.value as 'INVESTOR' | 'FOUNDER' | 'SUPPORT')}
+                    className="sr-only"
+                  />
+                  <div className="flex items-center">
+                    <div className="mr-2 flex h-4 w-4 items-center justify-center rounded-full border-2 border-current">
+                      {participantType === 'SUPPORT' && <div className="h-2 w-2 rounded-full bg-current"></div>}
+                    </div>
+                    Support
                   </div>
                 </label>
               </div>

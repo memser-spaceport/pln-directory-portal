@@ -26,7 +26,7 @@ export class DemoDaysService {
     memberEmail: string | null,
     demoDayUidOrSlug: string
   ): Promise<{
-    access: 'none' | 'INVESTOR' | 'FOUNDER';
+    access: 'none' | 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
     status: 'NONE' | 'UPCOMING' | 'REGISTRATION_OPEN' | 'ACTIVE' | 'COMPLETED';
     uid?: string;
     slugURL?: string;
@@ -117,7 +117,7 @@ export class DemoDaysService {
 
     if (participant && participant.status === 'ENABLED') {
       // Member is an enabled participant
-      const access = participant.type === 'INVESTOR' ? 'INVESTOR' : 'FOUNDER';
+      const access = participant.type;
 
       return {
         access,
@@ -285,7 +285,7 @@ export class DemoDaysService {
           const teamsCount = await this.getTeamsCountForDemoDay(demoDay.uid);
 
           // Determine access for this demo day
-          let access: 'none' | 'INVESTOR' | 'FOUNDER' = 'none';
+          let access: 'none' | 'INVESTOR' | 'FOUNDER' | 'SUPPORT' = 'none';
           let isDemoDayAdmin = false;
           let isEarlyAccess = false;
           let isPending = false;
@@ -297,7 +297,7 @@ export class DemoDaysService {
             );
 
             if (participant && participant.status === 'ENABLED') {
-              access = participant.type === 'INVESTOR' ? 'INVESTOR' : 'FOUNDER';
+              access = participant.type;
               isDemoDayAdmin = participant.isDemoDayAdmin || isDirectoryAdmin;
               isEarlyAccess = demoDay.status === DemoDayStatus.EARLY_ACCESS;
               confidentialityAccepted = participant.confidentialityAccepted;

@@ -26,7 +26,7 @@ const DemoDayDetailPage = () => {
   const router = useRouter();
   const { slugURL } = router.query;
   const [authToken] = useCookie('plnadmin');
-  const [activeTab, setActiveTab] = useState<'investors' | 'founders' | 'applications'>('applications');
+  const [activeTab, setActiveTab] = useState<'investors' | 'founders' | 'support' | 'applications'>('applications');
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -55,7 +55,7 @@ const DemoDayDetailPage = () => {
     authToken,
     demoDayUid: demoDay?.uid as string,
     query: {
-      type: activeTab === 'applications' ? undefined : activeTab === 'investors' ? 'INVESTOR' : 'FOUNDER',
+      type: activeTab === 'applications' ? undefined : activeTab === 'investors' ? 'INVESTOR' : activeTab === 'founders' ? 'FOUNDER' : 'SUPPORT',
       search: searchTerm || undefined,
       status:
         activeTab === 'applications'
@@ -183,11 +183,11 @@ const DemoDayDetailPage = () => {
   const handleUpdateParticipantType = async (
     participantUid: string,
     participantName: string,
-    newType: 'INVESTOR' | 'FOUNDER'
+    newType: 'INVESTOR' | 'FOUNDER' | 'SUPPORT'
   ) => {
     if (!authToken || !demoDay) return;
 
-    const newTabName = newType === 'INVESTOR' ? 'Investors' : 'Founders';
+    const newTabName = newType === 'INVESTOR' ? 'Investors' : newType === 'FOUNDER' ? 'Founders' : 'Support';
 
     try {
       await updateParticipantMutation.mutateAsync({
@@ -257,7 +257,7 @@ const DemoDayDetailPage = () => {
     setShowApproveModal(true);
   };
 
-  const handleApprove = async (participantUid: string, type: 'INVESTOR' | 'FOUNDER') => {
+  const handleApprove = async (participantUid: string, type: 'INVESTOR' | 'FOUNDER' | 'SUPPORT') => {
     if (!authToken || !demoDay) return;
 
     try {
@@ -537,6 +537,15 @@ const DemoDayDetailPage = () => {
                   onClick={() => setActiveTab('founders')}
                 >
                   Founders {participants && activeTab === 'founders' && `(${participants.total})`}
+                </button>
+                <button
+                  className={clsx(s.tab, { [s.active]: activeTab === 'support' })}
+                  onClick={() => setActiveTab('support')}
+                >
+                  Support{' '}
+                  {participants &&
+                    activeTab === 'support' &&
+                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
                 </button>
               </div>
 
@@ -864,18 +873,21 @@ const DemoDayDetailPage = () => {
                               handleUpdateParticipantType(
                                 participant.uid,
                                 participant.member?.name || participant.name,
-                                e.target.value as 'INVESTOR' | 'FOUNDER'
+                                e.target.value as 'INVESTOR' | 'FOUNDER' | 'SUPPORT'
                               )
                             }
                             disabled={updateParticipantMutation.isPending}
                             className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
                               participant.type === 'INVESTOR'
                                 ? 'bg-purple-100 text-purple-800'
-                                : 'bg-blue-100 text-blue-800'
+                                : participant.type === 'FOUNDER'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-amber-100 text-amber-800'
                             } disabled:opacity-50`}
                           >
                             <option value="INVESTOR">Investor</option>
                             <option value="FOUNDER">Founder</option>
+                            <option value="SUPPORT">Support</option>
                           </select>
                         </div>
                       )}
@@ -952,7 +964,13 @@ const DemoDayDetailPage = () => {
               <div className={s.paginationInfo}>
                 Showing {(participants.page - 1) * participants.limit + 1} to{' '}
                 {Math.min(participants.page * participants.limit, participants.total)} of {participants.total}{' '}
-                {activeTab === 'applications' ? 'applications' : activeTab === 'investors' ? 'investors' : 'founders'}
+                {activeTab === 'applications'
+                  ? 'applications'
+                  : activeTab === 'investors'
+                  ? 'investors'
+                  : activeTab === 'founders'
+                  ? 'founders'
+                  : 'support members'}
               </div>
               <div className={s.paginationControls}>
                 <button
