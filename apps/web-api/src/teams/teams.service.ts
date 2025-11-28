@@ -1785,4 +1785,62 @@ export class TeamsService {
     }
   }
 
+  /**
+   * Creates a new team from the participants request data.
+   * resets the cache, and triggers post-update actions like Airtable synchronization.
+   * @param teamParticipantRequest - The request containing the team details.
+   * @param requestorEmail - The email of the requestor.
+   * @returns The newly created team.
+   */
+  async createTeamFromParticipantsRequest(
+      teamParticipantRequest: ParticipantsRequest,
+      tx: Prisma.TransactionClient
+  ): Promise<Team> {
+    const newTeam: any = teamParticipantRequest.newData;
+    this.logger.info(`Creating team from participant request with data: ${JSON.stringify(newTeam)}`);
+    const { team: formattedTeam, investorProfileData } = await this.formatTeam(null, newTeam, tx);
+    this.logger.info(`Formatted team data, investorProfileData: ${JSON.stringify(investorProfileData)}`);
+    const createdTeam = await this.createTeam(formattedTeam, tx, teamParticipantRequest.requesterEmailId);
+
+    // Handle investor profile creation for teams
+    if (investorProfileData) {
+      this.logger.info(`Creating investor profile for team ${createdTeam.uid}`);
+      await this.updateTeamInvestorProfile(createdTeam.uid, investorProfileData, tx);
+    } else {
+      this.logger.info(`No investor profile data to process for team ${createdTeam.uid}`);
+    }
+
+    return createdTeam;
+  }
+
+  /**
+   * Creates a new team in the database within a transaction.
+   *
+   * @param team - The data for the new team to be created
+   * @param tx - The transaction client to ensure atomicity
+   * @param requestorEmail - Email of the person creating the team
+   * @returns The created team record
+   */
+  async createTeam(
+      team: Prisma.TeamUncheckedCreateInput,
+      tx: Prisma.TransactionClient,
+      requestorEmail: string
+  ): Promise<Team> {
+    try {
+      const teamData = {
+        ...team,
+        accessLevel: team.accessLevel || 'L1',
+        accessLevelUpdatedAt: new Date(),
+        tier: -1,
+      };
+
+      const createdTeam = await tx.team.create({
+        data: teamData,
+      });
+      await this.teamsHooksService.postCreateActions(createdTeam, requestorEmail);
+      return createdTeam;
+    } catch (err) {
+      return this.handleErrors(err);
+    }
+  }
 }

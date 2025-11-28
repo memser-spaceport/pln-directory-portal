@@ -1,170 +1,208 @@
 import {
   BadRequestException,
   Injectable,
-  Inject,
   forwardRef,
-  ConflictException,
-  NotFoundException
+  Inject,
 } from '@nestjs/common';
-import { MembersService } from '../members/members.service';
+
 import { LogService } from '../shared/log.service';
-import {TeamsService} from "../teams/teams.service";
-import {Prisma} from "@prisma/client";
+import { PrismaService } from '../shared/prisma.service';
+import { MembersService } from '../members/members.service';
+import { TeamsService } from '../teams/teams.service';
+import { NotificationService } from '../utils/notification/notification.service';
+import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
+import { CacheService } from '../utils/cache/cache.service';
+
+type ParticipantKind = 'MEMBER' | 'TEAM';
 
 @Injectable()
 export class ParticipantsRequestService {
   constructor(
+    private prisma: PrismaService,
+    private logger: LogService,
+    private locationTransferService: LocationTransferService,
+    private notificationService: NotificationService,
+    private cacheService: CacheService,
+
     @Inject(forwardRef(() => MembersService))
-    private readonly membersService: MembersService,
+    private membersService: MembersService,
+
     @Inject(forwardRef(() => TeamsService))
-    private readonly teamsService: TeamsService,
-    private readonly logger: LogService,
+    private teamsService: TeamsService,
   ) {}
 
   /**
-   * Validate and normalize body for /v1/participants-request/member
+   * Extracts a unique identifier:
+   * - TEAM → team name
+   * - MEMBER → email (lowercased)
    */
-  private validateMemberRequestBody(body: any): void {
-    if (!body) {
-      throw new BadRequestException('Request body is required');
-    }
-
-    const newData = body.newData || {};
-
-    const email =
-      newData.email ||
-      body.email ||
-      null;
-
-    if (!email) {
-      throw new BadRequestException('newData.email (or email) is required for member request');
-    }
-
-    if (body.isTeamNew) {
-      const team = body.team || {};
-      const teamName =
-        team.name ||
-        newData.teamTitle ||
-        null;
-
-      if (!teamName) {
-        throw new BadRequestException(
-          'team.name (or newData.teamTitle) is required when isTeamNew = true',
-        );
-      }
-    }
+  getUniqueIdentifier(requestData: any): string {
+    return requestData.participantType === 'TEAM'
+      ? requestData.newData.name
+      : requestData.newData.email?.toLowerCase().trim();
   }
 
   /**
-   * Handle member participant request in the NEW model:
-   *  - no "participants_request" table
-   *  - no statuses
-   *  - directly create/reuse Member and Team, then attach relation
+   * Validates uniqueness based on Members or Teams.
+   * There is no pending state or request table anymore.
    */
-  async handleMemberRequest(body: any): Promise<any> {
-    this.logger.info(
-      '[ParticipantsRequestService.handleMemberRequest] Incoming body=' + JSON.stringify(body),
-    );
-
-    this.validateMemberRequestBody(body);
-
-    const newData = body.newData || {};
-    const opts: any = {
-      role: body.role || null,
-      isTeamNew: body.isTeamNew === true,
-      requestorEmail: (newData && newData.email) || body.email || null,
-      team: null,
-      website: null,
-    };
-
-    if (body.team) {
-      opts.team = {
-        uid: body.team.uid,
-        name: body.team.name,
-        website: body.team.website,
-      };
+  async validateUniqueIdentifier(
+    participantType: ParticipantKind,
+    uniqueIdentifier: string
+  ): Promise<void> {
+    if (participantType === 'TEAM') {
+      const existing = await this.teamsService.findTeamByName(uniqueIdentifier);
+      if (existing) throw new BadRequestException('Team name already exists.');
+      return;
     }
 
-    if (!opts.team && body.website) {
-      opts.website = body.website;
+    if (participantType === 'MEMBER') {
+      const existing = await this.membersService.findMemberByEmail(uniqueIdentifier);
+      if (existing) throw new BadRequestException('Member email already exists.');
+      return;
     }
 
-    const result = await this.membersService.createMemberAndAttach(newData, opts);
-
-    this.logger.info(
-      '[ParticipantsRequestService.handleMemberRequest] Created/updated member uid=' +
-      result.uid,
-    );
-
-    return result;
+    throw new BadRequestException('Invalid participantType.');
   }
 
   /**
-   * Check if any entry exists in the participants-request table and the members/teams table
-   * for the given identifier.
-   *
-   * @param type - The participant type (either TEAM or MEMBER)
-   * @param identifier - The unique identifier (team name or member email)
-   * @returns A promise that resolves with an object containing flags indicating whether a request is pending and whether the identifier exists
+   * Used by frontend legacy endpoint `/unique-identifier`.
+   * Always returns isRequestPending=false since we no longer support PENDING workflows.
    */
   async checkIfIdentifierAlreadyExist(
-    type:   "MEMBER" | "TEAM",
+    participantType: ParticipantKind,
     identifier: string
-  ): Promise<{
-    isRequestPending: boolean;
-    isUniqueIdentifierExist: boolean;
-  }> {
-    try {
-      const existingEntry =
-        type === 'TEAM'
-          ? await this.teamsService.findTeamByName(identifier)
-          : await this.membersService.findMemberByEmail(identifier);
-      if (existingEntry) {
-        return {isRequestPending: false, isUniqueIdentifierExist: true};
+  ): Promise<{ isRequestPending: boolean; isUniqueIdentifierExist: boolean }> {
+    let exists = false;
+
+    if (participantType === 'TEAM') {
+      exists = !!(await this.teamsService.findTeamByName(identifier));
+    } else {
+      exists = !!(await this.membersService.findMemberByEmail(identifier));
+    }
+
+    return { isRequestPending: false, isUniqueIdentifierExist: exists };
+  }
+
+  /**
+   * Validates optional location for MEMBERS only.
+   */
+  async validateLocation(data: any): Promise<void> {
+    const { city, country, region } = data;
+    if (city || country || region) {
+      const result = await this.locationTransferService.fetchLocation(
+        city, country, null, region, null
+      );
+
+      if (!result?.location) {
+        throw new BadRequestException('Invalid location data.');
       }
-      return {isRequestPending: false, isUniqueIdentifierExist: false};
-    } catch (err) {
-      if (err instanceof Prisma.NotFoundError) {
-        return {isRequestPending: false, isUniqueIdentifierExist: false};
-      }
-      return this.handleErrors(err);
     }
   }
 
   /**
-   * Handles database-related errors specifically for the Participant entity.
-   * Logs the error and throws an appropriate HTTP exception based on the error type.
-   *
-   * @param {any} error - The error object thrown by Prisma or other services.
-   * @param {string} [message] - An optional message to provide additional context,
-   *                             such as the participant UID when an entity is not found.
-   * @throws {ConflictException} - If there's a unique key constraint violation.
-   * @throws {BadRequestException} - If there's a foreign key constraint violation or validation error.
-   * @throws {NotFoundException} - If a participant is not found with the provided UID.
-   * Handle member participant request in the NEW model:
-   *  - no "participants_request" table
-   *  - no statuses
-   *  - directly create/reuse Member and Team, then attach relation
+   * Validates input payload before creation.
    */
-  private handleErrors(error, message?: string) {
-    this.logger.error(error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      switch (error?.code) {
-        case 'P2002':
-          throw new ConflictException('Unique key constraint error on Participant:', error.message);
-        case 'P2003':
-          throw new BadRequestException('Foreign key constraint error on Participant', error.message);
-        case 'P2025':
-          throw new NotFoundException('Participant not found with uid: ' + message);
-        default:
-          throw error;
-      }
-    } else if (error instanceof Prisma.PrismaClientValidationError) {
-      throw new BadRequestException('Database field validation error on Participant', error.message);
-    } else {
-      throw error;
+  async validateParticipantRequest(requestData: any): Promise<void> {
+    if (requestData.participantType === 'MEMBER') {
+      await this.validateLocation(requestData.newData);
     }
-    // TODO: Remove this return statement if future versions allow all error-returning functions to be inferred correctly.
-    return error;
+
+    if (requestData.participantType === 'TEAM' && !requestData.requesterEmailId && !requestData.newData?.requestorEmail) {
+      throw new BadRequestException(
+        'Requester email is required when creating a Team.'
+      );
+    }
+  }
+
+  /**
+   * Main handler.
+   * Old behavior: saved request → waited for approval → created entity.
+   * New behavior: request directly creates MEMBER or TEAM instantly.
+   */
+  async addRequest(
+    requestData: any,
+    requesterUser?: any,
+    disableNotification = false
+  ): Promise<any> {
+    const participantType: ParticipantKind = requestData.participantType;
+
+    // MEMBER FLOW
+    if (participantType === 'MEMBER') {
+      const result = await this.membersService.createMemberAndAttach(requestData.newData, {
+        role: requestData.role,
+        team: requestData.team,
+        isTeamNew: requestData.isTeamNew,
+        website:
+          typeof requestData.team === 'object' && requestData.team?.website
+            ? requestData.team.website
+            : requestData.website,
+        requestorEmail: requestData?.newData?.email,
+      });
+
+      if (!disableNotification) {
+        const memberName = requestData.newData?.name || requesterUser?.name || requesterUser?.email;
+        await this.notificationService.notifyForCreateMember(memberName, result.uid);
+        this.logger.info(`MEMBER created: ${result.uid}`);
+      }
+
+      await this.resetCache();
+      return result;
+    }
+
+    // TEAM FLOW
+    if (participantType === 'TEAM') {
+      const requesterEmail =
+        requestData.requesterEmailId ||
+        requestData.newData?.requestorEmail ||
+        requesterUser?.email;
+
+      if (!requesterEmail) {
+        throw new BadRequestException('Requester email missing.');
+      }
+
+      const role = requestData.newData?.role || requestData.role || 'Lead';
+      const investmentTeam = requestData.newData?.investmentTeam || false;
+
+      const createdTeam = await this.prisma.$transaction(async (tx) => {
+        const team = await this.teamsService.createTeamFromParticipantsRequest({
+          ...requestData,
+          requesterEmailId: requesterEmail,
+        }, tx);
+
+        if (requesterUser?.uid) {
+          await tx.teamMemberRole.create({
+            data: {
+              teamUid: team.uid,
+              memberUid: requesterUser.uid,
+              role,
+              teamLead: true,
+              investmentTeam,
+            },
+          });
+        }
+
+        return team;
+      });
+
+      if (!disableNotification) {
+        await this.notificationService.notifyForCreateTeam(createdTeam.name, createdTeam.uid);
+        this.logger.info(`TEAM created: ${createdTeam.uid}`);
+      }
+
+      await this.resetCache();
+      return createdTeam;
+    }
+
+    throw new BadRequestException('Unsupported participantType.');
+  }
+
+  private async resetCache() {
+    try {
+      await this.cacheService.reset({ service: 'participants-requests' });
+      this.logger.info('Cache reset: participants-requests.');
+    } catch (err) {
+      this.logger.error('Cache reset failed:', err);
+    }
   }
 }
