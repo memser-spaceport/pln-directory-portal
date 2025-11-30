@@ -35,7 +35,7 @@ export const AddParticipantSchema = z
     memberUid: z.string().optional(),
     email: z.string().email().optional(),
     name: z.string().optional(),
-    type: z.enum(['INVESTOR', 'FOUNDER']),
+    type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']),
   })
   .refine((data) => data.memberUid || data.email, {
     message: 'Either memberUid or email must be provided',
@@ -73,7 +73,7 @@ export const GetParticipantsQuerySchema = z.object({
   page: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
   limit: z.string().regex(/^\d+$/).transform(Number).optional().default('20'),
   status: z.enum(['PENDING', 'INVITED', 'ENABLED', 'DISABLED']).optional(),
-  type: z.enum(['INVESTOR', 'FOUNDER']).optional(),
+  type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']).optional(),
   search: z.string().optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'statusUpdatedAt', 'type', 'status']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
@@ -85,7 +85,7 @@ export class GetParticipantsQueryDto extends createZodDto(GetParticipantsQuerySc
 export const UpdateParticipantSchema = z.object({
   status: z.enum(['PENDING', 'INVITED', 'ENABLED', 'DISABLED']).optional(),
   teamUid: z.string().optional(),
-  type: z.enum(['INVESTOR', 'FOUNDER']).optional(),
+  type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']).optional(),
   hasEarlyAccess: z.boolean().optional(),
 });
 
@@ -116,7 +116,7 @@ export const ResponseParticipantSchema = z.object({
   uid: z.string(),
   demoDayUid: z.string(),
   memberUid: z.string(),
-  type: z.enum(['INVESTOR', 'FOUNDER']),
+  type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']),
   status: z.enum(['PENDING', 'INVITED', 'ENABLED', 'DISABLED']),
   hasEarlyAccess: z.boolean(),
   teamUid: z.string().nullable(),
