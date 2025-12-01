@@ -40,6 +40,11 @@
   min-width: unset;
 }
 
+.new {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+}
+
 .label {
   overflow: hidden;
   color: var(--action-foreground-neutral-normal, #455468);

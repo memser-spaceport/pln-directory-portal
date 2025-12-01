@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import clsx from 'clsx';
 
 import { Member } from '../../types/member';
 import { EmptyIcon, MembersIcon, ProjectsIcon } from '../icons';
@@ -10,7 +11,7 @@ export const ProjectsCell = ({ member }: { member: Member }) => {
   const itemRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
   const items = useMemo(() => {
-    const result = [];
+    const result: { icon: React.ReactNode; label: string; isNew?: boolean }[] = [];
     member.projectContributions.forEach((project) => {
       result.push({
         icon: <ProjectsIcon />,
@@ -22,6 +23,7 @@ export const ProjectsCell = ({ member }: { member: Member }) => {
       result.push({
         icon: <MembersIcon />,
         label: item.team.name,
+        isNew: item.team.accessLevel === 'L0',
       });
     });
 
@@ -78,7 +80,7 @@ export const ProjectsCell = ({ member }: { member: Member }) => {
       {items.map((item, idx) => {
         if (idx < visibleCount) {
           return (
-            <span key={idx} ref={(el) => (itemRefs.current[idx] = el)} className={s.badge}>
+            <span key={idx} ref={(el) => (itemRefs.current[idx] = el)} className={clsx(s.badge, item.isNew && s.new)}>
               {item.icon}
               <span className={s.label}>{item.label}</span>
             </span>
