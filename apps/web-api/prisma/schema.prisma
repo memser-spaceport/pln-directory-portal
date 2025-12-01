@@ -967,6 +967,7 @@ model DemoDay {
   title                     String
   description               String
   shortDescription          String?
+  supportEmail              String?
   status                    DemoDayStatus                     @default(UPCOMING)
   createdAt                 DateTime                          @default(now())
   updatedAt                 DateTime                          @updatedAt

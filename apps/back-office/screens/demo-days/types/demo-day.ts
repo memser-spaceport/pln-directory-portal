@@ -7,6 +7,7 @@ export interface DemoDay {
   startDate: string;
   endDate: string;
   approximateStartDate?: string | null;
+  supportEmail?: string | null;
   status: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
   createdAt: string;
   updatedAt: string;
@@ -20,6 +21,7 @@ export interface CreateDemoDayDto {
   startDate: string;
   endDate: string;
   approximateStartDate?: string | null;
+  supportEmail?: string | null;
   status: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 }
 
@@ -31,6 +33,7 @@ export interface UpdateDemoDayDto {
   startDate?: string;
   endDate?: string;
   approximateStartDate?: string | null;
+  supportEmail?: string | null;
   status?: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 }
 
