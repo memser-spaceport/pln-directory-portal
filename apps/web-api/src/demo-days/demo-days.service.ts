@@ -886,6 +886,7 @@ export class DemoDaysService {
           accessLevel: 'L0',
           signUpSource: `demoday-${demoDay.slugURL}`,
           linkedinHandler: applicationData.linkedinProfile,
+          role: applicationData.role?.trim(),
         },
         select: {
           uid: true,
