@@ -48,12 +48,20 @@ export class CreateDemoDayFeedbackDto extends createZodDto(CreateDemoDayFeedback
 
 const optionalString = z.preprocess((val) => (val === '' || val === null ? undefined : val), z.string().optional());
 
+const TeamInputSchema = z.object({
+  uid: optionalString,
+  name: optionalString,
+  website: optionalString,
+});
+
 export const CreateDemoDayInvestorApplicationSchema = z.object({
   email: z.string().email('Invalid email address'),
   name: z.string().min(1, 'Name is required'),
   linkedinProfile: optionalString,
   role: optionalString,
   teamUid: optionalString,
+  isTeamNew: z.boolean().optional(),
+  team: TeamInputSchema.optional(),
   isAccreditedInvestor: z.boolean().optional(),
 });
 
