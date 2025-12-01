@@ -134,6 +134,7 @@ const DemoDayDetailPage = () => {
       startDate: demoDay.startDate,
       endDate: demoDay.endDate,
       approximateStartDate: demoDay.approximateStartDate,
+      supportEmail: demoDay.supportEmail,
       status: demoDay.status,
     });
     setIsEditing(true);
@@ -472,6 +473,20 @@ const DemoDayDetailPage = () => {
                   />
                 ) : (
                   <div className={s.fieldValue}>{demoDay.slugURL}</div>
+                )}
+              </div>
+              <div className={clsx(s.overviewField)}>
+                <label className={s.fieldLabel}>Support Email</label>
+                {isEditing ? (
+                  <input
+                    type="email"
+                    value={editFormData.supportEmail || ''}
+                    onChange={(e) => handleEditFormChange('supportEmail', e.target.value)}
+                    className={s.fieldInput}
+                    placeholder="e.g., support@example.com"
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{demoDay.supportEmail || '-'}</div>
                 )}
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>

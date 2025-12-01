@@ -9,7 +9,7 @@ import { DemoDay, DemoDayParticipantStatus, DemoDayStatus } from '@prisma/client
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
-import {CreateDemoDayInvestorApplicationDto} from "@protocol-labs-network/contracts";
+import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
 
 type ExpressInterestStats = { liked: number; connected: number; invested: number; referral: number; total: number };
 
@@ -36,6 +36,7 @@ export class DemoDaysService {
     description?: string;
     shortDescription?: string | null;
     approximateStartDate?: string | null;
+    supportEmail?: string | null;
     teamsCount?: number;
     investorsCount?: number;
     isDemoDayAdmin?: boolean;
@@ -71,6 +72,7 @@ export class DemoDaysService {
         description: demoDay.description,
         shortDescription: demoDay.shortDescription,
         approximateStartDate: demoDay.approximateStartDate,
+        supportEmail: demoDay.supportEmail,
         teamsCount: teamsCount,
         investorsCount: investorsCount,
         confidentialityAccepted: false,
@@ -102,6 +104,7 @@ export class DemoDaysService {
         description: demoDay.description,
         shortDescription: demoDay.shortDescription,
         approximateStartDate: demoDay.approximateStartDate,
+        supportEmail: demoDay.supportEmail,
         teamsCount,
         investorsCount,
         confidentialityAccepted: participant.confidentialityAccepted,
@@ -130,6 +133,7 @@ export class DemoDaysService {
         description: demoDay.description,
         shortDescription: demoDay.shortDescription,
         approximateStartDate: demoDay.approximateStartDate,
+        supportEmail: demoDay.supportEmail,
         status: this.getExternalDemoDayStatus(
           demoDay.status,
           participant.type === 'FOUNDER' || participant.hasEarlyAccess
@@ -151,6 +155,7 @@ export class DemoDaysService {
       description: demoDay.description,
       shortDescription: demoDay.shortDescription,
       approximateStartDate: demoDay.approximateStartDate,
+      supportEmail: demoDay.supportEmail,
       teamsCount,
       investorsCount,
       confidentialityAccepted: false,
@@ -169,6 +174,7 @@ export class DemoDaysService {
       description: string;
       shortDescription?: string | null;
       approximateStartDate?: string | null;
+      supportEmail?: string | null;
       status: DemoDayStatus;
     },
     actorEmail?: string
@@ -197,6 +203,7 @@ export class DemoDaysService {
         description: data.description,
         shortDescription: data.shortDescription,
         approximateStartDate: data.approximateStartDate,
+        supportEmail: data.supportEmail,
         status: data.status,
         slugURL,
       },
@@ -235,6 +242,7 @@ export class DemoDaysService {
         title: true,
         description: true,
         shortDescription: true,
+        supportEmail: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -316,6 +324,7 @@ export class DemoDaysService {
             description: demoDay.description,
             shortDescription: demoDay.shortDescription,
             approximateStartDate: demoDay.approximateStartDate,
+            supportEmail: demoDay.supportEmail,
             access,
             status: this.getExternalDemoDayStatus(
               demoDay.status,
@@ -360,6 +369,7 @@ export class DemoDaysService {
         title: true,
         description: true,
         shortDescription: true,
+        supportEmail: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -388,6 +398,7 @@ export class DemoDaysService {
         title: true,
         description: true,
         shortDescription: true,
+        supportEmail: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -413,6 +424,7 @@ export class DemoDaysService {
       description?: string;
       shortDescription?: string | null;
       approximateStartDate?: string | null;
+      supportEmail?: string | null;
       status?: DemoDayStatus;
     },
     actorEmail?: string
@@ -462,6 +474,9 @@ export class DemoDaysService {
     if (data.approximateStartDate !== undefined) {
       updateData.approximateStartDate = data.approximateStartDate;
     }
+    if (data.supportEmail !== undefined) {
+      updateData.supportEmail = data.supportEmail;
+    }
     if (data.status !== undefined) {
       updateData.status = data.status;
     }
@@ -479,6 +494,7 @@ export class DemoDaysService {
         title: true,
         description: true,
         shortDescription: true,
+        supportEmail: true,
         status: true,
         createdAt: true,
         updatedAt: true,
