@@ -10,6 +10,9 @@ export const ProjectsCell = ({ member }: { member: Member }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
+  // Only highlight new teams for L0 and L1 members
+  const shouldHighlightNewTeams = ['L0', 'L1'].includes(member.accessLevel);
+
   const items = useMemo(() => {
     const result: { icon: React.ReactNode; label: string; isNew?: boolean }[] = [];
     member.projectContributions.forEach((project) => {
@@ -23,12 +26,12 @@ export const ProjectsCell = ({ member }: { member: Member }) => {
       result.push({
         icon: <MembersIcon />,
         label: item.team.name,
-        isNew: item.team.accessLevel === 'L0',
+        isNew: shouldHighlightNewTeams && item.team.accessLevel === 'L0',
       });
     });
 
     return result;
-  }, [member]);
+  }, [member, shouldHighlightNewTeams]);
 
   const [visibleCount, setVisibleCount] = useState(items.length);
 
