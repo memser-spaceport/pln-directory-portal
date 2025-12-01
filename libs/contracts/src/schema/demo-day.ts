@@ -63,6 +63,7 @@ export const CreateDemoDayInvestorApplicationSchema = z.object({
   isTeamNew: z.boolean().optional(),
   team: TeamInputSchema.optional(),
   isAccreditedInvestor: z.boolean().optional(),
+  projectUid: optionalString,
 });
 
 export class CreateDemoDayInvestorApplicationDto extends createZodDto(CreateDemoDayInvestorApplicationSchema) {}
