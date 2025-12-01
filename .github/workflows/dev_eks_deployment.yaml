@@ -3,7 +3,7 @@ name: Deploy to EKS with Helm
 on:
   push:
     branches:
-      - develop   # Triggers Dev deployment
+      - LAB-1136/demo-day-v3-apply-for-demo-day-team-is-not-created   # Triggers Dev deployment
 jobs:
   dev-deploy:
     name: Deploy Helm Chart to EKS preprod
