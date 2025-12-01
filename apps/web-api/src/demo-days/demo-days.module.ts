@@ -9,9 +9,15 @@ import {AnalyticsModule} from "../analytics/analytics.module";
 import {DemoDayEngagementService} from "./demo-day-engagement.service";
 import {MembersModule} from "../members/members.module";
 import {NotificationsModule} from '../notifications/notifications.module';
+import {TeamsModule} from "../teams/teams.module";
 
 @Module({
-  imports: [SharedModule, UploadsModule, AnalyticsModule, forwardRef(() => MembersModule), NotificationsModule],
+  imports: [SharedModule,
+    UploadsModule,
+    AnalyticsModule,
+    forwardRef(() => MembersModule),
+    forwardRef(() => TeamsModule),
+    NotificationsModule],
   controllers: [DemoDaysController],
   providers: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService, DemoDayEngagementService],
   exports: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService],

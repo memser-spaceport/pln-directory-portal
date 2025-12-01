@@ -1,15 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {Injectable, NotFoundException, BadRequestException, Inject, forwardRef} from '@nestjs/common';
 import { DemoDayParticipant, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from './demo-days.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
+import {TeamsService} from "../teams/teams.service";
 
 @Injectable()
 export class DemoDayParticipantsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly demoDaysService: DemoDaysService,
-    private readonly analyticsService: AnalyticsService
+    private readonly analyticsService: AnalyticsService,
+    private readonly teamService: TeamsService
   ) {}
 
   async addParticipant(
@@ -1006,6 +1008,20 @@ export class DemoDayParticipantsService {
               isVerified: true,
             },
           });
+        }
+
+        // Promote teams where this member is a lead to L1
+        const teamUidsToUpdate =
+          participant.member?.teamMemberRoles
+            ?.filter((role) => role.teamLead)
+            .map((role) => role.team.uid) || [];
+
+        if (teamUidsToUpdate.length > 0) {
+          await Promise.all(
+            teamUidsToUpdate.map((teamUid) =>
+              this.teamService.updateTeamAccessLevel(teamUid, undefined, 'L1'),
+            ),
+          );
         }
       }
     }
