@@ -924,6 +924,7 @@ export class DemoDaysService {
             teamUid: createdTeam.uid,
             role: applicationData.role,
             investmentTeam: true,
+            mainTeam: true,
           },
         });
       } else if (applicationData.teamUid) {
@@ -946,6 +947,7 @@ export class DemoDaysService {
               teamUid: applicationData.teamUid,
               role: applicationData.role,
               investmentTeam: true,
+              mainTeam: true,
             },
           });
         }
