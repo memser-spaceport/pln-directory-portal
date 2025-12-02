@@ -1592,14 +1592,14 @@ export class TeamsService {
       AND: whereConditions,
     };
 
-    // Sorting
-    const orderBy: Prisma.TeamOrderByWithRelationInput = {};
+    // Sorting - always include a unique secondary sort (uid) to ensure deterministic pagination
+    const orderBy: Prisma.TeamOrderByWithRelationInput[] = [];
     if (filters.sort === 'name:desc') {
-      orderBy.name = 'desc';
+      orderBy.push({ name: 'desc' }, { uid: 'asc' });
     } else if (filters.sort === 'name:asc') {
-      orderBy.name = 'asc';
+      orderBy.push({ name: 'asc' }, { uid: 'asc' });
     } else {
-      orderBy.tier = 'desc'; // Default to descending tier order
+      orderBy.push({ tier: 'desc' }, { uid: 'asc' }); // Default to descending tier order
     }
 
     try {

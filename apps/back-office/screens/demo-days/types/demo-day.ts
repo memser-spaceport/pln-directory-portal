@@ -46,6 +46,7 @@ export interface DemoDayParticipant {
   type: 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
   status: 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED';
   hasEarlyAccess: boolean;
+  isDemoDayAdmin: boolean;
   teamUid?: string;
   createdAt: string;
   updatedAt: string;
@@ -163,4 +164,5 @@ export interface UpdateParticipantDto {
   teamUid?: string;
   type?: 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
   hasEarlyAccess?: boolean;
+  isDemoDayAdmin?: boolean;
 }

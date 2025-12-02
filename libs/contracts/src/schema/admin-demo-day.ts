@@ -89,6 +89,7 @@ export const UpdateParticipantSchema = z.object({
   teamUid: z.string().optional(),
   type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']).optional(),
   hasEarlyAccess: z.boolean().optional(),
+  isDemoDayAdmin: z.boolean().optional(),
 });
 
 export class UpdateParticipantDto extends createZodDto(UpdateParticipantSchema) {}
@@ -122,6 +123,7 @@ export const ResponseParticipantSchema = z.object({
   type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']),
   status: z.enum(['PENDING', 'INVITED', 'ENABLED', 'DISABLED']),
   hasEarlyAccess: z.boolean(),
+  isDemoDayAdmin: z.boolean(),
   teamUid: z.string().nullable(),
   statusUpdatedAt: z.date(),
   createdAt: z.date(),

@@ -255,52 +255,54 @@ export class DemoDayEngagementService {
     const investorNameLink = member.name ? `<a href="${investorLink}" target="_blank">${member.name}</a>` : '';
 
     // Send notification
-    await this.notificationServiceClient.sendNotification({
-      isPriority: true,
-      deliveryChannel: 'EMAIL',
-      templateName: template.templateName,
-      recipientsInfo: {
-        from: process.env.DEMO_DAY_EMAIL,
-        to: [...founderEmails, referralData?.investorEmail].filter(Boolean),
-        cc: [member.email],
-        bcc: [process.env.DEMO_DAY_EMAIL],
-      },
-      deliveryPayload: {
-        body: {
-          demoDayName: demoDay.title || 'PL F25 Demo Day',
-          demoDayLink: `${process.env.WEB_UI_BASE_URL}/demoday?utm_source=email_intro`,
-          subjectPrefix: isPrepDemoDay ? '[DEMO DAY PREP - PRACTICE EMAIL] ' : '',
-          teamsSubject: teamsSubject,
-          founderNames: founders.map((f) => f.member.name).join(', '),
-          founderTeamName: founderTeamName,
-          investorName: investorName,
-          investorTeamName: investorTeamName,
-          fromInvestorTeamName: investorTeamNameLink ? `from ${investorTeamNameLink}` : '',
-          investorNameLink,
-          ...(referralData
-            ? {
-                referralTeamName: fundraisingProfile.team.name,
-                referralInvestorName: referralData.investorName || referralData.investorEmail,
-                referralInvestorEmail: referralData.investorEmail,
-                referralMessage: referralData.message,
-              }
-            : {}),
+    if (!isPrepDemoDay) {
+      await this.notificationServiceClient.sendNotification({
+        isPriority: true,
+        deliveryChannel: 'EMAIL',
+        templateName: template.templateName,
+        recipientsInfo: {
+          from: process.env.DEMO_DAY_EMAIL,
+          to: [...founderEmails, referralData?.investorEmail].filter(Boolean),
+          cc: [member.email],
+          bcc: [process.env.DEMO_DAY_EMAIL],
         },
-      },
-      entityType: 'DEMO_DAY',
-      actionType: template.actionType,
-      sourceMeta: {
-        activityId: '',
-        activityType: 'DEMO_DAY',
-        activityUserId: member.uid,
-        activityUserName: member.name,
-      },
-      targetMeta: {
-        emailId: member.email,
-        userId: member.uid,
-        userName: member.name,
-      },
-    });
+        deliveryPayload: {
+          body: {
+            demoDayName: demoDay.title || 'PL F25 Demo Day',
+            demoDayLink: `${process.env.WEB_UI_BASE_URL}/demoday?utm_source=email_intro`,
+            subjectPrefix: isPrepDemoDay ? '[DEMO DAY PREP - PRACTICE EMAIL] ' : '',
+            teamsSubject: teamsSubject,
+            founderNames: founders.map((f) => f.member.name).join(', '),
+            founderTeamName: founderTeamName,
+            investorName: investorName,
+            investorTeamName: investorTeamName,
+            fromInvestorTeamName: investorTeamNameLink ? `from ${investorTeamNameLink}` : '',
+            investorNameLink,
+            ...(referralData
+              ? {
+                  referralTeamName: fundraisingProfile.team.name,
+                  referralInvestorName: referralData.investorName || referralData.investorEmail,
+                  referralInvestorEmail: referralData.investorEmail,
+                  referralMessage: referralData.message,
+                }
+              : {}),
+          },
+        },
+        entityType: 'DEMO_DAY',
+        actionType: template.actionType,
+        sourceMeta: {
+          activityId: '',
+          activityType: 'DEMO_DAY',
+          activityUserId: member.uid,
+          activityUserName: member.name,
+        },
+        targetMeta: {
+          emailId: member.email,
+          userId: member.uid,
+          userName: member.name,
+        },
+      });
+    }
 
     // Increment sticky flags & counters (+1 only on the first activation of each flag)
     await this.upsertInterestWithCounters({
