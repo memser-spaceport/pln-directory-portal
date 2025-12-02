@@ -5,30 +5,30 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException,
+  NotFoundException
 } from '@nestjs/common';
-import { z } from 'zod';
+import {z} from 'zod';
 import axios from 'axios';
 import * as path from 'path';
-import {ApprovalStatus, Member, ParticipantsRequest, ParticipantType, Prisma} from '@prisma/client';
-import { PrismaService } from '../shared/prisma.service';
-import { ParticipantsRequestService } from '../participants-request/participants-request.service';
-import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
-import { FileMigrationService } from '../utils/file-migration/file-migration.service';
-import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
-import { NotificationService } from '../utils/notification/notification.service';
-import { EmailOtpService } from '../otp/email-otp.service';
-import { AuthService } from '../auth/auth.service';
-import { LogService } from '../shared/log.service';
-import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
-import { hashFileName } from '../utils/hashing';
-import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
-import { CacheService } from '../utils/cache/cache.service';
-import { MembersHooksService } from './members.hooks.service';
-import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
-import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
-import { OfficeHoursService } from '../office-hours/office-hours.service';
-import { TeamsService } from '../teams/teams.service';
+import {Member, Prisma} from '@prisma/client';
+import {PrismaService} from '../shared/prisma.service';
+import {AirtableMemberSchema} from '../utils/airtable/schema/airtable-member.schema';
+import {FileMigrationService} from '../utils/file-migration/file-migration.service';
+import {LocationTransferService} from '../utils/location-transfer/location-transfer.service';
+import {NotificationService} from '../utils/notification/notification.service';
+import {EmailOtpService} from '../otp/email-otp.service';
+import {AuthService} from '../auth/auth.service';
+import {LogService} from '../shared/log.service';
+import {DEFAULT_MEMBER_ROLES} from '../utils/constants';
+import {hashFileName} from '../utils/hashing';
+import {buildMultiRelationMapping, copyObj} from '../utils/helper/helper';
+import {CacheService} from '../utils/cache/cache.service';
+import {MembersHooksService} from './members.hooks.service';
+import {NotificationSettingsService} from '../notification-settings/notification-settings.service';
+import {AccessLevel} from '../../../../libs/contracts/src/schema/admin-member';
+import {OfficeHoursService} from '../office-hours/office-hours.service';
+import {TeamsService} from '../teams/teams.service';
+import {ParticipantsRequest} from "./members.dto";
 
 @Injectable()
 export class MembersService {
@@ -39,8 +39,6 @@ export class MembersService {
     private emailOtpService: EmailOtpService,
     private authService: AuthService,
     private logger: LogService,
-    @Inject(forwardRef(() => ParticipantsRequestService))
-    private participantsRequestService: ParticipantsRequestService,
     @Inject(forwardRef(() => NotificationService))
     private notificationService: NotificationService,
     private cacheService: CacheService,
@@ -388,14 +386,14 @@ export class MembersService {
                   investorProfile: true,
                 },
               },
-            },
-            where: {
-              team: {
-                accessLevel: {
-                  not: 'L0',
-                },
-              },
-            },
+            },//TODO - docuble check with frontend
+            // where: {
+            //   team: {
+            //     accessLevel: {
+            //       not: 'L0',
+            //     },
+            //   },
+            // },
           },
           projectContributions: {
             include: {
@@ -444,13 +442,7 @@ export class MembersService {
         },
       });
 
-      // Only return investor profile for L5 and L6 members
-      const memberData = { ...(member as any) };
-      if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
-        delete memberData.investorProfile;
-      }
-
-      return memberData;
+      return { ...(member as any) };
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -600,22 +592,6 @@ export class MembersService {
       let newTokens;
       let newMemberInfo;
       await this.prisma.$transaction(async (tx) => {
-        await this.participantsRequestService.addRequest(
-          {
-            status: 'AUTOAPPROVED',
-            requesterEmailId: oldEmail,
-            referenceUid: memberInfo.uid,
-            uniqueIdentifier: oldEmail,
-            participantType: 'MEMBER',
-            newData: {
-              oldEmail: oldEmail,
-              email: newEmail,
-            },
-          },
-          null,
-          false,
-          tx
-        );
         newMemberInfo = await tx.member.update({
           where: { email: oldEmail.toLowerCase().trim() },
           data: { email: newEmail.toLowerCase().trim() },
@@ -835,25 +811,6 @@ export class MembersService {
     }
   }
 
-  /**
-   * Creates a new team from the participants request data.
-   * resets the cache, and triggers post-update actions like Airtable synchronization.
-   * @param teamParticipantRequest - The request containing the team details.
-   * @param requestorEmail - The email of the requestor.
-   * @param tx - The transaction client to ensure atomicity
-   * @returns The newly created team.
-   */
-  async createMemberFromParticipantsRequest(
-    memberParticipantRequest: ParticipantsRequest,
-    tx: Prisma.TransactionClient = this.prisma
-  ): Promise<Member> {
-    const memberData: any = memberParticipantRequest.newData;
-    const { member } = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
-    await this.mapLocationToMember(memberData, null, member, tx);
-    const createdMember = await this.createMember(member, tx);
-    await this.membersHooksService.postCreateActions(createdMember, memberParticipantRequest.requesterEmailId);
-    return createdMember;
-  }
 
   async createMemberFromSignUpData(memberData: any): Promise<Member> {
     let createdMember: any;
@@ -867,7 +824,7 @@ export class MembersService {
     return createdMember;
   }
 
-  async updateMemberFromParticipantsRequest(
+async updateMemberFromParticipantsRequest(
     memberUid: string,
     memberParticipantsRequest: ParticipantsRequest,
     requestorEmail: string,
@@ -899,7 +856,6 @@ export class MembersService {
         tx
       );
       await this.updateMemberEmailChange(memberUid, isEmailChanged, isExternalIdAvailable, memberData, existingMember);
-      await this.logParticipantRequest(requestorEmail, memberData, existingMember.uid, tx);
 
       // Handle investor profile updates
       if (investorProfileData) {
@@ -1460,48 +1416,6 @@ export class MembersService {
   }
 
   /**
-   * Validates if an email change is required and whether the new email is unique.
-   * @param isEmailChange - Flag indicating if email is being changed.
-   * @param transactionType - Prisma transaction client or Prisma client.
-   * @param newEmail - The new email to validate.
-   */
-  async validateEmailChange(isEmailChange, transactionType, newEmail) {
-    if (isEmailChange) {
-      const foundUser = await transactionType.member.findUnique({ where: { email: newEmail.toLowerCase().trim() } });
-      if (foundUser?.email) {
-        throw new BadRequestException('Email already exists. Please try again with a different email.');
-      }
-    }
-  }
-
-  /**
-   * Logs the participant request in the participants request table for audit and tracking purposes.
-   *
-   * @param tx - The transaction client to ensure atomicity
-   * @param requestorEmail - Email of the requestor who is updating the team
-   * @param newMemberData - The new data being applied to the team
-   * @param referenceUid - Unique identifier of the existing team to be referenced
-   */
-  private async logParticipantRequest(
-    requestorEmail: string,
-    newMemberData,
-    referenceUid: string,
-    tx: Prisma.TransactionClient
-  ): Promise<void> {
-    await this.participantsRequestService.add(
-      {
-        status: 'AUTOAPPROVED',
-        requesterEmailId: requestorEmail,
-        referenceUid,
-        uniqueIdentifier: newMemberData?.email || '',
-        participantType: 'MEMBER',
-        newData: { ...newMemberData },
-      },
-      tx
-    );
-  }
-
-  /**
    * Verify the list of members and log into participant request.
    * @param memberIds array of member IDs
    * @param userEmail logged in member email
@@ -1521,30 +1435,6 @@ export class MembersService {
 
       // enables recommendation feature for new users
       await this.notificationSettingsService.enableRecommendationsFor(memberIds);
-
-      const members = await tx.member.findMany({
-        where: { uid: { in: memberIds } },
-      });
-      await Promise.all(
-        members.map(async (member) => {
-          await this.participantsRequestService.add(
-            {
-              status: 'AUTOAPPROVED',
-              requesterEmailId: userEmail,
-              referenceUid: member.uid,
-              uniqueIdentifier: member?.email || '',
-              participantType: 'MEMBER',
-              oldData: {
-                isVerified: false,
-              },
-              newData: {
-                isVerified: true,
-              },
-            },
-            tx
-          );
-        })
-      );
 
       return result;
     });
@@ -2944,7 +2834,7 @@ export class MembersService {
   }
 
   async findByExternalId(externalId: string) {
-    const member = await this.prisma.member.findFirst({
+    return this.prisma.member.findFirst({
       where: { externalId },
       include: {
         image: true,
@@ -2966,16 +2856,6 @@ export class MembersService {
         investorProfile: true,
       },
     });
-
-    if (member) {
-      // Only return investor profile for L5 and L6 members
-      if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
-        return { ...member, investorProfile: null };
-      }
-      return member;
-    }
-
-    return member;
   }
 
   /**
@@ -3074,13 +2954,7 @@ export class MembersService {
         },
       });
 
-      // Apply conditional logic to only return investor profile for L5 and L6 members
-      return members.map((member) => {
-        if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
-          return { ...member, investorProfile: null };
-        }
-        return member;
-      });
+      return members;
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -3285,11 +3159,18 @@ export class MembersService {
   }
 
   /**
-   * Within a transaction: create OR resolve team and upsert TeamMemberRole (free-text role).
-   * - If no team provided -> nothing to do.
-   * - If isTeamNew -> create Team via TeamsService.createTeam
-   * - Else -> resolve by uid or name
-   * - Finally -> upsert teamMemberRole (memberUid, teamUid)
+   * Attach a member to a team within a transaction.
+   *
+   * Behavior:
+   * - If no team provided → nothing happens.
+   * - If isTeamNew = true:
+   *    - Create a new Team with accessLevel = 'L0'
+   *    - Attach the given member to that team via TeamMemberRole
+   *      (even if the member is not "approved" yet).
+   * - Else:
+   *    - Resolve an existing team by uid or name
+   *    - Attach the given member to that team via TeamMemberRole.
+   *
    */
   private async attachTeamAndRoleTx(
     tx: Prisma.TransactionClient,
@@ -3299,7 +3180,7 @@ export class MembersService {
       team?: { uid?: string; name?: string; website?: string } | string;
       isTeamNew?: boolean;
       website?: string | null;
-      requestorEmail?: string;
+      requestorEmail?: string; // kept for backward compatibility
     }
   ): Promise<void> {
     this.logger.info(
@@ -3310,126 +3191,94 @@ export class MembersService {
 
     const { team, isTeamNew, role } = opts ?? {};
     if (!team) {
-      this.logger.info(
-        `[attachTeamAndRoleTx] No team provided → exiting without changes`
-      );
+      this.logger.info(`[attachTeamAndRoleTx] No team provided → nothing to do`);
       return;
     }
 
     const norm = this.normalizeTeamInput(team);
 
+    let targetTeamUid: string | undefined;
+
     // ==================================================
-    // CASE 1: User requests to create a NEW TEAM (isTeamNew = true)
+    // CASE 1: Create NEW team directly (accessLevel = L0)
+    // and attach the member to it via TeamMemberRole
     // ==================================================
     if (isTeamNew) {
       this.logger.info(
-        `[attachTeamAndRoleTx] Creating NEW TEAM request instead of direct team creation`
+        `[attachTeamAndRoleTx] Creating NEW TEAM with accessLevel=L0`
       );
 
-      const name =
-        (norm.name && norm.name.trim()) || `team-${memberUid}`; // fallback name
+      const name = (norm.name && norm.name.trim()) || `team-${memberUid}`;
       const website = (norm.website ?? opts.website) || null;
 
-      if (!opts.requestorEmail) {
-        this.logger.error(
-          `[attachTeamAndRoleTx] Missing requesterEmail → cannot proceed`
+      this.logger.info(
+        `[attachTeamAndRoleTx] Creating Team in DB. name=${name}, website=${website}`
+      );
+
+      const createdTeam = await tx.team.create({
+        data: {
+          name,
+          website,
+          accessLevel: 'L0',
+        },
+        select: { uid: true },
+      });
+
+      targetTeamUid = createdTeam.uid;
+
+      this.logger.info(
+        `[attachTeamAndRoleTx] New team created successfully. teamUid=${targetTeamUid}`
+      );
+    } else {
+      // ==================================================
+      // CASE 2: Resolve EXISTING team
+      // and attach the member to it via TeamMemberRole
+      // ==================================================
+      this.logger.info(`[attachTeamAndRoleTx] Resolving EXISTING team`);
+
+      let existing: { uid: string } | null = null;
+
+      if (norm.uid) {
+        this.logger.info(
+          `[attachTeamAndRoleTx] Searching team by uid=${norm.uid}`
         );
-        throw new BadRequestException(
-          'Requester email is required to create a new team request'
-        );
+        existing = await this.teamService
+          .findTeamByUid(norm.uid)
+          .catch(() => null);
       }
 
-      const requesterEmail = opts.requestorEmail.toLowerCase().trim();
+      if (!existing && norm.name) {
+        this.logger.info(
+          `[attachTeamAndRoleTx] Searching team by name=${norm.name}`
+        );
+        existing = await this.teamService
+          .findTeamByName(norm.name)
+          .catch(() => null);
+      }
+
+      if (!existing) {
+        this.logger.info(
+          `[attachTeamAndRoleTx] Team not found by uid or name → aborting`
+        );
+        throw new NotFoundException('Team not found by uid or name');
+      }
+
+      targetTeamUid = existing.uid;
 
       this.logger.info(
-        `[attachTeamAndRoleTx] Validating unique team identifier: ${name}`
+        `[attachTeamAndRoleTx] Existing team resolved. teamUid=${targetTeamUid}`
       );
+    }
 
-      // Ensure team name is unique across Teams + ParticipantsRequest
-      await this.participantsRequestService.validateUniqueIdentifier(
-        ParticipantType.TEAM,
-        name
-      );
-
-      this.logger.info(
-        `[attachTeamAndRoleTx] Creating ParticipantsRequest: TEAM / PENDING`
-      );
-
-      // Create PENDING Team Request (instead of creating team directly)
-      await this.participantsRequestService.addRequest(
-        {
-          participantType: ParticipantType.TEAM,
-          status: ApprovalStatus.PENDING,
-          requesterEmailId: requesterEmail,
-          uniqueIdentifier: name,
-          newData: {
-            name,
-            website: website || undefined,
-          } as any,
-        } as any,
-        undefined, // requesterUser (undefined → no auto-approval)
-        false,     // disableNotification = false → send notifications
-        tx
-      );
-
-      this.logger.info(
-        `[attachTeamAndRoleTx] NEW TEAM REQUEST created successfully (PENDING). name=${name}`
-      );
-
-      // IMPORTANT:
-      // We DO NOT attach a role, because the team is not created yet.
-      this.logger.info(
-        `[attachTeamAndRoleTx] Exiting — team is pending approval, no TeamMemberRole created`
-      );
-
-      return;
+    if (!targetTeamUid) {
+      this.logger.info(`[attachTeamAndRoleTx] Fatal: teamUid is undefined`);
+      throw new NotFoundException('Team UID could not be resolved');
     }
 
     // ==================================================
-    // CASE 2: Attach MEMBER to EXISTING TEAM
+    // Attach member to team (create or update role)
+    // This happens for both NEW and EXISTING teams.
     // ==================================================
-    this.logger.info(
-      `[attachTeamAndRoleTx] Attaching member to EXISTING team`
-    );
-
-    let targetTeamUid: string;
-
-    // Try lookup by UID
-    let existing: { uid: string } | null = null;
-    if (norm.uid) {
-      this.logger.info(
-        `[attachTeamAndRoleTx] Searching team by UID=${norm.uid}`
-      );
-      existing = await this.teamService
-        .findTeamByUid(norm.uid)
-        .catch(() => null);
-    }
-
-    if (!existing && norm.name) {
-      this.logger.info(
-        `[attachTeamAndRoleTx] Searching team by NAME=${norm.name}`
-      );
-      existing = await this.teamService
-        .findTeamByName(norm.name)
-        .catch(() => null);
-    }
-
-    if (!existing) {
-      this.logger.error(
-        `[attachTeamAndRoleTx] Team not found by uid or name. norm=${JSON.stringify(
-          norm
-        )}`
-      );
-      throw new NotFoundException('Existing team not found by uid or name');
-    }
-
-    targetTeamUid = existing.uid;
-
-    this.logger.info(
-      `[attachTeamAndRoleTx] Existing team resolved. teamUid=${targetTeamUid}`
-    );
-
-    // Prepare role
     const finalRole = (role ?? 'member').trim();
     const roleTags = finalRole
       .split(',')
@@ -3437,7 +3286,7 @@ export class MembersService {
       .filter(Boolean);
 
     this.logger.info(
-      `[attachTeamAndRoleTx] Upserting TeamMemberRole for memberUid=${memberUid}, teamUid=${targetTeamUid}, role=${finalRole}`
+      `[attachTeamAndRoleTx] Upserting TeamMemberRole. memberUid=${memberUid}, teamUid=${targetTeamUid}, role=${finalRole}`
     );
 
     // Upsert (create or update) role
@@ -3448,8 +3297,8 @@ export class MembersService {
         teamUid: targetTeamUid,
         role: finalRole,
         roleTags,
-        mainTeam: false,
-        teamLead: false,
+        mainTeam: true,
+        teamLead: true,
       },
       update: {
         role: finalRole,
@@ -3458,9 +3307,10 @@ export class MembersService {
     });
 
     this.logger.info(
-      `[attachTeamAndRoleTx] TeamMemberRole updated successfully for teamUid=${targetTeamUid}`
+      `[attachTeamAndRoleTx] TeamMemberRole saved successfully. teamUid=${targetTeamUid}`
     );
   }
+
 
   /** Accepts string (treated as name) or object with { uid|name|website } */
   private normalizeTeamInput(team: { uid?: string; name?: string; website?: string } | string): {

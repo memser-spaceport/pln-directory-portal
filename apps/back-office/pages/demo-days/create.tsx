@@ -5,15 +5,22 @@ import { useCookie } from 'react-use';
 import api from '../../utils/api';
 import { API_ROUTE } from '../../utils/constants';
 import { CreateDemoDayDto } from '../../screens/demo-days/types/demo-day';
+import dynamic from 'next/dynamic';
+
+const RichTextEditor = dynamic(() => import('../../components/common/rich-text-editor'), { ssr: false });
 
 const CreateDemoDayPage = () => {
   const router = useRouter();
   const [authToken] = useCookie('plnadmin');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [slugError, setSlugError] = useState<string>('');
   const [formData, setFormData] = useState<CreateDemoDayDto>({
     title: '',
+    slugURL: '',
     description: '',
+    shortDescription: '',
     startDate: '',
+    endDate: '',
     status: 'UPCOMING',
   });
 
@@ -22,6 +29,7 @@ const CreateDemoDayPage = () => {
     if (!authToken) return;
 
     setIsSubmitting(true);
+    setSlugError('');
     try {
       const config = {
         headers: {
@@ -31,24 +39,66 @@ const CreateDemoDayPage = () => {
 
       const payload = {
         ...formData,
-        startDate: new Date(formData.startDate).toISOString(),
+        // Treat datetime-local input as UTC
+        startDate: `${formData.startDate}:00.000Z`,
+        endDate: `${formData.endDate}:00.000Z`,
       };
 
       await api.post(API_ROUTE.ADMIN_DEMO_DAYS, payload, config);
       router.push('/demo-days');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating demo day:', error);
-      alert('Failed to create demo day. Please try again.');
+
+      // Check if it's a conflict error (409) for duplicate slug
+      if (error?.response?.status === 409) {
+        const errorMessage =
+          error?.response?.data?.message || `A demo day with slug "${formData.slugURL}" already exists.`;
+        setSlugError(errorMessage);
+      } else {
+        alert('Failed to create demo day. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const slugify = (text: string) => {
+    return text
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w-]+/g, '')
+      .replace(/--+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '');
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+
+    // Clear slug error when user modifies the slug or title
+    if (name === 'slugURL' || name === 'title') {
+      setSlugError('');
+    }
+
+    setFormData((prev) => {
+      const updates: any = { [name]: value };
+
+      // Auto-generate slugURL when title changes
+      if (name === 'title') {
+        updates.slugURL = slugify(value);
+      }
+
+      return {
+        ...prev,
+        ...updates,
+      };
+    });
+  };
+
+  const handleRichTextChange = (field: keyof CreateDemoDayDto, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [field]: value,
     }));
   };
 
@@ -81,23 +131,60 @@ const CreateDemoDayPage = () => {
             </div>
 
             <div>
+              <label htmlFor="slugURL" className="mb-2 block text-sm font-medium text-gray-700">
+                URL Slug *
+              </label>
+              <input
+                type="text"
+                id="slugURL"
+                name="slugURL"
+                required
+                value={formData.slugURL}
+                onChange={handleInputChange}
+                className={`w-full rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 ${
+                  slugError
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                    : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                }`}
+                placeholder="demo-day-slug"
+              />
+              {slugError ? (
+                <p className="mt-1 text-sm text-red-600">{slugError}</p>
+              ) : (
+                <p className="mt-1 text-sm text-gray-500">
+                  This will be used in the URL: /demo-days/{formData.slugURL || 'demo-day-slug'}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="shortDescription" className="mb-2 block text-sm font-medium text-gray-700">
+                Short Description
+              </label>
+              <RichTextEditor
+                id="shortDescription"
+                value={formData.shortDescription || ''}
+                onChange={(value) => handleRichTextChange('shortDescription', value)}
+                placeholder="Enter a brief description"
+                maxLength={250}
+              />
+            </div>
+
+            <div>
               <label htmlFor="description" className="mb-2 block text-sm font-medium text-gray-700">
                 Description
               </label>
-              <textarea
+              <RichTextEditor
                 id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                rows={4}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={formData.description || ''}
+                onChange={(value) => handleRichTextChange('description', value)}
                 placeholder="Enter demo day description"
               />
             </div>
 
             <div>
               <label htmlFor="startDate" className="mb-2 block text-sm font-medium text-gray-700">
-                Start Date *
+                Start Date (UTC) *
               </label>
               <input
                 type="datetime-local"
@@ -107,6 +194,36 @@ const CreateDemoDayPage = () => {
                 value={formData.startDate}
                 onChange={handleInputChange}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="endDate" className="mb-2 block text-sm font-medium text-gray-700">
+                End Date (UTC) *
+              </label>
+              <input
+                type="datetime-local"
+                id="endDate"
+                name="endDate"
+                required
+                value={formData.endDate}
+                onChange={handleInputChange}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="approximateStartDate" className="mb-2 block text-sm font-medium text-gray-700">
+                Approximate Start Date
+              </label>
+              <input
+                type="text"
+                id="approximateStartDate"
+                name="approximateStartDate"
+                value={formData.approximateStartDate || ''}
+                onChange={handleInputChange}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., Q1 2025, Spring 2025"
               />
             </div>
 
@@ -122,8 +239,11 @@ const CreateDemoDayPage = () => {
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="UPCOMING">Upcoming</option>
+                <option value="REGISTRATION_OPEN">Registration Open</option>
+                <option value="EARLY_ACCESS">Early Access</option>
                 <option value="ACTIVE">Active</option>
                 <option value="COMPLETED">Completed</option>
+                <option value="ARCHIVED">Archived</option>
               </select>
             </div>
 

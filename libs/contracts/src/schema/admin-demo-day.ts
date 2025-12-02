@@ -4,9 +4,14 @@ import { z } from 'zod';
 // Create Demo Day Schema
 export const CreateDemoDaySchema = z.object({
   startDate: z.string(),
+  endDate: z.string(),
   title: z.string().min(1, 'Title is required'),
+  slugURL: z.string().min(1, 'URL slug is required'),
   description: z.string().min(1, 'Description is required'),
-  status: z.enum(['UPCOMING', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED']),
+  shortDescription: z.string().optional().nullable(),
+  approximateStartDate: z.string().optional().nullable(),
+  supportEmail: z.string().email().optional().nullable(),
+  status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']),
 });
 
 export class CreateDemoDayDto extends createZodDto(CreateDemoDaySchema) {}
@@ -14,9 +19,14 @@ export class CreateDemoDayDto extends createZodDto(CreateDemoDaySchema) {}
 // Update Demo Day Schema
 export const UpdateDemoDaySchema = z.object({
   startDate: z.string().optional(),
+  endDate: z.string().optional(),
   title: z.string().min(1, 'Title is required').optional(),
+  slugURL: z.string().min(1, 'URL slug is required').optional(),
   description: z.string().min(1, 'Description is required').optional(),
-  status: z.enum(['UPCOMING', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED']).optional(),
+  shortDescription: z.string().optional().nullable(),
+  approximateStartDate: z.string().optional().nullable(),
+  supportEmail: z.string().email().optional().nullable(),
+  status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']).optional(),
 });
 
 export class UpdateDemoDayDto extends createZodDto(UpdateDemoDaySchema) {}
@@ -27,7 +37,7 @@ export const AddParticipantSchema = z
     memberUid: z.string().optional(),
     email: z.string().email().optional(),
     name: z.string().optional(),
-    type: z.enum(['INVESTOR', 'FOUNDER']),
+    type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']),
   })
   .refine((data) => data.memberUid || data.email, {
     message: 'Either memberUid or email must be provided',
@@ -64,8 +74,8 @@ export class AddParticipantsBulkDto extends createZodDto(AddParticipantsBulkSche
 export const GetParticipantsQuerySchema = z.object({
   page: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
   limit: z.string().regex(/^\d+$/).transform(Number).optional().default('20'),
-  status: z.enum(['INVITED', 'ENABLED', 'DISABLED']).optional(),
-  type: z.enum(['INVESTOR', 'FOUNDER']).optional(),
+  status: z.enum(['PENDING', 'INVITED', 'ENABLED', 'DISABLED']).optional(),
+  type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']).optional(),
   search: z.string().optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'statusUpdatedAt', 'type', 'status']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
@@ -75,9 +85,9 @@ export class GetParticipantsQueryDto extends createZodDto(GetParticipantsQuerySc
 
 // Update Participant Schema
 export const UpdateParticipantSchema = z.object({
-  status: z.enum(['INVITED', 'ENABLED', 'DISABLED']).optional(),
+  status: z.enum(['PENDING', 'INVITED', 'ENABLED', 'DISABLED']).optional(),
   teamUid: z.string().optional(),
-  type: z.enum(['INVESTOR', 'FOUNDER']).optional(),
+  type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']).optional(),
   hasEarlyAccess: z.boolean().optional(),
   isDemoDayAdmin: z.boolean().optional(),
 });
@@ -88,10 +98,15 @@ export class UpdateParticipantDto extends createZodDto(UpdateParticipantSchema) 
 export const ResponseDemoDaySchema = z.object({
   id: z.number(),
   uid: z.string(),
+  slugURL: z.string(),
   startDate: z.date(),
+  endDate: z.date(),
   title: z.string(),
   description: z.string(),
-  status: z.enum(['UPCOMING', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED']),
+  shortDescription: z.string().nullable(),
+  approximateStartDate: z.string().nullable(),
+  supportEmail: z.string().nullable(),
+  status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']),
   createdAt: z.date(),
   updatedAt: z.date(),
   isDeleted: z.boolean(),
@@ -105,8 +120,8 @@ export const ResponseParticipantSchema = z.object({
   uid: z.string(),
   demoDayUid: z.string(),
   memberUid: z.string(),
-  type: z.enum(['INVESTOR', 'FOUNDER']),
-  status: z.enum(['INVITED', 'ENABLED', 'DISABLED']),
+  type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']),
+  status: z.enum(['PENDING', 'INVITED', 'ENABLED', 'DISABLED']),
   hasEarlyAccess: z.boolean(),
   isDemoDayAdmin: z.boolean(),
   teamUid: z.string().nullable(),

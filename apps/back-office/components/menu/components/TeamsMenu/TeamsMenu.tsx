@@ -13,26 +13,12 @@ export const TeamsMenu = () => {
   useOnClickOutside([menuRef], () => setOpen(false));
 
   return (
-    <div className={s.root} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <button className={s.trigger}>
-        <TeamsIcon /> Teams{' '}
-        <span
-          className={clsx(s.chevron, {
-            [s.open]: open,
-          })}
-        >
-          <ChevronDownIcon />
-        </span>
-      </button>
-      <div ref={menuRef} className={`${s.menu} ${open ? s.open : ''}`}>
-        <Link href="/pending-list" passHref>
-          <a className={s.menuItem}>
-            <PendingIcon />
-            <span className={s.menuItemLabel}>Pending</span>
-            <span className={s.menuItemCount}></span>
-            <CaretIcon />
-          </a>
-        </Link>
+      <Link href="/teams" passHref>
+        <a className={s.menuItem}>
+          <TeamsIcon />
+          <span className={s.menuItemLabel}>Teams</span>
+        </a>
+      </Link>);
 
         {/*<div className={s.menuItem}>*/}
         {/*  <VerifiedIcon />*/}
@@ -55,9 +41,7 @@ export const TeamsMenu = () => {
         {/*  <CaretIcon />*/}
         {/*</div>*/}
         {/*<button className={s.menuItem}>Add New Team</button>*/}
-      </div>
-    </div>
-  );
+
 };
 
 const TeamsIcon = () => (

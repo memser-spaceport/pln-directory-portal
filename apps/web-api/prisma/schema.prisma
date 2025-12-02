@@ -30,7 +30,7 @@ model Team {
   telegramHandler              String?
   shortDescription             String?
   longDescription              String?
-  tier                         Int?
+  tier                         Int?                          @default(-1)
   plnFriend                    Boolean                       @default(false)
   isFeatured                   Boolean?                      @default(false)
   isFund                       Boolean                       @default(false)
@@ -216,20 +216,6 @@ enum ImageSize {
 enum DiscoveryQuestionType {
   CHAT
   FOLLOW_UP
-}
-
-model ParticipantsRequest {
-  id               Int             @id @default(autoincrement())
-  uid              String          @unique @default(cuid())
-  participantType  ParticipantType
-  status           ApprovalStatus  @default(PENDING)
-  oldData          Json?
-  newData          Json
-  referenceUid     String?
-  requesterEmailId String
-  uniqueIdentifier String
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
 }
 
 model Skill {
@@ -951,17 +937,21 @@ model InvestorProfile {
 
 enum DemoDayStatus {
   UPCOMING
+  REGISTRATION_OPEN
   EARLY_ACCESS
   ACTIVE
   COMPLETED
+  ARCHIVED
 }
 
 enum DemoDayParticipantType {
   INVESTOR
   FOUNDER
+  SUPPORT
 }
 
 enum DemoDayParticipantStatus {
+  PENDING
   INVITED
   ENABLED
   DISABLED
@@ -970,9 +960,14 @@ enum DemoDayParticipantStatus {
 model DemoDay {
   id                        Int                               @id @default(autoincrement())
   uid                       String                            @unique @default(cuid())
+  slugURL                   String                            @unique
   startDate                 DateTime
+  endDate                   DateTime
+  approximateStartDate      String?
   title                     String
   description               String
+  shortDescription          String?
+  supportEmail              String?
   status                    DemoDayStatus                     @default(UPCOMING)
   createdAt                 DateTime                          @default(now())
   updatedAt                 DateTime                          @updatedAt

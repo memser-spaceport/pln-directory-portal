@@ -1,5 +1,5 @@
-import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { DemoDay, TeamFundraisingProfile, Upload, UploadKind } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { TeamFundraisingProfile, Upload, UploadKind } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from './demo-days.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
@@ -138,8 +138,8 @@ export class DemoDayFundraisingProfilesService {
     };
   }
 
-  async getCurrentDemoDayFundraisingProfile(memberEmail: string): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+  async getCurrentDemoDayFundraisingProfile(memberEmail: string, demoDayUidOrSlug: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day access');
     }
@@ -188,28 +188,26 @@ export class DemoDayFundraisingProfilesService {
     return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
-  private async validateDemoDayFounderAccess(
-    memberEmail: string
-  ): Promise<{ member: any; team: any; demoDay: DemoDay }> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
-    if (!demoDay) {
-      throw new ForbiddenException('No demo day access');
-    }
-
+  /**
+   * Validates if a non-admin user has founder access to the specified team
+   * @param memberEmail - Email of the member to validate
+   * @param teamUid - UID of the team to validate access for
+   * @param demoDayUid - UID of the demo day
+   * @throws ForbiddenException if user doesn't have access
+   */
+  private async validateTeamFounderAccess(memberEmail: string, teamUid: string, demoDayUid: string): Promise<void> {
     const member = await this.prisma.member.findUnique({
       where: { email: memberEmail },
       include: {
         demoDayParticipants: {
           where: {
-            demoDayUid: demoDay.uid,
+            demoDayUid: demoDayUid,
+            teamUid: teamUid,
             isDeleted: false,
             status: 'ENABLED',
             type: 'FOUNDER',
           },
           take: 1,
-        },
-        teamMemberRoles: {
-          include: { team: true },
         },
       },
     });
@@ -217,18 +215,6 @@ export class DemoDayFundraisingProfilesService {
     if (!member || member.demoDayParticipants.length === 0) {
       throw new ForbiddenException('No demo day access');
     }
-
-    const demoDayParticipant = member.demoDayParticipants[0];
-    const teamMemberRole = demoDayParticipant.teamUid
-      ? member.teamMemberRoles.find((role) => role.teamUid === demoDayParticipant.teamUid)
-      : member.teamMemberRoles.find((role) => role.mainTeam);
-    const team = teamMemberRole ? teamMemberRole.team : member.teamMemberRoles[0].team;
-
-    if (!team) {
-      throw new BadRequestException('Member must be part of a team to access fundraising profile');
-    }
-
-    return { member, team, demoDay };
   }
 
   async updateFundraisingProfileStatus(teamUid: string, demoDayUid: string): Promise<void> {
@@ -325,8 +311,23 @@ export class DemoDayFundraisingProfilesService {
     }
   }
 
-  async updateFundraisingOnePager(memberEmail: string, onePagerUploadUid: string): Promise<any> {
-    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+  async updateFundraisingOnePager(
+    memberEmail: string,
+    teamUid: string,
+    onePagerUploadUid: string,
+    demoDayUidOrSlug: string
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const { isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+
+    // If not admin, validate that the user is a founder of the specified team
+    if (!isAdmin) {
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDay.uid);
+    }
 
     // Validate upload
     if (onePagerUploadUid) {
@@ -342,7 +343,7 @@ export class DemoDayFundraisingProfilesService {
     await this.prisma.teamFundraisingProfile.upsert({
       where: {
         teamUid_demoDayUid: {
-          teamUid: team.uid,
+          teamUid: teamUid,
           demoDayUid: demoDay.uid,
         },
       },
@@ -350,24 +351,34 @@ export class DemoDayFundraisingProfilesService {
         onePagerUploadUid,
       },
       create: {
-        teamUid: team.uid,
+        teamUid: teamUid,
         demoDayUid: demoDay.uid,
         onePagerUploadUid,
         status: 'DRAFT',
       },
     });
 
-    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+    await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
-  async deleteFundraisingOnePager(memberEmail: string): Promise<any> {
-    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+  async deleteFundraisingOnePager(memberEmail: string, teamUid: string, demoDayUidOrSlug: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const { isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+
+    // If not admin, validate that the user is a founder of the specified team
+    if (!isAdmin) {
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDay.uid);
+    }
 
     const profile = await this.prisma.teamFundraisingProfile.findUnique({
       where: {
         teamUid_demoDayUid: {
-          teamUid: team.uid,
+          teamUid: teamUid,
           demoDayUid: demoDay.uid,
         },
       },
@@ -382,7 +393,7 @@ export class DemoDayFundraisingProfilesService {
       await this.prisma.teamFundraisingProfile.update({
         where: {
           teamUid_demoDayUid: {
-            teamUid: team.uid,
+            teamUid: teamUid,
             demoDayUid: demoDay.uid,
           },
         },
@@ -392,12 +403,27 @@ export class DemoDayFundraisingProfilesService {
       });
     }
 
-    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+    await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
-  async updateFundraisingVideo(memberEmail: string, videoUploadUid: string): Promise<any> {
-    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+  async updateFundraisingVideo(
+    memberEmail: string,
+    teamUid: string,
+    videoUploadUid: string,
+    demoDayUidOrSlug: string
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const { isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+
+    // If not admin, validate that the user is a founder of the specified team
+    if (!isAdmin) {
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDay.uid);
+    }
 
     // Validate upload
     if (videoUploadUid) {
@@ -413,7 +439,7 @@ export class DemoDayFundraisingProfilesService {
     await this.prisma.teamFundraisingProfile.upsert({
       where: {
         teamUid_demoDayUid: {
-          teamUid: team.uid,
+          teamUid: teamUid,
           demoDayUid: demoDay.uid,
         },
       },
@@ -421,25 +447,40 @@ export class DemoDayFundraisingProfilesService {
         videoUploadUid,
       },
       create: {
-        teamUid: team.uid,
+        teamUid: teamUid,
         demoDayUid: demoDay.uid,
         videoUploadUid,
         status: 'DRAFT',
       },
     });
 
-    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+    await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
-  async updateFundraisingDescription(memberEmail: string, description: string): Promise<any> {
-    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+  async updateFundraisingDescription(
+    memberEmail: string,
+    teamUid: string,
+    description: string,
+    demoDayUidOrSlug: string
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const { isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+
+    // If not admin, validate that the user is a founder of the specified team
+    if (!isAdmin) {
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDay.uid);
+    }
 
     // Update or create profile
     await this.prisma.teamFundraisingProfile.upsert({
       where: {
         teamUid_demoDayUid: {
-          teamUid: team.uid,
+          teamUid: teamUid,
           demoDayUid: demoDay.uid,
         },
       },
@@ -447,24 +488,34 @@ export class DemoDayFundraisingProfilesService {
         description,
       },
       create: {
-        teamUid: team.uid,
+        teamUid: teamUid,
         demoDayUid: demoDay.uid,
         description,
         status: 'DRAFT',
       },
     });
 
-    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+    await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
-  async deleteFundraisingVideo(memberEmail: string): Promise<any> {
-    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+  async deleteFundraisingVideo(memberEmail: string, teamUid: string, demoDayUidOrSlug: string): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const { isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+
+    // If not admin, validate that the user is a founder of the specified team
+    if (!isAdmin) {
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDay.uid);
+    }
 
     const profile = await this.prisma.teamFundraisingProfile.findUnique({
       where: {
         teamUid_demoDayUid: {
-          teamUid: team.uid,
+          teamUid: teamUid,
           demoDayUid: demoDay.uid,
         },
       },
@@ -479,7 +530,7 @@ export class DemoDayFundraisingProfilesService {
       await this.prisma.teamFundraisingProfile.update({
         where: {
           teamUid_demoDayUid: {
-            teamUid: team.uid,
+            teamUid: teamUid,
             demoDayUid: demoDay.uid,
           },
         },
@@ -489,12 +540,13 @@ export class DemoDayFundraisingProfilesService {
       });
     }
 
-    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+    await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
   async updateFundraisingTeam(
     memberEmail: string,
+    teamUid: string,
     data: {
       name?: string;
       shortDescription?: string;
@@ -502,9 +554,20 @@ export class DemoDayFundraisingProfilesService {
       industryTags?: string[];
       fundingStage?: string;
       logo?: string;
-    }
+    },
+    demoDayUidOrSlug: string
   ): Promise<any> {
-    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const { isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+
+    // If not admin, validate that the user is a founder of the specified team
+    if (!isAdmin) {
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDay.uid);
+    }
 
     const updateData: any = {};
 
@@ -536,30 +599,30 @@ export class DemoDayFundraisingProfilesService {
 
     // Update team
     await this.prisma.team.update({
-      where: { uid: team.uid },
+      where: { uid: teamUid },
       data: updateData,
     });
 
-    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+    await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
   async getCurrentDemoDayFundraisingProfiles(
     memberEmail: string,
-    params?: { stage?: string[]; industry?: string[]; search?: string }
+    demoDayUidOrSlug: string,
+    params?: { stage?: string[]; industry?: string[]; search?: string },
+    showDraft = false
   ): Promise<any[]> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day access');
     }
 
-    const participantUid = await this.ensureParticipantAccess(memberEmail, demoDay.uid);
-    if (!participantUid) {
-      throw new ForbiddenException('No demo day access');
-    }
+    // Check access and get user info - throws if no access
+    const { participantUid, isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
 
-    // Only include PUBLISHED profiles that have both uploads present
-    const where = this.buildProfilesWhere(params, demoDay.uid);
+    //Condition #1: admins with showDraft get all profiles - otherwise only published ones
+    const where = this.buildProfilesWhere(params, demoDay.uid, showDraft);
 
     const profiles = await this.fetchProfiles(where);
     if (profiles.length === 0) return [];
@@ -574,7 +637,7 @@ export class DemoDayFundraisingProfilesService {
         demoDayUid: demoDay.uid,
         memberUid: participantUid,
         teamFundraisingProfileUid: { in: filtered.map((p) => p.uid) },
-        isPrepDemoDay: false,
+        isPrepDemoDay: isAdmin,
       },
       select: {
         teamFundraisingProfileUid: true,
@@ -595,46 +658,31 @@ export class DemoDayFundraisingProfilesService {
     }, {} as Record<string, { liked: boolean; connected: boolean; invested: boolean; referral: boolean }>);
     for (const p of filtered) {
       const f = flagsByProfile[p.uid] || { liked: false, connected: false, invested: false, referral: false };
-      (p as any).liked = !!f.liked;
-      (p as any).connected = !!f.connected;
-      (p as any).invested = !!f.invested;
-      (p as any).referral = !!f.referral;
+      (p as any).liked = f.liked;
+      (p as any).connected = f.connected;
+      (p as any).invested = f.invested;
+      (p as any).referral = f.referral;
     }
 
     // Stable personalized order based on user email
     return this.sortProfilesForUser(participantUid, filtered);
   }
 
-  private async ensureParticipantAccess(memberEmail: string, demoDayUid: string): Promise<string | null> {
-    const access = await this.prisma.member.findUnique({
-      where: { email: memberEmail },
-      select: {
-        uid: true,
-        demoDayParticipants: {
-          where: {
-            demoDayUid: demoDayUid,
-            isDeleted: false,
-            status: 'ENABLED',
-          },
-          select: { uid: true },
-          take: 1,
-        },
-      },
-    });
-
-    return access && access.demoDayParticipants.length > 0 ? access.uid : null;
-  }
-
   private buildProfilesWhere(
     params: { stage?: string | string[]; industry?: string | string[]; search?: string } | undefined,
-    demoDayUid: string
+    demoDayUid: string,
+    showDraft = false
   ): any {
     const where: any = {
       demoDayUid: demoDayUid,
-      status: 'PUBLISHED', // Condition #1: exclude DISABLED or DRAFT
-      onePagerUploadUid: { not: null }, // Condition #1: onePager must be uploaded
-      videoUploadUid: { not: null }, // Condition #1: video must be uploaded
     };
+
+    // show all profiles if admin and showDraft parameter are presented
+    if (!showDraft) {
+      where.status = 'PUBLISHED'; // Condition #1: exclude DISABLED or DRAFT
+      where.onePagerUploadUid = { not: null }; // Condition #1: onePager must be uploaded
+      where.videoUploadUid = { not: null }; // Condition #1: video must be uploaded
+    }
 
     if (params?.stage || params?.industry || params?.search) {
       where.team = { ...(where.team || {}) };
@@ -812,11 +860,23 @@ export class DemoDayFundraisingProfilesService {
 
   async generateVideoUploadUrl(
     memberEmail: string,
+    teamUid: string,
     filename: string,
     filesize: number,
-    mimetype: string
+    mimetype: string,
+    demoDayUidOrSlug: string
   ): Promise<{ uploadUid: string; presignedUrl: string; s3Key: string; expiresAt: string }> {
-    await this.validateDemoDayFounderAccess(memberEmail);
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const { isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+
+    // If not admin, validate that the user is a founder of the specified team
+    if (!isAdmin) {
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDay.uid);
+    }
 
     const validVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
     if (!validVideoTypes.includes(mimetype)) {
@@ -861,8 +921,23 @@ export class DemoDayFundraisingProfilesService {
     };
   }
 
-  async confirmVideoUpload(memberEmail: string, uploadUid: string): Promise<any> {
-    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+  async confirmVideoUpload(
+    memberEmail: string,
+    teamUid: string,
+    uploadUid: string,
+    demoDayUidOrSlug: string
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const { isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+
+    // If not admin, validate that the user is a founder of the specified team
+    if (!isAdmin) {
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDay.uid);
+    }
 
     const upload = await this.prisma.upload.findUnique({
       where: { uid: uploadUid },
@@ -877,7 +952,7 @@ export class DemoDayFundraisingProfilesService {
     await this.prisma.teamFundraisingProfile.upsert({
       where: {
         teamUid_demoDayUid: {
-          teamUid: team.uid,
+          teamUid: teamUid,
           demoDayUid: demoDay.uid,
         },
       },
@@ -885,25 +960,37 @@ export class DemoDayFundraisingProfilesService {
         videoUploadUid: confirmedUpload.uid,
       },
       create: {
-        teamUid: team.uid,
+        teamUid: teamUid,
         demoDayUid: demoDay.uid,
         videoUploadUid: confirmedUpload.uid,
         status: 'DRAFT',
       },
     });
 
-    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
+    await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
 
-    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
   async generateOnePagerUploadUrl(
     memberEmail: string,
+    teamUid: string,
     filename: string,
     filesize: number,
-    mimetype: string
+    mimetype: string,
+    demoDayUidOrSlug: string
   ): Promise<{ uploadUid: string; presignedUrl: string; s3Key: string; expiresAt: string }> {
-    await this.validateDemoDayFounderAccess(memberEmail);
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const { isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+
+    // If not admin, validate that the user is a founder of the specified team
+    if (!isAdmin) {
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDay.uid);
+    }
 
     const validOnePagerTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
     if (!validOnePagerTypes.includes(mimetype)) {
@@ -948,8 +1035,23 @@ export class DemoDayFundraisingProfilesService {
     };
   }
 
-  async confirmOnePagerUpload(memberEmail: string, uploadUid: string): Promise<any> {
-    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+  async confirmOnePagerUpload(
+    memberEmail: string,
+    teamUid: string,
+    uploadUid: string,
+    demoDayUidOrSlug: string
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const { isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+
+    // If not admin, validate that the user is a founder of the specified team
+    if (!isAdmin) {
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDay.uid);
+    }
 
     // Get the upload record
     const upload = await this.prisma.upload.findUnique({
@@ -965,7 +1067,7 @@ export class DemoDayFundraisingProfilesService {
     await this.prisma.teamFundraisingProfile.upsert({
       where: {
         teamUid_demoDayUid: {
-          teamUid: team.uid,
+          teamUid: teamUid,
           demoDayUid: demoDay.uid,
         },
       },
@@ -973,30 +1075,42 @@ export class DemoDayFundraisingProfilesService {
         onePagerUploadUid: confirmedUpload.uid,
       },
       create: {
-        teamUid: team.uid,
+        teamUid: teamUid,
         demoDayUid: demoDay.uid,
         onePagerUploadUid: confirmedUpload.uid,
         status: 'DRAFT',
       },
     });
 
-    await this.updateFundraisingProfileStatus(team.uid, demoDay.uid);
+    await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
 
-    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
   async uploadOnePagerPreviewByMember(
     memberEmail: string,
+    teamUid: string,
     previewImage: Express.Multer.File,
-    previewImageSmall?: Express.Multer.File
+    previewImageSmall: Express.Multer.File | undefined,
+    demoDayUidOrSlug: string
   ): Promise<any> {
-    const { team, demoDay } = await this.validateDemoDayFounderAccess(memberEmail);
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day found');
+    }
+
+    const { isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+
+    // If not admin, validate that the user is a founder of the specified team
+    if (!isAdmin) {
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDay.uid);
+    }
 
     // Get the current fundraising profile
     const profile = await this.prisma.teamFundraisingProfile.findUnique({
       where: {
         teamUid_demoDayUid: {
-          teamUid: team.uid,
+          teamUid: teamUid,
           demoDayUid: demoDay.uid,
         },
       },
@@ -1007,15 +1121,16 @@ export class DemoDayFundraisingProfilesService {
 
     await this.uploadOnePagerPreview(profile, previewImage, previewImageSmall);
 
-    return this.getCurrentDemoDayFundraisingProfile(memberEmail);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
   }
 
   async uploadOnePagerPreviewByTeam(
     teamUid: string,
+    demoDayUidOrSlug: string,
     previewImage: Express.Multer.File,
     previewImageSmall?: Express.Multer.File
   ): Promise<any> {
-    const demoDay = await this.demoDaysService.getCurrentDemoDay();
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
       throw new ForbiddenException('No demo day found');
     }

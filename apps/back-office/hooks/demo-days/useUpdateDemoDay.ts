@@ -31,10 +31,10 @@ export function useUpdateDemoDay() {
 
   return useMutation({
     mutationFn: updateDemoDay,
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: [DemoDaysQueryKeys.GET_DEMO_DAYS_LIST] });
       queryClient.invalidateQueries({
-        queryKey: [DemoDaysQueryKeys.GET_DEMO_DAY_DETAILS, variables.authToken, variables.uid],
+        queryKey: [DemoDaysQueryKeys.GET_DEMO_DAY_DETAILS, variables.authToken],
       });
     },
   });

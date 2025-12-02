@@ -23,10 +23,16 @@ const DemoDaysPage = () => {
     switch (status) {
       case 'ACTIVE':
         return 'text-green-600 bg-green-100';
+      case 'REGISTRATION_OPEN':
+        return 'text-emerald-600 bg-emerald-100';
+      case 'EARLY_ACCESS':
+        return 'text-orange-600 bg-orange-100';
       case 'UPCOMING':
         return 'text-yellow-600 bg-yellow-100';
       case 'COMPLETED':
         return 'text-blue-600 bg-blue-100';
+      case 'ARCHIVED':
+        return 'text-gray-600 bg-gray-100';
       default:
         return 'text-gray-600 bg-gray-100';
     }
@@ -66,6 +72,7 @@ const DemoDaysPage = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Title</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Start Date (UTC)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">End Date (UTC)</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Actions</th>
                 </tr>
@@ -75,10 +82,18 @@ const DemoDaysPage = () => {
                   <tr key={demoDay.uid} className="cursor-pointer hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">{demoDay.title}</div>
-                      <div className="line-clamp-2 max-w-md text-sm text-gray-500">{demoDay.description}</div>
+                      <div
+                        className="line-clamp-2 max-w-md text-sm text-gray-500 [&>p]:inline"
+                        dangerouslySetInnerHTML={{
+                          __html: demoDay.shortDescription || demoDay.description || '',
+                        }}
+                      />
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <div className="text-sm text-gray-900">{formatDate(demoDay.startDate)}</div>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <div className="text-sm text-gray-900">{formatDate(demoDay.endDate)}</div>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <span
@@ -90,7 +105,7 @@ const DemoDaysPage = () => {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                      <Link href={`/demo-days/${demoDay.uid}`}>
+                      <Link href={`/demo-days/${demoDay.slugURL}`}>
                         <a className="text-blue-600 hover:text-blue-900">View Details</a>
                       </Link>
                     </td>

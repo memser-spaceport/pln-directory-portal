@@ -1,15 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {Injectable, NotFoundException, BadRequestException, Inject, forwardRef} from '@nestjs/common';
 import { DemoDayParticipant, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from './demo-days.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
+import {TeamsService} from "../teams/teams.service";
 
 @Injectable()
 export class DemoDayParticipantsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly demoDaysService: DemoDaysService,
-    private readonly analyticsService: AnalyticsService
+    private readonly analyticsService: AnalyticsService,
+    private readonly teamService: TeamsService
   ) {}
 
   async addParticipant(
@@ -18,11 +20,11 @@ export class DemoDayParticipantsService {
       memberUid?: string;
       email?: string;
       name?: string;
-      type: 'INVESTOR' | 'FOUNDER';
+      type: 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
     },
     actorEmail?: string
   ): Promise<DemoDayParticipant> {
-    await this.demoDaysService.getDemoDayByUid(demoDayUid);
+    await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
@@ -264,7 +266,7 @@ export class DemoDayParticipantsService {
       teamId?: string;
     }>;
   }> {
-    await this.demoDaysService.getDemoDayByUid(demoDayUid);
+    await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
@@ -763,7 +765,7 @@ export class DemoDayParticipantsService {
     limit: number;
     totalPages: number;
   }> {
-    await this.demoDaysService.getDemoDayByUid(demoDayUid);
+    await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
 
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -847,6 +849,7 @@ export class DemoDayParticipantsService {
               email: true,
               accessLevel: true,
               accessLevelUpdatedAt: true,
+              linkedinHandler: true,
               teamMemberRoles: {
                 select: {
                   mainTeam: true,
@@ -921,13 +924,13 @@ export class DemoDayParticipantsService {
     data: {
       status?: 'INVITED' | 'ENABLED' | 'DISABLED';
       teamUid?: string;
-      type?: 'INVESTOR' | 'FOUNDER';
+      type?: 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
       hasEarlyAccess?: boolean;
       isDemoDayAdmin?: boolean;
     },
     actorEmail?: string
   ): Promise<DemoDayParticipant> {
-    await this.demoDaysService.getDemoDayByUid(demoDayUid);
+    await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
@@ -971,14 +974,65 @@ export class DemoDayParticipantsService {
     if (data.status) {
       updateData.status = data.status;
       updateData.statusUpdatedAt = new Date();
+
+      // Update member access level when approving (status changes to ENABLED)
+      if (data.status === 'ENABLED' && participant.status !== 'ENABLED') {
+        const memberAccessLevel = participant.member?.accessLevel;
+        const participantType = data.type || participant.type;
+        let newAccessLevel: string | null = null;
+
+        if (participantType === 'INVESTOR') {
+          // Investor: L0 -> L5, L2-L4 -> L6
+          if (memberAccessLevel === 'L0') {
+            newAccessLevel = 'L5';
+          } else if (['L2', 'L3', 'L4'].includes(memberAccessLevel || '')) {
+            newAccessLevel = 'L6';
+          }
+        } else if (participantType === 'FOUNDER') {
+          // Founder: L0 -> L4
+          if (memberAccessLevel === 'L0') {
+            newAccessLevel = 'L4';
+          }
+        } else if (participantType === 'SUPPORT') {
+          // Support: L0 -> L2
+          if (memberAccessLevel === 'L0') {
+            newAccessLevel = 'L2';
+          }
+        }
+
+        if (newAccessLevel && participant.memberUid) {
+          await this.prisma.member.update({
+            where: { uid: participant.memberUid },
+            data: {
+              accessLevel: newAccessLevel,
+              accessLevelUpdatedAt: new Date(),
+              isVerified: true,
+            },
+          });
+        }
+
+        // Promote teams where this member is a lead to L1
+        const teamUidsToUpdate =
+          participant.member?.teamMemberRoles
+            ?.filter((role) => role.teamLead)
+            .map((role) => role.team.uid) || [];
+
+        if (teamUidsToUpdate.length > 0) {
+          await Promise.all(
+            teamUidsToUpdate.map((teamUid) =>
+              this.teamService.updateTeamAccessLevel(teamUid, undefined, 'L1'),
+            ),
+          );
+        }
+      }
     }
 
     // Handle type change and auto-assign/remove teamUid
     if (data.type && data.type !== participant.type) {
       updateData.type = data.type;
 
-      // If changing from INVESTOR to FOUNDER, auto-assign main team
-      if (data.type === 'FOUNDER' && participant.type === 'INVESTOR') {
+      // If changing from INVESTOR or SUPPORT to FOUNDER, auto-assign main team
+      if (data.type === 'FOUNDER' && (participant.type === 'INVESTOR' || participant.type === 'SUPPORT')) {
         const mainTeam = participant.member?.teamMemberRoles.find((role) => role.mainTeam);
         const teamUid = mainTeam?.team.uid || participant.member?.teamMemberRoles[0]?.team.uid;
 
@@ -987,8 +1041,8 @@ export class DemoDayParticipantsService {
         }
       }
 
-      // If changing from FOUNDER to INVESTOR, remove team
-      if (data.type === 'INVESTOR' && participant.type === 'FOUNDER') {
+      // If changing from FOUNDER to non-FOUNDER (INVESTOR or SUPPORT), remove the team
+      if (data.type !== 'FOUNDER' && participant.type === 'FOUNDER') {
         updateData.team = { disconnect: true };
       }
     }

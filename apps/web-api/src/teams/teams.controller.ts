@@ -1,5 +1,17 @@
 /* eslint-disable prettier/prettier */
-import { Controller, Req, UseGuards, Body, Param, UsePipes, Patch, ForbiddenException, CacheTTL } from '@nestjs/common';
+import {
+  Body,
+  CacheTTL,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  Patch,
+  Query,
+  Req,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer, TsRest } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -8,8 +20,8 @@ import { apiTeam } from 'libs/contracts/src/lib/contract-team';
 import {
   ResponseTeamWithRelationsSchema,
   TeamDetailQueryParams,
-  TeamQueryParams,
   TeamFilterQueryParams,
+  TeamQueryParams,
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -27,6 +39,8 @@ import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member'
 import { MembersService } from '../members/members.service';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { QueryCache } from '../decorators/query-cache.decorator';
+import { UpdateTeamAccessLevelDto } from './dto/teams.dto';
+import { ParticipantsRequest } from './dto/members.dto';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
@@ -37,7 +51,7 @@ export class TeamsController {
   @Api(server.route.teamFilters)
   @ApiQueryFromZod(TeamQueryParams)
   @QueryCache()
-  @CacheTTL(300)
+  @NoCache()
   @UseGuards(UserTokenCheckGuard)
   async getTeamFilters(@Req() request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
@@ -129,11 +143,12 @@ export class TeamsController {
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   @ApiQueryFromZod(TeamDetailQueryParams)
   @NoCache()
-  findOne(@Req() request: Request, @ApiDecorator() { params: { uid } }: RouteShape['getTeam']) {
+  @UseGuards(UserTokenCheckGuard)
+  findOne(@Req() request, @ApiDecorator() { params: { uid } }: RouteShape['getTeam']) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
     const builtQuery = builder.build(request.query);
-    return this.teamsService.findTeamByUid(uid, builtQuery);
+    return this.teamsService.findTeamByUid(uid, request.userEmail, builtQuery);
   }
 
   @Api(server.route.modifyTeam)
@@ -203,5 +218,39 @@ export class TeamsController {
   async searchTeams(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof TeamFilterQueryParams>;
     return await this.teamsService.searchTeams(params || {});
+  }
+
+  /**
+   * Admin: update access level of a team.
+   *
+   * PATCH /teams/:uid/access-level
+   * body: { accessLevel: "L0" | "L1" | ... }
+   */
+  @Patch('v1/teams/:uid/access-level')
+  @NoCache()
+  async updateTeamAccessLevel(@Param('uid') uid: string, @Body() body: UpdateTeamAccessLevelDto) {
+    return await this.teamsService.updateAccessLevel(uid, body.accessLevel);
+  }
+
+  /**
+   * Admin: full team update using old ParticipantsRequest payload.
+   */
+  @Patch('v1/admin/teams/:uid/full')
+  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @AccessLevels(AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @NoCache()
+  async adminUpdateTeamFull(@Param('uid') teamUid: string, @Body() body: ParticipantsRequest, @Req() req: Request) {
+    return this.teamsService.updateTeamFromParticipantsRequest(teamUid, body, req['userEmail']);
+  }
+
+  /**
+   * Back-office: list teams.
+   * GET /teams?includeL0=true|false
+   */
+  @Get('v1/admin/teams')
+  @NoCache()
+  async getTeams() {
+    const teams = await this.teamsService.findAllForAdmin();
+    return { teams };
   }
 }

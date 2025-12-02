@@ -1,37 +1,36 @@
 import {
-  Injectable,
+  BadRequestException,
   ConflictException,
   ForbiddenException,
-  BadRequestException,
-  NotFoundException,
   forwardRef,
   Inject,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import * as path from 'path';
 import { z } from 'zod';
-import { filter, isEmpty } from 'lodash';
-import { Prisma, Team, Member, ParticipantsRequest, AskStatus } from '@prisma/client';
+import { isEmpty } from 'lodash';
+import { AskStatus, Member, Prisma, Team } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
 import { NotificationService } from '../utils/notification/notification.service';
-import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { hashFileName } from '../utils/hashing';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { MembersService } from '../members/members.service';
 import { LogService } from '../shared/log.service';
-import { copyObj, buildMultiRelationMapping, buildRelationMapping } from '../utils/helper/helper';
+import { buildMultiRelationMapping, buildRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { AskService } from '../asks/asks.service';
 import { TeamsHooksService } from './teams.hooks.service';
+import { ParticipantsRequest } from './dto/members.dto';
+import { SelfUpdatePayload } from './dto/teams.dto';
 
 @Injectable()
 export class TeamsService {
   constructor(
     private prisma: PrismaService,
     private fileMigrationService: FileMigrationService,
-    @Inject(forwardRef(() => ParticipantsRequestService))
-    private participantsRequestService: ParticipantsRequestService,
     @Inject(forwardRef(() => MembersService))
     private membersService: MembersService,
     private logger: LogService,
@@ -54,9 +53,9 @@ export class TeamsService {
     try {
       const whereClause = {
         ...queryOptions.where,
-        accessLevel: {
-          not: 'L0',
-        },
+        // accessLevel: {
+        //   not: 'L0',
+        // },
       };
 
       const [teams, teamsCount] = await Promise.all([
@@ -81,8 +80,21 @@ export class TeamsService {
    * @param tx - Optional transaction client
    * @returns The updated team
    */
-  async updateTeamAccessLevel(teamUid: string, tx?: Prisma.TransactionClient): Promise<Team> {
+  async updateTeamAccessLevel(teamUid: string, tx?: Prisma.TransactionClient, accessLevel?: string): Promise<Team> {
     const prisma = tx || this.prisma;
+
+    // If caller explicitly passed accessLevel → always use it
+    if (accessLevel !== undefined) {
+      return prisma.team.update({
+        where: { uid: teamUid },
+        data: {
+          accessLevel,
+          accessLevelUpdatedAt: new Date(),
+        },
+      });
+    }
+
+    // If accessLevel wasn't passed
     const activeMemberCount = await prisma.teamMemberRole.count({
       where: {
         teamUid,
@@ -94,10 +106,12 @@ export class TeamsService {
       },
     });
 
-    return await prisma.team.update({
+    const computedLevel = activeMemberCount > 0 ? 'L1' : null;
+
+    return prisma.team.update({
       where: { uid: teamUid },
       data: {
-        accessLevel: activeMemberCount > 0 ? 'L1' : undefined,
+        accessLevel: computedLevel,
         accessLevelUpdatedAt: new Date(),
       },
     });
@@ -140,7 +154,11 @@ export class TeamsService {
    * @returns The team object with all related information or throws an error if not found
    * @throws {NotFoundException} If the team with the given UID is not found
    */
-  async findTeamByUid(uid: string, queryOptions: Omit<Prisma.TeamFindUniqueArgsBase, 'where'> = {}): Promise<Team> {
+  async findTeamByUid(
+    uid: string,
+    userEmail?: string,
+    queryOptions: Omit<Prisma.TeamFindUniqueArgsBase, 'where'> = {}
+  ): Promise<Team> {
     try {
       const team = await this.prisma.team.findUniqueOrThrow({
         where: { uid },
@@ -228,7 +246,11 @@ export class TeamsService {
         },
       });
       if (team.accessLevel === 'L0') {
-        throw new ForbiddenException('Team is inactive');
+        if (!userEmail) {
+          throw new ForbiddenException('Team is inactive');
+        } else {
+          await this.validateRequestor(userEmail, team.uid);
+        }
       }
       team.teamFocusAreas = this.removeDuplicateFocusAreas(team.teamFocusAreas);
       return team;
@@ -248,37 +270,6 @@ export class TeamsService {
       return this.prisma.team.findUniqueOrThrow({
         where: { name },
       });
-    } catch (err) {
-      return this.handleErrors(err);
-    }
-  }
-
-  /**
-   * Creates a new team in the database within a transaction.
-   *
-   * @param team - The data for the new team to be created
-   * @param tx - The transaction client to ensure atomicity
-   * @param requestorEmail - Email of the person creating the team
-   * @returns The created team record
-   */
-  async createTeam(
-    team: Prisma.TeamUncheckedCreateInput,
-    tx: Prisma.TransactionClient,
-    requestorEmail: string
-  ): Promise<Team> {
-    try {
-      const teamData = {
-        ...team,
-        accessLevel: team.accessLevel || 'L1',
-        accessLevelUpdatedAt: new Date(),
-        tier: -1,
-      };
-
-      const createdTeam = await tx.team.create({
-        data: teamData,
-      });
-      await this.teamsHooksService.postCreateActions(createdTeam, requestorEmail);
-      return createdTeam;
     } catch (err) {
       return this.handleErrors(err);
     }
@@ -310,6 +301,22 @@ export class TeamsService {
     }
   }
 
+  async findTeamByNameSafe(name: string): Promise<Team | null> {
+    const normalized = String(name || '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    try {
+      return await this.prisma.team.findFirst({
+        where: { name: normalized },
+      });
+    } catch (e) {
+      this.logger.error('[findTeamByNameSafe] Failed to find team by name="' + normalized + '"', e as any);
+      return null;
+    }
+  }
+
   /**
    * Updates the existing team with new information.
    * updates the team, logs the update in the participants request table,
@@ -326,7 +333,6 @@ export class TeamsService {
     requestorEmail: string
   ): Promise<Team> {
     const updatedTeam: any = teamParticipantRequest.newData;
-    const existingTeam = await this.findTeamByUid(teamUid);
     let result;
     this.logger.info(`Going to update information about the '${teamUid}' team`);
     const requestor = await this.membersService.findMemberByEmail(requestorEmail);
@@ -370,8 +376,6 @@ export class TeamsService {
       if (investorProfileData) {
         await this.updateTeamInvestorProfile(teamUid, investorProfileData, tx, requestor.accessLevel);
       }
-
-      await this.logParticipantRequest(requestorEmail, updatedTeam, existingTeam.uid, tx);
     });
     await this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
     return result;
@@ -426,34 +430,6 @@ export class TeamsService {
   }
 
   /**
-   * Creates a new team from the participants request data.
-   * resets the cache, and triggers post-update actions like Airtable synchronization.
-   * @param teamParticipantRequest - The request containing the team details.
-   * @param requestorEmail - The email of the requestor.
-   * @returns The newly created team.
-   */
-  async createTeamFromParticipantsRequest(
-    teamParticipantRequest: ParticipantsRequest,
-    tx: Prisma.TransactionClient
-  ): Promise<Team> {
-    const newTeam: any = teamParticipantRequest.newData;
-    this.logger.info(`Creating team from participant request with data: ${JSON.stringify(newTeam)}`);
-    const { team: formattedTeam, investorProfileData } = await this.formatTeam(null, newTeam, tx);
-    this.logger.info(`Formatted team data, investorProfileData: ${JSON.stringify(investorProfileData)}`);
-    const createdTeam = await this.createTeam(formattedTeam, tx, teamParticipantRequest.requesterEmailId);
-
-    // Handle investor profile creation for teams
-    if (investorProfileData) {
-      this.logger.info(`Creating investor profile for team ${createdTeam.uid}`);
-      await this.updateTeamInvestorProfile(createdTeam.uid, investorProfileData, tx);
-    } else {
-      this.logger.info(`No investor profile data to process for team ${createdTeam.uid}`);
-    }
-
-    return createdTeam;
-  }
-
-  /**
    * Format team data for creation or update
    *
    * @param teamUid - The unique identifier for the team (used for updates)
@@ -491,6 +467,7 @@ export class TeamsService {
       'longDescription',
       'moreDetails',
       'isFund',
+      'tier',
     ];
     copyObj(teamData, team, directFields);
     // Handle one-to-one or one-to-many mappings
@@ -655,33 +632,6 @@ export class TeamsService {
       uniqueFocusAreas[uid] = { uid, title };
     });
     return Object.values(uniqueFocusAreas);
-  }
-
-  /**
-   * Logs the participant request in the participants request table for audit and tracking purposes.
-   *
-   * @param requestorEmail - Email of the requestor who is updating the team
-   * @param newTeamData - The new data being applied to the team
-   * @param referenceUid - Unique identifier of the existing team to be referenced
-   * @param tx - The transaction client to ensure atomicity
-   */
-  private async logParticipantRequest(
-    requestorEmail: string,
-    newTeamData,
-    referenceUid: string,
-    tx: Prisma.TransactionClient
-  ): Promise<void> {
-    await this.participantsRequestService.add(
-      {
-        status: 'AUTOAPPROVED',
-        requesterEmailId: requestorEmail,
-        referenceUid,
-        uniqueIdentifier: newTeamData?.name || '',
-        participantType: 'TEAM',
-        newData: { ...newTeamData },
-      },
-      tx
-    );
   }
 
   /**
@@ -1243,20 +1193,6 @@ export class TeamsService {
         const teamAsksAfter = await tx.ask.findMany({
           where: { teamUid },
         });
-
-        //logging into participant request
-        await this.participantsRequestService.add(
-          {
-            status: 'AUTOAPPROVED',
-            requesterEmailId,
-            referenceUid: teamUid,
-            uniqueIdentifier: teamName,
-            participantType: 'TEAM',
-            newData: teamAsksAfter as any,
-            oldData: teamAsks as any,
-          },
-          tx
-        );
       });
 
       //notifying the team edit
@@ -1504,9 +1440,9 @@ export class TeamsService {
 
     // Base where clause excluding L0 access level
     const baseWhere: Prisma.TeamWhereInput = {
-      accessLevel: {
-        not: 'L0',
-      },
+      // accessLevel: {
+      //   not: 'L0',
+      // },
     };
 
     const whereConditions: Prisma.TeamWhereInput[] = [baseWhere];
@@ -1734,11 +1670,11 @@ export class TeamsService {
       _count: { _all: true },
     });
 
-    const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+    const counts: Record<number, number> = { [-1]: 0, 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
     for (const row of grouped) {
       if (row.tier !== null) {
         const t = (row.tier ?? 0) as number;
-        if (t >= 0 && t <= 4) counts[t] = row._count._all;
+        if (t <= 4) counts[t] = row._count._all;
       }
     }
 
@@ -1748,6 +1684,7 @@ export class TeamsService {
       { tier: 2, count: counts[2] },
       { tier: 3, count: counts[3] },
       { tier: 4, count: counts[4] },
+      { tier: -1, count: counts[-1] },
     ];
   }
 
@@ -1804,5 +1741,141 @@ export class TeamsService {
       // Neither is Pre-seed, Seed, or Series - sort alphabetically
       return a.localeCompare(b);
     });
+  }
+
+  /**
+   * Directly updates team's accessLevel (admin action).
+   * Used by back-office to control team visibility and tiering.
+   */
+  async updateAccessLevel(uid: string, accessLevel: string): Promise<Team> {
+    try {
+      return await this.prisma.team.update({
+        where: { uid },
+        data: {
+          accessLevel,
+          accessLevelUpdatedAt: new Date(),
+        },
+      });
+    } catch (err) {
+      return this.handleErrors(err, uid);
+    }
+  }
+
+  /**
+   * Returns teams for back-office.
+   * If includeL0 = true → returns all teams, including L0.
+   * If includeL0 = false → excludes L0.
+   */
+  async findAllForAdmin(): Promise<Team[]> {
+    try {
+      return await this.prisma.team.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (err) {
+      return this.handleErrors(err);
+    }
+  }
+
+  /**
+   * Creates a new Team from a "legacy" participants request payload,
+   * but WITHOUT using the participants_request table.
+   *
+   * This is used by the new ParticipantsRequestService.processImmediateRequest()
+   * to support the old /v1/participants-request endpoint while:
+   *  - directly creating a Team entity
+   *  - setting accessLevel = 'L0' (inactive / soft-created)
+   *  - optionally attaching the requester as a team member (team lead)
+   *
+   * @param payload.newData - Raw team data from the request
+   * @param payload.requesterEmailId - Email of the requester
+   * @param requesterUser - Member entity for the requester (if available)
+   */
+  async createTeamFromLegacyRequest(
+    payload: { newData: any; requesterEmailId?: string },
+    requesterUser?: any
+  ): Promise<Team> {
+    const { newData, requesterEmailId } = payload;
+
+    this.logger.info(
+      `[TeamsService.createTeamFromLegacyRequest] Creating team from legacy request, name=${newData?.name}`
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      // Reuse existing team formatting logic so industryTags, technologies, etc. work as before
+      const { team: formattedTeam, investorProfileData } = await this.formatTeam(
+        null,
+        newData,
+        tx,
+        'Create' // keep the semantics consistent with existing code
+      );
+
+      // Force L0 access level for newly created teams in this flow
+      formattedTeam.accessLevel =
+        !requesterUser?.accessLevel || ['L0', 'L1'].includes(requesterUser?.accessLevel) ? 'L0' : 'L1';
+      formattedTeam.accessLevelUpdatedAt = new Date();
+
+      const createdTeam = await this.createTeam(formattedTeam, tx, requesterEmailId || newData?.requestorEmail || '');
+
+      // Handle investor profile if present in newData
+      if (investorProfileData) {
+        this.logger.info(
+          `[TeamsService.createTeamFromLegacyRequest] Updating investor profile for team ${createdTeam.uid}`
+        );
+        await this.updateTeamInvestorProfile(createdTeam.uid, investorProfileData, tx, requesterUser?.accessLevel);
+      }
+
+      // Optionally add requester as a team member (team lead, investment team flag, etc.)
+      if (requesterUser) {
+        const role = newData?.role || 'Lead';
+        const investmentTeam = newData?.investmentTeam || false;
+
+        this.logger.info(
+          `[TeamsService.createTeamFromLegacyRequest] Adding requester ${requesterUser.uid} as team member for team ${createdTeam.uid}`
+        );
+
+        await tx.teamMemberRole.create({
+          data: {
+            teamUid: createdTeam.uid,
+            memberUid: requesterUser.uid,
+            role,
+            teamLead: true,
+            investmentTeam,
+          },
+        });
+      }
+
+      return createdTeam;
+    });
+  }
+
+  /**
+   * Creates a new team in the database within a transaction.
+   *
+   * @param team - The data for the new team to be created
+   * @param tx - The transaction client to ensure atomicity
+   * @param requestorEmail - Email of the person creating the team
+   * @returns The created team record
+   */
+  async createTeam(
+    team: Prisma.TeamUncheckedCreateInput,
+    tx: Prisma.TransactionClient,
+    requestorEmail: string
+  ): Promise<Team> {
+    try {
+      const teamData = {
+        ...team,
+        accessLevel: team.accessLevel || 'L1',
+        accessLevelUpdatedAt: new Date(),
+        tier: -1,
+      };
+
+      const createdTeam = await tx.team.create({
+        data: teamData,
+      });
+      await this.teamsHooksService.postCreateActions(createdTeam, requestorEmail);
+      return createdTeam;
+    } catch (err) {
+      return this.handleErrors(err);
+    }
   }
 }

@@ -5,30 +5,21 @@ export interface TooltipProps {
   triggerClassName?: string;
   content: string | React.ReactElement;
   asChild?: boolean;
-  align?: "start" | "center" | "end" | undefined,
+  align?: 'start' | 'center' | 'end' | undefined;
 }
 
-export function Tooltip({
-  trigger,
-  triggerClassName = '',
-  content,
-  asChild = false,
-  align= "start"
-}: TooltipProps) {
+export function Tooltip({ trigger, triggerClassName = '', content, asChild = false, align = 'start' }: TooltipProps) {
   return (
     <TooltipPrimitive.Provider delayDuration={0}>
       <TooltipPrimitive.Root>
-        <TooltipPrimitive.Trigger
-          className={triggerClassName}
-          asChild={asChild}
-        >
+        <TooltipPrimitive.Trigger className={triggerClassName} asChild={asChild}>
           {trigger}
         </TooltipPrimitive.Trigger>
         <TooltipPrimitive.Content
           side="top"
           align={align}
           sideOffset={8}
-          className="z-40 max-w-[260px] flex-shrink-0 break-words rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white"
+          className="z-40 max-w-[360px] flex-shrink-0 break-words rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white"
         >
           {content}
         </TooltipPrimitive.Content>

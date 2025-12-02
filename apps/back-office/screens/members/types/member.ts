@@ -7,7 +7,7 @@ export type Member = {
   linkedinProfile: { uid: string; linkedinHandler: string } | null;
   name: string;
   projectContributions: { uid: string; project: { uid: string; name: string } }[];
-  teamMemberRoles: { team: { uid: string; name: string } }[];
+  teamMemberRoles: { team: { uid: string; name: string; accessLevel: string } }[];
   teamOrProjectURL: string;
   uid: string;
   signUpSource: string | null;
