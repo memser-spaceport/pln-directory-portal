@@ -839,10 +839,7 @@ export class DemoDaysService {
     return feedback;
   }
 
-  async submitInvestorApplication(
-    applicationData: CreateDemoDayInvestorApplicationDto,
-    demoDayUidOrSlug: string
-  ) {
+  async submitInvestorApplication(applicationData: CreateDemoDayInvestorApplicationDto, demoDayUidOrSlug: string) {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     // Check if demo day is accepting applications (REGISTRATION_OPEN status)
@@ -902,32 +899,8 @@ export class DemoDaysService {
         },
       });
 
-      // If a new team is provided, create Team and TeamMemberRole (non-breaking extension)
-      if (applicationData.isTeamNew && applicationData.team?.name) {
-        const teamName = applicationData.team.name.trim();
-        const teamWebsite = applicationData.team.website?.trim() || null;
-
-        const createdTeam = await this.prisma.team.create({
-          data: {
-            name: teamName,
-            website: teamWebsite,
-            accessLevel: 'L0',
-          },
-          select: {
-            uid: true,
-          },
-        });
-
-        await this.prisma.teamMemberRole.create({
-          data: {
-            memberUid: member.uid,
-            teamUid: createdTeam.uid,
-            role: applicationData.role,
-            investmentTeam: true,
-          },
-        });
-      } else if (applicationData.teamUid) {
-        // If a teamUid is provided, create TeamMemberRole
+      // If a teamUid is provided, link member to the existing team
+      if (applicationData.teamUid) {
         // Check if TeamMemberRole already exists for this member-team combination
         const existingRole = await this.prisma.teamMemberRole.findUnique({
           where: {
@@ -946,6 +919,28 @@ export class DemoDaysService {
               teamUid: applicationData.teamUid,
               role: applicationData.role,
               investmentTeam: true,
+              mainTeam: true,
+            },
+          });
+        }
+      }
+
+      // If a projectUid is provided, create ProjectContribution
+      if (applicationData.projectUid) {
+        const existingContribution = await this.prisma.projectContribution.findFirst({
+          where: {
+            memberUid: member.uid,
+            projectUid: applicationData.projectUid,
+          },
+        });
+
+        if (!existingContribution) {
+          await this.prisma.projectContribution.create({
+            data: {
+              memberUid: member.uid,
+              projectUid: applicationData.projectUid,
+              role: applicationData.role,
+              currentProject: true,
             },
           });
         }
