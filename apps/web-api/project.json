@@ -22,7 +22,8 @@
           "apps/web-api/src/shared/onboarding.hbs",
           "apps/web-api/src/shared/linkedinVerifiedAdmin.hbs",
           "apps/web-api/src/shared/memberApproved.hbs",
-          "apps/web-api/src/shared/memberRejected.hbs"
+          "apps/web-api/src/shared/memberRejected.hbs",
+          "apps/web-api/src/shared/contactSupport.hbs"
         ]
       },
       "configurations": {

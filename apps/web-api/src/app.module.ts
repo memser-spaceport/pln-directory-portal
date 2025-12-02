@@ -55,6 +55,7 @@ import { MetricsMiddleware } from './metrics/metrics.interceptor';
 import { UploadsService } from './uploads/uploads.service';
 import { UploadsModule } from './uploads/uploads.module';
 import { DemoDaysModule } from './demo-days/demo-days.module';
+import { ContactSupportModule } from './contact-support/contact-support.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -131,6 +132,7 @@ import { DemoDaysModule } from './demo-days/demo-days.module';
     ForumModule,
     UploadsModule,
     DemoDaysModule,
+    ContactSupportModule,
   ],
   providers: [
     {

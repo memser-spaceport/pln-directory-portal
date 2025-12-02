@@ -32,3 +32,4 @@ export * from './ask';
 export * from './member-experience';
 export * from './forum';
 export * from './demo-day';
+export * from './contact-support';
