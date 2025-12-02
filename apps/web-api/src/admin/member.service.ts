@@ -802,6 +802,7 @@ export class MemberService {
               select: {
                 uid: true,
                 name: true,
+                accessLevel: true,
               },
             },
           },
