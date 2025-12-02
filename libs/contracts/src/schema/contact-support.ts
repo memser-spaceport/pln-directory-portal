@@ -10,7 +10,6 @@ const ContactSupportRequestSchema = z.object({
 });
 
 const ContactSupportResponseSchema = z.object({
-  success: z.boolean(),
   uid: z.string(),
 });
 
