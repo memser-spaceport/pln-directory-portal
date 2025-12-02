@@ -9,7 +9,7 @@ import { DemoDay, DemoDayParticipantStatus, DemoDayStatus } from '@prisma/client
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
-import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
+import {CreateDemoDayInvestorApplicationDto} from "@protocol-labs-network/contracts";
 
 type ExpressInterestStats = { liked: number; connected: number; invested: number; referral: number; total: number };
 
@@ -839,7 +839,10 @@ export class DemoDaysService {
     return feedback;
   }
 
-  async submitInvestorApplication(applicationData: CreateDemoDayInvestorApplicationDto, demoDayUidOrSlug: string) {
+  async submitInvestorApplication(
+    applicationData: CreateDemoDayInvestorApplicationDto,
+    demoDayUidOrSlug: string
+  ) {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     // Check if demo day is accepting applications (REGISTRATION_OPEN status)
@@ -899,8 +902,33 @@ export class DemoDaysService {
         },
       });
 
-      // If a teamUid is provided, link member to the existing team
-      if (applicationData.teamUid) {
+
+      // If a new team is provided, create Team and TeamMemberRole (non-breaking extension)
+      if (applicationData.isTeamNew && applicationData.team?.name) {
+        const teamName = applicationData.team.name.trim();
+        const teamWebsite = applicationData.team.website?.trim() || null;
+
+        const createdTeam = await this.prisma.team.create({
+          data: {
+            name: teamName,
+            website: teamWebsite,
+            accessLevel: 'L0',
+          },
+          select: {
+            uid: true,
+          },
+        });
+
+        await this.prisma.teamMemberRole.create({
+          data: {
+            memberUid: member.uid,
+            teamUid: createdTeam.uid,
+            role: applicationData.role,
+            investmentTeam: true,
+          },
+        });
+      } else if (applicationData.teamUid) {
+        // If a teamUid is provided, create TeamMemberRole
         // Check if TeamMemberRole already exists for this member-team combination
         const existingRole = await this.prisma.teamMemberRole.findUnique({
           where: {
