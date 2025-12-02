@@ -30,7 +30,7 @@ model Team {
   telegramHandler              String?
   shortDescription             String?
   longDescription              String?
-  tier                         Int?
+  tier                         Int?                          @default(-1)
   plnFriend                    Boolean                       @default(false)
   isFeatured                   Boolean?                      @default(false)
   isFund                       Boolean                       @default(false)
