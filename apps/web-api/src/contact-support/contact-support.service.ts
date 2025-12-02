@@ -37,7 +37,7 @@ export class ContactSupportService {
           this.notifyAdmins(result);
         }
         this.logger.info(`New contact support request created with topic "${request.topic}" and ref id ${result.uid}`);
-        return { success: true, uid: result.uid };
+        return { uid: result.uid };
       } else {
         throw new InternalServerErrorException('Cannot save a contact support request');
       }
