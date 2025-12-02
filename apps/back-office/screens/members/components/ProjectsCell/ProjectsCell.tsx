@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
+import { Tooltip } from '@protocol-labs-network/ui';
 
 import { Member } from '../../types/member';
 import { EmptyIcon, MembersIcon, ProjectsIcon } from '../icons';
@@ -82,12 +83,31 @@ export const ProjectsCell = ({ member }: { member: Member }) => {
       )}
       {items.map((item, idx) => {
         if (idx < visibleCount) {
-          return (
+          const badge = (
             <span key={idx} ref={(el) => (itemRefs.current[idx] = el)} className={clsx(s.badge, item.isNew && s.new)}>
               {item.icon}
               <span className={s.label}>{item.label}</span>
+              {item.isNew && <span className={s.newLabel}>new</span>}
             </span>
           );
+
+          if (item.isNew) {
+            return (
+              <Tooltip
+                key={idx}
+                asChild
+                trigger={badge}
+                content={
+                  <div className={s.newTooltip}>
+                    This team was created by the user and <br /> will remain hidden from other users until it is
+                    approved.
+                  </div>
+                }
+              />
+            );
+          }
+
+          return badge;
         }
         return null;
       })}
