@@ -30,6 +30,12 @@ export const ExpressInterestSchema = z.object({
     })
     .optional()
     .nullable(),
+  feedbackData: z
+    .object({
+      feedback: z.string().optional().nullable(),
+    })
+    .optional()
+    .nullable(),
 });
 
 export class ExpressInterestDto extends createZodDto(ExpressInterestSchema) {}

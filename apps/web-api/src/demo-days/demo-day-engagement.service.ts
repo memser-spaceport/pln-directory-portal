@@ -122,6 +122,9 @@ export class DemoDayEngagementService {
       investorName?: string | null;
       investorEmail?: string | null;
       message?: string | null;
+    } | null,
+    feedbackData?: {
+      feedback?: string | null;
     } | null
   ) {
     // Validate that the caller is an enabled demo day participant (investor)
@@ -260,14 +263,17 @@ export class DemoDayEngagementService {
 
     // Send notification
     if (!isPrepDemoDay) {
+      // Feedback emails go only to founders
+      const isFeedback = interestType === 'feedback';
+
       await this.notificationServiceClient.sendNotification({
         isPriority: true,
         deliveryChannel: 'EMAIL',
         templateName: template.templateName,
         recipientsInfo: {
           from: process.env.DEMO_DAY_EMAIL,
-          to: [...founderEmails, referralData?.investorEmail].filter(Boolean),
-          cc: [member.email],
+          to: isFeedback ? founderEmails : [...founderEmails, referralData?.investorEmail].filter(Boolean),
+          cc: isFeedback ? [] : [member.email],
           bcc: [process.env.DEMO_DAY_EMAIL],
         },
         deliveryPayload: {
@@ -288,6 +294,11 @@ export class DemoDayEngagementService {
                   referralInvestorName: referralData.investorName || referralData.investorEmail,
                   referralInvestorEmail: referralData.investorEmail,
                   referralMessage: referralData.message,
+                }
+              : {}),
+            ...(feedbackData
+              ? {
+                  feedbackText: feedbackData.feedback,
                 }
               : {}),
           },
@@ -338,6 +349,11 @@ export class DemoDayEngagementService {
                 referralName: referralData.investorName,
                 referralEmail: referralData.investorEmail,
                 referralMessage: referralData.message,
+              }
+            : {}),
+          ...(feedbackData
+            ? {
+                feedbackText: feedbackData.feedback,
               }
             : {}),
         },
