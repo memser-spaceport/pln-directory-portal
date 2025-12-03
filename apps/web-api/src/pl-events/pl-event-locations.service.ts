@@ -1,7 +1,6 @@
 import moment from 'moment-timezone';
 import { PLEventLocation, Prisma, SubscriptionEntityType } from '@prisma/client';
-import { forwardRef, Inject, Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { forwardRef, Inject, Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberSubscriptionService } from '../member-subscriptions/member-subscriptions.service';
@@ -103,6 +102,9 @@ export class PLEventLocationsService {
           ...queryOptions,
           where: {
             ...queryOptions.where,
+            priority: {
+              not: null
+            },
             events: {
               some: {
                 isDeleted: false
@@ -117,6 +119,9 @@ export class PLEventLocationsService {
         ...queryOptions,
         where: {
           ...queryOptions.where,
+          priority: {
+            not: null
+          },
           events: {
             some: {
               isDeleted: false
@@ -210,7 +215,6 @@ export class PLEventLocationsService {
     return {
       ...location,
       ...this.segregateEventsByTime(location.events)
-      ...this.segregateEventsByTime(location.events)
     }
   };
 
@@ -248,8 +252,8 @@ export class PLEventLocationsService {
    * @param timezone The timezone of the location
    * @returns An object containing the cutoff date for past events
    */
-  private computeEventTimeWindow(timezone: string): { pastEventsCutoff: moment.Moment } {
-    const currentDateTimeInZone = moment().tz(timezone);
+  private computeEventTimeWindow(timezone?: string): { pastEventsCutoff: moment.Moment } {
+    const currentDateTimeInZone = moment();
     const numberOfDays = parseInt(process.env.IRL_CURRENT_EVENT_WINDOW_IN_DAYS || '90', 10);
     const pastEventsCutoff = currentDateTimeInZone.clone().subtract(numberOfDays, 'days');
     
@@ -264,13 +268,13 @@ export class PLEventLocationsService {
    *   - Past events: events that ended before the configured number of days from current time
    *   - Upcoming events: events that start from the configured number of days from current time + all future events
    */
-  private segregateEventsByTime(events: PLEvent[], timezone: string): { pastEvents: PLEvent[], upcomingEvents: PLEvent[] } {
-    const { pastEventsCutoff } = this.computeEventTimeWindow(timezone);
+  private segregateEventsByTime(events: PLEvent[], timezone?: string): { pastEvents: PLEvent[], upcomingEvents: PLEvent[] } {
+    const { pastEventsCutoff } = this.computeEventTimeWindow();
     const pastEvents: any = [];
     const upcomingEvents: any = [];
     events.forEach((event) => {
-      const eventStartDateInZone = moment.utc(event.startDate).tz(timezone);
-      const eventEndDateInZone = moment.utc(event.endDate).tz(timezone);
+      const eventStartDateInZone = moment.utc(event.startDate);
+      const eventEndDateInZone = moment.utc(event.endDate);
       if (eventEndDateInZone.isBefore(pastEventsCutoff)) {
         pastEvents.push({
           ...event,
@@ -775,7 +779,7 @@ export class PLEventLocationsService {
       });
     } catch (error) {
       this.logger.error(`Error fetching locations: ${error.message}`, error.stack, 'PLEventLocationsService');
-      throw new BadRequestException(`Failed to fetch locations: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to fetch locations: ${error.message}`);
     }
   }
 
