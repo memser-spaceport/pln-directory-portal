@@ -1,0 +1,23 @@
+<html>
+<body>
+  <div style="border: 1px solid #ccc; padding: 20px; margin: 20px; font-family: Arial, sans-serif;">
+    <h2 style="color: #333; margin-bottom: 20px;">Contact Support Request</h2>
+    <p>Dear Team,</p>
+    <p>A new contact support request has been submitted. The details are as follows:</p>
+    <div style="margin-top: 20px; background-color: #f9f9f9; padding: 15px; border-radius: 5px;">
+      <p><strong>Topic:</strong> {{ topic }}</p>
+      <p><strong>Name:</strong> {{ name }}</p>
+      <p><strong>Email:</strong> {{ email }}</p>
+      <p><strong>Message:</strong></p>
+      <p style="white-space: pre-wrap; background-color: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 3px;">{{ message }}</p>
+      {{#if metadata}}
+      <p><strong>Additional Metadata:</strong></p>
+      <pre style="background-color: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 3px; overflow-x: auto;">{{ metadata }}</pre>
+      {{/if}}
+      <p><strong>Submitted At:</strong> {{ createdAt }}</p>
+    </div>
+    <p style="margin-top: 20px;">Regards,</p>
+    <p>PLN Support Team</p>
+  </div>
+</body>
+</html>

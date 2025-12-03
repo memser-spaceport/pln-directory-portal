@@ -1094,3 +1094,14 @@ model DemoDayFeedback {
   @@index([demoDayUid])
   @@index([memberUid, demoDayUid])
 }
+
+model ContactSupportRequest {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  topic     String
+  email     String?
+  name      String?
+  message   String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
