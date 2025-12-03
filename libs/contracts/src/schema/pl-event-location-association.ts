@@ -17,7 +17,7 @@ export const PLEventLocationAssociationSchema = z.object({
   isDeleted: z.boolean(),
 });
 
-export const createLocationAssociationSchema = z.object({
+export const CreateLocationAssociationSchema = z.object({
   locationUid: z.string(),
   googlePlaceId: z.string(),
   locationName: z.string(),
@@ -43,7 +43,7 @@ export const ResponsePLEventLocationAssociationWithRelationsSchema = ResponsePLE
   location: ResponsePLEventLocationSchema.optional(),
 });
 
-export class createLocationAssociationSchemaDto extends createZodDto(createLocationAssociationSchema) {}
+export class createLocationAssociationSchemaDto extends createZodDto(CreateLocationAssociationSchema) {}
 export class UpdatePLEventLocationAssociationSchemaDto extends createZodDto(UpdatePLEventLocationAssociationSchema) {}
 export class ResponsePLEventLocationAssociationSchemaDto extends createZodDto(ResponsePLEventLocationAssociationWithRelationsSchema) {}
 

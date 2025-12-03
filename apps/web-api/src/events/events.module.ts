@@ -37,10 +37,8 @@ import { AuthModule }  from '../auth/auth.module';
       producers: [],
     }),
     forwardRef(() => PLEventsModule),
-    AuthModule,
-    SharedModule
-  ,
-    AuthModule
+    forwardRef(() => AuthModule),
+    SharedModule,
   ],
   exports: [EventsToolingService, EventsService]
 })

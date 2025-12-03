@@ -271,16 +271,7 @@ export class PLEventLocationAssociationService {
 
         // If locationUid changed, update all related events' locationUid
         if (data.locationUid !== undefined && data.locationUid !== existing.locationUid) {
-          await tx.pLEvent.updateMany({
-            where: {
-              pLEventLocationAssociationUid: uid,
-              isDeleted: false
-            },
-            data: {
-              locationUid: data.locationUid
-            }
-          });
-
+          await this.updateRelatedEventsLocationUid(uid, data.locationUid, tx);
         }
         this.logger.info(`Updated location association: ${association.uid}`);
         return association;
@@ -321,6 +312,25 @@ export class PLEventLocationAssociationService {
       this.logger.error(`Error deleting location association: ${error.message}`); 
       this.handleErrors(error);
     }
+  }
+
+  /**
+   * Updates all related events' locationUid when a location association's locationUid is changed.
+   * 
+   * @param associationUid - The unique identifier of the location association.
+   * @param locationUid - The new locationUid to set on related events.
+   * @param tx - The transaction object.
+   */
+  private async updateRelatedEventsLocationUid(associationUid: string, locationUid: string, tx) {
+    await tx.pLEvent.updateMany({
+      where: {
+        pLEventLocationAssociationUid: associationUid,
+        isDeleted: false
+      },
+      data: {
+        locationUid: locationUid
+      }
+    });
   }
 
   private handleErrors(error, message?: string) {
