@@ -11,7 +11,7 @@ import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
 import {CreateDemoDayInvestorApplicationDto} from "@protocol-labs-network/contracts";
 
-type ExpressInterestStats = { liked: number; connected: number; invested: number; referral: number; total: number };
+type ExpressInterestStats = { liked: number; connected: number; invested: number; referral: number; feedback: number; total: number };
 
 @Injectable()
 export class DemoDaysService {
@@ -584,6 +584,7 @@ export class DemoDaysService {
         connectedCount: true,
         investedCount: true,
         referralCount: true,
+        feedbackCount: true,
       },
     });
 
@@ -591,9 +592,10 @@ export class DemoDaysService {
     const connected = agg._sum.connectedCount ?? 0;
     const invested = agg._sum.investedCount ?? 0;
     const referral = agg._sum.referralCount ?? 0;
-    const total = liked + connected + invested + referral;
+    const feedback = agg._sum.feedbackCount ?? 0;
+    const total = liked + connected + invested + referral + feedback;
 
-    return { liked, connected, invested, referral, total };
+    return { liked, connected, invested, referral, feedback, total };
   }
 
   async updateConfidentialityAcceptance(
@@ -697,6 +699,7 @@ export class DemoDaysService {
     const totalConnections = allStats.filter((s) => s.connected).length;
     const totalInvestments = allStats.filter((s) => s.invested).length;
     const totalReferrals = allStats.filter((s) => s.referral).length;
+    const totalFeedbacks = allStats.filter((s) => s.feedback).length;
     const totalEngagement = allStats.reduce((sum, s) => sum + s.totalCount, 0);
 
     // Build investor activity list
@@ -722,6 +725,7 @@ export class DemoDaysService {
             connected: stat.connected,
             invested: stat.invested,
             referral: stat.referral,
+            feedback: stat.feedback,
           },
           date: stat.updatedAt,
         };
@@ -730,7 +734,7 @@ export class DemoDaysService {
     // Group engagement by time
     // Use Event table for time-series data, but only count first occurrence of each action per investor
     const engagementOverTime = await this.prisma.$queryRaw<
-      Array<{ hour: Date; likes: bigint; connects: bigint; invests: bigint; referrals: bigint }>
+      Array<{ hour: Date; likes: bigint; connects: bigint; invests: bigint; referrals: bigint; feedbacks: bigint }>
     >`
       WITH first_events AS (
         SELECT DISTINCT ON ("userId", props->>'teamUid', props->>'interestType')
@@ -749,7 +753,8 @@ export class DemoDaysService {
         COUNT(*) FILTER (WHERE interest_type = 'like') as likes,
         COUNT(*) FILTER (WHERE interest_type = 'connect') as connects,
         COUNT(*) FILTER (WHERE interest_type = 'invest') as invests,
-        COUNT(*) FILTER (WHERE interest_type = 'referral') as referrals
+        COUNT(*) FILTER (WHERE interest_type = 'referral') as referrals,
+        COUNT(*) FILTER (WHERE interest_type = 'feedback') as feedbacks
       FROM first_events
       GROUP BY DATE_TRUNC('hour', ts)
       ORDER BY hour
@@ -771,6 +776,7 @@ export class DemoDaysService {
         connections: totalConnections,
         investments: totalInvestments,
         referrals: totalReferrals,
+        feedbacks: totalFeedbacks,
       },
       engagementOverTime: engagementOverTime.map((row) => ({
         timestamp: row.hour,
@@ -778,6 +784,7 @@ export class DemoDaysService {
         connects: Number(row.connects),
         invests: Number(row.invests),
         referrals: Number(row.referrals),
+        feedbacks: Number(row.feedbacks),
       })),
       investorActivity,
     };

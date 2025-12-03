@@ -311,7 +311,7 @@ curl -X GET "https://api.example.com/v1/demo-days/current/fundraising-profiles?s
 - Results are personalized and randomized per user for fair distribution
 - Only returns PUBLISHED profiles with both one-pager and video uploaded (unless admin with `showDraft=true`)
 - Only teams with at least one ENABLED FOUNDER are included
-- Engagement flags (`liked`, `connected`, `invested`, `referral`) show user's interaction status
+- Engagement flags (`liked`, `connected`, `invested`, `referral`, `feedback`) show user's interaction status
 
 ---
 
@@ -717,7 +717,7 @@ curl -X POST https://api.example.com/v1/demo-days/current/engagement/calendar-ad
 
 **Field Descriptions:**
 - `teamFundraisingProfileUid` (required): UID of the team's fundraising profile
-- `interestType` (required): One of `"like"`, `"connect"`, `"invest"`, or `"referral"`
+- `interestType` (required): One of `"like"`, `"connect"`, `"invest"`, `"referral"`, or `"feedback"`
 - `isPrepDemoDay` (optional): Whether this is prep demo day engagement. Default: `false`
 - `referralData` (optional): Required only for `"referral"` type. Contains email and notes.
 
@@ -726,6 +726,7 @@ curl -X POST https://api.example.com/v1/demo-days/current/engagement/calendar-ad
 - `connect`: Want to schedule a meeting
 - `invest`: Interested in investing
 - `referral`: Referring to another investor
+- `feedback`: Providing feedback to the team
 
 **Example:**
 ```bash
@@ -746,7 +747,8 @@ curl -X POST https://api.example.com/v1/demo-days/current/express-interest \
   "liked": false,
   "connected": false,
   "invested": true,
-  "referral": false
+  "referral": false,
+  "feedback": false
 }
 ```
 
