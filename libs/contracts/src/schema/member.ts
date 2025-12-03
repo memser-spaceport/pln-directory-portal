@@ -1,6 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
-import { ResponseImageWithRelationsSchema } from './image';
+import { ResponseImageWithRelationsSchema, ResponseImageSchema } from './image';
 import { LocationResponseSchema } from './location';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseSkillSchema } from './skill';
@@ -40,6 +40,8 @@ export const MemberSchema = z.object({
   telegramHandler: z.string().nullish(),
   telegramUid: z.string().nullable(),
   officeHours: z.string().nullish(),
+  ohStatus: z.string().nullish(),
+  scheduleMeetingCount: z.number().nullish(),
   ohInterest: z.array(z.string()).default([]),
   ohHelpWith: z.array(z.string()).default([]),
   airtableRecId: z.string().nullish(),
@@ -151,3 +153,90 @@ const SendEmailOtpRequestSchema = z.object({
 
 export class SendEmailOtpRequestDto extends createZodDto(SendEmailOtpRequestSchema) {}
 export class ChangeEmailRequestDto extends createZodDto(ChangeEmailRequestSchema) {}
+
+// New filtering schemas
+export const MemberFilterQueryParams = z.object({
+  hasOfficeHours: z.boolean().optional(),
+  topics: z.array(z.string()).optional(),
+  roles: z.array(z.string()).optional(),
+  search: z.string().optional(),
+  sort: z.enum(['name:asc', 'name:desc']).optional(),
+  page: z.number().positive().optional(),
+  limit: z.number().positive().max(100).optional(),
+});
+
+export const AutocompleteQueryParams = z.object({
+  q: z.string().optional(),
+  page: z.number().positive().optional(),
+  limit: z.number().positive().max(50).optional(),
+  hasOfficeHours: z.boolean().optional(),
+});
+
+export const TopicAutocompleteResult = z.object({
+  topic: z.string(),
+  count: z.number(),
+});
+
+export const RoleAutocompleteResult = z.object({
+  role: z.string(),
+  count: z.number(),
+});
+
+export const AutocompleteResponse = z.object({
+  results: z.array(z.union([TopicAutocompleteResult, RoleAutocompleteResult])),
+  total: z.number(),
+  page: z.number(),
+  hasMore: z.boolean(),
+});
+
+export class MemberFilterQueryParamsDto extends createZodDto(MemberFilterQueryParams) {}
+export class AutocompleteQueryParamsDto extends createZodDto(AutocompleteQueryParams) {}
+export class AutocompleteResponseDto extends createZodDto(AutocompleteResponse) {}
+
+// Forum service schema
+export const MembersForNodebbRequestSchema = z.object({
+  memberIds: z.array(z.string()).optional(),
+  externalIds: z.array(z.string()).optional(),
+});
+
+export const MembersForNodebbSchema = ResponseMemberSchema.pick({
+  uid: true,
+  name: true,
+  externalId: true,
+  email: true,
+  accessLevel: true,
+  officeHours: true,
+  ohStatus: true,
+}).extend({
+  image: ResponseImageSchema.pick({
+    uid: true,
+    url: true,
+    filename: true,
+  }).optional(),
+  memberRoles: z
+    .array(
+      z.object({
+        name: z.string(),
+      })
+    )
+    .optional(),
+  teamMemberRoles: z
+    .array(
+      z.object({
+        role: z.string(),
+        mainTeam: z.boolean(),
+        teamLead: z.boolean(),
+        team: z.object({
+          name: z.string(),
+          logo: ResponseImageSchema.pick({
+            uid: true,
+            url: true,
+            filename: true,
+          }).optional(),
+        }),
+      })
+    )
+    .optional(),
+});
+
+export class MembersForNodebbRequestDto extends createZodDto(MembersForNodebbRequestSchema) {}

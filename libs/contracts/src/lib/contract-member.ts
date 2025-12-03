@@ -6,6 +6,11 @@ import {
   ResponseMemberWithRelationsSchema,
   SimpleMemberSchema,
   MembersByIdsRequestSchema,
+  MemberFilterQueryParams,
+  AutocompleteQueryParams,
+  AutocompleteResponse,
+  MembersForNodebbSchema,
+  MembersForNodebbRequestSchema,
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -131,4 +136,45 @@ export const apiMembers = contract.router({
     }),
     query: MemberDetailQueryParams.optional(),
   } as const,
+  searchMembers: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members-search`,
+    query: MemberFilterQueryParams,
+    responses: {
+      200: z.object({
+        members: ResponseMemberWithRelationsSchema.array(),
+        total: z.number(),
+        page: z.number(),
+        hasMore: z.boolean(),
+      }),
+    },
+    summary: 'Search members with advanced filters',
+  },
+  autocompleteTopics: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/autocomplete/topics`,
+    query: AutocompleteQueryParams,
+    responses: {
+      200: AutocompleteResponse,
+    },
+    summary: 'Autocomplete topics for member search',
+  },
+  autocompleteRoles: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/autocomplete/roles`,
+    query: AutocompleteQueryParams,
+    responses: {
+      200: AutocompleteResponse,
+    },
+    summary: 'Autocomplete roles for member search',
+  },
+  getMembersBulk: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/members-bulk`,
+    body: MembersForNodebbRequestSchema,
+    responses: {
+      200: MembersForNodebbSchema.array(),
+    },
+    summary: 'Get members in bulk by UIDs or external IDs',
+  },
 });

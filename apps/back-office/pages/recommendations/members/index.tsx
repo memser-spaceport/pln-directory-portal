@@ -40,6 +40,7 @@ interface Member {
     industryTagList?: any[];
     keywordList?: any[];
   };
+  scheduleMeetingCount?: number;
   accessLevel: string;
 }
 

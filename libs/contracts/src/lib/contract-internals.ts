@@ -3,7 +3,18 @@ import {
   InternalUpdateMemberDto,
   PLEventGuestQueryParams,
   ResponseMemberSchema,
-  ResponsePLEventGuestSchemaWithRelationsSchema
+  ResponsePLEventGuestSchemaWithRelationsSchema,
+  ResponseMemberWithRelationsSchema,
+  ResponseTeamWithRelationsSchema,
+  ResponseProjectWithRelationsSchema,
+  ResponsePLEventSchemaWithRelationsSchema,
+  createLocationAssociationSchemaDto,
+  UpdatePLEventLocationAssociationSchemaDto,
+  ResponsePLEventLocationAssociationSchemaDto,
+  ResponsePLEventLocationAssociationWithRelationsSchema,
+  CreatePLEventLocationSchemaDto,
+  UpdatePLEventLocationSchemaDto,
+  ResponsePLEventLocationSchema
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -27,5 +38,91 @@ export const apiInternals = contract.router({
       200: ResponseMemberSchema
     },
     summary: 'Update the telegram uid for a member'
+  },
+  createLocationAssociation: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/location-associations`,
+    body: createLocationAssociationSchemaDto,
+    responses: {
+      200: ResponsePLEventLocationAssociationSchemaDto,
+    },
+    summary: 'Create a new PL event location association',
+  },
+  getAllPLEventLocationAssociations: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/location-associations`,
+    responses: {
+      200: ResponsePLEventLocationAssociationWithRelationsSchema.array(),
+    },
+    summary: 'Get all PL event location associations',
+  },
+  getPLEventLocationAssociation: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/location-associations/:uid`,
+    responses: {
+      200: ResponsePLEventLocationAssociationSchemaDto,
+    },
+    summary: 'Get a PL event location association by UID',
+  },
+  updatePLEventLocationAssociation: {
+    method: 'PUT',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/location-associations/:uid`,
+    body: UpdatePLEventLocationAssociationSchemaDto,
+    responses: {
+      200: ResponsePLEventLocationAssociationSchemaDto,
+    },
+    summary: 'Update a PL event location association by UID',
+  },
+  deletePLEventLocationAssociation: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/location-associations/:uid`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: ResponsePLEventLocationAssociationSchemaDto,
+    },
+    summary: 'Delete a PL event location association by UID',
+  },
+  createPLEventLocation: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/locations`,
+    body: CreatePLEventLocationSchemaDto,
+    responses: {
+      200: ResponsePLEventLocationSchema,
+    },
+    summary: 'Create a new PL event location',
+  },
+  getAllPLEventLocations: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/locations`,
+    responses: {
+      200: ResponsePLEventLocationSchema.array(),
+    },
+    summary: 'Get all PL event locations',
+  },
+  getPLEventLocation: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/locations/:uid`,
+    responses: {
+      200: ResponsePLEventLocationSchema,
+    },
+    summary: 'Get a PL event location by UID',
+  },
+  updatePLEventLocation: {
+    method: 'PUT',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/locations/:uid`,
+    body: UpdatePLEventLocationSchemaDto,
+    responses: {
+      200: ResponsePLEventLocationSchema,
+    },
+    summary: 'Update a PL event location by UID',
+  },
+  deletePLEventLocation: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/locations/:uid`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: ResponsePLEventLocationSchema,
+    },
+    summary: 'Delete a PL event location by UID',
   }
 });

@@ -24,11 +24,13 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
       await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })
     ).map((result) => result.uid);
     member.imageUid = sample(imageUids) || '';
+
     return member;
   });
 
   const name = faker.helpers.unique(faker.name.firstName);
   const accessLevel = faker.helpers.arrayElement(['L0', 'L1', 'L2', 'L3', 'L4', 'Rejected']);
+
   return {
     uid: faker.helpers.slugify(`uid-${name.toLowerCase()}`),
     name,
@@ -75,6 +77,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
     },
     linkedInDetails: {},
     accessLevel,
+    scheduleMeetingCount: 0,
     accessLevelUpdatedAt: faker.date.past(),
     deletedAt: accessLevel === 'Rejected' ? new Date() : null,
     deletionReason:

@@ -9,7 +9,7 @@ import {
 import { z } from 'zod';
 import axios from 'axios';
 import * as path from 'path';
-import { Location, Member, ParticipantsRequest, Prisma } from '@prisma/client';
+import { Member, ParticipantsRequest, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ParticipantsRequestService } from '../participants-request/participants-request.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
@@ -25,15 +25,7 @@ import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
-import {
-  AccessLevel,
-  AccessLevelCounts,
-  CreateMemberDto,
-  RequestMembersDto,
-  UpdateAccessLevelDto,
-  UpdateMemberDto,
-} from '../../../../libs/contracts/src/schema/admin-member';
-import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
+import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
 
 @Injectable()
@@ -87,7 +79,7 @@ export class MembersService {
    *                       the members. These options are based on Prisma's `MemberFindManyArgs`.
    * @returns A promise that resolves to an array of member records matching the query criteria.
    */
-  async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: Number; members: Member[] }> {
+  async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: number; members: Member[] }> {
     try {
       const where = {
         ...queryOptions.where,
@@ -96,7 +88,7 @@ export class MembersService {
         },
       };
 
-      const [members, membersCount] = await Promise.all([
+      const [members, membersCount] = await this.prisma.$transaction([
         this.prisma.member.findMany({ ...queryOptions, where }),
         this.prisma.member.count({ where }),
       ]);
@@ -366,7 +358,9 @@ export class MembersService {
     tx?: Prisma.TransactionClient
   ): Promise<Member> {
     try {
-      return await (tx || this.prisma).member.findUniqueOrThrow({
+      const prisma = tx || this.prisma;
+
+      const member = await prisma.member.findUniqueOrThrow({
         where: { uid },
         ...queryOptions,
         include: {
@@ -430,6 +424,10 @@ export class MembersService {
           },
         },
       });
+
+      return {
+        ...(member as any),
+      };
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -895,7 +893,7 @@ export class MembersService {
     memberData,
     existingMember,
     tx: Prisma.TransactionClient,
-    type: string = 'Create'
+    type = 'Create'
   ) {
     const member: any = {};
     const directFields = [
@@ -1642,6 +1640,531 @@ export class MembersService {
   }
 
   /**
+   * Advanced member search with filtering
+   * @param filters - Filter parameters including office hours, topics, roles, and sorting
+   * @returns Paginated search results with members and metadata
+   */
+  async searchMembers(filters: {
+    hasOfficeHours?: boolean;
+    topics?: string[];
+    roles?: string[];
+    search?: string;
+    sort?: 'name:asc' | 'name:desc';
+    page?: number;
+    limit?: number;
+  }) {
+    const page = filters.page || 1;
+    const limit = Math.min(filters.limit || 20, 100);
+    const skip = (page - 1) * limit;
+
+    // Base where clause excluding rejected access levels
+    const baseWhere: Prisma.MemberWhereInput = {
+      accessLevel: {
+        notIn: ['L0', 'L1', 'Rejected'],
+      },
+    };
+
+    const whereConditions: Prisma.MemberWhereInput[] = [baseWhere];
+
+    // Office hours filter
+    if (filters.hasOfficeHours) {
+      whereConditions.push({
+        AND: [
+          {
+            officeHours: {
+              not: null,
+            },
+          },
+          {
+            officeHours: {
+              not: '',
+            },
+          },
+        ],
+      });
+    }
+
+    // Topics filter - search across skills, experiences, ohInterest, ohHelpWith
+    if (filters.topics && filters.topics.length > 0) {
+      // Ensure topics is always an array (query params might come as string)
+      const topicsArray = Array.isArray(filters.topics) ? filters.topics : [filters.topics];
+      const topicsConditions: Prisma.MemberWhereInput[] = [];
+
+      // Search in skills
+      topicsConditions.push({
+        skills: {
+          some: {
+            title: {
+              in: topicsArray,
+              mode: 'insensitive',
+            },
+          },
+        },
+      });
+
+      // Search in member experiences
+      topicsConditions.push({
+        experiences: {
+          some: {
+            title: {
+              in: topicsArray,
+              mode: 'insensitive',
+            },
+          },
+        },
+      });
+
+      // Get member IDs that match ohInterest/ohHelpWith topics using raw SQL
+      if (topicsArray.length > 0) {
+        const [ohInterestMemberIds, ohHelpWithMemberIds] = await Promise.all([
+          this.prisma.$queryRaw<{ id: number }[]>`
+            SELECT DISTINCT id FROM "Member" 
+            WHERE ${Prisma.raw(
+              topicsArray
+                .map(
+                  (topic) => `
+                  EXISTS (
+                    SELECT 1 FROM unnest("ohInterest") AS interest_item 
+                    WHERE LOWER(interest_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
+                  )
+                `
+                )
+                .join(' OR ')
+            )}
+          `,
+          this.prisma.$queryRaw<{ id: number }[]>`
+            SELECT DISTINCT id FROM "Member" 
+            WHERE ${Prisma.raw(
+              topicsArray
+                .map(
+                  (topic) => `
+                  EXISTS (
+                    SELECT 1 FROM unnest("ohHelpWith") AS help_item 
+                    WHERE LOWER(help_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
+                  )
+                `
+                )
+                .join(' OR ')
+            )}
+          `,
+        ]);
+
+        const allOhMemberIds = [
+          ...ohInterestMemberIds.map((row) => row.id),
+          ...ohHelpWithMemberIds.map((row) => row.id),
+        ];
+
+        if (allOhMemberIds.length > 0) {
+          topicsConditions.push({
+            id: {
+              in: allOhMemberIds,
+            },
+          });
+        }
+      }
+
+      whereConditions.push({
+        OR: topicsConditions,
+      });
+    }
+
+    // Roles filter - search in current team roles
+    if (filters.roles && filters.roles.length > 0) {
+      // Ensure roles is always an array (query params might come as string)
+      const rolesArray = Array.isArray(filters.roles) ? filters.roles : [filters.roles];
+      whereConditions.push({
+        teamMemberRoles: {
+          some: {
+            mainTeam: true,
+            role: {
+              in: rolesArray,
+              mode: 'insensitive',
+            },
+          },
+        },
+      });
+    }
+
+    // Search filter - search by member name and team name
+    if (filters.search && filters.search.trim()) {
+      const searchTerm = filters.search.trim();
+      whereConditions.push({
+        OR: [
+          {
+            name: {
+              contains: searchTerm,
+              mode: 'insensitive',
+            },
+          },
+          {
+            teamMemberRoles: {
+              some: {
+                team: {
+                  name: {
+                    contains: searchTerm,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            },
+          },
+        ],
+      });
+    }
+
+    const where: Prisma.MemberWhereInput = {
+      AND: whereConditions,
+    };
+
+    // Sorting
+    const orderBy: Prisma.MemberOrderByWithRelationInput = {};
+    if (filters.sort === 'name:desc') {
+      orderBy.name = 'desc';
+    } else {
+      orderBy.name = 'asc'; // Default to ascending
+    }
+
+    try {
+      const [members, total] = await Promise.all([
+        this.prisma.member.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: {
+            uid: true,
+            name: true,
+            accessLevel: true,
+            officeHours: true,
+            ohStatus: true,
+            ohInterest: true,
+            ohHelpWith: true,
+            openToWork: true,
+            scheduleMeetingCount: true,
+            image: {
+              select: {
+                uid: true,
+                url: true,
+              },
+            },
+            location: {
+              select: {
+                uid: true,
+                country: true,
+                city: true,
+              },
+            },
+            teamMemberRoles: {
+              select: {
+                role: true,
+                mainTeam: true,
+                teamLead: true,
+                team: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+            skills: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        }),
+        this.prisma.member.count({ where }),
+      ]);
+
+      return {
+        members,
+        total,
+        page: Number(page),
+        hasMore: page * limit < total,
+      };
+    } catch (error) {
+      return this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Autocomplete topics from skills, experiences, ohInterest, and ohHelpWith
+   * @param query - Search query string
+   * @param page - Page number for pagination
+   * @param limit - Results per page
+   * @param hasOfficeHours - Filter by members who have office hours
+   * @returns Paginated autocomplete results with counts
+   */
+  async autocompleteTopics(query: string, page = 1, limit = 20, hasOfficeHours?: boolean) {
+    limit = Math.min(limit, 50);
+    const skip = (page - 1) * limit;
+    const searchQuery = query.toLowerCase();
+
+    try {
+      // Build where clause - if no query, get all topics; if query, filter by it
+      const titleFilter = query.trim()
+        ? {
+            contains: searchQuery,
+            mode: 'insensitive' as const,
+          }
+        : undefined;
+
+      // Build member filter for office hours
+      const memberFilter: any = {
+        accessLevel: {
+          notIn: ['L0', 'L1', 'Rejected'],
+        },
+        ...(hasOfficeHours && {
+          AND: [
+            {
+              officeHours: {
+                not: null,
+              },
+            },
+            {
+              officeHours: {
+                not: '',
+              },
+            },
+          ],
+        }),
+      };
+
+      // Get skills matching the query with filtered member count
+      const skillsPromise = this.prisma.skill.findMany({
+        where: {
+          ...(titleFilter && { title: titleFilter }),
+          members: {
+            some: memberFilter,
+          },
+        },
+        select: {
+          title: true,
+          members: {
+            where: memberFilter,
+            select: {
+              uid: true,
+            },
+          },
+        },
+      });
+
+      // Get experiences matching the query with member UIDs
+      const experiencesPromise = this.prisma.memberExperience.findMany({
+        where: {
+          ...(titleFilter && { title: titleFilter }),
+          member: memberFilter,
+        },
+        select: {
+          title: true,
+          memberUid: true,
+        },
+      });
+
+      // Get ohInterest and ohHelpWith matching the query using SQL-level filtering
+      let ohMemberIds: number[] = [];
+      if (query.trim()) {
+        // Get member IDs that match the search query in ohInterest or ohHelpWith
+        const [ohInterestIds, ohHelpWithIds] = await Promise.all([
+          this.prisma.$queryRaw<{ id: number }[]>`
+            SELECT DISTINCT id FROM "Member" 
+            WHERE EXISTS (
+              SELECT 1 FROM unnest("ohInterest") AS interest_item 
+              WHERE LOWER(interest_item) LIKE LOWER(${`%${searchQuery}%`})
+            )
+          `,
+          this.prisma.$queryRaw<{ id: number }[]>`
+            SELECT DISTINCT id FROM "Member" 
+            WHERE EXISTS (
+              SELECT 1 FROM unnest("ohHelpWith") AS help_item 
+              WHERE LOWER(help_item) LIKE LOWER(${`%${searchQuery}%`})
+            )
+          `,
+        ]);
+
+        ohMemberIds = [...ohInterestIds.map((row) => row.id), ...ohHelpWithIds.map((row) => row.id)];
+      }
+
+      const ohDataPromise = this.prisma.member.findMany({
+        where: {
+          ...memberFilter,
+          ...(query.trim() &&
+            ohMemberIds.length > 0 && {
+              id: {
+                in: ohMemberIds,
+              },
+            }),
+          // If no query, get members with any ohInterest or ohHelpWith
+          ...(!query.trim() && {
+            OR: [
+              {
+                ohInterest: {
+                  isEmpty: false,
+                },
+              },
+              {
+                ohHelpWith: {
+                  isEmpty: false,
+                },
+              },
+            ],
+          }),
+        },
+        select: {
+          uid: true,
+          ohInterest: true,
+          ohHelpWith: true,
+        },
+      });
+
+      const [skills, experiences, ohData] = await Promise.all([skillsPromise, experiencesPromise, ohDataPromise]);
+
+      // Use a Map to collect unique members per topic
+      const topicMemberSets = new Map<string, Set<string>>();
+
+      // Process skills
+      skills.forEach((skill) => {
+        const topic = skill.title.toLowerCase();
+        if (!topicMemberSets.has(topic)) {
+          topicMemberSets.set(topic, new Set());
+        }
+        skill.members.forEach((member) => {
+          topicMemberSets.get(topic)!.add(member.uid);
+        });
+      });
+
+      // Process experiences
+      experiences.forEach((exp) => {
+        const topic = exp.title.toLowerCase();
+        if (!topicMemberSets.has(topic)) {
+          topicMemberSets.set(topic, new Set());
+        }
+        topicMemberSets.get(topic)!.add(exp.memberUid);
+      });
+
+      // Process ohInterest and ohHelpWith
+      ohData.forEach((member) => {
+        member.ohInterest.forEach((interest) => {
+          // If no query, include all topics; if query, filter by it
+          if (!query.trim() || interest.toLowerCase().includes(searchQuery)) {
+            const topic = interest.toLowerCase();
+            if (!topicMemberSets.has(topic)) {
+              topicMemberSets.set(topic, new Set());
+            }
+            topicMemberSets.get(topic)!.add(member.uid);
+          }
+        });
+        member.ohHelpWith.forEach((help) => {
+          // If no query, include all topics; if query, filter by it
+          if (!query.trim() || help.toLowerCase().includes(searchQuery)) {
+            const topic = help.toLowerCase();
+            if (!topicMemberSets.has(topic)) {
+              topicMemberSets.set(topic, new Set());
+            }
+            topicMemberSets.get(topic)!.add(member.uid);
+          }
+        });
+      });
+
+      // Convert map to array and sort by count descending, then by topic name
+      const results = Array.from(topicMemberSets.entries())
+        .map(([topic, memberSet]) => ({ topic, count: memberSet.size }))
+        .sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          return a.topic.localeCompare(b.topic);
+        });
+
+      const paginatedResults = results.slice(skip, skip + limit);
+
+      return {
+        results: paginatedResults,
+        total: results.length,
+        page: Number(page),
+        hasMore: skip + limit < results.length,
+      };
+    } catch (error) {
+      return this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Autocomplete roles from team member roles
+   * @param query - Search query string
+   * @param page - Page number for pagination
+   * @param limit - Results per page
+   * @param hasOfficeHours - Filter by members who have office hours
+   * @returns Paginated autocomplete results with counts
+   */
+  async autocompleteRoles(query: string, page = 1, limit = 20, hasOfficeHours?: boolean) {
+    limit = Math.min(limit, 50);
+    const skip = (page - 1) * limit;
+
+    try {
+      // Build member filter for office hours
+      const memberFilter: any = {
+        accessLevel: {
+          notIn: ['L0', 'L1', 'Rejected'],
+        },
+        ...(hasOfficeHours && {
+          AND: [
+            {
+              officeHours: {
+                not: null,
+              },
+            },
+            {
+              officeHours: {
+                not: '',
+              },
+            },
+          ],
+        }),
+      };
+
+      const roles = await this.prisma.teamMemberRole.groupBy({
+        by: ['role'],
+        where: {
+          role: {
+            not: null,
+            ...(query.trim() && {
+              contains: query,
+              mode: 'insensitive' as const,
+            }),
+          },
+          mainTeam: true,
+          member: memberFilter,
+        },
+        _count: {
+          memberUid: true,
+        },
+        orderBy: {
+          _count: {
+            memberUid: 'desc',
+          },
+        },
+      });
+
+      const results = roles
+        .filter((role) => role.role !== null)
+        .map((role) => ({
+          role: role.role as string,
+          count: role._count.memberUid,
+        }));
+
+      const paginatedResults = results.slice(skip, skip + limit);
+
+      return {
+        results: paginatedResults,
+        total: results.length,
+        page: Number(page),
+        hasMore: skip + limit < results.length,
+      };
+    } catch (error) {
+      return this.handleErrors(error);
+    }
+  }
+
+  /**
    * Handles database-related errors specifically for the Member entity.
    * Logs the error and throws an appropriate HTTP exception based on the error type.
    *
@@ -1805,5 +2328,89 @@ export class MembersService {
         },
       },
     });
+  }
+
+  /**
+   * Retrieves members for NodeBB forum service by UIDs or external IDs.
+   * Returns the specific fields needed by the forum service.
+   *
+   * @param memberIds - Array of member UIDs to retrieve (optional)
+   * @param externalIds - Array of external IDs to retrieve (optional)
+   * @returns A promise that resolves to an array of member records with forum-specific fields
+   */
+  async findMembersBulk(memberIds?: string[], externalIds?: string[]): Promise<any[]> {
+    try {
+      if (!memberIds?.length && !externalIds?.length) {
+        return [];
+      }
+
+      const whereConditions: any[] = [];
+
+      if (memberIds?.length) {
+        whereConditions.push({
+          uid: {
+            in: memberIds,
+          },
+        });
+      }
+
+      if (externalIds?.length) {
+        whereConditions.push({
+          externalId: {
+            in: externalIds,
+          },
+        });
+      }
+
+      const members = await this.prisma.member.findMany({
+        where: {
+          OR: whereConditions,
+        },
+        select: {
+          uid: true,
+          name: true,
+          externalId: true,
+          email: true,
+          accessLevel: true,
+          officeHours: true,
+          ohStatus: true,
+          image: {
+            select: {
+              uid: true,
+              url: true,
+              filename: true,
+            },
+          },
+          memberRoles: {
+            select: {
+              name: true,
+            },
+          },
+          teamMemberRoles: {
+            select: {
+              role: true,
+              mainTeam: true,
+              teamLead: true,
+              team: {
+                select: {
+                  name: true,
+                  logo: {
+                    select: {
+                      uid: true,
+                      url: true,
+                      filename: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return members;
+    } catch (error) {
+      return this.handleErrors(error);
+    }
   }
 }
