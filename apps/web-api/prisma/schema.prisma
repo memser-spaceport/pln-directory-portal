@@ -164,7 +164,8 @@ model Member {
   demoDayEngagements               DemoDayEngagement[]
   demoDayExpressInterestStatistics DemoDayExpressInterestStatistic[]
   demoDayFeedbacks                 DemoDayFeedback[]
-  reviewedEvents               PLEvent[]                     @relation("PLEventReviewer")
+  reviewedEvents                   PLEvent[]                         @relation("PLEventReviewer")
+  isBackofficeAdmin                Boolean?                          @default(false)
 }
 
 model MemberRole {
