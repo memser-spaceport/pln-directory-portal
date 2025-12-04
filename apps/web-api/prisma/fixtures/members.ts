@@ -24,7 +24,6 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
       await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })
     ).map((result) => result.uid);
     member.imageUid = sample(imageUids) || '';
-
     return member;
   });
 
@@ -77,6 +76,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
       showTwitter: true,
       showSubscription: true,
     },
+    isBackofficeAdmin: false,
     isTierViewer: false,
     linkedInDetails: {},
     accessLevel,

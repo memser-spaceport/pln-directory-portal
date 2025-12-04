@@ -9,21 +9,41 @@ import { ReactComponent as LogoImage } from '/public/assets/images/Back_office_L
 import { GetServerSideProps } from 'next';
 
 export function Index() {
-  const [username, setUsername] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [error, setError] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [email, setEmail] = useState<string>('');
+  const [code, setCode] = useState<string>('');
+  const [otpToken, setOtpToken] = useState<string | null>(null);
+  const [isOtpSent, setIsOtpSent] = useState<boolean>(false);
 
-  function onChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  const [error, setError] = useState<string>('');
+  const [info, setInfo] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
+
+  const router = useRouter();
+
+  function onChange(
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) {
     const { name, value } = event.target;
-    name === 'name' ? setUsername(value) : setPassword(value);
+
+    if (name === 'email') {
+      setEmail(value);
+    }
+    if (name === 'code') {
+      setCode(value);
+    }
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
     if (event.key === 'Enter' || event.code === 'NumpadEnter') {
       event.preventDefault();
       event.stopPropagation();
-      onSubmit();
+
+      if (!isOtpSent) {
+        onSendOtp();
+      } else {
+        onSubmit();
+      }
     }
   }
 
@@ -31,30 +51,89 @@ export function Index() {
     setIsLoading(isLoading);
   }, [isLoading]);
 
-  const router = useRouter();
-  async function onSubmit() {
-    setIsLoading(true);
-    await fetch('/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password }),
-    })
-      .then((res) => {
-        if (res.ok) {
-          const backLink = router.query.backlink?.toString() ?? '';
-          router.push(backLink ? backLink : '/members?filter=level1');
-        } else if (res.status === 401) {
-          setError('Incorrect Username or Password!');
-        }
-      })
-      .catch((err) => {
-        setError('Please try again!');
-      })
-      .finally(() => {
-        setIsLoading(false);
+  async function onSendOtp() {
+    setError('');
+    setInfo('');
+
+    if (!email) {
+      setError('Email is required');
+      return;
+    }
+
+    setIsSendingOtp(true);
+
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
       });
+
+      if (!res.ok) {
+        if (res.status === 400) {
+          setError('Email is required');
+        } else {
+          setError('Failed to send OTP. Please try again.');
+        }
+        return;
+      }
+
+      const data = await res.json();
+      if (data?.otpToken) {
+        setOtpToken(data.otpToken);
+        setIsOtpSent(true);
+        setInfo('OTP code has been sent to your email.');
+      } else {
+        setError('OTP token is missing in response.');
+      }
+    } catch (e) {
+      setError('Failed to send OTP. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  }
+
+  async function onSubmit() {
+    setError('');
+    setInfo('');
+
+    if (!otpToken) {
+      setError('Please request OTP first.');
+      return;
+    }
+
+    if (!code) {
+      setError('OTP code is required.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ otpToken, code }),
+      });
+
+      if (res.ok) {
+        const backLink = router.query?.backLink as string | undefined;
+        // Cookie 'plnadmin' is set by /api/login on successful OTP verification
+        router.push(backLink ?? '/members?filter=level1');
+      } else if (res.status === 401) {
+        setError('Invalid OTP code.');
+      } else {
+        setError('Authentication failed. Please try again.');
+      }
+    } catch (err) {
+      setError('Please try again!');
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -63,52 +142,80 @@ export function Index() {
       <div className="absolute left-[50%] top-[50%] w-[75%] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-8 md:w-[30%]">
         <div className="inline-block">
           <div className="inline-block">
-            <LogoImage className="pl-3" height={95} width={195} alt="Protocol Labs Logo" />
+            <LogoImage
+              className="pl-3"
+              height={95}
+              width={195}
+              alt="Protocol Labs Logo"
+            />
           </div>
           <div className="fixed right-[30px] top-[66px] inline-block h-[29px] w-[113px] rounded-[4px] bg-[#9D3DE8] bg-opacity-10">
-            <Building className="relative left-[7px] inline-block" title="building" width="14" height="20" />
+            <Building
+              className="relative left-[7px] inline-block"
+              title="building"
+              width="14"
+              height="20"
+            />
             <span className="relative left-[10px] text-[14px] font-semibold text-[#9C3DE8]">
               {APP_CONSTANTS.BACK_OFFICE_LABEL}
             </span>
           </div>
         </div>
-        <div className="">
-          <div className="p-2">
-            <InputField
-              name="name"
-              label="Username"
-              value={username}
-              onChange={onChange}
-              onKeyDown={onKeyDown}
-              placeholder="Enter username"
-              className="custom-grey custom-outline-none border"
-            />
-          </div>
-          <div className="p-2">
-            <InputField
-              type="password"
-              name="password"
-              label="Password"
-              value={password}
-              onKeyDown={onKeyDown}
-              onChange={onChange}
-              placeholder="Enter password"
-              className="custom-grey custom-outline-none border"
-            />
-          </div>
+
+        <div className="p-2">
+          <InputField
+            name="email"
+            label="Email"
+            value={email}
+            onChange={onChange}
+            onKeyDown={onKeyDown}
+            placeholder="Enter email"
+            className="custom-grey custom-outline-none border"
+          />
         </div>
-        <div className="float-right pt-3">
+
+        <div className="p-2">
+          <InputField
+            name="code"
+            label="OTP code"
+            value={code}
+            onChange={onChange}
+            onKeyDown={onKeyDown}
+            placeholder="Enter OTP code"
+            className="custom-grey custom-outline-none border"
+            disabled={!isOtpSent}
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-3">
           <button
-            className="on-focus leading-3.5 text-md mr-2 rounded-full border border-slate-300 bg-blue-700 px-5 py-3 text-left font-medium text-white last:mr-0 focus-within:rounded-full hover:border-slate-400 focus:rounded-full focus-visible:rounded-full disabled:bg-slate-400"
-            onClick={onSubmit}
-            disabled={!username || !password}
+            type="button"
+            onClick={onSendOtp}
+            disabled={isSendingOtp || !email}
+            className="rounded bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Login
+            {isSendingOtp ? 'Sending...' : 'Send code'}
+          </button>
+
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={!isOtpSent || !code}
+            className="rounded bg-[#9D3DE8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#8b32cf] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Log in
           </button>
         </div>
+
+        {info && (
+          <div className="pt-2">
+            <span className="text-md text-green-500">{info}</span>
+          </div>
+        )}
+
         {error && (
-          <div>
-            <span className="text-md pt-2 text-red-400">{error}</span>
+          <div className="pt-2">
+            <span className="text-md text-red-400">{error}</span>
           </div>
         )}
       </div>
@@ -129,6 +236,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       },
     };
   }
+
   return {
     props: {},
   };

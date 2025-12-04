@@ -7,10 +7,13 @@ import { PrismaService } from '../shared/prisma.service';
 import { OtpModule } from '../otp/otp.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import {AuthOtpService} from "./auth-otp.service";
+import { AdminAuthController } from './admin-auth.controller';
+import { JwtService } from '../utils/jwt/jwt.service';
 @Module({
   imports: [HttpModule, OtpModule, AnalyticsModule, forwardRef(() => NotificationsModule)],
-  controllers: [AuthController],
-  providers: [AuthService, PrismaService],
+  controllers: [AuthController, AdminAuthController],
+  providers: [AuthService, PrismaService, AuthOtpService, JwtService],
   exports: [AuthService],
 })
 export class AuthModule {}
