@@ -226,11 +226,25 @@ export class AuthService implements OnModuleInit {
       `AuthService.getTokenAndUserInfo → No member found for externalId=${externalId} or email=${email}. Creating new member from SSO login.`,
     );
 
-    const newUser = await this.membersService.createMemberFromSso({
+    // 6.1. Create raw member record
+    await this.membersService.createMemberFromSso({
       email,
       externalId,
-      idTokenPayload: decoded,
     });
+
+    // 6.2. Reload member with full relations so that memberToUserInfo doesn't crash
+    let newUser =
+      externalId != null
+        ? await this.membersService.findMemberByExternalId(externalId)
+        : await this.membersService.findMemberByEmail(email);
+
+    if (!newUser) {
+      // This should not normally happen, but better to log loudly if something goes wrong
+      this.logger.error(
+        `AuthService.getTokenAndUserInfo → Newly created SSO member not found when reloading. email=${email}, externalId=${externalId}`,
+      );
+      throw new ForbiddenException('Unable to load newly created user');
+    }
 
     const upgradedNewUser = await this.checkAndUpgradeDemoDayParticipant(newUser);
     await this.trackLoginEvent(upgradedNewUser);
