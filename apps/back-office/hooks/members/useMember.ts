@@ -33,6 +33,7 @@ interface IMemberResponse {
   accessLevelUpdatedAt: string;
   // Other fields that might be present
   bio?: string;
+  aboutYou?: string;
   discordHandler?: string;
   githubHandler?: string;
   linkedinHandler?: string;

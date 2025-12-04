@@ -165,6 +165,7 @@ export const MemberFilterQueryParams = z.object({
   limit: z.number().positive().max(100).optional(),
   // Investor-related filters
   isInvestor: z.boolean().optional(),
+  investorTypes: z.array(z.enum(['ANGEL', 'FUND', 'ANGEL_AND_FUND'])).optional(),
   minTypicalCheckSize: z.number().min(0).optional(),
   maxTypicalCheckSize: z.number().min(0).optional(),
   investmentFocus: z.array(z.string()).optional(),

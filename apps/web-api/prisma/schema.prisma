@@ -156,6 +156,7 @@ model Member {
   accessLevelUpdatedAt             DateTime                          @default(now())
   deletedAt                        DateTime? // soft delete timestamp
   deletionReason                   String? // reason for deletion
+  aboutYou                         String? // "Tell us a bit about you" field from sign up flow
   modifiedFundraisingProfiles      TeamFundraisingProfile[]          @relation("TfpLastModifiedBy")
   uploads                          Upload[]                          @relation("MemberUploads")
   investorProfile                  InvestorProfile?                  @relation("MemberInvestorProfile", fields: [investorProfileId], references: [uid])
@@ -164,7 +165,8 @@ model Member {
   demoDayEngagements               DemoDayEngagement[]
   demoDayExpressInterestStatistics DemoDayExpressInterestStatistic[]
   demoDayFeedbacks                 DemoDayFeedback[]
-  reviewedEvents               PLEvent[]                     @relation("PLEventReviewer")
+  reviewedEvents                   PLEvent[]                         @relation("PLEventReviewer")
+  isBackofficeAdmin                Boolean?                          @default(false)
 }
 
 model MemberRole {

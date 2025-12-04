@@ -1738,6 +1738,7 @@ async updateMemberFromParticipantsRequest(
     limit?: number;
     // Investor-related filters
     isInvestor?: boolean;
+    investorTypes?: ('ANGEL' | 'FUND' | 'ANGEL_AND_FUND')[];
     minTypicalCheckSize?: number;
     maxTypicalCheckSize?: number;
     investmentFocus?: string[];
@@ -2100,6 +2101,18 @@ async updateMemberFromParticipantsRequest(
             ],
           },
         ],
+      });
+    }
+
+    // Investor types filter
+    if (filters.investorTypes && filters.investorTypes.length > 0) {
+      const typesArray = Array.isArray(filters.investorTypes) ? filters.investorTypes : [filters.investorTypes];
+      whereConditions.push({
+        investorProfile: {
+          type: {
+            in: typesArray,
+          },
+        },
       });
     }
 
