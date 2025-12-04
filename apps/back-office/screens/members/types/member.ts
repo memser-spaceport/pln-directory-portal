@@ -20,6 +20,7 @@ export type TMemberForm = {
   email: string;
   joinDate: Date | null;
   bio: string;
+  aboutYou: string;
   country: string;
   state: string;
   city: string;

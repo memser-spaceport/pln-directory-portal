@@ -233,6 +233,7 @@ export class MemberService {
       'isUserConsent',
       'isSubscribedToNewsletter',
       'teamOrProjectURL',
+      'aboutYou',
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();
@@ -1048,6 +1049,7 @@ export class MemberService {
         isVerified,
         plnFriend,
         bio: memberData.bio,
+        aboutYou: memberData.aboutYou,
         plnStartDate: memberData.joinDate ? new Date(memberData.joinDate) : null,
         githubHandler: memberData.githubHandler,
         discordHandler: memberData.discordHandler,

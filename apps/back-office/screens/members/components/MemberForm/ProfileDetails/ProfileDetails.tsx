@@ -22,6 +22,9 @@ export const ProfileDetails = ({ existingImageUrl }: Props) => {
       <div className="items-startq flex gap-4">
         <FormAreaField name="bio" placeholder="Short description" label="Bio" />
       </div>
+      <div className="items-startq flex gap-4">
+        <FormAreaField name="aboutYou" placeholder="Tell us a bit about you" label="Tell us a bit about you" />
+      </div>
     </div>
   );
 };

@@ -51,6 +51,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
     airtableRecId: `airtable-rec-id-${sequence}`,
     externalId: null,
     bio: faker.datatype.string(),
+    aboutYou: faker.datatype.string(),
     isFeatured: faker.datatype.boolean(),
     createdAt: faker.date.past(),
     approvedAt: faker.date.past(),
