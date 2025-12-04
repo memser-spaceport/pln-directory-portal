@@ -1,12 +1,32 @@
-import axios from 'axios';
-import { removeToken } from './auth';
+import axios, { AxiosRequestHeaders } from 'axios';
+import { removeToken, getToken } from './auth';
 
-// Create an Axios instance with default configuration
 const api = axios.create({
   baseURL: process.env.WEB_API_BASE_URL,
 });
 
-// Add a response interceptor to handle 401 Unauthorized errors
+
+api.interceptors.request.use(
+  (config) => {
+    if (typeof window !== 'undefined') {
+      const token = getToken();
+      if (token) {
+        const headers = (config.headers ?? {}) as AxiosRequestHeaders;
+
+        if (!headers.Authorization) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        config.headers = headers;
+      }
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
