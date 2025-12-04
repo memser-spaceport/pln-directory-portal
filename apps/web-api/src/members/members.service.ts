@@ -3358,4 +3358,58 @@ async updateMemberFromParticipantsRequest(
       },
     });
   }
+
+
+
+  /**
+   * Creates a new member based on SSO (Privy) login.
+   * This is used when we have a valid id_token with email + externalId,
+   * but there is no existing member for that combination.
+   */
+  async createMemberFromSso(payload: {
+    email: string;
+    externalId: string | null;
+    idTokenPayload?: any; // optional – decoded id_token, if caller has it
+  }) {
+    const { email, externalId, idTokenPayload } = payload;
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 1. Try to extract a human-readable name from the id_token payload
+    const tokenName: string | undefined =
+      (idTokenPayload?.name as string | undefined) ||
+      [idTokenPayload?.given_name, idTokenPayload?.family_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim() ||
+      undefined;
+
+    // 2. Fallback: use the part before '@' as a display name
+    const fallbackName = normalizedEmail.split('@')[0];
+
+    const displayName =
+      tokenName && tokenName.length > 0 ? tokenName : fallbackName;
+
+    this.logger.info(
+      `MembersService.createMemberFromSso → Creating new member from SSO. email=${normalizedEmail}, externalId=${externalId}, displayName="${displayName}"`,
+    );
+
+    const newMember = await this.prisma.member.create({
+      data: {
+        email: normalizedEmail,
+        externalId: externalId ?? null,
+        name: displayName,
+        accessLevel: 'L0', // default access level for newly created SSO users
+      },
+    });
+
+    this.logger.info(
+      `MembersService.createMemberFromSso → New member created. uid=${newMember.uid}, id=${newMember.id}, email=${newMember.email}`,
+    );
+
+    return newMember;
+  }
+
+
+
 }
