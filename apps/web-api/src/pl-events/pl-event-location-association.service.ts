@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ConflictException }
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { PLEventLocationAssociation, Prisma } from '@prisma/client';
+import { CacheService } from '../utils/cache/cache.service';
 
 /**
  * Service for managing location associations between events and locations.
@@ -12,6 +13,7 @@ export class PLEventLocationAssociationService {
   constructor(
     private prisma: PrismaService,
     private logger: LogService,
+    private cacheService: CacheService,
   ) {}
 
   /**
@@ -134,6 +136,7 @@ export class PLEventLocationAssociationService {
         data
       });
       this.logger.info(`Created location association: ${association.uid} with locationUid: ${association.locationUid}`, 'PLEventLocationAssociationService');
+      this.cacheService.flushCache();
       return association;
     } catch (error) {
       this.logger.error(`Error creating location association: ${error.message}`, error.stack, 'PLEventLocationAssociationService');
@@ -274,6 +277,7 @@ export class PLEventLocationAssociationService {
           await this.updateRelatedEventsLocationUid(uid, data.locationUid, tx);
         }
         this.logger.info(`Updated location association: ${association.uid}`);
+        this.cacheService.flushCache();
         return association;
       });
     } catch (error) {
@@ -307,6 +311,7 @@ export class PLEventLocationAssociationService {
         }
       });
       this.logger.info(`Deleted location association: ${association.uid}`, 'PLEventLocationAssociationService');
+      this.cacheService.flushCache();
       return association;
     } catch (error) {
       this.logger.error(`Error deleting location association: ${error.message}`); 
@@ -331,6 +336,7 @@ export class PLEventLocationAssociationService {
         locationUid: locationUid
       }
     });
+    this.cacheService.flushCache();
   }
 
   private handleErrors(error, message?: string) {

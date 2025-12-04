@@ -6,6 +6,7 @@ import { PLEventLocationAssociationService } from '../pl-events/pl-event-locatio
 import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
 import { getFilenameFromUrl, getFileTypeFromUrl } from '../utils/helper/helper';
 import { PLEvent, PLEventLocation, PLEventType, PLEventLocationAssociation } from '@prisma/client';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class EventConsumerHelper {
@@ -14,7 +15,8 @@ export class EventConsumerHelper {
     private plEventsService: PLEventsService,
     private prisma: PrismaService,
     private locationAssociationService: PLEventLocationAssociationService,
-    private plEventLocationsService: PLEventLocationsService
+    private plEventLocationsService: PLEventLocationsService,
+    private cacheService: CacheService,
   ) {}
 
   /**
@@ -84,6 +86,7 @@ export class EventConsumerHelper {
         associationUid = newAssociation.uid;
       }
     }
+    this.cacheService.flushCache();
     return { locationUid, associationUid };
   }
 
