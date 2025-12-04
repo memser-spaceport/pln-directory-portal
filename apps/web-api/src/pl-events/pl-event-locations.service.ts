@@ -14,6 +14,7 @@ import { NotificationService } from '../notifications/notifications.service';
 import { MembersService } from '../members/members.service';
 import { isEmpty } from 'lodash';
 import { PLEventGuestsService } from './pl-event-guests.service';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class PLEventLocationsService {
@@ -25,6 +26,7 @@ export class PLEventLocationsService {
     private notificationService: NotificationService,
     @Inject(forwardRef(() => PLEventGuestsService))
     private plEventGuestService: PLEventGuestsService,
+    private cacheService: CacheService,
   ) { }
 
   /**
@@ -681,6 +683,7 @@ export class PLEventLocationsService {
         data: location
       });
       this.logger.info(`New location created: ${createdLocation.location}`);
+      this.cacheService.flushCache();
       return createdLocation;
     } catch (error) {
       this.logger.error(`location error : , ${error}`);
@@ -745,6 +748,7 @@ export class PLEventLocationsService {
         where: { uid: locationUid },
         data: updatedLocation
       });
+      this.cacheService.flushCache();
       return location;
     } catch (error) { 
       this.logger.error(`Error while modifying pl event location ${locationUid}: ${error}`);
