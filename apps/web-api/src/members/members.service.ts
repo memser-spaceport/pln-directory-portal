@@ -19,7 +19,7 @@ import {NotificationService} from '../utils/notification/notification.service';
 import {EmailOtpService} from '../otp/email-otp.service';
 import {AuthService} from '../auth/auth.service';
 import {LogService} from '../shared/log.service';
-import {DEFAULT_MEMBER_ROLES} from '../utils/constants';
+import {DEFAULT_MEMBER_ROLES, AdminRole, isDirectoryAdmin} from '../utils/constants';
 import {hashFileName} from '../utils/hashing';
 import {buildMultiRelationMapping, copyObj} from '../utils/helper/helper';
 import {CacheService} from '../utils/cache/cache.service';
@@ -547,10 +547,10 @@ export class MembersService {
         return null;
       }
       const roleNames = foundMember.memberRoles.map((m) => m.name);
-      const isDirectoryAdmin = roleNames.includes('DIRECTORYADMIN');
+      const memberIsDirectoryAdmin = isDirectoryAdmin(foundMember);
       return {
         ...foundMember,
-        isDirectoryAdmin,
+        isDirectoryAdmin: memberIsDirectoryAdmin,
         roleNames,
         leadingTeams: foundMember.teamMemberRoles.filter((role) => role.teamLead).map((role) => role.teamUid),
       };
@@ -1531,7 +1531,7 @@ async updateMemberFromParticipantsRequest(
    * @returns True if the member is a directory admin, false otherwise.
    */
   checkIfAdminUser(member): boolean {
-    return member.memberRoles.some((role) => role.name === 'DIRECTORYADMIN');
+    return isDirectoryAdmin(member);
   }
 
   /**
@@ -2809,7 +2809,7 @@ async updateMemberFromParticipantsRequest(
       where: {
         memberRoles: {
           some: {
-            name: 'DIRECTORYADMIN', // Adjust this based on the actual field name in your schema
+            name: AdminRole.DIRECTORY_ADMIN,
           },
         },
       },

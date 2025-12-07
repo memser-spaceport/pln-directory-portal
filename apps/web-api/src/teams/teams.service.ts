@@ -25,6 +25,7 @@ import { AskService } from '../asks/asks.service';
 import { TeamsHooksService } from './teams.hooks.service';
 import { ParticipantsRequest } from './dto/members.dto';
 import { SelfUpdatePayload } from './dto/teams.dto';
+import { AdminRole, isDirectoryAdmin } from '../utils/constants';
 
 @Injectable()
 export class TeamsService {
@@ -120,7 +121,7 @@ export class TeamsService {
   /**
    * Soft deletes a team by marking it as L0 (inactive).
    * Teams with L0 access level are not visible in queries.
-   * Only users with DIRECTORYADMIN role can soft delete teams.
+   * Only users with DIRECTORY_ADMIN role can soft delete teams.
    *
    * @param teamUid - Unique identifier for the team to soft delete
    * @returns The updated team with L0 access level
@@ -536,7 +537,7 @@ export class TeamsService {
     if (requestorAccessLevel && !['L5', 'L6'].includes(requestorAccessLevel)) {
       // Check if they're a directory admin
       const requestor = await tx.member.findFirst({
-        where: { memberRoles: { some: { name: 'DIRECTORYADMIN' } } },
+        where: { memberRoles: { some: { name: AdminRole.DIRECTORY_ADMIN } } },
       });
       if (!requestor) {
         throw new ForbiddenException('Insufficient permissions to update investor profile');
@@ -1694,9 +1695,9 @@ export class TeamsService {
     const member = await this.membersService.findMemberByEmail(actorEmail);
     if (!member) return false;
 
-    const isDirectoryAdmin = !!member.memberRoles?.some((r) => r?.name === 'DIRECTORYADMIN');
+    const memberIsDirectoryAdmin = member.memberRoles ? isDirectoryAdmin(member as { memberRoles: Array<{ name: string }> }) : false;
 
-    return !!member.isTierViewer || isDirectoryAdmin;
+    return !!member.isTierViewer || memberIsDirectoryAdmin;
   }
 
   /**

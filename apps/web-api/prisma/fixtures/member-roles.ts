@@ -1,6 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { MemberRole } from '@prisma/client';
 import { Factory } from 'fishery';
+import { AdminRole } from '../../src/utils/constants';
 
 export const memberRoleFactory = Factory.define<Omit<MemberRole, 'id'>>(
   ({ sequence }) => ({
@@ -11,7 +12,8 @@ export const memberRoleFactory = Factory.define<Omit<MemberRole, 'id'>>(
   })
 );
 
-export const memberRoles = ['DIRECTORYADMIN'].map((role) =>
+// Use AdminRole enum values to ensure consistency
+export const memberRoles = [AdminRole.DIRECTORY_ADMIN, AdminRole.DEMO_DAY_ADMIN].map((role) =>
   memberRoleFactory.build({
     uid: faker.helpers.slugify(`uid-${role.toLowerCase()}`),
     name: role,
