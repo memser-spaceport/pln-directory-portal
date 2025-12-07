@@ -936,6 +936,7 @@ async updateMemberFromParticipantsRequest(
       'isUserConsent',
       'isSubscribedToNewsletter',
       'teamOrProjectURL',
+      'aboutYou',
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();
