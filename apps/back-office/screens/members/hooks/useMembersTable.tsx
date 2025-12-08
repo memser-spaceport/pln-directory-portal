@@ -10,7 +10,7 @@ import {
   SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import AdminRoleCell from '../components/AdminRoleCell/AdminRoleCell';
+import RoleCell from '../components/RoleCell/RoleCell';
 import {Row} from '@tanstack/table-core/src/types';
 
 import MemberCell from '../components/MemberCell/MemberCell';
@@ -115,10 +115,10 @@ export function useMembersTable({
       }),
 
       columnHelper.display({
-        id: 'adminRole',
-        header: 'Admin role',
+        id: 'role',
+        header: 'Role',
         cell: (info) => (
-          <AdminRoleCell member={info.row.original} />
+          <RoleCell member={info.row.original} />
         ),
         size: 150,
         enableResizing: false,

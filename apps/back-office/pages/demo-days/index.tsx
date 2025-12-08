@@ -1,14 +1,28 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useRouter } from 'next/router';
 import { useDemoDaysList } from '../../hooks/demo-days/useDemoDaysList';
 import { useCookie } from 'react-use';
 import Link from 'next/link';
+import { useAuth } from '../../context/auth-context';
 
 const DemoDaysPage = () => {
   const router = useRouter();
   const [authToken] = useCookie('plnadmin');
+  const { isDirectoryAdmin } = useAuth();
   const { data: demoDays, isLoading } = useDemoDaysList({ authToken });
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authToken) {
+      router.replace(`/?backlink=${router.asPath}`);
+    }
+  }, [authToken, router]);
+
+  // Don't render if not authenticated
+  if (!authToken) {
+    return null;
+  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -43,12 +57,14 @@ const DemoDaysPage = () => {
       <div className="mx-auto max-w-6xl p-6">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-semibold text-gray-900">Demo Days</h1>
-          <button
-            onClick={() => router.push('/demo-days/create')}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-          >
-            Create New Demo Day
-          </button>
+          {isDirectoryAdmin && (
+            <button
+              onClick={() => router.push('/demo-days/create')}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+            >
+              Create New Demo Day
+            </button>
+          )}
         </div>
 
         {isLoading ? (
@@ -58,12 +74,14 @@ const DemoDaysPage = () => {
         ) : !demoDays || demoDays.length === 0 ? (
           <div className="py-12 text-center">
             <div className="mb-4 text-gray-500">No demo days found</div>
-            <button
-              onClick={() => router.push('/demo-days/create')}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-            >
-              Create Your First Demo Day
-            </button>
+            {isDirectoryAdmin && (
+              <button
+                onClick={() => router.push('/demo-days/create')}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+              >
+                Create Your First Demo Day
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg bg-white shadow-sm">

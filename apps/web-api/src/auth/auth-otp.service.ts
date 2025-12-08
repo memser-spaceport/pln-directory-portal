@@ -190,7 +190,7 @@ export class AuthOtpService {
     );
 
     // 5) Issue a LOCAL admin JWT for directory with the member's actual admin roles
-    const accessToken = await this.jwtService.getSignedToken(jwtRoles);
+    const accessToken = await this.jwtService.getSignedToken(jwtRoles, member.uid);
 
     return {
       authToken: accessToken,

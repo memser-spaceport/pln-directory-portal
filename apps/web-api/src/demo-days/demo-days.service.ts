@@ -10,7 +10,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
 import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
-import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles } from '../utils/constants';
+import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, AdminRole } from '../utils/constants';
 
 type ExpressInterestStats = {
   liked: number;
@@ -240,6 +240,69 @@ export class DemoDaysService {
   async getAllDemoDays(): Promise<DemoDay[]> {
     return this.prisma.demoDay.findMany({
       where: { isDeleted: false },
+      select: {
+        id: true,
+        uid: true,
+        slugURL: true,
+        startDate: true,
+        endDate: true,
+        approximateStartDate: true,
+        title: true,
+        description: true,
+        shortDescription: true,
+        supportEmail: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        isDeleted: true,
+        deletedAt: true,
+        host: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Get all demo days for admin back-office.
+   * - DIRECTORYADMIN: sees all demo days
+   * - DEMO_DAY_ADMIN: sees only demo days where their MemberDemoDayAdminScope.scopeValue matches DemoDay.host
+   */
+  async getAllDemoDaysForAdmin(userRoles: string[], memberUid?: string): Promise<DemoDay[]> {
+    const isDirectoryAdmin = userRoles.includes(AdminRole.DIRECTORY_ADMIN);
+
+    // Directory admins see all demo days
+    if (isDirectoryAdmin) {
+      return this.getAllDemoDays();
+    }
+
+    // DEMO_DAY_ADMIN: filter by their admin scopes
+    if (!memberUid) {
+      return [];
+    }
+
+    // Get the member's demo day admin scopes (HOST type)
+    const adminScopes = await this.prisma.memberDemoDayAdminScope.findMany({
+      where: {
+        memberUid,
+        scopeType: 'HOST',
+      },
+      select: {
+        scopeValue: true,
+      },
+    });
+
+    const allowedHosts = adminScopes.map((scope) => scope.scopeValue);
+
+    if (allowedHosts.length === 0) {
+      return [];
+    }
+
+    // Return demo days that match the allowed hosts
+    return this.prisma.demoDay.findMany({
+      where: {
+        isDeleted: false,
+        host: { in: allowedHosts },
+      },
       select: {
         id: true,
         uid: true,

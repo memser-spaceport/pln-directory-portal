@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
@@ -26,6 +26,14 @@ const DemoDayDetailPage = () => {
   const router = useRouter();
   const { slugURL } = router.query;
   const [authToken] = useCookie('plnadmin');
+
+  // Redirect to log-in if not authenticated
+  useEffect(() => {
+    if (!authToken) {
+      router.replace(`/?backlink=${router.asPath}`);
+    }
+  }, [authToken, router]);
+
   const [activeTab, setActiveTab] = useState<'investors' | 'founders' | 'support' | 'applications'>('applications');
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -318,6 +326,11 @@ const DemoDayDetailPage = () => {
   React.useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, searchTerm, statusFilter]);
+
+  // Don't render if not authenticated
+  if (!authToken) {
+    return null;
+  }
 
   if (demoDayLoading) {
     return (

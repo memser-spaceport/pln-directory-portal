@@ -6,7 +6,6 @@ import { toast } from 'react-toastify';
 import { Member } from '../../types/member';
 import { useUpdateMemberRoles } from '../../../../hooks/members/useUpdateMemberRoles';
 
-
 import s from '../StatusCell/StatusCell.module.scss';
 
 type AdminRoleOptionValue = 'NONE' | 'DIRECTORYADMIN' | 'DEMO_DAY_ADMIN';
@@ -39,7 +38,7 @@ const adminRoleOptions: AdminRoleOption[] = [
  * Inline admin role selector.
  * Styled and behaves similar to StatusCell (access level select).
  */
-const AdminRoleCell = ({ member }: { member: Member }) => {
+const RoleCell = ({ member }: { member: Member }) => {
   const [plnadmin] = useCookie('plnadmin');
   const { mutateAsync: updateMemberRoles } = useUpdateMemberRoles();
 
@@ -51,8 +50,9 @@ const AdminRoleCell = ({ member }: { member: Member }) => {
       return member.roles;
     }
 
-    if (Array.isArray((member as any).memberRoles)) {
-      return (member as any).memberRoles.map((r: any) => r.name);
+    const memberWithRoles = member as Member & { memberRoles?: Array<{ name: string }> };
+    if (Array.isArray(memberWithRoles.memberRoles)) {
+      return memberWithRoles.memberRoles.map((r) => r.name);
     }
 
     return [];
@@ -76,13 +76,14 @@ const AdminRoleCell = ({ member }: { member: Member }) => {
    * Derive current option from roles
    */
   const currentOption: AdminRoleOption = useMemo(() => {
+    const noneOption = adminRoleOptions[0]; // 'NONE' option
     if (hasDirectoryAdmin) {
-      return adminRoleOptions.find((o) => o.value === 'DIRECTORYADMIN')!;
+      return adminRoleOptions.find((o) => o.value === 'DIRECTORYADMIN') ?? noneOption;
     }
     if (hasDemoDayAdmin) {
-      return adminRoleOptions.find((o) => o.value === 'DEMO_DAY_ADMIN')!;
+      return adminRoleOptions.find((o) => o.value === 'DEMO_DAY_ADMIN') ?? noneOption;
     }
-    return adminRoleOptions.find((o) => o.value === 'NONE')!;
+    return noneOption;
   }, [hasDirectoryAdmin, hasDemoDayAdmin]);
 
   /**
@@ -249,4 +250,4 @@ const AdminRoleCell = ({ member }: { member: Member }) => {
   );
 };
 
-export default AdminRoleCell;
+export default RoleCell;

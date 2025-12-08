@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
@@ -6,12 +6,29 @@ import api from '../../utils/api';
 import { API_ROUTE } from '../../utils/constants';
 import { CreateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import dynamic from 'next/dynamic';
+import { useAuth } from '../../context/auth-context';
 
 const RichTextEditor = dynamic(() => import('../../components/common/rich-text-editor'), { ssr: false });
 
 const CreateDemoDayPage = () => {
   const router = useRouter();
   const [authToken] = useCookie('plnadmin');
+  const { isDirectoryAdmin, isLoading, user } = useAuth();
+
+  // Redirect to log-in if not authenticated
+  useEffect(() => {
+    if (!authToken) {
+      router.replace(`/?backlink=${router.asPath}`);
+    }
+  }, [authToken, router]);
+
+  // Redirect non-directory admins - they can't create demo days
+  useEffect(() => {
+    if (!isLoading && user && !isDirectoryAdmin) {
+      router.replace('/demo-days');
+    }
+  }, [isLoading, user, isDirectoryAdmin, router]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [slugError, setSlugError] = useState<string>('');
   const [formData, setFormData] = useState<CreateDemoDayDto>({
@@ -101,6 +118,11 @@ const CreateDemoDayPage = () => {
       [field]: value,
     }));
   };
+
+  // Don't render if not authenticated or not a directory admin
+  if (!authToken || (!isLoading && user && !isDirectoryAdmin)) {
+    return null;
+  }
 
   return (
     <ApprovalLayout>
