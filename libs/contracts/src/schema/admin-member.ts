@@ -43,6 +43,7 @@ export const CreateMemberSchema = z.object({
   imageUid: z.string().nullable(),
   joinDate: z.string().nullable(),
   bio: z.string().nullable(),
+  aboutYou: z.string().nullable(),
 
   country: z.string().nullable(),
   region: z.string().nullable(),
@@ -87,6 +88,7 @@ export const UpdateMemberSchema = z.object({
   accessLevel: z.string().optional(),
   joinDate: z.string().optional().nullable(),
   bio: z.string().optional().nullable(),
+  aboutYou: z.string().optional().nullable(),
 
   country: z.string().optional().nullable(),
   region: z.string().optional().nullable(),

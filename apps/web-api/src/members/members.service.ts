@@ -19,7 +19,7 @@ import {NotificationService} from '../utils/notification/notification.service';
 import {EmailOtpService} from '../otp/email-otp.service';
 import {AuthService} from '../auth/auth.service';
 import {LogService} from '../shared/log.service';
-import {DEFAULT_MEMBER_ROLES} from '../utils/constants';
+import {DEFAULT_MEMBER_ROLES, AdminRole, isDirectoryAdmin} from '../utils/constants';
 import {hashFileName} from '../utils/hashing';
 import {buildMultiRelationMapping, copyObj} from '../utils/helper/helper';
 import {CacheService} from '../utils/cache/cache.service';
@@ -547,10 +547,10 @@ export class MembersService {
         return null;
       }
       const roleNames = foundMember.memberRoles.map((m) => m.name);
-      const isDirectoryAdmin = roleNames.includes('DIRECTORYADMIN');
+      const memberIsDirectoryAdmin = isDirectoryAdmin(foundMember);
       return {
         ...foundMember,
-        isDirectoryAdmin,
+        isDirectoryAdmin: memberIsDirectoryAdmin,
         roleNames,
         leadingTeams: foundMember.teamMemberRoles.filter((role) => role.teamLead).map((role) => role.teamUid),
       };
@@ -936,6 +936,7 @@ async updateMemberFromParticipantsRequest(
       'isUserConsent',
       'isSubscribedToNewsletter',
       'teamOrProjectURL',
+      'aboutYou',
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();
@@ -1531,7 +1532,7 @@ async updateMemberFromParticipantsRequest(
    * @returns True if the member is a directory admin, false otherwise.
    */
   checkIfAdminUser(member): boolean {
-    return member.memberRoles.some((role) => role.name === 'DIRECTORYADMIN');
+    return isDirectoryAdmin(member);
   }
 
   /**
@@ -1738,6 +1739,7 @@ async updateMemberFromParticipantsRequest(
     limit?: number;
     // Investor-related filters
     isInvestor?: boolean;
+    investorTypes?: ('ANGEL' | 'FUND' | 'ANGEL_AND_FUND')[];
     minTypicalCheckSize?: number;
     maxTypicalCheckSize?: number;
     investmentFocus?: string[];
@@ -2100,6 +2102,18 @@ async updateMemberFromParticipantsRequest(
             ],
           },
         ],
+      });
+    }
+
+    // Investor types filter
+    if (filters.investorTypes && filters.investorTypes.length > 0) {
+      const typesArray = Array.isArray(filters.investorTypes) ? filters.investorTypes : [filters.investorTypes];
+      whereConditions.push({
+        investorProfile: {
+          type: {
+            in: typesArray,
+          },
+        },
       });
     }
 
@@ -2796,7 +2810,7 @@ async updateMemberFromParticipantsRequest(
       where: {
         memberRoles: {
           some: {
-            name: 'DIRECTORYADMIN', // Adjust this based on the actual field name in your schema
+            name: AdminRole.DIRECTORY_ADMIN,
           },
         },
       },
@@ -3358,4 +3372,58 @@ async updateMemberFromParticipantsRequest(
       },
     });
   }
+
+
+
+  /**
+   * Creates a new member based on SSO (Privy) login.
+   * This is used when we have a valid id_token with email + externalId,
+   * but there is no existing member for that combination.
+   */
+  async createMemberFromSso(payload: {
+    email: string;
+    externalId: string | null;
+    idTokenPayload?: any; // optional – decoded id_token, if caller has it
+  }) {
+    const { email, externalId, idTokenPayload } = payload;
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 1. Try to extract a human-readable name from the id_token payload
+    const tokenName: string | undefined =
+      (idTokenPayload?.name as string | undefined) ||
+      [idTokenPayload?.given_name, idTokenPayload?.family_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim() ||
+      undefined;
+
+    // 2. Fallback: use the part before '@' as a display name
+    const fallbackName = normalizedEmail.split('@')[0];
+
+    const displayName =
+      tokenName && tokenName.length > 0 ? tokenName : fallbackName;
+
+    this.logger.info(
+      `MembersService.createMemberFromSso → Creating new member from SSO. email=${normalizedEmail}, externalId=${externalId}, displayName="${displayName}"`,
+    );
+
+    const newMember = await this.prisma.member.create({
+      data: {
+        email: normalizedEmail,
+        externalId: externalId ?? null,
+        name: displayName,
+        accessLevel: 'L0', // default access level for newly created SSO users
+      },
+    });
+
+    this.logger.info(
+      `MembersService.createMemberFromSso → New member created. uid=${newMember.uid}, id=${newMember.id}, email=${newMember.email}`,
+    );
+
+    return newMember;
+  }
+
+
+
 }

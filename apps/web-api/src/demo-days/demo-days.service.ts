@@ -9,9 +9,17 @@ import { DemoDay, DemoDayParticipantStatus, DemoDayStatus } from '@prisma/client
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
-import {CreateDemoDayInvestorApplicationDto} from "@protocol-labs-network/contracts";
+import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
+import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles } from '../utils/constants';
 
-type ExpressInterestStats = { liked: number; connected: number; invested: number; referral: number; feedback: number; total: number };
+type ExpressInterestStats = {
+  liked: number;
+  connected: number;
+  invested: number;
+  referral: number;
+  feedback: number;
+  total: number;
+};
 
 @Injectable()
 export class DemoDaysService {
@@ -90,8 +98,8 @@ export class DemoDaysService {
       };
     }
 
-    // Check if member is directory admin
-    const isDirectoryAdmin = this.isDirectoryAdmin(member);
+    // Check if member has demo day admin access (super admin or DEMO_DAY_ADMIN role)
+    const hasMemberLevelAdminAccess = this.hasDemoDayAdminAccess(member);
 
     // Check demo day participant
     const participant = member.demoDayParticipants[0];
@@ -139,7 +147,7 @@ export class DemoDaysService {
           participant.type === 'FOUNDER' || participant.hasEarlyAccess
         ),
         isEarlyAccess: demoDay.status === DemoDayStatus.EARLY_ACCESS,
-        isDemoDayAdmin: participant.isDemoDayAdmin || isDirectoryAdmin,
+        isDemoDayAdmin: participant.isDemoDayAdmin || hasMemberLevelAdminAccess,
         confidentialityAccepted: participant.confidentialityAccepted,
         teamsCount,
         investorsCount,
@@ -264,7 +272,7 @@ export class DemoDaysService {
       this.getQualifiedInvestorsCount(),
     ]);
 
-    const isDirectoryAdmin = member ? this.isDirectoryAdmin(member) : false;
+    const hasMemberLevelAdminAccess = member ? this.hasDemoDayAdminAccess(member) : false;
 
     // For each demo day, get counts and determine access
     return await Promise.all(
@@ -308,7 +316,7 @@ export class DemoDaysService {
 
             if (participant && participant.status === 'ENABLED') {
               access = participant.type;
-              isDemoDayAdmin = participant.isDemoDayAdmin || isDirectoryAdmin;
+              isDemoDayAdmin = participant.isDemoDayAdmin || hasMemberLevelAdminAccess;
               isEarlyAccess = demoDay.status === DemoDayStatus.EARLY_ACCESS;
               confidentialityAccepted = participant.confidentialityAccepted;
             }
@@ -846,10 +854,7 @@ export class DemoDaysService {
     return feedback;
   }
 
-  async submitInvestorApplication(
-    applicationData: CreateDemoDayInvestorApplicationDto,
-    demoDayUidOrSlug: string
-  ) {
+  async submitInvestorApplication(applicationData: CreateDemoDayInvestorApplicationDto, demoDayUidOrSlug: string) {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     // Check if demo day is accepting applications (REGISTRATION_OPEN status)
@@ -908,7 +913,6 @@ export class DemoDaysService {
           },
         },
       });
-
 
       // If a new team is provided, create Team and TeamMemberRole (non-breaking extension)
       if (applicationData.isTeamNew && applicationData.team?.name) {
@@ -1293,9 +1297,16 @@ export class DemoDaysService {
     });
   }
 
-  private isDirectoryAdmin(member: { memberRoles: Array<{ name: string }> }): boolean {
-    const roleNames = member.memberRoles.map((role) => role.name);
-    return roleNames.includes('DIRECTORYADMIN');
+  /**
+   * Check if a member has demo day admin access.
+   * A member has demo day admin access if they:
+   * - Are a directory admin (DIRECTORY_ADMIN), OR
+   * - Have the DEMO_DAY_ADMIN role at the member level
+   *
+   * Note: Participant-level isDemoDayAdmin is checked separately in getDemoDayAccess
+   */
+  private hasDemoDayAdminAccess(member: MemberWithRoles): boolean {
+    return isDirectoryAdmin(member) || hasDemoDayAdminRole(member);
   }
 
   /**

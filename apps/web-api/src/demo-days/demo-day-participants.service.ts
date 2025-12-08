@@ -1,9 +1,9 @@
-import {Injectable, NotFoundException, BadRequestException, Inject, forwardRef} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DemoDayParticipant, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from './demo-days.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
-import {TeamsService} from "../teams/teams.service";
+import { TeamsService } from '../teams/teams.service';
 
 @Injectable()
 export class DemoDayParticipantsService {
@@ -126,6 +126,9 @@ export class DemoDayParticipantsService {
             teamLead: true,
           },
         });
+
+        // Create teamFundraisingProfile if it doesn't exist
+        await this.ensureTeamFundraisingProfile(teamUid, demoDayUid, actorUid);
       }
     }
 
@@ -213,6 +216,27 @@ export class DemoDayParticipantsService {
     }
 
     return normalized || undefined;
+  }
+
+  private async ensureTeamFundraisingProfile(teamUid: string, demoDayUid: string, actorUid?: string): Promise<void> {
+    const existingFundraisingProfile = await this.prisma.teamFundraisingProfile.findUnique({
+      where: {
+        teamUid_demoDayUid: {
+          teamUid: teamUid,
+          demoDayUid: demoDayUid,
+        },
+      },
+    });
+
+    if (!existingFundraisingProfile) {
+      await this.prisma.teamFundraisingProfile.create({
+        data: {
+          teamUid: teamUid,
+          demoDayUid: demoDayUid,
+          lastModifiedBy: actorUid,
+        },
+      });
+    }
   }
 
   async addInvestorParticipantsBulk(
@@ -1013,15 +1037,11 @@ export class DemoDayParticipantsService {
 
         // Promote teams where this member is a lead to L1
         const teamUidsToUpdate =
-          participant.member?.teamMemberRoles
-            ?.filter((role) => role.teamLead)
-            .map((role) => role.team.uid) || [];
+          participant.member?.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.team.uid) || [];
 
         if (teamUidsToUpdate.length > 0) {
           await Promise.all(
-            teamUidsToUpdate.map((teamUid) =>
-              this.teamService.updateTeamAccessLevel(teamUid, undefined, 'L1'),
-            ),
+            teamUidsToUpdate.map((teamUid) => this.teamService.updateTeamAccessLevel(teamUid, undefined, 'L1'))
           );
         }
       }
@@ -1038,6 +1058,8 @@ export class DemoDayParticipantsService {
 
         if (teamUid) {
           updateData.team = { connect: { uid: teamUid } };
+          // Ensure teamFundraisingProfile exists
+          await this.ensureTeamFundraisingProfile(teamUid, demoDayUid, actorUid);
         }
       }
 
@@ -1049,6 +1071,11 @@ export class DemoDayParticipantsService {
 
     if (data.teamUid !== undefined) {
       updateData.team = data.teamUid ? { connect: { uid: data.teamUid } } : { disconnect: true };
+
+      // Ensure teamFundraisingProfile exists when assigning a team to FOUNDER participant
+      if (data.teamUid && currentType === 'FOUNDER') {
+        await this.ensureTeamFundraisingProfile(data.teamUid, demoDayUid, actorUid);
+      }
     }
 
     if (data.hasEarlyAccess !== undefined) {
