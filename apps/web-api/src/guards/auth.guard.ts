@@ -9,7 +9,7 @@ import {
 import { AuthService } from '../auth/auth.service';
 import { LogService } from '../shared/log.service';
 import { MembersService } from '../members/members.service';
-import { DIRECTORYADMIN } from '../utils/constants';
+import { isDirectoryAdmin } from '../utils/constants';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -52,10 +52,7 @@ export class AuthGuard implements CanActivate {
   };
 
   checkIfAdminUser = (member) => {
-    const roleFilter = member.memberRoles.filter((roles) => {
-      return roles.name === DIRECTORYADMIN;
-    });
-    return roleFilter.length > 0;
+    return isDirectoryAdmin(member);
   };
 }
 

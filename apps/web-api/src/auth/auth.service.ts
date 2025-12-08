@@ -223,43 +223,53 @@ export class AuthService implements OnModuleInit {
     // 6. No member by externalId and no member by email → first SSO login
     //    → create a new member automatically from SSO data.
     // ---------------------------------------------
-    this.logger.info(
-      `AuthService.getTokenAndUserInfo → No member found for externalId=${externalId} or email=${email}. Creating new member from SSO login.`,
-    );
-
+    // this.logger.info(
+    //   `AuthService.getTokenAndUserInfo → No member found for externalId=${externalId} or email=${email}. Creating new member from SSO login.`,
+    // );
+    //
     // // 6.1. Create raw member record
     // await this.membersService.createMemberFromSso({
     //   email,
     //   externalId,
     // });
+    //
+    // // 6.2. Reload member with full relations so that memberToUserInfo doesn't crash
+    // let newUser =
+    //   externalId != null
+    //     ? await this.membersService.findMemberByExternalId(externalId)
+    //     : await this.membersService.findMemberByEmail(email);
+    //
+    // if (!newUser) {
+    //   // This should not normally happen, but better to log loudly if something goes wrong
+    //   this.logger.error(
+    //     `AuthService.getTokenAndUserInfo → Newly created SSO member not found when reloading. email=${email}, externalId=${externalId}`,
+    //   );
+    //   throw new NotFoundException('Member with ');
+    // }
+    //
+    // const upgradedNewUser = await this.checkAndUpgradeDemoDayParticipant(newUser);
+    // await this.trackLoginEvent(upgradedNewUser);
+    //
+    // this.logger.info(
+    //   `AuthService.getTokenAndUserInfo → New member created from SSO. uid=${upgradedNewUser.uid}, email=${upgradedNewUser.email}`,
+    // );
+    //
+    // return {
+    //   userInfo: this.memberToUserInfo(upgradedNewUser),
+    //   refreshToken: refresh_token,
+    //   idToken: id_token,
+    //   accessToken: access_token,
+    // };
 
-    // 6.2. Reload member with full relations so that memberToUserInfo doesn't crash
-    let newUser =
-      externalId != null
-        ? await this.membersService.findMemberByExternalId(externalId)
-        : await this.membersService.findMemberByEmail(email);
-
-    if (!newUser) {
-      // This should not normally happen, but better to log loudly if something goes wrong
-      this.logger.error(
-        `AuthService.getTokenAndUserInfo → Newly created SSO member not found when reloading. email=${email}, externalId=${externalId}`,
-      );
-      throw new NotFoundException('Unable to load newly created user');
-    }
-
-    const upgradedNewUser = await this.checkAndUpgradeDemoDayParticipant(newUser);
-    await this.trackLoginEvent(upgradedNewUser);
-
-    this.logger.info(
-      `AuthService.getTokenAndUserInfo → New member created from SSO. uid=${upgradedNewUser.uid}, email=${upgradedNewUser.email}`,
+    // ---------------------------------------------
+    // 6 No member by externalId and no member by email → do NOT create a member.
+    //          Return 404 so frontend can trigger onboarding / registration flow.
+    // ---------------------------------------------
+    this.logger.error(
+      `AuthService.getTokenAndUserInfo → No member found for externalId=${externalId} or email=${email}`,
     );
 
-    return {
-      userInfo: this.memberToUserInfo(upgradedNewUser),
-      refreshToken: refresh_token,
-      idToken: id_token,
-      accessToken: access_token,
-    };
+    throw new NotFoundException('Member not found for provided SSO credentials.');
   }
 
   async verifyAndSendEmailOtp(email: string) {

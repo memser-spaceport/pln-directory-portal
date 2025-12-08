@@ -9,6 +9,7 @@ import {
 import axios from 'axios';
 import { PrismaService } from '../shared/prisma.service';
 import { JwtService } from '../utils/jwt/jwt.service';
+import { AdminRole, hasAnyAdminRole } from '../utils/constants';
 
 @Injectable()
 export class AuthOtpService {
@@ -152,11 +153,16 @@ export class AuthOtpService {
       throw new UnauthorizedException('Email is missing in OTP response');
     }
 
-    // 2) Look up Member by email in directory DB
+    // 2) Look up Member by email in directory DB with their roles
     const member = await this.prisma.member.findFirst({
       where: {
         email,
         deletedAt: null,
+      },
+      include: {
+        memberRoles: {
+          select: { name: true },
+        },
       },
     });
 
@@ -167,23 +173,24 @@ export class AuthOtpService {
       throw new ForbiddenException('Member not found for this email');
     }
 
-    // 3) Check that Member has back-office access.
-    // Preferred: dedicated flag isBackofficeAdmin
-    if (!(member as any).isBackofficeAdmin) {
-      // If you still rely on role, you can additionally check:
-      // if (member.role !== 'DIRECTORYADMIN') { ... }
-      this.logger.warn(
-        `Member ${member.uid} (${email}) is not back-office admin`,
-      );
-      throw new ForbiddenException('Member is not back-office admin');
+    // 3) Check that Member has back-office access via admin roles.
+    // A member can access back-office if they have DIRECTORY_ADMIN or DEMO_DAY_ADMIN role
+    const backofficeRoles = [AdminRole.DIRECTORY_ADMIN, AdminRole.DEMO_DAY_ADMIN];
+    const hasBackofficeAccess = hasAnyAdminRole(member, backofficeRoles);
+
+    if (!hasBackofficeAccess) {
+      this.logger.warn(`Member ${member.uid} (${email}) does not have back-office admin role`);
+      throw new ForbiddenException('Member does not have back-office admin access');
     }
 
-    // 4) Issue a LOCAL admin JWT for directory.
-    // We assume that getSignedToken accepts an array of roles,
-    // and internally uses ADMIN_TOKEN_SECRET or equivalent.
-    const accessToken = await this.jwtService.getSignedToken([
-      'DIRECTORYADMIN',
-    ]);
+    // 4) Determine which roles to include in the JWT based on member's roles
+    const memberRoleNames = member.memberRoles.map((r) => r.name);
+    const jwtRoles = memberRoleNames.filter((role) =>
+      Object.values(AdminRole).includes(role as AdminRole)
+    );
+
+    // 5) Issue a LOCAL admin JWT for directory with the member's actual admin roles
+    const accessToken = await this.jwtService.getSignedToken(jwtRoles);
 
     return {
       authToken: accessToken,
@@ -193,8 +200,7 @@ export class AuthOtpService {
         uid: member.uid,
         email: member.email,
         name: member.name,
-        role: member.role,
-        isBackofficeAdmin: (member as any).isBackofficeAdmin ?? false,
+        roles: jwtRoles,
       },
     };
   }

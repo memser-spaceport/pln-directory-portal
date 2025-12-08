@@ -182,7 +182,7 @@ export class TeamsController {
 
   /**
    * Soft deletes a team by marking it as L0 (inactive).
-   * Only users with a DIRECTORYADMIN role can delete teams.
+   * Only users with a DIRECTORY_ADMIN role can delete teams.
    * L0 teams are not visible in queries.
    */
   @TsRest(server.route.deleteTeam)

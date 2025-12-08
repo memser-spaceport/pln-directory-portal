@@ -5,7 +5,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException,
+  NotFoundException
 } from '@nestjs/common';
 import axios from 'axios';
 import { InvestorProfileType, Location, Member, Prisma } from '@prisma/client';
@@ -13,7 +13,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { NotificationService } from '../utils/notification/notification.service';
 import { LogService } from '../shared/log.service';
-import { DEFAULT_MEMBER_ROLES } from '../utils/constants';
+import { AdminRole, DEFAULT_MEMBER_ROLES } from '../utils/constants';
 import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
@@ -23,12 +23,12 @@ import {
   CreateMemberDto,
   RequestMembersDto,
   UpdateAccessLevelDto,
-  UpdateMemberDto,
+  UpdateMemberDto
 } from '../../../../libs/contracts/src/schema/admin-member';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { MembersHooksService } from '../members/members.hooks.service';
-import {ParticipantsRequest} from "./members.dto";
-import {TeamsService} from "../teams/teams.service";
+import { ParticipantsRequest } from './members.dto';
+import { TeamsService } from '../teams/teams.service';
 
 @Injectable()
 export class MemberService {
@@ -748,11 +748,11 @@ export class MemberService {
   }
 
   async findMemberByRole() {
-    const member = await this.prisma.member.findFirst({
+    return this.prisma.member.findFirst({
       where: {
         memberRoles: {
           some: {
-            name: 'DIRECTORYADMIN', // Adjust this based on the actual field name in your schema
+            name: AdminRole.DIRECTORY_ADMIN,
           },
         },
       },
@@ -762,7 +762,6 @@ export class MemberService {
         name: true,
       },
     });
-    return member;
   }
 
   async findMemberByAccessLevels(params: RequestMembersDto) {
