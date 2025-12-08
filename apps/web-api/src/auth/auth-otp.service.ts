@@ -9,7 +9,7 @@ import {
 import axios from 'axios';
 import { PrismaService } from '../shared/prisma.service';
 import { JwtService } from '../utils/jwt/jwt.service';
-import { AdminRole, hasAnyAdminRole } from '../utils/constants';
+import { MemberRole, hasAnyAdminRole } from '../utils/constants';
 
 @Injectable()
 export class AuthOtpService {
@@ -175,7 +175,7 @@ export class AuthOtpService {
 
     // 3) Check that Member has back-office access via admin roles.
     // A member can access back-office if they have DIRECTORY_ADMIN or DEMO_DAY_ADMIN role
-    const backofficeRoles = [AdminRole.DIRECTORY_ADMIN, AdminRole.DEMO_DAY_ADMIN];
+    const backofficeRoles = [MemberRole.DIRECTORY_ADMIN, MemberRole.DEMO_DAY_ADMIN];
     const hasBackofficeAccess = hasAnyAdminRole(member, backofficeRoles);
 
     if (!hasBackofficeAccess) {
@@ -186,7 +186,7 @@ export class AuthOtpService {
     // 4) Determine which roles to include in the JWT based on member's roles
     const memberRoleNames = member.memberRoles.map((r) => r.name);
     const jwtRoles = memberRoleNames.filter((role) =>
-      Object.values(AdminRole).includes(role as AdminRole)
+      Object.values(MemberRole).includes(role as MemberRole)
     );
 
     // 5) Issue a LOCAL admin JWT for directory with the member's actual admin roles

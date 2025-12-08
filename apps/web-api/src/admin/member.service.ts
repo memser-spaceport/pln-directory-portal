@@ -13,7 +13,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { NotificationService } from '../utils/notification/notification.service';
 import { LogService } from '../shared/log.service';
-import {AdminRole, DEFAULT_MEMBER_ROLES, hasDemoDayAdminRole} from '../utils/constants';
+import { MemberRole, DEFAULT_MEMBER_ROLES, hasDemoDayAdminRole } from '../utils/constants';
 import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
@@ -822,7 +822,7 @@ export class MemberService {
       where: {
         memberRoles: {
           some: {
-            name: AdminRole.DIRECTORY_ADMIN,
+            name: MemberRole.DIRECTORY_ADMIN,
           },
         },
       },

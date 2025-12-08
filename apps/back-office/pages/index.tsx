@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useState } from 'react';
 import { InputField } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
 import { ReactComponent as Building } from '/public/assets/icons/building.svg';
-import APP_CONSTANTS, { ROUTE_CONSTANTS } from '../utils/constants';
+import APP_CONSTANTS, { ROUTE_CONSTANTS, MemberRole } from '../utils/constants';
 import { parseCookies } from 'nookies';
 import Loader from '../components/common/loader';
 import { ReactComponent as LogoImage } from '/public/assets/images/Back_office_Logo.svg';
@@ -18,7 +18,7 @@ interface AdminUser {
 function getDefaultRedirect(user: AdminUser | null): string {
   if (!user) return '/members?filter=level1';
 
-  const isDirectoryAdmin = user.roles?.includes('DIRECTORYADMIN');
+  const isDirectoryAdmin = user.roles?.includes(MemberRole.DIRECTORY_ADMIN);
   if (isDirectoryAdmin) {
     return '/members?filter=level1';
   }

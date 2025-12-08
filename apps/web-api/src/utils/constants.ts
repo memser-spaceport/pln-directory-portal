@@ -73,11 +73,11 @@ export const FILE_UPLOAD_SIZE_LIMIT = 1000000; // 1MB in bytes
 export const IMAGE_UPLOAD_MAX_DIMENSION = 2000;
 
 /**
- * Admin roles enum for the application.
+ * Member roles enum for the application.
  * - DIRECTORY_ADMIN: Full system administration (super role)
  * - DEMO_DAY_ADMIN: Can manage Demo Days they are assigned to
  */
-export enum AdminRole {
+export enum MemberRole {
   DIRECTORY_ADMIN = 'DIRECTORYADMIN',
   DEMO_DAY_ADMIN = 'DEMO_DAY_ADMIN',
 }
@@ -92,14 +92,14 @@ export type MemberWithRoles = {
 /**
  * Check if a member has a specific admin role
  */
-export function hasAdminRole(member: MemberWithRoles, role: AdminRole): boolean {
+export function hasAdminRole(member: MemberWithRoles, role: MemberRole): boolean {
   return member.memberRoles.some((r) => r.name === role);
 }
 
 /**
  * Check if a member has any of the specified admin roles
  */
-export function hasAnyAdminRole(member: MemberWithRoles, roles: AdminRole[]): boolean {
+export function hasAnyAdminRole(member: MemberWithRoles, roles: MemberRole[]): boolean {
   const memberRoleNames = member.memberRoles.map((r) => r.name);
   return roles.some((role) => memberRoleNames.includes(role));
 }
@@ -108,14 +108,14 @@ export function hasAnyAdminRole(member: MemberWithRoles, roles: AdminRole[]): bo
  * Check if a member is a directory admin (super role)
  */
 export function isDirectoryAdmin(member: MemberWithRoles): boolean {
-  return hasAdminRole(member, AdminRole.DIRECTORY_ADMIN);
+  return hasAdminRole(member, MemberRole.DIRECTORY_ADMIN);
 }
 
 /**
  * Check if a member has demo day admin role (at member level, not participant level)
  */
 export function hasDemoDayAdminRole(member: MemberWithRoles): boolean {
-  return hasAdminRole(member, AdminRole.DEMO_DAY_ADMIN);
+  return hasAdminRole(member, MemberRole.DEMO_DAY_ADMIN);
 }
 
 export const JOIN_NOW_SUBJECT = 'A request to be a part of network';

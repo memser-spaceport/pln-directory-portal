@@ -10,7 +10,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
 import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
-import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, AdminRole } from '../utils/constants';
+import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, MemberRole } from '../utils/constants';
 
 type ExpressInterestStats = {
   liked: number;
@@ -268,7 +268,7 @@ export class DemoDaysService {
    * - DEMO_DAY_ADMIN: sees only demo days where their MemberDemoDayAdminScope.scopeValue matches DemoDay.host
    */
   async getAllDemoDaysForAdmin(userRoles: string[], memberUid?: string): Promise<DemoDay[]> {
-    const isDirectoryAdmin = userRoles.includes(AdminRole.DIRECTORY_ADMIN);
+    const isDirectoryAdmin = userRoles.includes(MemberRole.DIRECTORY_ADMIN);
 
     // Directory admins see all demo days
     if (isDirectoryAdmin) {

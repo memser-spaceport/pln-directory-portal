@@ -14,7 +14,7 @@ The system uses a two-tier role architecture:
 Defined in `apps/web-api/src/utils/constants.ts`:
 
 ```typescript
-export enum AdminRole {
+export enum MemberRole {
   DIRECTORY_ADMIN = 'DIRECTORYADMIN',  // Full system administration (super role)
   DEMO_DAY_ADMIN = 'DEMO_DAY_ADMIN',   // Global demo day administration
 }
@@ -32,7 +32,7 @@ export enum AdminRole {
 
 ### DIRECTORY_ADMIN
 
-- **Enum Key**: `AdminRole.DIRECTORY_ADMIN`
+- **Enum Key**: `MemberRole.DIRECTORY_ADMIN`
 - **Database Value**: `'DIRECTORYADMIN'`
 - **Scope**: System-wide
 - **Permissions**:
@@ -44,7 +44,7 @@ export enum AdminRole {
 
 ### DEMO_DAY_ADMIN
 
-- **Enum Key**: `AdminRole.DEMO_DAY_ADMIN`
+- **Enum Key**: `MemberRole.DEMO_DAY_ADMIN`
 - **Database Value**: `'DEMO_DAY_ADMIN'`
 - **Scope**: All demo days
 - **Permissions**:
@@ -69,7 +69,7 @@ A member can log into the back-office if they have ANY of these roles:
 - `DEMO_DAY_ADMIN`
 
 ```typescript
-const backofficeRoles = [AdminRole.DIRECTORY_ADMIN, AdminRole.DEMO_DAY_ADMIN];
+const backofficeRoles = [MemberRole.DIRECTORY_ADMIN, MemberRole.DEMO_DAY_ADMIN];
 const hasBackofficeAccess = hasAnyAdminRole(member, backofficeRoles);
 ```
 
@@ -129,7 +129,7 @@ model DemoDayParticipant {
 ```typescript
 // First, ensure the role exists
 const directoryAdminRole = await prisma.memberRole.findUnique({
-  where: { name: AdminRole.DIRECTORY_ADMIN }, // 'DIRECTORYADMIN'
+  where: { name: MemberRole.DIRECTORY_ADMIN }, // 'DIRECTORYADMIN'
 });
 
 // Connect the role to the member
@@ -147,7 +147,7 @@ await prisma.member.update({
 
 ```typescript
 const demoDayAdminRole = await prisma.memberRole.findUnique({
-  where: { name: AdminRole.DEMO_DAY_ADMIN },
+  where: { name: MemberRole.DEMO_DAY_ADMIN },
 });
 
 await prisma.member.update({
@@ -202,7 +202,7 @@ await prisma.demoDayParticipant.update({
 ### Check if Member Has Admin Access
 
 ```typescript
-import { isDirectoryAdmin, hasDemoDayAdminRole, hasAnyAdminRole, AdminRole } from '../utils/constants';
+import { isDirectoryAdmin, hasDemoDayAdminRole, hasAnyAdminRole, MemberRole } from '../utils/constants';
 
 // Check for directory admin (super role)
 if (isDirectoryAdmin(member)) {
@@ -215,7 +215,7 @@ if (hasDemoDayAdminRole(member)) {
 }
 
 // Check for back-office access
-const backofficeRoles = [AdminRole.DIRECTORY_ADMIN, AdminRole.DEMO_DAY_ADMIN];
+const backofficeRoles = [MemberRole.DIRECTORY_ADMIN, MemberRole.DEMO_DAY_ADMIN];
 if (hasAnyAdminRole(member, backofficeRoles)) {
   // Can access back-office
 }
@@ -237,7 +237,7 @@ Located in `apps/web-api/src/utils/constants.ts`:
 The roles are seeded via the fixture file at `apps/web-api/prisma/fixtures/member-roles.ts`:
 
 ```typescript
-export const memberRoles = [AdminRole.DIRECTORY_ADMIN, AdminRole.DEMO_DAY_ADMIN].map((role) =>
+export const memberRoles = [MemberRole.DIRECTORY_ADMIN, MemberRole.DEMO_DAY_ADMIN].map((role) =>
   memberRoleFactory.build({
     uid: faker.helpers.slugify(`uid-${role.toLowerCase()}`),
     name: role,

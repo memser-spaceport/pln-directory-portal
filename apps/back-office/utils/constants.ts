@@ -80,6 +80,16 @@ export default APP_CONSTANTS;
 
 export const WEB_UI_BASE_URL = process.env.WEB_UI_BASE_URL || 'https://directory.plnetwork.io';
 
+/**
+ * Member roles enum for the application.
+ * - DIRECTORY_ADMIN: Full system administration (super role)
+ * - DEMO_DAY_ADMIN: Can manage Demo Days they are assigned to
+ */
+export enum MemberRole {
+  DIRECTORY_ADMIN = 'DIRECTORYADMIN',
+  DEMO_DAY_ADMIN = 'DEMO_DAY_ADMIN',
+}
+
 export const INVESTOR_PROFILE_CONSTANTS = {
   STAGES: [
     { label: 'Pre-seed', value: 'pre-seed' },

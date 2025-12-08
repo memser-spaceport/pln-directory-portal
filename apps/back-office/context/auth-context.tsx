@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, useEffect, ReactNode } from 'react';
 import { useCookie } from 'react-use';
+import { MemberRole } from '../utils/constants';
 
 export interface AdminUser {
   uid: string;
@@ -49,8 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
-  const isDirectoryAdmin = hasRole('DIRECTORYADMIN');
-  const isDemoDayAdmin = hasRole('DEMO_DAY_ADMIN');
+  const isDirectoryAdmin = hasRole(MemberRole.DIRECTORY_ADMIN);
+  const isDemoDayAdmin = hasRole(MemberRole.DEMO_DAY_ADMIN);
 
   const value = useMemo(
     () => ({

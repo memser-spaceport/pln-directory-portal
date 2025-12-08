@@ -5,10 +5,11 @@ import { toast } from 'react-toastify';
 
 import { Member } from '../../types/member';
 import { useUpdateMemberRoles } from '../../../../hooks/members/useUpdateMemberRoles';
+import { MemberRole } from '../../../../utils/constants';
 
 import s from '../StatusCell/StatusCell.module.scss';
 
-type AdminRoleOptionValue = 'NONE' | 'DIRECTORYADMIN' | 'DEMO_DAY_ADMIN';
+type AdminRoleOptionValue = 'NONE' | MemberRole.DIRECTORY_ADMIN | MemberRole.DEMO_DAY_ADMIN;
 
 type AdminRoleOption = {
   name: string;
@@ -24,12 +25,12 @@ const adminRoleOptions: AdminRoleOption[] = [
   },
   {
     name: 'Directory admin',
-    value: 'DIRECTORYADMIN',
+    value: MemberRole.DIRECTORY_ADMIN,
     desc: '- Full directory admin permissions',
   },
   {
     name: 'Demo day admin',
-    value: 'DEMO_DAY_ADMIN',
+    value: MemberRole.DEMO_DAY_ADMIN,
     desc: '- Can manage demo days and hosts',
   },
 ];
@@ -59,16 +60,12 @@ const RoleCell = ({ member }: { member: Member }) => {
   }, [member]);
 
   const hasDirectoryAdmin = useMemo(
-    () =>
-      baseRoles.includes('DIRECTORYADMIN') ||
-      baseRoles.includes('DIRECTORY_ADMIN'),
+    () => baseRoles.includes(MemberRole.DIRECTORY_ADMIN),
     [baseRoles],
   );
 
   const hasDemoDayAdmin = useMemo(
-    () =>
-      baseRoles.includes('DEMODAYADMIN') ||
-      baseRoles.includes('DEMO_DAY_ADMIN'),
+    () => baseRoles.includes(MemberRole.DEMO_DAY_ADMIN),
     [baseRoles],
   );
 
@@ -78,10 +75,10 @@ const RoleCell = ({ member }: { member: Member }) => {
   const currentOption: AdminRoleOption = useMemo(() => {
     const noneOption = adminRoleOptions[0]; // 'NONE' option
     if (hasDirectoryAdmin) {
-      return adminRoleOptions.find((o) => o.value === 'DIRECTORYADMIN') ?? noneOption;
+      return adminRoleOptions.find((o) => o.value === MemberRole.DIRECTORY_ADMIN) ?? noneOption;
     }
     if (hasDemoDayAdmin) {
-      return adminRoleOptions.find((o) => o.value === 'DEMO_DAY_ADMIN') ?? noneOption;
+      return adminRoleOptions.find((o) => o.value === MemberRole.DEMO_DAY_ADMIN) ?? noneOption;
     }
     return noneOption;
   }, [hasDirectoryAdmin, hasDemoDayAdmin]);
@@ -106,16 +103,9 @@ const RoleCell = ({ member }: { member: Member }) => {
       return;
     }
 
-    // Strip any existing admin roles (legacy + canonical)
-    const adminRoleNamesToStrip = [
-      'DIRECTORYADMIN',
-      'DIRECTORY_ADMIN',
-      'DEMODAYADMIN',
-      'DEMO_DAY_ADMIN',
-    ];
-
+    // Strip any existing admin roles
     let nextRoles = baseRoles.filter(
-      (r) => !adminRoleNamesToStrip.includes(r),
+      (r) => !Object.values(MemberRole).includes(r as MemberRole),
     );
 
     // Add newly selected role (except NONE)
