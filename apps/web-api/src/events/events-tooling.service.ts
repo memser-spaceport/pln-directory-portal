@@ -25,7 +25,6 @@ export class EventsToolingService {
       if (!irlDomain || !internalAuthToken) {
         throw new BadRequestException('IRL domain or internal auth token is not set in ENV variables');
       }
-      console.log("Event Payload -----------------------------", event?.address_info);
       const response = await axios.post(
         `${baseUrl}/internals/events/submit`,
         { event: event, requestorEmail: requestorEmail },
