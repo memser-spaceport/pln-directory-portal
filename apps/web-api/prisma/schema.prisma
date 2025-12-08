@@ -166,6 +166,7 @@ model Member {
   demoDayExpressInterestStatistics DemoDayExpressInterestStatistic[]
   demoDayFeedbacks                 DemoDayFeedback[]
   reviewedEvents                   PLEvent[]                         @relation("PLEventReviewer")
+  demoDayAdminScopes               MemberDemoDayAdminScope[]
 }
 
 model MemberRole {
@@ -978,6 +979,12 @@ model InvestorProfile {
   @@unique([memberUid])
 }
 
+enum DemoDayAdminScopeType {
+  HOST // host-based permissions (e.g. "plnetwork.io")
+  // Later we can add more, e.g.:
+  // FEATURE_FLAG
+}
+
 enum DemoDayStatus {
   UPCOMING
   REGISTRATION_OPEN
@@ -1004,6 +1011,7 @@ model DemoDay {
   id                        Int                               @id @default(autoincrement())
   uid                       String                            @unique @default(cuid())
   slugURL                   String                            @unique
+  host                      String                            @default("plnetwork.io")
   startDate                 DateTime
   endDate                   DateTime
   approximateStartDate      String?
@@ -1021,6 +1029,18 @@ model DemoDay {
   engagements               DemoDayEngagement[]
   expressInterestStatistics DemoDayExpressInterestStatistic[]
   feedbacks                 DemoDayFeedback[]
+}
+
+model MemberDemoDayAdminScope {
+  id         Int                   @id @default(autoincrement())
+  memberUid  String
+  scopeType  DemoDayAdminScopeType
+  scopeValue String // e.g. "plnetwork.io" when scopeType = HOST
+  config     Json? // optional extra config for this scope
+
+  member Member @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+
+  @@unique([memberUid, scopeType, scopeValue])
 }
 
 model DemoDayParticipant {

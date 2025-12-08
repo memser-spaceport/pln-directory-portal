@@ -13,7 +13,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { NotificationService } from '../utils/notification/notification.service';
 import { LogService } from '../shared/log.service';
-import { AdminRole, DEFAULT_MEMBER_ROLES } from '../utils/constants';
+import {AdminRole, DEFAULT_MEMBER_ROLES, hasDemoDayAdminRole} from '../utils/constants';
 import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
@@ -712,6 +712,76 @@ export class MemberService {
     await this.cacheService.reset({ service: 'members' });
     return response;
   }
+
+
+  /**
+   * Replaces HOST-type demo day admin scopes for a given member.
+   *
+   * Only members with DEMO_DAY_ADMIN role are allowed to have demo day admin scopes.
+   * Returns the updated member including roles and demo day admin scopes.
+   */
+  async updateDemoDayAdminHosts(memberUid: string, hosts: string[]): Promise<Member> {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      include: {
+        memberRoles: true,
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+
+    if (!hasDemoDayAdminRole(member)) {
+      // Treat this as a configuration error rather than a permission error
+      throw new BadRequestException('Member does not have DEMO_DAY_ADMIN role');
+    }
+
+    const normalizedHosts = (hosts || [])
+      .map((h) => h.trim().toLowerCase())
+      .filter((h) => h.length > 0);
+
+    // Replace all HOST scopes for this member in a single transaction
+    await this.prisma.$transaction([
+      this.prisma.memberDemoDayAdminScope.deleteMany({
+        where: {
+          memberUid,
+          scopeType: 'HOST',
+        },
+      }),
+      ...normalizedHosts.map((host) =>
+        this.prisma.memberDemoDayAdminScope.create({
+          data: {
+            memberUid,
+            scopeType: 'HOST',
+            scopeValue: host,
+          },
+        }),
+      ),
+    ]);
+
+    // Reload member with roles and demo day–related scopes/relations
+    const updatedMember = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      include: {
+        memberRoles: true,
+        demoDayAdminScopes: true,
+        demoDayParticipants: {
+          include: {
+            demoDay: true,
+          },
+        },
+      },
+    });
+
+    // This should not happen, but be defensive in case the record was removed meanwhile
+    if (!updatedMember) {
+      throw new NotFoundException('Member not found after updating demo day admin hosts');
+    }
+
+    return updatedMember;
+  }
+
 
   /**
    * Handles database-related errors specifically for the Member entity.
