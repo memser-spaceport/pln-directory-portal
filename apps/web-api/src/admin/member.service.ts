@@ -845,6 +845,7 @@ export class MemberService {
         uid: true,
         name: true,
         imageUid: true,
+        memberRoles: true,
         image: {
           select: {
             uid: true,
@@ -1401,4 +1402,71 @@ export class MemberService {
         return { isVerified: false, plnFriend: false };
     }
   }
+
+  /**
+   * Replaces all roles for a given member with the provided list of role names.
+   *
+   * Only directory-level admins should be allowed to call this from controller.
+   */
+  async updateMemberRolesByUid(memberUid: string, roleNames: string[]) {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      include: { memberRoles: true },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+
+    const normalizedRoleNames = (roleNames ?? [])
+      .map((name) => name.trim().toUpperCase())
+      .filter((name) => name.length > 0);
+
+    // Load existing roles from DB by name
+    const roles = await this.prisma.memberRole.findMany({
+      where: {
+        name: { in: normalizedRoleNames },
+      },
+    });
+
+    if (roles.length !== normalizedRoleNames.length) {
+      const existingNames = roles.map((r) => r.name);
+      const missing = normalizedRoleNames.filter((r) => !existingNames.includes(r));
+      throw new BadRequestException(
+        `Unknown member roles: ${missing.join(', ')}`,
+      );
+    }
+
+    // Optional: protect from removing the last DIRECTORY_ADMIN
+    // (uncomment if you want safety here)
+    // if (member.memberRoles.some((r) => r.name === 'DIRECTORY_ADMIN') &&
+    //     !normalizedRoleNames.includes('DIRECTORY_ADMIN')) {
+    //   const directoryAdminsCount = await this.prisma.member.count({
+    //     where: {
+    //       memberRoles: { some: { name: 'DIRECTORY_ADMIN' } },
+    //     },
+    //   });
+    //   if (directoryAdminsCount === 1) {
+    //     throw new BadRequestException('Cannot remove the last DIRECTORY_ADMIN');
+    //   }
+    // }
+
+    // Replace roles via "set" + "connect"
+    const updated = await this.prisma.member.update({
+      where: { uid: memberUid },
+      data: {
+        memberRoles: {
+          set: [], // clear existing many-to-many
+          connect: roles.map((role) => ({ id: role.id })),
+        },
+      },
+      include: {
+        memberRoles: true,
+        demoDayAdminScopes: true,
+      },
+    });
+
+    return updated;
+  }
+
 }

@@ -92,9 +92,6 @@ async function load(fixtures: Array<Record<string, any>>) {
 
 /**
  * Assign DEMO_DAY_ADMIN role to demo day admin members.
- *
- * Prisma does not expose M:N join tables as models, so we use a raw insert
- * into the join table "_MemberToMemberRole".
  */
 async function seedDemoDayAdminRoleAssignments() {
   console.log('=== Seed: demo day admin role assignments (start) ===');

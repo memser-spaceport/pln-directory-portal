@@ -190,7 +190,7 @@ export class MembersService {
 
       // Filter out any members with null emails (type safety)
       return members.filter(
-        (member): member is { uid: string; name: string; email: string; accessLevel: string } => member.email !== null
+        (member): member is { uid: string; name: string; email: string; accessLevel: string; memberRoles: { name: string }[];} => member.email !== null
       );
     } catch (error) {
       return this.handleErrors(error);

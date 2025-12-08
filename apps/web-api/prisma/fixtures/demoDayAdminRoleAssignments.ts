@@ -1,12 +1,5 @@
 /**
  * Demo Day Admin → DEMO_DAY_ADMIN role assignments.
- *
- * ⚠ IMPORTANT:
- * Prisma does NOT allow CreateMany on join tables created by Many-to-Many relations.
- * Therefore, this fixture only describes the intended assignments.
- *
- * The seed.ts script must read these fixtures and insert the relation rows
- * into the join-table "_MemberToMemberRole" using raw SQL.
  */
 
 export interface DemoDayAdminRoleAssignment {

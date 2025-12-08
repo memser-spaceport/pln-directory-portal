@@ -12,6 +12,7 @@ import {
 import {NoCache} from '../decorators/no-cache.decorator';
 import {Member} from '@prisma/client';
 import {MemberService} from './member.service';
+import {UpdateMemberRolesDto} from "./dto/update-member-roles.dto";
 
 @Controller('v1/admin/members')
 export class MemberController {
@@ -97,6 +98,19 @@ export class MemberController {
       uid,
       body.hosts || [],
     );
+  }
+
+  /**
+   * Updates member roles (replaces the whole set) and returns the updated member.
+   * Only directory/super admins are allowed to call this endpoint.
+   */
+  @Patch(':uid/roles')
+  @UseGuards(AdminAuthGuard)
+  async updateMemberRoles(
+    @Param('uid') uid: string,
+    @Body() body: UpdateMemberRolesDto,
+  ) {
+    return await this.memberService.updateMemberRolesByUid(uid, body.roles);
   }
 }
 

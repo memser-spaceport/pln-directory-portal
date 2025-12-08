@@ -1,6 +1,6 @@
-import React, { Dispatch, HTMLProps, SetStateAction, useMemo } from 'react';
+import React, {Dispatch, HTMLProps, SetStateAction, useMemo} from 'react';
 import {
-  ColumnFilter,
+  ColumnFiltersState,
   createColumnHelper,
   getCoreRowModel,
   getFilteredRowModel,
@@ -10,87 +10,95 @@ import {
   SortingState,
   useReactTable,
 } from '@tanstack/react-table';
+import AdminRoleCell from '../components/AdminRoleCell/AdminRoleCell';
+import {Row} from '@tanstack/table-core/src/types';
+
 import MemberCell from '../components/MemberCell/MemberCell';
-import { Member } from '../types/member';
 import ProjectsCell from '../components/ProjectsCell/ProjectsCell';
 import LinkedinCell from '../components/LinkedinCell/LinkedinCell';
 import SignUpSourceCell from '../components/SignUpSourceCell/SignUpSourceCell';
-import EditCell from '../components/EditCell/EditCell';
 import StatusCell from '../components/StatusCell/StatusCell';
-import { Row } from '@tanstack/table-core/src/types';
+import EditCell from '../components/EditCell/EditCell';
+
+import {Member} from '../types/member';
 
 const columnHelper = createColumnHelper<Member>();
 
-export function useMembersTable({
-  members,
-  sorting,
-  setSorting,
-  rowSelection,
-  setRowSelection,
-  authToken,
-  pagination,
-  setPagination,
-  globalFilter,
-  setGlobalFilter,
-  columnFilters,
-  setColumnFilters,
-}: {
-  rowSelection: Record<string, boolean>;
-  setRowSelection: Dispatch<SetStateAction<Record<string, boolean>>>;
-  members: Member[];
+type UseMembersTableArgs = {
+  members: Member[] | undefined;
   sorting: SortingState;
   setSorting: Dispatch<SetStateAction<SortingState>>;
-  authToken: string;
+  rowSelection: Record<string, boolean>;
+  setRowSelection: Dispatch<SetStateAction<Record<string, boolean>>>;
+  authToken: string | undefined;
   pagination: PaginationState;
   setPagination: Dispatch<SetStateAction<PaginationState>>;
   globalFilter: string;
   setGlobalFilter: Dispatch<SetStateAction<string>>;
-  columnFilters: ColumnFilter[];
-  setColumnFilters: Dispatch<SetStateAction<ColumnFilter[]>>;
-}) {
-  const columns = useMemo(() => {
-    return [
+  columnFilters: ColumnFiltersState;
+  setColumnFilters: Dispatch<SetStateAction<ColumnFiltersState>>;
+};
+
+export function useMembersTable({
+                                  members,
+                                  sorting,
+                                  setSorting,
+                                  rowSelection,
+                                  setRowSelection,
+                                  authToken,
+                                  pagination,
+                                  setPagination,
+                                  globalFilter,
+                                  setGlobalFilter,
+                                  columnFilters,
+                                  setColumnFilters,
+                                }: UseMembersTableArgs) {
+  const columns = useMemo(
+    () => [
+      // Checkbox column
       {
         id: 'select',
-        header: ({ table }) => (
+        header: ({table}) => (
           <IndeterminateCheckbox
-            {...{
-              checked: table.getIsAllRowsSelected(),
-              indeterminate: table.getIsSomeRowsSelected(),
-              onChange: table.getToggleAllRowsSelectedHandler(),
-            }}
+            checked={table.getIsAllRowsSelected()}
+            indeterminate={table.getIsSomeRowsSelected()}
+            onChange={table.getToggleAllRowsSelectedHandler()}
           />
         ),
-        cell: ({ row }) => (
+        cell: ({row}) => (
           <div>
             <IndeterminateCheckbox
-              {...{
-                checked: row.getIsSelected(),
-                disabled: !row.getCanSelect(),
-                indeterminate: row.getIsSomeSelected(),
-                onChange: row.getToggleSelectedHandler(),
-              }}
+              checked={row.getIsSelected()}
+              disabled={!row.getCanSelect()}
+              indeterminate={row.getIsSomeSelected()}
+              onChange={row.getToggleSelectedHandler()}
             />
           </div>
         ),
         size: 48,
         enableResizing: false,
       },
+
+      // Member cell (avatar + name + email)
       columnHelper.accessor('name', {
         header: 'Member',
         sortingFn: 'alphanumeric',
-        cell: (info) => <MemberCell member={info.row.original} />,
+        cell: (info) => <MemberCell member={info.row.original}/>,
         size: 0,
       }),
+
+      // Project / Team column
       columnHelper.accessor('projectContributions', {
         header: 'Project/Team',
-        cell: (info) => <ProjectsCell member={info.row.original} />,
+        cell: (info) => <ProjectsCell member={info.row.original}/>,
         size: 250,
         enableSorting: false,
       }),
+
+      // LinkedIn verified column
       columnHelper.accessor('linkedinProfile', {
         header: 'LinkedIn Verified',
-        cell: (info) => <LinkedinCell member={info.row.original} />,
+        cell: (info) => <LinkedinCell member={info.row.original}/>,
         size: 160,
         enableResizing: false,
         enableSorting: false,
@@ -100,14 +108,27 @@ export function useMembersTable({
       }),
       columnHelper.accessor('signUpSource', {
         header: 'Sign Up Source',
-        cell: (info) => <SignUpSourceCell member={info.row.original} />,
+        cell: (info) => <SignUpSourceCell member={info.row.original}/>,
         size: 150,
         enableResizing: false,
         enableSorting: true,
       }),
+
+      columnHelper.display({
+        id: 'adminRole',
+        header: 'Admin role',
+        cell: (info) => (
+          <AdminRoleCell member={info.row.original} />
+        ),
+        size: 150,
+        enableResizing: false,
+        enableSorting: false,
+      }),
+
+      // Status (access level) column
       columnHelper.accessor('accessLevel', {
         header: 'Status',
-        sortingFn: (rowA: Row<Member>, rowB: Row<Member>, columnId: string) => {
+        sortingFn: (rowA: Row<Member>, rowB: Row<Member>) => {
           if (rowA.original.accessLevelUpdatedAt > rowB.original.accessLevelUpdatedAt) {
             return 1;
           }
@@ -118,42 +139,44 @@ export function useMembersTable({
 
           return 0;
         },
-        cell: (props) => <StatusCell member={props.row.original} authToken={authToken} />,
+        cell: (props) => <StatusCell member={props.row.original} authToken={authToken}/>,
         size: 0,
       }),
       columnHelper.display({
         header: 'Info',
-        cell: (props) => <EditCell member={props.row.original} authToken={authToken} />,
+        cell: (props) => <EditCell member={props.row.original} authToken={authToken}/>,
         size: 88,
         enableResizing: false,
         meta: {
           align: 'center',
         },
       }),
-    ];
-  }, [authToken]);
+    ],
+    [authToken],
+  );
 
-  const data = useMemo(() => {
-    return members ?? [];
-  }, [members]);
+  const data = useMemo(() => members ?? [], [members]);
 
-  const customFilterFn = (row, _, filterValue) => {
-    if (row.original.email?.toLowerCase().includes(filterValue?.toLowerCase())) {
-      return true;
-    }
+  // Global filter: name, email, project name
+  const customFilterFn = (row: Row<Member>, _columnId: string, filterValue: string) => {
+    const v = filterValue?.toLowerCase?.() ?? '';
 
-    if (row.original.name?.toLowerCase().includes(filterValue?.toLowerCase())) {
-      return true;
-    }
+    if (!v) return true;
 
-    return false;
+    if (row.original.email?.toLowerCase().includes(v)) return true;
+    if (row.original.name?.toLowerCase().includes(v)) return true;
+
+    const projectNames =
+      row.original.projectContributions?.map((project) =>
+        project.project.name?.toLowerCase(),
+      ) ?? [];
+
+    return projectNames.some((projectName) => projectName.includes(v));
   };
 
   const table = useReactTable({
-    columns,
     data,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    columns,
     state: {
       sorting,
       rowSelection,
@@ -161,28 +184,28 @@ export function useMembersTable({
       globalFilter,
       columnFilters,
     },
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
-    getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    onPaginationChange: setPagination,
+    onGlobalFilterChange: setGlobalFilter,
     onColumnFiltersChange: setColumnFilters,
     globalFilterFn: customFilterFn,
-    onPaginationChange: setPagination,
-    getRowId: (row) => {
-      return row.uid;
-    },
-    onGlobalFilterChange: setGlobalFilter,
+    getRowId: (row) => row.uid,
   });
 
-  return { table };
+  return {table};
 }
 
 function IndeterminateCheckbox({
-  indeterminate,
-  className = '',
-  ...rest
-}: { indeterminate?: boolean } & HTMLProps<HTMLInputElement>) {
+                                 indeterminate,
+                                 className = '',
+                                 ...rest
+                               }: { indeterminate?: boolean } & HTMLProps<HTMLInputElement>) {
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const ref = React.useRef<HTMLInputElement>(null!);
 
