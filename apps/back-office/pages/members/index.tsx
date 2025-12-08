@@ -15,13 +15,24 @@ import PaginationControls from '../../screens/members/components/PaginationContr
 import { AddMember } from '../../screens/members/components/AddMember/AddMember';
 import { useCookie } from 'react-use';
 import { StatusFilter } from '../../screens/members/components/StatusFilter';
+import { useAuth } from '../../context/auth-context';
 
 const MembersPage = () => {
   const router = useRouter();
+  const { isDirectoryAdmin, isLoading, user } = useAuth();
   const query = router.query;
   const { filter, search } = query;
   const [authToken] = useCookie('plnadmin');
   const { data: counts } = useAccessLevelCounts({ authToken });
+
+  // Redirect non-directory admins to demo-days
+  useEffect(() => {
+    // Wait for auth to load, then check if user has directory admin role
+    if (!isLoading && user && !isDirectoryAdmin) {
+      router.replace('/demo-days');
+    }
+  }, [isLoading, user, isDirectoryAdmin, router]);
+
   const items = useMemo(() => {
     return [
       {
@@ -101,6 +112,11 @@ const MembersPage = () => {
       setGlobalFilter(search as string);
     }
   }, [search]);
+
+  // Don't render page content if user doesn't have access
+  if (!isLoading && user && !isDirectoryAdmin) {
+    return null;
+  }
 
   return (
     <ApprovalLayout>

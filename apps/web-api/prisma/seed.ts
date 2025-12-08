@@ -29,6 +29,11 @@ import {
   discoveryQuestions,
 } from './fixtures';
 
+import { demoDays } from './fixtures/demo-days';
+import { demoDayAdmins } from './fixtures/demoDayAdmins';
+import { demoDayAdminScopes } from './fixtures/demoDayAdminScopes';
+import { demoDayAdminRoleAssignments } from './fixtures/demoDayAdminRoleAssignments';
+
 /**
  * Truncate all public tables (except _prisma_migrations) and reset identities.
  * Uses CASCADE to handle FK dependencies.
@@ -82,8 +87,42 @@ async function load(fixtures: Array<Record<string, any>>) {
     for (const relation of relationsToConnect) {
       await prisma[camelCase(model)].update(relation);
     }
-    console.log(`✅ Updated ${model} with its relations\n`);
   }
+}
+
+/**
+ * Assign DEMO_DAY_ADMIN role to demo day admin members.
+ */
+async function seedDemoDayAdminRoleAssignments() {
+  console.log('=== Seed: demo day admin role assignments (start) ===');
+
+  // Ensure DEMO_DAY_ADMIN role exists (idempotent)
+  await prisma.memberRole.upsert({
+    where: { name: 'DEMO_DAY_ADMIN' },
+    update: {},
+    create: {
+      name: 'DEMO_DAY_ADMIN',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  });
+
+  for (const { memberUid, roleName } of demoDayAdminRoleAssignments) {
+    // Insert into Prisma-generated join table between Member and MemberRole.
+    // Default name is "_MemberToMemberRole" with columns "A" (Member.id) and "B" (MemberRole.id).
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO "_MemberToMemberRole" ("A", "B")
+      SELECT
+        m."id",
+        r."id"
+      FROM "Member" m, "MemberRole" r
+      WHERE m."uid" = '${memberUid}'
+        AND r."name" = '${roleName}'
+      ON CONFLICT ("A", "B") DO NOTHING;
+    `);
+  }
+
+  console.log('=== Seed: demo day admin role assignments (done) ===');
 }
 
 async function main() {
@@ -126,7 +165,15 @@ async function main() {
     { [Prisma.ModelName.TeamFocusArea]: { fixtures: teamFocusAreas } },
     { [Prisma.ModelName.ProjectFocusArea]: { fixtures: projectFocusAreas } },
     { [Prisma.ModelName.DiscoveryQuestion]: { fixtures: discoveryQuestions } },
+
+    // Extra demo day–related fixtures
+    { [Prisma.ModelName.Member]: { fixtures: demoDayAdmins } },
+    { [Prisma.ModelName.MemberDemoDayAdminScope]: { fixtures: demoDayAdminScopes } },
+    { [Prisma.ModelName.DemoDay]: { fixtures: demoDays } },
   ]);
+
+  // After members + roles are created, assign DEMO_DAY_ADMIN role to demo day admins
+  await seedDemoDayAdminRoleAssignments();
 }
 
 main()

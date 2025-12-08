@@ -7,6 +7,7 @@ import Head from 'next/head';
 import './styles.css';
 import '../styles/react-datepicker.min.css';
 import { NavbarContextProvider } from '../context/navbar-context';
+import { AuthProvider } from '../context/auth-context';
 import Toaster from '../components/common/toaster';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -22,9 +23,11 @@ function CustomApp({ Component, pageProps }: AppProps) {
       </Head>
       <main className="app app full-body absolute h-full w-full">
         <QueryClientProvider client={queryClient}>
-          <NavbarContextProvider>
-            <Component {...pageProps} />
-          </NavbarContextProvider>
+          <AuthProvider>
+            <NavbarContextProvider>
+              <Component {...pageProps} />
+            </NavbarContextProvider>
+          </AuthProvider>
         </QueryClientProvider>
         <Toaster />
       </main>
