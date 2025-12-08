@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
-  InternalServerErrorException,
+  InternalServerErrorException, NotFoundException,
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -21,6 +21,7 @@ import {PrismaService} from '../shared/prisma.service';
 import {AuthMetrics, extractErrorCode, statusClassOf} from '../metrics/auth.metrics';
 import {TeamsService} from '../teams/teams.service';
 import {NotificationServiceClient} from '../notifications/notification-service.client';
+import {NotFoundError} from "@prisma/client/runtime";
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -226,11 +227,11 @@ export class AuthService implements OnModuleInit {
       `AuthService.getTokenAndUserInfo → No member found for externalId=${externalId} or email=${email}. Creating new member from SSO login.`,
     );
 
-    // 6.1. Create raw member record
-    await this.membersService.createMemberFromSso({
-      email,
-      externalId,
-    });
+    // // 6.1. Create raw member record
+    // await this.membersService.createMemberFromSso({
+    //   email,
+    //   externalId,
+    // });
 
     // 6.2. Reload member with full relations so that memberToUserInfo doesn't crash
     let newUser =
@@ -243,7 +244,7 @@ export class AuthService implements OnModuleInit {
       this.logger.error(
         `AuthService.getTokenAndUserInfo → Newly created SSO member not found when reloading. email=${email}, externalId=${externalId}`,
       );
-      throw new ForbiddenException('Unable to load newly created user');
+      throw new NotFoundException('Unable to load newly created user');
     }
 
     const upgradedNewUser = await this.checkAndUpgradeDemoDayParticipant(newUser);
