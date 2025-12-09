@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import s from '../members/styles.module.scss';
 import { ApprovalLayout } from '../../layout/approval-layout';
@@ -12,8 +12,11 @@ import PaginationControls from '../../screens/members/components/PaginationContr
 import { SortIcon } from '../../screens/members/components/icons';
 import { useRolesTable } from '../../screens/roles/hooks/useRolesTable';
 import { useAuth } from '../../context/auth-context';
+import { MemberRole } from '../../utils/constants';
 
 const ALL_ACCESS_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'Rejected'];
+
+type RoleFilterValue = '' | MemberRole.DIRECTORY_ADMIN | MemberRole.DEMO_DAY_ADMIN;
 
 const RolesPage = () => {
   const router = useRouter();
@@ -34,14 +37,28 @@ const RolesPage = () => {
 
   const [globalFilter, setGlobalFilter] = useState<string>('');
   const [columnFilters] = useState<ColumnFiltersState>([]);
+  const [roleFilter, setRoleFilter] = useState<RoleFilterValue>('');
 
   const { data } = useMembersList({
     authToken,
     accessLevel: ALL_ACCESS_LEVELS,
   });
 
+  // Filter members by role before passing to the table
+  const filteredMembers = useMemo(() => {
+    if (!data?.data) return [];
+    if (!roleFilter) return data.data;
+
+    return data.data.filter((member) => {
+      const roles = member.roles || [];
+      const memberRoleNames = member.memberRoles?.map((r) => r.name) || [];
+      const allRoles = [...roles, ...memberRoleNames];
+      return allRoles.includes(roleFilter);
+    });
+  }, [data?.data, roleFilter]);
+
   const { table } = useRolesTable({
-    members: data?.data,
+    members: filteredMembers,
     sorting,
     setSorting,
     pagination,
@@ -78,6 +95,16 @@ const RolesPage = () => {
                 }
               }}
             />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as RoleFilterValue)}
+              className={clsx(s.input)}
+              style={{ marginLeft: 8, minWidth: 160 }}
+            >
+              <option value="">All roles</option>
+              <option value={MemberRole.DIRECTORY_ADMIN}>Directory Admin</option>
+              <option value={MemberRole.DEMO_DAY_ADMIN}>Demo Day Admin</option>
+            </select>
           </span>
         </div>
 
