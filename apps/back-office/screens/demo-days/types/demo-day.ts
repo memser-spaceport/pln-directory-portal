@@ -8,6 +8,7 @@ export interface DemoDay {
   endDate: string;
   approximateStartDate?: string | null;
   supportEmail?: string | null;
+  host?: string | null;
   status: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
   createdAt: string;
   updatedAt: string;
@@ -34,6 +35,7 @@ export interface UpdateDemoDayDto {
   endDate?: string;
   approximateStartDate?: string | null;
   supportEmail?: string | null;
+  host?: string | null;
   status?: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 }
 

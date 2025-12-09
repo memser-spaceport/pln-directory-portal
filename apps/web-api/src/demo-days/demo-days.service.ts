@@ -500,6 +500,7 @@ export class DemoDaysService {
       approximateStartDate?: string | null;
       supportEmail?: string | null;
       status?: DemoDayStatus;
+      host?: string | null;
     },
     actorEmail?: string
   ): Promise<DemoDay> {
@@ -553,6 +554,9 @@ export class DemoDaysService {
     }
     if (data.status !== undefined) {
       updateData.status = data.status;
+    }
+    if (data.host !== undefined) {
+      updateData.host = data.host;
     }
 
     const updated = await this.prisma.demoDay.update({
