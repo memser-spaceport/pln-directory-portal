@@ -42,13 +42,13 @@ type DemoDayHostOption = {
   value: string;
 };
 
+const hostOptions: DemoDayHostOption[] = DEMO_DAY_HOSTS.map((h) => ({ label: h, value: h }));
+
 const RoleCell = ({ member }: { member: Member }) => {
   const [plnadmin] = useCookie('plnadmin');
   const { mutateAsync: updateMemberRoles } = useUpdateMemberRoles();
   const { mutateAsync: updateDemoDayHosts, isLoading: isUpdatingHosts } =
     useUpdateMemberDemoDayHosts();
-
-  const hostOptions: DemoDayHostOption[] = DEMO_DAY_HOSTS.map((h) => ({ label: h, value: h }));
 
   // ---- ROLES ----
 
@@ -125,34 +125,33 @@ const RoleCell = ({ member }: { member: Member }) => {
   };
 
 
-  const [selectedHosts, setSelectedHosts] = useState<DemoDayHostOption[]>([]);
+  const demoDayHosts = member.demoDayHosts;
+  const demoDayAdminScopes = member.demoDayAdminScopes;
 
-  useEffect(() => {
+  const initialSelectedHosts = useMemo(() => {
     let hosts: string[] | undefined;
 
-    const fromDemoDayHosts = (member as any).demoDayHosts as string[] | undefined;
-    if (Array.isArray(fromDemoDayHosts) && fromDemoDayHosts.length > 0) {
-      hosts = fromDemoDayHosts;
-    } else {
-      const scopes = (member as any).demoDayAdminScopes as
-        | { scopeType: string; scopeValue: string }[]
-        | undefined;
-
-      if (Array.isArray(scopes)) {
-        hosts = scopes
-          .filter((s) => s.scopeType === 'HOST')
-          .map((s) => s.scopeValue);
-      }
+    if (Array.isArray(demoDayHosts) && demoDayHosts.length > 0) {
+      hosts = demoDayHosts;
+    } else if (Array.isArray(demoDayAdminScopes)) {
+      hosts = demoDayAdminScopes
+        .filter((s) => s.scopeType === 'HOST')
+        .map((s) => s.scopeValue);
     }
 
     if (Array.isArray(hosts) && hosts.length > 0) {
       const hostsLower = hosts.map((h) => h.toLowerCase());
-      const initial = hostOptions.filter((opt) => hostsLower.includes(opt.value.toLowerCase()));
-      setSelectedHosts(initial);
-    } else {
-      setSelectedHosts([]);
+      return hostOptions.filter((opt) => hostsLower.includes(opt.value.toLowerCase()));
     }
-  }, [member.uid, (member as any).demoDayHosts, (member as any).demoDayAdminScopes]);
+
+    return [];
+  }, [demoDayHosts, demoDayAdminScopes]);
+
+  const [selectedHosts, setSelectedHosts] = useState<DemoDayHostOption[]>(initialSelectedHosts);
+
+  useEffect(() => {
+    setSelectedHosts(initialSelectedHosts);
+  }, [initialSelectedHosts]);
 
   const handleHostsSelectChange = (value: readonly DemoDayHostOption[] | null) => {
     setSelectedHosts(value ? [...value] : []);
