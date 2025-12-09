@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import s from '../members/styles.module.scss';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useRouter } from 'next/router';
-import { ColumnFiltersState, flexRender, PaginationState, SortingState } from '@tanstack/react-table';
+import { flexRender, PaginationState, SortingState } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { useCookie } from 'react-use';
 
@@ -13,6 +13,7 @@ import { SortIcon } from '../../screens/members/components/icons';
 import { useRolesTable } from '../../screens/roles/hooks/useRolesTable';
 import { useAuth } from '../../context/auth-context';
 import { MemberRole } from '../../utils/constants';
+import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
 
 const ALL_ACCESS_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'Rejected'];
 
@@ -36,26 +37,56 @@ const RolesPage = () => {
   });
 
   const [globalFilter, setGlobalFilter] = useState<string>('');
-  const [columnFilters] = useState<ColumnFiltersState>([]);
   const [roleFilter, setRoleFilter] = useState<RoleFilterValue>('');
+  const [scopeFilter, setScopeFilter] = useState<string>('');
 
   const { data } = useMembersList({
     authToken,
     accessLevel: ALL_ACCESS_LEVELS,
   });
 
-  // Filter members by role before passing to the table
+  // Reset scope filter when role filter changes away from Demo Day Admin
+  useEffect(() => {
+    if (roleFilter !== MemberRole.DEMO_DAY_ADMIN) {
+      setScopeFilter('');
+    }
+  }, [roleFilter]);
+
+  // Filter members by role and scope before passing to the table
   const filteredMembers = useMemo(() => {
     if (!data?.data) return [];
-    if (!roleFilter) return data.data;
 
-    return data.data.filter((member) => {
-      const roles = member.roles || [];
-      const memberRoleNames = member.memberRoles?.map((r) => r.name) || [];
-      const allRoles = [...roles, ...memberRoleNames];
-      return allRoles.includes(roleFilter);
-    });
-  }, [data?.data, roleFilter]);
+    let result = data.data;
+
+    // Filter by role
+    if (roleFilter) {
+      result = result.filter((member) => {
+        const roles = member.roles || [];
+        const memberRoleNames = member.memberRoles?.map((r) => r.name) || [];
+        const allRoles = [...roles, ...memberRoleNames];
+        return allRoles.includes(roleFilter);
+      });
+    }
+
+    // Filter by Demo Day scope (only when Demo Day Admin role is selected)
+    if (scopeFilter && roleFilter === MemberRole.DEMO_DAY_ADMIN) {
+      result = result.filter((member) => {
+        // Check demoDayHosts array
+        const demoDayHosts = member.demoDayHosts || [];
+        if (demoDayHosts.some((h) => h.toLowerCase() === scopeFilter.toLowerCase())) {
+          return true;
+        }
+
+        // Check demoDayAdminScopes
+        const scopes = member.demoDayAdminScopes || [];
+        return scopes.some(
+          (s) => s.scopeType === 'HOST' && s.scopeValue.toLowerCase() === scopeFilter.toLowerCase()
+        );
+      });
+    }
+
+    return result;
+  }, [data?.data, roleFilter, scopeFilter]);
 
   const { table } = useRolesTable({
     members: filteredMembers,
@@ -105,6 +136,21 @@ const RolesPage = () => {
               <option value={MemberRole.DIRECTORY_ADMIN}>Directory Admin</option>
               <option value={MemberRole.DEMO_DAY_ADMIN}>Demo Day Admin</option>
             </select>
+            {roleFilter === MemberRole.DEMO_DAY_ADMIN && (
+              <select
+                value={scopeFilter}
+                onChange={(e) => setScopeFilter(e.target.value)}
+                className={clsx(s.input)}
+                style={{ marginLeft: 8, minWidth: 160 }}
+              >
+                <option value="">All hosts</option>
+                {DEMO_DAY_HOSTS.map((host) => (
+                  <option key={host} value={host}>
+                    {host}
+                  </option>
+                ))}
+              </select>
+            )}
           </span>
         </div>
 

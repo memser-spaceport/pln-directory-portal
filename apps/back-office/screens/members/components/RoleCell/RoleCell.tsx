@@ -270,7 +270,7 @@ const RoleCell = ({ member }: { member: Member }) => {
             onClick={handleUpdateHostsClick}
             disabled={isUpdatingHosts || selectedHosts.length === 0}
           >
-            {isUpdatingHosts ? 'Saving…' : 'Update scope'}
+            {isUpdatingHosts ? 'Saving…' : 'Update host'}
           </button>
         </div>
       )}
