@@ -738,7 +738,7 @@ export class MemberService {
     }
 
     const normalizedHosts = (hosts || [])
-      .map((h) => h.trim().toLowerCase())
+      .map((h) => h.trim())
       .filter((h) => h.length > 0);
 
     // Replace all HOST scopes for this member in a single transaction

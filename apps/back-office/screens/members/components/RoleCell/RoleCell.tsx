@@ -146,7 +146,8 @@ const RoleCell = ({ member }: { member: Member }) => {
     }
 
     if (Array.isArray(hosts) && hosts.length > 0) {
-      const initial = hostOptions.filter((opt) => hosts!.includes(opt.value));
+      const hostsLower = hosts.map((h) => h.toLowerCase());
+      const initial = hostOptions.filter((opt) => hostsLower.includes(opt.value.toLowerCase()));
       setSelectedHosts(initial);
     } else {
       setSelectedHosts([]);
