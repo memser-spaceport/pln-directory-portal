@@ -51,9 +51,6 @@ export function useRolesTable({
         size: 0,
         enableResizing: false,
         enableSorting: false,
-        meta: {
-          align: 'left',
-        },
       }),
     ],
     [],

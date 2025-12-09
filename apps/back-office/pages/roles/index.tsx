@@ -102,10 +102,6 @@ const RolesPage = () => {
                       style={{
                         width: header.column.getSize(),
                         flexBasis: header.column.getSize(),
-                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                        // @ts-ignore
-                        justifyContent:
-                          header.column.columnDef.meta?.align === 'center' ? 'center' : 'flex-start',
                       }}
                       onClick={header.column.getToggleSortingHandler()}
                     >
