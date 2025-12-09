@@ -906,11 +906,27 @@ export class MemberService {
             type: true,
           },
         },
+        demoDayAdminScopes: {
+          select: {
+            memberUid: true,
+            scopeType: true,
+            scopeValue: true,
+            config: true,
+          },
+        },
       },
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { name: 'asc' },
     });
+
+    const membersWithHosts = members.map((m) => ({
+      ...m,
+      demoDayHosts:
+        m.demoDayAdminScopes
+          ?.filter((s) => s.scopeType === 'HOST')
+          .map((s) => s.scopeValue) ?? [],
+    }));
 
     const total = await this.prisma.member.count({
       where: {
@@ -919,7 +935,7 @@ export class MemberService {
     });
 
     return {
-      data: members,
+      data: membersWithHosts,
       pagination: {
         total,
         page,
