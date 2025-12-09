@@ -1,8 +1,9 @@
-import {Injectable, BadRequestException, Logger} from '@nestjs/common';
-import {PrismaService} from '../shared/prisma.service';
-import {parse} from 'csv-parse/sync';
+import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../shared/prisma.service';
+import { parse } from 'csv-parse/sync';
 import * as iconv from 'iconv-lite';
-import {Prisma} from "@prisma/client";
+import { Prisma } from '@prisma/client';
+import { ParticipantsRequest } from '../teams/dto/members.dto';
 
 type ImportParams = {
   csvBuffer: Buffer;
@@ -19,29 +20,60 @@ const MAX_REASON_SAMPLES = 15;
 
 // Optional alias map if you ever want business labels -> tiers
 const TIER_ALIASES: Record<string, number> = {
-  'tier1': 1, 'tier-1': 1, 'tier 1': 1, 't1': 1, 'level1': 1, 'level-1': 1, 'level 1': 1,
-  'tier2': 2, 'tier-2': 2, 'tier 2': 2, 't2': 2, 'level2': 2, 'level-2': 2, 'level 2': 2,
-  'tier3': 3, 'tier-3': 3, 'tier 3': 3, 't3': 3, 'level3': 3, 'level-3': 3, 'level 3': 3,
-  'tier4': 4, 'tier-4': 4, 'tier 4': 4, 't4': 4, 'level4': 4, 'level-4': 4, 'level 4': 4,
+  tier1: 1,
+  'tier-1': 1,
+  'tier 1': 1,
+  t1: 1,
+  level1: 1,
+  'level-1': 1,
+  'level 1': 1,
+  tier2: 2,
+  'tier-2': 2,
+  'tier 2': 2,
+  t2: 2,
+  level2: 2,
+  'level-2': 2,
+  'level 2': 2,
+  tier3: 3,
+  'tier-3': 3,
+  'tier 3': 3,
+  t3: 3,
+  level3: 3,
+  'level-3': 3,
+  'level 3': 3,
+  tier4: 4,
+  'tier-4': 4,
+  'tier 4': 4,
+  t4: 4,
+  level4: 4,
+  'level-4': 4,
+  'level 4': 4,
 };
 
 /** Normalize a header key for robust matching */
 function normKey(k: string): string {
-  return k.trim().toLowerCase().replace(/[\s\-_()]/g, '');
+  return k
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-_()]/g, '');
 }
 
 /** Try to find a key in row that matches any of candidates OR satisfies a predicate */
-function findKey(keys: string[], candidates: string[], pred?: (nk: string, raw: string) => boolean): string | undefined {
-  const normalized = keys.map(k => ({raw: k, nk: normKey(k)}));
+function findKey(
+  keys: string[],
+  candidates: string[],
+  pred?: (nk: string, raw: string) => boolean
+): string | undefined {
+  const normalized = keys.map((k) => ({ raw: k, nk: normKey(k) }));
   // strict candidates
   for (const c of candidates) {
     const nc = normKey(c);
-    const hit = normalized.find(x => x.nk === nc);
+    const hit = normalized.find((x) => x.nk === nc);
     if (hit) return hit.raw;
   }
   // predicate fallback
   if (pred) {
-    const hit = normalized.find(x => pred(x.nk, x.raw));
+    const hit = normalized.find((x) => pred(x.nk, x.raw));
     return hit?.raw;
   }
   return undefined;
@@ -74,11 +106,10 @@ function parseTierLoose(input: unknown): number {
 export class AdminTeamsService {
   private readonly logger = new Logger(AdminTeamsService.name);
 
-  constructor(private readonly prisma: PrismaService) {
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   async importTiersFromCsv(params: ImportParams) {
-    const {csvBuffer, dryRun, matchBy, delimiter, encoding} = params;
+    const { csvBuffer, dryRun, matchBy, delimiter, encoding } = params;
 
     // Decode & parse CSV
     const decoded = iconv.decode(csvBuffer, encoding as any);
@@ -95,11 +126,9 @@ export class AdminTeamsService {
 
     // Flexible header resolution per file (works with both: "tier", "Tier (0 - 4)", etc.)
     const headerKeys = Object.keys(rows[0] ?? {});
-    const uidKey =
-      findKey(headerKeys, ['uid', 'team_uid', 'teamuid', 'id'], (nk) => nk.includes('uid')) ?? 'uid';
+    const uidKey = findKey(headerKeys, ['uid', 'team_uid', 'teamuid', 'id'], (nk) => nk.includes('uid')) ?? 'uid';
 
-    const nameKey =
-      findKey(headerKeys, ['name', 'team_name', 'teamname'], (nk) => nk.includes('name')) ?? 'name';
+    const nameKey = findKey(headerKeys, ['name', 'team_name', 'teamname'], (nk) => nk.includes('name')) ?? 'name';
 
     // Any column that *mentions* tier qualifies; also accept "level"/"rank" as fallback
     const tierKey =
@@ -110,19 +139,17 @@ export class AdminTeamsService {
     if (!tierKey) {
       // If file has no tier column at all (e.g., a short UID-only CSV), default to tier=1
       defaultTierUsed = true;
-      this.logger.warn(
-        '[CSV] No tier-like column found; applying default TIER=1 to all rows.',
-      );
+      this.logger.warn('[CSV] No tier-like column found; applying default TIER=1 to all rows.');
     } else {
       this.logger.log(`[CSV] Detected columns -> uid: "${uidKey}" | name: "${nameKey}" | tier: "${tierKey}"`);
     }
 
     // Normalize & validate
-    const norm = this.normalize(rows, matchBy, {uidKey, nameKey, tierKey, defaultTierUsed});
+    const norm = this.normalize(rows, matchBy, { uidKey, nameKey, tierKey, defaultTierUsed });
 
     // Summary logs
     this.logger.log(
-      `CSV parsed: total=${rows.length}, valid=${norm.valid.length}, invalidTier=${norm.invalidTier.length}, noKey=${norm.noKey.length}, dups=${norm.duplicates}, keyType=${norm.keyType}`,
+      `CSV parsed: total=${rows.length}, valid=${norm.valid.length}, invalidTier=${norm.invalidTier.length}, noKey=${norm.noKey.length}, dups=${norm.duplicates}, keyType=${norm.keyType}`
     );
 
     // Print reasons (first N)
@@ -135,7 +162,9 @@ export class AdminTeamsService {
       norm.reasons.noKey.slice(0, MAX_REASON_SAMPLES).forEach((s, i) => this.logger.warn(`  #${i + 1} ${s}`));
     }
     if (norm.reasons.duplicates.length) {
-      this.logger.warn(`[Reasons] duplicates dropped: ${norm.duplicates} (showing up to ${MAX_REASON_SAMPLES} samples)`);
+      this.logger.warn(
+        `[Reasons] duplicates dropped: ${norm.duplicates} (showing up to ${MAX_REASON_SAMPLES} samples)`
+      );
       norm.reasons.duplicates.slice(0, MAX_REASON_SAMPLES).forEach((s, i) => this.logger.warn(`  #${i + 1} ${s}`));
     }
 
@@ -165,7 +194,9 @@ export class AdminTeamsService {
     }
 
     if (failedKeys.length) {
-      this.logger.warn(`[Update] Failed to update ${failedKeys.length} keys. Example(s): ${failedKeys.slice(0, 10).join(', ')}`);
+      this.logger.warn(
+        `[Update] Failed to update ${failedKeys.length} keys. Example(s): ${failedKeys.slice(0, 10).join(', ')}`
+      );
     }
 
     return {
@@ -175,8 +206,18 @@ export class AdminTeamsService {
       noKeyRows: norm.noKey.length,
       duplicatesDropped: norm.duplicates,
       keyType: norm.keyType,
-      ...(failedKeys.length ? {failedKeys} : {}),
+      ...(failedKeys.length ? { failedKeys } : {}),
     };
+  }
+
+  async updateTeam(uid: string, date: Prisma.TeamUpdateInput) {
+    await this.prisma.$transaction(async (tx) => {
+      const team = await tx.team.findUnique({ where: { uid } });
+      if (!team) {
+        throw new NotFoundException('Team not found');
+      }
+      await tx.team.update({ where: { uid }, data: date });
+    });
   }
 
   /**
@@ -189,7 +230,7 @@ export class AdminTeamsService {
   private normalize(
     rows: AnyRow[],
     matchBy: 'uid' | 'name' | 'auto',
-    keys: { uidKey: string; nameKey: string; tierKey?: string; defaultTierUsed: boolean },
+    keys: { uidKey: string; nameKey: string; tierKey?: string; defaultTierUsed: boolean }
   ) {
     const valid: { uid?: string; name?: string; tier: number }[] = [];
     const invalidTier: AnyRow[] = [];
@@ -204,8 +245,8 @@ export class AdminTeamsService {
     let keyType: 'uid' | 'name' = 'uid';
     if (matchBy === 'name') keyType = 'name';
     if (matchBy === 'auto') {
-      const hasUid = rows.some((r) => (String(r[keys.uidKey] ?? '').trim().length > 0));
-      const hasName = rows.some((r) => (String(r[keys.nameKey] ?? '').trim().length > 0));
+      const hasUid = rows.some((r) => String(r[keys.uidKey] ?? '').trim().length > 0);
+      const hasName = rows.some((r) => String(r[keys.nameKey] ?? '').trim().length > 0);
       keyType = hasUid ? 'uid' : hasName ? 'name' : 'uid';
     }
 
@@ -214,14 +255,14 @@ export class AdminTeamsService {
       const name = String(r[keys.nameKey] ?? '').trim() || undefined;
 
       // Choose raw tier source
-      const tierRaw = keys.tierKey ? r[keys.tierKey] : (keys.defaultTierUsed ? 1 : undefined);
+      const tierRaw = keys.tierKey ? r[keys.tierKey] : keys.defaultTierUsed ? 1 : undefined;
       const tier = parseTierLoose(tierRaw);
 
       if (!(tier >= 1 && tier <= 4)) {
         invalidTier.push(r);
         if (reasons.invalidTier.length < MAX_REASON_SAMPLES) {
           reasons.invalidTier.push(
-            `Row has invalid tier: value=${JSON.stringify(tierRaw)} parsed=${tier}; row=${JSON.stringify(r)}`,
+            `Row has invalid tier: value=${JSON.stringify(tierRaw)} parsed=${tier}; row=${JSON.stringify(r)}`
           );
         }
         continue;
@@ -245,11 +286,11 @@ export class AdminTeamsService {
       }
       seen.add(sig);
 
-      valid.push({uid, name, tier});
+      valid.push({ uid, name, tier });
     }
 
     const duplicates = rows.length - (valid.length + invalidTier.length + noKey.length);
-    return {valid, invalidTier, noKey, duplicates, keyType, reasons};
+    return { valid, invalidTier, noKey, duplicates, keyType, reasons };
   }
 
   /**
@@ -268,8 +309,8 @@ export class AdminTeamsService {
 
       // Prefetch existing UIDs to identify missing ones
       const existing = await this.prisma.team.findMany({
-        where: {uid: {in: uids}},
-        select: {uid: true},
+        where: { uid: { in: uids } },
+        select: { uid: true },
       });
       const existingSet = new Set(existing.map((e) => e.uid));
       const missingInThisChunk = uids.filter((u) => !existingSet.has(u));
@@ -297,7 +338,6 @@ export class AdminTeamsService {
     return failed;
   }
 
-
   /**
    * Universal path — prefer uid, otherwise update by name. Chunked and transactional.
    * Returns keys that failed to update (not found / unique mismatch).
@@ -314,9 +354,9 @@ export class AdminTeamsService {
           for (const r of chunk) {
             try {
               if (r.uid) {
-                await tx.team.update({where: {uid: r.uid}, data: {tier: r.tier}});
+                await tx.team.update({ where: { uid: r.uid }, data: { tier: r.tier } });
               } else if (r.name) {
-                await tx.team.update({where: {name: r.name}, data: {tier: r.tier}});
+                await tx.team.update({ where: { name: r.name }, data: { tier: r.tier } });
               } else {
                 failed.push('key:unknown');
               }
@@ -325,7 +365,7 @@ export class AdminTeamsService {
             }
           }
         },
-        {timeout: 60_000},
+        { timeout: 60_000 }
       );
     }
 

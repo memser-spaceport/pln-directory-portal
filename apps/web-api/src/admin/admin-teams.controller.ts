@@ -1,7 +1,10 @@
 import {
   BadRequestException,
+  Body,
   CacheTTL,
-  Controller, Get,
+  Controller,
+  Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -9,14 +12,14 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import {FileInterceptor} from '@nestjs/platform-express';
-import {ApiBody, ApiConsumes, ApiTags} from '@nestjs/swagger';
-import {AdminAuthGuard} from '../guards/admin-auth.guard';
-import {NoCache} from '../decorators/no-cache.decorator';
-import {ZodValidationPipe} from '@abitia/zod-dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { AdminAuthGuard } from '../guards/admin-auth.guard';
+import { NoCache } from '../decorators/no-cache.decorator';
+import { ZodValidationPipe } from '@abitia/zod-dto';
 
-import {AdminTeamsService} from './admin-teams.service';
-import {UploadTeamTiersQueryDto} from './schema/admin-teams';
+import { AdminTeamsService } from './admin-teams.service';
+import { UploadTeamTiersQueryDto } from './schema/admin-teams';
 
 @ApiTags('Admin Teams')
 @Controller('v1/admin/teams')
@@ -41,12 +44,10 @@ export class AdminTeamsController {
   async uploadTiers(
     @UploadedFile() file: Express.Multer.File,
     @Query(new ZodValidationPipe()) query: UploadTeamTiersQueryDto,
-    @Req() req: any,
+    @Req() req: any
   ) {
     if (!file?.buffer?.length) {
-      throw new BadRequestException(
-        'CSV file is required (multipart/form-data; field name: file)',
-      );
+      throw new BadRequestException('CSV file is required (multipart/form-data; field name: file)');
     }
 
     if (file.mimetype !== 'text/csv' && !file.originalname.toLowerCase().endsWith('.csv')) {
@@ -61,5 +62,14 @@ export class AdminTeamsController {
       delimiter: query.delimiter,
       encoding: query.encoding,
     });
+  }
+
+  /**
+   * Admin: full team update using old ParticipantsRequest payload.
+   */
+  @Patch('/:uid/full')
+  @NoCache()
+  async adminUpdateTeamFull(@Param('uid') teamUid: string, @Body() body) {
+    return this.adminTeamsService.updateTeam(teamUid, body);
   }
 }
