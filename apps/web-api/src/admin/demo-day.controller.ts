@@ -168,11 +168,4 @@ export class AdminDemoDaysController {
       req.userEmail
     );
   }
-
-
-  @Get('hosts')
-  async getHosts(): Promise<{ hosts: string[] }> {
-    const hosts = await this.demoDaysService.getDemoDayHosts();
-    return { hosts };
-  }
 }

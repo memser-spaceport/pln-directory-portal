@@ -1,5 +1,5 @@
 ALTER TABLE "DemoDay"
-  ADD COLUMN "host" TEXT NOT NULL DEFAULT 'plnetwork.io';
+  ADD COLUMN "host" TEXT NOT NULL DEFAULT 'Protocol Labs';
 
 CREATE TYPE "DemoDayAdminScopeType" AS ENUM ('HOST');
 

@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 import { Member } from '../../types/member';
 import { useUpdateMemberRoles } from '../../../../hooks/members/useUpdateMemberRoles';
 import { useUpdateMemberDemoDayHosts } from '../../../../hooks/members/useUpdateMemberDemoDayHosts';
-import { useDemoDayHosts } from '../../../../hooks/demo-days/useDemoDayHosts';
+import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
 import { MemberRole } from '../../../../utils/constants';
 
 import s from '../StatusCell/StatusCell.module.scss';
@@ -48,12 +48,7 @@ const RoleCell = ({ member }: { member: Member }) => {
   const { mutateAsync: updateDemoDayHosts, isLoading: isUpdatingHosts } =
     useUpdateMemberDemoDayHosts();
 
-  const { data: hostsFromApi = [], isLoading: isHostsLoading } = useDemoDayHosts(plnadmin);
-
-  const hostOptions: DemoDayHostOption[] = useMemo(
-    () => hostsFromApi.map((h) => ({ label: h, value: h })),
-    [hostsFromApi],
-  );
+  const hostOptions: DemoDayHostOption[] = DEMO_DAY_HOSTS.map((h) => ({ label: h, value: h }));
 
   // ---- ROLES ----
 
@@ -133,11 +128,6 @@ const RoleCell = ({ member }: { member: Member }) => {
   const [selectedHosts, setSelectedHosts] = useState<DemoDayHostOption[]>([]);
 
   useEffect(() => {
-    if (!hostOptions.length) {
-      setSelectedHosts([]);
-      return;
-    }
-
     let hosts: string[] | undefined;
 
     const fromDemoDayHosts = (member as any).demoDayHosts as string[] | undefined;
@@ -161,7 +151,7 @@ const RoleCell = ({ member }: { member: Member }) => {
     } else {
       setSelectedHosts([]);
     }
-  }, [member.uid, (member as any).demoDayHosts, (member as any).demoDayAdminScopes, hostOptions]);
+  }, [member.uid, (member as any).demoDayHosts, (member as any).demoDayAdminScopes]);
 
   const handleHostsSelectChange = (value: readonly DemoDayHostOption[] | null) => {
     setSelectedHosts(value ? [...value] : []);
@@ -242,11 +232,8 @@ const RoleCell = ({ member }: { member: Member }) => {
             className="flex-1"
             isMulti
             closeMenuOnSelect={false}
-            placeholder={
-              isHostsLoading ? 'Loading hosts…' : 'Select demo day hosts'
-            }
+            placeholder="Select demo day hosts"
             options={hostOptions}
-            isDisabled={isHostsLoading || !hostOptions.length}
             value={selectedHosts}
             onChange={(value) => handleHostsSelectChange(value as DemoDayHostOption[])}
             styles={{
@@ -281,9 +268,7 @@ const RoleCell = ({ member }: { member: Member }) => {
             type="button"
             className={s.btn}
             onClick={handleUpdateHostsClick}
-            disabled={
-              isUpdatingHosts || selectedHosts.length === 0 || !hostOptions.length
-            }
+            disabled={isUpdatingHosts || selectedHosts.length === 0}
           >
             {isUpdatingHosts ? 'Saving…' : 'Update scope'}
           </button>
