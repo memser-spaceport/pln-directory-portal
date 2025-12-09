@@ -1431,4 +1431,21 @@ export class DemoDaysService {
 
     return participant?.isDemoDayAdmin || false;
   }
+
+
+
+  async getDemoDayHosts(): Promise<string[]> {
+    const demoDays = await this.prisma.demoDay.findMany({
+      select: {
+        host: true,
+      },
+      distinct: ['host'],
+    });
+
+    return demoDays
+      .map((d) => d.host)
+      .filter((h): h is string => !!h)
+      .sort();
+  }
+
 }
