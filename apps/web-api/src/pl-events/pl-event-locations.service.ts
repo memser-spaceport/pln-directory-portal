@@ -684,7 +684,7 @@ export class PLEventLocationsService {
         data: location
       });
       this.logger.info(`New location created: ${createdLocation.location}`);
-      this.cacheService.flushCache();
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return createdLocation;
     } catch (error) {
       this.logger.error(`location error : , ${error}`);
@@ -749,7 +749,7 @@ export class PLEventLocationsService {
         where: { uid: locationUid },
         data: updatedLocation
       });
-      this.cacheService.flushCache();
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return location;
     } catch (error) { 
       this.logger.error(`Error while modifying pl event location ${locationUid}: ${error}`);
@@ -836,7 +836,7 @@ export class PLEventLocationsService {
         data
       });
       this.logger.info(`Updated location: ${location.uid}`, 'PLEventLocationsService');
-      this.cacheService.flushCache();
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return location;
     } catch (error) {
       this.logger.error(`Error updating location: ${error.message}`);
@@ -901,7 +901,7 @@ export class PLEventLocationsService {
           data: { isDeleted: true }
         });
         this.logger.info(`Deleted location: ${location.uid}, ${associationsResult.count} location-associations`, 'PLEventLocationsService');
-        this.cacheService.flushCache();
+        this.cacheService.reset({ service: 'PLEventGuest' });;
         return location;
       });
     } catch (error) {

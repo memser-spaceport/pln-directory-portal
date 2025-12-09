@@ -136,7 +136,7 @@ export class PLEventLocationAssociationService {
         data
       });
       this.logger.info(`Created location association: ${association.uid} with locationUid: ${association.locationUid}`, 'PLEventLocationAssociationService');
-      this.cacheService.flushCache();
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return association;
     } catch (error) {
       this.logger.error(`Error creating location association: ${error.message}`, error.stack, 'PLEventLocationAssociationService');
@@ -173,7 +173,7 @@ export class PLEventLocationAssociationService {
         }
       });
       this.logger.info(`Created location association: ${association.uid}`, 'PLEventLocationAssociationService');
-      this.cacheService.flushCache();
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return association;
     } catch (error) {
       this.logger.error(`Error creating location association: ${error.message}`);
@@ -199,7 +199,7 @@ export class PLEventLocationAssociationService {
    */
   async updateAssociations(query: Prisma.PLEventLocationAssociationUpdateManyArgs, tx?) {
     const updatedAssociations = await (tx || this.prisma).pLEventLocationAssociation.updateMany(query);
-    this.cacheService.flushCache();
+    this.cacheService.reset({ service: 'PLEventGuest' });;
     return updatedAssociations;
   }
 
@@ -293,7 +293,7 @@ export class PLEventLocationAssociationService {
           await this.updateRelatedEventsLocationUid(uid, data.locationUid, tx);
         }
         this.logger.info(`Updated location association: ${association.uid}`);
-        this.cacheService.flushCache();
+        this.cacheService.reset({ service: 'PLEventGuest' });;
         return association;
       });
     } catch (error) {
@@ -350,7 +350,7 @@ export class PLEventLocationAssociationService {
           }
         });
         this.logger.info(`Deleted location association: ${association.uid}`, 'PLEventLocationAssociationService');
-        this.cacheService.flushCache();
+        this.cacheService.reset({ service: 'PLEventGuest' });;
         return association;
       });
     } catch (error) {
@@ -376,7 +376,7 @@ export class PLEventLocationAssociationService {
         locationUid: locationUid
       }
     });
-    this.cacheService.flushCache();
+    this.cacheService.reset({ service: 'PLEventGuest' });;
   }
 
   private handleErrors(error, message?: string) {
