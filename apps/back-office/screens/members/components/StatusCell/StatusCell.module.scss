@@ -26,8 +26,13 @@
   line-height: 16px; /* 133.333% */
   letter-spacing: -0.2px;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: var(--action-background-neutral-light_hover, rgba(14, 15, 17, 0.08));
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 }
 
