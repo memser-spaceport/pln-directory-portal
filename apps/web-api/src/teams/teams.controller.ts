@@ -233,17 +233,6 @@ export class TeamsController {
   }
 
   /**
-   * Admin: full team update using old ParticipantsRequest payload.
-   */
-  @Patch('v1/admin/teams/:uid/full')
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
-  @NoCache()
-  async adminUpdateTeamFull(@Param('uid') teamUid: string, @Body() body: ParticipantsRequest, @Req() req: Request) {
-    return this.teamsService.updateTeamFromParticipantsRequest(teamUid, body, req['userEmail']);
-  }
-
-  /**
    * Back-office: list teams.
    * GET /teams?includeL0=true|false
    */
