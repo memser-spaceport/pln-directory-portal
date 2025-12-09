@@ -86,7 +86,7 @@ export class EventConsumerHelper {
         associationUid = newAssociation.uid;
       }
     }
-    this.cacheService.flushCache();
+    this.cacheService.reset({ service: 'PLEventGuest' });
     return { locationUid, associationUid };
   }
 
