@@ -1284,7 +1284,7 @@ export class TeamsService {
         : await this.membersService.findMemberByUid(body.memberUid);
     if (!member) throw new NotFoundException('Member not found');
 
-    const { role, investmentTeam, isFund, investorProfile } = body ?? {};
+    const { role, investmentTeam, isFund, investorProfile, website } = body ?? {};
 
     return await this.prisma.$transaction(async (tx) => {
       const teamExists = await tx.team.findUnique({
@@ -1320,7 +1320,8 @@ export class TeamsService {
       }
 
       // 2) Privileged fields require team lead
-      const wantsPrivileged = isFund !== undefined || (investorProfile && Object.keys(investorProfile).length > 0);
+      const wantsPrivileged =
+        isFund !== undefined || (investorProfile && Object.keys(investorProfile).length > 0) || website !== undefined;
 
       if (wantsPrivileged) {
         // Check caller's role in this team: must be teamLead === true
@@ -1340,6 +1341,10 @@ export class TeamsService {
         // Create/update investor profile (no global ACLs here; team lead is enough)
         if (investorProfile) {
           await this.upsertInvestorProfileAsTeamLead(tx, teamUid, investorProfile);
+        }
+
+        if (website !== undefined) {
+          await tx.team.update({ where: { uid: teamUid }, data: { website } });
         }
       }
 
@@ -1695,7 +1700,9 @@ export class TeamsService {
     const member = await this.membersService.findMemberByEmail(actorEmail);
     if (!member) return false;
 
-    const memberIsDirectoryAdmin = member.memberRoles ? isDirectoryAdmin(member as { memberRoles: Array<{ name: string }> }) : false;
+    const memberIsDirectoryAdmin = member.memberRoles
+      ? isDirectoryAdmin(member as { memberRoles: Array<{ name: string }> })
+      : false;
 
     return !!member.isTierViewer || memberIsDirectoryAdmin;
   }

@@ -3,6 +3,7 @@ export type SelfUpdatePayload = {
   memberUid?: string;
   role?: string | null;
   investmentTeam: boolean;
+  website?: string | null;
 
   // allowed only for team lead:
   isFund?: boolean | false;
@@ -13,7 +14,6 @@ export type SelfUpdatePayload = {
     typicalCheckSize?: number | null;
   } | null;
 };
-
 
 export class UpdateTeamAccessLevelDto {
   accessLevel: string;
