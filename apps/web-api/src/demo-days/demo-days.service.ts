@@ -500,6 +500,7 @@ export class DemoDaysService {
       approximateStartDate?: string | null;
       supportEmail?: string | null;
       status?: DemoDayStatus;
+      host?: string | null;
     },
     actorEmail?: string
   ): Promise<DemoDay> {
@@ -553,6 +554,9 @@ export class DemoDaysService {
     }
     if (data.status !== undefined) {
       updateData.status = data.status;
+    }
+    if (data.host !== undefined) {
+      updateData.host = data.host;
     }
 
     const updated = await this.prisma.demoDay.update({
@@ -1431,21 +1435,4 @@ export class DemoDaysService {
 
     return participant?.isDemoDayAdmin || false;
   }
-
-
-
-  async getDemoDayHosts(): Promise<string[]> {
-    const demoDays = await this.prisma.demoDay.findMany({
-      select: {
-        host: true,
-      },
-      distinct: ['host'],
-    });
-
-    return demoDays
-      .map((d) => d.host)
-      .filter((h): h is string => !!h)
-      .sort();
-  }
-
 }

@@ -87,6 +87,7 @@ export class AdminDemoDaysController {
         approximateStartDate: body.approximateStartDate,
         supportEmail: body.supportEmail,
         status: body.status?.toUpperCase() as DemoDayStatus,
+        host: body.host,
       },
       req.userEmail
     );
@@ -167,12 +168,5 @@ export class AdminDemoDaysController {
       },
       req.userEmail
     );
-  }
-
-
-  @Get('hosts')
-  async getHosts(): Promise<{ hosts: string[] }> {
-    const hosts = await this.demoDaysService.getDemoDayHosts();
-    return { hosts };
   }
 }

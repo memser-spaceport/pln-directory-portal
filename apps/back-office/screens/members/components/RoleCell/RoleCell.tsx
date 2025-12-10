@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 import { Member } from '../../types/member';
 import { useUpdateMemberRoles } from '../../../../hooks/members/useUpdateMemberRoles';
 import { useUpdateMemberDemoDayHosts } from '../../../../hooks/members/useUpdateMemberDemoDayHosts';
-import { useDemoDayHosts } from '../../../../hooks/demo-days/useDemoDayHosts';
+import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
 import { MemberRole } from '../../../../utils/constants';
 
 import s from '../StatusCell/StatusCell.module.scss';
@@ -42,18 +42,13 @@ type DemoDayHostOption = {
   value: string;
 };
 
+const hostOptions: DemoDayHostOption[] = DEMO_DAY_HOSTS.map((h) => ({ label: h, value: h }));
+
 const RoleCell = ({ member }: { member: Member }) => {
   const [plnadmin] = useCookie('plnadmin');
   const { mutateAsync: updateMemberRoles } = useUpdateMemberRoles();
   const { mutateAsync: updateDemoDayHosts, isLoading: isUpdatingHosts } =
     useUpdateMemberDemoDayHosts();
-
-  const { data: hostsFromApi = [], isLoading: isHostsLoading } = useDemoDayHosts(plnadmin);
-
-  const hostOptions: DemoDayHostOption[] = useMemo(
-    () => hostsFromApi.map((h) => ({ label: h, value: h })),
-    [hostsFromApi],
-  );
 
   // ---- ROLES ----
 
@@ -130,38 +125,33 @@ const RoleCell = ({ member }: { member: Member }) => {
   };
 
 
-  const [selectedHosts, setSelectedHosts] = useState<DemoDayHostOption[]>([]);
+  const demoDayHosts = member.demoDayHosts;
+  const demoDayAdminScopes = member.demoDayAdminScopes;
 
-  useEffect(() => {
-    if (!hostOptions.length) {
-      setSelectedHosts([]);
-      return;
-    }
-
+  const initialSelectedHosts = useMemo(() => {
     let hosts: string[] | undefined;
 
-    const fromDemoDayHosts = (member as any).demoDayHosts as string[] | undefined;
-    if (Array.isArray(fromDemoDayHosts) && fromDemoDayHosts.length > 0) {
-      hosts = fromDemoDayHosts;
-    } else {
-      const scopes = (member as any).demoDayAdminScopes as
-        | { scopeType: string; scopeValue: string }[]
-        | undefined;
-
-      if (Array.isArray(scopes)) {
-        hosts = scopes
-          .filter((s) => s.scopeType === 'HOST')
-          .map((s) => s.scopeValue);
-      }
+    if (Array.isArray(demoDayHosts) && demoDayHosts.length > 0) {
+      hosts = demoDayHosts;
+    } else if (Array.isArray(demoDayAdminScopes)) {
+      hosts = demoDayAdminScopes
+        .filter((s) => s.scopeType === 'HOST')
+        .map((s) => s.scopeValue);
     }
 
     if (Array.isArray(hosts) && hosts.length > 0) {
-      const initial = hostOptions.filter((opt) => hosts!.includes(opt.value));
-      setSelectedHosts(initial);
-    } else {
-      setSelectedHosts([]);
+      const hostsLower = hosts.map((h) => h.toLowerCase());
+      return hostOptions.filter((opt) => hostsLower.includes(opt.value.toLowerCase()));
     }
-  }, [member.uid, (member as any).demoDayHosts, (member as any).demoDayAdminScopes, hostOptions]);
+
+    return [];
+  }, [demoDayHosts, demoDayAdminScopes]);
+
+  const [selectedHosts, setSelectedHosts] = useState<DemoDayHostOption[]>(initialSelectedHosts);
+
+  useEffect(() => {
+    setSelectedHosts(initialSelectedHosts);
+  }, [initialSelectedHosts]);
 
   const handleHostsSelectChange = (value: readonly DemoDayHostOption[] | null) => {
     setSelectedHosts(value ? [...value] : []);
@@ -242,11 +232,8 @@ const RoleCell = ({ member }: { member: Member }) => {
             className="flex-1"
             isMulti
             closeMenuOnSelect={false}
-            placeholder={
-              isHostsLoading ? 'Loading hosts…' : 'Select demo day hosts'
-            }
+            placeholder="Select demo day hosts"
             options={hostOptions}
-            isDisabled={isHostsLoading || !hostOptions.length}
             value={selectedHosts}
             onChange={(value) => handleHostsSelectChange(value as DemoDayHostOption[])}
             styles={{
@@ -281,11 +268,9 @@ const RoleCell = ({ member }: { member: Member }) => {
             type="button"
             className={s.btn}
             onClick={handleUpdateHostsClick}
-            disabled={
-              isUpdatingHosts || selectedHosts.length === 0 || !hostOptions.length
-            }
+            disabled={isUpdatingHosts || selectedHosts.length === 0}
           >
-            {isUpdatingHosts ? 'Saving…' : 'Update scope'}
+            {isUpdatingHosts ? 'Saving…' : 'Update host'}
           </button>
         </div>
       )}

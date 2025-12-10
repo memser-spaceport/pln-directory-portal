@@ -13,6 +13,7 @@ import { ApproveParticipantModal } from '../../components/demo-days/ApproveParti
 import { ApplicationDetailsModal } from '../../components/demo-days/ApplicationDetailsModal';
 import { DemoDayParticipant, UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
+import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
 import { RichText } from '../../components/common/rich-text';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
@@ -143,6 +144,7 @@ const DemoDayDetailPage = () => {
       endDate: demoDay.endDate,
       approximateStartDate: demoDay.approximateStartDate,
       supportEmail: demoDay.supportEmail,
+      host: demoDay.host,
       status: demoDay.status,
     });
     setIsEditing(true);
@@ -486,6 +488,25 @@ const DemoDayDetailPage = () => {
                   />
                 ) : (
                   <div className={s.fieldValue}>{demoDay.slugURL}</div>
+                )}
+              </div>
+              <div className={clsx(s.overviewField)}>
+                <label className={s.fieldLabel}>Host</label>
+                {isEditing ? (
+                  <select
+                    value={editFormData.host || ''}
+                    onChange={(e) => handleEditFormChange('host', e.target.value)}
+                    className={s.fieldInput}
+                  >
+                    <option value="">Select a host</option>
+                    {DEMO_DAY_HOSTS.map((host) => (
+                      <option key={host} value={host}>
+                        {host}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className={s.fieldValue}>{demoDay.host || '-'}</div>
                 )}
               </div>
               <div className={clsx(s.overviewField)}>
