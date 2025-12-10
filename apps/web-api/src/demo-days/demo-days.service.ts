@@ -183,6 +183,7 @@ export class DemoDaysService {
       shortDescription?: string | null;
       approximateStartDate?: string | null;
       supportEmail?: string | null;
+      host: string;
       status: DemoDayStatus;
     },
     actorEmail?: string
@@ -212,6 +213,7 @@ export class DemoDaysService {
         shortDescription: data.shortDescription,
         approximateStartDate: data.approximateStartDate,
         supportEmail: data.supportEmail,
+        host: data.host,
         status: data.status,
         slugURL,
       },
@@ -228,6 +230,7 @@ export class DemoDaysService {
         shortDescription: created.shortDescription,
         startDate: created.startDate?.toISOString?.() || null,
         endDate: created.endDate?.toISOString?.() || null,
+        host: created.host || null,
         status: created.status,
         actorUid: actorUid || null,
         actorEmail: actorEmail || null,
@@ -1131,7 +1134,7 @@ export class DemoDaysService {
    */
   async checkDemoDayAccess(
     memberEmail: string,
-    demoDayUid: string,
+    demoDayUid: string
   ): Promise<{ participantUid: string; isAdmin: boolean }> {
     const member = await this.membersService.findMemberByEmail(memberEmail);
 
@@ -1210,7 +1213,6 @@ export class DemoDaysService {
     // 5) No access
     throw new ForbiddenException('No demo day access');
   }
-
 
   // Private helper methods
 

@@ -18,6 +18,7 @@ import { RichText } from '../../components/common/rich-text';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
 import dynamic from 'next/dynamic';
+import { useAuth } from '../../context/auth-context';
 
 import s from './styles.module.scss';
 
@@ -27,6 +28,7 @@ const DemoDayDetailPage = () => {
   const router = useRouter();
   const { slugURL } = router.query;
   const [authToken] = useCookie('plnadmin');
+  const { isDirectoryAdmin } = useAuth();
 
   // Redirect to log-in if not authenticated
   useEffect(() => {
@@ -64,7 +66,14 @@ const DemoDayDetailPage = () => {
     authToken,
     demoDayUid: demoDay?.uid as string,
     query: {
-      type: activeTab === 'applications' ? undefined : activeTab === 'investors' ? 'INVESTOR' : activeTab === 'founders' ? 'FOUNDER' : 'SUPPORT',
+      type:
+        activeTab === 'applications'
+          ? undefined
+          : activeTab === 'investors'
+          ? 'INVESTOR'
+          : activeTab === 'founders'
+          ? 'FOUNDER'
+          : 'SUPPORT',
       search: searchTerm || undefined,
       status:
         activeTab === 'applications'
@@ -492,7 +501,7 @@ const DemoDayDetailPage = () => {
               </div>
               <div className={clsx(s.overviewField)}>
                 <label className={s.fieldLabel}>Host</label>
-                {isEditing ? (
+                {isEditing && isDirectoryAdmin ? (
                   <select
                     value={editFormData.host || ''}
                     onChange={(e) => handleEditFormChange('host', e.target.value)}
@@ -579,13 +588,19 @@ const DemoDayDetailPage = () => {
                   className={clsx(s.tab, { [s.active]: activeTab === 'investors' })}
                   onClick={() => setActiveTab('investors')}
                 >
-                  Investors {participants && activeTab === 'investors' && `(${participants.participants.filter(p => p.status !== 'PENDING').length})`}
+                  Investors{' '}
+                  {participants &&
+                    activeTab === 'investors' &&
+                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'founders' })}
                   onClick={() => setActiveTab('founders')}
                 >
-                  Founders {participants && activeTab === 'founders' && `(${participants.participants.filter(p => p.status !== 'PENDING').length})`}
+                  Founders{' '}
+                  {participants &&
+                    activeTab === 'founders' &&
+                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'support' })}
