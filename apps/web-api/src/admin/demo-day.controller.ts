@@ -44,6 +44,7 @@ export class AdminDemoDaysController {
         shortDescription: body.shortDescription,
         approximateStartDate: body.approximateStartDate,
         supportEmail: body.supportEmail,
+        host: body.host,
         status: body.status.toUpperCase() as DemoDayStatus,
       },
       req.userEmail

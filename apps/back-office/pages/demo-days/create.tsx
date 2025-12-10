@@ -7,6 +7,7 @@ import { API_ROUTE } from '../../utils/constants';
 import { CreateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../../context/auth-context';
+import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
 
 const RichTextEditor = dynamic(() => import('../../components/common/rich-text-editor'), { ssr: false });
 
@@ -38,6 +39,7 @@ const CreateDemoDayPage = () => {
     shortDescription: '',
     startDate: '',
     endDate: '',
+    host: '',
     status: 'UPCOMING',
   });
 
@@ -247,6 +249,27 @@ const CreateDemoDayPage = () => {
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g., Q1 2025, Spring 2025"
               />
+            </div>
+
+            <div>
+              <label htmlFor="host" className="mb-2 block text-sm font-medium text-gray-700">
+                Host *
+              </label>
+              <select
+                id="host"
+                name="host"
+                required
+                value={formData.host}
+                onChange={handleInputChange}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a host</option>
+                {DEMO_DAY_HOSTS.map((host) => (
+                  <option key={host} value={host}>
+                    {host}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
