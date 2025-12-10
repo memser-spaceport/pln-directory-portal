@@ -13,6 +13,7 @@ interface IMemberResponse {
   email: string;
   isSubscribedToNewsletter: boolean;
   accessLevel: string;
+  memberRoles?: { name: string }[];
   teamOrProjectURL?: string;
   locationUid?: string;
   location?: {
@@ -38,10 +39,6 @@ interface IMemberResponse {
   githubHandler?: string;
   linkedinHandler?: string;
   officeHours?: string;
-  plnStartDate?: string;
-  skills?: [];
-  telegramHandler?: string;
-  twitterHandler?: string;
 }
 
 export const getMemberInfo = async (memberUid: string) => {
@@ -89,6 +86,7 @@ export const getMemberInfo = async (memberUid: string) => {
     projectContributions: projectContributions,
     teamMemberRoles: teamMemberRoles,
     skills: skills,
+    roles: (data.memberRoles ?? []).map((r: any) => r.name),
   };
 
   return formatted;

@@ -66,6 +66,16 @@ export default async function login(req: NextApiRequest, res: NextApiResponse) {
       sameSite: 'lax',
     });
 
+    // Store user info (including roles) for UI role-based access control
+    if (user) {
+      setCookie({ res }, 'plnadmin_user', JSON.stringify(user), {
+        expires: expiry,
+        path: '/',
+        httpOnly: false,
+        sameSite: 'lax',
+      });
+    }
+
     // Optional: store refresh token in a separate cookie (may be used later)
     if (refreshToken) {
       setCookie({ res }, 'plnadmin_refresh', refreshToken, {

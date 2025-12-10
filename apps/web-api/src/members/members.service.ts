@@ -5,30 +5,30 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException
+  NotFoundException,
 } from '@nestjs/common';
-import {z} from 'zod';
+import { z } from 'zod';
 import axios from 'axios';
 import * as path from 'path';
-import {Member, Prisma} from '@prisma/client';
-import {PrismaService} from '../shared/prisma.service';
-import {AirtableMemberSchema} from '../utils/airtable/schema/airtable-member.schema';
-import {FileMigrationService} from '../utils/file-migration/file-migration.service';
-import {LocationTransferService} from '../utils/location-transfer/location-transfer.service';
-import {NotificationService} from '../utils/notification/notification.service';
-import {EmailOtpService} from '../otp/email-otp.service';
-import {AuthService} from '../auth/auth.service';
-import {LogService} from '../shared/log.service';
-import {DEFAULT_MEMBER_ROLES, AdminRole, isDirectoryAdmin} from '../utils/constants';
-import {hashFileName} from '../utils/hashing';
-import {buildMultiRelationMapping, copyObj} from '../utils/helper/helper';
-import {CacheService} from '../utils/cache/cache.service';
-import {MembersHooksService} from './members.hooks.service';
-import {NotificationSettingsService} from '../notification-settings/notification-settings.service';
-import {AccessLevel} from '../../../../libs/contracts/src/schema/admin-member';
-import {OfficeHoursService} from '../office-hours/office-hours.service';
-import {TeamsService} from '../teams/teams.service';
-import {ParticipantsRequest} from "./members.dto";
+import { Member, Prisma } from '@prisma/client';
+import { PrismaService } from '../shared/prisma.service';
+import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
+import { FileMigrationService } from '../utils/file-migration/file-migration.service';
+import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
+import { NotificationService } from '../utils/notification/notification.service';
+import { EmailOtpService } from '../otp/email-otp.service';
+import { AuthService } from '../auth/auth.service';
+import { LogService } from '../shared/log.service';
+import { DEFAULT_MEMBER_ROLES, MemberRole, isDirectoryAdmin } from '../utils/constants';
+import { hashFileName } from '../utils/hashing';
+import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
+import { CacheService } from '../utils/cache/cache.service';
+import { MembersHooksService } from './members.hooks.service';
+import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
+import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
+import { OfficeHoursService } from '../office-hours/office-hours.service';
+import { TeamsService } from '../teams/teams.service';
+import { ParticipantsRequest } from './members.dto';
 
 @Injectable()
 export class MembersService {
@@ -190,7 +190,7 @@ export class MembersService {
 
       // Filter out any members with null emails (type safety)
       return members.filter(
-        (member): member is { uid: string; name: string; email: string; accessLevel: string } => member.email !== null
+        (member): member is { uid: string; name: string; email: string; accessLevel: string; memberRoles: { name: string }[];} => member.email !== null
       );
     } catch (error) {
       return this.handleErrors(error);
@@ -2810,7 +2810,7 @@ async updateMemberFromParticipantsRequest(
       where: {
         memberRoles: {
           some: {
-            name: AdminRole.DIRECTORY_ADMIN,
+            name: MemberRole.DIRECTORY_ADMIN,
           },
         },
       },

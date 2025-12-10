@@ -52,8 +52,11 @@ export class AdminDemoDaysController {
 
   @Get()
   @NoCache()
-  async getAllDemoDays(): Promise<ResponseDemoDayDto[]> {
-    return this.demoDaysService.getAllDemoDays();
+  async getAllDemoDays(@Req() req): Promise<ResponseDemoDayDto[]> {
+    // req.user contains the JWT payload with roles and memberUid
+    const userRoles: string[] = req.user?.roles ?? [];
+    const memberUid: string | undefined = req.user?.memberUid;
+    return this.demoDaysService.getAllDemoDaysForAdmin(userRoles, memberUid);
   }
 
   // This endpoint uses slugURL for browser-friendly URLs (e.g., /demo-days/crypto-day)
@@ -84,6 +87,7 @@ export class AdminDemoDaysController {
         approximateStartDate: body.approximateStartDate,
         supportEmail: body.supportEmail,
         status: body.status?.toUpperCase() as DemoDayStatus,
+        host: body.host,
       },
       req.userEmail
     );

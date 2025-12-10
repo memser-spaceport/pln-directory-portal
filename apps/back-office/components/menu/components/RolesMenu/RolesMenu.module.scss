@@ -1,0 +1,20 @@
+.menuItem {
+  display: flex;
+  padding: var(--spacing-2xs, 8px) var(--spacing-sm, 12px);
+  align-items: center;
+  gap: var(--spacing-2xs, 8px);
+  align-self: stretch;
+  border-radius: var(--corner-radius-3xl, 20px);
+  width: 100%;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: #f1f5f9;
+  }
+}
+
+.menuItemLabel {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 500;
+}

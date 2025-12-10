@@ -25,7 +25,7 @@ import { AskService } from '../asks/asks.service';
 import { TeamsHooksService } from './teams.hooks.service';
 import { ParticipantsRequest } from './dto/members.dto';
 import { SelfUpdatePayload } from './dto/teams.dto';
-import { AdminRole, isDirectoryAdmin } from '../utils/constants';
+import { MemberRole, isDirectoryAdmin } from '../utils/constants';
 
 @Injectable()
 export class TeamsService {
@@ -537,7 +537,7 @@ export class TeamsService {
     if (requestorAccessLevel && !['L5', 'L6'].includes(requestorAccessLevel)) {
       // Check if they're a directory admin
       const requestor = await tx.member.findFirst({
-        where: { memberRoles: { some: { name: AdminRole.DIRECTORY_ADMIN } } },
+        where: { memberRoles: { some: { name: MemberRole.DIRECTORY_ADMIN } } },
       });
       if (!requestor) {
         throw new ForbiddenException('Insufficient permissions to update investor profile');

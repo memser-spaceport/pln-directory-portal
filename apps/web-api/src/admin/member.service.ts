@@ -13,7 +13,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { NotificationService } from '../utils/notification/notification.service';
 import { LogService } from '../shared/log.service';
-import { AdminRole, DEFAULT_MEMBER_ROLES } from '../utils/constants';
+import { MemberRole, DEFAULT_MEMBER_ROLES, hasDemoDayAdminRole } from '../utils/constants';
 import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
@@ -713,6 +713,76 @@ export class MemberService {
     return response;
   }
 
+
+  /**
+   * Replaces HOST-type demo day admin scopes for a given member.
+   *
+   * Only members with DEMO_DAY_ADMIN role are allowed to have demo day admin scopes.
+   * Returns the updated member including roles and demo day admin scopes.
+   */
+  async updateDemoDayAdminHosts(memberUid: string, hosts: string[]): Promise<Member> {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      include: {
+        memberRoles: true,
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+
+    if (!hasDemoDayAdminRole(member)) {
+      // Treat this as a configuration error rather than a permission error
+      throw new BadRequestException('Member does not have DEMO_DAY_ADMIN role');
+    }
+
+    const normalizedHosts = (hosts || [])
+      .map((h) => h.trim())
+      .filter((h) => h.length > 0);
+
+    // Replace all HOST scopes for this member in a single transaction
+    await this.prisma.$transaction([
+      this.prisma.memberDemoDayAdminScope.deleteMany({
+        where: {
+          memberUid,
+          scopeType: 'HOST',
+        },
+      }),
+      ...normalizedHosts.map((host) =>
+        this.prisma.memberDemoDayAdminScope.create({
+          data: {
+            memberUid,
+            scopeType: 'HOST',
+            scopeValue: host,
+          },
+        }),
+      ),
+    ]);
+
+    // Reload member with roles and demo day–related scopes/relations
+    const updatedMember = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      include: {
+        memberRoles: true,
+        demoDayAdminScopes: true,
+        demoDayParticipants: {
+          include: {
+            demoDay: true,
+          },
+        },
+      },
+    });
+
+    // This should not happen, but be defensive in case the record was removed meanwhile
+    if (!updatedMember) {
+      throw new NotFoundException('Member not found after updating demo day admin hosts');
+    }
+
+    return updatedMember;
+  }
+
+
   /**
    * Handles database-related errors specifically for the Member entity.
    * Logs the error and throws an appropriate HTTP exception based on the error type.
@@ -752,7 +822,7 @@ export class MemberService {
       where: {
         memberRoles: {
           some: {
-            name: AdminRole.DIRECTORY_ADMIN,
+            name: MemberRole.DIRECTORY_ADMIN,
           },
         },
       },
@@ -775,6 +845,7 @@ export class MemberService {
         uid: true,
         name: true,
         imageUid: true,
+        memberRoles: true,
         image: {
           select: {
             uid: true,
@@ -835,11 +906,27 @@ export class MemberService {
             type: true,
           },
         },
+        demoDayAdminScopes: {
+          select: {
+            memberUid: true,
+            scopeType: true,
+            scopeValue: true,
+            config: true,
+          },
+        },
       },
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { name: 'asc' },
     });
+
+    const membersWithHosts = members.map((m) => ({
+      ...m,
+      demoDayHosts:
+        m.demoDayAdminScopes
+          ?.filter((s) => s.scopeType === 'HOST')
+          .map((s) => s.scopeValue) ?? [],
+    }));
 
     const total = await this.prisma.member.count({
       where: {
@@ -848,7 +935,7 @@ export class MemberService {
     });
 
     return {
-      data: members,
+      data: membersWithHosts,
       pagination: {
         total,
         page,
@@ -1331,4 +1418,71 @@ export class MemberService {
         return { isVerified: false, plnFriend: false };
     }
   }
+
+  /**
+   * Replaces all roles for a given member with the provided list of role names.
+   *
+   * Only directory-level admins should be allowed to call this from controller.
+   */
+  async updateMemberRolesByUid(memberUid: string, roleNames: string[]) {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      include: { memberRoles: true },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+
+    const normalizedRoleNames = (roleNames ?? [])
+      .map((name) => name.trim().toUpperCase())
+      .filter((name) => name.length > 0);
+
+    // Load existing roles from DB by name
+    const roles = await this.prisma.memberRole.findMany({
+      where: {
+        name: { in: normalizedRoleNames },
+      },
+    });
+
+    if (roles.length !== normalizedRoleNames.length) {
+      const existingNames = roles.map((r) => r.name);
+      const missing = normalizedRoleNames.filter((r) => !existingNames.includes(r));
+      throw new BadRequestException(
+        `Unknown member roles: ${missing.join(', ')}`,
+      );
+    }
+
+    // Optional: protect from removing the last DIRECTORY_ADMIN
+    // (uncomment if you want safety here)
+    // if (member.memberRoles.some((r) => r.name === 'DIRECTORY_ADMIN') &&
+    //     !normalizedRoleNames.includes('DIRECTORY_ADMIN')) {
+    //   const directoryAdminsCount = await this.prisma.member.count({
+    //     where: {
+    //       memberRoles: { some: { name: 'DIRECTORY_ADMIN' } },
+    //     },
+    //   });
+    //   if (directoryAdminsCount === 1) {
+    //     throw new BadRequestException('Cannot remove the last DIRECTORY_ADMIN');
+    //   }
+    // }
+
+    // Replace roles via "set" + "connect"
+    const updated = await this.prisma.member.update({
+      where: { uid: memberUid },
+      data: {
+        memberRoles: {
+          set: [], // clear existing many-to-many
+          connect: roles.map((role) => ({ id: role.id })),
+        },
+      },
+      include: {
+        memberRoles: true,
+        demoDayAdminScopes: true,
+      },
+    });
+
+    return updated;
+  }
+
 }

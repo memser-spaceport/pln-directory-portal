@@ -27,6 +27,7 @@ export const UpdateDemoDaySchema = z.object({
   approximateStartDate: z.string().optional().nullable(),
   supportEmail: z.string().email().optional().nullable(),
   status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']).optional(),
+  host: z.string().optional().nullable(),
 });
 
 export class UpdateDemoDayDto extends createZodDto(UpdateDemoDaySchema) {}

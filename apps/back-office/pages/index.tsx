@@ -2,11 +2,30 @@ import { ChangeEvent, useEffect, useState } from 'react';
 import { InputField } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
 import { ReactComponent as Building } from '/public/assets/icons/building.svg';
-import APP_CONSTANTS, { ROUTE_CONSTANTS } from '../utils/constants';
+import APP_CONSTANTS, { ROUTE_CONSTANTS, MemberRole } from '../utils/constants';
 import { parseCookies } from 'nookies';
 import Loader from '../components/common/loader';
 import { ReactComponent as LogoImage } from '/public/assets/images/Back_office_Logo.svg';
 import { GetServerSideProps } from 'next';
+
+interface AdminUser {
+  uid: string;
+  email: string;
+  name: string;
+  roles: string[];
+}
+
+function getDefaultRedirect(user: AdminUser | null): string {
+  if (!user) return '/members?filter=level1';
+
+  const isDirectoryAdmin = user.roles?.includes(MemberRole.DIRECTORY_ADMIN);
+  if (isDirectoryAdmin) {
+    return '/members?filter=level1';
+  }
+
+  // DEMO_DAY_ADMIN users go directly to demo-days
+  return '/demo-days';
+}
 
 export function Index() {
   const [email, setEmail] = useState<string>('');
@@ -121,9 +140,11 @@ export function Index() {
       });
 
       if (res.ok) {
+        const data = await res.json();
         const backLink = router.query?.backLink as string | undefined;
         // Cookie 'plnadmin' is set by /api/login on successful OTP verification
-        router.push(backLink ?? '/members?filter=level1');
+        // Redirect based on user role
+        router.push(backLink ?? getDefaultRedirect(data?.user));
       } else if (res.status === 401) {
         setError('Invalid OTP code.');
       } else {
@@ -226,12 +247,19 @@ export function Index() {
 export default Index;
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const { plnadmin } = parseCookies(context);
+  const { plnadmin, plnadmin_user } = parseCookies(context);
 
   if (plnadmin) {
+    let user: AdminUser | null;
+    try {
+      user = plnadmin_user ? JSON.parse(plnadmin_user) : null;
+    } catch {
+      user = null;
+    }
+
     return {
       redirect: {
-        destination: '/members?filter=level1',
+        destination: getDefaultRedirect(user),
         permanent: false,
       },
     };

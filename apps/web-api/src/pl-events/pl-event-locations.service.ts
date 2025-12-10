@@ -670,7 +670,8 @@ export class PLEventLocationsService {
           location: {
             equals: location.location,
             mode: 'insensitive'
-          }
+          },
+          isDeleted: false
         }
       });
       if (existingLocation) {
@@ -683,7 +684,7 @@ export class PLEventLocationsService {
         data: location
       });
       this.logger.info(`New location created: ${createdLocation.location}`);
-      this.cacheService.flushCache();
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return createdLocation;
     } catch (error) {
       this.logger.error(`location error : , ${error}`);
@@ -748,7 +749,7 @@ export class PLEventLocationsService {
         where: { uid: locationUid },
         data: updatedLocation
       });
-      this.cacheService.flushCache();
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return location;
     } catch (error) { 
       this.logger.error(`Error while modifying pl event location ${locationUid}: ${error}`);
@@ -835,11 +836,33 @@ export class PLEventLocationsService {
         data
       });
       this.logger.info(`Updated location: ${location.uid}`, 'PLEventLocationsService');
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return location;
     } catch (error) {
       this.logger.error(`Error updating location: ${error.message}`);
       this.handleErrors(error);
     }
+  }
+
+  /**
+   * Soft deletes all events associated with a location.
+   * 
+   * @param locationUid - The unique identifier of the location.
+   * @param tx - Optional transaction object.
+   * @returns The number of events soft deleted.
+   */
+  private async deleteAssociatedEvents(locationUid: string, tx?: any): Promise<number> {
+    const result = await (tx || this.prisma).pLEvent.updateMany({
+      where: {
+        locationUid: locationUid,
+        isDeleted: false
+      },
+      data: {
+        isDeleted: true
+      }
+    });
+    this.logger.info(`Soft deleted ${result.count} events associated with location ${locationUid}`, 'PLEventLocationsService');
+    return result.count;
   }
 
   /**
@@ -859,8 +882,9 @@ export class PLEventLocationsService {
         throw new NotFoundException(`Location with UID ${uid} not found.`);
       }
 
-      // Soft delete location and all associated location associations in a transaction
+      // Soft delete location and all associated location associations
       return await this.prisma.$transaction(async (tx) => {
+
         // Soft delete all associated location associations
         const associationsResult = await tx.pLEventLocationAssociation.updateMany({
           where: {
@@ -876,27 +900,8 @@ export class PLEventLocationsService {
           where: { uid },
           data: { isDeleted: true }
         });
-        this.logger.info(`Deleted location: ${location.uid} and all its location-associations`, 'PLEventLocationsService');
-        return location;
-      });
-      // Soft delete location and all associated location associations in a transaction
-      return await this.prisma.$transaction(async (tx) => {
-        // Soft delete all associated location associations
-        const associationsResult = await tx.pLEventLocationAssociation.updateMany({
-          where: {
-            locationUid: uid,
-            isDeleted: false
-          },
-          data: {
-            isDeleted: true
-          }
-        });
-
-        const location = await tx.pLEventLocation.update({
-          where: { uid },
-          data: { isDeleted: true }
-        });
-        this.logger.info(`Deleted location: ${location.uid} and all its location-associations`, 'PLEventLocationsService');
+        this.logger.info(`Deleted location: ${location.uid}, ${associationsResult.count} location-associations`, 'PLEventLocationsService');
+        this.cacheService.reset({ service: 'PLEventGuest' });;
         return location;
       });
     } catch (error) {

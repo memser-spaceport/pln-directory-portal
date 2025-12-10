@@ -136,7 +136,7 @@ export class PLEventLocationAssociationService {
         data
       });
       this.logger.info(`Created location association: ${association.uid} with locationUid: ${association.locationUid}`, 'PLEventLocationAssociationService');
-      this.cacheService.flushCache();
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return association;
     } catch (error) {
       this.logger.error(`Error creating location association: ${error.message}`, error.stack, 'PLEventLocationAssociationService');
@@ -153,6 +153,19 @@ export class PLEventLocationAssociationService {
    */
   async createPLEventLocationAssociation(data: Prisma.PLEventLocationAssociationUncheckedCreateInput) {
     try {
+      const existingAssociation = await this.prisma.pLEventLocationAssociation.findFirst({
+        where: {
+          locationUid: data.locationUid,
+          city: data.city ?? null,
+          state: data.state ?? null,
+          country: data.country ?? null,
+          isDeleted: false
+        }
+      });
+      
+      if (existingAssociation) {
+        throw new ConflictException(`Location association with locationUid ${data.locationUid} already exists.`);
+      }
       const association = await this.prisma.pLEventLocationAssociation.create({
         data,
         include: {
@@ -160,6 +173,7 @@ export class PLEventLocationAssociationService {
         }
       });
       this.logger.info(`Created location association: ${association.uid}`, 'PLEventLocationAssociationService');
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return association;
     } catch (error) {
       this.logger.error(`Error creating location association: ${error.message}`);
@@ -174,7 +188,7 @@ export class PLEventLocationAssociationService {
    * @returns Promise<PLEventLocationAssociation> - Found association record
    */
   async findAssociation(query: Prisma.PLEventLocationAssociationFindFirstArgs, tx?) {
-    return (tx || this.prisma).pLEventLocationAssociation.findFirst(query);
+    return await (tx || this.prisma).pLEventLocationAssociation.findFirst(query);
   }
 
   /**
@@ -184,7 +198,9 @@ export class PLEventLocationAssociationService {
    * @returns Promise<void> - Deleted associations
    */
   async updateAssociations(query: Prisma.PLEventLocationAssociationUpdateManyArgs, tx?) {
-    return (tx || this.prisma).pLEventLocationAssociation.updateMany(query);
+    const updatedAssociations = await (tx || this.prisma).pLEventLocationAssociation.updateMany(query);
+    this.cacheService.reset({ service: 'PLEventGuest' });;
+    return updatedAssociations;
   }
 
 
@@ -277,13 +293,34 @@ export class PLEventLocationAssociationService {
           await this.updateRelatedEventsLocationUid(uid, data.locationUid, tx);
         }
         this.logger.info(`Updated location association: ${association.uid}`);
-        this.cacheService.flushCache();
+        this.cacheService.reset({ service: 'PLEventGuest' });;
         return association;
       });
     } catch (error) {
       this.logger.error(`Error updating location association: ${error.message}`);
       this.handleErrors(error);
     }
+  }
+
+  /**
+   * Soft deletes all events associated with a location association.
+   * 
+   * @param associationUid - The unique identifier of the location association.
+   * @param tx - Optional transaction object.
+   * @returns The number of events soft deleted.
+   */
+  private async deleteAssociatedEvents(associationUid: string, tx?: any): Promise<number> {
+    const result = await (tx || this.prisma).pLEvent.updateMany({
+      where: {
+        pLEventLocationAssociationUid: associationUid,
+        isDeleted: false
+      },
+      data: {
+        isDeleted: true
+      }
+    });
+    this.logger.info(`Soft deleted ${result.count} events associated with location association ${associationUid}`, 'PLEventLocationAssociationService');
+    return result.count;
   }
 
   /**
@@ -303,16 +340,19 @@ export class PLEventLocationAssociationService {
         throw new NotFoundException(`Location association with UID ${uid} not found.`);
       }
 
-      const association = await this.prisma.pLEventLocationAssociation.update({
-        where: { uid },
-        data: { isDeleted: true },
-        include: {
-          location: true
-        }
+      // Soft deletes location association
+      return await this.prisma.$transaction(async (tx) => {
+        const association = await tx.pLEventLocationAssociation.update({
+          where: { uid },
+          data: { isDeleted: true },
+          include: {
+            location: true
+          }
+        });
+        this.logger.info(`Deleted location association: ${association.uid}`, 'PLEventLocationAssociationService');
+        this.cacheService.reset({ service: 'PLEventGuest' });;
+        return association;
       });
-      this.logger.info(`Deleted location association: ${association.uid}`, 'PLEventLocationAssociationService');
-      this.cacheService.flushCache();
-      return association;
     } catch (error) {
       this.logger.error(`Error deleting location association: ${error.message}`); 
       this.handleErrors(error);
@@ -336,7 +376,7 @@ export class PLEventLocationAssociationService {
         locationUid: locationUid
       }
     });
-    this.cacheService.flushCache();
+    this.cacheService.reset({ service: 'PLEventGuest' });;
   }
 
   private handleErrors(error, message?: string) {

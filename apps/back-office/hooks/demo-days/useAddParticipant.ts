@@ -10,6 +10,7 @@ interface MutationParams {
   data: AddParticipantDto;
 }
 
+
 async function addParticipant(params: MutationParams): Promise<DemoDayParticipant> {
   const config = {
     headers: {
