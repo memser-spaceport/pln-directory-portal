@@ -201,14 +201,7 @@ const TeamsPage: React.FC = () => {
         newData.tier = tierValue;
       }
 
-      const payload = {
-        participantType: 'TEAM',
-        requesterEmailId: 'backoffice@plnetwork.io',
-        uniqueIdentifier: name || selectedTeamUid,
-        newData,
-      };
-
-      await api.patch(`/v1/admin/teams/${selectedTeamUid}/full`, payload, config);
+      await api.patch(`/v1/admin/teams/${selectedTeamUid}/full`, newData, config);
 
       // Optimistic local update (including tier)
       setTeams((prev) =>

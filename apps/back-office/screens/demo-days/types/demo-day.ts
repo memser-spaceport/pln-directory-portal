@@ -23,6 +23,7 @@ export interface CreateDemoDayDto {
   endDate: string;
   approximateStartDate?: string | null;
   supportEmail?: string | null;
+  host: string;
   status: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 }
 
