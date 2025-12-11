@@ -68,6 +68,10 @@ export const MemberSchema = z.object({
 
 export const ResponseMemberSchema = MemberSchema.omit({ id: true, telegramUid: true }).strict();
 
+export const ResponseMemberRoleSchema = z.object({
+  name: z.string(),
+});
+
 export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   image: ResponseImageWithRelationsSchema.optional(),
   location: LocationResponseSchema.optional(),
@@ -75,6 +79,7 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
   projectContributions: ResponseProjectContributionSchema.array().optional(),
   experiences: ResponseMemberExperienceSchema.array().optional(),
+  memberRoles: ResponseMemberRoleSchema.array().optional(),
 });
 
 export const SimpleMemberSchema = ResponseMemberSchema.pick({
@@ -120,6 +125,7 @@ export const MemberRelationalFields = ResponseMemberWithRelationsSchema.pick({
   teamMemberRoles: true,
   projectContributions: true,
   experiences: true,
+  memberRoles: true,
   linkedInProfile: true,
 }).strip();
 
