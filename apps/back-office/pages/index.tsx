@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useState } from 'react';
 import { InputField } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
 import { ReactComponent as Building } from '/public/assets/icons/building.svg';
-import APP_CONSTANTS, { ROUTE_CONSTANTS, MemberRole } from '../utils/constants';
+import APP_CONSTANTS, { MemberRole } from '../utils/constants';
 import { parseCookies } from 'nookies';
 import Loader from '../components/common/loader';
 import { ReactComponent as LogoImage } from '/public/assets/images/Back_office_Logo.svg';
@@ -143,8 +143,9 @@ export function Index() {
         const data = await res.json();
         const backLink = router.query?.backLink as string | undefined;
         // Cookie 'plnadmin' is set by /api/login on successful OTP verification
-        // Redirect based on user role
-        router.push(backLink ?? getDefaultRedirect(data?.user));
+        // Use window.location for hard redirect to ensure cookies are properly re-read
+        // This prevents stale role data from previous sessions
+        window.location.href = backLink ?? getDefaultRedirect(data?.user);
       } else if (res.status === 401) {
         setError('Invalid OTP code.');
       } else {
