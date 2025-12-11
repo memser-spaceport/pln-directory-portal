@@ -98,8 +98,8 @@ export class DemoDaysService {
       };
     }
 
-    // Check if member has demo day admin access (super admin or DEMO_DAY_ADMIN role)
-    const hasMemberLevelAdminAccess = this.hasDemoDayAdminAccess(member);
+    // Check if member has demo day admin access (super admin or DEMO_DAY_ADMIN role with matching host scope)
+    const hasMemberLevelAdminAccess = this.hasDemoDayAdminAccess(member, demoDay.host);
 
     // Check demo day participant
     const participant = member.demoDayParticipants[0];
@@ -339,8 +339,6 @@ export class DemoDaysService {
       this.getQualifiedInvestorsCount(),
     ]);
 
-    const hasMemberLevelAdminAccess = member ? this.hasDemoDayAdminAccess(member) : false;
-
     // For each demo day, get counts and determine access
     return await Promise.all(
       demoDays
@@ -368,6 +366,9 @@ export class DemoDaysService {
         })
         .map(async (demoDay) => {
           const teamsCount = await this.getTeamsCountForDemoDay(demoDay.uid);
+
+          // Check member-level admin access for this specific demo day (host-scoped)
+          const hasMemberLevelAdminAccess = member ? this.hasDemoDayAdminAccess(member, demoDay.host) : false;
 
           // Determine access for this demo day
           let access: 'none' | 'INVESTOR' | 'FOUNDER' | 'SUPPORT' = 'none';
@@ -1384,6 +1385,14 @@ export class DemoDaysService {
             name: true,
           },
         },
+        demoDayAdminScopes: {
+          where: {
+            scopeType: 'HOST',
+          },
+          select: {
+            scopeValue: true,
+          },
+        },
         demoDayParticipants: {
           where: demoDayUid
             ? {
@@ -1408,15 +1417,42 @@ export class DemoDaysService {
   }
 
   /**
-   * Check if a member has demo day admin access.
+   * Check if a member has demo day admin access for a specific demo day.
    * A member has demo day admin access if they:
    * - Are a directory admin (DIRECTORY_ADMIN), OR
-   * - Have the DEMO_DAY_ADMIN role at the member level
+   * - Have the DEMO_DAY_ADMIN role AND their MemberDemoDayAdminScope.scopeValue matches the DemoDay.host
    *
    * Note: Participant-level isDemoDayAdmin is checked separately in getDemoDayAccess
+   *
+   * @param member - Member with roles and demoDayAdminScopes
+   * @param demoDayHost - The host of the demo day to check access for
    */
-  private hasDemoDayAdminAccess(member: MemberWithRoles): boolean {
-    return isDirectoryAdmin(member) || hasDemoDayAdminRole(member);
+  private hasDemoDayAdminAccess(
+    member: MemberWithRoles & { demoDayAdminScopes?: { scopeValue: string }[] },
+    demoDayHost?: string
+  ): boolean {
+    // Directory admins always have access
+    if (isDirectoryAdmin(member)) {
+      return true;
+    }
+
+    // Check if member has DEMO_DAY_ADMIN role
+    if (!hasDemoDayAdminRole(member)) {
+      return false;
+    }
+
+    // If no host provided, or no scopes defined, deny access for DEMO_DAY_ADMIN
+    if (!demoDayHost || !member.demoDayAdminScopes || member.demoDayAdminScopes.length === 0) {
+      return false;
+    }
+
+    // Check if member's scopes include the demo day host (case-insensitive)
+    if (hasDemoDayAdminRole(member)) {
+      const allowedHosts = member.demoDayAdminScopes.map((s) => s.scopeValue.toLowerCase());
+      return allowedHosts.includes(demoDayHost.toLowerCase());
+    }
+
+    return false;
   }
 
   /**
