@@ -190,7 +190,15 @@ export class MembersService {
 
       // Filter out any members with null emails (type safety)
       return members.filter(
-        (member): member is { uid: string; name: string; email: string; accessLevel: string; memberRoles: { name: string }[];} => member.email !== null
+        (
+          member
+        ): member is {
+          uid: string;
+          name: string;
+          email: string;
+          accessLevel: string;
+          memberRoles: { name: string }[];
+        } => member.email !== null
       );
     } catch (error) {
       return this.handleErrors(error);
@@ -386,7 +394,7 @@ export class MembersService {
                   investorProfile: true,
                 },
               },
-            },//TODO - docuble check with frontend
+            }, //TODO - docuble check with frontend
             // where: {
             //   team: {
             //     accessLevel: {
@@ -811,7 +819,6 @@ export class MembersService {
     }
   }
 
-
   async createMemberFromSignUpData(memberData: any): Promise<Member> {
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {
@@ -824,7 +831,7 @@ export class MembersService {
     return createdMember;
   }
 
-async updateMemberFromParticipantsRequest(
+  async updateMemberFromParticipantsRequest(
     memberUid: string,
     memberParticipantsRequest: ParticipantsRequest,
     requestorEmail: string,
@@ -1739,7 +1746,7 @@ async updateMemberFromParticipantsRequest(
     limit?: number;
     // Investor-related filters
     isInvestor?: boolean;
-    investorTypes?: ('ANGEL' | 'FUND' | 'ANGEL_AND_FUND')[];
+    investorType?: ('ANGEL' | 'FUND' | 'ANGEL_AND_FUND')[];
     minTypicalCheckSize?: number;
     maxTypicalCheckSize?: number;
     investmentFocus?: string[];
@@ -2106,8 +2113,8 @@ async updateMemberFromParticipantsRequest(
     }
 
     // Investor types filter
-    if (filters.investorTypes && filters.investorTypes.length > 0) {
-      const typesArray = Array.isArray(filters.investorTypes) ? filters.investorTypes : [filters.investorTypes];
+    if (filters.investorType && filters.investorType.length > 0) {
+      const typesArray = Array.isArray(filters.investorType) ? filters.investorType : [filters.investorType];
       whereConditions.push({
         investorProfile: {
           type: {
@@ -3197,11 +3204,7 @@ async updateMemberFromParticipantsRequest(
       requestorEmail?: string; // kept for backward compatibility
     }
   ): Promise<void> {
-    this.logger.info(
-      `[attachTeamAndRoleTx] Start. memberUid=${memberUid}, opts=${JSON.stringify(
-        opts
-      )}`
-    );
+    this.logger.info(`[attachTeamAndRoleTx] Start. memberUid=${memberUid}, opts=${JSON.stringify(opts)}`);
 
     const { team, isTeamNew, role } = opts ?? {};
     if (!team) {
@@ -3218,16 +3221,12 @@ async updateMemberFromParticipantsRequest(
     // and attach the member to it via TeamMemberRole
     // ==================================================
     if (isTeamNew) {
-      this.logger.info(
-        `[attachTeamAndRoleTx] Creating NEW TEAM with accessLevel=L0`
-      );
+      this.logger.info(`[attachTeamAndRoleTx] Creating NEW TEAM with accessLevel=L0`);
 
       const name = (norm.name && norm.name.trim()) || `team-${memberUid}`;
       const website = (norm.website ?? opts.website) || null;
 
-      this.logger.info(
-        `[attachTeamAndRoleTx] Creating Team in DB. name=${name}, website=${website}`
-      );
+      this.logger.info(`[attachTeamAndRoleTx] Creating Team in DB. name=${name}, website=${website}`);
 
       const createdTeam = await tx.team.create({
         data: {
@@ -3240,9 +3239,7 @@ async updateMemberFromParticipantsRequest(
 
       targetTeamUid = createdTeam.uid;
 
-      this.logger.info(
-        `[attachTeamAndRoleTx] New team created successfully. teamUid=${targetTeamUid}`
-      );
+      this.logger.info(`[attachTeamAndRoleTx] New team created successfully. teamUid=${targetTeamUid}`);
     } else {
       // ==================================================
       // CASE 2: Resolve EXISTING team
@@ -3253,35 +3250,23 @@ async updateMemberFromParticipantsRequest(
       let existing: { uid: string } | null = null;
 
       if (norm.uid) {
-        this.logger.info(
-          `[attachTeamAndRoleTx] Searching team by uid=${norm.uid}`
-        );
-        existing = await this.teamService
-          .findTeamByUid(norm.uid)
-          .catch(() => null);
+        this.logger.info(`[attachTeamAndRoleTx] Searching team by uid=${norm.uid}`);
+        existing = await this.teamService.findTeamByUid(norm.uid).catch(() => null);
       }
 
       if (!existing && norm.name) {
-        this.logger.info(
-          `[attachTeamAndRoleTx] Searching team by name=${norm.name}`
-        );
-        existing = await this.teamService
-          .findTeamByName(norm.name)
-          .catch(() => null);
+        this.logger.info(`[attachTeamAndRoleTx] Searching team by name=${norm.name}`);
+        existing = await this.teamService.findTeamByName(norm.name).catch(() => null);
       }
 
       if (!existing) {
-        this.logger.info(
-          `[attachTeamAndRoleTx] Team not found by uid or name → aborting`
-        );
+        this.logger.info(`[attachTeamAndRoleTx] Team not found by uid or name → aborting`);
         throw new NotFoundException('Team not found by uid or name');
       }
 
       targetTeamUid = existing.uid;
 
-      this.logger.info(
-        `[attachTeamAndRoleTx] Existing team resolved. teamUid=${targetTeamUid}`
-      );
+      this.logger.info(`[attachTeamAndRoleTx] Existing team resolved. teamUid=${targetTeamUid}`);
     }
 
     if (!targetTeamUid) {
@@ -3320,11 +3305,8 @@ async updateMemberFromParticipantsRequest(
       },
     });
 
-    this.logger.info(
-      `[attachTeamAndRoleTx] TeamMemberRole saved successfully. teamUid=${targetTeamUid}`
-    );
+    this.logger.info(`[attachTeamAndRoleTx] TeamMemberRole saved successfully. teamUid=${targetTeamUid}`);
   }
-
 
   /** Accepts string (treated as name) or object with { uid|name|website } */
   private normalizeTeamInput(team: { uid?: string; name?: string; website?: string } | string): {
@@ -3373,8 +3355,6 @@ async updateMemberFromParticipantsRequest(
     });
   }
 
-
-
   /**
    * Creates a new member based on SSO (Privy) login.
    * This is used when we have a valid id_token with email + externalId,
@@ -3392,20 +3372,16 @@ async updateMemberFromParticipantsRequest(
     // 1. Try to extract a human-readable name from the id_token payload
     const tokenName: string | undefined =
       (idTokenPayload?.name as string | undefined) ||
-      [idTokenPayload?.given_name, idTokenPayload?.family_name]
-        .filter(Boolean)
-        .join(' ')
-        .trim() ||
+      [idTokenPayload?.given_name, idTokenPayload?.family_name].filter(Boolean).join(' ').trim() ||
       undefined;
 
     // 2. Fallback: use the part before '@' as a display name
     const fallbackName = normalizedEmail.split('@')[0];
 
-    const displayName =
-      tokenName && tokenName.length > 0 ? tokenName : fallbackName;
+    const displayName = tokenName && tokenName.length > 0 ? tokenName : fallbackName;
 
     this.logger.info(
-      `MembersService.createMemberFromSso → Creating new member from SSO. email=${normalizedEmail}, externalId=${externalId}, displayName="${displayName}"`,
+      `MembersService.createMemberFromSso → Creating new member from SSO. email=${normalizedEmail}, externalId=${externalId}, displayName="${displayName}"`
     );
 
     const newMember = await this.prisma.member.create({
@@ -3418,12 +3394,9 @@ async updateMemberFromParticipantsRequest(
     });
 
     this.logger.info(
-      `MembersService.createMemberFromSso → New member created. uid=${newMember.uid}, id=${newMember.id}, email=${newMember.email}`,
+      `MembersService.createMemberFromSso → New member created. uid=${newMember.uid}, id=${newMember.id}, email=${newMember.email}`
     );
 
     return newMember;
   }
-
-
-
 }
