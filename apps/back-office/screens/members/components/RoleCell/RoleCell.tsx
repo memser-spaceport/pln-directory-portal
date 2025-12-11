@@ -1,14 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Select from 'react-select';
-import { useCookie } from 'react-use';
-import { toast } from 'react-toastify';
-
-import { Member } from '../../types/member';
-import { useUpdateMemberRoles } from '../../../../hooks/members/useUpdateMemberRoles';
-import { useUpdateMemberDemoDayHosts } from '../../../../hooks/members/useUpdateMemberDemoDayHosts';
 import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
 import { MemberRole } from '../../../../utils/constants';
 
+import { Member } from '../../types/member';
 import s from '../StatusCell/StatusCell.module.scss';
 
 type AdminRoleOptionValue = 'NONE' | MemberRole.DIRECTORY_ADMIN | MemberRole.DEMO_DAY_ADMIN;
@@ -44,12 +39,23 @@ type DemoDayHostOption = {
 
 const hostOptions: DemoDayHostOption[] = DEMO_DAY_HOSTS.map((h) => ({ label: h, value: h }));
 
-const RoleCell = ({ member }: { member: Member }) => {
-  const [plnadmin] = useCookie('plnadmin');
-  const { mutateAsync: updateMemberRoles } = useUpdateMemberRoles();
-  const { mutateAsync: updateDemoDayHosts, isLoading: isUpdatingHosts } =
-    useUpdateMemberDemoDayHosts();
+export type PendingRoleChange = {
+  memberUid: string;
+  roles: string[];
+};
 
+export type PendingHostChange = {
+  memberUid: string;
+  hosts: string[];
+};
+
+type RoleCellProps = {
+  member: Member;
+  onRoleChange?: (change: PendingRoleChange | null) => void;
+  onHostChange?: (change: PendingHostChange | null) => void;
+};
+
+const RoleCell = ({ member, onRoleChange, onHostChange }: RoleCellProps) => {
   // ---- ROLES ----
 
   const baseRoles: string[] = useMemo(() => {
@@ -64,15 +70,9 @@ const RoleCell = ({ member }: { member: Member }) => {
     return [];
   }, [member.roles, member.memberRoles]);
 
-  const hasDirectoryAdmin = useMemo(
-    () => baseRoles.includes(MemberRole.DIRECTORY_ADMIN),
-    [baseRoles],
-  );
+  const hasDirectoryAdmin = useMemo(() => baseRoles.includes(MemberRole.DIRECTORY_ADMIN), [baseRoles]);
 
-  const hasDemoDayAdmin = useMemo(
-    () => baseRoles.includes(MemberRole.DEMO_DAY_ADMIN),
-    [baseRoles],
-  );
+  const hasDemoDayAdmin = useMemo(() => baseRoles.includes(MemberRole.DEMO_DAY_ADMIN), [baseRoles]);
 
   const currentOption: AdminRoleOption = useMemo(() => {
     const noneOption = adminRoleOptions[0];
@@ -91,39 +91,30 @@ const RoleCell = ({ member }: { member: Member }) => {
     setSelectedOption(currentOption);
   }, [currentOption]);
 
-  const handleRoleChange = async (val: AdminRoleOption | null) => {
+  const handleRoleChange = (val: AdminRoleOption | null) => {
     if (!val) return;
 
     setSelectedOption(val);
 
-    if (!plnadmin) {
-      toast.error('Missing admin token');
-      return;
-    }
-
-    let nextRoles = baseRoles.filter(
-      (r) => !Object.values(MemberRole).includes(r as MemberRole),
-    );
+    let nextRoles = baseRoles.filter((r) => !Object.values(MemberRole).includes(r as MemberRole));
 
     if (val.value !== 'NONE') {
       nextRoles = [...nextRoles, val.value];
     }
 
-    try {
-      await updateMemberRoles({
-        authToken: plnadmin,
+    const currentRolesSorted = [...baseRoles].sort();
+    const nextRolesSorted = [...nextRoles].sort();
+    const hasChanged = JSON.stringify(currentRolesSorted) !== JSON.stringify(nextRolesSorted);
+
+    if (hasChanged) {
+      onRoleChange?.({
         memberUid: member.uid,
         roles: nextRoles,
       });
-
-      toast.success(`Admin role updated to "${val.name}" for ${member.name}`);
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to update admin role');
-      setSelectedOption(currentOption);
+    } else {
+      onRoleChange?.(null);
     }
   };
-
 
   const demoDayHosts = member.demoDayHosts;
   const demoDayAdminScopes = member.demoDayAdminScopes;
@@ -134,9 +125,7 @@ const RoleCell = ({ member }: { member: Member }) => {
     if (Array.isArray(demoDayHosts) && demoDayHosts.length > 0) {
       hosts = demoDayHosts;
     } else if (Array.isArray(demoDayAdminScopes)) {
-      hosts = demoDayAdminScopes
-        .filter((s) => s.scopeType === 'HOST')
-        .map((s) => s.scopeValue);
+      hosts = demoDayAdminScopes.filter((s) => s.scopeType === 'HOST').map((s) => s.scopeValue);
     }
 
     if (Array.isArray(hosts) && hosts.length > 0) {
@@ -149,42 +138,41 @@ const RoleCell = ({ member }: { member: Member }) => {
 
   const [selectedHosts, setSelectedHosts] = useState<DemoDayHostOption[]>(initialSelectedHosts);
 
+  const currentHostValues = useMemo(() => {
+    let hosts: string[] | undefined;
+
+    if (Array.isArray(demoDayHosts) && demoDayHosts.length > 0) {
+      hosts = demoDayHosts;
+    } else if (Array.isArray(demoDayAdminScopes)) {
+      hosts = demoDayAdminScopes.filter((s) => s.scopeType === 'HOST').map((s) => s.scopeValue);
+    }
+
+    return hosts ? hosts.map((h) => h.toLowerCase()).sort() : [];
+  }, [demoDayHosts, demoDayAdminScopes]);
+
   useEffect(() => {
     setSelectedHosts(initialSelectedHosts);
   }, [initialSelectedHosts]);
 
   const handleHostsSelectChange = (value: readonly DemoDayHostOption[] | null) => {
-    setSelectedHosts(value ? [...value] : []);
-  };
+    const newHosts = value ? [...value] : [];
+    setSelectedHosts(newHosts);
 
-  const handleUpdateHostsClick = async () => {
-    if (!plnadmin) {
-      toast.error('Missing admin token');
-      return;
-    }
+    const newHostValues = newHosts.map((h) => h.value.toLowerCase()).sort();
+    const hasChanged = JSON.stringify(currentHostValues) !== JSON.stringify(newHostValues);
 
-    if (selectedHosts.length === 0) {
-      toast.error('Please select at least one host');
-      return;
-    }
-
-    try {
-      await updateDemoDayHosts({
-        authToken: plnadmin,
+    if (hasChanged) {
+      onHostChange?.({
         memberUid: member.uid,
-        hosts: selectedHosts.map((h) => h.value),
+        hosts: newHosts.map((h) => h.value),
       });
-
-      toast.success(`Demo day scope updated for ${member.name}`);
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to update demo day hosts');
+    } else {
+      onHostChange?.(null);
     }
   };
 
   const isDemoDayAdminSelected =
-    selectedOption.value === MemberRole.DEMO_DAY_ADMIN ||
-    baseRoles.includes(MemberRole.DEMO_DAY_ADMIN);
+    selectedOption.value === MemberRole.DEMO_DAY_ADMIN || baseRoles.includes(MemberRole.DEMO_DAY_ADMIN);
 
   return (
     <div className={s.root} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
@@ -226,53 +214,42 @@ const RoleCell = ({ member }: { member: Member }) => {
       />
 
       {isDemoDayAdminSelected && (
-        <div className="mt-1 flex items-center gap-2">
-          <Select<DemoDayHostOption, true>
-            classNamePrefix="demo-day-hosts-select"
-            className="flex-1"
-            isMulti
-            closeMenuOnSelect={false}
-            placeholder="Select demo day hosts"
-            options={hostOptions}
-            value={selectedHosts}
-            onChange={(value) => handleHostsSelectChange(value as DemoDayHostOption[])}
-            styles={{
-              control: (base, state) => ({
-                ...base,
-                minHeight: 32,
-                borderRadius: 8,
-                borderColor: state.isFocused ? '#1B4DFF' : 'rgba(148, 163, 184, 0.6)',
-                boxShadow: 'none',
-                backgroundColor: 'transparent',
-                fontSize: 13,
-              }),
-              valueContainer: (base) => ({
-                ...base,
-                padding: '0 8px',
-              }),
-              dropdownIndicator: (base) => ({
-                ...base,
-                paddingRight: 8,
-              }),
-              indicatorSeparator: () => ({
-                display: 'none',
-              }),
-              menu: (base) => ({
-                ...base,
-                zIndex: 20,
-              }),
-            }}
-          />
-
-          <button
-            type="button"
-            className={s.btn}
-            onClick={handleUpdateHostsClick}
-            disabled={isUpdatingHosts || selectedHosts.length === 0}
-          >
-            {isUpdatingHosts ? 'Saving…' : 'Update host'}
-          </button>
-        </div>
+        <Select<DemoDayHostOption, true>
+          classNamePrefix="demo-day-hosts-select"
+          className="w-full"
+          isMulti
+          closeMenuOnSelect={false}
+          placeholder="Select demo day hosts"
+          options={hostOptions}
+          value={selectedHosts}
+          onChange={(value) => handleHostsSelectChange(value as DemoDayHostOption[])}
+          styles={{
+            control: (base, state) => ({
+              ...base,
+              minHeight: 32,
+              borderRadius: 8,
+              borderColor: state.isFocused ? '#1B4DFF' : 'rgba(148, 163, 184, 0.6)',
+              boxShadow: 'none',
+              backgroundColor: 'transparent',
+              fontSize: 13,
+            }),
+            valueContainer: (base) => ({
+              ...base,
+              padding: '0 8px',
+            }),
+            dropdownIndicator: (base) => ({
+              ...base,
+              paddingRight: 8,
+            }),
+            indicatorSeparator: () => ({
+              display: 'none',
+            }),
+            menu: (base) => ({
+              ...base,
+              zIndex: 20,
+            }),
+          }}
+        />
       )}
     </div>
   );
