@@ -44,9 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasRole = useMemo(
-    () => (role: string): boolean => {
-      return user?.roles?.includes(role) ?? false;
-    },
+    () =>
+      (role: string): boolean => {
+        return user?.roles?.includes(role) ?? false;
+      },
     [user]
   );
 

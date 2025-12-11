@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import s from '../members/styles.module.scss';
 import { ApprovalLayout } from '../../layout/approval-layout';
@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { flexRender, PaginationState, SortingState } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { useCookie } from 'react-use';
+import { toast } from 'react-toastify';
 
 import { useMembersList } from '../../hooks/members/useMembersList';
 import PaginationControls from '../../screens/members/components/PaginationControls/PaginationControls';
@@ -14,6 +15,9 @@ import { useRolesTable } from '../../screens/roles/hooks/useRolesTable';
 import { useAuth } from '../../context/auth-context';
 import { MemberRole } from '../../utils/constants';
 import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
+import { PendingRoleChange, PendingHostChange } from '../../screens/members/components/RoleCell/RoleCell';
+import { useUpdateMemberRolesAndHosts } from '../../hooks/members/useUpdateMemberRolesAndHosts';
+import { RolesSaveControls } from '../../screens/roles/components/RolesSaveControls';
 
 const ALL_ACCESS_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'Rejected'];
 
@@ -23,6 +27,7 @@ const RolesPage = () => {
   const router = useRouter();
   const { isDirectoryAdmin, isLoading, user } = useAuth();
   const [authToken] = useCookie('plnadmin');
+  const { mutateAsync: updateMemberRolesAndHosts } = useUpdateMemberRolesAndHosts();
 
   const [sorting, setSorting] = useState<SortingState>([
     {
@@ -39,6 +44,9 @@ const RolesPage = () => {
   const [globalFilter, setGlobalFilter] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<RoleFilterValue>('');
   const [scopeFilter, setScopeFilter] = useState<string>('');
+  const [pendingRoleChanges, setPendingRoleChanges] = useState<Map<string, PendingRoleChange>>(new Map());
+  const [pendingHostChanges, setPendingHostChanges] = useState<Map<string, PendingHostChange>>(new Map());
+  const [isSaving, setIsSaving] = useState(false);
 
   const { data } = useMembersList({
     authToken,
@@ -79,14 +87,100 @@ const RolesPage = () => {
 
         // Check demoDayAdminScopes
         const scopes = member.demoDayAdminScopes || [];
-        return scopes.some(
-          (s) => s.scopeType === 'HOST' && s.scopeValue.toLowerCase() === scopeFilter.toLowerCase()
-        );
+        return scopes.some((s) => s.scopeType === 'HOST' && s.scopeValue.toLowerCase() === scopeFilter.toLowerCase());
       });
     }
 
     return result;
   }, [data?.data, roleFilter, scopeFilter]);
+
+  const handleRoleChange = useCallback((change: PendingRoleChange | null, memberUid: string) => {
+    setPendingRoleChanges((prev) => {
+      const next = new Map(prev);
+      if (change) {
+        next.set(memberUid, change);
+      } else {
+        next.delete(memberUid);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleHostChange = useCallback((change: PendingHostChange | null, memberUid: string) => {
+    setPendingHostChanges((prev) => {
+      const next = new Map(prev);
+      if (change) {
+        next.set(memberUid, change);
+      } else {
+        next.delete(memberUid);
+      }
+      return next;
+    });
+  }, []);
+
+  const hasPendingChanges = pendingRoleChanges.size > 0 || pendingHostChanges.size > 0;
+
+  const memberCountWithPendingChanges = useMemo(() => {
+    const memberUids = new Set<string>();
+    pendingRoleChanges.forEach((_, uid) => memberUids.add(uid));
+    pendingHostChanges.forEach((_, uid) => memberUids.add(uid));
+    return memberUids.size;
+  }, [pendingRoleChanges, pendingHostChanges]);
+
+  const handleSave = useCallback(async () => {
+    if (!authToken) {
+      toast.error('Missing admin token');
+      return;
+    }
+
+    if (!hasPendingChanges) {
+      return;
+    }
+
+    setIsSaving(true);
+
+    const currentRoleChanges = Array.from(pendingRoleChanges.values());
+    const currentHostChanges = Array.from(pendingHostChanges.values());
+
+    // Group changes by member UID
+    const memberUids = new Set<string>();
+    currentRoleChanges.forEach((change) => memberUids.add(change.memberUid));
+    currentHostChanges.forEach((change) => memberUids.add(change.memberUid));
+
+    const roleChangesMap = new Map<string, string[]>();
+    currentRoleChanges.forEach((change) => {
+      roleChangesMap.set(change.memberUid, change.roles);
+    });
+
+    const hostChangesMap = new Map<string, string[]>();
+    currentHostChanges.forEach((change) => {
+      hostChangesMap.set(change.memberUid, change.hosts);
+    });
+
+    try {
+      const promises = Array.from(memberUids).map((memberUid) =>
+        updateMemberRolesAndHosts({
+          authToken,
+          memberUid,
+          roles: roleChangesMap.get(memberUid),
+          hosts: hostChangesMap.get(memberUid),
+        })
+      );
+
+      await Promise.all(promises);
+
+      setPendingRoleChanges(new Map());
+      setPendingHostChanges(new Map());
+
+      const totalChanges = memberUids.size;
+      toast.success(`Successfully saved ${totalChanges} change${totalChanges !== 1 ? 's' : ''}`);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to save changes. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [authToken, hasPendingChanges, pendingRoleChanges, pendingHostChanges, updateMemberRolesAndHosts]);
 
   const { table } = useRolesTable({
     members: filteredMembers,
@@ -96,6 +190,9 @@ const RolesPage = () => {
     setPagination,
     globalFilter,
     setGlobalFilter,
+    onRoleChange: handleRoleChange,
+    onHostChange: handleHostChange,
+    authToken,
   });
 
   useEffect(() => {
@@ -103,6 +200,11 @@ const RolesPage = () => {
       router.replace('/demo-days');
     }
   }, [isLoading, user, isDirectoryAdmin, router]);
+
+  const handleReset = useCallback(() => {
+    setPendingRoleChanges(new Map());
+    setPendingHostChanges(new Map());
+  }, []);
 
   if (!isLoading && user && !isDirectoryAdmin) {
     return null;
@@ -114,44 +216,46 @@ const RolesPage = () => {
         <div className={s.header}>
           <span className={s.title}>Roles</span>
 
-          <span className={s.filters}>
-            <input
-              value={globalFilter}
-              onChange={(e) => table.setGlobalFilter(String(e.target.value))}
-              placeholder="Filter by name or email"
-              className={clsx(s.input)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  table.setGlobalFilter('');
-                }
-              }}
-            />
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as RoleFilterValue)}
-              className={clsx(s.input)}
-              style={{ marginLeft: 8, minWidth: 160 }}
-            >
-              <option value="">All roles</option>
-              <option value={MemberRole.DIRECTORY_ADMIN}>Directory Admin</option>
-              <option value={MemberRole.DEMO_DAY_ADMIN}>Demo Day Admin</option>
-            </select>
-            {roleFilter === MemberRole.DEMO_DAY_ADMIN && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className={s.filters}>
+              <input
+                value={globalFilter}
+                onChange={(e) => table.setGlobalFilter(String(e.target.value))}
+                placeholder="Search by name or email"
+                className={clsx(s.input)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    table.setGlobalFilter('');
+                  }
+                }}
+              />
               <select
-                value={scopeFilter}
-                onChange={(e) => setScopeFilter(e.target.value)}
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value as RoleFilterValue)}
                 className={clsx(s.input)}
                 style={{ marginLeft: 8, minWidth: 160 }}
               >
-                <option value="">All hosts</option>
-                {DEMO_DAY_HOSTS.map((host) => (
-                  <option key={host} value={host}>
-                    {host}
-                  </option>
-                ))}
+                <option value="">All roles</option>
+                <option value={MemberRole.DIRECTORY_ADMIN}>Directory Admin</option>
+                <option value={MemberRole.DEMO_DAY_ADMIN}>Demo Day Admin</option>
               </select>
-            )}
-          </span>
+              {roleFilter === MemberRole.DEMO_DAY_ADMIN && (
+                <select
+                  value={scopeFilter}
+                  onChange={(e) => setScopeFilter(e.target.value)}
+                  className={clsx(s.input)}
+                  style={{ marginLeft: 8, minWidth: 160 }}
+                >
+                  <option value="">All hosts</option>
+                  {DEMO_DAY_HOSTS.map((host) => (
+                    <option key={host} value={host}>
+                      {host}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </span>
+          </div>
         </div>
 
         <div className={s.body}>
@@ -213,6 +317,12 @@ const RolesPage = () => {
               </React.Fragment>
             ))}
           </div>
+          <RolesSaveControls
+            memberCount={memberCountWithPendingChanges}
+            onReset={handleReset}
+            onSave={handleSave}
+            isSaving={isSaving}
+          />
         </div>
 
         <div className={s.footer}>

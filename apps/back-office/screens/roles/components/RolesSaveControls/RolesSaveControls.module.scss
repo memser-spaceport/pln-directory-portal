@@ -1,0 +1,122 @@
+.root {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-direction: row;
+  border-radius: var(--corner-radius-xl, 12px);
+  border: 1px solid var(--border-neutral-muted, rgba(27, 56, 96, 0.24));
+  background: var(--background-base-white, #fff);
+
+  box-shadow: 0px 10px 20px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06)),
+    0px 20px 65px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06));
+
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translate(-50%, 40px);
+  width: 100%;
+  max-width: 847px;
+  gap: 12px;
+  opacity: 0;
+
+  transition: all 0.3s ease-in-out;
+
+  &.visible {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.message {
+  color: var(--foreground-neutral-primary, #0a0c11);
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: -0.4px;
+  white-space: nowrap;
+
+  .accent {
+    color: #1b4dff;
+  }
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: fit-content;
+}
+
+.btn {
+  height: 40px;
+  display: flex;
+  padding: var(--spacing-2xs, 8px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-zero, 0px);
+
+  border-radius: var(--corner-radius-Full-round, 9999px);
+  background: var(--action-background-neutral-light_normal, rgba(14, 15, 17, 0.04));
+
+  box-shadow: 0px -2px 4px 0px var(--transparent-dark-2, rgba(14, 15, 17, 0.02)) inset;
+
+  color: var(--Text-text-dark, #0f172a);
+  font-feature-settings: 'liga' off, 'clig' off;
+
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+
+  border: none;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--action-background-neutral-light_hover, rgba(14, 15, 17, 0.08));
+  }
+
+  &:disabled {
+    pointer-events: none;
+    cursor: default;
+  }
+}
+
+.primaryBtn {
+  display: flex;
+  height: 40px;
+  padding: 10px 24px;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  width: 138px;
+
+  border-radius: 8px;
+  border: 1px solid var(--Neutral-Slate-300, #cbd5e1);
+  background: var(--Button-surface-brand-button, #156ff7);
+
+  box-shadow: 0px 1px 1px 0px rgba(15, 23, 42, 0.08);
+
+  color: var(--Text-text-lightest, #fff);
+  font-feature-settings: 'liga' off, 'clig' off;
+
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--Button-surface-brand-button-hover, #0d5ed6);
+  }
+
+  &:disabled {
+    pointer-events: none;
+    cursor: default;
+    opacity: 0.5;
+  }
+}

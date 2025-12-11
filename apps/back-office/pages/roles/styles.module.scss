@@ -16,7 +16,7 @@
 }
 
 .title {
-  color: var(--foreground-neutral-primary, #0A0C11);
+  color: var(--foreground-neutral-primary, #0a0c11);
   font-size: 32px;
   font-style: normal;
   font-weight: 600;
@@ -38,15 +38,15 @@
   gap: 8px;
   align-self: stretch;
   border-radius: 8px;
-  border: 1px solid rgba(203, 213, 225, 0.50);
-  background: #FFF;
+  border: 1px solid rgba(203, 213, 225, 0.5);
+  background: #fff;
   outline: none;
   min-width: 320px;
 
   &:focus {
     border-radius: 8px;
-    border: 1px solid #5E718D;
-    background: #FFF;
+    border: 1px solid #5e718d;
+    background: #fff;
     box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12) !important;
   }
 
@@ -64,12 +64,14 @@
 
   border-radius: var(--corner-radius-md, 8px);
   border: 1px solid var(--transparent-dark-12, rgba(14, 15, 17, 0.12));
-  background: var(--action-background-brand-normal, #1B4DFF);
+  background: var(--action-background-brand-normal, #1b4dff);
 
   /* Button/primay/fill */
-  box-shadow: 0px 1px 3px 0px var(--transparent-light-32, rgba(255, 255, 255, 0.32)) inset, 0px 4px 6px 0px var(--transparent-light-6, rgba(255, 255, 255, 0.06)) inset, 0px 1px 5px 0px var(--transparent-brand-16, rgba(27, 77, 255, 0.16));
+  box-shadow: 0px 1px 3px 0px var(--transparent-light-32, rgba(255, 255, 255, 0.32)) inset,
+    0px 4px 6px 0px var(--transparent-light-6, rgba(255, 255, 255, 0.06)) inset,
+    0px 1px 5px 0px var(--transparent-brand-16, rgba(27, 77, 255, 0.16));
 
-  color: var(--action-foreground-base-inverted_white, #FFF);
+  color: var(--action-foreground-base-inverted_white, #fff);
   font-size: 14px;
   font-style: normal;
   font-weight: 500;
@@ -88,7 +90,7 @@
 .tableHeader {
   background: #f8f8f8;
   font-weight: bold;
-  background: var(--background-neutral-soft-surface, #F9FAFB);
+  background: var(--background-neutral-soft-surface, #f9fafb);
 }
 
 .tableRow {
@@ -122,7 +124,7 @@
 }
 
 .bodyCell {
-  background: var(--background-base-white, #FFF);
+  background: var(--background-base-white, #fff);
   display: flex;
   padding: var(--spacing-4xs, 12px) var(--spacing-md, 8px);
   align-items: center;
@@ -145,7 +147,6 @@
     padding-left: 12px;
   }
 }
-
 
 .fixed {
   flex: 0 0 auto;

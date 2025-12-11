@@ -5,7 +5,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException
+  NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
 import { InvestorProfileType, Location, Member, Prisma } from '@prisma/client';
@@ -23,7 +23,7 @@ import {
   CreateMemberDto,
   RequestMembersDto,
   UpdateAccessLevelDto,
-  UpdateMemberDto
+  UpdateMemberDto,
 } from '../../../../libs/contracts/src/schema/admin-member';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { MembersHooksService } from '../members/members.hooks.service';
@@ -44,7 +44,7 @@ export class MemberService {
     private notificationSettingsService: NotificationSettingsService,
     private forestAdminService: ForestAdminService,
     @Inject(forwardRef(() => TeamsService))
-    private teamService: TeamsService,
+    private teamService: TeamsService
   ) {}
 
   /**
@@ -685,7 +685,6 @@ export class MemberService {
     }
   }
 
-
   /**
    * Verify the list of members and log into participant request.
    * @param memberIds array of member IDs
@@ -713,7 +712,6 @@ export class MemberService {
     return response;
   }
 
-
   /**
    * Replaces HOST-type demo day admin scopes for a given member.
    *
@@ -737,9 +735,7 @@ export class MemberService {
       throw new BadRequestException('Member does not have DEMO_DAY_ADMIN role');
     }
 
-    const normalizedHosts = (hosts || [])
-      .map((h) => h.trim())
-      .filter((h) => h.length > 0);
+    const normalizedHosts = (hosts || []).map((h) => h.trim()).filter((h) => h.length > 0);
 
     // Replace all HOST scopes for this member in a single transaction
     await this.prisma.$transaction([
@@ -756,7 +752,7 @@ export class MemberService {
             scopeType: 'HOST',
             scopeValue: host,
           },
-        }),
+        })
       ),
     ]);
 
@@ -781,7 +777,6 @@ export class MemberService {
 
     return updatedMember;
   }
-
 
   /**
    * Handles database-related errors specifically for the Member entity.
@@ -922,10 +917,7 @@ export class MemberService {
 
     const membersWithHosts = members.map((m) => ({
       ...m,
-      demoDayHosts:
-        m.demoDayAdminScopes
-          ?.filter((s) => s.scopeType === 'HOST')
-          .map((s) => s.scopeValue) ?? [],
+      demoDayHosts: m.demoDayAdminScopes?.filter((s) => s.scopeType === 'HOST').map((s) => s.scopeValue) ?? [],
     }));
 
     const total = await this.prisma.member.count({
@@ -990,7 +982,7 @@ export class MemberService {
           select: {
             teamUid: true,
           },
-        }
+        },
       },
     });
 
@@ -1027,30 +1019,18 @@ export class MemberService {
     // Create investor profiles for L5/L6 members who don't have one
     await this.createInvestorProfileForHighLevelMembers(memberUids, this.prisma);
 
-
     if (result.count > 0) {
       const teamUidsToUpdate = Array.from(
-        new Set(
-          notApprovedMembers.flatMap((m) =>
-            m.teamMemberRoles?.map((r) => r.teamUid) ?? [],
-          ),
-        ),
+        new Set(notApprovedMembers.flatMap((m) => m.teamMemberRoles?.map((r) => r.teamUid) ?? []))
       );
 
       if (
-        [
-          AccessLevel.L1,
-          AccessLevel.L2,
-          AccessLevel.L3,
-          AccessLevel.L4,
-          AccessLevel.L5,
-          AccessLevel.L6,
-        ].includes(accessLevel as AccessLevel)
+        [AccessLevel.L1, AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6].includes(
+          accessLevel as AccessLevel
+        )
       ) {
         await Promise.all(
-          teamUidsToUpdate.map((teamUid) =>
-            this.teamService.updateTeamAccessLevel(teamUid, undefined, 'L1'),
-          ),
+          teamUidsToUpdate.map((teamUid) => this.teamService.updateTeamAccessLevel(teamUid, undefined, 'L1'))
         );
       }
 
@@ -1219,7 +1199,9 @@ export class MemberService {
 
       // handle email change with normalization and validation
       if (dto.email) {
-        this.logger.info(`Admin updateMemberByAdmin - email change requested, uid -> ${uid}, old -> ${existingMember.email}, new -> ${dto.email}`);
+        this.logger.info(
+          `Admin updateMemberByAdmin - email change requested, uid -> ${uid}, old -> ${existingMember.email}, new -> ${dto.email}`
+        );
         isEmailChanged = await this.checkIfEmailChanged({ email: dto.email }, existingMember, tx);
         data.email = dto.email.toLowerCase().trim();
         if (isEmailChanged && existingMember.externalId) {
@@ -1313,7 +1295,9 @@ export class MemberService {
         data,
       });
 
-      this.logger.info(`Admin updateMemberByAdmin - updated, uid -> ${updatedMember.uid}, isEmailChanged -> ${isEmailChanged}`);
+      this.logger.info(
+        `Admin updateMemberByAdmin - updated, uid -> ${updatedMember.uid}, isEmailChanged -> ${isEmailChanged}`
+      );
     });
 
     // post-processing of email change (delete external account and log)
@@ -1448,9 +1432,7 @@ export class MemberService {
     if (roles.length !== normalizedRoleNames.length) {
       const existingNames = roles.map((r) => r.name);
       const missing = normalizedRoleNames.filter((r) => !existingNames.includes(r));
-      throw new BadRequestException(
-        `Unknown member roles: ${missing.join(', ')}`,
-      );
+      throw new BadRequestException(`Unknown member roles: ${missing.join(', ')}`);
     }
 
     // Optional: protect from removing the last DIRECTORY_ADMIN
@@ -1485,4 +1467,120 @@ export class MemberService {
     return updated;
   }
 
+  /**
+   * Updates both member roles and demo day admin hosts in a single transaction.
+   * This is more efficient than calling updateMemberRolesByUid and updateDemoDayAdminHosts separately.
+   *
+   * Only directory-level admins should be allowed to call this from controller.
+   */
+  async updateMemberRolesAndHosts(memberUid: string, roleNames?: string[], hosts?: string[]): Promise<Member> {
+    return await this.prisma.$transaction(async (tx) => {
+      const member = await tx.member.findUnique({
+        where: { uid: memberUid },
+        include: {
+          memberRoles: true,
+          demoDayAdminScopes: true,
+        },
+      });
+
+      if (!member) {
+        throw new NotFoundException('Member not found');
+      }
+
+      // Update roles if provided
+      if (roleNames !== undefined) {
+        const normalizedRoleNames = (roleNames ?? [])
+          .map((name) => name.trim().toUpperCase())
+          .filter((name) => name.length > 0);
+
+        // Load existing roles from DB by name
+        const roles = await tx.memberRole.findMany({
+          where: {
+            name: { in: normalizedRoleNames },
+          },
+        });
+
+        if (roles.length !== normalizedRoleNames.length) {
+          const existingNames = roles.map((r) => r.name);
+          const missing = normalizedRoleNames.filter((r) => !existingNames.includes(r));
+          throw new BadRequestException(`Unknown member roles: ${missing.join(', ')}`);
+        }
+
+        // Update roles
+        await tx.member.update({
+          where: { uid: memberUid },
+          data: {
+            memberRoles: {
+              set: [],
+              connect: roles.map((role) => ({ id: role.id })),
+            },
+          },
+        });
+      }
+
+      // Update hosts if provided
+      if (hosts !== undefined) {
+        // Reload member to get updated roles if roles were updated
+        const updatedMember = await tx.member.findUnique({
+          where: { uid: memberUid },
+          include: {
+            memberRoles: true,
+          },
+        });
+
+        if (!updatedMember) {
+          throw new NotFoundException('Member not found after updating roles');
+        }
+
+        // Check if member has DEMO_DAY_ADMIN role (only required if hosts are being set)
+        if (hosts.length > 0 && !hasDemoDayAdminRole(updatedMember)) {
+          throw new BadRequestException('Member must have DEMO_DAY_ADMIN role to have demo day admin hosts');
+        }
+
+        const normalizedHosts = (hosts || []).map((h) => h.trim()).filter((h) => h.length > 0);
+
+        // Replace all HOST scopes for this member
+        await tx.memberDemoDayAdminScope.deleteMany({
+          where: {
+            memberUid,
+            scopeType: 'HOST',
+          },
+        });
+
+        if (normalizedHosts.length > 0) {
+          await Promise.all(
+            normalizedHosts.map((host) =>
+              tx.memberDemoDayAdminScope.create({
+                data: {
+                  memberUid,
+                  scopeType: 'HOST',
+                  scopeValue: host,
+                },
+              })
+            )
+          );
+        }
+      }
+
+      // Reload and return the final member state
+      const finalMember = await tx.member.findUnique({
+        where: { uid: memberUid },
+        include: {
+          memberRoles: true,
+          demoDayAdminScopes: true,
+          demoDayParticipants: {
+            include: {
+              demoDay: true,
+            },
+          },
+        },
+      });
+
+      if (!finalMember) {
+        throw new NotFoundException('Member not found after update');
+      }
+
+      return finalMember;
+    });
+  }
 }
