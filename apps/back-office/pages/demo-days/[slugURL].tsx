@@ -12,13 +12,15 @@ import { UploadParticipantsModal } from '../../components/demo-days/UploadPartic
 import { ApproveParticipantModal } from '../../components/demo-days/ApproveParticipantModal';
 import { ApplicationDetailsModal } from '../../components/demo-days/ApplicationDetailsModal';
 import { DemoDayParticipant, UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
-import { WEB_UI_BASE_URL } from '../../utils/constants';
+import { WEB_UI_BASE_URL, API_ROUTE } from '../../utils/constants';
 import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
 import { RichText } from '../../components/common/rich-text';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../../context/auth-context';
+import api from '../../utils/api';
+import { removeToken } from '../../utils/auth';
 
 import s from './styles.module.scss';
 
@@ -28,7 +30,35 @@ const DemoDayDetailPage = () => {
   const router = useRouter();
   const { slugURL } = router.query;
   const [authToken] = useCookie('plnadmin');
-  const { isDirectoryAdmin } = useAuth();
+  const { isDirectoryAdmin, user } = useAuth();
+
+
+  /**
+   * Reloads current member from backend and returns role names.
+   * If member has no roles, returns an empty array.
+   */
+  const fetchMemberRolesFromApi = async (): Promise<string[]> => {
+    if (!authToken || !user?.uid) {
+      return [];
+    }
+
+    const config = {
+      headers: {
+        authorization: `Bearer ${authToken}`,
+      },
+    };
+
+    const res = await api.get(`${API_ROUTE.ADMIN_MEMBERS}/${user.uid}`, config);
+    const member = res.data;
+
+    const rolesFromApi: string[] = Array.isArray(member?.memberRoles)
+      ? member.memberRoles.map((r: any) => r.name).filter(Boolean)
+      : [];
+
+    console.log('[DemoDayDetailPage] Member roles from API =', rolesFromApi);
+    return rolesFromApi;
+  };
+
 
   // Redirect to log-in if not authenticated
   useEffect(() => {
@@ -70,10 +100,10 @@ const DemoDayDetailPage = () => {
         activeTab === 'applications'
           ? undefined
           : activeTab === 'investors'
-          ? 'INVESTOR'
-          : activeTab === 'founders'
-          ? 'FOUNDER'
-          : 'SUPPORT',
+            ? 'INVESTOR'
+            : activeTab === 'founders'
+              ? 'FOUNDER'
+              : 'SUPPORT',
       search: searchTerm || undefined,
       status:
         activeTab === 'applications'
@@ -142,6 +172,14 @@ const DemoDayDetailPage = () => {
     }
   };
 
+  // Force logout helper: use when member has no roles / forbidden
+  const forceLogout = () => {
+    console.log('[DemoDayDetailPage] Force logout (no roles / forbidden)');
+    removeToken();
+    document.cookie = 'plnadmin_user=; Max-Age=0; path=/;';
+    router.replace('/');
+  };
+
   const handleEditDemoDay = () => {
     if (!demoDay) return;
     setEditFormData({
@@ -168,18 +206,42 @@ const DemoDayDetailPage = () => {
     if (!authToken || !demoDay) return;
 
     try {
+      try {
+        const rolesFromApi = await fetchMemberRolesFromApi();
+
+        // If user has NO ROLES → cancel save + logout
+        if (!rolesFromApi.length) {
+          console.log('[DemoDayDetailPage] Save cancelled because user has NO ROLES');
+          forceLogout();
+          return;
+        }
+      } catch (preCheckError) {
+        console.error('[DemoDayDetailPage] Failed to reload member before save', preCheckError);
+        // If reload fails — do NOT block save, to avoid false positives
+      }
+
       await updateDemoDayMutation.mutateAsync({
         authToken,
         uid: demoDay.uid,
         data: editFormData,
       });
+
       setIsEditing(false);
       setEditFormData({});
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating demo day:', error);
+
+      // If backend already returned FORBIDDEN → logout
+      if (error?.response?.status === 403) {
+        console.log('[DemoDayDetailPage] Backend FORBIDDEN → force logout');
+        forceLogout();
+        return;
+      }
+
       alert('Failed to update demo day. Please try again.');
     }
   };
+
 
   const handleUpdateParticipantStatus = async (
     participantUid: string,
@@ -713,86 +775,86 @@ const DemoDayDetailPage = () => {
                         <div className={clsx(s.bodyCell, s.flexible)}>
                           {activeTab === 'founders'
                             ? (() => {
-                                const memberTeams = participant.member?.teamMemberRoles || [];
-                                const currentTeamUid = participant.teamUid || '';
+                              const memberTeams = participant.member?.teamMemberRoles || [];
+                              const currentTeamUid = participant.teamUid || '';
 
-                                if (memberTeams.length === 0) {
-                                  return <span className="text-gray-400">No teams</span>;
-                                }
+                              if (memberTeams.length === 0) {
+                                return <span className="text-gray-400">No teams</span>;
+                              }
 
-                                return (
-                                  <div className="flex items-center gap-2">
-                                    <select
-                                      value={currentTeamUid}
-                                      onChange={(e) => {
-                                        const selectedTeam = memberTeams.find(
-                                          (role) => role.team.uid === e.target.value
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <select
+                                    value={currentTeamUid}
+                                    onChange={(e) => {
+                                      const selectedTeam = memberTeams.find(
+                                        (role) => role.team.uid === e.target.value
+                                      );
+                                      if (selectedTeam) {
+                                        handleUpdateParticipantTeam(
+                                          participant.uid,
+                                          participant.member?.name || participant.name,
+                                          e.target.value,
+                                          selectedTeam.team.name
                                         );
-                                        if (selectedTeam) {
-                                          handleUpdateParticipantTeam(
-                                            participant.uid,
-                                            participant.member?.name || participant.name,
-                                            e.target.value,
-                                            selectedTeam.team.name
-                                          );
-                                        }
-                                      }}
-                                      disabled={updateParticipantMutation.isPending}
-                                      className={`flex-1 rounded-full border-0 px-2 py-1 text-xs font-semibold ${
-                                        currentTeamUid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                                      } disabled:opacity-50`}
-                                    >
-                                      <option value="">Select team...</option>
-                                      {memberTeams.map((role) => (
-                                        <option key={role.team.uid} value={role.team.uid}>
-                                          {role.team.name}
-                                          {role.mainTeam ? ' (Main)' : ''}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    {currentTeamUid && (
-                                      <a
-                                        href={`${WEB_UI_BASE_URL}/teams/${currentTeamUid}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center text-blue-600 hover:text-blue-800"
-                                        title="Open team page"
-                                      >
-                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
-                                          <path
-                                            d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
-                                            fill="currentColor"
-                                          />
-                                        </svg>
-                                      </a>
-                                    )}
-                                  </div>
-                                );
-                              })()
-                            : (() => {
-                                const team =
-                                  participant.member?.teamMemberRoles.find((role) => role.mainTeam)?.team ||
-                                  participant.member?.teamMemberRoles[0]?.team;
-
-                                return team ? (
-                                  <a
-                                    href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                                      }
+                                    }}
+                                    disabled={updateParticipantMutation.isPending}
+                                    className={`flex-1 rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                                      currentTeamUid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                                    } disabled:opacity-50`}
                                   >
-                                    {team.name}
-                                    <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
-                                      <path
-                                        d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
-                                        fill="currentColor"
-                                      />
-                                    </svg>
-                                  </a>
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                );
-                              })()}
+                                    <option value="">Select team...</option>
+                                    {memberTeams.map((role) => (
+                                      <option key={role.team.uid} value={role.team.uid}>
+                                        {role.team.name}
+                                        {role.mainTeam ? ' (Main)' : ''}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {currentTeamUid && (
+                                    <a
+                                      href={`${WEB_UI_BASE_URL}/teams/${currentTeamUid}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                                      title="Open team page"
+                                    >
+                                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                                        <path
+                                          d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
+                                          fill="currentColor"
+                                        />
+                                      </svg>
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })()
+                            : (() => {
+                              const team =
+                                participant.member?.teamMemberRoles.find((role) => role.mainTeam)?.team ||
+                                participant.member?.teamMemberRoles[0]?.team;
+
+                              return team ? (
+                                <a
+                                  href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                                >
+                                  {team.name}
+                                  <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                                    <path
+                                      d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
+                                      fill="currentColor"
+                                    />
+                                  </svg>
+                                </a>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              );
+                            })()}
                         </div>
                       )}
                       {activeTab === 'founders' && (
@@ -944,8 +1006,8 @@ const DemoDayDetailPage = () => {
                               participant.type === 'INVESTOR'
                                 ? 'bg-purple-100 text-purple-800'
                                 : participant.type === 'FOUNDER'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-amber-100 text-amber-800'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-amber-100 text-amber-800'
                             } disabled:opacity-50`}
                           >
                             <option value="INVESTOR">Investor</option>
@@ -1029,10 +1091,10 @@ const DemoDayDetailPage = () => {
                 {activeTab === 'applications'
                   ? 'applications'
                   : activeTab === 'investors'
-                  ? 'investors'
-                  : activeTab === 'founders'
-                  ? 'founders'
-                  : 'support members'}
+                    ? 'investors'
+                    : activeTab === 'founders'
+                      ? 'founders'
+                      : 'support members'}
               </div>
               <div className={s.paginationControls}>
                 <button

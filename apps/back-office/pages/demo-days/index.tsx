@@ -5,12 +5,13 @@ import { useDemoDaysList } from '../../hooks/demo-days/useDemoDaysList';
 import { useCookie } from 'react-use';
 import Link from 'next/link';
 import { useAuth } from '../../context/auth-context';
+import { removeToken } from '../../utils/auth';
 
 const DemoDaysPage = () => {
   const router = useRouter();
   const [authToken] = useCookie('plnadmin');
-  const { isDirectoryAdmin } = useAuth();
-  const { data: demoDays, isLoading } = useDemoDaysList({ authToken });
+  const { user, isDirectoryAdmin, isDemoDayAdmin, isLoading } = useAuth();
+  const { data: demoDays, isLoading: isDemoDaysLoading } = useDemoDaysList({ authToken });
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -19,8 +20,32 @@ const DemoDaysPage = () => {
     }
   }, [authToken, router]);
 
-  // Don't render if not authenticated
-  if (!authToken) {
+  // Logout completely if user has NO roles (NONE case)
+  useEffect(() => {
+    if (!isLoading && authToken && user && (!user.roles || user.roles.length === 0)) {
+      removeToken();
+      router.replace('/');
+    }
+  }, [authToken, user, isLoading, router]);
+
+  // Block access to Demo Days if user has no required role
+  useEffect(() => {
+    if (!isLoading && authToken && user && user.roles && user.roles.length > 0) {
+      if (!isDirectoryAdmin && !isDemoDayAdmin) {
+        router.replace('/');
+      }
+    }
+  }, [authToken, user, isLoading, isDirectoryAdmin, isDemoDayAdmin, router]);
+
+  if (!authToken || isLoading) {
+    return null;
+  }
+
+  if (user && (!user.roles || user.roles.length === 0)) {
+    return null;
+  }
+
+  if (!isDirectoryAdmin && !isDemoDayAdmin) {
     return null;
   }
 
@@ -38,14 +63,10 @@ const DemoDaysPage = () => {
       case 'ACTIVE':
         return 'text-green-600 bg-green-100';
       case 'REGISTRATION_OPEN':
-        return 'text-emerald-600 bg-emerald-100';
-      case 'EARLY_ACCESS':
-        return 'text-orange-600 bg-orange-100';
-      case 'UPCOMING':
-        return 'text-yellow-600 bg-yellow-100';
-      case 'COMPLETED':
         return 'text-blue-600 bg-blue-100';
-      case 'ARCHIVED':
+      case 'CLOSED':
+        return 'text-red-600 bg-red-100';
+      case 'DRAFT':
         return 'text-gray-600 bg-gray-100';
       default:
         return 'text-gray-600 bg-gray-100';
@@ -60,40 +81,48 @@ const DemoDaysPage = () => {
           {isDirectoryAdmin && (
             <button
               onClick={() => router.push('/demo-days/create')}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
               Create New Demo Day
             </button>
           )}
         </div>
 
-        {isLoading ? (
+        {isDemoDaysLoading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="text-gray-500">Loading demo days...</div>
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
           </div>
         ) : !demoDays || demoDays.length === 0 ? (
-          <div className="py-12 text-center">
-            <div className="mb-4 text-gray-500">No demo days found</div>
-            {isDirectoryAdmin && (
-              <button
-                onClick={() => router.push('/demo-days/create')}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-              >
-                Create Your First Demo Day
-              </button>
-            )}
+          <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-500">
+            No Demo Days found.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Title</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Start Date (UTC)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">End Date (UTC)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Actions</th>
-                </tr>
+              <tr>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                >
+                  Name
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                >
+                  Date
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                >
+                  Status
+                </th>
+                <th scope="col" className="relative px-6 py-3">
+                  <span className="sr-only">View</span>
+                </th>
+              </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {demoDays.map((demoDay) => (

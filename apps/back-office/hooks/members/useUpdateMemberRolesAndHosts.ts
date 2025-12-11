@@ -2,7 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../utils/api';
 import { API_ROUTE } from '../../utils/constants';
 import { MembersQueryKeys } from './constants/queryKeys';
-
+import {useAuth} from "../../context/auth-context";
+import { removeToken } from '../../utils/auth';
 interface MutationParams {
   authToken: string;
   memberUid: string;
@@ -32,7 +33,7 @@ async function mutation(params: MutationParams) {
 
 export function useUpdateMemberRolesAndHosts() {
   const queryClient = useQueryClient();
-
+  const { user } = useAuth();
   return useMutation({
     mutationFn: mutation,
     onSuccess: (_data, variables) => {
@@ -43,6 +44,15 @@ export function useUpdateMemberRolesAndHosts() {
       queryClient.invalidateQueries({
         queryKey: [MembersQueryKeys.GET_MEMBER, variables.memberUid],
       });
+
+      if (user && user.uid === variables.memberUid) {
+        console.log('[useUpdateMemberRolesAndHosts] updated current user roles to', variables.roles);
+
+        if (!variables.roles || variables.roles.length === 0) {
+          removeToken();
+          window.location.href = '/';
+        }
+      }
     },
   });
 }
