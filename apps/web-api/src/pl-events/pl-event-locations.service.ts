@@ -1,6 +1,6 @@
 import moment from 'moment-timezone';
-import { Prisma, SubscriptionEntityType } from '@prisma/client';
-import { BadRequestException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { PLEventLocation, Prisma, SubscriptionEntityType } from '@prisma/client';
+import { forwardRef, Inject, Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberSubscriptionService } from '../member-subscriptions/member-subscriptions.service';
@@ -14,6 +14,7 @@ import { NotificationService } from '../notifications/notifications.service';
 import { MembersService } from '../members/members.service';
 import { isEmpty } from 'lodash';
 import { PLEventGuestsService } from './pl-event-guests.service';
+import { CacheService } from '../utils/cache/cache.service';
 
 @Injectable()
 export class PLEventLocationsService {
@@ -25,6 +26,7 @@ export class PLEventLocationsService {
     private notificationService: NotificationService,
     @Inject(forwardRef(() => PLEventGuestsService))
     private plEventGuestService: PLEventGuestsService,
+    private cacheService: CacheService,
   ) { }
 
   /**
@@ -102,6 +104,9 @@ export class PLEventLocationsService {
           ...queryOptions,
           where: {
             ...queryOptions.where,
+            priority: {
+              not: null
+            },
             events: {
               some: {
                 isDeleted: false
@@ -116,6 +121,9 @@ export class PLEventLocationsService {
         ...queryOptions,
         where: {
           ...queryOptions.where,
+          priority: {
+            not: null
+          },
           events: {
             some: {
               isDeleted: false
@@ -200,12 +208,15 @@ export class PLEventLocationsService {
    * This method formats the event location object and segregates its events into past and upcoming events.
    * @param location The event location object retrieved from the database
    * @returns The formatted location object with pastEvents and upcomingEvents fields
-   *   - Past and upcoming events are based on the current date and the location's timezone.
+   *   - Events are classified as past or upcoming based on whether their end date is before or after the current time in UTC.
+   *   - The method delegates event segregation to segregateEventsByTime and spreads the result into the location object.
+   *   - Events are classified as past or upcoming based on whether their end date is before or after the current time in UTC.
+   *   - The method delegates event segregation to segregateEventsByTime and spreads the result into the location object.
    */
   private formatLocation(location: PLEventLocationWithEvents): FormattedLocationWithEvents {
     return {
       ...location,
-      ...this.segregateEventsByTime(location.events, location.timezone)
+      ...this.segregateEventsByTime(location.events)
     }
   };
 
@@ -243,8 +254,8 @@ export class PLEventLocationsService {
    * @param timezone The timezone of the location
    * @returns An object containing the cutoff date for past events
    */
-  private computeEventTimeWindow(timezone: string): { pastEventsCutoff: moment.Moment } {
-    const currentDateTimeInZone = moment().tz(timezone);
+  private computeEventTimeWindow(timezone?: string): { pastEventsCutoff: moment.Moment } {
+    const currentDateTimeInZone = moment();
     const numberOfDays = parseInt(process.env.IRL_CURRENT_EVENT_WINDOW_IN_DAYS || '90', 10);
     const pastEventsCutoff = currentDateTimeInZone.clone().subtract(numberOfDays, 'days');
     
@@ -259,13 +270,13 @@ export class PLEventLocationsService {
    *   - Past events: events that ended before the configured number of days from current time
    *   - Upcoming events: events that start from the configured number of days from current time + all future events
    */
-  private segregateEventsByTime(events: PLEvent[], timezone: string): { pastEvents: PLEvent[], upcomingEvents: PLEvent[] } {
-    const { pastEventsCutoff } = this.computeEventTimeWindow(timezone);
+  private segregateEventsByTime(events: PLEvent[], timezone?: string): { pastEvents: PLEvent[], upcomingEvents: PLEvent[] } {
+    const { pastEventsCutoff } = this.computeEventTimeWindow();
     const pastEvents: any = [];
     const upcomingEvents: any = [];
     events.forEach((event) => {
-      const eventStartDateInZone = moment.utc(event.startDate).tz(timezone);
-      const eventEndDateInZone = moment.utc(event.endDate).tz(timezone);
+      const eventStartDateInZone = moment.utc(event.startDate);
+      const eventEndDateInZone = moment.utc(event.endDate);
       if (eventEndDateInZone.isBefore(pastEventsCutoff)) {
         pastEvents.push({
           ...event,
@@ -646,40 +657,34 @@ export class PLEventLocationsService {
    * Creates a new event location.
    *
    * @param location The location data to be created.
+   * @param tx - The transaction object.
    * @returns The created location object or existing location if found within deviation.
    * @throws {Error} - If an error occurs during the creation process, it will be passed to the `handleErrors` method.
    */
-  async createPLEventLocation(location: Prisma.PLEventLocationUncheckedCreateInput) {
+  async createPLEventLocation(location: Prisma.PLEventLocationUncheckedCreateInput, tx?): Promise<PLEventLocation | null> {
     try {
       this.logger.info(`location data : , ${location}`);
-      
       // First, check if a location with the same city name exists
       const existingLocation = await this.prisma.pLEventLocation.findFirst({
         where: {
           location: {
             equals: location.location,
             mode: 'insensitive'
-          }
+          },
+          isDeleted: false
         }
       });
-
       if (existingLocation) {
-        // Calculate the deviation between existing and new coordinates
-        const latitudeDeviation = Math.abs(Math.abs(parseFloat(existingLocation.latitude || '0')) - Math.abs(parseFloat(location.latitude || '0')));
-        const longitudeDeviation = Math.abs(Math.abs(parseFloat(existingLocation.longitude || '0')) - Math.abs(parseFloat(location.longitude || '0')));
-
-        // Check if deviation is within provided degrees
-        if (latitudeDeviation <= Number(process.env.ALLOWED_LATITUDE_DEVIATION || 2) && longitudeDeviation <= Number(process.env.ALLOWED_LONGITUDE_DEVIATION || 2)) {
-          this.logger.info(`Location already exists with similar coordinates. City: ${location.location}, Existing: (${existingLocation.latitude}, ${existingLocation.longitude})`);
-          return existingLocation;
-        }
+        this.logger.info(`Location already exists with similar coordinates. City: ${location.location}, Existing: (${existingLocation.latitude}, ${existingLocation.longitude})`);
+        return existingLocation;
       }
 
       // If no existing location found or deviation is greater than 2 degrees, create new location
-      const createdLocation = await this.prisma.pLEventLocation.create({
+      const createdLocation = await (tx || this.prisma).pLEventLocation.create({
         data: location
       });
       this.logger.info(`New location created: ${createdLocation.location}`);
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return createdLocation;
     } catch (error) {
       this.logger.error(`location error : , ${error}`);
@@ -690,6 +695,7 @@ export class PLEventLocationsService {
         return null;
       }
       this.handleErrors(error);
+      return null;
     }
   }
 
@@ -743,11 +749,167 @@ export class PLEventLocationsService {
         where: { uid: locationUid },
         data: updatedLocation
       });
+      this.cacheService.reset({ service: 'PLEventGuest' });;
       return location;
     } catch (error) { 
       this.logger.error(`Error while modifying pl event location ${locationUid}: ${error}`);
       this.handleErrors(error);
     }  
   }
+
+  /**
+   * Retrieves all PLEventLocations with optional filtering.
+   * Includes location associations and their corresponding events.
+   * 
+   * @param queryOptions - Optional Prisma query options for filtering and pagination.
+   * @returns An array of locations with locationAssociations and events.
+   */
+  async findAllPLEventLocations(queryOptions?: Prisma.PLEventLocationFindManyArgs) {
+    try {
+      return await this.prisma.pLEventLocation.findMany({
+        where: {
+          ...queryOptions?.where,
+          isDeleted: false,
+        },
+        include: {
+          locationAssociations: {
+            where: { isDeleted: false },
+            include: {
+              PLEvent: {
+                where: { isDeleted: false }
+              }
+            }
+          }
+        }
+      });
+    } catch (error) {
+      this.logger.error(`Error fetching locations: ${error.message}`, error.stack, 'PLEventLocationsService');
+      throw new InternalServerErrorException(`Failed to fetch locations: ${error.message}`);
+    }
+  }
+
+  /**
+   * Retrieves a single PLEventLocation by UID.
+   * 
+   * @param uid - The unique identifier of the location.
+   * @returns The location object.
+   * @throws {NotFoundException} - If the location is not found.
+   */
+  async findOnePLEventLocation(uid: string) {
+    try {
+      const location = await this.prisma.pLEventLocation.findFirst({
+        where: {
+          uid,
+          isDeleted: false
+        }
+      });
+      if (!location) {
+        throw new NotFoundException(`Location with UID ${uid} not found.`);
+      }
+      return location;
+    } catch (error) {
+      this.logger.error(`Error fetching location: ${error.message}`);
+      this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Updates a PLEventLocation by UID.
+   * 
+   * @param uid - The unique identifier of the location to update.
+   * @param data - The data to update.
+   * @returns The updated location object.
+   * @throws {NotFoundException} - If the location is not found.
+   */
+  async updatePLEventLocation(uid: string, data: Prisma.PLEventLocationUpdateInput) {
+    try {
+      // Check if location exists
+      const existing = await this.prisma.pLEventLocation.findFirst({
+        where: { uid, isDeleted: false }
+      });
+      if (!existing) {
+        throw new NotFoundException(`Location with UID ${uid} not found.`);
+      }
+
+      const location = await this.prisma.pLEventLocation.update({
+        where: { uid },
+        data
+      });
+      this.logger.info(`Updated location: ${location.uid}`, 'PLEventLocationsService');
+      this.cacheService.reset({ service: 'PLEventGuest' });;
+      return location;
+    } catch (error) {
+      this.logger.error(`Error updating location: ${error.message}`);
+      this.handleErrors(error);
+    }
+  }
+
+  /**
+   * Soft deletes all events associated with a location.
+   * 
+   * @param locationUid - The unique identifier of the location.
+   * @param tx - Optional transaction object.
+   * @returns The number of events soft deleted.
+   */
+  private async deleteAssociatedEvents(locationUid: string, tx?: any): Promise<number> {
+    const result = await (tx || this.prisma).pLEvent.updateMany({
+      where: {
+        locationUid: locationUid,
+        isDeleted: false
+      },
+      data: {
+        isDeleted: true
+      }
+    });
+    this.logger.info(`Soft deleted ${result.count} events associated with location ${locationUid}`, 'PLEventLocationsService');
+    return result.count;
+  }
+
+  /**
+   * Soft deletes a PLEventLocation by UID.
+   * 
+   * @param uid - The unique identifier of the location to delete.
+   * @returns The deleted location object.
+   * @throws {NotFoundException} - If the location is not found.
+   */
+  async deletePLEventLocation(uid: string) {
+    try {
+      // Check if location exists
+      const existing = await this.prisma.pLEventLocation.findFirst({
+        where: { uid, isDeleted: false }
+      });
+      if (!existing) {
+        throw new NotFoundException(`Location with UID ${uid} not found.`);
+      }
+
+      // Soft delete location and all associated location associations
+      return await this.prisma.$transaction(async (tx) => {
+
+        // Soft delete all associated location associations
+        const associationsResult = await tx.pLEventLocationAssociation.updateMany({
+          where: {
+            locationUid: uid,
+            isDeleted: false
+          },
+          data: {
+            isDeleted: true
+          }
+        });
+
+        const location = await tx.pLEventLocation.update({
+          where: { uid },
+          data: { isDeleted: true }
+        });
+        this.logger.info(`Deleted location: ${location.uid}, ${associationsResult.count} location-associations`, 'PLEventLocationsService');
+        this.cacheService.reset({ service: 'PLEventGuest' });;
+        return location;
+      });
+    } catch (error) {
+     this.logger.error(`Error deleting location: ${error.message}`);
+     this.handleErrors(error);
+    }
+  }
+
+  
 
 }

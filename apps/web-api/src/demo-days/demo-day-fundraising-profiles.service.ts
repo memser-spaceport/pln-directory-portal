@@ -645,6 +645,7 @@ export class DemoDayFundraisingProfilesService {
         connected: true,
         invested: true,
         referral: true,
+        feedback: true,
       },
     });
     const flagsByProfile = interests.reduce((acc, it) => {
@@ -653,15 +654,17 @@ export class DemoDayFundraisingProfilesService {
         connected: it.connected,
         invested: it.invested,
         referral: it.referral,
+        feedback: it.feedback,
       };
       return acc;
-    }, {} as Record<string, { liked: boolean; connected: boolean; invested: boolean; referral: boolean }>);
+    }, {} as Record<string, { liked: boolean; connected: boolean; invested: boolean; referral: boolean; feedback: boolean }>);
     for (const p of filtered) {
-      const f = flagsByProfile[p.uid] || { liked: false, connected: false, invested: false, referral: false };
+      const f = flagsByProfile[p.uid] || { liked: false, connected: false, invested: false, referral: false, feedback: false };
       (p as any).liked = f.liked;
       (p as any).connected = f.connected;
       (p as any).invested = f.invested;
       (p as any).referral = f.referral;
+      (p as any).feedback = f.feedback;
     }
 
     // Stable personalized order based on user email

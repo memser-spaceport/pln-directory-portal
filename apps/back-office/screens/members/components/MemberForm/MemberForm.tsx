@@ -30,6 +30,7 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
       email: '',
       joinDate: null,
       bio: '',
+      aboutYou: '',
       country: '',
       state: '',
       city: '',

@@ -9,9 +9,17 @@ import { DemoDay, DemoDayParticipantStatus, DemoDayStatus } from '@prisma/client
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
-import {CreateDemoDayInvestorApplicationDto} from "@protocol-labs-network/contracts";
+import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
+import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, MemberRole } from '../utils/constants';
 
-type ExpressInterestStats = { liked: number; connected: number; invested: number; referral: number; total: number };
+type ExpressInterestStats = {
+  liked: number;
+  connected: number;
+  invested: number;
+  referral: number;
+  feedback: number;
+  total: number;
+};
 
 @Injectable()
 export class DemoDaysService {
@@ -90,8 +98,8 @@ export class DemoDaysService {
       };
     }
 
-    // Check if member is directory admin
-    const isDirectoryAdmin = this.isDirectoryAdmin(member);
+    // Check if member has demo day admin access (super admin or DEMO_DAY_ADMIN role with matching host scope)
+    const hasMemberLevelAdminAccess = this.hasDemoDayAdminAccess(member, demoDay.host);
 
     // Check demo day participant
     const participant = member.demoDayParticipants[0];
@@ -139,7 +147,7 @@ export class DemoDaysService {
           participant.type === 'FOUNDER' || participant.hasEarlyAccess
         ),
         isEarlyAccess: demoDay.status === DemoDayStatus.EARLY_ACCESS,
-        isDemoDayAdmin: participant.isDemoDayAdmin || isDirectoryAdmin,
+        isDemoDayAdmin: participant.isDemoDayAdmin || hasMemberLevelAdminAccess,
         confidentialityAccepted: participant.confidentialityAccepted,
         teamsCount,
         investorsCount,
@@ -175,6 +183,7 @@ export class DemoDaysService {
       shortDescription?: string | null;
       approximateStartDate?: string | null;
       supportEmail?: string | null;
+      host: string;
       status: DemoDayStatus;
     },
     actorEmail?: string
@@ -204,6 +213,7 @@ export class DemoDaysService {
         shortDescription: data.shortDescription,
         approximateStartDate: data.approximateStartDate,
         supportEmail: data.supportEmail,
+        host: data.host,
         status: data.status,
         slugURL,
       },
@@ -220,6 +230,7 @@ export class DemoDaysService {
         shortDescription: created.shortDescription,
         startDate: created.startDate?.toISOString?.() || null,
         endDate: created.endDate?.toISOString?.() || null,
+        host: created.host || null,
         status: created.status,
         actorUid: actorUid || null,
         actorEmail: actorEmail || null,
@@ -248,6 +259,70 @@ export class DemoDaysService {
         updatedAt: true,
         isDeleted: true,
         deletedAt: true,
+        host: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Get all demo days for admin back-office.
+   * - DIRECTORYADMIN: sees all demo days
+   * - DEMO_DAY_ADMIN: sees only demo days where their MemberDemoDayAdminScope.scopeValue matches DemoDay.host
+   */
+  async getAllDemoDaysForAdmin(userRoles: string[], memberUid?: string): Promise<DemoDay[]> {
+    const isDirectoryAdmin = userRoles.includes(MemberRole.DIRECTORY_ADMIN);
+
+    // Directory admins see all demo days
+    if (isDirectoryAdmin) {
+      return this.getAllDemoDays();
+    }
+
+    // DEMO_DAY_ADMIN: filter by their admin scopes
+    if (!memberUid) {
+      return [];
+    }
+
+    // Get the member's demo day admin scopes (HOST type)
+    const adminScopes = await this.prisma.memberDemoDayAdminScope.findMany({
+      where: {
+        memberUid,
+        scopeType: 'HOST',
+      },
+      select: {
+        scopeValue: true,
+      },
+    });
+
+    const allowedHosts = adminScopes.map((scope) => scope.scopeValue);
+
+    if (allowedHosts.length === 0) {
+      return [];
+    }
+
+    // Return demo days that match the allowed hosts
+    return this.prisma.demoDay.findMany({
+      where: {
+        isDeleted: false,
+        host: { in: allowedHosts },
+      },
+      select: {
+        id: true,
+        uid: true,
+        slugURL: true,
+        startDate: true,
+        endDate: true,
+        approximateStartDate: true,
+        title: true,
+        description: true,
+        shortDescription: true,
+        supportEmail: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        isDeleted: true,
+        deletedAt: true,
+        host: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -263,8 +338,6 @@ export class DemoDaysService {
       memberEmail ? this.getMemberWithDemoDayParticipants(memberEmail) : Promise.resolve(null),
       this.getQualifiedInvestorsCount(),
     ]);
-
-    const isDirectoryAdmin = member ? this.isDirectoryAdmin(member) : false;
 
     // For each demo day, get counts and determine access
     return await Promise.all(
@@ -294,6 +367,9 @@ export class DemoDaysService {
         .map(async (demoDay) => {
           const teamsCount = await this.getTeamsCountForDemoDay(demoDay.uid);
 
+          // Check member-level admin access for this specific demo day (host-scoped)
+          const hasMemberLevelAdminAccess = member ? this.hasDemoDayAdminAccess(member, demoDay.host) : false;
+
           // Determine access for this demo day
           let access: 'none' | 'INVESTOR' | 'FOUNDER' | 'SUPPORT' = 'none';
           let isDemoDayAdmin = false;
@@ -308,7 +384,7 @@ export class DemoDaysService {
 
             if (participant && participant.status === 'ENABLED') {
               access = participant.type;
-              isDemoDayAdmin = participant.isDemoDayAdmin || isDirectoryAdmin;
+              isDemoDayAdmin = participant.isDemoDayAdmin || hasMemberLevelAdminAccess;
               isEarlyAccess = demoDay.status === DemoDayStatus.EARLY_ACCESS;
               confidentialityAccepted = participant.confidentialityAccepted;
             }
@@ -371,6 +447,7 @@ export class DemoDaysService {
         shortDescription: true,
         supportEmail: true,
         status: true,
+        host: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -400,6 +477,7 @@ export class DemoDaysService {
         shortDescription: true,
         supportEmail: true,
         status: true,
+        host: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -426,6 +504,7 @@ export class DemoDaysService {
       approximateStartDate?: string | null;
       supportEmail?: string | null;
       status?: DemoDayStatus;
+      host?: string | null;
     },
     actorEmail?: string
   ): Promise<DemoDay> {
@@ -480,6 +559,9 @@ export class DemoDaysService {
     if (data.status !== undefined) {
       updateData.status = data.status;
     }
+    if (data.host !== undefined) {
+      updateData.host = data.host;
+    }
 
     const updated = await this.prisma.demoDay.update({
       where: { uid },
@@ -496,6 +578,7 @@ export class DemoDaysService {
         shortDescription: true,
         supportEmail: true,
         status: true,
+        host: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -584,6 +667,7 @@ export class DemoDaysService {
         connectedCount: true,
         investedCount: true,
         referralCount: true,
+        feedbackCount: true,
       },
     });
 
@@ -591,9 +675,10 @@ export class DemoDaysService {
     const connected = agg._sum.connectedCount ?? 0;
     const invested = agg._sum.investedCount ?? 0;
     const referral = agg._sum.referralCount ?? 0;
-    const total = liked + connected + invested + referral;
+    const feedback = agg._sum.feedbackCount ?? 0;
+    const total = liked + connected + invested + referral + feedback;
 
-    return { liked, connected, invested, referral, total };
+    return { liked, connected, invested, referral, feedback, total };
   }
 
   async updateConfidentialityAcceptance(
@@ -697,6 +782,7 @@ export class DemoDaysService {
     const totalConnections = allStats.filter((s) => s.connected).length;
     const totalInvestments = allStats.filter((s) => s.invested).length;
     const totalReferrals = allStats.filter((s) => s.referral).length;
+    const totalFeedbacks = allStats.filter((s) => s.feedback).length;
     const totalEngagement = allStats.reduce((sum, s) => sum + s.totalCount, 0);
 
     // Build investor activity list
@@ -722,6 +808,7 @@ export class DemoDaysService {
             connected: stat.connected,
             invested: stat.invested,
             referral: stat.referral,
+            feedback: stat.feedback,
           },
           date: stat.updatedAt,
         };
@@ -730,7 +817,7 @@ export class DemoDaysService {
     // Group engagement by time
     // Use Event table for time-series data, but only count first occurrence of each action per investor
     const engagementOverTime = await this.prisma.$queryRaw<
-      Array<{ hour: Date; likes: bigint; connects: bigint; invests: bigint; referrals: bigint }>
+      Array<{ hour: Date; likes: bigint; connects: bigint; invests: bigint; referrals: bigint; feedbacks: bigint }>
     >`
       WITH first_events AS (
         SELECT DISTINCT ON ("userId", props->>'teamUid', props->>'interestType')
@@ -749,7 +836,8 @@ export class DemoDaysService {
         COUNT(*) FILTER (WHERE interest_type = 'like') as likes,
         COUNT(*) FILTER (WHERE interest_type = 'connect') as connects,
         COUNT(*) FILTER (WHERE interest_type = 'invest') as invests,
-        COUNT(*) FILTER (WHERE interest_type = 'referral') as referrals
+        COUNT(*) FILTER (WHERE interest_type = 'referral') as referrals,
+        COUNT(*) FILTER (WHERE interest_type = 'feedback') as feedbacks
       FROM first_events
       GROUP BY DATE_TRUNC('hour', ts)
       ORDER BY hour
@@ -771,6 +859,7 @@ export class DemoDaysService {
         connections: totalConnections,
         investments: totalInvestments,
         referrals: totalReferrals,
+        feedbacks: totalFeedbacks,
       },
       engagementOverTime: engagementOverTime.map((row) => ({
         timestamp: row.hour,
@@ -778,6 +867,7 @@ export class DemoDaysService {
         connects: Number(row.connects),
         invests: Number(row.invests),
         referrals: Number(row.referrals),
+        feedbacks: Number(row.feedbacks),
       })),
       investorActivity,
     };
@@ -839,10 +929,7 @@ export class DemoDaysService {
     return feedback;
   }
 
-  async submitInvestorApplication(
-    applicationData: CreateDemoDayInvestorApplicationDto,
-    demoDayUidOrSlug: string
-  ) {
+  async submitInvestorApplication(applicationData: CreateDemoDayInvestorApplicationDto, demoDayUidOrSlug: string) {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
     // Check if demo day is accepting applications (REGISTRATION_OPEN status)
@@ -901,7 +988,6 @@ export class DemoDaysService {
           },
         },
       });
-
 
       // If a new team is provided, create Team and TeamMemberRole (non-breaking extension)
       if (applicationData.isTeamNew && applicationData.team?.name) {
@@ -1057,19 +1143,55 @@ export class DemoDaysService {
       throw new ForbiddenException('No demo day access');
     }
 
-    // Check if a user is a directory admin
+    const demoDay = await this.prisma.demoDay.findUnique({
+      where: { uid: demoDayUid },
+      select: {
+        uid: true,
+        host: true,
+      },
+    });
+
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day access');
+    }
+
+    // 1) Directory admins always have full access
     const isDirectoryAdmin = this.membersService.checkIfAdminUser(member);
     if (isDirectoryAdmin) {
       return { participantUid: member.uid, isAdmin: true };
     }
 
-    // Check if a user is a demo day admin or founder with admin privileges
+    // 2) Demo day admin with host-level scope (generic demoDayAdminScopes table)
+    const hasDemoDayAdminRoleFlag = hasDemoDayAdminRole(member);
+
+    if (hasDemoDayAdminRoleFlag) {
+      const hostScopes = await this.prisma.memberDemoDayAdminScope.findMany({
+        where: {
+          memberUid: member.uid,
+          scopeType: 'HOST',
+        },
+        select: {
+          scopeValue: true,
+        },
+      });
+
+      const allowedHosts = hostScopes.map((s) => s.scopeValue.toLowerCase());
+      const demoDayHost = demoDay.host.toLowerCase();
+
+      const canManageByHost = allowedHosts.includes(demoDayHost);
+
+      if (canManageByHost) {
+        return { participantUid: member.uid, isAdmin: true };
+      }
+    }
+
+    // 3) Participant-level demo day admin (existing behavior based on DemoDayParticipant)
     const hasViewOnlyAdminAccess = await this.isDemoDayAdmin(member.uid, demoDayUid);
     if (hasViewOnlyAdminAccess) {
       return { participantUid: member.uid, isAdmin: true };
     }
 
-    // Check if a user is a participant
+    // 4) Regular participant access
     const participantAccess = await this.prisma.member.findUnique({
       where: { uid: member.uid },
       select: {
@@ -1089,7 +1211,7 @@ export class DemoDaysService {
       return { participantUid: member.uid, isAdmin: false };
     }
 
-    // No access
+    // 5) No access
     throw new ForbiddenException('No demo day access');
   }
 
@@ -1263,6 +1385,14 @@ export class DemoDaysService {
             name: true,
           },
         },
+        demoDayAdminScopes: {
+          where: {
+            scopeType: 'HOST',
+          },
+          select: {
+            scopeValue: true,
+          },
+        },
         demoDayParticipants: {
           where: demoDayUid
             ? {
@@ -1286,9 +1416,43 @@ export class DemoDaysService {
     });
   }
 
-  private isDirectoryAdmin(member: { memberRoles: Array<{ name: string }> }): boolean {
-    const roleNames = member.memberRoles.map((role) => role.name);
-    return roleNames.includes('DIRECTORYADMIN');
+  /**
+   * Check if a member has demo day admin access for a specific demo day.
+   * A member has demo day admin access if they:
+   * - Are a directory admin (DIRECTORY_ADMIN), OR
+   * - Have the DEMO_DAY_ADMIN role AND their MemberDemoDayAdminScope.scopeValue matches the DemoDay.host
+   *
+   * Note: Participant-level isDemoDayAdmin is checked separately in getDemoDayAccess
+   *
+   * @param member - Member with roles and demoDayAdminScopes
+   * @param demoDayHost - The host of the demo day to check access for
+   */
+  private hasDemoDayAdminAccess(
+    member: MemberWithRoles & { demoDayAdminScopes?: { scopeValue: string }[] },
+    demoDayHost?: string
+  ): boolean {
+    // Directory admins always have access
+    if (isDirectoryAdmin(member)) {
+      return true;
+    }
+
+    // Check if member has DEMO_DAY_ADMIN role
+    if (!hasDemoDayAdminRole(member)) {
+      return false;
+    }
+
+    // If no host provided, or no scopes defined, deny access for DEMO_DAY_ADMIN
+    if (!demoDayHost || !member.demoDayAdminScopes || member.demoDayAdminScopes.length === 0) {
+      return false;
+    }
+
+    // Check if member's scopes include the demo day host (case-insensitive)
+    if (hasDemoDayAdminRole(member)) {
+      const allowedHosts = member.demoDayAdminScopes.map((s) => s.scopeValue.toLowerCase());
+      return allowedHosts.includes(demoDayHost.toLowerCase());
+    }
+
+    return false;
   }
 
   /**

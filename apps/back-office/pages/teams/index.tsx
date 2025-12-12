@@ -4,6 +4,7 @@ import { GetServerSideProps } from 'next';
 import { parseCookies } from 'nookies';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'react-toastify';
+import { useRouter } from 'next/router';
 
 import { ApprovalLayout } from '../../layout/approval-layout';
 import api from '../../utils/api';
@@ -11,6 +12,7 @@ import s from './styles.module.scss';
 import clsx from 'clsx';
 import { CloseIcon } from '../../screens/members/components/icons';
 import { TeamAccessLevelSelect } from './components/TeamAccessLevelSelect';
+import { useAuth } from '../../context/auth-context';
 
 // Access levels we allow to set for teams
 type AccessLevel = 'L0' | 'L1';
@@ -36,6 +38,8 @@ const fade = {
 };
 
 const TeamsPage: React.FC = () => {
+  const router = useRouter();
+  const { isDirectoryAdmin } = useAuth();
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -49,6 +53,15 @@ const TeamsPage: React.FC = () => {
   const [selectedTeamUid, setSelectedTeamUid] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<TeamRow>>({});
   const [savingTeam, setSavingTeam] = useState(false);
+
+  const { isLoading, user } = useAuth();
+
+  // Redirect non-directory admins to demo-days
+  useEffect(() => {
+    if (!isLoading && user && !isDirectoryAdmin) {
+      router.replace('/demo-days');
+    }
+  }, [isLoading, user, isDirectoryAdmin, router]);
 
   // Load teams on mount
   useEffect(() => {
@@ -223,6 +236,11 @@ const TeamsPage: React.FC = () => {
   });
 
   const selectedTeam = teams.find((t) => t.uid === selectedTeamUid) || null;
+
+  // Don't render page content if user doesn't have access
+  if (!isLoading && user && !isDirectoryAdmin) {
+    return null;
+  }
 
   return (
     <ApprovalLayout>

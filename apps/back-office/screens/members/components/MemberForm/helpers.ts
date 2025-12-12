@@ -12,6 +12,7 @@ export const memberFormSchema = yup.object({
   email: yup.string().email('Must be a valid email').required('Email is required'),
   joinDate: yup.date().nullable().defined(),
   bio: yup.string().defined(),
+  aboutYou: yup.string().defined(),
   country: yup.string().defined(),
   state: yup.string().defined(),
   city: yup.string().defined(),

@@ -1,13 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '../utils/jwt/jwt.service';
-import { LogService } from '../shared/log.service'; 
+import { LogService } from '../shared/log.service';
+import { MemberRole } from '../utils/constants';
 
 @Injectable()
 export class AdminService {
-  constructor(
-    private readonly jwtService: JwtService,
-    private logger: LogService,
-  ) {}
+  constructor(private readonly jwtService: JwtService, private logger: LogService) {}
 
   /**
    * Logs in the admin using the provided username and password.
@@ -17,13 +15,13 @@ export class AdminService {
    * @returns Object containing access token on successful login
    * @throws UnauthorizedException if credentials are invalid
    */
-  async login(username: string, password: string): Promise<{ code:Number, accessToken: string }> {
+  async login(username: string, password: string): Promise<{ code: number; accessToken: string }> {
     if (!this.isValidAdminCredentials(username, password)) {
       this.logger.error('Invalid credentials provided for admin login.');
       throw new UnauthorizedException('Invalid credentials');
     }
     this.logger.info('Generating admin access token...');
-    const accessToken = await this.jwtService.getSignedToken(['DIRECTORYADMIN']);
+    const accessToken = await this.jwtService.getSignedToken([MemberRole.DIRECTORY_ADMIN]);
     return { code: 1, accessToken: accessToken };
   }
 

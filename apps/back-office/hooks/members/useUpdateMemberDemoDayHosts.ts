@@ -1,0 +1,48 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '../../utils/api';
+import { API_ROUTE } from '../../utils/constants';
+import { MembersQueryKeys } from './constants/queryKeys';
+
+interface MutationParams {
+  authToken: string;
+  memberUid: string;
+  hosts: string[];
+}
+
+async function mutation(params: MutationParams) {
+  const config = {
+    headers: {
+      authorization: `Bearer ${params.authToken}`,
+    },
+  };
+
+  const body = {
+    hosts: params.hosts,
+  };
+
+  // PATCH /v1/admin/members/{uid}/demo-day-hosts
+  const { data } = await api.patch(
+    `${API_ROUTE.ADMIN_MEMBERS}/${params.memberUid}/demo-day-hosts`,
+    body,
+    config,
+  );
+
+  return data;
+}
+
+export function useUpdateMemberDemoDayHosts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: mutation,
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [MembersQueryKeys.GET_MEMBERS_LIST],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: [MembersQueryKeys.GET_MEMBER, variables.memberUid],
+      });
+    },
+  });
+}

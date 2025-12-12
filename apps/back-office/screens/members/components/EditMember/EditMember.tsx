@@ -58,6 +58,7 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
           email: string;
           joinDate: string;
           bio: string;
+          aboutYou: string;
           country: string;
           region: string;
           city: string;
@@ -85,6 +86,7 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
           email: formData.email,
           joinDate: formData.joinDate?.toISOString() ?? '',
           bio: formData.bio,
+          aboutYou: formData.aboutYou,
           country: formData.country || '',
           region: formData.state || '',
           city: formData.city || '',
@@ -161,6 +163,7 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
           return { team: _team ? { value: _team.teamUid, label: _team.teamTitle } : null, role: item.role };
         }) ?? [],
       bio: data.bio ?? '',
+      aboutYou: data.aboutYou ?? '',
       country: data.location?.country ?? '',
       state: data.location?.region ?? '',
       city: data.location?.city ?? '',

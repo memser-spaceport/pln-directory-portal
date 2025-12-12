@@ -1,4 +1,4 @@
-name: Deploy to EKS with Helm
+name: Deploy to EKS with Helm [Prod]
 
 on:
   push:

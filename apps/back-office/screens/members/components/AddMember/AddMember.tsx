@@ -54,6 +54,7 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
           email: formData.email,
           joinDate: formData.joinDate?.toISOString() ?? '',
           bio: formData.bio,
+          aboutYou: formData.aboutYou,
           country: formData.country ?? '',
           region: formData.state ?? '',
           city: formData.city ?? '',

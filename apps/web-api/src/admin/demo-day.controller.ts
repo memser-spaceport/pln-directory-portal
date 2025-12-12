@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, Patch, UseGuards, UsePipes, Req, CacheTTL } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
-import { AdminAuthGuard } from '../guards/admin-auth.guard';
+import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
 import { DemoDaysService } from '../demo-days/demo-days.service';
 import { DemoDayParticipantsService } from '../demo-days/demo-day-participants.service';
 import { DemoDayStatus } from '@prisma/client';
@@ -22,7 +22,6 @@ import { QueryCache } from '../decorators/query-cache.decorator';
 
 @ApiTags('Admin Demo Days')
 @Controller('v1/admin/demo-days')
-@UseGuards(AdminAuthGuard)
 export class AdminDemoDaysController {
   constructor(
     private readonly demoDaysService: DemoDaysService,
@@ -30,6 +29,7 @@ export class AdminDemoDaysController {
   ) {}
 
   @Post()
+  @UseGuards(AdminAuthGuard)
   @UsePipes(ZodValidationPipe)
   @QueryCache()
   @CacheTTL(120) // 2 minutes
@@ -44,6 +44,7 @@ export class AdminDemoDaysController {
         shortDescription: body.shortDescription,
         approximateStartDate: body.approximateStartDate,
         supportEmail: body.supportEmail,
+        host: body.host,
         status: body.status.toUpperCase() as DemoDayStatus,
       },
       req.userEmail
@@ -51,13 +52,18 @@ export class AdminDemoDaysController {
   }
 
   @Get()
+  @UseGuards(DemoDayAdminAuthGuard)
   @NoCache()
-  async getAllDemoDays(): Promise<ResponseDemoDayDto[]> {
-    return this.demoDaysService.getAllDemoDays();
+  async getAllDemoDays(@Req() req): Promise<ResponseDemoDayDto[]> {
+    // req.user contains the JWT payload with roles and memberUid
+    const userRoles: string[] = req.user?.roles ?? [];
+    const memberUid: string | undefined = req.user?.memberUid;
+    return this.demoDaysService.getAllDemoDaysForAdmin(userRoles, memberUid);
   }
 
   // This endpoint uses slugURL for browser-friendly URLs (e.g., /demo-days/crypto-day)
   @Get(':slugURL')
+  @UseGuards(DemoDayAdminAuthGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async getDemoDayDetails(@Param('slugURL') slugURL: string): Promise<ResponseDemoDayDto> {
@@ -65,6 +71,7 @@ export class AdminDemoDaysController {
   }
 
   @Patch(':uid')
+  @UseGuards(DemoDayAdminAuthGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async updateDemoDay(
@@ -84,12 +91,14 @@ export class AdminDemoDaysController {
         approximateStartDate: body.approximateStartDate,
         supportEmail: body.supportEmail,
         status: body.status?.toUpperCase() as DemoDayStatus,
+        host: body.host,
       },
       req.userEmail
     );
   }
 
   @Post(':uid/participants')
+  @UseGuards(DemoDayAdminAuthGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async addParticipant(
@@ -110,6 +119,7 @@ export class AdminDemoDaysController {
   }
 
   @Post(':uid/participants-bulk')
+  @UseGuards(DemoDayAdminAuthGuard)
   @UsePipes(ZodValidationPipe)
   async addInvestorParticipantsBulk(
     @Req() req,
@@ -126,6 +136,7 @@ export class AdminDemoDaysController {
   }
 
   @Get(':uid/participants')
+  @UseGuards(DemoDayAdminAuthGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async getParticipants(
@@ -144,6 +155,7 @@ export class AdminDemoDaysController {
   }
 
   @Patch(':demoDayUid/participants/:participantUid')
+  @UseGuards(DemoDayAdminAuthGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async updateParticipant(

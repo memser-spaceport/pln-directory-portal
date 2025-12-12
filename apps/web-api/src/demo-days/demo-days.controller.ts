@@ -254,7 +254,8 @@ export class DemoDaysController {
       body.teamFundraisingProfileUid,
       body.interestType,
       body.isPrepDemoDay,
-      body.referralData
+      body.referralData,
+      body.feedbackData
     );
   }
 

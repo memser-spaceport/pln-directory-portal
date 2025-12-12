@@ -11,6 +11,15 @@ export type Member = {
   teamOrProjectURL: string;
   uid: string;
   signUpSource: string | null;
+  roles?: string[];
+  memberRoles?: { name: string }[];
+  demoDayHosts?: string[];
+  demoDayAdminScopes?: {
+    memberUid: string;
+    scopeType: string;
+    scopeValue: string;
+    config: unknown | null;
+  }[];
 };
 
 export type TMemberForm = {
@@ -20,6 +29,7 @@ export type TMemberForm = {
   email: string;
   joinDate: Date | null;
   bio: string;
+  aboutYou: string;
   country: string;
   state: string;
   city: string;

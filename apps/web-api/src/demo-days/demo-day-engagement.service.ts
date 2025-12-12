@@ -116,12 +116,15 @@ export class DemoDayEngagementService {
     memberEmail: string,
     demoDayUidOrSlug: string,
     teamFundraisingProfileUid: string,
-    interestType: 'like' | 'connect' | 'invest' | 'referral',
+    interestType: 'like' | 'connect' | 'invest' | 'referral' | 'feedback',
     isPrepDemoDay = false,
     referralData?: {
       investorName?: string | null;
       investorEmail?: string | null;
       message?: string | null;
+    } | null,
+    feedbackData?: {
+      feedback?: string | null;
     } | null
   ) {
     // Validate that the caller is an enabled demo day participant (investor)
@@ -231,6 +234,10 @@ export class DemoDayEngagementService {
         templateName: 'DEMO_DAY_REFERRAL_COMPANY_EMAIL',
         actionType: 'REFERRAL_COMPANY',
       },
+      feedback: {
+        templateName: 'DEMO_DAY_FEEDBACK_COMPANY_EMAIL',
+        actionType: 'FEEDBACK_COMPANY',
+      },
     };
 
     const template = templateMap[interestType];
@@ -256,14 +263,17 @@ export class DemoDayEngagementService {
 
     // Send notification
     if (!isPrepDemoDay) {
+      // Feedback emails go only to founders
+      const isFeedback = interestType === 'feedback';
+
       await this.notificationServiceClient.sendNotification({
         isPriority: true,
         deliveryChannel: 'EMAIL',
         templateName: template.templateName,
         recipientsInfo: {
           from: process.env.DEMO_DAY_EMAIL,
-          to: [...founderEmails, referralData?.investorEmail].filter(Boolean),
-          cc: [member.email],
+          to: isFeedback ? founderEmails : [...founderEmails, referralData?.investorEmail].filter(Boolean),
+          cc: isFeedback ? [] : [member.email],
           bcc: [process.env.DEMO_DAY_EMAIL],
         },
         deliveryPayload: {
@@ -284,6 +294,11 @@ export class DemoDayEngagementService {
                   referralInvestorName: referralData.investorName || referralData.investorEmail,
                   referralInvestorEmail: referralData.investorEmail,
                   referralMessage: referralData.message,
+                }
+              : {}),
+            ...(feedbackData
+              ? {
+                  feedbackText: feedbackData.feedback,
                 }
               : {}),
           },
@@ -336,6 +351,11 @@ export class DemoDayEngagementService {
                 referralMessage: referralData.message,
               }
             : {}),
+          ...(feedbackData
+            ? {
+                feedbackText: feedbackData.feedback,
+              }
+            : {}),
         },
       });
     }, 500);
@@ -353,7 +373,7 @@ export class DemoDayEngagementService {
     memberUid: string;
     teamFundraisingProfileUid: string;
     isPrepDemoDay: boolean;
-    interestType: 'like' | 'connect' | 'invest' | 'referral';
+    interestType: 'like' | 'connect' | 'invest' | 'referral' | 'feedback';
   }) {
     const { demoDayUid, memberUid, teamFundraisingProfileUid, isPrepDemoDay, interestType } = args;
 
@@ -362,6 +382,7 @@ export class DemoDayEngagementService {
       connected: interestType === 'connect',
       invested: interestType === 'invest',
       referral: interestType === 'referral',
+      feedback: interestType === 'feedback',
     };
 
     await this.prisma.$transaction(async (tx) => {
@@ -375,7 +396,7 @@ export class DemoDayEngagementService {
             isPrepDemoDay,
           },
         },
-        select: { uid: true, liked: true, connected: true, invested: true, referral: true },
+        select: { uid: true, liked: true, connected: true, invested: true, referral: true, feedback: true },
       });
 
       // Next sticky booleans (once true — stays true)
@@ -383,13 +404,15 @@ export class DemoDayEngagementService {
       const nextConnected = (existing?.connected ?? false) || patch.connected;
       const nextInvested = (existing?.invested ?? false) || patch.invested;
       const nextReferral = (existing?.referral ?? false) || patch.referral;
+      const nextFeedback = (existing?.feedback ?? false) || patch.feedback;
 
       // Deltas: +1 only when flipping false -> true in this call
       const dLiked = !existing?.liked && patch.liked ? 1 : 0;
       const dConnected = !existing?.connected && patch.connected ? 1 : 0;
       const dInvested = !existing?.invested && patch.invested ? 1 : 0;
       const dReferral = !existing?.referral && patch.referral ? 1 : 0;
-      const dTotal = dLiked + dConnected + dInvested + dReferral;
+      const dFeedback = !existing?.feedback && patch.feedback ? 1 : 0;
+      const dTotal = dLiked + dConnected + dInvested + dReferral + dFeedback;
 
       if (!existing) {
         // First interaction for this (demoDay, member, profile, prep)
@@ -404,9 +427,11 @@ export class DemoDayEngagementService {
             connected: nextConnected,
             invested: nextInvested,
             referral: nextReferral,
+            feedback: nextFeedback,
             likedCount: dLiked,
             connectedCount: dConnected,
             investedCount: dInvested,
+            feedbackCount: dFeedback,
             totalCount: dTotal,
           },
           select: { uid: true },
@@ -420,10 +445,12 @@ export class DemoDayEngagementService {
             connected: nextConnected,
             invested: nextInvested,
             referral: nextReferral,
+            feedback: nextFeedback,
             ...(dLiked > 0 ? { likedCount: { increment: dLiked } } : {}),
             ...(dConnected > 0 ? { connectedCount: { increment: dConnected } } : {}),
             ...(dInvested > 0 ? { investedCount: { increment: dInvested } } : {}),
             ...(dReferral > 0 ? { referralCount: { increment: dReferral } } : {}),
+            ...(dFeedback > 0 ? { feedbackCount: { increment: dFeedback } } : {}),
             ...(dTotal > 0 ? { totalCount: { increment: dTotal } } : {}),
           },
           select: { uid: true },
