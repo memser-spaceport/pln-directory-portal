@@ -30,9 +30,9 @@ export class MembershipSourcesService {
         },
       };
 
-      // Add plnFriend filter if specified
-      if (plnFriend !== 'true') {
-        whereClause.plnFriend = false;
+      // Add plnFriend filter only if explicitly specified
+      if (plnFriend !== undefined) {
+        whereClause.plnFriend = plnFriend === 'true';
       }
 
       return {

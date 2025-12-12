@@ -1439,6 +1439,7 @@ export class TeamsService {
     page?: number | string;
     limit?: number | string;
     tiers?: string | number[];
+    plnFriend?: string;
   }) {
     const page = Number(filters.page) || 1;
     const limit = Math.min(Number(filters.limit) || 20, 100);
@@ -1446,9 +1447,9 @@ export class TeamsService {
 
     // Base where clause excluding L0 access level
     const baseWhere: Prisma.TeamWhereInput = {
-      // accessLevel: {
-      //   not: 'L0',
-      // },
+      accessLevel: {
+        not: 'L0',
+      },
     };
 
     const whereConditions: Prisma.TeamWhereInput[] = [baseWhere];
@@ -1458,6 +1459,13 @@ export class TeamsService {
       const isFundValue = typeof filters.isFund === 'string' ? filters.isFund === 'true' : filters.isFund;
       whereConditions.push({
         isFund: isFundValue,
+      });
+    }
+
+    // plnFriend filter - only apply if explicitly specified
+    if (filters.plnFriend !== undefined) {
+      whereConditions.push({
+        plnFriend: filters.plnFriend === 'true',
       });
     }
 
