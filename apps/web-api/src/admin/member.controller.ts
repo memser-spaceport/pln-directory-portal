@@ -27,6 +27,13 @@ export class MemberController {
     return await this.memberService.findMemberByAccessLevels(query);
   }
 
+  @Get('access-level-counts')
+  @UseGuards(AdminAuthGuard)
+  @NoCache()
+  async getAccessLevelCounts(): Promise<AccessLevelCounts> {
+    return this.memberService.getAccessLevelCounts();
+  }
+
   /**
    * Returns a single member by uid.
    * Used by Back Office to refresh roles and member data.
@@ -36,13 +43,6 @@ export class MemberController {
   @NoCache()
   async getMemberByUid(@Param('uid') uid: string): Promise<Member> {
     return await this.memberService.findMemberByUid(uid);
-  }
-
-  @Get('access-level-counts')
-  @UseGuards(AdminAuthGuard)
-  @NoCache()
-  async getAccessLevelCounts(): Promise<AccessLevelCounts> {
-    return this.memberService.getAccessLevelCounts();
   }
 
   @Put('access-level')
