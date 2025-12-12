@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { MembersQueryKeys } from './constants/queryKeys';
 import api from '../../utils/api';
 import { API_ROUTE } from '../../utils/constants';
-import { AxiosResponse } from 'axios';
 import { Member } from '../../screens/members/types/member';
 
 interface QueryParams {
@@ -20,7 +19,7 @@ async function fetcher(params: QueryParams) {
   const { data } = await api.get<{
     data: Member[];
     pagination: { total: number; page: number; limit: number; pages: number };
-  }>(`${API_ROUTE.ADMIN_MEMBERS}?accessLevel=${params.accessLevel.join(',')}&page=1&limit=5000`, config);
+  }>(`${API_ROUTE.ADMIN_MEMBERS}?accessLevel=${params.accessLevel.join(',')}`, config);
 
   return data;
 }

@@ -49,6 +49,15 @@ export const ALLOWED_CORS_ORIGINS = {
 
 export const IS_DEV_ENVIRONMENT = process.env.ENVIRONMENT == APP_ENV.DEV;
 
+/**
+ * Checks if IRL notifications are enabled via environment variable.
+ * Returns true unless explicitly set to 'false' (case-insensitive).
+ * @returns {boolean} True if notifications are enabled, false otherwise
+ */
+export function isIRLNotificationsEnabled(): boolean {
+  return String(process.env.IRL_NOTIFICATIONS_ENABLED).toLowerCase() !== 'false';
+}
+
 export const NOT_FOUND_GLOBAL_ERROR_RESPONSE = {
   statusCode: 404,
   error: 'Not Found',
