@@ -6,7 +6,7 @@ import { useAuth } from '../../context/auth-context';
 import { RolesMenu } from './components/RolesMenu/RolesMenu';
 
 export function Menu() {
-  const { isDirectoryAdmin } = useAuth();
+  const { isDirectoryAdmin, isDemoDayAdmin } = useAuth();
 
   return (
     <ul className="flex space-x-4 text-sm text-gray-700">
@@ -14,7 +14,7 @@ export function Menu() {
       {isDirectoryAdmin && <RolesMenu />}
       {isDirectoryAdmin && <TeamsMenu />}
       {isDirectoryAdmin && <RecommendationsMenu />}
-      <DemoDaysMenu />
+      {(isDirectoryAdmin || isDemoDayAdmin) && <DemoDaysMenu />}
     </ul>
   );
 }

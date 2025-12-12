@@ -1,5 +1,7 @@
 export function removeToken() {
   document.cookie = 'plnadmin=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+  document.cookie = 'plnadmin_user=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+  document.cookie = 'plnadmin_refresh=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 }
 
 export function getToken(): string | null {

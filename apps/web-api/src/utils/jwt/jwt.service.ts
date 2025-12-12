@@ -4,7 +4,7 @@ import * as jwt from 'jsonwebtoken';
 @Injectable()
 export class JwtService {
   /**
-   * <p> Returns a signed jwt token for given roles valid for an hour </p>
+   * <p> Returns a signed jwt token for given roles valid for 30 days </p>
    * @returns the signed jwt token as string
    */
   async getSignedToken(roles: string[], memberUid?: string) {
@@ -12,7 +12,7 @@ export class JwtService {
       {
         roles,
         memberUid,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
+        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30,
       },
       process.env.ADMIN_TOKEN_SECRET
     );
