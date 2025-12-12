@@ -47,10 +47,22 @@ export function useRolesTable({
   const columns = useMemo(
     () => [
       columnHelper.accessor('name', {
-        header: 'Member',
-        sortingFn: 'alphanumeric',
+        header: 'Name',
         cell: (info) => <MemberCell member={info.row.original} />,
         size: 260,
+        enableSorting: false,
+      }),
+      columnHelper.accessor('projectContributions', {
+        header: 'Team',
+        cell: (info) => <ProjectsCell member={info.row.original} />,
+        size: 250,
+        enableSorting: false,
+      }),
+      columnHelper.accessor('accessLevel', {
+        header: 'Access level',
+        cell: (info) => (authToken ? <StatusCell member={info.row.original} authToken={authToken} /> : null),
+        size: 0,
+        enableSorting: false,
       }),
       columnHelper.display({
         id: 'role',
@@ -64,28 +76,6 @@ export function useRolesTable({
         ),
         size: 0,
         enableResizing: false,
-        enableSorting: false,
-      }),
-      columnHelper.accessor('accessLevel', {
-        header: 'Status',
-        sortingFn: (rowA: Row<Member>, rowB: Row<Member>) => {
-          if (rowA.original.accessLevelUpdatedAt > rowB.original.accessLevelUpdatedAt) {
-            return 1;
-          }
-
-          if (rowA.original.accessLevelUpdatedAt < rowB.original.accessLevelUpdatedAt) {
-            return -1;
-          }
-
-          return 0;
-        },
-        cell: (info) => (authToken ? <StatusCell member={info.row.original} authToken={authToken} /> : null),
-        size: 0,
-      }),
-      columnHelper.accessor('projectContributions', {
-        header: 'Team',
-        cell: (info) => <ProjectsCell member={info.row.original} />,
-        size: 250,
         enableSorting: false,
       }),
     ],
