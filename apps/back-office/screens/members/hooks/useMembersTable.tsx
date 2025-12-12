@@ -41,133 +41,130 @@ type UseMembersTableArgs = {
 };
 
 export function useMembersTable({
-                                  members,
-                                  sorting,
-                                  setSorting,
-                                  rowSelection,
-                                  setRowSelection,
-                                  authToken,
-                                  pagination,
-                                  setPagination,
-                                  globalFilter,
-                                  setGlobalFilter,
-                                  columnFilters,
-                                  setColumnFilters,
-                                  mode = 'members',
-                                }: UseMembersTableArgs) {
-  const columns = useMemo(
-    () => {
-      if (mode === 'roles') {
-        return [
-          columnHelper.accessor('name', {
-            header: 'Member',
-            sortingFn: 'alphanumeric',
-            cell: (info) => <MemberCell member={info.row.original} />,
-            size: 0,
-          }),
-          columnHelper.display({
-            id: 'role',
-            header: 'Role',
-            cell: (info) => <RoleCell member={info.row.original} />,
-            size: 200,
-            enableResizing: false,
-            enableSorting: false,
-          }),
-        ];
-      }
-
+  members,
+  sorting,
+  setSorting,
+  rowSelection,
+  setRowSelection,
+  authToken,
+  pagination,
+  setPagination,
+  globalFilter,
+  setGlobalFilter,
+  columnFilters,
+  setColumnFilters,
+  mode = 'members',
+}: UseMembersTableArgs) {
+  const columns = useMemo(() => {
+    if (mode === 'roles') {
       return [
-        // Checkbox column
-        {
-          id: 'select',
-          header: ({ table }) => (
-            <IndeterminateCheckbox
-              checked={table.getIsAllRowsSelected()}
-              indeterminate={table.getIsSomeRowsSelected()}
-              onChange={table.getToggleAllRowsSelectedHandler()}
-            />
-          ),
-          cell: ({ row }) => (
-            <div>
-              <IndeterminateCheckbox
-                checked={row.getIsSelected()}
-                disabled={!row.getCanSelect()}
-                indeterminate={row.getIsSomeSelected()}
-                onChange={row.getToggleSelectedHandler()}
-              />
-            </div>
-          ),
-          size: 48,
-          enableResizing: false,
-        },
-
-        // Member cell (avatar + name + email)
         columnHelper.accessor('name', {
           header: 'Member',
           sortingFn: 'alphanumeric',
           cell: (info) => <MemberCell member={info.row.original} />,
           size: 0,
         }),
-
-        // Project / Team column
-        columnHelper.accessor('projectContributions', {
-          header: 'Project/Team',
-          cell: (info) => <ProjectsCell member={info.row.original} />,
-          size: 250,
-          enableSorting: false,
-        }),
-
-        // LinkedIn verified column
-        columnHelper.accessor('linkedinProfile', {
-          header: 'LinkedIn Verified',
-          cell: (info) => <LinkedinCell member={info.row.original} />,
-          size: 160,
-          enableResizing: false,
-          enableSorting: false,
-          meta: {
-            align: 'center',
-          },
-        }),
-
-        columnHelper.accessor('signUpSource', {
-          header: 'Sign Up Source',
-          cell: (info) => <SignUpSourceCell member={info.row.original} />,
-          size: 150,
-          enableResizing: false,
-          enableSorting: true,
-        }),
-
-        // Status (access level) column
-        columnHelper.accessor('accessLevel', {
-          header: 'Status',
-          sortingFn: (rowA: Row<Member>, rowB: Row<Member>) => {
-            if (rowA.original.accessLevelUpdatedAt > rowB.original.accessLevelUpdatedAt) {
-              return 1;
-            }
-
-            if (rowA.original.accessLevelUpdatedAt < rowB.original.accessLevelUpdatedAt) {
-              return -1;
-            }
-
-            return 0;
-          },
-          cell: (props) => <StatusCell member={props.row.original} authToken={authToken} />,
-          size: 0,
-        }),
-
         columnHelper.display({
-          header: 'Info',
-          cell: (props) => <EditCell member={props.row.original} authToken={authToken} />,
-          size: 88,
+          id: 'role',
+          header: 'Role',
+          cell: (info) => <RoleCell member={info.row.original} />,
+          size: 200,
           enableResizing: false,
-          meta: {
-            align: 'center',
-          },
+          enableSorting: false,
         }),
       ];
-    },
-    [authToken, mode],
-  );
+    }
+
+    return [
+      // Checkbox column
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <IndeterminateCheckbox
+            checked={table.getIsAllRowsSelected()}
+            indeterminate={table.getIsSomeRowsSelected()}
+            onChange={table.getToggleAllRowsSelectedHandler()}
+          />
+        ),
+        cell: ({ row }) => (
+          <div>
+            <IndeterminateCheckbox
+              checked={row.getIsSelected()}
+              disabled={!row.getCanSelect()}
+              indeterminate={row.getIsSomeSelected()}
+              onChange={row.getToggleSelectedHandler()}
+            />
+          </div>
+        ),
+        size: 48,
+        enableResizing: false,
+      },
+
+      // Member cell (avatar + name + email)
+      columnHelper.accessor('name', {
+        header: 'Member',
+        sortingFn: 'alphanumeric',
+        cell: (info) => <MemberCell member={info.row.original} />,
+        size: 0,
+      }),
+
+      // Project / Team column
+      columnHelper.accessor('projectContributions', {
+        header: 'Project/Team',
+        cell: (info) => <ProjectsCell member={info.row.original} />,
+        size: 250,
+        enableSorting: false,
+      }),
+
+      // LinkedIn verified column
+      columnHelper.accessor('linkedinProfile', {
+        header: 'LinkedIn Verified',
+        cell: (info) => <LinkedinCell member={info.row.original} />,
+        size: 160,
+        enableResizing: false,
+        enableSorting: false,
+        meta: {
+          align: 'center',
+        },
+      }),
+
+      columnHelper.accessor('signUpSource', {
+        header: 'Sign Up Source',
+        cell: (info) => <SignUpSourceCell member={info.row.original} />,
+        size: 150,
+        enableResizing: false,
+        enableSorting: true,
+      }),
+
+      // Status (access level) column
+      columnHelper.accessor('accessLevel', {
+        header: 'Access level',
+        sortingFn: (rowA: Row<Member>, rowB: Row<Member>) => {
+          if (rowA.original.accessLevelUpdatedAt > rowB.original.accessLevelUpdatedAt) {
+            return 1;
+          }
+
+          if (rowA.original.accessLevelUpdatedAt < rowB.original.accessLevelUpdatedAt) {
+            return -1;
+          }
+
+          return 0;
+        },
+        cell: (props) => <StatusCell member={props.row.original} authToken={authToken} />,
+        size: 0,
+      }),
+
+      columnHelper.display({
+        header: 'Info',
+        cell: (props) => <EditCell member={props.row.original} authToken={authToken} />,
+        size: 88,
+        enableResizing: false,
+        meta: {
+          align: 'center',
+        },
+      }),
+    ];
+  }, [authToken, mode]);
 
   const data = useMemo(() => members ?? [], [members]);
 
@@ -180,10 +177,7 @@ export function useMembersTable({
     if (row.original.email?.toLowerCase().includes(v)) return true;
     if (row.original.name?.toLowerCase().includes(v)) return true;
 
-    const projectNames =
-      row.original.projectContributions?.map((project) =>
-        project.project.name?.toLowerCase(),
-      ) ?? [];
+    const projectNames = row.original.projectContributions?.map((project) => project.project.name?.toLowerCase()) ?? [];
 
     if (projectNames.some((name) => name?.includes(v))) return true;
 
@@ -218,10 +212,10 @@ export function useMembersTable({
 }
 
 function IndeterminateCheckbox({
-                                 indeterminate,
-                                 className = '',
-                                 ...rest
-                               }: { indeterminate?: boolean } & HTMLProps<HTMLInputElement>) {
+  indeterminate,
+  className = '',
+  ...rest
+}: { indeterminate?: boolean } & HTMLProps<HTMLInputElement>) {
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const ref = React.useRef<HTMLInputElement>(null!);
 

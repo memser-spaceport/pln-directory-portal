@@ -155,7 +155,6 @@ export class PLEventLocationAssociationService {
     try {
       const existingAssociation = await this.prisma.pLEventLocationAssociation.findFirst({
         where: {
-          locationUid: data.locationUid,
           city: data.city ?? null,
           state: data.state ?? null,
           country: data.country ?? null,
