@@ -1976,7 +1976,7 @@ export class MembersService {
             ],
           },
           {
-            OR: [
+            AND: [
               {
                 investorProfile: {
                   secRulesAccepted: true,
