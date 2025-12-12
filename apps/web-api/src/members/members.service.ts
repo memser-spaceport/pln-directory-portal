@@ -1976,18 +1976,9 @@ export class MembersService {
             ],
           },
           {
-            OR: [
-              {
-                investorProfile: {
-                  secRulesAccepted: true,
-                },
-              },
-              {
-                investorProfile: {
-                  type: { not: null },
-                },
-              },
-            ],
+            investorProfile: {
+              type: { not: null },
+            },
           },
           // If InvestorProfile.type = 'FUND', member must belong to a team with isFund = true
           {
