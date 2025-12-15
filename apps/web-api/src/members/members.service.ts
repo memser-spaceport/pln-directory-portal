@@ -2704,6 +2704,158 @@ export class MembersService {
   }
 
   /**
+   * Get investor type counts for filter display
+   * Uses the same filtering logic as searchMembers with isInvestor=true and investorType filter
+   * Counts match what frontend sends: ANGEL filter = type IN ['ANGEL', 'ANGEL_AND_FUND']
+   * @param hasOfficeHours - Optional filter by members who have office hours
+   * @returns Array of investor types with their counts
+   */
+  async getInvestorTypeCounts(hasOfficeHours?: boolean) {
+    try {
+      // Base conditions array - same logic as searchMembers isInvestor filter
+      const baseConditions: Prisma.MemberWhereInput[] = [
+        // Must be L5/L6 with isInvestor true or null
+        {
+          OR: [
+            { AND: [{ isInvestor: true }, { accessLevel: { in: ['L5', 'L6'] } }] },
+            { AND: [{ accessLevel: { in: ['L5', 'L6'] } }, { isInvestor: null }] },
+          ],
+        },
+        // Must have accepted SEC rules
+        { investorProfile: { secRulesAccepted: true } },
+        // Must have a type set
+        { investorProfile: { type: { not: null } } },
+      ];
+
+      // Add office hours filter if needed
+      if (hasOfficeHours) {
+        baseConditions.push({ officeHours: { not: null } });
+        baseConditions.push({ officeHours: { not: '' } });
+      }
+
+      // ANGEL count: type IN ['ANGEL', 'ANGEL_AND_FUND'] with their respective requirements
+      // This matches frontend query: investorType=ANGEL|ANGEL_AND_FUND
+      const angelCount = await this.prisma.member.count({
+        where: {
+          AND: [
+            ...baseConditions,
+            {
+              OR: [
+                // Pure ANGEL with at least one field filled
+                {
+                  AND: [
+                    { investorProfile: { type: 'ANGEL' } },
+                    {
+                      investorProfile: {
+                        OR: [
+                          { investInStartupStages: { isEmpty: false } },
+                          { typicalCheckSize: { not: null, gt: 0 } },
+                          { investmentFocus: { isEmpty: false } },
+                        ],
+                      },
+                    },
+                  ],
+                },
+                // ANGEL_AND_FUND with at least one requirement met (angel OR fund)
+                {
+                  AND: [
+                    { investorProfile: { type: 'ANGEL_AND_FUND' } },
+                    {
+                      OR: [
+                        {
+                          investorProfile: {
+                            OR: [
+                              { investInStartupStages: { isEmpty: false } },
+                              { typicalCheckSize: { not: null, gt: 0 } },
+                              { investmentFocus: { isEmpty: false } },
+                            ],
+                          },
+                        },
+                        {
+                          teamMemberRoles: {
+                            some: {
+                              investmentTeam: true,
+                              team: { isFund: true },
+                            },
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      // FUND count: type IN ['FUND', 'ANGEL_AND_FUND'] with their respective requirements
+      // This matches frontend query: investorType=FUND|ANGEL_AND_FUND
+      const fundCount = await this.prisma.member.count({
+        where: {
+          AND: [
+            ...baseConditions,
+            {
+              OR: [
+                // Pure FUND with team requirement
+                {
+                  AND: [
+                    { investorProfile: { type: 'FUND' } },
+                    {
+                      teamMemberRoles: {
+                        some: {
+                          investmentTeam: true,
+                          team: { isFund: true },
+                        },
+                      },
+                    },
+                  ],
+                },
+                // ANGEL_AND_FUND with at least one requirement met (angel OR fund)
+                {
+                  AND: [
+                    { investorProfile: { type: 'ANGEL_AND_FUND' } },
+                    {
+                      OR: [
+                        {
+                          investorProfile: {
+                            OR: [
+                              { investInStartupStages: { isEmpty: false } },
+                              { typicalCheckSize: { not: null, gt: 0 } },
+                              { investmentFocus: { isEmpty: false } },
+                            ],
+                          },
+                        },
+                        {
+                          teamMemberRoles: {
+                            some: {
+                              investmentTeam: true,
+                              team: { isFund: true },
+                            },
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      return {
+        results: [
+          { type: 'ANGEL', label: 'Angel Investor', count: angelCount },
+          { type: 'FUND', label: 'Invest through fund(s)', count: fundCount },
+        ],
+      };
+    } catch (error) {
+      return this.handleErrors(error);
+    }
+  }
+
+  /**
    * Handles database-related errors specifically for the Member entity.
    * Logs the error and throws an appropriate HTTP exception based on the error type.
    *
