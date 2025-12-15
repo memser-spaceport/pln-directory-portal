@@ -21,7 +21,10 @@ import {
   UpdateParticipationDto,
   UpdateForumSettingsDto,
   CreateNotificationSettingItemDto,
-  UpdateInvestorSettingsDto, InvestorSettingsResponse,
+  UpdateInvestorSettingsDto,
+  InvestorSettingsResponse,
+  UpdateDemoDaySubscriptionSettingsDto,
+  DemoDaySubscriptionSettingsResponseDto,
 } from 'libs/contracts/src/schema/notification-settings';
 import { MembersService } from '../members/members.service';
 import { ZodValidationPipe } from '@abitia/zod-dto';
@@ -183,10 +186,55 @@ export class NotificationSettingsController {
 
     const isSelf = authenticatedUser.uid === memberUid;
     const isAdmin = this.memberService.checkIfAdminUser(authenticatedUser);
-    const isInvestor = authenticatedUser?.accessLevel && (authenticatedUser.accessLevel === 'L5' || authenticatedUser.accessLevel === 'L6')
+    const isInvestor =
+      authenticatedUser?.accessLevel &&
+      (authenticatedUser.accessLevel === 'L5' || authenticatedUser.accessLevel === 'L6');
 
     if (!((isSelf && isInvestor) || isAdmin)) {
       throw new ForbiddenException(`User isn't authorized to update the investor settings`);
+    }
+
+    return this.notificationServiceClient.upsertNotificationSetting(memberUid, {
+      ...body,
+      memberUid,
+      memberExternalId: authenticatedUser.externalId,
+    });
+  }
+
+  @Get(':memberUid/demo-day-subscription')
+  @NoCache()
+  @UsePipes(ZodValidationPipe)
+  async getDemoDaySubscriptionSettings(
+    @Param('memberUid') memberUid: string,
+    @Req() request: Request
+  ): Promise<DemoDaySubscriptionSettingsResponseDto> {
+    const userEmail = request['userEmail'];
+    const authenticatedUser = await this.memberService.findMemberFromEmail(userEmail);
+
+    if (authenticatedUser.uid !== memberUid && !this.memberService.checkIfAdminUser(authenticatedUser)) {
+      throw new ForbiddenException(`User isn't authorized to get the demo day subscription settings`);
+    }
+
+    const settings = await this.notificationServiceClient.getNotificationSetting(memberUid);
+
+    return {
+      memberUid,
+      demoDaySubscriptionEnabled: !!settings?.demoDaySubscriptionEnabled,
+    };
+  }
+
+  @Put(':memberUid/demo-day-subscription')
+  @UsePipes(ZodValidationPipe)
+  async updateDemoDaySubscriptionSettings(
+    @Param('memberUid') memberUid: string,
+    @Body() body: UpdateDemoDaySubscriptionSettingsDto,
+    @Req() request: Request
+  ) {
+    const userEmail = request['userEmail'];
+    const authenticatedUser = await this.memberService.findMemberFromEmail(userEmail);
+
+    if (authenticatedUser.uid !== memberUid && !this.memberService.checkIfAdminUser(authenticatedUser)) {
+      throw new ForbiddenException(`User isn't authorized to update the demo day subscription settings`);
     }
 
     return this.notificationServiceClient.upsertNotificationSetting(memberUid, {
