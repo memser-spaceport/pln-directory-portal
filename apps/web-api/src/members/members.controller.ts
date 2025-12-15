@@ -423,6 +423,23 @@ export class MemberController {
   }
 
   /**
+   * Autocomplete investor types for member search.
+   *
+   * @param request - HTTP request object containing query parameters
+   * @returns Investor types with their counts
+   */
+  @Api(server.route.autocompleteInvestorTypes)
+  @ApiQueryFromZod(AutocompleteQueryParams.optional())
+  @UseInterceptors(IsVerifiedMemberInterceptor)
+  @QueryCache()
+  @CacheTTL(7200) // 2 hours
+  async autocompleteInvestorTypes(@Req() request: Request) {
+    const params = request.query as unknown as z.infer<typeof AutocompleteQueryParams>;
+    const { hasOfficeHours } = params || {};
+    return await this.membersService.getInvestorTypeCounts(hasOfficeHours);
+  }
+
+  /**
    * Retrieves member details by externalId.
    *
    * @param externalId - External ID of the member to fetch
