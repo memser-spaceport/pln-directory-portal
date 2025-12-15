@@ -15,6 +15,7 @@ import { MembersService } from '../members/members.service';
 import { isEmpty } from 'lodash';
 import { PLEventGuestsService } from './pl-event-guests.service';
 import { CacheService } from '../utils/cache/cache.service';
+import { isIRLNotificationsEnabled } from '../utils/constants';
 
 @Injectable()
 export class PLEventLocationsService {
@@ -381,6 +382,10 @@ export class PLEventLocationsService {
    */
   @Cron(process.env.IRL_NOTIFICATION_CRON || '0 0 * * *')
   async handleCron() {
+    if (!isIRLNotificationsEnabled()) {
+      this.logger.info('IRL notifications are disabled via IRL_NOTIFICATIONS_ENABLED environment variable');
+      return;
+    }
     try {
       this.logger.info('Notification initiated by cron');
       const query: any = `
@@ -489,6 +494,10 @@ export class PLEventLocationsService {
    * notification to the subscribers for that location.
    */
   private async notifySubscribers(data) {
+    if (!isIRLNotificationsEnabled()) {
+      this.logger.info('IRL notifications are disabled via IRL_NOTIFICATIONS_ENABLED environment variable');
+      return;
+    }
     try {
       await Promise.all(
         data.map(async (location) => {

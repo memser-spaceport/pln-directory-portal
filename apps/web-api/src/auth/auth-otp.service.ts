@@ -54,11 +54,39 @@ export class AuthOtpService {
 
   /**
    * Trigger OTP sending via Auth Service for a given email.
+   * Only sends OTP if the member exists and has back-office access.
    */
   async sendOtp(email: string): Promise<{ token: string }> {
-    const clientToken = await this.getClientToken();
-
     const normalizedEmail = email.trim().toLowerCase();
+
+    // Check if member exists and has back-office access before sending OTP
+    const member = await this.prisma.member.findFirst({
+      where: {
+        email: normalizedEmail,
+        deletedAt: null,
+      },
+      include: {
+        memberRoles: {
+          select: { name: true },
+        },
+      },
+    });
+
+    if (!member) {
+      this.logger.warn(`Member not found for email ${normalizedEmail} during OTP request`);
+      throw new ForbiddenException('Member not found for this email');
+    }
+
+    // Check that Member has back-office access via admin roles
+    const backofficeRoles = [MemberRole.DIRECTORY_ADMIN, MemberRole.DEMO_DAY_ADMIN];
+    const hasBackofficeAccess = hasAnyAdminRole(member, backofficeRoles);
+
+    if (!hasBackofficeAccess) {
+      this.logger.warn(`Member ${member.uid} (${normalizedEmail}) does not have back-office admin role`);
+      throw new ForbiddenException('Member does not have back-office admin access');
+    }
+
+    const clientToken = await this.getClientToken();
 
     try {
       const resp = await axios.post(

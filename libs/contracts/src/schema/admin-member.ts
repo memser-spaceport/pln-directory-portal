@@ -32,8 +32,8 @@ export const RequestMembersSchema = z.object({
     .string()
     .transform((val) => val.split(',').map((v) => v.trim()))
     .refine((arr) => arr.length > 0, { message: 'accessLevel must contain at least one value' }),
-  page: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
-  limit: z.string().regex(/^\d+$/).transform(Number).optional().default('20'),
+  page: z.string().regex(/^\d+$/).transform(Number).optional(),
+  limit: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
 
 export const CreateMemberSchema = z.object({

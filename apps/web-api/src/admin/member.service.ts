@@ -836,6 +836,8 @@ export class MemberService {
       where: {
         accessLevel: { in: accessLevel },
       },
+      // When no pagination params provided, fetch all members
+      ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
       select: {
         uid: true,
         name: true,
@@ -910,8 +912,6 @@ export class MemberService {
           },
         },
       },
-      skip: (page - 1) * limit,
-      take: limit,
       orderBy: { name: 'asc' },
     });
 
@@ -930,9 +930,9 @@ export class MemberService {
       data: membersWithHosts,
       pagination: {
         total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
+        page: page ?? 1,
+        limit: limit ?? total,
+        pages: limit ? Math.ceil(total / limit) : 1,
       },
     };
   }
