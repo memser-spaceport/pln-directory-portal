@@ -1,10 +1,7 @@
 import {
   Body,
   Controller,
-  Delete,
   Param,
-  Get,
-  Put,
   Req,
   UseGuards,
   UsePipes,
