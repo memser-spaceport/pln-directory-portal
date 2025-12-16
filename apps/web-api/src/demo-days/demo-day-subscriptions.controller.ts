@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
@@ -25,13 +25,15 @@ export class DemoDaySubscriptionsController {
     const token = extractTokenFromRequest(req);
     let memberId: string | undefined;
 
-    if (token && req['userEmail']) {
-      try {
-        const member = await this.membersService.findMemberFromEmail(req['userEmail']);
-        memberId = member.uid;
-      } catch (error) {
-        // Member not found, continue without memberId
-      }
+    try {
+      const member = await this.membersService.findMemberFromEmail(body.email);
+      memberId = member.uid;
+    } catch (error) {
+      // Member not found, continue without memberId
+    }
+
+    if (token && req['userEmail'] && body.email !== req['userEmail']) {
+      throw new ForbiddenException('Email mismatch');
     }
 
     const subscriberData = {

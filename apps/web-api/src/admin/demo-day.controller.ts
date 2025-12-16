@@ -4,6 +4,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
 import { DemoDaysService } from '../demo-days/demo-days.service';
 import { DemoDayParticipantsService } from '../demo-days/demo-day-participants.service';
+import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { DemoDayStatus } from '@prisma/client';
 import {
   CreateDemoDayDto,
@@ -25,8 +26,33 @@ import { QueryCache } from '../decorators/query-cache.decorator';
 export class AdminDemoDaysController {
   constructor(
     private readonly demoDaysService: DemoDaysService,
-    private readonly demoDayParticipantsService: DemoDayParticipantsService
+    private readonly demoDayParticipantsService: DemoDayParticipantsService,
+    private readonly notificationServiceClient: NotificationServiceClient
   ) {}
+
+  @Get('subscribers')
+  @UseGuards(DemoDayAdminAuthGuard)
+  @NoCache()
+  async getDemoDaySubscribers() {
+    const [subscribers, notificationSettings] = await Promise.all([
+      this.notificationServiceClient.listEventSubscribers({ eventType: 'DEMO_DAY' }),
+      this.notificationServiceClient.getAllNotificationSettings(),
+    ]);
+
+    const disabledMemberIds = new Set(
+      notificationSettings
+        .filter((setting: any) => setting.memberId && setting.demoDaySubscriptionEnabled === false)
+        .map((setting: any) => setting.memberId)
+    );
+
+    return subscribers.filter((subscriber: any) => {
+      const memberId = subscriber.memberId || subscriber.memberUid;
+      if (!memberId) {
+        return true;
+      }
+      return !disabledMemberIds.has(memberId);
+    });
+  }
 
   @Post()
   @UseGuards(AdminAuthGuard)
