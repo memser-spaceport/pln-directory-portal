@@ -187,6 +187,15 @@ export const apiMembers = contract.router({
     },
     summary: 'Autocomplete roles for member search',
   },
+  autocompleteInvestorTypes: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/members/autocomplete/investor-types`,
+    query: AutocompleteQueryParams,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Autocomplete investor types for member search',
+  },
   getMembersBulk: {
     method: 'POST',
     path: `${getAPIVersionAsPath('1')}/members-bulk`,

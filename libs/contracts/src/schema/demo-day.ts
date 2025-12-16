@@ -73,3 +73,17 @@ export const CreateDemoDayInvestorApplicationSchema = z.object({
 });
 
 export class CreateDemoDayInvestorApplicationDto extends createZodDto(CreateDemoDayInvestorApplicationSchema) {}
+
+export const SubscribeDemoDaySchema = z.object({
+  email: z.string().email('Invalid email address'),
+  name: z.string().optional(),
+});
+
+export class SubscribeDemoDayDto extends createZodDto(SubscribeDemoDaySchema) {}
+
+export const DemoDaySubscriptionStatusResponseSchema = z.object({
+  subscribed: z.boolean(),
+  email: z.string().optional(),
+});
+
+export class DemoDaySubscriptionStatusResponseDto extends createZodDto(DemoDaySubscriptionStatusResponseSchema) {}

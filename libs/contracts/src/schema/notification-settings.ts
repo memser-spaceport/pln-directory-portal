@@ -66,6 +66,18 @@ export const InvestorSettingsResponseSchema = z.object({
   investorDealflowEnabled: z.boolean(),
 });
 
+export const UpdateDemoDaySubscriptionSettingsSchema = z.object({
+  demoDaySubscriptionEnabled: z.boolean(),
+});
+
+export class UpdateDemoDaySubscriptionSettingsDto extends createZodDto(UpdateDemoDaySubscriptionSettingsSchema) {}
+
+export const DemoDaySubscriptionSettingsResponseSchema = z.object({
+  memberUid: z.string(),
+  demoDaySubscriptionEnabled: z.boolean(),
+});
+
+export class DemoDaySubscriptionSettingsResponseDto extends createZodDto(DemoDaySubscriptionSettingsResponseSchema) {}
 
 export class NotificationSettingsResponse extends createZodDto(NotificationSettingsResponseSchema) {}
 export class UpdateNotificationSettingsDto extends createZodDto(UpdateNotificationSettingsSchema) {}
