@@ -63,7 +63,7 @@ export class PLEventLocationsService {
           }
         }
       });
-      return this.formatLocation(location);
+      return this.formatLocation(location, true);
     } catch (error) {
       return this.handleErrors(error, uid);
     }
@@ -198,7 +198,7 @@ export class PLEventLocationsService {
         return this.formatLocation({
           ...location,
           events: formattedEvents
-        });
+        }, false);
       });
     } catch (error) {
       return this.handleErrors(error);
@@ -208,16 +208,17 @@ export class PLEventLocationsService {
   /**
    * This method formats the event location object and segregates its events into past and upcoming events.
    * @param location The event location object retrieved from the database
+   * @param useCutoff When true, uses the configured cutoff window; when false, uses strict "now"
    * @returns The formatted location object with pastEvents and upcomingEvents fields
    *   - Events are classified as past or upcoming based on whether their end date is before or after the current time in UTC.
    *   - The method delegates event segregation to segregateEventsByTime and spreads the result into the location object.
    *   - Events are classified as past or upcoming based on whether their end date is before or after the current time in UTC.
    *   - The method delegates event segregation to segregateEventsByTime and spreads the result into the location object.
    */
-  private formatLocation(location: PLEventLocationWithEvents): FormattedLocationWithEvents {
+  private formatLocation(location: PLEventLocationWithEvents, useCutoff: boolean): FormattedLocationWithEvents {
     return {
       ...location,
-      ...this.segregateEventsByTime(location.events)
+      ...this.segregateEvents(location.events, useCutoff)
     }
   };
 
@@ -264,21 +265,25 @@ export class PLEventLocationsService {
   }
 
   /**
-   * This method separates the events of a location into past and upcoming based on the timezone.
+   * Segregates events into past and upcoming based on a configurable time boundary.
+   * 
    * @param events An array of event objects associated with the location
-   * @param timezone The timezone of the location
+   * @param useCutoff When true, uses the configured past events cutoff window;
+   *                  when false, uses the current time (UTC) as the boundary
    * @returns An object containing two arrays: pastEvents and upcomingEvents
-   *   - Past events: events that ended before the configured number of days from current time
-   *   - Upcoming events: events that start from the configured number of days from current time + all future events
+   *   - Past events: events that ended before the time boundary
+   *   - Upcoming events: events that end on or after the time boundary
    */
-  private segregateEventsByTime(events: PLEvent[], timezone?: string): { pastEvents: PLEvent[], upcomingEvents: PLEvent[] } {
-    const { pastEventsCutoff } = this.computeEventTimeWindow();
+  private segregateEvents(events: PLEvent[], useCutoff: boolean): { pastEvents: PLEvent[], upcomingEvents: PLEvent[] } {
+    const timeBoundary = useCutoff 
+      ? this.computeEventTimeWindow().pastEventsCutoff 
+      : moment.utc();
     const pastEvents: any = [];
     const upcomingEvents: any = [];
     events.forEach((event) => {
       const eventStartDateInZone = moment.utc(event.startDate);
       const eventEndDateInZone = moment.utc(event.endDate);
-      if (eventEndDateInZone.isBefore(pastEventsCutoff)) {
+      if (eventEndDateInZone.isBefore(timeBoundary)) {
         pastEvents.push({
           ...event,
           startDate: eventStartDateInZone.format(),
@@ -461,7 +466,7 @@ export class PLEventLocationsService {
 
     FROM
       "PLEventLocation" el
-      JOIN "PLEvent" e ON e."locationUid" = el.uid
+      JOIN "PLEvent" e ON e."locationUid" = el.uid AND e."endDate" >= NOW()  -- Only include current or future events
       LEFT JOIN "PLEventGuest" pg ON pg."eventUid" = e.uid
       LEFT JOIN "Member" m ON m."uid" = pg."memberUid"
       LEFT JOIN (
@@ -472,6 +477,7 @@ export class PLEventLocationsService {
         FROM "PLEvent" e
         WHERE                --fetch the events added after latest notification date,or today
           (e."createdAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid"))
+          AND e."endDate" >= NOW()  -- Only include current or future events
           )AS events ON events."locationUid" = el."uid"
     GROUP BY
       el."uid",
