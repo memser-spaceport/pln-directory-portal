@@ -348,4 +348,39 @@ export class NotificationServiceClient {
       }
     }
   }
+
+  /**
+   * Gets all notification settings.
+   * @returns A Promise that resolves to all notification settings.
+   */
+  async getAllNotificationSettings() {
+    try {
+      const response = await axios.get(`${this.notificationServiceBaseUrl}/notification-settings`, {
+        headers: {
+          Authorization: `Basic ${this.notificationServiceSecret}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        switch (error.response?.status) {
+          case 400:
+            throw new BadRequestException('Invalid request parameters.');
+          case 401:
+            throw new UnauthorizedException('Authentication failed. Check API keys or tokens.');
+          case 404:
+            throw new NotFoundException('Notification settings endpoint not found.');
+          case 500:
+            throw new InternalServerErrorException('Internal server error. Retry later.');
+          default:
+            throw new HttpException(
+              `Unhandled error with status ${error.response?.status || 'unknown'}.`,
+              error.response?.status || 500
+            );
+        }
+      } else {
+        throw new InternalServerErrorException('Unexpected error during notification settings retrieval.');
+      }
+    }
+  }
 }
