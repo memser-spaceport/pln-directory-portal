@@ -14,12 +14,12 @@ diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 const ENABLED = process.env.OTEL_ENABLED === 'true';
 
 if(ENABLED) {
-// --- Config
+  // --- Config
   const SERVICE_NAME = process.env.OTEL_SERVICE_NAME || 'pln-directory-portal';
   const ZIPKIN_URL = process.env.ZIPKIN_URL || 'http://zipkin.monitoring.svc.cluster.local:9411/api/v2/spans';
   const SAMPLE = Number(process.env.OTEL_TRACES_SAMPLER_ARG || '1'); // 1 = 100%
   process.env.OTEL_SERVICE_NAME = SERVICE_NAME;
-  const exporter = new ZipkinExporter({url: ZIPKIN_URL, serviceName: SERVICE_NAME});
+  const exporter = new ZipkinExporter({ url: ZIPKIN_URL, serviceName: SERVICE_NAME });
 
   const httpInstr = new HttpInstrumentation({
     // (span, response)
@@ -28,7 +28,8 @@ if(ENABLED) {
         const traceId = span?.spanContext().traceId;
         const r = res as any;
         if (traceId && r?.setHeader) r.setHeader('X-Trace-Id', traceId);
-      } catch {/* no-op */
+      } catch {
+        /* no-op */
       }
     },
     // optional: ignore noisy paths
@@ -46,11 +47,11 @@ if(ENABLED) {
     new IORedisInstrumentation(),
   ];
 
-// --- SDK
+  // --- SDK
   const sdk = new NodeSDK({
     contextManager: new AsyncLocalStorageContextManager(),
     traceExporter: exporter,
-    sampler: new ParentBasedSampler({root: new TraceIdRatioBasedSampler(SAMPLE)}),
+    sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(SAMPLE) }),
     instrumentations,
     serviceName: SERVICE_NAME,
   });
@@ -62,10 +63,16 @@ if(ENABLED) {
     console.error('[OTel] start() threw synchronously', e);
   }
 
-// Graceful shutdown
+  // Graceful shutdown
   process.on('SIGTERM', () => {
     sdk.shutdown().finally(() => process.exit(0));
   });
+
+  process.on('exit', () => {
+    console.log('exit');
+    process.stdin.setRawMode(false);
+  });
+
   process.on('SIGINT', () => {
     sdk.shutdown().finally(() => process.exit(0));
   });

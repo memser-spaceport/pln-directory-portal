@@ -167,6 +167,8 @@ model Member {
   demoDayFeedbacks                 DemoDayFeedback[]
   reviewedEvents                   PLEvent[]                         @relation("PLEventReviewer")
   demoDayAdminScopes               MemberDemoDayAdminScope[]
+  pushNotifications                PushNotification[]                @relation("PushNotificationRecipient")
+  pushNotificationReadStatuses     PushNotificationReadStatus[]      @relation("PushNotificationReadStatuses")
 }
 
 model MemberRole {
@@ -1169,4 +1171,64 @@ model ContactSupportRequest {
   message   String?
   metadata  Json?
   createdAt DateTime @default(now())
+}
+
+// Push Notification Categories - for real-time WebSocket notifications
+enum PushNotificationCategory {
+  // Demo Day engagement
+  DEMO_DAY_LIKE
+  DEMO_DAY_CONNECT
+  DEMO_DAY_INVEST
+  DEMO_DAY_REFERRAL
+  DEMO_DAY_FEEDBACK
+  // Forum
+  FORUM_POST
+  FORUM_REPLY
+  // Events
+  EVENT
+  // System
+  SYSTEM
+}
+
+// Push notifications for WebSocket delivery
+model PushNotification {
+  id           Int                      @id @default(autoincrement())
+  uid          String                   @unique @default(cuid())
+  category     PushNotificationCategory
+  title        String
+  description  String?
+  image        String? // URL to image
+  link         String? // URL or route to navigate to
+  metadata     Json?                    @default("{}")
+  isPublic     Boolean                  @default(false) // If true, anyone can see; if false, only recipient
+  recipientUid String? // Optional: specific user to notify (null = broadcast/public)
+  recipient    Member?                  @relation("PushNotificationRecipient", fields: [recipientUid], references: [uid], onDelete: Cascade)
+  isRead       Boolean                  @default(false) // For private notifications only
+  isSent       Boolean                  @default(false) // Whether sent via WebSocket
+  sentAt       DateTime? // When sent via WebSocket
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  // Read status for public notifications (tracked per user)
+  readStatuses PushNotificationReadStatus[]
+
+  // Indexes based on actual query patterns:
+  // - Public notifications: WHERE isPublic = true
+  // - Private notifications: WHERE recipientUid = ? AND isPublic = false AND isRead = ?
+  @@index([isPublic])
+  @@index([recipientUid, isPublic, isRead])
+}
+
+// Tracks read status per user for public notifications
+model PushNotificationReadStatus {
+  id             Int              @id @default(autoincrement())
+  notificationId Int
+  notification   PushNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  memberUid      String
+  member         Member           @relation("PushNotificationReadStatuses", fields: [memberUid], references: [uid], onDelete: Cascade)
+  readAt         DateTime         @default(now())
+
+  @@unique([notificationId, memberUid])
+  @@index([memberUid])
+  @@index([notificationId])
 }
