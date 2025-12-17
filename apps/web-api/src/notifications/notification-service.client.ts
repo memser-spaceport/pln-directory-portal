@@ -307,6 +307,47 @@ export class NotificationServiceClient {
   }
 
   /**
+   * Deletes an event subscriber by email and event type.
+   * @param email - The subscriber email.
+   * @param eventType - The event type (e.g., "DEMO_DAY").
+   * @returns A Promise that resolves when the subscriber is deleted.
+   */
+  async deleteEventSubscriberByEmailAndType(email: string, eventType: string) {
+    try {
+      await axios.delete(
+        `${this.notificationServiceBaseUrl}/event-subscribers/by-email-and-type?email=${encodeURIComponent(
+          email
+        )}&eventType=${encodeURIComponent(eventType)}`,
+        {
+          headers: {
+            Authorization: `Basic ${this.notificationServiceSecret}`,
+          },
+        }
+      );
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        switch (error.response?.status) {
+          case 400:
+            throw new BadRequestException('Invalid email or eventType parameters.');
+          case 401:
+            throw new UnauthorizedException('Authentication failed. Check API keys or tokens.');
+          case 404:
+            return;
+          case 500:
+            throw new InternalServerErrorException('Internal server error. Retry later.');
+          default:
+            throw new HttpException(
+              `Unhandled error with status ${error.response?.status || 'unknown'}.`,
+              error.response?.status || 500
+            );
+        }
+      } else {
+        throw new InternalServerErrorException('Unexpected error during event subscriber deletion.');
+      }
+    }
+  }
+
+  /**
    * Lists event subscribers with optional filters.
    * @param filters - Optional filters (eventType, search, skip, take).
    * @returns A Promise that resolves to an array of event subscribers.

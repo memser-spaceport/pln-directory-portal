@@ -1,5 +1,6 @@
 import { ApiTags } from '@nestjs/swagger';
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -235,6 +236,31 @@ export class NotificationSettingsController {
 
     if (authenticatedUser.uid !== memberUid && !this.memberService.checkIfAdminUser(authenticatedUser)) {
       throw new ForbiddenException(`User isn't authorized to update the demo day subscription settings`);
+    }
+
+    const targetMember =
+      authenticatedUser.uid === memberUid ? authenticatedUser : await this.memberService.findOne(memberUid);
+    const targetEmail = targetMember.email;
+
+    if (!targetEmail) {
+      throw new BadRequestException('Member email is required for demo day subscription');
+    }
+
+    const existingSubscriber = await this.notificationServiceClient.getEventSubscriberByEmailAndType(
+      targetEmail,
+      'DEMO_DAY'
+    );
+    if (body.demoDaySubscriptionEnabled) {
+      if (!existingSubscriber) {
+        await this.notificationServiceClient.createEventSubscriber({
+          email: targetEmail,
+          eventType: 'DEMO_DAY',
+          name: targetMember.name,
+          memberId: memberUid,
+        });
+      }
+    } else if (existingSubscriber) {
+      await this.notificationServiceClient.deleteEventSubscriberByEmailAndType(targetEmail, 'DEMO_DAY');
     }
 
     return this.notificationServiceClient.upsertNotificationSetting(memberUid, {
