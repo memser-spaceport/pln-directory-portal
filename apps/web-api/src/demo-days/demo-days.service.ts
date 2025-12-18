@@ -1515,11 +1515,40 @@ export class DemoDaysService {
       DemoDayStatus.UPCOMING,
       DemoDayStatus.REGISTRATION_OPEN,
       DemoDayStatus.EARLY_ACCESS,
+      DemoDayStatus.ACTIVE,
     ];
 
     if (!notifiableStatuses.includes(demoDay.status)) {
       this.logger.log(`Status ${demoDay.status} is not notifiable, skipping notification`);
       return;
+    }
+
+    // For ACTIVE status: skip if EARLY_ACCESS notification was already sent
+    // Users who got EARLY_ACCESS already have access, no need for another notification
+    if (demoDay.status === DemoDayStatus.ACTIVE) {
+      const earlyAccessNotification = await this.prisma.pushNotification.findFirst({
+        where: {
+          category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
+          isPublic: true,
+          metadata: {
+            path: ['demoDayUid'],
+            equals: demoDay.uid,
+          },
+          AND: {
+            metadata: {
+              path: ['status'],
+              equals: DemoDayStatus.EARLY_ACCESS,
+            },
+          },
+        },
+      });
+
+      if (earlyAccessNotification) {
+        this.logger.log(
+          `EARLY_ACCESS notification already sent for Demo Day ${demoDay.uid}, skipping ACTIVE notification`
+        );
+        return;
+      }
     }
 
     // Check if notification was already sent for this demo day and status
@@ -1595,6 +1624,12 @@ export class DemoDaysService {
         return {
           title: `${demoDay.title} - Early Access`,
           description: `Early access is now available for "${demoDay.title}"! Check your eligibility and get a head start.`,
+        };
+
+      case DemoDayStatus.ACTIVE:
+        return {
+          title: `${demoDay.title} - Now Live!`,
+          description: `"${demoDay.title}" is now live! Join now to connect with founders and explore exciting projects.`,
         };
 
       default:
