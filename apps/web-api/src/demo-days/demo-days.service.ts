@@ -3,12 +3,14 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { DemoDay, DemoDayParticipantStatus, DemoDayStatus } from '@prisma/client';
+import { DemoDay, DemoDayParticipantStatus, DemoDayStatus, PushNotificationCategory } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
 import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, MemberRole } from '../utils/constants';
 
@@ -23,10 +25,13 @@ type ExpressInterestStats = {
 
 @Injectable()
 export class DemoDaysService {
+  private readonly logger = new Logger(DemoDaysService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly analyticsService: AnalyticsService,
-    private readonly membersService: MembersService
+    private readonly membersService: MembersService,
+    private readonly pushNotificationsService: PushNotificationsService
   ) {}
 
   // Public methods
@@ -635,6 +640,9 @@ export class DemoDaysService {
           actorEmail: actorEmail || null,
         },
       });
+
+      // Send Demo Day announcement notification if enabled
+      await this.sendDemoDayStatusNotification(updated);
     }
 
     return updated;
@@ -1481,5 +1489,119 @@ export class DemoDaysService {
     });
 
     return participant?.isDemoDayAdmin || false;
+  }
+
+  /**
+   * Send Demo Day announcement notification when status changes.
+   * Only sends for UPCOMING, REGISTRATION_OPEN, EARLY_ACCESS statuses.
+   * Only sends if notificationsEnabled is true and notification hasn't been sent yet for this status.
+   */
+  private async sendDemoDayStatusNotification(demoDay: {
+    uid: string;
+    title: string;
+    slugURL: string;
+    status: DemoDayStatus;
+    notificationsEnabled: boolean;
+    startDate: Date;
+  }): Promise<void> {
+    // Only send notifications if enabled
+    if (!demoDay.notificationsEnabled) {
+      this.logger.log(`Notifications disabled for Demo Day ${demoDay.uid}, skipping notification`);
+      return;
+    }
+
+    // Only send for specific statuses
+    const notifiableStatuses: DemoDayStatus[] = [
+      DemoDayStatus.UPCOMING,
+      DemoDayStatus.REGISTRATION_OPEN,
+      DemoDayStatus.EARLY_ACCESS,
+    ];
+
+    if (!notifiableStatuses.includes(demoDay.status)) {
+      this.logger.log(`Status ${demoDay.status} is not notifiable, skipping notification`);
+      return;
+    }
+
+    // Check if notification was already sent for this demo day and status
+    const existingNotification = await this.prisma.pushNotification.findFirst({
+      where: {
+        category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
+        isPublic: true,
+        metadata: {
+          path: ['demoDayUid'],
+          equals: demoDay.uid,
+        },
+        AND: {
+          metadata: {
+            path: ['status'],
+            equals: demoDay.status,
+          },
+        },
+      },
+    });
+
+    if (existingNotification) {
+      this.logger.log(`Notification already sent for Demo Day ${demoDay.uid} status ${demoDay.status}, skipping`);
+      return;
+    }
+
+    // Build notification content based on status
+    const notificationContent = this.getDemoDayNotificationContent(demoDay);
+
+    // Send the notification
+    try {
+      await this.pushNotificationsService.create({
+        category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
+        title: notificationContent.title,
+        description: notificationContent.description,
+        link: `/demo-day/${demoDay.slugURL}`,
+        metadata: {
+          demoDayUid: demoDay.uid,
+          demoDayTitle: demoDay.title,
+          status: demoDay.status,
+        },
+        isPublic: true,
+      });
+
+      this.logger.debug(`Demo Day announcement notification sent for ${demoDay.uid} status ${demoDay.status}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send Demo Day announcement notification: ${error instanceof Error ? error.message : error}`
+      );
+    }
+  }
+
+  /**
+   * Get notification title and description based on Demo Day status.
+   */
+  private getDemoDayNotificationContent(demoDay: { title: string; status: DemoDayStatus; startDate: Date }): {
+    title: string;
+    description: string;
+  } {
+    switch (demoDay.status) {
+      case DemoDayStatus.UPCOMING:
+        return {
+          title: `${demoDay.title} Announced`,
+          description: `A new Demo Day "${demoDay.title}" has been announced! Stay tuned for registration opening soon.`,
+        };
+
+      case DemoDayStatus.REGISTRATION_OPEN:
+        return {
+          title: `${demoDay.title} - Registration Open`,
+          description: `Registration is now open for "${demoDay.title}"! Sign up now to participate in this exciting Demo Day event.`,
+        };
+
+      case DemoDayStatus.EARLY_ACCESS:
+        return {
+          title: `${demoDay.title} - Early Access`,
+          description: `Early access is now available for "${demoDay.title}"! Check your eligibility and get a head start.`,
+        };
+
+      default:
+        return {
+          title: `${demoDay.title} Update`,
+          description: `"${demoDay.title}" has been updated.`,
+        };
+    }
   }
 }
