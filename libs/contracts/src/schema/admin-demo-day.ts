@@ -29,6 +29,7 @@ export const UpdateDemoDaySchema = z.object({
   supportEmail: z.string().email().optional().nullable(),
   status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']).optional(),
   host: z.string().optional().nullable(),
+  notificationsEnabled: z.boolean().optional(),
 });
 
 export class UpdateDemoDayDto extends createZodDto(UpdateDemoDaySchema) {}

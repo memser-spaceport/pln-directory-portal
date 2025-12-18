@@ -118,6 +118,7 @@ export class AdminDemoDaysController {
         supportEmail: body.supportEmail,
         status: body.status?.toUpperCase() as DemoDayStatus,
         host: body.host,
+        notificationsEnabled: body.notificationsEnabled,
       },
       req.userEmail
     );

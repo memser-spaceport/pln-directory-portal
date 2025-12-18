@@ -1022,6 +1022,7 @@ model DemoDay {
   shortDescription          String?
   supportEmail              String?
   status                    DemoDayStatus                     @default(UPCOMING)
+  notificationsEnabled      Boolean                           @default(false)
   createdAt                 DateTime                          @default(now())
   updatedAt                 DateTime                          @updatedAt
   isDeleted                 Boolean                           @default(false)
@@ -1181,6 +1182,8 @@ enum PushNotificationCategory {
   DEMO_DAY_INVEST
   DEMO_DAY_REFERRAL
   DEMO_DAY_FEEDBACK
+  // Demo Day announcements (status changes, etc.)
+  DEMO_DAY_ANNOUNCEMENT
   // Forum
   FORUM_POST
   FORUM_REPLY

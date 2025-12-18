@@ -260,6 +260,7 @@ export class DemoDaysService {
         isDeleted: true,
         deletedAt: true,
         host: true,
+        notificationsEnabled: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -323,6 +324,7 @@ export class DemoDaysService {
         isDeleted: true,
         deletedAt: true,
         host: true,
+        notificationsEnabled: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -448,6 +450,7 @@ export class DemoDaysService {
         supportEmail: true,
         status: true,
         host: true,
+        notificationsEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -478,6 +481,7 @@ export class DemoDaysService {
         supportEmail: true,
         status: true,
         host: true,
+        notificationsEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -505,6 +509,7 @@ export class DemoDaysService {
       supportEmail?: string | null;
       status?: DemoDayStatus;
       host?: string | null;
+      notificationsEnabled?: boolean;
     },
     actorEmail?: string
   ): Promise<DemoDay> {
@@ -562,6 +567,9 @@ export class DemoDaysService {
     if (data.host !== undefined) {
       updateData.host = data.host;
     }
+    if (data.notificationsEnabled !== undefined) {
+      updateData.notificationsEnabled = data.notificationsEnabled;
+    }
 
     const updated = await this.prisma.demoDay.update({
       where: { uid },
@@ -579,6 +587,7 @@ export class DemoDaysService {
         supportEmail: true,
         status: true,
         host: true,
+        notificationsEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
