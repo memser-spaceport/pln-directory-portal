@@ -16,7 +16,9 @@ import { useAuth } from '../../context/auth-context';
 import { MemberRole } from '../../utils/constants';
 import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
 import { PendingRoleChange, PendingHostChange } from '../../screens/members/components/RoleCell/RoleCell';
+import { PendingAccessLevelChange } from '../../screens/members/components/StatusCell/StatusCell';
 import { useUpdateMemberRolesAndHosts } from '../../hooks/members/useUpdateMemberRolesAndHosts';
+import { useUpdateMembersStatus } from '../../hooks/members/useUpdateMembersStatus';
 import { RolesSaveControls } from '../../screens/roles/components/RolesSaveControls';
 
 const ALL_ACCESS_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'Rejected'];
@@ -28,6 +30,7 @@ const RolesPage = () => {
   const { isDirectoryAdmin, isLoading, user } = useAuth();
   const [authToken] = useCookie('plnadmin');
   const { mutateAsync: updateMemberRolesAndHosts } = useUpdateMemberRolesAndHosts();
+  const { mutateAsync: updateMembersStatus } = useUpdateMembersStatus();
 
   const [sorting, setSorting] = useState<SortingState>([
     {
@@ -46,6 +49,9 @@ const RolesPage = () => {
   const [scopeFilter, setScopeFilter] = useState<string>('');
   const [pendingRoleChanges, setPendingRoleChanges] = useState<Map<string, PendingRoleChange>>(new Map());
   const [pendingHostChanges, setPendingHostChanges] = useState<Map<string, PendingHostChange>>(new Map());
+  const [pendingAccessLevelChanges, setPendingAccessLevelChanges] = useState<Map<string, PendingAccessLevelChange>>(
+    new Map()
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   const { data } = useMembersList({
@@ -118,14 +124,28 @@ const RolesPage = () => {
     });
   }, []);
 
-  const hasPendingChanges = pendingRoleChanges.size > 0 || pendingHostChanges.size > 0;
+  const handleAccessLevelChange = useCallback((change: PendingAccessLevelChange | null, memberUid: string) => {
+    setPendingAccessLevelChanges((prev) => {
+      const next = new Map(prev);
+      if (change) {
+        next.set(memberUid, change);
+      } else {
+        next.delete(memberUid);
+      }
+      return next;
+    });
+  }, []);
+
+  const hasPendingChanges =
+    pendingRoleChanges.size > 0 || pendingHostChanges.size > 0 || pendingAccessLevelChanges.size > 0;
 
   const memberCountWithPendingChanges = useMemo(() => {
     const memberUids = new Set<string>();
     pendingRoleChanges.forEach((_, uid) => memberUids.add(uid));
     pendingHostChanges.forEach((_, uid) => memberUids.add(uid));
+    pendingAccessLevelChanges.forEach((_, uid) => memberUids.add(uid));
     return memberUids.size;
-  }, [pendingRoleChanges, pendingHostChanges]);
+  }, [pendingRoleChanges, pendingHostChanges, pendingAccessLevelChanges]);
 
   const handleSave = useCallback(async () => {
     if (!authToken) {
@@ -141,6 +161,7 @@ const RolesPage = () => {
 
     const currentRoleChanges = Array.from(pendingRoleChanges.values());
     const currentHostChanges = Array.from(pendingHostChanges.values());
+    const currentAccessLevelChanges = Array.from(pendingAccessLevelChanges.values());
 
     // Group changes by member UID
     const memberUids = new Set<string>();
@@ -157,22 +178,67 @@ const RolesPage = () => {
       hostChangesMap.set(change.memberUid, change.hosts);
     });
 
+    // Group access level changes by accessLevel + sendRejectEmail combination
+    // The API supports batch updates for the same access level
+    const accessLevelGroups = new Map<
+      string,
+      {
+        memberUids: string[];
+        accessLevel: string;
+        sendRejectEmail?: boolean;
+      }
+    >();
+    currentAccessLevelChanges.forEach((change) => {
+      const key = `${change.accessLevel}-${change.sendRejectEmail ?? false}`;
+      if (!accessLevelGroups.has(key)) {
+        accessLevelGroups.set(key, {
+          memberUids: [],
+          accessLevel: change.accessLevel,
+          sendRejectEmail: change.sendRejectEmail,
+        });
+      }
+      accessLevelGroups.get(key)!.memberUids.push(change.memberUid);
+    });
+
     try {
-      const promises = Array.from(memberUids).map((memberUid) =>
-        updateMemberRolesAndHosts({
-          authToken,
-          memberUid,
-          roles: roleChangesMap.get(memberUid),
-          hosts: hostChangesMap.get(memberUid),
-        })
-      );
+      const promises: Promise<unknown>[] = [];
+
+      // Role/host update promises
+      Array.from(memberUids).forEach((memberUid) => {
+        promises.push(
+          updateMemberRolesAndHosts({
+            authToken,
+            memberUid,
+            roles: roleChangesMap.get(memberUid),
+            hosts: hostChangesMap.get(memberUid),
+          })
+        );
+      });
+
+      // Access level update promises (batched by accessLevel)
+      accessLevelGroups.forEach((group) => {
+        promises.push(
+          updateMembersStatus({
+            authToken,
+            memberUids: group.memberUids,
+            accessLevel: group.accessLevel,
+            sendRejectEmail: group.sendRejectEmail,
+          })
+        );
+      });
 
       await Promise.all(promises);
 
       setPendingRoleChanges(new Map());
       setPendingHostChanges(new Map());
+      setPendingAccessLevelChanges(new Map());
 
-      const totalChanges = memberUids.size;
+      // Count unique members affected
+      const allMemberUids = new Set<string>();
+      memberUids.forEach((uid) => allMemberUids.add(uid));
+      currentAccessLevelChanges.forEach((change) => allMemberUids.add(change.memberUid));
+
+      const totalChanges = allMemberUids.size;
       toast.success(`Successfully saved ${totalChanges} change${totalChanges !== 1 ? 's' : ''}`);
     } catch (error) {
       console.error(error);
@@ -180,7 +246,15 @@ const RolesPage = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [authToken, hasPendingChanges, pendingRoleChanges, pendingHostChanges, updateMemberRolesAndHosts]);
+  }, [
+    authToken,
+    hasPendingChanges,
+    pendingRoleChanges,
+    pendingHostChanges,
+    pendingAccessLevelChanges,
+    updateMemberRolesAndHosts,
+    updateMembersStatus,
+  ]);
 
   const { table } = useRolesTable({
     members: filteredMembers,
@@ -192,6 +266,7 @@ const RolesPage = () => {
     setGlobalFilter,
     onRoleChange: handleRoleChange,
     onHostChange: handleHostChange,
+    onAccessLevelChange: handleAccessLevelChange,
     authToken,
   });
 
@@ -204,6 +279,7 @@ const RolesPage = () => {
   const handleReset = useCallback(() => {
     setPendingRoleChanges(new Map());
     setPendingHostChanges(new Map());
+    setPendingAccessLevelChanges(new Map());
   }, []);
 
   if (!isLoading && user && !isDirectoryAdmin) {
