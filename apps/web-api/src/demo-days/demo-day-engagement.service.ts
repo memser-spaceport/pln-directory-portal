@@ -5,21 +5,27 @@ import {
   BadRequestException,
   forwardRef,
   Inject,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import cuid from 'cuid';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { DemoDaysService } from './demo-days.service';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
+import { PushNotificationCategory } from '@prisma/client';
 
 @Injectable()
 export class DemoDayEngagementService {
+  private readonly logger = new Logger(DemoDayEngagementService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly analyticsService: AnalyticsService,
     private readonly notificationServiceClient: NotificationServiceClient,
     @Inject(forwardRef(() => DemoDaysService))
-    private readonly demoDaysService: DemoDaysService
+    private readonly demoDaysService: DemoDaysService,
+    private readonly pushNotificationsService: PushNotificationsService
   ) {}
 
   // Read engagement state for UI
@@ -265,6 +271,76 @@ export class DemoDayEngagementService {
     if (!isPrepDemoDay) {
       // Feedback emails go only to founders
       const isFeedback = interestType === 'feedback';
+
+      // Send push notifications to founders (WebSocket real-time)
+      const pushCategoryMap: Record<string, PushNotificationCategory> = {
+        like: PushNotificationCategory.DEMO_DAY_LIKE,
+        connect: PushNotificationCategory.DEMO_DAY_CONNECT,
+        invest: PushNotificationCategory.DEMO_DAY_INVEST,
+        referral: PushNotificationCategory.DEMO_DAY_REFERRAL,
+        feedback: PushNotificationCategory.DEMO_DAY_FEEDBACK,
+      };
+
+      const pushTitleMap: Record<string, string> = {
+        like: `${investorName} liked your company`,
+        connect: `${investorName} wants to connect`,
+        invest: `${investorName} is interested in investing`,
+        referral: `${investorName} sent a referral`,
+        feedback: `${investorName} sent feedback`,
+      };
+
+      const pushDescriptionMap: Record<string, string> = {
+        like: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} liked ${
+          fundraisingProfile.team.name
+        } on ${demoDay.title}`,
+        connect: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} wants to connect with ${
+          fundraisingProfile.team.name
+        }`,
+        invest: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} is interested in investing in ${
+          fundraisingProfile.team.name
+        }`,
+        referral: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} referred ${
+          referralData?.investorName || 'an investor'
+        } to ${fundraisingProfile.team.name}`,
+        feedback: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} sent feedback to ${
+          fundraisingProfile.team.name
+        }`,
+      };
+
+      // Send push notification to each founder
+      for (const founder of founders) {
+        try {
+          await this.pushNotificationsService.create({
+            category: pushCategoryMap[interestType],
+            title: pushTitleMap[interestType],
+            description: pushDescriptionMap[interestType],
+            recipientUid: founder.member.uid,
+            link: `/members/${member.uid}`,
+            metadata: {
+              demoDayUid: demoDay.uid,
+              demoDayTitle: demoDay.title,
+              investorUid: member.uid,
+              investorName: member.name,
+              investorEmail: member.email,
+              investorTeamUid: investorTeam?.uid,
+              investorTeamName: investorTeam?.name,
+              founderTeamUid: fundraisingProfile.teamUid,
+              founderTeamName: fundraisingProfile.team.name,
+              interestType,
+              ...(referralData ? { referralData } : {}),
+              ...(feedbackData ? { feedbackData } : {}),
+            },
+            isPublic: false,
+          });
+        } catch (error) {
+          this.logger.error(
+            `Failed to send push notification to founder ${founder.member.uid}: ${
+              error instanceof Error ? error.message : error
+            }`
+          );
+          // Continue with other founders even if one fails
+        }
+      }
 
       await this.notificationServiceClient.sendNotification({
         isPriority: true,
