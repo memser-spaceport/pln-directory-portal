@@ -91,11 +91,10 @@ export function Index() {
       });
 
       if (!res.ok) {
-        if (res.status === 400) {
-          setError('Email is required');
-        } else {
-          setError('Failed to send OTP. Please try again.');
-        }
+        const errorData = await res.json().catch(() => null);
+        const errorMessage =
+          errorData?.message || 'Failed to send OTP. Please try again.';
+        setError(errorMessage);
         return;
       }
 

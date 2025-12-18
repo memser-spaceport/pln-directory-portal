@@ -1,10 +1,7 @@
 import {
   Body,
   Controller,
-  Delete,
   Param,
-  Get,
-  Put,
   Req,
   UseGuards,
   UsePipes,
@@ -420,6 +417,23 @@ export class MemberController {
     const params = request.query as unknown as z.infer<typeof AutocompleteQueryParams>;
     const { q, page, limit, hasOfficeHours } = params || {};
     return await this.membersService.autocompleteRoles(q || '', page, limit, hasOfficeHours);
+  }
+
+  /**
+   * Autocomplete investor types for member search.
+   *
+   * @param request - HTTP request object containing query parameters
+   * @returns Investor types with their counts
+   */
+  @Api(server.route.autocompleteInvestorTypes)
+  @ApiQueryFromZod(AutocompleteQueryParams.optional())
+  @UseInterceptors(IsVerifiedMemberInterceptor)
+  @QueryCache()
+  @CacheTTL(7200) // 2 hours
+  async autocompleteInvestorTypes(@Req() request: Request) {
+    const params = request.query as unknown as z.infer<typeof AutocompleteQueryParams>;
+    const { hasOfficeHours } = params || {};
+    return await this.membersService.getInvestorTypeCounts(hasOfficeHours);
   }
 
   /**

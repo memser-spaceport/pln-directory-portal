@@ -48,10 +48,11 @@ export default async function sendOtp(
     );
 
     const status = error?.response?.status ?? 500;
+    const errorMessage = error?.response?.data?.message || 'Failed to request OTP';
 
     return res.status(status).json({
       success: false,
-      message: 'Failed to request OTP',
+      message: errorMessage,
     });
   }
 }
