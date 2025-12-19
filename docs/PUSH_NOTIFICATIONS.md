@@ -254,6 +254,7 @@ POST /v1/admin/push-notifications/send
 
 | Category | Description |
 |----------|-------------|
+| `DEMO_DAY_ANNOUNCEMENT` | Demo Day status changes and scheduled reminders (public broadcast) |
 | `DEMO_DAY_LIKE` | Someone liked a demo day presentation |
 | `DEMO_DAY_CONNECT` | Connection request from demo day |
 | `DEMO_DAY_INVEST` | Investment interest from demo day |
@@ -461,6 +462,102 @@ const count = this.wsService.getConnectedUsersCount();
 const isOnline = this.wsService.isUserConnected('member-uid');
 ```
 
+## Demo Day Notifications
+
+Demo Day notifications are automated push notifications sent to users based on Demo Day status changes and scheduled timings. All Demo Day notifications use the `DEMO_DAY_ANNOUNCEMENT` category.
+
+### Configuration
+
+Demo Day notifications can be configured per Demo Day in the back-office:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `notificationsEnabled` | boolean | `false` | Master toggle for all notifications |
+| `notifyBeforeStartHours` | number | `336` (2 weeks) | Hours before `startDate` to send "Starting Soon" notification |
+| `notifyBeforeEndHours` | number | `48` (2 days) | Hours before `endDate` to send "Closing Soon" notification |
+
+### Status Change Notifications
+
+These notifications are sent automatically when a Demo Day's status is changed (via back-office update).
+
+| Status | Title | Description | When Sent |
+|--------|-------|-------------|-----------|
+| `UPCOMING` | `{demoDayName}` Announced | A new Demo Day `{demoDayName}` has been announced! Stay tuned for registration opening soon. | When status changes to `UPCOMING` |
+| `REGISTRATION_OPEN` | `{demoDayName}` - Registration Open | Registration is now open for `{demoDayName}`! Sign up now to participate in this exciting Demo Day event. | When status changes to `REGISTRATION_OPEN` |
+| `EARLY_ACCESS` | `{demoDayName}` - Early Access | Early access is now available for `{demoDayName}`! Check your eligibility and get a head start. | When status changes to `EARLY_ACCESS` |
+| `ACTIVE` | `{demoDayName}` - Now Live! | `{demoDayName}` is now live! Join now to connect with founders and explore exciting projects. | When status changes to `ACTIVE` (skipped if `EARLY_ACCESS` notification was sent) |
+
+**Example:**
+- Title: `Protocol Labs Demo Day Announced`
+- Description: `A new Demo Day "Protocol Labs Demo Day" has been announced! Stay tuned for registration opening soon.`
+- Link: `/demo-day/{slugURL}`
+
+### Scheduled Notifications
+
+These notifications are sent automatically by a cron job that runs every hour.
+
+| Type | Title | Description | When Sent |
+|------|-------|-------------|-----------|
+| `STARTING_SOON` | `{demoDayName}` is starting soon! | Demo Day starts in `{time}`. Get ready to discover innovative projects and connect with founders. | X hours before `startDate` (configurable via `notifyBeforeStartHours`) |
+| `CLOSING_SOON` | `{demoDayName}` is ending soon! | Only `{time}` left! Don't miss your chance to explore projects and connect with founders before Demo Day ends. | X hours before `endDate` (configurable via `notifyBeforeEndHours`) |
+
+**Time formatting:**
+- 336 hours → "2 weeks"
+- 168 hours → "1 week"
+- 72 hours → "3 days"
+- 48 hours → "48 hours"
+- 24 hours → "1 day"
+
+**Example:**
+- Title: `Protocol Labs Demo Day is starting soon!`
+- Description: `Demo Day starts in 2 weeks. Get ready to discover innovative projects and connect with founders.`
+- Link: `/demo-day/{slugURL}`
+
+### Duplicate Prevention
+
+All Demo Day notifications include duplicate prevention logic:
+
+1. **Status notifications**: Before sending, the system checks if a notification with the same `demoDayUid` and `status` already exists in the `PushNotification` table metadata.
+
+2. **Scheduled notifications**: Before sending, the system checks if a notification with the same `demoDayUid` and `notificationType` (`STARTING_SOON` or `CLOSING_SOON`) already exists.
+
+3. **ACTIVE status special case**: If an `EARLY_ACCESS` notification was previously sent for a Demo Day, the `ACTIVE` notification is skipped (users already have access).
+
+### Notification Metadata
+
+All Demo Day notifications include metadata for tracking and querying:
+
+**Status Change Notifications:**
+```json
+{
+  "demoDayUid": "demo-day-uid",
+  "demoDayTitle": "Protocol Labs Demo Day",
+  "status": "UPCOMING"
+}
+```
+
+**Scheduled Notifications:**
+```json
+{
+  "demoDayUid": "demo-day-uid",
+  "notificationType": "STARTING_SOON",
+  "startDate": "2024-01-15T00:00:00.000Z"
+}
+```
+
+### Cron Job
+
+The scheduled notifications are handled by `DemoDayNotificationsJob`:
+
+- **Schedule**: Every minute (`* * * * *`)
+- **Timezone**: UTC
+- **File**: `apps/web-api/src/demo-days/demo-day-notifications.job.ts`
+
+The job:
+1. Finds all Demo Days with `notificationsEnabled: true` and status in `[UPCOMING, REGISTRATION_OPEN, EARLY_ACCESS, ACTIVE]`
+2. For each Demo Day, checks if "Starting Soon" or "Closing Soon" notifications should be sent based on current time and configured hours
+3. Sends notifications only if they haven't been sent before (duplicate prevention)
+
 ## File Structure
 
 ```
@@ -475,4 +572,7 @@ apps/web-api/src/
 │   ├── admin-push-notifications.controller.ts # Admin REST API endpoints
 │   ├── push-notifications.service.ts          # Business logic
 │   └── push-notifications.module.ts           # Module configuration
+├── demo-days/
+│   ├── demo-days.service.ts           # Status change notifications
+│   └── demo-day-notifications.job.ts  # Scheduled notifications cron job
 ```
