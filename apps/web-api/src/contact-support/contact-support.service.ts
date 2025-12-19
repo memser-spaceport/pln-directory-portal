@@ -5,6 +5,7 @@ import { LogService } from '../shared/log.service';
 import { isEmails } from '../utils/helper/helper';
 import { AwsService } from '../utils/aws/aws.service';
 import * as path from 'path';
+import { NotificationServiceClient } from '../notifications/notification-service.client';
 
 const CONTACT_SUPPORT_SUBJECT = 'New Contact Support Request';
 
@@ -14,7 +15,12 @@ export class ContactSupportService {
   private readonly isSupportEmailsValid: boolean;
   private readonly isEmailEnabled: string | undefined;
 
-  constructor(private prisma: PrismaService, private logger: LogService, private awsService: AwsService) {
+  constructor(
+    private prisma: PrismaService,
+    private logger: LogService,
+    private awsService: AwsService,
+    private notificationServiceClient: NotificationServiceClient
+  ) {
     this.supportEmails = this.getSupportEmails();
     this.isSupportEmailsValid = this.validateSupportEmails();
     this.isEmailEnabled = process.env.IS_EMAIL_ENABLED?.toLowerCase();
@@ -37,6 +43,20 @@ export class ContactSupportService {
           this.notifyAdmins(result);
         }
         this.logger.info(`New contact support request created with topic "${request.topic}" and ref id ${result.uid}`);
+
+        await this.notificationServiceClient.sendTelegramOutboxMessage({
+          channelType: 'SUPPORT',
+          text: [
+            'New support request',
+            `Topic: ${request.topic}`,
+            `Message: ${request.message ?? '-'}`,
+          ].join('\n'),
+          meta: {
+            email: request.email,
+            name: request.name,
+            source: 'contact-support',
+          },
+        });
         return { uid: result.uid };
       } else {
         throw new InternalServerErrorException('Cannot save a contact support request');
