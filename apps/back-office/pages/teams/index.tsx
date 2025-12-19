@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { GetServerSideProps } from 'next';
 import { parseCookies } from 'nookies';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -13,6 +13,12 @@ import clsx from 'clsx';
 import { CloseIcon } from '../../screens/members/components/icons';
 import { TeamAccessLevelSelect } from './components/TeamAccessLevelSelect';
 import { useAuth } from '../../context/auth-context';
+import { ConfirmSaveDrawer } from '../../components/common/ConfirmSaveDrawer';
+
+type PendingTeamAccessLevelChange = {
+  teamUid: string;
+  accessLevel: AccessLevel;
+};
 
 // Access levels we allow to set for teams
 type AccessLevel = 'L0' | 'L1';
@@ -43,8 +49,11 @@ const TeamsPage: React.FC = () => {
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Access-level saving state
-  const [savingUid, setSavingUid] = useState<string | null>(null);
+  // Pending access level changes for batch saving
+  const [pendingAccessLevelChanges, setPendingAccessLevelChanges] = useState<Map<string, PendingTeamAccessLevelChange>>(
+    new Map()
+  );
+  const [isSavingBatch, setIsSavingBatch] = useState(false);
 
   // Search state
   const [search, setSearch] = useState('');
@@ -97,34 +106,94 @@ const TeamsPage: React.FC = () => {
   }
 
   /**
-   * Updates access level for a single team.
-   * PATCH /v1/teams/:uid/access-level { accessLevel }
+   * Handles access level change - tracks as pending instead of saving immediately
    */
-  async function updateAccessLevel(teamUid: string, accessLevel: AccessLevel) {
-    if (!accessLevel) return;
+  const handleAccessLevelChange = useCallback(
+    (teamUid: string, accessLevel: AccessLevel) => {
+      const team = teams.find((t) => t.uid === teamUid);
 
-    const teamName = teams.find((t) => t.uid === teamUid)?.name || 'Team';
+      if (!team) {
+        return;
+      }
+
+      // Check if the new value is different from the original
+      const hasChanged = accessLevel !== team.accessLevel;
+
+      setPendingAccessLevelChanges((prev) => {
+        const next = new Map(prev);
+        if (hasChanged) {
+          next.set(teamUid, { teamUid, accessLevel });
+        } else {
+          next.delete(teamUid);
+        }
+        return next;
+      });
+    },
+    [teams]
+  );
+
+  /**
+   * Saves all pending access level changes
+   */
+  const handleSaveBatch = useCallback(async () => {
+    if (pendingAccessLevelChanges.size === 0) {
+      return;
+    }
+
+    setIsSavingBatch(true);
+
+    const cookies = parseCookies();
+    const config = {
+      headers: { authorization: `Bearer ${cookies.plnadmin}` },
+    };
+
+    const changes = Array.from(pendingAccessLevelChanges.values());
 
     try {
-      setSavingUid(teamUid);
-      const cookies = parseCookies();
-      const config = {
-        headers: { authorization: `Bearer ${cookies.plnadmin}` },
-      };
+      const promises = changes.map((change) =>
+        api.patch(`/v1/teams/${change.teamUid}/access-level`, { accessLevel: change.accessLevel }, config)
+      );
 
-      await api.patch(`/v1/teams/${teamUid}/access-level`, { accessLevel }, config);
+      await Promise.all(promises);
 
-      toast.success(`Successfully updated access level for ${teamName} to ${accessLevel}`);
+      // Update local state with new values
+      setTeams((prev) =>
+        prev.map((t) => {
+          const change = pendingAccessLevelChanges.get(t.uid);
+          return change ? { ...t, accessLevel: change.accessLevel } : t;
+        })
+      );
 
-      // Optimistic UI update
-      setTeams((prev) => prev.map((t) => (t.uid === teamUid ? { ...t, accessLevel } : t)));
+      setPendingAccessLevelChanges(new Map());
+
+      toast.success(`Successfully saved ${changes.length} change${changes.length !== 1 ? 's' : ''}`);
     } catch (e) {
-      console.error('Failed to update access level', e);
-      toast.error(`Failed to update access level for ${teamName}`);
+      console.error('Failed to save access level changes', e);
+      toast.error('Failed to save changes. Please try again.');
     } finally {
-      setSavingUid(null);
+      setIsSavingBatch(false);
     }
-  }
+  }, [pendingAccessLevelChanges]);
+
+  /**
+   * Resets all pending access level changes
+   */
+  const handleResetBatch = useCallback(() => {
+    setPendingAccessLevelChanges(new Map());
+  }, []);
+
+  /**
+   * Gets the display value for access level (pending or actual)
+   */
+  const getDisplayAccessLevel = useCallback(
+    (teamUid: string, actualLevel: AccessLevel): AccessLevel => {
+      const pending = pendingAccessLevelChanges.get(teamUid);
+      return pending ? pending.accessLevel : actualLevel;
+    },
+    [pendingAccessLevelChanges]
+  );
+
+  const pendingChangeCount = useMemo(() => pendingAccessLevelChanges.size, [pendingAccessLevelChanges]);
 
   /**
    * Opens the right-hand editor panel for the given team.
@@ -298,9 +367,9 @@ const TeamsPage: React.FC = () => {
 
                   <div className={clsx(s.bodyCell, s.accessLevelColumn)} onClick={(e) => e.stopPropagation()}>
                     <TeamAccessLevelSelect
-                      value={team.accessLevel ?? 'L0'}
-                      onChange={(val) => updateAccessLevel(team.uid, val)}
-                      disabled={savingUid === team.uid}
+                      value={getDisplayAccessLevel(team.uid, team.accessLevel ?? 'L0')}
+                      onChange={(val) => handleAccessLevelChange(team.uid, val)}
+                      disabled={isSavingBatch}
                     />
                   </div>
 
@@ -333,6 +402,14 @@ const TeamsPage: React.FC = () => {
                 </div>
               ))}
           </div>
+
+          <ConfirmSaveDrawer
+            label="Team"
+            count={pendingChangeCount}
+            onReset={handleResetBatch}
+            onSave={handleSaveBatch}
+            isSaving={isSavingBatch}
+          />
 
           {/* Modal editor panel */}
           <AnimatePresence>

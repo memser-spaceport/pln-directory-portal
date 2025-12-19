@@ -19,7 +19,7 @@ import { PendingRoleChange, PendingHostChange } from '../../screens/members/comp
 import { PendingAccessLevelChange } from '../../screens/members/components/StatusCell/StatusCell';
 import { useUpdateMemberRolesAndHosts } from '../../hooks/members/useUpdateMemberRolesAndHosts';
 import { useUpdateMembersStatus } from '../../hooks/members/useUpdateMembersStatus';
-import { RolesSaveControls } from '../../screens/roles/components/RolesSaveControls';
+import { ConfirmSaveDrawer } from '../../components/common/ConfirmSaveDrawer';
 
 const ALL_ACCESS_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'Rejected'];
 
@@ -393,8 +393,9 @@ const RolesPage = () => {
               </React.Fragment>
             ))}
           </div>
-          <RolesSaveControls
-            memberCount={memberCountWithPendingChanges}
+          <ConfirmSaveDrawer
+            label="Member"
+            count={memberCountWithPendingChanges}
             onReset={handleReset}
             onSave={handleSave}
             isSaving={isSaving}
