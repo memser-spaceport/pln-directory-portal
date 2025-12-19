@@ -1023,6 +1023,8 @@ model DemoDay {
   supportEmail              String?
   status                    DemoDayStatus                     @default(UPCOMING)
   notificationsEnabled      Boolean                           @default(false)
+  notifyBeforeStartHours    Int?                              @default(336)
+  notifyBeforeEndHours      Int?                              @default(48)
   createdAt                 DateTime                          @default(now())
   updatedAt                 DateTime                          @updatedAt
   isDeleted                 Boolean                           @default(false)

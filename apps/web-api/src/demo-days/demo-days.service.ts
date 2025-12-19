@@ -266,6 +266,8 @@ export class DemoDaysService {
         deletedAt: true,
         host: true,
         notificationsEnabled: true,
+        notifyBeforeStartHours: true,
+        notifyBeforeEndHours: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -330,6 +332,8 @@ export class DemoDaysService {
         deletedAt: true,
         host: true,
         notificationsEnabled: true,
+        notifyBeforeStartHours: true,
+        notifyBeforeEndHours: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -456,6 +460,8 @@ export class DemoDaysService {
         status: true,
         host: true,
         notificationsEnabled: true,
+        notifyBeforeStartHours: true,
+        notifyBeforeEndHours: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -487,6 +493,8 @@ export class DemoDaysService {
         status: true,
         host: true,
         notificationsEnabled: true,
+        notifyBeforeStartHours: true,
+        notifyBeforeEndHours: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -515,6 +523,8 @@ export class DemoDaysService {
       status?: DemoDayStatus;
       host?: string | null;
       notificationsEnabled?: boolean;
+      notifyBeforeStartHours?: number | null;
+      notifyBeforeEndHours?: number | null;
     },
     actorEmail?: string
   ): Promise<DemoDay> {
@@ -575,6 +585,12 @@ export class DemoDaysService {
     if (data.notificationsEnabled !== undefined) {
       updateData.notificationsEnabled = data.notificationsEnabled;
     }
+    if (data.notifyBeforeStartHours !== undefined) {
+      updateData.notifyBeforeStartHours = data.notifyBeforeStartHours;
+    }
+    if (data.notifyBeforeEndHours !== undefined) {
+      updateData.notifyBeforeEndHours = data.notifyBeforeEndHours;
+    }
 
     const updated = await this.prisma.demoDay.update({
       where: { uid },
@@ -593,6 +609,8 @@ export class DemoDaysService {
         status: true,
         host: true,
         notificationsEnabled: true,
+        notifyBeforeStartHours: true,
+        notifyBeforeEndHours: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,

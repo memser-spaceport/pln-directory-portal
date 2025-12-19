@@ -11,6 +11,8 @@ export interface DemoDay {
   host?: string | null;
   status: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
   notificationsEnabled: boolean;
+  notifyBeforeStartHours?: number | null;
+  notifyBeforeEndHours?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,6 +42,8 @@ export interface UpdateDemoDayDto {
   host?: string | null;
   status?: 'UPCOMING' | 'REGISTRATION_OPEN' | 'EARLY_ACCESS' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
   notificationsEnabled?: boolean;
+  notifyBeforeStartHours?: number | null;
+  notifyBeforeEndHours?: number | null;
 }
 
 export interface DemoDayParticipant {
