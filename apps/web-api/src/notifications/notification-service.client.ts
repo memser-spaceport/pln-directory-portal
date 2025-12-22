@@ -424,4 +424,46 @@ export class NotificationServiceClient {
       }
     }
   }
+
+  async sendTelegramOutboxMessage(dto: {
+    channelType: 'DEMO_DAY_SUBSCRIPTION' | 'SUPPORT';
+    text: string;
+    meta?: Record<string, any>;
+  }) {
+    try {
+      const response = await axios.post(
+        `${this.notificationServiceBaseUrl}/telegram-outbox/messages`,
+        dto,
+        {
+          headers: {
+            Authorization: `Basic ${this.notificationServiceSecret}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        switch (error.response?.status) {
+          case 400:
+            throw new BadRequestException('Invalid telegram outbox payload.');
+          case 401:
+            throw new UnauthorizedException('Authentication failed.');
+          case 404:
+            throw new NotFoundException('Telegram outbox endpoint not found.');
+          case 500:
+            throw new InternalServerErrorException('Notification service error.');
+          default:
+            throw new HttpException(
+              `Unhandled error with status ${error.response?.status || 'unknown'}.`,
+              error.response?.status || 500
+            );
+        }
+      }
+
+      throw new InternalServerErrorException('Unexpected error sending telegram outbox message.');
+    }
+  }
+
 }
