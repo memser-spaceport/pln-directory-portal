@@ -49,6 +49,8 @@ export class ContactSupportService {
           text: [
             'New support request',
             `Topic: ${request.topic}`,
+            `Email: ${request.email ?? '-'}`,
+            `Name: ${request.name ?? '-'}`,
             `Message: ${request.message ?? '-'}`,
           ].join('\n'),
           meta: {
