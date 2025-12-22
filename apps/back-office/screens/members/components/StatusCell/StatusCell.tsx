@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Select from 'react-select';
 import { Member } from '../../types/member';
 
@@ -8,6 +8,12 @@ import { useUpdateMembersStatus } from '../../../../hooks/members/useUpdateMembe
 import { format } from 'date-fns';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { toast } from 'react-toastify';
+
+export type PendingAccessLevelChange = {
+  memberUid: string;
+  accessLevel: string;
+  sendRejectEmail?: boolean;
+};
 
 const options = [
   {
@@ -92,11 +98,28 @@ const options = [
   },
 ];
 
-export const StatusCell = ({ member, authToken }: { member: Member; authToken: string }) => {
+interface StatusCellProps {
+  member: Member;
+  authToken: string;
+  onAccessLevelChange?: (change: PendingAccessLevelChange | null) => void;
+}
+
+export const StatusCell = (props: StatusCellProps) => {
+  const { member, authToken, onAccessLevelChange } = props;
+
   const [val, setVal] = useState(null);
   const [sendRejectEmail, setSendRejectEmail] = useState(false);
+  const [localAccessLevel, setLocalAccessLevel] = useState<string | null>(null);
+
+  // Reset local state when member changes
+  useEffect(() => {
+    setLocalAccessLevel(null);
+  }, [member.uid, member.accessLevel]);
+
+  const displayAccessLevel = localAccessLevel ?? member.accessLevel;
+
   const _value = useMemo(() => {
-    const val = options.find((option) => option.value === member.accessLevel);
+    const val = options.find((option) => option.value === displayAccessLevel);
 
     if (val) {
       return [
@@ -106,22 +129,41 @@ export const StatusCell = ({ member, authToken }: { member: Member; authToken: s
         },
       ];
     }
-  }, [member.accessLevel, member.accessLevelUpdatedAt]);
+  }, [displayAccessLevel, member.accessLevelUpdatedAt]);
 
   const { mutateAsync } = useUpdateMembersStatus();
 
-  const handleSubmit = async (val) => {
+  const handleSubmit = async (selectedVal) => {
     setVal(null);
     setSendRejectEmail(false);
+
+    // If callback is provided, track as pending change instead of saving immediately
+    if (onAccessLevelChange) {
+      setLocalAccessLevel(selectedVal.value);
+
+      const hasChanged = selectedVal.value !== member.accessLevel;
+      if (hasChanged) {
+        onAccessLevelChange({
+          memberUid: member.uid,
+          accessLevel: selectedVal.value,
+          sendRejectEmail: selectedVal.value === 'Rejected' ? sendRejectEmail : undefined,
+        });
+      } else {
+        onAccessLevelChange(null);
+      }
+      return;
+    }
+
+    // Original immediate save behavior
     const res = await mutateAsync({
       authToken,
       memberUids: [member.uid],
-      accessLevel: val.value,
+      accessLevel: selectedVal.value,
       sendRejectEmail,
     });
 
     if (res.status === 200) {
-      toast.success(`Successfully updated access level for ${member.name} to ${val.name}`);
+      toast.success(`Successfully updated access level for ${member.name} to ${selectedVal.name}`);
     } else {
       toast.error(`Failed to update access level for ${member.name}`);
     }
