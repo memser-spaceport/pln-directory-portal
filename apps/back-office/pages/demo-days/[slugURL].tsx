@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
@@ -25,6 +25,22 @@ import { removeToken } from '../../utils/auth';
 import s from './styles.module.scss';
 
 const RichTextEditor = dynamic(() => import('../../components/common/rich-text-editor'), { ssr: false });
+
+/**
+ * Format hours into a human-readable message (e.g., "2 weeks", "3 days", "48 hours")
+ */
+const formatHoursMessage = (hours: number): string => {
+  if (hours >= 168) {
+    // 168 hours = 1 week
+    const weeks = Math.round(hours / 168);
+    return weeks === 1 ? '1 week' : `${weeks} weeks`;
+  } else if (hours >= 24) {
+    const days = Math.round(hours / 24);
+    return days === 1 ? '1 day' : `${days} days`;
+  } else {
+    return hours === 1 ? '1 hour' : `${hours} hours`;
+  }
+};
 
 const DemoDayDetailPage = () => {
   const router = useRouter();
@@ -83,6 +99,9 @@ const DemoDayDetailPage = () => {
     email: string;
   } | null>(null);
   const [selectedParticipantForDetails, setSelectedParticipantForDetails] = useState<DemoDayParticipant | null>(null);
+  const [showNotificationsConfirmModal, setShowNotificationsConfirmModal] = useState(false);
+  const [modalNotifyBeforeStartHours, setModalNotifyBeforeStartHours] = useState(336);
+  const [modalNotifyBeforeEndHours, setModalNotifyBeforeEndHours] = useState(48);
 
   const updateDemoDayMutation = useUpdateDemoDay();
   const updateParticipantMutation = useUpdateParticipant();
@@ -193,6 +212,7 @@ const DemoDayDetailPage = () => {
       supportEmail: demoDay.supportEmail,
       host: demoDay.host,
       status: demoDay.status,
+      notificationsEnabled: demoDay.notificationsEnabled,
     });
     setIsEditing(true);
   };
@@ -328,6 +348,32 @@ const DemoDayDetailPage = () => {
       ...prev,
       [field]: value,
     }));
+  };
+
+  const handleNotificationsToggle = (enabled: boolean) => {
+    if (enabled) {
+      // Initialize modal values with defaults (336 hours = 2 weeks before start, 48 hours before end)
+      setModalNotifyBeforeStartHours(336);
+      setModalNotifyBeforeEndHours(48);
+      // Show confirmation dialog when enabling notifications
+      setShowNotificationsConfirmModal(true);
+    } else {
+      // Disable notifications without confirmation
+      setEditFormData((prev) => ({
+        ...prev,
+        notificationsEnabled: false,
+      }));
+    }
+  };
+
+  const handleConfirmEnableNotifications = () => {
+    setEditFormData((prev) => ({
+      ...prev,
+      notificationsEnabled: true,
+      notifyBeforeStartHours: modalNotifyBeforeStartHours,
+      notifyBeforeEndHours: modalNotifyBeforeEndHours,
+    }));
+    setShowNotificationsConfirmModal(false);
   };
 
   const handleApproveClick = (participant: any) => {
@@ -592,6 +638,39 @@ const DemoDayDetailPage = () => {
                   />
                 ) : (
                   <div className={s.fieldValue}>{demoDay.supportEmail || '-'}</div>
+                )}
+              </div>
+              <div className={clsx(s.overviewField)}>
+                <label className={s.fieldLabel}>Notifications</label>
+                {isEditing && isDirectoryAdmin ? (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.notificationsEnabled || false}
+                      onChange={(e) => handleNotificationsToggle(e.target.checked)}
+                      className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span className="text-sm text-gray-600">
+                      {editFormData.notificationsEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </label>
+                ) : (
+                  <div className={s.fieldValue}>
+                    <span
+                      className={clsx(
+                        'inline-flex rounded-full px-2 py-1 text-xs font-semibold',
+                        demoDay.notificationsEnabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      )}
+                    >
+                      {demoDay.notificationsEnabled ? 'Yes' : 'No'}
+                    </span>
+                    {demoDay.notificationsEnabled && (
+                      <div className="mt-2 text-sm text-gray-600 space-y-1">
+                        <div>Starting Soon: {formatHoursMessage(demoDay.notifyBeforeStartHours ?? 336)} before start</div>
+                        <div>Closing Soon: {formatHoursMessage(demoDay.notifyBeforeEndHours ?? 48)} before end</div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
@@ -1151,6 +1230,90 @@ const DemoDayDetailPage = () => {
           }}
           participant={selectedParticipantForDetails}
         />
+
+        {/* Notifications Enable Confirmation Modal */}
+        {showNotificationsConfirmModal && (
+          <div className="fixed inset-0 z-[1058] overflow-y-auto">
+            <div className="flex min-h-screen items-center justify-center px-4 text-center">
+              <div
+                className="fixed inset-0 bg-black bg-opacity-30 transition-opacity"
+                onClick={() => setShowNotificationsConfirmModal(false)}
+              />
+
+              <div className="relative inline-block w-full max-w-lg transform overflow-hidden rounded-lg bg-white p-6 text-left shadow-xl transition-all">
+                <h3 className="text-lg font-medium leading-6 text-gray-900">
+                  Enable Notifications
+                </h3>
+
+                <div className="mt-4">
+                  <p className="text-sm text-gray-500">
+                    Are you sure you want to enable notifications for this Demo Day? When enabled,
+                    notifications will be sent to participants when the Demo Day status changes.
+                  </p>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      &quot;Starting Soon&quot; notification
+                    </label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="720"
+                        value={modalNotifyBeforeStartHours}
+                        onChange={(e) => setModalNotifyBeforeStartHours(Math.max(1, Math.min(720, parseInt(e.target.value) || 336)))}
+                        className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      />
+                      <span className="text-sm text-gray-500">hours</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-400">
+                      Send a notification before the Demo Day starts
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      &quot;Closing Soon&quot; notification
+                    </label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="720"
+                        value={modalNotifyBeforeEndHours}
+                        onChange={(e) => setModalNotifyBeforeEndHours(Math.max(1, Math.min(720, parseInt(e.target.value) || 48)))}
+                        className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      />
+                      <span className="text-sm text-gray-500">hours</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-400">
+                      Send a notification before the Demo Day ends
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    onClick={() => setShowNotificationsConfirmModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    onClick={handleConfirmEnableNotifications}
+                  >
+                    Enable Notifications
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ApprovalLayout>
   );
