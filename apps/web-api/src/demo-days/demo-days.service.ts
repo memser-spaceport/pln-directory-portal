@@ -1612,14 +1612,6 @@ export class DemoDaysService {
       }
     }
 
-    // For ACTIVE status: skip if EARLY_ACCESS notification was already sent
-    if (status === DemoDayStatus.ACTIVE) {
-      const earlyAccessSent = await this.hasNotificationBeenSent(demoDayUid, DemoDayStatus.EARLY_ACCESS);
-      if (earlyAccessSent) {
-        return { eligible: false, reason: 'EARLY_ACCESS notification was already sent' };
-      }
-    }
-
     // Check if notification was already sent for this status
     const alreadySent = await this.hasNotificationBeenSent(demoDayUid, status);
     if (alreadySent) {
