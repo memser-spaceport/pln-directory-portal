@@ -231,46 +231,39 @@ const DemoDayDetailPage = () => {
   };
 
   const checkNotificationPreview = async (dataToSave: UpdateDemoDayDto): Promise<boolean> => {
-    if (!authToken || !demoDay) return true; // proceed without check
+    if (!authToken || !demoDay) return true;
 
-    // Only check if status is changing or notifications are being enabled
-    const isStatusChanging = dataToSave.status && dataToSave.status !== demoDay.status;
-    const notificationsEnabled = dataToSave.notificationsEnabled ?? demoDay.notificationsEnabled;
+    const hasStatusChange = dataToSave.status && dataToSave.status !== demoDay.status;
+    const hasNotificationToggle = dataToSave.notificationsEnabled !== undefined &&
+      dataToSave.notificationsEnabled !== demoDay.notificationsEnabled;
 
-    if (!isStatusChanging || !notificationsEnabled) {
-      return true; // No notification will be sent, proceed with save
+    // Skip API call if no relevant changes
+    if (!hasStatusChange && !hasNotificationToggle) {
+      return true;
     }
 
     try {
-      const config = {
-        headers: {
-          authorization: `Bearer ${authToken}`,
-        },
-      };
-
       const response = await api.post(
         `${API_ROUTE.ADMIN_DEMO_DAYS}/${demoDay.slugURL}/preview-notification`,
         {
-          status: dataToSave.status,
-          notificationsEnabled: notificationsEnabled,
+          status: dataToSave.status || demoDay.status,
+          notificationsEnabled: dataToSave.notificationsEnabled ?? demoDay.notificationsEnabled,
         },
-        config
+        {
+          headers: { authorization: `Bearer ${authToken}` },
+        }
       );
 
-      const preview = response.data;
-
-      if (preview.willSend) {
-        // Show confirmation modal
-        setNotificationPreview(preview);
+      if (response.data.willSend) {
+        setNotificationPreview(response.data);
         setPendingSaveData(dataToSave);
         setShowNotificationPreviewModal(true);
-        return false; // Don't proceed with save yet
+        return false;
       }
 
-      return true; // No notification will be sent, proceed with save
+      return true;
     } catch (error) {
       console.error('Error checking notification preview:', error);
-      // If preview check fails, proceed with save anyway
       return true;
     }
   };
