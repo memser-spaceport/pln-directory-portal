@@ -480,16 +480,18 @@ Demo Day notifications can be configured per Demo Day in the back-office:
 
 These notifications are sent automatically when a Demo Day's status is changed (via back-office update).
 
-| Status | Title | Description | When Sent |
-|--------|-------|-------------|-----------|
-| `UPCOMING` | `{demoDayName}` Announced | A new Demo Day `{demoDayName}` has been announced! Stay tuned for registration opening soon. | When status changes to `UPCOMING` |
-| `REGISTRATION_OPEN` | `{demoDayName}` - Registration Open | Registration is now open for `{demoDayName}`! Sign up now to participate in this exciting Demo Day event. | When status changes to `REGISTRATION_OPEN` |
-| `EARLY_ACCESS` | `{demoDayName}` - Early Access | Early access is now available for `{demoDayName}`! Check your eligibility and get a head start. | When status changes to `EARLY_ACCESS` |
-| `ACTIVE` | `{demoDayName}` - Now Live! | `{demoDayName}` is now live! Join now to connect with founders and explore exciting projects. | When status changes to `ACTIVE` (skipped if `EARLY_ACCESS` notification was sent) |
+| Status | Title | Description                                                                                | When Sent |
+|--------|-------|--------------------------------------------------------------------------------------------|-----------|
+| `UPCOMING` | `{demoDayName}` | Upcoming: `{demoDayName}` starts `{Date}`                                                  | When status changes to `UPCOMING` |
+| `REGISTRATION_OPEN` | `{demoDayName}` | Registration is now open for `{demoDayName}`!                                              | When status changes to `REGISTRATION_OPEN` |
+| `EARLY_ACCESS` | `{demoDayName}` | Open now: You have early access to `{demoDayName}`!                                        | When status changes to `EARLY_ACCESS` |
+| `ACTIVE` | `{demoDayName}` | `{demoDayName}` is now live! Join now to connect with founders and explore exciting projects. | When status changes to `ACTIVE` |
+
+**Note:** `{Date}` is formatted from `DemoDay.startDate` (e.g., "Jan 15, 2025").
 
 **Example:**
-- Title: `Protocol Labs Demo Day Announced`
-- Description: `A new Demo Day "Protocol Labs Demo Day" has been announced! Stay tuned for registration opening soon.`
+- Title: `Protocol Labs Demo Day`
+- Description: `Upcoming: Protocol Labs Demo Day starts Jan 15, 2025`
 - Link: `/demo-day/{slugURL}`
 
 ### Scheduled Notifications
@@ -498,8 +500,8 @@ These notifications are sent automatically by a cron job that runs every hour.
 
 | Type | Title | Description | When Sent |
 |------|-------|-------------|-----------|
-| `STARTING_SOON` | `{demoDayName}` is starting soon! | Demo Day starts in `{time}`. Get ready to discover innovative projects and connect with founders. | X hours before `startDate` (configurable via `notifyBeforeStartHours`) |
-| `CLOSING_SOON` | `{demoDayName}` is ending soon! | Only `{time}` left! Don't miss your chance to explore projects and connect with founders before Demo Day ends. | X hours before `endDate` (configurable via `notifyBeforeEndHours`) |
+| `STARTING_SOON` | `{demoDayName}` | `{demoDayName}` starts in `{time}`. | X hours before `startDate` (configurable via `notifyBeforeStartHours`) |
+| `CLOSING_SOON` | `{demoDayName}` | `{demoDayName}` closing soon: Only `{time}` left! | X hours before `endDate` (configurable via `notifyBeforeEndHours`) |
 
 **Time formatting:**
 - 336 hours → "2 weeks"
@@ -509,19 +511,17 @@ These notifications are sent automatically by a cron job that runs every hour.
 - 24 hours → "1 day"
 
 **Example:**
-- Title: `Protocol Labs Demo Day is starting soon!`
-- Description: `Demo Day starts in 2 weeks. Get ready to discover innovative projects and connect with founders.`
+- Title: `Protocol Labs Demo Day`
+- Description: `Protocol Labs Demo Day starts in 2 weeks.`
 - Link: `/demo-day/{slugURL}`
 
 ### Duplicate Prevention
 
 All Demo Day notifications include duplicate prevention logic:
 
-1. **Status notifications**: Before sending, the system checks if a notification with the same `demoDayUid` and `status` already exists in the `PushNotification` table metadata.
+1. **Status notifications**: Before sending, the system checks if a notification with the same `demoDaySlugURL` and `status` already exists in the `PushNotification` table metadata.
 
-2. **Scheduled notifications**: Before sending, the system checks if a notification with the same `demoDayUid` and `notificationType` (`STARTING_SOON` or `CLOSING_SOON`) already exists.
-
-3. **ACTIVE status special case**: If an `EARLY_ACCESS` notification was previously sent for a Demo Day, the `ACTIVE` notification is skipped (users already have access).
+2. **Scheduled notifications**: Before sending, the system checks if a notification with the same `demoDaySlugURL` and `notificationType` (`STARTING_SOON` or `CLOSING_SOON`) already exists.
 
 ### Notification Metadata
 

@@ -1697,35 +1697,41 @@ export class DemoDaysService {
     title: string;
     description: string;
   } {
+    const formattedDate = demoDay.startDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
     switch (demoDay.status) {
       case DemoDayStatus.UPCOMING:
         return {
-          title: `${demoDay.title} Announced`,
-          description: `A new Demo Day "${demoDay.title}" has been announced! Stay tuned for registration opening soon.`,
+          title: `${demoDay.title}`,
+          description: `Upcoming: ${demoDay.title} starts ${formattedDate}`,
         };
 
       case DemoDayStatus.REGISTRATION_OPEN:
         return {
-          title: `${demoDay.title} - Registration Open`,
-          description: `Registration is now open for "${demoDay.title}"! Sign up now to participate in this exciting Demo Day event.`,
+          title: `${demoDay.title}`,
+          description: `Registration is now open for ${demoDay.title}!`,
         };
 
       case DemoDayStatus.EARLY_ACCESS:
         return {
-          title: `${demoDay.title} - Early Access`,
-          description: `Early access is now available for "${demoDay.title}"! Check your eligibility and get a head start.`,
+          title: `${demoDay.title}`,
+          description: `Open now: You have early access to ${demoDay.title}!`,
         };
 
       case DemoDayStatus.ACTIVE:
         return {
-          title: `${demoDay.title} - Now Live!`,
-          description: `"${demoDay.title}" is now live! Join now to connect with founders and explore exciting projects.`,
+          title: `${demoDay.title}`,
+          description: `${demoDay.title} is now live! Join now to connect with founders and explore exciting projects.`,
         };
 
       default:
         return {
-          title: `${demoDay.title} Update`,
-          description: `"${demoDay.title}" has been updated.`,
+          title: `${demoDay.title}`,
+          description: `${demoDay.title} has been updated.`,
         };
     }
   }
