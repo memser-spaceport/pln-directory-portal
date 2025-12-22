@@ -52,10 +52,12 @@ export class ContactSupportService {
             `Email: ${request.email ?? '-'}`,
             `Name: ${request.name ?? '-'}`,
             `Message: ${request.message ?? '-'}`,
+             this.formatSupportEmails(),
           ].join('\n'),
           meta: {
             email: request.email,
             name: request.name,
+            supportEmails: this.supportEmails,
             source: 'contact-support',
           },
         });
@@ -115,4 +117,13 @@ export class ContactSupportService {
     const adminEmailIdsFromEnv = process.env.SUPPORT_EMAILS;
     return adminEmailIdsFromEnv?.split(',') ?? [];
   }
+
+  private formatSupportEmails(): string {
+    return `Support emails: ${
+      this.supportEmails.length
+        ? this.supportEmails.join(', ')
+        : '-'
+    }`;
+  }
+
 }

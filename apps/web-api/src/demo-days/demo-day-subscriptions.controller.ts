@@ -44,6 +44,7 @@ export class DemoDaySubscriptionsController {
     };
 
     const result = await this.notificationServiceClient.createEventSubscriber(subscriberData);
+    const adminUrl = process.env.DEMO_DAY_SUBSCRIBERS_ADMIN_URL;
 
     await this.notificationServiceClient.sendTelegramOutboxMessage({
       channelType: 'DEMO_DAY_SUBSCRIPTION',
@@ -52,6 +53,7 @@ export class DemoDaySubscriptionsController {
         `Email: ${body.email}`,
         `Name: ${body.name ?? '-'}`,
         `MemberId: ${memberId ?? '-'}`,
+         adminUrl ? `Admin panel: ${adminUrl}` : '-',
       ].join('\n'),
       meta: {
         email: body.email,
