@@ -102,6 +102,14 @@ const DemoDayDetailPage = () => {
   const [showNotificationsConfirmModal, setShowNotificationsConfirmModal] = useState(false);
   const [modalNotifyBeforeStartHours, setModalNotifyBeforeStartHours] = useState(336);
   const [modalNotifyBeforeEndHours, setModalNotifyBeforeEndHours] = useState(48);
+  const [showNotificationPreviewModal, setShowNotificationPreviewModal] = useState(false);
+  const [notificationPreview, setNotificationPreview] = useState<{
+    willSend: boolean;
+    title?: string;
+    description?: string;
+    reason?: string;
+  } | null>(null);
+  const [pendingSaveData, setPendingSaveData] = useState<UpdateDemoDayDto | null>(null);
 
   const updateDemoDayMutation = useUpdateDemoDay();
   const updateParticipantMutation = useUpdateParticipant();
@@ -222,7 +230,52 @@ const DemoDayDetailPage = () => {
     setEditFormData({});
   };
 
-  const handleSaveDemoDay = async () => {
+  const checkNotificationPreview = async (dataToSave: UpdateDemoDayDto): Promise<boolean> => {
+    if (!authToken || !demoDay) return true; // proceed without check
+
+    // Only check if status is changing or notifications are being enabled
+    const isStatusChanging = dataToSave.status && dataToSave.status !== demoDay.status;
+    const notificationsEnabled = dataToSave.notificationsEnabled ?? demoDay.notificationsEnabled;
+
+    if (!isStatusChanging || !notificationsEnabled) {
+      return true; // No notification will be sent, proceed with save
+    }
+
+    try {
+      const config = {
+        headers: {
+          authorization: `Bearer ${authToken}`,
+        },
+      };
+
+      const response = await api.post(
+        `${API_ROUTE.ADMIN_DEMO_DAYS}/${demoDay.slugURL}/preview-notification`,
+        {
+          status: dataToSave.status,
+          notificationsEnabled: notificationsEnabled,
+        },
+        config
+      );
+
+      const preview = response.data;
+
+      if (preview.willSend) {
+        // Show confirmation modal
+        setNotificationPreview(preview);
+        setPendingSaveData(dataToSave);
+        setShowNotificationPreviewModal(true);
+        return false; // Don't proceed with save yet
+      }
+
+      return true; // No notification will be sent, proceed with save
+    } catch (error) {
+      console.error('Error checking notification preview:', error);
+      // If preview check fails, proceed with save anyway
+      return true;
+    }
+  };
+
+  const executeSave = async (dataToSave: UpdateDemoDayDto) => {
     if (!authToken || !demoDay) return;
 
     try {
@@ -243,11 +296,12 @@ const DemoDayDetailPage = () => {
       await updateDemoDayMutation.mutateAsync({
         authToken,
         uid: demoDay.uid,
-        data: editFormData,
+        data: dataToSave,
       });
 
       setIsEditing(false);
       setEditFormData({});
+      setPendingSaveData(null);
     } catch (error: any) {
       console.error('Error updating demo day:', error);
 
@@ -260,6 +314,28 @@ const DemoDayDetailPage = () => {
 
       alert('Failed to update demo day. Please try again.');
     }
+  };
+
+  const handleSaveDemoDay = async () => {
+    if (!authToken || !demoDay) return;
+
+    const shouldProceed = await checkNotificationPreview(editFormData);
+    if (shouldProceed) {
+      await executeSave(editFormData);
+    }
+  };
+
+  const handleConfirmNotificationAndSave = async () => {
+    setShowNotificationPreviewModal(false);
+    if (pendingSaveData) {
+      await executeSave(pendingSaveData);
+    }
+  };
+
+  const handleCancelNotificationSave = () => {
+    setShowNotificationPreviewModal(false);
+    setPendingSaveData(null);
+    setNotificationPreview(null);
   };
 
 
@@ -1308,6 +1384,74 @@ const DemoDayDetailPage = () => {
                     onClick={handleConfirmEnableNotifications}
                   >
                     Enable Notifications
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Notification Preview Confirmation Modal */}
+        {showNotificationPreviewModal && notificationPreview && (
+          <div className="fixed inset-0 z-[1058] overflow-y-auto">
+            <div className="flex min-h-screen items-center justify-center px-4 text-center">
+              <div
+                className="fixed inset-0 bg-black bg-opacity-30 transition-opacity"
+                onClick={handleCancelNotificationSave}
+              />
+
+              <div className="relative inline-block w-full max-w-lg transform overflow-hidden rounded-lg bg-white p-6 text-left shadow-xl transition-all">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium leading-6 text-gray-900">
+                    Notification Will Be Sent
+                  </h3>
+                </div>
+
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500 mb-4">
+                    Saving these changes will immediately send the following notification to all users:
+                  </p>
+
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="mb-3">
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        Title
+                      </label>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {notificationPreview.title}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                        Description
+                      </label>
+                      <p className="text-sm text-gray-700">
+                        {notificationPreview.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    onClick={handleCancelNotificationSave}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex justify-center rounded-md border border-transparent bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                    onClick={handleConfirmNotificationAndSave}
+                    disabled={updateDemoDayMutation.isPending}
+                  >
+                    {updateDemoDayMutation.isPending ? 'Saving...' : 'Save & Send Notification'}
                   </button>
                 </div>
               </div>

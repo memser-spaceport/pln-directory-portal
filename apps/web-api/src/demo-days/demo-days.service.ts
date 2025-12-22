@@ -1510,6 +1510,120 @@ export class DemoDaysService {
   }
 
   /**
+   * Preview what notification would be sent if the demo day status is updated.
+   * Returns null if no notification would be sent.
+   */
+  async previewStatusNotification(
+    demoDayUidOrSlug: string,
+    newStatus: DemoDayStatus,
+    notificationsEnabled: boolean
+  ): Promise<{ willSend: boolean; title?: string; description?: string; reason?: string }> {
+    // Get current demo day data
+    const demoDay = await this.prisma.demoDay.findFirst({
+      where: {
+        OR: [{ uid: demoDayUidOrSlug }, { slugURL: demoDayUidOrSlug }],
+        isDeleted: false,
+      },
+      select: {
+        uid: true,
+        title: true,
+        slugURL: true,
+        status: true,
+        notificationsEnabled: true,
+        startDate: true,
+      },
+    });
+
+    if (!demoDay) {
+      return { willSend: false, reason: 'Demo day not found' };
+    }
+
+    // Use the new notificationsEnabled value if provided, otherwise use current
+    const effectiveNotificationsEnabled = notificationsEnabled ?? demoDay.notificationsEnabled;
+
+    // Check if notifications are enabled
+    if (!effectiveNotificationsEnabled) {
+      return { willSend: false, reason: 'Notifications are disabled for this Demo Day' };
+    }
+
+    // Check if status is actually changing
+    if (demoDay.status === newStatus) {
+      return { willSend: false, reason: 'Status is not changing' };
+    }
+
+    // Check if new status is notifiable
+    const notifiableStatuses: DemoDayStatus[] = [
+      DemoDayStatus.UPCOMING,
+      DemoDayStatus.REGISTRATION_OPEN,
+      DemoDayStatus.EARLY_ACCESS,
+      DemoDayStatus.ACTIVE,
+    ];
+
+    if (!notifiableStatuses.includes(newStatus)) {
+      return { willSend: false, reason: `Status "${newStatus}" does not trigger notifications` };
+    }
+
+    // For ACTIVE status: check if EARLY_ACCESS notification was already sent
+    if (newStatus === DemoDayStatus.ACTIVE) {
+      const earlyAccessNotification = await this.prisma.pushNotification.findFirst({
+        where: {
+          category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
+          isPublic: true,
+          metadata: {
+            path: ['demoDayUid'],
+            equals: demoDay.uid,
+          },
+          AND: {
+            metadata: {
+              path: ['status'],
+              equals: DemoDayStatus.EARLY_ACCESS,
+            },
+          },
+        },
+      });
+
+      if (earlyAccessNotification) {
+        return { willSend: false, reason: 'EARLY_ACCESS notification was already sent, skipping ACTIVE notification' };
+      }
+    }
+
+    // Check if notification was already sent for this status
+    const existingNotification = await this.prisma.pushNotification.findFirst({
+      where: {
+        category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
+        isPublic: true,
+        metadata: {
+          path: ['demoDayUid'],
+          equals: demoDay.uid,
+        },
+        AND: {
+          metadata: {
+            path: ['status'],
+            equals: newStatus,
+          },
+        },
+      },
+    });
+
+    if (existingNotification) {
+      return { willSend: false, reason: `Notification for status "${newStatus}" was already sent` };
+    }
+
+    // Get the notification content that would be sent
+    const content = this.getDemoDayNotificationContent({
+      title: demoDay.title,
+      status: newStatus,
+      startDate: demoDay.startDate,
+    });
+
+    return {
+      willSend: true,
+      title: content.title,
+      description: content.description,
+    };
+  }
+
+  /**
    * Send Demo Day announcement notification when status changes.
    * Only sends for UPCOMING, REGISTRATION_OPEN, EARLY_ACCESS statuses.
    * Only sends if notificationsEnabled is true and notification hasn't been sent yet for this status.
@@ -1601,7 +1715,7 @@ export class DemoDaysService {
         category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
         title: notificationContent.title,
         description: notificationContent.description,
-        link: `/demo-day/${demoDay.slugURL}`,
+        link: `demoday/${demoDay.slugURL}`,
         metadata: {
           demoDayUid: demoDay.uid,
           demoDayTitle: demoDay.title,
