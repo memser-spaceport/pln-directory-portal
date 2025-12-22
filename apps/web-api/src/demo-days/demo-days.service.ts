@@ -23,6 +23,14 @@ type ExpressInterestStats = {
   total: number;
 };
 
+// Statuses that trigger notifications
+const NOTIFIABLE_STATUSES: DemoDayStatus[] = [
+  DemoDayStatus.UPCOMING,
+  DemoDayStatus.REGISTRATION_OPEN,
+  DemoDayStatus.EARLY_ACCESS,
+  DemoDayStatus.ACTIVE,
+];
+
 @Injectable()
 export class DemoDaysService {
   private readonly logger = new Logger(DemoDaysService.name);
@@ -646,7 +654,8 @@ export class DemoDaysService {
     }
 
     // Track "status updated" if changed
-    if (updateData.status !== undefined && before.status !== updated.status) {
+    const isStatusChanged = updateData.status !== undefined && before.status !== updated.status;
+    if (isStatusChanged) {
       await this.analyticsService.trackEvent({
         name: 'demo-day-status-updated',
         distinctId: updated.uid,
@@ -660,6 +669,11 @@ export class DemoDaysService {
       });
 
       // Send Demo Day announcement notification if enabled
+      await this.sendDemoDayStatusNotification(updated);
+    }
+
+    const isEnablingNotifications = !before.notificationsEnabled && updated.notificationsEnabled;
+    if (isEnablingNotifications && !isStatusChanged) {
       await this.sendDemoDayStatusNotification(updated);
     }
 
@@ -1510,9 +1524,129 @@ export class DemoDaysService {
   }
 
   /**
-   * Send Demo Day announcement notification when status changes.
-   * Only sends for UPCOMING, REGISTRATION_OPEN, EARLY_ACCESS statuses.
-   * Only sends if notificationsEnabled is true and notification hasn't been sent yet for this status.
+   * Preview what notification would be sent if the demo day is updated.
+   * Returns { willSend: false, reason } if no notification would be sent.
+   * Returns { willSend: true, title, description } if a notification would be sent.
+   */
+  async previewStatusNotification(
+    demoDayUidOrSlug: string,
+    newStatus: DemoDayStatus,
+    newNotificationsEnabled: boolean
+  ): Promise<{ willSend: boolean; title?: string; description?: string; reason?: string }> {
+    const demoDay = await this.prisma.demoDay.findFirst({
+      where: {
+        OR: [{ uid: demoDayUidOrSlug }, { slugURL: demoDayUidOrSlug }],
+        isDeleted: false,
+      },
+      select: {
+        uid: true,
+        title: true,
+        slugURL: true,
+        status: true,
+        notificationsEnabled: true,
+        startDate: true,
+      },
+    });
+
+    if (!demoDay) {
+      return { willSend: false, reason: 'Demo day not found' };
+    }
+
+    // Determine effective values after the update
+    const effectiveStatus = newStatus || demoDay.status;
+    const effectiveNotificationsEnabled = newNotificationsEnabled ?? demoDay.notificationsEnabled;
+
+    // Check eligibility
+    const eligibility = await this.checkNotificationEligibility(
+      demoDay.uid,
+      effectiveStatus,
+      effectiveNotificationsEnabled,
+      {
+        currentStatus: demoDay.status,
+        currentNotificationsEnabled: demoDay.notificationsEnabled,
+      }
+    );
+
+    if (!eligibility.eligible) {
+      return { willSend: false, reason: eligibility.reason };
+    }
+
+    // Get the notification content
+    const content = this.getDemoDayNotificationContent({
+      title: demoDay.title,
+      status: effectiveStatus,
+      startDate: demoDay.startDate,
+    });
+
+    return {
+      willSend: true,
+      title: content.title,
+      description: content.description,
+    };
+  }
+
+  /**
+   * Check if a notification should be sent for a demo day status.
+   */
+  private async checkNotificationEligibility(
+    demoDayUid: string,
+    status: DemoDayStatus,
+    notificationsEnabled: boolean,
+    previous?: { currentStatus: DemoDayStatus; currentNotificationsEnabled: boolean }
+  ): Promise<{ eligible: boolean; reason?: string }> {
+    if (!notificationsEnabled) {
+      return { eligible: false, reason: 'Notifications are disabled' };
+    }
+
+    if (!NOTIFIABLE_STATUSES.includes(status)) {
+      return { eligible: false, reason: `Status "${status}" does not trigger notifications` };
+    }
+
+    // If we have previous state, check if there's an actual change that triggers notification
+    if (previous) {
+      const isStatusChanging = status !== previous.currentStatus;
+      const isEnablingNotifications = notificationsEnabled && !previous.currentNotificationsEnabled;
+
+      if (!isStatusChanging && !isEnablingNotifications) {
+        return { eligible: false, reason: 'No changes that trigger notifications' };
+      }
+    }
+
+    // Check if notification was already sent for this status
+    const alreadySent = await this.hasNotificationBeenSent(demoDayUid, status);
+    if (alreadySent) {
+      return { eligible: false, reason: `Notification for "${status}" was already sent` };
+    }
+
+    return { eligible: true };
+  }
+
+  /**
+   * Check if a notification has been sent for a demo day and status.
+   */
+  private async hasNotificationBeenSent(demoDayUid: string, status: DemoDayStatus): Promise<boolean> {
+    const notification = await this.prisma.pushNotification.findFirst({
+      where: {
+        category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
+        isPublic: true,
+        metadata: {
+          path: ['demoDayUid'],
+          equals: demoDayUid,
+        },
+        AND: {
+          metadata: {
+            path: ['status'],
+            equals: status,
+          },
+        },
+      },
+    });
+    return !!notification;
+  }
+
+  /**
+   * Send Demo Day announcement notification.
+   * Uses checkNotificationEligibility to determine if notification should be sent.
    */
   private async sendDemoDayStatusNotification(demoDay: {
     uid: string;
@@ -1522,86 +1656,26 @@ export class DemoDaysService {
     notificationsEnabled: boolean;
     startDate: Date;
   }): Promise<void> {
-    // Only send notifications if enabled
-    if (!demoDay.notificationsEnabled) {
-      this.logger.log(`Notifications disabled for Demo Day ${demoDay.uid}, skipping notification`);
+    const eligibility = await this.checkNotificationEligibility(
+      demoDay.uid,
+      demoDay.status,
+      demoDay.notificationsEnabled
+    );
+
+    if (!eligibility.eligible) {
+      this.logger.log(`Skipping notification for Demo Day ${demoDay.uid}: ${eligibility.reason}`);
       return;
     }
 
-    // Only send for specific statuses
-    const notifiableStatuses: DemoDayStatus[] = [
-      DemoDayStatus.UPCOMING,
-      DemoDayStatus.REGISTRATION_OPEN,
-      DemoDayStatus.EARLY_ACCESS,
-      DemoDayStatus.ACTIVE,
-    ];
+    // Build and send notification
+    const content = this.getDemoDayNotificationContent(demoDay);
 
-    if (!notifiableStatuses.includes(demoDay.status)) {
-      this.logger.log(`Status ${demoDay.status} is not notifiable, skipping notification`);
-      return;
-    }
-
-    // For ACTIVE status: skip if EARLY_ACCESS notification was already sent
-    // Users who got EARLY_ACCESS already have access, no need for another notification
-    if (demoDay.status === DemoDayStatus.ACTIVE) {
-      const earlyAccessNotification = await this.prisma.pushNotification.findFirst({
-        where: {
-          category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
-          isPublic: true,
-          metadata: {
-            path: ['demoDayUid'],
-            equals: demoDay.uid,
-          },
-          AND: {
-            metadata: {
-              path: ['status'],
-              equals: DemoDayStatus.EARLY_ACCESS,
-            },
-          },
-        },
-      });
-
-      if (earlyAccessNotification) {
-        this.logger.log(
-          `EARLY_ACCESS notification already sent for Demo Day ${demoDay.uid}, skipping ACTIVE notification`
-        );
-        return;
-      }
-    }
-
-    // Check if notification was already sent for this demo day and status
-    const existingNotification = await this.prisma.pushNotification.findFirst({
-      where: {
-        category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
-        isPublic: true,
-        metadata: {
-          path: ['demoDayUid'],
-          equals: demoDay.uid,
-        },
-        AND: {
-          metadata: {
-            path: ['status'],
-            equals: demoDay.status,
-          },
-        },
-      },
-    });
-
-    if (existingNotification) {
-      this.logger.log(`Notification already sent for Demo Day ${demoDay.uid} status ${demoDay.status}, skipping`);
-      return;
-    }
-
-    // Build notification content based on status
-    const notificationContent = this.getDemoDayNotificationContent(demoDay);
-
-    // Send the notification
     try {
       await this.pushNotificationsService.create({
         category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
-        title: notificationContent.title,
-        description: notificationContent.description,
-        link: `/demo-day/${demoDay.slugURL}`,
+        title: content.title,
+        description: content.description,
+        link: `demoday/${demoDay.slugURL}`,
         metadata: {
           demoDayUid: demoDay.uid,
           demoDayTitle: demoDay.title,
@@ -1610,11 +1684,9 @@ export class DemoDaysService {
         isPublic: true,
       });
 
-      this.logger.debug(`Demo Day announcement notification sent for ${demoDay.uid} status ${demoDay.status}`);
+      this.logger.debug(`Demo Day notification sent for ${demoDay.uid} status ${demoDay.status}`);
     } catch (error) {
-      this.logger.error(
-        `Failed to send Demo Day announcement notification: ${error instanceof Error ? error.message : error}`
-      );
+      this.logger.error(`Failed to send Demo Day notification: ${error instanceof Error ? error.message : error}`);
     }
   }
 
@@ -1625,35 +1697,41 @@ export class DemoDaysService {
     title: string;
     description: string;
   } {
+    const formattedDate = demoDay.startDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
     switch (demoDay.status) {
       case DemoDayStatus.UPCOMING:
         return {
-          title: `${demoDay.title} Announced`,
-          description: `A new Demo Day "${demoDay.title}" has been announced! Stay tuned for registration opening soon.`,
+          title: `${demoDay.title}`,
+          description: `Upcoming: ${demoDay.title} starts ${formattedDate}`,
         };
 
       case DemoDayStatus.REGISTRATION_OPEN:
         return {
-          title: `${demoDay.title} - Registration Open`,
-          description: `Registration is now open for "${demoDay.title}"! Sign up now to participate in this exciting Demo Day event.`,
+          title: `${demoDay.title}`,
+          description: `Registration is now open for ${demoDay.title}!`,
         };
 
       case DemoDayStatus.EARLY_ACCESS:
         return {
-          title: `${demoDay.title} - Early Access`,
-          description: `Early access is now available for "${demoDay.title}"! Check your eligibility and get a head start.`,
+          title: `${demoDay.title}`,
+          description: `Open now: You have early access to ${demoDay.title}!`,
         };
 
       case DemoDayStatus.ACTIVE:
         return {
-          title: `${demoDay.title} - Now Live!`,
-          description: `"${demoDay.title}" is now live! Join now to connect with founders and explore exciting projects.`,
+          title: `${demoDay.title}`,
+          description: `${demoDay.title} is now live! Join now to connect with founders and explore exciting projects.`,
         };
 
       default:
         return {
-          title: `${demoDay.title} Update`,
-          description: `"${demoDay.title}" has been updated.`,
+          title: `${demoDay.title}`,
+          description: `${demoDay.title} has been updated.`,
         };
     }
   }

@@ -96,6 +96,20 @@ export class AdminDemoDaysController {
     return this.demoDaysService.getDemoDayBySlugURL(slugURL);
   }
 
+  @Post(':slugURL/preview-notification')
+  @UseGuards(DemoDayAdminAuthGuard)
+  @NoCache()
+  async previewNotification(
+    @Param('slugURL') slugURL: string,
+    @Body() body: { status: string; notificationsEnabled: boolean }
+  ): Promise<{ willSend: boolean; title?: string; description?: string; reason?: string }> {
+    return this.demoDaysService.previewStatusNotification(
+      slugURL,
+      body.status?.toUpperCase() as DemoDayStatus,
+      body.notificationsEnabled
+    );
+  }
+
   @Patch(':uid')
   @UseGuards(DemoDayAdminAuthGuard)
   @UsePipes(ZodValidationPipe)

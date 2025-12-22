@@ -143,9 +143,9 @@ export class DemoDayNotificationsJob {
     // Create the notification
     await this.pushNotificationsService.create({
       category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
-      title: `${demoDay.title} is starting soon!`,
-      description: `Demo Day starts in ${timeMessage}. Get ready to discover innovative projects and connect with founders.`,
-      link: `/demo-day/${demoDay.slugURL}`,
+      title: `${demoDay.title}`,
+      description: `${demoDay.title} starts in ${timeMessage}.`,
+      link: `demoday/${demoDay.slugURL}`,
       metadata: {
         demoDayUid: demoDay.uid,
         notificationType: 'STARTING_SOON',
@@ -195,9 +195,9 @@ export class DemoDayNotificationsJob {
     // Create the notification
     await this.pushNotificationsService.create({
       category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
-      title: `${demoDay.title} is ending soon!`,
-      description: `Only ${timeMessage} left! Don't miss your chance to explore projects and connect with founders before Demo Day ends.`,
-      link: `/demo-day/${demoDay.slugURL}`,
+      title: `${demoDay.title}`,
+      description: `${demoDay.title} closing soon: Only ${timeMessage} left!`,
+      link: `demoday/${demoDay.slugURL}`,
       metadata: {
         demoDayUid: demoDay.uid,
         notificationType: 'CLOSING_SOON',
