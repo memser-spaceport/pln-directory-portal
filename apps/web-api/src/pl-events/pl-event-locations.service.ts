@@ -1,6 +1,6 @@
 import moment from 'moment-timezone';
 import { PLEventLocation, Prisma, SubscriptionEntityType } from '@prisma/client';
-import { forwardRef, Inject, Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, NotFoundException, InternalServerErrorException, ConflictException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberSubscriptionService } from '../member-subscriptions/member-subscriptions.service';
@@ -706,7 +706,7 @@ export class PLEventLocationsService {
       });
       if (existingLocation) {
         this.logger.info(`Location already exists with similar coordinates. City: ${location.location}, Existing: (${existingLocation.latitude}, ${existingLocation.longitude})`);
-        return existingLocation;
+        throw new ConflictException(`Location already exists : ${location.location}`);
       }
 
       // If no existing location found or deviation is greater than 2 degrees, create new location
