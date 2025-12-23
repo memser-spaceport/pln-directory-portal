@@ -1311,7 +1311,7 @@ const DemoDayDetailPage = () => {
 
               <div className="relative inline-block w-full max-w-lg transform overflow-hidden rounded-lg bg-white p-6 text-left shadow-xl transition-all">
                 <h3 className="text-lg font-medium leading-6 text-gray-900">
-                  Enable Notifications
+                  Enable In-App notifications
                 </h3>
 
                 <div className="mt-4">
@@ -1338,7 +1338,7 @@ const DemoDayDetailPage = () => {
                       <span className="text-sm text-gray-500">hours</span>
                     </div>
                     <p className="mt-1 text-xs text-gray-400">
-                      Send a notification before the Demo Day starts
+                      Example: &quot;{demoDay?.title || 'Demo Day'} starts in {formatHoursMessage(modalNotifyBeforeStartHours)}.&quot;
                     </p>
                   </div>
 
@@ -1358,7 +1358,7 @@ const DemoDayDetailPage = () => {
                       <span className="text-sm text-gray-500">hours</span>
                     </div>
                     <p className="mt-1 text-xs text-gray-400">
-                      Send a notification before the Demo Day ends
+                      Example: &quot;{demoDay?.title || 'Demo Day'} closing soon: only {formatHoursMessage(modalNotifyBeforeEndHours)} left!&quot;
                     </p>
                   </div>
                 </div>

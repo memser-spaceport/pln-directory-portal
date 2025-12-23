@@ -196,7 +196,7 @@ export class DemoDayNotificationsJob {
     await this.pushNotificationsService.create({
       category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
       title: `${demoDay.title}`,
-      description: `${demoDay.title} closing soon: Only ${timeMessage} left!`,
+      description: `${demoDay.title} closing soon: only ${timeMessage} left!`,
       link: `demoday/${demoDay.slugURL}`,
       metadata: {
         demoDayUid: demoDay.uid,

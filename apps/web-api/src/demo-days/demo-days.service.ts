@@ -1725,7 +1725,7 @@ export class DemoDaysService {
       case DemoDayStatus.ACTIVE:
         return {
           title: `${demoDay.title}`,
-          description: `${demoDay.title} is now live! Join now to connect with founders and explore exciting projects.`,
+          description: `${demoDay.title} is now live!`,
         };
 
       default:

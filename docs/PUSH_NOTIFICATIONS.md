@@ -480,12 +480,12 @@ Demo Day notifications can be configured per Demo Day in the back-office:
 
 These notifications are sent automatically when a Demo Day's status is changed (via back-office update).
 
-| Status | Title | Description                                                                                | When Sent |
-|--------|-------|--------------------------------------------------------------------------------------------|-----------|
-| `UPCOMING` | `{demoDayName}` | Upcoming: `{demoDayName}` starts `{Date}`                                                  | When status changes to `UPCOMING` |
-| `REGISTRATION_OPEN` | `{demoDayName}` | Registration is now open for `{demoDayName}`!                                              | When status changes to `REGISTRATION_OPEN` |
-| `EARLY_ACCESS` | `{demoDayName}` | Open now: You have early access to `{demoDayName}`!                                        | When status changes to `EARLY_ACCESS` |
-| `ACTIVE` | `{demoDayName}` | `{demoDayName}` is now live! Join now to connect with founders and explore exciting projects. | When status changes to `ACTIVE` |
+| Status | Title | Description                                                                               | When Sent |
+|--------|-------|-------------------------------------------------------------------------------------------|-----------|
+| `UPCOMING` | `{demoDayName}` | Upcoming: `{demoDayName}` starts `{Date}`                                                 | When status changes to `UPCOMING` |
+| `REGISTRATION_OPEN` | `{demoDayName}` | Registration is now open for `{demoDayName}`!                                             | When status changes to `REGISTRATION_OPEN` |
+| `EARLY_ACCESS` | `{demoDayName}` | Open now: You have early access to `{demoDayName}`!                                       | When status changes to `EARLY_ACCESS` |
+| `ACTIVE` | `{demoDayName}` | `{demoDayName}` is now live! To participate `<go to demo day>` | When status changes to `ACTIVE` |
 
 **Note:** `{Date}` is formatted from `DemoDay.startDate` (e.g., "Jan 15, 2025").
 
