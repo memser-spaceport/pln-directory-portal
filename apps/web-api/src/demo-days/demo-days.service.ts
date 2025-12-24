@@ -983,7 +983,6 @@ export class DemoDaysService {
 
     // Check if demo day is accepting applications
     if (
-      demoDay.status !== DemoDayStatus.UPCOMING &&
       demoDay.status !== DemoDayStatus.REGISTRATION_OPEN &&
       demoDay.status !== DemoDayStatus.EARLY_ACCESS &&
       demoDay.status !== DemoDayStatus.ACTIVE
