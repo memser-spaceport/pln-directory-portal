@@ -981,8 +981,13 @@ export class DemoDaysService {
   async submitInvestorApplication(applicationData: CreateDemoDayInvestorApplicationDto, demoDayUidOrSlug: string) {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
-    // Check if demo day is accepting applications (REGISTRATION_OPEN status)
-    if (demoDay.status !== DemoDayStatus.REGISTRATION_OPEN && demoDay.status !== DemoDayStatus.EARLY_ACCESS) {
+    // Check if demo day is accepting applications
+    if (
+      demoDay.status !== DemoDayStatus.UPCOMING &&
+      demoDay.status !== DemoDayStatus.REGISTRATION_OPEN &&
+      demoDay.status !== DemoDayStatus.EARLY_ACCESS &&
+      demoDay.status !== DemoDayStatus.ACTIVE
+    ) {
       throw new BadRequestException('Demo day is not currently accepting applications');
     }
 
