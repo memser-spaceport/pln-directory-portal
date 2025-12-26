@@ -3,12 +3,14 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { DemoDay, DemoDayParticipantStatus, DemoDayStatus } from '@prisma/client';
+import { DemoDay, DemoDayParticipantStatus, DemoDayStatus, PushNotificationCategory } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
 import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, MemberRole } from '../utils/constants';
 
@@ -21,12 +23,23 @@ type ExpressInterestStats = {
   total: number;
 };
 
+// Statuses that trigger notifications
+const NOTIFIABLE_STATUSES: DemoDayStatus[] = [
+  DemoDayStatus.UPCOMING,
+  DemoDayStatus.REGISTRATION_OPEN,
+  DemoDayStatus.EARLY_ACCESS,
+  DemoDayStatus.ACTIVE,
+];
+
 @Injectable()
 export class DemoDaysService {
+  private readonly logger = new Logger(DemoDaysService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly analyticsService: AnalyticsService,
-    private readonly membersService: MembersService
+    private readonly membersService: MembersService,
+    private readonly pushNotificationsService: PushNotificationsService
   ) {}
 
   // Public methods
@@ -260,6 +273,9 @@ export class DemoDaysService {
         isDeleted: true,
         deletedAt: true,
         host: true,
+        notificationsEnabled: true,
+        notifyBeforeStartHours: true,
+        notifyBeforeEndHours: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -323,6 +339,9 @@ export class DemoDaysService {
         isDeleted: true,
         deletedAt: true,
         host: true,
+        notificationsEnabled: true,
+        notifyBeforeStartHours: true,
+        notifyBeforeEndHours: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -448,6 +467,9 @@ export class DemoDaysService {
         supportEmail: true,
         status: true,
         host: true,
+        notificationsEnabled: true,
+        notifyBeforeStartHours: true,
+        notifyBeforeEndHours: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -478,6 +500,9 @@ export class DemoDaysService {
         supportEmail: true,
         status: true,
         host: true,
+        notificationsEnabled: true,
+        notifyBeforeStartHours: true,
+        notifyBeforeEndHours: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -505,6 +530,9 @@ export class DemoDaysService {
       supportEmail?: string | null;
       status?: DemoDayStatus;
       host?: string | null;
+      notificationsEnabled?: boolean;
+      notifyBeforeStartHours?: number | null;
+      notifyBeforeEndHours?: number | null;
     },
     actorEmail?: string
   ): Promise<DemoDay> {
@@ -562,6 +590,15 @@ export class DemoDaysService {
     if (data.host !== undefined) {
       updateData.host = data.host;
     }
+    if (data.notificationsEnabled !== undefined) {
+      updateData.notificationsEnabled = data.notificationsEnabled;
+    }
+    if (data.notifyBeforeStartHours !== undefined) {
+      updateData.notifyBeforeStartHours = data.notifyBeforeStartHours;
+    }
+    if (data.notifyBeforeEndHours !== undefined) {
+      updateData.notifyBeforeEndHours = data.notifyBeforeEndHours;
+    }
 
     const updated = await this.prisma.demoDay.update({
       where: { uid },
@@ -579,6 +616,9 @@ export class DemoDaysService {
         supportEmail: true,
         status: true,
         host: true,
+        notificationsEnabled: true,
+        notifyBeforeStartHours: true,
+        notifyBeforeEndHours: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -614,7 +654,8 @@ export class DemoDaysService {
     }
 
     // Track "status updated" if changed
-    if (updateData.status !== undefined && before.status !== updated.status) {
+    const isStatusChanged = updateData.status !== undefined && before.status !== updated.status;
+    if (isStatusChanged) {
       await this.analyticsService.trackEvent({
         name: 'demo-day-status-updated',
         distinctId: updated.uid,
@@ -626,6 +667,14 @@ export class DemoDaysService {
           actorEmail: actorEmail || null,
         },
       });
+
+      // Send Demo Day announcement notification if enabled
+      await this.sendDemoDayStatusNotification(updated);
+    }
+
+    const isEnablingNotifications = !before.notificationsEnabled && updated.notificationsEnabled;
+    if (isEnablingNotifications && !isStatusChanged) {
+      await this.sendDemoDayStatusNotification(updated);
     }
 
     return updated;
@@ -932,8 +981,12 @@ export class DemoDaysService {
   async submitInvestorApplication(applicationData: CreateDemoDayInvestorApplicationDto, demoDayUidOrSlug: string) {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
-    // Check if demo day is accepting applications (REGISTRATION_OPEN status)
-    if (demoDay.status !== DemoDayStatus.REGISTRATION_OPEN && demoDay.status !== DemoDayStatus.EARLY_ACCESS) {
+    // Check if demo day is accepting applications
+    if (
+      demoDay.status !== DemoDayStatus.REGISTRATION_OPEN &&
+      demoDay.status !== DemoDayStatus.EARLY_ACCESS &&
+      demoDay.status !== DemoDayStatus.ACTIVE
+    ) {
       throw new BadRequestException('Demo day is not currently accepting applications');
     }
 
@@ -1472,5 +1525,218 @@ export class DemoDaysService {
     });
 
     return participant?.isDemoDayAdmin || false;
+  }
+
+  /**
+   * Preview what notification would be sent if the demo day is updated.
+   * Returns { willSend: false, reason } if no notification would be sent.
+   * Returns { willSend: true, title, description } if a notification would be sent.
+   */
+  async previewStatusNotification(
+    demoDayUidOrSlug: string,
+    newStatus: DemoDayStatus,
+    newNotificationsEnabled: boolean
+  ): Promise<{ willSend: boolean; title?: string; description?: string; reason?: string }> {
+    const demoDay = await this.prisma.demoDay.findFirst({
+      where: {
+        OR: [{ uid: demoDayUidOrSlug }, { slugURL: demoDayUidOrSlug }],
+        isDeleted: false,
+      },
+      select: {
+        uid: true,
+        title: true,
+        slugURL: true,
+        status: true,
+        notificationsEnabled: true,
+        startDate: true,
+      },
+    });
+
+    if (!demoDay) {
+      return { willSend: false, reason: 'Demo day not found' };
+    }
+
+    // Determine effective values after the update
+    const effectiveStatus = newStatus || demoDay.status;
+    const effectiveNotificationsEnabled = newNotificationsEnabled ?? demoDay.notificationsEnabled;
+
+    // Check eligibility
+    const eligibility = await this.checkNotificationEligibility(
+      demoDay.uid,
+      effectiveStatus,
+      effectiveNotificationsEnabled,
+      {
+        currentStatus: demoDay.status,
+        currentNotificationsEnabled: demoDay.notificationsEnabled,
+      }
+    );
+
+    if (!eligibility.eligible) {
+      return { willSend: false, reason: eligibility.reason };
+    }
+
+    // Get the notification content
+    const content = this.getDemoDayNotificationContent({
+      title: demoDay.title,
+      status: effectiveStatus,
+      startDate: demoDay.startDate,
+    });
+
+    return {
+      willSend: true,
+      title: content.title,
+      description: content.description,
+    };
+  }
+
+  /**
+   * Check if a notification should be sent for a demo day status.
+   */
+  private async checkNotificationEligibility(
+    demoDayUid: string,
+    status: DemoDayStatus,
+    notificationsEnabled: boolean,
+    previous?: { currentStatus: DemoDayStatus; currentNotificationsEnabled: boolean }
+  ): Promise<{ eligible: boolean; reason?: string }> {
+    if (!notificationsEnabled) {
+      return { eligible: false, reason: 'Notifications are disabled' };
+    }
+
+    if (!NOTIFIABLE_STATUSES.includes(status)) {
+      return { eligible: false, reason: `Status "${status}" does not trigger notifications` };
+    }
+
+    // If we have previous state, check if there's an actual change that triggers notification
+    if (previous) {
+      const isStatusChanging = status !== previous.currentStatus;
+      const isEnablingNotifications = notificationsEnabled && !previous.currentNotificationsEnabled;
+
+      if (!isStatusChanging && !isEnablingNotifications) {
+        return { eligible: false, reason: 'No changes that trigger notifications' };
+      }
+    }
+
+    // Check if notification was already sent for this status
+    const alreadySent = await this.hasNotificationBeenSent(demoDayUid, status);
+    if (alreadySent) {
+      return { eligible: false, reason: `Notification for "${status}" was already sent` };
+    }
+
+    return { eligible: true };
+  }
+
+  /**
+   * Check if a notification has been sent for a demo day and status.
+   */
+  private async hasNotificationBeenSent(demoDayUid: string, status: DemoDayStatus): Promise<boolean> {
+    const notification = await this.prisma.pushNotification.findFirst({
+      where: {
+        category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
+        isPublic: true,
+        metadata: {
+          path: ['demoDayUid'],
+          equals: demoDayUid,
+        },
+        AND: {
+          metadata: {
+            path: ['status'],
+            equals: status,
+          },
+        },
+      },
+    });
+    return !!notification;
+  }
+
+  /**
+   * Send Demo Day announcement notification.
+   * Uses checkNotificationEligibility to determine if notification should be sent.
+   */
+  private async sendDemoDayStatusNotification(demoDay: {
+    uid: string;
+    title: string;
+    slugURL: string;
+    status: DemoDayStatus;
+    notificationsEnabled: boolean;
+    startDate: Date;
+  }): Promise<void> {
+    const eligibility = await this.checkNotificationEligibility(
+      demoDay.uid,
+      demoDay.status,
+      demoDay.notificationsEnabled
+    );
+
+    if (!eligibility.eligible) {
+      this.logger.log(`Skipping notification for Demo Day ${demoDay.uid}: ${eligibility.reason}`);
+      return;
+    }
+
+    // Build and send notification
+    const content = this.getDemoDayNotificationContent(demoDay);
+
+    try {
+      await this.pushNotificationsService.create({
+        category: PushNotificationCategory.DEMO_DAY_ANNOUNCEMENT,
+        title: content.title,
+        description: content.description,
+        link: `demoday/${demoDay.slugURL}`,
+        metadata: {
+          demoDayUid: demoDay.uid,
+          demoDayTitle: demoDay.title,
+          status: demoDay.status,
+        },
+        isPublic: true,
+      });
+
+      this.logger.debug(`Demo Day notification sent for ${demoDay.uid} status ${demoDay.status}`);
+    } catch (error) {
+      this.logger.error(`Failed to send Demo Day notification: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  /**
+   * Get notification title and description based on Demo Day status.
+   */
+  private getDemoDayNotificationContent(demoDay: { title: string; status: DemoDayStatus; startDate: Date }): {
+    title: string;
+    description: string;
+  } {
+    const formattedDate = demoDay.startDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    switch (demoDay.status) {
+      case DemoDayStatus.UPCOMING:
+        return {
+          title: `${demoDay.title}`,
+          description: `Upcoming: ${demoDay.title} starts ${formattedDate}`,
+        };
+
+      case DemoDayStatus.REGISTRATION_OPEN:
+        return {
+          title: `${demoDay.title}`,
+          description: `Registration is now open for ${demoDay.title}!`,
+        };
+
+      case DemoDayStatus.EARLY_ACCESS:
+        return {
+          title: `${demoDay.title}`,
+          description: `Open now: You have early access to ${demoDay.title}!`,
+        };
+
+      case DemoDayStatus.ACTIVE:
+        return {
+          title: `${demoDay.title}`,
+          description: `${demoDay.title} is now live!`,
+        };
+
+      default:
+        return {
+          title: `${demoDay.title}`,
+          description: `${demoDay.title} has been updated.`,
+        };
+    }
   }
 }

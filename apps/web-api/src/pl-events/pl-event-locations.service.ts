@@ -1,6 +1,6 @@
 import moment from 'moment-timezone';
 import { PLEventLocation, Prisma, SubscriptionEntityType } from '@prisma/client';
-import { forwardRef, Inject, Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, NotFoundException, InternalServerErrorException, ConflictException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberSubscriptionService } from '../member-subscriptions/member-subscriptions.service';
@@ -393,6 +393,9 @@ export class PLEventLocationsService {
     }
     try {
       this.logger.info('Notification initiated by cron');
+      // Fallback date for entities with no prior notifications (e.g., newly created entities)
+      const fallbackDate = process.env.IRL_NOTIFICATION_FALLBACK_DATE;
+      
       const query: any = `
       WITH LatestNotificationDate AS (
         SELECT
@@ -426,10 +429,13 @@ export class PLEventLocationsService {
             )
           ELSE NULL
         END
-        ) FILTER (                -- Filter hosts by created/updated at or after latest notification date, or today
+        ) FILTER (                -- Filter hosts by created/updated at or after latest notification date, or fallback date
         WHERE pg."isHost" = TRUE
           AND (
-             (pg."updatedAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
+             pg."updatedAt" >= COALESCE(
+               (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"),
+               '${fallbackDate}'::timestamp
+             )
           )) AS hosts,
 
       jsonb_agg(
@@ -441,10 +447,13 @@ export class PLEventLocationsService {
             )
           ELSE NULL
         END
-      ) FILTER (                    -- Filter speakers by created/updated at or after latest notification date, or today
+      ) FILTER (                    -- Filter speakers by created/updated at or after latest notification date, or fallback date
           WHERE pg."isSpeaker" = TRUE
             AND (
-              (pg."updatedAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
+              pg."updatedAt" >= COALESCE(
+                (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"),
+                '${fallbackDate}'::timestamp
+              )
         )
       ) AS speakers,
 
@@ -457,10 +466,13 @@ export class PLEventLocationsService {
             )
           ELSE NULL
         END
-      ) FILTER (                    -- Filter sponsors by created/updated at or after latest notification date, or today
+      ) FILTER (                    -- Filter sponsors by created/updated at or after latest notification date, or fallback date
           WHERE pg."isSponsor" = TRUE
             AND (
-              (pg."updatedAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"))
+              pg."updatedAt" >= COALESCE(
+                (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = el."uid"),
+                '${fallbackDate}'::timestamp
+              )
         )
       ) AS sponsors
 
@@ -475,8 +487,11 @@ export class PLEventLocationsService {
           e."uid",
           e."name"
         FROM "PLEvent" e
-        WHERE                --fetch the events added after latest notification date,or today
-          (e."createdAt" >= (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid"))
+        WHERE                -- Fetch the events added after latest notification date, or fallback date for new locations
+          e."createdAt" >= COALESCE(
+            (SELECT latest_createdAt FROM LatestNotificationDate ln WHERE ln."entityUid" = e."locationUid"),
+            '${fallbackDate}'::timestamp
+          )
           AND e."endDate" >= NOW()  -- Only include current or future events
           )AS events ON events."locationUid" = el."uid"
     GROUP BY
@@ -691,7 +706,7 @@ export class PLEventLocationsService {
       });
       if (existingLocation) {
         this.logger.info(`Location already exists with similar coordinates. City: ${location.location}, Existing: (${existingLocation.latitude}, ${existingLocation.longitude})`);
-        return existingLocation;
+        throw new ConflictException(`Location already exists : ${location.location}`);
       }
 
       // If no existing location found or deviation is greater than 2 degrees, create new location

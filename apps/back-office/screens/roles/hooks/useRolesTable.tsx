@@ -14,7 +14,7 @@ import { Row } from '@tanstack/table-core/src/types';
 import { Member } from '../../members/types/member';
 import MemberCell from '../../members/components/MemberCell/MemberCell';
 import RoleCell, { PendingRoleChange, PendingHostChange } from '../../members/components/RoleCell/RoleCell';
-import { StatusCell } from '../../members/components/StatusCell/StatusCell';
+import { StatusCell, PendingAccessLevelChange } from '../../members/components/StatusCell/StatusCell';
 import ProjectsCell from '../../members/components/ProjectsCell/ProjectsCell';
 
 const columnHelper = createColumnHelper<Member>();
@@ -29,6 +29,7 @@ type UseRolesTableArgs = {
   setGlobalFilter: Dispatch<SetStateAction<string>>;
   onRoleChange?: (change: PendingRoleChange | null, memberUid: string) => void;
   onHostChange?: (change: PendingHostChange | null, memberUid: string) => void;
+  onAccessLevelChange?: (change: PendingAccessLevelChange | null, memberUid: string) => void;
   authToken?: string;
 };
 
@@ -42,6 +43,7 @@ export function useRolesTable({
   setGlobalFilter,
   onRoleChange,
   onHostChange,
+  onAccessLevelChange,
   authToken,
 }: UseRolesTableArgs) {
   const columns = useMemo(
@@ -60,7 +62,16 @@ export function useRolesTable({
       }),
       columnHelper.accessor('accessLevel', {
         header: 'Access level',
-        cell: (info) => (authToken ? <StatusCell member={info.row.original} authToken={authToken} /> : null),
+        cell: (info) =>
+          authToken ? (
+            <StatusCell
+              member={info.row.original}
+              authToken={authToken}
+              onAccessLevelChange={
+                onAccessLevelChange ? (change) => onAccessLevelChange(change, info.row.original.uid) : undefined
+              }
+            />
+          ) : null,
         size: 0,
         enableSorting: false,
       }),
@@ -79,7 +90,7 @@ export function useRolesTable({
         enableSorting: false,
       }),
     ],
-    [onRoleChange, onHostChange, authToken]
+    [onRoleChange, onHostChange, onAccessLevelChange, authToken]
   );
 
   const data = useMemo(() => members ?? [], [members]);

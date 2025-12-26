@@ -43,7 +43,27 @@ export class DemoDaySubscriptionsController {
       memberId: memberId,
     };
 
-    return await this.notificationServiceClient.createEventSubscriber(subscriberData);
+    const result = await this.notificationServiceClient.createEventSubscriber(subscriberData);
+    const adminUrl = process.env.DEMO_DAY_SUBSCRIBERS_ADMIN_URL;
+
+    await this.notificationServiceClient.sendTelegramOutboxMessage({
+      channelType: 'DEMO_DAY_SUBSCRIPTION',
+      text: [
+        'New Demo Day subscription',
+        `Email: ${body.email}`,
+        `Name: ${body.name ?? '-'}`,
+        `MemberId: ${memberId ?? '-'}`,
+         adminUrl ? `Admin panel: ${adminUrl}` : '-',
+      ].join('\n'),
+      meta: {
+        email: body.email,
+        name: body.name,
+        memberId,
+        source: 'demo-day-subscribe',
+      },
+    });
+
+    return result;
   }
 
   @Get('subscription-status')

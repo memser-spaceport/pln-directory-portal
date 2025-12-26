@@ -11,6 +11,8 @@ import { DemoDayEngagementService } from './demo-day-engagement.service';
 import { MembersModule } from '../members/members.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TeamsModule } from '../teams/teams.module';
+import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
+import { DemoDayNotificationsJob } from './demo-day-notifications.job';
 
 @Module({
   imports: [
@@ -20,9 +22,16 @@ import { TeamsModule } from '../teams/teams.module';
     forwardRef(() => MembersModule),
     forwardRef(() => TeamsModule),
     NotificationsModule,
+    PushNotificationsModule,
   ],
   controllers: [DemoDaysController, DemoDaySubscriptionsController],
-  providers: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService, DemoDayEngagementService],
+  providers: [
+    DemoDaysService,
+    DemoDayParticipantsService,
+    DemoDayFundraisingProfilesService,
+    DemoDayEngagementService,
+    DemoDayNotificationsJob,
+  ],
   exports: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService],
 })
 export class DemoDaysModule {}
