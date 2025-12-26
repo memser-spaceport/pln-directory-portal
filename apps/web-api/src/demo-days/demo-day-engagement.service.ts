@@ -204,6 +204,7 @@ export class DemoDayEngagementService {
         member: {
           select: {
             uid: true,
+            externalId: true,
             name: true,
             email: true,
           },
@@ -314,7 +315,7 @@ export class DemoDayEngagementService {
             category: pushCategoryMap[interestType],
             title: pushTitleMap[interestType],
             description: pushDescriptionMap[interestType],
-            recipientUid: founder.member.uid,
+            recipientUid: founder.member.externalId ?? undefined,
             link: `/members/${member.uid}`,
             metadata: {
               demoDayUid: demoDay.uid,
