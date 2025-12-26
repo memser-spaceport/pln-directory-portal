@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { PushNotificationsController } from './push-notifications.controller';
 import { AdminPushNotificationsController } from './admin-push-notifications.controller';
+import { ForumPushNotificationsController } from './forum-push-notifications.controller';
 import { PushNotificationsService } from './push-notifications.service';
 import { SharedModule } from '../shared/shared.module';
 import { MembersModule } from '../members/members.module';
@@ -12,7 +13,7 @@ import { JwtService } from '../utils/jwt/jwt.service';
  */
 @Module({
   imports: [SharedModule, forwardRef(() => MembersModule)],
-  controllers: [PushNotificationsController, AdminPushNotificationsController],
+  controllers: [PushNotificationsController, AdminPushNotificationsController, ForumPushNotificationsController],
   providers: [PushNotificationsService, JwtService],
   exports: [PushNotificationsService],
 })
