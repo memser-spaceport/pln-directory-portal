@@ -70,6 +70,7 @@ export class ForumPushNotificationsController {
         metadata: dto.metadata,
         recipientUid: dto.recipientUid,
         isPublic: false,
+        accessLevels: dto.recipientUid ? undefined : ['L2', 'L3', 'L4', 'L6'],
       });
 
       this.logger.log(`Forum notification sent to ${dto.recipientUid}: ${dto.category}`);
@@ -122,6 +123,7 @@ export class ForumPushNotificationsController {
           metadata: n.metadata,
           recipientUid: n.recipientUid,
           isPublic: false,
+          accessLevels: n.recipientUid ? undefined : ['L2', 'L3', 'L4', 'L6'],
         })
       )
     );
@@ -158,7 +160,8 @@ export class ForumPushNotificationsController {
         description: dto.description,
         link: dto.link,
         metadata: dto.metadata,
-        isPublic: true,
+        isPublic: false,
+        accessLevels: ['L2', 'L3', 'L4', 'L6'],
       });
 
       this.logger.log(`Forum broadcast notification sent: ${dto.category} - ${dto.title}`);

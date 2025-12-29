@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NotificationGateway } from './websocket.gateway';
+import { PrismaService } from '../shared/prisma.service';
 import {
   getRoomName,
   NotificationCountPayload,
   NotificationPayload,
   NotificationUpdatePayload,
-  WebSocketEvent
+  WebSocketEvent,
 } from './websocket.types';
 
 /**
@@ -15,7 +16,7 @@ import {
 export class WebSocketService {
   private readonly logger = new Logger(WebSocketService.name);
 
-  constructor(private readonly gateway: NotificationGateway) {}
+  constructor(private readonly gateway: NotificationGateway, private readonly prisma: PrismaService) {}
 
   /**
    * Send a new notification to a specific user
@@ -82,6 +83,45 @@ export class WebSocketService {
 
     this.gateway.server.emit(WebSocketEvent.NOTIFICATION_NEW, payload);
     this.logger.debug(`Broadcast notification: ${payload.id}`);
+  }
+
+  /**
+   * Send notification to all users with specified access levels
+   */
+  async notifyByAccessLevels(accessLevels: string[], payload: NotificationPayload): Promise<void> {
+    if (!this.gateway.server) {
+      this.logger.warn('WebSocket server not initialized');
+      return;
+    }
+
+    if (!accessLevels || accessLevels.length === 0) {
+      this.logger.warn('No access levels specified for notification');
+      return;
+    }
+
+    // Query database for all members with the specified access levels
+    const members = await this.prisma.member.findMany({
+      where: {
+        accessLevel: { in: accessLevels },
+        externalId: { not: null },
+      },
+      select: {
+        externalId: true,
+      },
+    });
+
+    // Send notification to all members with matching access levels (both connected and disconnected)
+    // Connected users will receive it immediately, others will see it when they fetch notifications
+    for (const member of members) {
+      if (member.externalId) {
+        const roomName = getRoomName(member.externalId);
+        this.gateway.server.to(roomName).emit(WebSocketEvent.NOTIFICATION_NEW, payload);
+      }
+    }
+
+    this.logger.debug(
+      `Notification sent to ${members.length} users with access levels ${accessLevels.join(', ')}: ${payload.id}`
+    );
   }
 
   /**
