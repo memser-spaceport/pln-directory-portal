@@ -105,9 +105,6 @@ export class ForumPushNotificationsController {
 
     // Validate all notifications before processing
     for (const notification of dto.notifications) {
-      if (!notification.recipientUid) {
-        return { success: false, error: 'All notifications must have recipientUid' };
-      }
       if (!this.isValidForumCategory(notification.category)) {
         return { success: false, error: 'All notifications must have valid category (FORUM_POST or FORUM_REPLY)' };
       }
