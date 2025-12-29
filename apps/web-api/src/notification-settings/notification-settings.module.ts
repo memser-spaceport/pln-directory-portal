@@ -1,5 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { NotificationSettingsController } from './notification-settings.controller';
+import { NotificationSettingsServiceController } from './notification-settings-service.controller';
 import { NotificationSettingsService } from './notification-settings.service';
 import { SharedModule } from '../shared/shared.module';
 import { MembersModule } from '../members/members.module';
@@ -13,7 +14,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     forwardRef(() => MembersModule),
     forwardRef(() => NotificationsModule),
   ],
-  controllers: [NotificationSettingsController],
+  controllers: [NotificationSettingsController, NotificationSettingsServiceController],
   providers: [NotificationSettingsService],
   exports: [NotificationSettingsService],
 })
