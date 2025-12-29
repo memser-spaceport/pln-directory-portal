@@ -1,14 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Param,
-  Query,
-  UseGuards,
-  Req,
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { PushNotificationsService } from './push-notifications.service';
 import { MembersService } from '../members/members.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';

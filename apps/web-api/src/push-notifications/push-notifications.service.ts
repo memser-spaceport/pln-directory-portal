@@ -12,6 +12,7 @@ export interface CreatePushNotificationDto {
   metadata?: Record<string, unknown>;
   recipientUid?: string;
   isPublic?: boolean;
+  accessLevels?: string[]; // Optional: list of access levels (L2, L3, L4, L5, L6) to target
 }
 
 interface NotificationWithReadStatus {
@@ -24,6 +25,7 @@ interface NotificationWithReadStatus {
   metadata: Prisma.JsonValue;
   isPublic: boolean;
   recipientUid: string | null;
+  accessLevels: string[];
   isRead: boolean;
   createdAt: Date;
 }
@@ -51,6 +53,7 @@ export class PushNotificationsService {
         metadata: dto.metadata ? (dto.metadata as Prisma.InputJsonValue) : undefined,
         recipientUid: dto.recipientUid,
         isPublic: dto.isPublic ?? false,
+        accessLevels: dto.accessLevels ?? [],
         isRead: false,
         isSent: false,
       },
@@ -73,6 +76,9 @@ export class PushNotificationsService {
       if (dto.recipientUid) {
         // Send to specific user
         await this.webSocketService.notifyUser(dto.recipientUid, payload);
+      } else if (dto.accessLevels && dto.accessLevels.length > 0) {
+        // Send to users with specified access levels
+        await this.webSocketService.notifyByAccessLevels(dto.accessLevels, payload);
       } else if (dto.isPublic) {
         // Broadcast to all connected users
         await this.webSocketService.broadcast(payload);
@@ -102,6 +108,7 @@ export class PushNotificationsService {
    * Get push notifications for a user.
    * - Private notifications: use isRead field directly
    * - Public notifications: check PushNotificationReadStatus table
+   * - Access level notifications: check if user's access level is in the accessLevels array
    */
   async getForUser(
     memberUid: string,
@@ -112,6 +119,14 @@ export class PushNotificationsService {
     }
   ) {
     const { limit = 50, offset = 0, unreadOnly = false } = options || {};
+
+    // Get user's access level
+    const member = await this.prisma.member.findFirst({
+      where: { externalId: memberUid },
+      select: { accessLevel: true },
+    });
+
+    const userAccessLevel = member?.accessLevel;
 
     // Get private notifications for this user
     const privateNotifications = await this.prisma.pushNotification.findMany({
@@ -137,6 +152,24 @@ export class PushNotificationsService {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Get access level notifications (where user's access level is in the accessLevels array)
+    const accessLevelNotifications = userAccessLevel
+      ? await this.prisma.pushNotification.findMany({
+          where: {
+            accessLevels: { has: userAccessLevel },
+            isPublic: false,
+            recipientUid: null,
+          },
+          include: {
+            readStatuses: {
+              where: { memberUid },
+              take: 1,
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      : [];
+
     // Transform and combine notifications
     const notifications: NotificationWithReadStatus[] = [
       ...privateNotifications.map((n) => ({
@@ -149,6 +182,7 @@ export class PushNotificationsService {
         metadata: n.metadata,
         isPublic: n.isPublic,
         recipientUid: n.recipientUid,
+        accessLevels: n.accessLevels,
         isRead: n.isRead,
         createdAt: n.createdAt,
       })),
@@ -164,6 +198,23 @@ export class PushNotificationsService {
           metadata: n.metadata,
           isPublic: n.isPublic,
           recipientUid: n.recipientUid,
+          accessLevels: n.accessLevels,
+          isRead: n.readStatuses.length > 0,
+          createdAt: n.createdAt,
+        })),
+      ...accessLevelNotifications
+        .filter((n) => !unreadOnly || n.readStatuses.length === 0)
+        .map((n) => ({
+          uid: n.uid,
+          category: n.category,
+          title: n.title,
+          description: n.description,
+          image: n.image,
+          link: n.link,
+          metadata: n.metadata,
+          isPublic: n.isPublic,
+          recipientUid: n.recipientUid,
+          accessLevels: n.accessLevels,
           isRead: n.readStatuses.length > 0,
           createdAt: n.createdAt,
         })),
@@ -184,8 +235,17 @@ export class PushNotificationsService {
    * Get unread count for a user.
    * - Private: count where isRead = false
    * - Public: count where no read status exists for this user
+   * - Access level: count where user's access level is in accessLevels array and no read status exists
    */
   async getUnreadCount(memberUid: string): Promise<number> {
+    // Get user's access level
+    const member = await this.prisma.member.findFirst({
+      where: { externalId: memberUid },
+      select: { accessLevel: true },
+    });
+
+    const userAccessLevel = member?.accessLevel;
+
     // Count unread private notifications
     const privateUnread = await this.prisma.pushNotification.count({
       where: {
@@ -207,19 +267,65 @@ export class PushNotificationsService {
       },
     });
 
-    return privateUnread + (totalPublic - readPublic);
+    // Count access level notifications not read by this user
+    let accessLevelUnread = 0;
+    if (userAccessLevel) {
+      const totalAccessLevel = await this.prisma.pushNotification.count({
+        where: {
+          accessLevels: { has: userAccessLevel },
+          isPublic: false,
+          recipientUid: null,
+        },
+      });
+
+      const readAccessLevel = await this.prisma.pushNotificationReadStatus.count({
+        where: {
+          memberUid,
+          notification: {
+            accessLevels: { has: userAccessLevel },
+            isPublic: false,
+            recipientUid: null,
+          },
+        },
+      });
+
+      accessLevelUnread = totalAccessLevel - readAccessLevel;
+    }
+
+    return privateUnread + (totalPublic - readPublic) + accessLevelUnread;
   }
 
   /**
    * Mark a notification as read for a specific user.
    * - Private notifications: update isRead field
    * - Public notifications: insert into PushNotificationReadStatus
+   * - Access level notifications: insert into PushNotificationReadStatus
    */
   async markAsRead(uid: string, memberUid: string) {
+    // Get user's access level
+    const member = await this.prisma.member.findFirst({
+      where: { externalId: memberUid },
+      select: { accessLevel: true },
+    });
+
+    const userAccessLevel = member?.accessLevel;
+
+    // Build OR conditions for finding the notification
+    const orConditions: Prisma.PushNotificationWhereInput[] = [{ recipientUid: memberUid }, { isPublic: true }];
+
+    // Add access level condition if user has an access level
+    if (userAccessLevel) {
+      orConditions.push({
+        accessLevels: { has: userAccessLevel },
+        isPublic: false,
+        recipientUid: null,
+      });
+    }
+
     const notification = await this.prisma.pushNotification.findFirst({
       where: {
         uid,
-        OR: [{ recipientUid: memberUid }, { isPublic: true }],
+        OR: orConditions,
       },
     });
 
@@ -227,8 +333,8 @@ export class PushNotificationsService {
       return null;
     }
 
-    if (notification.isPublic) {
-      // For public notifications, create a read status entry
+    if (notification.isPublic || (notification.accessLevels.length > 0 && !notification.recipientUid)) {
+      // For public and access level notifications, create a read status entry
       await this.prisma.pushNotificationReadStatus.upsert({
         where: {
           notificationId_memberUid: {
@@ -263,8 +369,17 @@ export class PushNotificationsService {
    * Mark all notifications as read for a user.
    * - Private: update isRead field
    * - Public: insert read status for all unread public notifications
+   * - Access level: insert read status for all unread access level notifications
    */
   async markAllAsRead(memberUid: string) {
+    // Get user's access level
+    const member = await this.prisma.member.findFirst({
+      where: { externalId: memberUid },
+      select: { accessLevel: true },
+    });
+
+    const userAccessLevel = member?.accessLevel;
+
     // Mark all private notifications as read
     await this.prisma.pushNotification.updateMany({
       where: {
@@ -295,6 +410,32 @@ export class PushNotificationsService {
         })),
         skipDuplicates: true,
       });
+    }
+
+    // Get all access level notifications not yet read by this user
+    if (userAccessLevel) {
+      const unreadAccessLevelNotifications = await this.prisma.pushNotification.findMany({
+        where: {
+          accessLevels: { has: userAccessLevel },
+          isPublic: false,
+          recipientUid: null,
+          readStatuses: {
+            none: { memberUid },
+          },
+        },
+        select: { id: true },
+      });
+
+      // Create read status for all unread access level notifications
+      if (unreadAccessLevelNotifications.length > 0) {
+        await this.prisma.pushNotificationReadStatus.createMany({
+          data: unreadAccessLevelNotifications.map((n) => ({
+            notificationId: n.id,
+            memberUid,
+          })),
+          skipDuplicates: true,
+        });
+      }
     }
 
     // Notify via WebSocket
