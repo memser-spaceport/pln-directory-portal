@@ -710,7 +710,7 @@ const DemoDayDetailPage = () => {
                 )}
               </div>
               <div className={clsx(s.overviewField)}>
-                <label className={s.fieldLabel}>In App notifications</label>
+                <label className={s.fieldLabel}>In-App Notifications</label>
                 {isEditing && isDirectoryAdmin ? (
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1311,7 +1311,7 @@ const DemoDayDetailPage = () => {
 
               <div className="relative inline-block w-full max-w-lg transform overflow-hidden rounded-lg bg-white p-6 text-left shadow-xl transition-all">
                 <h3 className="text-lg font-medium leading-6 text-gray-900">
-                  Enable In-App notifications
+                  Enable In-App Notifications
                 </h3>
 
                 <div className="mt-4">
@@ -1401,7 +1401,7 @@ const DemoDayDetailPage = () => {
                     </svg>
                   </div>
                   <h3 className="text-lg font-medium leading-6 text-gray-900">
-                    In App notification will be sent
+                    In-app notification will be sent
                   </h3>
                 </div>
 

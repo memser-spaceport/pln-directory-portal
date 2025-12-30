@@ -1206,8 +1206,9 @@ model PushNotification {
   link         String? // URL or route to navigate to
   metadata     Json?                    @default("{}")
   isPublic     Boolean                  @default(false) // If true, anyone can see; if false, only recipient
-  recipientUid String? // Optional: specific user to notify (null = broadcast/public)
-  recipient    Member?                  @relation("PushNotificationRecipient", fields: [recipientUid], references: [uid], onDelete: Cascade)
+  recipientUid String? // Optional: Member.externalId of user to notify (null = broadcast/public)
+  recipient    Member?                  @relation("PushNotificationRecipient", fields: [recipientUid], references: [externalId], onDelete: Cascade)
+  accessLevels String[]                 @default([]) // Optional: list of access levels (L2, L3, L4, L5, L6) to target
   isRead       Boolean                  @default(false) // For private notifications only
   isSent       Boolean                  @default(false) // Whether sent via WebSocket
   sentAt       DateTime? // When sent via WebSocket
@@ -1220,6 +1221,7 @@ model PushNotification {
   // Indexes based on actual query patterns:
   // - Public notifications: WHERE isPublic = true
   // - Private notifications: WHERE recipientUid = ? AND isPublic = false AND isRead = ?
+  // - Access level notifications: WHERE array_length(accessLevels, 1) > 0
   @@index([isPublic])
   @@index([recipientUid, isPublic, isRead])
 }
@@ -1230,7 +1232,7 @@ model PushNotificationReadStatus {
   notificationId Int
   notification   PushNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   memberUid      String
-  member         Member           @relation("PushNotificationReadStatuses", fields: [memberUid], references: [uid], onDelete: Cascade)
+  member         Member           @relation("PushNotificationReadStatuses", fields: [memberUid], references: [externalId], onDelete: Cascade)
   readAt         DateTime         @default(now())
 
   @@unique([notificationId, memberUid])

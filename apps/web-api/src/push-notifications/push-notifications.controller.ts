@@ -1,14 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Param,
-  Query,
-  UseGuards,
-  Req,
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { PushNotificationsService } from './push-notifications.service';
 import { MembersService } from '../members/members.service';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
@@ -48,7 +38,7 @@ export class PushNotificationsController {
       return { notifications: [], total: 0, unreadCount: 0 };
     }
 
-    return this.pushNotificationsService.getForUser(member.uid, {
+    return this.pushNotificationsService.getForUser(member.externalId, {
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
       unreadOnly: unreadOnly === 'true',
@@ -67,7 +57,7 @@ export class PushNotificationsController {
       return { unreadCount: 0 };
     }
 
-    const unreadCount = await this.pushNotificationsService.getUnreadCount(member.uid);
+    const unreadCount = await this.pushNotificationsService.getUnreadCount(member.externalId);
     return { unreadCount };
   }
 
@@ -83,7 +73,7 @@ export class PushNotificationsController {
       return { success: false };
     }
 
-    const notification = await this.pushNotificationsService.markAsRead(uid, member.uid);
+    const notification = await this.pushNotificationsService.markAsRead(uid, member.externalId);
     return { success: !!notification, notification };
   }
 
@@ -99,7 +89,7 @@ export class PushNotificationsController {
       return { success: false };
     }
 
-    return this.pushNotificationsService.markAllAsRead(member.uid);
+    return this.pushNotificationsService.markAllAsRead(member.externalId);
   }
 
   /**
@@ -114,7 +104,7 @@ export class PushNotificationsController {
       return { success: false };
     }
 
-    const notification = await this.pushNotificationsService.delete(uid, member.uid);
+    const notification = await this.pushNotificationsService.delete(uid, member.externalId);
     return { success: !!notification };
   }
 }

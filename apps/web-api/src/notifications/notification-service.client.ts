@@ -187,6 +187,49 @@ export class NotificationServiceClient {
   }
 
   /**
+   * Finds all notification setting items for a type and contextId.
+   * Used for bulk subscription checks (e.g., all subscribers to a topic).
+   * @param type - The item type (e.g., 'POST_COMMENT').
+   * @param contextId - The context ID (e.g., topic ID).
+   * @returns Array of notification setting items.
+   */
+  async findItems(type: string, contextId: string) {
+    try {
+      const response = await axios.get(
+        `${this.notificationServiceBaseUrl}/notification-settings/items/${type}?contextId=${encodeURIComponent(
+          contextId
+        )}`,
+        {
+          headers: {
+            Authorization: `Basic ${this.notificationServiceSecret}`,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        switch (error.response?.status) {
+          case 400:
+            throw new BadRequestException('Invalid parameters for findItems.');
+          case 401:
+            throw new UnauthorizedException('Authentication failed. Check API keys or tokens.');
+          case 404:
+            return []; // No items found, return empty array
+          case 500:
+            throw new InternalServerErrorException('Internal server error. Retry later.');
+          default:
+            throw new HttpException(
+              `Unhandled error with status ${error.response?.status || 'unknown'}.`,
+              error.response?.status || 500
+            );
+        }
+      } else {
+        throw new InternalServerErrorException('Unexpected error during findItems.');
+      }
+    }
+  }
+
+  /**
    * Upserts a notification setting item for a member by type and contextId.
    * @param memberUid - The member UID.
    * @param type - The item type.
