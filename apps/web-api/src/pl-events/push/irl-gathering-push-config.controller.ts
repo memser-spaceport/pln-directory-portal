@@ -5,13 +5,16 @@ import {
   IrlGatheringPushConfigService,
   UpdateIrlGatheringPushConfigDto,
 } from './irl-gathering-push-config.service';
+import {NoCache} from "../../decorators/no-cache.decorator";
 
-@Controller('/v1/admin/irl-push-config')
+@NoCache()
+@Controller('/v1/admin/irl-gathering-push-config')
 @UseGuards(AdminAuthGuard)
 export class IrlGatheringPushConfigController {
   constructor(private readonly service: IrlGatheringPushConfigService) {}
 
-  @Get()
+
+  @Get('active')
   async getActive() {
     return this.service.getActiveConfigOrThrow();
   }

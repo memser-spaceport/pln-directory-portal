@@ -3,7 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../shared/prisma.service';
 import { PushNotificationsService } from '../../push-notifications/push-notifications.service';
 import { IrlGatheringPushRuleKind, PushNotificationCategory } from '@prisma/client';
-import { getIrlGatheringPushConfig } from './irl-gathering-push.config';
+import { IrlGatheringPushConfigService } from './irl-gathering-push-config.service';
 
 type LocationInfo = {
   uid: string;
@@ -33,6 +33,18 @@ type TopAttendee = {
   eventsCount: number;
 };
 
+// Cron schedule can't be dynamic from DB. Keep it in env.
+const IRL_GATHERING_PUSH_CRON = process.env.IRL_GATHERING_PUSH_CRON ?? '*/5 * * * *';
+
+type ActiveDbConfig = {
+  uid: string;
+  enabled: boolean;
+  upcomingWindowDays: number;
+  reminderDaysBefore: number;
+  minAttendeesPerEvent: number;
+  isActive: boolean;
+};
+
 @Injectable()
 export class IrlGatheringPushNotificationsJob {
   private readonly logger = new Logger(IrlGatheringPushNotificationsJob.name);
@@ -42,23 +54,30 @@ export class IrlGatheringPushNotificationsJob {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly pushNotificationsService: PushNotificationsService
+    private readonly pushNotificationsService: PushNotificationsService,
+    private readonly irlGatheringPushConfigService: IrlGatheringPushConfigService
   ) {}
 
-  @Cron(getIrlGatheringPushConfig().cron, {
+  @Cron(IRL_GATHERING_PUSH_CRON, {
     name: 'IrlGatheringPushNotificationsJob',
   })
   async run(): Promise<void> {
-    const cfg = getIrlGatheringPushConfig();
+    const cfg = (await this.irlGatheringPushConfigService.getActiveConfigOrNull()) as ActiveDbConfig | null;
+
+    if (!cfg) {
+      this.logger.log('[IRL push job] No active config in DB. Exiting.');
+      return;
+    }
+
     const now = new Date();
 
     this.logger.log('[IRL push job] Starting IRL gathering push notifications job');
     this.logger.log(
-      `[IRL push job] Config: enabled=${cfg.enabled}, upcomingWindowDays=${cfg.upcomingWindowDays}, reminderDaysBefore=${cfg.reminderDaysBefore}`
+      `[IRL push job] Active DB config: uid=${cfg.uid}, enabled=${cfg.enabled}, upcomingWindowDays=${cfg.upcomingWindowDays}, reminderDaysBefore=${cfg.reminderDaysBefore}`
     );
 
     if (!cfg.enabled) {
-      this.logger.log('[IRL push job] Job disabled. Exiting.');
+      this.logger.log('[IRL push job] Job disabled (DB config). Exiting.');
       return;
     }
 
@@ -109,7 +128,7 @@ export class IrlGatheringPushNotificationsJob {
         // - UPCOMING: only if earliest eventStartDate <= now + upcomingWindowDays
         // - REMINDER: only if earliest eventStartDate is within reminderDaysBefore days (job controls exact date)
         const startDates = groupCandidates.map((c) => c.eventStartDate);
-        const windowOk = this.matchesWindow(ruleKind, startDates, now);
+        const windowOk = this.matchesWindow(ruleKind, startDates, now, cfg);
 
         if (!windowOk) {
           this.logger.log(
@@ -184,9 +203,12 @@ export class IrlGatheringPushNotificationsJob {
     this.logger.log('[IRL push job] Completed IRL gathering push notifications job');
   }
 
-  private matchesWindow(ruleKind: IrlGatheringPushRuleKind, startDates: Date[], now: Date): boolean {
-    const cfg = getIrlGatheringPushConfig();
-
+  private matchesWindow(
+    ruleKind: IrlGatheringPushRuleKind,
+    startDates: Date[],
+    now: Date,
+    cfg: Pick<ActiveDbConfig, 'upcomingWindowDays' | 'reminderDaysBefore'>
+  ): boolean {
     // For a grouped notification we consider the earliest event (closest upcoming).
     const earliest = startDates
       .filter(Boolean)
@@ -246,7 +268,9 @@ export class IrlGatheringPushNotificationsJob {
     }>
   ): Promise<any> {
     const eventUids = [...new Set(groupCandidates.map((c) => c.eventUid).filter(Boolean))];
-    this.logger.log(`[IRL push job] Building payload: ruleKind=${ruleKind}, gatheringUid=${gatheringUid}, eventUids=${eventUids.length}`);
+    this.logger.log(
+      `[IRL push job] Building payload: ruleKind=${ruleKind}, gatheringUid=${gatheringUid}, eventUids=${eventUids.length}`
+    );
 
     const location = await this.prisma.pLEventLocation.findUnique({
       where: { uid: gatheringUid },

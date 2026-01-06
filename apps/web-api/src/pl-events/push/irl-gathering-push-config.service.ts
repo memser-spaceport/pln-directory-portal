@@ -4,6 +4,7 @@ import { PrismaService } from '../../shared/prisma.service';
 export type IrlGatheringPushConfigDto = {
   uid: string;
   enabled: boolean;
+  isActive: boolean;
   minAttendeesPerEvent: number;
   upcomingWindowDays: number;
   reminderDaysBefore: number;
@@ -40,6 +41,7 @@ export class IrlGatheringPushConfigService {
       orderBy: { updatedAt: 'desc' },
       select: {
         uid: true,
+        isActive: true,
         enabled: true,
         minAttendeesPerEvent: true,
         upcomingWindowDays: true,
