@@ -5,20 +5,17 @@ import {
   BadRequestException,
   forwardRef,
   Inject,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
-import { Prisma, Member, NotificationStatus, SubscriptionEntityType, Team } from '@prisma/client';
+import { Prisma, Member, Team } from '@prisma/client';
 import { MembersService } from '../members/members.service';
 import { PLEventLocationsService } from './pl-event-locations.service';
 import { CreatePLEventGuestSchemaDto, UpdatePLEventGuestSchemaDto } from 'libs/contracts/src/schema';
 import { FormattedLocationWithEvents, PLEvent } from './pl-event-locations.types';
 import { CacheService } from '../utils/cache/cache.service';
-import { NotificationService } from '../notifications/notifications.service';
 import {
   CREATE,
-  EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME,
   EventInvitationToMember,
   UPDATE,
 } from '../utils/constants';
@@ -26,6 +23,7 @@ import { AwsService } from '../utils/aws/aws.service';
 import { PLEventsService } from './pl-events.service';
 import { TeamsService } from '../teams/teams.service';
 import path from 'path';
+import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
 
 @Injectable()
 export class PLEventGuestsService {
@@ -36,11 +34,11 @@ export class PLEventGuestsService {
     @Inject(forwardRef(() => PLEventLocationsService))
     private eventLocationsService: PLEventLocationsService,
     private cacheService: CacheService,
-    private notificationService: NotificationService,
     private teamService: TeamsService,
     private awsService: AwsService,
     @Inject(forwardRef(() => PLEventsService))
-    private eventService: PLEventsService
+    private eventService: PLEventsService,
+    private readonly irlGatheringPushCandidatesService: IrlGatheringPushCandidatesService
   ) {}
 
   /**
@@ -76,7 +74,8 @@ export class PLEventGuestsService {
           (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
       await this.updateGuestTopicsAndReason(data, locationUid, member, eventType, tx);
-      this.cacheService.reset({ service: 'PLEventGuest' });
+      await this.irlGatheringPushCandidatesService.refreshCandidatesForEvents(guests.map((g) => g.eventUid));
+      this.cacheService.reset({service: 'PLEventGuest'});
       return result;
     } catch (err) {
       this.handleErrors(err);
@@ -146,7 +145,7 @@ export class PLEventGuestsService {
   ) {
     try {
       const events = type === 'upcoming' ? location.upcomingEvents : location.pastEvents;
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const isAdmin = this.memberService.checkIfAdminUser(member);
         await tx.pLEventGuest.deleteMany({
           where: {
@@ -167,6 +166,8 @@ export class PLEventGuestsService {
           type
         );
       });
+      await this.irlGatheringPushCandidatesService.refreshCandidatesForEvents(events.map((e) => e.uid));
+      return result;
     } catch (err) {
       this.handleErrors(err);
     }
@@ -189,6 +190,13 @@ export class PLEventGuestsService {
         },
       });
       await this.cacheService.reset({ service: 'PLEventGuest' });
+
+      const affectedEventUids = Array.from(
+        new Set(
+          (deleteConditions as Array<{ eventUid: unknown }>).map((d) => String(d.eventUid))
+        )
+      ).filter((x): x is string => x.length > 0);
+      await this.irlGatheringPushCandidatesService.refreshCandidatesForEvents(affectedEventUids);
       return result;
     } catch (err) {
       this.handleErrors(err);

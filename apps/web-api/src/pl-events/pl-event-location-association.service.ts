@@ -28,7 +28,7 @@ export class PLEventLocationAssociationService {
   ): Promise<PLEventLocationAssociation[]> {
     try {
       this.logger.info(`Fetching associations for ${locationCriteria?.length} location criteria`, 'PLEventLocationAssociationService');
-      
+
       if (!locationCriteria || locationCriteria.length === 0) {
         return [];
       }
@@ -41,10 +41,10 @@ export class PLEventLocationAssociationService {
           a."locationName"   AS location,     -- Location name from association table (input location)
           a."locationUid"    AS "inferredLocationUid", -- UID linking to PLEventLocation table
           l."location"       AS "inferredLocation",      -- Actual location name from PLEventLocation table (joined data)
-          a."city",         
-          a."state",         
-          a."country",      
-          a."region"    
+          a."city",
+          a."state",
+          a."country",
+          a."region"
         FROM "PLEventLocationAssociation" a   -- Main table: event location associations (aliased as 'a')
         JOIN "PLEventLocation" l ON l."uid" = a."locationUid" -- Join with location table to get inferred location data
         WHERE a."isDeleted" = false           -- Only include active (non-deleted) associations
@@ -118,7 +118,7 @@ export class PLEventLocationAssociationService {
    */
   async createLocationAssociation(data: Prisma.PLEventLocationAssociationUncheckedCreateInput, tx?): Promise<PLEventLocationAssociation> {
     try {
-      
+
       // Verify locationUid exists if provided
       if (data.locationUid) {
         const locationExists = await (tx || this.prisma).pLEventLocation.findUnique({
@@ -131,7 +131,7 @@ export class PLEventLocationAssociationService {
         }
         this.logger.info(`Verified location exists: ${data.locationUid}`, 'PLEventLocationAssociationService');
       }
-      
+
       const association = await (tx || this.prisma).pLEventLocationAssociation.create({
         data
       });
@@ -147,7 +147,7 @@ export class PLEventLocationAssociationService {
   /**
    * Creates a new PLEventLocationAssociation.
    * Public method that includes location relation.
-   * 
+   *
    * @param data - The location association data to be created.
    * @returns The created location association object with location relation.
    */
@@ -161,7 +161,7 @@ export class PLEventLocationAssociationService {
           isDeleted: false
         }
       });
-      
+
       if (existingAssociation) {
         throw new ConflictException(`Location association with locationUid ${data.locationUid} already exists.`);
       }
@@ -205,7 +205,7 @@ export class PLEventLocationAssociationService {
 
   /**
    * Retrieves all PLEventLocationAssociations with optional filtering.
-   * 
+   *
    * @param queryOptions - Optional Prisma query options for filtering and pagination.
    * @returns An array of location associations with location relation.
    */
@@ -230,7 +230,7 @@ export class PLEventLocationAssociationService {
 
   /**
    * Retrieves a single PLEventLocationAssociation by UID.
-   * 
+   *
    * @param uid - The unique identifier of the location association.
    * @returns The location association object with location relation.
    * @throws {NotFoundException} - If the location association is not found.
@@ -259,7 +259,7 @@ export class PLEventLocationAssociationService {
   /**
    * Updates a PLEventLocationAssociation by UID.
    * If the locationUid is changed, updates all related events' locationUid accordingly.
-   * 
+   *
    * @param uid - The unique identifier of the location association to update.
    * @param data - The data to update.
    * @returns The updated location association object with location relation.
@@ -301,30 +301,10 @@ export class PLEventLocationAssociationService {
     }
   }
 
-  /**
-   * Soft deletes all events associated with a location association.
-   * 
-   * @param associationUid - The unique identifier of the location association.
-   * @param tx - Optional transaction object.
-   * @returns The number of events soft deleted.
-   */
-  private async deleteAssociatedEvents(associationUid: string, tx?: any): Promise<number> {
-    const result = await (tx || this.prisma).pLEvent.updateMany({
-      where: {
-        pLEventLocationAssociationUid: associationUid,
-        isDeleted: false
-      },
-      data: {
-        isDeleted: true
-      }
-    });
-    this.logger.info(`Soft deleted ${result.count} events associated with location association ${associationUid}`, 'PLEventLocationAssociationService');
-    return result.count;
-  }
 
   /**
    * Delete's a PLEventLocationAssociation by UID.
-   * 
+   *
    * @param uid - The unique identifier of the location association to delete.
    * @returns The deleted location association object with location relation.
    * @throws {NotFoundException} - If the location association is not found.
@@ -353,14 +333,14 @@ export class PLEventLocationAssociationService {
         return association;
       });
     } catch (error) {
-      this.logger.error(`Error deleting location association: ${error.message}`); 
+      this.logger.error(`Error deleting location association: ${error.message}`);
       this.handleErrors(error);
     }
   }
 
   /**
    * Updates all related events' locationUid when a location association's locationUid is changed.
-   * 
+   *
    * @param associationUid - The unique identifier of the location association.
    * @param locationUid - The new locationUid to set on related events.
    * @param tx - The transaction object.
@@ -399,4 +379,4 @@ export class PLEventLocationAssociationService {
     }
     return error;
   }
-} 
+}

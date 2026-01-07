@@ -260,13 +260,13 @@ export class PLEventLocationsService {
     const currentDateTimeInZone = moment();
     const numberOfDays = parseInt(process.env.IRL_CURRENT_EVENT_WINDOW_IN_DAYS || '90', 10);
     const pastEventsCutoff = currentDateTimeInZone.clone().subtract(numberOfDays, 'days');
-    
+
     return { pastEventsCutoff };
   }
 
   /**
    * Segregates events into past and upcoming based on a configurable time boundary.
-   * 
+   *
    * @param events An array of event objects associated with the location
    * @param useCutoff When true, uses the configured past events cutoff window;
    *                  when false, uses the current time (UTC) as the boundary
@@ -275,8 +275,8 @@ export class PLEventLocationsService {
    *   - Upcoming events: events that end on or after the time boundary
    */
   private segregateEvents(events: PLEvent[], useCutoff: boolean): { pastEvents: PLEvent[], upcomingEvents: PLEvent[] } {
-    const timeBoundary = useCutoff 
-      ? this.computeEventTimeWindow().pastEventsCutoff 
+    const timeBoundary = useCutoff
+      ? this.computeEventTimeWindow().pastEventsCutoff
       : moment.utc();
     const pastEvents: any = [];
     const upcomingEvents: any = [];
@@ -395,7 +395,7 @@ export class PLEventLocationsService {
       this.logger.info('Notification initiated by cron');
       // Fallback date for entities with no prior notifications (e.g., newly created entities)
       const fallbackDate = process.env.IRL_NOTIFICATION_FALLBACK_DATE;
-      
+
       const query: any = `
       WITH LatestNotificationDate AS (
         SELECT
@@ -781,16 +781,16 @@ export class PLEventLocationsService {
       });
       this.cacheService.reset({ service: 'PLEventGuest' });;
       return location;
-    } catch (error) { 
+    } catch (error) {
       this.logger.error(`Error while modifying pl event location ${locationUid}: ${error}`);
       this.handleErrors(error);
-    }  
+    }
   }
 
   /**
    * Retrieves all PLEventLocations with optional filtering.
    * Includes location associations and their corresponding events.
-   * 
+   *
    * @param queryOptions - Optional Prisma query options for filtering and pagination.
    * @returns An array of locations with locationAssociations and events.
    */
@@ -820,7 +820,7 @@ export class PLEventLocationsService {
 
   /**
    * Retrieves a single PLEventLocation by UID.
-   * 
+   *
    * @param uid - The unique identifier of the location.
    * @returns The location object.
    * @throws {NotFoundException} - If the location is not found.
@@ -845,7 +845,7 @@ export class PLEventLocationsService {
 
   /**
    * Updates a PLEventLocation by UID.
-   * 
+   *
    * @param uid - The unique identifier of the location to update.
    * @param data - The data to update.
    * @returns The updated location object.
@@ -874,30 +874,10 @@ export class PLEventLocationsService {
     }
   }
 
-  /**
-   * Soft deletes all events associated with a location.
-   * 
-   * @param locationUid - The unique identifier of the location.
-   * @param tx - Optional transaction object.
-   * @returns The number of events soft deleted.
-   */
-  private async deleteAssociatedEvents(locationUid: string, tx?: any): Promise<number> {
-    const result = await (tx || this.prisma).pLEvent.updateMany({
-      where: {
-        locationUid: locationUid,
-        isDeleted: false
-      },
-      data: {
-        isDeleted: true
-      }
-    });
-    this.logger.info(`Soft deleted ${result.count} events associated with location ${locationUid}`, 'PLEventLocationsService');
-    return result.count;
-  }
 
   /**
    * Soft deletes a PLEventLocation by UID.
-   * 
+   *
    * @param uid - The unique identifier of the location to delete.
    * @returns The deleted location object.
    * @throws {NotFoundException} - If the location is not found.
@@ -940,6 +920,6 @@ export class PLEventLocationsService {
     }
   }
 
-  
+
 
 }

@@ -1,0 +1,32 @@
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  color: #3d4a5c;
+  text-decoration: none;
+}
+
+.menuItem:hover {
+  background: rgba(61, 74, 92, 0.06);
+}
+
+.menuItemLabel {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.menuItemLabel {
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 1;
+}

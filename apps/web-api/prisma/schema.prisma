@@ -1193,6 +1193,8 @@ enum PushNotificationCategory {
   EVENT
   // System
   SYSTEM
+
+  IRL_GATHERING
 }
 
 // Push notifications for WebSocket delivery
@@ -1239,3 +1241,64 @@ model PushNotificationReadStatus {
   @@index([memberUid])
   @@index([notificationId])
 }
+
+
+enum IrlGatheringPushRuleKind {
+  UPCOMING
+  REMINDER
+}
+
+model IrlGatheringPushCandidate {
+  id             Int                    @id @default(autoincrement())
+  uid            String                 @unique @default(cuid())
+  ruleKind       IrlGatheringPushRuleKind
+  gatheringUid   String
+  eventUid       String
+  eventStartDate DateTime
+  attendeeCount  Int
+  isSuppressed   Boolean                @default(false)
+  processedAt    DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([ruleKind, eventUid])
+  @@index([ruleKind, gatheringUid])
+  @@index([ruleKind, processedAt])
+  @@index([eventStartDate])
+}
+
+model IrlGatheringPushConfig {
+  id   Int    @id @default(autoincrement())
+  uid  String @unique @default(cuid())
+
+  /// Only one config row should be active at a time.
+  isActive Boolean @default(true)
+
+  /// Global switch for IRL gathering push logic.
+  enabled  Boolean @default(true)
+
+  /// Base threshold: minimum number of attendees required for an event
+  /// to become a push candidate.
+  minAttendeesPerEvent Int @default(5)
+
+  /// Upcoming window: consider event a candidate only if
+  /// startDate <= now + upcomingWindowDays.
+  upcomingWindowDays Int @default(7)
+
+  /// Reminder: how many days before the event start date the reminder
+  /// should be eligible (job decides exact sending date/time).
+  reminderDaysBefore Int @default(1)
+
+  /// Audit info (optional).
+  updatedByMemberUid String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([enabled])
+  @@index([updatedAt])
+}
+
+
+

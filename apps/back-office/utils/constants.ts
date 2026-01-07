@@ -66,6 +66,8 @@ export const API_ROUTE = {
   ADMIN_MEMBERS: `${APP_CONSTANTS.V1}admin/members`,
   ADMIN_DEMO_DAYS: `${APP_CONSTANTS.V1}admin/demo-days`,
   ADMIN_DEMO_DAY_SUBSCRIBERS: `${APP_CONSTANTS.V1}admin/demo-days/subscribers`,
+  ADMIN_IRL_GATHERING_PUSH_CONFIG: `${APP_CONSTANTS.V1}admin/irl-gathering-push-config`,
+  ADMIN_IRL_GATHERING_PUSH_CONFIG_ACTIVE: `${APP_CONSTANTS.V1}admin/irl-gathering-push-config/active`,
 };
 
 export const TOKEN = 'plnetwork@1';

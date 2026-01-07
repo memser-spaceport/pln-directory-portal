@@ -13,7 +13,7 @@ export class EventsService {
 
   /**
    * Submits a new event to the event service.
-   * 
+   *
    * @param event - The event data to be submitted.
    * @param requestorEmail - The email address of the requestor.
    * @returns The response from the event service.
@@ -28,19 +28,20 @@ export class EventsService {
 
   /**
    * Creates a new event location if it doesn't already exist.
-   * 
+   *
    * @param event - The event data containing the location information.
    * @returns The created location object if it was created, or null if it already exists.
    */
   async createEventLocation(event) {
     try {
       const eventLocationName = event?.address_info?.city || event?.address_info?.country;
-      return await this.locationService.createPLEventLocation({ 
-        location: eventLocationName.toLowerCase(), 
-        timezone: event?.timezone, 
+      if(!eventLocationName) return
+      return await this.locationService.createPLEventLocation({
+        location: eventLocationName?.toLowerCase(),
+        timezone: event?.timezone,
         latitude: Number(event?.address_info?.latitude).toFixed(2),
-        longitude: Number(event?.address_info?.longitude).toFixed(2), 
-        country: event?.address_info?.country 
+        longitude: Number(event?.address_info?.longitude).toFixed(2),
+        country: event?.address_info?.country
       });
     } catch (error) {
       throw error;
@@ -49,7 +50,7 @@ export class EventsService {
 
   /**
    * Deletes an event from the event service.
-   * 
+   *
    * @param eventUid - The unique identifier of the event to be deleted.
    * @returns The response from the event service.
    */
@@ -60,7 +61,7 @@ export class EventsService {
       throw error;
     }
   }
-  
+
   private handleAxiosError(error) {
     const url = error.config?.url || 'unknown URL';
     this.logger.error(`Error occurred while submitting event: ${error.message}`);

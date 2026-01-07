@@ -1,0 +1,204 @@
+.root {
+  padding: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.titleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.primaryBtn {
+  border: 1px solid transparent;
+  background: #4174ff;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.secondaryBtn {
+  border: 1px solid #e6e9ef;
+  background: #fff;
+  color: #111827;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.disabledBtn {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 6px 0 0 0;
+  opacity: 0.8;
+}
+
+.meta {
+  min-width: 260px;
+  padding: 12px 14px;
+  border: 1px solid #e6e9ef;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.metaLabel {
+  opacity: 0.7;
+}
+
+.metaValue {
+  font-weight: 600;
+}
+
+.card {
+  border: 1px solid #e6e9ef;
+  border-radius: 14px;
+  background: #fff;
+  padding: 18px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #eef1f6;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.saveMessage {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.saveButton {
+  min-width: 120px;
+}
+
+.stateText {
+  padding: 16px 0;
+  opacity: 0.8;
+}
+
+.form {
+  padding-top: 14px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 18px;
+  align-items: end;
+}
+
+.hint {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px dashed #e0e6f0;
+  border-radius: 12px;
+  background: rgba(224, 230, 240, 0.25);
+}
+
+.hintTitle {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.hintList {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.formFooter {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modalContent {
+  width: 520px;
+  max-width: calc(100vw - 40px);
+  padding: 18px;
+}
+
+.modalIcon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  margin-bottom: 12px;
+}
+
+.iconSuccess {
+  background: rgba(10, 153, 82, 0.12);
+  color: #0a9952;
+}
+
+.iconError {
+  background: rgba(210, 26, 14, 0.12);
+  color: #d21a0e;
+}
+
+.modalTitle {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.modalText {
+  margin: 0;
+  opacity: 0.8;
+  line-height: 1.4;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}

@@ -17,6 +17,7 @@ import moment from 'moment-timezone';
 import { ResponseUpcomingEvents } from '@protocol-labs-network/contracts';
 import { EventsToolingService } from '../events/events-tooling.service';
 import { CacheService } from '../utils/cache/cache.service';
+import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
 
 
 @Injectable()
@@ -30,7 +31,8 @@ export class PLEventsService {
     private memberService: MembersService,
     private locationService: PLEventLocationsService,
     private eventsToolingService: EventsToolingService,
-    private cacheService: CacheService
+    private cacheService: CacheService,
+    private readonly irlGatheringPushCandidatesService: IrlGatheringPushCandidatesService
   ) { }
 
   /**
@@ -42,15 +44,14 @@ export class PLEventsService {
    * @returns The newly created event object with details such as name, type, start and end dates, and location.
    */
   async createPLEvent(event, tx?) {
-    try {
-      const createdEvent = await (tx || this.prisma).pLEvent.create({
-        data: event
-      });
-      this.cacheService.reset({ service: 'PLEventGuest' });
-      return createdEvent;
-    } catch (error) {
-      this.handleErrors(error);
+    const createdEvent = await (tx || this.prisma).pLEvent.create({ data: event });
+    this.cacheService.reset({ service: 'PLEventGuest' });
+
+    if (!tx) {
+      await this.irlGatheringPushCandidatesService.refreshCandidatesForEvents([createdEvent.uid]);
     }
+
+    return createdEvent;
   }
 
   /**
@@ -92,7 +93,7 @@ export class PLEventsService {
   async getPLEventBySlug(slug, query, isUserLoggedIn): Promise<PLEvent> {
     try {
       const plEvent = await this.prisma.pLEvent.findFirst({
-        where: { 
+        where: {
           slugURL: slug,
           isDeleted: false
         },
@@ -401,6 +402,7 @@ export class PLEventsService {
         where: { uid },
         data: event
       });
+      await this.irlGatheringPushCandidatesService.refreshCandidatesForEvents([uid]);
       this.cacheService.reset({ service: 'PLEventGuest' });
       return updatedEvent;
     } catch (error) {
@@ -422,6 +424,7 @@ export class PLEventsService {
           isDeleted: true
         }
       });
+      await this.irlGatheringPushCandidatesService.refreshCandidatesForEvents([uid]);
       this.cacheService.reset({ service: 'PLEventGuest' });
       return deletedEvent;
     } catch (error) {
