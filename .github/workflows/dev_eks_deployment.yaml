@@ -3,7 +3,7 @@ name: Deploy to EKS with Helm [Dev]
 on:
   push:
     branches:
-      - feat/irl-gathering-notifications-part1   # Triggers Dev deployment
+      - feat/develop   # Triggers Dev deployment
 jobs:
   dev-deploy:
     name: Deploy Helm Chart to EKS preprod
