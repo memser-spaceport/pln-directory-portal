@@ -2206,6 +2206,7 @@ export class MembersService {
           take: limit,
           select: {
             uid: true,
+            externalId: true,
             name: true,
             accessLevel: true,
             officeHours: true,
