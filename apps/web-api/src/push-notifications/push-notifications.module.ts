@@ -6,13 +6,14 @@ import { PushNotificationsService } from './push-notifications.service';
 import { SharedModule } from '../shared/shared.module';
 import { MembersModule } from '../members/members.module';
 import { JwtService } from '../utils/jwt/jwt.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 /**
  * Module for push notifications (WebSocket-based real-time notifications).
  * Uses the local WebSocketModule for delivery.
  */
 @Module({
-  imports: [SharedModule, forwardRef(() => MembersModule)],
+  imports: [SharedModule, forwardRef(() => MembersModule), NotificationsModule],
   controllers: [PushNotificationsController, AdminPushNotificationsController, ForumPushNotificationsController],
   providers: [PushNotificationsService, JwtService],
   exports: [PushNotificationsService],
