@@ -508,7 +508,9 @@ export class PushNotificationsService {
         return;
       }
 
-      const authorName = (metadata.authorName as string) || 'Someone';
+      const authorName = (metadata.authorName as string) || 'Unknown User';
+      const authorRole = (metadata.authorRole as string) || 'N/A';
+      const authorTeam = (metadata.authorTeam as string) || 'N/A';
       const authorUid = (metadata.authorUid as string) || '';
       const authorPicture = metadata.authorPicture as string | undefined;
       const postLink = notification.link
@@ -526,10 +528,12 @@ export class PushNotificationsService {
           body: {
             recipientName: member.name || 'there',
             authorName,
+            authorRole,
+            authorTeam,
             authorPicture: authorPicture || '',
             postContent: notification.description || '',
             postLink,
-            postTitle: notification.metadata?.postTitle || 'a post',
+            postTitle: notification.metadata?.postTitle || 'Untitled Post',
           },
         },
         entityType: 'FORUM',
