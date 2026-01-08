@@ -75,6 +75,9 @@ export class ForumPushNotificationsController {
 
       this.logger.log(`Forum notification sent to ${dto.recipientUid}: ${dto.category}`);
 
+      // Send email notification for forum mentions
+      await this.pushNotificationsService.sendForumMentionEmail(dto);
+
       return {
         success: true,
         notification: {
@@ -129,6 +132,11 @@ export class ForumPushNotificationsController {
     const failed = results.filter((r) => r.status === 'rejected').length;
 
     this.logger.log(`Bulk forum notifications: ${sent} sent, ${failed} failed`);
+
+    // Send email notifications for forum mentions (don't await to avoid blocking response)
+    Promise.all(dto.notifications.map((n) => this.pushNotificationsService.sendForumMentionEmail(n))).catch((error) => {
+      this.logger.error(`Failed to send forum mention emails: ${error instanceof Error ? error.message : error}`);
+    });
 
     return {
       success: true,
