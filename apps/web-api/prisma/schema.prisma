@@ -437,6 +437,8 @@ model PLEventLocation {
   id                   Int                          @id @default(autoincrement())
   uid                  String                       @unique @default(cuid())
   location             String
+  /// Optional human-provided description for IRL gathering (used in UI/push).
+  description          String?
   country              String?
   timezone             String?
   latitude             String?
@@ -1255,6 +1257,7 @@ model IrlGatheringPushCandidate {
   gatheringUid   String
   eventUid       String
   eventStartDate DateTime
+  eventEndDate   DateTime
   attendeeCount  Int
   isSuppressed   Boolean                @default(false)
   processedAt    DateTime?
@@ -1265,6 +1268,7 @@ model IrlGatheringPushCandidate {
   @@index([ruleKind, gatheringUid])
   @@index([ruleKind, processedAt])
   @@index([eventStartDate])
+  @@index([eventEndDate])
 }
 
 model IrlGatheringPushConfig {
@@ -1280,6 +1284,14 @@ model IrlGatheringPushConfig {
   /// Base threshold: minimum number of attendees required for an event
   /// to become a push candidate.
   minAttendeesPerEvent Int @default(5)
+
+  /// Group-level gate: total number of events in the upcoming window
+  /// required before we send any push for a gathering.
+  totalEventsThreshold Int @default(5)
+
+  /// Group-level gate: minimum number of events that qualify by attendee + time
+  /// filters (upcoming/reminder candidates) before we send any push for a gathering.
+  qualifiedEventsThreshold Int @default(2)
 
   /// Upcoming window: consider event a candidate only if
   /// startDate <= now + upcomingWindowDays.

@@ -74,7 +74,11 @@ export class PLEventGuestsService {
           (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
       await this.updateGuestTopicsAndReason(data, locationUid, member, eventType, tx);
-      await this.irlGatheringPushCandidatesService.refreshCandidatesForEvents(guests.map((g) => g.eventUid));
+      // Recompute candidates and immediately refresh already-sent push notifications
+      // so attendee counts stay accurate when guests are added/removed.
+      await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(
+        guests.map((g) => g.eventUid)
+      );
       this.cacheService.reset({service: 'PLEventGuest'});
       return result;
     } catch (err) {
@@ -166,7 +170,9 @@ export class PLEventGuestsService {
           type
         );
       });
-      await this.irlGatheringPushCandidatesService.refreshCandidatesForEvents(events.map((e) => e.uid));
+      await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(
+        events.map((e) => e.uid)
+      );
       return result;
     } catch (err) {
       this.handleErrors(err);
@@ -196,7 +202,7 @@ export class PLEventGuestsService {
           (deleteConditions as Array<{ eventUid: unknown }>).map((d) => String(d.eventUid))
         )
       ).filter((x): x is string => x.length > 0);
-      await this.irlGatheringPushCandidatesService.refreshCandidatesForEvents(affectedEventUids);
+      await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(affectedEventUids);
       return result;
     } catch (err) {
       this.handleErrors(err);

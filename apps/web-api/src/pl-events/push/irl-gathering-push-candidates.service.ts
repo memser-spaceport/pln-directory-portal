@@ -1,7 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma.service';
-import { IrlGatheringPushRuleKind } from '@prisma/client';
+import { IrlGatheringPushRuleKind, PushNotificationCategory } from '@prisma/client';
 import { IrlGatheringPushConfigService } from './irl-gathering-push-config.service';
+
+type CandidateRow = {
+  eventUid: string;
+  eventStartDate: Date;
+  eventEndDate: Date;
+  attendeeCount: number;
+};
 
 @Injectable()
 export class IrlGatheringPushCandidatesService {
@@ -19,8 +26,8 @@ export class IrlGatheringPushCandidatesService {
    * - config.enabled == true
    * - event.isDeleted == false
    * - event.locationUid is present (has gathering)
-   * - event.startDate is in the future
-   * - event.startDate <= now + upcomingWindowDays
+   * - event.endDate is in the future (includes in-progress events)
+   * - event.endDate <= now + upcomingWindowDays
    * - attendeeCount >= minAttendeesPerEvent
    *
    * Idempotency:
@@ -69,6 +76,7 @@ export class IrlGatheringPushCandidatesService {
       select: {
         uid: true,
         startDate: true,
+        endDate: true,
         locationUid: true,
       },
     });
@@ -104,22 +112,33 @@ export class IrlGatheringPushCandidatesService {
 
       const hasGathering = Boolean(ev.locationUid);
       const startDate = ev.startDate ? new Date(ev.startDate) : null;
+      const endDate = ev.endDate ? new Date(ev.endDate) : null;
 
-      const isFuture = !!startDate && startDate.getTime() > now.getTime();
-      const withinUpcomingWindow = !!startDate && startDate.getTime() <= windowEnd.getTime();
+      // Use endDate to include in-progress events. An event is "relevant" if it hasn't ended yet.
+      const notEnded = !!endDate && endDate.getTime() >= now.getTime();
+
+      // Upcoming window is also based on end date so that ongoing events are included.
+      const withinUpcomingWindow = !!endDate && endDate.getTime() <= windowEnd.getTime();
       const meetsThreshold = attendeeCount >= cfg.minAttendeesPerEvent;
 
-      const qualifies = hasGathering && isFuture && withinUpcomingWindow && meetsThreshold;
+      // UPCOMING should include in-progress + future events.
+      const qualifiesUpcoming = hasGathering && notEnded && withinUpcomingWindow && meetsThreshold;
+
+      // REMINDER should only apply for events that haven't started yet.
+      const notStartedYet = !!startDate && startDate.getTime() > now.getTime();
+      const qualifiesReminder = qualifiesUpcoming && notStartedYet;
 
       this.logger.log(
         `[candidates] evaluate event=${ev.uid} ` +
         `hasGathering=${hasGathering} ` +
-        `startDate=${startDate ? startDate.toISOString() : 'null'} ` +
-        `isFuture=${isFuture} withinUpcomingWindow=${withinUpcomingWindow} ` +
-        `attendeeCount=${attendeeCount} meetsThreshold=${meetsThreshold} qualifies=${qualifies}`
+        `startDate=${startDate ? startDate.toISOString() : 'null'} endDate=${endDate ? endDate.toISOString() : 'null'} ` +
+        `notEnded=${notEnded} withinUpcomingWindow=${withinUpcomingWindow} ` +
+        `attendeeCount=${attendeeCount} meetsThreshold=${meetsThreshold} ` +
+        `qualifiesUpcoming=${qualifiesUpcoming} qualifiesReminder=${qualifiesReminder}`
       );
 
-      if (qualifies) {
+      if (qualifiesUpcoming) {
+        // UPCOMING candidate
         upserts.push(
           this.prisma.irlGatheringPushCandidate.upsert({
             where: {
@@ -133,6 +152,7 @@ export class IrlGatheringPushCandidatesService {
               gatheringUid: ev.locationUid!,
               eventUid: ev.uid,
               eventStartDate: ev.startDate,
+              eventEndDate: ev.endDate,
               attendeeCount,
               processedAt: null,
               isSuppressed: false,
@@ -140,13 +160,16 @@ export class IrlGatheringPushCandidatesService {
             update: {
               gatheringUid: ev.locationUid!,
               eventStartDate: ev.startDate,
+              eventEndDate: ev.endDate,
               attendeeCount,
               processedAt: null,
             },
           })
         );
 
-        upserts.push(
+        // REMINDER candidate (only when event hasn't started)
+        if (qualifiesReminder) {
+          upserts.push(
           this.prisma.irlGatheringPushCandidate.upsert({
             where: {
               ruleKind_eventUid: {
@@ -159,6 +182,7 @@ export class IrlGatheringPushCandidatesService {
               gatheringUid: ev.locationUid!,
               eventUid: ev.uid,
               eventStartDate: ev.startDate,
+              eventEndDate: ev.endDate,
               attendeeCount,
               processedAt: null,
               isSuppressed: false,
@@ -166,13 +190,27 @@ export class IrlGatheringPushCandidatesService {
             update: {
               gatheringUid: ev.locationUid!,
               eventStartDate: ev.startDate,
+              eventEndDate: ev.endDate,
               attendeeCount,
               processedAt: null,
             },
           })
-        );
+          );
+        } else {
+          // Ensure stale reminder candidates are removed for in-progress events.
+          deletes.push(
+            this.prisma.irlGatheringPushCandidate.deleteMany({
+              where: {
+                ruleKind: IrlGatheringPushRuleKind.REMINDER,
+                eventUid: ev.uid,
+              },
+            })
+          );
+        }
 
-        this.logger.log(`[candidates] event=${ev.uid} qualifies -> scheduling UPSERT (UPCOMING + REMINDER)`);
+        this.logger.log(
+          `[candidates] event=${ev.uid} qualifies -> scheduling UPSERT (UPCOMING${qualifiesReminder ? ' + REMINDER' : ''})`
+        );
       } else {
         deletes.push(
           this.prisma.irlGatheringPushCandidate.deleteMany({
@@ -202,5 +240,213 @@ export class IrlGatheringPushCandidatesService {
       `[candidates] done; refreshed events=${uniqueEventUids.length} upserts=${upserts.length} deletes=${deletes.length} ` +
       `postCount(candidates for provided eventUids)=${postCount}`
     );
+  }
+
+  /**
+   * Convenience wrapper used by write-paths (e.g., adding/removing guests).
+   *
+   * Why:
+   * - Candidates are recomputed on every guest change.
+   * - If a push notification for the affected gathering was already sent, we want its metadata (attendee counts)
+   *   to be refreshed immediately, not only when the cron job runs next.
+   */
+  async refreshCandidatesForEventsAndUpdateNotifications(eventUids: string[]): Promise<void> {
+    await this.refreshCandidatesForEvents(eventUids);
+    await this.updateAlreadySentNotificationsForEvents(eventUids);
+  }
+
+  private async updateAlreadySentNotificationsForEvents(eventUids: string[]): Promise<void> {
+    const uniqueEventUids = [...new Set((eventUids ?? []).filter(Boolean))];
+    if (uniqueEventUids.length === 0) return;
+
+    const cfg = await this.configService.getActiveConfigOrNull();
+    if (!cfg || !cfg.enabled) return;
+
+    const now = new Date();
+    const msInDay = 24 * 60 * 60 * 1000;
+    const windowEnd = new Date(now.getTime() + cfg.upcomingWindowDays * msInDay);
+
+    // Resolve gatherings impacted by these events.
+    const events = await this.prisma.pLEvent.findMany({
+      where: { uid: { in: uniqueEventUids }, isDeleted: false },
+      select: { uid: true, locationUid: true },
+    });
+
+    const gatheringUids = [...new Set(events.map((e) => e.locationUid).filter(Boolean))] as string[];
+    if (gatheringUids.length === 0) return;
+
+    for (const gatheringUid of gatheringUids) {
+      // Check if there are already-sent notifications for this gathering.
+      // We update both rule kinds if present.
+      const sent = await this.prisma.pushNotification.findMany({
+        where: {
+          category: PushNotificationCategory.IRL_GATHERING,
+          AND: [
+            { metadata: { path: ['gatheringUid'], equals: gatheringUid } },
+            { metadata: { path: ['version'], equals: 1 } },
+          ],
+        },
+        select: { uid: true, metadata: true },
+      });
+
+      if (sent.length === 0) continue;
+
+      for (const row of sent) {
+        const ruleKind = (row.metadata as any)?.ruleKind as IrlGatheringPushRuleKind | undefined;
+        if (!ruleKind) continue;
+
+        // Candidates we should show in the notification payload.
+        // We use eventEndDate window so in-progress events are included.
+        const candidates = await this.prisma.irlGatheringPushCandidate.findMany({
+          where: {
+            gatheringUid,
+            ruleKind,
+            isSuppressed: false,
+            eventEndDate: { gte: now, lte: windowEnd },
+          },
+          orderBy: [{ eventStartDate: 'asc' }],
+          select: {
+            eventUid: true,
+            eventStartDate: true,
+            eventEndDate: true,
+            attendeeCount: true,
+          },
+        });
+
+        if (candidates.length === 0) continue;
+
+        const payload = await this.buildLocationPayload(gatheringUid, candidates);
+
+        const title = payload.location?.name ? `IRL gathering in ${payload.location.name}` : 'IRL gathering';
+        const description =
+          (payload.location?.description && String(payload.location.description).trim().length > 0)
+            ? String(payload.location.description).trim()
+            : payload.events?.total != null
+              ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
+              : 'Upcoming IRL gathering';
+
+        await this.prisma.pushNotification.update({
+          where: { uid: row.uid },
+          data: { title, description, metadata: { ...payload, ruleKind } as any },
+        });
+
+        this.logger.log(
+          `[candidates] updated sent pushNotification uid=${row.uid} gatheringUid=${gatheringUid} ruleKind=${ruleKind}`
+        );
+      }
+    }
+  }
+
+  private async buildLocationPayload(gatheringUid: string, candidates: CandidateRow[]): Promise<any> {
+    const eventUids = [...new Set(candidates.map((c) => c.eventUid).filter(Boolean))];
+
+    const location = await this.prisma.pLEventLocation.findUnique({
+      where: { uid: gatheringUid },
+      select: {
+        uid: true,
+        location: true,
+        description: true,
+        country: true,
+        timezone: true,
+        latitude: true,
+        longitude: true,
+        flag: true,
+        icon: true,
+      },
+    });
+
+    const events = await this.prisma.pLEvent.findMany({
+      where: { uid: { in: eventUids }, isDeleted: false },
+      select: {
+        uid: true,
+        slugURL: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        logo: { select: { url: true } },
+      },
+      orderBy: [{ startDate: 'asc' }],
+    });
+
+    const attendeeCountByEventUid = new Map<string, number>();
+    for (const c of candidates) attendeeCountByEventUid.set(c.eventUid, c.attendeeCount);
+
+    const eventSummaries = events.map((ev) => ({
+      uid: ev.uid,
+      slug: ev.slugURL,
+      name: ev.name,
+      startDate: ev.startDate.toISOString(),
+      endDate: ev.endDate.toISOString(),
+      attendeeCount: attendeeCountByEventUid.get(ev.uid) ?? 0,
+      logoUrl: ev.logo?.url ?? null,
+    }));
+
+    const dateStart = eventSummaries.length ? eventSummaries[0].startDate : null;
+    const dateEnd = eventSummaries.length ? eventSummaries[eventSummaries.length - 1].endDate : null;
+
+    const distinctAttendees = await this.prisma.pLEventGuest.findMany({
+      where: { eventUid: { in: eventUids } },
+      distinct: ['memberUid'],
+      select: { memberUid: true },
+    });
+
+    const top = await this.prisma.pLEventGuest.groupBy({
+      by: ['memberUid'],
+      where: { eventUid: { in: eventUids } },
+      _count: { eventUid: true },
+      orderBy: { _count: { eventUid: 'desc' } },
+      take: 6,
+    });
+
+    const topMemberUids = top.map((t) => t.memberUid);
+    const topMembers = topMemberUids.length
+      ? await this.prisma.member.findMany({
+        where: { uid: { in: topMemberUids } },
+        select: { uid: true, name: true, image: { select: { url: true } } },
+      })
+      : [];
+
+    const memberByUid = new Map(topMembers.map((m) => [m.uid, m]));
+    const topAttendees = top.map((row) => {
+      const m = memberByUid.get(row.memberUid);
+      return {
+        memberUid: row.memberUid,
+        eventsCount: row._count.eventUid,
+        imageUrl: m?.image?.url ?? null,
+        displayName: m?.name ?? null,
+      };
+    });
+
+    return {
+      version: 1,
+      gatheringUid,
+      location: location
+        ? {
+          id: location.uid,
+          name: location.location,
+          description: location.description,
+          country: location.country,
+          timezone: location.timezone,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          flag: location.flag,
+          icon: location.icon,
+        }
+        : null,
+      events: {
+        total: eventSummaries.length,
+        eventUids,
+        dates: { start: dateStart, end: dateEnd },
+        items: eventSummaries,
+      },
+      attendees: {
+        total: distinctAttendees.length,
+        topAttendees,
+      },
+      ui: {
+        locationUid: gatheringUid,
+        eventSlugs: eventSummaries.map((e) => e.slug),
+      },
+    };
   }
 }

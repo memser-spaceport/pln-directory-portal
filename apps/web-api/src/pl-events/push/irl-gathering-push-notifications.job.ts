@@ -8,6 +8,7 @@ import { IrlGatheringPushConfigService } from './irl-gathering-push-config.servi
 type LocationInfo = {
   uid: string;
   location: string;
+  description?: string | null;
   country?: string | null;
   timezone?: string | null;
   latitude?: string | null;
@@ -42,6 +43,8 @@ type ActiveDbConfig = {
   upcomingWindowDays: number;
   reminderDaysBefore: number;
   minAttendeesPerEvent: number;
+  totalEventsThreshold: number;
+  qualifiedEventsThreshold: number;
   isActive: boolean;
 };
 
@@ -94,6 +97,7 @@ export class IrlGatheringPushNotificationsJob {
         gatheringUid: true,
         eventUid: true,
         eventStartDate: true,
+        eventEndDate: true,
         attendeeCount: true,
       },
     });
@@ -128,13 +132,40 @@ export class IrlGatheringPushNotificationsJob {
         // - UPCOMING: only if earliest eventStartDate <= now + upcomingWindowDays
         // - REMINDER: only if earliest eventStartDate is within reminderDaysBefore days (job controls exact date)
         const startDates = groupCandidates.map((c) => c.eventStartDate);
-        const windowOk = this.matchesWindow(ruleKind, startDates, now, cfg);
+        const endDates = groupCandidates.map((c) => c.eventEndDate);
+        const windowOk = this.matchesWindow(ruleKind, startDates, endDates, now, cfg);
 
         if (!windowOk) {
           this.logger.log(
             `[IRL push job] Group skipped (does not match time window): ruleKind=${ruleKind}, gatheringUid=${gatheringUid}`
           );
           await this.markCandidatesProcessed(groupCandidates.map((c) => c.uid));
+          continue;
+        }
+
+        // Group-level thresholds: require a minimum total number of events at the location
+        // and a minimum number of qualifying events (candidates) before we send or update a push.
+        const msInDay = 24 * 60 * 60 * 1000;
+        const windowEnd = new Date(now.getTime() + cfg.upcomingWindowDays * msInDay);
+
+        const totalEventsInWindow = await this.prisma.pLEvent.count({
+          where: {
+            isDeleted: false,
+            locationUid: gatheringUid,
+            // consider current + future events that haven't ended, and that end within the window
+            endDate: { gte: now, lte: windowEnd },
+          },
+        });
+
+        const qualifiedEventsInWindow = new Set(groupCandidates.map((c) => c.eventUid)).size;
+
+        if (totalEventsInWindow < cfg.totalEventsThreshold || qualifiedEventsInWindow < cfg.qualifiedEventsThreshold) {
+          this.logger.log(
+            `[IRL push job] Group gated by thresholds; ruleKind=${ruleKind}, gatheringUid=${gatheringUid} ` +
+            `totalEventsInWindow=${totalEventsInWindow}/${cfg.totalEventsThreshold} ` +
+            `qualifiedEventsInWindow=${qualifiedEventsInWindow}/${cfg.qualifiedEventsThreshold} -> skip (will retry)`
+          );
+          // Do not mark candidates processed so that the group can become eligible later.
           continue;
         }
 
@@ -158,8 +189,27 @@ export class IrlGatheringPushNotificationsJob {
 
         if (alreadySent) {
           this.logger.log(
-            `[IRL push job] Notification already sent for group. Skipping. notificationUid=${alreadySent.uid}, createdAt=${alreadySent.createdAt.toISOString()}`
+            `[IRL push job] Notification already sent for group. Will refresh metadata if needed. notificationUid=${alreadySent.uid}, createdAt=${alreadySent.createdAt.toISOString()}`
           );
+
+          const payload = await this.buildLocationPayload(ruleKind, gatheringUid, groupCandidates);
+          const title = payload.location?.name ? `IRL gathering in ${payload.location.name}` : 'IRL gathering';
+          const description =
+            (payload.location?.description && String(payload.location.description).trim().length > 0)
+              ? String(payload.location.description).trim()
+              : payload.events?.total != null
+                ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
+                : 'Upcoming IRL gathering';
+
+          await this.prisma.pushNotification.update({
+            where: { uid: alreadySent.uid },
+            data: {
+              title,
+              description,
+              metadata: payload as any,
+            },
+          });
+
           await this.markCandidatesProcessed(groupCandidates.map((c) => c.uid));
           continue;
         }
@@ -170,9 +220,11 @@ export class IrlGatheringPushNotificationsJob {
         // A human-readable title/description; UI can ignore and fully rely on metadata payload.
         const title = payload.location?.name ? `IRL gathering in ${payload.location.name}` : 'IRL gathering';
         const description =
-          payload.events?.total != null
-            ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
-            : 'Upcoming IRL gathering';
+          (payload.location?.description && String(payload.location.description).trim().length > 0)
+            ? String(payload.location.description).trim()
+            : payload.events?.total != null
+              ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
+              : 'Upcoming IRL gathering';
 
         this.logger.log(`[IRL push job] Creating push notification: title="${title}"`);
         this.logger.log(
@@ -206,28 +258,39 @@ export class IrlGatheringPushNotificationsJob {
   private matchesWindow(
     ruleKind: IrlGatheringPushRuleKind,
     startDates: Date[],
+    endDates: Date[],
     now: Date,
     cfg: Pick<ActiveDbConfig, 'upcomingWindowDays' | 'reminderDaysBefore'>
   ): boolean {
-    // For a grouped notification we consider the earliest event (closest upcoming).
-    const earliest = startDates
+    const msInDay = 24 * 60 * 60 * 1000;
+
+    // For a grouped notification we consider the earliest end date (closest finishing)
+    // for UPCOMING, and the earliest start date for REMINDER.
+    const earliestStart = startDates
       .filter(Boolean)
       .map((d) => new Date(d))
       .sort((a, b) => a.getTime() - b.getTime())[0];
 
-    if (!earliest) {
+    const earliestEnd = endDates
+      .filter(Boolean)
+      .map((d) => new Date(d))
+      .sort((a, b) => a.getTime() - b.getTime())[0];
+
+    if (!earliestStart && !earliestEnd) {
       this.logger.log(`[IRL push job] Window check: ruleKind=${ruleKind}, earliest=<none> -> false`);
       return false;
     }
 
-    this.logger.log(`[IRL push job] Window check: ruleKind=${ruleKind}, earliest=${earliest.toISOString()}`);
-
-    const msInDay = 24 * 60 * 60 * 1000;
-
     if (ruleKind === IrlGatheringPushRuleKind.UPCOMING) {
       const windowEnd = new Date(now.getTime() + cfg.upcomingWindowDays * msInDay);
       this.logger.log(`[IRL push job] UPCOMING windowEnd=${windowEnd.toISOString()}`);
-      return earliest.getTime() <= windowEnd.getTime();
+      if (!earliestEnd) {
+        this.logger.log(`[IRL push job] Window check: ruleKind=UPCOMING earliestEnd=<none> -> false`);
+        return false;
+      }
+      this.logger.log(`[IRL push job] Window check: ruleKind=UPCOMING earliestEnd=${earliestEnd.toISOString()}`);
+      // include in-progress events: endDate must not be in the past
+      return earliestEnd.getTime() >= now.getTime() && earliestEnd.getTime() <= windowEnd.getTime();
     }
 
     // REMINDER: fire when event is within N days (inclusive).
@@ -237,7 +300,12 @@ export class IrlGatheringPushNotificationsJob {
       this.logger.log(
         `[IRL push job] REMINDER window=[${reminderStart.toISOString()}..${reminderEnd.toISOString()}]`
       );
-      return earliest.getTime() >= reminderStart.getTime() && earliest.getTime() <= reminderEnd.getTime();
+      if (!earliestStart) {
+        this.logger.log(`[IRL push job] Window check: ruleKind=REMINDER earliestStart=<none> -> false`);
+        return false;
+      }
+      this.logger.log(`[IRL push job] Window check: ruleKind=REMINDER earliestStart=${earliestStart.toISOString()}`);
+      return earliestStart.getTime() >= reminderStart.getTime() && earliestStart.getTime() <= reminderEnd.getTime();
     }
 
     return false;
@@ -264,6 +332,7 @@ export class IrlGatheringPushNotificationsJob {
     groupCandidates: Array<{
       eventUid: string;
       eventStartDate: Date;
+      eventEndDate: Date;
       attendeeCount: number;
     }>
   ): Promise<any> {
@@ -277,6 +346,7 @@ export class IrlGatheringPushNotificationsJob {
       select: {
         uid: true,
         location: true,
+        description: true,
         country: true,
         timezone: true,
         latitude: true,
@@ -292,6 +362,7 @@ export class IrlGatheringPushNotificationsJob {
       ? {
         uid: location.uid,
         location: location.location,
+        description: location.description,
         country: location.country,
         timezone: location.timezone,
         latitude: location.latitude,
@@ -407,6 +478,7 @@ export class IrlGatheringPushNotificationsJob {
         ? {
           id: locationInfo.uid,
           name: locationInfo.location,
+          description: locationInfo.description,
           country: locationInfo.country,
           timezone: locationInfo.timezone,
           latitude: locationInfo.latitude,
