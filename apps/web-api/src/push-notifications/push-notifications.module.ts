@@ -13,7 +13,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
  * Uses the local WebSocketModule for delivery.
  */
 @Module({
-  imports: [SharedModule, forwardRef(() => MembersModule), NotificationsModule],
+  imports: [SharedModule, forwardRef(() => MembersModule), forwardRef(() => NotificationsModule)],
   controllers: [PushNotificationsController, AdminPushNotificationsController, ForumPushNotificationsController],
   providers: [PushNotificationsService, JwtService],
   exports: [PushNotificationsService],
