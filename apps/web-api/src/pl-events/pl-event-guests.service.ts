@@ -63,7 +63,7 @@ export class PLEventGuestsService {
       const isAdmin = this.memberService.checkIfAdminUser(member);
       await this.updateMemberDetails(data, member, isAdmin, tx);
       data.memberUid = isAdmin ? data.memberUid : member.uid;
-      const guests = this.formatInputToEventGuests(data);
+      const guests = this.formatInputToEventGuests(data, locationUid);
       const eventMember: Member = await this.memberService.findMemberByUid(data.memberUid);
       const plEvents: PLEvent[] = await this.getPLEventsByMemberAndLocation(eventMember, locationUid);
       const result = await (tx || this.prisma).pLEventGuest.createMany({ data: guests });
@@ -77,7 +77,7 @@ export class PLEventGuestsService {
       // Recompute candidates and immediately refresh already-sent push notifications
       // so attendee counts stay accurate when guests are added/removed.
       await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(
-        guests.map((g) => g.eventUid)
+        guests.map((g) => g.eventUid).filter(Boolean)
       );
       this.cacheService.reset({service: 'PLEventGuest'});
       return result;
@@ -344,8 +344,29 @@ export class PLEventGuestsService {
    * @param input The input data containing details such as events, topics, telegram ID, office hours, etc.
    * @returns An array of formatted event guest objects to be inserted into the database.
    */
-  private formatInputToEventGuests(input: CreatePLEventGuestSchemaDto) {
-    return input.events.map((event) => {
+  private formatInputToEventGuests(input: CreatePLEventGuestSchemaDto, locationUid: string) {
+    const events = input.events ?? [];
+    if (events.length === 0) {
+      // Location-level guest (IRL Gathering attendee without a specific event)
+      return [
+        {
+          telegramId: input.telegramId || null,
+          officeHours: input.officeHours || null,
+          reason: input.reason || null,
+          memberUid: input.memberUid,
+          teamUid: input.teamUid,
+          locationUid,
+          eventUid: null,
+          additionalInfo: input.additionalInfo ?? null,
+          topics: input.topics || [],
+          isHost: false,
+          isSpeaker: false,
+          isSponsor: false,
+        },
+      ];
+    }
+
+    return events.map((event) => {
       const additionalInfo = {
         ...input.additionalInfo,
         hostSubEvents: event.hostSubEvents || [],
@@ -358,6 +379,7 @@ export class PLEventGuestsService {
         reason: input.reason || null,
         memberUid: input.memberUid,
         teamUid: input.teamUid,
+        locationUid,
         eventUid: event.uid,
         additionalInfo: additionalInfo,
         topics: input.topics || [],

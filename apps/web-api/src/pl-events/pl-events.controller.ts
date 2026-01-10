@@ -143,6 +143,7 @@ export class PLEventsController {
     const location = await this.eventLocationService.getPLEventLocationByUid(locationUid);
     if (
       !this.memberService.checkIfAdminUser(member) &&
+      body.events?.length &&
       !this.eventGuestService.checkIfEventsAreUpcoming(location.upcomingEvents, body.events)
     ) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
