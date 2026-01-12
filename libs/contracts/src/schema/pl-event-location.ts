@@ -7,6 +7,7 @@ export const PLEventLocationSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
   location: z.string(),
+  description: z.string().optional().nullable(),
   country: z.string(),
   latitude: z.string().optional().nullable(),
   longitude: z.string().optional().nullable(),
@@ -28,6 +29,7 @@ export const PLEventLocationSchema = z.object({
 
 export const PLCreateEventLocationSchema = PLEventLocationSchema.pick({
   location: true,
+  description: true,
   country: true,
   latitude: true,
   longitude: true,
@@ -75,6 +77,7 @@ export const UpdateIRLAggregatedPriority = z.object({
 
 export const UpdatePLEventLocationSchema = z.object({
   location: z.string().optional(),
+  description: z.string().optional().nullable(),
   country: z.string().optional().nullable(),
   latitude: z.string().optional().nullable(),
   longitude: z.string().optional().nullable(),
