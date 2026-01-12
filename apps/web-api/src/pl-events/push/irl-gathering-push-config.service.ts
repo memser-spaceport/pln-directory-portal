@@ -6,6 +6,8 @@ export type IrlGatheringPushConfigDto = {
   enabled: boolean;
   isActive: boolean;
   minAttendeesPerEvent: number;
+  totalEventsThreshold: number;
+  qualifiedEventsThreshold: number;
   upcomingWindowDays: number;
   reminderDaysBefore: number;
   updatedAt: Date;
@@ -14,6 +16,8 @@ export type IrlGatheringPushConfigDto = {
 export type UpdateIrlGatheringPushConfigDto = Partial<{
   enabled: boolean;
   minAttendeesPerEvent: number;
+  totalEventsThreshold: number;
+  qualifiedEventsThreshold: number;
   upcomingWindowDays: number;
   reminderDaysBefore: number;
   updatedByMemberUid: string | null;
@@ -22,6 +26,8 @@ export type UpdateIrlGatheringPushConfigDto = Partial<{
 export type CreateIrlGatheringPushConfigDto = {
   enabled: boolean;
   minAttendeesPerEvent: number;
+  totalEventsThreshold: number;
+  qualifiedEventsThreshold: number;
   upcomingWindowDays: number;
   reminderDaysBefore: number;
   updatedByMemberUid?: string | null;
@@ -44,6 +50,8 @@ export class IrlGatheringPushConfigService {
         isActive: true,
         enabled: true,
         minAttendeesPerEvent: true,
+        totalEventsThreshold: true,
+        qualifiedEventsThreshold: true,
         upcomingWindowDays: true,
         reminderDaysBefore: true,
         updatedAt: true,
@@ -74,6 +82,8 @@ export class IrlGatheringPushConfigService {
       data: {
         enabled: body.enabled,
         minAttendeesPerEvent: body.minAttendeesPerEvent,
+        totalEventsThreshold: body.totalEventsThreshold,
+        qualifiedEventsThreshold: body.qualifiedEventsThreshold,
         upcomingWindowDays: body.upcomingWindowDays,
         reminderDaysBefore: body.reminderDaysBefore,
         // if field is omitted -> no update; if null -> set null
@@ -93,6 +103,8 @@ export class IrlGatheringPushConfigService {
           isActive: true,
           enabled: body.enabled,
           minAttendeesPerEvent: body.minAttendeesPerEvent,
+          totalEventsThreshold: body.totalEventsThreshold,
+          qualifiedEventsThreshold: body.qualifiedEventsThreshold,
           upcomingWindowDays: body.upcomingWindowDays,
           reminderDaysBefore: body.reminderDaysBefore,
           updatedByMemberUid: body.updatedByMemberUid ?? null,

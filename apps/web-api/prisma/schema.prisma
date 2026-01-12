@@ -455,6 +455,7 @@ model PLEventLocation {
   isDeleted            Boolean                      @default(false)
   aggregatedPriority   Int?
   locationAssociations PLEventLocationAssociation[]
+  guests               PLEventGuest[]
 }
 
 model PLEventLocationAssociation {
@@ -514,19 +515,26 @@ model PLEvent {
 }
 
 model PLEventGuest {
-  id             Int      @id @default(autoincrement())
-  uid            String   @unique @default(cuid())
-  telegramId     String?
-  officeHours    String?
-  reason         String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  memberUid      String
-  member         Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
-  teamUid        String?
-  team           Team?    @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
-  eventUid       String
-  event          PLEvent  @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
+  id          Int      @id @default(autoincrement())
+  uid         String   @unique @default(cuid())
+  telegramId  String?
+  officeHours String?
+  reason      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  memberUid   String
+  member      Member   @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  teamUid     String?
+  team        Team?    @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+
+  // Guest can be attached either to a specific event (eventUid) or to the gathering overall (eventUid = null).
+  // In both cases we store locationUid to allow location-level attendees.
+  locationUid String
+  location    PLEventLocation @relation(fields: [locationUid], references: [uid], onDelete: Cascade)
+
+  eventUid String?
+  event    PLEvent? @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
+
   additionalInfo Json?
   topics         String[]
   priority       Int?
@@ -1243,44 +1251,53 @@ model PushNotificationReadStatus {
   @@index([notificationId])
 }
 
-
 enum IrlGatheringPushRuleKind {
   UPCOMING
   REMINDER
 }
 
 model IrlGatheringPushCandidate {
-  id             Int                    @id @default(autoincrement())
-  uid            String                 @unique @default(cuid())
+  id             Int                      @id @default(autoincrement())
+  uid            String                   @unique @default(cuid())
   ruleKind       IrlGatheringPushRuleKind
   gatheringUid   String
   eventUid       String
   eventStartDate DateTime
+  eventEndDate   DateTime
   attendeeCount  Int
-  isSuppressed   Boolean                @default(false)
+  isSuppressed   Boolean                  @default(false)
   processedAt    DateTime?
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
 
   @@unique([ruleKind, eventUid])
   @@index([ruleKind, gatheringUid])
   @@index([ruleKind, processedAt])
   @@index([eventStartDate])
+  @@index([eventEndDate])
 }
 
 model IrlGatheringPushConfig {
-  id   Int    @id @default(autoincrement())
-  uid  String @unique @default(cuid())
+  id  Int    @id @default(autoincrement())
+  uid String @unique @default(cuid())
 
   /// Only one config row should be active at a time.
   isActive Boolean @default(true)
 
   /// Global switch for IRL gathering push logic.
-  enabled  Boolean @default(true)
+  enabled Boolean @default(true)
 
   /// Base threshold: minimum number of attendees required for an event
   /// to become a push candidate.
   minAttendeesPerEvent Int @default(5)
+
+  /// Group-level gate: total number of events in the upcoming window
+  /// required before we send any push for a gathering.
+  totalEventsThreshold Int @default(5)
+
+  /// Group-level gate: minimum number of events that qualify by attendee + time
+  /// filters (upcoming/reminder candidates) before we send any push for a gathering.
+  qualifiedEventsThreshold Int @default(2)
 
   /// Upcoming window: consider event a candidate only if
   /// startDate <= now + upcomingWindowDays.
@@ -1300,6 +1317,3 @@ model IrlGatheringPushConfig {
   @@index([enabled])
   @@index([updatedAt])
 }
-
-
-

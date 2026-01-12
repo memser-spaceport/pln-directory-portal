@@ -4,7 +4,7 @@ import { RecommendationsMenu } from './components/RecommendationsMenu/Recommenda
 import { DemoDaysMenu } from './components/DemoDaysMenu/DemoDaysMenu';
 import { useAuth } from '../../context/auth-context';
 import { RolesMenu } from './components/RolesMenu/RolesMenu';
-import { IrlGatheringPushConfigMenu } from './components/IrlGatheringPushConfigMenu/IrlGatheringPushConfigMenu';
+import { IrlGatheringMenu } from './components/IrlGatheringMenu/IrlGatheringMenu';
 
 export function Menu() {
   const { isDirectoryAdmin, isDemoDayAdmin } = useAuth();
@@ -16,7 +16,7 @@ export function Menu() {
       {isDirectoryAdmin && <TeamsMenu />}
       {isDirectoryAdmin && <RecommendationsMenu />}
       {(isDirectoryAdmin || isDemoDayAdmin) && <DemoDaysMenu />}
-      {isDirectoryAdmin && <IrlGatheringPushConfigMenu />}
+      {isDirectoryAdmin && <IrlGatheringMenu />}
     </ul>
   );
 }

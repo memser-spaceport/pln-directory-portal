@@ -4,72 +4,66 @@ import { faker } from '@faker-js/faker';
 import sample from 'lodash/sample';
 import { prisma } from './../index';
 
-const getUidsFrom = async (model, where = {}) => {
-  return await prisma[model].findMany({
-    select: {
-      uid: true,
-    },
+const getUidsFrom = async (model: string, where: Record<string, any> = {}) => {
+  const rows = await (prisma as any)[model].findMany({
+    select: { uid: true },
     where,
   });
+  return (rows ?? []).map((r: any) => r.uid);
 };
 
-const eventFactory = Factory.define<Omit<PLEvent, 'id'>>(
-  ({ sequence, onCreate }) => {
-    onCreate(async (event) => {
-      const locationUids = await (
-        await getUidsFrom('pLEventLocation')
-      ).map((result) => result.uid);
-      event.locationUid = sample(locationUids) || '';
-      
-      const logoImageUids = await (
-        await getUidsFrom('image', { thumbnailToUid: null })
-      ).map((result) => result.uid);
-      event.logoUid = sample(logoImageUids) || '';
-      event.bannerUid = sample(logoImageUids) || '';
-      return event;
-    });
+const eventFactory = Factory.define<Omit<PLEvent, 'id'>>(({ sequence, onCreate }) => {
+  onCreate(async (event) => {
+    const locationUids = await getUidsFrom('pLEventLocation', { isDeleted: false });
+    event.locationUid = sample(locationUids) ?? null;
 
-    const startDate = faker.date.future();
-    // Manually set endDate to a random time after startDate, ensuring it's in the future
-    const endDate = new Date(startDate.getTime() + faker.datatype.number({ min: 1, max: 30 }) * 24 * 60 * 60 * 1000);
+    // FK-safe: real image uid OR null
+    const imageUids = await getUidsFrom('image');
+    const imageUid = sample(imageUids) ?? null;
 
-    return {
-      uid: `uid_${sequence}`,
-      type: faker.helpers.arrayElement(['INVITE_ONLY', null]),
-      name: faker.company.name(),
-      description: faker.lorem.paragraph(),
-      eventsCount: faker.datatype.number({ min: 1, max: 100 }),
-      startDate: startDate,
-      endDate: endDate,
-      shortDescription: faker.lorem.sentence(),
-      isFeatured: faker.datatype.boolean(),
-      telegramId: faker.datatype.uuid(),
-      websiteURL: faker.internet.url(),
-      resources: [{ 
-        url: faker.internet.url(), 
-        description: faker.lorem.sentence(),
-        name: faker.company.name() 
-      }],
-      logoUid: '',
-      bannerUid: '',
-      locationUid: '',
-      additionalInfo: {},
-      priority: faker.datatype.number({ min: 1, max: 100 }),
-      slugURL: `${faker.helpers.slugify(faker.company.name())}-${sequence}`,
-      createdAt: faker.date.past(),
-      updatedAt: faker.date.recent(),
-      externalId: faker.datatype.uuid(),
-      syncedAt: faker.date.recent(),
-      isAggregated: false,
-      isDeleted: false,
-      aggregatedPriority: faker.datatype.number({ min: 1, max: 100 }),
-      // Added required fields after schema updates
-      locationStatus: 'AUTO_MAPPED' as PLEventLocationStatus,
-      reviewerUid: null,
-      pLEventLocationAssociationUid: null,
-      // country: faker.address.country(),
-    };
-  }
-);
+    event.logoUid = imageUid;
+    event.bannerUid = imageUid;
+
+    return event;
+  });
+
+  const startDate = faker.date.future();
+  const endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000);
+
+  return {
+    uid: `event-${sequence}`,
+    type: null,
+    name: faker.company.name(),
+    description: faker.lorem.paragraph(),
+    shortDescription: faker.lorem.sentence(),
+    eventsCount: 0,
+    startDate,
+    endDate,
+    slugURL: `event-${sequence}`,
+    telegramId: null,
+    websiteURL: null,
+    resources: [],
+    isFeatured: false,
+
+    // ❗ CRITICAL: must be null, NOT empty string
+    logoUid: null,
+    bannerUid: null,
+    locationUid: null,
+
+    additionalInfo: {},
+    priority: 1,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    externalId: faker.datatype.uuid(),
+    syncedAt: new Date(),
+    isAggregated: false,
+    isDeleted: false,
+    aggregatedPriority: 1,
+
+    locationStatus: 'AUTO_MAPPED' as PLEventLocationStatus,
+    reviewerUid: null,
+    pLEventLocationAssociationUid: null,
+  };
+});
 
 export const events = async () => await eventFactory.createList(25);

@@ -1,0 +1,92 @@
+.root {
+  position: relative;
+}
+
+.trigger {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  gap: 8px;
+  color: var(--action-foreground-neutral-normal, #455468);
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 24px;
+  letter-spacing: -0.3px;
+  background: none;
+  border: none;
+  white-space: nowrap;
+}
+
+.menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
+  z-index: 10;
+  min-width: 272px;
+  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  align-items: flex-start;
+  border-radius: var(--corner-radius-2xl, 16px);
+  background: var(--background-base-white, #fff);
+  box-shadow: 0px 10px 20px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06)),
+  0px 20px 65px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06));
+}
+
+.menu.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.chevron {
+  transition: transform 0.25s ease;
+  &.open {
+    transform: rotate(180deg);
+  }
+}
+
+.menuItem {
+  display: flex;
+  padding: var(--spacing-2xs, 8px) var(--spacing-sm, 12px);
+  align-items: center;
+  gap: var(--spacing-2xs, 8px);
+  align-self: stretch;
+  border-radius: var(--corner-radius-3xl, 20px);
+  width: 100%;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  color: var(--action-foreground-neutral-active, #3d4a5c);
+
+  .caret {
+    width: 0;
+    transition: all 0.3s ease;
+    margin-left: auto;
+  }
+
+  &:hover {
+    background: var(--transparent-dark-4, rgba(14, 15, 17, 0.04));
+
+    .caret {
+      width: 16px;
+    }
+  }
+}
+
+.menuItemLabel {
+  overflow: hidden;
+  color: var(--action-foreground-neutral-active, #3d4a5c);
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}

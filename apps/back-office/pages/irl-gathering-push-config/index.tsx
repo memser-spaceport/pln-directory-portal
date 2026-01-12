@@ -15,6 +15,8 @@ type IrlGatheringPushConfigDto = {
   enabled: boolean;
 
   minAttendeesPerEvent: number;
+  totalEventsThreshold: number;
+  qualifiedEventsThreshold: number;
   upcomingWindowDays: number;
   reminderDaysBefore: number;
 
@@ -40,6 +42,8 @@ const IrlGatheringPushConfigPage = () => {
     isActive: true,
     enabled: true,
     minAttendeesPerEvent: 5,
+    totalEventsThreshold: 5,
+    qualifiedEventsThreshold: 2,
     upcomingWindowDays: 7,
     reminderDaysBefore: 1,
   });
@@ -50,6 +54,8 @@ const IrlGatheringPushConfigPage = () => {
         form.isActive !== config.isActive ||
         form.enabled !== config.enabled ||
         Number(form.minAttendeesPerEvent) !== Number(config.minAttendeesPerEvent) ||
+        Number(form.totalEventsThreshold) !== Number(config.totalEventsThreshold) ||
+        Number(form.qualifiedEventsThreshold) !== Number(config.qualifiedEventsThreshold) ||
         Number(form.upcomingWindowDays) !== Number(config.upcomingWindowDays) ||
         Number(form.reminderDaysBefore) !== Number(config.reminderDaysBefore)
     );
@@ -108,6 +114,8 @@ const IrlGatheringPushConfigPage = () => {
             isActive: Boolean(dto.isActive),
             enabled: Boolean(dto.enabled),
             minAttendeesPerEvent: Number(dto.minAttendeesPerEvent),
+            totalEventsThreshold: Number(dto.totalEventsThreshold ?? 5),
+            qualifiedEventsThreshold: Number(dto.qualifiedEventsThreshold ?? 2),
             upcomingWindowDays: Number(dto.upcomingWindowDays),
             reminderDaysBefore: Number(dto.reminderDaysBefore),
           });
@@ -156,6 +164,8 @@ const IrlGatheringPushConfigPage = () => {
         isActive: Boolean(form.isActive),
         enabled: Boolean(form.enabled),
         minAttendeesPerEvent: Number(form.minAttendeesPerEvent),
+        totalEventsThreshold: Number(form.totalEventsThreshold),
+        qualifiedEventsThreshold: Number(form.qualifiedEventsThreshold),
         upcomingWindowDays: Number(form.upcomingWindowDays),
         reminderDaysBefore: Number(form.reminderDaysBefore),
       };
@@ -172,11 +182,13 @@ const IrlGatheringPushConfigPage = () => {
         isActive: Boolean(updated.isActive),
         enabled: Boolean(updated.enabled),
         minAttendeesPerEvent: Number(updated.minAttendeesPerEvent),
+        totalEventsThreshold: Number(updated.totalEventsThreshold ?? 5),
+        qualifiedEventsThreshold: Number(updated.qualifiedEventsThreshold ?? 2),
         upcomingWindowDays: Number(updated.upcomingWindowDays),
         reminderDaysBefore: Number(updated.reminderDaysBefore),
       });
 
-      setSuccessText('Saved');``
+      setSuccessText('Saved');
     } catch (e: any) {
       console.error('[IrlGatheringPushConfigPage] Save failed:', e);
 
@@ -242,6 +254,7 @@ const IrlGatheringPushConfigPage = () => {
                         <div className="grid grid-cols-1 gap-4">
                           <label className="flex items-center gap-2 text-sm text-gray-700">
                             <input
+                                disabled={true}
                                 type="checkbox"
                                 checked={form.isActive}
                                 onChange={(e) => updateField('isActive', e.target.checked)}
@@ -269,6 +282,32 @@ const IrlGatheringPushConfigPage = () => {
                                 min={0}
                             />
                             <p className="mt-1 text-xs text-gray-500">Minimum guests required per event to become a candidate.</p>
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">totalEventsThreshold</label>
+                            <input
+                              type="number"
+                              value={form.totalEventsThreshold}
+                              onChange={(e) => updateField('totalEventsThreshold', e.target.valueAsNumber)}
+                              className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              min={0}
+                            />
+                            <p className="mt-1 text-xs text-gray-500">Send (or refresh) a location push only when there are at least N total events in the upcoming window.</p>
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">qualifiedEventsThreshold</label>
+                            <input
+                              type="number"
+                              value={form.qualifiedEventsThreshold}
+                              onChange={(e) => updateField('qualifiedEventsThreshold', e.target.valueAsNumber)}
+                              className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              min={0}
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                              Out of total events, how many must qualify by attendee + time filters.
+                            </p>
                           </div>
 
                           <div>
@@ -307,6 +346,8 @@ const IrlGatheringPushConfigPage = () => {
                                   isActive: Boolean(config.isActive),
                                   enabled: Boolean(config.enabled),
                                   minAttendeesPerEvent: Number(config.minAttendeesPerEvent),
+                                  totalEventsThreshold: Number((config as any).totalEventsThreshold ?? 5),
+                                  qualifiedEventsThreshold: Number((config as any).qualifiedEventsThreshold ?? 2),
                                   upcomingWindowDays: Number(config.upcomingWindowDays),
                                   reminderDaysBefore: Number(config.reminderDaysBefore),
                                 });
