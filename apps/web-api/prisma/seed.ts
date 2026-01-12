@@ -34,6 +34,11 @@ import { demoDayAdmins } from './fixtures/demoDayAdmins';
 import { demoDayAdminScopes } from './fixtures/demoDayAdminScopes';
 import { demoDayAdminRoleAssignments } from './fixtures/demoDayAdminRoleAssignments';
 import {irlGatheringPushConfigs} from "./fixtures/irl-gathering-push-config";
+import {
+  irlGatheringPushCandidates,
+  irlGatheringPushEventGuests,
+  irlGatheringPushEventLocations, irlGatheringPushEvents
+} from "./fixtures/irl-gathering-push-candidates";
 
 /**
  * Truncate all public tables (except _prisma_migrations) and reset identities.
@@ -172,6 +177,11 @@ async function main() {
     { [Prisma.ModelName.MemberDemoDayAdminScope]: { fixtures: demoDayAdminScopes } },
     { [Prisma.ModelName.DemoDay]: { fixtures: demoDays } },
     { [Prisma.ModelName.IrlGatheringPushConfig]: { fixtures: irlGatheringPushConfigs } },
+    { [Prisma.ModelName.PLEventLocation]: { fixtures: irlGatheringPushEventLocations } },
+    { [Prisma.ModelName.PLEvent]: { fixtures: irlGatheringPushEvents } },
+    { [Prisma.ModelName.PLEventGuest]: { fixtures: irlGatheringPushEventGuests } },
+    { [Prisma.ModelName.IrlGatheringPushCandidate]: { fixtures: irlGatheringPushCandidates } },
+
   ]);
 
   // After members + roles are created, assign DEMO_DAY_ADMIN role to demo day admins

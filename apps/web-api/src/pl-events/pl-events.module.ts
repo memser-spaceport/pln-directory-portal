@@ -19,8 +19,10 @@ import { IrlGatheringPushNotificationsJob } from './push/irl-gathering-push-noti
 import { EventsModule } from '../events/events.module';
 import {IrlGatheringPushConfigService} from "./push/irl-gathering-push-config.service";
 import {IrlGatheringPushConfigController} from "./push/irl-gathering-push-config.controller";
+import {IrlGatheringPushNotificationsController} from "./push/irl-gathering-push-notifications.controller";
+import { IrlGatheringPushNotificationsProcessor } from './push/irl-gathering-push-notifications.processor';
 @Module({
-  controllers: [PLEventsController, IrlGatheringPushConfigController],
+  controllers: [PLEventsController, IrlGatheringPushConfigController, IrlGatheringPushNotificationsController],
   providers: [
     PLEventsService,
     PLEventLocationsService,
@@ -31,6 +33,7 @@ import {IrlGatheringPushConfigController} from "./push/irl-gathering-push-config
     PLEventLocationAssociationService,
     IrlGatheringPushCandidatesService,
     IrlGatheringPushNotificationsJob,
+    IrlGatheringPushNotificationsProcessor
   ],
   exports: [
     PLEventsService,
