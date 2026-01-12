@@ -100,6 +100,7 @@ export class IrlGatheringPushCandidatesService {
 
     const countByEventUid = new Map<string, number>();
     for (const row of attendeeCounts) {
+      if (!row.eventUid) continue;
       countByEventUid.set(row.eventUid, row._count._all);
     }
 
