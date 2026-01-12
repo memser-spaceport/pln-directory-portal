@@ -860,6 +860,15 @@ export class PLEventLocationsService {
       if (!existing) {
         throw new NotFoundException(`Location with UID ${uid} not found.`);
       }
+      if(data.location && data.location !== existing.location) {
+        const existingLocation = await this.prisma.pLEventLocation.findFirst({
+          where: { location: { equals: data.location as string, mode: 'insensitive' } , isDeleted: false }}
+        );
+        if (existingLocation) {
+          throw new ConflictException(`Location with location ${data.location} already exists.`);
+        }
+      }
+
 
       const location = await this.prisma.pLEventLocation.update({
         where: { uid },

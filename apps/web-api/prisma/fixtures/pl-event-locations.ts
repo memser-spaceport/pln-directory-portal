@@ -9,6 +9,7 @@ const eventLocationFactory = Factory.define<Omit<PLEventLocation, 'id'>>(({ onCr
   return {
     uid: faker.datatype.uuid(),
     location: faker.address.city(),
+    description: faker.lorem.sentence(),
     country: faker.address.country(),
     flag: "https://plabs-assets.s3.us-west-1.amazonaws.com/images/Thailand-flag.png",
     icon: "https://plabs-assets.s3.us-west-1.amazonaws.com/images/Bangkok.svg",
@@ -24,7 +25,6 @@ const eventLocationFactory = Factory.define<Omit<PLEventLocation, 'id'>>(({ onCr
     isAggregated: false,
     aggregatedPriority: faker.datatype.number({ min: 1, max: 100 }),
     isDeleted: false,
-    description: 'test'
   };
 });
 

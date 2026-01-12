@@ -437,7 +437,6 @@ model PLEventLocation {
   id                   Int                          @id @default(autoincrement())
   uid                  String                       @unique @default(cuid())
   location             String
-  /// Optional human-provided description for IRL gathering (used in UI/push).
   description          String?
   country              String?
   timezone             String?
