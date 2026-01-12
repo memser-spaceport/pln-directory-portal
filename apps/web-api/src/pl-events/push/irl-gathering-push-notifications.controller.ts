@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
-import { AdminAuthGuard } from '../../guards/admin-auth.guard';
-import { IrlGatheringPushRuleKind } from '@prisma/client';
-import { PrismaService } from '../../shared/prisma.service';
-import { IrlGatheringPushNotificationsProcessor } from './irl-gathering-push-notifications.processor';
+import {Body, Controller, Get, Post, UseGuards} from '@nestjs/common';
+import {AdminAuthGuard} from '../../guards/admin-auth.guard';
+import {IrlGatheringPushRuleKind} from '@prisma/client';
+import {PrismaService} from '../../shared/prisma.service';
+import {IrlGatheringPushNotificationsProcessor} from './irl-gathering-push-notifications.processor';
 
 class TriggerIrlPushDto {
   locationUid: string;
@@ -38,7 +38,6 @@ export class IrlGatheringPushNotificationsController {
    */
   @Post('trigger')
   async trigger(@Body() body: TriggerIrlPushDto) {
-    await this.processor.triggerManual({ locationUid: body.locationUid, kind: body.kind });
-    return { ok: true };
+    return await this.processor.triggerManual({locationUid: body.locationUid, kind: body.kind});
   }
 }
