@@ -60,16 +60,26 @@ FIELDS TO POPULATE:
 
    ALWAYS populate this field based on what the company does.
 
-8. logoUrl: Direct URL to the company's logo image. Search for:
-   - "[Company] logo"
-   - Check their website for /logo.png, /favicon.ico, or Open Graph images
-   - Look for logo URLs in press kits or social media profiles
+8. logoUrl: Direct, publicly accessible URL to the company's logo image.
+   IMPORTANT: Only return URLs that are directly accessible (no authentication required).
+
+   Best sources for logos (in order of preference):
+   - Twitter/X profile image: https://pbs.twimg.com/profile_images/... (search for company Twitter)
+   - Company website Open Graph image: Look for og:image meta tag
+   - Crunchbase or PitchBook company profile images
+   - GitHub organization avatar (if tech company)
+   - Company press kit or media page
+
+   DO NOT use:
+   - LinkedIn logos (require authentication)
+   - Made-up URLs like "/logo.png" without verification
+   - URLs that return 404 or require login
 
 SEARCH STRATEGY:
 1. Search for "[Company Name]" + website or official site
-2. Search for "[Company Name]" + about or team
-3. Search for "[Company Name] logo" or "[Company Name] press kit"
-4. Search for "[Company Name] LinkedIn"
+2. Search for "[Company Name] Twitter" or "[Company Name] X" to find their Twitter profile
+3. Search for "[Company Name] Crunchbase" for company profile with logo
+4. Search for "[Company Name]" + about or team
 
 CRITICAL: You MUST ALWAYS respond with valid JSON. Never leave investmentFocus empty - derive tags from what you know about the company.
 
@@ -219,6 +229,11 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
       }
 
       const aiResponse = this.parseAIResponse(text);
+
+      // Validate logo URL exists (returns null if 404 or invalid)
+      const validatedLogoUrl = await this.validateLogoUrl(aiResponse.logoUrl);
+      aiResponse.logoUrl = validatedLogoUrl;
+
       const fieldsUpdated = this.getUpdatedFields(originalData, aiResponse);
 
       return {
@@ -233,7 +248,7 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
           longDescription: aiResponse.longDescription,
           moreDetails: aiResponse.moreDetails,
           investmentFocus: aiResponse.investmentFocus || [],
-          logoUrl: aiResponse.logoUrl,
+          logoUrl: validatedLogoUrl,
         },
         confidence: aiResponse.confidence,
         sources: aiResponse.sources,
@@ -282,7 +297,7 @@ ${existingDescription ? `Existing Description: ${existingDescription}` : 'Descri
 
 TASK:
 1. Search for "${fund.name}" to find additional information
-2. Find their logo URL (search for "${fund.name} logo" or check their website)
+2. Search for "${fund.name} Twitter" or "${fund.name} Crunchbase" to find their logo
 3. Gather information about their team, history, and achievements for moreDetails
 4. DERIVE investmentFocus tags based on:
    - What the company does (from description: "${existingDescription}")
@@ -294,7 +309,8 @@ REQUIRED OUTPUT:
 - investmentFocus: MUST contain 3-8 tags derived from what the company does
   Example: If description mentions "Browser with LLMs & Wallets, Private by design"
   Tags should be: ["AI", "Privacy", "Web3", "Crypto", "Browser"]
-- logoUrl: Direct URL to their logo image
+- logoUrl: MUST be a publicly accessible URL (Twitter profile image, Crunchbase, or verified website image)
+  DO NOT guess URLs - only use URLs found in search results
 
 Respond with ONLY a valid JSON object as specified in system prompt.
 
@@ -358,6 +374,48 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       confidence: {},
       sources: [],
     };
+  }
+
+  /**
+   * Validate that a logo URL actually exists (returns 200 and is an image)
+   */
+  private async validateLogoUrl(url: string | null | undefined): Promise<string | null> {
+    if (!url) return null;
+
+    try {
+      // Validate URL format first
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+
+      // Make a HEAD request to check if URL exists
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(url, {
+        method: 'HEAD',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; LogoValidator/1.0)',
+        },
+      });
+
+      clearTimeout(timeout);
+
+      // Check if response is OK and content type is an image
+      if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.startsWith('image/')) {
+          this.log(`Logo URL validated: ${url}`);
+          return url;
+        }
+      }
+
+      this.log(`Logo URL invalid (status: ${response.status}): ${url}`);
+      return null;
+    } catch (error) {
+      this.log(`Logo URL validation failed: ${url} - ${error.message}`);
+      return null;
+    }
   }
 
   /**
