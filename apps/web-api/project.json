@@ -51,6 +51,17 @@
         "tsPlugins": ["@nestjs/swagger/plugin"]
       }
     },
+    "build-enrich-funds-cli": {
+      "executor": "@nrwl/node:webpack",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/web-api/enrich-funds-cli",
+        "main": "apps/web-api/src/enrich-funds-cli.ts",
+        "outputFileName": "enrich-funds-cli.js",
+        "tsConfig": "apps/web-api/tsconfig.build.json",
+        "tsPlugins": ["@nestjs/swagger/plugin"]
+      }
+    },
     "seed": {
       "executor": "@nrwl/workspace:run-commands",
       "options": {
