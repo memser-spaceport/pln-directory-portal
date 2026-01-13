@@ -15,73 +15,83 @@ import {
 
 // System prompt for fund enrichment
 const FUND_ENRICHMENT_SYSTEM_PROMPT = `
-You are a professional research assistant specializing in investment fund data enrichment.
+You are a professional research assistant specializing in company/fund data enrichment.
 
-TASK: Research and gather publicly available information about the investment fund described below using web search.
+TASK: Research and enrich the profile of the company or investment fund described below.
 
 CRITICAL REQUIREMENTS:
-1. ALWAYS use the web_search_preview tool to search for information about the fund
-2. Only return information you can verify through web search
-3. All URLs must be valid and directly related to the fund
-4. If information cannot be verified, return null for that field
-5. Never fabricate or hallucinate information
-6. LinkedIn handlers should be in format "company/fundname" (without full URL)
+1. Use web_search_preview tool to find information about the company/fund
+2. All URLs must be valid and directly related to the company
+3. Never fabricate URLs - only return URLs you found in search results
+4. LinkedIn handlers should be in format "company/name" (without full URL)
 
-FIELDS TO RESEARCH:
-- website: The fund's official website URL (full URL including https://)
-- blog: The fund's blog URL (if available)
-- linkedinHandler: LinkedIn company page handle only (e.g., "company/fundname")
-- shortDescription: A 1-2 sentence description of the fund (max 200 characters)
-- longDescription: A detailed description of the fund's mission, focus, and investment thesis (max 1000 characters)
-- moreDetails: Additional relevant information about the fund, portfolio, team, or notable investments
-- investmentFocus: Array of SHORT TAGS (1-2 words each) describing the fund's investment focus areas.
-  Examples: ["AI", "Crypto", "Web3", "Blockchain", "DeFi", "Infrastructure", "Gaming", "NFT", "DAO", "Layer2", "ZK", "Privacy", "DePIN", "RWA", "SocialFi"]
-  Return 3-8 relevant tags that best describe the fund's focus.
-- logoUrl: URL to the fund's logo image (for reference only)
+FIELDS TO POPULATE:
+
+1. website: Official website URL (https://...)
+
+2. blog: Blog URL if available
+
+3. linkedinHandler: LinkedIn company handle (e.g., "company/puma-ai")
+
+4. shortDescription: 1-2 sentence summary (max 200 chars)
+
+5. longDescription: Detailed description of mission, products, and value proposition (max 1000 chars)
+
+6. moreDetails: IMPORTANT - This should contain additional context such as:
+   - Team information (founders, key people)
+   - Company history or founding date
+   - Notable achievements or milestones
+   - Key features or differentiators
+   - Portfolio companies (if investment fund)
+   - Partnerships or integrations
+   NEVER leave this empty if any additional information was found.
+
+7. investmentFocus: IMPORTANT - Array of 3-8 SHORT TAGS (1-2 words each) that describe what the company focuses on.
+   DERIVE these tags from:
+   - The company's products/services
+   - The industry they operate in
+   - Technologies they use or build
+   - Their target market
+
+   Example tags: ["AI", "Crypto", "Web3", "Blockchain", "DeFi", "Infrastructure", "Gaming", "NFT", "Privacy", "Browser", "Fintech", "SaaS", "Enterprise", "Mobile", "Security", "Data", "Cloud", "IoT", "AR/VR", "Payments"]
+
+   For example, a "Browser with built-in LLMs & Wallets, Private by design" should have tags like:
+   ["AI", "Privacy", "Web3", "Crypto", "Browser"]
+
+   ALWAYS populate this field based on what the company does.
+
+8. logoUrl: Direct URL to the company's logo image. Search for:
+   - "[Company] logo"
+   - Check their website for /logo.png, /favicon.ico, or Open Graph images
+   - Look for logo URLs in press kits or social media profiles
 
 SEARCH STRATEGY:
-1. Search for "[Fund Name] venture capital" or "[Fund Name] investment fund"
-2. Search for "[Fund Name] portfolio companies"
-3. Search for "[Fund Name] LinkedIn"
-4. Search for "[Fund Name] Crunchbase" or "[Fund Name] PitchBook"
+1. Search for "[Company Name]" + website or official site
+2. Search for "[Company Name]" + about or team
+3. Search for "[Company Name] logo" or "[Company Name] press kit"
+4. Search for "[Company Name] LinkedIn"
 
-CRITICAL: You MUST ALWAYS respond with valid JSON, even if no information is found.
+CRITICAL: You MUST ALWAYS respond with valid JSON. Never leave investmentFocus empty - derive tags from what you know about the company.
 
-OUTPUT FORMAT - Respond with ONLY this JSON structure (no markdown, no explanation):
+OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
 {
-  "website": "https://..." or null,
+  "website": "https://...",
   "blog": "https://..." or null,
   "linkedinHandler": "company/..." or null,
-  "shortDescription": "..." or null,
-  "longDescription": "..." or null,
-  "moreDetails": "..." or null,
-  "investmentFocus": ["...", "..."] or [],
+  "shortDescription": "...",
+  "longDescription": "...",
+  "moreDetails": "Additional context about team, history, achievements...",
+  "investmentFocus": ["Tag1", "Tag2", "Tag3", ...],
   "logoUrl": "https://..." or null,
   "confidence": {
-    "website": "high" | "medium" | "low" | null,
-    "blog": "high" | "medium" | "low" | null,
-    "linkedinHandler": "high" | "medium" | "low" | null,
-    "shortDescription": "high" | "medium" | "low" | null,
-    "longDescription": "high" | "medium" | "low" | null,
-    "moreDetails": "high" | "medium" | "low" | null,
-    "investmentFocus": "high" | "medium" | "low" | null,
-    "logoUrl": "high" | "medium" | "low" | null
+    "website": "high" | "medium" | "low",
+    "shortDescription": "high" | "medium" | "low",
+    "longDescription": "high" | "medium" | "low",
+    "moreDetails": "high" | "medium" | "low",
+    "investmentFocus": "high" | "medium" | "low",
+    "logoUrl": "high" | "medium" | "low"
   },
   "sources": ["url1", "url2", ...]
-}
-
-If NO information can be found for the fund, return:
-{
-  "website": null,
-  "blog": null,
-  "linkedinHandler": null,
-  "shortDescription": null,
-  "longDescription": null,
-  "moreDetails": null,
-  "investmentFocus": [],
-  "logoUrl": null,
-  "confidence": {},
-  "sources": []
 }
 `;
 
@@ -260,26 +270,33 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
    * Build user prompt for AI enrichment
    */
   private buildUserPrompt(fund: FundToEnrich): string {
-    return `
-Research the following investment fund and return the results as JSON:
+    const existingDescription = fund.shortDescription || fund.longDescription || '';
 
-Fund Name: ${fund.name}
+    return `
+Research and enrich the profile for this company/fund:
+
+Company Name: ${fund.name}
 ${fund.website ? `Existing Website: ${fund.website}` : 'Website: Unknown'}
 ${fund.linkedinHandler ? `Existing LinkedIn: ${fund.linkedinHandler}` : 'LinkedIn: Unknown'}
-${fund.shortDescription ? `Existing Description: ${fund.shortDescription}` : 'Description: Not available'}
-${
-  fund.investorProfile?.investmentFocus?.length
-    ? `Current Investment Focus: ${fund.investorProfile.investmentFocus.join(', ')}`
-    : 'Investment Focus: Not specified'
-}
+${existingDescription ? `Existing Description: ${existingDescription}` : 'Description: Not available'}
 
-Instructions:
-1. Use web search to find information about "${fund.name}"
-2. Search for their official website, LinkedIn, portfolio companies, and news
-3. Extract relevant information from search results
-4. Return your findings as a JSON object (as specified in the system prompt)
+TASK:
+1. Search for "${fund.name}" to find additional information
+2. Find their logo URL (search for "${fund.name} logo" or check their website)
+3. Gather information about their team, history, and achievements for moreDetails
+4. DERIVE investmentFocus tags based on:
+   - What the company does (from description: "${existingDescription}")
+   - Information found in search results
+   - Their products, services, and target market
 
-IMPORTANT: After searching, you MUST respond with a valid JSON object. If no information is found, return a JSON object with null values.
+REQUIRED OUTPUT:
+- moreDetails: MUST contain additional context (team, history, features, etc.)
+- investmentFocus: MUST contain 3-8 tags derived from what the company does
+  Example: If description mentions "Browser with LLMs & Wallets, Private by design"
+  Tags should be: ["AI", "Privacy", "Web3", "Crypto", "Browser"]
+- logoUrl: Direct URL to their logo image
+
+Respond with ONLY a valid JSON object as specified in system prompt.
 
 Current Date: ${new Date().toISOString().split('T')[0]}
 `;
@@ -605,8 +622,41 @@ Current Date: ${new Date().toISOString().split('T')[0]}
   async executeRollback(sqlPath: string): Promise<{ success: boolean; message: string }> {
     try {
       const sql = fs.readFileSync(sqlPath, 'utf-8');
-      await this.prisma.$executeRawUnsafe(sql);
-      return { success: true, message: 'Rollback executed successfully' };
+
+      // Remove all comment lines first
+      const sqlWithoutComments = sql
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('--'))
+        .join('\n');
+
+      // Parse SQL into individual statements
+      const statements = sqlWithoutComments
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => {
+          // Filter out empty statements and transaction control
+          // (we'll use Prisma's $transaction instead)
+          if (!s) return false;
+          if (s.toUpperCase() === 'BEGIN') return false;
+          if (s.toUpperCase() === 'COMMIT') return false;
+          return true;
+        });
+
+      if (statements.length === 0) {
+        return { success: false, message: 'No valid SQL statements found in rollback file' };
+      }
+
+      // Execute all statements in a transaction
+      await this.prisma.$transaction(async (tx) => {
+        for (const statement of statements) {
+          await tx.$executeRawUnsafe(statement);
+        }
+      });
+
+      return {
+        success: true,
+        message: `Rollback executed successfully. ${statements.length} statement(s) applied.`,
+      };
     } catch (error) {
       return { success: false, message: `Rollback failed: ${error.message}` };
     }
