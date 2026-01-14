@@ -233,8 +233,15 @@ export class PushNotificationsService {
         })),
     ];
 
-    // Sort by createdAt desc and apply pagination
-    notifications.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    // Sort: unread first, then by createdAt desc
+    notifications.sort((a, b) => {
+      // Unread notifications first
+      if (a.isRead !== b.isRead) {
+        return a.isRead ? 1 : -1;
+      }
+      // Then by createdAt descending
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
     const paginatedNotifications = notifications.slice(offset, offset + limit);
 
     return {
