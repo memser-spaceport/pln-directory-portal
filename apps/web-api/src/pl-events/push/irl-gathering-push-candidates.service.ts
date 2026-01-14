@@ -3,6 +3,12 @@ import { PrismaService } from '../../shared/prisma.service';
 import { IrlGatheringPushRuleKind, PushNotificationCategory } from '@prisma/client';
 import { IrlGatheringPushConfigService } from './irl-gathering-push-config.service';
 
+type CandidateRow = {
+  eventUid: string;
+  eventStartDate: Date;
+  eventEndDate: Date;
+  attendeeCount: number;
+};
 
 type ActiveDbConfig = {
   uid: string;
@@ -23,10 +29,7 @@ type TopAttendee = {
 export class IrlGatheringPushCandidatesService {
   private readonly logger = new Logger(IrlGatheringPushCandidatesService.name);
 
-  /**
-   * Must match payload version in IrlGatheringPushNotificationsProcessor.
-   * Used to locate already-existing notifications to refresh.
-   */
+  // Must match metadata payload produced by processor
   private readonly payloadVersion = 1;
 
   constructor(
@@ -45,66 +48,36 @@ export class IrlGatheringPushCandidatesService {
    * - event.endDate <= now + upcomingWindowDays
    * - attendeeCount >= minAttendeesPerEvent
    *
-   * attendeeCount:
-   * - counts DISTINCT members for the event
-   * - excludes members with accessLevel in ['L0','L1','Rejected']
-   *
    * Idempotency:
    * - Uses upsert on (ruleKind, eventUid), so it never creates duplicates.
    * - If no longer qualifies, deletes both UPCOMING and REMINDER rows for that event.
    */
   async refreshCandidatesForEvents(eventUids: string[]): Promise<void> {
-    const inputCount = Array.isArray(eventUids) ? eventUids.length : 0;
     const uniqueEventUids = [...new Set((eventUids ?? []).filter(Boolean))];
-
-    this.logger.log(
-      `[candidates] refreshCandidatesForEvents() called; inputCount=${inputCount} uniqueCount=${uniqueEventUids.length}`
-    );
-
-    if (uniqueEventUids.length === 0) {
-      this.logger.log('[candidates] no eventUids after normalization -> nothing to do');
-      return;
-    }
+    if (uniqueEventUids.length === 0) return;
 
     const cfg = (await this.configService.getActiveConfigOrNull()) as ActiveDbConfig | null;
-    if (!cfg) {
-      this.logger.warn('[candidates] active config not found -> skipping refresh');
-      return;
-    }
-    if (!cfg.enabled) {
-      this.logger.warn(`[candidates] config.enabled=false (uid=${cfg.uid}) -> skipping refresh`);
-      return;
-    }
+    if (!cfg || !cfg.enabled) return;
 
     const now = new Date();
     const windowEnd = new Date(now.getTime() + cfg.upcomingWindowDays * 24 * 60 * 60 * 1000);
-
-    this.logger.log(
-      `[candidates] config in effect; uid=${cfg.uid} now=${now.toISOString()} windowEnd=${windowEnd.toISOString()} ` +
-        `minAttendeesPerEvent=${cfg.minAttendeesPerEvent} upcomingWindowDays=${cfg.upcomingWindowDays} reminderDaysBefore=${cfg.reminderDaysBefore}`
-    );
 
     const events = await this.prisma.pLEvent.findMany({
       where: { uid: { in: uniqueEventUids }, isDeleted: false },
       select: { uid: true, startDate: true, endDate: true, locationUid: true },
     });
 
-    // attendee counts: distinct members, excluding L0/L1/Rejected
-    const counts = await this.prisma.$queryRaw<
-      Array<{ eventUid: string; cnt: bigint }>
-    >`
-      select
-        g."eventUid" as "eventUid",
-        count(distinct g."memberUid") as cnt
-      from "PLEventGuest" g
-      join "Member" m on m.uid = g."memberUid"
-      where g."eventUid" = any(${uniqueEventUids}::text[])
-        and m."accessLevel" not in ('L0','L1','Rejected')
-      group by g."eventUid";
-    `;
+    const attendeeCounts = await this.prisma.pLEventGuest.groupBy({
+      by: ['eventUid'],
+      where: { eventUid: { in: uniqueEventUids } },
+      _count: { _all: true },
+    });
 
     const countByEventUid = new Map<string, number>();
-    for (const r of counts) countByEventUid.set(r.eventUid, Number(r.cnt ?? 0n));
+    for (const row of attendeeCounts) {
+      if (!row.eventUid) continue;
+      countByEventUid.set(row.eventUid, row._count._all);
+    }
 
     const upserts: Promise<any>[] = [];
     const deletes: Promise<any>[] = [];
@@ -116,23 +89,19 @@ export class IrlGatheringPushCandidatesService {
       const startDate = ev.startDate ? new Date(ev.startDate) : null;
       const endDate = ev.endDate ? new Date(ev.endDate) : null;
 
-      // Use endDate to include in-progress events.
       const notEnded = !!endDate && endDate.getTime() >= now.getTime();
       const withinUpcomingWindow = !!endDate && endDate.getTime() <= windowEnd.getTime();
       const meetsThreshold = attendeeCount >= cfg.minAttendeesPerEvent;
 
       const qualifiesUpcoming = hasGathering && notEnded && withinUpcomingWindow && meetsThreshold;
 
-      // REMINDER candidates only for events that haven't started yet
       const notStartedYet = !!startDate && startDate.getTime() > now.getTime();
       const qualifiesReminder = qualifiesUpcoming && notStartedYet;
 
       if (qualifiesUpcoming) {
         upserts.push(
           this.prisma.irlGatheringPushCandidate.upsert({
-            where: {
-              ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.UPCOMING, eventUid: ev.uid },
-            },
+            where: { ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.UPCOMING, eventUid: ev.uid } },
             create: {
               ruleKind: IrlGatheringPushRuleKind.UPCOMING,
               gatheringUid: ev.locationUid!,
@@ -156,9 +125,7 @@ export class IrlGatheringPushCandidatesService {
         if (qualifiesReminder) {
           upserts.push(
             this.prisma.irlGatheringPushCandidate.upsert({
-              where: {
-                ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.REMINDER, eventUid: ev.uid },
-              },
+              where: { ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.REMINDER, eventUid: ev.uid } },
               create: {
                 ruleKind: IrlGatheringPushRuleKind.REMINDER,
                 gatheringUid: ev.locationUid!,
@@ -179,7 +146,6 @@ export class IrlGatheringPushCandidatesService {
             })
           );
         } else {
-          // Ensure stale reminder candidates are removed for in-progress events.
           deletes.push(
             this.prisma.irlGatheringPushCandidate.deleteMany({
               where: { ruleKind: IrlGatheringPushRuleKind.REMINDER, eventUid: ev.uid },
@@ -189,26 +155,21 @@ export class IrlGatheringPushCandidatesService {
       } else {
         deletes.push(
           this.prisma.irlGatheringPushCandidate.deleteMany({
-            where: {
-              ruleKind: { in: [IrlGatheringPushRuleKind.UPCOMING, IrlGatheringPushRuleKind.REMINDER] },
-              eventUid: ev.uid,
-            },
+            where: { ruleKind: { in: [IrlGatheringPushRuleKind.UPCOMING, IrlGatheringPushRuleKind.REMINDER] }, eventUid: ev.uid },
           })
         );
       }
     }
 
-    this.logger.log(`[candidates] executing DB writes; upserts=${upserts.length}, deletes=${deletes.length}`);
     await Promise.all([...upserts, ...deletes]);
   }
 
   /**
-   * Convenience wrapper used by write-paths (adding/removing guests attached to events).
+   * Convenience wrapper used by write-paths (guest create/update/delete for events).
+   * - refreshes candidates for those events
+   * - refreshes already-sent IRL_GATHERING pushes for impacted locations
    *
-   * IMPORTANT:
-   * - This does NOT create new push notifications.
-   * - It only refreshes candidates + updates already-existing IRL_GATHERING pushes (if they exist).
-   * - We DO NOT bump createdAt/sentAt and DO NOT reset read statuses here.
+   * IMPORTANT: does NOT create new notifications and does NOT reset read statuses.
    */
   async refreshCandidatesForEventsAndUpdateNotifications(eventUids: string[]): Promise<void> {
     await this.refreshCandidatesForEvents(eventUids);
@@ -219,10 +180,7 @@ export class IrlGatheringPushCandidatesService {
    * When a guest is created/updated/deleted at a location WITHOUT eventUid (location-level attendee),
    * we still need to update attendee counters for already-sent IRL_GATHERING pushes for this location.
    *
-   * IMPORTANT:
-   * - Does NOT create any new notifications.
-   * - Does NOT bump createdAt/sentAt.
-   * - Does NOT reset read statuses.
+   * IMPORTANT: does NOT create any new notifications and does NOT reset read statuses.
    */
   async refreshNotificationsForLocation(locationUid: string): Promise<void> {
     await this.updateAlreadySentNotificationsForLocation(locationUid);
@@ -232,25 +190,22 @@ export class IrlGatheringPushCandidatesService {
     const uniqueEventUids = [...new Set((eventUids ?? []).filter(Boolean))];
     if (uniqueEventUids.length === 0) return;
 
-    const cfg = (await this.configService.getActiveConfigOrNull()) as ActiveDbConfig | null;
-    if (!cfg || !cfg.enabled) return;
-
     const events = await this.prisma.pLEvent.findMany({
       where: { uid: { in: uniqueEventUids }, isDeleted: false },
       select: { locationUid: true },
     });
 
-    const locationUids = [...new Set(events.map((e) => e.locationUid).filter(Boolean))] as string[];
-    for (const locationUid of locationUids) {
-      await this.updateAlreadySentNotificationsForLocation(locationUid);
+    const gatheringUids = [...new Set(events.map((e) => e.locationUid).filter(Boolean))] as string[];
+    for (const gatheringUid of gatheringUids) {
+      await this.updateAlreadySentNotificationsForLocation(gatheringUid);
     }
   }
 
   /**
    * Rebuilds payload for already-sent IRL_GATHERING notifications for a location.
-   * Used by:
-   * - guests added/removed for events (via impacted location list)
-   * - guests added/removed with eventUid=null (location-only)
+   * - Keeps the same ruleKind of the existing push
+   * - Updates metadata/title/description only
+   * - Never creates new pushes
    */
   private async updateAlreadySentNotificationsForLocation(locationUid: string): Promise<void> {
     const cfg = (await this.configService.getActiveConfigOrNull()) as ActiveDbConfig | null;
@@ -268,46 +223,61 @@ export class IrlGatheringPushCandidatesService {
       select: { uid: true, metadata: true },
     });
 
-    if (pushes.length === 0) {
-      // IMPORTANT: do nothing. We never create new notifications from “refresh”.
-      return;
-    }
+    if (pushes.length === 0) return;
+
+    const now = new Date();
+    const windowEndUpcoming = new Date(now.getTime() + cfg.upcomingWindowDays * 24 * 60 * 60 * 1000);
+    const windowEndReminder = new Date(now.getTime() + cfg.reminderDaysBefore * 24 * 60 * 60 * 1000);
 
     for (const p of pushes) {
       const ruleKind = (p.metadata as any)?.ruleKind as IrlGatheringPushRuleKind | undefined;
       if (!ruleKind) continue;
 
-      const payload = await this.buildLocationPayload(cfg, ruleKind, locationUid);
-      if (!payload || !payload.events?.eventUids?.length) continue;
+      const dateFilter =
+        ruleKind === IrlGatheringPushRuleKind.REMINDER
+          ? { eventStartDate: { gte: now, lte: windowEndReminder } }
+          : { eventEndDate: { gte: now, lte: windowEndUpcoming } };
 
-      // Keep title/description in sync, but do NOT bump createdAt/sentAt and do NOT clear read statuses.
+      // Candidates we should show in notification payload (display events).
+      const candidates = await this.prisma.irlGatheringPushCandidate.findMany({
+        where: {
+          isSuppressed: false,
+          gatheringUid: locationUid,
+          ruleKind,
+          ...dateFilter,
+        },
+        orderBy: [{ eventStartDate: 'asc' }],
+        select: {
+          eventUid: true,
+          eventStartDate: true,
+          eventEndDate: true,
+          attendeeCount: true,
+        },
+      });
+
+      if (candidates.length === 0) continue;
+
+      const payload = await this.buildLocationPayload(locationUid, candidates, cfg);
+
+      // Titles per design. Description always location.description (or default same as announcement).
+      const locationName = payload?.location?.name ?? payload?.location?.id ?? 'this location';
       const title =
         ruleKind === IrlGatheringPushRuleKind.REMINDER
-          ? `Reminder: IRL Gathering in ${payload.location?.name ?? payload.location?.id ?? 'this location'}`
-          : payload.location?.name
-            ? `IRL gathering in ${payload.location.name}`
-            : 'IRL gathering';
+          ? `Reminder: IRL Gathering in ${locationName} starts in ${payload?.ui?.daysToStart ?? 0} days.`
+          : `${payload.events?.total ?? 0} event${(payload.events?.total ?? 0) === 1 ? '' : 's'} happening in ${locationName}${
+              payload?.ui?.startsLabel ? ` starting ${payload.ui.startsLabel}` : ''
+            }`;
 
       const description =
-        ruleKind === IrlGatheringPushRuleKind.REMINDER
-          ? (() => {
-              const startIso = payload?.events?.dates?.start ?? null;
-              const days = this.daysUntil(startIso);
-              return `Reminder: IRL Gathering in ${payload.location?.name ?? payload.location?.id ?? 'this location'} starts in ${this.humanDays(days)}.`;
-            })()
-          : payload.location?.description && String(payload.location.description).trim().length > 0
-            ? String(payload.location.description).trim()
-            : payload.events?.total != null
-              ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
-              : 'Upcoming IRL gathering';
+        payload.location?.description && String(payload.location.description).trim().length > 0
+          ? String(payload.location.description).trim()
+          : payload.events?.total != null
+            ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
+            : 'Upcoming IRL gathering';
 
       await this.prisma.pushNotification.update({
         where: { uid: p.uid },
-        data: {
-          title,
-          description,
-          metadata: payload as any,
-        },
+        data: { title, description, metadata: { ...(payload as any), ruleKind } as any },
       });
 
       this.logger.log(
@@ -317,12 +287,11 @@ export class IrlGatheringPushCandidatesService {
   }
 
   // ---------------------------------------------------------------------------
-  // Payload helpers (match IRL Gatherings page attendees logic)
+  // Payload helpers
   // ---------------------------------------------------------------------------
 
   private normalizeResources(raw: any): any[] {
     if (!raw) return [];
-
     const tryParse = (v: any) => {
       if (typeof v !== 'string') return v;
       const s = v.trim();
@@ -330,38 +299,21 @@ export class IrlGatheringPushCandidatesService {
       try {
         return JSON.parse(s);
       } catch {
-        return { raw: s };
+        return { raw: v };
       }
     };
 
     if (Array.isArray(raw)) {
-      const out: any[] = [];
-      for (const item of raw) {
-        const p1 = tryParse(item);
-        if (p1 == null) continue;
-
-        // unwrap one extra layer if needed
-        if (typeof p1 === 'string') {
-          const p2 = tryParse(p1);
-          if (p2 != null) out.push(p2);
-          continue;
-        }
-
-        out.push(p1);
-      }
-      return out;
+      return raw.map(tryParse).filter(Boolean);
     }
-
     if (typeof raw === 'string') {
       const p = tryParse(raw);
-      if (p == null) return [];
-      return Array.isArray(p) ? p : [p];
+      return p == null ? [] : Array.isArray(p) ? p : [p];
     }
-
     return [raw];
   }
 
-  private parseYmd(v: any): Date | null {
+  private parseYmdToUtcDate(v: any): Date | null {
     if (!v || typeof v !== 'string') return null;
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v.trim());
     if (!m) return null;
@@ -376,176 +328,107 @@ export class IrlGatheringPushCandidatesService {
     return aStart.getTime() <= bEnd.getTime() && aEnd.getTime() >= bStart.getTime();
   }
 
+  private ordinal(n: number): string {
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return `${n}st`;
+    if (mod10 === 2 && mod100 !== 12) return `${n}nd`;
+    if (mod10 === 3 && mod100 !== 13) return `${n}rd`;
+    return `${n}th`;
+  }
+
+  private startsLabelFromIso(iso: string | null | undefined): string | null {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    const day = this.ordinal(d.getUTCDate());
+    const month = d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+    return `${day} ${month}`;
+  }
+
   private daysUntil(startIso: string | null | undefined): number | null {
     if (!startIso) return null;
     const start = new Date(startIso);
     if (Number.isNaN(start.getTime())) return null;
-    const diffMs = start.getTime() - new Date().getTime();
-    return Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
-  }
-
-  private humanDays(days: number | null): string {
-    if (days == null) return 'soon';
-    if (days === 0) return 'today';
-    if (days === 1) return '1 day';
-    return `${days} days`;
-  }
-
-  /**
-   * Builds payload for FE modal:
-   * - includes location resources (twitter/telegram/etc)
-   * - includes event resources
-   * - attendees.total matches IRL Gatherings page logic:
-   *   distinct members across selected events + location-only guests overlapping the events window
-   *
-   * IMPORTANT:
-   * - Event list is derived from the LOCATION + ruleKind window (not from candidates table),
-   *   so payload stays consistent with the location page.
-   */
-  private async buildLocationPayload(cfg: ActiveDbConfig, ruleKind: IrlGatheringPushRuleKind, locationUid: string): Promise<any> {
     const now = new Date();
-    const msInDay = 24 * 60 * 60 * 1000;
+    const diffMs = start.getTime() - now.getTime();
+    const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+    return Math.max(0, days);
+  }
 
-    const endUpcoming = new Date(now.getTime() + cfg.upcomingWindowDays * msInDay);
-    const endReminder = new Date(now.getTime() + cfg.reminderDaysBefore * msInDay);
+  private async computeAttendeesForLocation(params: {
+    locationUid: string;
+    attendeeEventUids: string[];
+    windowStartIso: string | null;
+    windowEndIso: string | null;
+  }): Promise<{ total: number; topAttendees: TopAttendee[] }> {
+    const { locationUid, attendeeEventUids, windowStartIso, windowEndIso } = params;
 
-    const eventWhere =
-      ruleKind === IrlGatheringPushRuleKind.REMINDER
-        ? { isDeleted: false, locationUid, startDate: { gte: now, lte: endReminder } }
-        : { isDeleted: false, locationUid, endDate: { gte: now, lte: endUpcoming } };
+    const distinctEventAttendees = attendeeEventUids.length
+      ? await this.prisma.pLEventGuest.findMany({
+          where: {
+            eventUid: { in: attendeeEventUids },
+            member: { accessLevel: { notIn: ['L0', 'L1', 'Rejected'] } },
+          },
+          distinct: ['memberUid'],
+          select: { memberUid: true },
+        })
+      : [];
 
-    const events = await this.prisma.pLEvent.findMany({
-      where: eventWhere as any,
-      select: {
-        uid: true,
-        slugURL: true,
-        name: true,
-        startDate: true,
-        endDate: true,
-        websiteURL: true,
-        telegramId: true,
-        resources: true,
-        logo: { select: { url: true } },
+    const locationOnlyGuests = await this.prisma.pLEventGuest.findMany({
+      where: {
+        locationUid,
+        eventUid: null,
+        member: { accessLevel: { notIn: ['L0', 'L1', 'Rejected'] } },
       },
-      orderBy: [{ startDate: 'asc' }],
+      select: { memberUid: true, additionalInfo: true, createdAt: true },
     });
 
-    const eventUids = events.map((e) => e.uid);
-    if (eventUids.length === 0) return null;
+    const windowStart = windowStartIso ? new Date(windowStartIso) : null;
+    const windowEnd = windowEndIso ? new Date(windowEndIso) : null;
 
-    const location = await this.prisma.pLEventLocation.findUnique({
-      where: { uid: locationUid },
-      select: {
-        uid: true,
-        location: true,
-        description: true,
-        country: true,
-        timezone: true,
-        latitude: true,
-        longitude: true,
-        flag: true,
-        icon: true,
-        resources: true,
-      },
-    });
+    const locationOnlyAttendeeUids = new Set<string>();
 
-    // per-event attendee counts (distinct members; excludes L0/L1/Rejected)
-    const perEvent = await this.prisma.$queryRaw<Array<{ eventUid: string; cnt: bigint }>>`
-      select
-        g."eventUid" as "eventUid",
-        count(distinct g."memberUid") as cnt
-      from "PLEventGuest" g
-      join "Member" m on m.uid = g."memberUid"
-      where g."eventUid" = any(${eventUids}::text[])
-        and m."accessLevel" not in ('L0','L1','Rejected')
-      group by g."eventUid";
-    `;
-    const perEventMap = new Map(perEvent.map((r) => [r.eventUid, Number(r.cnt ?? 0n)]));
+    if (windowStart && windowEnd) {
+      for (const g of locationOnlyGuests) {
+        const ai: any = g.additionalInfo ?? {};
+        const checkIn = this.parseYmdToUtcDate(ai?.checkInDate);
+        const checkOut = this.parseYmdToUtcDate(ai?.checkOutDate);
 
-    const eventSummaries = events.map((ev) => ({
-      uid: ev.uid,
-      slug: ev.slugURL,
-      name: ev.name,
-      startDate: ev.startDate.toISOString(),
-      endDate: ev.endDate.toISOString(),
-      attendeeCount: perEventMap.get(ev.uid) ?? 0,
-      logoUrl: ev.logo?.url ?? null,
-      websiteURL: (ev as any).websiteURL ?? null,
-      telegramId: (ev as any).telegramId ?? null,
-      resources: this.normalizeResources((ev as any).resources),
-    }));
+        if (!checkIn && !checkOut) {
+          locationOnlyAttendeeUids.add(g.memberUid);
+          continue;
+        }
 
-    const dateStart = eventSummaries.length ? eventSummaries[0].startDate : null;
-    const dateEnd = eventSummaries.length ? eventSummaries[eventSummaries.length - 1].endDate : null;
+        const gStart = checkIn ?? (checkOut as Date);
+        const gEnd = checkOut ?? (checkIn as Date);
 
-    const windowStart = dateStart ? new Date(dateStart) : null;
-    const windowEnd = dateEnd ? new Date(dateEnd) : null;
-
-    // distinct attendees across events
-    const distinctEventAttendees = await this.prisma.$queryRaw<Array<{ memberUid: string }>>`
-      select distinct g."memberUid" as "memberUid"
-      from "PLEventGuest" g
-      join "Member" m on m.uid = g."memberUid"
-      where g."eventUid" = any(${eventUids}::text[])
-        and m."accessLevel" not in ('L0','L1','Rejected');
-    `;
-    const eventAttendeeUids = new Set(distinctEventAttendees.map((r) => r.memberUid));
-
-    // location-only guests (eventUid=null) that overlap the events window (or included if dates missing)
-    const locationOnly = await this.prisma.pLEventGuest.findMany({
-      where: { locationUid, eventUid: null },
-      select: { memberUid: true, additionalInfo: true },
-    });
-
-    const locationOnlyUids = new Set<string>();
-    for (const g of locationOnly) {
-      // filter out blocked access levels
-      const m = await this.prisma.member.findUnique({ where: { uid: g.memberUid }, select: { accessLevel: true } });
-      if (!m || ['L0','L1','Rejected'].includes(String(m.accessLevel))) continue;
-
-      if (!windowStart || !windowEnd) {
-        locationOnlyUids.add(g.memberUid);
-        continue;
+        if (this.overlaps(gStart, gEnd, windowStart, windowEnd)) locationOnlyAttendeeUids.add(g.memberUid);
       }
-
-      const ai: any = g.additionalInfo ?? {};
-      const ci = this.parseYmd(ai?.checkInDate);
-      const co = this.parseYmd(ai?.checkOutDate);
-
-      // If we cannot parse -> include (best effort)
-      if (!ci && !co) {
-        locationOnlyUids.add(g.memberUid);
-        continue;
-      }
-
-      const gStart = ci ?? (co as Date);
-      const gEnd = co ?? (ci as Date);
-
-      if (this.overlaps(gStart, gEnd, windowStart, windowEnd)) locationOnlyUids.add(g.memberUid);
+    } else {
+      for (const g of locationOnlyGuests) locationOnlyAttendeeUids.add(g.memberUid);
     }
 
-    const allUids = new Set<string>(eventAttendeeUids);
-    for (const uid of locationOnlyUids) allUids.add(uid);
+    const allAttendeeUids = new Set<string>(distinctEventAttendees.map((a) => a.memberUid));
+    for (const uid of locationOnlyAttendeeUids) allAttendeeUids.add(uid);
+    const total = allAttendeeUids.size;
 
-    const uniqueAttendeeCount = allUids.size;
-
-    // Top attendees: count distinct events per member + (+1 if location-only overlap)
-    const topEventCounts = await this.prisma.$queryRaw<Array<{ memberUid: string; cnt: bigint }>>`
-      select
-        g."memberUid" as "memberUid",
-        count(distinct g."eventUid") as cnt
-      from "PLEventGuest" g
-      join "Member" m on m.uid = g."memberUid"
-      where g."eventUid" = any(${eventUids}::text[])
-        and m."accessLevel" not in ('L0','L1','Rejected')
-      group by g."memberUid"
-      order by cnt desc
-      limit 50;
-    `;
+    const topEventCounts = attendeeEventUids.length
+      ? await this.prisma.pLEventGuest.groupBy({
+          by: ['memberUid'],
+          where: {
+            eventUid: { in: attendeeEventUids },
+            member: { accessLevel: { notIn: ['L0', 'L1', 'Rejected'] } },
+          },
+          _count: { eventUid: true },
+          orderBy: { _count: { eventUid: 'desc' } },
+          take: 50,
+        })
+      : [];
 
     const countsByMember = new Map<string, number>();
-    for (const r of topEventCounts) countsByMember.set(r.memberUid, Number(r.cnt ?? 0n));
-    for (const uid of locationOnlyUids) countsByMember.set(uid, (countsByMember.get(uid) ?? 0) + 1);
+    for (const row of topEventCounts) countsByMember.set(row.memberUid, row._count.eventUid);
+    for (const uid of locationOnlyAttendeeUids) countsByMember.set(uid, (countsByMember.get(uid) ?? 0) + 1);
 
     const topCombined = [...countsByMember.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -561,20 +444,109 @@ export class IrlGatheringPushCandidatesService {
       : [];
 
     const memberByUid = new Map(topMembers.map((m) => [m.uid, m]));
+
     const topAttendees: TopAttendee[] = topCombined.map((row) => {
-      const mm = memberByUid.get(row.memberUid);
+      const m = memberByUid.get(row.memberUid);
       return {
         memberUid: row.memberUid,
         eventsCount: row.eventsCount,
-        imageUrl: mm?.image?.url ?? null,
-        displayName: mm?.name ?? null,
+        imageUrl: m?.image?.url ?? null,
+        displayName: m?.name ?? null,
       };
+    });
+
+    return { total, topAttendees };
+  }
+
+  /**
+   * Build payload used by FE modal.
+   *
+   * IMPORTANT FIX:
+   * - attendees.total must reflect the UPCOMING window for the location (same as IRL page)
+   *   so REMINDER and UPCOMING pushes show consistent totals.
+   */
+  private async buildLocationPayload(gatheringUid: string, displayCandidates: CandidateRow[], cfg: ActiveDbConfig): Promise<any> {
+    const displayEventUids = [...new Set(displayCandidates.map((c) => c.eventUid).filter(Boolean))];
+
+    const location = await this.prisma.pLEventLocation.findUnique({
+      where: { uid: gatheringUid },
+      select: {
+        uid: true,
+        location: true,
+        description: true,
+        country: true,
+        timezone: true,
+        latitude: true,
+        longitude: true,
+        flag: true,
+        icon: true,
+        resources: true,
+      },
+    });
+
+    const displayEvents = await this.prisma.pLEvent.findMany({
+      where: { uid: { in: displayEventUids }, isDeleted: false },
+      select: {
+        uid: true,
+        slugURL: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        websiteURL: true,
+        telegramId: true,
+        resources: true,
+        logo: { select: { url: true } },
+      },
+      orderBy: [{ startDate: 'asc' }],
+    });
+
+    const attendeeCountByEventUid = new Map<string, number>();
+    for (const c of displayCandidates) attendeeCountByEventUid.set(c.eventUid, c.attendeeCount);
+
+    const eventSummaries = displayEvents.map((ev) => ({
+      uid: ev.uid,
+      slug: ev.slugURL,
+      name: ev.name,
+      startDate: ev.startDate.toISOString(),
+      endDate: ev.endDate.toISOString(),
+      attendeeCount: attendeeCountByEventUid.get(ev.uid) ?? 0,
+      logoUrl: ev.logo?.url ?? null,
+      websiteURL: (ev as any).websiteURL ?? null,
+      telegramId: (ev as any).telegramId ?? null,
+      resources: this.normalizeResources((ev as any).resources),
+    }));
+
+    const dateStart = eventSummaries.length ? eventSummaries[0].startDate : null;
+    const dateEnd = eventSummaries.length ? eventSummaries[eventSummaries.length - 1].endDate : null;
+
+    // Attendee window = UPCOMING events in window (same as page).
+    const now = new Date();
+    const windowEndUpcoming = new Date(now.getTime() + cfg.upcomingWindowDays * 24 * 60 * 60 * 1000);
+
+    const attendeeEvents = await this.prisma.pLEvent.findMany({
+      where: {
+        isDeleted: false,
+        locationUid: gatheringUid,
+        endDate: { gte: now, lte: windowEndUpcoming },
+      },
+      select: { uid: true, startDate: true, endDate: true },
+      orderBy: [{ startDate: 'asc' }],
+    });
+
+    const attendeeEventUids = attendeeEvents.map((e) => e.uid);
+    const windowStartIso = attendeeEvents.length ? attendeeEvents[0].startDate.toISOString() : dateStart;
+    const windowEndIso = attendeeEvents.length ? attendeeEvents[attendeeEvents.length - 1].endDate.toISOString() : dateEnd;
+
+    const attendees = await this.computeAttendeesForLocation({
+      locationUid: gatheringUid,
+      attendeeEventUids,
+      windowStartIso,
+      windowEndIso,
     });
 
     return {
       version: this.payloadVersion,
-      ruleKind,
-      gatheringUid: locationUid,
+      gatheringUid,
       location: location
         ? {
             id: location.uid,
@@ -591,17 +563,19 @@ export class IrlGatheringPushCandidatesService {
         : null,
       events: {
         total: eventSummaries.length,
-        eventUids,
+        eventUids: displayEventUids,
         dates: { start: dateStart, end: dateEnd },
         items: eventSummaries,
       },
       attendees: {
-        total: uniqueAttendeeCount,
-        topAttendees,
+        total: attendees.total,
+        topAttendees: attendees.topAttendees,
       },
       ui: {
-        locationUid,
+        locationUid: gatheringUid,
         eventSlugs: eventSummaries.map((e) => e.slug),
+        startsLabel: this.startsLabelFromIso(dateStart),
+        daysToStart: this.daysUntil(dateStart) ?? 0,
       },
     };
   }
