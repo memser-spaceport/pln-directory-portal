@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma.service';
 import { IrlGatheringPushRuleKind, PushNotificationCategory } from '@prisma/client';
 import { IrlGatheringPushConfigService } from './irl-gathering-push-config.service';
+import { PLEventGuestsService } from '../pl-event-guests.service';
 
 type CandidateRow = {
   eventUid: string;
@@ -33,25 +34,12 @@ export class IrlGatheringPushCandidatesService {
   private readonly payloadVersion = 1;
 
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly configService: IrlGatheringPushConfigService
+      private readonly prisma: PrismaService,
+      private readonly configService: IrlGatheringPushConfigService,
+      @Inject(forwardRef(() => PLEventGuestsService))
+      private readonly pleventGuestsService: PLEventGuestsService
   ) {}
 
-  /**
-   * Recomputes push candidates for provided event UIDs.
-   *
-   * Qualification rules (DB-configurable):
-   * - config.enabled == true
-   * - event.isDeleted == false
-   * - event.locationUid is present (has gathering)
-   * - event.endDate is in the future (includes in-progress events)
-   * - event.endDate <= now + upcomingWindowDays
-   * - attendeeCount >= minAttendeesPerEvent
-   *
-   * Idempotency:
-   * - Uses upsert on (ruleKind, eventUid), so it never creates duplicates.
-   * - If no longer qualifies, deletes both UPCOMING and REMINDER rows for that event.
-   */
   async refreshCandidatesForEvents(eventUids: string[]): Promise<void> {
     const uniqueEventUids = [...new Set((eventUids ?? []).filter(Boolean))];
     if (uniqueEventUids.length === 0) return;
@@ -100,34 +88,10 @@ export class IrlGatheringPushCandidatesService {
 
       if (qualifiesUpcoming) {
         upserts.push(
-          this.prisma.irlGatheringPushCandidate.upsert({
-            where: { ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.UPCOMING, eventUid: ev.uid } },
-            create: {
-              ruleKind: IrlGatheringPushRuleKind.UPCOMING,
-              gatheringUid: ev.locationUid!,
-              eventUid: ev.uid,
-              eventStartDate: ev.startDate,
-              eventEndDate: ev.endDate,
-              attendeeCount,
-              processedAt: null,
-              isSuppressed: false,
-            },
-            update: {
-              gatheringUid: ev.locationUid!,
-              eventStartDate: ev.startDate,
-              eventEndDate: ev.endDate,
-              attendeeCount,
-              processedAt: null,
-            },
-          })
-        );
-
-        if (qualifiesReminder) {
-          upserts.push(
             this.prisma.irlGatheringPushCandidate.upsert({
-              where: { ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.REMINDER, eventUid: ev.uid } },
+              where: { ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.UPCOMING, eventUid: ev.uid } },
               create: {
-                ruleKind: IrlGatheringPushRuleKind.REMINDER,
+                ruleKind: IrlGatheringPushRuleKind.UPCOMING,
                 gatheringUid: ev.locationUid!,
                 eventUid: ev.uid,
                 eventStartDate: ev.startDate,
@@ -142,21 +106,47 @@ export class IrlGatheringPushCandidatesService {
                 eventEndDate: ev.endDate,
                 attendeeCount,
                 processedAt: null,
+                isSuppressed: false,
               },
             })
+        );
+
+        if (qualifiesReminder) {
+          upserts.push(
+              this.prisma.irlGatheringPushCandidate.upsert({
+                where: { ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.REMINDER, eventUid: ev.uid } },
+                create: {
+                  ruleKind: IrlGatheringPushRuleKind.REMINDER,
+                  gatheringUid: ev.locationUid!,
+                  eventUid: ev.uid,
+                  eventStartDate: ev.startDate,
+                  eventEndDate: ev.endDate,
+                  attendeeCount,
+                  processedAt: null,
+                  isSuppressed: false,
+                },
+                update: {
+                  gatheringUid: ev.locationUid!,
+                  eventStartDate: ev.startDate,
+                  eventEndDate: ev.endDate,
+                  attendeeCount,
+                  processedAt: null,
+                  isSuppressed: false,
+                },
+              })
           );
         } else {
           deletes.push(
-            this.prisma.irlGatheringPushCandidate.deleteMany({
-              where: { ruleKind: IrlGatheringPushRuleKind.REMINDER, eventUid: ev.uid },
-            })
+              this.prisma.irlGatheringPushCandidate.deleteMany({
+                where: { ruleKind: IrlGatheringPushRuleKind.REMINDER, eventUid: ev.uid },
+              })
           );
         }
       } else {
         deletes.push(
-          this.prisma.irlGatheringPushCandidate.deleteMany({
-            where: { ruleKind: { in: [IrlGatheringPushRuleKind.UPCOMING, IrlGatheringPushRuleKind.REMINDER] }, eventUid: ev.uid },
-          })
+            this.prisma.irlGatheringPushCandidate.deleteMany({
+              where: { ruleKind: { in: [IrlGatheringPushRuleKind.UPCOMING, IrlGatheringPushRuleKind.REMINDER] }, eventUid: ev.uid },
+            })
         );
       }
     }
@@ -164,24 +154,11 @@ export class IrlGatheringPushCandidatesService {
     await Promise.all([...upserts, ...deletes]);
   }
 
-  /**
-   * Convenience wrapper used by write-paths (guest create/update/delete for events).
-   * - refreshes candidates for those events
-   * - refreshes already-sent IRL_GATHERING pushes for impacted locations
-   *
-   * IMPORTANT: does NOT create new notifications and does NOT reset read statuses.
-   */
   async refreshCandidatesForEventsAndUpdateNotifications(eventUids: string[]): Promise<void> {
     await this.refreshCandidatesForEvents(eventUids);
     await this.updateAlreadySentNotificationsForEvents(eventUids);
   }
 
-  /**
-   * When a guest is created/updated/deleted at a location WITHOUT eventUid (location-level attendee),
-   * we still need to update attendee counters for already-sent IRL_GATHERING pushes for this location.
-   *
-   * IMPORTANT: does NOT create any new notifications and does NOT reset read statuses.
-   */
   async refreshNotificationsForLocation(locationUid: string): Promise<void> {
     await this.updateAlreadySentNotificationsForLocation(locationUid);
   }
@@ -201,17 +178,10 @@ export class IrlGatheringPushCandidatesService {
     }
   }
 
-  /**
-   * Rebuilds payload for already-sent IRL_GATHERING notifications for a location.
-   * - Keeps the same ruleKind of the existing push
-   * - Updates metadata/title/description only
-   * - Never creates new pushes
-   */
   private async updateAlreadySentNotificationsForLocation(locationUid: string): Promise<void> {
     const cfg = (await this.configService.getActiveConfigOrNull()) as ActiveDbConfig | null;
     if (!cfg || !cfg.enabled) return;
 
-    // Find all already-existing pushes for this location (any ruleKind), versioned.
     const pushes = await this.prisma.pushNotification.findMany({
       where: {
         category: PushNotificationCategory.IRL_GATHERING,
@@ -234,11 +204,10 @@ export class IrlGatheringPushCandidatesService {
       if (!ruleKind) continue;
 
       const dateFilter =
-        ruleKind === IrlGatheringPushRuleKind.REMINDER
-          ? { eventStartDate: { gte: now, lte: windowEndReminder } }
-          : { eventEndDate: { gte: now, lte: windowEndUpcoming } };
+          ruleKind === IrlGatheringPushRuleKind.REMINDER
+              ? { eventStartDate: { gte: now, lte: windowEndReminder } }
+              : { eventEndDate: { gte: now, lte: windowEndUpcoming } };
 
-      // Candidates we should show in notification payload (display events).
       const candidates = await this.prisma.irlGatheringPushCandidate.findMany({
         where: {
           isSuppressed: false,
@@ -255,25 +224,26 @@ export class IrlGatheringPushCandidatesService {
         },
       });
 
-      if (candidates.length === 0) continue;
+      // If reminder candidates disappeared, still update attendee totals (don’t skip update).
+      const payload =
+          candidates.length > 0
+              ? await this.buildLocationPayload(locationUid, candidates, cfg)
+              : await this.patchExistingPayloadWithFreshAttendees(p.metadata as any, locationUid);
 
-      const payload = await this.buildLocationPayload(locationUid, candidates, cfg);
-
-      // Titles per design. Description always location.description (or default same as announcement).
       const locationName = payload?.location?.name ?? payload?.location?.id ?? 'this location';
       const title =
-        ruleKind === IrlGatheringPushRuleKind.REMINDER
-          ? `Reminder: IRL Gathering in ${locationName} starts in ${payload?.ui?.daysToStart ?? 0} days.`
-          : `${payload.events?.total ?? 0} event${(payload.events?.total ?? 0) === 1 ? '' : 's'} happening in ${locationName}${
-              payload?.ui?.startsLabel ? ` starting ${payload.ui.startsLabel}` : ''
-            }`;
+          ruleKind === IrlGatheringPushRuleKind.REMINDER
+              ? `Reminder: IRL Gathering in ${locationName} starts in ${payload?.ui?.daysToStart ?? 0} days.`
+              : `${payload.events?.total ?? 0} event${(payload.events?.total ?? 0) === 1 ? '' : 's'} happening in ${locationName}${
+                  payload?.ui?.startsLabel ? ` starting ${payload.ui.startsLabel}` : ''
+              }`;
 
       const description =
-        payload.location?.description && String(payload.location.description).trim().length > 0
-          ? String(payload.location.description).trim()
-          : payload.events?.total != null
-            ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
-            : 'Upcoming IRL gathering';
+          payload.location?.description && String(payload.location.description).trim().length > 0
+              ? String(payload.location.description).trim()
+              : payload.events?.total != null
+                  ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
+                  : 'Upcoming IRL gathering';
 
       await this.prisma.pushNotification.update({
         where: { uid: p.uid },
@@ -281,7 +251,7 @@ export class IrlGatheringPushCandidatesService {
       });
 
       this.logger.log(
-        `[candidates] refreshed existing pushNotification uid=${p.uid} locationUid=${locationUid} ruleKind=${ruleKind} attendeesTotal=${payload.attendees?.total}`
+          `[candidates] refreshed existing pushNotification uid=${p.uid} locationUid=${locationUid} ruleKind=${ruleKind} attendeesTotal=${payload.attendees?.total}`
       );
     }
   }
@@ -303,29 +273,12 @@ export class IrlGatheringPushCandidatesService {
       }
     };
 
-    if (Array.isArray(raw)) {
-      return raw.map(tryParse).filter(Boolean);
-    }
+    if (Array.isArray(raw)) return raw.map(tryParse).filter(Boolean);
     if (typeof raw === 'string') {
       const p = tryParse(raw);
       return p == null ? [] : Array.isArray(p) ? p : [p];
     }
     return [raw];
-  }
-
-  private parseYmdToUtcDate(v: any): Date | null {
-    if (!v || typeof v !== 'string') return null;
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v.trim());
-    if (!m) return null;
-    const y = Number(m[1]);
-    const mo = Number(m[2]) - 1;
-    const d = Number(m[3]);
-    const dt = new Date(Date.UTC(y, mo, d));
-    return Number.isNaN(dt.getTime()) ? null : dt;
-  }
-
-  private overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
-    return aStart.getTime() <= bEnd.getTime() && aEnd.getTime() >= bStart.getTime();
   }
 
   private ordinal(n: number): string {
@@ -356,115 +309,62 @@ export class IrlGatheringPushCandidatesService {
     return Math.max(0, days);
   }
 
-  private async computeAttendeesForLocation(params: {
-    locationUid: string;
-    attendeeEventUids: string[];
-    windowStartIso: string | null;
-    windowEndIso: string | null;
-  }): Promise<{ total: number; topAttendees: TopAttendee[] }> {
-    const { locationUid, attendeeEventUids, windowStartIso, windowEndIso } = params;
+  private async computeAttendeesUsingIrlPage(locationUid: string): Promise<{ total: number; topAttendees: TopAttendee[] }> {
+    try {
+      const rows: any[] = await this.pleventGuestsService.getPLEventGuestsByLocationAndType(
+          locationUid,
+          { type: 'upcoming', limit: 6, page: 1 },
+          null
+      );
 
-    const distinctEventAttendees = attendeeEventUids.length
-      ? await this.prisma.pLEventGuest.findMany({
-          where: {
-            eventUid: { in: attendeeEventUids },
-            member: { accessLevel: { notIn: ['L0', 'L1', 'Rejected'] } },
-          },
-          distinct: ['memberUid'],
-          select: { memberUid: true },
-        })
-      : [];
+      const total = rows?.length ? Number(rows[0]?.count ?? 0) : 0;
+      const topAttendees: TopAttendee[] = (rows ?? []).slice(0, 6).map((r) => {
+        const eventsLen = Array.isArray(r?.events) ? r.events.length : 0;
+        return {
+          memberUid: r.memberUid,
+          imageUrl: r?.member?.image?.url ?? null,
+          displayName: r?.member?.name ?? null,
+          eventsCount: eventsLen > 0 ? eventsLen : 1,
+        };
+      });
 
-    const locationOnlyGuests = await this.prisma.pLEventGuest.findMany({
-      where: {
-        locationUid,
-        eventUid: null,
-        member: { accessLevel: { notIn: ['L0', 'L1', 'Rejected'] } },
-      },
-      select: { memberUid: true, additionalInfo: true, createdAt: true },
-    });
-
-    const windowStart = windowStartIso ? new Date(windowStartIso) : null;
-    const windowEnd = windowEndIso ? new Date(windowEndIso) : null;
-
-    const locationOnlyAttendeeUids = new Set<string>();
-
-    if (windowStart && windowEnd) {
-      for (const g of locationOnlyGuests) {
-        const ai: any = g.additionalInfo ?? {};
-        const checkIn = this.parseYmdToUtcDate(ai?.checkInDate);
-        const checkOut = this.parseYmdToUtcDate(ai?.checkOutDate);
-
-        if (!checkIn && !checkOut) {
-          locationOnlyAttendeeUids.add(g.memberUid);
-          continue;
-        }
-
-        const gStart = checkIn ?? (checkOut as Date);
-        const gEnd = checkOut ?? (checkIn as Date);
-
-        if (this.overlaps(gStart, gEnd, windowStart, windowEnd)) locationOnlyAttendeeUids.add(g.memberUid);
-      }
-    } else {
-      for (const g of locationOnlyGuests) locationOnlyAttendeeUids.add(g.memberUid);
+      return { total, topAttendees };
+    } catch (e) {
+      this.logger.warn(
+          `[candidates] failed to compute attendees via IRL page logic for locationUid=${locationUid}: ${String(e)}`
+      );
+      return { total: 0, topAttendees: [] };
     }
-
-    const allAttendeeUids = new Set<string>(distinctEventAttendees.map((a) => a.memberUid));
-    for (const uid of locationOnlyAttendeeUids) allAttendeeUids.add(uid);
-    const total = allAttendeeUids.size;
-
-    const topEventCounts = attendeeEventUids.length
-      ? await this.prisma.pLEventGuest.groupBy({
-          by: ['memberUid'],
-          where: {
-            eventUid: { in: attendeeEventUids },
-            member: { accessLevel: { notIn: ['L0', 'L1', 'Rejected'] } },
-          },
-          _count: { eventUid: true },
-          orderBy: { _count: { eventUid: 'desc' } },
-          take: 50,
-        })
-      : [];
-
-    const countsByMember = new Map<string, number>();
-    for (const row of topEventCounts) countsByMember.set(row.memberUid, row._count.eventUid);
-    for (const uid of locationOnlyAttendeeUids) countsByMember.set(uid, (countsByMember.get(uid) ?? 0) + 1);
-
-    const topCombined = [...countsByMember.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([memberUid, eventsCount]) => ({ memberUid, eventsCount }));
-
-    const topMemberUids = topCombined.map((t) => t.memberUid);
-    const topMembers = topMemberUids.length
-      ? await this.prisma.member.findMany({
-          where: { uid: { in: topMemberUids } },
-          select: { uid: true, name: true, image: { select: { url: true } } },
-        })
-      : [];
-
-    const memberByUid = new Map(topMembers.map((m) => [m.uid, m]));
-
-    const topAttendees: TopAttendee[] = topCombined.map((row) => {
-      const m = memberByUid.get(row.memberUid);
-      return {
-        memberUid: row.memberUid,
-        eventsCount: row.eventsCount,
-        imageUrl: m?.image?.url ?? null,
-        displayName: m?.name ?? null,
-      };
-    });
-
-    return { total, topAttendees };
   }
 
-  /**
-   * Build payload used by FE modal.
-   *
-   * IMPORTANT FIX:
-   * - attendees.total must reflect the UPCOMING window for the location (same as IRL page)
-   *   so REMINDER and UPCOMING pushes show consistent totals.
-   */
+  private async patchExistingPayloadWithFreshAttendees(existing: any, gatheringUid: string): Promise<any> {
+    const attendees = await this.computeAttendeesUsingIrlPage(gatheringUid);
+
+    const next = {
+      ...(existing ?? {}),
+      version: this.payloadVersion,
+      gatheringUid,
+      attendees: {
+        ...(existing?.attendees ?? {}),
+        total: attendees.total,
+        topAttendees: attendees.topAttendees,
+      },
+      ui: {
+        ...(existing?.ui ?? {}),
+        locationUid: gatheringUid,
+      },
+    };
+
+    const startIso: string | null | undefined = existing?.events?.dates?.start ?? null;
+    next.ui = {
+      ...(next.ui ?? {}),
+      startsLabel: this.startsLabelFromIso(startIso),
+      daysToStart: this.daysUntil(startIso) ?? 0,
+    };
+
+    return next;
+  }
+
   private async buildLocationPayload(gatheringUid: string, displayCandidates: CandidateRow[], cfg: ActiveDbConfig): Promise<any> {
     const displayEventUids = [...new Set(displayCandidates.map((c) => c.eventUid).filter(Boolean))];
 
@@ -519,36 +419,13 @@ export class IrlGatheringPushCandidatesService {
     const dateStart = eventSummaries.length ? eventSummaries[0].startDate : null;
     const dateEnd = eventSummaries.length ? eventSummaries[eventSummaries.length - 1].endDate : null;
 
-    // Attendee window = UPCOMING events in window (same as page).
-    const now = new Date();
-    const windowEndUpcoming = new Date(now.getTime() + cfg.upcomingWindowDays * 24 * 60 * 60 * 1000);
-
-    const attendeeEvents = await this.prisma.pLEvent.findMany({
-      where: {
-        isDeleted: false,
-        locationUid: gatheringUid,
-        endDate: { gte: now, lte: windowEndUpcoming },
-      },
-      select: { uid: true, startDate: true, endDate: true },
-      orderBy: [{ startDate: 'asc' }],
-    });
-
-    const attendeeEventUids = attendeeEvents.map((e) => e.uid);
-    const windowStartIso = attendeeEvents.length ? attendeeEvents[0].startDate.toISOString() : dateStart;
-    const windowEndIso = attendeeEvents.length ? attendeeEvents[attendeeEvents.length - 1].endDate.toISOString() : dateEnd;
-
-    const attendees = await this.computeAttendeesForLocation({
-      locationUid: gatheringUid,
-      attendeeEventUids,
-      windowStartIso,
-      windowEndIso,
-    });
+    const attendees = await this.computeAttendeesUsingIrlPage(gatheringUid);
 
     return {
       version: this.payloadVersion,
       gatheringUid,
       location: location
-        ? {
+          ? {
             id: location.uid,
             name: location.location,
             description: location.description,
@@ -560,7 +437,7 @@ export class IrlGatheringPushCandidatesService {
             icon: location.icon,
             resources: this.normalizeResources((location as any).resources),
           }
-        : null,
+          : null,
       events: {
         total: eventSummaries.length,
         eventUids: displayEventUids,

@@ -34,6 +34,7 @@ export class PLEventGuestsService {
       private awsService: AwsService,
       @Inject(forwardRef(() => PLEventsService))
       private eventService: PLEventsService,
+      @Inject(forwardRef(() => IrlGatheringPushCandidatesService))
       private readonly irlGatheringPushCandidatesService: IrlGatheringPushCandidatesService
   ) {}
 
