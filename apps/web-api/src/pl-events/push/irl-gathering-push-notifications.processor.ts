@@ -4,13 +4,15 @@ import { PushNotificationsService } from '../../push-notifications/push-notifica
 import { IrlGatheringPushRuleKind, PushNotificationCategory } from '@prisma/client';
 import { IrlGatheringPushConfigService } from './irl-gathering-push-config.service';
 import { IrlGatheringPushCandidatesService } from './irl-gathering-push-candidates.service';
+import { PLEventGuestsService } from '../pl-event-guests.service';
+
 
 /**
  * Response returned to back-office on manual trigger.
  * Keep it stable & explicit so UI can show rich details without guessing.
  */
 export type IrlPushTriggerResult =
-    | {
+  | {
   ok: true;
   action: 'created' | 'updated';
   pushUid: string;
@@ -22,16 +24,16 @@ export type IrlPushTriggerResult =
   attendees: { total: number; topAttendees: number };
   updatedAt: string;
 }
-    | {
+  | {
   ok: false;
   action: 'skipped';
   reason:
-      | 'no_active_config'
-      | 'config_disabled'
-      | 'no_events_in_window'
-      | 'no_candidates'
-      | 'window_miss'
-      | 'thresholds_not_met';
+    | 'no_active_config'
+    | 'config_disabled'
+    | 'no_events_in_window'
+    | 'no_candidates'
+    | 'window_miss'
+    | 'thresholds_not_met';
   ruleKind: IrlGatheringPushRuleKind;
   locationUid: string;
   details?: any;
@@ -97,10 +99,11 @@ export class IrlGatheringPushNotificationsProcessor {
   private readonly payloadVersion = 1;
 
   constructor(
-      private readonly prisma: PrismaService,
-      private readonly pushNotificationsService: PushNotificationsService,
-      private readonly configService: IrlGatheringPushConfigService,
-      private readonly candidatesService: IrlGatheringPushCandidatesService
+    private readonly prisma: PrismaService,
+    private readonly pushNotificationsService: PushNotificationsService,
+    private readonly configService: IrlGatheringPushConfigService,
+    private readonly candidatesService: IrlGatheringPushCandidatesService,
+    private readonly pleventGuestsService: PLEventGuestsService
   ) {}
 
   /**
@@ -490,9 +493,6 @@ export class IrlGatheringPushNotificationsProcessor {
     return aStart.getTime() <= bEnd.getTime() && aEnd.getTime() >= bStart.getTime();
   }
 
-  // ---------------------------------------------------------------------------
-  // Copy
-  // ---------------------------------------------------------------------------
 
   private daysUntil(startIso: string | null | undefined): number | null {
     if (!startIso) return null;
@@ -573,127 +573,19 @@ export class IrlGatheringPushNotificationsProcessor {
     return { title, description };
   }
 
-  // ---------------------------------------------------------------------------
-  // Payload
-  // ---------------------------------------------------------------------------
+  private computeAttendeesTotalsFromGuestsResponse(
+    guestsRows: any[] | null | undefined
+  ): { total: number; topAttendees: TopAttendee[] } {
+    const rows = Array.isArray(guestsRows) ? guestsRows : [];
 
-  /**
-   * NOTE:
-   * attendees.total is now counted WITH duplicates (no distinct by memberUid),
-   * to match IRL page "rows" behavior.
-   */
-  private async computeAttendeesForLocation(params: {
-    locationUid: string;
-    attendeeEventUids: string[];
-    windowStartIso: string | null;
-    windowEndIso: string | null;
-  }): Promise<{ total: number; topAttendees: TopAttendee[] }> {
-    const { locationUid, attendeeEventUids, windowStartIso, windowEndIso } = params;
+    const total = rows.length > 0 && typeof rows[0]?.count === 'number' ? rows[0].count : 0;
 
-    // 1) Event attendee rows (NO distinct) -> duplicates are kept
-    const eventAttendeeRows = attendeeEventUids.length
-        ? await this.prisma.pLEventGuest.findMany({
-          where: {
-            eventUid: { in: attendeeEventUids },
-            member: { accessLevel: { notIn: ['L0', 'L1', 'Rejected'] } },
-          },
-          select: { memberUid: true },
-        })
-        : [];
-
-    // 2) Location-only guests (eventUid = null) filtered by overlap with window.
-    // We keep duplicates too (multiple rows => multiple counts), but still apply overlap.
-    const locationOnlyGuests = await this.prisma.pLEventGuest.findMany({
-      where: {
-        locationUid,
-        eventUid: null,
-        member: { accessLevel: { notIn: ['L0', 'L1', 'Rejected'] } },
-      },
-      select: {
-        memberUid: true,
-        additionalInfo: true,
-        createdAt: true,
-      },
-    });
-
-    const windowStart = windowStartIso ? new Date(windowStartIso) : null;
-    const windowEnd = windowEndIso ? new Date(windowEndIso) : null;
-
-    const locationOnlyRowsIncluded: Array<{ memberUid: string }> = [];
-
-    if (windowStart && windowEnd) {
-      for (const g of locationOnlyGuests) {
-        const ai: any = g.additionalInfo ?? {};
-        const checkIn = this.parseYmdToUtcDate(ai?.checkInDate);
-        const checkOut = this.parseYmdToUtcDate(ai?.checkOutDate);
-
-        // If no parsable dates -> include to avoid undercounting (same philosophy as page logic).
-        if (!checkIn && !checkOut) {
-          locationOnlyRowsIncluded.push({ memberUid: g.memberUid });
-          continue;
-        }
-
-        const gStart = checkIn ?? (checkOut as Date);
-        const gEnd = checkOut ?? (checkIn as Date);
-
-        if (this.overlaps(gStart, gEnd, windowStart, windowEnd)) {
-          locationOnlyRowsIncluded.push({ memberUid: g.memberUid });
-        }
-      }
-    } else {
-      for (const g of locationOnlyGuests) locationOnlyRowsIncluded.push({ memberUid: g.memberUid });
-    }
-
-    // total WITH duplicates
-    const total = eventAttendeeRows.length + locationOnlyRowsIncluded.length;
-
-    // 3) Top attendees: count event attendance per member + location-only overlap adds +1 PER ROW
-    const topEventCounts = attendeeEventUids.length
-        ? await this.prisma.pLEventGuest.groupBy({
-          by: ['memberUid'],
-          where: {
-            eventUid: { in: attendeeEventUids },
-            member: { accessLevel: { notIn: ['L0', 'L1', 'Rejected'] } },
-          },
-          _count: { eventUid: true },
-          orderBy: { _count: { eventUid: 'desc' } },
-          take: 50,
-        })
-        : [];
-
-    const countsByMember = new Map<string, number>();
-    for (const row of topEventCounts) countsByMember.set(row.memberUid, row._count.eventUid);
-
-    // location-only rows included: +1 per row (duplicates kept)
-    for (const r of locationOnlyRowsIncluded) {
-      countsByMember.set(r.memberUid, (countsByMember.get(r.memberUid) ?? 0) + 1);
-    }
-
-    const topCombined = [...countsByMember.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 6)
-        .map(([memberUid, eventsCount]) => ({ memberUid, eventsCount }));
-
-    const topMemberUids = topCombined.map((t) => t.memberUid);
-
-    const topMembers = topMemberUids.length
-        ? await this.prisma.member.findMany({
-          where: { uid: { in: topMemberUids } },
-          select: { uid: true, name: true, image: { select: { url: true } } },
-        })
-        : [];
-
-    const memberByUid = new Map(topMembers.map((m) => [m.uid, m]));
-
-    const topAttendees: TopAttendee[] = topCombined.map((row) => {
-      const m = memberByUid.get(row.memberUid);
-      return {
-        memberUid: row.memberUid,
-        eventsCount: row.eventsCount,
-        imageUrl: m?.image?.url ?? null,
-        displayName: m?.name ?? null,
-      };
-    });
+    const topAttendees: TopAttendee[] = rows.slice(0, 6).map((r) => ({
+      memberUid: r.memberUid,
+      eventsCount: Array.isArray(r?.events) ? r.events.length : 0,
+      imageUrl: r?.member?.image?.url ?? null,
+      displayName: r?.member?.name ?? null,
+    }));
 
     return { total, topAttendees };
   }
@@ -780,38 +672,13 @@ export class IrlGatheringPushNotificationsProcessor {
 
     const dateStart = eventSummaries.length ? eventSummaries[0].startDate : null;
     const dateEnd = eventSummaries.length ? eventSummaries[eventSummaries.length - 1].endDate : null;
+    const guestsRows = await this.pleventGuestsService.getPLEventGuestsByLocationAndType(
+      gatheringUid,
+      {},
+      null
+    );
 
-    // IMPORTANT FIX:
-    // Attendees.total must match the IRL page you open from notification.
-    // The page uses UPCOMING window (not reminder-subset), so for REMINDER we still compute totals
-    // using ALL events in UPCOMING window for the location.
-    const now = new Date();
-    const msInDay = 24 * 60 * 60 * 1000;
-    const windowEndUpcoming = new Date(now.getTime() + cfg.upcomingWindowDays * msInDay);
-
-    const attendeeEvents = await this.prisma.pLEvent.findMany({
-      where: {
-        isDeleted: false,
-        locationUid: gatheringUid,
-        endDate: { gte: now, lte: windowEndUpcoming },
-      },
-      select: { uid: true, startDate: true, endDate: true },
-      orderBy: [{ startDate: 'asc' }],
-    });
-
-    const attendeeEventUids = attendeeEvents.map((e) => e.uid);
-
-    const attendeeWindowStartIso = attendeeEvents.length ? attendeeEvents[0].startDate.toISOString() : dateStart;
-    const attendeeWindowEndIso = attendeeEvents.length
-        ? attendeeEvents[attendeeEvents.length - 1].endDate.toISOString()
-        : dateEnd;
-
-    const attendees = await this.computeAttendeesForLocation({
-      locationUid: gatheringUid,
-      attendeeEventUids,
-      windowStartIso: attendeeWindowStartIso,
-      windowEndIso: attendeeWindowEndIso,
-    });
+    const attendees = this.computeAttendeesTotalsFromGuestsResponse(guestsRows);
 
     return {
       version: this.payloadVersion,
