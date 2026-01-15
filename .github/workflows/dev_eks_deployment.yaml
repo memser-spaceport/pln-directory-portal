@@ -3,7 +3,7 @@ name: Deploy to EKS with Helm [Dev]
 on:
   push:
     branches:
-      - fix/update-guests-in-irl   # Triggers Dev deployment
+      - develop   # Triggers Dev deployment
   workflow_dispatch:
 jobs:
   dev-deploy:
