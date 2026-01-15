@@ -674,7 +674,7 @@ export class IrlGatheringPushNotificationsProcessor {
     const dateEnd = eventSummaries.length ? eventSummaries[eventSummaries.length - 1].endDate : null;
     const guestsRows = await this.pleventGuestsService.getPLEventGuestsByLocationAndType(
       gatheringUid,
-      {},
+      { type: 'upcoming' },
       null
     );
 
