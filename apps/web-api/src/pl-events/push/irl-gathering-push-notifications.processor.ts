@@ -20,7 +20,7 @@ export type IrlPushTriggerResult =
   locationUid: string;
   payloadVersion: number;
   candidates: { total: number; processed: number };
-  events: { total: number; eventUids: string[]; dates: { start: string | null; end: string | null } };
+  events: { total: number; qualifiedTotal?: number; eventUids: string[]; dates: { start: string | null; end: string | null } };
   attendees: { total: number; topAttendees: number };
   updatedAt: string;
 }
@@ -386,11 +386,11 @@ export class IrlGatheringPushNotificationsProcessor {
    * - REMINDER: earliest start date must fall within [now..now+reminderDaysBefore]
    */
   private matchesWindow(
-      ruleKind: IrlGatheringPushRuleKind,
-      startDates: Date[],
-      endDates: Date[],
-      now: Date,
-      cfg: Pick<ActiveDbConfig, 'upcomingWindowDays' | 'reminderDaysBefore'>
+    ruleKind: IrlGatheringPushRuleKind,
+    startDates: Date[],
+    endDates: Date[],
+    now: Date,
+    cfg: Pick<ActiveDbConfig, 'upcomingWindowDays' | 'reminderDaysBefore'>
   ): boolean {
     const msInDay = 24 * 60 * 60 * 1000;
 
@@ -398,14 +398,14 @@ export class IrlGatheringPushNotificationsProcessor {
     // - use earliest end date for UPCOMING (closest finishing)
     // - use earliest start date for REMINDER (closest starting)
     const earliestStart = startDates
-        .filter(Boolean)
-        .map((d) => new Date(d))
-        .sort((a, b) => a.getTime() - b.getTime())[0];
+      .filter(Boolean)
+      .map((d) => new Date(d))
+      .sort((a, b) => a.getTime() - b.getTime())[0];
 
     const earliestEnd = endDates
-        .filter(Boolean)
-        .map((d) => new Date(d))
-        .sort((a, b) => a.getTime() - b.getTime())[0];
+      .filter(Boolean)
+      .map((d) => new Date(d))
+      .sort((a, b) => a.getTime() - b.getTime())[0];
 
     if (!earliestStart && !earliestEnd) return false;
 
@@ -454,26 +454,26 @@ export class IrlGatheringPushNotificationsProcessor {
     if (!Array.isArray(input)) return [];
 
     return input
-        .map((x) => {
-          if (!x) return null;
+      .map((x) => {
+        if (!x) return null;
 
-          // DB usually stores text[] where each element is a JSON-string
-          if (typeof x === 'string') {
-            const s = x.trim();
-            if (!s) return null;
-            try {
-              return JSON.parse(s);
-            } catch {
-              return { raw: s };
-            }
+        // DB usually stores text[] where each element is a JSON-string
+        if (typeof x === 'string') {
+          const s = x.trim();
+          if (!s) return null;
+          try {
+            return JSON.parse(s);
+          } catch {
+            return { raw: s };
           }
+        }
 
-          // already an object
-          if (typeof x === 'object') return x;
+        // already an object
+        if (typeof x === 'object') return x;
 
-          return null;
-        })
-        .filter(Boolean);
+        return null;
+      })
+      .filter(Boolean);
   }
 
   private parseYmdToUtcDate(v: any): Date | null {
@@ -520,55 +520,24 @@ export class IrlGatheringPushNotificationsProcessor {
     if (!iso) return '';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
-    const day = this.ordinal(d.getUTCDate());
-    const month = d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
-    return `${day} ${month}`;
+    const month = d.toLocaleString('en-US', { month: 'short' });
+    const day = d.getDate();
+    return `${month} ${this.ordinal(day)}`;
   }
 
-  private humanDays(days: number | null): string {
-    if (days == null) return 'soon';
-    if (days === 0) return '0';
-    return String(days);
-  }
-
-  /**
-   * Titles per design:
-   * - Announcement (UPCOMING): "# events happening in [Location] starting [start date e.g. '16th Feb']"
-   * - Reminder: "Reminder: IRL Gathering in [Location] starts in [days] days."
-   *
-   * Description always: location.description if present else default (current behavior).
-   */
-  private buildTitleAndDescription(
-      ruleKind: IrlGatheringPushRuleKind,
-      payload: any
-  ): { title: string; description: string } {
-    const locationName = payload?.location?.name ?? payload?.location?.id ?? 'this location';
-
-    if (ruleKind === IrlGatheringPushRuleKind.REMINDER) {
-      const earliestStartIso: string | null | undefined = payload?.events?.dates?.start ?? null;
-      const days = this.daysUntil(earliestStartIso);
-
-      return {
-        title: `Reminder: IRL Gathering in ${locationName} starts in ${this.humanDays(days)} days.`,
-        description:
-            payload.location?.description && String(payload.location.description).trim().length > 0
-                ? String(payload.location.description).trim()
-                : payload.events?.total != null
-                    ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
-                    : 'Upcoming IRL gathering',
-      };
-    }
+  private buildTitleAndDescription(payload: any): { title: string; description: string } {
+    const locationName = payload?.location?.name ?? 'your area';
 
     const startLabel = this.formatDateForTitle(payload?.events?.dates?.start ?? null);
     const eventsTotal = payload?.events?.total ?? 0;
     const title = `${eventsTotal} event${eventsTotal === 1 ? '' : 's'} happening in ${locationName}${startLabel ? ` starting ${startLabel}` : ''}`;
 
     const description =
-        payload.location?.description && String(payload.location.description).trim().length > 0
-            ? String(payload.location.description).trim()
-            : payload.events?.total != null
-                ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
-                : 'Upcoming IRL gathering';
+      payload.location?.description && String(payload.location.description).trim().length > 0
+        ? String(payload.location.description).trim()
+        : payload.events?.total != null
+          ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
+          : 'Upcoming IRL gathering';
 
     return { title, description };
   }
@@ -591,15 +560,15 @@ export class IrlGatheringPushNotificationsProcessor {
   }
 
   private async buildLocationPayload(
-      cfg: ActiveDbConfig,
-      ruleKind: IrlGatheringPushRuleKind,
-      gatheringUid: string,
-      groupCandidates: Array<{
-        eventUid: string;
-        eventStartDate: Date;
-        eventEndDate: Date;
-        attendeeCount: number;
-      }>
+    cfg: ActiveDbConfig,
+    ruleKind: IrlGatheringPushRuleKind,
+    gatheringUid: string,
+    groupCandidates: Array<{
+      eventUid: string;
+      eventStartDate: Date;
+      eventEndDate: Date;
+      attendeeCount: number;
+    }>
   ): Promise<any> {
     const displayEventUids = [...new Set(groupCandidates.map((c) => c.eventUid).filter(Boolean))];
 
@@ -621,38 +590,38 @@ export class IrlGatheringPushNotificationsProcessor {
     });
 
     const locationInfo: LocationInfo | null = location
-        ? {
-          uid: location.uid,
-          location: location.location,
-          description: location.description,
-          country: location.country,
-          timezone: location.timezone,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          flag: location.flag,
-          icon: location.icon,
-          resources: this.normalizeResources((location as any).resources),
-        }
-        : null;
+      ? {
+        uid: location.uid,
+        location: location.location,
+        description: location.description,
+        country: location.country,
+        timezone: location.timezone,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        flag: location.flag,
+        icon: location.icon,
+        resources: this.normalizeResources((location as any).resources),
+      }
+      : null;
 
     // Events to DISPLAY in notification (candidate-driven; reminder will show subset)
     const events = displayEventUids.length
-        ? await this.prisma.pLEvent.findMany({
-          where: { uid: { in: displayEventUids }, isDeleted: false },
-          select: {
-            uid: true,
-            slugURL: true,
-            name: true,
-            startDate: true,
-            endDate: true,
-            websiteURL: true,
-            telegramId: true,
-            resources: true,
-            logo: { select: { url: true } },
-          },
-          orderBy: [{ startDate: 'asc' }],
-        })
-        : [];
+      ? await this.prisma.pLEvent.findMany({
+        where: { uid: { in: displayEventUids }, isDeleted: false },
+        select: {
+          uid: true,
+          slugURL: true,
+          name: true,
+          startDate: true,
+          endDate: true,
+          websiteURL: true,
+          telegramId: true,
+          resources: true,
+          logo: { select: { url: true } },
+        },
+        orderBy: [{ startDate: 'asc' }],
+      })
+      : [];
 
     const attendeeCountByEventUid = new Map<string, number>();
     for (const c of groupCandidates) attendeeCountByEventUid.set(c.eventUid, c.attendeeCount);
@@ -680,26 +649,36 @@ export class IrlGatheringPushNotificationsProcessor {
 
     const attendees = this.computeAttendeesTotalsFromGuestsResponse(guestsRows);
 
+    // Total events shown on IRL schedule UI (not window-limited): endDate >= now
+    const scheduleTotalEvents = await this.prisma.pLEvent.count({
+      where: {
+        isDeleted: false,
+        locationUid: gatheringUid,
+        endDate: { gte: new Date() },
+      },
+    });
+
     return {
       version: this.payloadVersion,
       ruleKind,
       gatheringUid,
       location: locationInfo
-          ? {
-            id: locationInfo.uid,
-            name: locationInfo.location,
-            description: locationInfo.description,
-            country: locationInfo.country,
-            timezone: locationInfo.timezone,
-            latitude: locationInfo.latitude,
-            longitude: locationInfo.longitude,
-            flag: locationInfo.flag,
-            icon: locationInfo.icon,
-            resources: locationInfo.resources ?? [],
-          }
-          : null,
+        ? {
+          id: locationInfo.uid,
+          name: locationInfo.location,
+          description: locationInfo.description,
+          country: locationInfo.country,
+          timezone: locationInfo.timezone,
+          latitude: locationInfo.latitude,
+          longitude: locationInfo.longitude,
+          flag: locationInfo.flag,
+          icon: locationInfo.icon,
+          resources: locationInfo.resources ?? [],
+        }
+        : null,
       events: {
-        total: eventSummaries.length,
+        total: scheduleTotalEvents,
+        qualifiedTotal: eventSummaries.length,
         eventUids: displayEventUids,
         dates: { start: dateStart, end: dateEnd },
         items: eventSummaries,
@@ -720,28 +699,28 @@ export class IrlGatheringPushNotificationsProcessor {
   // ---------------------------------------------------------------------------
 
   private async processSingleGroup(
-      cfg: ActiveDbConfig,
-      ruleKind: IrlGatheringPushRuleKind,
-      gatheringUid: string,
-      groupCandidates: Array<{
-        uid: string;
-        eventUid: string;
-        eventStartDate: Date;
-        eventEndDate: Date;
-        attendeeCount: number;
-      }>,
-      opts: ProcessGroupOptions
+    cfg: ActiveDbConfig,
+    ruleKind: IrlGatheringPushRuleKind,
+    gatheringUid: string,
+    groupCandidates: Array<{
+      uid: string;
+      eventUid: string;
+      eventStartDate: Date;
+      eventEndDate: Date;
+      attendeeCount: number;
+    }>,
+    opts: ProcessGroupOptions
   ): Promise<IrlPushTriggerResult> {
     const now = new Date();
 
     // If NOT bypassing gating, enforce window & thresholds (job path).
     if (!opts.bypassGating) {
       const windowOk = this.matchesWindow(
-          ruleKind,
-          groupCandidates.map((c) => c.eventStartDate),
-          groupCandidates.map((c) => c.eventEndDate),
-          now,
-          cfg
+        ruleKind,
+        groupCandidates.map((c) => c.eventStartDate),
+        groupCandidates.map((c) => c.eventEndDate),
+        now,
+        cfg
       );
 
       if (!windowOk) {
@@ -803,30 +782,38 @@ export class IrlGatheringPushNotificationsProcessor {
       }
     }
 
-    // Dedup key: category + (ruleKind, gatheringUid, version)
+    const payload = await this.buildLocationPayload(cfg, ruleKind, gatheringUid, groupCandidates);
+    const { title, description } = this.buildTitleAndDescription(payload);
+
     const alreadySent = await this.prisma.pushNotification.findFirst({
       where: {
         category: PushNotificationCategory.IRL_GATHERING,
+        isPublic: true,
+        metadata: {
+          path: ['ruleKind'],
+          equals: ruleKind,
+        },
         AND: [
-          { metadata: { path: ['ruleKind'], equals: ruleKind } },
-          { metadata: { path: ['gatheringUid'], equals: gatheringUid } },
-          { metadata: { path: ['version'], equals: this.payloadVersion } },
+          {
+            metadata: {
+              path: ['gatheringUid'],
+              equals: gatheringUid,
+            },
+          },
         ],
       },
+      orderBy: [{ createdAt: 'desc' }],
       select: { id: true, uid: true },
     });
 
-    const payload = await this.buildLocationPayload(cfg, ruleKind, gatheringUid, groupCandidates);
-    const { title, description } = this.buildTitleAndDescription(ruleKind, payload);
+    // Bump for admin triggers so back-office sees a fresh notification (and users see it sooner).
+    const bumpForAdmin = opts.source === 'admin';
 
+    let action: 'created' | 'updated' = 'updated';
     let pushUid: string;
-    let action: 'created' | 'updated';
 
     if (alreadySent) {
-      action = 'updated';
       pushUid = alreadySent.uid;
-
-      const bumpForAdmin = opts.source === 'admin';
 
       // reset read statuses only when admin explicitly triggers it
       if (bumpForAdmin) {
@@ -873,6 +860,7 @@ export class IrlGatheringPushNotificationsProcessor {
       candidates: { total: groupCandidates.length, processed: groupCandidates.length },
       events: {
         total: payload.events?.total ?? 0,
+        qualifiedTotal: (payload.events as any)?.qualifiedTotal ?? 0,
         eventUids: payload.events?.eventUids ?? [],
         dates: { start: payload.events?.dates?.start ?? null, end: payload.events?.dates?.end ?? null },
       },
@@ -886,8 +874,8 @@ export class IrlGatheringPushNotificationsProcessor {
 
   private logCtx(ctx: Record<string, any>) {
     return Object.entries(ctx)
-        .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
-        .join(' ');
+      .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+      .join(' ');
   }
 
   private logDecision(message: string, ctx: Record<string, any> = {}) {

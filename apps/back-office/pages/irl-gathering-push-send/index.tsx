@@ -185,7 +185,7 @@ function TriggerResultCard({ result }: { result: IrlPushTriggerResult }) {
     );
   }
 
-  // ✅ Explicitly narrow union to skipped branch
+  // Explicitly narrow union to skipped branch
   const skipped = result as Extract<IrlPushTriggerResult, { ok: false }>;
   const reasonCode = skipped.reason ?? 'unknown';
   const label = SKIP_REASON_LABEL[reasonCode] ?? reasonCode;
@@ -358,7 +358,6 @@ const IrlGatheringPushSendPage = () => {
               {locations.map((l) => (
                 <option key={l.uid} value={l.uid}>
                   {l.location}
-                  {l.country ? ` (${l.country})` : ''}
                 </option>
               ))}
             </select>
@@ -390,8 +389,7 @@ const IrlGatheringPushSendPage = () => {
             {selectedLocation ? (
               <>
                 <br />
-                Selected: <span className="font-semibold">{selectedLocation.location}</span>{' '}
-                {selectedLocation.country ? `(${selectedLocation.country})` : ''}
+                Selected: <span className="font-semibold">{selectedLocation.location}</span>
               </>
             ) : null}
           </p>

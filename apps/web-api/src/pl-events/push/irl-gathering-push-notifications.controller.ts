@@ -3,6 +3,7 @@ import {AdminAuthGuard} from '../../guards/admin-auth.guard';
 import {IrlGatheringPushRuleKind} from '@prisma/client';
 import {PrismaService} from '../../shared/prisma.service';
 import {IrlGatheringPushNotificationsProcessor} from './irl-gathering-push-notifications.processor';
+import {NoCache} from "../../decorators/no-cache.decorator";
 
 class TriggerIrlPushDto {
   locationUid: string;
@@ -21,10 +22,13 @@ export class IrlGatheringPushNotificationsController {
    * Returns list of IRL gathering locations for back-office dropdown.
    */
   @Get('locations')
+  @NoCache()
   async locations() {
     const items = await this.prisma.pLEventLocation.findMany({
-      where: { isDeleted: false },
-      select: { uid: true, location: true, country: true },
+      where: {
+        location: { not: '' },
+      },
+      select: { uid: true, location: true },
       orderBy: [{ location: 'asc' }],
     });
 
