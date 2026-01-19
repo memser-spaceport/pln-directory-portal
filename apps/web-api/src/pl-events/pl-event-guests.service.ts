@@ -24,18 +24,18 @@ import { IrlGatheringPushCandidatesService } from './push/irl-gathering-push-can
 @Injectable()
 export class PLEventGuestsService {
   constructor(
-    private prisma: PrismaService,
-    private logger: LogService,
-    private memberService: MembersService,
-    @Inject(forwardRef(() => PLEventLocationsService))
-    private eventLocationsService: PLEventLocationsService,
-    private cacheService: CacheService,
-    private teamService: TeamsService,
-    private awsService: AwsService,
-    @Inject(forwardRef(() => PLEventsService))
-    private eventService: PLEventsService,
-    @Inject(forwardRef(() => IrlGatheringPushCandidatesService))
-    private readonly irlGatheringPushCandidatesService: IrlGatheringPushCandidatesService
+      private prisma: PrismaService,
+      private logger: LogService,
+      private memberService: MembersService,
+      @Inject(forwardRef(() => PLEventLocationsService))
+      private eventLocationsService: PLEventLocationsService,
+      private cacheService: CacheService,
+      private teamService: TeamsService,
+      private awsService: AwsService,
+      @Inject(forwardRef(() => PLEventsService))
+      private eventService: PLEventsService,
+      @Inject(forwardRef(() => IrlGatheringPushCandidatesService))
+      private readonly irlGatheringPushCandidatesService: IrlGatheringPushCandidatesService
   ) {}
 
   /**
@@ -47,14 +47,14 @@ export class PLEventGuestsService {
    *   - Resets the cache after creation.
    */
   async createPLEventGuestByLocation(
-    data: CreatePLEventGuestSchemaDto,
-    member: Member,
-    locationUid: string,
-    requestorEmail: string,
-    location: { location: string },
-    type: string = CREATE,
-    tx?: Prisma.TransactionClient,
-    eventType?: string
+      data: CreatePLEventGuestSchemaDto,
+      member: Member,
+      locationUid: string,
+      requestorEmail: string,
+      location: { location: string },
+      type: string = CREATE,
+      tx?: Prisma.TransactionClient,
+      eventType?: string
   ) {
     try {
       const isAdmin = this.memberService.checkIfAdminUser(member);
@@ -102,15 +102,15 @@ export class PLEventGuestsService {
       if (type === CREATE) {
         await this.eventLocationsService.subscribeLocationByUid(locationUid, data.memberUid);
         this.memberService.checkIfAdminUser(member) &&
-          !plEvents.length &&
-          (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
+        !plEvents.length &&
+        (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
 
       await this.updateGuestTopicsAndReason(data, locationUid, member, eventType, tx);
 
       // Recompute candidates and refresh already-sent pushes ONLY for affected events
       await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(
-        guests.map((g) => g.eventUid).filter(Boolean)
+          guests.map((g) => g.eventUid).filter(Boolean)
       );
 
       // If guest(s) were added at the location without eventUid, refresh only this location push
@@ -180,11 +180,11 @@ export class PLEventGuestsService {
    *   - Deletes the existing guests and calls the `createPLEventGuestByLocation` method for new guests.
    */
   async modifyPLEventGuestByLocation(
-    data: UpdatePLEventGuestSchemaDto,
-    location: FormattedLocationWithEvents,
-    member: Member,
-    requestorEmail: string,
-    type: string
+      data: UpdatePLEventGuestSchemaDto,
+      location: FormattedLocationWithEvents,
+      member: Member,
+      requestorEmail: string,
+      type: string
   ) {
     try {
       const events = type === 'upcoming' ? location.upcomingEvents : location.pastEvents;
@@ -199,18 +199,18 @@ export class PLEventGuestsService {
           },
         });
         return await this.createPLEventGuestByLocation(
-          data,
-          member,
-          location.uid,
-          requestorEmail,
-          location,
-          UPDATE,
-          tx,
-          type
+            data,
+            member,
+            location.uid,
+            requestorEmail,
+            location,
+            UPDATE,
+            tx,
+            type
         );
       });
       await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(
-        events.map((e) => e.uid)
+          events.map((e) => e.uid)
       );
       return result;
     } catch (err) {
@@ -227,7 +227,7 @@ export class PLEventGuestsService {
   async deletePLEventGuests(membersAndEvents) {
     try {
       const deleteConditions = membersAndEvents.flatMap(({ memberUid, events }) =>
-        events.map((eventUid) => ({ memberUid, eventUid }))
+          events.map((eventUid) => ({ memberUid, eventUid }))
       );
       const result = await this.prisma.pLEventGuest.deleteMany({
         where: {
@@ -237,7 +237,7 @@ export class PLEventGuestsService {
       await this.cacheService.reset({ service: 'PLEventGuest' });
 
       const affectedEventUids = Array.from(
-        new Set((deleteConditions as Array<{ eventUid: unknown }>).map((d) => String(d.eventUid)))
+          new Set((deleteConditions as Array<{ eventUid: unknown }>).map((d) => String(d.eventUid)))
       ).filter((x): x is string => x.length > 0);
 
       await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(affectedEventUids);
@@ -525,9 +525,7 @@ export class PLEventGuestsService {
    */
   async filterEventsByAttendanceAndAdminStatus(filteredEventsUid, events: PLEvent[], member): Promise<PLEvent[]> {
     if (filteredEventsUid?.length > 0 && !member) {
-      return events
-        .filter((event) => filteredEventsUid?.includes(event.uid))
-        .filter((event) => event.type !== 'INVITE_ONLY');
+      return events.filter((event) => filteredEventsUid?.includes(event.uid)).filter((event) => event.type !== 'INVITE_ONLY');
     }
     // If the user is logged out, remove all invite-only events
     if (!member) {
@@ -556,8 +554,8 @@ export class PLEventGuestsService {
     // Filter events to keep non-invite-only events and attended invite-only events
     if (filteredEventsUid?.length > 0) {
       return events
-        .filter((event) => filteredEventsUid?.includes(event.uid))
-        .filter((event) => event.type !== 'INVITE_ONLY' || attendedEventUids.has(event?.uid));
+          .filter((event) => filteredEventsUid?.includes(event.uid))
+          .filter((event) => event.type !== 'INVITE_ONLY' || attendedEventUids.has(event?.uid));
     }
     return events.filter((event) => event.type !== 'INVITE_ONLY' || attendedEventUids.has(event.uid));
   }
@@ -709,10 +707,7 @@ export class PLEventGuestsService {
         'name', tm.name,
         'logo', json_build_object('url', tml.url)
         )
-        ) AS team,
-        MAX(pg."reason") AS sort_reason,
-        MAX(pg."topics") AS sort_topics,
-        MAX(m.name) AS sort_member_name
+        ) AS team
 
         FROM "PLEventGuest" pg
         JOIN "PLEvent" e ON e.uid = pg."eventUid"
@@ -746,8 +741,8 @@ export class PLEventGuestsService {
 
         location_only AS (
         ${
-          includeLocationOnlyGuests
-            ? `
+            includeLocationOnlyGuests
+                ? `
                   SELECT
                     pg."memberUid",
                     'none' AS guest_type,
@@ -798,10 +793,7 @@ export class PLEventGuestsService {
                             'logo', json_build_object('url', tml.url)
                         )
                     ) AS team,
-                    0::bigint AS count,
-                    MAX(pg."reason") AS sort_reason,
-                    MAX(pg."topics") AS sort_topics,
-                    MAX(m.name) AS sort_member_name
+                    0::bigint AS count
                   FROM "PLEventGuest" pg
                     JOIN "Member" m ON m.uid = pg."memberUid"
                     LEFT JOIN "Image" mi ON mi.uid = m."imageUid"
@@ -830,7 +822,7 @@ export class PLEventGuestsService {
                     m.name,
                     tm.name
                 `
-            : `SELECT NULL::text AS "memberUid", 'none'::text AS guest_type, '{}'::json AS guest, '[]'::json AS events, '{}'::json AS member, '[]'::jsonb AS teamMemberRoles, '{}'::json AS team, 0::bigint AS count, NULL::text AS sort_reason, NULL::text[] AS sort_topics, NULL::text AS sort_member_name WHERE FALSE`
+                : `SELECT NULL::text AS "memberUid", 'none'::text AS guest_type, '{}'::json AS guest, '[]'::json AS events, '{}'::json AS member, '[]'::jsonb AS teamMemberRoles, '{}'::json AS team, 0::bigint AS count WHERE FALSE`
         }
         ),
 
@@ -845,7 +837,6 @@ export class PLEventGuestsService {
         COUNT(*) OVER() AS count
       FROM combined
         ${this.buildHostAndSpeakerCondition(isHost, isSpeaker, isSponsor)}
-        ${this.buildFinalOrderBy(sortBy, sortDirection, loggedInMemberUid)}
         LIMIT $${values.length + 1}
       OFFSET $${values.length + 2}
     `;
@@ -882,8 +873,8 @@ export class PLEventGuestsService {
     return result.map((attendee) => {
       let guestInfo = { ...attendee?.guest?.info };
       guestInfo.teamUid = this.getGuestsActiveTeam(attendee?.teammemberroles, guestInfo?.teamUid)
-        ? guestInfo?.teamUid
-        : null;
+          ? guestInfo?.teamUid
+          : null;
       return {
         // Total count of members after filtering, represented by totalMembers
         count: Number(BigInt(attendee.count || '0n')),
@@ -1005,37 +996,6 @@ export class PLEventGuestsService {
             ELSE 4
           END asc,
           m."name" ${sortDirection}
-        `;
-    }
-  }
-
-  /**
-   * Builds ORDER BY clause for the final combined result (event_attendees + location_only).
-   * This ensures proper sorting including logged-in user priority for both event attendees and location-only guests.
-   *
-   * @param {string} sortBy - The field by which to sort the results.
-   * @param {string} sortDirection - Sort direction ('asc' or 'desc').
-   * @param {string} uid - Logged-in member UID for priority sorting.
-   * @returns {string} SQL ORDER BY clause for the combined result.
-   */
-  buildFinalOrderBy(sortBy: string, sortDirection: string, uid: string) {
-    switch (sortBy) {
-      case 'member':
-        return `ORDER BY sort_member_name ${sortDirection}`;
-      case 'team':
-        return `ORDER BY (team->>'name') ${sortDirection}`;
-      default:
-        const loggedInMemberOrder = uid ? `CASE WHEN "memberUid" = '${uid}' THEN 0 ELSE 1 END,` : '';
-        return `
-          ORDER BY
-            ${loggedInMemberOrder}
-            CASE
-              WHEN sort_reason IS NOT NULL AND array_length(sort_topics, 1) > 0 THEN 1
-              WHEN array_length(sort_topics, 1) > 0 THEN 2
-              WHEN sort_reason IS NOT NULL THEN 3
-            ELSE 4
-          END asc,
-          sort_member_name ${sortDirection}
         `;
     }
   }
@@ -1309,11 +1269,11 @@ export class PLEventGuestsService {
    * @throws Throws an error if fetching location details or updating records fails.
    */
   async updateGuestTopicsAndReason(
-    data: UpdatePLEventGuestSchemaDto,
-    locationUid: string,
-    member: Member,
-    type: string = 'upcoming',
-    tx?: Prisma.TransactionClient
+      data: UpdatePLEventGuestSchemaDto,
+      locationUid: string,
+      member: Member,
+      type: string = 'upcoming',
+      tx?: Prisma.TransactionClient
   ) {
     const location = await this.eventLocationsService.getPLEventLocationByUid(locationUid);
     const events = type === 'upcoming' ? location.pastEvents : location.upcomingEvents;
@@ -1383,22 +1343,22 @@ export class PLEventGuestsService {
     try {
       // Build search conditions for events and locations
       const eventSearchCondition = queryParams?.name
-        ? {
+          ? {
             name: {
               contains: queryParams.name,
               mode: 'insensitive' as const,
             },
           }
-        : {};
+          : {};
 
       const locationSearchCondition = queryParams?.name
-        ? {
+          ? {
             location: {
               contains: queryParams.name,
               mode: 'insensitive' as const,
             },
           }
-        : {};
+          : {};
 
       // Build orderBy conditions based on queryParams.orderBy
       const eventOrderBy = (await this.buildOrderByCondition(queryParams?.orderBy)) || { aggregatedPriority: 'desc' };
@@ -1416,14 +1376,14 @@ export class PLEventGuestsService {
         }),
 
         locations: await this.eventLocationsService.getFeaturedLocationsWithSubscribers(
-          {
-            where: {
-              isAggregated: queryParams.isAggregated !== undefined ? queryParams.isAggregated === 'true' : true,
-              ...locationSearchCondition,
+            {
+              where: {
+                isAggregated: queryParams.isAggregated !== undefined ? queryParams.isAggregated === 'true' : true,
+                ...locationSearchCondition,
+              },
+              ...(locationOrderBy && { orderBy: locationOrderBy as any }),
             },
-            ...(locationOrderBy && { orderBy: locationOrderBy as any }),
-          },
-          loggedInMember
+            loggedInMember
         ),
       };
     } catch (error) {
@@ -1449,9 +1409,9 @@ export class PLEventGuestsService {
     return events.map((event) => ({
       ...event,
       rowspan:
-        (event.hostSubEvents?.length || 0) +
-        (event.speakerSubEvents?.length || 0) +
-        (event.sponsorSubEvents?.length || 0),
+          (event.hostSubEvents?.length || 0) +
+          (event.speakerSubEvents?.length || 0) +
+          (event.sponsorSubEvents?.length || 0),
     }));
   }
 
@@ -1484,18 +1444,18 @@ export class PLEventGuestsService {
       const adminEmailIds = adminEmailIdsEnv?.split('|') ?? [];
 
       const result = await this.awsService.sendEmailWithTemplate(
-        path.join(__dirname, '/shared/markMyPresence.hbs'),
-        {
-          ...emailData,
-        },
-        '',
-        'Request to Log Attendance for Past In-Person Events',
-        process.env.SES_SOURCE_EMAIL || '',
-        adminEmailIds,
-        []
+          path.join(__dirname, '/shared/markMyPresence.hbs'),
+          {
+            ...emailData,
+          },
+          '',
+          'Request to Log Attendance for Past In-Person Events',
+          process.env.SES_SOURCE_EMAIL || '',
+          adminEmailIds,
+          []
       );
       this.logger.info(
-        `New mark my presence request for ${userEmail} notified to support team ref: ${result?.MessageId}`
+          `New mark my presence request for ${userEmail} notified to support team ref: ${result?.MessageId}`
       );
 
       //const response = await this.awsService.sendEmail(EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME, true, [], emailData);
@@ -1577,7 +1537,7 @@ export class PLEventGuestsService {
 
     if (existing) {
       throw new ConflictException(
-        `Guest already exists for this location and event (memberUid=${params.memberUid}, locationUid=${params.locationUid}, eventUid=${existing.eventUid})`
+          `Guest already exists for this location and event (memberUid=${params.memberUid}, locationUid=${params.locationUid}, eventUid=${existing.eventUid})`
       );
     }
   }
@@ -1606,7 +1566,7 @@ export class PLEventGuestsService {
     if (incomingHasNoRange) {
       if (existing.length > 0) {
         throw new ConflictException(
-          `Guest already exists for this location (memberUid=${memberUid}, locationUid=${locationUid}).`
+            `Guest already exists for this location (memberUid=${memberUid}, locationUid=${locationUid}).`
         );
       }
       return;
@@ -1624,7 +1584,7 @@ export class PLEventGuestsService {
       // If existing row has no range => it blocks everything
       if (!exStart && !exEnd) {
         throw new ConflictException(
-          `Guest already exists for this location (existing row has no date range). memberUid=${memberUid}, locationUid=${locationUid}`
+            `Guest already exists for this location (existing row has no date range). memberUid=${memberUid}, locationUid=${locationUid}`
         );
       }
 
@@ -1633,7 +1593,7 @@ export class PLEventGuestsService {
 
       if (this.overlaps(existingStart, existingEnd, incomingStart, incomingEnd)) {
         throw new ConflictException(
-          `Guest already exists for this location in an overlapping date range (memberUid=${memberUid}, locationUid=${locationUid}).`
+            `Guest already exists for this location in an overlapping date range (memberUid=${memberUid}, locationUid=${locationUid}).`
         );
       }
     }
@@ -1652,7 +1612,7 @@ export class PLEventGuestsService {
         const evEnd = new Date(ev.endDate);
         if (this.overlaps(evStart, evEnd, incomingStart, incomingEnd)) {
           throw new ConflictException(
-            `Guest already exists for this location via event attendance in an overlapping date range (memberUid=${memberUid}, locationUid=${locationUid}, eventUid=${ev.uid}).`
+              `Guest already exists for this location via event attendance in an overlapping date range (memberUid=${memberUid}, locationUid=${locationUid}, eventUid=${ev.uid}).`
           );
         }
       }
