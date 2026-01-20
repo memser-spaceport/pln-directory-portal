@@ -116,7 +116,7 @@ export class TeamsTool {
             if (guest.isHost) roles.push('Host');
             if (guest.isSpeaker) roles.push('Speaker');
             if (guest.isSponsor) roles.push('Sponsor');
-            return `${guest.event.name} (${roles.join(', ')})`;
+            return `${guest.event?.name} (${roles.join(', ')})`;
           })
           .join(', ');
 

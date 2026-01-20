@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { WebSocketService } from '../websocket/websocket.service';
 import { Prisma, PushNotificationCategory } from '@prisma/client';
+import { NotificationServiceClient } from '../notifications/notification-service.client';
 
 export interface CreatePushNotificationDto {
   category: PushNotificationCategory;
@@ -13,6 +14,14 @@ export interface CreatePushNotificationDto {
   recipientUid?: string;
   isPublic?: boolean;
   accessLevels?: string[]; // Optional: list of access levels (L2, L3, L4, L5, L6) to target
+}
+
+export interface ForumMentionEmailDto {
+  recipientUid: string;
+  title: string;
+  description?: string;
+  link?: string;
+  metadata?: Record<string, unknown>;
 }
 
 interface NotificationWithReadStatus {
@@ -34,7 +43,11 @@ interface NotificationWithReadStatus {
 export class PushNotificationsService {
   private readonly logger = new Logger(PushNotificationsService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly webSocketService: WebSocketService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly webSocketService: WebSocketService,
+    private readonly notificationServiceClient: NotificationServiceClient
+  ) {}
 
   /**
    * Create and send a push notification.
@@ -220,8 +233,15 @@ export class PushNotificationsService {
         })),
     ];
 
-    // Sort by createdAt desc and apply pagination
-    notifications.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    // Sort: unread first, then by createdAt desc
+    notifications.sort((a, b) => {
+      // Unread notifications first
+      if (a.isRead !== b.isRead) {
+        return a.isRead ? 1 : -1;
+      }
+      // Then by createdAt descending
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
     const paginatedNotifications = notifications.slice(offset, offset + limit);
 
     return {
@@ -471,5 +491,80 @@ export class PushNotificationsService {
     });
 
     return notification;
+  }
+
+  /**
+   * Send email notification for forum mention
+   */
+  async sendForumMentionEmail(notification: ForumMentionEmailDto): Promise<void> {
+    const metadata = notification.metadata as Record<string, unknown> | undefined;
+
+    if (metadata?.eventType !== 'forum_mention') {
+      return;
+    }
+
+    try {
+      // Get recipient's email from member table using externalId (recipientUid)
+      const member = await this.prisma.member.findFirst({
+        where: { externalId: notification.recipientUid },
+        select: { email: true, name: true, uid: true },
+      });
+
+      if (!member?.email) {
+        this.logger.warn(`Cannot send forum mention email: member email not found for ${notification.recipientUid}`);
+        return;
+      }
+
+      const authorName = (metadata.authorName as string) || 'Unknown User';
+      const authorRole = (metadata.authorRole as string) || 'N/A';
+      const authorTeam = (metadata.authorTeam as string) || 'N/A';
+      const authorUid = (metadata.authorUid as string) || '';
+      const authorPicture = metadata.authorPicture as string | undefined;
+      const postLink = notification.link
+        ? `${process.env.WEB_UI_BASE_URL}${notification.link}`
+        : process.env.WEB_UI_BASE_URL;
+
+      await this.notificationServiceClient.sendNotification({
+        isPriority: true,
+        deliveryChannel: 'EMAIL',
+        templateName: 'FORUM_MENTION',
+        recipientsInfo: {
+          to: [member.email],
+        },
+        deliveryPayload: {
+          body: {
+            recipientName: member.name || 'there',
+            authorName,
+            authorRole,
+            authorTeam,
+            authorPicture: authorPicture || '',
+            postContent: notification.description || '',
+            postLink,
+            postTitle: notification.metadata?.postTitle || 'Untitled Post',
+          },
+        },
+        entityType: 'FORUM',
+        actionType: 'MENTION',
+        sourceMeta: {
+          activityId: '',
+          activityType: 'FORUM_MENTION',
+          activityUserId: authorUid,
+          activityUserName: authorName,
+        },
+        targetMeta: {
+          emailId: member.email,
+          userId: member.uid,
+          userName: member.name || '',
+        },
+      });
+
+      this.logger.log(`Forum mention email sent to ${member.email}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send forum mention email for ${notification.recipientUid}: ${
+          error instanceof Error ? error.message : error
+        }`
+      );
+    }
   }
 }

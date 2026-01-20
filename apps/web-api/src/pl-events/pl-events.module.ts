@@ -12,17 +12,28 @@ import { AuthModule } from '../auth/auth.module';
 import { TeamsModule } from '../teams/teams.module';
 import { AdminModule } from '../admin/admin.module';
 import { PLEventLocationAssociationService } from './pl-event-location-association.service';
+import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
+import { IrlGatheringPushCandidatesService } from './push/irl-gathering-push-candidates.service';
+import { IrlGatheringPushNotificationsJob } from './push/irl-gathering-push-notifications.job';
 
 import { EventsModule } from '../events/events.module';
+import {IrlGatheringPushConfigService} from "./push/irl-gathering-push-config.service";
+import {IrlGatheringPushConfigController} from "./push/irl-gathering-push-config.controller";
+import {IrlGatheringPushNotificationsController} from "./push/irl-gathering-push-notifications.controller";
+import { IrlGatheringPushNotificationsProcessor } from './push/irl-gathering-push-notifications.processor';
 @Module({
-  controllers: [PLEventsController],
+  controllers: [PLEventsController, IrlGatheringPushConfigController, IrlGatheringPushNotificationsController],
   providers: [
     PLEventsService,
     PLEventLocationsService,
     PLEventGuestsService,
+    IrlGatheringPushConfigService,
     JwtService,
     PLEventSyncService,
     PLEventLocationAssociationService,
+    IrlGatheringPushCandidatesService,
+    IrlGatheringPushNotificationsJob,
+    IrlGatheringPushNotificationsProcessor
   ],
   exports: [
     PLEventsService,
@@ -38,6 +49,7 @@ import { EventsModule } from '../events/events.module';
     forwardRef(() => AuthModule),
     forwardRef(() => TeamsModule),
     forwardRef(() => EventsModule),
+    PushNotificationsModule,
   ],
 })
 export class PLEventsModule {}

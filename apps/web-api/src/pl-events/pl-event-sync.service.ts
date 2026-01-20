@@ -6,6 +6,7 @@ import { CacheService } from '../utils/cache/cache.service';
 import { isEmpty } from 'lodash';
 import { EventsService } from '../events/events.service';
 import { PLEventType } from '@prisma/client';
+import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
 
 @Injectable()
 export class PLEventSyncService {
@@ -13,7 +14,8 @@ export class PLEventSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private cacheService: CacheService,
-    private eventsService: EventsService
+    private eventsService: EventsService,
+    private readonly irlGatheringPushCandidatesService: IrlGatheringPushCandidatesService
   ) {}
 
   /**
@@ -27,6 +29,7 @@ export class PLEventSyncService {
       const {selectedEventUids } = body;
       const events = await this.fetchEventsFromService(body);
       if (!events) return [];
+
       const existingEvents = await this.prisma.pLEvent.findMany({
         where: {
           AND:{
@@ -41,14 +44,21 @@ export class PLEventSyncService {
           syncedAt: true
         },
       });
-      // Create a mapping of existing events for quick lookup
+
       const eventMap = new Map(existingEvents.map(event => [event.externalId, event]));
-      // Insert or update events based on fetched data
-      await this.createOrUpdateEvents(events, eventMap);
-      // Remove events that no longer exist in the external source
+
+      const touchedEventUids: string[] = [];
+
+      await this.createOrUpdateEvents(events, eventMap, touchedEventUids);
+
       if (isEmpty(selectedEventUids)) {
-        await this.deleteStaleEvents(existingEvents, events);
+        await this.deleteStaleEvents(existingEvents, events, touchedEventUids);
       }
+
+      if (touchedEventUids.length > 0) {
+        await this.irlGatheringPushCandidatesService.refreshCandidatesForEvents(touchedEventUids);
+      }
+
       this.cacheService.reset({ service: 'PLEventGuest' });
       this.logger.log('Event sync process completed successfully.');
       return events;
@@ -57,6 +67,7 @@ export class PLEventSyncService {
       throw error;
     }
   }
+
 
   /**
    * Fetches events from an external service.
@@ -70,7 +81,7 @@ export class PLEventSyncService {
         status: 'APPROVED',
         conference: ""
       });
-  
+
       if (selectedEventUids && selectedEventUids.length > 0) {
         selectedEventUids.forEach(name => queryParams.append('event_id', name));
       }
@@ -100,7 +111,7 @@ export class PLEventSyncService {
    * @param eventMap - Map of existing events stored in the database.
    * @param locationUid - Unique identifier for the location.
    */
-  private async createOrUpdateEvents(events, eventMap) {
+  private async createOrUpdateEvents(events, eventMap, touchedEventUids: string[]) {
     for (const event of events) {
       const existingEvent = eventMap.get(event.event_id);
       if (existingEvent) {
@@ -116,19 +127,25 @@ export class PLEventSyncService {
             where: { uid: existingEvent.uid },
             data: await this.mapEventData(event),
           });
+
+          touchedEventUids.push(existingEvent.uid);
+
           this.logger.log(`Updated event: "${event.event_name}" (ID: ${event.event_id}).`);
         } else {
           this.logger.log(`No update needed for event: "${event.event_name}" (ID: ${event.event_id}), already up to date.`);
         }
       } else {
         if (event?.format != PLEventType.VIRTUAL) {
-        const location = await this.eventsService.createEventLocation(event);
+          const location = await this.eventsService.createEventLocation(event);
           // Create a new event if it does not exist in the database
           event.locationUid = location?.uid;
         }
         const createdEvent = await this.prisma.pLEvent.create({
           data: await this.mapEventData(event)
         });
+
+        touchedEventUids.push(createdEvent.uid);
+
         this.logger.log(`Created new event: "${createdEvent.name}" (ID: ${createdEvent.externalId}).`);
       }
     }
@@ -139,7 +156,7 @@ export class PLEventSyncService {
    * @param existingEvents - List of currently stored events.
    * @param events - List of fetched events from the external service.
    */
-  private async deleteStaleEvents(existingEvents, events) {
+  private async deleteStaleEvents(existingEvents, events, touchedEventUids: string[]) {
     const eventIds = events.map(event => event.event_id);
     // Identify events that are in the database but not in the fetched list
     const eventsToDelete = existingEvents.filter(e => !eventIds.includes(e.externalId));
@@ -147,15 +164,17 @@ export class PLEventSyncService {
       this.logger.log(`Events to be deleted: ${eventsToDelete.map(e => `${e.name} (ID: ${e.externalId})`).join(', ')}`);
       await this.prisma.pLEvent.updateMany({
         where: { uid: { in: eventsToDelete.map(e => e.uid) } },
-        data: {
-          isDeleted: true
-        }
+        data: { isDeleted: true }
       });
+
+      touchedEventUids.push(...eventsToDelete.map(e => e.uid));
+
       this.logger.log(`Deleted ${eventsToDelete?.length} events from the database.`);
     } else {
       this.logger.log("No stale events to delete.");
     }
   }
+
 
   /**
    * Maps external event data to the database schema.
@@ -165,15 +184,15 @@ export class PLEventSyncService {
    */
   private async mapEventData(event) {
     const logo = await this.createLogo(this.prisma, event.event_logo);
-    const resources: Array<{ 
-      name: string; 
-      description: string; 
+    const resources: Array<{
+      name: string;
+      description: string;
       link: string;
     }> = [];
-    
+
     if (event?.registration_link) {
       resources.push({
-        name: "Registration", 
+        name: "Registration",
         description: "Registration URL",
         link: event.registration_link
       });
@@ -181,7 +200,7 @@ export class PLEventSyncService {
 
     if (event?.website_link) {
       resources.push({
-        name: "Website", 
+        name: "Website",
         description: "Website URL",
         link: event.website_link
       });

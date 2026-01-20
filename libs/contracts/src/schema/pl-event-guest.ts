@@ -35,14 +35,15 @@ export const CreatePLEventGuestSchema = z.object({
         link: z.string().url(),
       })
     ).optional()
-  }))
+  })).optional()
 });
 
 export const PLEventGuestSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
   teamUid: z.string(),
-  eventUid: z.string(),
+  locationUid: z.string(),
+  eventUid: z.string().nullish(),
   memberUid: z.string(),
   telegramId: z.string().nullish(),
   reason: z.string().nullish(),
@@ -62,8 +63,8 @@ export const PLEventGuestQuerySchema = z.object({
   id: z.string(),
   uid: z.string(),
   teamUid: z.string(),
-  eventUid: z.string(),
   locationUid: z.string(),
+  eventUid: z.string().nullish(),
   slugURL: z.string(),
   memberUid: z.string(),
   telegramId: z.string().nullish(),
