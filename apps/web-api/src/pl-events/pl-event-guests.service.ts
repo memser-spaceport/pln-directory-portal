@@ -597,10 +597,14 @@ export class PLEventGuestsService {
     const locationUidPos = values.length;
 
     // window bounds (for location-only overlap)
-    values.push(windowStart);
-    const windowStartPos = values.length;
-    values.push(windowEnd);
-    const windowEndPos = values.length;
+    let windowStartPos, windowEndPos;
+
+    if (includeLocationOnlyGuests) {
+      values.push(windowStart);
+      windowStartPos = values.length;
+      values.push(windowEnd);
+      windowEndPos = values.length;
+    }
 
     // Apply sorting based on the sortBy parameter (default is sorting by memberName)
     const orderBy = this.applySorting(sortBy, sortDirection, loggedInMemberUid);
@@ -724,7 +728,7 @@ export class PLEventGuestsService {
         LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
 
         ${this.applySearch(values, search)}
-        AND pg."locationUid" = $${locationUidPos}
+        AND ($${locationUidPos}::text IS NULL OR pg."locationUid" = $${locationUidPos})
 
         GROUP BY
         pg."memberUid",
@@ -803,7 +807,7 @@ export class PLEventGuestsService {
                     LEFT JOIN "Team" tm ON tm.uid = pg."teamUid"
                     LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
                   WHERE
-                    pg."locationUid" = $${locationUidPos}
+                    ($${locationUidPos}::text IS NULL OR pg."locationUid" = $${locationUidPos})
                     AND pg."eventUid" IS NULL
                     AND m."accessLevel" NOT IN ('L0','L1','Rejected')
                     AND (
