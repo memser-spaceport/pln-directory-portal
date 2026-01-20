@@ -16,7 +16,8 @@ export function Menu() {
       {isDirectoryAdmin && <TeamsMenu />}
       {isDirectoryAdmin && <RecommendationsMenu />}
       {(isDirectoryAdmin || isDemoDayAdmin) && <DemoDaysMenu />}
-      {isDirectoryAdmin && <IrlGatheringMenu />}
+      {/* Temporary disabled until we have a proper IRL Gathering Notiication flow */}
+      {/* {isDirectoryAdmin && <IrlGatheringMenu />} */}
     </ul>
   );
 }
