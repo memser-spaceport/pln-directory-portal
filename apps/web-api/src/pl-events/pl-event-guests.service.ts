@@ -275,6 +275,26 @@ export class PLEventGuestsService {
 
       const window = this.getEventsWindow(events);
 
+      // Detailed request log
+      this.logger.info(
+        `[PLEventGuestsService] getPLEventGuestsByLocationAndType request ` +
+        JSON.stringify({
+          locationUid,
+          type: type ?? null,
+          loggedInMemberUid: member?.uid ?? null,
+          filteredEventsCount: Array.isArray(filteredEvents) ? filteredEvents.length : 0,
+          eventsCountAfterFilter: Array.isArray(events) ? events.length : 0,
+          page: query?.page ?? 1,
+          limit: query?.limit ?? 10,
+          sortBy: query?.sortBy ?? null,
+          sortDirection: query?.sortDirection ?? null,
+          search: query?.search ?? null,
+          includeLocationOnlyGuests: true,
+          windowStart: window?.start ?? null,
+          windowEnd: window?.end ?? null,
+        })
+      );
+
       const result = await this.fetchAttendees({
         locationUid,
         eventUids: events?.map((event) => event.uid),
@@ -288,7 +308,7 @@ export class PLEventGuestsService {
       this.restrictTelegramBasedOnMemberPreference(result, !!member);
       this.restrictOfficeHours(result, !!member);
 
-      // UX: ensure the logged-in user is returned as the first guest (if present in the list)
+      // Keep old UX safeguard (should become no-op once SQL ordering is correct)
       if (member?.uid && Array.isArray(result) && result.length > 1) {
         const idx = result.findIndex((g: any) => g?.memberUid === member.uid);
         if (idx > 0) {
@@ -296,6 +316,19 @@ export class PLEventGuestsService {
           result.unshift(me);
         }
       }
+
+      // Response log (page-level)
+      this.logger.info(
+        `[PLEventGuestsService] getPLEventGuestsByLocationAndType response ` +
+        JSON.stringify({
+          locationUid,
+          type: type ?? null,
+          loggedInMemberUid: member?.uid ?? null,
+          returnedCount: Array.isArray(result) ? result.length : 0,
+          firstMemberUid: Array.isArray(result) && result[0] ? result[0]?.memberUid ?? null : null,
+        })
+      );
+
       return result;
     } catch (err) {
       this.handleErrors(err);
@@ -598,6 +631,28 @@ export class PLEventGuestsService {
       includeLocations,
     } = queryParams;
 
+    this.logger.info(
+      `[PLEventGuestsService] fetchAttendees input ` +
+      JSON.stringify({
+        locationUid: locationUid ?? null,
+        loggedInMemberUid: loggedInMemberUid ?? null,
+        includeLocationOnlyGuests: !!includeLocationOnlyGuests,
+        eventUidsCount: Array.isArray(eventUids) ? eventUids.length : 0,
+        topicsCount: Array.isArray(topics) ? topics.length : 0,
+        isHost: isHost ?? null,
+        isSpeaker: isSpeaker ?? null,
+        isSponsor: isSponsor ?? null,
+        sortBy: sortBy ?? null,
+        sortDirection: sortDirection ?? null,
+        search: search ?? null,
+        limit: limit ?? 10,
+        page: page ?? 1,
+        includeLocations: !!includeLocations,
+        windowStart: windowStart ?? null,
+        windowEnd: windowEnd ?? null,
+      })
+    );
+
     // Build dynamic query conditions for filtering by eventUids and topics
     let { conditions, values } = this.buildConditions(eventUids, topics);
 
@@ -615,6 +670,15 @@ export class PLEventGuestsService {
       windowEndPos = values.length;
     }
 
+    // bind loggedInMemberUid for outer ORDER BY (so it works before pagination)
+    values.push(loggedInMemberUid ?? null);
+    const loggedInUidPos = values.length;
+
+    // IMPORTANT:
+    // Bind eventUids now as a fixed placeholder so search (applySearch) can't shift it.
+    values.push(eventUids);
+    const eventUidsPos = values.length;
+
     // Apply sorting based on the sortBy parameter (default is sorting by memberName)
     const orderBy = this.applySorting(sortBy, sortDirection, loggedInMemberUid);
 
@@ -622,9 +686,6 @@ export class PLEventGuestsService {
     const { limit: paginationLimit, offset } = this.applyPagination(Number(limit), page);
 
     const selectLocation = includeLocations ? `,'location', l."location"` : ``; // Empty if location is not required
-
-    // Determine the position of the eventUid placeholder in the SQL query's values array (keep old logic)
-    const eventPosition = search ? values.length + 4 : values.length + 3;
 
     const query: any = `
       WITH event_attendees AS (
@@ -635,21 +696,21 @@ export class PLEventGuestsService {
         SELECT
         pg."memberUid",
         CASE
-        WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition}))
-        AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
-        AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
+        WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
         THEN 'isHostOnly'
-        WHEN BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
-        AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition}))
-        AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
+        WHEN BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
         THEN 'isSpeakerOnly'
-        WHEN BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
-        AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition}))
-        AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
+        WHEN BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
         THEN 'isSponsorOnly'
-        WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition}))
-        AND BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
-        AND BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
+        WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
         THEN 'hostAndSpeakerAndSponsor'
         ELSE 'none'
         END AS guest_type,
@@ -684,7 +745,7 @@ export class PLEventGuestsService {
         'additionalInfo', pg."additionalInfo"
         ${selectLocation}
         )
-        ) FILTER (WHERE e.uid = ANY($${eventPosition})),
+        ) FILTER (WHERE e.uid = ANY($${eventUidsPos})),
         '[]'::json
         ) AS events,
 
@@ -828,7 +889,7 @@ export class PLEventGuestsService {
                     WHERE
                     pg2."locationUid" = pg."locationUid"
                     AND pg2."memberUid" = pg."memberUid"
-                    AND pg2."eventUid" = ANY($${eventPosition})
+                    AND pg2."eventUid" = ANY($${eventUidsPos})
                     )
                   GROUP BY
                     pg."memberUid",
@@ -853,17 +914,98 @@ export class PLEventGuestsService {
         COUNT(*) OVER() AS count
       FROM combined
         ${this.buildHostAndSpeakerCondition(isHost, isSpeaker, isSponsor)}
+        ${this.buildOuterOrderBy(sortBy, sortDirection, loggedInUidPos)}
         LIMIT $${values.length + 1}
       OFFSET $${values.length + 2}
     `;
 
+    this.logger.info(
+      `[PLEventGuestsService] fetchAttendees sqlMeta ` +
+      JSON.stringify({
+        valuesCountBeforePagination: values.length,
+        locationUidPos,
+        windowStartPos: windowStartPos ?? null,
+        windowEndPos: windowEndPos ?? null,
+        loggedInUidPos,
+        eventUidsPos,
+        paginationLimit,
+        offset,
+      })
+    );
+
     values.push(paginationLimit, offset);
-    values.push(eventUids);
+
+    this.logger.info(
+      `[PLEventGuestsService] fetchAttendees sqlParams ` +
+      JSON.stringify({
+        valuesCountFinal: values.length,
+        eventUidsCount: Array.isArray(eventUids) ? eventUids.length : 0,
+        hasSearch: !!search,
+        hasLoggedInUid: !!loggedInMemberUid,
+      })
+    );
 
     // Execute the raw query with the built query string and values
     const result = await this.prisma.$queryRawUnsafe(query, ...values);
     return this.formatAttendees(result);
   }
+
+
+  private buildOuterOrderBy(sortBy: string, sortDirection: any, loggedInUidPos: number): string {
+    const normalizeString = (v: any): string => {
+      if (Array.isArray(v)) {
+        // take last non-empty item if present, otherwise last item
+        const lastNonEmpty = [...v].reverse().find((x) => typeof x === 'string' && x.trim().length > 0);
+        return (lastNonEmpty ?? v[v.length - 1] ?? '').toString();
+      }
+      if (v === undefined || v === null) return '';
+      return String(v);
+    };
+
+    const normalizedSortBy = normalizeString(sortBy).trim();
+    const normalizedSortDirection = normalizeString(sortDirection).trim().toLowerCase();
+    const dir = normalizedSortDirection === 'desc' ? 'desc' : 'asc';
+
+    const loggedInFirst = `CASE WHEN $${loggedInUidPos}::text IS NOT NULL AND "memberUid" = $${loggedInUidPos} THEN 0 ELSE 1 END`;
+
+    const memberNameExpr = `("member"->'member'->>'name')`;
+    const teamNameExpr = `("team"->'team'->>'name')`;
+
+    if (normalizedSortBy === 'member') {
+      return `
+      ORDER BY
+        ${loggedInFirst},
+        ${memberNameExpr} ${dir}
+    `;
+    }
+
+    if (normalizedSortBy === 'team') {
+      return `
+      ORDER BY
+        ${loggedInFirst},
+        ${teamNameExpr} ${dir} NULLS LAST,
+        ${memberNameExpr} asc
+    `;
+    }
+
+    // Default ordering (preserve previous intent: completeness first, then name)
+    const hasReasonAndTopics = `(("guest"->'info'->>'reason') IS NOT NULL AND jsonb_typeof(("guest"->'info'->'topics')::jsonb) = 'array' AND jsonb_array_length(("guest"->'info'->'topics')::jsonb) > 0)`;
+    const hasTopics = `(jsonb_typeof(("guest"->'info'->'topics')::jsonb) = 'array' AND jsonb_array_length(("guest"->'info'->'topics')::jsonb) > 0)`;
+    const hasReason = `(("guest"->'info'->>'reason') IS NOT NULL)`;
+
+    return `
+    ORDER BY
+      ${loggedInFirst},
+      CASE
+        WHEN ${hasReasonAndTopics} THEN 1
+        WHEN ${hasTopics} THEN 2
+        WHEN ${hasReason} THEN 3
+        ELSE 4
+      END asc,
+      ${memberNameExpr} ${dir}
+  `;
+  }
+
 
   /**
    *
