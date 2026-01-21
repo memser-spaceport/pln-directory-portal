@@ -218,29 +218,126 @@ export class PLEventGuestsService {
     }
   }
 
+
   /**
-   * This method deletes event guests for a specific location and given members.
-   * @param membersAndEvents An array of objects containing member and event UIDs
-   * @returns The result of deleting event guests
-   *   - Delete Guests from events , then resets the cache.
+   * Deletes PLEventGuest records based on provided member/event pairs.
+   *
+   * Rules:
+   * 1) If `events` are provided (non-empty) for a member:
+   *    - delete ONLY event-level guest rows for those events (eventUid IN events)
+   *    - keep location-only rows (eventUid = null) untouched
+   *
+   * 2) If `events` are missing or an empty array for a member:
+   *    - treat as FULL delete for that member
+   *    - delete ALL guest rows for that member across all locations (event-level + location-only)
+   *
+   * After deletion:
+   * - resets PLEventGuest cache
+   * - refreshes push candidates/notifications for affected eventUids only
+   *
+   * @param membersAndEvents An array of objects containing { memberUid, events?: string[] }
+   * @returns DeleteMany results (for event deletes and full deletes)
    */
   async deletePLEventGuests(membersAndEvents) {
     try {
-      const deleteConditions = membersAndEvents.flatMap(({ memberUid, events }) =>
-        events.map((eventUid) => ({ memberUid, eventUid }))
-      );
-      const result = await this.prisma.pLEventGuest.deleteMany({
-        where: {
-          OR: deleteConditions,
-        },
+      const eventDeleteConditions: Array<{ memberUid: string; eventUid: string }> = [];
+      const fullDeleteMemberUids: string[] = [];
+
+      // Build delete intent with minimal transformation (keep old style)
+      for (const item of membersAndEvents ?? []) {
+        const memberUid = item?.memberUid;
+        const events = item?.events;
+
+        if (!memberUid) continue;
+
+        if (!Array.isArray(events) || events.length === 0) {
+          fullDeleteMemberUids.push(memberUid);
+          continue;
+        }
+
+        events.forEach((eventUid) => {
+          const uid = typeof eventUid === 'string' ? eventUid.trim() : '';
+          if (uid) eventDeleteConditions.push({ memberUid, eventUid: uid });
+        });
+      }
+
+      // De-dup
+      const uniqueFullDeleteMemberUids = Array.from(new Set(fullDeleteMemberUids));
+
+      const uniqueEventDeleteConditions: Array<{ memberUid: string; eventUid: string }> = [];
+      const seenPairs = new Set<string>();
+      for (const c of eventDeleteConditions) {
+        const key = `${c.memberUid}::${c.eventUid}`;
+        if (!seenPairs.has(key)) {
+          seenPairs.add(key);
+          uniqueEventDeleteConditions.push(c);
+        }
+      }
+
+      // Collect affected eventUids for push refresh:
+      // - event delete: known directly
+      // - full delete: fetch all existing event-level rows for those members
+      const affectedEventUidsSet = new Set<string>();
+
+      uniqueEventDeleteConditions.forEach((d) => affectedEventUidsSet.add(d.eventUid));
+
+      if (uniqueFullDeleteMemberUids.length > 0) {
+        const existingEventRows = await this.prisma.pLEventGuest.findMany({
+          where: {
+            memberUid: { in: uniqueFullDeleteMemberUids },
+            eventUid: { not: null },
+          },
+          select: { eventUid: true },
+        });
+
+        existingEventRows.forEach((r) => {
+          if (r?.eventUid) affectedEventUidsSet.add(String(r.eventUid));
+        });
+      }
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        const r: any = { events: { count: 0 }, full: { count: 0 } };
+
+        // 1) Delete ONLY event-level rows (old logic style)
+        if (uniqueEventDeleteConditions.length > 0) {
+          r.events = await tx.pLEventGuest.deleteMany({
+            where: {
+              OR: uniqueEventDeleteConditions,
+            },
+          });
+        }
+
+        // 2) Full delete for members with empty/missing events (delete everything for those members)
+        if (uniqueFullDeleteMemberUids.length > 0) {
+          r.full = await tx.pLEventGuest.deleteMany({
+            where: {
+              memberUid: { in: uniqueFullDeleteMemberUids },
+            },
+          });
+        }
+
+        return r;
       });
+
       await this.cacheService.reset({ service: 'PLEventGuest' });
 
-      const affectedEventUids = Array.from(
-        new Set((deleteConditions as Array<{ eventUid: unknown }>).map((d) => String(d.eventUid)))
-      ).filter((x): x is string => x.length > 0);
+      const affectedEventUids = Array.from(affectedEventUidsSet).filter((x): x is string => x.length > 0);
 
-      await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(affectedEventUids);
+      if (affectedEventUids.length > 0) {
+        await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(affectedEventUids);
+      }
+
+      this.logger.info(
+        `[PLEventGuestsService] deletePLEventGuests ` +
+        JSON.stringify({
+          eventDeletePairs: uniqueEventDeleteConditions.length,
+          fullDeleteMembers: uniqueFullDeleteMemberUids.length,
+          affectedEventUids: affectedEventUids.length,
+          deletedEventCount: result?.events?.count ?? 0,
+          deletedFullCount: result?.full?.count ?? 0,
+        })
+      );
+
       return result;
     } catch (err) {
       this.handleErrors(err);
