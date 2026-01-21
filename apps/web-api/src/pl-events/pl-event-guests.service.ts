@@ -79,13 +79,15 @@ export class PLEventGuestsService {
           tx,
         });
       } else {
-        await this.assertNoDuplicateGuestForLocationAndRange({
-          locationUid,
-          memberUid: data.memberUid,
-          checkInDate,
-          checkOutDate,
-          tx,
-        });
+        if (type === CREATE) {
+          await this.assertNoDuplicateGuestForLocationAndRange({
+            locationUid,
+            memberUid: data.memberUid,
+            checkInDate,
+            checkOutDate,
+            tx,
+          });
+        }
       }
 
       // 4) Update member details (telegram/officeHours) once
@@ -188,16 +190,61 @@ export class PLEventGuestsService {
   ) {
     try {
       const events = type === 'upcoming' ? location.upcomingEvents : location.pastEvents;
+
+      const isAdmin = this.memberService.checkIfAdminUser(member);
+      const targetMemberUid = isAdmin ? data.memberUid : member.uid;
+
       const result = await this.prisma.$transaction(async (tx) => {
-        const isAdmin = this.memberService.checkIfAdminUser(member);
+        // If editing location-only guest (no events) -> update existing location-only row, do not create a new one.
+        if (!data?.events?.length) {
+          const updated = await tx.pLEventGuest.updateMany({
+            where: {
+              locationUid: location.uid,
+              memberUid: targetMemberUid,
+              eventUid: null,
+            },
+            data: {
+              telegramId: data.telegramId || null,
+              officeHours: data.officeHours || null,
+              reason: data.reason || null,
+              teamUid: data.teamUid,
+              topics: data.topics || [],
+              additionalInfo: data.additionalInfo ?? null,
+            },
+          });
+
+          // If row doesn't exist (count=0) create it (location-only guest)
+          if (!updated?.count) {
+            await tx.pLEventGuest.create({
+              data: {
+                memberUid: targetMemberUid,
+                teamUid: data.teamUid,
+                locationUid: location.uid,
+                eventUid: null,
+                telegramId: data.telegramId || null,
+                officeHours: data.officeHours || null,
+                reason: data.reason || null,
+                topics: data.topics || [],
+                additionalInfo: data.additionalInfo ?? null,
+                isHost: false,
+                isSpeaker: false,
+                isSponsor: false,
+              } as any,
+            });
+          }
+
+          return updated;
+        }
+
         await tx.pLEventGuest.deleteMany({
           where: {
-            memberUid: isAdmin ? data.memberUid : member.uid,
+            memberUid: targetMemberUid,
             eventUid: {
               in: events.map((event) => event.uid),
             },
           },
         });
+
         return await this.createPLEventGuestByLocation(
           data,
           member,
@@ -209,9 +256,17 @@ export class PLEventGuestsService {
           type
         );
       });
-      await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(
-        events.map((e) => e.uid)
-      );
+
+      // IMPORTANT: update Member OUTSIDE transaction to avoid P2028 (MembersService may use non-tx prisma calls)
+      if (!data?.events?.length) {
+        await this.updateMemberDetails(data, member, isAdmin);
+        await this.irlGatheringPushCandidatesService.refreshNotificationsForLocation(location.uid);
+      } else {
+        await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(
+          events.map((e) => e.uid)
+        );
+      }
+
       return result;
     } catch (err) {
       this.handleErrors(err);
