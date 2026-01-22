@@ -137,10 +137,12 @@ export class PushNotificationsService {
     // Get user's access level
     const member = await this.prisma.member.findFirst({
       where: { externalId: memberUid },
-      select: { accessLevel: true },
+      select: { accessLevel: true, uid: true },
     });
 
     const userAccessLevel = member?.accessLevel;
+
+    const realMemberUid = member?.uid ?? memberUid;
 
     // Get private notifications for this user
     const privateNotifications = await this.prisma.pushNotification.findMany({
@@ -253,7 +255,7 @@ export class PushNotificationsService {
 
     const paginatedNotifications = notifications.slice(offset, offset + limit);
 
-// ---- IRL: compute isAttended per user (only for returned page) ----
+     // ---- IRL: compute isAttended per user (only for returned page) ----
     const irlPage = paginatedNotifications.filter(
       (n) =>
         n.category === PushNotificationCategory.IRL_GATHERING &&
@@ -275,12 +277,8 @@ export class PushNotificationsService {
 
       const attendedRows = await this.prisma.pLEventGuest.findMany({
         where: {
-          memberUid,
+          memberUid: realMemberUid,
           locationUid: { in: locationUids },
-          OR: [
-            { eventUid: null }, // location-level guest
-            { event: { endDate: { gte: now } } }, // upcoming event guest
-          ],
         },
         select: { locationUid: true },
         distinct: ['locationUid'],

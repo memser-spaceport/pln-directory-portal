@@ -195,6 +195,16 @@ export class PLEventGuestsService {
       const targetMemberUid = isAdmin ? data.memberUid : member.uid;
 
       const result = await this.prisma.$transaction(async (tx) => {
+        let scopedEventUids: string[] = [];
+
+        if (!data?.events?.length) {
+          // user cleared all upcoming events
+          scopedEventUids = location.upcomingEvents.map(e => e.uid)
+        } else {
+          // user provided specific events
+          scopedEventUids = data.events.map((e) => e.uid);
+        }
+
         // If user cleared all events -> must delete old event-level rows and keep only location-only row (eventUid=null)
         if (!data?.events?.length) {
           // 1) delete all event-level guest rows for this member in this location & current type window
@@ -203,7 +213,7 @@ export class PLEventGuestsService {
               locationUid: location.uid,
               memberUid: targetMemberUid,
               eventUid: {
-                in: (events ?? []).map((e) => e.uid),
+                in: scopedEventUids,
               },
             },
           });
@@ -251,9 +261,10 @@ export class PLEventGuestsService {
         // If events provided -> replace event-level rows for this member in the current type window
         await tx.pLEventGuest.deleteMany({
           where: {
+            locationUid: location.uid,
             memberUid: targetMemberUid,
             eventUid: {
-              in: events.map((event) => event.uid),
+              in: scopedEventUids
             },
           },
         });
