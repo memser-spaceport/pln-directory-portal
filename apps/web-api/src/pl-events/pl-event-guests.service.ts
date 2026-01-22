@@ -190,35 +190,25 @@ export class PLEventGuestsService {
   ) {
     try {
       const events = type === 'upcoming' ? location.upcomingEvents : location.pastEvents;
+      const windowEventUids = events.map(e => e.uid);
 
       const isAdmin = this.memberService.checkIfAdminUser(member);
       const targetMemberUid = isAdmin ? data.memberUid : member.uid;
 
       const result = await this.prisma.$transaction(async (tx) => {
-        let scopedEventUids: string[] = [];
-
-        if (!data?.events?.length) {
-          // user cleared all upcoming events
-          scopedEventUids = location.upcomingEvents.map(e => e.uid)
-        } else {
-          // user provided specific events
-          scopedEventUids = data.events.map((e) => e.uid);
-        }
-
-        // If user cleared all events -> must delete old event-level rows and keep only location-only row (eventUid=null)
-        if (!data?.events?.length) {
-          // 1) delete all event-level guest rows for this member in this location & current type window
+        // 1) ALWAYS clear event-level rows in the window (this is the core fix)
+        if (windowEventUids.length > 0) {
           await tx.pLEventGuest.deleteMany({
             where: {
               locationUid: location.uid,
               memberUid: targetMemberUid,
-              eventUid: {
-                in: scopedEventUids,
-              },
+              eventUid: { in: windowEventUids },
             },
           });
+        }
 
-          // 2) update existing location-only row
+        // 2) If user cleared all events -> keep/update location-only row
+        if (!data?.events?.length) {
           const updated = await tx.pLEventGuest.updateMany({
             where: {
               locationUid: location.uid,
@@ -235,7 +225,6 @@ export class PLEventGuestsService {
             },
           });
 
-          // 3) if location-only row doesn't exist -> create it
           if (!updated?.count) {
             await tx.pLEventGuest.create({
               data: {
@@ -258,18 +247,8 @@ export class PLEventGuestsService {
           return updated;
         }
 
-        // If events provided -> replace event-level rows for this member in the current type window
-        await tx.pLEventGuest.deleteMany({
-          where: {
-            locationUid: location.uid,
-            memberUid: targetMemberUid,
-            eventUid: {
-              in: scopedEventUids
-            },
-          },
-        });
-
-        return await this.createPLEventGuestByLocation(
+        // 3) events provided -> create new event-level rows (the new selection)
+        return this.createPLEventGuestByLocation(
           data,
           member,
           location.uid,
@@ -281,14 +260,12 @@ export class PLEventGuestsService {
         );
       });
 
-      // IMPORTANT: update Member OUTSIDE transaction to avoid P2028 (MembersService may use non-tx prisma calls)
+      // post-transaction effects
       if (!data?.events?.length) {
         await this.updateMemberDetails(data, member, isAdmin);
         await this.irlGatheringPushCandidatesService.refreshNotificationsForLocation(location.uid);
       } else {
-        await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(
-          events.map((e) => e.uid)
-        );
+        await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(windowEventUids);
       }
 
       return result;
@@ -298,31 +275,32 @@ export class PLEventGuestsService {
   }
 
 
+
   /**
-   * Deletes PLEventGuest records based on provided member/event pairs.
+   * Deletes PLEventGuest records for a SPECIFIC location only.
    *
-   * Rules:
+   * Rules (scoped by locationUid):
    * 1) If `events` are provided (non-empty) for a member:
-   *    - delete ONLY event-level guest rows for those events (eventUid IN events)
+   *    - delete ONLY event-level guest rows for those eventUids within THIS location
    *    - keep location-only rows (eventUid = null) untouched
    *
    * 2) If `events` are missing or an empty array for a member:
-   *    - treat as FULL delete for that member
-   *    - delete ALL guest rows for that member across all locations (event-level + location-only)
+   *    - treat as FULL delete for that member within THIS location
+   *    - delete ALL guest rows for that member in THIS location only (event-level + location-only)
    *
    * After deletion:
    * - resets PLEventGuest cache
-   * - refreshes push candidates/notifications for affected eventUids only
+   * - refreshes push candidates/notifications for affected eventUids only (scoped to this location)
    *
+   * @param locationUid Location UID from route (/v1/irl/locations/:locationUid/...)
    * @param membersAndEvents An array of objects containing { memberUid, events?: string[] }
-   * @returns DeleteMany results (for event deletes and full deletes)
    */
-  async deletePLEventGuests(membersAndEvents) {
+  async deletePLEventGuests(locationUid: string, membersAndEvents: Array<{ memberUid: string; events?: string[] }>) {
     try {
       const eventDeleteConditions: Array<{ memberUid: string; eventUid: string }> = [];
       const fullDeleteMemberUids: string[] = [];
 
-      // Build delete intent with minimal transformation (keep old style)
+      // Build delete intent
       for (const item of membersAndEvents ?? []) {
         const memberUid = item?.memberUid;
         const events = item?.events;
@@ -340,9 +318,10 @@ export class PLEventGuestsService {
         });
       }
 
-      // De-dup
+      // De-dup full deletes
       const uniqueFullDeleteMemberUids = Array.from(new Set(fullDeleteMemberUids));
 
+      // De-dup event delete pairs
       const uniqueEventDeleteConditions: Array<{ memberUid: string; eventUid: string }> = [];
       const seenPairs = new Set<string>();
       for (const c of eventDeleteConditions) {
@@ -353,9 +332,7 @@ export class PLEventGuestsService {
         }
       }
 
-      // Collect affected eventUids for push refresh:
-      // - event delete: known directly
-      // - full delete: fetch all existing event-level rows for those members
+      // Collect affected eventUids for push refresh (scoped to this location)
       const affectedEventUidsSet = new Set<string>();
 
       uniqueEventDeleteConditions.forEach((d) => affectedEventUidsSet.add(d.eventUid));
@@ -363,6 +340,7 @@ export class PLEventGuestsService {
       if (uniqueFullDeleteMemberUids.length > 0) {
         const existingEventRows = await this.prisma.pLEventGuest.findMany({
           where: {
+            locationUid, // IMPORTANT: scope to this location only
             memberUid: { in: uniqueFullDeleteMemberUids },
             eventUid: { not: null },
           },
@@ -377,19 +355,21 @@ export class PLEventGuestsService {
       const result = await this.prisma.$transaction(async (tx) => {
         const r: any = { events: { count: 0 }, full: { count: 0 } };
 
-        // 1) Delete ONLY event-level rows (old logic style)
+        // 1) Delete ONLY event-level rows (scoped to this location)
         if (uniqueEventDeleteConditions.length > 0) {
           r.events = await tx.pLEventGuest.deleteMany({
             where: {
+              locationUid,
               OR: uniqueEventDeleteConditions,
             },
           });
         }
 
-        // 2) Full delete for members with empty/missing events (delete everything for those members)
+        // 2) Full delete for members with empty/missing events (ONLY within this location)
         if (uniqueFullDeleteMemberUids.length > 0) {
           r.full = await tx.pLEventGuest.deleteMany({
             where: {
+              locationUid,
               memberUid: { in: uniqueFullDeleteMemberUids },
             },
           });
@@ -409,6 +389,7 @@ export class PLEventGuestsService {
       this.logger.info(
         `[PLEventGuestsService] deletePLEventGuests ` +
         JSON.stringify({
+          locationUid,
           eventDeletePairs: uniqueEventDeleteConditions.length,
           fullDeleteMembers: uniqueFullDeleteMemberUids.length,
           affectedEventUids: affectedEventUids.length,
