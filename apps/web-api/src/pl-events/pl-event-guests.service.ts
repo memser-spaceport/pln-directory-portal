@@ -195,8 +195,20 @@ export class PLEventGuestsService {
       const targetMemberUid = isAdmin ? data.memberUid : member.uid;
 
       const result = await this.prisma.$transaction(async (tx) => {
-        // If editing location-only guest (no events) -> update existing location-only row, do not create a new one.
+        // If user cleared all events -> must delete old event-level rows and keep only location-only row (eventUid=null)
         if (!data?.events?.length) {
+          // 1) delete all event-level guest rows for this member in this location & current type window
+          await tx.pLEventGuest.deleteMany({
+            where: {
+              locationUid: location.uid,
+              memberUid: targetMemberUid,
+              eventUid: {
+                in: (events ?? []).map((e) => e.uid),
+              },
+            },
+          });
+
+          // 2) update existing location-only row
           const updated = await tx.pLEventGuest.updateMany({
             where: {
               locationUid: location.uid,
@@ -213,7 +225,7 @@ export class PLEventGuestsService {
             },
           });
 
-          // If row doesn't exist (count=0) create it (location-only guest)
+          // 3) if location-only row doesn't exist -> create it
           if (!updated?.count) {
             await tx.pLEventGuest.create({
               data: {
@@ -236,6 +248,7 @@ export class PLEventGuestsService {
           return updated;
         }
 
+        // If events provided -> replace event-level rows for this member in the current type window
         await tx.pLEventGuest.deleteMany({
           where: {
             memberUid: targetMemberUid,
