@@ -37,6 +37,7 @@ interface NotificationWithReadStatus {
   accessLevels: string[];
   isRead: boolean;
   createdAt: Date;
+  isAttended?: boolean;
 }
 
 @Injectable()
@@ -136,10 +137,12 @@ export class PushNotificationsService {
     // Get user's access level
     const member = await this.prisma.member.findFirst({
       where: { externalId: memberUid },
-      select: { accessLevel: true },
+      select: { accessLevel: true, uid: true },
     });
 
     const userAccessLevel = member?.accessLevel;
+
+    const realMemberUid = member?.uid ?? memberUid;
 
     // Get private notifications for this user
     const privateNotifications = await this.prisma.pushNotification.findMany({
@@ -242,7 +245,52 @@ export class PushNotificationsService {
       // Then by createdAt descending
       return b.createdAt.getTime() - a.createdAt.getTime();
     });
+    // Sort: unread first, then by createdAt desc
+    notifications.sort((a, b) => {
+      if (a.isRead !== b.isRead) {
+        return a.isRead ? 1 : -1;
+      }
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
+
     const paginatedNotifications = notifications.slice(offset, offset + limit);
+
+     // ---- IRL: compute isAttended per user (only for returned page) ----
+    const irlPage = paginatedNotifications.filter(
+      (n) =>
+        n.category === PushNotificationCategory.IRL_GATHERING &&
+        n.metadata &&
+        typeof n.metadata === 'object' &&
+        (n.metadata as any)?.ui?.locationUid
+    );
+
+    const locationUids = [
+      ...new Set(
+        irlPage
+          .map((n) => (n.metadata as any).ui.locationUid)
+          .filter(Boolean)
+      ),
+    ];
+
+    if (locationUids.length > 0) {
+      const now = new Date();
+
+      const attendedRows = await this.prisma.pLEventGuest.findMany({
+        where: {
+          memberUid: realMemberUid,
+          locationUid: { in: locationUids },
+        },
+        select: { locationUid: true },
+        distinct: ['locationUid'],
+      });
+
+      const attendedSet = new Set(attendedRows.map((r) => r.locationUid));
+
+      for (const n of irlPage) {
+        const loc = (n.metadata as any)?.ui?.locationUid;
+        n.isAttended = attendedSet.has(loc);
+      }
+    }
 
     return {
       notifications: paginatedNotifications,

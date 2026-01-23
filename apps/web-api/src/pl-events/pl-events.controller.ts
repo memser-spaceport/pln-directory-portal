@@ -194,7 +194,7 @@ export class PLEventsController {
       && body.membersAndEvents[0]?.memberUid != member.uid) {
       throw new ForbiddenException(`Member with email ${userEmail} is not admin`);
     }
-    return await this.eventGuestService.deletePLEventGuests(body.membersAndEvents);
+    return await this.eventGuestService.deletePLEventGuests(locationUid, body.membersAndEvents);
   }
 
   @Api(server.route.getPLEventsByLoggedInMember)
