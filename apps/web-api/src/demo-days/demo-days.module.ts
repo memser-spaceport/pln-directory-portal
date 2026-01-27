@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { DemoDaysService } from './demo-days.service';
 import { DemoDayParticipantsService } from './demo-day-participants.service';
 import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profiles.service';
+import { DemoDayDashboardService } from './demo-day-dashboard.service';
 import { DemoDaysController } from './demo-days.controller';
 import { DemoDaySubscriptionsController } from './demo-day-subscriptions.controller';
 import { SharedModule } from '../shared/shared.module';
@@ -30,6 +31,7 @@ import { DemoDayNotificationsJob } from './demo-day-notifications.job';
     DemoDayParticipantsService,
     DemoDayFundraisingProfilesService,
     DemoDayEngagementService,
+    DemoDayDashboardService,
     DemoDayNotificationsJob,
   ],
   exports: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService],

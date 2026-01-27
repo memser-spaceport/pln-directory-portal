@@ -31,7 +31,10 @@ import {
   ExpressInterestDto,
   UpdateFundraisingDescriptionDto,
   UpdateFundraisingTeamDto,
+  FounderDashboardQueryDto,
+  InvestorDashboardQueryDto,
 } from 'libs/contracts/src/schema';
+import { DemoDayDashboardService } from './demo-day-dashboard.service';
 
 const cache = new Map<string, { data: any; expires: number }>();
 const TTL = 30_000; // 30 seconds
@@ -43,7 +46,8 @@ export class DemoDaysController {
     private readonly demoDaysService: DemoDaysService,
     private readonly demoDayFundraisingProfilesService: DemoDayFundraisingProfilesService,
     private readonly uploadsService: UploadsService,
-    private readonly demoDayEngagementService: DemoDayEngagementService
+    private readonly demoDayEngagementService: DemoDayEngagementService,
+    private readonly demoDayDashboardService: DemoDayDashboardService
   ) {}
 
   @Get()
@@ -51,6 +55,24 @@ export class DemoDaysController {
   @NoCache()
   async getAllDemoDays(@Req() req) {
     return this.demoDaysService.getAllDemoDaysPublic(req.userEmail || null);
+  }
+
+  // Dashboard endpoints - must be before :demoDayUidOrSlug to avoid route conflicts
+
+  @Get('dashboard/founder')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async getFounderDashboard(@Req() req, @Query() query: FounderDashboardQueryDto) {
+    return this.demoDayDashboardService.getFounderDashboard(req.userEmail, query);
+  }
+
+  @Get('dashboard/investor')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async getInvestorDashboard(@Req() req, @Query() query: InvestorDashboardQueryDto) {
+    return this.demoDayDashboardService.getInvestorDashboard(req.userEmail, query);
   }
 
   @Get(':demoDayUidOrSlug')
