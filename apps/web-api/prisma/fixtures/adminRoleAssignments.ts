@@ -1,15 +1,15 @@
 /**
- * Demo Day Admin → DEMO_DAY_ADMIN role assignments.
+ * Admin role assignments for Demo Day Admins and Directory Admin.
  */
 
-export interface DemoDayAdminRoleAssignment {
+export interface AdminRoleAssignment {
   memberUid: string;
   roleName: string;
 }
 
 // Declarative list of assignments.
 // seed.ts will convert this into INSERT statements.
-export const demoDayAdminRoleAssignments: DemoDayAdminRoleAssignment[] = [
+export const adminRoleAssignments: AdminRoleAssignment[] = [
   {
     memberUid: 'demo-admin-uid-001',
     roleName: 'DEMO_DAY_ADMIN',
@@ -17,5 +17,9 @@ export const demoDayAdminRoleAssignments: DemoDayAdminRoleAssignment[] = [
   {
     memberUid: 'demo-admin-uid-002',
     roleName: 'DEMO_DAY_ADMIN',
+  },
+  {
+    memberUid: 'uid-directoryadmin',
+    roleName: 'DIRECTORYADMIN',
   },
 ];
