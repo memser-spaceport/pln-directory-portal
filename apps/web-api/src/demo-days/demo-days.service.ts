@@ -1783,7 +1783,7 @@ export class DemoDaysService {
 
     try {
       await this.notificationServiceClient.sendTelegramOutboxMessage({
-        channelType: 'DEMO_DAY_SUBSCRIPTION',
+        channelType: 'DEMO_DAY_APPLICATION',
         text: [
           '🔔 New Demo Day Application',
           `Name: ${args.applicantName ?? '-'}`,
