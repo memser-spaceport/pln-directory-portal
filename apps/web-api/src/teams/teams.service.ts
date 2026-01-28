@@ -1214,30 +1214,80 @@ export class TeamsService {
    * Retrieves all contributors for PL events.
    * @returns An array of contributors with their details.
    */
-  async getAllPLEventContibutors() {
+  async getAllPLEventContibutors(queryParams: any = {}) {
     try {
-      return await this.prisma.team.findMany({
-        where: {
-          eventGuests: {
-            some: {
-              OR: [{ isHost: true }, { isSpeaker: true }, { isSponsor: true }],
-            },
-          },
+      const search = (queryParams?.search ?? '').toString().trim();
+
+      const filter = (queryParams?.filter ?? 'all')
+        .toString()
+        .trim()
+        .toLowerCase(); // all | host | speaker | sponsor
+
+      const whereGuests =
+        filter === 'host'
+          ? { isHost: true }
+          : filter === 'speaker'
+            ? { isSpeaker: true }
+            : filter === 'sponsor'
+              ? { isSponsor: true }
+              : { OR: [{ isHost: true }, { isSpeaker: true }, { isSponsor: true }] };
+
+      let where: any = {
+        eventGuests: {
+          some: whereGuests,
         },
+      };
+
+      if (search) {
+        where = {
+          AND: [
+            {
+              eventGuests: {
+                some: whereGuests,
+              },
+            },
+            {
+              OR: [
+                {
+                  name: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  eventGuests: {
+                    some: {
+                      ...whereGuests,
+                      member: {
+                        name: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        };
+      }
+
+      return await this.prisma.team.findMany({
+        where,
         select: {
           uid: true,
           name: true,
           logo: true,
           eventGuests: {
-            where: {
-              OR: [{ isHost: true }, { isSpeaker: true }, { isSponsor: true }],
-            },
-            distinct: ['memberUid'], // Ensures unique members per team
+            where: whereGuests,
+            distinct: ['memberUid'],
             select: {
               uid: true,
               isHost: true,
               isSpeaker: true,
               isSponsor: true,
+              memberUid: true,
               member: {
                 select: {
                   uid: true,
