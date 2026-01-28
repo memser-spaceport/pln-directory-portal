@@ -304,7 +304,7 @@ export class DemoDaysController {
     );
   }
 
-  @Get(':demoDayUidOrSlug/dashboard/investor/engagement')
+  @Get(':demoDayUidOrSlug/dashboard/founder/engagement/investors')
   @UseGuards(UserTokenValidation)
   @UsePipes(ZodValidationPipe)
   @CacheTTL(3600) // 1 hour
@@ -321,7 +321,7 @@ export class DemoDaysController {
     });
   }
 
-  @Get(':demoDayUidOrSlug/dashboard/investor/funnel')
+  @Get(':demoDayUidOrSlug/dashboard/founder/engagement/funnel')
   @UseGuards(UserTokenValidation)
   @CacheTTL(3600) // 1 hour
   async getFounderEngagementFunnel(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
