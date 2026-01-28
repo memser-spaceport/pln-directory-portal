@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException, forwardRef, Inject, Logger } from '@nestjs/common';
+import { ForbiddenException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from './demo-days.service';
@@ -330,16 +330,357 @@ export class DemoDayEngagementAnalyticsService {
     const sortedOverviewDates = [...overviewMap.keys()].sort();
     const sortedCtaDates = [...ctaMap.keys()].sort();
 
-    const engagementOverview = sortedOverviewDates.map((date) => ({
-      date,
-      ...overviewMap.get(date)!,
-    }));
+    const engagementOverview = sortedOverviewDates.map((date) => {
+      const data = overviewMap.get(date);
+      return {
+        date,
+        profileViews: data?.profileViews ?? 0,
+        ctaInteractions: data?.ctaInteractions ?? 0,
+        uniqueInvestors: data?.uniqueInvestors ?? 0,
+      };
+    });
 
-    const ctaPerformance = sortedCtaDates.map((date) => ({
-      date,
-      ...ctaMap.get(date)!,
-    }));
+    const ctaPerformance = sortedCtaDates.map((date) => {
+      const data = ctaMap.get(date);
+      return {
+        date,
+        profileViews: data?.profileViews ?? 0,
+        connections: data?.connections ?? 0,
+        investmentInterest: data?.investmentInterest ?? 0,
+      };
+    });
 
     return { engagementOverview, ctaPerformance };
+  }
+
+  async getInvestorActivity(
+    memberEmail: string,
+    demoDayUidOrSlug: string,
+    options: {
+      page: number;
+      limit: number;
+      sortBy: 'lastActivity' | 'totalInteractions' | 'name';
+      sortOrder: 'asc' | 'desc';
+    }
+  ) {
+    const { demoDayUid, teamFundraisingProfileUid } = await this.validateFounderAndGetProfileUid(
+      memberEmail,
+      demoDayUidOrSlug
+    );
+
+    const { page, limit, sortBy, sortOrder } = options;
+    const offset = (page - 1) * limit;
+
+    // Get investor activity aggregated per investor from Event table
+    // Note: props.teamUid contains TeamFundraisingProfile.uid
+    const investorEvents = await this.prisma.$queryRaw<
+      Array<{
+        user_id: string;
+        profile_views: bigint;
+        deck_views: bigint;
+        video_views: bigint;
+        cta_clicks: bigint;
+        total_interactions: bigint;
+        first_activity: Date;
+        last_activity: Date;
+      }>
+    >`
+      SELECT
+        "userId" AS user_id,
+        COUNT(*) FILTER (WHERE "eventType" = ${DD.TEAM_CARD_CLICKED}) AS profile_views,
+        COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_DECK_VIEWED}) AS deck_views,
+        COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_VIDEO_VIEWED}) AS video_views,
+        COUNT(*) FILTER (WHERE "eventType" IN (${Prisma.join(CTA_CLICK_EVENTS)})) AS cta_clicks,
+        COUNT(*) AS total_interactions,
+        MIN(ts) AS first_activity,
+        MAX(ts) AS last_activity
+      FROM "Event"
+      WHERE "eventType" LIKE 'demo-day-active-view-%'
+        AND props->>'teamUid' = ${teamFundraisingProfileUid}
+        AND "userId" IS NOT NULL
+      GROUP BY "userId"
+    `;
+
+    // Get interest data from DemoDayExpressInterestStatistic
+    const interestStats = await this.prisma.demoDayExpressInterestStatistic.findMany({
+      where: {
+        demoDayUid,
+        teamFundraisingProfileUid,
+      },
+      select: {
+        memberUid: true,
+        connected: true,
+        invested: true,
+        liked: true,
+        referral: true,
+        connectedCount: true,
+        investedCount: true,
+        likedCount: true,
+        referralCount: true,
+        updatedAt: true,
+      },
+    });
+
+    // Create a map of memberUid to interest stats
+    const interestMap = new Map(interestStats.map((s) => [s.memberUid, s]));
+
+    // Get all unique investor member UIDs
+    const allInvestorUids = new Set<string>();
+    investorEvents.forEach((e) => allInvestorUids.add(e.user_id));
+    interestStats.forEach((s) => allInvestorUids.add(s.memberUid));
+
+    // Fetch member details and investor profiles for all investors
+    const members = await this.prisma.member.findMany({
+      where: { uid: { in: Array.from(allInvestorUids) } },
+      select: {
+        uid: true,
+        name: true,
+        email: true,
+        image: { select: { url: true } },
+        investorProfile: {
+          select: {
+            type: true,
+            investmentFocus: true,
+            investInStartupStages: true,
+            typicalCheckSize: true,
+          },
+        },
+      },
+    });
+    const memberMap = new Map(members.map((m) => [m.uid, m]));
+
+    // Merge event data and interest data per investor
+    const eventMap = new Map(investorEvents.map((e) => [e.user_id, e]));
+    const investorData: Array<{
+      memberUid: string;
+      name: string;
+      email: string;
+      imageUrl: string | null;
+      investorProfile: {
+        type: string | null;
+        investmentFocus: string[];
+        investInStartupStages: string[];
+        typicalCheckSize: number | null;
+      } | null;
+      profileViews: number;
+      deckViews: number;
+      videoViews: number;
+      ctaClicks: number;
+      connected: boolean;
+      invested: boolean;
+      liked: boolean;
+      totalInteractions: number;
+      firstActivity: Date | null;
+      lastActivity: Date | null;
+    }> = [];
+
+    for (const uid of allInvestorUids) {
+      const event = eventMap.get(uid);
+      const interest = interestMap.get(uid);
+      const member = memberMap.get(uid);
+
+      const profileViews = Number(event?.profile_views ?? 0);
+      const deckViews = Number(event?.deck_views ?? 0);
+      const videoViews = Number(event?.video_views ?? 0);
+      const ctaClicks = Number(event?.cta_clicks ?? 0);
+      const connectCount = interest?.connectedCount ?? 0;
+      const investCount = interest?.investedCount ?? 0;
+      const likeCount = interest?.likedCount ?? 0;
+
+      const totalInteractions =
+        profileViews + deckViews + videoViews + ctaClicks + connectCount + investCount + likeCount;
+
+      // Determine last activity from both sources
+      const eventLastActivity = event?.last_activity ? new Date(event.last_activity) : null;
+      const interestLastActivity = interest?.updatedAt ? new Date(interest.updatedAt) : null;
+      let lastActivity: Date | null = null;
+      if (eventLastActivity && interestLastActivity) {
+        lastActivity = eventLastActivity > interestLastActivity ? eventLastActivity : interestLastActivity;
+      } else {
+        lastActivity = eventLastActivity || interestLastActivity;
+      }
+
+      investorData.push({
+        memberUid: uid,
+        name: member?.name ?? 'Unknown',
+        email: member?.email ?? '',
+        imageUrl: member?.image?.url ?? null,
+        investorProfile: member?.investorProfile
+          ? {
+              type: member.investorProfile.type,
+              investmentFocus: member.investorProfile.investmentFocus,
+              investInStartupStages: member.investorProfile.investInStartupStages,
+              typicalCheckSize: member.investorProfile.typicalCheckSize,
+            }
+          : null,
+        profileViews,
+        deckViews,
+        videoViews,
+        ctaClicks,
+        connected: interest?.connected ?? false,
+        invested: interest?.invested ?? false,
+        liked: interest?.liked ?? false,
+        totalInteractions,
+        firstActivity: event?.first_activity ? new Date(event.first_activity) : null,
+        lastActivity,
+      });
+    }
+
+    // Sort based on options
+    investorData.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'lastActivity':
+          const aTime = a.lastActivity?.getTime() ?? 0;
+          const bTime = b.lastActivity?.getTime() ?? 0;
+          comparison = aTime - bTime;
+          break;
+        case 'totalInteractions':
+          comparison = a.totalInteractions - b.totalInteractions;
+          break;
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+      }
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+
+    // Paginate
+    const total = investorData.length;
+    const paginatedData = investorData.slice(offset, offset + limit);
+
+    return {
+      data: paginatedData.map((inv) => ({
+        member: {
+          uid: inv.memberUid,
+          name: inv.name,
+          imageUrl: inv.imageUrl,
+        },
+        investorProfile: inv.investorProfile,
+        engagement: {
+          profileViews: inv.profileViews,
+          deckViews: inv.deckViews,
+          videoViews: inv.videoViews,
+          ctaClicks: inv.ctaClicks,
+        },
+        interest: {
+          connected: inv.connected,
+          invested: inv.invested,
+          liked: inv.liked,
+        },
+        totalInteractions: inv.totalInteractions,
+        lastActivity: inv.lastActivity?.toISOString() ?? null,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getInvestorEngagementFunnel(memberEmail: string, demoDayUidOrSlug: string) {
+    const { demoDayUid, teamFundraisingProfileUid } = await this.validateFounderAndGetProfileUid(
+      memberEmail,
+      demoDayUidOrSlug
+    );
+
+    // Get funnel stages from Event table (unique investors at each stage)
+    // Note: props.teamUid contains TeamFundraisingProfile.uid
+    const [funnelStats, interestStats] = await Promise.all([
+      this.prisma.$queryRaw<
+        Array<{
+          profile_opened: bigint;
+          deck_opened: bigint;
+          video_started: bigint;
+          cta_clicked: bigint;
+        }>
+      >`
+        SELECT
+          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" = ${DD.TEAM_CARD_CLICKED})
+            AS profile_opened,
+          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" = ${DD.PITCH_DECK_VIEWED})
+            AS deck_opened,
+          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" = ${DD.PITCH_VIDEO_VIEWED})
+            AS video_started,
+          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" IN (${Prisma.join(CTA_CLICK_EVENTS)}))
+            AS cta_clicked
+        FROM "Event"
+        WHERE "eventType" LIKE 'demo-day-active-view-%'
+          AND props->>'teamUid' = ${teamFundraisingProfileUid}
+          AND "userId" IS NOT NULL
+      `,
+
+      // Get interest funnel (unique investors who connected/invested)
+      this.prisma.$queryRaw<
+        Array<{
+          unique_connected: bigint;
+          unique_invested: bigint;
+        }>
+      >`
+        SELECT
+          COUNT(*) FILTER (WHERE connected = true) AS unique_connected,
+          COUNT(*) FILTER (WHERE invested = true) AS unique_invested
+        FROM "DemoDayExpressInterestStatistic"
+        WHERE "demoDayUid" = ${demoDayUid}
+          AND "teamFundraisingProfileUid" = ${teamFundraisingProfileUid}
+      `,
+    ]);
+
+    const funnelRow = funnelStats[0];
+    const interestRow = interestStats[0];
+
+    const profileOpened = Number(funnelRow?.profile_opened ?? 0);
+    const deckOpened = Number(funnelRow?.deck_opened ?? 0);
+    const videoStarted = Number(funnelRow?.video_started ?? 0);
+    const ctaClicked = Number(funnelRow?.cta_clicked ?? 0);
+    const connected = Number(interestRow?.unique_connected ?? 0);
+    const invested = Number(interestRow?.unique_invested ?? 0);
+
+    // Calculate conversion rates (from profile opened as baseline)
+    const calcRate = (value: number, baseline: number) =>
+      baseline > 0 ? Math.round((value / baseline) * 100 * 10) / 10 : 0;
+
+    return {
+      funnel: [
+        {
+          stage: 'profileOpened',
+          label: 'Profile Opened',
+          uniqueInvestors: profileOpened,
+          conversionRate: 100,
+        },
+        {
+          stage: 'deckOpened',
+          label: 'Deck Opened',
+          uniqueInvestors: deckOpened,
+          conversionRate: calcRate(deckOpened, profileOpened),
+        },
+        {
+          stage: 'videoStarted',
+          label: 'Video Started',
+          uniqueInvestors: videoStarted,
+          conversionRate: calcRate(videoStarted, profileOpened),
+        },
+        {
+          stage: 'ctaClicked',
+          label: 'CTA Clicked',
+          uniqueInvestors: ctaClicked,
+          conversionRate: calcRate(ctaClicked, profileOpened),
+        },
+        {
+          stage: 'connected',
+          label: 'Connected',
+          uniqueInvestors: connected,
+          conversionRate: calcRate(connected, profileOpened),
+        },
+        {
+          stage: 'invested',
+          label: 'Investment Interest',
+          uniqueInvestors: invested,
+          conversionRate: calcRate(invested, profileOpened),
+        },
+      ],
+    };
   }
 }

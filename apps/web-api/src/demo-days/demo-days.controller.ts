@@ -1,5 +1,6 @@
 import {
   Body,
+  CacheTTL,
   Controller,
   Delete,
   Get,
@@ -31,6 +32,7 @@ import {
   CreateDemoDayInvestorApplicationDto,
   EngagementTimelineQueryDto,
   ExpressInterestDto,
+  InvestorActivityQueryDto,
   UpdateFundraisingDescriptionDto,
   UpdateFundraisingTeamDto,
 } from 'libs/contracts/src/schema';
@@ -276,11 +278,11 @@ export class DemoDaysController {
     return data;
   }
 
-  // Founder engagement analytics endpoints
+  // Founder and Investor engagement analytics endpoints
 
   @Get(':demoDayUidOrSlug/dashboard/founder/engagement')
   @UseGuards(UserTokenValidation)
-  @NoCache()
+  @CacheTTL(3600) // 1 hour
   async getFounderEngagementStats(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
     return this.demoDayEngagementAnalyticsService.getFounderEngagementStats(req.userEmail, demoDayUidOrSlug);
   }
@@ -288,7 +290,7 @@ export class DemoDaysController {
   @Get(':demoDayUidOrSlug/dashboard/founder/engagement/timeline')
   @UseGuards(UserTokenValidation)
   @UsePipes(ZodValidationPipe)
-  @NoCache()
+  @CacheTTL(3600) // 1 hour
   async getFounderEngagementTimeline(
     @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
     @Req() req,
@@ -300,6 +302,30 @@ export class DemoDaysController {
       query.startDate,
       query.endDate
     );
+  }
+
+  @Get(':demoDayUidOrSlug/dashboard/investor/engagement')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @CacheTTL(3600) // 1 hour
+  async getFounderInvestorActivity(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Query() query: InvestorActivityQueryDto
+  ) {
+    return this.demoDayEngagementAnalyticsService.getInvestorActivity(req.userEmail, demoDayUidOrSlug, {
+      page: query.page ?? 1,
+      limit: query.limit ?? 10,
+      sortBy: query.sortBy ?? 'lastActivity',
+      sortOrder: query.sortOrder ?? 'desc',
+    });
+  }
+
+  @Get(':demoDayUidOrSlug/dashboard/investor/funnel')
+  @UseGuards(UserTokenValidation)
+  @CacheTTL(3600) // 1 hour
+  async getFounderEngagementFunnel(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
+    return this.demoDayEngagementAnalyticsService.getInvestorEngagementFunnel(req.userEmail, demoDayUidOrSlug);
   }
 
   // Direct S3 upload endpoints
