@@ -101,4 +101,8 @@ export const RETRIEVAL_QUERY_FILTERS: { [prop: string]: true } = {
   order: true,
   with: true,
   select: true,
+
+  // contributors filters
+  search: true,
+  filter: true,
 };
