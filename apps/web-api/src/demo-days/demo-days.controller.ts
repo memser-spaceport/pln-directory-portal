@@ -20,6 +20,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { DemoDaysService } from './demo-days.service';
 import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profiles.service';
 import { DemoDayEngagementService } from './demo-day-engagement.service';
+import { DemoDayEngagementAnalyticsService } from './demo-day-engagement-analytics.service';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UploadsService } from '../uploads/uploads.service';
@@ -28,6 +29,7 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import {
   CreateDemoDayFeedbackDto,
   CreateDemoDayInvestorApplicationDto,
+  EngagementTimelineQueryDto,
   ExpressInterestDto,
   UpdateFundraisingDescriptionDto,
   UpdateFundraisingTeamDto,
@@ -43,7 +45,8 @@ export class DemoDaysController {
     private readonly demoDaysService: DemoDaysService,
     private readonly demoDayFundraisingProfilesService: DemoDayFundraisingProfilesService,
     private readonly uploadsService: UploadsService,
-    private readonly demoDayEngagementService: DemoDayEngagementService
+    private readonly demoDayEngagementService: DemoDayEngagementService,
+    private readonly demoDayEngagementAnalyticsService: DemoDayEngagementAnalyticsService
   ) {}
 
   @Get()
@@ -271,6 +274,32 @@ export class DemoDaysController {
     const data = await this.demoDaysService.getCurrentExpressInterestStats(isPrepDemoDay, demoDayUidOrSlug);
     cache.set(key, { data, expires: now + TTL });
     return data;
+  }
+
+  // Founder engagement analytics endpoints
+
+  @Get(':demoDayUidOrSlug/dashboard/founder/engagement')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getFounderEngagementStats(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
+    return this.demoDayEngagementAnalyticsService.getFounderEngagementStats(req.userEmail, demoDayUidOrSlug);
+  }
+
+  @Get(':demoDayUidOrSlug/dashboard/founder/engagement/timeline')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async getFounderEngagementTimeline(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Query() query: EngagementTimelineQueryDto
+  ) {
+    return this.demoDayEngagementAnalyticsService.getFounderEngagementTimeline(
+      req.userEmail,
+      demoDayUidOrSlug,
+      query.startDate,
+      query.endDate
+    );
   }
 
   // Direct S3 upload endpoints
