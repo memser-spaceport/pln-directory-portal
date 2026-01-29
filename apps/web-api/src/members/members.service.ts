@@ -49,7 +49,7 @@ export class MembersService {
     private notificationSettingsService: NotificationSettingsService,
     @Inject(forwardRef(() => OfficeHoursService))
     private officeHoursService: OfficeHoursService
-  ) {}
+  ) { }
 
   /**
    * Creates a new member in the database within a transaction.
@@ -950,8 +950,8 @@ export class MembersService {
     member['image'] = memberData.imageUid
       ? { connect: { uid: memberData.imageUid } }
       : type === 'Update'
-      ? { disconnect: true }
-      : undefined;
+        ? { disconnect: true }
+        : undefined;
     member['skills'] = buildMultiRelationMapping('skills', memberData, type);
     if (type === 'Create') {
       if (Array.isArray(memberData.teamAndRoles)) {
@@ -1019,7 +1019,7 @@ export class MembersService {
 
     const secRulesAcceptedAt =
       investorProfileData.secRulesAccepted &&
-      existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
+        existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
         ? new Date()
         : existingMember.investorProfile?.secRulesAcceptedAt;
 
@@ -1818,32 +1818,32 @@ export class MembersService {
           this.prisma.$queryRaw<{ id: number }[]>`
             SELECT DISTINCT id FROM "Member"
             WHERE ${Prisma.raw(
-              topicsArray
-                .map(
-                  (topic) => `
+            topicsArray
+              .map(
+                (topic) => `
                   EXISTS (
                     SELECT 1 FROM unnest("ohInterest") AS interest_item
                     WHERE LOWER(interest_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
                   )
                 `
-                )
-                .join(' OR ')
-            )}
+              )
+              .join(' OR ')
+          )}
           `,
           this.prisma.$queryRaw<{ id: number }[]>`
             SELECT DISTINCT id FROM "Member"
             WHERE ${Prisma.raw(
-              topicsArray
-                .map(
-                  (topic) => `
+            topicsArray
+              .map(
+                (topic) => `
                   EXISTS (
                     SELECT 1 FROM unnest("ohHelpWith") AS help_item
                     WHERE LOWER(help_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
                   )
                 `
-                )
-                .join(' OR ')
-            )}
+              )
+              .join(' OR ')
+          )}
           `,
         ]);
 
@@ -2156,17 +2156,17 @@ export class MembersService {
         SELECT DISTINCT m.id FROM "Member" m
         INNER JOIN "InvestorProfile" ip ON m."investorProfileId" = ip.uid
         WHERE ${Prisma.raw(
-          focusArray
-            .map(
-              (focus) => `
+        focusArray
+          .map(
+            (focus) => `
               EXISTS (
                 SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item
                 WHERE LOWER(focus_item) LIKE LOWER('%${focus.replace(/'/g, "''")}%')
               )
             `
-            )
-            .join(' OR ')
-        )}
+          )
+          .join(' OR ')
+      )}
       `;
 
       if (matchingMemberIds.length > 0) {
@@ -2305,9 +2305,9 @@ export class MembersService {
       // Build where clause - if no query, get all topics; if query, filter by it
       const titleFilter = query.trim()
         ? {
-            contains: searchQuery,
-            mode: 'insensitive' as const,
-          }
+          contains: searchQuery,
+          mode: 'insensitive' as const,
+        }
         : undefined;
 
       // Build member filter for office hours
@@ -2391,10 +2391,10 @@ export class MembersService {
           ...memberFilter,
           ...(query.trim() &&
             ohMemberIds.length > 0 && {
-              id: {
-                in: ohMemberIds,
-              },
-            }),
+            id: {
+              in: ohMemberIds,
+            },
+          }),
           // If no query, get members with any ohInterest or ohHelpWith
           ...(!query.trim() && {
             OR: [
@@ -2872,6 +2872,12 @@ export class MembersService {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error?.code) {
         case 'P2002':
+          const target = error.meta?.target as string[] | undefined;
+          if (target && target.some((t) => t.includes('telegram'))) {
+            throw new ConflictException(
+              'This Telegram is already in use by another member. Please use a different Telegram ID.'
+            );
+          }
           throw new ConflictException('Unique key constraint error on Member:', error.message);
         case 'P2003':
           throw new BadRequestException('Foreign key constraint error on Member', error.message);
@@ -3159,8 +3165,7 @@ export class MembersService {
       select: { uid: true, teamUid: true },
     });
     this.logger.info(
-      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${
-        newTeamUid ?? 'null'
+      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${newTeamUid ?? 'null'
       }`
     );
     // If there are no FOUNDER participants, nothing to do
