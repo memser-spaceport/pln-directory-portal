@@ -13,6 +13,7 @@ import { MembersService } from '../members/members.service';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
 import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, MemberRole } from '../utils/constants';
+import {NotificationServiceClient} from "../notifications/notification-service.client";
 
 type ExpressInterestStats = {
   liked: number;
@@ -39,7 +40,8 @@ export class DemoDaysService {
     private readonly prisma: PrismaService,
     private readonly analyticsService: AnalyticsService,
     private readonly membersService: MembersService,
-    private readonly pushNotificationsService: PushNotificationsService
+    private readonly pushNotificationsService: PushNotificationsService,
+    private readonly notificationServiceClient: NotificationServiceClient
   ) {}
 
   // Public methods
@@ -1173,6 +1175,27 @@ export class DemoDaysService {
       },
     });
 
+    let resolvedTeamName: string | null =
+      applicationData.isTeamNew && applicationData.team?.name?.trim() ? applicationData.team.name.trim() : null;
+
+    if (!resolvedTeamName && applicationData.teamUid) {
+      const team = await this.prisma.team.findUnique({
+        where: { uid: applicationData.teamUid },
+        select: { name: true },
+      });
+      resolvedTeamName = team?.name ?? null;
+    }
+
+    await this.sendTelegramNewDemoDayApplicationAlert({
+      demoDay: { uid: demoDay.uid, slugURL: demoDay.slugURL, title: demoDay.title },
+      participantUid: participant.uid,
+      memberUid: member.uid,
+      applicantName: applicationData.name ?? null,
+      applicantEmail: normalizedEmail,
+      teamName: resolvedTeamName,
+      teamUid: applicationData.teamUid ?? null,
+    });
+
     return {
       participantUid: participant.uid,
       isNewMember: isNewMember,
@@ -1739,4 +1762,55 @@ export class DemoDaysService {
         };
     }
   }
+
+  private buildAdminDemoDayLink(demoDaySlugURL: string): string | null {
+    const base = process.env.WEB_ADMIN_UI_BASE_URL?.replace(/\/+$/, '');
+    if (!base) return null;
+
+    return `${base}/demo-days/${encodeURIComponent(demoDaySlugURL)}`;
+  }
+
+  private async sendTelegramNewDemoDayApplicationAlert(args: {
+    demoDay: { uid: string; slugURL: string; title: string };
+    participantUid: string;
+    memberUid: string;
+    applicantName: string | null;
+    applicantEmail: string;
+    teamName?: string | null;
+    teamUid?: string | null;
+  }): Promise<void> {
+    const adminLink = this.buildAdminDemoDayLink(args.demoDay.slugURL);
+
+    try {
+      await this.notificationServiceClient.sendTelegramOutboxMessage({
+        channelType: 'DEMO_DAY_APPLICATION',
+        text: [
+          '🔔 New Demo Day Application',
+          `Name: ${args.applicantName ?? '-'}`,
+          `Email: ${args.applicantEmail ?? '-'}`,
+          `Team: ${args.teamName ?? '-'}`,
+          adminLink ? `Open in Admin: ${adminLink}` : 'Open in Admin: -',
+        ].join('\n'),
+        meta: {
+          source: 'demo-day-application',
+          demoDayUid: args.demoDay.uid,
+          demoDaySlugURL: args.demoDay.slugURL,
+          demoDayTitle: args.demoDay.title,
+          participantUid: args.participantUid,
+          memberUid: args.memberUid,
+          name: args.applicantName,
+          email: args.applicantEmail,
+          teamUid: args.teamUid ?? null,
+          teamName: args.teamName ?? null,
+          adminLink,
+        },
+      });
+    } catch (e) {
+      this.logger.warn(
+        `Failed to send Telegram alert for demo-day application. demoDayUid=${args.demoDay.uid}, participantUid=${args.participantUid}. ` +
+        (e instanceof Error ? e.message : String(e))
+      );
+    }
+  }
+
 }

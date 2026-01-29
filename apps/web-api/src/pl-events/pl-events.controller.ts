@@ -279,10 +279,10 @@ export class PLEventsController {
 
   @Api(server.route.getEventContributors)
   @NoCache()
-  async getAllPLEventContributors() {
-    return await this.teamService.getAllPLEventContibutors();
+  async getAllPLEventContributors(@Req() request: Request) {
+    return await this.teamService.getAllPLEventContibutors(request.query);
   }
-
+  
   @Api(server.route.getAllAggregatedData)
   @ApiQueryFromZod(PLEventAggregatedDataQueryParams)
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
