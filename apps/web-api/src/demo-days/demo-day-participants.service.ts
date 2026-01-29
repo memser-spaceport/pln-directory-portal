@@ -1107,6 +1107,25 @@ export class DemoDayParticipantsService {
           actorEmail: actorEmail || null,
         },
       });
+
+      // Track "participant added" event when approved (ENABLED) - same as bulk upload
+      if (updated.status === 'ENABLED') {
+        await this.analyticsService.trackEvent({
+          name: 'demo-day-participant-added',
+          distinctId: updated.memberUid,
+          properties: {
+            demoDayUid,
+            participantUid: updated.uid,
+            memberUid: updated.memberUid,
+            type: updated.type,
+            status: updated.status,
+            teamUid: updated.teamUid || null,
+            isNewMember: false,
+            actorUid: actorUid || null,
+            actorEmail: actorEmail || null,
+          },
+        });
+      }
     }
 
     // Track type change only when it actually changed
