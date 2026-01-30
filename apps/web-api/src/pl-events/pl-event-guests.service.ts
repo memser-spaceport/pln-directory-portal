@@ -788,18 +788,14 @@ export class PLEventGuestsService {
       includeLocations,
     } = queryParams;
 
-    // Normalize inputs (important for ANY() / cardinality())
-    const safeEventUids: string[] = Array.isArray(eventUids) ? eventUids.filter(Boolean) : [];
-    const safeTopics: string[] = Array.isArray(topics) ? topics : [];
-
     this.logger.info(
       `[PLEventGuestsService] fetchAttendees input ` +
       JSON.stringify({
         locationUid: locationUid ?? null,
         loggedInMemberUid: loggedInMemberUid ?? null,
         includeLocationOnlyGuests: !!includeLocationOnlyGuests,
-        eventUidsCount: safeEventUids.length,
-        topicsCount: safeTopics.length,
+        eventUidsCount: Array.isArray(eventUids) ? eventUids.length : 0,
+        topicsCount: Array.isArray(topics) ? topics.length : 0,
         isHost: isHost ?? null,
         isSpeaker: isSpeaker ?? null,
         isSponsor: isSponsor ?? null,
@@ -814,16 +810,15 @@ export class PLEventGuestsService {
       })
     );
 
-    // Build dynamic query conditions for filtering by eventUids and topics (keeps your old behavior)
-    let { conditions, values } = this.buildConditions(safeEventUids, safeTopics);
+    // Build dynamic query conditions for filtering by eventUids and topics
+    let { conditions, values } = this.buildConditions(eventUids, topics);
 
     // location filter (always)
     values.push(locationUid);
     const locationUidPos = values.length;
 
     // window bounds (for location-only overlap)
-    let windowStartPos: number | null = null;
-    let windowEndPos: number | null = null;
+    let windowStartPos, windowEndPos;
 
     if (includeLocationOnlyGuests) {
       values.push(windowStart);
@@ -832,125 +827,118 @@ export class PLEventGuestsService {
       windowEndPos = values.length;
     }
 
-    // bind loggedInMemberUid for outer ORDER BY
+    // bind loggedInMemberUid for outer ORDER BY (so it works before pagination)
     values.push(loggedInMemberUid ?? null);
     const loggedInUidPos = values.length;
 
-    // IMPORTANT: bind eventUids as fixed placeholder so applySearch won't shift it
-    values.push(safeEventUids);
+    // IMPORTANT:
+    // Bind eventUids now as a fixed placeholder so search (applySearch) can't shift it.
+    values.push(eventUids);
     const eventUidsPos = values.length;
 
+    // Apply sorting based on the sortBy parameter (default is sorting by memberName)
     const orderBy = this.applySorting(sortBy, sortDirection, loggedInMemberUid);
+
+    // Apply pagination to limit the results and calculate the offset for the current page
     const { limit: paginationLimit, offset } = this.applyPagination(Number(limit), page);
 
-    const selectLocation = includeLocations ? `,'location', l."location"` : ``;
+    const selectLocation = includeLocations ? `,'location', l."location"` : ``; // Empty if location is not required
 
     const query: any = `
-    WITH event_attendees AS (
-      SELECT
-        *,
-        COUNT(*) OVER() AS count
+      WITH event_attendees AS (
+        SELECT
+          *,
+          COUNT(*) OVER() AS count
       FROM (
         SELECT
-          pg."memberUid",
+        pg."memberUid",
+        CASE
+        WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
+        THEN 'isHostOnly'
+        WHEN BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
+        THEN 'isSpeakerOnly'
+        WHEN BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
+        THEN 'isSponsorOnly'
+        WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
+        THEN 'hostAndSpeakerAndSponsor'
+        ELSE 'none'
+        END AS guest_type,
 
-          CASE
-            WHEN BOOL_OR(pg."isHost" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-             AND NOT BOOL_OR(pg."isSpeaker" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-             AND NOT BOOL_OR(pg."isSponsor" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-            THEN 'isHostOnly'
+        json_object_agg(
+        'info',
+        json_build_object(
+        'reason', pg."reason",
+        'teamUid', pg."teamUid",
+        'topics', pg."topics",
+        'isHost', pg."isHost",
+        'isSpeaker', pg."isSpeaker",
+        'isSponsor', pg."isSponsor",
+        'createdAt', pg."createdAt",
+        'telegramId', pg."telegramId",
+        'officeHours', pg."officeHours"
+        )
+        ) AS guest,
 
-            WHEN BOOL_OR(pg."isSpeaker" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-             AND NOT BOOL_OR(pg."isHost" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-             AND NOT BOOL_OR(pg."isSponsor" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-            THEN 'isSpeakerOnly'
+        COALESCE(
+        json_agg(
+        DISTINCT jsonb_build_object(
+        'uid', e.uid,
+        'slugURL', e."slugURL",
+        'name', e.name,
+        'type', e.type,
+        'startDate', e."startDate",
+        'endDate', e."endDate",
+        'isHost', pg."isHost",
+        'isSpeaker', pg."isSpeaker",
+        'isSponsor', pg."isSponsor",
+        'additionalInfo', pg."additionalInfo"
+        ${selectLocation}
+        )
+        ) FILTER (WHERE e.uid = ANY($${eventUidsPos})),
+        '[]'::json
+        ) AS events,
 
-            WHEN BOOL_OR(pg."isSponsor" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-             AND NOT BOOL_OR(pg."isHost" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-             AND NOT BOOL_OR(pg."isSpeaker" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-            THEN 'isSponsorOnly'
+        json_object_agg(
+        'member',
+        json_build_object(
+        'name', m.name,
+        'image', json_build_object('url', mi.url),
+        'telegramHandler', m."telegramHandler",
+        'preferences', m.preferences,
+        'officeHours', m."officeHours"
+        )
+        ) AS member,
 
-            WHEN BOOL_OR(pg."isHost" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-             AND BOOL_OR(pg."isSpeaker" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-             AND BOOL_OR(pg."isSponsor" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[])))
-            THEN 'hostAndSpeakerAndSponsor'
+        COALESCE(
+        jsonb_agg(
+        DISTINCT jsonb_build_object(
+        'role', tmr."role",
+        'team', jsonb_build_object(
+        'uid', tmr_team.uid,
+        'name', tmr_team.name,
+        'logo', jsonb_build_object('url', tmr_logo.url)
+        )
+        )
+        ) FILTER (WHERE tmr_team.uid IS NOT NULL),
+        '[]'::jsonb
+        ) AS teamMemberRoles,
 
-            ELSE 'none'
-          END AS guest_type,
-
-          json_build_object(
-            'info',
-            json_build_object(
-              'reason', pg."reason",
-              'teamUid', pg."teamUid",
-              'topics', pg."topics",
-
-              'isHost', BOOL_OR(pg."isHost" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[]))),
-              'isSpeaker', BOOL_OR(pg."isSpeaker" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[]))),
-              'isSponsor', BOOL_OR(pg."isSponsor" AND (cardinality($${eventUidsPos}::text[]) = 0 OR pg."eventUid" = ANY($${eventUidsPos}::text[]))),
-
-              'createdAt', MIN(pg."createdAt"),
-              'telegramId', MAX(pg."telegramId"),
-              'officeHours', MAX(pg."officeHours")
-            )
-          ) AS guest,
-
-          COALESCE(
-            json_agg(
-              DISTINCT jsonb_build_object(
-                'uid', e.uid,
-                'slugURL', e."slugURL",
-                'name', e.name,
-                'type', e.type,
-                'startDate', e."startDate",
-                'endDate', e."endDate",
-                'isHost', pg."isHost",
-                'isSpeaker', pg."isSpeaker",
-                'isSponsor', pg."isSponsor",
-                'additionalInfo', pg."additionalInfo"
-                ${selectLocation}
-              )
-            )
-            FILTER (
-              WHERE cardinality($${eventUidsPos}::text[]) = 0
-                 OR e.uid = ANY($${eventUidsPos}::text[])
-            ),
-            '[]'::json
-          ) AS events,
-
-          json_object_agg(
-            'member',
-            json_build_object(
-              'name', m.name,
-              'image', json_build_object('url', mi.url),
-              'telegramHandler', m."telegramHandler",
-              'preferences', m.preferences,
-              'officeHours', m."officeHours"
-            )
-          ) AS member,
-
-          COALESCE(
-            jsonb_agg(
-              DISTINCT jsonb_build_object(
-                'role', tmr."role",
-                'team', jsonb_build_object(
-                  'uid', tmr_team.uid,
-                  'name', tmr_team.name,
-                  'logo', jsonb_build_object('url', tmr_logo.url)
-                )
-              )
-            ) FILTER (WHERE tmr_team.uid IS NOT NULL),
-            '[]'::jsonb
-          ) AS teamMemberRoles,
-
-          json_object_agg(
-            'team',
-            json_build_object(
-              'uid', tm.uid,
-              'name', tm.name,
-              'logo', json_build_object('url', tml.url)
-            )
-          ) AS team
+        json_object_agg(
+        'team',
+        json_build_object(
+        'uid', tm.uid,
+        'name', tm.name,
+        'logo', json_build_object('url', tml.url)
+        )
+        ) AS team
 
         FROM "PLEventGuest" pg
         JOIN "PLEvent" e ON e.uid = pg."eventUid"
@@ -970,139 +958,123 @@ export class PLEventGuestsService {
         AND ($${locationUidPos}::text IS NULL OR pg."locationUid" = $${locationUidPos})
 
         GROUP BY
-          pg."memberUid",
-          pg."teamUid",
-          pg."topics",
-          pg."reason",
-          m.name,
-          tm.name
-          ${conditions}
-          ${orderBy}
-      ) AS subquery
-      ${this.buildHostAndSpeakerCondition(isHost, isSpeaker, isSponsor)}
-    ),
+        pg."memberUid",
+        pg."teamUid",
+        pg."topics",
+        pg."reason",
+        m.name,
+        tm.name
+        ${conditions}
+        ${orderBy}
+        ) AS subquery
+        ${this.buildHostAndSpeakerCondition(isHost, isSpeaker, isSponsor)}
+        ),
 
-    location_only AS (
-      ${
-      includeLocationOnlyGuests
-        ? `
-            SELECT
-              pg."memberUid",
-              'none' AS guest_type,
-              json_build_object(
-                'info',
-                json_build_object(
-                  'reason', pg."reason",
-                  'teamUid', pg."teamUid",
-                  'topics', pg."topics",
-                  'isHost', false,
-                  'isSpeaker', false,
-                  'isSponsor', false,
-                  'createdAt', pg."createdAt",
-                  'telegramId', pg."telegramId",
-                  'officeHours', pg."officeHours",
-                  'additionalInfo', pg."additionalInfo"
+        location_only AS (
+        ${
+            includeLocationOnlyGuests
+                ? `
+                  SELECT
+                    pg."memberUid",
+                    'none' AS guest_type,
+                    json_object_agg(
+                        'info',
+                        json_build_object(
+                            'reason', pg."reason",
+                            'teamUid', pg."teamUid",
+                            'topics', pg."topics",
+                            'isHost', false,
+                            'isSpeaker', false,
+                            'isSponsor', false,
+                            'createdAt', pg."createdAt",
+                            'telegramId', pg."telegramId",
+                            'officeHours', pg."officeHours",
+                            'additionalInfo', pg."additionalInfo"
+                        )
+                    ) AS guest,
+                    '[]'::json AS events,
+                    json_object_agg(
+                        'member',
+                        json_build_object(
+                            'name', m.name,
+                            'image', json_build_object('url', mi.url),
+                            'telegramHandler', m."telegramHandler",
+                            'preferences', m.preferences,
+                            'officeHours', m."officeHours"
+                        )
+                    ) AS member,
+                    COALESCE(
+                        jsonb_agg(
+                          DISTINCT jsonb_build_object(
+                'role', tmr."role",
+                'team', jsonb_build_object(
+                  'uid', tmr_team.uid,
+                  'name', tmr_team.name,
+                  'logo', jsonb_build_object('url', tmr_logo.url)
                 )
-              ) AS guest,
-              '[]'::json AS events,
-              json_object_agg(
-                'member',
-                json_build_object(
-                  'name', m.name,
-                  'image', json_build_object('url', mi.url),
-                  'telegramHandler', m."telegramHandler",
-                  'preferences', m.preferences,
-                  'officeHours', m."officeHours"
-                )
-              ) AS member,
-              COALESCE(
-                jsonb_agg(
-                  DISTINCT jsonb_build_object(
-                    'role', tmr."role",
-                    'team', jsonb_build_object(
-                      'uid', tmr_team.uid,
-                      'name', tmr_team.name,
-                      'logo', jsonb_build_object('url', tmr_logo.url)
-                    )
-                  )
-                ) FILTER (WHERE tmr_team.uid IS NOT NULL),
-                '[]'::jsonb
-              ) AS teamMemberRoles,
-              json_object_agg(
-                'team',
-                json_build_object(
-                  'uid', tm.uid,
-                  'name', tm.name,
-                  'logo', json_build_object('url', tml.url)
-                )
-              ) AS team,
-              0::bigint AS count
-            FROM "PLEventGuest" pg
-              JOIN "Member" m ON m.uid = pg."memberUid"
-              LEFT JOIN "Image" mi ON mi.uid = m."imageUid"
-              LEFT JOIN "TeamMemberRole" tmr ON tmr."memberUid" = m.uid
-              LEFT JOIN "Team" tmr_team ON tmr_team.uid = tmr."teamUid"
-              LEFT JOIN "Image" tmr_logo ON tmr_logo.uid = tmr_team."logoUid"
-              LEFT JOIN "Team" tm ON tm.uid = pg."teamUid"
-              LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
-            WHERE
-              ($${locationUidPos}::text IS NULL OR pg."locationUid" = $${locationUidPos})
-              AND pg."eventUid" IS NULL
-              AND m."accessLevel" NOT IN ('L0','L1','Rejected')
-
-              AND NOT EXISTS (
-                SELECT 1
-                FROM "PLEventGuest" pg2
-                WHERE
-                  pg2."locationUid" = pg."locationUid"
-                  AND pg2."memberUid" = pg."memberUid"
-                  AND (
-                    (cardinality($${eventUidsPos}::text[]) = 0 AND pg2."eventUid" IS NOT NULL)
-                    OR
-                    (cardinality($${eventUidsPos}::text[]) > 0 AND pg2."eventUid" = ANY($${eventUidsPos}::text[]))
-                  )
               )
+            ) FILTER (WHERE tmr_team.uid IS NOT NULL),
+                        '[]'::jsonb
+                    ) AS teamMemberRoles,
+                    json_object_agg(
+                        'team',
+                        json_build_object(
+                            'uid', tm.uid,
+                            'name', tm.name,
+                            'logo', json_build_object('url', tml.url)
+                        )
+                    ) AS team,
+                    0::bigint AS count
+                  FROM "PLEventGuest" pg
+                    JOIN "Member" m ON m.uid = pg."memberUid"
+                    LEFT JOIN "Image" mi ON mi.uid = m."imageUid"
+                    LEFT JOIN "TeamMemberRole" tmr ON tmr."memberUid" = m.uid
+                    LEFT JOIN "Team" tmr_team ON tmr_team.uid = tmr."teamUid"
+                    LEFT JOIN "Image" tmr_logo ON tmr_logo.uid = tmr_team."logoUid"
+                    LEFT JOIN "Team" tm ON tm.uid = pg."teamUid"
+                    LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
+                  WHERE
+                    ($${locationUidPos}::text IS NULL OR pg."locationUid" = $${locationUidPos})
+                    AND pg."eventUid" IS NULL
+                    AND m."accessLevel" NOT IN ('L0','L1','Rejected')
 
-              ${
-          includeLocationOnlyGuests && windowStartPos && windowEndPos
-            ? `
-                    AND (
-                      (pg."additionalInfo"->>'checkInDate')::timestamp IS NOT NULL
-                      AND (pg."additionalInfo"->>'checkOutDate')::timestamp IS NOT NULL
-                      AND (pg."additionalInfo"->>'checkInDate')::timestamp <= $${windowEndPos}::timestamp
-                      AND (pg."additionalInfo"->>'checkOutDate')::timestamp >= $${windowStartPos}::timestamp
+                    -- prevent duplicates: if member already attends at least one of the requested events,
+                    -- don't include their location-only row
+                    AND NOT EXISTS (
+                    SELECT 1
+                    FROM "PLEventGuest" pg2
+                    WHERE
+                    pg2."locationUid" = pg."locationUid"
+                    AND pg2."memberUid" = pg."memberUid"
+                    AND pg2."eventUid" = ANY($${eventUidsPos})
                     )
-                  `
-            : ''
+                  GROUP BY
+                    pg."memberUid",
+                    pg."teamUid",
+                    pg."topics",
+                    pg."reason",
+                    m.name,
+                    tm.name
+                `
+                : `SELECT NULL::text AS "memberUid", 'none'::text AS guest_type, '{}'::json AS guest, '[]'::json AS events, '{}'::json AS member, '[]'::jsonb AS teamMemberRoles, '{}'::json AS team, 0::bigint AS count WHERE FALSE`
         }
+        ),
 
-            GROUP BY
-              pg."memberUid",
-              pg."teamUid",
-              pg."topics",
-              pg."reason",
-              m.name,
-              tm.name
-          `
-        : `SELECT NULL::text AS "memberUid", 'none'::text AS guest_type, '{}'::json AS guest, '[]'::json AS events, '{}'::json AS member, '[]'::jsonb AS teamMemberRoles, '{}'::json AS team, 0::bigint AS count WHERE FALSE`
-    }
-    ),
-
-    combined AS (
+        combined AS (
       SELECT * FROM event_attendees
       UNION ALL
       SELECT * FROM location_only
-    )
+        )
 
-    SELECT
-      *,
-      COUNT(*) OVER() AS count
-    FROM combined
-      ${this.buildHostAndSpeakerCondition(isHost, isSpeaker, isSponsor)}
-      ${this.buildOuterOrderBy(sortBy, sortDirection, loggedInUidPos)}
-    LIMIT $${values.length + 1}
-    OFFSET $${values.length + 2}
-  `;
+      SELECT
+        *,
+        COUNT(*) OVER() AS count
+      FROM combined
+        ${this.buildHostAndSpeakerCondition(isHost, isSpeaker, isSponsor)}
+        ${this.buildOuterOrderBy(sortBy, sortDirection, loggedInUidPos)}
+        LIMIT $${values.length + 1}
+      OFFSET $${values.length + 2}
+    `;
 
     this.logger.info(
       `[PLEventGuestsService] fetchAttendees sqlMeta ` +
@@ -1124,18 +1096,16 @@ export class PLEventGuestsService {
       `[PLEventGuestsService] fetchAttendees sqlParams ` +
       JSON.stringify({
         valuesCountFinal: values.length,
-        eventUidsCount: safeEventUids.length,
+        eventUidsCount: Array.isArray(eventUids) ? eventUids.length : 0,
         hasSearch: !!search,
         hasLoggedInUid: !!loggedInMemberUid,
       })
     );
 
+    // Execute the raw query with the built query string and values
     const result = await this.prisma.$queryRawUnsafe(query, ...values);
     return this.formatAttendees(result);
   }
-
-
-
 
 
   private buildOuterOrderBy(sortBy: string, sortDirection: any, loggedInUidPos: number): string {
