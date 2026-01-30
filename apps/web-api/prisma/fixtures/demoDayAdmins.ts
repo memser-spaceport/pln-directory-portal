@@ -24,3 +24,17 @@ export const demoDayAdmins: Prisma.MemberCreateManyInput[] = [
     updatedAt: new Date(),
   },
 ];
+
+/**
+ * Seed directory admin member.
+ * This user will receive the DIRECTORY_ADMIN role.
+ */
+export const directoryAdmin: Prisma.MemberCreateManyInput = {
+  uid: 'uid-directoryadmin',
+  name: 'Directory Admin',
+  email: 'directory-admin@example.com',
+  accessLevel: 'L4',
+  approvedAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};

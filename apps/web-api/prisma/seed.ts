@@ -2,6 +2,42 @@ import { Prisma } from '@prisma/client';
 import camelCase from 'camelcase';
 import { prisma } from './index';
 
+// Thresholds for detecting non-seed data (seed creates ~33 members, ~44 teams)
+const SEED_MEMBER_THRESHOLD = 10;
+const SEED_TEAM_THRESHOLD = 10;
+
+/**
+ * Safety check to prevent accidental data loss on non-seed databases.
+ * Blocks seeding if member or team count exceeds thresholds.
+ *
+ * Override with: SEED_FORCE=true yarn nx seed web-api
+ */
+async function checkDatabaseSafety(): Promise<void> {
+  const forceFlag = process.env.SEED_FORCE === 'true';
+
+  if (forceFlag) {
+    console.log('⚠️  SEED_FORCE=true detected, skipping safety check\n');
+    return;
+  }
+
+  const memberCount = await prisma.member.count();
+  const teamCount = await prisma.team.count();
+
+  // If counts exceed thresholds, this might be production data
+  if (memberCount > SEED_MEMBER_THRESHOLD || teamCount > SEED_TEAM_THRESHOLD) {
+    console.error('❌ SAFETY CHECK FAILED');
+    console.error(`   Found ${memberCount} members and ${teamCount} teams`);
+    console.error(`   Thresholds: ${SEED_MEMBER_THRESHOLD} members, ${SEED_TEAM_THRESHOLD} teams`);
+    console.error('');
+    console.error('   To force seeding (WILL DELETE ALL DATA), run:');
+    console.error('   SEED_FORCE=true yarn nx seed web-api');
+    console.error('');
+    process.exit(1);
+  }
+
+  console.log(`✅ Safety check passed (${memberCount} members, ${teamCount} teams)\n`);
+}
+
 import {
   membershipSources,
   fundingStages,
@@ -30,15 +66,24 @@ import {
 } from './fixtures';
 
 import { demoDays } from './fixtures/demo-days';
-import { demoDayAdmins } from './fixtures/demoDayAdmins';
+import { demoDayAdmins, directoryAdmin } from './fixtures/demoDayAdmins';
 import { demoDayAdminScopes } from './fixtures/demoDayAdminScopes';
-import { demoDayAdminRoleAssignments } from './fixtures/demoDayAdminRoleAssignments';
-import {irlGatheringPushConfigs} from "./fixtures/irl-gathering-push-config";
+import { adminRoleAssignments } from './fixtures/adminRoleAssignments';
+import { irlGatheringPushConfigs } from './fixtures/irl-gathering-push-config';
 import {
   irlGatheringPushCandidates,
   irlGatheringPushEventGuests,
-  irlGatheringPushEventLocations, irlGatheringPushEvents
-} from "./fixtures/irl-gathering-push-candidates";
+  irlGatheringPushEventLocations,
+  irlGatheringPushEvents,
+} from './fixtures/irl-gathering-push-candidates';
+
+// Demo Day fixtures
+import { demoDayMembers } from './fixtures/demoDayMembers';
+import { demoDayTeams } from './fixtures/demoDayTeams';
+import { demoDayInvestorProfiles } from './fixtures/demoDayInvestorProfiles';
+import { demoDayTeamFundraisingProfiles } from './fixtures/demoDayTeamFundraisingProfiles';
+import { demoDayParticipants } from './fixtures/demoDayParticipants';
+import { demoDayExpressInterestStats } from './fixtures/demoDayExpressInterestStats';
 
 /**
  * Truncate all public tables (except _prisma_migrations) and reset identities.
@@ -97,41 +142,50 @@ async function load(fixtures: Array<Record<string, any>>) {
 }
 
 /**
- * Assign DEMO_DAY_ADMIN role to demo day admin members.
+ * Assign admin roles to members (DEMO_DAY_ADMIN, DIRECTORY_ADMIN).
  */
-async function seedDemoDayAdminRoleAssignments() {
-  console.log('=== Seed: demo day admin role assignments (start) ===');
+async function seedAdminRoleAssignments() {
+  console.log('=== Seed: admin role assignments (start) ===');
 
-  // Ensure DEMO_DAY_ADMIN role exists (idempotent)
-  await prisma.memberRole.upsert({
-    where: { name: 'DEMO_DAY_ADMIN' },
-    update: {},
-    create: {
-      name: 'DEMO_DAY_ADMIN',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  });
+  for (const { memberUid, roleName } of adminRoleAssignments) {
+    // Find the member and role to get their IDs
+    const member = await prisma.member.findUnique({
+      where: { uid: memberUid },
+      select: { id: true, uid: true, name: true },
+    });
 
-  for (const { memberUid, roleName } of demoDayAdminRoleAssignments) {
-    // Insert into Prisma-generated join table between Member and MemberRole.
-    // Default name is "_MemberToMemberRole" with columns "A" (Member.id) and "B" (MemberRole.id).
+    const role = await prisma.memberRole.findUnique({
+      where: { name: roleName },
+      select: { id: true, name: true },
+    });
+
+    if (!member) {
+      console.error(`  ❌ Member not found: uid=${memberUid}`);
+      continue;
+    }
+
+    if (!role) {
+      console.error(`  ❌ Role not found: name=${roleName}`);
+      continue;
+    }
+
+    // Insert into join table using the correct IDs
     await prisma.$executeRawUnsafe(`
       INSERT INTO "_MemberToMemberRole" ("A", "B")
-      SELECT
-        m."id",
-        r."id"
-      FROM "Member" m, "MemberRole" r
-      WHERE m."uid" = '${memberUid}'
-        AND r."name" = '${roleName}'
+      VALUES (${member.id}, ${role.id})
       ON CONFLICT ("A", "B") DO NOTHING;
     `);
+
+    console.log(`  ✅ Assigned ${roleName} to ${member.name} (member.id=${member.id}, role.id=${role.id})`);
   }
 
-  console.log('=== Seed: demo day admin role assignments (done) ===');
+  console.log('=== Seed: admin role assignments (done) ===');
 }
 
 async function main() {
+  // Safety check to prevent accidental data loss
+  await checkDatabaseSafety();
+
   await resetAllTables();
 
   // Load core fixtures in a FK-safe order
@@ -174,18 +228,65 @@ async function main() {
 
     // Extra demo day–related fixtures
     { [Prisma.ModelName.Member]: { fixtures: demoDayAdmins } },
+    { [Prisma.ModelName.Member]: { fixtures: [directoryAdmin] } },
     { [Prisma.ModelName.MemberDemoDayAdminScope]: { fixtures: demoDayAdminScopes } },
     { [Prisma.ModelName.DemoDay]: { fixtures: demoDays } },
+
+    // Demo Day fixtures (must be after DemoDay, Member, and Team)
+    { [Prisma.ModelName.Member]: { fixtures: demoDayMembers } },
+    { [Prisma.ModelName.Team]: { fixtures: demoDayTeams } },
+    { [Prisma.ModelName.InvestorProfile]: { fixtures: demoDayInvestorProfiles } },
+    {
+      [Prisma.ModelName.TeamFundraisingProfile]: {
+        fixtures: demoDayTeamFundraisingProfiles,
+      },
+    },
+    { [Prisma.ModelName.DemoDayParticipant]: { fixtures: demoDayParticipants } },
+    {
+      [Prisma.ModelName.DemoDayExpressInterestStatistic]: {
+        fixtures: demoDayExpressInterestStats,
+      },
+    },
+
     { [Prisma.ModelName.IrlGatheringPushConfig]: { fixtures: irlGatheringPushConfigs } },
     { [Prisma.ModelName.PLEventLocation]: { fixtures: irlGatheringPushEventLocations } },
     { [Prisma.ModelName.PLEvent]: { fixtures: irlGatheringPushEvents } },
     { [Prisma.ModelName.PLEventGuest]: { fixtures: irlGatheringPushEventGuests } },
     { [Prisma.ModelName.IrlGatheringPushCandidate]: { fixtures: irlGatheringPushCandidates } },
-
   ]);
 
   // After members + roles are created, assign DEMO_DAY_ADMIN role to demo day admins
-  await seedDemoDayAdminRoleAssignments();
+  await seedAdminRoleAssignments();
+
+  // Link InvestorProfiles to Members (update Member.investorProfileId)
+  await linkInvestorProfilesToMembers();
+}
+
+/**
+ * Link InvestorProfiles to Members by updating Member.investorProfileId.
+ * This creates the bidirectional relationship between Member and InvestorProfile.
+ */
+async function linkInvestorProfilesToMembers() {
+  console.log('=== Seed: linking investor profiles to members (start) ===');
+
+  // Find all investor profiles that have a memberUid
+  const investorProfiles = await prisma.investorProfile.findMany({
+    where: { memberUid: { not: null } },
+    select: { uid: true, memberUid: true },
+  });
+
+  for (const profile of investorProfiles) {
+    if (!profile.memberUid) continue;
+
+    await prisma.member.update({
+      where: { uid: profile.memberUid },
+      data: { investorProfileId: profile.uid },
+    });
+
+    console.log(`  ✅ Linked InvestorProfile ${profile.uid} to Member ${profile.memberUid}`);
+  }
+
+  console.log('=== Seed: linking investor profiles to members (done) ===');
 }
 
 main()

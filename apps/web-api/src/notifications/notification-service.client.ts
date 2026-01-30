@@ -469,7 +469,7 @@ export class NotificationServiceClient {
   }
 
   async sendTelegramOutboxMessage(dto: {
-    channelType: 'DEMO_DAY_SUBSCRIPTION' | 'SUPPORT';
+    channelType: 'DEMO_DAY_SUBSCRIPTION' | 'DEMO_DAY_APPLICATION' | 'SUPPORT';
     text: string;
     meta?: Record<string, any>;
   }) {
