@@ -13,7 +13,7 @@ import { MembersService } from '../members/members.service';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
 import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, MemberRole } from '../utils/constants';
-import {NotificationServiceClient} from "../notifications/notification-service.client";
+import { NotificationServiceClient } from '../notifications/notification-service.client';
 
 type ExpressInterestStats = {
   liked: number;
@@ -278,6 +278,7 @@ export class DemoDaysService {
         notificationsEnabled: true,
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
+        dashboardEnabled: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -344,6 +345,7 @@ export class DemoDaysService {
         notificationsEnabled: true,
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
+        dashboardEnabled: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -472,6 +474,7 @@ export class DemoDaysService {
         notificationsEnabled: true,
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
+        dashboardEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -505,6 +508,7 @@ export class DemoDaysService {
         notificationsEnabled: true,
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
+        dashboardEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -535,6 +539,7 @@ export class DemoDaysService {
       notificationsEnabled?: boolean;
       notifyBeforeStartHours?: number | null;
       notifyBeforeEndHours?: number | null;
+      dashboardEnabled?: boolean;
     },
     actorEmail?: string
   ): Promise<DemoDay> {
@@ -601,6 +606,9 @@ export class DemoDaysService {
     if (data.notifyBeforeEndHours !== undefined) {
       updateData.notifyBeforeEndHours = data.notifyBeforeEndHours;
     }
+    if (data.dashboardEnabled !== undefined) {
+      updateData.dashboardEnabled = data.dashboardEnabled;
+    }
 
     const updated = await this.prisma.demoDay.update({
       where: { uid },
@@ -621,6 +629,7 @@ export class DemoDaysService {
         notificationsEnabled: true,
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
+        dashboardEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -1770,6 +1779,156 @@ export class DemoDaysService {
     return `${base}/demo-days/${encodeURIComponent(demoDaySlugURL)}`;
   }
 
+  // Dashboard Whitelist methods
+
+  /**
+   * Get all whitelisted members for a demo day's founder dashboard
+   */
+  async getDashboardWhitelist(demoDayUid: string) {
+    // Get demo day to retrieve host
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUid);
+
+    // Query MemberDemoDayAdminScope WHERE scopeType='DASHBOARD_WHITELIST' AND scopeValue=demoDay.host
+    const whitelistScopes = await this.prisma.memberDemoDayAdminScope.findMany({
+      where: {
+        scopeType: 'DASHBOARD_WHITELIST',
+        scopeValue: demoDay.host,
+      },
+      include: {
+        member: {
+          select: {
+            uid: true,
+            name: true,
+            email: true,
+            image: {
+              select: {
+                url: true,
+              },
+            },
+            teamMemberRoles: {
+              where: {
+                mainTeam: true,
+              },
+              select: {
+                team: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    // Get demo day participants to check participant type/status
+    const memberUids = whitelistScopes.map((scope) => scope.memberUid);
+    const participants = await this.prisma.demoDayParticipant.findMany({
+      where: {
+        demoDayUid,
+        memberUid: { in: memberUids },
+        isDeleted: false,
+      },
+      select: {
+        memberUid: true,
+        type: true,
+        status: true,
+      },
+    });
+
+    const participantMap = new Map(participants.map((p) => [p.memberUid, p]));
+
+    return whitelistScopes.map((scope) => {
+      const participant = participantMap.get(scope.memberUid);
+      const teamName = scope.member.teamMemberRoles[0]?.team?.name || null;
+
+      return {
+        memberUid: scope.memberUid,
+        member: {
+          uid: scope.member.uid,
+          name: scope.member.name,
+          email: scope.member.email || '',
+          imageUrl: scope.member.image?.url || null,
+        },
+        participantType: (participant?.type || 'NONE') as 'INVESTOR' | 'FOUNDER' | 'SUPPORT' | 'NONE',
+        participantStatus: (participant?.status || 'NONE') as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED' | 'NONE',
+        teamName,
+      };
+    });
+  }
+
+  /**
+   * Add a member to the dashboard whitelist for a demo day
+   */
+  async addToDashboardWhitelist(demoDayUid: string, memberUid: string) {
+    // Get demo day to retrieve host
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUid);
+
+    // Verify member exists
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      select: { uid: true },
+    });
+
+    if (!member) {
+      throw new NotFoundException(`Member with uid ${memberUid} not found`);
+    }
+
+    // Check if already whitelisted (using host as scopeValue)
+    const existing = await this.prisma.memberDemoDayAdminScope.findFirst({
+      where: {
+        memberUid,
+        scopeType: 'DASHBOARD_WHITELIST',
+        scopeValue: demoDay.host,
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException('Member is already whitelisted for this demo day');
+    }
+
+    // Create the whitelist scope using host as scopeValue
+    await this.prisma.memberDemoDayAdminScope.create({
+      data: {
+        memberUid,
+        scopeType: 'DASHBOARD_WHITELIST',
+        scopeValue: demoDay.host,
+      },
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Remove a member from the dashboard whitelist for a demo day
+   */
+  async removeFromDashboardWhitelist(demoDayUid: string, memberUid: string) {
+    // Get demo day to retrieve host
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUid);
+
+    // Find the whitelist scope using host as scopeValue
+    const scope = await this.prisma.memberDemoDayAdminScope.findFirst({
+      where: {
+        memberUid,
+        scopeType: 'DASHBOARD_WHITELIST',
+        scopeValue: demoDay.host,
+      },
+    });
+
+    if (!scope) {
+      throw new NotFoundException('Member is not whitelisted for this demo day');
+    }
+
+    // Delete the scope
+    await this.prisma.memberDemoDayAdminScope.delete({
+      where: { id: scope.id },
+    });
+
+    return { success: true };
+  }
+
   private async sendTelegramNewDemoDayApplicationAlert(args: {
     demoDay: { uid: string; slugURL: string; title: string };
     participantUid: string;
@@ -1808,9 +1967,8 @@ export class DemoDaysService {
     } catch (e) {
       this.logger.warn(
         `Failed to send Telegram alert for demo-day application. demoDayUid=${args.demoDay.uid}, participantUid=${args.participantUid}. ` +
-        (e instanceof Error ? e.message : String(e))
+          (e instanceof Error ? e.message : String(e))
       );
     }
   }
-
 }

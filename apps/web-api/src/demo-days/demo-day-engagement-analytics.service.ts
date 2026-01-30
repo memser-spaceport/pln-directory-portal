@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from './demo-days.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
+import { MemberRole } from '../../../back-office/utils/constants';
 
 // Event type arrays for SQL queries
 const DD = ANALYTICS_EVENTS.DEMO_DAY_EVENT;
@@ -38,9 +39,10 @@ export class DemoDayEngagementAnalyticsService {
     private readonly demoDaysService: DemoDaysService
   ) {}
 
-  private async validateFounderAndGetProfileUid(
+  private async validateAndGetProfileUid(
     memberEmail: string,
-    demoDayUidOrSlug: string
+    demoDayUidOrSlug: string,
+    requestedProfileUid?: string
   ): Promise<{ demoDayUid: string; teamFundraisingProfileUid: string }> {
     const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
@@ -48,15 +50,21 @@ export class DemoDayEngagementAnalyticsService {
       where: { email: memberEmail },
       select: {
         uid: true,
+        memberRoles: { select: { name: true } },
+        demoDayAdminScopes: {
+          select: { scopeType: true, scopeValue: true },
+        },
         demoDayParticipants: {
           where: {
             demoDayUid: demoDay.uid,
             isDeleted: false,
-            status: 'ENABLED',
-            type: 'FOUNDER',
           },
           take: 1,
-          select: { teamUid: true },
+          select: {
+            teamUid: true,
+            type: true,
+            status: true,
+          },
         },
       },
     });
@@ -65,32 +73,85 @@ export class DemoDayEngagementAnalyticsService {
       throw new NotFoundException('Member not found');
     }
 
-    const founderParticipant = member.demoDayParticipants[0];
-    if (!founderParticipant || !founderParticipant.teamUid) {
-      throw new ForbiddenException('Only enabled founders can access engagement analytics');
+    // Check if dashboard is enabled for this demo day
+    if (!demoDay.dashboardEnabled) {
+      throw new ForbiddenException('Dashboard access is not enabled for this Demo Day');
     }
 
-    const fundraisingProfile = await this.prisma.teamFundraisingProfile.findUnique({
-      where: {
-        teamUid_demoDayUid: {
-          teamUid: founderParticipant.teamUid,
+    // Check admin roles
+    const isDirectoryAdmin = member.memberRoles.some((r) => r.name === MemberRole.DIRECTORY_ADMIN);
+    const isDemoDayAdmin = member.memberRoles.some((r) => r.name === MemberRole.DEMO_DAY_ADMIN);
+
+    // Check admin scopes
+    const hasHostScope = member.demoDayAdminScopes?.some(
+      (s) => s.scopeType === 'HOST' && s.scopeValue.toLowerCase() === demoDay.host.toLowerCase()
+    );
+    const hasWhitelistAll = member.demoDayAdminScopes?.some(
+      (s) => s.scopeType === 'DASHBOARD_WHITELIST' && s.scopeValue === '*'
+    );
+    const hasWhitelistHost = member.demoDayAdminScopes?.some(
+      (s) => s.scopeType === 'DASHBOARD_WHITELIST' && s.scopeValue.toLowerCase() === demoDay.host.toLowerCase()
+    );
+
+    // Determine access level
+    const isAdmin = isDirectoryAdmin || (isDemoDayAdmin && hasHostScope) || hasWhitelistAll || hasWhitelistHost;
+
+    // Get user's participant record for this demo day
+    const participant = member.demoDayParticipants[0];
+
+    // Check if user is an enabled founder
+    const isEnabledFounder = participant?.type === 'FOUNDER' && participant?.status === 'ENABLED';
+
+    // --- ADMIN PATH ---
+    if (isAdmin) {
+      if (!requestedProfileUid) {
+        throw new ForbiddenException('Admin users must specify teamFundraisingProfileUid query parameter');
+      }
+
+      // Validate the requested profile exists and belongs to this demo day
+      const profile = await this.prisma.teamFundraisingProfile.findFirst({
+        where: {
+          uid: requestedProfileUid,
           demoDayUid: demoDay.uid,
         },
-      },
-      select: { uid: true },
-    });
+        select: { uid: true },
+      });
 
-    if (!fundraisingProfile) {
-      throw new NotFoundException('Fundraising profile not found for this team and demo day');
+      if (!profile) {
+        throw new NotFoundException('TeamFundraisingProfile not found for this demo day');
+      }
+
+      return { demoDayUid: demoDay.uid, teamFundraisingProfileUid: profile.uid };
     }
 
-    return { demoDayUid: demoDay.uid, teamFundraisingProfileUid: fundraisingProfile.uid };
+    // --- FOUNDER PATH ---
+    if (isEnabledFounder && participant?.teamUid) {
+      const profile = await this.prisma.teamFundraisingProfile.findUnique({
+        where: {
+          teamUid_demoDayUid: {
+            teamUid: participant.teamUid,
+            demoDayUid: demoDay.uid,
+          },
+        },
+        select: { uid: true },
+      });
+
+      if (!profile) {
+        throw new NotFoundException('Fundraising profile not found for your team');
+      }
+
+      return { demoDayUid: demoDay.uid, teamFundraisingProfileUid: profile.uid };
+    }
+
+    // --- NO ACCESS ---
+    throw new ForbiddenException('Only admins or enabled founders can access engagement analytics');
   }
 
-  async getFounderEngagementStats(memberEmail: string, demoDayUidOrSlug: string) {
-    const { demoDayUid, teamFundraisingProfileUid } = await this.validateFounderAndGetProfileUid(
+  async getFounderEngagementStats(memberEmail: string, demoDayUidOrSlug: string, requestedProfileUid?: string) {
+    const { demoDayUid, teamFundraisingProfileUid } = await this.validateAndGetProfileUid(
       memberEmail,
-      demoDayUidOrSlug
+      demoDayUidOrSlug,
+      requestedProfileUid
     );
 
     // Run both queries in parallel: Event table stats + ExpressInterest stats (single query each)
@@ -216,11 +277,13 @@ export class DemoDayEngagementAnalyticsService {
     memberEmail: string,
     demoDayUidOrSlug: string,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    requestedProfileUid?: string
   ) {
-    const { demoDayUid, teamFundraisingProfileUid } = await this.validateFounderAndGetProfileUid(
+    const { demoDayUid, teamFundraisingProfileUid } = await this.validateAndGetProfileUid(
       memberEmail,
-      demoDayUidOrSlug
+      demoDayUidOrSlug,
+      requestedProfileUid
     );
 
     // Build optional date filter clauses for Event table
@@ -361,11 +424,13 @@ export class DemoDayEngagementAnalyticsService {
       limit: number;
       sortBy: 'lastActivity' | 'totalInteractions' | 'name';
       sortOrder: 'asc' | 'desc';
-    }
+    },
+    requestedProfileUid?: string
   ) {
-    const { demoDayUid, teamFundraisingProfileUid } = await this.validateFounderAndGetProfileUid(
+    const { demoDayUid, teamFundraisingProfileUid } = await this.validateAndGetProfileUid(
       memberEmail,
-      demoDayUidOrSlug
+      demoDayUidOrSlug,
+      requestedProfileUid
     );
 
     const { page, limit, sortBy, sortOrder } = options;
@@ -580,10 +645,11 @@ export class DemoDayEngagementAnalyticsService {
     };
   }
 
-  async getInvestorEngagementFunnel(memberEmail: string, demoDayUidOrSlug: string) {
-    const { demoDayUid, teamFundraisingProfileUid } = await this.validateFounderAndGetProfileUid(
+  async getInvestorEngagementFunnel(memberEmail: string, demoDayUidOrSlug: string, requestedProfileUid?: string) {
+    const { demoDayUid, teamFundraisingProfileUid } = await this.validateAndGetProfileUid(
       memberEmail,
-      demoDayUidOrSlug
+      demoDayUidOrSlug,
+      requestedProfileUid
     );
 
     // Get funnel stages from Event table (unique investors at each stage)
