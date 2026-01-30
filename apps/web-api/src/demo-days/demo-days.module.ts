@@ -8,6 +8,7 @@ import { SharedModule } from '../shared/shared.module';
 import { UploadsModule } from '../uploads/uploads.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { DemoDayEngagementService } from './demo-day-engagement.service';
+import { DemoDayEngagementAnalyticsService } from './demo-day-engagement-analytics.service';
 import { MembersModule } from '../members/members.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TeamsModule } from '../teams/teams.module';
@@ -30,6 +31,7 @@ import { DemoDayNotificationsJob } from './demo-day-notifications.job';
     DemoDayParticipantsService,
     DemoDayFundraisingProfilesService,
     DemoDayEngagementService,
+    DemoDayEngagementAnalyticsService,
     DemoDayNotificationsJob,
   ],
   exports: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService],

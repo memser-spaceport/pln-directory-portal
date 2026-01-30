@@ -49,7 +49,7 @@ export class MembersService {
     private notificationSettingsService: NotificationSettingsService,
     @Inject(forwardRef(() => OfficeHoursService))
     private officeHoursService: OfficeHoursService
-  ) {}
+  ) { }
 
   /**
    * Creates a new member in the database within a transaction.
@@ -950,8 +950,8 @@ export class MembersService {
     member['image'] = memberData.imageUid
       ? { connect: { uid: memberData.imageUid } }
       : type === 'Update'
-      ? { disconnect: true }
-      : undefined;
+        ? { disconnect: true }
+        : undefined;
     member['skills'] = buildMultiRelationMapping('skills', memberData, type);
     if (type === 'Create') {
       if (Array.isArray(memberData.teamAndRoles)) {
@@ -1019,7 +1019,7 @@ export class MembersService {
 
     const secRulesAcceptedAt =
       investorProfileData.secRulesAccepted &&
-      existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
+        existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
         ? new Date()
         : existingMember.investorProfile?.secRulesAcceptedAt;
 
@@ -1818,32 +1818,32 @@ export class MembersService {
           this.prisma.$queryRaw<{ id: number }[]>`
             SELECT DISTINCT id FROM "Member"
             WHERE ${Prisma.raw(
-              topicsArray
-                .map(
-                  (topic) => `
+            topicsArray
+              .map(
+                (topic) => `
                   EXISTS (
                     SELECT 1 FROM unnest("ohInterest") AS interest_item
                     WHERE LOWER(interest_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
                   )
                 `
-                )
-                .join(' OR ')
-            )}
+              )
+              .join(' OR ')
+          )}
           `,
           this.prisma.$queryRaw<{ id: number }[]>`
             SELECT DISTINCT id FROM "Member"
             WHERE ${Prisma.raw(
-              topicsArray
-                .map(
-                  (topic) => `
+            topicsArray
+              .map(
+                (topic) => `
                   EXISTS (
                     SELECT 1 FROM unnest("ohHelpWith") AS help_item
                     WHERE LOWER(help_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
                   )
                 `
-                )
-                .join(' OR ')
-            )}
+              )
+              .join(' OR ')
+          )}
           `,
         ]);
 
@@ -2156,17 +2156,17 @@ export class MembersService {
         SELECT DISTINCT m.id FROM "Member" m
         INNER JOIN "InvestorProfile" ip ON m."investorProfileId" = ip.uid
         WHERE ${Prisma.raw(
-          focusArray
-            .map(
-              (focus) => `
+        focusArray
+          .map(
+            (focus) => `
               EXISTS (
                 SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item
                 WHERE LOWER(focus_item) LIKE LOWER('%${focus.replace(/'/g, "''")}%')
               )
             `
-            )
-            .join(' OR ')
-        )}
+          )
+          .join(' OR ')
+      )}
       `;
 
       if (matchingMemberIds.length > 0) {
@@ -2197,74 +2197,130 @@ export class MembersService {
       orderBy.name = 'asc'; // Default to ascending
     }
 
+    // Common select object for member queries
+    const memberSelect = {
+      uid: true,
+      externalId: true,
+      name: true,
+      accessLevel: true,
+      officeHours: true,
+      ohStatus: true,
+      ohInterest: true,
+      ohHelpWith: true,
+      openToWork: true,
+      scheduleMeetingCount: true,
+      role: true,
+      image: {
+        select: {
+          uid: true,
+          url: true,
+        },
+      },
+      location: {
+        select: {
+          uid: true,
+          country: true,
+          city: true,
+        },
+      },
+      teamMemberRoles: {
+        select: {
+          role: true,
+          mainTeam: true,
+          teamLead: true,
+          team: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        where: {
+          team: {
+            accessLevel: {
+              not: 'L0',
+            },
+          },
+        },
+      },
+      skills: {
+        select: {
+          title: true,
+        },
+      },
+      investorProfile: {
+        select: {
+          investmentFocus: true,
+          investInStartupStages: true,
+          investInFundTypes: true,
+          type: true,
+          typicalCheckSize: true,
+          secRulesAccepted: true,
+          secRulesAcceptedAt: true,
+        },
+      },
+    } as const;
+
     try {
+      // When search is provided, use relevance-based sorting
+      if (filters.search && filters.search.trim()) {
+        const searchTerm = filters.search.trim();
+        const maxResults = 500; // Reasonable max for in-memory sorting
+
+        // Fetch results without pagination (up to maxResults) for relevance sorting
+        const [allMatches, total] = await Promise.all([
+          this.prisma.member.findMany({
+            where,
+            orderBy,
+            take: maxResults,
+            select: memberSelect,
+          }),
+          this.prisma.member.count({ where }),
+        ]);
+
+        // Score and sort by relevance
+        const scoredMembers = allMatches
+          .map((m) => ({
+            ...m,
+            _relevanceScore: this.calculateSearchRelevanceScore(m, searchTerm),
+          }))
+          .sort((a, b) => {
+            // Sort by score descending first
+            if (b._relevanceScore !== a._relevanceScore) {
+              return b._relevanceScore - a._relevanceScore;
+            }
+            // Then by name ascending as tiebreaker
+            return (a.name || '').localeCompare(b.name || '');
+          });
+
+        // Apply pagination manually
+        const paginatedMembers = scoredMembers.slice(skip, skip + limit);
+
+        // Remove internal score and filter investorProfile based on access level
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const filteredMembers = paginatedMembers.map(({ _relevanceScore, ...member }) => {
+          if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+            return { ...member, investorProfile: null };
+          }
+          return member;
+        });
+
+        const effectiveTotal = Math.min(total, maxResults);
+        return {
+          members: filteredMembers,
+          total: effectiveTotal,
+          page: Number(page),
+          hasMore: skip + limit < effectiveTotal,
+        };
+      }
+
+      // Standard query path (no search term)
       const [members, total] = await Promise.all([
         this.prisma.member.findMany({
           where,
           orderBy,
           skip,
           take: limit,
-          select: {
-            uid: true,
-            externalId: true,
-            name: true,
-            accessLevel: true,
-            officeHours: true,
-            ohStatus: true,
-            ohInterest: true,
-            ohHelpWith: true,
-            openToWork: true,
-            scheduleMeetingCount: true,
-            role: true,
-            image: {
-              select: {
-                uid: true,
-                url: true,
-              },
-            },
-            location: {
-              select: {
-                uid: true,
-                country: true,
-                city: true,
-              },
-            },
-            teamMemberRoles: {
-              select: {
-                role: true,
-                mainTeam: true,
-                teamLead: true,
-                team: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-              where: {
-                team: {
-                  accessLevel: {
-                    not: 'L0',
-                  },
-                },
-              },
-            },
-            skills: {
-              select: {
-                title: true,
-              },
-            },
-            investorProfile: {
-              select: {
-                investmentFocus: true,
-                investInStartupStages: true,
-                investInFundTypes: true,
-                type: true,
-                typicalCheckSize: true,
-                secRulesAccepted: true,
-                secRulesAcceptedAt: true,
-              },
-            },
-          },
+          select: memberSelect,
         }),
         this.prisma.member.count({ where }),
       ]);
@@ -2305,9 +2361,9 @@ export class MembersService {
       // Build where clause - if no query, get all topics; if query, filter by it
       const titleFilter = query.trim()
         ? {
-            contains: searchQuery,
-            mode: 'insensitive' as const,
-          }
+          contains: searchQuery,
+          mode: 'insensitive' as const,
+        }
         : undefined;
 
       // Build member filter for office hours
@@ -2391,10 +2447,10 @@ export class MembersService {
           ...memberFilter,
           ...(query.trim() &&
             ohMemberIds.length > 0 && {
-              id: {
-                in: ohMemberIds,
-              },
-            }),
+            id: {
+              in: ohMemberIds,
+            },
+          }),
           // If no query, get members with any ohInterest or ohHelpWith
           ...(!query.trim() && {
             OR: [
@@ -2857,6 +2913,42 @@ export class MembersService {
   }
 
   /**
+   * Calculates a relevance score for a member based on how well they match the search term.
+   * Used for ranking search results to prioritize better matches.
+   *
+   * @param member - Member object with name and teamMemberRoles
+   * @param searchTerm - The search term to score against
+   * @returns Relevance score (higher = better match)
+   */
+  private calculateSearchRelevanceScore(
+    member: { name?: string; teamMemberRoles?: Array<{ team?: { name?: string } }> },
+    searchTerm: string
+  ): number {
+    const search = searchTerm.toLowerCase();
+    const name = (member.name || '').toLowerCase();
+
+    // Exact match (case-insensitive)
+    if (name === search) return 100;
+
+    // Name starts with search term
+    if (name.startsWith(search)) return 80;
+
+    // Word boundary match (e.g., "John RG Smith" matches "RG")
+    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const wordBoundaryRegex = new RegExp(`\\b${escapedSearch}`, 'i');
+    if (wordBoundaryRegex.test(member.name || '')) return 60;
+
+    // Contains anywhere in name
+    if (name.includes(search)) return 40;
+
+    // Team name match only
+    const teamNames = member.teamMemberRoles?.map((t) => t.team?.name?.toLowerCase() || '') || [];
+    if (teamNames.some((tn) => tn.includes(search))) return 20;
+
+    return 0;
+  }
+
+  /**
    * Handles database-related errors specifically for the Member entity.
    * Logs the error and throws an appropriate HTTP exception based on the error type.
    *
@@ -2872,6 +2964,12 @@ export class MembersService {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error?.code) {
         case 'P2002':
+          const target = error.meta?.target as string[] | undefined;
+          if (target && target.some((t) => t.includes('telegram'))) {
+            throw new ConflictException(
+              'This Telegram is already in use by another member. Please use a different Telegram ID.'
+            );
+          }
           throw new ConflictException('Unique key constraint error on Member:', error.message);
         case 'P2003':
           throw new BadRequestException('Foreign key constraint error on Member', error.message);
@@ -3159,8 +3257,7 @@ export class MembersService {
       select: { uid: true, teamUid: true },
     });
     this.logger.info(
-      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${
-        newTeamUid ?? 'null'
+      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${newTeamUid ?? 'null'
       }`
     );
     // If there are no FOUNDER participants, nothing to do
