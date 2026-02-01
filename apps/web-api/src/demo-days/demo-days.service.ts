@@ -1223,7 +1223,7 @@ export class DemoDaysService {
     }
 
     await this.sendTelegramNewDemoDayApplicationAlert({
-      demoDay: { uid: demoDay.uid, slugURL: demoDay.slugURL, title: demoDay.title },
+      demoDay: { uid: demoDay.uid, slugURL: demoDay.slugURL, title: demoDay.title, host: demoDay.host },
       participantUid: participant.uid,
       memberUid: member.uid,
       applicantName: applicationData.name ?? null,
@@ -1823,6 +1823,10 @@ export class DemoDaysService {
       host: args.demoDay.host,
       applicationStartDate: args.applicationStartDate,
     });
+
+    this.logger.log(
+      `demoDayApplication: channel=${channelType}, host="${args.demoDay.host ?? ''}", applicationDate=${applicationDate}`
+    );
 
     try {
       await this.notificationServiceClient.sendTelegramOutboxMessage({
