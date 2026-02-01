@@ -32,6 +32,42 @@ const NOTIFIABLE_STATUSES: DemoDayStatus[] = [
   DemoDayStatus.ACTIVE,
 ];
 
+export type ChannelType =
+  | 'SUPPORT'
+  | 'DEMO_DAY_SUBSCRIPTION'
+  | 'DEMO_DAY_APPLICATION'
+  | 'DEMO_DAY_APPLICATION_FOUNDERS_FORGE'
+  | 'DEMO_DAY_APPLICATION_CRECIMIENTO'
+  | 'DEMO_DAY_APPLICATION_FOUNDER_SCHOOL'
+  | 'DEMO_DAY_APPLICATION_PROTOCOL_LABS'
+  | 'DEFAULT';
+
+function formatDateMMDDYYYY(d: Date): string {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const yyyy = String(d.getFullYear());
+  return `${mm}.${dd}.${yyyy}`;
+}
+
+function resolveChannelTypeAndApplicationDate(args: {
+  host?: string | null;
+  applicationStartDate: Date;
+}): { channelType: ChannelType; applicationDate: string } {
+  const host = (args.host ?? '').trim().toLowerCase();
+
+  let channelType: ChannelType = 'DEMO_DAY_APPLICATION';
+
+  if (host === 'founders forge') channelType = 'DEMO_DAY_APPLICATION_FOUNDERS_FORGE';
+  else if (host === 'crecimiento') channelType = 'DEMO_DAY_APPLICATION_CRECIMIENTO';
+  else if (host === 'founder school') channelType = 'DEMO_DAY_APPLICATION_FOUNDER_SCHOOL';
+  else if (host === 'protocol labs') channelType = 'DEMO_DAY_APPLICATION_PROTOCOL_LABS';
+
+  return {
+    channelType,
+    applicationDate: formatDateMMDDYYYY(args.applicationStartDate),
+  };
+}
+
 @Injectable()
 export class DemoDaysService {
   private readonly logger = new Logger(DemoDaysService.name);
@@ -1194,6 +1230,7 @@ export class DemoDaysService {
       applicantEmail: normalizedEmail,
       teamName: resolvedTeamName,
       teamUid: applicationData.teamUid ?? null,
+      applicationStartDate: participant.createdAt
     });
 
     return {
@@ -1771,7 +1808,8 @@ export class DemoDaysService {
   }
 
   private async sendTelegramNewDemoDayApplicationAlert(args: {
-    demoDay: { uid: string; slugURL: string; title: string };
+    demoDay: { uid: string; slugURL: string; title: string; host?: string | null };
+    applicationStartDate: Date;
     participantUid: string;
     memberUid: string;
     applicantName: string | null;
@@ -1781,11 +1819,18 @@ export class DemoDaysService {
   }): Promise<void> {
     const adminLink = this.buildAdminDemoDayLink(args.demoDay.slugURL);
 
+    const { channelType, applicationDate } = resolveChannelTypeAndApplicationDate({
+      host: args.demoDay.host,
+      applicationStartDate: args.applicationStartDate,
+    });
+
     try {
       await this.notificationServiceClient.sendTelegramOutboxMessage({
-        channelType: 'DEMO_DAY_APPLICATION',
+        channelType,
         text: [
           '🔔 New Demo Day Application',
+          `Application Date: ${applicationDate}`,
+          `Host: ${args.demoDay.host ?? '-'}`,
           `Name: ${args.applicantName ?? '-'}`,
           `Email: ${args.applicantEmail ?? '-'}`,
           `Team: ${args.teamName ?? '-'}`,
@@ -1796,6 +1841,9 @@ export class DemoDaysService {
           demoDayUid: args.demoDay.uid,
           demoDaySlugURL: args.demoDay.slugURL,
           demoDayTitle: args.demoDay.title,
+          demoDayHost: args.demoDay.host ?? null,
+          applicationStartDate: args.applicationStartDate.toISOString(),
+          applicationDate,
           participantUid: args.participantUid,
           memberUid: args.memberUid,
           name: args.applicantName,
@@ -1803,6 +1851,7 @@ export class DemoDaysService {
           teamUid: args.teamUid ?? null,
           teamName: args.teamName ?? null,
           adminLink,
+          channelType,
         },
       });
     } catch (e) {
@@ -1812,5 +1861,6 @@ export class DemoDaysService {
       );
     }
   }
+
 
 }
