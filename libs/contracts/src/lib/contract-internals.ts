@@ -14,7 +14,11 @@ import {
   ResponsePLEventLocationAssociationWithRelationsSchema,
   CreatePLEventLocationSchemaDto,
   UpdatePLEventLocationSchemaDto,
-  ResponsePLEventLocationSchema
+  ResponsePLEventLocationSchema,
+  MemberSearchQueryParams,
+  ResponseMemberSearchResultSchema,
+  TeamSearchQueryParams,
+  ResponseTeamSearchResultSchema
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -46,6 +50,24 @@ export const apiInternals = contract.router({
       200: ResponseMemberWithRelationsSchema,
     },
     summary: 'Get detailed member information by UID',
+  },
+  searchMembers: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/members-search`,
+    query: MemberSearchQueryParams,
+    responses: {
+      200: ResponseMemberSearchResultSchema,
+    },
+    summary: 'Search members by name and/or email using OpenSearch',
+  },
+  searchTeams: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/teams-search`,
+    query: TeamSearchQueryParams,
+    responses: {
+      200: ResponseTeamSearchResultSchema,
+    },
+    summary: 'Search teams by name using OpenSearch',
   },
   getTeamDetails: {
     method: 'GET',
