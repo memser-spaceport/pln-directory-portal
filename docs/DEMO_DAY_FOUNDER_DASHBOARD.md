@@ -53,16 +53,15 @@ VALUES ('member-uid-here', 'DASHBOARD_WHITELIST', 'plnetwork.io');
 
 ### Current Access Model
 
-**All 4 analytics endpoints are restricted to authorized users only.**
+**All 3 analytics endpoints are restricted to authorized users only.**
 
 All endpoints are grouped under `/dashboard/founder/engagement/` to clearly indicate this is the Founder Dashboard.
 
 | Endpoint | Accessible By | Data Shown |
 |----------|---------------|------------|
 | `/dashboard/founder/engagement` | Admin / Whitelisted / FOUNDER | Aggregated investor engagement |
-| `/dashboard/founder/engagement/timeline` | Admin / Whitelisted / FOUNDER | Daily breakdown of investor engagement |
+| `/dashboard/founder/engagement/timeline` | Admin / Whitelisted / FOUNDER | Time-series breakdown of all engagement metrics (hour/day) |
 | `/dashboard/founder/engagement/investors` | Admin / Whitelisted / FOUNDER | List of investors who engaged |
-| `/dashboard/founder/engagement/funnel` | Admin / Whitelisted / FOUNDER | Conversion funnel of investor engagement |
 
 ### Query Parameters
 
@@ -82,6 +81,12 @@ All endpoints accept an optional `teamFundraisingProfileUid` query parameter:
 |-----------|------|----------|-------------|
 | `startDate` | string | No | ISO date string (e.g., `2026-01-15`) - filters events from this date, inclusive |
 | `endDate` | string | No | ISO date string (e.g., `2026-01-31`) - filters events until this date, inclusive |
+
+**Timeline endpoint only:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `aggregation` | string | No | `day` | Time period for grouping: `hour` or `day` |
 
 ### Validation
 
@@ -162,7 +167,7 @@ curl -X GET \
     "total": 312,
     "uniqueInvestors": 45
   },
-  "viewedDeck": {
+  "viewedSlide": {
     "total": 141,
     "uniqueInvestors": 98
   },
@@ -191,23 +196,31 @@ curl -X GET \
 
 ### 2. GET `/v1/demo-days/:demoDayUidOrSlug/dashboard/founder/engagement/timeline`
 
-Daily breakdown of engagement metrics for chart rendering.
+Time-series breakdown of all engagement metrics for the Engagement Funnel chart. Supports aggregation by hour or day.
 
 **Authentication:** Bearer token (UserTokenValidation)
 
 **Cache:** 1 hour TTL
 
 **Query Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `teamFundraisingProfileUid` | string | Admin: YES, Founder: NO | Team's fundraising profile UID |
-| `startDate` | string | No | ISO date (e.g., `2026-01-15`) |
-| `endDate` | string | No | ISO date (e.g., `2026-01-31`) |
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `teamFundraisingProfileUid` | string | Admin: YES, Founder: NO | - | Team's fundraising profile UID |
+| `startDate` | string | No | - | ISO date (e.g., `2026-01-15`) |
+| `endDate` | string | No | - | ISO date (e.g., `2026-01-31`) |
+| `aggregation` | string | No | `day` | Time period for grouping: `hour` or `day` |
 
-**Example Request (Founder):**
+**Example Request (Founder, day aggregation):**
 ```bash
 curl -X GET \
   'https://api.plnetwork.io/v1/demo-days/demo-day-2026-q1/dashboard/founder/engagement/timeline?startDate=2026-01-15&endDate=2026-01-31' \
+  -H 'Authorization: Bearer <token>'
+```
+
+**Example Request (Founder, hour aggregation):**
+```bash
+curl -X GET \
+  'https://api.plnetwork.io/v1/demo-days/demo-day-2026-q1/dashboard/founder/engagement/timeline?aggregation=hour&startDate=2026-01-15&endDate=2026-01-15' \
   -H 'Authorization: Bearer <token>'
 ```
 
@@ -218,35 +231,90 @@ curl -X GET \
   -H 'Authorization: Bearer <admin-token>'
 ```
 
-**Example Response:**
+**Example Response (day aggregation):**
 ```json
 [
   {
     "date": "2026-01-15",
-    "founderProfileClicks": 45,
-    "ctaInteractions": 23,
-    "uniqueInvestors": 30,
-    "connections": 12,
-    "investmentInterest": 5
+    "profileViewed": 600,
+    "viewedSlide": 320,
+    "videoWatched": 210,
+    "founderProfileClicked": 180,
+    "teamPageClicked": 160,
+    "teamWebsiteClicked": 95,
+    "liked": 70,
+    "connected": 55,
+    "investmentInterest": 42,
+    "introMade": 8,
+    "feedbackGiven": 6
   },
   {
     "date": "2026-01-16",
-    "founderProfileClicks": 62,
-    "ctaInteractions": 31,
-    "uniqueInvestors": 48,
-    "connections": 18,
-    "investmentInterest": 8
-  },
-  {
-    "date": "2026-01-17",
-    "founderProfileClicks": 78,
-    "ctaInteractions": 45,
-    "uniqueInvestors": 55,
-    "connections": 22,
-    "investmentInterest": 11
+    "profileViewed": 550,
+    "viewedSlide": 290,
+    "videoWatched": 185,
+    "founderProfileClicked": 165,
+    "teamPageClicked": 140,
+    "teamWebsiteClicked": 82,
+    "liked": 65,
+    "connected": 48,
+    "investmentInterest": 38,
+    "introMade": 5,
+    "feedbackGiven": 4
   }
 ]
 ```
+
+**Example Response (hour aggregation):**
+```json
+[
+  {
+    "date": "2026-01-15T10:00:00.000Z",
+    "profileViewed": 45,
+    "viewedSlide": 28,
+    "videoWatched": 15,
+    "founderProfileClicked": 12,
+    "teamPageClicked": 10,
+    "teamWebsiteClicked": 6,
+    "liked": 5,
+    "connected": 3,
+    "investmentInterest": 2,
+    "introMade": 1,
+    "feedbackGiven": 0
+  },
+  {
+    "date": "2026-01-15T11:00:00.000Z",
+    "profileViewed": 52,
+    "viewedSlide": 31,
+    "videoWatched": 18,
+    "founderProfileClicked": 14,
+    "teamPageClicked": 12,
+    "teamWebsiteClicked": 8,
+    "liked": 6,
+    "connected": 4,
+    "investmentInterest": 3,
+    "introMade": 1,
+    "feedbackGiven": 1
+  }
+]
+```
+
+**Response Fields:**
+
+| Field | Source | Description |
+|-------|--------|-------------|
+| `date` | - | Date string (day: `YYYY-MM-DD`, hour: ISO timestamp) |
+| `profileViewed` | Event: `demo-day-active-view-team-card-viewed` | Profile card viewed |
+| `viewedSlide` | Event: `demo-day-active-view-team-pitch-deck-viewed` | Pitch deck viewed |
+| `videoWatched` | Event: `demo-day-active-view-team-pitch-video-viewed` | Pitch video watched |
+| `founderProfileClicked` | Event: `demo-day-active-view-team-card-clicked` | Founder profile clicked |
+| `teamPageClicked` | Event: `demo-day-landing-team-card-clicked` | Team page clicked (landing) |
+| `teamWebsiteClicked` | Event: `demo-day-landing-team-website-clicked` | Team website clicked (landing) |
+| `liked` | `DemoDayExpressInterestStatistic.likedCount` | Total likes |
+| `connected` | `DemoDayExpressInterestStatistic.connectedCount` | Total connections |
+| `investmentInterest` | `DemoDayExpressInterestStatistic.investedCount` | Total investment interests |
+| `introMade` | Event: `demo-day-active-view-intro-company-confirm-clicked` | Intro confirmations |
+| `feedbackGiven` | `DemoDayExpressInterestStatistic.feedbackCount` | Total feedback given |
 
 ---
 
@@ -371,79 +439,6 @@ curl -X GET \
 
 ---
 
-### 4. GET `/v1/demo-days/:demoDayUidOrSlug/dashboard/founder/engagement/funnel`
-
-Conversion funnel showing investor progression through engagement stages.
-
-**Authentication:** Bearer token (UserTokenValidation)
-
-**Cache:** 1 hour TTL
-
-**Query Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `teamFundraisingProfileUid` | string | Admin: YES, Founder: NO | Team's fundraising profile UID |
-
-**Example Request (Founder):**
-```bash
-curl -X GET \
-  'https://api.plnetwork.io/v1/demo-days/demo-day-2026-q1/dashboard/founder/engagement/funnel' \
-  -H 'Authorization: Bearer <token>'
-```
-
-**Example Request (Admin):**
-```bash
-curl -X GET \
-  'https://api.plnetwork.io/v1/demo-days/demo-day-2026-q1/dashboard/founder/engagement/funnel?teamFundraisingProfileUid=clx123abc' \
-  -H 'Authorization: Bearer <admin-token>'
-```
-
-**Example Response:**
-```json
-{
-  "funnel": [
-    {
-      "stage": "profileOpened",
-      "label": "Profile Opened",
-      "uniqueInvestors": 183,
-      "conversionRate": 100
-    },
-    {
-      "stage": "deckOpened",
-      "label": "Deck Opened",
-      "uniqueInvestors": 98,
-      "conversionRate": 53.6
-    },
-    {
-      "stage": "videoStarted",
-      "label": "Video Started",
-      "uniqueInvestors": 67,
-      "conversionRate": 36.6
-    },
-    {
-      "stage": "ctaClicked",
-      "label": "CTA Clicked",
-      "uniqueInvestors": 45,
-      "conversionRate": 24.6
-    },
-    {
-      "stage": "connected",
-      "label": "Connected",
-      "uniqueInvestors": 56,
-      "conversionRate": 30.6
-    },
-    {
-      "stage": "invested",
-      "label": "Investment Interest",
-      "uniqueInvestors": 24,
-      "conversionRate": 13.1
-    }
-  ]
-}
-```
-
----
-
 ## Error Responses
 
 ### 401 Unauthorized
@@ -512,17 +507,20 @@ or
 
 ## Event Types
 
-| Event Type                                           | Description                    |
-| ---------------------------------------------------- | ------------------------------ |
-| `demo-day-active-view-team-card-clicked`             | Investor opened team profile   |
-| `demo-day-active-view-team-pitch-deck-viewed`        | Investor viewed pitch deck     |
-| `demo-day-active-view-team-pitch-video-viewed`       | Investor watched pitch video   |
-| `demo-day-active-view-like-company-clicked`          | Investor liked company         |
-| `demo-day-active-view-connect-company-clicked`       | Investor clicked connect       |
-| `demo-day-active-view-invest-company-clicked`        | Investor clicked invest        |
-| `demo-day-active-view-refer-company-clicked`         | Investor clicked refer         |
-| `demo-day-active-view-intro-company-clicked`         | Investor requested intro       |
-| `demo-day-active-view-intro-company-confirm-clicked` | Investor confirmed intro       |
+| Event Type                                           | Constant                        | Description                    |
+| ---------------------------------------------------- | ------------------------------- | ------------------------------ |
+| `demo-day-active-view-team-card-viewed`              | `TEAM_CARD_VIEWED`              | Profile card viewed            |
+| `demo-day-active-view-team-card-clicked`             | `TEAM_CARD_CLICKED`             | Founder profile clicked        |
+| `demo-day-active-view-team-pitch-deck-viewed`        | `PITCH_DECK_VIEWED`             | Pitch deck viewed              |
+| `demo-day-active-view-team-pitch-video-viewed`       | `PITCH_VIDEO_VIEWED`            | Pitch video watched            |
+| `demo-day-active-view-like-company-clicked`          | `LIKE_COMPANY_CLICKED`          | Investor liked company         |
+| `demo-day-active-view-connect-company-clicked`       | `CONNECT_COMPANY_CLICKED`       | Investor clicked connect       |
+| `demo-day-active-view-invest-company-clicked`        | `INVEST_COMPANY_CLICKED`        | Investor clicked invest        |
+| `demo-day-active-view-refer-company-clicked`         | `REFER_COMPANY_CLICKED`         | Investor clicked refer         |
+| `demo-day-active-view-intro-company-clicked`         | `INTRO_COMPANY_CLICKED`         | Investor requested intro       |
+| `demo-day-active-view-intro-company-confirm-clicked` | `INTRO_COMPANY_CONFIRM_CLICKED` | Investor confirmed intro       |
+| `demo-day-landing-team-card-clicked`                 | `LANDING_TEAM_CARD_CLICKED`     | Team card clicked (landing)    |
+| `demo-day-landing-team-website-clicked`              | `LANDING_TEAM_WEBSITE_CLICKED`  | Team website clicked (landing) |
 
 ---
 

@@ -251,7 +251,7 @@ export class DemoDayEngagementAnalyticsService {
         total: totalCtaInteractions,
         uniqueInvestors: ctaClicksUnique,
       },
-      viewedDeck: {
+      viewedSlide: {
         total: deckViewsTotal,
         uniqueInvestors: deckViewsUnique,
       },
@@ -275,7 +275,8 @@ export class DemoDayEngagementAnalyticsService {
     demoDayUidOrSlug: string,
     startDate?: string,
     endDate?: string,
-    requestedProfileUid?: string
+    requestedProfileUid?: string,
+    aggregation: 'hour' | 'day' = 'day'
   ) {
     const { demoDayUid, teamFundraisingProfileUid } = await this.validateAndGetProfileUid(
       memberEmail,
@@ -287,96 +288,199 @@ export class DemoDayEngagementAnalyticsService {
     const startDateObj = startDate ? new Date(startDate) : null;
     const endDateObj = endDate ? new Date(endDate) : null;
 
-    const [eventTimeline, interestTimeline] = await Promise.all([
-      // Daily breakdown from Event table
-      // Note: props.teamUid contains TeamFundraisingProfile.uid (unique per team+demoDay)
-      this.prisma.$queryRaw<
-        Array<{
-          date: Date;
-          profile_views: bigint;
-          cta_interactions: bigint;
-          unique_investors: bigint;
-        }>
-      >`
-        SELECT
-          DATE_TRUNC('day', ts)::date AS date,
-          COUNT(*) FILTER (WHERE "eventType" = ${DD.TEAM_CARD_CLICKED})
-            AS profile_views,
-          COUNT(*) FILTER (WHERE "eventType" IN (${Prisma.join(CTA_CLICK_EVENTS)}))
-            AS cta_interactions,
-          COUNT(DISTINCT "userId") AS unique_investors
-        FROM "Event"
-        WHERE "eventType" LIKE 'demo-day-active-view-%'
-          AND props->>'teamUid' = ${teamFundraisingProfileUid}
-          AND (${startDateObj}::timestamp IS NULL OR ts >= ${startDateObj}::timestamp)
-          AND (${endDateObj}::timestamp IS NULL OR ts < (${endDateObj}::timestamp + interval '1 day'))
-        GROUP BY DATE_TRUNC('day', ts)::date
-        ORDER BY date
-      `,
+    // All event types for timeline (including landing page events)
+    const allTimelineEvents = [
+      DD.TEAM_CARD_VIEWED,
+      DD.TEAM_CARD_CLICKED,
+      DD.PITCH_DECK_VIEWED,
+      DD.PITCH_VIDEO_VIEWED,
+      DD.LANDING_TEAM_CARD_CLICKED,
+      DD.LANDING_TEAM_WEBSITE_CLICKED,
+      DD.INTRO_COMPANY_CONFIRM_CLICKED,
+    ];
 
-      // Daily breakdown from DemoDayExpressInterestStatistic
+    const [eventTimeline, interestTimeline] = await Promise.all([
+      // Aggregated breakdown from Event table
+      // Note: props.teamUid contains TeamFundraisingProfile.uid (unique per team+demoDay)
+      aggregation === 'hour'
+        ? this.prisma.$queryRaw<
+            Array<{
+              period: Date;
+              profile_viewed: bigint;
+              viewed_slide: bigint;
+              video_watched: bigint;
+              founder_profile_clicked: bigint;
+              team_page_clicked: bigint;
+              team_website_clicked: bigint;
+              intro_made: bigint;
+            }>
+          >`
+            SELECT
+              DATE_TRUNC('hour', ts) AS period,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.TEAM_CARD_VIEWED}) AS profile_viewed,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_DECK_VIEWED}) AS viewed_slide,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_VIDEO_VIEWED}) AS video_watched,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.TEAM_CARD_CLICKED}) AS founder_profile_clicked,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.LANDING_TEAM_CARD_CLICKED}) AS team_page_clicked,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.LANDING_TEAM_WEBSITE_CLICKED}) AS team_website_clicked,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.INTRO_COMPANY_CONFIRM_CLICKED}) AS intro_made
+            FROM "Event"
+            WHERE "eventType" IN (${Prisma.join(allTimelineEvents)})
+              AND props->>'teamUid' = ${teamFundraisingProfileUid}
+              AND (${startDateObj}::timestamp IS NULL OR ts >= ${startDateObj}::timestamp)
+              AND (${endDateObj}::timestamp IS NULL OR ts < (${endDateObj}::timestamp + interval '1 day'))
+            GROUP BY DATE_TRUNC('hour', ts)
+            ORDER BY period
+          `
+        : this.prisma.$queryRaw<
+            Array<{
+              period: Date;
+              profile_viewed: bigint;
+              viewed_slide: bigint;
+              video_watched: bigint;
+              founder_profile_clicked: bigint;
+              team_page_clicked: bigint;
+              team_website_clicked: bigint;
+              intro_made: bigint;
+            }>
+          >`
+            SELECT
+              DATE_TRUNC('day', ts)::date AS period,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.TEAM_CARD_VIEWED}) AS profile_viewed,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_DECK_VIEWED}) AS viewed_slide,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_VIDEO_VIEWED}) AS video_watched,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.TEAM_CARD_CLICKED}) AS founder_profile_clicked,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.LANDING_TEAM_CARD_CLICKED}) AS team_page_clicked,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.LANDING_TEAM_WEBSITE_CLICKED}) AS team_website_clicked,
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.INTRO_COMPANY_CONFIRM_CLICKED}) AS intro_made
+            FROM "Event"
+            WHERE "eventType" IN (${Prisma.join(allTimelineEvents)})
+              AND props->>'teamUid' = ${teamFundraisingProfileUid}
+              AND (${startDateObj}::timestamp IS NULL OR ts >= ${startDateObj}::timestamp)
+              AND (${endDateObj}::timestamp IS NULL OR ts < (${endDateObj}::timestamp + interval '1 day'))
+            GROUP BY DATE_TRUNC('day', ts)::date
+            ORDER BY period
+          `,
+
+      // Aggregated breakdown from DemoDayExpressInterestStatistic
       // Filters by both demoDayUid and teamFundraisingProfileUid for explicit scoping
-      this.prisma.$queryRaw<
-        Array<{
-          date: Date;
-          connections: bigint;
-          investment_interest: bigint;
-        }>
-      >`
-        SELECT
-          DATE_TRUNC('day', "updatedAt")::date AS date,
-          SUM("connectedCount") AS connections,
-          SUM("investedCount") AS investment_interest
-        FROM "DemoDayExpressInterestStatistic"
-        WHERE "demoDayUid" = ${demoDayUid}
-          AND "teamFundraisingProfileUid" = ${teamFundraisingProfileUid}
-          AND (${startDateObj}::timestamp IS NULL OR "updatedAt" >= ${startDateObj}::timestamp)
-          AND (${endDateObj}::timestamp IS NULL OR "updatedAt" < (${endDateObj}::timestamp + interval '1 day'))
-        GROUP BY DATE_TRUNC('day', "updatedAt")::date
-        ORDER BY date
-      `,
+      aggregation === 'hour'
+        ? this.prisma.$queryRaw<
+            Array<{
+              period: Date;
+              liked: bigint;
+              connected: bigint;
+              investment_interest: bigint;
+              feedback_given: bigint;
+            }>
+          >`
+            SELECT
+              DATE_TRUNC('hour', "updatedAt") AS period,
+              SUM("likedCount") AS liked,
+              SUM("connectedCount") AS connected,
+              SUM("investedCount") AS investment_interest,
+              SUM("feedbackCount") AS feedback_given
+            FROM "DemoDayExpressInterestStatistic"
+            WHERE "demoDayUid" = ${demoDayUid}
+              AND "teamFundraisingProfileUid" = ${teamFundraisingProfileUid}
+              AND (${startDateObj}::timestamp IS NULL OR "updatedAt" >= ${startDateObj}::timestamp)
+              AND (${endDateObj}::timestamp IS NULL OR "updatedAt" < (${endDateObj}::timestamp + interval '1 day'))
+            GROUP BY DATE_TRUNC('hour', "updatedAt")
+            ORDER BY period
+          `
+        : this.prisma.$queryRaw<
+            Array<{
+              period: Date;
+              liked: bigint;
+              connected: bigint;
+              investment_interest: bigint;
+              feedback_given: bigint;
+            }>
+          >`
+            SELECT
+              DATE_TRUNC('day', "updatedAt")::date AS period,
+              SUM("likedCount") AS liked,
+              SUM("connectedCount") AS connected,
+              SUM("investedCount") AS investment_interest,
+              SUM("feedbackCount") AS feedback_given
+            FROM "DemoDayExpressInterestStatistic"
+            WHERE "demoDayUid" = ${demoDayUid}
+              AND "teamFundraisingProfileUid" = ${teamFundraisingProfileUid}
+              AND (${startDateObj}::timestamp IS NULL OR "updatedAt" >= ${startDateObj}::timestamp)
+              AND (${endDateObj}::timestamp IS NULL OR "updatedAt" < (${endDateObj}::timestamp + interval '1 day'))
+            GROUP BY DATE_TRUNC('day', "updatedAt")::date
+            ORDER BY period
+          `,
     ]);
 
     // Merge into single date-keyed map
     const timelineMap = new Map<
       string,
       {
-        founderProfileClicks: number;
-        ctaInteractions: number;
-        uniqueInvestors: number;
-        connections: number;
+        profileViewed: number;
+        viewedSlide: number;
+        videoWatched: number;
+        founderProfileClicked: number;
+        teamPageClicked: number;
+        teamWebsiteClicked: number;
+        liked: number;
+        connected: number;
         investmentInterest: number;
+        introMade: number;
+        feedbackGiven: number;
       }
     >();
 
+    const formatDate = (date: Date | string): string => {
+      if (date instanceof Date) {
+        return aggregation === 'hour' ? date.toISOString() : date.toISOString().split('T')[0];
+      }
+      return String(date);
+    };
+
     for (const row of eventTimeline) {
-      const dateStr = row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date);
+      const dateStr = formatDate(row.period);
       timelineMap.set(dateStr, {
-        founderProfileClicks: Number(row.profile_views),
-        ctaInteractions: Number(row.cta_interactions),
-        uniqueInvestors: Number(row.unique_investors),
-        connections: 0,
+        profileViewed: Number(row.profile_viewed ?? 0),
+        viewedSlide: Number(row.viewed_slide ?? 0),
+        videoWatched: Number(row.video_watched ?? 0),
+        founderProfileClicked: Number(row.founder_profile_clicked ?? 0),
+        teamPageClicked: Number(row.team_page_clicked ?? 0),
+        teamWebsiteClicked: Number(row.team_website_clicked ?? 0),
+        liked: 0,
+        connected: 0,
         investmentInterest: 0,
+        introMade: Number(row.intro_made ?? 0),
+        feedbackGiven: 0,
       });
     }
 
     for (const row of interestTimeline) {
-      const dateStr = row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date);
-      const connections = Number(row.connections ?? 0);
+      const dateStr = formatDate(row.period);
+      const liked = Number(row.liked ?? 0);
+      const connected = Number(row.connected ?? 0);
       const investmentInterest = Number(row.investment_interest ?? 0);
+      const feedbackGiven = Number(row.feedback_given ?? 0);
 
       const existing = timelineMap.get(dateStr);
       if (existing) {
-        existing.ctaInteractions += connections + investmentInterest;
-        existing.connections = connections;
+        existing.liked = liked;
+        existing.connected = connected;
         existing.investmentInterest = investmentInterest;
+        existing.feedbackGiven = feedbackGiven;
       } else {
         timelineMap.set(dateStr, {
-          founderProfileClicks: 0,
-          ctaInteractions: connections + investmentInterest,
-          uniqueInvestors: 0,
-          connections,
+          profileViewed: 0,
+          viewedSlide: 0,
+          videoWatched: 0,
+          founderProfileClicked: 0,
+          teamPageClicked: 0,
+          teamWebsiteClicked: 0,
+          liked,
+          connected,
           investmentInterest,
+          introMade: 0,
+          feedbackGiven,
         });
       }
     }
@@ -388,11 +492,17 @@ export class DemoDayEngagementAnalyticsService {
       const data = timelineMap.get(date);
       return {
         date,
-        founderProfileClicks: data?.founderProfileClicks ?? 0,
-        ctaInteractions: data?.ctaInteractions ?? 0,
-        uniqueInvestors: data?.uniqueInvestors ?? 0,
-        connections: data?.connections ?? 0,
+        profileViewed: data?.profileViewed ?? 0,
+        viewedSlide: data?.viewedSlide ?? 0,
+        videoWatched: data?.videoWatched ?? 0,
+        founderProfileClicked: data?.founderProfileClicked ?? 0,
+        teamPageClicked: data?.teamPageClicked ?? 0,
+        teamWebsiteClicked: data?.teamWebsiteClicked ?? 0,
+        liked: data?.liked ?? 0,
+        connected: data?.connected ?? 0,
         investmentInterest: data?.investmentInterest ?? 0,
+        introMade: data?.introMade ?? 0,
+        feedbackGiven: data?.feedbackGiven ?? 0,
       };
     });
 
@@ -628,108 +738,4 @@ export class DemoDayEngagementAnalyticsService {
     };
   }
 
-  async getInvestorEngagementFunnel(memberEmail: string, demoDayUidOrSlug: string, requestedProfileUid?: string) {
-    const { demoDayUid, teamFundraisingProfileUid } = await this.validateAndGetProfileUid(
-      memberEmail,
-      demoDayUidOrSlug,
-      requestedProfileUid
-    );
-
-    // Get funnel stages from Event table (unique investors at each stage)
-    // Note: props.teamUid contains TeamFundraisingProfile.uid
-    const [funnelStats, interestStats] = await Promise.all([
-      this.prisma.$queryRaw<
-        Array<{
-          profile_opened: bigint;
-          deck_opened: bigint;
-          video_started: bigint;
-          cta_clicked: bigint;
-        }>
-      >`
-        SELECT
-          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" = ${DD.TEAM_CARD_CLICKED})
-            AS profile_opened,
-          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" = ${DD.PITCH_DECK_VIEWED})
-            AS deck_opened,
-          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" = ${DD.PITCH_VIDEO_VIEWED})
-            AS video_started,
-          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" IN (${Prisma.join(CTA_CLICK_EVENTS)}))
-            AS cta_clicked
-        FROM "Event"
-        WHERE "eventType" LIKE 'demo-day-active-view-%'
-          AND props->>'teamUid' = ${teamFundraisingProfileUid}
-          AND "userId" IS NOT NULL
-      `,
-
-      // Get interest funnel (unique investors who connected/invested)
-      this.prisma.$queryRaw<
-        Array<{
-          unique_connected: bigint;
-          unique_invested: bigint;
-        }>
-      >`
-        SELECT
-          COUNT(*) FILTER (WHERE connected = true) AS unique_connected,
-          COUNT(*) FILTER (WHERE invested = true) AS unique_invested
-        FROM "DemoDayExpressInterestStatistic"
-        WHERE "demoDayUid" = ${demoDayUid}
-          AND "teamFundraisingProfileUid" = ${teamFundraisingProfileUid}
-      `,
-    ]);
-
-    const funnelRow = funnelStats[0];
-    const interestRow = interestStats[0];
-
-    const profileOpened = Number(funnelRow?.profile_opened ?? 0);
-    const deckOpened = Number(funnelRow?.deck_opened ?? 0);
-    const videoStarted = Number(funnelRow?.video_started ?? 0);
-    const ctaClicked = Number(funnelRow?.cta_clicked ?? 0);
-    const connected = Number(interestRow?.unique_connected ?? 0);
-    const invested = Number(interestRow?.unique_invested ?? 0);
-
-    // Calculate conversion rates (from profile opened as baseline)
-    const calcRate = (value: number, baseline: number) =>
-      baseline > 0 ? Math.round((value / baseline) * 100 * 10) / 10 : 0;
-
-    return {
-      funnel: [
-        {
-          stage: 'profileOpened',
-          label: 'Profile Opened',
-          uniqueInvestors: profileOpened,
-          conversionRate: 100,
-        },
-        {
-          stage: 'deckOpened',
-          label: 'Deck Opened',
-          uniqueInvestors: deckOpened,
-          conversionRate: calcRate(deckOpened, profileOpened),
-        },
-        {
-          stage: 'videoStarted',
-          label: 'Video Started',
-          uniqueInvestors: videoStarted,
-          conversionRate: calcRate(videoStarted, profileOpened),
-        },
-        {
-          stage: 'ctaClicked',
-          label: 'CTA Clicked',
-          uniqueInvestors: ctaClicked,
-          conversionRate: calcRate(ctaClicked, profileOpened),
-        },
-        {
-          stage: 'connected',
-          label: 'Connected',
-          uniqueInvestors: connected,
-          conversionRate: calcRate(connected, profileOpened),
-        },
-        {
-          stage: 'invested',
-          label: 'Investment Interest',
-          uniqueInvestors: invested,
-          conversionRate: calcRate(invested, profileOpened),
-        },
-      ],
-    };
-  }
 }

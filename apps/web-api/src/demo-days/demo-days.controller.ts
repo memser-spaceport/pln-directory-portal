@@ -313,7 +313,8 @@ export class DemoDaysController {
       demoDayUidOrSlug,
       query.startDate,
       query.endDate,
-      query.teamFundraisingProfileUid
+      query.teamFundraisingProfileUid,
+      query.aggregation ?? 'day'
     );
   }
 
@@ -335,22 +336,6 @@ export class DemoDaysController {
         sortBy: query.sortBy ?? 'lastActivity',
         sortOrder: query.sortOrder ?? 'desc',
       },
-      query.teamFundraisingProfileUid
-    );
-  }
-
-  @Get(':demoDayUidOrSlug/dashboard/founder/engagement/funnel')
-  @UseGuards(UserTokenValidation)
-  @UsePipes(ZodValidationPipe)
-  @CacheTTL(3600) // 1 hour
-  async getFounderEngagementFunnel(
-    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
-    @Req() req,
-    @Query() query: DashboardBaseQueryDto
-  ) {
-    return this.demoDayEngagementAnalyticsService.getInvestorEngagementFunnel(
-      req.userEmail,
-      demoDayUidOrSlug,
       query.teamFundraisingProfileUid
     );
   }

@@ -10,8 +10,10 @@ export const DashboardBaseQuerySchema = z.object({
 
 export class DashboardBaseQueryDto extends createZodDto(DashboardBaseQuerySchema) {}
 
-// Timeline extends base (inherits startDate/endDate from base)
-export const EngagementTimelineQuerySchema = DashboardBaseQuerySchema;
+// Timeline extends base with aggregation parameter
+export const EngagementTimelineQuerySchema = DashboardBaseQuerySchema.extend({
+  aggregation: z.enum(['hour', 'day']).optional().default('day'),
+});
 
 export class EngagementTimelineQueryDto extends createZodDto(EngagementTimelineQuerySchema) {}
 
