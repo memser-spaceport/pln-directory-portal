@@ -5,6 +5,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import * as path from 'path';
@@ -26,6 +27,17 @@ import { TeamsHooksService } from './teams.hooks.service';
 import { ParticipantsRequest } from './dto/members.dto';
 import { SelfUpdatePayload } from './dto/teams.dto';
 import { MemberRole, isDirectoryAdmin } from '../utils/constants';
+import { OpenSearchService } from '../opensearch/opensearch.service';
+
+/**
+ * Interface for team search match result (used by entity association)
+ */
+export interface TeamSearchMatch {
+  uid: string;
+  name: string;
+  score: number;
+  logo: string | null;
+}
 
 @Injectable()
 export class TeamsService {
@@ -39,8 +51,9 @@ export class TeamsService {
     private notificationService: NotificationService,
     private cacheService: CacheService,
     private askService: AskService,
-    private teamsHooksService: TeamsHooksService
-  ) { }
+    private teamsHooksService: TeamsHooksService,
+    private openSearchService: OpenSearchService
+  ) {}
 
   /**
    * Find all teams based on provided query options.
@@ -1564,7 +1577,7 @@ export class TeamsService {
         industryTags: {
           some: {
             title: {
-              in: filters.tags.split('|'),
+              in: filters.tags.split('searchTeams|'),
               mode: 'insensitive',
             },
           },
@@ -1943,5 +1956,95 @@ export class TeamsService {
     } catch (err) {
       return this.handleErrors(err);
     }
+  }
+
+  // ============================================================
+  // Team Search Methods (Internal API)
+  // ============================================================
+
+  /**
+   * Search teams by name with relevance scoring.
+   * Used by internal APIs for entity matching and lookups.
+   * 
+   * @param params - Search parameters including team name query
+   * @returns Array of matching teams with confidence scores (0-100), sorted by score desc
+   */
+  async searchTeamMatches(params: { searchTerm: string; limit: number }): Promise<{ matches: TeamSearchMatch[] }> {
+    try {
+      const { searchTerm, limit } = params;
+      const trimmedSearchTerm = searchTerm?.trim();
+      this.logger.info(`Searching team matches: searchTerm="${trimmedSearchTerm}", limit=${limit}`);
+      if (!trimmedSearchTerm) {
+        return { matches: [] };
+      }
+      const body = this.buildTeamSearchQuery(trimmedSearchTerm);
+      const response = await this.openSearchService.searchWithLimit('team', limit, body);
+      const hits = response?.body?.hits?.hits ?? [];
+      const maxScore = Number(hits[0]?._score) || 1; // First hit has highest score (sorted by _score desc)
+      const matches: TeamSearchMatch[] = hits.map((hit: any) => {
+        const src = hit._source || {};
+        const rawScore = Number(hit._score) || 0;
+        return {
+          uid: hit._id,
+          name: src.name ?? '',
+          score: Math.round((rawScore / maxScore) * 100),
+          logo: src.image ?? null,
+        };
+      });
+      return { matches };
+    } catch (error) {
+      this.logger.error('Error searching team matches:', error);
+      throw new InternalServerErrorException('Error searching team matches', error);   
+    }
+  }
+
+  /**
+   * Build OpenSearch query for team search by name.
+   * 
+   * Fields indexed in OpenSearch team index:
+   * - uid, name, image, shortDescription, longDescription, name_suggest, shortDescription_suggest
+   */
+  private buildTeamSearchQuery(name: string) {
+    const safeName = this.openSearchService.escapeQuery(name);
+    return {
+      query: {
+        bool: {
+          should: [
+            // Exact name match with highest boost
+            {
+              match_phrase: {
+                name: {
+                  query: safeName, 
+                  boost: 5.0 
+                }
+              }
+            },
+            // Fuzzy name match
+            {
+              match: {
+                name: {
+                  query: safeName,
+                  fuzziness: 'AUTO',
+                  boost: 3.0,
+                }
+              }
+            },
+            // Short description match
+            {
+              match: {
+                shortDescription: {
+                  query: safeName,
+                  fuzziness: 'AUTO',
+                  boost: 1.0,
+                }
+              }
+            }
+          ],
+          minimum_should_match: 1,
+        }
+      },
+      _source: ['uid', 'name', 'image'],
+      sort: [{ _score: 'desc' }],
+    };
   }
 }
