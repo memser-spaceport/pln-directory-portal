@@ -190,7 +190,17 @@ curl -X GET \
 | UI Label | Response Field |
 |----------|----------------|
 | Unique Investors (Interacted with your profile) | `uniqueInvestors` |
-| Total & Unique CTAs (Like, Connect, Investment Interest) | `totalCtaInteractions.total` / `.uniqueInvestors` |
+| Total & Unique CTAs (Like, Connect, Invest, Intro, Feedback) | `totalCtaInteractions.total` / `.uniqueInvestors` |
+
+**Data Sources:**
+| Field | Source |
+|-------|--------|
+| `uniqueInvestors` | Max of Event table and DemoDayExpressInterestStatistic unique investors |
+| `totalCtaInteractions` | `DemoDayExpressInterestStatistic` (likedCount + connectedCount + investedCount + referralCount + feedbackCount) |
+| `viewedSlide` | Event table (`demo-day-active-view-team-pitch-deck-viewed`) |
+| `watchedVideo` | Event table (`demo-day-active-view-team-pitch-video-viewed`) |
+| `connections` | `DemoDayExpressInterestStatistic.connectedCount` |
+| `investmentInterest` | `DemoDayExpressInterestStatistic.investedCount` |
 
 ---
 
@@ -313,14 +323,14 @@ curl -X GET \
 | `liked` | `DemoDayExpressInterestStatistic.likedCount` | Total likes |
 | `connected` | `DemoDayExpressInterestStatistic.connectedCount` | Total connections |
 | `investmentInterest` | `DemoDayExpressInterestStatistic.investedCount` | Total investment interests |
-| `introMade` | Event: `demo-day-active-view-intro-company-confirm-clicked` | Intro confirmations |
+| `introMade` | `DemoDayExpressInterestStatistic.referralCount` | Total intro/referral requests |
 | `feedbackGiven` | `DemoDayExpressInterestStatistic.feedbackCount` | Total feedback given |
 
 ---
 
 ### 3. GET `/v1/demo-days/:demoDayUidOrSlug/dashboard/founder/engagement/investors`
 
-Paginated list of investors who engaged with the founder's team.
+Paginated list of investor interactions with the founder's team. Returns **one row per interaction** (not per investor). If an investor has 5 interactions, they appear 5 times.
 
 **Authentication:** Bearer token (UserTokenValidation)
 
@@ -339,14 +349,14 @@ Paginated list of investors who engaged with the founder's team.
 **Example Request (Founder):**
 ```bash
 curl -X GET \
-  'https://api.plnetwork.io/v1/demo-days/demo-day-2026-q1/dashboard/founder/engagement/investors?page=1&limit=10&sortBy=totalInteractions&sortOrder=desc' \
+  'https://api.plnetwork.io/v1/demo-days/demo-day-2026-q1/dashboard/founder/engagement/investors?page=1&limit=10&sortBy=lastActivity&sortOrder=desc' \
   -H 'Authorization: Bearer <token>'
 ```
 
 **Example Request (Admin):**
 ```bash
 curl -X GET \
-  'https://api.plnetwork.io/v1/demo-days/demo-day-2026-q1/dashboard/founder/engagement/investors?teamFundraisingProfileUid=clx123abc&page=1&limit=10&sortBy=totalInteractions&sortOrder=desc' \
+  'https://api.plnetwork.io/v1/demo-days/demo-day-2026-q1/dashboard/founder/engagement/investors?teamFundraisingProfileUid=clx123abc&page=1&limit=10&sortBy=lastActivity&sortOrder=desc' \
   -H 'Authorization: Bearer <admin-token>'
 ```
 
@@ -357,75 +367,47 @@ curl -X GET \
     {
       "member": {
         "uid": "clx1abc123def",
-        "name": "Sarah Chen",
-        "imageUrl": "https://cdn.plnetwork.io/images/members/sarah-chen.jpg"
+        "name": "Bob Smith",
+        "imageUrl": "https://cdn.plnetwork.io/images/members/bob-smith.jpg",
+        "organization": null
       },
       "investorProfile": {
         "type": "ANGEL",
-        "investmentFocus": ["DeFi", "Infrastructure", "Developer Tools"],
-        "investInStartupStages": ["Pre-seed", "Seed"],
+        "investmentFocus": ["Frontier Tech", "Dev Tooling"],
         "typicalCheckSize": 50000
       },
-      "engagement": {
-        "founderProfileClicks": 5,
-        "deckViews": 3,
-        "videoViews": 2,
-        "ctaClicks": 4
+      "interactionType": "invested",
+      "interactionDate": "2025-10-23T18:45:00.000Z"
+    },
+    {
+      "member": {
+        "uid": "clx1abc123def",
+        "name": "Bob Smith",
+        "imageUrl": "https://cdn.plnetwork.io/images/members/bob-smith.jpg",
+        "organization": null
       },
-      "interest": {
-        "connected": true,
-        "invested": false,
-        "liked": true
+      "investorProfile": {
+        "type": "ANGEL",
+        "investmentFocus": ["Frontier Tech", "Dev Tooling"],
+        "typicalCheckSize": 50000
       },
-      "totalInteractions": 14,
-      "lastActivity": "2026-01-28T14:32:00.000Z"
+      "interactionType": "viewedSlide",
+      "interactionDate": "2025-10-23T18:30:00.000Z"
     },
     {
       "member": {
         "uid": "clx2xyz789ghi",
-        "name": "Marcus Johnson",
-        "imageUrl": "https://cdn.plnetwork.io/images/members/marcus-johnson.jpg"
+        "name": "Catherine Lee",
+        "imageUrl": null,
+        "organization": "ARK Fintech Innovation ETF"
       },
       "investorProfile": {
         "type": "FUND",
-        "investmentFocus": ["Web3", "AI", "Climate Tech"],
-        "investInStartupStages": ["Seed", "Series A"],
-        "typicalCheckSize": 250000
+        "investmentFocus": ["Frontier Tech", "DeFi/Fintech", "AI"],
+        "typicalCheckSize": 175000
       },
-      "engagement": {
-        "founderProfileClicks": 3,
-        "deckViews": 2,
-        "videoViews": 1,
-        "ctaClicks": 2
-      },
-      "interest": {
-        "connected": true,
-        "invested": true,
-        "liked": false
-      },
-      "totalInteractions": 10,
-      "lastActivity": "2026-01-28T11:15:00.000Z"
-    },
-    {
-      "member": {
-        "uid": "clx3def456jkl",
-        "name": "Emily Rodriguez",
-        "imageUrl": null
-      },
-      "investorProfile": null,
-      "engagement": {
-        "founderProfileClicks": 2,
-        "deckViews": 1,
-        "videoViews": 0,
-        "ctaClicks": 1
-      },
-      "interest": {
-        "connected": false,
-        "invested": false,
-        "liked": true
-      },
-      "totalInteractions": 5,
-      "lastActivity": "2026-01-27T09:45:00.000Z"
+      "interactionType": "introMade",
+      "interactionDate": "2025-10-23T18:15:00.000Z"
     }
   ],
   "pagination": {
@@ -436,6 +418,22 @@ curl -X GET \
   }
 }
 ```
+
+**Interaction Types** (same as timeline endpoint):
+
+| Type | Source | Field |
+|------|--------|-------|
+| `profileViewed` | Event | `demo-day-active-view-team-card-viewed` |
+| `viewedSlide` | Event | `demo-day-active-view-team-pitch-deck-viewed` |
+| `videoWatched` | Event | `demo-day-active-view-team-pitch-video-viewed` |
+| `founderProfileClicked` | Event | `demo-day-active-view-team-card-clicked` |
+| `teamPageClicked` | Event | `demo-day-landing-team-card-clicked` |
+| `teamWebsiteClicked` | Event | `demo-day-landing-team-website-clicked` |
+| `liked` | DemoDayExpressInterestStatistic | `liked = true` |
+| `connected` | DemoDayExpressInterestStatistic | `connected = true` |
+| `invested` | DemoDayExpressInterestStatistic | `invested = true` |
+| `introMade` | DemoDayExpressInterestStatistic | `referral = true` |
+| `feedbackGiven` | DemoDayExpressInterestStatistic | `feedback = true` |
 
 ---
 
@@ -503,7 +501,8 @@ or
 | `Event` table                            | Profile views, deck views, video views, CTA clicks |
 | `DemoDayExpressInterestStatistic` table  | Connections, investment interest (deduplicated)   |
 | `Member` table                           | Investor name, email, image                       |
-| `InvestorProfile` table                  | Investment focus, check size, stages, type        |
+| `InvestorProfile` table                  | Investment focus, check size, type                |
+| `TeamMemberRole` table                   | Investor organization (via `mainTeam` relation)   |
 
 ## Event Types
 

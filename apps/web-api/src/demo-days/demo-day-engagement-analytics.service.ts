@@ -8,26 +8,8 @@ import { MemberRole } from '../../../back-office/utils/constants';
 // Event type arrays for SQL queries
 const DD = ANALYTICS_EVENTS.DEMO_DAY_EVENT;
 
-const ALL_ENGAGEMENT_EVENTS = [
-  DD.TEAM_CARD_CLICKED,
-  DD.PITCH_DECK_VIEWED,
-  DD.PITCH_VIDEO_VIEWED,
-  DD.LIKE_COMPANY_CLICKED,
-  DD.CONNECT_COMPANY_CLICKED,
-  DD.INVEST_COMPANY_CLICKED,
-  DD.REFER_COMPANY_CLICKED,
-  DD.INTRO_COMPANY_CLICKED,
-  DD.INTRO_COMPANY_CONFIRM_CLICKED,
-];
-
-const CTA_CLICK_EVENTS = [
-  DD.LIKE_COMPANY_CLICKED,
-  DD.CONNECT_COMPANY_CLICKED,
-  DD.INVEST_COMPANY_CLICKED,
-  DD.REFER_COMPANY_CLICKED,
-  DD.INTRO_COMPANY_CLICKED,
-  DD.INTRO_COMPANY_CONFIRM_CLICKED,
-];
+// Event types for engagement stats (Event table only - CTA metrics come from DemoDayExpressInterestStatistic)
+const ENGAGEMENT_VIEW_EVENTS = [DD.TEAM_CARD_CLICKED, DD.PITCH_DECK_VIEWED, DD.PITCH_VIDEO_VIEWED];
 
 @Injectable()
 export class DemoDayEngagementAnalyticsService {
@@ -166,9 +148,8 @@ export class DemoDayEngagementAnalyticsService {
 
     // Run both queries in parallel: Event table stats + ExpressInterest stats (single query each)
     const [eventStats, interestStats] = await Promise.all([
-      // Raw SQL on Event table for all frontend analytics event types (Demo Day related only)
+      // Event table: view metrics only (CTA metrics come from DemoDayExpressInterestStatistic)
       // Note: props.teamUid contains TeamFundraisingProfile.uid (unique per team+demoDay)
-      // so filtering by it alone correctly scopes to the specific demo day
       this.prisma.$queryRaw<
         Array<{
           unique_investors: bigint;
@@ -176,12 +157,10 @@ export class DemoDayEngagementAnalyticsService {
           deck_views_unique: bigint;
           video_views_total: bigint;
           video_views_unique: bigint;
-          cta_clicks_total: bigint;
-          cta_clicks_unique: bigint;
         }>
       >`
         SELECT
-          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" IN (${Prisma.join(ALL_ENGAGEMENT_EVENTS)}))
+          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" IN (${Prisma.join(ENGAGEMENT_VIEW_EVENTS)}))
             AS unique_investors,
 
           COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_DECK_VIEWED})
@@ -192,12 +171,7 @@ export class DemoDayEngagementAnalyticsService {
           COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_VIDEO_VIEWED})
             AS video_views_total,
           COUNT(DISTINCT "userId") FILTER (WHERE "eventType" = ${DD.PITCH_VIDEO_VIEWED})
-            AS video_views_unique,
-
-          COUNT(*) FILTER (WHERE "eventType" IN (${Prisma.join(CTA_CLICK_EVENTS)}))
-            AS cta_clicks_total,
-          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" IN (${Prisma.join(CTA_CLICK_EVENTS)}))
-            AS cta_clicks_unique
+            AS video_views_unique
         FROM "Event"
         WHERE "eventType" LIKE 'demo-day-active-view-%'
           AND props->>'teamUid' = ${teamFundraisingProfileUid}
@@ -205,21 +179,35 @@ export class DemoDayEngagementAnalyticsService {
           AND (${endDateObj}::timestamp IS NULL OR ts < (${endDateObj}::timestamp + interval '1 day'))
       `,
 
-      // Single query for all DemoDayExpressInterestStatistic aggregates
-      // Filters by both demoDayUid and teamFundraisingProfileUid for explicit scoping
+      // DemoDayExpressInterestStatistic: all CTA metrics (liked, connected, invested, referral, feedback)
+      // This is the source of truth for CTA interactions
       this.prisma.$queryRaw<
         Array<{
-          connections_total: bigint;
-          investments_total: bigint;
-          unique_connected: bigint;
-          unique_invested: bigint;
+          unique_investors: bigint;
+          liked_total: bigint;
+          liked_unique: bigint;
+          connected_total: bigint;
+          connected_unique: bigint;
+          invested_total: bigint;
+          invested_unique: bigint;
+          referral_total: bigint;
+          referral_unique: bigint;
+          feedback_total: bigint;
+          feedback_unique: bigint;
         }>
       >`
         SELECT
-          COALESCE(SUM("connectedCount"), 0) AS connections_total,
-          COALESCE(SUM("investedCount"), 0) AS investments_total,
-          COUNT(*) FILTER (WHERE connected = true) AS unique_connected,
-          COUNT(*) FILTER (WHERE invested = true) AS unique_invested
+          COUNT(*) AS unique_investors,
+          COALESCE(SUM("likedCount"), 0) AS liked_total,
+          COUNT(*) FILTER (WHERE liked = true) AS liked_unique,
+          COALESCE(SUM("connectedCount"), 0) AS connected_total,
+          COUNT(*) FILTER (WHERE connected = true) AS connected_unique,
+          COALESCE(SUM("investedCount"), 0) AS invested_total,
+          COUNT(*) FILTER (WHERE invested = true) AS invested_unique,
+          COALESCE(SUM("referralCount"), 0) AS referral_total,
+          COUNT(*) FILTER (WHERE referral = true) AS referral_unique,
+          COALESCE(SUM("feedbackCount"), 0) AS feedback_total,
+          COUNT(*) FILTER (WHERE feedback = true) AS feedback_unique
         FROM "DemoDayExpressInterestStatistic"
         WHERE "demoDayUid" = ${demoDayUid}
           AND "teamFundraisingProfileUid" = ${teamFundraisingProfileUid}
@@ -229,27 +217,36 @@ export class DemoDayEngagementAnalyticsService {
     ]);
 
     const eventRow = eventStats[0];
-    const uniqueInvestors = Number(eventRow?.unique_investors ?? 0);
+    const eventUniqueInvestors = Number(eventRow?.unique_investors ?? 0);
     const deckViewsTotal = Number(eventRow?.deck_views_total ?? 0);
     const deckViewsUnique = Number(eventRow?.deck_views_unique ?? 0);
     const videoViewsTotal = Number(eventRow?.video_views_total ?? 0);
     const videoViewsUnique = Number(eventRow?.video_views_unique ?? 0);
-    const ctaClicksTotal = Number(eventRow?.cta_clicks_total ?? 0);
-    const ctaClicksUnique = Number(eventRow?.cta_clicks_unique ?? 0);
 
     const interestRow = interestStats[0];
-    const connectionsTotal = Number(interestRow?.connections_total ?? 0);
-    const investmentsTotal = Number(interestRow?.investments_total ?? 0);
-    const uniqueConnected = Number(interestRow?.unique_connected ?? 0);
-    const uniqueInvested = Number(interestRow?.unique_invested ?? 0);
+    const interestUniqueInvestors = Number(interestRow?.unique_investors ?? 0);
+    const likedTotal = Number(interestRow?.liked_total ?? 0);
+    const connectedTotal = Number(interestRow?.connected_total ?? 0);
+    const connectedUnique = Number(interestRow?.connected_unique ?? 0);
+    const investedTotal = Number(interestRow?.invested_total ?? 0);
+    const investedUnique = Number(interestRow?.invested_unique ?? 0);
+    const referralTotal = Number(interestRow?.referral_total ?? 0);
+    const feedbackTotal = Number(interestRow?.feedback_total ?? 0);
 
-    const totalCtaInteractions = ctaClicksTotal + connectionsTotal + investmentsTotal;
+    // Total CTA interactions = sum of all CTA types from DemoDayExpressInterestStatistic
+    const totalCtaInteractions = likedTotal + connectedTotal + investedTotal + referralTotal + feedbackTotal;
+    // For unique investors in CTAs, we use the count from DemoDayExpressInterestStatistic
+    const totalCtaUniqueInvestors = interestUniqueInvestors;
+
+    // Unique investors = max of event-based and interest-based (they may overlap)
+    // Using event-based as primary since it captures more interaction types
+    const uniqueInvestors = Math.max(eventUniqueInvestors, interestUniqueInvestors);
 
     return {
       uniqueInvestors,
       totalCtaInteractions: {
         total: totalCtaInteractions,
-        uniqueInvestors: ctaClicksUnique,
+        uniqueInvestors: totalCtaUniqueInvestors,
       },
       viewedSlide: {
         total: deckViewsTotal,
@@ -260,12 +257,12 @@ export class DemoDayEngagementAnalyticsService {
         uniqueInvestors: videoViewsUnique,
       },
       connections: {
-        total: connectionsTotal,
-        uniqueInvestors: uniqueConnected,
+        total: connectedTotal,
+        uniqueInvestors: connectedUnique,
       },
       investmentInterest: {
-        total: investmentsTotal,
-        uniqueInvestors: uniqueInvested,
+        total: investedTotal,
+        uniqueInvestors: investedUnique,
       },
     };
   }
@@ -289,6 +286,7 @@ export class DemoDayEngagementAnalyticsService {
     const endDateObj = endDate ? new Date(endDate) : null;
 
     // All event types for timeline (including landing page events)
+    // Note: liked, connected, invested, introMade (referral), feedbackGiven come from DemoDayExpressInterestStatistic
     const allTimelineEvents = [
       DD.TEAM_CARD_VIEWED,
       DD.TEAM_CARD_CLICKED,
@@ -296,7 +294,6 @@ export class DemoDayEngagementAnalyticsService {
       DD.PITCH_VIDEO_VIEWED,
       DD.LANDING_TEAM_CARD_CLICKED,
       DD.LANDING_TEAM_WEBSITE_CLICKED,
-      DD.INTRO_COMPANY_CONFIRM_CLICKED,
     ];
 
     const [eventTimeline, interestTimeline] = await Promise.all([
@@ -312,7 +309,6 @@ export class DemoDayEngagementAnalyticsService {
               founder_profile_clicked: bigint;
               team_page_clicked: bigint;
               team_website_clicked: bigint;
-              intro_made: bigint;
             }>
           >`
             SELECT
@@ -322,8 +318,7 @@ export class DemoDayEngagementAnalyticsService {
               COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_VIDEO_VIEWED}) AS video_watched,
               COUNT(*) FILTER (WHERE "eventType" = ${DD.TEAM_CARD_CLICKED}) AS founder_profile_clicked,
               COUNT(*) FILTER (WHERE "eventType" = ${DD.LANDING_TEAM_CARD_CLICKED}) AS team_page_clicked,
-              COUNT(*) FILTER (WHERE "eventType" = ${DD.LANDING_TEAM_WEBSITE_CLICKED}) AS team_website_clicked,
-              COUNT(*) FILTER (WHERE "eventType" = ${DD.INTRO_COMPANY_CONFIRM_CLICKED}) AS intro_made
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.LANDING_TEAM_WEBSITE_CLICKED}) AS team_website_clicked
             FROM "Event"
             WHERE "eventType" IN (${Prisma.join(allTimelineEvents)})
               AND props->>'teamUid' = ${teamFundraisingProfileUid}
@@ -341,7 +336,6 @@ export class DemoDayEngagementAnalyticsService {
               founder_profile_clicked: bigint;
               team_page_clicked: bigint;
               team_website_clicked: bigint;
-              intro_made: bigint;
             }>
           >`
             SELECT
@@ -351,8 +345,7 @@ export class DemoDayEngagementAnalyticsService {
               COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_VIDEO_VIEWED}) AS video_watched,
               COUNT(*) FILTER (WHERE "eventType" = ${DD.TEAM_CARD_CLICKED}) AS founder_profile_clicked,
               COUNT(*) FILTER (WHERE "eventType" = ${DD.LANDING_TEAM_CARD_CLICKED}) AS team_page_clicked,
-              COUNT(*) FILTER (WHERE "eventType" = ${DD.LANDING_TEAM_WEBSITE_CLICKED}) AS team_website_clicked,
-              COUNT(*) FILTER (WHERE "eventType" = ${DD.INTRO_COMPANY_CONFIRM_CLICKED}) AS intro_made
+              COUNT(*) FILTER (WHERE "eventType" = ${DD.LANDING_TEAM_WEBSITE_CLICKED}) AS team_website_clicked
             FROM "Event"
             WHERE "eventType" IN (${Prisma.join(allTimelineEvents)})
               AND props->>'teamUid' = ${teamFundraisingProfileUid}
@@ -371,6 +364,7 @@ export class DemoDayEngagementAnalyticsService {
               liked: bigint;
               connected: bigint;
               investment_interest: bigint;
+              intro_made: bigint;
               feedback_given: bigint;
             }>
           >`
@@ -379,6 +373,7 @@ export class DemoDayEngagementAnalyticsService {
               SUM("likedCount") AS liked,
               SUM("connectedCount") AS connected,
               SUM("investedCount") AS investment_interest,
+              SUM("referralCount") AS intro_made,
               SUM("feedbackCount") AS feedback_given
             FROM "DemoDayExpressInterestStatistic"
             WHERE "demoDayUid" = ${demoDayUid}
@@ -394,6 +389,7 @@ export class DemoDayEngagementAnalyticsService {
               liked: bigint;
               connected: bigint;
               investment_interest: bigint;
+              intro_made: bigint;
               feedback_given: bigint;
             }>
           >`
@@ -402,6 +398,7 @@ export class DemoDayEngagementAnalyticsService {
               SUM("likedCount") AS liked,
               SUM("connectedCount") AS connected,
               SUM("investedCount") AS investment_interest,
+              SUM("referralCount") AS intro_made,
               SUM("feedbackCount") AS feedback_given
             FROM "DemoDayExpressInterestStatistic"
             WHERE "demoDayUid" = ${demoDayUid}
@@ -450,7 +447,7 @@ export class DemoDayEngagementAnalyticsService {
         liked: 0,
         connected: 0,
         investmentInterest: 0,
-        introMade: Number(row.intro_made ?? 0),
+        introMade: 0,
         feedbackGiven: 0,
       });
     }
@@ -460,6 +457,7 @@ export class DemoDayEngagementAnalyticsService {
       const liked = Number(row.liked ?? 0);
       const connected = Number(row.connected ?? 0);
       const investmentInterest = Number(row.investment_interest ?? 0);
+      const introMade = Number(row.intro_made ?? 0);
       const feedbackGiven = Number(row.feedback_given ?? 0);
 
       const existing = timelineMap.get(dateStr);
@@ -467,6 +465,7 @@ export class DemoDayEngagementAnalyticsService {
         existing.liked = liked;
         existing.connected = connected;
         existing.investmentInterest = investmentInterest;
+        existing.introMade = introMade;
         existing.feedbackGiven = feedbackGiven;
       } else {
         timelineMap.set(dateStr, {
@@ -479,7 +478,7 @@ export class DemoDayEngagementAnalyticsService {
           liked,
           connected,
           investmentInterest,
-          introMade: 0,
+          introMade,
           feedbackGiven,
         });
       }
@@ -529,37 +528,52 @@ export class DemoDayEngagementAnalyticsService {
     const { page, limit, sortBy, sortOrder } = options;
     const offset = (page - 1) * limit;
 
-    // Get investor activity aggregated per investor from Event table
-    // Note: props.teamUid contains TeamFundraisingProfile.uid
-    const investorEvents = await this.prisma.$queryRaw<
+    // Interaction types matching the timeline endpoint
+    type InteractionType =
+      | 'profileViewed'
+      | 'viewedSlide'
+      | 'videoWatched'
+      | 'founderProfileClicked'
+      | 'teamPageClicked'
+      | 'teamWebsiteClicked'
+      | 'liked'
+      | 'connected'
+      | 'invested'
+      | 'introMade'
+      | 'feedbackGiven';
+
+    // Map event types to interaction types (only for Event table interactions)
+    // Note: liked, connected, invested, introMade, feedbackGiven come from DemoDayExpressInterestStatistic
+    const eventTypeToInteraction: Record<string, InteractionType> = {
+      [DD.TEAM_CARD_VIEWED]: 'profileViewed',
+      [DD.PITCH_DECK_VIEWED]: 'viewedSlide',
+      [DD.PITCH_VIDEO_VIEWED]: 'videoWatched',
+      [DD.TEAM_CARD_CLICKED]: 'founderProfileClicked',
+      [DD.LANDING_TEAM_CARD_CLICKED]: 'teamPageClicked',
+      [DD.LANDING_TEAM_WEBSITE_CLICKED]: 'teamWebsiteClicked',
+    };
+
+    // Get individual events from Event table (one row per event)
+    const relevantEventTypes = Object.keys(eventTypeToInteraction);
+    const individualEvents = await this.prisma.$queryRaw<
       Array<{
         user_id: string;
-        profile_views: bigint;
-        deck_views: bigint;
-        video_views: bigint;
-        cta_clicks: bigint;
-        total_interactions: bigint;
-        first_activity: Date;
-        last_activity: Date;
+        event_type: string;
+        event_ts: Date;
       }>
     >`
       SELECT
         "userId" AS user_id,
-        COUNT(*) FILTER (WHERE "eventType" = ${DD.TEAM_CARD_CLICKED}) AS profile_views,
-        COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_DECK_VIEWED}) AS deck_views,
-        COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_VIDEO_VIEWED}) AS video_views,
-        COUNT(*) FILTER (WHERE "eventType" IN (${Prisma.join(CTA_CLICK_EVENTS)})) AS cta_clicks,
-        COUNT(*) AS total_interactions,
-        MIN(ts) AS first_activity,
-        MAX(ts) AS last_activity
+        "eventType" AS event_type,
+        ts AS event_ts
       FROM "Event"
-      WHERE "eventType" LIKE 'demo-day-active-view-%'
+      WHERE "eventType" IN (${Prisma.join(relevantEventTypes)})
         AND props->>'teamUid' = ${teamFundraisingProfileUid}
         AND "userId" IS NOT NULL
-      GROUP BY "userId"
+      ORDER BY ts DESC
     `;
 
-    // Get interest data from DemoDayExpressInterestStatistic
+    // Get interest data from DemoDayExpressInterestStatistic (for liked, connected, invested, introMade, feedbackGiven)
     const interestStats = await this.prisma.demoDayExpressInterestStatistic.findMany({
       where: {
         demoDayUid,
@@ -567,39 +581,37 @@ export class DemoDayEngagementAnalyticsService {
       },
       select: {
         memberUid: true,
+        liked: true,
         connected: true,
         invested: true,
-        liked: true,
         referral: true,
-        connectedCount: true,
-        investedCount: true,
-        likedCount: true,
-        referralCount: true,
+        feedback: true,
         updatedAt: true,
       },
     });
 
-    // Create a map of memberUid to interest stats
-    const interestMap = new Map(interestStats.map((s) => [s.memberUid, s]));
-
-    // Get all unique investor member UIDs
+    // Collect all unique investor UIDs
     const allInvestorUids = new Set<string>();
-    investorEvents.forEach((e) => allInvestorUids.add(e.user_id));
+    individualEvents.forEach((e) => allInvestorUids.add(e.user_id));
     interestStats.forEach((s) => allInvestorUids.add(s.memberUid));
 
-    // Fetch member details and investor profiles for all investors
+    // Fetch member details, investor profiles, and team membership for organization
     const members = await this.prisma.member.findMany({
       where: { uid: { in: Array.from(allInvestorUids) } },
       select: {
         uid: true,
         name: true,
-        email: true,
         image: { select: { url: true } },
+        teamMemberRoles: {
+          select: {
+            mainTeam: true,
+            team: { select: { name: true } },
+          },
+        },
         investorProfile: {
           select: {
             type: true,
             investmentFocus: true,
-            investInStartupStages: true,
             typicalCheckSize: true,
           },
         },
@@ -607,94 +619,104 @@ export class DemoDayEngagementAnalyticsService {
     });
     const memberMap = new Map(members.map((m) => [m.uid, m]));
 
-    // Merge event data and interest data per investor
-    const eventMap = new Map(investorEvents.map((e) => [e.user_id, e]));
-    const investorData: Array<{
-      memberUid: string;
-      name: string;
-      email: string;
-      imageUrl: string | null;
-      investorProfile: {
-        type: string | null;
-        investmentFocus: string[];
-        investInStartupStages: string[];
-        typicalCheckSize: number | null;
-      } | null;
-      founderProfileClicks: number;
-      deckViews: number;
-      videoViews: number;
-      ctaClicks: number;
-      connected: boolean;
-      invested: boolean;
-      liked: boolean;
-      totalInteractions: number;
-      firstActivity: Date | null;
-      lastActivity: Date | null;
-    }> = [];
-
-    for (const uid of allInvestorUids) {
-      const event = eventMap.get(uid);
-      const interest = interestMap.get(uid);
+    // Helper to get member info
+    const getMemberInfo = (uid: string) => {
       const member = memberMap.get(uid);
-
-      const founderProfileClicks = Number(event?.profile_views ?? 0);
-      const deckViews = Number(event?.deck_views ?? 0);
-      const videoViews = Number(event?.video_views ?? 0);
-      const ctaClicks = Number(event?.cta_clicks ?? 0);
-      const connectCount = interest?.connectedCount ?? 0;
-      const investCount = interest?.investedCount ?? 0;
-      const likeCount = interest?.likedCount ?? 0;
-
-      const totalInteractions =
-        founderProfileClicks + deckViews + videoViews + ctaClicks + connectCount + investCount + likeCount;
-
-      // Determine last activity from both sources
-      const eventLastActivity = event?.last_activity ? new Date(event.last_activity) : null;
-      const interestLastActivity = interest?.updatedAt ? new Date(interest.updatedAt) : null;
-      let lastActivity: Date | null = null;
-      if (eventLastActivity && interestLastActivity) {
-        lastActivity = eventLastActivity > interestLastActivity ? eventLastActivity : interestLastActivity;
-      } else {
-        lastActivity = eventLastActivity || interestLastActivity;
-      }
-
-      investorData.push({
+      const mainTeamRole = member?.teamMemberRoles?.find((r) => r.mainTeam) || member?.teamMemberRoles?.[0];
+      return {
         memberUid: uid,
         name: member?.name ?? 'Unknown',
-        email: member?.email ?? '',
         imageUrl: member?.image?.url ?? null,
+        organization: mainTeamRole?.team?.name ?? null,
         investorProfile: member?.investorProfile
           ? {
               type: member.investorProfile.type,
               investmentFocus: member.investorProfile.investmentFocus,
-              investInStartupStages: member.investorProfile.investInStartupStages,
               typicalCheckSize: member.investorProfile.typicalCheckSize,
             }
           : null,
-        founderProfileClicks,
-        deckViews,
-        videoViews,
-        ctaClicks,
-        connected: interest?.connected ?? false,
-        invested: interest?.invested ?? false,
-        liked: interest?.liked ?? false,
-        totalInteractions,
-        firstActivity: event?.first_activity ? new Date(event.first_activity) : null,
-        lastActivity,
+      };
+    };
+
+    // Build interaction rows - one row per interaction
+    const interactionRows: Array<{
+      memberUid: string;
+      name: string;
+      imageUrl: string | null;
+      organization: string | null;
+      investorProfile: {
+        type: string | null;
+        investmentFocus: string[];
+        typicalCheckSize: number | null;
+      } | null;
+      interactionType: InteractionType;
+      interactionDate: Date;
+    }> = [];
+
+    // Add rows from Event table
+    for (const event of individualEvents) {
+      const interactionType = eventTypeToInteraction[event.event_type];
+      if (!interactionType) continue;
+
+      const memberInfo = getMemberInfo(event.user_id);
+      interactionRows.push({
+        ...memberInfo,
+        interactionType,
+        interactionDate: event.event_ts,
       });
     }
 
+    // Add rows from DemoDayExpressInterestStatistic (for liked, connected, invested, introMade, feedbackGiven)
+    for (const stat of interestStats) {
+      const memberInfo = getMemberInfo(stat.memberUid);
+
+      if (stat.liked) {
+        interactionRows.push({
+          ...memberInfo,
+          interactionType: 'liked',
+          interactionDate: stat.updatedAt,
+        });
+      }
+      if (stat.connected) {
+        interactionRows.push({
+          ...memberInfo,
+          interactionType: 'connected',
+          interactionDate: stat.updatedAt,
+        });
+      }
+      if (stat.invested) {
+        interactionRows.push({
+          ...memberInfo,
+          interactionType: 'invested',
+          interactionDate: stat.updatedAt,
+        });
+      }
+      if (stat.referral) {
+        interactionRows.push({
+          ...memberInfo,
+          interactionType: 'introMade',
+          interactionDate: stat.updatedAt,
+        });
+      }
+      if (stat.feedback) {
+        interactionRows.push({
+          ...memberInfo,
+          interactionType: 'feedbackGiven',
+          interactionDate: stat.updatedAt,
+        });
+      }
+    }
+
     // Sort based on options
-    investorData.sort((a, b) => {
+    interactionRows.sort((a, b) => {
       let comparison = 0;
       switch (sortBy) {
         case 'lastActivity':
-          const aTime = a.lastActivity?.getTime() ?? 0;
-          const bTime = b.lastActivity?.getTime() ?? 0;
-          comparison = aTime - bTime;
+          comparison = a.interactionDate.getTime() - b.interactionDate.getTime();
           break;
         case 'totalInteractions':
-          comparison = a.totalInteractions - b.totalInteractions;
+          // For totalInteractions, sort by date as secondary since we now have one row per interaction
+          comparison = a.interactionDate.getTime() - b.interactionDate.getTime();
           break;
         case 'name':
           comparison = a.name.localeCompare(b.name);
@@ -704,30 +726,20 @@ export class DemoDayEngagementAnalyticsService {
     });
 
     // Paginate
-    const total = investorData.length;
-    const paginatedData = investorData.slice(offset, offset + limit);
+    const total = interactionRows.length;
+    const paginatedData = interactionRows.slice(offset, offset + limit);
 
     return {
-      data: paginatedData.map((inv) => ({
+      data: paginatedData.map((row) => ({
         member: {
-          uid: inv.memberUid,
-          name: inv.name,
-          imageUrl: inv.imageUrl,
+          uid: row.memberUid,
+          name: row.name,
+          imageUrl: row.imageUrl,
+          organization: row.organization,
         },
-        investorProfile: inv.investorProfile,
-        engagement: {
-          founderProfileClicks: inv.founderProfileClicks,
-          deckViews: inv.deckViews,
-          videoViews: inv.videoViews,
-          ctaClicks: inv.ctaClicks,
-        },
-        interest: {
-          connected: inv.connected,
-          invested: inv.invested,
-          liked: inv.liked,
-        },
-        totalInteractions: inv.totalInteractions,
-        lastActivity: inv.lastActivity?.toISOString() ?? null,
+        investorProfile: row.investorProfile,
+        interactionType: row.interactionType,
+        interactionDate: row.interactionDate.toISOString(),
       })),
       pagination: {
         page,
@@ -737,5 +749,4 @@ export class DemoDayEngagementAnalyticsService {
       },
     };
   }
-
 }
