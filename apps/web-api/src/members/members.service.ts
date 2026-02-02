@@ -6,6 +6,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  InternalServerErrorException
 } from '@nestjs/common';
 import { z } from 'zod';
 import axios from 'axios';
@@ -29,6 +30,18 @@ import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member'
 import { OfficeHoursService } from '../office-hours/office-hours.service';
 import { TeamsService } from '../teams/teams.service';
 import { ParticipantsRequest } from './members.dto';
+import { OpenSearchService } from '../opensearch/opensearch.service';
+
+/**
+ * Interface for member search match result (used by entity association)
+ */
+export interface MemberSearchMatch {
+  uid: string;
+  name: string;
+  email: string | null;
+  score: number;
+  image: string | null;
+}
 
 @Injectable()
 export class MembersService {
@@ -48,8 +61,9 @@ export class MembersService {
     @Inject(forwardRef(() => NotificationSettingsService))
     private notificationSettingsService: NotificationSettingsService,
     @Inject(forwardRef(() => OfficeHoursService))
-    private officeHoursService: OfficeHoursService
-  ) { }
+    private officeHoursService: OfficeHoursService,
+    private openSearchService: OpenSearchService
+  ) {}
 
   /**
    * Creates a new member in the database within a transaction.
@@ -504,6 +518,22 @@ export class MembersService {
     } catch (error) {
       return this.handleErrors(error);
     }
+  }
+
+  /**
+   * Gets member's main team UID.
+   * Returns the team with mainTeam=true, or the first team if none is marked as main.
+   */
+  async getMemberMainTeamByUid(
+    memberUid: string,
+    tx: Prisma.TransactionClient = this.prisma
+  ): Promise<string | null> {
+    const teamRoles = await tx.teamMemberRole.findMany({
+      where: { memberUid },
+      select: { teamUid: true, mainTeam: true },
+      orderBy: { mainTeam: 'desc' },
+    });
+    return teamRoles[0]?.teamUid || null;
   }
 
   /**
@@ -3648,5 +3678,132 @@ export class MembersService {
     );
 
     return newMember;
+  }
+
+  // ============================================================
+  // Member Search Methods (Internal API)
+  // ============================================================
+
+  /**
+   * Search members by name and/or email with relevance scoring.
+   * Used by internal APIs for entity matching and lookups.
+   * 
+   * Strategy:
+   * 1. If email is provided, first check database for exact match (email not indexed in OpenSearch)
+   * 2. Then search OpenSearch by name for additional candidates
+   * 3. Merge and deduplicate results
+   * 
+   * @param params - Search parameters including optional searchTerm and email
+   * @returns Array of matching members with confidence scores (0-100), sorted by score desc
+   */
+  async searchMemberMatches(params: { searchTerm?: string; email?: string; limit: number }): Promise<{ matches: MemberSearchMatch[] }> {
+    try {
+      const { searchTerm, email, limit } = params;
+      const trimmedName = searchTerm?.trim();
+      const trimmedEmail = email?.trim().toLowerCase();
+      this.logger.info(`Searching member matches: searchTerm="${trimmedName}", email="${trimmedEmail}", limit=${limit}`);
+      if (!trimmedName && !trimmedEmail) {
+        return { matches: [] };
+      }
+      const matches: MemberSearchMatch[] = [];
+      const seenUids = new Set<string>();
+      // Step 1: If email provided, do exact DB lookup (email not in OpenSearch index)
+      if (trimmedEmail) {
+        const memberByEmail = await this.prisma.member.findUnique({
+          where: { email: trimmedEmail },
+          select: {
+            uid: true,
+            name: true,
+            email: true,
+            image: { select: { url: true } },
+          },
+        });
+        if (memberByEmail) {
+          matches.push({
+            uid: memberByEmail.uid,
+            name: memberByEmail.name,
+            email: memberByEmail.email,
+            score: 100, // Perfect score for exact email match
+            image: memberByEmail.image?.url ?? null,
+          });
+          seenUids.add(memberByEmail.uid);
+        }
+      }
+      // Step 2: Search OpenSearch by name if provided
+      if (trimmedName && matches.length < limit) {
+        const remainingLimit = limit - matches.length;
+        const body = this.buildMemberSearchQuery(trimmedName);
+        const response = await this.openSearchService.searchWithLimit('member', remainingLimit + 5, body);
+        const hits = response?.body?.hits?.hits ?? [];
+        const maxScore = Number(hits[0]?._score) || 1; // First hit has highest score (sorted by _score desc)
+        for (const hit of hits) {
+          if (seenUids.has(hit._id)) continue;
+          if (matches.length >= limit) break;
+          const src = hit._source || {};
+          const rawScore = Number(hit._score) || 0;
+          matches.push({
+            uid: hit._id,
+            name: src.name ?? '',
+            email: null, // Email not in OpenSearch index
+            score: Math.round((rawScore / maxScore) * 100),
+            image: src.image ?? null,
+          });
+          seenUids.add(hit._id);
+        }
+      }
+      return { matches };
+    } catch (error) {
+      this.logger.error('Error searching member matches:', error);
+      throw new InternalServerErrorException('Error searching member matches', error);   
+    }
+  }
+
+  /**
+   * Build OpenSearch query for member search by name.
+   * 
+   * Fields indexed in OpenSearch member index:
+   * - uid, name, image, bio, scheduleMeetingCount, officeHoursUrl, availableToConnect, name_suggest
+   * 
+   * Note: Email is NOT indexed in OpenSearch. Email lookup is done via Prisma.
+   */
+  private buildMemberSearchQuery(name: string) {
+    const safeName = this.openSearchService.escapeQuery(name);
+    return {
+      query: {
+        bool: {
+          should: [
+            // Exact name match with highest boost
+            {
+              match_phrase: {
+                name: { query: safeName, boost: 5.0 }
+              }
+            },
+            // Fuzzy name match
+            {
+              match: {
+                name: {
+                  query: safeName,
+                  fuzziness: 'AUTO',
+                  boost: 2.0,
+                }
+              }
+            },
+            // Bio match for additional context
+            {
+              match: {
+                bio: {
+                  query: safeName,
+                  fuzziness: 'AUTO',
+                  boost: 0.5,
+                }
+              }
+            }
+          ],
+          minimum_should_match: 1,
+        }
+      },
+      _source: ['uid', 'name', 'image'],
+      sort: [{ _score: 'desc' }],
+    };
   }
 }
