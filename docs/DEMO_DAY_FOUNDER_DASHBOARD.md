@@ -76,6 +76,13 @@ All endpoints accept an optional `teamFundraisingProfileUid` query parameter:
 
 **Founders** do not need this parameter - the team is auto-derived from their `DemoDayParticipant.teamUid`.
 
+**Date filtering** (engagement and timeline endpoints):
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `startDate` | string | No | ISO date string (e.g., `2026-01-15`) - filters events from this date, inclusive |
+| `endDate` | string | No | ISO date string (e.g., `2026-01-31`) - filters events until this date, inclusive |
+
 ### Validation
 
 All endpoints use `validateAndGetProfileUid()` which:
@@ -116,11 +123,20 @@ Aggregated engagement statistics for the founder's team.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `teamFundraisingProfileUid` | string | Admin: YES, Founder: NO | Team's fundraising profile UID |
+| `startDate` | string | No | ISO date (e.g., `2026-01-15`) - filters events from this date |
+| `endDate` | string | No | ISO date (e.g., `2026-01-31`) - filters events until this date |
 
 **Example Request (Founder):**
 ```bash
 curl -X GET \
   'https://api.plnetwork.io/v1/demo-days/demo-day-2026-q1/dashboard/founder/engagement' \
+  -H 'Authorization: Bearer <token>'
+```
+
+**Example Request (Founder with date filter):**
+```bash
+curl -X GET \
+  'https://api.plnetwork.io/v1/demo-days/demo-day-2026-q1/dashboard/founder/engagement?startDate=2026-01-15&endDate=2026-01-31' \
   -H 'Authorization: Bearer <token>'
 ```
 
@@ -131,43 +147,45 @@ curl -X GET \
   -H 'Authorization: Bearer <admin-token>'
 ```
 
+**Example Request (Admin with date filter):**
+```bash
+curl -X GET \
+  'https://api.plnetwork.io/v1/demo-days/demo-day-2026-q1/dashboard/founder/engagement?teamFundraisingProfileUid=clx123abc&startDate=2026-01-15&endDate=2026-01-31' \
+  -H 'Authorization: Bearer <admin-token>'
+```
+
 **Example Response:**
 ```json
 {
-  "engagementOverview": {
-    "uniqueInvestors": 183,
-    "profileViews": {
-      "total": 278,
-      "unique": 183,
-      "repeat": 95
-    },
-    "totalCtaInteractions": 312
+  "uniqueInvestors": 183,
+  "totalCtaInteractions": {
+    "total": 312,
+    "uniqueInvestors": 45
   },
-  "ctaPerformance": {
-    "profileViews": {
-      "total": 278,
-      "unique": 183,
-      "repeat": 95
-    },
-    "viewedDeck": {
-      "total": 141,
-      "uniqueInvestors": 98
-    },
-    "watchedVideo": {
-      "total": 89,
-      "uniqueInvestors": 67
-    },
-    "connections": {
-      "total": 102,
-      "uniqueInvestors": 56
-    },
-    "investmentInterest": {
-      "total": 56,
-      "uniqueInvestors": 24
-    }
+  "viewedDeck": {
+    "total": 141,
+    "uniqueInvestors": 98
+  },
+  "watchedVideo": {
+    "total": 89,
+    "uniqueInvestors": 67
+  },
+  "connections": {
+    "total": 102,
+    "uniqueInvestors": 56
+  },
+  "investmentInterest": {
+    "total": 56,
+    "uniqueInvestors": 24
   }
 }
 ```
+
+**UI Field Mapping:**
+| UI Label | Response Field |
+|----------|----------------|
+| Unique Investors (Interacted with your profile) | `uniqueInvestors` |
+| Total & Unique CTAs (Like, Connect, Investment Interest) | `totalCtaInteractions.total` / `.uniqueInvestors` |
 
 ---
 
@@ -202,48 +220,32 @@ curl -X GET \
 
 **Example Response:**
 ```json
-{
-  "engagementOverview": [
-    {
-      "date": "2026-01-15",
-      "profileViews": 45,
-      "ctaInteractions": 23,
-      "uniqueInvestors": 30
-    },
-    {
-      "date": "2026-01-16",
-      "profileViews": 62,
-      "ctaInteractions": 31,
-      "uniqueInvestors": 48
-    },
-    {
-      "date": "2026-01-17",
-      "profileViews": 78,
-      "ctaInteractions": 45,
-      "uniqueInvestors": 55
-    }
-  ],
-  "ctaPerformance": [
-    {
-      "date": "2026-01-15",
-      "profileViews": 45,
-      "connections": 12,
-      "investmentInterest": 5
-    },
-    {
-      "date": "2026-01-16",
-      "profileViews": 62,
-      "connections": 18,
-      "investmentInterest": 8
-    },
-    {
-      "date": "2026-01-17",
-      "profileViews": 78,
-      "connections": 22,
-      "investmentInterest": 11
-    }
-  ]
-}
+[
+  {
+    "date": "2026-01-15",
+    "founderProfileClicks": 45,
+    "ctaInteractions": 23,
+    "uniqueInvestors": 30,
+    "connections": 12,
+    "investmentInterest": 5
+  },
+  {
+    "date": "2026-01-16",
+    "founderProfileClicks": 62,
+    "ctaInteractions": 31,
+    "uniqueInvestors": 48,
+    "connections": 18,
+    "investmentInterest": 8
+  },
+  {
+    "date": "2026-01-17",
+    "founderProfileClicks": 78,
+    "ctaInteractions": 45,
+    "uniqueInvestors": 55,
+    "connections": 22,
+    "investmentInterest": 11
+  }
+]
 ```
 
 ---
@@ -297,7 +299,7 @@ curl -X GET \
         "typicalCheckSize": 50000
       },
       "engagement": {
-        "profileViews": 5,
+        "founderProfileClicks": 5,
         "deckViews": 3,
         "videoViews": 2,
         "ctaClicks": 4
@@ -323,7 +325,7 @@ curl -X GET \
         "typicalCheckSize": 250000
       },
       "engagement": {
-        "profileViews": 3,
+        "founderProfileClicks": 3,
         "deckViews": 2,
         "videoViews": 1,
         "ctaClicks": 2
@@ -344,7 +346,7 @@ curl -X GET \
       },
       "investorProfile": null,
       "engagement": {
-        "profileViews": 2,
+        "founderProfileClicks": 2,
         "deckViews": 1,
         "videoViews": 0,
         "ctaClicks": 1

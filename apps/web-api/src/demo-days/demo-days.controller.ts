@@ -293,7 +293,9 @@ export class DemoDaysController {
     return this.demoDayEngagementAnalyticsService.getFounderEngagementStats(
       req.userEmail,
       demoDayUidOrSlug,
-      query.teamFundraisingProfileUid
+      query.teamFundraisingProfileUid,
+      query.startDate,
+      query.endDate
     );
   }
 

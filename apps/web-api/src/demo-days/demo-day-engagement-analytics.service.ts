@@ -147,12 +147,22 @@ export class DemoDayEngagementAnalyticsService {
     throw new ForbiddenException('Only admins or enabled founders can access engagement analytics');
   }
 
-  async getFounderEngagementStats(memberEmail: string, demoDayUidOrSlug: string, requestedProfileUid?: string) {
+  async getFounderEngagementStats(
+    memberEmail: string,
+    demoDayUidOrSlug: string,
+    requestedProfileUid?: string,
+    startDate?: string,
+    endDate?: string
+  ) {
     const { demoDayUid, teamFundraisingProfileUid } = await this.validateAndGetProfileUid(
       memberEmail,
       demoDayUidOrSlug,
       requestedProfileUid
     );
+
+    // Build optional date filter clauses
+    const startDateObj = startDate ? new Date(startDate) : null;
+    const endDateObj = endDate ? new Date(endDate) : null;
 
     // Run both queries in parallel: Event table stats + ExpressInterest stats (single query each)
     const [eventStats, interestStats] = await Promise.all([
@@ -162,23 +172,17 @@ export class DemoDayEngagementAnalyticsService {
       this.prisma.$queryRaw<
         Array<{
           unique_investors: bigint;
-          profile_views_total: bigint;
-          profile_views_unique: bigint;
           deck_views_total: bigint;
           deck_views_unique: bigint;
           video_views_total: bigint;
           video_views_unique: bigint;
           cta_clicks_total: bigint;
+          cta_clicks_unique: bigint;
         }>
       >`
         SELECT
           COUNT(DISTINCT "userId") FILTER (WHERE "eventType" IN (${Prisma.join(ALL_ENGAGEMENT_EVENTS)}))
             AS unique_investors,
-
-          COUNT(*) FILTER (WHERE "eventType" = ${DD.TEAM_CARD_CLICKED})
-            AS profile_views_total,
-          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" = ${DD.TEAM_CARD_CLICKED})
-            AS profile_views_unique,
 
           COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_DECK_VIEWED})
             AS deck_views_total,
@@ -191,10 +195,14 @@ export class DemoDayEngagementAnalyticsService {
             AS video_views_unique,
 
           COUNT(*) FILTER (WHERE "eventType" IN (${Prisma.join(CTA_CLICK_EVENTS)}))
-            AS cta_clicks_total
+            AS cta_clicks_total,
+          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" IN (${Prisma.join(CTA_CLICK_EVENTS)}))
+            AS cta_clicks_unique
         FROM "Event"
         WHERE "eventType" LIKE 'demo-day-active-view-%'
           AND props->>'teamUid' = ${teamFundraisingProfileUid}
+          AND (${startDateObj}::timestamp IS NULL OR ts >= ${startDateObj}::timestamp)
+          AND (${endDateObj}::timestamp IS NULL OR ts < (${endDateObj}::timestamp + interval '1 day'))
       `,
 
       // Single query for all DemoDayExpressInterestStatistic aggregates
@@ -215,19 +223,19 @@ export class DemoDayEngagementAnalyticsService {
         FROM "DemoDayExpressInterestStatistic"
         WHERE "demoDayUid" = ${demoDayUid}
           AND "teamFundraisingProfileUid" = ${teamFundraisingProfileUid}
+          AND (${startDateObj}::timestamp IS NULL OR "createdAt" >= ${startDateObj}::timestamp)
+          AND (${endDateObj}::timestamp IS NULL OR "createdAt" < (${endDateObj}::timestamp + interval '1 day'))
       `,
     ]);
 
     const eventRow = eventStats[0];
     const uniqueInvestors = Number(eventRow?.unique_investors ?? 0);
-    const profileViewsTotal = Number(eventRow?.profile_views_total ?? 0);
-    const profileViewsUnique = Number(eventRow?.profile_views_unique ?? 0);
-    const profileViewsRepeat = profileViewsTotal - profileViewsUnique;
     const deckViewsTotal = Number(eventRow?.deck_views_total ?? 0);
     const deckViewsUnique = Number(eventRow?.deck_views_unique ?? 0);
     const videoViewsTotal = Number(eventRow?.video_views_total ?? 0);
     const videoViewsUnique = Number(eventRow?.video_views_unique ?? 0);
     const ctaClicksTotal = Number(eventRow?.cta_clicks_total ?? 0);
+    const ctaClicksUnique = Number(eventRow?.cta_clicks_unique ?? 0);
 
     const interestRow = interestStats[0];
     const connectionsTotal = Number(interestRow?.connections_total ?? 0);
@@ -238,37 +246,26 @@ export class DemoDayEngagementAnalyticsService {
     const totalCtaInteractions = ctaClicksTotal + connectionsTotal + investmentsTotal;
 
     return {
-      engagementOverview: {
-        uniqueInvestors,
-        profileViews: {
-          total: profileViewsTotal,
-          unique: profileViewsUnique,
-          repeat: profileViewsRepeat,
-        },
-        totalCtaInteractions,
+      uniqueInvestors,
+      totalCtaInteractions: {
+        total: totalCtaInteractions,
+        uniqueInvestors: ctaClicksUnique,
       },
-      ctaPerformance: {
-        profileViews: {
-          total: profileViewsTotal,
-          unique: profileViewsUnique,
-          repeat: profileViewsRepeat,
-        },
-        viewedDeck: {
-          total: deckViewsTotal,
-          uniqueInvestors: deckViewsUnique,
-        },
-        watchedVideo: {
-          total: videoViewsTotal,
-          uniqueInvestors: videoViewsUnique,
-        },
-        connections: {
-          total: connectionsTotal,
-          uniqueInvestors: uniqueConnected,
-        },
-        investmentInterest: {
-          total: investmentsTotal,
-          uniqueInvestors: uniqueInvested,
-        },
+      viewedDeck: {
+        total: deckViewsTotal,
+        uniqueInvestors: deckViewsUnique,
+      },
+      watchedVideo: {
+        total: videoViewsTotal,
+        uniqueInvestors: videoViewsUnique,
+      },
+      connections: {
+        total: connectionsTotal,
+        uniqueInvestors: uniqueConnected,
+      },
+      investmentInterest: {
+        total: investmentsTotal,
+        uniqueInvestors: uniqueInvested,
       },
     };
   }
@@ -340,19 +337,24 @@ export class DemoDayEngagementAnalyticsService {
       `,
     ]);
 
-    // Merge into date-keyed maps
-    const overviewMap = new Map<string, { profileViews: number; ctaInteractions: number; uniqueInvestors: number }>();
-    const ctaMap = new Map<string, { profileViews: number; connections: number; investmentInterest: number }>();
+    // Merge into single date-keyed map
+    const timelineMap = new Map<
+      string,
+      {
+        founderProfileClicks: number;
+        ctaInteractions: number;
+        uniqueInvestors: number;
+        connections: number;
+        investmentInterest: number;
+      }
+    >();
 
     for (const row of eventTimeline) {
       const dateStr = row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date);
-      overviewMap.set(dateStr, {
-        profileViews: Number(row.profile_views),
+      timelineMap.set(dateStr, {
+        founderProfileClicks: Number(row.profile_views),
         ctaInteractions: Number(row.cta_interactions),
         uniqueInvestors: Number(row.unique_investors),
-      });
-      ctaMap.set(dateStr, {
-        profileViews: Number(row.profile_views),
         connections: 0,
         investmentInterest: 0,
       });
@@ -363,57 +365,38 @@ export class DemoDayEngagementAnalyticsService {
       const connections = Number(row.connections ?? 0);
       const investmentInterest = Number(row.investment_interest ?? 0);
 
-      // Merge into overview (add connection + investment as CTA interactions)
-      const existing = overviewMap.get(dateStr);
+      const existing = timelineMap.get(dateStr);
       if (existing) {
         existing.ctaInteractions += connections + investmentInterest;
+        existing.connections = connections;
+        existing.investmentInterest = investmentInterest;
       } else {
-        overviewMap.set(dateStr, {
-          profileViews: 0,
+        timelineMap.set(dateStr, {
+          founderProfileClicks: 0,
           ctaInteractions: connections + investmentInterest,
           uniqueInvestors: 0,
-        });
-      }
-
-      // Merge into CTA map
-      const existingCta = ctaMap.get(dateStr);
-      if (existingCta) {
-        existingCta.connections = connections;
-        existingCta.investmentInterest = investmentInterest;
-      } else {
-        ctaMap.set(dateStr, {
-          profileViews: 0,
           connections,
           investmentInterest,
         });
       }
     }
 
-    // Sort by date and build arrays
-    const sortedOverviewDates = [...overviewMap.keys()].sort();
-    const sortedCtaDates = [...ctaMap.keys()].sort();
+    // Sort by date and build array
+    const sortedDates = [...timelineMap.keys()].sort();
 
-    const engagementOverview = sortedOverviewDates.map((date) => {
-      const data = overviewMap.get(date);
+    const timeline = sortedDates.map((date) => {
+      const data = timelineMap.get(date);
       return {
         date,
-        profileViews: data?.profileViews ?? 0,
+        founderProfileClicks: data?.founderProfileClicks ?? 0,
         ctaInteractions: data?.ctaInteractions ?? 0,
         uniqueInvestors: data?.uniqueInvestors ?? 0,
-      };
-    });
-
-    const ctaPerformance = sortedCtaDates.map((date) => {
-      const data = ctaMap.get(date);
-      return {
-        date,
-        profileViews: data?.profileViews ?? 0,
         connections: data?.connections ?? 0,
         investmentInterest: data?.investmentInterest ?? 0,
       };
     });
 
-    return { engagementOverview, ctaPerformance };
+    return timeline;
   }
 
   async getInvestorActivity(
@@ -527,7 +510,7 @@ export class DemoDayEngagementAnalyticsService {
         investInStartupStages: string[];
         typicalCheckSize: number | null;
       } | null;
-      profileViews: number;
+      founderProfileClicks: number;
       deckViews: number;
       videoViews: number;
       ctaClicks: number;
@@ -544,7 +527,7 @@ export class DemoDayEngagementAnalyticsService {
       const interest = interestMap.get(uid);
       const member = memberMap.get(uid);
 
-      const profileViews = Number(event?.profile_views ?? 0);
+      const founderProfileClicks = Number(event?.profile_views ?? 0);
       const deckViews = Number(event?.deck_views ?? 0);
       const videoViews = Number(event?.video_views ?? 0);
       const ctaClicks = Number(event?.cta_clicks ?? 0);
@@ -553,7 +536,7 @@ export class DemoDayEngagementAnalyticsService {
       const likeCount = interest?.likedCount ?? 0;
 
       const totalInteractions =
-        profileViews + deckViews + videoViews + ctaClicks + connectCount + investCount + likeCount;
+        founderProfileClicks + deckViews + videoViews + ctaClicks + connectCount + investCount + likeCount;
 
       // Determine last activity from both sources
       const eventLastActivity = event?.last_activity ? new Date(event.last_activity) : null;
@@ -578,7 +561,7 @@ export class DemoDayEngagementAnalyticsService {
               typicalCheckSize: member.investorProfile.typicalCheckSize,
             }
           : null,
-        profileViews,
+        founderProfileClicks,
         deckViews,
         videoViews,
         ctaClicks,
@@ -623,7 +606,7 @@ export class DemoDayEngagementAnalyticsService {
         },
         investorProfile: inv.investorProfile,
         engagement: {
-          profileViews: inv.profileViews,
+          founderProfileClicks: inv.founderProfileClicks,
           deckViews: inv.deckViews,
           videoViews: inv.videoViews,
           ctaClicks: inv.ctaClicks,

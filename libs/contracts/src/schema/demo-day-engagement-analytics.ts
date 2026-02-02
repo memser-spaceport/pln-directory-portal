@@ -1,18 +1,17 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 
-// Base schema with optional teamFundraisingProfileUid for admin users
+// Base schema with optional teamFundraisingProfileUid for admin users and date filtering
 export const DashboardBaseQuerySchema = z.object({
   teamFundraisingProfileUid: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
 });
 
 export class DashboardBaseQueryDto extends createZodDto(DashboardBaseQuerySchema) {}
 
-// Timeline extends base
-export const EngagementTimelineQuerySchema = DashboardBaseQuerySchema.extend({
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-});
+// Timeline extends base (inherits startDate/endDate from base)
+export const EngagementTimelineQuerySchema = DashboardBaseQuerySchema;
 
 export class EngagementTimelineQueryDto extends createZodDto(EngagementTimelineQuerySchema) {}
 
