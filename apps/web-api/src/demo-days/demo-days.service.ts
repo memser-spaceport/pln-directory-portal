@@ -994,6 +994,13 @@ export class DemoDaysService {
 
     const normalizedEmail = applicationData.email.toLowerCase().trim();
 
+    this.logger.debug(
+      `[submitInvestorApplication] start demoDay=${demoDay.uid} slug=${demoDay.slugURL} email=${normalizedEmail} ` +
+      `isTeamNew=${!!applicationData.isTeamNew} teamUid=${applicationData.teamUid ?? '-'} projectUid=${
+        applicationData.projectUid ?? '-'
+      }`
+    );
+
     // Check if a member already exists
     let member = await this.prisma.member.findFirst({
       where: {
@@ -1021,6 +1028,11 @@ export class DemoDaysService {
     // If a member doesn't exist, create a new one with L0 access level
     if (!member) {
       isNewMember = true;
+
+      this.logger.debug(
+        `[submitInvestorApplication] creating new member demoDay=${demoDay.uid} email=${normalizedEmail}`
+      );
+
       member = await this.prisma.member.create({
         data: {
           email: normalizedEmail,
@@ -1044,33 +1056,9 @@ export class DemoDaysService {
         },
       });
 
-      // If a new team is provided, create Team and TeamMemberRole (non-breaking extension)
-      if (applicationData.isTeamNew && applicationData.team?.name) {
-        const teamName = applicationData.team.name.trim();
-        const teamWebsite = applicationData.team.website?.trim() || null;
-
-        const createdTeam = await this.prisma.team.create({
-          data: {
-            name: teamName,
-            website: teamWebsite,
-            accessLevel: 'L0',
-          },
-          select: {
-            uid: true,
-          },
-        });
-
-        await this.prisma.teamMemberRole.create({
-          data: {
-            memberUid: member.uid,
-            teamUid: createdTeam.uid,
-            role: applicationData.role,
-            investmentTeam: true,
-          },
-        });
-      } else if (applicationData.teamUid) {
-        // If a teamUid is provided, create TeamMemberRole
-        // Check if TeamMemberRole already exists for this member-team combination
+      // If a teamUid is provided, create TeamMemberRole
+      // Check if TeamMemberRole already exists for this member-team combination
+      if (!applicationData.isTeamNew && applicationData.teamUid) {
         const existingRole = await this.prisma.teamMemberRole.findUnique({
           where: {
             memberUid_teamUid: {
@@ -1114,6 +1102,76 @@ export class DemoDaysService {
           });
         }
       }
+    } else {
+      this.logger.debug(
+        `[submitInvestorApplication] existing member found uid=${member.uid} email=${normalizedEmail} accessLevel=${
+          member.accessLevel ?? '-'
+        }`
+      );
+    }
+
+    // ===========================
+    // create NEW TEAM also for existing/logged-in member
+    // set member as team lead
+    // ===========================
+    let createdTeamUid: string | null = null;
+    let createdTeamName: string | null = null;
+
+    if (applicationData.isTeamNew && applicationData.team?.name?.trim()) {
+      const teamName = applicationData.team.name.trim();
+      const teamWebsite = applicationData.team.website?.trim() || null;
+
+      this.logger.log(
+        `[submitInvestorApplication] creating NEW team for member uid=${member.uid} name="${teamName}" website=${
+          teamWebsite ?? '-'
+        }`
+      );
+
+      const createdTeam = await this.prisma.team.create({
+        data: {
+          name: teamName,
+          website: teamWebsite,
+          accessLevel: 'L0',
+        },
+        select: {
+          uid: true,
+          name: true,
+        },
+      });
+
+      createdTeamUid = createdTeam.uid;
+      createdTeamName = createdTeam.name;
+
+      // Ensure membership exists (safe for retries)
+      const existingRole = await this.prisma.teamMemberRole.findUnique({
+        where: {
+          memberUid_teamUid: {
+            memberUid: member.uid,
+            teamUid: createdTeam.uid,
+          },
+        },
+      });
+
+      if (!existingRole) {
+        await this.prisma.teamMemberRole.create({
+          data: {
+            memberUid: member.uid,
+            teamUid: createdTeam.uid,
+            role: applicationData.role,
+            investmentTeam: true,
+            mainTeam: true,
+            teamLead: true
+          },
+        });
+
+        this.logger.log(
+          `[submitInvestorApplication] created TeamMemberRole for NEW team teamUid=${createdTeam.uid} memberUid=${member.uid} mainTeam=true`
+        );
+      } else {
+        this.logger.log(
+          `[submitInvestorApplication] TeamMemberRole already exists for NEW team teamUid=${createdTeam.uid} memberUid=${member.uid}`
+        );
+      }
     }
 
     // Create or update investor profile
@@ -1132,6 +1190,10 @@ export class DemoDaysService {
         where: { uid: member.uid },
         data: { investorProfileId: investorProfile.uid },
       });
+
+      this.logger.debug(
+        `[submitInvestorApplication] investorProfile created uid=${investorProfile.uid} memberUid=${member.uid}`
+      );
     } else if (applicationData.isAccreditedInvestor && !member.investorProfile.secRulesAccepted) {
       // Update existing profile if user accepted accredited investor terms
       await this.prisma.investorProfile.update({
@@ -1141,11 +1203,51 @@ export class DemoDaysService {
           secRulesAcceptedAt: new Date(),
         },
       });
+
+      this.logger.debug(
+        `[submitInvestorApplication] investorProfile updated secRulesAccepted=true memberUid=${member.uid}`
+      );
     }
 
     // Check if already a participant for this demo day
     if (member.demoDayParticipants && member.demoDayParticipants.length > 0) {
+      this.logger.warn(
+        `[submitInvestorApplication] already applied demoDay=${demoDay.uid} memberUid=${member.uid} email=${normalizedEmail}`
+      );
       throw new BadRequestException('You have already submitted an application for this demo day');
+    }
+
+    // If a teamUid is provided (existing team path), create TeamMemberRole
+    if (!applicationData.isTeamNew && applicationData.teamUid) {
+      const existingRole = await this.prisma.teamMemberRole.findUnique({
+        where: {
+          memberUid_teamUid: {
+            memberUid: member.uid,
+            teamUid: applicationData.teamUid,
+          },
+        },
+      });
+
+      // Only create if it doesn't exist
+      if (!existingRole) {
+        await this.prisma.teamMemberRole.create({
+          data: {
+            memberUid: member.uid,
+            teamUid: applicationData.teamUid,
+            role: applicationData.role,
+            investmentTeam: true,
+            mainTeam: true,
+          },
+        });
+
+        this.logger.debug(
+          `[submitInvestorApplication] created TeamMemberRole for existing team teamUid=${applicationData.teamUid} memberUid=${member.uid}`
+        );
+      } else {
+        this.logger.debug(
+          `[submitInvestorApplication] TeamMemberRole already exists for existing team teamUid=${applicationData.teamUid} memberUid=${member.uid}`
+        );
+      }
     }
 
     // Create a demo day participant with PENDING status
@@ -1157,6 +1259,10 @@ export class DemoDaysService {
         status: 'PENDING', // Pending approval from admin
       },
     });
+
+    this.logger.debug(
+      `[submitInvestorApplication] participant created uid=${participant.uid} demoDay=${demoDay.uid} memberUid=${member.uid} status=PENDING`
+    );
 
     // Track analytics event
     await this.analyticsService.trackEvent({
@@ -1178,6 +1284,10 @@ export class DemoDaysService {
     let resolvedTeamName: string | null =
       applicationData.isTeamNew && applicationData.team?.name?.trim() ? applicationData.team.name.trim() : null;
 
+    if (!resolvedTeamName && createdTeamName) {
+      resolvedTeamName = createdTeamName;
+    }
+
     if (!resolvedTeamName && applicationData.teamUid) {
       const team = await this.prisma.team.findUnique({
         where: { uid: applicationData.teamUid },
@@ -1193,8 +1303,14 @@ export class DemoDaysService {
       applicantName: applicationData.name ?? null,
       applicantEmail: normalizedEmail,
       teamName: resolvedTeamName,
-      teamUid: applicationData.teamUid ?? null,
+      teamUid: createdTeamUid ?? applicationData.teamUid ?? null,
     });
+
+    this.logger.debug(
+      `[submitInvestorApplication] done participantUid=${participant.uid} isNewMember=${isNewMember} createdTeamUid=${
+        createdTeamUid ?? '-'
+      }`
+    );
 
     return {
       participantUid: participant.uid,
