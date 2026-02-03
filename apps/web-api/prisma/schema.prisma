@@ -1153,6 +1153,7 @@ model DemoDayExpressInterestStatistic {
   @@unique([demoDayUid, memberUid, teamFundraisingProfileUid, isPrepDemoDay])
   @@index([memberUid, teamFundraisingProfileUid])
   @@index([demoDayUid])
+  @@index([demoDayUid, teamFundraisingProfileUid], map: "DemoDayExpressInterestStatistic_demoDay_tfp_idx")
 }
 
 model DemoDayFeedback {
