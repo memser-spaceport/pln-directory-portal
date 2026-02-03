@@ -84,7 +84,7 @@
     "@ssut/nestjs-sqs": "^2.1.0",
     "@swc/helpers": "^0.4.11",
     "@tanstack/react-query": "4.40.0",
-    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-table": "8.21.3",
     "@ts-rest/core": "^3.19.3",
     "@ts-rest/nest": "^3.19.3",
     "@ts-rest/open-api": "^3.19.3",
