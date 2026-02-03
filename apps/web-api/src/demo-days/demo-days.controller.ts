@@ -30,6 +30,7 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import {
   CreateDemoDayFeedbackDto,
   CreateDemoDayInvestorApplicationDto,
+  DashboardBaseQueryDto,
   EngagementTimelineQueryDto,
   ExpressInterestDto,
   InvestorActivityQueryDto,
@@ -282,9 +283,20 @@ export class DemoDaysController {
 
   @Get(':demoDayUidOrSlug/dashboard/founder/engagement')
   @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
   @CacheTTL(3600) // 1 hour
-  async getFounderEngagementStats(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
-    return this.demoDayEngagementAnalyticsService.getFounderEngagementStats(req.userEmail, demoDayUidOrSlug);
+  async getFounderEngagementStats(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Query() query: DashboardBaseQueryDto
+  ) {
+    return this.demoDayEngagementAnalyticsService.getFounderEngagementStats(
+      req.userEmail,
+      demoDayUidOrSlug,
+      query.teamFundraisingProfileUid,
+      query.startDate,
+      query.endDate
+    );
   }
 
   @Get(':demoDayUidOrSlug/dashboard/founder/engagement/timeline')
@@ -300,7 +312,9 @@ export class DemoDaysController {
       req.userEmail,
       demoDayUidOrSlug,
       query.startDate,
-      query.endDate
+      query.endDate,
+      query.teamFundraisingProfileUid,
+      query.aggregation ?? 'day'
     );
   }
 
@@ -313,19 +327,17 @@ export class DemoDaysController {
     @Req() req,
     @Query() query: InvestorActivityQueryDto
   ) {
-    return this.demoDayEngagementAnalyticsService.getInvestorActivity(req.userEmail, demoDayUidOrSlug, {
-      page: query.page ?? 1,
-      limit: query.limit ?? 10,
-      sortBy: query.sortBy ?? 'lastActivity',
-      sortOrder: query.sortOrder ?? 'desc',
-    });
-  }
-
-  @Get(':demoDayUidOrSlug/dashboard/founder/engagement/funnel')
-  @UseGuards(UserTokenValidation)
-  @CacheTTL(3600) // 1 hour
-  async getFounderEngagementFunnel(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
-    return this.demoDayEngagementAnalyticsService.getInvestorEngagementFunnel(req.userEmail, demoDayUidOrSlug);
+    return this.demoDayEngagementAnalyticsService.getInvestorActivity(
+      req.userEmail,
+      demoDayUidOrSlug,
+      {
+        page: query.page ?? 1,
+        limit: query.limit ?? 10,
+        sortBy: query.sortBy ?? 'lastActivity',
+        sortOrder: query.sortOrder ?? 'desc',
+      },
+      query.teamFundraisingProfileUid
+    );
   }
 
   // Direct S3 upload endpoints

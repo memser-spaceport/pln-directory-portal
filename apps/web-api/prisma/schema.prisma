@@ -991,9 +991,8 @@ model InvestorProfile {
 }
 
 enum DemoDayAdminScopeType {
-  HOST // host-based permissions (e.g. "plnetwork.io")
-  // Later we can add more, e.g.:
-  // FEATURE_FLAG
+  HOST                  // host-based permissions (e.g. "plnetwork.io")
+  DASHBOARD_WHITELIST   // dashboard access whitelist (scopeValue = '*' for all)
 }
 
 enum DemoDayStatus {
@@ -1032,6 +1031,7 @@ model DemoDay {
   supportEmail              String?
   status                    DemoDayStatus                     @default(UPCOMING)
   notificationsEnabled      Boolean                           @default(false)
+  dashboardEnabled          Boolean                           @default(false)
   notifyBeforeStartHours    Int?                              @default(336)
   notifyBeforeEndHours      Int?                              @default(48)
   createdAt                 DateTime                          @default(now())
@@ -1153,6 +1153,7 @@ model DemoDayExpressInterestStatistic {
   @@unique([demoDayUid, memberUid, teamFundraisingProfileUid, isPrepDemoDay])
   @@index([memberUid, teamFundraisingProfileUid])
   @@index([demoDayUid])
+  @@index([demoDayUid, teamFundraisingProfileUid], map: "DemoDayExpressInterestStatistic_demoDay_tfp_idx")
 }
 
 model DemoDayFeedback {
