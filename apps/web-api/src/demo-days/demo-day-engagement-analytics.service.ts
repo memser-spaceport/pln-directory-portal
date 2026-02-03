@@ -9,7 +9,15 @@ import { MemberRole } from '../../../back-office/utils/constants';
 const DD = ANALYTICS_EVENTS.DEMO_DAY_EVENT;
 
 // Event types for engagement stats (Event table only - CTA metrics come from DemoDayExpressInterestStatistic)
-const ENGAGEMENT_VIEW_EVENTS = [DD.TEAM_CARD_CLICKED, DD.PITCH_DECK_VIEWED, DD.PITCH_VIDEO_VIEWED];
+// Must be consistent across all 3 endpoints: /engagement, /engagement/timeline, /engagement/investors
+const ENGAGEMENT_VIEW_EVENTS = [
+  DD.TEAM_CARD_VIEWED,
+  DD.TEAM_CARD_CLICKED,
+  DD.PITCH_DECK_VIEWED,
+  DD.PITCH_VIDEO_VIEWED,
+  DD.LANDING_TEAM_CARD_CLICKED,
+  DD.LANDING_TEAM_WEBSITE_CLICKED,
+];
 
 @Injectable()
 export class DemoDayEngagementAnalyticsService {
@@ -487,7 +495,7 @@ export class DemoDayEngagementAnalyticsService {
     // Sort by date and build array
     const sortedDates = [...timelineMap.keys()].sort();
 
-    const timeline = sortedDates.map((date) => {
+    return sortedDates.map((date) => {
       const data = timelineMap.get(date);
       return {
         date,
@@ -504,8 +512,6 @@ export class DemoDayEngagementAnalyticsService {
         feedbackGiven: data?.feedbackGiven ?? 0,
       };
     });
-
-    return timeline;
   }
 
   async getInvestorActivity(
@@ -554,7 +560,7 @@ export class DemoDayEngagementAnalyticsService {
     };
 
     // Get individual events from Event table (one row per event)
-    const relevantEventTypes = Object.keys(eventTypeToInteraction);
+    // Use ENGAGEMENT_VIEW_EVENTS for consistency with /engagement endpoint
     const individualEvents = await this.prisma.$queryRaw<
       Array<{
         user_id: string;
@@ -567,7 +573,7 @@ export class DemoDayEngagementAnalyticsService {
         "eventType" AS event_type,
         ts AS event_ts
       FROM "Event"
-      WHERE "eventType" IN (${Prisma.join(relevantEventTypes)})
+      WHERE "eventType" IN (${Prisma.join(ENGAGEMENT_VIEW_EVENTS)})
         AND props->>'teamUid' = ${teamFundraisingProfileUid}
         AND "userId" IS NOT NULL
       ORDER BY ts DESC
@@ -595,7 +601,7 @@ export class DemoDayEngagementAnalyticsService {
     individualEvents.forEach((e) => allInvestorUids.add(e.user_id));
     interestStats.forEach((s) => allInvestorUids.add(s.memberUid));
 
-    // Fetch member details, investor profiles, and team membership for organization
+    // Fetch member details, investor profiles, team membership, and member roles
     const members = await this.prisma.member.findMany({
       where: { uid: { in: Array.from(allInvestorUids) } },
       select: {
@@ -615,9 +621,48 @@ export class DemoDayEngagementAnalyticsService {
             typicalCheckSize: true,
           },
         },
+        memberRoles: {
+          select: { name: true },
+        },
       },
     });
     const memberMap = new Map(members.map((m) => [m.uid, m]));
+
+    // Fetch DemoDayParticipant records to get participant types
+    const participants = await this.prisma.demoDayParticipant.findMany({
+      where: {
+        demoDayUid,
+        memberUid: { in: Array.from(allInvestorUids) },
+        isDeleted: false,
+      },
+      select: {
+        memberUid: true,
+        type: true,
+      },
+    });
+    const participantMap = new Map(participants.map((p) => [p.memberUid, p.type]));
+
+    // Helper to determine member role
+    // Priority: DIRECTORY_ADMIN > DEMO_DAY_ADMIN > Participant type (INVESTOR/FOUNDER/SUPPORT)
+    const getMemberRole = (uid: string): string | null => {
+      const member = memberMap.get(uid);
+      const roles = member?.memberRoles?.map((r) => r.name) ?? [];
+
+      if (roles.includes(MemberRole.DIRECTORY_ADMIN)) {
+        return 'DIRECTORY_ADMIN';
+      }
+      if (roles.includes(MemberRole.DEMO_DAY_ADMIN)) {
+        return 'DEMO_DAY_ADMIN';
+      }
+
+      // Check DemoDayParticipant type
+      const participantType = participantMap.get(uid);
+      if (participantType) {
+        return participantType; // 'INVESTOR' | 'FOUNDER' | 'SUPPORT'
+      }
+
+      return null;
+    };
 
     // Helper to get member info
     const getMemberInfo = (uid: string) => {
@@ -628,6 +673,7 @@ export class DemoDayEngagementAnalyticsService {
         name: member?.name ?? 'Unknown',
         imageUrl: member?.image?.url ?? null,
         organization: mainTeamRole?.team?.name ?? null,
+        memberRole: getMemberRole(uid),
         investorProfile: member?.investorProfile
           ? {
               type: member.investorProfile.type,
@@ -644,6 +690,7 @@ export class DemoDayEngagementAnalyticsService {
       name: string;
       imageUrl: string | null;
       organization: string | null;
+      memberRole: string | null;
       investorProfile: {
         type: string | null;
         investmentFocus: string[];
@@ -736,6 +783,7 @@ export class DemoDayEngagementAnalyticsService {
           name: row.name,
           imageUrl: row.imageUrl,
           organization: row.organization,
+          role: row.memberRole,
         },
         investorProfile: row.investorProfile,
         interactionType: row.interactionType,

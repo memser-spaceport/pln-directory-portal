@@ -369,7 +369,8 @@ curl -X GET \
         "uid": "clx1abc123def",
         "name": "Bob Smith",
         "imageUrl": "https://cdn.plnetwork.io/images/members/bob-smith.jpg",
-        "organization": null
+        "organization": null,
+        "role": "INVESTOR"
       },
       "investorProfile": {
         "type": "ANGEL",
@@ -384,7 +385,8 @@ curl -X GET \
         "uid": "clx1abc123def",
         "name": "Bob Smith",
         "imageUrl": "https://cdn.plnetwork.io/images/members/bob-smith.jpg",
-        "organization": null
+        "organization": null,
+        "role": "INVESTOR"
       },
       "investorProfile": {
         "type": "ANGEL",
@@ -399,7 +401,8 @@ curl -X GET \
         "uid": "clx2xyz789ghi",
         "name": "Catherine Lee",
         "imageUrl": null,
-        "organization": "ARK Fintech Innovation ETF"
+        "organization": "ARK Fintech Innovation ETF",
+        "role": "DIRECTORY_ADMIN"
       },
       "investorProfile": {
         "type": "FUND",
@@ -418,6 +421,16 @@ curl -X GET \
   }
 }
 ```
+
+**Member Role Values:**
+| Role | Description |
+|------|-------------|
+| `DIRECTORY_ADMIN` | Directory administrator (highest priority) |
+| `DEMO_DAY_ADMIN` | Demo day administrator |
+| `INVESTOR` | Investor participant |
+| `FOUNDER` | Founder participant |
+| `SUPPORT` | Support staff participant |
+| `null` | No role found (non-participant) |
 
 **Interaction Types** (same as timeline endpoint):
 
