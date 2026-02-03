@@ -21,8 +21,6 @@ const ENGAGEMENT_VIEW_EVENTS = [
 
 @Injectable()
 export class DemoDayEngagementAnalyticsService {
-  private readonly logger = new Logger(DemoDayEngagementAnalyticsService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => DemoDaysService))
@@ -154,13 +152,33 @@ export class DemoDayEngagementAnalyticsService {
     const startDateObj = startDate ? new Date(startDate) : null;
     const endDateObj = endDate ? new Date(endDate) : null;
 
-    // Run both queries in parallel: Event table stats + ExpressInterest stats (single query each)
-    const [eventStats, interestStats] = await Promise.all([
+    // Run queries in parallel: unique investors (union), Event table stats, ExpressInterest stats
+    const [uniqueInvestorsResult, eventStats, interestStats] = await Promise.all([
+      // Count unique investors from BOTH Event table AND DemoDayExpressInterestStatistic (union)
+      this.prisma.$queryRaw<Array<{ unique_investors: bigint }>>`
+        SELECT COUNT(DISTINCT user_id) AS unique_investors
+        FROM (
+          SELECT "userId" AS user_id
+          FROM "Event"
+          WHERE "eventType" IN (${Prisma.join(ENGAGEMENT_VIEW_EVENTS)})
+            AND props->>'teamUid' = ${teamFundraisingProfileUid}
+            AND (${startDateObj}::timestamp IS NULL OR ts >= ${startDateObj}::timestamp)
+            AND (${endDateObj}::timestamp IS NULL OR ts < (${endDateObj}::timestamp + interval '1 day'))
+            AND "userId" IS NOT NULL
+          UNION
+          SELECT "memberUid" AS user_id
+          FROM "DemoDayExpressInterestStatistic"
+          WHERE "demoDayUid" = ${demoDayUid}
+            AND "teamFundraisingProfileUid" = ${teamFundraisingProfileUid}
+            AND (${startDateObj}::timestamp IS NULL OR "createdAt" >= ${startDateObj}::timestamp)
+            AND (${endDateObj}::timestamp IS NULL OR "createdAt" < (${endDateObj}::timestamp + interval '1 day'))
+        ) AS combined_users
+      `,
+
       // Event table: view metrics only (CTA metrics come from DemoDayExpressInterestStatistic)
       // Note: props.teamUid contains TeamFundraisingProfile.uid (unique per team+demoDay)
       this.prisma.$queryRaw<
         Array<{
-          unique_investors: bigint;
           deck_views_total: bigint;
           deck_views_unique: bigint;
           video_views_total: bigint;
@@ -168,9 +186,6 @@ export class DemoDayEngagementAnalyticsService {
         }>
       >`
         SELECT
-          COUNT(DISTINCT "userId") FILTER (WHERE "eventType" IN (${Prisma.join(ENGAGEMENT_VIEW_EVENTS)}))
-            AS unique_investors,
-
           COUNT(*) FILTER (WHERE "eventType" = ${DD.PITCH_DECK_VIEWED})
             AS deck_views_total,
           COUNT(DISTINCT "userId") FILTER (WHERE "eventType" = ${DD.PITCH_DECK_VIEWED})
@@ -193,29 +208,23 @@ export class DemoDayEngagementAnalyticsService {
         Array<{
           unique_investors: bigint;
           liked_total: bigint;
-          liked_unique: bigint;
           connected_total: bigint;
           connected_unique: bigint;
           invested_total: bigint;
           invested_unique: bigint;
           referral_total: bigint;
-          referral_unique: bigint;
           feedback_total: bigint;
-          feedback_unique: bigint;
         }>
       >`
         SELECT
           COUNT(*) AS unique_investors,
           COALESCE(SUM("likedCount"), 0) AS liked_total,
-          COUNT(*) FILTER (WHERE liked = true) AS liked_unique,
           COALESCE(SUM("connectedCount"), 0) AS connected_total,
           COUNT(*) FILTER (WHERE connected = true) AS connected_unique,
           COALESCE(SUM("investedCount"), 0) AS invested_total,
           COUNT(*) FILTER (WHERE invested = true) AS invested_unique,
           COALESCE(SUM("referralCount"), 0) AS referral_total,
-          COUNT(*) FILTER (WHERE referral = true) AS referral_unique,
-          COALESCE(SUM("feedbackCount"), 0) AS feedback_total,
-          COUNT(*) FILTER (WHERE feedback = true) AS feedback_unique
+          COALESCE(SUM("feedbackCount"), 0) AS feedback_total
         FROM "DemoDayExpressInterestStatistic"
         WHERE "demoDayUid" = ${demoDayUid}
           AND "teamFundraisingProfileUid" = ${teamFundraisingProfileUid}
@@ -224,8 +233,10 @@ export class DemoDayEngagementAnalyticsService {
       `,
     ]);
 
+    // Unique investors from union of both sources
+    const uniqueInvestors = Number(uniqueInvestorsResult[0]?.unique_investors ?? 0);
+
     const eventRow = eventStats[0];
-    const eventUniqueInvestors = Number(eventRow?.unique_investors ?? 0);
     const deckViewsTotal = Number(eventRow?.deck_views_total ?? 0);
     const deckViewsUnique = Number(eventRow?.deck_views_unique ?? 0);
     const videoViewsTotal = Number(eventRow?.video_views_total ?? 0);
@@ -243,18 +254,12 @@ export class DemoDayEngagementAnalyticsService {
 
     // Total CTA interactions = sum of all CTA types from DemoDayExpressInterestStatistic
     const totalCtaInteractions = likedTotal + connectedTotal + investedTotal + referralTotal + feedbackTotal;
-    // For unique investors in CTAs, we use the count from DemoDayExpressInterestStatistic
-    const totalCtaUniqueInvestors = interestUniqueInvestors;
-
-    // Unique investors = max of event-based and interest-based (they may overlap)
-    // Using event-based as primary since it captures more interaction types
-    const uniqueInvestors = Math.max(eventUniqueInvestors, interestUniqueInvestors);
 
     return {
       uniqueInvestors,
       totalCtaInteractions: {
         total: totalCtaInteractions,
-        uniqueInvestors: totalCtaUniqueInvestors,
+        uniqueInvestors: interestUniqueInvestors,
       },
       viewedSlide: {
         total: deckViewsTotal,
