@@ -285,7 +285,8 @@ export const ANALYTICS_EVENTS = {
   },
   DEMO_DAY_EVENT: {
     // Frontend engagement events (from pln-directory-portal-v2)
-    TEAM_CARD_CLICKED: 'demo-day-active-view-team-card-clicked',
+    TEAM_CARD_VIEWED: 'demo-day-active-view-team-card-viewed',
+    TEAM_CARD_CLICKED: 'demo-day-active-view-team-card-clicked', // TODO change it
     PITCH_DECK_VIEWED: 'demo-day-active-view-team-pitch-deck-viewed',
     PITCH_VIDEO_VIEWED: 'demo-day-active-view-team-pitch-video-viewed',
     LIKE_COMPANY_CLICKED: 'demo-day-active-view-like-company-clicked',
@@ -294,6 +295,9 @@ export const ANALYTICS_EVENTS = {
     REFER_COMPANY_CLICKED: 'demo-day-active-view-refer-company-clicked',
     INTRO_COMPANY_CLICKED: 'demo-day-active-view-intro-company-clicked',
     INTRO_COMPANY_CONFIRM_CLICKED: 'demo-day-active-view-intro-company-confirm-clicked',
+    // Landing page events
+    LANDING_TEAM_CARD_CLICKED: 'demo-day-landing-team-card-clicked',
+    LANDING_TEAM_WEBSITE_CLICKED: 'demo-day-landing-team-website-clicked',
   },
 };
 

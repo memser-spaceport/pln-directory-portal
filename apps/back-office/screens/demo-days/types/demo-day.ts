@@ -13,6 +13,7 @@ export interface DemoDay {
   notificationsEnabled: boolean;
   notifyBeforeStartHours?: number | null;
   notifyBeforeEndHours?: number | null;
+  dashboardEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,6 +45,7 @@ export interface UpdateDemoDayDto {
   notificationsEnabled?: boolean;
   notifyBeforeStartHours?: number | null;
   notifyBeforeEndHours?: number | null;
+  dashboardEnabled?: boolean;
 }
 
 export interface DemoDayParticipant {

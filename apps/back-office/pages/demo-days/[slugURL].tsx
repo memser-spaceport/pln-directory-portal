@@ -11,6 +11,7 @@ import { AddParticipantModal } from '../../components/demo-days/AddParticipantMo
 import { UploadParticipantsModal } from '../../components/demo-days/UploadParticipantsModal';
 import { ApproveParticipantModal } from '../../components/demo-days/ApproveParticipantModal';
 import { ApplicationDetailsModal } from '../../components/demo-days/ApplicationDetailsModal';
+import { DashboardWhitelistSection } from '../../components/demo-days/DashboardWhitelistSection';
 import { DemoDayParticipant, UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL, API_ROUTE } from '../../utils/constants';
 import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
@@ -221,6 +222,7 @@ const DemoDayDetailPage = () => {
       host: demoDay.host,
       status: demoDay.status,
       notificationsEnabled: demoDay.notificationsEnabled,
+      dashboardEnabled: demoDay.dashboardEnabled,
     });
     setIsEditing(true);
   };
@@ -412,7 +414,7 @@ const DemoDayDetailPage = () => {
     }
   };
 
-  const handleEditFormChange = (field: keyof UpdateDemoDayDto, value: string) => {
+  const handleEditFormChange = (field: keyof UpdateDemoDayDto, value: string | boolean) => {
     setEditFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -739,6 +741,33 @@ const DemoDayDetailPage = () => {
                         <div>Closing Soon: {formatHoursMessage(demoDay.notifyBeforeEndHours ?? 48)} before end</div>
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+              <div className={clsx(s.overviewField)}>
+                <label className={s.fieldLabel}>Founders Dashboard</label>
+                {isEditing && isDirectoryAdmin ? (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.dashboardEnabled || false}
+                      onChange={(e) => handleEditFormChange('dashboardEnabled', e.target.checked)}
+                      className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span className="text-sm text-gray-600">
+                      {editFormData.dashboardEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </label>
+                ) : (
+                  <div className={s.fieldValue}>
+                    <span
+                      className={clsx(
+                        'inline-flex rounded-full px-2 py-1 text-xs font-semibold',
+                        demoDay.dashboardEnabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      )}
+                    >
+                      {demoDay.dashboardEnabled ? 'Yes' : 'No'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1265,6 +1294,9 @@ const DemoDayDetailPage = () => {
               </div>
             </div>
           )}
+
+          {/* Dashboard Whitelist Section */}
+          <DashboardWhitelistSection demoDayUid={demoDay.uid} authToken={authToken ?? undefined} />
         </div>
 
         {/* Modals */}

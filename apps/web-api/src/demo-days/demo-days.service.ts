@@ -13,7 +13,7 @@ import { MembersService } from '../members/members.service';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
 import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, MemberRole } from '../utils/constants';
-import {NotificationServiceClient} from "../notifications/notification-service.client";
+import { NotificationServiceClient } from '../notifications/notification-service.client';
 
 type ExpressInterestStats = {
   liked: number;
@@ -78,7 +78,7 @@ export class DemoDaysService {
     private readonly membersService: MembersService,
     private readonly pushNotificationsService: PushNotificationsService,
     private readonly notificationServiceClient: NotificationServiceClient
-  ) {}
+  ) { }
 
   // Public methods
 
@@ -314,6 +314,7 @@ export class DemoDaysService {
         notificationsEnabled: true,
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
+        dashboardEnabled: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -380,6 +381,7 @@ export class DemoDaysService {
         notificationsEnabled: true,
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
+        dashboardEnabled: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -462,9 +464,9 @@ export class DemoDaysService {
             status: this.getExternalDemoDayStatus(
               demoDay.status,
               access === 'FOUNDER' ||
-                (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
-                  ?.hasEarlyAccess ??
-                  false)
+              (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
+                ?.hasEarlyAccess ??
+                false)
             ),
             teamsCount: access !== 'none' ? teamsCount : 0,
             investorsCount: access !== 'none' ? investorsCount : 0,
@@ -508,6 +510,7 @@ export class DemoDaysService {
         notificationsEnabled: true,
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
+        dashboardEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -541,6 +544,7 @@ export class DemoDaysService {
         notificationsEnabled: true,
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
+        dashboardEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -571,6 +575,7 @@ export class DemoDaysService {
       notificationsEnabled?: boolean;
       notifyBeforeStartHours?: number | null;
       notifyBeforeEndHours?: number | null;
+      dashboardEnabled?: boolean;
     },
     actorEmail?: string
   ): Promise<DemoDay> {
@@ -637,6 +642,9 @@ export class DemoDaysService {
     if (data.notifyBeforeEndHours !== undefined) {
       updateData.notifyBeforeEndHours = data.notifyBeforeEndHours;
     }
+    if (data.dashboardEnabled !== undefined) {
+      updateData.dashboardEnabled = data.dashboardEnabled;
+    }
 
     const updated = await this.prisma.demoDay.update({
       where: { uid },
@@ -657,6 +665,7 @@ export class DemoDaysService {
         notificationsEnabled: true,
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
+        dashboardEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -885,10 +894,10 @@ export class DemoDaysService {
           investorEmail: stat.member.email,
           fundOrAngel: fundOrAngel
             ? {
-                uid: fundOrAngel.uid,
-                name: fundOrAngel.name,
-                isFund: fundOrAngel.isFund,
-              }
+              uid: fundOrAngel.uid,
+              name: fundOrAngel.name,
+              isFund: fundOrAngel.isFund,
+            }
             : null,
           activity: {
             liked: stat.liked,
@@ -1030,6 +1039,12 @@ export class DemoDaysService {
 
     const normalizedEmail = applicationData.email.toLowerCase().trim();
 
+    this.logger.debug(
+      `[submitInvestorApplication] start demoDay=${demoDay.uid} slug=${demoDay.slugURL} email=${normalizedEmail} ` +
+      `isTeamNew=${!!applicationData.isTeamNew} teamUid=${applicationData.teamUid ?? '-'} projectUid=${applicationData.projectUid ?? '-'
+      }`
+    );
+
     // Check if a member already exists
     let member = await this.prisma.member.findFirst({
       where: {
@@ -1057,6 +1072,11 @@ export class DemoDaysService {
     // If a member doesn't exist, create a new one with L0 access level
     if (!member) {
       isNewMember = true;
+
+      this.logger.debug(
+        `[submitInvestorApplication] creating new member demoDay=${demoDay.uid} email=${normalizedEmail}`
+      );
+
       member = await this.prisma.member.create({
         data: {
           email: normalizedEmail,
@@ -1080,33 +1100,9 @@ export class DemoDaysService {
         },
       });
 
-      // If a new team is provided, create Team and TeamMemberRole (non-breaking extension)
-      if (applicationData.isTeamNew && applicationData.team?.name) {
-        const teamName = applicationData.team.name.trim();
-        const teamWebsite = applicationData.team.website?.trim() || null;
-
-        const createdTeam = await this.prisma.team.create({
-          data: {
-            name: teamName,
-            website: teamWebsite,
-            accessLevel: 'L0',
-          },
-          select: {
-            uid: true,
-          },
-        });
-
-        await this.prisma.teamMemberRole.create({
-          data: {
-            memberUid: member.uid,
-            teamUid: createdTeam.uid,
-            role: applicationData.role,
-            investmentTeam: true,
-          },
-        });
-      } else if (applicationData.teamUid) {
-        // If a teamUid is provided, create TeamMemberRole
-        // Check if TeamMemberRole already exists for this member-team combination
+      // If a teamUid is provided, create TeamMemberRole
+      // Check if TeamMemberRole already exists for this member-team combination
+      if (!applicationData.isTeamNew && applicationData.teamUid) {
         const existingRole = await this.prisma.teamMemberRole.findUnique({
           where: {
             memberUid_teamUid: {
@@ -1150,6 +1146,74 @@ export class DemoDaysService {
           });
         }
       }
+    } else {
+      this.logger.debug(
+        `[submitInvestorApplication] existing member found uid=${member.uid} email=${normalizedEmail} accessLevel=${member.accessLevel ?? '-'
+        }`
+      );
+    }
+
+    // ===========================
+    // create NEW TEAM also for existing/logged-in member
+    // set member as team lead
+    // ===========================
+    let createdTeamUid: string | null = null;
+    let createdTeamName: string | null = null;
+
+    if (applicationData.isTeamNew && applicationData.team?.name?.trim()) {
+      const teamName = applicationData.team.name.trim();
+      const teamWebsite = applicationData.team.website?.trim() || null;
+
+      this.logger.log(
+        `[submitInvestorApplication] creating NEW team for member uid=${member.uid} name="${teamName}" website=${teamWebsite ?? '-'
+        }`
+      );
+
+      const createdTeam = await this.prisma.team.create({
+        data: {
+          name: teamName,
+          website: teamWebsite,
+          accessLevel: 'L0',
+        },
+        select: {
+          uid: true,
+          name: true,
+        },
+      });
+
+      createdTeamUid = createdTeam.uid;
+      createdTeamName = createdTeam.name;
+
+      // Ensure membership exists (safe for retries)
+      const existingRole = await this.prisma.teamMemberRole.findUnique({
+        where: {
+          memberUid_teamUid: {
+            memberUid: member.uid,
+            teamUid: createdTeam.uid,
+          },
+        },
+      });
+
+      if (!existingRole) {
+        await this.prisma.teamMemberRole.create({
+          data: {
+            memberUid: member.uid,
+            teamUid: createdTeam.uid,
+            role: applicationData.role,
+            investmentTeam: true,
+            mainTeam: true,
+            teamLead: true
+          },
+        });
+
+        this.logger.log(
+          `[submitInvestorApplication] created TeamMemberRole for NEW team teamUid=${createdTeam.uid} memberUid=${member.uid} mainTeam=true`
+        );
+      } else {
+        this.logger.log(
+          `[submitInvestorApplication] TeamMemberRole already exists for NEW team teamUid=${createdTeam.uid} memberUid=${member.uid}`
+        );
+      }
     }
 
     // Create or update investor profile
@@ -1168,6 +1232,10 @@ export class DemoDaysService {
         where: { uid: member.uid },
         data: { investorProfileId: investorProfile.uid },
       });
+
+      this.logger.debug(
+        `[submitInvestorApplication] investorProfile created uid=${investorProfile.uid} memberUid=${member.uid}`
+      );
     } else if (applicationData.isAccreditedInvestor && !member.investorProfile.secRulesAccepted) {
       // Update existing profile if user accepted accredited investor terms
       await this.prisma.investorProfile.update({
@@ -1177,11 +1245,51 @@ export class DemoDaysService {
           secRulesAcceptedAt: new Date(),
         },
       });
+
+      this.logger.debug(
+        `[submitInvestorApplication] investorProfile updated secRulesAccepted=true memberUid=${member.uid}`
+      );
     }
 
     // Check if already a participant for this demo day
     if (member.demoDayParticipants && member.demoDayParticipants.length > 0) {
+      this.logger.warn(
+        `[submitInvestorApplication] already applied demoDay=${demoDay.uid} memberUid=${member.uid} email=${normalizedEmail}`
+      );
       throw new BadRequestException('You have already submitted an application for this demo day');
+    }
+
+    // If a teamUid is provided (existing team path), create TeamMemberRole
+    if (!applicationData.isTeamNew && applicationData.teamUid) {
+      const existingRole = await this.prisma.teamMemberRole.findUnique({
+        where: {
+          memberUid_teamUid: {
+            memberUid: member.uid,
+            teamUid: applicationData.teamUid,
+          },
+        },
+      });
+
+      // Only create if it doesn't exist
+      if (!existingRole) {
+        await this.prisma.teamMemberRole.create({
+          data: {
+            memberUid: member.uid,
+            teamUid: applicationData.teamUid,
+            role: applicationData.role,
+            investmentTeam: true,
+            mainTeam: true,
+          },
+        });
+
+        this.logger.debug(
+          `[submitInvestorApplication] created TeamMemberRole for existing team teamUid=${applicationData.teamUid} memberUid=${member.uid}`
+        );
+      } else {
+        this.logger.debug(
+          `[submitInvestorApplication] TeamMemberRole already exists for existing team teamUid=${applicationData.teamUid} memberUid=${member.uid}`
+        );
+      }
     }
 
     // Create a demo day participant with PENDING status
@@ -1193,6 +1301,10 @@ export class DemoDaysService {
         status: 'PENDING', // Pending approval from admin
       },
     });
+
+    this.logger.debug(
+      `[submitInvestorApplication] participant created uid=${participant.uid} demoDay=${demoDay.uid} memberUid=${member.uid} status=PENDING`
+    );
 
     // Track analytics event
     await this.analyticsService.trackEvent({
@@ -1214,6 +1326,10 @@ export class DemoDaysService {
     let resolvedTeamName: string | null =
       applicationData.isTeamNew && applicationData.team?.name?.trim() ? applicationData.team.name.trim() : null;
 
+    if (!resolvedTeamName && createdTeamName) {
+      resolvedTeamName = createdTeamName;
+    }
+
     if (!resolvedTeamName && applicationData.teamUid) {
       const team = await this.prisma.team.findUnique({
         where: { uid: applicationData.teamUid },
@@ -1229,9 +1345,14 @@ export class DemoDaysService {
       applicantName: applicationData.name ?? null,
       applicantEmail: normalizedEmail,
       teamName: resolvedTeamName,
-      teamUid: applicationData.teamUid ?? null,
+      teamUid: createdTeamUid ?? applicationData.teamUid ?? null,
       applicationStartDate: participant.createdAt
     });
+
+    this.logger.debug(
+      `[submitInvestorApplication] done participantUid=${participant.uid} isNewMember=${isNewMember} createdTeamUid=${createdTeamUid ?? '-'
+      }`
+    );
 
     return {
       participantUid: participant.uid,
@@ -1509,12 +1630,12 @@ export class DemoDaysService {
         demoDayParticipants: {
           where: demoDayUid
             ? {
-                demoDayUid,
-                isDeleted: false,
-              }
+              demoDayUid,
+              isDeleted: false,
+            }
             : {
-                isDeleted: false,
-              },
+              isDeleted: false,
+            },
           select: {
             uid: true,
             demoDayUid: true,
@@ -1807,6 +1928,156 @@ export class DemoDaysService {
     return `${base}/demo-days/${encodeURIComponent(demoDaySlugURL)}`;
   }
 
+  // Dashboard Whitelist methods
+
+  /**
+   * Get all whitelisted members for a demo day's founder dashboard
+   */
+  async getDashboardWhitelist(demoDayUid: string) {
+    // Get demo day to retrieve host
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUid);
+
+    // Query MemberDemoDayAdminScope WHERE scopeType='DASHBOARD_WHITELIST' AND scopeValue=demoDay.host
+    const whitelistScopes = await this.prisma.memberDemoDayAdminScope.findMany({
+      where: {
+        scopeType: 'DASHBOARD_WHITELIST',
+        scopeValue: demoDay.host,
+      },
+      include: {
+        member: {
+          select: {
+            uid: true,
+            name: true,
+            email: true,
+            image: {
+              select: {
+                url: true,
+              },
+            },
+            teamMemberRoles: {
+              where: {
+                mainTeam: true,
+              },
+              select: {
+                team: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    // Get demo day participants to check participant type/status
+    const memberUids = whitelistScopes.map((scope) => scope.memberUid);
+    const participants = await this.prisma.demoDayParticipant.findMany({
+      where: {
+        demoDayUid,
+        memberUid: { in: memberUids },
+        isDeleted: false,
+      },
+      select: {
+        memberUid: true,
+        type: true,
+        status: true,
+      },
+    });
+
+    const participantMap = new Map(participants.map((p) => [p.memberUid, p]));
+
+    return whitelistScopes.map((scope) => {
+      const participant = participantMap.get(scope.memberUid);
+      const teamName = scope.member.teamMemberRoles[0]?.team?.name || null;
+
+      return {
+        memberUid: scope.memberUid,
+        member: {
+          uid: scope.member.uid,
+          name: scope.member.name,
+          email: scope.member.email || '',
+          imageUrl: scope.member.image?.url || null,
+        },
+        participantType: (participant?.type || 'NONE') as 'INVESTOR' | 'FOUNDER' | 'SUPPORT' | 'NONE',
+        participantStatus: (participant?.status || 'NONE') as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED' | 'NONE',
+        teamName,
+      };
+    });
+  }
+
+  /**
+   * Add a member to the dashboard whitelist for a demo day
+   */
+  async addToDashboardWhitelist(demoDayUid: string, memberUid: string) {
+    // Get demo day to retrieve host
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUid);
+
+    // Verify member exists
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      select: { uid: true },
+    });
+
+    if (!member) {
+      throw new NotFoundException(`Member with uid ${memberUid} not found`);
+    }
+
+    // Check if already whitelisted (using host as scopeValue)
+    const existing = await this.prisma.memberDemoDayAdminScope.findFirst({
+      where: {
+        memberUid,
+        scopeType: 'DASHBOARD_WHITELIST',
+        scopeValue: demoDay.host,
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException('Member is already whitelisted for this demo day');
+    }
+
+    // Create the whitelist scope using host as scopeValue
+    await this.prisma.memberDemoDayAdminScope.create({
+      data: {
+        memberUid,
+        scopeType: 'DASHBOARD_WHITELIST',
+        scopeValue: demoDay.host,
+      },
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Remove a member from the dashboard whitelist for a demo day
+   */
+  async removeFromDashboardWhitelist(demoDayUid: string, memberUid: string) {
+    // Get demo day to retrieve host
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUid);
+
+    // Find the whitelist scope using host as scopeValue
+    const scope = await this.prisma.memberDemoDayAdminScope.findFirst({
+      where: {
+        memberUid,
+        scopeType: 'DASHBOARD_WHITELIST',
+        scopeValue: demoDay.host,
+      },
+    });
+
+    if (!scope) {
+      throw new NotFoundException('Member is not whitelisted for this demo day');
+    }
+
+    // Delete the scope
+    await this.prisma.memberDemoDayAdminScope.delete({
+      where: { id: scope.id },
+    });
+
+    return { success: true };
+  }
+
   private async sendTelegramNewDemoDayApplicationAlert(args: {
     demoDay: { uid: string; slugURL: string; title: string; host?: string | null };
     applicationStartDate: Date;
@@ -1865,6 +2136,4 @@ export class DemoDaysService {
       );
     }
   }
-
-
 }
