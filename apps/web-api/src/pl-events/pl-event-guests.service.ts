@@ -1539,7 +1539,7 @@ export class PLEventGuestsService {
   }
 
   async getAllPLEventGuest() {
-    return await this.fetchAttendees({
+    const rows = await this.fetchAttendees({
       locationUid: null,
       eventUids: [],
       isHost: undefined,
@@ -1557,7 +1557,63 @@ export class PLEventGuestsService {
       windowStart: null,
       windowEnd: null,
     });
+
+    return await this.attachRoleFlags(rows, { locationUid: null, eventUids: [] });
   }
+
+  private async attachRoleFlags(
+    attendees: any[],
+    scope: { locationUid?: string | null; eventUids?: string[] }
+  ) {
+    const memberUids = Array.from(new Set((attendees ?? []).map((x) => x?.memberUid).filter(Boolean)));
+    if (memberUids.length === 0) return attendees ?? [];
+
+    const safeEventUids = Array.isArray(scope?.eventUids) ? scope.eventUids.filter(Boolean) : [];
+    const hasEventFilter = safeEventUids.length > 0;
+
+    const rows: Array<{ memberUid: string; isHost: boolean; isSpeaker: boolean; isSponsor: boolean }> =
+      await this.prisma.$queryRawUnsafe(
+        `
+      SELECT
+        pg."memberUid" AS "memberUid",
+        BOOL_OR(pg."isHost")    AS "isHost",
+        BOOL_OR(pg."isSpeaker") AS "isSpeaker",
+        BOOL_OR(pg."isSponsor") AS "isSponsor"
+      FROM "PLEventGuest" pg
+      WHERE pg."memberUid" = ANY($1::text[])
+        AND ($2::text IS NULL OR pg."locationUid" = $2::text)
+        AND (
+          $3::boolean = false
+          OR (pg."eventUid" IS NOT NULL AND pg."eventUid" = ANY($4::text[]))
+        )
+      GROUP BY pg."memberUid"
+      `,
+        memberUids,
+        scope?.locationUid ?? null,
+        hasEventFilter,
+        safeEventUids
+      );
+
+    const map = new Map<string, { isHost: boolean; isSpeaker: boolean; isSponsor: boolean }>();
+    for (const r of rows) {
+      map.set(r.memberUid, {
+        isHost: !!r.isHost,
+        isSpeaker: !!r.isSpeaker,
+        isSponsor: !!r.isSponsor,
+      });
+    }
+
+    return (attendees ?? []).map((a) => {
+      const f = map.get(a.memberUid) ?? { isHost: false, isSpeaker: false, isSponsor: false };
+      return {
+        ...a,
+        isHost: f.isHost,
+        isSpeaker: f.isSpeaker,
+        isSponsor: f.isSponsor,
+      };
+    });
+  }
+
 
   /**
    * Determines the active team for a guest.

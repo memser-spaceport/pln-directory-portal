@@ -32,6 +32,42 @@ const NOTIFIABLE_STATUSES: DemoDayStatus[] = [
   DemoDayStatus.ACTIVE,
 ];
 
+export type ChannelType =
+  | 'SUPPORT'
+  | 'DEMO_DAY_SUBSCRIPTION'
+  | 'DEMO_DAY_APPLICATION'
+  | 'DEMO_DAY_APPLICATION_FOUNDERS_FORGE'
+  | 'DEMO_DAY_APPLICATION_CRECIMIENTO'
+  | 'DEMO_DAY_APPLICATION_FOUNDER_SCHOOL'
+  | 'DEMO_DAY_APPLICATION_PROTOCOL_LABS'
+  | 'DEFAULT';
+
+function formatDateMMDDYYYY(d: Date): string {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const yyyy = String(d.getFullYear());
+  return `${mm}.${dd}.${yyyy}`;
+}
+
+function resolveChannelTypeAndApplicationDate(args: {
+  host?: string | null;
+  applicationStartDate: Date;
+}): { channelType: ChannelType; applicationDate: string } {
+  const host = (args.host ?? '').trim().toLowerCase();
+
+  let channelType: ChannelType = 'DEMO_DAY_APPLICATION';
+
+  if (host === 'founders forge') channelType = 'DEMO_DAY_APPLICATION_FOUNDERS_FORGE';
+  else if (host === 'crecimiento') channelType = 'DEMO_DAY_APPLICATION_CRECIMIENTO';
+  else if (host === 'founder school') channelType = 'DEMO_DAY_APPLICATION_FOUNDER_SCHOOL';
+  else if (host === 'protocol labs') channelType = 'DEMO_DAY_APPLICATION_PROTOCOL_LABS';
+
+  return {
+    channelType,
+    applicationDate: formatDateMMDDYYYY(args.applicationStartDate),
+  };
+}
+
 @Injectable()
 export class DemoDaysService {
   private readonly logger = new Logger(DemoDaysService.name);
@@ -42,7 +78,7 @@ export class DemoDaysService {
     private readonly membersService: MembersService,
     private readonly pushNotificationsService: PushNotificationsService,
     private readonly notificationServiceClient: NotificationServiceClient
-  ) {}
+  ) { }
 
   // Public methods
 
@@ -428,9 +464,9 @@ export class DemoDaysService {
             status: this.getExternalDemoDayStatus(
               demoDay.status,
               access === 'FOUNDER' ||
-                (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
-                  ?.hasEarlyAccess ??
-                  false)
+              (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
+                ?.hasEarlyAccess ??
+                false)
             ),
             teamsCount: access !== 'none' ? teamsCount : 0,
             investorsCount: access !== 'none' ? investorsCount : 0,
@@ -858,10 +894,10 @@ export class DemoDaysService {
           investorEmail: stat.member.email,
           fundOrAngel: fundOrAngel
             ? {
-                uid: fundOrAngel.uid,
-                name: fundOrAngel.name,
-                isFund: fundOrAngel.isFund,
-              }
+              uid: fundOrAngel.uid,
+              name: fundOrAngel.name,
+              isFund: fundOrAngel.isFund,
+            }
             : null,
           activity: {
             liked: stat.liked,
@@ -1005,8 +1041,7 @@ export class DemoDaysService {
 
     this.logger.debug(
       `[submitInvestorApplication] start demoDay=${demoDay.uid} slug=${demoDay.slugURL} email=${normalizedEmail} ` +
-      `isTeamNew=${!!applicationData.isTeamNew} teamUid=${applicationData.teamUid ?? '-'} projectUid=${
-        applicationData.projectUid ?? '-'
+      `isTeamNew=${!!applicationData.isTeamNew} teamUid=${applicationData.teamUid ?? '-'} projectUid=${applicationData.projectUid ?? '-'
       }`
     );
 
@@ -1113,8 +1148,7 @@ export class DemoDaysService {
       }
     } else {
       this.logger.debug(
-        `[submitInvestorApplication] existing member found uid=${member.uid} email=${normalizedEmail} accessLevel=${
-          member.accessLevel ?? '-'
+        `[submitInvestorApplication] existing member found uid=${member.uid} email=${normalizedEmail} accessLevel=${member.accessLevel ?? '-'
         }`
       );
     }
@@ -1131,8 +1165,7 @@ export class DemoDaysService {
       const teamWebsite = applicationData.team.website?.trim() || null;
 
       this.logger.log(
-        `[submitInvestorApplication] creating NEW team for member uid=${member.uid} name="${teamName}" website=${
-          teamWebsite ?? '-'
+        `[submitInvestorApplication] creating NEW team for member uid=${member.uid} name="${teamName}" website=${teamWebsite ?? '-'
         }`
       );
 
@@ -1306,18 +1339,18 @@ export class DemoDaysService {
     }
 
     await this.sendTelegramNewDemoDayApplicationAlert({
-      demoDay: { uid: demoDay.uid, slugURL: demoDay.slugURL, title: demoDay.title },
+      demoDay: { uid: demoDay.uid, slugURL: demoDay.slugURL, title: demoDay.title, host: demoDay.host },
       participantUid: participant.uid,
       memberUid: member.uid,
       applicantName: applicationData.name ?? null,
       applicantEmail: normalizedEmail,
       teamName: resolvedTeamName,
       teamUid: createdTeamUid ?? applicationData.teamUid ?? null,
+      applicationStartDate: participant.createdAt
     });
 
     this.logger.debug(
-      `[submitInvestorApplication] done participantUid=${participant.uid} isNewMember=${isNewMember} createdTeamUid=${
-        createdTeamUid ?? '-'
+      `[submitInvestorApplication] done participantUid=${participant.uid} isNewMember=${isNewMember} createdTeamUid=${createdTeamUid ?? '-'
       }`
     );
 
@@ -1597,12 +1630,12 @@ export class DemoDaysService {
         demoDayParticipants: {
           where: demoDayUid
             ? {
-                demoDayUid,
-                isDeleted: false,
-              }
+              demoDayUid,
+              isDeleted: false,
+            }
             : {
-                isDeleted: false,
-              },
+              isDeleted: false,
+            },
           select: {
             uid: true,
             demoDayUid: true,
@@ -2046,7 +2079,8 @@ export class DemoDaysService {
   }
 
   private async sendTelegramNewDemoDayApplicationAlert(args: {
-    demoDay: { uid: string; slugURL: string; title: string };
+    demoDay: { uid: string; slugURL: string; title: string; host?: string | null };
+    applicationStartDate: Date;
     participantUid: string;
     memberUid: string;
     applicantName: string | null;
@@ -2056,11 +2090,22 @@ export class DemoDaysService {
   }): Promise<void> {
     const adminLink = this.buildAdminDemoDayLink(args.demoDay.slugURL);
 
+    const { channelType, applicationDate } = resolveChannelTypeAndApplicationDate({
+      host: args.demoDay.host,
+      applicationStartDate: args.applicationStartDate,
+    });
+
+    this.logger.log(
+      `demoDayApplication: channel=${channelType}, host="${args.demoDay.host ?? ''}", applicationDate=${applicationDate}`
+    );
+
     try {
       await this.notificationServiceClient.sendTelegramOutboxMessage({
-        channelType: 'DEMO_DAY_APPLICATION',
+        channelType,
         text: [
           '🔔 New Demo Day Application',
+          `Application Date: ${applicationDate}`,
+          `Host: ${args.demoDay.host ?? '-'}`,
           `Name: ${args.applicantName ?? '-'}`,
           `Email: ${args.applicantEmail ?? '-'}`,
           `Team: ${args.teamName ?? '-'}`,
@@ -2071,6 +2116,9 @@ export class DemoDaysService {
           demoDayUid: args.demoDay.uid,
           demoDaySlugURL: args.demoDay.slugURL,
           demoDayTitle: args.demoDay.title,
+          demoDayHost: args.demoDay.host ?? null,
+          applicationStartDate: args.applicationStartDate.toISOString(),
+          applicationDate,
           participantUid: args.participantUid,
           memberUid: args.memberUid,
           name: args.applicantName,
@@ -2078,12 +2126,13 @@ export class DemoDaysService {
           teamUid: args.teamUid ?? null,
           teamName: args.teamName ?? null,
           adminLink,
+          channelType,
         },
       });
     } catch (e) {
       this.logger.warn(
         `Failed to send Telegram alert for demo-day application. demoDayUid=${args.demoDay.uid}, participantUid=${args.participantUid}. ` +
-          (e instanceof Error ? e.message : String(e))
+        (e instanceof Error ? e.message : String(e))
       );
     }
   }
