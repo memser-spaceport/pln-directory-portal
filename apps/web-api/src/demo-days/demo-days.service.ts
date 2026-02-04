@@ -124,6 +124,7 @@ export class DemoDaysService {
     if (!memberEmail) {
       return {
         access: 'none',
+        uid: demoDay.uid,
         slugURL: demoDay.slugURL,
         status: this.getExternalDemoDayStatus(demoDay.status),
         date: demoDay.startDate.toISOString(),
@@ -144,6 +145,8 @@ export class DemoDaysService {
     if (!member || ['Rejected'].includes(member?.accessLevel ?? '')) {
       return {
         access: 'none',
+        uid: demoDay.uid,
+        slugURL: demoDay.slugURL,
         status: this.getExternalDemoDayStatus(demoDay.status),
         isPending: false,
       };
@@ -157,6 +160,8 @@ export class DemoDaysService {
     if (participant && participant.status !== 'ENABLED') {
       return {
         access: 'none',
+        uid: demoDay.uid,
+        slugURL: demoDay.slugURL,
         status: this.getExternalDemoDayStatus(demoDay.status),
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
@@ -208,6 +213,7 @@ export class DemoDaysService {
 
     return {
       access: 'none',
+      slugURL: demoDay.slugURL,
       status: this.getExternalDemoDayStatus(demoDay.status),
       date: demoDay.startDate.toISOString(),
       title: demoDay.title,
