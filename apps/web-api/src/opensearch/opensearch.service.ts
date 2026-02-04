@@ -8,6 +8,20 @@ export class OpenSearchService {
   private readonly client: Client;
 
   constructor() {
+    // Check if using local OpenSearch (no AWS credentials)
+    const useLocal = process.env.OPENSEARCH_LOCAL === 'true';
+    const localEndpoint = process.env.OPENSEARCH_LOCAL_ENDPOINT || 'http://localhost:9200';
+
+    if (useLocal) {
+      // Local OpenSearch connection (no auth)
+      this.client = new Client({
+        node: localEndpoint,
+      });
+      console.log(`OpenSearch: Connected to local instance at ${localEndpoint}`);
+      return;
+    }
+
+    // AWS OpenSearch Serverless connection
     const accessKeyId = process.env.AWS_OPENSEARCH_ACCESS_KEY_ID;
     const secretAccessKey = process.env.AWS_OPENSEARCH_SECRET_ACCESS_KEY;
     const region = process.env.AWS_OPENSEARCH_REGION;

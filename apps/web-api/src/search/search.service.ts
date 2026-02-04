@@ -52,6 +52,8 @@ export class SearchService {
       'shortDescription_suggest',
       'location_suggest',
       'timestamp_suggest',
+      'topicSlug',
+      'topicUrl',
     ]);
 
     const textFields = fields.filter((f) => !keywordOnly.has(f));
