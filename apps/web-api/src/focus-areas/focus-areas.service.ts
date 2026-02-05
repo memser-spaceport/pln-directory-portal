@@ -62,14 +62,22 @@ export class FocusAreasService {
 
   buildAncestorFocusAreasFilterByType(type, query): any {
     if (type === TEAM) {
+      const { plnFriend } = query;
+      const teamWhereClause: any = {
+        accessLevel: {
+          not: 'L0',
+        },
+      };
+
+      // Add plnFriend filter only if explicitly specified
+      if (plnFriend !== undefined) {
+        teamWhereClause.plnFriend = plnFriend === 'true';
+      }
+
       return {
         teamAncestorFocusAreas: {
           where: {
-            team: {
-              accessLevel: {
-                not: 'L0',
-              },
-            },
+            team: teamWhereClause,
           },
           select: {
             team: {
