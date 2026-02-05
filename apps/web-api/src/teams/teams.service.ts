@@ -1512,10 +1512,10 @@ export class TeamsService {
       });
     }
 
-    // plnFriend filter - by default exclude PLN friends (plnFriend: false)
-    if (filters.plnFriend !== 'true') {
+    // plnFriend filter - only apply if explicitly specified
+    if (filters.plnFriend !== undefined) {
       whereConditions.push({
-        plnFriend: false,
+        plnFriend: filters.plnFriend === 'true',
       });
     }
 

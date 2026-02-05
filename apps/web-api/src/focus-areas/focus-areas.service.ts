@@ -69,9 +69,9 @@ export class FocusAreasService {
         },
       };
 
-      // Add plnFriend filter - by default exclude PLN friends unless plnFriend=true is passed
-      if (plnFriend !== 'true') {
-        teamWhereClause.plnFriend = false;
+      // Add plnFriend filter only if explicitly specified
+      if (plnFriend !== undefined) {
+        teamWhereClause.plnFriend = plnFriend === 'true';
       }
 
       return {
