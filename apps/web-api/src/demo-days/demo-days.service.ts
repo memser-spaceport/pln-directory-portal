@@ -1361,6 +1361,7 @@ export class DemoDaysService {
     );
 
     return {
+      memberUid: member.uid,
       participantUid: participant.uid,
       isNewMember: isNewMember,
     };
