@@ -1098,6 +1098,7 @@ export class DemoDaysService {
           email: true,
           accessLevel: true,
           investorProfile: true,
+          linkedinHandler: true,
           demoDayParticipants: {
             where: {
               demoDayUid: demoDay.uid,
