@@ -1064,6 +1064,7 @@ export class DemoDaysService {
         email: true,
         accessLevel: true,
         investorProfile: true,
+        linkedinHandler: true,
         demoDayParticipants: {
           where: {
             demoDayUid: demoDay.uid,
@@ -1097,6 +1098,7 @@ export class DemoDaysService {
           email: true,
           accessLevel: true,
           investorProfile: true,
+          linkedinHandler: true,
           demoDayParticipants: {
             where: {
               demoDayUid: demoDay.uid,
@@ -1153,6 +1155,14 @@ export class DemoDaysService {
         }
       }
     } else {
+      await this.prisma.member.update({
+        where: { uid: member.uid },
+        data: {
+          linkedinHandler: applicationData.linkedinProfile || member.linkedinHandler,
+          role: applicationData.role?.trim(),
+        },
+      });
+
       this.logger.debug(
         `[submitInvestorApplication] existing member found uid=${member.uid} email=${normalizedEmail} accessLevel=${member.accessLevel ?? '-'
         }`
@@ -1175,6 +1185,21 @@ export class DemoDaysService {
         }`
       );
 
+      const existingTeam = await this.prisma.team.findFirst({
+        where: {
+          name: {
+            equals: teamName,
+            mode: 'insensitive',
+          },
+        },
+      });
+
+      if (existingTeam) {
+        throw new BadRequestException(
+          `Team '${teamName}' already exists. Please use a different name or select the existing team.`
+        );
+      }
+
       const createdTeam = await this.prisma.team.create({
         data: {
           name: teamName,
@@ -1191,14 +1216,13 @@ export class DemoDaysService {
       createdTeamName = createdTeam.name;
 
       // Ensure membership exists (safe for retries)
-      const existingRole = await this.prisma.teamMemberRole.findUnique({
+      const existingRoles = await this.prisma.teamMemberRole.findMany({
         where: {
-          memberUid_teamUid: {
-            memberUid: member.uid,
-            teamUid: createdTeam.uid,
-          },
+          memberUid: member.uid,
         },
       });
+      const existingMainTeamRole = existingRoles.find((r) => r.mainTeam);
+      const existingRole = existingRoles.find((r) => r.teamUid === createdTeam.uid);
 
       if (!existingRole) {
         await this.prisma.teamMemberRole.create({
@@ -1207,8 +1231,8 @@ export class DemoDaysService {
             teamUid: createdTeam.uid,
             role: applicationData.role,
             investmentTeam: true,
-            mainTeam: true,
-            teamLead: true
+            mainTeam: !existingMainTeamRole,
+            teamLead: true,
           },
         });
 
