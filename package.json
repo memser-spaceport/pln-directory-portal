@@ -14,6 +14,8 @@
     "api:prisma-sync": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && npx prisma db push --schema=./apps/web-api/prisma/schema.prisma",
     "api:prod-migrate-airtable-data": "node ./dist/apps/web-api/cli/cli.js migrate-airtable-data",
     "api:migrate-airtable-data": "ts-node apps/web-api/src/cli.ts migrate-airtable-data",
+    "api:enrich-funds:build": "nx run web-api:build-enrich-funds-cli",
+    "api:enrich-funds": "node dist/apps/web-api/enrich-funds-cli/enrich-funds-cli.js enrich-funds",
     "check:local": "npx nx workspace-lint && npx nx format:check && npx nx affected --target=lint && npx nx affected --target=test --ci --code-coverage && npx nx affected --target=build",
     "analyze:web": "WITH_BUNDLE_ANALYZER=true nx run web-app:build",
     "heroku-postbuild": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && npx prisma generate --schema=./apps/web-api/prisma/oso-schema.prisma && nx build $PROJECT_NAME --prod && npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma && npx prisma db execute --file ./apps/web-api/prisma/migrations/fix_m2m_forest_admin.sql && nx run web-api:build-cli",
