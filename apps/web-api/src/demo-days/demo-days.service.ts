@@ -1175,6 +1175,21 @@ export class DemoDaysService {
         }`
       );
 
+      const existingTeam = await this.prisma.team.findFirst({
+        where: {
+          name: {
+            equals: teamName,
+            mode: 'insensitive',
+          },
+        },
+      });
+
+      if (existingTeam) {
+        throw new BadRequestException(
+          `Team '${teamName}' already exists. Please use a different name or select the existing team.`
+        );
+      }
+
       const createdTeam = await this.prisma.team.create({
         data: {
           name: teamName,
@@ -1208,7 +1223,7 @@ export class DemoDaysService {
             role: applicationData.role,
             investmentTeam: true,
             mainTeam: true,
-            teamLead: true
+            teamLead: true,
           },
         });
 
