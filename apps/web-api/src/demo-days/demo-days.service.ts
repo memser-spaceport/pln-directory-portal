@@ -1064,6 +1064,7 @@ export class DemoDaysService {
         email: true,
         accessLevel: true,
         investorProfile: true,
+        linkedinHandler: true,
         demoDayParticipants: {
           where: {
             demoDayUid: demoDay.uid,
@@ -1156,7 +1157,7 @@ export class DemoDaysService {
       await this.prisma.member.update({
         where: { uid: member.uid },
         data: {
-          linkedinHandler: applicationData.linkedinProfile,
+          linkedinHandler: applicationData.linkedinProfile || member.linkedinHandler,
           role: applicationData.role?.trim(),
         },
       });
