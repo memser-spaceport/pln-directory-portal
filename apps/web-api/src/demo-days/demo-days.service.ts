@@ -1153,6 +1153,14 @@ export class DemoDaysService {
         }
       }
     } else {
+      await this.prisma.member.update({
+        where: { uid: member.uid },
+        data: {
+          linkedinHandler: applicationData.linkedinProfile,
+          role: applicationData.role?.trim(),
+        },
+      });
+
       this.logger.debug(
         `[submitInvestorApplication] existing member found uid=${member.uid} email=${normalizedEmail} accessLevel=${member.accessLevel ?? '-'
         }`
