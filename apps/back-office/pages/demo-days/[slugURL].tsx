@@ -1217,7 +1217,8 @@ const DemoDayDetailPage = () => {
                             >
                               Approve
                             </button>
-                            <button
+                            {/* Temporarily disabled reject flow */}
+                            {/* <button
                               onClick={() =>
                                 handleReject(participant.uid, participant.member?.name || participant.name)
                               }
@@ -1226,7 +1227,7 @@ const DemoDayDetailPage = () => {
                               title="Reject application"
                             >
                               Reject
-                            </button>
+                            </button> */}
                           </div>
                         ) : (
                           <select
