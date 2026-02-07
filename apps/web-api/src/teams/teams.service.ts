@@ -40,7 +40,7 @@ export class TeamsService {
     private cacheService: CacheService,
     private askService: AskService,
     private teamsHooksService: TeamsHooksService
-  ) {}
+  ) { }
 
   /**
    * Find all teams based on provided query options.
@@ -485,8 +485,8 @@ export class TeamsService {
     team['logo'] = teamData.logoUid
       ? { connect: { uid: teamData.logoUid } }
       : type === 'Update'
-      ? { disconnect: true }
-      : undefined;
+        ? { disconnect: true }
+        : undefined;
 
     // Handle investor profile
     let investorProfileData: any;
@@ -1379,22 +1379,22 @@ export class TeamsService {
           where: { memberUid_teamUid: { memberUid: requestorMember.uid, teamUid } },
           select: { teamLead: true },
         });
-        if (!myRole?.teamLead && !requestorMember.isDirectoryAdmin) {
-          throw new ForbiddenException('Only team lead or directory admin can update investor settings');
-        }
+        const hasAccess = requestorMember.isDirectoryAdmin || myRole?.teamLead;
 
-        // Update team.isFund if requested
-        if (isFund !== undefined) {
-          await tx.team.update({ where: { uid: teamUid }, data: { isFund } });
-        }
+        if (hasAccess) {
+          // Update team.isFund if requested
+          if (isFund !== undefined) {
+            await tx.team.update({ where: { uid: teamUid }, data: { isFund } });
+          }
 
-        // Create/update investor profile (no global ACLs here; team lead is enough)
-        if (investorProfile) {
-          await this.upsertInvestorProfileAsTeamLead(tx, teamUid, investorProfile);
-        }
+          // Create/update investor profile (no global ACLs here; team lead is enough)
+          if (investorProfile) {
+            await this.upsertInvestorProfileAsTeamLead(tx, teamUid, investorProfile);
+          }
 
-        if (website !== undefined) {
-          await tx.team.update({ where: { uid: teamUid }, data: { website } });
+          if (website !== undefined) {
+            await tx.team.update({ where: { uid: teamUid }, data: { website } });
+          }
         }
       }
 
@@ -1623,17 +1623,17 @@ export class TeamsService {
         SELECT DISTINCT t.id FROM "Team" t
         INNER JOIN "InvestorProfile" ip ON t."investorProfileId" = ip.uid
         WHERE ${Prisma.raw(
-          focusArray
-            .map(
-              (focus) => `
+        focusArray
+          .map(
+            (focus) => `
               EXISTS (
                 SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item
                 WHERE LOWER(focus_item) LIKE LOWER('%${focus.replace(/'/g, "''")}%')
               )
             `
-            )
-            .join(' OR ')
-        )}
+          )
+          .join(' OR ')
+      )}
       `;
 
       if (matchingTeamIds.length > 0) {
