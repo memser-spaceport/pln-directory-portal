@@ -43,7 +43,7 @@ export class AdminDemoDaysController {
     private readonly demoDaysService: DemoDaysService,
     private readonly demoDayParticipantsService: DemoDayParticipantsService,
     private readonly notificationServiceClient: NotificationServiceClient
-  ) {}
+  ) { }
 
   @Get('subscribers')
   @UseGuards(DemoDayAdminAuthGuard)
