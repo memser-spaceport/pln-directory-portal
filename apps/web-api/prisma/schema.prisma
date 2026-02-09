@@ -1236,6 +1236,7 @@ model PushNotification {
   // - Access level notifications: WHERE array_length(accessLevels, 1) > 0
   @@index([isPublic])
   @@index([recipientUid, isPublic, isRead])
+  @@index([link])
 }
 
 // Tracks read status per user for public notifications
