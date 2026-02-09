@@ -255,7 +255,7 @@ export class PushNotificationsService {
 
     const paginatedNotifications = notifications.slice(offset, offset + limit);
 
-     // ---- IRL: compute isAttended per user (only for returned page) ----
+    // ---- IRL: compute isAttended per user (only for returned page) ----
     const irlPage = paginatedNotifications.filter(
       (n) =>
         n.category === PushNotificationCategory.IRL_GATHERING &&
@@ -264,17 +264,9 @@ export class PushNotificationsService {
         (n.metadata as any)?.ui?.locationUid
     );
 
-    const locationUids = [
-      ...new Set(
-        irlPage
-          .map((n) => (n.metadata as any).ui.locationUid)
-          .filter(Boolean)
-      ),
-    ];
+    const locationUids = [...new Set(irlPage.map((n) => (n.metadata as any).ui.locationUid).filter(Boolean))];
 
     if (locationUids.length > 0) {
-      const now = new Date();
-
       const attendedRows = await this.prisma.pLEventGuest.findMany({
         where: {
           memberUid: realMemberUid,
@@ -361,6 +353,64 @@ export class PushNotificationsService {
     }
 
     return privateUnread + (totalPublic - readPublic) + accessLevelUnread;
+  }
+
+  /**
+   * Get all unread notification links for a user.
+   * Only returns notifications that have a non-null link.
+   */
+  async getUnreadLinksForUser(memberUid: string): Promise<Array<{ uid: string; link: string }>> {
+    const member = await this.prisma.member.findFirst({
+      where: { externalId: memberUid },
+      select: { accessLevel: true },
+    });
+
+    const userAccessLevel = member?.accessLevel;
+
+    // Unread private notifications with links
+    const privateLinks = await this.prisma.pushNotification.findMany({
+      where: {
+        recipientUid: memberUid,
+        isPublic: false,
+        isRead: false,
+        link: { not: null },
+      },
+      select: { uid: true, link: true },
+    });
+
+    // Unread public notifications with links (no read status for this user)
+    const publicLinks = await this.prisma.pushNotification.findMany({
+      where: {
+        isPublic: true,
+        link: { not: null },
+        readStatuses: {
+          none: { memberUid },
+        },
+      },
+      select: { uid: true, link: true },
+    });
+
+    // Unread access-level notifications with links
+    const accessLevelLinks = userAccessLevel
+      ? await this.prisma.pushNotification.findMany({
+          where: {
+            accessLevels: { has: userAccessLevel },
+            isPublic: false,
+            recipientUid: null,
+            link: { not: null },
+            readStatuses: {
+              none: { memberUid },
+            },
+          },
+          select: { uid: true, link: true },
+        })
+      : [];
+
+    return [
+      ...privateLinks.map((n) => ({ uid: n.uid, link: n.link as string })),
+      ...publicLinks.map((n) => ({ uid: n.uid, link: n.link as string })),
+      ...accessLevelLinks.map((n) => ({ uid: n.uid, link: n.link as string })),
+    ];
   }
 
   /**
