@@ -177,3 +177,41 @@ export interface UpdateParticipantDto {
   hasEarlyAccess?: boolean;
   isDemoDayAdmin?: boolean;
 }
+
+export type TeamLeadRequestStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED';
+
+export interface TeamLeadRequestParticipant {
+  uid: string;
+  demoDayUid: string;
+  memberUid: string;
+  type: 'FOUNDER';
+  teamUid: string;
+  teamLeadRequestStatus: TeamLeadRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+  member?: {
+    uid: string;
+    name: string;
+    email: string;
+    image?: {
+      uid: string;
+      url: string;
+    };
+  };
+  team?: {
+    uid: string;
+    name: string;
+  };
+}
+
+export interface TeamLeadRequestsListResponse {
+  requests: TeamLeadRequestParticipant[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface ReviewTeamLeadRequestDto {
+  action: 'APPROVE' | 'REJECT';
+}

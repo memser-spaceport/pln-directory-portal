@@ -87,3 +87,6 @@ export const DemoDaySubscriptionStatusResponseSchema = z.object({
 });
 
 export class DemoDaySubscriptionStatusResponseDto extends createZodDto(DemoDaySubscriptionStatusResponseSchema) {}
+
+export const RequestTeamLeadSchema = z.object({});
+export class RequestTeamLeadDto extends createZodDto(RequestTeamLeadSchema) {}

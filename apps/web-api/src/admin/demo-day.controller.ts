@@ -17,6 +17,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
 import { DemoDaysService } from '../demo-days/demo-days.service';
 import { DemoDayParticipantsService } from '../demo-days/demo-day-participants.service';
+import { DemoDayTeamLeadRequestsService } from '../demo-days/demo-day-team-lead-requests.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { DemoDayStatus } from '@prisma/client';
 import {
@@ -32,6 +33,9 @@ import {
   ResponseParticipantsListDto,
   AddDashboardWhitelistMemberDto,
   DashboardWhitelistMemberDto,
+  GetTeamLeadRequestsQueryDto,
+  ReviewTeamLeadRequestDto,
+  ResponseTeamLeadRequestsListDto,
 } from 'libs/contracts/src/schema/admin-demo-day';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { QueryCache } from '../decorators/query-cache.decorator';
@@ -42,6 +46,7 @@ export class AdminDemoDaysController {
   constructor(
     private readonly demoDaysService: DemoDaysService,
     private readonly demoDayParticipantsService: DemoDayParticipantsService,
+    private readonly demoDayTeamLeadRequestsService: DemoDayTeamLeadRequestsService,
     private readonly notificationServiceClient: NotificationServiceClient
   ) { }
 
@@ -265,5 +270,41 @@ export class AdminDemoDaysController {
     @Param('memberUid') memberUid: string
   ): Promise<{ success: boolean }> {
     return this.demoDaysService.removeFromDashboardWhitelist(uid, memberUid);
+  }
+
+  // Team Lead Requests
+
+  @Get(':uid/team-lead-requests')
+  @UseGuards(DemoDayAdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async getTeamLeadRequests(
+    @Param('uid') demoDayUid: string,
+    @Query() query: GetTeamLeadRequestsQueryDto
+  ): Promise<ResponseTeamLeadRequestsListDto> {
+    return this.demoDayTeamLeadRequestsService.getRequests(demoDayUid, {
+      page: query.page,
+      limit: query.limit,
+      status: query.status,
+      search: query.search,
+    });
+  }
+
+  @Patch(':demoDayUid/team-lead-requests/:participantUid')
+  @UseGuards(DemoDayAdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async reviewTeamLeadRequest(
+    @Req() req,
+    @Param('demoDayUid') demoDayUid: string,
+    @Param('participantUid') participantUid: string,
+    @Body() body: ReviewTeamLeadRequestDto
+  ) {
+    return this.demoDayTeamLeadRequestsService.reviewRequest(
+      demoDayUid,
+      participantUid,
+      body.action,
+      req.userEmail
+    );
   }
 }

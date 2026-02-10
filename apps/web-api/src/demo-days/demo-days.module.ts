@@ -13,6 +13,7 @@ import { MembersModule } from '../members/members.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TeamsModule } from '../teams/teams.module';
 import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
+import { DemoDayTeamLeadRequestsService } from './demo-day-team-lead-requests.service';
 import { DemoDayNotificationsJob } from './demo-day-notifications.job';
 
 @Module({
@@ -32,8 +33,9 @@ import { DemoDayNotificationsJob } from './demo-day-notifications.job';
     DemoDayFundraisingProfilesService,
     DemoDayEngagementService,
     DemoDayEngagementAnalyticsService,
+    DemoDayTeamLeadRequestsService,
     DemoDayNotificationsJob,
   ],
-  exports: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService],
+  exports: [DemoDaysService, DemoDayParticipantsService, DemoDayFundraisingProfilesService, DemoDayTeamLeadRequestsService],
 })
 export class DemoDaysModule {}
