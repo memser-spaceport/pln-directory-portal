@@ -470,16 +470,14 @@ export class DemoDaysService {
             status: this.getExternalDemoDayStatus(
               demoDay.status,
               access === 'FOUNDER' ||
-              (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
-                ?.hasEarlyAccess ??
-                false)
+                (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
+                  ?.hasEarlyAccess ??
+                  false)
             ),
             teamsCount: access !== 'none' ? teamsCount : 0,
             investorsCount: access !== 'none' ? investorsCount : 0,
             confidentialityAccepted,
           };
-
-          console.log(demoDay.slugURL, access);
 
           // Only include these fields for authorized users
           if (access !== 'none') {
