@@ -62,6 +62,24 @@ export class PushNotificationsController {
   }
 
   /**
+   * Get all unread notification links for the current user.
+   * Returns lightweight { uid, link } pairs for client-side matching.
+   *
+   * GET /v1/push-notifications/unread-links
+   */
+  @Get('unread-links')
+  @NoCache()
+  async getUnreadLinks(@Req() req) {
+    const member = await this.membersService.findMemberByEmail(req.userEmail);
+    if (!member) {
+      return { unreadLinks: [] };
+    }
+
+    const unreadLinks = await this.pushNotificationsService.getUnreadLinksForUser(member.externalId);
+    return { unreadLinks };
+  }
+
+  /**
    * Mark a notification as read.
    *
    * PATCH /v1/push-notifications/:uid/read
