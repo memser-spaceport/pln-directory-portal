@@ -859,6 +859,13 @@ const DemoDayDetailPage = () => {
                   Applications {participants && activeTab === 'applications' && `(${participants.total})`}
                 </button>
                 <button
+                  className={clsx(s.tab, { [s.active]: activeTab === 'teamLeadRequests' })}
+                  onClick={() => setActiveTab('teamLeadRequests')}
+                >
+                  Team Lead Requests{' '}
+                  {teamLeadRequests && activeTab === 'teamLeadRequests' && `(${teamLeadRequests.total})`}
+                </button>
+                <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'investors' })}
                   onClick={() => setActiveTab('investors')}
                 >
@@ -884,13 +891,6 @@ const DemoDayDetailPage = () => {
                   {participants &&
                     activeTab === 'support' &&
                     `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
-                </button>
-                <button
-                  className={clsx(s.tab, { [s.active]: activeTab === 'teamLeadRequests' })}
-                  onClick={() => setActiveTab('teamLeadRequests')}
-                >
-                  Team Lead Requests{' '}
-                  {teamLeadRequests && activeTab === 'teamLeadRequests' && `(${teamLeadRequests.total})`}
                 </button>
               </div>
 
