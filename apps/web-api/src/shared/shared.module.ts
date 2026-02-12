@@ -13,6 +13,9 @@ import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { FileEncryptionService } from '../utils/file-encryption/file-encryption.service';
 import { CacheService } from '../utils/cache/cache.service';
 import { HuskyDataIngestionService } from './husky-data-ingestion.service'; 
+import { LumaGuestProvider } from '../utils/luma/luma-guest.provider';
+import { LumaApiService } from '../utils/luma/luma-api.service';
+
 
 @Global()
 @Module({
@@ -21,6 +24,8 @@ import { HuskyDataIngestionService } from './husky-data-ingestion.service';
     OsoPrismaService,
     LogService,
     Logger,
+    LumaApiService,
+    LumaGuestProvider,
     ForestAdminService,
     AwsService,
     SlackService,
@@ -37,6 +42,8 @@ import { HuskyDataIngestionService } from './husky-data-ingestion.service';
     PrismaService,
     OsoPrismaService,
     LogService,
+    LumaApiService,
+    LumaGuestProvider,
     ForestAdminService,
     AwsService,
     SlackService,

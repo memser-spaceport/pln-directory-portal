@@ -63,6 +63,9 @@ const eventFactory = Factory.define<Omit<PLEvent, 'id'>>(({ sequence, onCreate }
     locationStatus: 'AUTO_MAPPED' as PLEventLocationStatus,
     reviewerUid: null,
     pLEventLocationAssociationUid: null,
+    externalEventProvider: null,
+    externalEventId: null,
+    guestLastSyncedAt: null,
   };
 });
 

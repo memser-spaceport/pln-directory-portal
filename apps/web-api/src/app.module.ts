@@ -58,6 +58,7 @@ import { DemoDaysModule } from './demo-days/demo-days.module';
 import { ContactSupportModule } from './contact-support/contact-support.module';
 import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 import { WebSocketModule } from './websocket/websocket.module';
+import { PLEventGuestSyncModule } from './pl-events/pl-event-guest-sync/pl-event-guest-sync.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -137,6 +138,7 @@ import { WebSocketModule } from './websocket/websocket.module';
     ContactSupportModule,
     PushNotificationsModule,
     WebSocketModule,
+    PLEventGuestSyncModule,
   ],
   providers: [
     {
