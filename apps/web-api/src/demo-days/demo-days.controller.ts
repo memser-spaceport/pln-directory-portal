@@ -22,6 +22,7 @@ import { DemoDaysService } from './demo-days.service';
 import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profiles.service';
 import { DemoDayEngagementService } from './demo-day-engagement.service';
 import { DemoDayEngagementAnalyticsService } from './demo-day-engagement-analytics.service';
+import { DemoDayTeamLeadRequestsService } from './demo-day-team-lead-requests.service';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UploadsService } from '../uploads/uploads.service';
@@ -49,7 +50,8 @@ export class DemoDaysController {
     private readonly demoDayFundraisingProfilesService: DemoDayFundraisingProfilesService,
     private readonly uploadsService: UploadsService,
     private readonly demoDayEngagementService: DemoDayEngagementService,
-    private readonly demoDayEngagementAnalyticsService: DemoDayEngagementAnalyticsService
+    private readonly demoDayEngagementAnalyticsService: DemoDayEngagementAnalyticsService,
+    private readonly demoDayTeamLeadRequestsService: DemoDayTeamLeadRequestsService
   ) {}
 
   @Get()
@@ -502,5 +504,12 @@ export class DemoDaysController {
     @Body() body: CreateDemoDayInvestorApplicationDto
   ) {
     return this.demoDaysService.submitInvestorApplication(body, demoDayUidOrSlug);
+  }
+
+  @Post(':demoDayUidOrSlug/team-lead-request')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async requestTeamLead(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Req() req) {
+    return this.demoDayTeamLeadRequestsService.createRequest(req.userEmail, demoDayUidOrSlug);
   }
 }

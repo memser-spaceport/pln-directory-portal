@@ -1017,6 +1017,12 @@ enum DemoDayParticipantStatus {
   DISABLED
 }
 
+enum TeamLeadRequestStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
 model DemoDay {
   id                        Int                               @id @default(autoincrement())
   uid                       String                            @unique @default(cuid())
@@ -1071,6 +1077,7 @@ model DemoDayParticipant {
   confidentialityAccepted Boolean                  @default(false)
   teamUid                 String?
   team                    Team?                    @relation(fields: [teamUid], references: [uid])
+  teamLeadRequestStatus   TeamLeadRequestStatus?
   statusUpdatedAt         DateTime                 @default(now())
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt

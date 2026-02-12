@@ -7,12 +7,14 @@ import { useDemoDayDetails } from '../../hooks/demo-days/useDemoDayDetails';
 import { useDemoDayParticipants } from '../../hooks/demo-days/useDemoDayParticipants';
 import { useUpdateDemoDay } from '../../hooks/demo-days/useUpdateDemoDay';
 import { useUpdateParticipant } from '../../hooks/demo-days/useUpdateParticipant';
+import { useTeamLeadRequests } from '../../hooks/demo-days/useTeamLeadRequests';
+import { useReviewTeamLeadRequest } from '../../hooks/demo-days/useReviewTeamLeadRequest';
 import { AddParticipantModal } from '../../components/demo-days/AddParticipantModal';
 import { UploadParticipantsModal } from '../../components/demo-days/UploadParticipantsModal';
 import { ApproveParticipantModal } from '../../components/demo-days/ApproveParticipantModal';
 import { ApplicationDetailsModal } from '../../components/demo-days/ApplicationDetailsModal';
 import { DashboardWhitelistSection } from '../../components/demo-days/DashboardWhitelistSection';
-import { DemoDayParticipant, UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
+import { DemoDayParticipant, UpdateDemoDayDto, TeamLeadRequestStatus } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL, API_ROUTE } from '../../utils/constants';
 import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
 import { RichText } from '../../components/common/rich-text';
@@ -82,7 +84,7 @@ const DemoDayDetailPage = () => {
     }
   }, [authToken, router]);
 
-  const [activeTab, setActiveTab] = useState<'investors' | 'founders' | 'support' | 'applications'>('applications');
+  const [activeTab, setActiveTab] = useState<'investors' | 'founders' | 'support' | 'applications' | 'teamLeadRequests'>('applications');
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -110,17 +112,22 @@ const DemoDayDetailPage = () => {
   } | null>(null);
   const [pendingSaveData, setPendingSaveData] = useState<UpdateDemoDayDto | null>(null);
 
+  const [teamLeadRequestStatusFilter, setTeamLeadRequestStatusFilter] = useState<TeamLeadRequestStatus | ''>('');
+
   const updateDemoDayMutation = useUpdateDemoDay();
   const updateParticipantMutation = useUpdateParticipant();
+  const reviewTeamLeadRequestMutation = useReviewTeamLeadRequest();
 
   const { data: demoDay, isLoading: demoDayLoading } = useDemoDayDetails({
     authToken,
     slugURL: slugURL as string,
   });
 
+  const isTeamLeadRequestsTab = activeTab === 'teamLeadRequests';
+
   const { data: participants, isLoading: participantsLoading } = useDemoDayParticipants({
     authToken,
-    demoDayUid: demoDay?.uid as string,
+    demoDayUid: isTeamLeadRequestsTab ? '' : (demoDay?.uid as string),
     query: {
       type:
         activeTab === 'applications'
@@ -135,6 +142,17 @@ const DemoDayDetailPage = () => {
         activeTab === 'applications'
           ? 'PENDING'
           : (statusFilter as 'PENDING' | 'INVITED' | 'ENABLED' | 'DISABLED') || undefined,
+      page: currentPage,
+      limit: 50,
+    },
+  });
+
+  const { data: teamLeadRequests, isLoading: teamLeadRequestsLoading } = useTeamLeadRequests({
+    authToken,
+    demoDayUid: isTeamLeadRequestsTab ? (demoDay?.uid as string) : '',
+    query: {
+      search: searchTerm || undefined,
+      status: (teamLeadRequestStatusFilter as TeamLeadRequestStatus) || undefined,
       page: currentPage,
       limit: 50,
     },
@@ -411,6 +429,23 @@ const DemoDayDetailPage = () => {
     }
   };
 
+  const handleReviewTeamLeadRequest = async (participantUid: string, action: 'APPROVE' | 'REJECT') => {
+    if (!authToken || !demoDay) return;
+
+    try {
+      await reviewTeamLeadRequestMutation.mutateAsync({
+        authToken,
+        demoDayUid: demoDay.uid,
+        participantUid,
+        data: { action },
+      });
+      toast.success(action === 'APPROVE' ? 'Team lead request approved' : 'Team lead request rejected');
+    } catch (error) {
+      console.error('Error reviewing team lead request:', error);
+      toast.error('Failed to review team lead request. Please try again.');
+    }
+  };
+
   const handleEditFormChange = (field: keyof UpdateDemoDayDto, value: string | boolean) => {
     setEditFormData((prev) => ({
       ...prev,
@@ -498,7 +533,8 @@ const DemoDayDetailPage = () => {
   };
 
   const handleNextPage = () => {
-    if (participants?.totalPages && currentPage < participants.totalPages) {
+    const paginationData = activeTab === 'teamLeadRequests' ? teamLeadRequests : participants;
+    if (paginationData?.totalPages && currentPage < paginationData.totalPages) {
       setCurrentPage(currentPage + 1);
     }
   };
@@ -512,7 +548,7 @@ const DemoDayDetailPage = () => {
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, statusFilter]);
+  }, [activeTab, searchTerm, statusFilter, teamLeadRequestStatusFilter]);
 
   // Don't render if not authenticated
   if (!authToken) {
@@ -823,6 +859,13 @@ const DemoDayDetailPage = () => {
                   Applications {participants && activeTab === 'applications' && `(${participants.total})`}
                 </button>
                 <button
+                  className={clsx(s.tab, { [s.active]: activeTab === 'teamLeadRequests' })}
+                  onClick={() => setActiveTab('teamLeadRequests')}
+                >
+                  Team Lead Requests{' '}
+                  {teamLeadRequests && activeTab === 'teamLeadRequests' && `(${teamLeadRequests.total})`}
+                </button>
+                <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'investors' })}
                   onClick={() => setActiveTab('investors')}
                 >
@@ -860,7 +903,18 @@ const DemoDayDetailPage = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className={clsx(s.input)}
                 />
-                {activeTab !== 'applications' && (
+                {activeTab === 'teamLeadRequests' ? (
+                  <select
+                    value={teamLeadRequestStatusFilter}
+                    onChange={(e) => setTeamLeadRequestStatusFilter(e.target.value as TeamLeadRequestStatus | '')}
+                    className={s.filterSelect}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="REQUESTED">Requested</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="REJECTED">Rejected</option>
+                  </select>
+                ) : activeTab !== 'applications' ? (
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
@@ -871,13 +925,95 @@ const DemoDayDetailPage = () => {
                     <option value="ENABLED">Enabled</option>
                     <option value="DISABLED">Disabled</option>
                   </select>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
 
+          {/* Team Lead Requests Table */}
+          {isTeamLeadRequestsTab && (
+            <div className={s.participantsTable}>
+              {teamLeadRequestsLoading ? (
+                <div className={s.loadingState}>Loading team lead requests...</div>
+              ) : !teamLeadRequests || teamLeadRequests.requests?.length === 0 ? (
+                <div className={s.emptyState}>No team lead requests found</div>
+              ) : (
+                <div className={s.table}>
+                  <div className={clsx(s.tableRow, s.tableHeader)}>
+                    <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
+                    <div className={clsx(s.headerCell, s.flexible)}>Team</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 180 }}>Submitted</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 120 }}>Status</div>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 200 }}>Action</div>
+                  </div>
+
+                  {teamLeadRequests.requests.map((request) => (
+                    <div key={request.uid} className={s.tableRow}>
+                      <div className={clsx(s.bodyCell, s.first, s.flexible)}>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {request.member?.name || '-'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {request.member?.email || '-'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={clsx(s.bodyCell, s.flexible)}>
+                        <span className="text-sm text-gray-900">{request.team?.name || '-'}</span>
+                      </div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 180 }}>
+                        <span className="text-sm text-gray-500">
+                          {new Date(request.updatedAt).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                      </div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 120 }}>
+                        <span
+                          className={clsx(
+                            'inline-flex rounded-full px-2 py-1 text-xs font-semibold',
+                            request.teamLeadRequestStatus === 'REQUESTED' && 'bg-yellow-100 text-yellow-800',
+                            request.teamLeadRequestStatus === 'APPROVED' && 'bg-green-100 text-green-800',
+                            request.teamLeadRequestStatus === 'REJECTED' && 'bg-red-100 text-red-800'
+                          )}
+                        >
+                          {request.teamLeadRequestStatus}
+                        </span>
+                      </div>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
+                        {request.teamLeadRequestStatus === 'REQUESTED' ? (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleReviewTeamLeadRequest(request.uid, 'APPROVE')}
+                              disabled={reviewTeamLeadRequestMutation.isPending}
+                              className="flex-1 rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleReviewTeamLeadRequest(request.uid, 'REJECT')}
+                              disabled={reviewTeamLeadRequestMutation.isPending}
+                              className="flex-1 rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Participants Table */}
-          <div className={s.participantsTable}>
+          {!isTeamLeadRequestsTab && <div className={s.participantsTable}>
             {participantsLoading ? (
               <div className={s.loadingState}>Loading participants...</div>
             ) : !participants || participants.participants?.length === 0 ? (
@@ -1257,21 +1393,34 @@ const DemoDayDetailPage = () => {
                   ))}
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Pagination Controls */}
-          {participants?.totalPages > 1 && participants.total > 0 && (
+          {(() => {
+            const paginationData = isTeamLeadRequestsTab ? teamLeadRequests : participants;
+            if (!paginationData || paginationData.totalPages <= 1 || (isTeamLeadRequestsTab ? paginationData.total : paginationData.total) <= 0) return null;
+
+            const totalCount = paginationData.total;
+            const pageNum = paginationData.page;
+            const pageLimit = paginationData.limit;
+            const totalPages = paginationData.totalPages;
+
+            const label = isTeamLeadRequestsTab
+              ? 'team lead requests'
+              : activeTab === 'applications'
+              ? 'applications'
+              : activeTab === 'investors'
+              ? 'investors'
+              : activeTab === 'founders'
+              ? 'founders'
+              : 'support members';
+
+            return (
             <div className={s.pagination}>
               <div className={s.paginationInfo}>
-                Showing {(participants.page - 1) * participants.limit + 1} to{' '}
-                {Math.min(participants.page * participants.limit, participants.total)} of {participants.total}{' '}
-                {activeTab === 'applications'
-                  ? 'applications'
-                  : activeTab === 'investors'
-                  ? 'investors'
-                  : activeTab === 'founders'
-                  ? 'founders'
-                  : 'support members'}
+                Showing {(pageNum - 1) * pageLimit + 1} to{' '}
+                {Math.min(pageNum * pageLimit, totalCount)} of {totalCount}{' '}
+                {label}
               </div>
               <div className={s.paginationControls}>
                 <button
@@ -1282,18 +1431,19 @@ const DemoDayDetailPage = () => {
                   Previous
                 </button>
                 <span className={s.paginationCurrent}>
-                  Page {participants.page} of {participants.totalPages}
+                  Page {pageNum} of {totalPages}
                 </span>
                 <button
                   onClick={handleNextPage}
-                  disabled={participants.page >= participants.totalPages}
-                  className={clsx(s.paginationButton, participants.page >= participants.totalPages ? s.disabled : '')}
+                  disabled={pageNum >= totalPages}
+                  className={clsx(s.paginationButton, pageNum >= totalPages ? s.disabled : '')}
                 >
                   Next
                 </button>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* Dashboard Whitelist Section (temporarily disabled) */}
           {/* <DashboardWhitelistSection demoDayUid={demoDay.uid} authToken={authToken ?? undefined} /> */}

@@ -213,3 +213,30 @@ export const DashboardWhitelistMemberSchema = z.object({
 });
 
 export class DashboardWhitelistMemberDto extends createZodDto(DashboardWhitelistMemberSchema) {}
+
+// Team Lead Requests
+
+export const GetTeamLeadRequestsQuerySchema = z.object({
+  page: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  limit: z.string().regex(/^\d+$/).transform(Number).optional().default('20'),
+  status: z.enum(['REQUESTED', 'APPROVED', 'REJECTED']).optional(),
+  search: z.string().optional(),
+});
+
+export class GetTeamLeadRequestsQueryDto extends createZodDto(GetTeamLeadRequestsQuerySchema) {}
+
+export const ReviewTeamLeadRequestSchema = z.object({
+  action: z.enum(['APPROVE', 'REJECT']),
+});
+
+export class ReviewTeamLeadRequestDto extends createZodDto(ReviewTeamLeadRequestSchema) {}
+
+export const ResponseTeamLeadRequestsListSchema = z.object({
+  requests: z.array(z.any()),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+  totalPages: z.number(),
+});
+
+export class ResponseTeamLeadRequestsListDto extends createZodDto(ResponseTeamLeadRequestsListSchema) {}
