@@ -11,7 +11,6 @@ import { AddParticipantModal } from '../../components/demo-days/AddParticipantMo
 import { UploadParticipantsModal } from '../../components/demo-days/UploadParticipantsModal';
 import { ApproveParticipantModal } from '../../components/demo-days/ApproveParticipantModal';
 import { ApplicationDetailsModal } from '../../components/demo-days/ApplicationDetailsModal';
-import { DashboardWhitelistSection } from '../../components/demo-days/DashboardWhitelistSection';
 import { DemoDayParticipant, UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL, API_ROUTE } from '../../utils/constants';
 import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
@@ -98,6 +97,10 @@ const DemoDayDetailPage = () => {
     email: string;
   } | null>(null);
   const [selectedParticipantForDetails, setSelectedParticipantForDetails] = useState<DemoDayParticipant | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [isBrandingEditing, setIsBrandingEditing] = useState(false);
   const [showNotificationsConfirmModal, setShowNotificationsConfirmModal] = useState(false);
   const [modalNotifyBeforeStartHours, setModalNotifyBeforeStartHours] = useState(336);
   const [modalNotifyBeforeEndHours, setModalNotifyBeforeEndHours] = useState(48);
@@ -329,6 +332,71 @@ const DemoDayDetailPage = () => {
     setShowNotificationPreviewModal(false);
     setPendingSaveData(null);
     setNotificationPreview(null);
+  };
+
+  const handleLogoFileChange = (file: File | null) => {
+    if (file) {
+      setLogoFile(file);
+      setRemoveLogo(false);
+      const reader = new FileReader();
+      reader.onload = () => setLogoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    setRemoveLogo(true);
+  };
+
+  const handleBrandingEdit = () => {
+    setIsBrandingEditing(true);
+    setLogoFile(null);
+    setLogoPreview(null);
+    setRemoveLogo(false);
+  };
+
+  const handleBrandingCancel = () => {
+    setIsBrandingEditing(false);
+    setLogoFile(null);
+    setLogoPreview(null);
+    setRemoveLogo(false);
+  };
+
+  const handleBrandingSave = async () => {
+    if (!authToken || !demoDay) return;
+
+    try {
+      let logoUid: string | null | undefined = undefined;
+
+      if (logoFile) {
+        const formData = new FormData();
+        formData.append('file', logoFile);
+        const imageResponse = await api.post(API_ROUTE.IMAGES, formData, {
+          headers: { 'content-type': 'multipart/form-data' },
+        });
+        logoUid = imageResponse?.data?.image?.uid;
+      } else if (removeLogo) {
+        logoUid = null;
+      }
+
+      if (logoUid !== undefined) {
+        await updateDemoDayMutation.mutateAsync({
+          authToken,
+          uid: demoDay.uid,
+          data: { logoUid },
+        });
+      }
+
+      setIsBrandingEditing(false);
+      setLogoFile(null);
+      setLogoPreview(null);
+      setRemoveLogo(false);
+    } catch (error) {
+      console.error('Error saving branding:', error);
+      toast.error('Failed to save branding. Please try again.');
+    }
   };
 
   const handleUpdateParticipantStatus = async (
@@ -793,6 +861,105 @@ const DemoDayDetailPage = () => {
                   <RichText text={demoDay.description} className={s.fieldValue} />
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Branding Section */}
+          <div className={s.branding}>
+            <div className={s.overviewHeader}>
+              <h2 className={s.brandingTitle}>Branding</h2>
+              {!isBrandingEditing ? (
+                <button onClick={handleBrandingEdit} className={s.editButton}>
+                  Edit
+                </button>
+              ) : (
+                <div className="flex space-x-2">
+                  <button onClick={handleBrandingCancel} className={s.editButton}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBrandingSave}
+                    disabled={updateDemoDayMutation.isPending}
+                    className={clsx(s.editButton, s.primary)}
+                  >
+                    {updateDemoDayMutation.isPending ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className={s.overviewField}>
+              <label className={s.fieldLabel}>Logo</label>
+              {isBrandingEditing ? (
+                <div className="flex items-start gap-4">
+                  {logoPreview || (!removeLogo && demoDay.logoUrl) ? (
+                    <div className={s.logoPreview}>
+                      <Image src={logoPreview || demoDay.logoUrl || ''} alt="Logo preview" />
+                    </div>
+                  ) : (
+                    <label className={s.logoDropzone}>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 4 * 1024 * 1024) {
+                              toast.error('File size must be less than 4MB');
+                              return;
+                            }
+                            handleLogoFileChange(file);
+                          }
+                        }}
+                      />
+                      <div className="flex flex-col items-center gap-2 text-center text-sm text-gray-500">
+                        <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>Upload logo</span>
+                        <span className="text-xs text-gray-400">PNG, JPG, WebP (max 4MB)</span>
+                      </div>
+                    </label>
+                  )}
+                  <div className="flex flex-col gap-2">
+                    {(logoPreview || (!removeLogo && demoDay.logoUrl)) && (
+                      <>
+                        <label className={clsx(s.editButton, 'cursor-pointer')}>
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                if (file.size > 4 * 1024 * 1024) {
+                                  toast.error('File size must be less than 4MB');
+                                  return;
+                                }
+                                handleLogoFileChange(file);
+                              }
+                            }}
+                          />
+                          Change
+                        </label>
+                        <button
+                          onClick={handleRemoveLogo}
+                          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                        >
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : demoDay.logoUrl ? (
+                <div className={s.logoPreview}>
+                  <img src={demoDay.logoUrl} alt="Demo day logo" />
+                </div>
+              ) : (
+                <div className={s.logoPlaceholder}>No logo uploaded</div>
+              )}
             </div>
           </div>
 
