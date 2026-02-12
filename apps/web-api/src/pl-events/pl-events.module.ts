@@ -40,6 +40,7 @@ import { IrlGatheringPushNotificationsProcessor } from './push/irl-gathering-pus
     PLEventLocationsService,
     PLEventGuestsService,
     PLEventLocationAssociationService,
+    IrlGatheringPushCandidatesService,
   ],
   imports: [
     forwardRef(() => MembersModule),

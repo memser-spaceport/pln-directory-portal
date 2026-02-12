@@ -507,6 +507,60 @@ export class MembersService {
   }
 
   /**
+   * Gets member's main team UID.
+   * Returns the team with mainTeam=true, or the first team if none is marked as main.
+   */
+  async getMemberMainTeamByUid(
+    memberUid: string,
+    tx: Prisma.TransactionClient = this.prisma
+  ): Promise<string | null> {
+    const teamRoles = await tx.teamMemberRole.findMany({
+      where: { memberUid },
+      select: { teamUid: true, mainTeam: true },
+      orderBy: { mainTeam: 'desc' },
+    });
+    return teamRoles[0]?.teamUid || null;
+  }
+
+  /**
+   * Fetches members by multiple emails and returns a lookup map.
+   * Used for bulk member matching operations.
+   * 
+   * @param emails - Array of email addresses to lookup
+   * @returns Map of lowercase email to member uid and email
+   */
+  async getMembersByEmails(
+    emails: string[]
+  ): Promise<Map<string, { uid: string; email: string }>> {
+    if (emails.length === 0) return new Map();
+    const members = await this.prisma.member.findMany({
+      where: { email: { in: emails }, deletedAt: null },
+      select: { uid: true, email: true },
+    });
+    return new Map(
+      members
+        .filter(member => member.email)
+        .map(member => [member.email!.toLowerCase(), { uid: member.uid, email: member.email! }])
+    );
+  }
+
+  /**
+   * Fetches main team UIDs for multiple members.
+   * Used for bulk team lookup operations.
+   * 
+   * @param memberUids - Array of member UIDs
+   * @returns Map of memberUid to teamUid
+   */
+  async getMainTeamsByMemberUids(memberUids: string[]): Promise<Map<string, string>> {
+    if (memberUids.length === 0) return new Map();
+    const relations = await this.prisma.teamMemberRole.findMany({
+      where: { memberUid: { in: memberUids }, mainTeam: true },
+      select: { memberUid: true, teamUid: true },
+    });
+    return new Map(relations.map(relation => [relation.memberUid, relation.teamUid]));
+  }
+
+  /**
    * Finds a member by their email address.
    *
    * @param email - The member's email address.

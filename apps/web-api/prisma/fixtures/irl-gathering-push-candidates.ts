@@ -87,6 +87,9 @@ export const irlGatheringPushEvents: Array<Omit<PLEvent, 'id'>> = IRL_FIXTURE_EV
     locationStatus: 'AUTO_MAPPED' as any,
     reviewerUid: null,
     pLEventLocationAssociationUid: null,
+    externalEventProvider: null,
+    externalEventId: null,
+    guestLastSyncedAt: null,
   }),
 );
 

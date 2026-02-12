@@ -228,6 +228,24 @@ enum PLEventLocationStatus {
   MANUALLY_MAPPED
 }
 
+enum AssociationRole {
+  HOST
+  CO_HOST
+  SPEAKER
+  SPONSOR
+  ATTENDEE
+}
+
+enum AssociationEntityType {
+  MEMBER
+  TEAM
+}
+
+/// External event providers for guest sync
+enum ExternalEventProvider {
+  LUMA
+}
+
 model ParticipantsRequest {
   id               Int             @id @default(autoincrement())
   uid              String          @unique @default(cuid())
@@ -512,6 +530,14 @@ model PLEvent {
   aggregatedPriority            Int?
   pLEventLocationAssociationUid String?
   pLEventLocationAssociation    PLEventLocationAssociation? @relation(fields: [pLEventLocationAssociationUid], references: [uid])
+  eventAssociations             PLEventAssociation[]
+
+  // External Event Integration
+  externalEventProvider  ExternalEventProvider?
+  externalEventId   String?
+  guestLastSyncedAt      DateTime?
+
+  @@index([externalEventProvider, externalEventId])
 }
 
 model PLEventGuest {
@@ -535,6 +561,9 @@ model PLEventGuest {
   eventUid String?
   event    PLEvent? @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
 
+  // External guest provider ID (e.g., LUMA guest ID)
+  externalGuestId String?
+
   additionalInfo Json?
   topics         String[]
   priority       Int?
@@ -542,6 +571,8 @@ model PLEventGuest {
   isSpeaker      Boolean  @default(false)
   isSponsor      Boolean  @default(false)
   isFeatured     Boolean  @default(false)
+
+  @@index([externalGuestId])
 }
 
 model FocusArea {
