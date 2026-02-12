@@ -90,6 +90,7 @@ export class DemoDaysService {
     status: 'NONE' | 'UPCOMING' | 'REGISTRATION_OPEN' | 'ACTIVE' | 'COMPLETED';
     uid?: string;
     slugURL?: string;
+    host?: string | null;
     date?: string;
     title?: string;
     description?: string;
@@ -127,6 +128,7 @@ export class DemoDaysService {
         uid: demoDay.uid,
         slugURL: demoDay.slugURL,
         status: this.getExternalDemoDayStatus(demoDay.status),
+        host: demoDay.host,
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
@@ -148,6 +150,7 @@ export class DemoDaysService {
         uid: demoDay.uid,
         slugURL: demoDay.slugURL,
         status: this.getExternalDemoDayStatus(demoDay.status),
+        host: demoDay.host,
         isPending: false,
       };
     }
@@ -163,6 +166,7 @@ export class DemoDaysService {
         uid: demoDay.uid,
         slugURL: demoDay.slugURL,
         status: this.getExternalDemoDayStatus(demoDay.status),
+        host: demoDay.host,
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
@@ -192,6 +196,7 @@ export class DemoDaysService {
         access,
         uid: demoDay.uid,
         slugURL: demoDay.slugURL,
+        host: demoDay.host,
         date: demoDay.startDate.toISOString(),
         title: demoDay.title,
         description: demoDay.description,
@@ -215,6 +220,7 @@ export class DemoDaysService {
       access: 'none',
       slugURL: demoDay.slugURL,
       status: this.getExternalDemoDayStatus(demoDay.status),
+      host: demoDay.host,
       date: demoDay.startDate.toISOString(),
       title: demoDay.title,
       description: demoDay.description,
@@ -467,12 +473,13 @@ export class DemoDaysService {
             approximateStartDate: demoDay.approximateStartDate,
             supportEmail: demoDay.supportEmail,
             access,
+            host: demoDay.host,
             status: this.getExternalDemoDayStatus(
               demoDay.status,
               access === 'FOUNDER' ||
-                (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
-                  ?.hasEarlyAccess ??
-                  false)
+              (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
+                ?.hasEarlyAccess ??
+                false)
             ),
             teamsCount: access !== 'none' ? teamsCount : 0,
             investorsCount: access !== 'none' ? investorsCount : 0,
