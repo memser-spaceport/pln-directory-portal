@@ -103,6 +103,7 @@ export class DemoDaysService {
     isEarlyAccess?: boolean;
     isPending?: boolean;
     confidentialityAccepted?: boolean;
+    logoUrl?: string | null;
   }> {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
@@ -139,6 +140,7 @@ export class DemoDaysService {
         investorsCount: investorsCount,
         confidentialityAccepted: false,
         isPending: false,
+        logoUrl: demoDay.logoUrl ?? null,
       };
     }
 
@@ -213,6 +215,7 @@ export class DemoDaysService {
         teamsCount,
         investorsCount,
         isPending: false,
+        logoUrl: demoDay.logoUrl ?? null,
       };
     }
 
@@ -280,6 +283,11 @@ export class DemoDaysService {
         status: data.status,
         slugURL,
       },
+    });
+
+    // Create associated branding record
+    await this.prisma.demoDayBranding.create({
+      data: { demoDayUid: created.uid },
     });
 
     // Track "Demo Day created"
@@ -405,6 +413,7 @@ export class DemoDaysService {
       this.prisma.demoDay.findMany({
         where: { isDeleted: false, status: { not: DemoDayStatus.ARCHIVED } },
         orderBy: { createdAt: 'desc' },
+        include: { branding: { include: { logo: true } } },
       }),
       memberEmail ? this.getMemberWithDemoDayParticipants(memberEmail) : Promise.resolve(null),
       this.getQualifiedInvestorsCount(),
@@ -484,6 +493,7 @@ export class DemoDaysService {
             teamsCount: access !== 'none' ? teamsCount : 0,
             investorsCount: access !== 'none' ? investorsCount : 0,
             confidentialityAccepted,
+            logoUrl: demoDay.branding?.logo?.url ?? null,
           };
 
           // Only include these fields for authorized users
@@ -502,7 +512,7 @@ export class DemoDaysService {
     );
   }
 
-  async getDemoDayByUidOrSlug(uidOrSlug: string): Promise<DemoDay> {
+  async getDemoDayByUidOrSlug(uidOrSlug: string): Promise<DemoDay & { logoUid?: string | null; logoUrl?: string | null }> {
     const demoDay = await this.prisma.demoDay.findFirst({
       where: { OR: [{ uid: uidOrSlug }, { slugURL: uidOrSlug }], isDeleted: false },
       select: {
@@ -526,6 +536,9 @@ export class DemoDaysService {
         updatedAt: true,
         isDeleted: true,
         deletedAt: true,
+        branding: {
+          include: { logo: true },
+        },
       },
     });
 
@@ -533,10 +546,15 @@ export class DemoDaysService {
       throw new NotFoundException(`Demo day with uid or slug ${uidOrSlug} not found`);
     }
 
-    return demoDay;
+    const { branding, ...rest } = demoDay;
+    return {
+      ...rest,
+      logoUid: branding?.logoUid ?? null,
+      logoUrl: branding?.logo?.url ?? null,
+    };
   }
 
-  async getDemoDayBySlugURL(slugURL: string): Promise<DemoDay> {
+  async getDemoDayBySlugURL(slugURL: string): Promise<DemoDay & { logoUid?: string | null; logoUrl?: string | null }> {
     const demoDay = await this.prisma.demoDay.findFirst({
       where: { slugURL, isDeleted: false },
       select: {
@@ -560,6 +578,9 @@ export class DemoDaysService {
         updatedAt: true,
         isDeleted: true,
         deletedAt: true,
+        branding: {
+          include: { logo: true },
+        },
       },
     });
 
@@ -567,7 +588,12 @@ export class DemoDaysService {
       throw new NotFoundException(`Demo day with slug ${slugURL} not found`);
     }
 
-    return demoDay;
+    const { branding, ...rest } = demoDay;
+    return {
+      ...rest,
+      logoUid: branding?.logoUid ?? null,
+      logoUrl: branding?.logo?.url ?? null,
+    };
   }
 
   async updateDemoDay(
@@ -587,9 +613,10 @@ export class DemoDaysService {
       notifyBeforeStartHours?: number | null;
       notifyBeforeEndHours?: number | null;
       dashboardEnabled?: boolean;
+      logoUid?: string | null;
     },
     actorEmail?: string
-  ): Promise<DemoDay> {
+  ): Promise<DemoDay & { logoUid?: string | null; logoUrl?: string | null }> {
     // First check if demo day exists
     const before = await this.getDemoDayByUidOrSlug(uid);
 
@@ -684,6 +711,27 @@ export class DemoDaysService {
       },
     });
 
+    // Handle branding logo update
+    if (data.logoUid !== undefined) {
+      await this.prisma.demoDayBranding.upsert({
+        where: { demoDayUid: uid },
+        update: { logoUid: data.logoUid },
+        create: { demoDayUid: uid, logoUid: data.logoUid },
+      });
+    }
+
+    // Fetch branding for response
+    const branding = await this.prisma.demoDayBranding.findUnique({
+      where: { demoDayUid: uid },
+      include: { logo: true },
+    });
+
+    const result: DemoDay & { logoUid?: string | null; logoUrl?: string | null } = {
+      ...updated,
+      logoUid: branding?.logoUid ?? null,
+      logoUrl: branding?.logo?.url ?? null,
+    };
+
     // Track "details updated" (name/description/startDate/endDate/slugURL) only if any changed
     const detailsChanged: string[] = [];
     if (updateData.title !== undefined && before.title !== updated.title) detailsChanged.push('title');
@@ -735,7 +783,7 @@ export class DemoDaysService {
       await this.sendDemoDayStatusNotification(updated);
     }
 
-    return updated;
+    return result;
   }
 
   private getExternalDemoDayStatus(

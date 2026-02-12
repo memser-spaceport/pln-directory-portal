@@ -361,11 +361,12 @@ model Image {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   // Reverse Relations:
-  Team           Team[]
-  Member         Member[]
-  Project        Project[]
-  eventLogo      PLEvent[] @relation("logo")
-  eventBanner    PLEvent[] @relation("banner")
+  Team                 Team[]
+  Member               Member[]
+  Project              Project[]
+  eventLogo            PLEvent[]          @relation("logo")
+  eventBanner          PLEvent[]          @relation("banner")
+  demoDayBrandingLogos DemoDayBranding[]
 }
 
 model Faq {
@@ -1043,6 +1044,18 @@ model DemoDay {
   engagements               DemoDayEngagement[]
   expressInterestStatistics DemoDayExpressInterestStatistic[]
   feedbacks                 DemoDayFeedback[]
+  branding                  DemoDayBranding?
+}
+
+model DemoDayBranding {
+  id         Int      @id @default(autoincrement())
+  uid        String   @unique @default(cuid())
+  demoDayUid String   @unique
+  demoDay    DemoDay  @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
+  logoUid    String?
+  logo       Image?   @relation(fields: [logoUid], references: [uid])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model MemberDemoDayAdminScope {
