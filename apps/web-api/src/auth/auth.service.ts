@@ -481,7 +481,7 @@ export class AuthService implements OnModuleInit {
       mainTeamName: team?.name,
       accessLevel: memberInfo.accessLevel,
       isTierViewer: memberInfo.isTierViewer ?? false,
-      signupSource: memberInfo.signupSource,
+      signUpSource: memberInfo.signUpSource,
     };
   }
 
