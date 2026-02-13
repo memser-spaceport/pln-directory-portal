@@ -770,8 +770,6 @@ export class PLEventGuestsService {
   async fetchAttendees(queryParams) {
     const {
       locationUid,
-      windowStart,
-      windowEnd,
       includeLocationOnlyGuests = false,
 
       eventUids,
@@ -805,8 +803,6 @@ export class PLEventGuestsService {
         limit: limit ?? 10,
         page: page ?? 1,
         includeLocations: !!includeLocations,
-        windowStart: windowStart ?? null,
-        windowEnd: windowEnd ?? null,
       })
     );
 
@@ -816,17 +812,6 @@ export class PLEventGuestsService {
     // location filter (always)
     values.push(locationUid);
     const locationUidPos = values.length;
-
-    // window bounds (for location-only overlap)
-    let windowStartPos, windowEndPos;
-
-    if (includeLocationOnlyGuests) {
-      values.push(windowStart);
-      windowStartPos = values.length;
-      values.push(windowEnd);
-      windowEndPos = values.length;
-    }
-
     // bind loggedInMemberUid for outer ORDER BY (so it works before pagination)
     values.push(loggedInMemberUid ?? null);
     const loggedInUidPos = values.length;
@@ -1081,8 +1066,6 @@ export class PLEventGuestsService {
       JSON.stringify({
         valuesCountBeforePagination: values.length,
         locationUidPos,
-        windowStartPos: windowStartPos ?? null,
-        windowEndPos: windowEndPos ?? null,
         loggedInUidPos,
         eventUidsPos,
         paginationLimit,
