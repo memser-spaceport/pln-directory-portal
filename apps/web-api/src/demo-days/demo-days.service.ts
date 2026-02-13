@@ -16,6 +16,7 @@ import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, MemberRole } fr
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 
 type ExpressInterestStats = {
+  saved: number;
   liked: number;
   connected: number;
   invested: number;
@@ -818,6 +819,7 @@ export class DemoDaysService {
         isPrepDemoDay,
       },
       _sum: {
+        savedCount: true,
         likedCount: true,
         connectedCount: true,
         investedCount: true,
@@ -826,14 +828,15 @@ export class DemoDaysService {
       },
     });
 
+    const saved = agg._sum.savedCount ?? 0;
     const liked = agg._sum.likedCount ?? 0;
     const connected = agg._sum.connectedCount ?? 0;
     const invested = agg._sum.investedCount ?? 0;
     const referral = agg._sum.referralCount ?? 0;
     const feedback = agg._sum.feedbackCount ?? 0;
-    const total = liked + connected + invested + referral + feedback;
+    const total = saved + liked + connected + invested + referral + feedback;
 
-    return { liked, connected, invested, referral, feedback, total };
+    return { saved, liked, connected, invested, referral, feedback, total };
   }
 
   async updateConfidentialityAcceptance(

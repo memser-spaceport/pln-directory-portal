@@ -341,31 +341,31 @@ model Technology {
 }
 
 model Image {
-  id             Int       @id @default(autoincrement())
-  uid            String    @unique @default(cuid())
+  id                   Int               @id @default(autoincrement())
+  uid                  String            @unique @default(cuid())
   // The cid is not unique because this id represents an array of multiple images
   // with different sizes that can be accessed trough the cid and filename
-  cid            String
-  width          Int
-  height         Int
-  url            String
-  filename       String
-  size           Int
-  type           String
-  version        ImageSize
+  cid                  String
+  width                Int
+  height               Int
+  url                  String
+  filename             String
+  size                 Int
+  type                 String
+  version              ImageSize
   // This image can be a thumbnail to other image
-  thumbnailToUid String?
-  thumbnailTo    Image?    @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
+  thumbnailToUid       String?
+  thumbnailTo          Image?            @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
   // This image can have multiple thumbnails
-  thumbnails     Image[]   @relation("ImageThumbnails")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  thumbnails           Image[]           @relation("ImageThumbnails")
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
   // Reverse Relations:
   Team                 Team[]
   Member               Member[]
   Project              Project[]
-  eventLogo            PLEvent[]          @relation("logo")
-  eventBanner          PLEvent[]          @relation("banner")
+  eventLogo            PLEvent[]         @relation("logo")
+  eventBanner          PLEvent[]         @relation("banner")
   demoDayBrandingLogos DemoDayBranding[]
 }
 
@@ -992,8 +992,8 @@ model InvestorProfile {
 }
 
 enum DemoDayAdminScopeType {
-  HOST                  // host-based permissions (e.g. "plnetwork.io")
-  DASHBOARD_WHITELIST   // dashboard access whitelist (scopeValue = '*' for all)
+  HOST // host-based permissions (e.g. "plnetwork.io")
+  DASHBOARD_WHITELIST // dashboard access whitelist (scopeValue = '*' for all)
 }
 
 enum DemoDayStatus {
@@ -1147,12 +1147,14 @@ model DemoDayExpressInterestStatistic {
   teamFundraisingProfile    TeamFundraisingProfile @relation(fields: [teamFundraisingProfileUid], references: [uid], onDelete: Cascade)
   isPrepDemoDay             Boolean                @default(false)
 
+  saved     Boolean @default(false)
   liked     Boolean @default(false)
   connected Boolean @default(false)
   invested  Boolean @default(false)
   referral  Boolean @default(false)
   feedback  Boolean @default(false)
 
+  savedCount     Int @default(0)
   likedCount     Int @default(0)
   connectedCount Int @default(0)
   investedCount  Int @default(0)
