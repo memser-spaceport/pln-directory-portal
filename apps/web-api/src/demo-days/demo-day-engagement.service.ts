@@ -26,7 +26,7 @@ export class DemoDayEngagementService {
     @Inject(forwardRef(() => DemoDaysService))
     private readonly demoDaysService: DemoDaysService,
     private readonly pushNotificationsService: PushNotificationsService
-  ) {}
+  ) { }
 
   // Read engagement state for UI
   async getCurrentEngagement(memberEmail: string, demoDayUidOrSlug: string) {
@@ -291,21 +291,16 @@ export class DemoDayEngagementService {
       };
 
       const pushDescriptionMap: Record<string, string> = {
-        like: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} liked ${
-          fundraisingProfile.team.name
-        } on ${demoDay.title}`,
-        connect: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} wants to connect with ${
-          fundraisingProfile.team.name
-        }`,
-        invest: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} is interested in investing in ${
-          fundraisingProfile.team.name
-        }`,
-        referral: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} referred ${
-          referralData?.investorName || 'an investor'
-        } to ${fundraisingProfile.team.name}`,
-        feedback: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} sent feedback to ${
-          fundraisingProfile.team.name
-        }`,
+        like: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} liked ${fundraisingProfile.team.name
+          } on ${demoDay.title}`,
+        connect: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} wants to connect with ${fundraisingProfile.team.name
+          }`,
+        invest: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} is interested in investing in ${fundraisingProfile.team.name
+          }`,
+        referral: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} referred ${referralData?.investorName || 'an investor'
+          } to ${fundraisingProfile.team.name}`,
+        feedback: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} sent feedback to ${fundraisingProfile.team.name
+          }`,
       };
 
       // Send push notification to each founder (only those with externalId)
@@ -340,8 +335,7 @@ export class DemoDayEngagementService {
           });
         } catch (error) {
           this.logger.error(
-            `Failed to send push notification to founder ${founder.member.uid}: ${
-              error instanceof Error ? error.message : error
+            `Failed to send push notification to founder ${founder.member.uid}: ${error instanceof Error ? error.message : error
             }`
           );
           // Continue with other founders even if one fails
@@ -372,16 +366,16 @@ export class DemoDayEngagementService {
             investorNameLink,
             ...(referralData
               ? {
-                  referralTeamName: fundraisingProfile.team.name,
-                  referralInvestorName: referralData.investorName || referralData.investorEmail,
-                  referralInvestorEmail: referralData.investorEmail,
-                  referralMessage: referralData.message,
-                }
+                referralTeamName: fundraisingProfile.team.name,
+                referralInvestorName: referralData.investorName || referralData.investorEmail,
+                referralInvestorEmail: referralData.investorEmail,
+                referralMessage: referralData.message,
+              }
               : {}),
             ...(feedbackData
               ? {
-                  feedbackText: feedbackData.feedback,
-                }
+                feedbackText: feedbackData.feedback,
+              }
               : {}),
           },
         },
@@ -408,6 +402,7 @@ export class DemoDayEngagementService {
       teamFundraisingProfileUid,
       isPrepDemoDay,
       interestType,
+      interestValue: true,
     });
 
     // Fire analytics (non-blocking)
@@ -428,21 +423,102 @@ export class DemoDayEngagementService {
           isPrepDemoDay,
           ...(referralData
             ? {
-                referralName: referralData.investorName,
-                referralEmail: referralData.investorEmail,
-                referralMessage: referralData.message,
-              }
+              referralName: referralData.investorName,
+              referralEmail: referralData.investorEmail,
+              referralMessage: referralData.message,
+            }
             : {}),
           ...(feedbackData
             ? {
-                feedbackText: feedbackData.feedback,
-              }
+              feedbackText: feedbackData.feedback,
+            }
             : {}),
         },
       });
     }, 500);
 
     return { success: true };
+  }
+
+  async updateSaveInterest(
+    memberEmail: string,
+    demoDayUidOrSlug: string,
+    teamFundraisingProfileUid: string,
+    isPrepDemoDay: boolean,
+    value: boolean
+  ) {
+    // Validate that the caller is an enabled demo day participant (investor)
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day access');
+    }
+
+    const [member, fundraisingProfile] = await Promise.all([
+      this.prisma.member.findUnique({
+        where: { email: memberEmail },
+        select: {
+          uid: true,
+          name: true,
+          email: true,
+          demoDayParticipants: {
+            where: {
+              demoDayUid: demoDay.uid,
+              isDeleted: false,
+              status: 'ENABLED',
+            },
+            take: 1,
+          },
+        },
+      }),
+      this.prisma.teamFundraisingProfile.findUnique({
+        where: {
+          uid: teamFundraisingProfileUid,
+        },
+        include: {
+          team: {
+            select: {
+              uid: true,
+              name: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    if (!member || member.demoDayParticipants.length === 0) {
+      throw new ForbiddenException('Only enabled demo day participants can express interest');
+    }
+
+    if (!fundraisingProfile || fundraisingProfile.demoDayUid !== demoDay.uid) {
+      throw new BadRequestException('Invalid fundraising profile or not part of current demo day');
+    }
+
+    await this.upsertInterestWithCounters({
+      demoDayUid: fundraisingProfile.demoDayUid,
+      memberUid: member.uid,
+      teamFundraisingProfileUid,
+      isPrepDemoDay,
+      interestType: 'save',
+      interestValue: value,
+    });
+
+    // Fire analytics (non-blocking)
+    setTimeout(async () => {
+      await this.analyticsService.trackEvent({
+        name: value ? 'demo-day-express-interest' : 'demo-day-remove-express-interest',
+        distinctId: member.uid,
+        properties: {
+          demoDayUid: demoDay.uid,
+          userId: member.uid,
+          userName: member.name,
+          userEmail: member.email,
+          teamUid: fundraisingProfile.teamUid,
+          teamName: fundraisingProfile.team.name,
+          interestType: 'save',
+        },
+      });
+    }, 500);
   }
 
   /**
@@ -455,16 +531,18 @@ export class DemoDayEngagementService {
     memberUid: string;
     teamFundraisingProfileUid: string;
     isPrepDemoDay: boolean;
-    interestType: 'like' | 'connect' | 'invest' | 'referral' | 'feedback';
+    interestType: 'like' | 'connect' | 'invest' | 'referral' | 'feedback' | 'save';
+    interestValue: boolean;
   }) {
-    const { demoDayUid, memberUid, teamFundraisingProfileUid, isPrepDemoDay, interestType } = args;
+    const { demoDayUid, memberUid, teamFundraisingProfileUid, isPrepDemoDay, interestType, interestValue } = args;
 
-    const patch = {
-      liked: interestType === 'like',
-      connected: interestType === 'connect',
-      invested: interestType === 'invest',
-      referral: interestType === 'referral',
-      feedback: interestType === 'feedback',
+    const interestTypeFields = {
+      save: 'saved',
+      like: 'liked',
+      connect: 'connected',
+      invest: 'invested',
+      referral: 'referral',
+      feedback: 'feedback',
     };
 
     await this.prisma.$transaction(async (tx) => {
@@ -478,23 +556,51 @@ export class DemoDayEngagementService {
             isPrepDemoDay,
           },
         },
-        select: { uid: true, liked: true, connected: true, invested: true, referral: true, feedback: true },
+        select: {
+          uid: true,
+          saved: true,
+          liked: true,
+          connected: true,
+          invested: true,
+          referral: true,
+          feedback: true,
+        },
       });
+      let newStats: {
+        saved: boolean;
+        liked: boolean;
+        connected: boolean;
+        invested: boolean;
+        referral: boolean;
+        feedback: boolean;
+        savedCount?: number;
+        likedCount?: number;
+        connectedCount?: number;
+        investedCount?: number;
+        referralCount?: number;
+        feedbackCount?: number;
+      } = {
+        saved: !!existing?.saved,
+        liked: !!existing?.liked,
+        connected: !!existing?.connected,
+        invested: !!existing?.invested,
+        referral: !!existing?.referral,
+        feedback: !!existing?.feedback,
+      };
 
-      // Next sticky booleans (once true — stays true)
-      const nextLiked = (existing?.liked ?? false) || patch.liked;
-      const nextConnected = (existing?.connected ?? false) || patch.connected;
-      const nextInvested = (existing?.invested ?? false) || patch.invested;
-      const nextReferral = (existing?.referral ?? false) || patch.referral;
-      const nextFeedback = (existing?.feedback ?? false) || patch.feedback;
+      newStats[interestTypeFields[interestType]] = interestValue;
 
-      // Deltas: +1 only when flipping false -> true in this call
-      const dLiked = !existing?.liked && patch.liked ? 1 : 0;
-      const dConnected = !existing?.connected && patch.connected ? 1 : 0;
-      const dInvested = !existing?.invested && patch.invested ? 1 : 0;
-      const dReferral = !existing?.referral && patch.referral ? 1 : 0;
-      const dFeedback = !existing?.feedback && patch.feedback ? 1 : 0;
-      const dTotal = dLiked + dConnected + dInvested + dReferral + dFeedback;
+      newStats = {
+        ...newStats,
+        savedCount: newStats?.saved ? 1 : 0,
+        likedCount: newStats?.liked ? 1 : 0,
+        connectedCount: newStats?.connected ? 1 : 0,
+        investedCount: newStats?.invested ? 1 : 0,
+        referralCount: newStats?.referral ? 1 : 0,
+        feedbackCount: newStats?.feedback ? 1 : 0,
+      };
+
+      const dTotal = Object.values(newStats).reduce<number>((sum: number, v: boolean) => (v ? sum + 1 : sum), 0);
 
       if (!existing) {
         // First interaction for this (demoDay, member, profile, prep)
@@ -505,15 +611,7 @@ export class DemoDayEngagementService {
             memberUid,
             teamFundraisingProfileUid,
             isPrepDemoDay,
-            liked: nextLiked,
-            connected: nextConnected,
-            invested: nextInvested,
-            referral: nextReferral,
-            feedback: nextFeedback,
-            likedCount: dLiked,
-            connectedCount: dConnected,
-            investedCount: dInvested,
-            feedbackCount: dFeedback,
+            ...newStats,
             totalCount: dTotal,
           },
           select: { uid: true },
@@ -523,17 +621,8 @@ export class DemoDayEngagementService {
         await tx.demoDayExpressInterestStatistic.update({
           where: { uid: existing.uid },
           data: {
-            liked: nextLiked,
-            connected: nextConnected,
-            invested: nextInvested,
-            referral: nextReferral,
-            feedback: nextFeedback,
-            ...(dLiked > 0 ? { likedCount: { increment: dLiked } } : {}),
-            ...(dConnected > 0 ? { connectedCount: { increment: dConnected } } : {}),
-            ...(dInvested > 0 ? { investedCount: { increment: dInvested } } : {}),
-            ...(dReferral > 0 ? { referralCount: { increment: dReferral } } : {}),
-            ...(dFeedback > 0 ? { feedbackCount: { increment: dFeedback } } : {}),
-            ...(dTotal > 0 ? { totalCount: { increment: dTotal } } : {}),
+            ...newStats,
+            totalCount: dTotal,
           },
           select: { uid: true },
         });

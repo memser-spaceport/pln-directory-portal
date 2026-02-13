@@ -10,18 +10,18 @@ export const UpdateFundraisingTeamSchema = z.object({
   logo: z.string().optional(),
 });
 
-export class UpdateFundraisingTeamDto extends createZodDto(UpdateFundraisingTeamSchema) {}
+export class UpdateFundraisingTeamDto extends createZodDto(UpdateFundraisingTeamSchema) { }
 
 export const UpdateFundraisingDescriptionSchema = z.object({
   description: z.string(),
 });
 
-export class UpdateFundraisingDescriptionDto extends createZodDto(UpdateFundraisingDescriptionSchema) {}
+export class UpdateFundraisingDescriptionDto extends createZodDto(UpdateFundraisingDescriptionSchema) { }
 
 export const ExpressInterestSchema = z.object({
   teamFundraisingProfileUid: z.string(),
   interestType: z.enum(['like', 'connect', 'invest', 'referral', 'feedback']),
-  isPrepDemoDay: z.boolean().optional(),
+  isPrepDemoDay: z.boolean(),
   referralData: z
     .object({
       investorName: z.string().optional().nullable(),
@@ -38,7 +38,14 @@ export const ExpressInterestSchema = z.object({
     .nullable(),
 });
 
-export class ExpressInterestDto extends createZodDto(ExpressInterestSchema) {}
+export const SaveFundraisingProfileSchema = z.object({
+  teamFundraisingProfileUid: z.string(),
+  isPrepDemoDay: z.boolean(),
+});
+
+export class ExpressInterestDto extends createZodDto(ExpressInterestSchema) { }
+
+export class SaveFundraisingProfileDto extends createZodDto(SaveFundraisingProfileSchema) { }
 
 export const DemoDayFeedbackIssueType = z.enum(['TECHNICAL_ISSUES', 'ACCESS_ISSUES', 'NETWORKING_ISSUES']);
 
@@ -50,7 +57,7 @@ export const CreateDemoDayFeedbackSchema = z.object({
   issues: z.array(z.union([DemoDayFeedbackIssueType, z.string()])).default([]),
 });
 
-export class CreateDemoDayFeedbackDto extends createZodDto(CreateDemoDayFeedbackSchema) {}
+export class CreateDemoDayFeedbackDto extends createZodDto(CreateDemoDayFeedbackSchema) { }
 
 const optionalString = z.preprocess((val) => (val === '' || val === null ? undefined : val), z.string().optional());
 
@@ -72,18 +79,18 @@ export const CreateDemoDayInvestorApplicationSchema = z.object({
   projectUid: optionalString,
 });
 
-export class CreateDemoDayInvestorApplicationDto extends createZodDto(CreateDemoDayInvestorApplicationSchema) {}
+export class CreateDemoDayInvestorApplicationDto extends createZodDto(CreateDemoDayInvestorApplicationSchema) { }
 
 export const SubscribeDemoDaySchema = z.object({
   email: z.string().email('Invalid email address'),
   name: z.string().optional(),
 });
 
-export class SubscribeDemoDayDto extends createZodDto(SubscribeDemoDaySchema) {}
+export class SubscribeDemoDayDto extends createZodDto(SubscribeDemoDaySchema) { }
 
 export const DemoDaySubscriptionStatusResponseSchema = z.object({
   subscribed: z.boolean(),
   email: z.string().optional(),
 });
 
-export class DemoDaySubscriptionStatusResponseDto extends createZodDto(DemoDaySubscriptionStatusResponseSchema) {}
+export class DemoDaySubscriptionStatusResponseDto extends createZodDto(DemoDaySubscriptionStatusResponseSchema) { }
