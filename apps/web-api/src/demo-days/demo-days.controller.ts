@@ -34,6 +34,7 @@ import {
   EngagementTimelineQueryDto,
   ExpressInterestDto,
   InvestorActivityQueryDto,
+  SaveFundraisingProfileDto,
   UpdateFundraisingDescriptionDto,
   UpdateFundraisingTeamDto,
 } from 'libs/contracts/src/schema';
@@ -50,7 +51,7 @@ export class DemoDaysController {
     private readonly uploadsService: UploadsService,
     private readonly demoDayEngagementService: DemoDayEngagementService,
     private readonly demoDayEngagementAnalyticsService: DemoDayEngagementAnalyticsService
-  ) {}
+  ) { }
 
   @Get()
   @UseGuards(UserTokenCheckGuard)
@@ -262,6 +263,42 @@ export class DemoDaysController {
       body.isPrepDemoDay,
       body.referralData,
       body.feedbackData
+    );
+  }
+
+  @Post(':demoDayUidOrSlug/save')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async saveFundraisingProfile(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Body() body: SaveFundraisingProfileDto
+  ) {
+    return this.demoDayEngagementService.updateSaveInterest(
+      req.userEmail,
+      demoDayUidOrSlug,
+      body.teamFundraisingProfileUid,
+      body.isPrepDemoDay,
+      true
+    );
+  }
+
+  @Post(':demoDayUidOrSlug/unsave')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async unsaveFundraisingProfile(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Body() body: SaveFundraisingProfileDto
+  ) {
+    return this.demoDayEngagementService.updateSaveInterest(
+      req.userEmail,
+      demoDayUidOrSlug,
+      body.teamFundraisingProfileUid,
+      body.isPrepDemoDay,
+      false
     );
   }
 
