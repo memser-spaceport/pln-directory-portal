@@ -88,7 +88,11 @@ export class WebSocketService {
   /**
    * Send notification to all users with specified access levels
    */
-  async notifyByAccessLevels(accessLevels: string[], payload: NotificationPayload): Promise<void> {
+  async notifyByAccessLevels(
+    accessLevels: string[],
+    payload: NotificationPayload,
+    options?: { excludeUid?: string }
+  ): Promise<void> {
     if (!this.gateway.server) {
       this.logger.warn('WebSocket server not initialized');
       return;
@@ -106,6 +110,7 @@ export class WebSocketService {
         externalId: { not: null },
       },
       select: {
+        uid: true,
         externalId: true,
       },
     });
@@ -114,6 +119,9 @@ export class WebSocketService {
     // Connected users will receive it immediately, others will see it when they fetch notifications
     for (const member of members) {
       if (member.externalId) {
+        if (options?.excludeUid && member.uid === options.excludeUid) {
+          continue;
+        }
         const roomName = getRoomName(member.externalId);
         this.gateway.server.to(roomName).emit(WebSocketEvent.NOTIFICATION_NEW, payload);
       }

@@ -16,6 +16,8 @@ export interface DemoDay {
   dashboardEnabled: boolean;
   createdAt: string;
   updatedAt: string;
+  logoUid?: string | null;
+  logoUrl?: string | null;
 }
 
 export interface CreateDemoDayDto {
@@ -46,6 +48,7 @@ export interface UpdateDemoDayDto {
   notifyBeforeStartHours?: number | null;
   notifyBeforeEndHours?: number | null;
   dashboardEnabled?: boolean;
+  logoUid?: string | null;
 }
 
 export interface DemoDayParticipant {

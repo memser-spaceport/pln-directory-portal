@@ -50,6 +50,18 @@ export class PushNotificationsService {
     private readonly notificationServiceClient: NotificationServiceClient
   ) {}
 
+  private isSelfAuthoredForumPost(
+    notification: { category: PushNotificationCategory; metadata: Prisma.JsonValue },
+    memberUid: string
+  ): boolean {
+    return (
+      notification.category === PushNotificationCategory.FORUM_POST &&
+      notification.metadata != null &&
+      typeof notification.metadata === 'object' &&
+      (notification.metadata as any)?.authorUid === memberUid
+    );
+  }
+
   /**
    * Create and send a push notification.
    * 1. Stores in database
@@ -92,7 +104,13 @@ export class PushNotificationsService {
         await this.webSocketService.notifyUser(dto.recipientUid, payload);
       } else if (dto.accessLevels && dto.accessLevels.length > 0) {
         // Send to users with specified access levels
-        await this.webSocketService.notifyByAccessLevels(dto.accessLevels, payload);
+        const excludeUid =
+          dto.category === PushNotificationCategory.FORUM_POST &&
+          dto.metadata?.authorUid &&
+          typeof dto.metadata.authorUid === 'string'
+            ? dto.metadata.authorUid
+            : undefined;
+        await this.webSocketService.notifyByAccessLevels(dto.accessLevels, payload, { excludeUid });
       } else if (dto.isPublic) {
         // Broadcast to all connected users
         await this.webSocketService.broadcast(payload);
@@ -234,7 +252,7 @@ export class PushNotificationsService {
           isRead: n.readStatuses.length > 0,
           createdAt: n.createdAt,
         })),
-    ];
+    ].filter((n) => !this.isSelfAuthoredForumPost(n, realMemberUid));
 
     // Sort: unread first, then by createdAt desc
     notifications.sort((a, b) => {
@@ -255,7 +273,7 @@ export class PushNotificationsService {
 
     const paginatedNotifications = notifications.slice(offset, offset + limit);
 
-     // ---- IRL: compute isAttended per user (only for returned page) ----
+    // ---- IRL: compute isAttended per user (only for returned page) ----
     const irlPage = paginatedNotifications.filter(
       (n) =>
         n.category === PushNotificationCategory.IRL_GATHERING &&
@@ -264,17 +282,9 @@ export class PushNotificationsService {
         (n.metadata as any)?.ui?.locationUid
     );
 
-    const locationUids = [
-      ...new Set(
-        irlPage
-          .map((n) => (n.metadata as any).ui.locationUid)
-          .filter(Boolean)
-      ),
-    ];
+    const locationUids = [...new Set(irlPage.map((n) => (n.metadata as any).ui.locationUid).filter(Boolean))];
 
     if (locationUids.length > 0) {
-      const now = new Date();
-
       const attendedRows = await this.prisma.pLEventGuest.findMany({
         where: {
           memberUid: realMemberUid,
@@ -309,7 +319,7 @@ export class PushNotificationsService {
     // Get user's access level
     const member = await this.prisma.member.findFirst({
       where: { externalId: memberUid },
-      select: { accessLevel: true },
+      select: { accessLevel: true, uid: true },
     });
 
     const userAccessLevel = member?.accessLevel;
@@ -360,7 +370,88 @@ export class PushNotificationsService {
       accessLevelUnread = totalAccessLevel - readAccessLevel;
     }
 
-    return privateUnread + (totalPublic - readPublic) + accessLevelUnread;
+    // Subtract self-authored forum notifications from access-level unread count
+    let selfAuthoredForumCount = 0;
+    if (userAccessLevel) {
+      const unreadForumNotifications = await this.prisma.pushNotification.findMany({
+        where: {
+          accessLevels: { has: userAccessLevel },
+          isPublic: false,
+          recipientUid: null,
+          category: PushNotificationCategory.FORUM_POST,
+          readStatuses: { none: { memberUid } },
+        },
+        select: { category: true, metadata: true },
+      });
+      // member is guaranteed non-null when userAccessLevel is truthy
+      selfAuthoredForumCount = unreadForumNotifications.filter((n) =>
+        this.isSelfAuthoredForumPost(n, member?.uid ?? '')
+      ).length;
+    }
+
+    return privateUnread + (totalPublic - readPublic) + accessLevelUnread - selfAuthoredForumCount;
+  }
+
+  /**
+   * Get all unread notification links for a user.
+   * Only returns notifications that have a non-null link.
+   */
+  async getUnreadLinksForUser(memberUid: string): Promise<Array<{ uid: string; link: string }>> {
+    const member = await this.prisma.member.findFirst({
+      where: { externalId: memberUid },
+      select: { accessLevel: true, uid: true },
+    });
+
+    const userAccessLevel = member?.accessLevel;
+
+    // Unread private notifications with links
+    const privateLinks = await this.prisma.pushNotification.findMany({
+      where: {
+        recipientUid: memberUid,
+        isPublic: false,
+        isRead: false,
+        link: { not: null },
+      },
+      select: { uid: true, link: true },
+    });
+
+    // Unread public notifications with links (no read status for this user)
+    const publicLinks = await this.prisma.pushNotification.findMany({
+      where: {
+        isPublic: true,
+        link: { not: null },
+        readStatuses: {
+          none: { memberUid },
+        },
+      },
+      select: { uid: true, link: true },
+    });
+
+    // Unread access-level notifications with links
+    const accessLevelLinks = userAccessLevel
+      ? await this.prisma.pushNotification.findMany({
+          where: {
+            accessLevels: { has: userAccessLevel },
+            isPublic: false,
+            recipientUid: null,
+            link: { not: null },
+            readStatuses: {
+              none: { memberUid },
+            },
+          },
+          select: { uid: true, link: true, category: true, metadata: true },
+        })
+      : [];
+
+    const filteredAccessLevelLinks = accessLevelLinks.filter(
+      (n) => !this.isSelfAuthoredForumPost(n, member?.uid ?? '')
+    );
+
+    return [
+      ...privateLinks.map((n) => ({ uid: n.uid, link: n.link as string })),
+      ...publicLinks.map((n) => ({ uid: n.uid, link: n.link as string })),
+      ...filteredAccessLevelLinks.map((n) => ({ uid: n.uid, link: n.link as string })),
+    ];
   }
 
   /**

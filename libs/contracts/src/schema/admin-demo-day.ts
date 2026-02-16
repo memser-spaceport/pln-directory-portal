@@ -33,6 +33,7 @@ export const UpdateDemoDaySchema = z.object({
   notifyBeforeStartHours: z.number().int().min(1).max(720).optional().nullable(),
   notifyBeforeEndHours: z.number().int().min(1).max(720).optional().nullable(),
   dashboardEnabled: z.boolean().optional(),
+  logoUid: z.string().optional().nullable(),
 });
 
 export class UpdateDemoDayDto extends createZodDto(UpdateDemoDaySchema) {}
@@ -121,6 +122,8 @@ export const ResponseDemoDaySchema = z.object({
   updatedAt: z.date(),
   isDeleted: z.boolean(),
   deletedAt: z.date().nullable(),
+  logoUid: z.string().nullable().optional(),
+  logoUrl: z.string().nullable().optional(),
 });
 
 export class ResponseDemoDayDto extends createZodDto(ResponseDemoDaySchema) {}
