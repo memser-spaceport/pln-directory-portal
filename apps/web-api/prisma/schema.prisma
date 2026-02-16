@@ -31,6 +31,15 @@ model Team {
   shortDescription             String?
   longDescription              String?
   tier                         Int?                          @default(-1)
+  /// Priority is the new name for tiering in the UI/API.
+  /// Convention:
+  ///   1 = highest importance
+  ///   5 = lowest importance
+  ///   99 = NA (Not Assigned)
+  ///
+  /// We intentionally keep `tier` for backward compatibility and internal consistency.
+  /// During the transition, we store BOTH values and keep them in sync in write paths.
+  priority                     Int                           @default(99)
   plnFriend                    Boolean                       @default(false)
   isFeatured                   Boolean?                      @default(false)
   isFund                       Boolean                       @default(false)
