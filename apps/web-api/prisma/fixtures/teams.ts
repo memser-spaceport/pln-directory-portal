@@ -18,6 +18,12 @@ const getUidsFrom = async (model, where = {}) => {
 };
 
 const randTier = () => [1, 2, 3, 4][Math.floor(Math.random() * 4)];
+const tierToPriority = (tier: number) => {
+  // tier 4 -> priority 1
+  // tier 0 -> priority 5
+  if (tier >= 0 && tier <= 4) return 5 - tier;
+  return 99;
+};
 
 const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) => {
   onCreate(async (team) => {
@@ -55,7 +61,11 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) =
     isFund: faker.datatype.boolean(),
     accessLevel: 'L1',
     accessLevelUpdatedAt: faker.date.past(),
-    tier: randTier(),
+    // Keep tier/priority in sync in fixtures.
+    ...((): { tier: number; priority: number } => {
+      const tier = randTier();
+      return { tier, priority: tierToPriority(tier) };
+    })(),
   };
 });
 

@@ -577,6 +577,7 @@ export class DemoDayParticipantsService {
                     accessLevel: 'L0',
                     accessLevelUpdatedAt: new Date(),
                     tier: -1,
+                    priority: 99,
                   },
                 });
                 summary.createdTeams++;
