@@ -600,7 +600,13 @@ export class DemoDayEngagementService {
         feedbackCount: newStats?.feedback ? 1 : 0,
       };
 
-      const dTotal = Object.values(newStats).reduce<number>((sum: number, v: boolean) => (v ? sum + 1 : sum), 0);
+      const dTotal =
+        Number(newStats.savedCount) +
+        Number(newStats.likedCount) +
+        Number(newStats.connectedCount) +
+        Number(newStats.investedCount) +
+        Number(newStats.referralCount) +
+        Number(newStats.feedbackCount);
 
       if (!existing) {
         // First interaction for this (demoDay, member, profile, prep)
