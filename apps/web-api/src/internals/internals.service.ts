@@ -220,7 +220,7 @@ export class InternalsService {
    * @returns Array of matching members with normalized confidence scores (0-1)
    */
   async searchMembers(params: { searchTerm?: string; email?: string; limit: number }) {
-    this.logger.info(`InternalsService.searchMembers: searchTerm=${params.searchTerm}, email=${params.email}, limit=${params.limit}`);
+    this.logger.info(`InternalsService.searchMembers: searchTerm=${params.searchTerm}, email=${params.email}, limit=${params.limit} `);
     return this.membersService.searchMemberMatches(params);
   }
 
