@@ -619,7 +619,7 @@ export class DemoDayFundraisingProfilesService {
     }
 
     // Check access and get user info - throws if no access
-    const { participantUid, isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+    const { participantUid } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
 
     //Condition #1: admins with showDraft get all profiles - otherwise only published ones
     const where = this.buildProfilesWhere(params, demoDay.uid, showDraft);
@@ -637,7 +637,7 @@ export class DemoDayFundraisingProfilesService {
         demoDayUid: demoDay.uid,
         memberUid: participantUid,
         teamFundraisingProfileUid: { in: filtered.map((p) => p.uid) },
-        isPrepDemoDay: isAdmin,
+        isPrepDemoDay: showDraft,
       },
       select: {
         teamFundraisingProfileUid: true,
