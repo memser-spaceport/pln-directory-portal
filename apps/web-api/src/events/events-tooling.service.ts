@@ -32,6 +32,7 @@ export class EventsToolingService {
           headers: {
             'origin': irlDomain,
             'x-internal-auth-token': internalAuthToken
+            
           }
         }
       );
