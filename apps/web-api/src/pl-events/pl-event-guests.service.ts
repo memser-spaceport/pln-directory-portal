@@ -14,7 +14,7 @@ import { PLEventLocationsService } from './pl-event-locations.service';
 import { CreatePLEventGuestSchemaDto, UpdatePLEventGuestSchemaDto } from 'libs/contracts/src/schema';
 import { FormattedLocationWithEvents, PLEvent } from './pl-event-locations.types';
 import { CacheService } from '../utils/cache/cache.service';
-import { CREATE, EventInvitationToMember, UPDATE } from '../utils/constants';
+import { CREATE, EventInvitationToMember, UPDATE, isIRLNotificationsEnabled } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
 import { PLEventsService } from './pl-events.service';
 import { TeamsService } from '../teams/teams.service';
@@ -36,7 +36,7 @@ export class PLEventGuestsService {
     private eventService: PLEventsService,
     @Inject(forwardRef(() => IrlGatheringPushCandidatesService))
     private readonly irlGatheringPushCandidatesService: IrlGatheringPushCandidatesService
-  ) {}
+  ) { }
 
   /**
    * This method creates multiple event guests for a specific location.
@@ -104,8 +104,8 @@ export class PLEventGuestsService {
       if (type === CREATE) {
         await this.eventLocationsService.subscribeLocationByUid(locationUid, data.memberUid);
         this.memberService.checkIfAdminUser(member) &&
-        !plEvents.length &&
-        (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
+          !plEvents.length &&
+          (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
 
       await this.updateGuestTopicsAndReason(data, locationUid, member, eventType, tx);
@@ -137,6 +137,7 @@ export class PLEventGuestsService {
    *   - Handles errors such as issues with retrieving events or sending emails.
    */
   async sendEventInvitationIfAdminAddsMember(eventMember: Member, location: { location: string }): Promise<any> {
+    if (!isIRLNotificationsEnabled()) return;
     try {
       const eventData = {
         memberName: eventMember.name,
@@ -956,9 +957,8 @@ export class PLEventGuestsService {
         ),
 
         location_only AS (
-        ${
-            includeLocationOnlyGuests
-                ? `
+        ${includeLocationOnlyGuests
+        ? `
                   SELECT
                     pg."memberUid",
                     'none' AS guest_type,
@@ -1041,8 +1041,8 @@ export class PLEventGuestsService {
                     m.name,
                     tm.name
                 `
-                : `SELECT NULL::text AS "memberUid", 'none'::text AS guest_type, '{}'::json AS guest, '[]'::json AS events, '{}'::json AS member, '[]'::jsonb AS teamMemberRoles, '{}'::json AS team, 0::bigint AS count WHERE FALSE`
-        }
+        : `SELECT NULL::text AS "memberUid", 'none'::text AS guest_type, '{}'::json AS guest, '[]'::json AS events, '{}'::json AS member, '[]'::jsonb AS teamMemberRoles, '{}'::json AS team, 0::bigint AS count WHERE FALSE`
+      }
         ),
 
         combined AS (
