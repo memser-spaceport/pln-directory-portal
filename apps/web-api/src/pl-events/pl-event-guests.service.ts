@@ -1371,8 +1371,6 @@ export class PLEventGuestsService {
       const result = await this.prisma.pLEventGuest.findMany({
         where: {
           memberUid,
-          locationUid,
-
           eventUid: {
             in: events.map((event) => event.uid),
           },
