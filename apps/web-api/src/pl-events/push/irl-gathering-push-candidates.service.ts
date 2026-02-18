@@ -48,7 +48,10 @@ export class IrlGatheringPushCandidatesService {
     if (!cfg || !cfg.enabled) return;
 
     const now = new Date();
-    const windowEnd = new Date(now.getTime() + cfg.upcomingWindowDays * 24 * 60 * 60 * 1000);
+    const msInDay = 24 * 60 * 60 * 1000;
+
+    const windowEndUpcoming = new Date(now.getTime() + cfg.upcomingWindowDays * msInDay);
+    const windowEndReminder = new Date(now.getTime() + cfg.reminderDaysBefore * msInDay);
 
     const events = await this.prisma.pLEvent.findMany({
       where: { uid: { in: uniqueEventUids }, isDeleted: false },
@@ -77,76 +80,80 @@ export class IrlGatheringPushCandidatesService {
       const startDate = ev.startDate ? new Date(ev.startDate) : null;
       const endDate = ev.endDate ? new Date(ev.endDate) : null;
 
-      const notEnded = !!endDate && endDate.getTime() >= now.getTime();
-      const withinUpcomingWindow = !!endDate && endDate.getTime() <= windowEnd.getTime();
       const meetsThreshold = attendeeCount >= cfg.minAttendeesPerEvent;
 
+      const notEnded = !!endDate && endDate.getTime() >= now.getTime();
+
+      // UPCOMING: endDate within upcoming window
+      const withinUpcomingWindow = !!endDate && endDate.getTime() <= windowEndUpcoming.getTime();
       const qualifiesUpcoming = hasGathering && notEnded && withinUpcomingWindow && meetsThreshold;
 
-      const notStartedYet = !!startDate && startDate.getTime() > now.getTime();
-      const qualifiesReminder = qualifiesUpcoming && notStartedYet;
+      // REMINDER: event has NOT started yet + starts within reminder window (matches sync logic)
+      const notStartedYet = !!startDate && startDate.getTime() >= now.getTime();
+      const withinReminderWindow = !!startDate && startDate.getTime() <= windowEndReminder.getTime();
+      const qualifiesReminder = hasGathering && notEnded && meetsThreshold && notStartedYet && withinReminderWindow;
 
       if (qualifiesUpcoming) {
         upserts.push(
-            this.prisma.irlGatheringPushCandidate.upsert({
-              where: { ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.UPCOMING, eventUid: ev.uid } },
-              create: {
-                ruleKind: IrlGatheringPushRuleKind.UPCOMING,
-                gatheringUid: ev.locationUid!,
-                eventUid: ev.uid,
-                eventStartDate: ev.startDate,
-                eventEndDate: ev.endDate,
-                attendeeCount,
-                processedAt: null,
-                isSuppressed: false,
-              },
-              update: {
-                gatheringUid: ev.locationUid!,
-                eventStartDate: ev.startDate,
-                eventEndDate: ev.endDate,
-                attendeeCount,
-                processedAt: null,
-                isSuppressed: false,
-              },
-            })
+          this.prisma.irlGatheringPushCandidate.upsert({
+            where: { ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.UPCOMING, eventUid: ev.uid } },
+            create: {
+              ruleKind: IrlGatheringPushRuleKind.UPCOMING,
+              gatheringUid: ev.locationUid!,
+              eventUid: ev.uid,
+              eventStartDate: ev.startDate,
+              eventEndDate: ev.endDate,
+              attendeeCount,
+              processedAt: null,
+              isSuppressed: false,
+            },
+            update: {
+              gatheringUid: ev.locationUid!,
+              eventStartDate: ev.startDate,
+              eventEndDate: ev.endDate,
+              attendeeCount,
+              processedAt: null,
+              isSuppressed: false,
+            },
+          })
         );
-
-        if (qualifiesReminder) {
-          upserts.push(
-              this.prisma.irlGatheringPushCandidate.upsert({
-                where: { ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.REMINDER, eventUid: ev.uid } },
-                create: {
-                  ruleKind: IrlGatheringPushRuleKind.REMINDER,
-                  gatheringUid: ev.locationUid!,
-                  eventUid: ev.uid,
-                  eventStartDate: ev.startDate,
-                  eventEndDate: ev.endDate,
-                  attendeeCount,
-                  processedAt: null,
-                  isSuppressed: false,
-                },
-                update: {
-                  gatheringUid: ev.locationUid!,
-                  eventStartDate: ev.startDate,
-                  eventEndDate: ev.endDate,
-                  attendeeCount,
-                  processedAt: null,
-                  isSuppressed: false,
-                },
-              })
-          );
-        } else {
-          deletes.push(
-              this.prisma.irlGatheringPushCandidate.deleteMany({
-                where: { ruleKind: IrlGatheringPushRuleKind.REMINDER, eventUid: ev.uid },
-              })
-          );
-        }
       } else {
         deletes.push(
-            this.prisma.irlGatheringPushCandidate.deleteMany({
-              where: { ruleKind: { in: [IrlGatheringPushRuleKind.UPCOMING, IrlGatheringPushRuleKind.REMINDER] }, eventUid: ev.uid },
-            })
+          this.prisma.irlGatheringPushCandidate.deleteMany({
+            where: { ruleKind: IrlGatheringPushRuleKind.UPCOMING, eventUid: ev.uid },
+          })
+        );
+      }
+
+      if (qualifiesReminder) {
+        upserts.push(
+          this.prisma.irlGatheringPushCandidate.upsert({
+            where: { ruleKind_eventUid: { ruleKind: IrlGatheringPushRuleKind.REMINDER, eventUid: ev.uid } },
+            create: {
+              ruleKind: IrlGatheringPushRuleKind.REMINDER,
+              gatheringUid: ev.locationUid!,
+              eventUid: ev.uid,
+              eventStartDate: ev.startDate,
+              eventEndDate: ev.endDate,
+              attendeeCount,
+              processedAt: null,
+              isSuppressed: false,
+            },
+            update: {
+              gatheringUid: ev.locationUid!,
+              eventStartDate: ev.startDate,
+              eventEndDate: ev.endDate,
+              attendeeCount,
+              processedAt: null,
+              isSuppressed: false,
+            },
+          })
+        );
+      } else {
+        deletes.push(
+          this.prisma.irlGatheringPushCandidate.deleteMany({
+            where: { ruleKind: IrlGatheringPushRuleKind.REMINDER, eventUid: ev.uid },
+          })
         );
       }
     }
@@ -309,7 +316,9 @@ export class IrlGatheringPushCandidatesService {
     return Math.max(0, days);
   }
 
-  private async computeAttendeesUsingIrlPage(locationUid: string): Promise<{ total: number; topAttendees: TopAttendee[] }> {
+  private async computeAttendeesUsingIrlPage(
+    locationUid: string
+  ): Promise<{ total: number; topAttendees: TopAttendee[] }> {
     try {
       const rows: any[] = await this.pleventGuestsService.getPLEventGuestsByLocationAndType(
           locationUid,
@@ -421,6 +430,15 @@ export class IrlGatheringPushCandidatesService {
 
     const attendees = await this.computeAttendeesUsingIrlPage(gatheringUid);
 
+    // Total events shown on IRL schedule UI (not candidate-limited): endDate >= now
+    const scheduleTotalEvents = await this.prisma.pLEvent.count({
+      where: {
+        isDeleted: false,
+        locationUid: gatheringUid,
+        endDate: { gte: new Date() },
+      },
+    });
+
     return {
       version: this.payloadVersion,
       gatheringUid,
@@ -439,7 +457,7 @@ export class IrlGatheringPushCandidatesService {
           }
           : null,
       events: {
-        total: eventSummaries.length,
+        total: scheduleTotalEvents,
         eventUids: displayEventUids,
         dates: { start: dateStart, end: dateEnd },
         items: eventSummaries,

@@ -6,7 +6,6 @@ import { IrlGatheringPushConfigService } from './irl-gathering-push-config.servi
 import { IrlGatheringPushCandidatesService } from './irl-gathering-push-candidates.service';
 import { PLEventGuestsService } from '../pl-event-guests.service';
 
-
 /**
  * Response returned to back-office on manual trigger.
  * Keep it stable & explicit so UI can show rich details without guessing.
@@ -20,7 +19,12 @@ export type IrlPushTriggerResult =
   locationUid: string;
   payloadVersion: number;
   candidates: { total: number; processed: number };
-  events: { total: number; qualifiedTotal?: number; eventUids: string[]; dates: { start: string | null; end: string | null } };
+  events: {
+    total: number;
+    qualifiedTotal?: number;
+    eventUids: string[];
+    dates: { start: string | null; end: string | null };
+  };
   attendees: { total: number; topAttendees: number };
   updatedAt: string;
 }
@@ -156,7 +160,10 @@ export class IrlGatheringPushNotificationsProcessor {
    *
    * Admin trigger bypasses window & thresholds gating: if candidates exist -> we create/update.
    */
-  async triggerManual(params: { locationUid: string; kind: IrlGatheringPushRuleKind }): Promise<IrlPushTriggerResult> {
+  async triggerManual(params: {
+    locationUid: string;
+    kind: IrlGatheringPushRuleKind;
+  }): Promise<IrlPushTriggerResult> {
     const cfg = (await this.configService.getActiveConfigOrNull()) as ActiveDbConfig | null;
 
     if (!cfg) {
@@ -196,6 +203,7 @@ export class IrlGatheringPushNotificationsProcessor {
     const now = new Date();
     const msInDay = 24 * 60 * 60 * 1000;
     const windowEndUpcoming = new Date(now.getTime() + cfg.upcomingWindowDays * msInDay);
+    const windowEndReminder = new Date(now.getTime() + cfg.reminderDaysBefore * msInDay);
 
     this.logDecision('trigger started', {
       source: 'admin',
@@ -203,15 +211,29 @@ export class IrlGatheringPushNotificationsProcessor {
       locationUid: params.locationUid,
       now: now.toISOString(),
       windowEndUpcoming: windowEndUpcoming.toISOString(),
+      windowEndReminder: windowEndReminder.toISOString(),
       configUid: cfg.uid,
     });
 
-    // Load events at this location in the UPCOMING window (same base as IRL page).
+    // IMPORTANT: choose the same "base event window" by kind so reminder behaves like reminder.
+    const eventWindowWhere =
+      params.kind === IrlGatheringPushRuleKind.REMINDER
+        ? {
+          // reminder: starts within N days (and not ended)
+          startDate: { gte: now, lte: windowEndReminder },
+          endDate: { gte: now },
+        }
+        : {
+          // upcoming: ends within upcoming window (and not ended)
+          endDate: { gte: now, lte: windowEndUpcoming },
+        };
+
+    // Load events at this location in the relevant window.
     const events = await this.prisma.pLEvent.findMany({
       where: {
         isDeleted: false,
         locationUid: params.locationUid,
-        endDate: { gte: now, lte: windowEndUpcoming },
+        ...eventWindowWhere,
       },
       select: { uid: true },
     });
@@ -229,6 +251,7 @@ export class IrlGatheringPushNotificationsProcessor {
         ruleKind: params.kind,
         locationUid: params.locationUid,
         windowEndUpcoming: windowEndUpcoming.toISOString(),
+        windowEndReminder: windowEndReminder.toISOString(),
       });
 
       return {
@@ -237,7 +260,10 @@ export class IrlGatheringPushNotificationsProcessor {
         reason: 'no_events_in_window',
         ruleKind: params.kind,
         locationUid: params.locationUid,
-        details: { windowEndUpcoming: windowEndUpcoming.toISOString() },
+        details: {
+          windowEndUpcoming: windowEndUpcoming.toISOString(),
+          windowEndReminder: windowEndReminder.toISOString(),
+        },
       };
     }
 
@@ -476,37 +502,6 @@ export class IrlGatheringPushNotificationsProcessor {
       .filter(Boolean);
   }
 
-  private parseYmdToUtcDate(v: any): Date | null {
-    if (!v || typeof v !== 'string') return null;
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v.trim());
-    if (!m) return null;
-
-    const y = Number(m[1]);
-    const mo = Number(m[2]) - 1;
-    const d = Number(m[3]);
-
-    const dt = new Date(Date.UTC(y, mo, d));
-    return Number.isNaN(dt.getTime()) ? null : dt;
-  }
-
-  private overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
-    return aStart.getTime() <= bEnd.getTime() && aEnd.getTime() >= bStart.getTime();
-  }
-
-
-  private daysUntil(startIso: string | null | undefined): number | null {
-    if (!startIso) return null;
-
-    const start = new Date(startIso);
-    if (Number.isNaN(start.getTime())) return null;
-
-    const now = new Date();
-    const diffMs = start.getTime() - now.getTime();
-    const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
-
-    return Math.max(0, days);
-  }
-
   private ordinal(n: number): string {
     const mod10 = n % 10;
     const mod100 = n % 100;
@@ -527,16 +522,20 @@ export class IrlGatheringPushNotificationsProcessor {
 
   private buildTitleAndDescription(payload: any): { title: string; description: string } {
     const locationName = payload?.location?.name ?? 'your area';
-
-    const startLabel = this.formatDateForTitle(payload?.events?.dates?.start ?? null);
     const eventsTotal = payload?.events?.total ?? 0;
-    const title = `${eventsTotal} event${eventsTotal === 1 ? '' : 's'} happening in ${locationName}${startLabel ? ` starting ${startLabel}` : ''}`;
+
+    const title =
+      payload?.ruleKind === IrlGatheringPushRuleKind.REMINDER
+        ? `Reminder: IRL Gathering in ${locationName} starts in ${payload?.ui?.daysToStart ?? 0} days.`
+        : `${eventsTotal} event${eventsTotal === 1 ? '' : 's'} happening in ${locationName}${
+          payload?.ui?.startsLabel ? ` starting ${payload.ui.startsLabel}` : ''
+        }`;
 
     const description =
-      payload.location?.description && String(payload.location.description).trim().length > 0
+      payload?.location?.description && String(payload.location.description).trim().length > 0
         ? String(payload.location.description).trim()
-        : payload.events?.total != null
-          ? `${payload.events.total} upcoming event(s) • ${payload.attendees.total} attendee(s)`
+        : payload?.events?.total != null
+          ? `${payload.events.total} upcoming event(s) • ${payload?.attendees?.total ?? 0} attendee(s)`
           : 'Upcoming IRL gathering';
 
     return { title, description };
@@ -604,7 +603,7 @@ export class IrlGatheringPushNotificationsProcessor {
       }
       : null;
 
-    // Events to DISPLAY in notification (candidate-driven; reminder will show subset)
+    // Events to DISPLAY in notification (candidate-driven)
     const events = displayEventUids.length
       ? await this.prisma.pLEvent.findMany({
         where: { uid: { in: displayEventUids }, isDeleted: false },
@@ -641,6 +640,8 @@ export class IrlGatheringPushNotificationsProcessor {
 
     const dateStart = eventSummaries.length ? eventSummaries[0].startDate : null;
     const dateEnd = eventSummaries.length ? eventSummaries[eventSummaries.length - 1].endDate : null;
+    const startsLabel = this.startsLabelFromIso(dateStart);
+    const daysToStart = this.daysUntil(dateStart);
     const guestsRows = await this.pleventGuestsService.getPLEventGuestsByLocationAndType(
       gatheringUid,
       { type: 'upcoming' },
@@ -649,14 +650,30 @@ export class IrlGatheringPushNotificationsProcessor {
 
     const attendees = this.computeAttendeesTotalsFromGuestsResponse(guestsRows);
 
-    // Total events shown on IRL schedule UI (not window-limited): endDate >= now
-    const scheduleTotalEvents = await this.prisma.pLEvent.count({
-      where: {
-        isDeleted: false,
-        locationUid: gatheringUid,
-        endDate: { gte: new Date() },
-      },
-    });
+    // IMPORTANT: total events should be computed in the SAME window logic as the notification kind,
+    // otherwise "total" will look wrong and will jump.
+    const now = new Date();
+    const msInDay = 24 * 60 * 60 * 1000;
+    const windowEndUpcoming = new Date(now.getTime() + cfg.upcomingWindowDays * msInDay);
+    const windowEndReminder = new Date(now.getTime() + cfg.reminderDaysBefore * msInDay);
+
+    const totalEventsInWindow =
+      ruleKind === IrlGatheringPushRuleKind.REMINDER
+        ? await this.prisma.pLEvent.count({
+          where: {
+            isDeleted: false,
+            locationUid: gatheringUid,
+            startDate: { gte: now, lte: windowEndReminder },
+            endDate: { gte: now },
+          },
+        })
+        : await this.prisma.pLEvent.count({
+          where: {
+            isDeleted: false,
+            locationUid: gatheringUid,
+            endDate: { gte: now, lte: windowEndUpcoming },
+          },
+        });
 
     return {
       version: this.payloadVersion,
@@ -677,7 +694,7 @@ export class IrlGatheringPushNotificationsProcessor {
         }
         : null,
       events: {
-        total: scheduleTotalEvents,
+        total: totalEventsInWindow,
         qualifiedTotal: eventSummaries.length,
         eventUids: displayEventUids,
         dates: { start: dateStart, end: dateEnd },
@@ -690,6 +707,8 @@ export class IrlGatheringPushNotificationsProcessor {
       ui: {
         locationUid: gatheringUid,
         eventSlugs: eventSummaries.map((e) => e.slug),
+        startsLabel,
+        daysToStart,
       },
     };
   }
@@ -881,4 +900,24 @@ export class IrlGatheringPushNotificationsProcessor {
   private logDecision(message: string, ctx: Record<string, any> = {}) {
     this.logger.log(`[IRL push] ${message} | ${this.logCtx(ctx)}`);
   }
+
+  private startsLabelFromIso(iso: string | null | undefined): string | null {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    const day = this.ordinal(d.getUTCDate());
+    const month = d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+    return `${day} ${month}`; // <-- "3rd Mar"
+  }
+
+  private daysUntil(startIso: string | null | undefined): number {
+    if (!startIso) return 0;
+    const start = new Date(startIso);
+    if (Number.isNaN(start.getTime())) return 0;
+    const now = new Date();
+    const diffMs = start.getTime() - now.getTime();
+    const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+    return Math.max(0, days);
+  }
+
 }
