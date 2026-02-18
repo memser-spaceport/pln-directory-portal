@@ -29,19 +29,19 @@ export type IrlPushTriggerResult =
   updatedAt: string;
 }
   | {
-  ok: false;
-  action: 'skipped';
-  reason:
+    ok: false;
+    action: 'skipped';
+    reason:
     | 'no_active_config'
     | 'config_disabled'
     | 'no_events_in_window'
     | 'no_candidates'
     | 'window_miss'
     | 'thresholds_not_met';
-  ruleKind: IrlGatheringPushRuleKind;
-  locationUid: string;
-  details?: any;
-};
+    ruleKind: IrlGatheringPushRuleKind;
+    locationUid: string;
+    details?: any;
+  };
 
 type ActiveDbConfig = {
   uid: string;
@@ -108,7 +108,7 @@ export class IrlGatheringPushNotificationsProcessor {
     private readonly configService: IrlGatheringPushConfigService,
     private readonly candidatesService: IrlGatheringPushCandidatesService,
     private readonly pleventGuestsService: PLEventGuestsService
-  ) {}
+  ) { }
 
   /**
    * Scheduled/automatic processing path:
@@ -323,17 +323,17 @@ export class IrlGatheringPushNotificationsProcessor {
   // ---------------------------------------------------------------------------
 
   private async processCandidates(
-      cfg: ActiveDbConfig,
-      candidates: Array<{
-        uid: string;
-        ruleKind: IrlGatheringPushRuleKind;
-        gatheringUid: string;
-        eventUid: string;
-        eventStartDate: Date;
-        eventEndDate: Date;
-        attendeeCount: number;
-      }>,
-      opts: { markProcessed: boolean }
+    cfg: ActiveDbConfig,
+    candidates: Array<{
+      uid: string;
+      ruleKind: IrlGatheringPushRuleKind;
+      gatheringUid: string;
+      eventUid: string;
+      eventStartDate: Date;
+      eventEndDate: Date;
+      attendeeCount: number;
+    }>,
+    opts: { markProcessed: boolean }
   ) {
     if (!candidates.length) return;
 
@@ -352,11 +352,11 @@ export class IrlGatheringPushNotificationsProcessor {
 
       // Window checks (job gating).
       const windowOk = this.matchesWindow(
-          ruleKind,
-          groupCandidates.map((c) => c.eventStartDate),
-          groupCandidates.map((c) => c.eventEndDate),
-          now,
-          cfg
+        ruleKind,
+        groupCandidates.map((c) => c.eventStartDate),
+        groupCandidates.map((c) => c.eventEndDate),
+        now,
+        cfg
       );
 
       if (!windowOk) {
@@ -520,7 +520,7 @@ export class IrlGatheringPushNotificationsProcessor {
     return `${month} ${this.ordinal(day)}`;
   }
 
-  private buildTitleAndDescription(payload: any): { title: string; description: string } {
+  private buildTitleAndDescription(payload: any): { title: string; description: string; link: string } {
     const locationName = payload?.location?.name ?? 'your area';
     const eventsTotal = payload?.events?.total ?? 0;
 
@@ -538,7 +538,7 @@ export class IrlGatheringPushNotificationsProcessor {
           ? `${payload.events.total} upcoming event(s) • ${payload?.attendees?.total ?? 0} attendee(s)`
           : 'Upcoming IRL gathering';
 
-    return { title, description };
+    return { title, description, link: `/events/irl?location=${payload?.location?.name}&open-modal=true` };
   }
 
   private computeAttendeesTotalsFromGuestsResponse(
@@ -802,7 +802,7 @@ export class IrlGatheringPushNotificationsProcessor {
     }
 
     const payload = await this.buildLocationPayload(cfg, ruleKind, gatheringUid, groupCandidates);
-    const { title, description } = this.buildTitleAndDescription(payload);
+    const { title, description, link } = this.buildTitleAndDescription(payload);
 
     const alreadySent = await this.prisma.pushNotification.findFirst({
       where: {
@@ -844,15 +844,16 @@ export class IrlGatheringPushNotificationsProcessor {
         data: {
           title,
           description,
+          link,
           metadata: payload as any,
           ...(bumpForAdmin
-              ? {
-                createdAt: new Date(),
-                sentAt: new Date(),
-                isSent: true,
-                isRead: false,
-              }
-              : {}),
+            ? {
+              createdAt: new Date(),
+              sentAt: new Date(),
+              isSent: true,
+              isRead: false,
+            }
+            : {}),
         },
       });
     } else {
@@ -861,6 +862,7 @@ export class IrlGatheringPushNotificationsProcessor {
         category: PushNotificationCategory.IRL_GATHERING,
         title,
         description,
+        link,
         metadata: payload,
         isPublic: true,
       });
