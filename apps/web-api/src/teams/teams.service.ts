@@ -502,7 +502,7 @@ export class TeamsService {
       if (computedTier !== team.tier) {
         this.logger.info(
           `[Teams] Conflicting tier/priority provided (tier=${team.tier}, priority=${team.priority}). ` +
-            `Using priority and overwriting tier -> ${computedTier}.`
+          `Using priority and overwriting tier -> ${computedTier}.`
         );
         team.tier = computedTier;
       }
@@ -1216,7 +1216,7 @@ export class TeamsService {
     ]);
 
     const canSee = await this.canSeeTiers(userEmail || undefined);
-    const tiers = canSee ? await this.getTierCounts(queryParams.where ?? {}) : undefined;
+    const priorities = canSee ? await this.getPriorityCounts(queryParams.where ?? {}) : undefined;
 
     // Sort funding stages using universal sorting logic
     const sortedFundingStages = this.sortFundingStages(fundingStages.map((stage) => stage.title));
@@ -1227,7 +1227,7 @@ export class TeamsService {
       fundingStages: sortedFundingStages,
       technologies: technologies.map((tech) => tech.title),
       askTags: this.askService.formatAskFilterResponse(askTags),
-      ...(canSee ? { tiers } : {}),
+      ...(canSee ? { priorities } : {}),
     };
   }
 
@@ -1846,34 +1846,33 @@ export class TeamsService {
     }
   }
 
-  async getTierCounts(where: Prisma.TeamWhereInput) {
+  async getPriorityCounts(where: Prisma.TeamWhereInput) {
     const baseWhere: Prisma.TeamWhereInput = {
       accessLevel: { not: 'L0' },
       ...where,
     };
 
     const grouped = await this.prisma.team.groupBy({
-      by: ['tier'],
+      by: ['priority'],
       where: baseWhere,
       _count: { _all: true },
     });
 
-    const counts: Record<number, number> = { [-1]: 0, 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+    const counts: Record<number, number> = { 99: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     for (const row of grouped) {
-      if (row.tier !== null) {
-        const t = (row.tier ?? 0) as number;
-        if (t <= 4) counts[t] = row._count._all;
+      if (row.priority !== null) {
+        const p = (row.priority ?? 0) as number;
+        if (p <= 5) counts[p] = row._count._all;
       }
     }
 
     return [
-      { tier: 0, count: counts[0] },
-      { tier: 1, count: counts[1] },
-      { tier: 2, count: counts[2] },
-      { tier: 3, count: counts[3] },
-      { tier: 4, count: counts[4] },
-      { tier: -1,
-        priority: 99, count: counts[-1] },
+      { priority: 1, count: counts[1] },
+      { priority: 2, count: counts[2] },
+      { priority: 3, count: counts[3] },
+      { priority: 4, count: counts[4] },
+      { priority: 5, count: counts[5] },
+      { priority: 99, count: counts[99] },
     ];
   }
 
