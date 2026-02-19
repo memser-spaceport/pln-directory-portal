@@ -1105,8 +1105,13 @@ const DemoDayDetailPage = () => {
                             />
                           )}
                           <div>
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
                               {participant.member?.name || participant.name}
+                              {activeTab === 'applications' &&
+                                participant.member?.accessLevel === 'L0' &&
+                                !!participant.member?.investorProfile && (
+                                  <span className={s.newBadge}>new</span>
+                                )}
                             </div>
                             <div className="text-sm text-gray-500">
                               {participant.member?.email || participant.email}
