@@ -1849,7 +1849,7 @@ export class TeamsService {
     for (const row of grouped) {
       if (row.priority !== null) {
         const p = (row.priority ?? 0) as number;
-        if (p <= 5) counts[p] = row._count._all;
+        counts[p] = row._count._all;
       }
     }
 
