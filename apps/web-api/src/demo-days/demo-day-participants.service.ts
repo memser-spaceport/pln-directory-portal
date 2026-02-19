@@ -803,6 +803,8 @@ export class DemoDayParticipantsService {
 
     if (params.status) {
       where.status = params.status as any;
+    } else if (params.type) {
+      where.status = { not: 'PENDING' } as any;
     }
 
     if (params.type) {

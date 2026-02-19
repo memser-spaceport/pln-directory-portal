@@ -996,7 +996,7 @@ const DemoDayDetailPage = () => {
                   Investors{' '}
                   {participants &&
                     activeTab === 'investors' &&
-                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
+                    `(${participants.total})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'founders' })}
@@ -1005,7 +1005,7 @@ const DemoDayDetailPage = () => {
                   Founders{' '}
                   {participants &&
                     activeTab === 'founders' &&
-                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
+                    `(${participants.total})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'support' })}
@@ -1014,7 +1014,7 @@ const DemoDayDetailPage = () => {
                   Support{' '}
                   {participants &&
                     activeTab === 'support' &&
-                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
+                    `(${participants.total})`}
                 </button>
               </div>
 
@@ -1090,7 +1090,6 @@ const DemoDayDetailPage = () => {
 
                 {/* Body */}
                 {participants.participants
-                  .filter((participant) => activeTab === 'applications' || participant.status !== 'PENDING')
                   .map((participant) => (
                     <div key={participant.uid} className={s.tableRow}>
                       <div className={clsx(s.bodyCell, s.first, s.flexible)}>
