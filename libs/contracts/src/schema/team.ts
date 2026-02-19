@@ -30,6 +30,17 @@ export const TeamSchema = z.object({
   fundingStageUid: z.string().nullish(),
   linkedinHandler: z.string().nullish(),
   officeHours: z.string().nullish(),
+  /**
+   * Legacy field (0..4, -1 = NA). Kept for backward compatibility.
+   * Prefer using `priority` in new clients.
+   */
+  tier: z.number().int().nullish(),
+
+  /**
+   * New field for PL Network team prioritization.
+   * 1 = highest importance, 5 = lowest importance, 99 = NA (Not Assigned).
+   */
+  priority: z.number().int().nullish(),
 });
 
 export const CreateTeamSchema = TeamSchema.pick({
@@ -90,6 +101,11 @@ export const TeamFilterQueryParams = z.object({
   page: z.number().positive().optional(),
   limit: z.number().positive().max(100).optional(),
   tiers: z.union([z.string(), z.array(z.number())]).optional(),
+  /**
+   * New filter: comma-separated priorities (1..5, NA)
+   * Example: priorities=1,2,NA
+   */
+  priorities: z.union([z.string(), z.array(z.union([z.number(), z.string()]))]).optional(),
 });
 
 export class TeamDto extends createZodDto(TeamSchema) {}
