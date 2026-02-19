@@ -1432,7 +1432,8 @@ export class DemoDaysService {
       applicantEmail: normalizedEmail,
       teamName: resolvedTeamName,
       teamUid: createdTeamUid ?? applicationData.teamUid ?? null,
-      applicationStartDate: participant.createdAt
+      applicationStartDate: participant.createdAt,
+      isNewMember,
     });
 
     this.logger.debug(
@@ -2174,6 +2175,7 @@ export class DemoDaysService {
     applicantEmail: string;
     teamName?: string | null;
     teamUid?: string | null;
+    isNewMember?: boolean;
   }): Promise<void> {
     const adminLink = this.buildAdminDemoDayLink(args.demoDay.slugURL);
 
@@ -2183,14 +2185,17 @@ export class DemoDaysService {
     });
 
     this.logger.log(
-      `demoDayApplication: channel=${channelType}, host="${args.demoDay.host ?? ''}", applicationDate=${applicationDate}`
+      `demoDayApplication: channel=${channelType}, host="${
+        args.demoDay.host ?? ''
+      }", applicationDate=${applicationDate}`
     );
 
+    const newMember = args.isNewMember ? ' (🎉 New Member)' : '';
     try {
       await this.notificationServiceClient.sendTelegramOutboxMessage({
         channelType,
         text: [
-          '🔔 New Demo Day Application',
+          `🔔 New Demo Day Application${newMember}`,
           `Application Date: ${applicationDate}`,
           `Host: ${args.demoDay.host ?? '-'}`,
           `Name: ${args.applicantName ?? '-'}`,
@@ -2214,6 +2219,7 @@ export class DemoDaysService {
           teamName: args.teamName ?? null,
           adminLink,
           channelType,
+          isNewMember: args.isNewMember ?? false,
         },
       });
     } catch (e) {
