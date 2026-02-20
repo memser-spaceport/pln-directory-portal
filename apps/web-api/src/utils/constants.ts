@@ -309,3 +309,10 @@ export const ANALYTICS_PROVIDER = {
   HYBRID: 'hybrid',
   DB: 'db'
 }
+
+
+/**
+ * Max score threshold for OpenSearch score normalization.
+ * Used to cap the denominator when normalizing scores to 0-1 range.
+ */
+export const MAX_SCORE_THRESHOLD = 20.0;

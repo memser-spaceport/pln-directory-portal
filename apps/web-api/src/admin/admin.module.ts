@@ -20,7 +20,6 @@ import { AdminTeamsController } from './admin-teams.controller';
 import { AdminTeamsService } from './admin-teams.service';
 import { ParticipantsRequestModule } from '../participants-request/participants-request.module';
 import { TeamsModule } from '../teams/teams.module';
-import { TeamsService } from '../teams/teams.service';
 import { AskModule } from '../asks/asks.module';
 
 @Module({
@@ -48,6 +47,6 @@ import { AskModule } from '../asks/asks.module';
     AdminTeamsController,
   ],
   exports: [MemberService],
-  providers: [AdminService, MemberService, JwtService, AdminTeamsService, TeamsService],
+  providers: [AdminService, MemberService, JwtService, AdminTeamsService],
 })
 export class AdminModule {}

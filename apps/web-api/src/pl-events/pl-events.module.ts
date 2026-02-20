@@ -15,12 +15,13 @@ import { PLEventLocationAssociationService } from './pl-event-location-associati
 import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
 import { IrlGatheringPushCandidatesService } from './push/irl-gathering-push-candidates.service';
 import { IrlGatheringPushNotificationsJob } from './push/irl-gathering-push-notifications.job';
-
+import { PLEventAssociationService } from './pl-event-association.service';
 import { EventsModule } from '../events/events.module';
 import {IrlGatheringPushConfigService} from "./push/irl-gathering-push-config.service";
 import {IrlGatheringPushConfigController} from "./push/irl-gathering-push-config.controller";
 import {IrlGatheringPushNotificationsController} from "./push/irl-gathering-push-notifications.controller";
 import { IrlGatheringPushNotificationsProcessor } from './push/irl-gathering-push-notifications.processor';
+
 @Module({
   controllers: [PLEventsController, IrlGatheringPushConfigController, IrlGatheringPushNotificationsController],
   providers: [
@@ -33,13 +34,15 @@ import { IrlGatheringPushNotificationsProcessor } from './push/irl-gathering-pus
     PLEventLocationAssociationService,
     IrlGatheringPushCandidatesService,
     IrlGatheringPushNotificationsJob,
-    IrlGatheringPushNotificationsProcessor
+    IrlGatheringPushNotificationsProcessor,
+    PLEventAssociationService,
   ],
   exports: [
     PLEventsService,
     PLEventLocationsService,
     PLEventGuestsService,
     PLEventLocationAssociationService,
+    PLEventAssociationService,
   ],
   imports: [
     forwardRef(() => MembersModule),

@@ -1,18 +1,24 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
+import { MembersService } from '../members/members.service';
+import { TeamsService } from '../teams/teams.service';
 import { Prisma } from '@prisma/client';
 
 /**
  * Service responsible for retrieving detailed information about core entities.
  * Provides methods to fetch Member, Team, Project, and IRL Event details with complete relationships.
  * Handles database operations and error management for internal data access operations.
+ * 
+ * For entity association search, delegates to MembersService and TeamsService.
  */
 @Injectable()
 export class InternalsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly logger: LogService
+    private readonly logger: LogService,
+    private readonly membersService: MembersService,
+    private readonly teamsService: TeamsService
   ) { }
 
   /**
@@ -205,6 +211,28 @@ export class InternalsService {
       this.logger.error(`Error getting IRL event details for uid ${uid}:`, error);
       this.handleErrors(error);
     }
+  }
+
+  /**
+   * Search members using OpenSearch with optional email lookup.
+   * 
+   * @param params - Search parameters including optional searchTerm and email
+   * @returns Array of matching members with normalized confidence scores (0-1)
+   */
+  async searchMembers(params: { searchTerm?: string; email?: string; limit: number }) {
+    this.logger.info(`InternalsService.searchMembers: searchTerm=${params.searchTerm}, email=${params.email}, limit=${params.limit}`);
+    return this.membersService.searchMemberMatches(params);
+  }
+
+  /**
+   * Search teams using OpenSearch.
+   *  
+   * @param params - Search parameters including team name query
+   * @returns Array of matching teams with normalized confidence scores (0-1)
+   */
+  async searchTeams(params: { searchTerm: string; limit: number }) {  
+    this.logger.info(`InternalsService.searchTeams: searchTerm=${params.searchTerm}, limit=${params.limit}`);
+    return this.teamsService.searchTeamMatches(params);
   }
 
   /**
