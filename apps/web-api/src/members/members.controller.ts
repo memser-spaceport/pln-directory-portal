@@ -436,6 +436,16 @@ export class MemberController {
     return await this.membersService.getInvestorTypeCounts(hasOfficeHours);
   }
 
+  @Api(server.route.deleteMemberImage)
+  @UseGuards(UserTokenValidation)
+  async deleteMemberImage(@Param('uid') uid: string, @Req() req) {
+    const requestor = await this.membersService.findMemberByEmail(req.userEmail);
+    if (!requestor.isDirectoryAdmin && uid !== requestor.uid) {
+      throw new ForbiddenException(`Member isn't authorized to delete this member's image`);
+    }
+    return this.membersService.deleteMemberImage(uid);
+  }
+
   /**
    * Retrieves member details by externalId.
    *
