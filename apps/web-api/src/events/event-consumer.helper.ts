@@ -431,19 +431,20 @@ export class EventConsumerHelper {
       teamUid: entityType === 'TEAM' ? entityUid : null,
       role: this.plEventAssociationService.mapRole(role),
     };
-    await this.plEventAssociationService.upsertByExternalIds(
+    const createdAssociation = await this.plEventAssociationService.upsertByExternalIds(
       externalEventId,
       _id,
       { ...associationData, externalEventId, externalAssociationId: _id },
       associationData,
       tx
     );
-    this.logger.info(`${logContext} - Association synced successfully`, 'EventConsumerHelper');
+    this.logger.info(`${logContext} - Association synced uid=${createdAssociation.uid}`, 'EventConsumerHelper');
     return {
       _id,
       entityType,
       entityUid,
-      role: role as AssociationRole
+      role: role as AssociationRole,
+      associationUid: createdAssociation.uid
     };
   }
 }
