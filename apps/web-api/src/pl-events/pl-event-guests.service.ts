@@ -14,16 +14,12 @@ import { PLEventLocationsService } from './pl-event-locations.service';
 import { CreatePLEventGuestSchemaDto, UpdatePLEventGuestSchemaDto } from 'libs/contracts/src/schema';
 import { FormattedLocationWithEvents, PLEvent } from './pl-event-locations.types';
 import { CacheService } from '../utils/cache/cache.service';
-import {
-  CREATE,
-  EventInvitationToMember,
-  UPDATE,
-} from '../utils/constants';
+import { CREATE, EventInvitationToMember, UPDATE, isIRLNotificationsEnabled } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
 import { PLEventsService } from './pl-events.service';
 import { TeamsService } from '../teams/teams.service';
 import path from 'path';
-import {IrlGatheringPushCandidatesService} from "./push/irl-gathering-push-candidates.service";
+import { IrlGatheringPushCandidatesService } from './push/irl-gathering-push-candidates.service';
 
 @Injectable()
 export class PLEventGuestsService {
@@ -38,8 +34,9 @@ export class PLEventGuestsService {
     private awsService: AwsService,
     @Inject(forwardRef(() => PLEventsService))
     private eventService: PLEventsService,
+    @Inject(forwardRef(() => IrlGatheringPushCandidatesService))
     private readonly irlGatheringPushCandidatesService: IrlGatheringPushCandidatesService
-  ) {}
+  ) { }
 
   /**
    * This method creates multiple event guests for a specific location.
@@ -61,25 +58,69 @@ export class PLEventGuestsService {
   ) {
     try {
       const isAdmin = this.memberService.checkIfAdminUser(member);
-      await this.updateMemberDetails(data, member, isAdmin, tx);
+
+      // 1) Normalize memberUid first
       data.memberUid = isAdmin ? data.memberUid : member.uid;
+
+      // 2) Validate stay range (if provided)
+      const checkInDate = data.additionalInfo?.checkInDate;
+      const checkOutDate = data.additionalInfo?.checkOutDate;
+      this.assertValidStayRange(checkInDate, checkOutDate);
+
+      // 3) Prevent duplicates:
+      // - if events are provided: block duplicates for the same (memberUid, locationUid, eventUid)
+      // - if no events: block duplicates for the same (memberUid, locationUid) with overlapping stay range
+      const requestedEventUids = (data.events ?? []).map((e) => e.uid).filter(Boolean);
+      if (requestedEventUids.length > 0) {
+        await this.assertNoDuplicateGuestForEvents({
+          locationUid,
+          memberUid: data.memberUid,
+          eventUids: requestedEventUids,
+          tx,
+        });
+      } else {
+        if (type === CREATE) {
+          await this.assertNoDuplicateGuestForLocationAndRange({
+            locationUid,
+            memberUid: data.memberUid,
+            checkInDate,
+            checkOutDate,
+            tx,
+          });
+        }
+      }
+
+      // 4) Update member details (telegram/officeHours) once
+      await this.updateMemberDetails(data, member, isAdmin, tx);
+
+      // 5) Create guests rows
       const guests = this.formatInputToEventGuests(data, locationUid);
+
       const eventMember: Member = await this.memberService.findMemberByUid(data.memberUid);
       const plEvents: PLEvent[] = await this.getPLEventsByMemberAndLocation(eventMember, locationUid);
+
       const result = await (tx || this.prisma).pLEventGuest.createMany({ data: guests });
+
       if (type === CREATE) {
         await this.eventLocationsService.subscribeLocationByUid(locationUid, data.memberUid);
         this.memberService.checkIfAdminUser(member) &&
           !plEvents.length &&
           (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
+
       await this.updateGuestTopicsAndReason(data, locationUid, member, eventType, tx);
-      // Recompute candidates and immediately refresh already-sent push notifications
-      // so attendee counts stay accurate when guests are added/removed.
+
+      // Recompute candidates and refresh already-sent pushes ONLY for affected events
       await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(
         guests.map((g) => g.eventUid).filter(Boolean)
       );
-      this.cacheService.reset({service: 'PLEventGuest'});
+
+      // If guest(s) were added at the location without eventUid, refresh only this location push
+      if (guests.some((g) => !g.eventUid)) {
+        await this.irlGatheringPushCandidatesService.refreshNotificationsForLocation(locationUid);
+      }
+
+      this.cacheService.reset({ service: 'PLEventGuest' });
       return result;
     } catch (err) {
       this.handleErrors(err);
@@ -96,6 +137,7 @@ export class PLEventGuestsService {
    *   - Handles errors such as issues with retrieving events or sending emails.
    */
   async sendEventInvitationIfAdminAddsMember(eventMember: Member, location: { location: string }): Promise<any> {
+    if (!isIRLNotificationsEnabled()) return;
     try {
       const eventData = {
         memberName: eventMember.name,
@@ -149,17 +191,65 @@ export class PLEventGuestsService {
   ) {
     try {
       const events = type === 'upcoming' ? location.upcomingEvents : location.pastEvents;
+      const windowEventUids = events.map(e => e.uid);
+
+      const isAdmin = this.memberService.checkIfAdminUser(member);
+      const targetMemberUid = isAdmin ? data.memberUid : member.uid;
+
       const result = await this.prisma.$transaction(async (tx) => {
-        const isAdmin = this.memberService.checkIfAdminUser(member);
-        await tx.pLEventGuest.deleteMany({
-          where: {
-            memberUid: isAdmin ? data.memberUid : member.uid,
-            eventUid: {
-              in: events.map((event) => event.uid),
+        // 1) ALWAYS clear event-level rows in the window (this is the core fix)
+        if (windowEventUids.length > 0) {
+          await tx.pLEventGuest.deleteMany({
+            where: {
+              locationUid: location.uid,
+              memberUid: targetMemberUid,
+              eventUid: { in: windowEventUids },
             },
-          },
-        });
-        return await this.createPLEventGuestByLocation(
+          });
+        }
+
+        // 2) If user cleared all events -> keep/update location-only row
+        if (!data?.events?.length) {
+          const updated = await tx.pLEventGuest.updateMany({
+            where: {
+              locationUid: location.uid,
+              memberUid: targetMemberUid,
+              eventUid: null,
+            },
+            data: {
+              telegramId: data.telegramId || null,
+              officeHours: data.officeHours || null,
+              reason: data.reason || null,
+              teamUid: data.teamUid,
+              topics: data.topics || [],
+              additionalInfo: data.additionalInfo ?? null,
+            },
+          });
+
+          if (!updated?.count) {
+            await tx.pLEventGuest.create({
+              data: {
+                memberUid: targetMemberUid,
+                teamUid: data.teamUid,
+                locationUid: location.uid,
+                eventUid: null,
+                telegramId: data.telegramId || null,
+                officeHours: data.officeHours || null,
+                reason: data.reason || null,
+                topics: data.topics || [],
+                additionalInfo: data.additionalInfo ?? null,
+                isHost: false,
+                isSpeaker: false,
+                isSponsor: false,
+              } as any,
+            });
+          }
+
+          return updated;
+        }
+
+        // 3) events provided -> create new event-level rows (the new selection)
+        return this.createPLEventGuestByLocation(
           data,
           member,
           location.uid,
@@ -170,39 +260,145 @@ export class PLEventGuestsService {
           type
         );
       });
-      await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(
-        events.map((e) => e.uid)
-      );
+
+      // post-transaction effects
+      if (!data?.events?.length) {
+        await this.updateMemberDetails(data, member, isAdmin);
+        await this.irlGatheringPushCandidatesService.refreshNotificationsForLocation(location.uid);
+      } else {
+        await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(windowEventUids);
+      }
+
       return result;
     } catch (err) {
       this.handleErrors(err);
     }
   }
 
+
+
   /**
-   * This method deletes event guests for a specific location and given members.
-   * @param membersAndEvents An array of objects containing member and event UIDs
-   * @returns The result of deleting event guests
-   *   - Delete Guests from events , then resets the cache.
+   * Deletes PLEventGuest records for a SPECIFIC location only.
+   *
+   * Rules (scoped by locationUid):
+   * 1) If `events` are provided (non-empty) for a member:
+   *    - delete ONLY event-level guest rows for those eventUids within THIS location
+   *    - keep location-only rows (eventUid = null) untouched
+   *
+   * 2) If `events` are missing or an empty array for a member:
+   *    - treat as FULL delete for that member within THIS location
+   *    - delete ALL guest rows for that member in THIS location only (event-level + location-only)
+   *
+   * After deletion:
+   * - resets PLEventGuest cache
+   * - refreshes push candidates/notifications for affected eventUids only (scoped to this location)
+   *
+   * @param locationUid Location UID from route (/v1/irl/locations/:locationUid/...)
+   * @param membersAndEvents An array of objects containing { memberUid, events?: string[] }
    */
-  async deletePLEventGuests(membersAndEvents) {
+  async deletePLEventGuests(locationUid: string, membersAndEvents: Array<{ memberUid: string; events?: string[] }>) {
     try {
-      const deleteConditions = membersAndEvents.flatMap(({ memberUid, events }) =>
-        events.map((eventUid) => ({ memberUid, eventUid }))
-      );
-      const result = await this.prisma.pLEventGuest.deleteMany({
-        where: {
-          OR: deleteConditions,
-        },
+      const eventDeleteConditions: Array<{ memberUid: string; eventUid: string }> = [];
+      const fullDeleteMemberUids: string[] = [];
+
+      // Build delete intent
+      for (const item of membersAndEvents ?? []) {
+        const memberUid = item?.memberUid;
+        const events = item?.events;
+
+        if (!memberUid) continue;
+
+        if (!Array.isArray(events) || events.length === 0) {
+          fullDeleteMemberUids.push(memberUid);
+          continue;
+        }
+
+        events.forEach((eventUid) => {
+          const uid = typeof eventUid === 'string' ? eventUid.trim() : '';
+          if (uid) eventDeleteConditions.push({ memberUid, eventUid: uid });
+        });
+      }
+
+      // De-dup full deletes
+      const uniqueFullDeleteMemberUids = Array.from(new Set(fullDeleteMemberUids));
+
+      // De-dup event delete pairs
+      const uniqueEventDeleteConditions: Array<{ memberUid: string; eventUid: string }> = [];
+      const seenPairs = new Set<string>();
+      for (const c of eventDeleteConditions) {
+        const key = `${c.memberUid}::${c.eventUid}`;
+        if (!seenPairs.has(key)) {
+          seenPairs.add(key);
+          uniqueEventDeleteConditions.push(c);
+        }
+      }
+
+      // Collect affected eventUids for push refresh (scoped to this location)
+      const affectedEventUidsSet = new Set<string>();
+
+      uniqueEventDeleteConditions.forEach((d) => affectedEventUidsSet.add(d.eventUid));
+
+      if (uniqueFullDeleteMemberUids.length > 0) {
+        const existingEventRows = await this.prisma.pLEventGuest.findMany({
+          where: {
+            locationUid, // IMPORTANT: scope to this location only
+            memberUid: { in: uniqueFullDeleteMemberUids },
+            eventUid: { not: null },
+          },
+          select: { eventUid: true },
+        });
+
+        existingEventRows.forEach((r) => {
+          if (r?.eventUid) affectedEventUidsSet.add(String(r.eventUid));
+        });
+      }
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        const r: any = { events: { count: 0 }, full: { count: 0 } };
+
+        // 1) Delete ONLY event-level rows (scoped to this location)
+        if (uniqueEventDeleteConditions.length > 0) {
+          r.events = await tx.pLEventGuest.deleteMany({
+            where: {
+              locationUid,
+              OR: uniqueEventDeleteConditions,
+            },
+          });
+        }
+
+        // 2) Full delete for members with empty/missing events (ONLY within this location)
+        if (uniqueFullDeleteMemberUids.length > 0) {
+          r.full = await tx.pLEventGuest.deleteMany({
+            where: {
+              locationUid,
+              memberUid: { in: uniqueFullDeleteMemberUids },
+            },
+          });
+        }
+
+        return r;
       });
+
       await this.cacheService.reset({ service: 'PLEventGuest' });
 
-      const affectedEventUids = Array.from(
-        new Set(
-          (deleteConditions as Array<{ eventUid: unknown }>).map((d) => String(d.eventUid))
-        )
-      ).filter((x): x is string => x.length > 0);
-      await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(affectedEventUids);
+      const affectedEventUids = Array.from(affectedEventUidsSet).filter((x): x is string => x.length > 0);
+
+      if (affectedEventUids.length > 0) {
+        await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(affectedEventUids);
+      }
+
+      this.logger.info(
+        `[PLEventGuestsService] deletePLEventGuests ` +
+        JSON.stringify({
+          locationUid,
+          eventDeletePairs: uniqueEventDeleteConditions.length,
+          fullDeleteMembers: uniqueFullDeleteMemberUids.length,
+          affectedEventUids: affectedEventUids.length,
+          deletedEventCount: result?.events?.count ?? 0,
+          deletedFullCount: result?.full?.count ?? 0,
+        })
+      );
+
       return result;
     } catch (err) {
       this.handleErrors(err);
@@ -216,11 +412,15 @@ export class PLEventGuestsService {
    * @param isUserLoggedIn Boolean indicating whether the user is logged in
    * @returns An array of event guests, with sensitive details filtered based on login status
    *   - Applies member preferences on displaying details like telegramId and office hours.
+   *
+   * include location-only guests (eventUid = null) in Attendees list
+   * based on checkInDate/checkOutDate overlap with the events window.
    */
   async getPLEventGuestsByLocationAndType(locationUid: string, query, member) {
     try {
-      let events;
+      let events: PLEvent[];
       const { type, filteredEvents } = query;
+
       if (type === 'upcoming') {
         events = await this.eventLocationsService.getUpcomingEventsByLocation(locationUid);
       } else if (type === 'past') {
@@ -228,15 +428,65 @@ export class PLEventGuestsService {
       } else {
         events = (await this.eventLocationsService.getPLEventLocationByUid(locationUid)).events;
       }
+
       events = await this.filterEventsByAttendanceAndAdminStatus(filteredEvents, events, member);
-      if (events.length === 0) return [];
+
+      const window = this.getEventsWindow(events);
+
+      // Detailed request log
+      this.logger.info(
+        `[PLEventGuestsService] getPLEventGuestsByLocationAndType request ` +
+        JSON.stringify({
+          locationUid,
+          type: type ?? null,
+          loggedInMemberUid: member?.uid ?? null,
+          filteredEventsCount: Array.isArray(filteredEvents) ? filteredEvents.length : 0,
+          eventsCountAfterFilter: Array.isArray(events) ? events.length : 0,
+          page: query?.page ?? 1,
+          limit: query?.limit ?? 10,
+          sortBy: query?.sortBy ?? null,
+          sortDirection: query?.sortDirection ?? null,
+          search: query?.search ?? null,
+          includeLocationOnlyGuests: true,
+          windowStart: window?.start ?? null,
+          windowEnd: window?.end ?? null,
+        })
+      );
+
       const result = await this.fetchAttendees({
+        locationUid,
         eventUids: events?.map((event) => event.uid),
+        windowStart: window?.start ?? null,
+        windowEnd: window?.end ?? null,
+        includeLocationOnlyGuests: true,
         ...query,
         loggedInMemberUid: member ? member?.uid : null,
       });
-      this.restrictTelegramBasedOnMemberPreference(result, member ? true : false);
-      this.restrictOfficeHours(result, member ? true : false);
+
+      this.restrictTelegramBasedOnMemberPreference(result, !!member);
+      this.restrictOfficeHours(result, !!member);
+
+      // Keep old UX safeguard (should become no-op once SQL ordering is correct)
+      if (member?.uid && Array.isArray(result) && result.length > 1) {
+        const idx = result.findIndex((g: any) => g?.memberUid === member.uid);
+        if (idx > 0) {
+          const [me] = result.splice(idx, 1);
+          result.unshift(me);
+        }
+      }
+
+      // Response log (page-level)
+      this.logger.info(
+        `[PLEventGuestsService] getPLEventGuestsByLocationAndType response ` +
+        JSON.stringify({
+          locationUid,
+          type: type ?? null,
+          loggedInMemberUid: member?.uid ?? null,
+          returnedCount: Array.isArray(result) ? result.length : 0,
+          firstMemberUid: Array.isArray(result) && result[0] ? result[0]?.memberUid ?? null : null,
+        })
+      );
+
       return result;
     } catch (err) {
       this.handleErrors(err);
@@ -408,8 +658,7 @@ export class PLEventGuestsService {
         }
         return guest;
       });
-    }
-    else if (!isUserLoggedIn && eventGuests) {
+    } else if (!isUserLoggedIn && eventGuests) {
       eventGuests = eventGuests.map((guest: any) => {
         delete guest.member.telegramHandler;
         delete guest.telegramId;
@@ -476,9 +725,7 @@ export class PLEventGuestsService {
    */
   async filterEventsByAttendanceAndAdminStatus(filteredEventsUid, events: PLEvent[], member): Promise<PLEvent[]> {
     if (filteredEventsUid?.length > 0 && !member) {
-      return events
-        .filter((event) => filteredEventsUid?.includes(event.uid))
-        .filter((event) => event.type !== 'INVITE_ONLY');
+      return events.filter((event) => filteredEventsUid?.includes(event.uid)).filter((event) => event.type !== 'INVITE_ONLY');
     }
     // If the user is logged out, remove all invite-only events
     if (!member) {
@@ -517,21 +764,15 @@ export class PLEventGuestsService {
    * Fetches event attendees with dynamic filtering, searching, sorting, and pagination.
    * Retrieves event, member, and team information for each attendee.
    *
-   * @param {Object}  queryParams - Parameters for filtering, searching, sorting, and pagination.
-   * @param {Array}   queryParams.eventUids - List of event UIDs to filter attendees.
-   * @param {boolean} queryParams.isHost - Filter by whether the attendee is a host.
-   * @param {boolean} queryParams.isSpeaker - Filter by whether the attendee is a speaker.
-   * @param {boolean} queryParams.isSponsor - Filter by whether the attendee is a sponsor.
-   * @param {string}  queryParams.sortBy - Field by which to sort results (member, team).
-   * @param {string}  queryParams.sortDirection - Direction of sorting (asc, desc).
-   * @param {string}  queryParams.search - Search term to filter results by member name, team name, or project name.
-   * @param {number}  queryParams.limit - Number of records to return per page.
-   * @param {number}  queryParams.page - Current page number for pagination.
-   * @param {userEmail} queryParams.userEmail - The email of the logged-in user.
-   * @returns {Promise<Array>} A list of attendees with their associated member, team, and event information.
+   * fetchAttendees now returns BOTH
+   * - event attendees (eventUid in eventUids)
+   * - location-only attendees (eventUid IS NULL) filtered by stay overlap with events window (if window present)
    */
   async fetchAttendees(queryParams) {
     const {
+      locationUid,
+      includeLocationOnlyGuests = false,
+
       eventUids,
       isHost,
       isSpeaker,
@@ -545,8 +786,42 @@ export class PLEventGuestsService {
       loggedInMemberUid,
       includeLocations,
     } = queryParams;
-    // Build dynamic query conditions for filtering by eventUids, isHost, and isSpeaker
+
+    this.logger.info(
+      `[PLEventGuestsService] fetchAttendees input ` +
+      JSON.stringify({
+        locationUid: locationUid ?? null,
+        loggedInMemberUid: loggedInMemberUid ?? null,
+        includeLocationOnlyGuests: !!includeLocationOnlyGuests,
+        eventUidsCount: Array.isArray(eventUids) ? eventUids.length : 0,
+        topicsCount: Array.isArray(topics) ? topics.length : 0,
+        isHost: isHost ?? null,
+        isSpeaker: isSpeaker ?? null,
+        isSponsor: isSponsor ?? null,
+        sortBy: sortBy ?? null,
+        sortDirection: sortDirection ?? null,
+        search: search ?? null,
+        limit: limit ?? 10,
+        page: page ?? 1,
+        includeLocations: !!includeLocations,
+      })
+    );
+
+    // Build dynamic query conditions for filtering by eventUids and topics
     let { conditions, values } = this.buildConditions(eventUids, topics);
+
+    // location filter (always)
+    values.push(locationUid);
+    const locationUidPos = values.length;
+    // bind loggedInMemberUid for outer ORDER BY (so it works before pagination)
+    values.push(loggedInMemberUid ?? null);
+    const loggedInUidPos = values.length;
+
+    // IMPORTANT:
+    // Bind eventUids now as a fixed placeholder so search (applySearch) can't shift it.
+    values.push(eventUids);
+    const eventUidsPos = values.length;
+
     // Apply sorting based on the sortBy parameter (default is sorting by memberName)
     const orderBy = this.applySorting(sortBy, sortDirection, loggedInMemberUid);
 
@@ -555,113 +830,105 @@ export class PLEventGuestsService {
 
     const selectLocation = includeLocations ? `,'location', l."location"` : ``; // Empty if location is not required
 
-    // Determine the position of the eventUid placeholder in the SQL query's values array
-    // If search is enabled, adjust the position accordingly
-
-    /*
-      Position Breakdown:
-      - LIMIT placeholder → `$${values.length + 1}`
-      - OFFSET placeholder → `$${values.length + 2}`
-      - If search is enabled, an extra placeholder is used for search filters:
-        - Search placeholder → `$${values.length + 3}`
-        - EventUid placeholder → `$${values.length + 4}`
-      - Otherwise:
-        - EventUid placeholder → `$${values.length + 3}`
-    */
-
-    const eventPosition = search ? values.length + 4 : values.length + 3;
-
-    // Construct the raw SQL query for fetching attendees with joined tables and aggregated JSON data
     const query: any = `
-      SELECT
-        *,
-        COUNT(*) OVER() AS count FROM (
+      WITH event_attendees AS (
         SELECT
-          pg."memberUid",
-          CASE   --check the guestType of the guest in the events in specified locations
-            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition})) --eventUid's index in values array
-               AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
-               AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
-            THEN 'isHostOnly'
-            WHEN BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
-               AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition}))
-               AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
-            THEN 'isSpeakerOnly'
-            WHEN BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
-               AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition}))
-               AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
-            THEN 'isSponsorOnly'
-            WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventPosition}))
-               AND BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventPosition}))
-               AND BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventPosition}))
-            THEN 'hostAndSpeakerAndSponsor'
-            ELSE 'none'
-          END AS guest_type,
-          json_object_agg(
-            'info',
-            json_build_object(
-              'reason', pg."reason",
-              'teamUid', pg."teamUid",
-              'topics', pg."topics",
-              'isHost', pg."isHost",
-              'isSpeaker', pg."isSpeaker",
-              'isSponsor', pg."isSponsor",
-              'createdAt', pg."createdAt",
-              'telegramId', pg."telegramId",
-              'officeHours', pg."officeHours"
-            )
-          ) AS guest,
-          json_agg(
-            DISTINCT jsonb_build_object(
-              'uid', e.uid,
-              'slugURL', e."slugURL",
-              'name', e.name,
-              'type', e.type,
-              'startDate', e."startDate",
-              'endDate', e."endDate",
-              'isHost', pg."isHost",      -- Event-specific host details
-              'isSpeaker', pg."isSpeaker", -- Event-specific speaker details
-              'isSponsor', pg."isSponsor", -- Event-specific sponsor details
-              'additionalInfo', pg."additionalInfo"
-               ${selectLocation}
-            )
-          ) FILTER (WHERE e.uid = ANY($${eventPosition})) AS events,
-          json_object_agg(
-            'member',
-            json_build_object(
-              'name', m.name,
-              'image', json_build_object('url', mi.url),
-              'telegramHandler', m."telegramHandler",
-              'preferences', m.preferences,
-              'officeHours', m."officeHours"
-            )
-          ) AS member,
-          COALESCE(   -- Ensure that if the aggregation results in NULL, it returns an empty JSON array instead
-            jsonb_agg(
-                DISTINCT jsonb_build_object(
-                  'role', tmr."role",
-                  'team', jsonb_build_object(
-                  'uid', tmr_team.uid,
-                  'name', tmr_team.name,
-                  'logo', jsonb_build_object('url', tmr_logo.url)
-                )
-              )
-            ) FILTER (WHERE tmr_team.uid IS NOT NULL),  -- Exclude NULL teams from the aggregation
-            '[]'::jsonb     -- Default to an empty JSON array if no valid team member roles exist
-          ) AS teamMemberRoles,
-          json_object_agg(
-            'team',
-            json_build_object(
-              'uid', tm.uid,
-              'name', tm.name,
-              'logo', json_build_object('url', tml.url)
-            )
-          ) AS team
+          *,
+          COUNT(*) OVER() AS count
+      FROM (
+        SELECT
+        pg."memberUid",
+        CASE
+        WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
+        THEN 'isHostOnly'
+        WHEN BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
+        THEN 'isSpeakerOnly'
+        WHEN BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND NOT BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
+        THEN 'isSponsorOnly'
+        WHEN BOOL_OR(pg."isHost" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND BOOL_OR(pg."isSpeaker" AND pg."eventUid" = ANY($${eventUidsPos}))
+        AND BOOL_OR(pg."isSponsor" AND pg."eventUid" = ANY($${eventUidsPos}))
+        THEN 'hostAndSpeakerAndSponsor'
+        ELSE 'none'
+        END AS guest_type,
+
+        json_object_agg(
+        'info',
+        json_build_object(
+        'reason', pg."reason",
+        'teamUid', pg."teamUid",
+        'topics', pg."topics",
+        'isHost', pg."isHost",
+        'isSpeaker', pg."isSpeaker",
+        'isSponsor', pg."isSponsor",
+        'createdAt', pg."createdAt",
+        'telegramId', pg."telegramId",
+        'officeHours', pg."officeHours"
+        )
+        ) AS guest,
+
+        COALESCE(
+        json_agg(
+        DISTINCT jsonb_build_object(
+        'uid', e.uid,
+        'slugURL', e."slugURL",
+        'name', e.name,
+        'type', e.type,
+        'startDate', e."startDate",
+        'endDate', e."endDate",
+        'isHost', pg."isHost",
+        'isSpeaker', pg."isSpeaker",
+        'isSponsor', pg."isSponsor",
+        'additionalInfo', pg."additionalInfo"
+        ${selectLocation}
+        )
+        ) FILTER (WHERE e.uid = ANY($${eventUidsPos})),
+        '[]'::json
+        ) AS events,
+
+        json_object_agg(
+        'member',
+        json_build_object(
+        'name', m.name,
+        'image', json_build_object('url', mi.url),
+        'telegramHandler', m."telegramHandler",
+        'preferences', m.preferences,
+        'officeHours', m."officeHours"
+        )
+        ) AS member,
+
+        COALESCE(
+        jsonb_agg(
+        DISTINCT jsonb_build_object(
+        'role', tmr."role",
+        'team', jsonb_build_object(
+        'uid', tmr_team.uid,
+        'name', tmr_team.name,
+        'logo', jsonb_build_object('url', tmr_logo.url)
+        )
+        )
+        ) FILTER (WHERE tmr_team.uid IS NOT NULL),
+        '[]'::jsonb
+        ) AS teamMemberRoles,
+
+        json_object_agg(
+        'team',
+        json_build_object(
+        'uid', tm.uid,
+        'name', tm.name,
+        'logo', json_build_object('url', tml.url)
+        )
+        ) AS team
+
         FROM "PLEventGuest" pg
         JOIN "PLEvent" e ON e.uid = pg."eventUid"
         ${this.joinEventLocations(includeLocations)}
-        LEFT JOIN "Image" el ON el.uid = e."logoUid"
-        LEFT JOIN "Image" eb ON eb.uid = e."bannerUid"
         JOIN "Member" m ON m.uid = pg."memberUid"
         LEFT JOIN "Image" mi ON mi.uid = m."imageUid"
         LEFT JOIN "TeamMemberRole" tmr ON tmr."memberUid" = m.uid
@@ -672,29 +939,213 @@ export class PLEventGuestsService {
         LEFT JOIN "Project" cp ON cp."createdBy" = m.uid
         LEFT JOIN "Team" tm ON tm.uid = pg."teamUid"
         LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
+
         ${this.applySearch(values, search)}
+        AND ($${locationUidPos}::text IS NULL OR pg."locationUid" = $${locationUidPos})
+
         GROUP BY
-          pg."memberUid",
-          pg."teamUid",
-          pg."topics",
-          pg."reason",
-          m.name,
-          tm.name
-        ${conditions} -- Add the dynamically generated conditions for filtering
-        ${orderBy} -- Apply sorting logic
-      )
-      AS subquery
-      ${this.buildHostAndSpeakerCondition(isHost, isSpeaker, isSponsor)}
-      LIMIT $${values.length + 1}
-      OFFSET $${values.length + 2} -- Apply pagination limit and offset
+        pg."memberUid",
+        pg."teamUid",
+        pg."topics",
+        pg."reason",
+        m.name,
+        tm.name
+        ${conditions}
+        ${orderBy}
+        ) AS subquery
+        ${this.buildHostAndSpeakerCondition(isHost, isSpeaker, isSponsor)}
+        ),
+
+        location_only AS (
+        ${includeLocationOnlyGuests
+        ? `
+                  SELECT
+                    pg."memberUid",
+                    'none' AS guest_type,
+                    json_object_agg(
+                        'info',
+                        json_build_object(
+                            'reason', pg."reason",
+                            'teamUid', pg."teamUid",
+                            'topics', pg."topics",
+                            'isHost', false,
+                            'isSpeaker', false,
+                            'isSponsor', false,
+                            'createdAt', pg."createdAt",
+                            'telegramId', pg."telegramId",
+                            'officeHours', pg."officeHours",
+                            'additionalInfo', pg."additionalInfo"
+                        )
+                    ) AS guest,
+                    '[]'::json AS events,
+                    json_object_agg(
+                        'member',
+                        json_build_object(
+                            'name', m.name,
+                            'image', json_build_object('url', mi.url),
+                            'telegramHandler', m."telegramHandler",
+                            'preferences', m.preferences,
+                            'officeHours', m."officeHours"
+                        )
+                    ) AS member,
+                    COALESCE(
+                        jsonb_agg(
+                          DISTINCT jsonb_build_object(
+                'role', tmr."role",
+                'team', jsonb_build_object(
+                  'uid', tmr_team.uid,
+                  'name', tmr_team.name,
+                  'logo', jsonb_build_object('url', tmr_logo.url)
+                )
+              )
+            ) FILTER (WHERE tmr_team.uid IS NOT NULL),
+                        '[]'::jsonb
+                    ) AS teamMemberRoles,
+                    json_object_agg(
+                        'team',
+                        json_build_object(
+                            'uid', tm.uid,
+                            'name', tm.name,
+                            'logo', json_build_object('url', tml.url)
+                        )
+                    ) AS team,
+                    0::bigint AS count
+                  FROM "PLEventGuest" pg
+                    JOIN "Member" m ON m.uid = pg."memberUid"
+                    LEFT JOIN "Image" mi ON mi.uid = m."imageUid"
+                    LEFT JOIN "TeamMemberRole" tmr ON tmr."memberUid" = m.uid
+                    LEFT JOIN "Team" tmr_team ON tmr_team.uid = tmr."teamUid"
+                    LEFT JOIN "Image" tmr_logo ON tmr_logo.uid = tmr_team."logoUid"
+                    LEFT JOIN "Team" tm ON tm.uid = pg."teamUid"
+                    LEFT JOIN "Image" tml ON tml.uid = tm."logoUid"
+                  WHERE
+                    ($${locationUidPos}::text IS NULL OR pg."locationUid" = $${locationUidPos})
+                    AND pg."eventUid" IS NULL
+                    AND m."accessLevel" NOT IN ('L0','L1','Rejected')
+
+                    -- prevent duplicates: if member already attends at least one of the requested events,
+                    -- don't include their location-only row
+                    AND NOT EXISTS (
+                    SELECT 1
+                    FROM "PLEventGuest" pg2
+                    WHERE
+                    pg2."locationUid" = pg."locationUid"
+                    AND pg2."memberUid" = pg."memberUid"
+                    AND pg2."eventUid" = ANY($${eventUidsPos})
+                    )
+                  GROUP BY
+                    pg."memberUid",
+                    pg."teamUid",
+                    pg."topics",
+                    pg."reason",
+                    m.name,
+                    tm.name
+                `
+        : `SELECT NULL::text AS "memberUid", 'none'::text AS guest_type, '{}'::json AS guest, '[]'::json AS events, '{}'::json AS member, '[]'::jsonb AS teamMemberRoles, '{}'::json AS team, 0::bigint AS count WHERE FALSE`
+      }
+        ),
+
+        combined AS (
+      SELECT * FROM event_attendees
+      UNION ALL
+      SELECT * FROM location_only
+        )
+
+      SELECT
+        *,
+        COUNT(*) OVER() AS count
+      FROM combined
+        ${this.buildHostAndSpeakerCondition(isHost, isSpeaker, isSponsor)}
+        ${this.buildOuterOrderBy(sortBy, sortDirection, loggedInUidPos)}
+        LIMIT $${values.length + 1}
+      OFFSET $${values.length + 2}
     `;
-    // Add pagination values to the query parameters for limit and offset
+
+    this.logger.info(
+      `[PLEventGuestsService] fetchAttendees sqlMeta ` +
+      JSON.stringify({
+        valuesCountBeforePagination: values.length,
+        locationUidPos,
+        loggedInUidPos,
+        eventUidsPos,
+        paginationLimit,
+        offset,
+      })
+    );
+
     values.push(paginationLimit, offset);
-    values.push(eventUids);
+
+    this.logger.info(
+      `[PLEventGuestsService] fetchAttendees sqlParams ` +
+      JSON.stringify({
+        valuesCountFinal: values.length,
+        eventUidsCount: Array.isArray(eventUids) ? eventUids.length : 0,
+        hasSearch: !!search,
+        hasLoggedInUid: !!loggedInMemberUid,
+      })
+    );
+
     // Execute the raw query with the built query string and values
     const result = await this.prisma.$queryRawUnsafe(query, ...values);
     return this.formatAttendees(result);
   }
+
+
+  private buildOuterOrderBy(sortBy: string, sortDirection: any, loggedInUidPos: number): string {
+    const normalizeString = (v: any): string => {
+      if (Array.isArray(v)) {
+        // take last non-empty item if present, otherwise last item
+        const lastNonEmpty = [...v].reverse().find((x) => typeof x === 'string' && x.trim().length > 0);
+        return (lastNonEmpty ?? v[v.length - 1] ?? '').toString();
+      }
+      if (v === undefined || v === null) return '';
+      return String(v);
+    };
+
+    const normalizedSortBy = normalizeString(sortBy).trim();
+    const normalizedSortDirection = normalizeString(sortDirection).trim().toLowerCase();
+    const dir = normalizedSortDirection === 'desc' ? 'desc' : 'asc';
+
+    const loggedInFirst = `CASE WHEN $${loggedInUidPos}::text IS NOT NULL AND "memberUid" = $${loggedInUidPos} THEN 0 ELSE 1 END`;
+
+    const memberNameExpr = `("member"->'member'->>'name')`;
+    const teamNameExpr = `("team"->'team'->>'name')`;
+
+    if (normalizedSortBy === 'member') {
+      return `
+      ORDER BY
+        ${loggedInFirst},
+        ${memberNameExpr} ${dir}
+    `;
+    }
+
+    if (normalizedSortBy === 'team') {
+      return `
+      ORDER BY
+        ${loggedInFirst},
+        ${teamNameExpr} ${dir} NULLS LAST,
+        ${memberNameExpr} asc
+    `;
+    }
+
+    // Default ordering (preserve previous intent: completeness first, then name)
+    const hasReasonAndTopics = `(("guest"->'info'->>'reason') IS NOT NULL AND jsonb_typeof(("guest"->'info'->'topics')::jsonb) = 'array' AND jsonb_array_length(("guest"->'info'->'topics')::jsonb) > 0)`;
+    const hasTopics = `(jsonb_typeof(("guest"->'info'->'topics')::jsonb) = 'array' AND jsonb_array_length(("guest"->'info'->'topics')::jsonb) > 0)`;
+    const hasReason = `(("guest"->'info'->>'reason') IS NOT NULL)`;
+
+    return `
+    ORDER BY
+      ${loggedInFirst},
+      CASE
+        WHEN ${hasReasonAndTopics} THEN 1
+        WHEN ${hasTopics} THEN 2
+        WHEN ${hasReason} THEN 3
+        ELSE 4
+      END asc,
+      ${memberNameExpr} ${dir}
+  `;
+  }
+
 
   /**
    *
@@ -788,7 +1239,7 @@ export class PLEventGuestsService {
     else if (isSpeaker === 'true') {
       return ` WHERE guest_type = 'isSpeakerOnly' `; // Return condition for speaker only
     }
-    // Check if the guest is only a speaker
+    // Check if the guest is only a sponsor
     else if (isSponsor === 'true') {
       return ` WHERE guest_type = 'isSponsorOnly' `; // Return condition for sponsor only
     }
@@ -1071,7 +1522,8 @@ export class PLEventGuestsService {
   }
 
   async getAllPLEventGuest() {
-    return await this.fetchAttendees({
+    const rows = await this.fetchAttendees({
+      locationUid: null,
       eventUids: [],
       isHost: undefined,
       isSpeaker: undefined,
@@ -1084,8 +1536,67 @@ export class PLEventGuestsService {
       page: 1,
       loggedInMemberUid: null,
       includeLocations: true,
+      includeLocationOnlyGuests: false,
+      windowStart: null,
+      windowEnd: null,
+    });
+
+    return await this.attachRoleFlags(rows, { locationUid: null, eventUids: [] });
+  }
+
+  private async attachRoleFlags(
+    attendees: any[],
+    scope: { locationUid?: string | null; eventUids?: string[] }
+  ) {
+    const memberUids = Array.from(new Set((attendees ?? []).map((x) => x?.memberUid).filter(Boolean)));
+    if (memberUids.length === 0) return attendees ?? [];
+
+    const safeEventUids = Array.isArray(scope?.eventUids) ? scope.eventUids.filter(Boolean) : [];
+    const hasEventFilter = safeEventUids.length > 0;
+
+    const rows: Array<{ memberUid: string; isHost: boolean; isSpeaker: boolean; isSponsor: boolean }> =
+      await this.prisma.$queryRawUnsafe(
+        `
+      SELECT
+        pg."memberUid" AS "memberUid",
+        BOOL_OR(pg."isHost")    AS "isHost",
+        BOOL_OR(pg."isSpeaker") AS "isSpeaker",
+        BOOL_OR(pg."isSponsor") AS "isSponsor"
+      FROM "PLEventGuest" pg
+      WHERE pg."memberUid" = ANY($1::text[])
+        AND ($2::text IS NULL OR pg."locationUid" = $2::text)
+        AND (
+          $3::boolean = false
+          OR (pg."eventUid" IS NOT NULL AND pg."eventUid" = ANY($4::text[]))
+        )
+      GROUP BY pg."memberUid"
+      `,
+        memberUids,
+        scope?.locationUid ?? null,
+        hasEventFilter,
+        safeEventUids
+      );
+
+    const map = new Map<string, { isHost: boolean; isSpeaker: boolean; isSponsor: boolean }>();
+    for (const r of rows) {
+      map.set(r.memberUid, {
+        isHost: !!r.isHost,
+        isSpeaker: !!r.isSpeaker,
+        isSponsor: !!r.isSponsor,
+      });
+    }
+
+    return (attendees ?? []).map((a) => {
+      const f = map.get(a.memberUid) ?? { isHost: false, isSpeaker: false, isSponsor: false };
+      return {
+        ...a,
+        isHost: f.isHost,
+        isSpeaker: f.isSpeaker,
+        isSponsor: f.isSponsor,
+      };
     });
   }
+
 
   /**
    * Determines the active team for a guest.
@@ -1187,20 +1698,20 @@ export class PLEventGuestsService {
       // Build search conditions for events and locations
       const eventSearchCondition = queryParams?.name
         ? {
-            name: {
-              contains: queryParams.name,
-              mode: 'insensitive' as const,
-            },
-          }
+          name: {
+            contains: queryParams.name,
+            mode: 'insensitive' as const,
+          },
+        }
         : {};
 
       const locationSearchCondition = queryParams?.name
         ? {
-            location: {
-              contains: queryParams.name,
-              mode: 'insensitive' as const,
-            },
-          }
+          location: {
+            contains: queryParams.name,
+            mode: 'insensitive' as const,
+          },
+        }
         : {};
 
       // Build orderBy conditions based on queryParams.orderBy
@@ -1308,5 +1819,119 @@ export class PLEventGuestsService {
     } catch (error) {
       return this.handleErrors(error);
     }
+  }
+
+  // ===========================
+  // helpers for stay overlap + duplicates
+  // ===========================
+
+  private parseYmdToUtcDate(v?: string): Date | null {
+    if (!v || typeof v !== 'string') return null;
+    const s = v.trim();
+    if (!s) return null;
+
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (!m) return null;
+
+    const y = Number(m[1]);
+    const mo = Number(m[2]) - 1;
+    const d = Number(m[3]);
+
+    const dt = new Date(Date.UTC(y, mo, d));
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  }
+
+  private overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
+    return aStart.getTime() <= bEnd.getTime() && aEnd.getTime() >= bStart.getTime();
+  }
+
+  private assertValidStayRange(checkInDate?: string, checkOutDate?: string) {
+    const inRaw = (checkInDate ?? '').trim();
+    const outRaw = (checkOutDate ?? '').trim();
+
+    const hasIn = inRaw.length > 0;
+    const hasOut = outRaw.length > 0;
+
+    if (!hasIn && !hasOut) return;
+
+    if (hasIn !== hasOut) {
+      throw new BadRequestException('Both additionalInfo.checkInDate and additionalInfo.checkOutDate are required');
+    }
+
+    const inDt = this.parseYmdToUtcDate(inRaw);
+    const outDt = this.parseYmdToUtcDate(outRaw);
+
+    if (!inDt || !outDt) {
+      throw new BadRequestException('checkInDate/checkOutDate must be in YYYY-MM-DD format');
+    }
+
+    if (inDt.getTime() > outDt.getTime()) {
+      throw new BadRequestException('checkInDate must be <= checkOutDate');
+    }
+  }
+
+  private async assertNoDuplicateGuestForEvents(params: {
+    locationUid: string;
+    memberUid: string;
+    eventUids: string[];
+    tx?: Prisma.TransactionClient;
+  }): Promise<void> {
+    const prisma = params.tx || this.prisma;
+    const eventUids = [...new Set((params.eventUids ?? []).filter(Boolean))];
+    if (!eventUids.length) return;
+
+    const existing = await prisma.pLEventGuest.findFirst({
+      where: {
+        locationUid: params.locationUid,
+        memberUid: params.memberUid,
+        eventUid: { in: eventUids },
+      },
+      select: { uid: true, eventUid: true },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `Guest already exists for this location and event (memberUid=${params.memberUid}, locationUid=${params.locationUid}, eventUid=${existing.eventUid})`
+      );
+    }
+  }
+
+  private async assertNoDuplicateGuestForLocationAndRange(params: {
+    locationUid: string;
+    memberUid: string;
+    checkInDate?: string;
+    checkOutDate?: string;
+    tx?: Prisma.TransactionClient;
+  }): Promise<void> {
+    const { locationUid, memberUid } = params;
+    const prisma = params.tx || this.prisma;
+
+    // New rule: only one location-only guest row per (memberUid, locationUid)
+    // (event-level rows are allowed and do not block location-only creation)
+    const existing = await prisma.pLEventGuest.findFirst({
+      where: { locationUid, memberUid, eventUid: null },
+      select: { uid: true },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `Guest already exists for this location (memberUid=${memberUid}, locationUid=${locationUid}).`
+      );
+    }
+  }
+
+  // helper for event window
+  private getEventsWindow(events: Array<{ startDate: any; endDate: any }>) {
+    if (!events?.length) return null;
+    const starts = events.map((e) => new Date(e.startDate).getTime()).filter((x) => !Number.isNaN(x));
+    const ends = events.map((e) => new Date(e.endDate).getTime()).filter((x) => !Number.isNaN(x));
+    if (!starts.length || !ends.length) return null;
+
+    const minStart = Math.min(...starts);
+    const maxEnd = Math.max(...ends);
+    return {
+      start: new Date(minStart).toISOString(),
+      end: new Date(maxEnd).toISOString(),
+    };
   }
 }

@@ -14,7 +14,7 @@ export class DemoDayFundraisingProfilesService {
     private readonly analyticsService: AnalyticsService,
     private readonly uploadsService: UploadsService,
     private readonly awsService: AwsService
-  ) {}
+  ) { }
 
   async getCurrentDemoDayFundraisingProfileByTeamUid(teamUid: string, demoDayUid: string): Promise<any> {
     // Get team details with required fields
@@ -619,7 +619,7 @@ export class DemoDayFundraisingProfilesService {
     }
 
     // Check access and get user info - throws if no access
-    const { participantUid, isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+    const { participantUid } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
 
     //Condition #1: admins with showDraft get all profiles - otherwise only published ones
     const where = this.buildProfilesWhere(params, demoDay.uid, showDraft);
@@ -637,10 +637,11 @@ export class DemoDayFundraisingProfilesService {
         demoDayUid: demoDay.uid,
         memberUid: participantUid,
         teamFundraisingProfileUid: { in: filtered.map((p) => p.uid) },
-        isPrepDemoDay: isAdmin,
+        isPrepDemoDay: showDraft,
       },
       select: {
         teamFundraisingProfileUid: true,
+        saved: true,
         liked: true,
         connected: true,
         invested: true,
@@ -650,6 +651,7 @@ export class DemoDayFundraisingProfilesService {
     });
     const flagsByProfile = interests.reduce((acc, it) => {
       acc[it.teamFundraisingProfileUid] = {
+        saved: it.saved,
         liked: it.liked,
         connected: it.connected,
         invested: it.invested,
@@ -657,9 +659,17 @@ export class DemoDayFundraisingProfilesService {
         feedback: it.feedback,
       };
       return acc;
-    }, {} as Record<string, { liked: boolean; connected: boolean; invested: boolean; referral: boolean; feedback: boolean }>);
+    }, {} as Record<string, { saved: boolean; liked: boolean; connected: boolean; invested: boolean; referral: boolean; feedback: boolean }>);
     for (const p of filtered) {
-      const f = flagsByProfile[p.uid] || { liked: false, connected: false, invested: false, referral: false, feedback: false };
+      const f = flagsByProfile[p.uid] || {
+        saved: false,
+        liked: false,
+        connected: false,
+        invested: false,
+        referral: false,
+        feedback: false,
+      };
+      (p as any).saved = f.saved;
       (p as any).liked = f.liked;
       (p as any).connected = f.connected;
       (p as any).invested = f.invested;
@@ -1183,10 +1193,10 @@ export class DemoDayFundraisingProfilesService {
       }),
       previewImageSmall
         ? this.uploadsService.uploadGeneric({
-            file: previewImageSmall,
-            kind: UploadKind.IMAGE,
-            scopeType: 'NONE',
-          })
+          file: previewImageSmall,
+          kind: UploadKind.IMAGE,
+          scopeType: 'NONE',
+        })
         : Promise.resolve(),
     ]);
 

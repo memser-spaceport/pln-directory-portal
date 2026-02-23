@@ -32,6 +32,8 @@ export const UpdateDemoDaySchema = z.object({
   notificationsEnabled: z.boolean().optional(),
   notifyBeforeStartHours: z.number().int().min(1).max(720).optional().nullable(),
   notifyBeforeEndHours: z.number().int().min(1).max(720).optional().nullable(),
+  dashboardEnabled: z.boolean().optional(),
+  logoUid: z.string().optional().nullable(),
 });
 
 export class UpdateDemoDayDto extends createZodDto(UpdateDemoDaySchema) {}
@@ -115,10 +117,13 @@ export const ResponseDemoDaySchema = z.object({
   notificationsEnabled: z.boolean(),
   notifyBeforeStartHours: z.number().nullable(),
   notifyBeforeEndHours: z.number().nullable(),
+  dashboardEnabled: z.boolean(),
   createdAt: z.date(),
   updatedAt: z.date(),
   isDeleted: z.boolean(),
   deletedAt: z.date().nullable(),
+  logoUid: z.string().nullable().optional(),
+  logoUrl: z.string().nullable().optional(),
 });
 
 export class ResponseDemoDayDto extends createZodDto(ResponseDemoDaySchema) {}
@@ -188,3 +193,26 @@ export const ResponseParticipantsListSchema = z.object({
 });
 
 export class ResponseParticipantsListDto extends createZodDto(ResponseParticipantsListSchema) {}
+
+// Dashboard Whitelist Member Schema
+export const AddDashboardWhitelistMemberSchema = z.object({
+  memberUid: z.string().min(1, 'Member UID is required'),
+});
+
+export class AddDashboardWhitelistMemberDto extends createZodDto(AddDashboardWhitelistMemberSchema) {}
+
+// Dashboard Whitelist Response Schema
+export const DashboardWhitelistMemberSchema = z.object({
+  memberUid: z.string(),
+  member: z.object({
+    uid: z.string(),
+    name: z.string().nullable(),
+    email: z.string(),
+    imageUrl: z.string().nullable(),
+  }),
+  participantType: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT', 'NONE']),
+  participantStatus: z.enum(['PENDING', 'INVITED', 'ENABLED', 'DISABLED', 'NONE']),
+  teamName: z.string().nullable(),
+});
+
+export class DashboardWhitelistMemberDto extends createZodDto(DashboardWhitelistMemberSchema) {}

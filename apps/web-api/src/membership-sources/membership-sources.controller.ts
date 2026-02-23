@@ -1,4 +1,4 @@
-import { Controller, Req } from '@nestjs/common';
+import { CacheTTL, Controller, Req } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
@@ -15,21 +15,20 @@ import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { MembershipSourcesService } from './membership-sources.service';
-import { NoCache } from '../decorators/no-cache.decorator';
+import { QueryCache } from '../decorators/query-cache.decorator';
 
 const server = initNestServer(apiMembershipSource);
 type RouteShape = typeof server.routeShapes;
 
 @Controller()
 export class MembershipSourcesController {
-  constructor(
-    private readonly membershipSourcesService: MembershipSourcesService
-  ) {}
+  constructor(private readonly membershipSourcesService: MembershipSourcesService) {}
 
   @Api(server.route.getMembershipSources)
   @ApiQueryFromZod(MembershipSourceQueryParams)
   @ApiOkResponseFromZod(ResponseMembershipSourceSchema.array())
-  @NoCache()
+  @QueryCache()
+  @CacheTTL(60)
   findAll(@Req() request: Request) {
     return this.membershipSourcesService.findAll(request.query);
   }
@@ -39,17 +38,9 @@ export class MembershipSourcesController {
   @ApiQueryFromZod(MembershipSourceDetailQueryParams)
   @ApiOkResponseFromZod(ResponseMembershipSourceSchema)
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
-  async findOne(
-    @Req() request: Request,
-    @ApiDecorator() { params: { uid } }: RouteShape['getMembershipSource']
-  ) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponseMembershipSourceSchema
-    );
-    const builder = new PrismaQueryBuilder(
-      queryableFields,
-      ENABLED_RETRIEVAL_PROFILE
-    );
+  async findOne(@Req() request: Request, @ApiDecorator() { params: { uid } }: RouteShape['getMembershipSource']) {
+    const queryableFields = prismaQueryableFieldsFromZod(ResponseMembershipSourceSchema);
+    const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
     const builtQuery = builder.build(request.query);
     return this.membershipSourcesService.findOne(uid, builtQuery);
   }

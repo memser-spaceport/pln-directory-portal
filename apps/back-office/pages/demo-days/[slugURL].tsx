@@ -48,7 +48,6 @@ const DemoDayDetailPage = () => {
   const [authToken] = useCookie('plnadmin');
   const { isDirectoryAdmin, user } = useAuth();
 
-
   /**
    * Reloads current member from backend and returns role names.
    * If member has no roles, returns an empty array.
@@ -75,7 +74,6 @@ const DemoDayDetailPage = () => {
     return rolesFromApi;
   };
 
-
   // Redirect to log-in if not authenticated
   useEffect(() => {
     if (!authToken) {
@@ -99,6 +97,10 @@ const DemoDayDetailPage = () => {
     email: string;
   } | null>(null);
   const [selectedParticipantForDetails, setSelectedParticipantForDetails] = useState<DemoDayParticipant | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [isBrandingEditing, setIsBrandingEditing] = useState(false);
   const [showNotificationsConfirmModal, setShowNotificationsConfirmModal] = useState(false);
   const [modalNotifyBeforeStartHours, setModalNotifyBeforeStartHours] = useState(336);
   const [modalNotifyBeforeEndHours, setModalNotifyBeforeEndHours] = useState(48);
@@ -127,10 +129,10 @@ const DemoDayDetailPage = () => {
         activeTab === 'applications'
           ? undefined
           : activeTab === 'investors'
-            ? 'INVESTOR'
-            : activeTab === 'founders'
-              ? 'FOUNDER'
-              : 'SUPPORT',
+          ? 'INVESTOR'
+          : activeTab === 'founders'
+          ? 'FOUNDER'
+          : 'SUPPORT',
       search: searchTerm || undefined,
       status:
         activeTab === 'applications'
@@ -221,6 +223,7 @@ const DemoDayDetailPage = () => {
       host: demoDay.host,
       status: demoDay.status,
       notificationsEnabled: demoDay.notificationsEnabled,
+      dashboardEnabled: demoDay.dashboardEnabled,
     });
     setIsEditing(true);
   };
@@ -234,8 +237,8 @@ const DemoDayDetailPage = () => {
     if (!authToken || !demoDay) return true;
 
     const hasStatusChange = dataToSave.status && dataToSave.status !== demoDay.status;
-    const hasNotificationToggle = dataToSave.notificationsEnabled !== undefined &&
-      dataToSave.notificationsEnabled !== demoDay.notificationsEnabled;
+    const hasNotificationToggle =
+      dataToSave.notificationsEnabled !== undefined && dataToSave.notificationsEnabled !== demoDay.notificationsEnabled;
 
     // Skip API call if no relevant changes
     if (!hasStatusChange && !hasNotificationToggle) {
@@ -331,6 +334,70 @@ const DemoDayDetailPage = () => {
     setNotificationPreview(null);
   };
 
+  const handleLogoFileChange = (file: File | null) => {
+    if (file) {
+      setLogoFile(file);
+      setRemoveLogo(false);
+      const reader = new FileReader();
+      reader.onload = () => setLogoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    setRemoveLogo(true);
+  };
+
+  const handleBrandingEdit = () => {
+    setIsBrandingEditing(true);
+    setLogoFile(null);
+    setLogoPreview(null);
+    setRemoveLogo(false);
+  };
+
+  const handleBrandingCancel = () => {
+    setIsBrandingEditing(false);
+    setLogoFile(null);
+    setLogoPreview(null);
+    setRemoveLogo(false);
+  };
+
+  const handleBrandingSave = async () => {
+    if (!authToken || !demoDay) return;
+
+    try {
+      let logoUid: string | null | undefined = undefined;
+
+      if (logoFile) {
+        const formData = new FormData();
+        formData.append('file', logoFile);
+        const imageResponse = await api.post(API_ROUTE.IMAGES, formData, {
+          headers: { 'content-type': 'multipart/form-data' },
+        });
+        logoUid = imageResponse?.data?.image?.uid;
+      } else if (removeLogo) {
+        logoUid = null;
+      }
+
+      if (logoUid !== undefined) {
+        await updateDemoDayMutation.mutateAsync({
+          authToken,
+          uid: demoDay.uid,
+          data: { logoUid },
+        });
+      }
+
+      setIsBrandingEditing(false);
+      setLogoFile(null);
+      setLogoPreview(null);
+      setRemoveLogo(false);
+    } catch (error) {
+      console.error('Error saving branding:', error);
+      toast.error('Failed to save branding. Please try again.');
+    }
+  };
 
   const handleUpdateParticipantStatus = async (
     participantUid: string,
@@ -412,7 +479,7 @@ const DemoDayDetailPage = () => {
     }
   };
 
-  const handleEditFormChange = (field: keyof UpdateDemoDayDto, value: string) => {
+  const handleEditFormChange = (field: keyof UpdateDemoDayDto, value: string | boolean) => {
     setEditFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -712,12 +779,12 @@ const DemoDayDetailPage = () => {
               <div className={clsx(s.overviewField)}>
                 <label className={s.fieldLabel}>In-App Notifications</label>
                 {isEditing && isDirectoryAdmin ? (
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex cursor-pointer items-center gap-2">
                     <input
                       type="checkbox"
                       checked={editFormData.notificationsEnabled || false}
                       onChange={(e) => handleNotificationsToggle(e.target.checked)}
-                      className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      className="h-5 w-5 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                     <span className="text-sm text-gray-600">
                       {editFormData.notificationsEnabled ? 'Enabled' : 'Disabled'}
@@ -734,11 +801,40 @@ const DemoDayDetailPage = () => {
                       {demoDay.notificationsEnabled ? 'Yes' : 'No'}
                     </span>
                     {demoDay.notificationsEnabled && (
-                      <div className="mt-2 text-sm text-gray-600 space-y-1">
-                        <div>Starting Soon: {formatHoursMessage(demoDay.notifyBeforeStartHours ?? 336)} before start</div>
+                      <div className="mt-2 space-y-1 text-sm text-gray-600">
+                        <div>
+                          Starting Soon: {formatHoursMessage(demoDay.notifyBeforeStartHours ?? 336)} before start
+                        </div>
                         <div>Closing Soon: {formatHoursMessage(demoDay.notifyBeforeEndHours ?? 48)} before end</div>
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+              <div className={clsx(s.overviewField)}>
+                <label className={s.fieldLabel}>Founders Dashboard</label>
+                {isEditing && isDirectoryAdmin ? (
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.dashboardEnabled || false}
+                      onChange={(e) => handleEditFormChange('dashboardEnabled', e.target.checked)}
+                      className="h-5 w-5 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-600">
+                      {editFormData.dashboardEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </label>
+                ) : (
+                  <div className={s.fieldValue}>
+                    <span
+                      className={clsx(
+                        'inline-flex rounded-full px-2 py-1 text-xs font-semibold',
+                        demoDay.dashboardEnabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      )}
+                    >
+                      {demoDay.dashboardEnabled ? 'Yes' : 'No'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -765,6 +861,105 @@ const DemoDayDetailPage = () => {
                   <RichText text={demoDay.description} className={s.fieldValue} />
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Branding Section */}
+          <div className={s.branding}>
+            <div className={s.overviewHeader}>
+              <h2 className={s.brandingTitle}>Branding</h2>
+              {!isBrandingEditing ? (
+                <button onClick={handleBrandingEdit} className={s.editButton}>
+                  Edit
+                </button>
+              ) : (
+                <div className="flex space-x-2">
+                  <button onClick={handleBrandingCancel} className={s.editButton}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBrandingSave}
+                    disabled={updateDemoDayMutation.isPending}
+                    className={clsx(s.editButton, s.primary)}
+                  >
+                    {updateDemoDayMutation.isPending ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className={s.overviewField}>
+              <label className={s.fieldLabel}>Logo</label>
+              {isBrandingEditing ? (
+                <div className="flex items-start gap-4">
+                  {logoPreview || (!removeLogo && demoDay.logoUrl) ? (
+                    <div className={s.logoPreview}>
+                      <Image src={logoPreview || demoDay.logoUrl || ''} alt="Logo preview" />
+                    </div>
+                  ) : (
+                    <label className={s.logoDropzone}>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 4 * 1024 * 1024) {
+                              toast.error('File size must be less than 4MB');
+                              return;
+                            }
+                            handleLogoFileChange(file);
+                          }
+                        }}
+                      />
+                      <div className="flex flex-col items-center gap-2 text-center text-sm text-gray-500">
+                        <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>Upload logo</span>
+                        <span className="text-xs text-gray-400">PNG, JPG, WebP (max 4MB)</span>
+                      </div>
+                    </label>
+                  )}
+                  <div className="flex flex-col gap-2">
+                    {(logoPreview || (!removeLogo && demoDay.logoUrl)) && (
+                      <>
+                        <label className={clsx(s.editButton, 'cursor-pointer')}>
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                if (file.size > 4 * 1024 * 1024) {
+                                  toast.error('File size must be less than 4MB');
+                                  return;
+                                }
+                                handleLogoFileChange(file);
+                              }
+                            }}
+                          />
+                          Change
+                        </label>
+                        <button
+                          onClick={handleRemoveLogo}
+                          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                        >
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : demoDay.logoUrl ? (
+                <div className={s.logoPreview}>
+                  <img src={demoDay.logoUrl} alt="Demo day logo" />
+                </div>
+              ) : (
+                <div className={s.logoPlaceholder}>No logo uploaded</div>
+              )}
             </div>
           </div>
 
@@ -801,7 +996,7 @@ const DemoDayDetailPage = () => {
                   Investors{' '}
                   {participants &&
                     activeTab === 'investors' &&
-                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
+                    `(${participants.total})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'founders' })}
@@ -810,7 +1005,7 @@ const DemoDayDetailPage = () => {
                   Founders{' '}
                   {participants &&
                     activeTab === 'founders' &&
-                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
+                    `(${participants.total})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'support' })}
@@ -819,7 +1014,7 @@ const DemoDayDetailPage = () => {
                   Support{' '}
                   {participants &&
                     activeTab === 'support' &&
-                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
+                    `(${participants.total})`}
                 </button>
               </div>
 
@@ -895,7 +1090,6 @@ const DemoDayDetailPage = () => {
 
                 {/* Body */}
                 {participants.participants
-                  .filter((participant) => activeTab === 'applications' || participant.status !== 'PENDING')
                   .map((participant) => (
                     <div key={participant.uid} className={s.tableRow}>
                       <div className={clsx(s.bodyCell, s.first, s.flexible)}>
@@ -910,8 +1104,13 @@ const DemoDayDetailPage = () => {
                             />
                           )}
                           <div>
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
                               {participant.member?.name || participant.name}
+                              {activeTab === 'applications' &&
+                                participant.member?.accessLevel === 'L0' &&
+                                !!participant.member?.investorProfile && (
+                                  <span className={s.newBadge}>new</span>
+                                )}
                             </div>
                             <div className="text-sm text-gray-500">
                               {participant.member?.email || participant.email}
@@ -923,86 +1122,86 @@ const DemoDayDetailPage = () => {
                         <div className={clsx(s.bodyCell, s.flexible)}>
                           {activeTab === 'founders'
                             ? (() => {
-                              const memberTeams = participant.member?.teamMemberRoles || [];
-                              const currentTeamUid = participant.teamUid || '';
+                                const memberTeams = participant.member?.teamMemberRoles || [];
+                                const currentTeamUid = participant.teamUid || '';
 
-                              if (memberTeams.length === 0) {
-                                return <span className="text-gray-400">No teams</span>;
-                              }
+                                if (memberTeams.length === 0) {
+                                  return <span className="text-gray-400">No teams</span>;
+                                }
 
-                              return (
-                                <div className="flex items-center gap-2">
-                                  <select
-                                    value={currentTeamUid}
-                                    onChange={(e) => {
-                                      const selectedTeam = memberTeams.find(
-                                        (role) => role.team.uid === e.target.value
-                                      );
-                                      if (selectedTeam) {
-                                        handleUpdateParticipantTeam(
-                                          participant.uid,
-                                          participant.member?.name || participant.name,
-                                          e.target.value,
-                                          selectedTeam.team.name
+                                return (
+                                  <div className="flex items-center gap-2">
+                                    <select
+                                      value={currentTeamUid}
+                                      onChange={(e) => {
+                                        const selectedTeam = memberTeams.find(
+                                          (role) => role.team.uid === e.target.value
                                         );
-                                      }
-                                    }}
-                                    disabled={updateParticipantMutation.isPending}
-                                    className={`flex-1 rounded-full border-0 px-2 py-1 text-xs font-semibold ${
-                                      currentTeamUid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                                    } disabled:opacity-50`}
-                                  >
-                                    <option value="">Select team...</option>
-                                    {memberTeams.map((role) => (
-                                      <option key={role.team.uid} value={role.team.uid}>
-                                        {role.team.name}
-                                        {role.mainTeam ? ' (Main)' : ''}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  {currentTeamUid && (
-                                    <a
-                                      href={`${WEB_UI_BASE_URL}/teams/${currentTeamUid}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center text-blue-600 hover:text-blue-800"
-                                      title="Open team page"
+                                        if (selectedTeam) {
+                                          handleUpdateParticipantTeam(
+                                            participant.uid,
+                                            participant.member?.name || participant.name,
+                                            e.target.value,
+                                            selectedTeam.team.name
+                                          );
+                                        }
+                                      }}
+                                      disabled={updateParticipantMutation.isPending}
+                                      className={`flex-1 rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                                        currentTeamUid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                                      } disabled:opacity-50`}
                                     >
-                                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
-                                        <path
-                                          d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
-                                          fill="currentColor"
-                                        />
-                                      </svg>
-                                    </a>
-                                  )}
-                                </div>
-                              );
-                            })()
+                                      <option value="">Select team...</option>
+                                      {memberTeams.map((role) => (
+                                        <option key={role.team.uid} value={role.team.uid}>
+                                          {role.team.name}
+                                          {role.mainTeam ? ' (Main)' : ''}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {currentTeamUid && (
+                                      <a
+                                        href={`${WEB_UI_BASE_URL}/teams/${currentTeamUid}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                                        title="Open team page"
+                                      >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                                          <path
+                                            d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
+                                            fill="currentColor"
+                                          />
+                                        </svg>
+                                      </a>
+                                    )}
+                                  </div>
+                                );
+                              })()
                             : (() => {
-                              const team =
-                                participant.member?.teamMemberRoles.find((role) => role.mainTeam)?.team ||
-                                participant.member?.teamMemberRoles[0]?.team;
+                                const team =
+                                  participant.member?.teamMemberRoles.find((role) => role.mainTeam)?.team ||
+                                  participant.member?.teamMemberRoles[0]?.team;
 
-                              return team ? (
-                                <a
-                                  href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-                                >
-                                  {team.name}
-                                  <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
-                                    <path
-                                      d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
-                                      fill="currentColor"
-                                    />
-                                  </svg>
-                                </a>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              );
-                            })()}
+                                return team ? (
+                                  <a
+                                    href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                                  >
+                                    {team.name}
+                                    <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                                      <path
+                                        d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
+                                        fill="currentColor"
+                                      />
+                                    </svg>
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                );
+                              })()}
                         </div>
                       )}
                       {activeTab === 'founders' && (
@@ -1154,8 +1353,8 @@ const DemoDayDetailPage = () => {
                               participant.type === 'INVESTOR'
                                 ? 'bg-purple-100 text-purple-800'
                                 : participant.type === 'FOUNDER'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-amber-100 text-amber-800'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-amber-100 text-amber-800'
                             } disabled:opacity-50`}
                           >
                             <option value="INVESTOR">Investor</option>
@@ -1189,7 +1388,8 @@ const DemoDayDetailPage = () => {
                             >
                               Approve
                             </button>
-                            <button
+                            {/* Temporarily disabled reject flow */}
+                            {/* <button
                               onClick={() =>
                                 handleReject(participant.uid, participant.member?.name || participant.name)
                               }
@@ -1198,7 +1398,7 @@ const DemoDayDetailPage = () => {
                               title="Reject application"
                             >
                               Reject
-                            </button>
+                            </button> */}
                           </div>
                         ) : (
                           <select
@@ -1239,10 +1439,10 @@ const DemoDayDetailPage = () => {
                 {activeTab === 'applications'
                   ? 'applications'
                   : activeTab === 'investors'
-                    ? 'investors'
-                    : activeTab === 'founders'
-                      ? 'founders'
-                      : 'support members'}
+                  ? 'investors'
+                  : activeTab === 'founders'
+                  ? 'founders'
+                  : 'support members'}
               </div>
               <div className={s.paginationControls}>
                 <button
@@ -1265,6 +1465,9 @@ const DemoDayDetailPage = () => {
               </div>
             </div>
           )}
+
+          {/* Dashboard Whitelist Section (temporarily disabled) */}
+          {/* <DashboardWhitelistSection demoDayUid={demoDay.uid} authToken={authToken ?? undefined} /> */}
         </div>
 
         {/* Modals */}
@@ -1310,14 +1513,12 @@ const DemoDayDetailPage = () => {
               />
 
               <div className="relative inline-block w-full max-w-lg transform overflow-hidden rounded-lg bg-white p-6 text-left shadow-xl transition-all">
-                <h3 className="text-lg font-medium leading-6 text-gray-900">
-                  Enable In-App Notifications
-                </h3>
+                <h3 className="text-lg font-medium leading-6 text-gray-900">Enable In-App Notifications</h3>
 
                 <div className="mt-4">
                   <p className="text-sm text-gray-500">
-                    Are you sure you want to enable notifications for this Demo Day? When enabled,
-                    notifications will be sent to participants when the Demo Day status changes.
+                    Are you sure you want to enable notifications for this Demo Day? When enabled, notifications will be
+                    sent to participants when the Demo Day status changes.
                   </p>
                 </div>
 
@@ -1332,13 +1533,16 @@ const DemoDayDetailPage = () => {
                         min="1"
                         max="720"
                         value={modalNotifyBeforeStartHours}
-                        onChange={(e) => setModalNotifyBeforeStartHours(Math.max(1, Math.min(720, parseInt(e.target.value) || 336)))}
+                        onChange={(e) =>
+                          setModalNotifyBeforeStartHours(Math.max(1, Math.min(720, parseInt(e.target.value) || 336)))
+                        }
                         className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                       />
                       <span className="text-sm text-gray-500">hours</span>
                     </div>
                     <p className="mt-1 text-xs text-gray-400">
-                      Example: &quot;{demoDay?.title || 'Demo Day'} starts in {formatHoursMessage(modalNotifyBeforeStartHours)}.&quot;
+                      Example: &quot;{demoDay?.title || 'Demo Day'} starts in{' '}
+                      {formatHoursMessage(modalNotifyBeforeStartHours)}.&quot;
                     </p>
                   </div>
 
@@ -1352,13 +1556,16 @@ const DemoDayDetailPage = () => {
                         min="1"
                         max="720"
                         value={modalNotifyBeforeEndHours}
-                        onChange={(e) => setModalNotifyBeforeEndHours(Math.max(1, Math.min(720, parseInt(e.target.value) || 48)))}
+                        onChange={(e) =>
+                          setModalNotifyBeforeEndHours(Math.max(1, Math.min(720, parseInt(e.target.value) || 48)))
+                        }
                         className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                       />
                       <span className="text-sm text-gray-500">hours</span>
                     </div>
                     <p className="mt-1 text-xs text-gray-400">
-                      Example: &quot;{demoDay?.title || 'Demo Day'} closing soon: only {formatHoursMessage(modalNotifyBeforeEndHours)} left!&quot;
+                      Example: &quot;{demoDay?.title || 'Demo Day'} closing soon: only{' '}
+                      {formatHoursMessage(modalNotifyBeforeEndHours)} left!&quot;
                     </p>
                   </div>
                 </div>
@@ -1394,38 +1601,37 @@ const DemoDayDetailPage = () => {
               />
 
               <div className="relative inline-block w-full max-w-lg transform overflow-hidden rounded-lg bg-white p-6 text-left shadow-xl transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-100">
+                    <svg className="h-6 w-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                      />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-medium leading-6 text-gray-900">
-                    In-app notification will be sent
-                  </h3>
+                  <h3 className="text-lg font-medium leading-6 text-gray-900">In-app notification will be sent</h3>
                 </div>
 
                 <div className="mt-2">
-                  <p className="text-sm text-gray-500 mb-4">
+                  <p className="mb-4 text-sm text-gray-500">
                     Saving these changes will immediately send the following notification to all users:
                   </p>
 
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                     <div className="mb-3">
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
                         Title
                       </label>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {notificationPreview.title}
-                      </p>
+                      <p className="text-sm font-semibold text-gray-900">{notificationPreview.title}</p>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
                         Description
                       </label>
-                      <p className="text-sm text-gray-700">
-                        {notificationPreview.description}
-                      </p>
+                      <p className="text-sm text-gray-700">{notificationPreview.description}</p>
                     </div>
                   </div>
                 </div>

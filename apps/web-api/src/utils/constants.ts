@@ -281,8 +281,24 @@ export const ANALYTICS_EVENTS = {
   },
   TEAM: {
     TEAM_CREATE: 'team_create',
-    TEAM_UPDATE: 'team_update'
-  }
+    TEAM_UPDATE: 'team_update',
+  },
+  DEMO_DAY_EVENT: {
+    // Frontend engagement events (from pln-directory-portal-v2)
+    TEAM_CARD_VIEWED: 'demo-day-active-view-team-card-viewed',
+    TEAM_CARD_CLICKED: 'demo-day-active-view-team-card-clicked', // TODO change it
+    PITCH_DECK_VIEWED: 'demo-day-active-view-team-pitch-deck-viewed',
+    PITCH_VIDEO_VIEWED: 'demo-day-active-view-team-pitch-video-viewed',
+    LIKE_COMPANY_CLICKED: 'demo-day-active-view-like-company-clicked',
+    CONNECT_COMPANY_CLICKED: 'demo-day-active-view-connect-company-clicked',
+    INVEST_COMPANY_CLICKED: 'demo-day-active-view-invest-company-clicked',
+    REFER_COMPANY_CLICKED: 'demo-day-active-view-refer-company-clicked',
+    INTRO_COMPANY_CLICKED: 'demo-day-active-view-intro-company-clicked',
+    INTRO_COMPANY_CONFIRM_CLICKED: 'demo-day-active-view-intro-company-confirm-clicked',
+    // Landing page events
+    LANDING_TEAM_CARD_CLICKED: 'demo-day-landing-team-card-clicked',
+    LANDING_TEAM_WEBSITE_CLICKED: 'demo-day-landing-team-website-clicked',
+  },
 };
 
 export const ANALYTICS_SOURCE = 'directory-backend';

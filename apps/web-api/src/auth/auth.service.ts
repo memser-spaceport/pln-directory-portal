@@ -10,18 +10,18 @@ import {
 } from '@nestjs/common';
 import axios from 'axios';
 import jwt_decode from 'jwt-decode';
-import {Cache} from 'cache-manager';
-import {MembersService} from '../members/members.service';
-import {EmailOtpService} from '../otp/email-otp.service';
-import {ModuleRef} from '@nestjs/core';
-import {LogService} from '../shared/log.service';
-import {AnalyticsService} from '../analytics/service/analytics.service';
-import {ANALYTICS_EVENTS} from '../utils/constants';
-import {PrismaService} from '../shared/prisma.service';
-import {AuthMetrics, extractErrorCode, statusClassOf} from '../metrics/auth.metrics';
-import {TeamsService} from '../teams/teams.service';
-import {NotificationServiceClient} from '../notifications/notification-service.client';
-import {NotFoundError} from "@prisma/client/runtime";
+import { Cache } from 'cache-manager';
+import { MembersService } from '../members/members.service';
+import { EmailOtpService } from '../otp/email-otp.service';
+import { ModuleRef } from '@nestjs/core';
+import { LogService } from '../shared/log.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
+import { ANALYTICS_EVENTS } from '../utils/constants';
+import { PrismaService } from '../shared/prisma.service';
+import { AuthMetrics, extractErrorCode, statusClassOf } from '../metrics/auth.metrics';
+import { TeamsService } from '../teams/teams.service';
+import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { NotFoundError } from "@prisma/client/runtime";
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -35,7 +35,7 @@ export class AuthService implements OnModuleInit {
     private analyticsService: AnalyticsService,
     private prisma: PrismaService,
     private notificationServiceClient: NotificationServiceClient
-  ) {}
+  ) { }
 
   onModuleInit() {
     this.membersService = this.moduleRef.get(MembersService, { strict: false });
@@ -129,8 +129,7 @@ export class AuthService implements OnModuleInit {
       // Soft-deleted member should never be allowed to log in
       if (foundUser.deletedAt) {
         this.logger.error(
-          `AuthService.getTokenAndUserInfo → Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${
-            foundUser.deletionReason || 'not specified'
+          `AuthService.getTokenAndUserInfo → Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${foundUser.deletionReason || 'not specified'
           }`,
         );
         throw new ForbiddenException(
@@ -175,8 +174,7 @@ export class AuthService implements OnModuleInit {
       // Soft-deleted member should never be allowed to log in
       if (foundUser.deletedAt) {
         this.logger.error(
-          `AuthService.getTokenAndUserInfo → Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${
-            foundUser.deletionReason || 'not specified'
+          `AuthService.getTokenAndUserInfo → Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${foundUser.deletionReason || 'not specified'
           }`,
         );
         throw new ForbiddenException(
@@ -483,6 +481,7 @@ export class AuthService implements OnModuleInit {
       mainTeamName: team?.name,
       accessLevel: memberInfo.accessLevel,
       isTierViewer: memberInfo.isTierViewer ?? false,
+      signUpSource: memberInfo.signUpSource,
     };
   }
 

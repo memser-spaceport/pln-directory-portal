@@ -1,5 +1,6 @@
 import {
   Body,
+  CacheTTL,
   Controller,
   Delete,
   Get,
@@ -20,6 +21,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { DemoDaysService } from './demo-days.service';
 import { DemoDayFundraisingProfilesService } from './demo-day-fundraising-profiles.service';
 import { DemoDayEngagementService } from './demo-day-engagement.service';
+import { DemoDayEngagementAnalyticsService } from './demo-day-engagement-analytics.service';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { UploadsService } from '../uploads/uploads.service';
@@ -28,7 +30,11 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import {
   CreateDemoDayFeedbackDto,
   CreateDemoDayInvestorApplicationDto,
+  DashboardBaseQueryDto,
+  EngagementTimelineQueryDto,
   ExpressInterestDto,
+  InvestorActivityQueryDto,
+  SaveFundraisingProfileDto,
   UpdateFundraisingDescriptionDto,
   UpdateFundraisingTeamDto,
 } from 'libs/contracts/src/schema';
@@ -43,8 +49,9 @@ export class DemoDaysController {
     private readonly demoDaysService: DemoDaysService,
     private readonly demoDayFundraisingProfilesService: DemoDayFundraisingProfilesService,
     private readonly uploadsService: UploadsService,
-    private readonly demoDayEngagementService: DemoDayEngagementService
-  ) {}
+    private readonly demoDayEngagementService: DemoDayEngagementService,
+    private readonly demoDayEngagementAnalyticsService: DemoDayEngagementAnalyticsService
+  ) { }
 
   @Get()
   @UseGuards(UserTokenCheckGuard)
@@ -259,6 +266,42 @@ export class DemoDaysController {
     );
   }
 
+  @Post(':demoDayUidOrSlug/save')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async saveFundraisingProfile(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Body() body: SaveFundraisingProfileDto
+  ) {
+    return this.demoDayEngagementService.updateSaveInterest(
+      req.userEmail,
+      demoDayUidOrSlug,
+      body.teamFundraisingProfileUid,
+      body.isPrepDemoDay,
+      true
+    );
+  }
+
+  @Post(':demoDayUidOrSlug/unsave')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async unsaveFundraisingProfile(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Body() body: SaveFundraisingProfileDto
+  ) {
+    return this.demoDayEngagementService.updateSaveInterest(
+      req.userEmail,
+      demoDayUidOrSlug,
+      body.teamFundraisingProfileUid,
+      body.isPrepDemoDay,
+      false
+    );
+  }
+
   @NoCache() //turn off global cache
   @Get(':demoDayUidOrSlug/express-interest/stats')
   async getExpressInterestStats(@Param('demoDayUidOrSlug') demoDayUidOrSlug: string, @Query('prep') prep?: string) {
@@ -271,6 +314,67 @@ export class DemoDaysController {
     const data = await this.demoDaysService.getCurrentExpressInterestStats(isPrepDemoDay, demoDayUidOrSlug);
     cache.set(key, { data, expires: now + TTL });
     return data;
+  }
+
+  // Founder and Investor engagement analytics endpoints
+
+  @Get(':demoDayUidOrSlug/dashboard/founder/engagement')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @CacheTTL(3600) // 1 hour
+  async getFounderEngagementStats(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Query() query: DashboardBaseQueryDto
+  ) {
+    return this.demoDayEngagementAnalyticsService.getFounderEngagementStats(
+      req.userEmail,
+      demoDayUidOrSlug,
+      query.teamFundraisingProfileUid,
+      query.startDate,
+      query.endDate
+    );
+  }
+
+  @Get(':demoDayUidOrSlug/dashboard/founder/engagement/timeline')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @CacheTTL(3600) // 1 hour
+  async getFounderEngagementTimeline(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Query() query: EngagementTimelineQueryDto
+  ) {
+    return this.demoDayEngagementAnalyticsService.getFounderEngagementTimeline(
+      req.userEmail,
+      demoDayUidOrSlug,
+      query.startDate,
+      query.endDate,
+      query.teamFundraisingProfileUid,
+      query.aggregation ?? 'day'
+    );
+  }
+
+  @Get(':demoDayUidOrSlug/dashboard/founder/engagement/investors')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @CacheTTL(3600) // 1 hour
+  async getFounderInvestorActivity(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Query() query: InvestorActivityQueryDto
+  ) {
+    return this.demoDayEngagementAnalyticsService.getInvestorActivity(
+      req.userEmail,
+      demoDayUidOrSlug,
+      {
+        page: query.page ?? 1,
+        limit: query.limit ?? 10,
+        sortBy: query.sortBy ?? 'lastActivity',
+        sortOrder: query.sortOrder ?? 'desc',
+      },
+      query.teamFundraisingProfileUid
+    );
   }
 
   // Direct S3 upload endpoints

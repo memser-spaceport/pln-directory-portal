@@ -7,6 +7,7 @@ import {
   HttpException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import {ChannelType} from "../demo-days/demo-days.service";
 
 @Injectable()
 export class NotificationServiceClient {
@@ -469,7 +470,7 @@ export class NotificationServiceClient {
   }
 
   async sendTelegramOutboxMessage(dto: {
-    channelType: 'DEMO_DAY_SUBSCRIPTION' | 'SUPPORT';
+    channelType: ChannelType;
     text: string;
     meta?: Record<string, any>;
   }) {

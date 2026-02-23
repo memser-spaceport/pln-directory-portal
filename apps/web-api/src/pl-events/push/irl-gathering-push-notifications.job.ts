@@ -11,7 +11,7 @@ export class IrlGatheringPushNotificationsJob {
 
   constructor(
     private readonly processor: IrlGatheringPushNotificationsProcessor
-  ) {}
+  ) { }
 
   @Cron(IRL_GATHERING_PUSH_CRON, {
     name: 'IrlGatheringPushNotificationsJob',
@@ -24,17 +24,18 @@ export class IrlGatheringPushNotificationsJob {
       return;
     }
 
-    this.logger.log('[IRL push job] Starting IRL gathering push notifications job');
+    // Temporary disabled
+    // this.logger.log('[IRL push job] Starting IRL gathering push notifications job');
 
-    try {
-      await this.processor.processUnprocessedCandidates();
-    } catch (err: any) {
-      this.logger.error(
-        `[IRL push job] Processor failed. Error: ${err?.message || err}`,
-        err?.stack
-      );
-    }
+    // try {
+    //   await this.processor.processUnprocessedCandidates();
+    // } catch (err: any) {
+    //   this.logger.error(
+    //     `[IRL push job] Processor failed. Error: ${err?.message || err}`,
+    //     err?.stack
+    //   );
+    // }
 
-    this.logger.log('[IRL push job] Completed IRL gathering push notifications job');
+    // this.logger.log('[IRL push job] Completed IRL gathering push notifications job');
   }
 }

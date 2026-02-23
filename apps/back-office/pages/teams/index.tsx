@@ -32,10 +32,38 @@ type TeamRow = {
   website?: string | null;
   shortDescription?: string | null;
   longDescription?: string | null;
-  tier: number | null; // make it always present (null if not set)
+  /**
+   * Legacy tier: 0..4 (or -1/NULL = NA)
+   * Kept for backward compatibility.
+   */
+  tier: number | null;
+
+  /**
+   * New priority: 1..5, or 99/NULL = NA
+   * This is what we display in UI going forward.
+   */
+  priority: number | null;
   createdAt: string;
   updatedAt: string;
 };
+
+/**
+ * Tier <-> Priority mapping.
+ * Priority is the new UI term:
+ *   - Lower number = higher importance
+ *   - 99 (or null) = Not Assigned
+ */
+function tierToPriority(tier: number | null | undefined): number {
+  if (tier === null || tier === undefined) return 99;
+  if (tier >= 0 && tier <= 4) return 5 - tier;
+  return 99;
+}
+
+function priorityToTier(priority: number | null | undefined): number {
+  if (priority === null || priority === undefined) return -1;
+  if (priority >= 1 && priority <= 5) return 5 - priority;
+  return -1;
+}
 
 const fade = {
   hidden: { opacity: 0 },
@@ -91,10 +119,11 @@ const TeamsPage: React.FC = () => {
       const res = await api.get('/v1/admin/teams', config);
       const rawTeams: any[] = res.data?.teams ?? [];
 
-      // Normalise tier to number | null, to avoid "undefined" issues
+      // Normalise tier/priority to number | null, to avoid "undefined" issues
       const data: TeamRow[] = rawTeams.map((t) => ({
         ...t,
         tier: t.tier === undefined || t.tier === null || t.tier === '' ? null : Number(t.tier),
+        priority: t.priority === undefined || t.priority === null || t.priority === '' ? null : Number(t.priority),
       }));
 
       setTeams(data);
@@ -207,7 +236,8 @@ const TeamsPage: React.FC = () => {
       shortDescription: team.shortDescription ?? '',
       longDescription: team.longDescription ?? '',
       plnFriend: team.plnFriend,
-      // keep tier as number | null; if null — input will be empty
+      // Prefer priority if present; otherwise derive it from tier.
+      priority: team.priority ?? tierToPriority(team.tier),
       tier: team.tier,
     });
   }
@@ -253,7 +283,15 @@ const TeamsPage: React.FC = () => {
 
       const name = (editForm.name ?? '').toString().trim();
 
-      const tierValue = editForm.tier === undefined || editForm.tier === null ? null : Number(editForm.tier);
+      // Priority is the new canonical UI value.
+      // We still store tier in DB for compatibility, so we always send BOTH.
+      const priorityValueRaw = (editForm as any).priority;
+      const priorityValue =
+        priorityValueRaw === undefined || priorityValueRaw === null || priorityValueRaw === ''
+          ? 99
+          : Number(priorityValueRaw);
+
+      const tierValue = priorityToTier(priorityValue);
 
       const newData: any = {
         name,
@@ -264,11 +302,15 @@ const TeamsPage: React.FC = () => {
         // isFund is intentionally NOT editable on the right panel now
       };
 
-      // Only send tier when user set it explicitly;
-      // if null — backend may treat as "clear" or ignore, depending on mapping.
-      if (tierValue !== null) {
-        newData.tier = tierValue;
-      }
+      // Always send priority.
+      // 1..5 => real priorities; 99 => NA.
+      newData.priority = priorityValue;
+
+      // Keep legacy tier in sync on write.
+      // This makes the transition safe for any old code paths still relying on `tier`.
+      newData.tier = tierValue;
+
+      console.info(`[BackOffice] Saving team priority: teamUid=${selectedTeamUid}, priority=${priorityValue}, tier=${tierValue}`);
 
       await api.patch(`/v1/admin/teams/${selectedTeamUid}/full`, newData, config);
 
@@ -284,7 +326,8 @@ const TeamsPage: React.FC = () => {
                   newData.shortDescription !== undefined ? newData.shortDescription : t.shortDescription,
                 longDescription: newData.longDescription !== undefined ? newData.longDescription : t.longDescription,
                 plnFriend: newData.plnFriend !== undefined ? newData.plnFriend : t.plnFriend,
-                tier: tierValue !== null ? tierValue : t.tier, // if no tier sent, keep previous value
+                tier: newData.tier !== undefined ? newData.tier : t.tier,
+                priority: newData.priority !== undefined ? newData.priority : t.priority,
               }
             : t
         )
@@ -476,23 +519,28 @@ const TeamsPage: React.FC = () => {
                     </div>
 
                     <div className={s.formField}>
-                      <label className={s.formLabel}>Tier</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={4}
+                      <label className={s.formLabel}>Priority</label>
+                      <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>
+                        PL network team prioritization. Lower number = higher importance level.
+                      </div>
+
+                      <select
                         className={s.formInput}
-                        value={editForm.tier === null || editForm.tier === undefined ? '' : String(editForm.tier)}
+                        value={(editForm as any).priority ?? 99}
                         onChange={(e) => {
                           const raw = e.target.value;
-                          if (raw === '') {
-                            onFieldChange('tier', null as any);
-                          } else {
-                            const num = Number(raw);
-                            onFieldChange('tier', (isNaN(num) ? null : num) as any);
-                          }
+                          const p = Number(raw);
+                          // We store NA as 99.
+                          onFieldChange('priority' as any, (Number.isNaN(p) ? 99 : p) as any);
                         }}
-                      />
+                      >
+                        <option value={1}>Priority 1</option>
+                        <option value={2}>Priority 2</option>
+                        <option value={3}>Priority 3</option>
+                        <option value={4}>Priority 4</option>
+                        <option value={5}>Priority 5</option>
+                        <option value={99}>Priority NA (Not Assigned)</option>
+                      </select>
                     </div>
                   </div>
 

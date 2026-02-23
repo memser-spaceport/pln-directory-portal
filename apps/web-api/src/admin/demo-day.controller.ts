@@ -1,4 +1,17 @@
-import { Body, Controller, Get, Param, Post, Query, Patch, UseGuards, UsePipes, Req, CacheTTL } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  Patch,
+  UseGuards,
+  UsePipes,
+  Req,
+  CacheTTL,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
@@ -17,6 +30,8 @@ import {
   ResponseParticipantDto,
   ResponseBulkParticipantsDto,
   ResponseParticipantsListDto,
+  AddDashboardWhitelistMemberDto,
+  DashboardWhitelistMemberDto,
 } from 'libs/contracts/src/schema/admin-demo-day';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { QueryCache } from '../decorators/query-cache.decorator';
@@ -28,7 +43,7 @@ export class AdminDemoDaysController {
     private readonly demoDaysService: DemoDaysService,
     private readonly demoDayParticipantsService: DemoDayParticipantsService,
     private readonly notificationServiceClient: NotificationServiceClient
-  ) {}
+  ) { }
 
   @Get('subscribers')
   @UseGuards(DemoDayAdminAuthGuard)
@@ -135,6 +150,8 @@ export class AdminDemoDaysController {
         notificationsEnabled: body.notificationsEnabled,
         notifyBeforeStartHours: body.notifyBeforeStartHours,
         notifyBeforeEndHours: body.notifyBeforeEndHours,
+        dashboardEnabled: body.dashboardEnabled,
+        logoUid: body.logoUid,
       },
       req.userEmail
     );
@@ -219,5 +236,35 @@ export class AdminDemoDaysController {
       },
       req.userEmail
     );
+  }
+
+  // Dashboard Whitelist Endpoints
+
+  @Get(':uid/dashboard-whitelist')
+  @UseGuards(DemoDayAdminAuthGuard)
+  @NoCache()
+  async getDashboardWhitelist(@Param('uid') uid: string): Promise<DashboardWhitelistMemberDto[]> {
+    return this.demoDaysService.getDashboardWhitelist(uid);
+  }
+
+  @Post(':uid/dashboard-whitelist')
+  @UseGuards(DemoDayAdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async addToDashboardWhitelist(
+    @Param('uid') uid: string,
+    @Body() body: AddDashboardWhitelistMemberDto
+  ): Promise<{ success: boolean }> {
+    return this.demoDaysService.addToDashboardWhitelist(uid, body.memberUid);
+  }
+
+  @Delete(':uid/dashboard-whitelist/:memberUid')
+  @UseGuards(DemoDayAdminAuthGuard)
+  @NoCache()
+  async removeFromDashboardWhitelist(
+    @Param('uid') uid: string,
+    @Param('memberUid') memberUid: string
+  ): Promise<{ success: boolean }> {
+    return this.demoDaysService.removeFromDashboardWhitelist(uid, memberUid);
   }
 }

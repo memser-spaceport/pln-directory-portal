@@ -210,20 +210,28 @@ export class AdminTeamsService {
     };
   }
 
-  async updateTeam(uid: string, date: Prisma.TeamUpdateInput) {
+  async updateTeam(uid: string, data: Prisma.TeamUpdateInput) {
     await this.prisma.$transaction(async (tx) => {
       const team = await tx.team.findUnique({ where: { uid } });
       if (!team) {
         throw new NotFoundException('Team not found');
       }
-      await tx.team.update({ where: { uid }, data: date });
+
+      const synced = syncTierPriorityOnWrite(
+        data,
+        (m) => this.logger.log(m),
+        (m) => this.logger.warn(m)
+      );
+
+      await tx.team.update({ where: { uid }, data: synced });
     });
   }
+
 
   /**
    * Normalize CSV rows:
    * - choose keyType (uid/name) based on matchBy or content (auto)
-   * - parse tier via parseTierLoose and enforce 1..4
+   * - parse tier via parseTierLoose and enforce 0..4
    * - deduplicate by chosen key (first row wins)
    * - capture reasons for debugging (invalid tier / no key / duplicate)
    */
@@ -323,14 +331,16 @@ export class AdminTeamsService {
       }
 
       // Build VALUES list safely for Postgres using Prisma.sql
-      const values = toUpdate.map((r) => Prisma.sql`(${r.uid!}, ${r.tier})`);
+      const values = toUpdate.map((r) => Prisma.sql`(${r.uid!}, ${r.tier}, ${tierToPriority(r.tier)})`);
 
       await this.prisma.$executeRaw`
         UPDATE "Team" AS t
-        SET "tier" = v.tier FROM (VALUES ${Prisma.join(values)}) AS v(uid
-          , tier)
+        SET "tier" = v.tier,
+            "priority" = v.priority
+        FROM (VALUES ${Prisma.join(values)}) AS v(uid, tier, priority)
         WHERE v.uid = t.uid
       `;
+
 
       this.logger.log(`Fast update chunk: updated=${toUpdate.length}, missing=${missingInThisChunk.length}`);
     }
@@ -354,9 +364,15 @@ export class AdminTeamsService {
           for (const r of chunk) {
             try {
               if (r.uid) {
-                await tx.team.update({ where: { uid: r.uid }, data: { tier: r.tier } });
+                await tx.team.update({
+                  where: { uid: r.uid },
+                  data: { tier: r.tier, priority: tierToPriority(r.tier) },
+                });
               } else if (r.name) {
-                await tx.team.update({ where: { name: r.name }, data: { tier: r.tier } });
+                await tx.team.update({
+                  where: { name: r.name },
+                  data: { tier: r.tier, priority: tierToPriority(r.tier) },
+                });
               } else {
                 failed.push('key:unknown');
               }
@@ -372,3 +388,55 @@ export class AdminTeamsService {
     return failed;
   }
 }
+
+/** Tier (legacy) <-> Priority (new) mapping.
+ * - tier: 0..4 (or 1..4 depending on legacy input), NA=-1/null
+ * - priority: 1..5, NA=99
+ */
+function tierToPriority(tier: any): number {
+  const t = Number(tier);
+  if (!Number.isFinite(t)) return 99;
+  if (t >= 0 && t <= 4) return 5 - t;
+  // Some legacy CSVs might use 1..4 only; still works with formula above.
+  if (t >= 1 && t <= 4) return 5 - t;
+  return 99;
+}
+
+function priorityToTier(priority: any): number {
+  const p = Number(priority);
+  if (!Number.isFinite(p)) return -1;
+  if (p >= 1 && p <= 5) return 5 - p; // 1->4 ... 5->0
+  return -1;
+}
+
+/** Keep tier/priority consistent on write paths. */
+function syncTierPriorityOnWrite(
+  input: Prisma.TeamUpdateInput,
+  log: (msg: string) => void,
+  warn: (msg: string) => void
+): Prisma.TeamUpdateInput {
+  const data: any = { ...input };
+
+  const hasPriority = data.priority !== undefined && data.priority !== null;
+  const hasTier = data.tier !== undefined && data.tier !== null;
+
+  if (hasPriority && !hasTier) {
+    data.tier = priorityToTier(data.priority);
+    log(`[AdminTeams] Synced tier from provided priority=${data.priority} -> tier=${data.tier}`);
+  } else if (!hasPriority && hasTier) {
+    data.priority = tierToPriority(data.tier);
+    log(`[AdminTeams] Synced priority from provided tier=${data.tier} -> priority=${data.priority}`);
+  } else if (hasPriority && hasTier) {
+    const computedTier = priorityToTier(data.priority);
+    if (computedTier !== Number(data.tier)) {
+      warn(
+        `[AdminTeams] Conflicting tier/priority provided (tier=${data.tier}, priority=${data.priority}). ` +
+        `Using priority and overwriting tier -> ${computedTier}.`
+      );
+      data.tier = computedTier;
+    }
+  }
+
+  return data;
+}
+

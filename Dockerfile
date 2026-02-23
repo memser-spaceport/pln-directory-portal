@@ -11,6 +11,7 @@ RUN corepack enable
 # Copy dependency files
 COPY package.json yarn.lock ./
 COPY .forestadmin-schema.json ./
+COPY patches ./patches
 RUN yarn install --frozen-lockfile
 
 # Copy source code

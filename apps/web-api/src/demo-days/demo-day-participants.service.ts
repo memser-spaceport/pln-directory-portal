@@ -12,7 +12,7 @@ export class DemoDayParticipantsService {
     private readonly demoDaysService: DemoDaysService,
     private readonly analyticsService: AnalyticsService,
     private readonly teamService: TeamsService
-  ) {}
+  ) { }
 
   async addParticipant(
     demoDayUid: string,
@@ -470,25 +470,25 @@ export class DemoDayParticipantsService {
                   type: updatedInvestorType,
                   ...(isTeamInvestorProfile
                     ? {
-                        secRulesAccepted:
-                          participantData.secRulesAccepted !== undefined
-                            ? participantData.secRulesAccepted
-                            : existingMember.investorProfile.secRulesAccepted,
-                      }
+                      secRulesAccepted:
+                        participantData.secRulesAccepted !== undefined
+                          ? participantData.secRulesAccepted
+                          : existingMember.investorProfile.secRulesAccepted,
+                    }
                     : {
-                        typicalCheckSize:
-                          participantData.typicalCheckSize !== undefined
-                            ? participantData.typicalCheckSize
-                            : existingMember.investorProfile.typicalCheckSize,
-                        investInStartupStages:
-                          participantData.investInStartupStages !== undefined
-                            ? participantData.investInStartupStages
-                            : existingMember.investorProfile.investInStartupStages,
-                        secRulesAccepted:
-                          participantData.secRulesAccepted !== undefined
-                            ? participantData.secRulesAccepted
-                            : existingMember.investorProfile.secRulesAccepted,
-                      }),
+                      typicalCheckSize:
+                        participantData.typicalCheckSize !== undefined
+                          ? participantData.typicalCheckSize
+                          : existingMember.investorProfile.typicalCheckSize,
+                      investInStartupStages:
+                        participantData.investInStartupStages !== undefined
+                          ? participantData.investInStartupStages
+                          : existingMember.investorProfile.investInStartupStages,
+                      secRulesAccepted:
+                        participantData.secRulesAccepted !== undefined
+                          ? participantData.secRulesAccepted
+                          : existingMember.investorProfile.secRulesAccepted,
+                    }),
                 },
               };
             }
@@ -515,19 +515,19 @@ export class DemoDayParticipantsService {
               accessLevel: 'L0',
               investorProfile: isTeamInvestorProfile
                 ? {
-                    create: {
-                      type: investorType || undefined, // Keep as null if not provided
-                      secRulesAccepted: participantData.secRulesAccepted || false,
-                    },
-                  }
-                : {
-                    create: {
-                      type: investorType || undefined, // Keep as null if not provided
-                      typicalCheckSize: participantData.typicalCheckSize || undefined,
-                      investInStartupStages: participantData.investInStartupStages || undefined,
-                      secRulesAccepted: participantData.secRulesAccepted || false,
-                    },
+                  create: {
+                    type: investorType || undefined, // Keep as null if not provided
+                    secRulesAccepted: participantData.secRulesAccepted || false,
                   },
+                }
+                : {
+                  create: {
+                    type: investorType || undefined, // Keep as null if not provided
+                    typicalCheckSize: participantData.typicalCheckSize || undefined,
+                    investInStartupStages: participantData.investInStartupStages || undefined,
+                    secRulesAccepted: participantData.secRulesAccepted || false,
+                  },
+                },
             };
 
             // Only set telegramHandler if it's not used by another member
@@ -577,6 +577,7 @@ export class DemoDayParticipantsService {
                     accessLevel: 'L0',
                     accessLevelUpdatedAt: new Date(),
                     tier: -1,
+                    priority: 99,
                   },
                 });
                 summary.createdTeams++;
@@ -802,6 +803,8 @@ export class DemoDayParticipantsService {
 
     if (params.status) {
       where.status = params.status as any;
+    } else if (params.type) {
+      where.status = { not: 'PENDING' } as any;
     }
 
     if (params.type) {
@@ -1003,23 +1006,24 @@ export class DemoDayParticipantsService {
       if (data.status === 'ENABLED' && participant.status !== 'ENABLED') {
         const memberAccessLevel = participant.member?.accessLevel;
         const participantType = data.type || participant.type;
+        const isNewMember = ['L0', 'L1'].includes(memberAccessLevel || '');
         let newAccessLevel: string | null = null;
 
         if (participantType === 'INVESTOR') {
           // Investor: L0 -> L5, L2-L4 -> L6
-          if (memberAccessLevel === 'L0') {
+          if (isNewMember) {
             newAccessLevel = 'L5';
           } else if (['L2', 'L3', 'L4'].includes(memberAccessLevel || '')) {
             newAccessLevel = 'L6';
           }
         } else if (participantType === 'FOUNDER') {
           // Founder: L0 -> L4
-          if (memberAccessLevel === 'L0') {
+          if (isNewMember) {
             newAccessLevel = 'L4';
           }
         } else if (participantType === 'SUPPORT') {
           // Support: L0 -> L2
-          if (memberAccessLevel === 'L0') {
+          if (isNewMember) {
             newAccessLevel = 'L2';
           }
         }
@@ -1107,6 +1111,25 @@ export class DemoDayParticipantsService {
           actorEmail: actorEmail || null,
         },
       });
+
+      // Track "participant added" event when approved (ENABLED) - same as bulk upload
+      if (updated.status === 'ENABLED') {
+        await this.analyticsService.trackEvent({
+          name: 'demo-day-participant-added',
+          distinctId: updated.memberUid,
+          properties: {
+            demoDayUid,
+            participantUid: updated.uid,
+            memberUid: updated.memberUid,
+            type: updated.type,
+            status: updated.status,
+            teamUid: updated.teamUid || null,
+            isNewMember: false,
+            actorUid: actorUid || null,
+            actorEmail: actorEmail || null,
+          },
+        });
+      }
     }
 
     // Track type change only when it actually changed
