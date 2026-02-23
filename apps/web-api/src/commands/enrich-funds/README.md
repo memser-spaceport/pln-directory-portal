@@ -6,6 +6,8 @@ A CLI tool to enrich investment fund/company data using AI-powered web search.
 
 - **AI-Powered Enrichment**: Uses GPT-4o with web search to find missing company information
 - **Dry-Run Mode**: Generate JSON for review before applying changes
+- **Markdown Reports**: Generate side-by-side old vs new comparison tables (`--format md`)
+- **Team Whitelist**: Process only specific teams by name via a whitelist JSON file
 - **Safe Apply**: Updates database and generates rollback SQL automatically
 - **Rollback Support**: Easily revert changes using generated SQL scripts
 - **Logo Validation**: Validates logo URLs exist before including them
@@ -26,7 +28,28 @@ npm run api:enrich-funds -- dry-run --output ./funds.json --limit 10
 
 # Process a specific fund by UID
 npm run api:enrich-funds -- dry-run --output ./funds.json --fund-uid cmkcykdib0001f5n369i3j0oe
+
+# Generate both JSON and markdown report for review
+npm run api:enrich-funds -- dry-run --format md --limit 10
+
+# Process only whitelisted teams
+npm run api:enrich-funds -- dry-run --whitelist ./whitelist.json --limit 5
+
+# Combined: markdown output + whitelist
+npm run api:enrich-funds -- dry-run --format md --whitelist ./whitelist.json
 ```
+
+The whitelist file is a JSON array of team names:
+
+```json
+[
+  "Acme Capital",
+  "Blockchain Ventures",
+  "Web3 Fund"
+]
+```
+
+See `enrich-funds-whitelist.example.json` for a template.
 
 ### Step 2: Review the JSON file, then apply changes
 
@@ -71,6 +94,8 @@ DEBUG_ENRICHMENT=true npm run api:enrich-funds -- dry-run --limit 1
 | `-o, --output <path>` | Output JSON file path (default: `./enriched-funds-{timestamp}.json`) |
 | `-l, --limit <number>` | Limit number of funds to process |
 | `-f, --fund-uid <uid>` | Process specific fund by UID |
+| `--format <type>` | Output format: `json` (default) or `md` (generates both JSON + markdown) |
+| `-w, --whitelist <path>` | Path to JSON file containing array of team names to process |
 
 ### apply
 

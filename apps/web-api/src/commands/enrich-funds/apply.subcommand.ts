@@ -1,5 +1,6 @@
 import { CommandRunner, Option, SubCommand } from 'nest-commander';
 import * as fs from 'fs';
+import * as path from 'path';
 import { EnrichFundsService } from './enrich-funds.service';
 import { EnrichmentOutput } from './enrich-funds.types';
 
@@ -25,7 +26,9 @@ export class ApplySubcommand extends CommandRunner {
 
     const inputPath = options.input;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const rollbackPath = options?.rollbackOutput || `./rollback-${timestamp}.sql`;
+    const outputDir = './enriched-funds';
+    fs.mkdirSync(outputDir, { recursive: true });
+    const rollbackPath = options?.rollbackOutput || path.join(outputDir, `rollback-${timestamp}.sql`);
 
     console.log('\n🚀 Fund Data Enrichment - Apply\n');
     console.log('Configuration:');

@@ -41,6 +41,8 @@ Options:
     -o, --output <path>     Output JSON file path
     -l, --limit <n>         Limit number of funds to process
     -f, --fund-uid <uid>    Process specific fund by UID
+    --format <type>         Output format: "json" (default) or "md"
+    -w, --whitelist <path>  JSON file with array of team names to process
 
   apply:
     -i, --input <path>      Input JSON file (required)

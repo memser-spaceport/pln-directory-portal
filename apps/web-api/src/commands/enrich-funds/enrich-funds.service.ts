@@ -134,11 +134,12 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
   /**
    * Find funds with incomplete data
    */
-  async findFundsWithIncompleteData(limit?: number, fundUid?: string): Promise<FundToEnrich[]> {
+  async findFundsWithIncompleteData(limit?: number, fundUid?: string, teamNames?: string[]): Promise<FundToEnrich[]> {
     const funds = await this.prisma.team.findMany({
       where: {
         isFund: true,
         ...(fundUid ? { uid: fundUid } : {}),
+        ...(teamNames && teamNames.length > 0 ? { name: { in: teamNames } } : {}),
         OR: [
           { website: null },
           { website: '' },
@@ -236,19 +237,23 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
 
       const fieldsUpdated = this.getUpdatedFields(originalData, aiResponse);
 
+      // Only include AI data for fields that are actually being updated;
+      // keep original values for fields that already have data
+      const originalFocus = originalData.investorProfile?.investmentFocus || [];
+
       return {
         uid: fund.uid,
         name: fund.name,
         originalData,
         enrichedData: {
-          website: aiResponse.website,
-          blog: aiResponse.blog,
-          linkedinHandler: aiResponse.linkedinHandler,
-          shortDescription: aiResponse.shortDescription,
-          longDescription: aiResponse.longDescription,
-          moreDetails: aiResponse.moreDetails,
-          investmentFocus: aiResponse.investmentFocus || [],
-          logoUrl: validatedLogoUrl,
+          website: fieldsUpdated.includes('website') ? aiResponse.website : originalData.website,
+          blog: fieldsUpdated.includes('blog') ? aiResponse.blog : originalData.blog,
+          linkedinHandler: fieldsUpdated.includes('linkedinHandler') ? aiResponse.linkedinHandler : originalData.linkedinHandler,
+          shortDescription: fieldsUpdated.includes('shortDescription') ? aiResponse.shortDescription : originalData.shortDescription,
+          longDescription: fieldsUpdated.includes('longDescription') ? aiResponse.longDescription : originalData.longDescription,
+          moreDetails: fieldsUpdated.includes('moreDetails') ? aiResponse.moreDetails : originalData.moreDetails,
+          investmentFocus: fieldsUpdated.includes('investmentFocus') ? (aiResponse.investmentFocus || []) : originalFocus,
+          logoUrl: fieldsUpdated.includes('logoUrl') ? validatedLogoUrl : originalData.logoUrl,
         },
         confidence: aiResponse.confidence,
         sources: aiResponse.sources,
@@ -467,8 +472,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     if (!original.website && enriched.website) fields.push('website');
     if (!original.blog && enriched.blog) fields.push('blog');
     if (!original.linkedinHandler && enriched.linkedinHandler) fields.push('linkedinHandler');
-    if ((!original.shortDescription || original.shortDescription.length < 20) && enriched.shortDescription)
-      fields.push('shortDescription');
+    if (!original.shortDescription && enriched.shortDescription) fields.push('shortDescription');
     if (!original.longDescription && enriched.longDescription) fields.push('longDescription');
     if (!original.moreDetails && enriched.moreDetails) fields.push('moreDetails');
 
@@ -500,6 +504,99 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       funds: enrichedFunds,
       skipped,
     };
+  }
+
+  /**
+   * Generate a markdown report for dry-run output review
+   */
+  generateMarkdownReport(output: EnrichmentOutput): string {
+    const lines: string[] = [];
+
+    lines.push('# Fund Data Enrichment Report');
+    lines.push('');
+    lines.push(`Generated: ${output.metadata.generatedAt}`);
+    lines.push(`Model: ${output.metadata.modelUsed}`);
+    lines.push(
+      `Total: ${output.metadata.totalFunds} | Enriched: ${output.metadata.enrichedFunds} | Skipped: ${output.metadata.skippedFunds}`
+    );
+    lines.push('');
+    lines.push('---');
+
+    // Enriched funds
+    const enrichedFunds = output.funds.filter((f) => f.status === 'enriched');
+    for (let i = 0; i < enrichedFunds.length; i++) {
+      const fund = enrichedFunds[i];
+      lines.push('');
+      lines.push(`## ${i + 1}. ${fund.name} (\`${fund.uid}\`)`);
+      lines.push('');
+      lines.push(`**Status:** ${fund.status} | **Fields updated:** ${fund.fieldsUpdated.join(', ')}`);
+      lines.push('');
+      lines.push('| Field | Old Value | New Value |');
+      lines.push('|-------|-----------|-----------|');
+
+      const fields: Array<{ field: string; oldVal: string | null; newVal: string | null }> = [
+        { field: 'website', oldVal: fund.originalData.website, newVal: fund.enrichedData.website },
+        { field: 'blog', oldVal: fund.originalData.blog, newVal: fund.enrichedData.blog },
+        { field: 'linkedinHandler', oldVal: fund.originalData.linkedinHandler, newVal: fund.enrichedData.linkedinHandler },
+        { field: 'shortDescription', oldVal: fund.originalData.shortDescription, newVal: fund.enrichedData.shortDescription },
+        { field: 'longDescription', oldVal: fund.originalData.longDescription, newVal: fund.enrichedData.longDescription },
+        { field: 'moreDetails', oldVal: fund.originalData.moreDetails, newVal: fund.enrichedData.moreDetails },
+        {
+          field: 'investmentFocus',
+          oldVal: (fund.originalData.investorProfile?.investmentFocus || []).join(', ') || null,
+          newVal: (fund.enrichedData.investmentFocus || []).join(', ') || null,
+        },
+        { field: 'logoUrl', oldVal: fund.originalData.logoUrl, newVal: fund.enrichedData.logoUrl },
+      ];
+
+      for (const row of fields) {
+        const isUpdated = fund.fieldsUpdated.includes(row.field);
+        const newCell = isUpdated ? this.formatMdCell(row.newVal) : '_(no change)_';
+        lines.push(`| ${row.field} | ${this.formatMdCell(row.oldVal)} | ${newCell} |`);
+      }
+
+      lines.push('');
+      lines.push('---');
+    }
+
+    // Error funds
+    const errorFunds = output.funds.filter((f) => f.status === 'error');
+    if (errorFunds.length > 0) {
+      lines.push('');
+      lines.push('## Errors');
+      lines.push('');
+      lines.push('| # | Name | UID | Error |');
+      lines.push('|---|------|-----|-------|');
+      errorFunds.forEach((fund, idx) => {
+        lines.push(`| ${idx + 1} | ${fund.name} | ${fund.uid} | ${fund.error || 'Unknown error'} |`);
+      });
+      lines.push('');
+      lines.push('---');
+    }
+
+    // Skipped funds
+    if (output.skipped.length > 0) {
+      lines.push('');
+      lines.push('## Skipped Funds');
+      lines.push('');
+      lines.push('| # | Name | UID | Reason |');
+      lines.push('|---|------|-----|--------|');
+      output.skipped.forEach((fund, idx) => {
+        lines.push(`| ${idx + 1} | ${fund.name} | ${fund.uid} | ${fund.reason} |`);
+      });
+    }
+
+    lines.push('');
+    return lines.join('\n');
+  }
+
+  /**
+   * Format a value for a markdown table cell
+   */
+  private formatMdCell(value: string | null | undefined): string {
+    if (value === null || value === undefined || value === '') return '\u2014';
+    // Escape pipe characters that would break the table
+    return value.replace(/\|/g, '\\|');
   }
 
   /**
