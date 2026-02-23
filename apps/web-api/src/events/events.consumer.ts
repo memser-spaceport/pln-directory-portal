@@ -6,6 +6,7 @@ import { PLEventsService } from '../pl-events/pl-events.service';
 import { PLEventType, PLEventLocationStatus } from '@prisma/client';
 import { UPSERT, DELETE } from '../utils/constants';
 import { EventConsumerHelper } from './event-consumer.helper';
+import { EventGuestSyncHelper } from './event-guests-sync.helper';
 
 export type EventOperationType = 'UPSERT'| 'DELETE';
 
@@ -23,12 +24,14 @@ export class EventsConsumer {
     private logger: LogService,
     private prisma: PrismaService,
     private plEventsService: PLEventsService,
-    private helperService: EventConsumerHelper
+    private helperService: EventConsumerHelper,
+    private guestSyncHelper: EventGuestSyncHelper
   ) {}
 
   /**
    * Process event operation message from SQS
    * Handles create, update, and delete operations for PLEvent table
+   * Also syncs host/co-host associations from events-service
    * @param message - SQS message containing event operation payload
    * @returns Promise<void>
    */
@@ -59,42 +62,60 @@ export class EventsConsumer {
   }
 
   /**
-   * Handle event UPSERT operation
-   * Creates event if it doesn't exist; updates otherwise. Also handles location creation/association.
+   * Handle event UPSERT operation.
+   * 
+   * Flow:
+   * 1. Handle location creation/association (for physical events)
+   * 2. Sync event (create or update)
+   * 3. Sync associations
+   * 4. Sync guests for member associations
+   * 
    * @param event - Event data
    * @param location - Location data
    */
   private async handleEventUpsert(event, location): Promise<void> {
     try {
       this.logger.info(`Upserting event: ${event.externalId}`, 'EventsConsumer');
-      // Wrap entire operation in a transaction
+      
       await this.prisma.$transaction(async (tx) => {
-        // Handle location creation and association only for physical events
-        const result = event?.type != PLEventType.VIRTUAL ? 
-          await this.helperService.handleLocationAndAssociation(location, tx):
-          { locationUid: null, associationUid: null };
-        const locationUid = result.locationUid;
-        const associationUid = result.associationUid;
-        const locationStatus = location.isInferred ? PLEventLocationStatus.AUTO_MAPPED : PLEventLocationStatus.MANUALLY_MAPPED;
-        // Try to find by externalId first
-        let existingEvent = await this.helperService.findEventByExternalId(event.externalId, tx);
-        if (existingEvent) {
-          await this.plEventsService.updateEventByUid(existingEvent.uid, {
-            ...event,
-            locationStatus,
-            locationUid,
-            pLEventLocationAssociationUid: associationUid
-          }, tx);
-          this.logger.info(`Updated existing event: ${existingEvent.uid}`, 'EventsConsumer');
-        } else {
-          await this.plEventsService.createPLEvent({
-            ...event,
-            locationStatus,
-            locationUid,
-            pLEventLocationAssociationUid: associationUid
-          }, tx);
-          this.logger.info(`Created new event with externalId: ${event.externalId}`, 'EventsConsumer');
+        // Step 1: Handle location (only for physical events)
+        const { locationUid, associationUid } = event?.type !== PLEventType.VIRTUAL 
+          ? await this.helperService.handleLocationAndAssociation(location, tx)
+          : { locationUid: null, associationUid: null };
+
+        if (!locationUid) {
+          this.logger.error(`Location not found for event: ${event.externalId} with type: ${event.type}`, 'EventsConsumer');
+          return;
         }
+        
+        const locationStatus = location.isInferred 
+          ? PLEventLocationStatus.AUTO_MAPPED 
+          : PLEventLocationStatus.MANUALLY_MAPPED;
+        
+        // Step 2: Sync event (create or update)
+        const eventUid = await this.helperService.syncEvent(
+          event,
+          locationUid ?? null,
+          associationUid ?? null,
+          locationStatus,
+          tx
+        );
+        
+        // Step 3: Sync associations
+        const processedAssociations = await this.helperService.syncEventAssociations(
+          eventUid,
+          event.externalId,
+          event.associations,
+          tx
+        );
+        
+        // Step 4: Sync guests (member + team associations)
+        await this.guestSyncHelper.syncEventGuests(
+          eventUid,
+          locationUid,
+          processedAssociations,
+          tx
+        );
       });
     } catch (error) {
       this.logger.error(`Error handling event upsert: ${error.message}`, error.stack, 'EventsConsumer');

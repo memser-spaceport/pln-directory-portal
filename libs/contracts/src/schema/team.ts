@@ -115,3 +115,27 @@ export class CreateTeamSchemaDto extends createZodDto(CreateTeamSchema) {}
 export class TeamFilterQueryParamsDto extends createZodDto(TeamFilterQueryParams) {}
 
 export type TTeamResponse = z.infer<typeof ResponseTeamWithRelationsSchema>;
+
+
+// ============================================
+// Team Search Schemas
+// ============================================
+
+export const TeamSearchQueryParams = z.object({
+  q: z.string().describe('Team name search query'),
+  limit: z.number().default(5).describe('Max results to return'),
+});
+
+export const TeamSearchMatchSchema = z.object({
+  uid: z.string(),
+  name: z.string(),
+  score: z.number(),
+  logo: z.string().nullable(),
+});
+
+export const ResponseTeamSearchResultSchema = z.object({
+  matches: z.array(TeamSearchMatchSchema),
+});
+
+export class TeamSearchQueryParamsDto extends createZodDto(TeamSearchQueryParams) {}
+export class ResponseTeamSearchResultDto extends createZodDto(ResponseTeamSearchResultSchema) {}

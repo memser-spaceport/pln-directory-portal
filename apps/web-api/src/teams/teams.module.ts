@@ -6,8 +6,9 @@ import { SharedModule } from '../shared/shared.module';
 import { MembersModule } from '../members/members.module';
 import { AskModule } from '../asks/asks.module';
 import { HuskyModule } from '../husky/husky.module';
-import {AdminModule} from "../admin/admin.module";
-import {ParticipantsRequestModule} from "../participants-request/participants-request.module";
+import { AdminModule } from "../admin/admin.module";
+import { ParticipantsRequestModule } from "../participants-request/participants-request.module";
+import { OpenSearchModule } from '../opensearch/opensearch.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import {ParticipantsRequestModule} from "../participants-request/participants-re
     SharedModule,
     forwardRef(() => AskModule),
     HuskyModule,
+    OpenSearchModule,
   ],
   controllers: [TeamsController],
   providers: [TeamsService, TeamsHooksService],

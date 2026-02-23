@@ -11,7 +11,8 @@ import { AuthModule } from '../auth/auth.module';
 import { HuskyModule } from '../husky/husky.module';
 import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
 import { OfficeHoursModule } from '../office-hours/office-hours.module';
-import {TeamsModule} from "../teams/teams.module";
+import { TeamsModule } from "../teams/teams.module";
+import { OpenSearchModule } from '../opensearch/opensearch.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import {TeamsModule} from "../teams/teams.module";
     OtpModule,
     ParticipantsRequestModule,
     HuskyModule,
+    OpenSearchModule,
     forwardRef(() => NotificationSettingsModule),
     forwardRef(() => OfficeHoursModule),
     forwardRef(() => TeamsModule)
