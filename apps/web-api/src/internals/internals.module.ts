@@ -4,6 +4,7 @@ import { PLEventsInternalController } from './pl-events.controller';
 import { AuthModule } from '../auth/auth.module'
 import { MembersController } from './members.controller';
 import { MembersModule } from '../members/members.module';
+import { TeamsModule } from '../teams/teams.module';
 import { CacheController } from './cache.controller';
 import { InternalsService } from './internals.service';
 import { HuskyModule } from '../husky/husky.module';
@@ -15,6 +16,6 @@ import { EventsModule } from '../events/events.module';
   controllers: [PLEventsInternalController, MembersController, CacheController, TeamsInternalController, ProjectsInternalController],
   providers: [InternalsService],
   exports: [InternalsService],
-  imports:[PLEventsModule, AuthModule, MembersModule, forwardRef(() => EventsModule)]
+  imports: [PLEventsModule, AuthModule, MembersModule, TeamsModule, forwardRef(() => EventsModule)]
 })
 export class InternalsModule {}

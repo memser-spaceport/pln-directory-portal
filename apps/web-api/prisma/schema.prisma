@@ -59,6 +59,7 @@ model Team {
   demoDayParticipants          DemoDayParticipant[]
   accessLevel                  String?                       @default("L1")
   accessLevelUpdatedAt         DateTime                      @default(now())
+  eventAssociations            PLEventAssociation[]
 }
 
 enum AskStatus {
@@ -169,6 +170,7 @@ model Member {
   demoDayAdminScopes               MemberDemoDayAdminScope[]
   pushNotifications                PushNotification[]                @relation("PushNotificationRecipient")
   pushNotificationReadStatuses     PushNotificationReadStatus[]      @relation("PushNotificationReadStatuses")
+  eventAssociations                PLEventAssociation[]
 }
 
 model MemberRole {
@@ -226,6 +228,19 @@ enum DiscoveryQuestionType {
 enum PLEventLocationStatus {
   AUTO_MAPPED
   MANUALLY_MAPPED
+}
+
+enum AssociationRole {
+  HOST
+  CO_HOST
+  SPEAKER
+  SPONSOR
+  ATTENDEE
+}
+
+enum AssociationEntityType {
+  MEMBER
+  TEAM
 }
 
 model ParticipantsRequest {
@@ -513,6 +528,7 @@ model PLEvent {
   aggregatedPriority            Int?
   pLEventLocationAssociationUid String?
   pLEventLocationAssociation    PLEventLocationAssociation? @relation(fields: [pLEventLocationAssociationUid], references: [uid])
+  eventAssociations             PLEventAssociation[]
 }
 
 model PLEventGuest {
@@ -543,6 +559,25 @@ model PLEventGuest {
   isSpeaker      Boolean  @default(false)
   isSponsor      Boolean  @default(false)
   isFeatured     Boolean  @default(false)
+}
+
+model PLEventAssociation {
+  id                    Int                   @id @default(autoincrement())
+  uid                   String                @unique @default(cuid())
+  eventUid              String
+  event                 PLEvent               @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
+  entityType            AssociationEntityType
+  memberUid             String?
+  member                Member?               @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  teamUid               String?
+  team                  Team?                 @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  role                  AssociationRole
+  externalEventId       String?
+  externalAssociationId String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@unique([externalEventId, externalAssociationId])
 }
 
 model FocusArea {
