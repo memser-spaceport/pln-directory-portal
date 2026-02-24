@@ -235,6 +235,26 @@ export class TeamsService {
               },
             },
           },
+          eventAssociations: {
+            where: {
+              entityType: 'TEAM',
+              teamUid: uid
+            },
+            select: {
+              uid: true,
+              role: true,
+              event: {
+                select: {
+                  uid: true,
+                  name: true,
+                  type: true,
+                  slugURL: true,
+                  startDate: true,
+                  endDate: true,
+                },
+              },
+            },
+          },
           asks: {
             select: {
               uid: true,
