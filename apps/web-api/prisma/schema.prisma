@@ -1277,8 +1277,8 @@ model PushNotification {
   link         String? // URL or route to navigate to
   metadata     Json?                    @default("{}")
   isPublic     Boolean                  @default(false) // If true, anyone can see; if false, only recipient
-  recipientUid String? // Optional: Member.externalId of user to notify (null = broadcast/public)
-  recipient    Member?                  @relation("PushNotificationRecipient", fields: [recipientUid], references: [externalId], onDelete: Cascade)
+  recipientUid String? // Optional: Member.uid of user to notify (null = broadcast/public)
+  recipient    Member?                  @relation("PushNotificationRecipient", fields: [recipientUid], references: [uid], onDelete: Cascade)
   accessLevels String[]                 @default([]) // Optional: list of access levels (L2, L3, L4, L5, L6) to target
   isRead       Boolean                  @default(false) // For private notifications only
   isSent       Boolean                  @default(false) // Whether sent via WebSocket
@@ -1304,7 +1304,7 @@ model PushNotificationReadStatus {
   notificationId Int
   notification   PushNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   memberUid      String
-  member         Member           @relation("PushNotificationReadStatuses", fields: [memberUid], references: [externalId], onDelete: Cascade)
+  member         Member           @relation("PushNotificationReadStatuses", fields: [memberUid], references: [uid], onDelete: Cascade)
   readAt         DateTime         @default(now())
 
   @@unique([notificationId, memberUid])

@@ -154,13 +154,11 @@ export class PushNotificationsService {
 
     // Get user's access level
     const member = await this.prisma.member.findFirst({
-      where: { externalId: memberUid },
-      select: { accessLevel: true, uid: true },
+      where: { uid: memberUid },
+      select: { accessLevel: true },
     });
 
     const userAccessLevel = member?.accessLevel;
-
-    const realMemberUid = member?.uid ?? memberUid;
 
     // Get private notifications for this user
     const privateNotifications = await this.prisma.pushNotification.findMany({
@@ -252,7 +250,7 @@ export class PushNotificationsService {
           isRead: n.readStatuses.length > 0,
           createdAt: n.createdAt,
         })),
-    ].filter((n) => !this.isSelfAuthoredForumPost(n, realMemberUid));
+    ].filter((n) => !this.isSelfAuthoredForumPost(n, memberUid));
 
     // Sort: unread first, then by createdAt desc
     notifications.sort((a, b) => {
@@ -287,7 +285,7 @@ export class PushNotificationsService {
     if (locationUids.length > 0) {
       const attendedRows = await this.prisma.pLEventGuest.findMany({
         where: {
-          memberUid: realMemberUid,
+          memberUid: memberUid,
           locationUid: { in: locationUids },
         },
         select: { locationUid: true },
@@ -318,8 +316,8 @@ export class PushNotificationsService {
   async getUnreadCount(memberUid: string): Promise<number> {
     // Get user's access level
     const member = await this.prisma.member.findFirst({
-      where: { externalId: memberUid },
-      select: { accessLevel: true, uid: true },
+      where: { uid: memberUid },
+      select: { accessLevel: true },
     });
 
     const userAccessLevel = member?.accessLevel;
@@ -385,7 +383,7 @@ export class PushNotificationsService {
       });
       // member is guaranteed non-null when userAccessLevel is truthy
       selfAuthoredForumCount = unreadForumNotifications.filter((n) =>
-        this.isSelfAuthoredForumPost(n, member?.uid ?? '')
+        this.isSelfAuthoredForumPost(n, memberUid)
       ).length;
     }
 
@@ -398,8 +396,8 @@ export class PushNotificationsService {
    */
   async getUnreadLinksForUser(memberUid: string): Promise<Array<{ uid: string; link: string }>> {
     const member = await this.prisma.member.findFirst({
-      where: { externalId: memberUid },
-      select: { accessLevel: true, uid: true },
+      where: { uid: memberUid },
+      select: { accessLevel: true },
     });
 
     const userAccessLevel = member?.accessLevel;
@@ -444,7 +442,7 @@ export class PushNotificationsService {
       : [];
 
     const filteredAccessLevelLinks = accessLevelLinks.filter(
-      (n) => !this.isSelfAuthoredForumPost(n, member?.uid ?? '')
+      (n) => !this.isSelfAuthoredForumPost(n, memberUid)
     );
 
     return [
@@ -463,7 +461,7 @@ export class PushNotificationsService {
   async markAsRead(uid: string, memberUid: string) {
     // Get user's access level
     const member = await this.prisma.member.findFirst({
-      where: { externalId: memberUid },
+      where: { uid: memberUid },
       select: { accessLevel: true },
     });
 
@@ -533,7 +531,7 @@ export class PushNotificationsService {
   async markAllAsRead(memberUid: string) {
     // Get user's access level
     const member = await this.prisma.member.findFirst({
-      where: { externalId: memberUid },
+      where: { uid: memberUid },
       select: { accessLevel: true },
     });
 
@@ -643,9 +641,9 @@ export class PushNotificationsService {
     }
 
     try {
-      // Get recipient's email from member table using externalId (recipientUid)
+      // Get recipient's email from member table using uid (recipientUid)
       const member = await this.prisma.member.findFirst({
-        where: { externalId: notification.recipientUid },
+        where: { uid: notification.recipientUid },
         select: { email: true, name: true, uid: true },
       });
 

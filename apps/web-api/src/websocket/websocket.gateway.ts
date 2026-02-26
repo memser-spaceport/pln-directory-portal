@@ -11,6 +11,7 @@ import {
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import axios from 'axios';
+import { PrismaService } from '../shared/prisma.service';
 import { AuthenticatedSocketData, getRoomName, WebSocketEvent } from './websocket.types';
 import { ALLOWED_CORS_ORIGINS, APP_ENV } from '../utils/constants';
 
@@ -34,6 +35,8 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
   private readonly logger = new Logger(NotificationGateway.name);
   private connectedUsers: Map<string, Set<string>> = new Map(); // memberUid -> Set<socketId>
 
+  constructor(private readonly prisma: PrismaService) {}
+
   afterInit() {
     this.logger.log('WebSocket Gateway initialized');
   }
@@ -52,9 +55,18 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
       // Validate token and extract user info
       const userInfo = await this.validateToken(token as string);
 
-      if (!userInfo || !userInfo.memberUid) {
+      if (!userInfo || !userInfo.sub) {
         this.logger.warn(`Connection rejected: Invalid token. Socket ID: ${client.id}`);
         client.emit(WebSocketEvent.CONNECTION_ERROR, { message: 'Invalid token' });
+        client.disconnect(true);
+        return;
+      }
+
+      // Resolve auth sub claim (externalId) to stable member.uid
+      const memberUid = await this.resolveMemberUid(userInfo.sub);
+      if (!memberUid) {
+        this.logger.warn(`Connection rejected: No member found for sub ${userInfo.sub}. Socket ID: ${client.id}`);
+        client.emit(WebSocketEvent.CONNECTION_ERROR, { message: 'Member not found' });
         client.disconnect(true);
         return;
       }
@@ -62,22 +74,22 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
       // Store authenticated data on socket
       const authenticatedClient = client as AuthenticatedSocket;
       authenticatedClient.data = {
-        memberUid: userInfo.memberUid,
+        memberUid,
         email: userInfo.email,
         authenticatedAt: new Date(),
       };
 
       // Join user's personal room
-      const roomName = getRoomName(userInfo.memberUid);
+      const roomName = getRoomName(memberUid);
       await client.join(roomName);
 
       // Track connected user
-      this.addConnectedUser(userInfo.memberUid, client.id);
+      this.addConnectedUser(memberUid, client.id);
 
-      this.logger.debug(`Client connected: ${client.id}, User: ${userInfo.memberUid}, Room: ${roomName}`);
+      this.logger.debug(`Client connected: ${client.id}, User: ${memberUid}, Room: ${roomName}`);
 
       // Emit success event
-      client.emit(WebSocketEvent.CONNECTION_SUCCESS, { memberUid: userInfo.memberUid });
+      client.emit(WebSocketEvent.CONNECTION_SUCCESS, { memberUid });
     } catch (error) {
       this.logger.error(`Connection error: ${error instanceof Error ? error.message : error}`);
       client.emit(WebSocketEvent.CONNECTION_ERROR, { message: 'Connection failed' });
@@ -131,9 +143,29 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
   }
 
   /**
+   * Resolve an auth sub claim (externalId) to the stable member.uid.
+   * Falls back to checking if the value is already a member.uid.
+   */
+  private async resolveMemberUid(sub: string): Promise<string | null> {
+    // Try externalId first (the normal case — sub comes from auth provider)
+    const byExternalId = await this.prisma.member.findFirst({
+      where: { externalId: sub },
+      select: { uid: true },
+    });
+    if (byExternalId) return byExternalId.uid;
+
+    // Fallback: check if the value is already a member.uid (dev tokens)
+    const byUid = await this.prisma.member.findFirst({
+      where: { uid: sub },
+      select: { uid: true },
+    });
+    return byUid?.uid ?? null;
+  }
+
+  /**
    * Validate JWT token against auth service
    */
-  private async validateToken(token: string): Promise<{ memberUid: string; email?: string } | null> {
+  private async validateToken(token: string): Promise<{ sub: string; email?: string } | null> {
     const authApiUrl = process.env['AUTH_API_URL'];
 
     // If no auth API configured, try to decode token directly (development mode)
@@ -155,7 +187,7 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
       // Auth introspect returns: { active: boolean, email: string, sub: string }
       if (response.data?.active && response.data?.sub) {
         return {
-          memberUid: response.data.sub,
+          sub: response.data.sub,
           email: response.data.email,
         };
       }
@@ -171,7 +203,7 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
    * Development mode: parse token without validation
    * WARNING: Only use in development environments
    */
-  private parseTokenDev(token: string): { memberUid: string; email?: string } | null {
+  private parseTokenDev(token: string): { sub: string; email?: string } | null {
     try {
       // Simple JWT decode (without verification) for development
       const parts = token.split('.');
@@ -183,7 +215,7 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
 
       if (payload.uid || payload.memberUid || payload.sub) {
         return {
-          memberUid: payload.uid || payload.memberUid || payload.sub,
+          sub: payload.uid || payload.memberUid || payload.sub,
           email: payload.email,
         };
       }
