@@ -79,11 +79,15 @@ The script uses the existing `OPENAI_API_KEY` already configured in the project.
 
 ### Logo.dev API
 
-Logo discovery uses the [Logo.dev API](https://logo.dev) instead of AI web search. Add the API token to `.env`:
+Logo discovery uses the [Logo.dev](https://logo.dev) image endpoints instead of AI web search. Add the publishable key to `.env`:
 
 ```bash
-LOGO_DEV_API_TOKEN=sk_your_token_here
+LOGO_DEV_PUBLISHABLE_KEY=pk_your_key_here
 ```
+
+The lookup strategy is:
+1. If the company has a website/domain, fetch via `https://img.logo.dev/{domain}?token=...&retina=true`
+2. Otherwise, fall back to name search via `https://img.logo.dev/name/{companyName}?token=...&retina=true`
 
 During **dry-run**, the Logo.dev URL is stored in the output JSON (`enrichedData.logoUrl`). During **apply**, the logo image is downloaded, uploaded to S3, an `Image` record is created in the database, and the team's `logoUid` is linked to it.
 

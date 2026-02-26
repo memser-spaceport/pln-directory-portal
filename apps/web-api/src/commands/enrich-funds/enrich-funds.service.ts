@@ -105,11 +105,11 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
 export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
   private readonly MODEL_NAME: string;
   private prisma: PrismaClient;
-  private readonly LOGO_DEV_API_TOKEN: string;
+  private readonly LOGO_DEV_PUBLISHABLE_KEY: string;
 
   constructor(private readonly fileUploadService: FileUploadService) {
     this.MODEL_NAME = process.env.OPENAI_FUND_ENRICHMENT_MODEL || 'gpt-4o';
-    this.LOGO_DEV_API_TOKEN = process.env.LOGO_DEV_API_TOKEN || '';
+    this.LOGO_DEV_PUBLISHABLE_KEY = process.env.LOGO_DEV_PUBLISHABLE_KEY || '';
     this.prisma = new PrismaClient();
   }
 
@@ -237,11 +237,13 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
 
       const aiResponse = this.parseAIResponse(text);
 
-      // Fetch logo from Logo.dev API if the team has no logo
+      // Fetch logo from Logo.dev if the team has no logo
       let logoDevUrl: string | null = null;
       let logoDomain: string | null = null;
       if (!fund.logo) {
-        const logoResult = await this.fetchLogoFromLogoDev(fund.name);
+        // Prefer domain from existing or AI-enriched website
+        const website = fund.website || aiResponse.website;
+        const logoResult = await this.fetchLogoFromLogoDev(fund.name, website);
         if (logoResult) {
           logoDevUrl = logoResult.logoUrl;
           logoDomain = logoResult.domain;
@@ -417,12 +419,12 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       const parsed = new URL(url);
       if (!['http:', 'https:'].includes(parsed.protocol)) return null;
 
-      // Make a HEAD request to check if URL exists
+      // Use GET instead of HEAD — some services (e.g. img.logo.dev) return 404 for HEAD
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeout = setTimeout(() => controller.abort(), 5000);
 
       const response = await fetch(url, {
-        method: 'HEAD',
+        method: 'GET',
         signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; LogoValidator/1.0)',
@@ -449,58 +451,52 @@ Current Date: ${new Date().toISOString().split('T')[0]}
   }
 
   /**
-   * Fetch company logo from Logo.dev API
+   * Fetch company logo from Logo.dev image endpoints.
+   * Strategy:
+   *  1. If a website URL is available, extract the domain and use https://img.logo.dev/{domain}
+   *  2. Otherwise, fall back to name-based search: https://img.logo.dev/name/{companyName}
    */
-  private async fetchLogoFromLogoDev(companyName: string): Promise<{ logoUrl: string; domain: string } | null> {
-    if (!this.LOGO_DEV_API_TOKEN) {
-      this.log('LOGO_DEV_API_TOKEN not configured, skipping logo fetch');
+  private async fetchLogoFromLogoDev(
+    companyName: string,
+    websiteUrl?: string | null,
+  ): Promise<{ logoUrl: string; domain: string } | null> {
+    if (!this.LOGO_DEV_PUBLISHABLE_KEY) {
+      this.log('LOGO_DEV_PUBLISHABLE_KEY not configured, skipping logo fetch');
       return null;
     }
 
+    const token = this.LOGO_DEV_PUBLISHABLE_KEY;
+
+    // Try domain-based lookup first if we have a website
+    if (websiteUrl) {
+      try {
+        const domain = new URL(websiteUrl).hostname.replace(/^www\./, '');
+        const logoUrl = `https://img.logo.dev/${domain}?token=${token}&retina=true`;
+
+        const validated = await this.validateLogoUrl(logoUrl);
+        if (validated) {
+          this.log(`Logo.dev found logo for "${companyName}" via domain: ${domain}`);
+          return { logoUrl: validated, domain };
+        }
+      } catch (error) {
+        this.log(`Logo.dev domain lookup failed for "${companyName}": ${error.message}`);
+      }
+    }
+
+    // Fall back to name-based search
     try {
-      const url = `https://api.logo.dev/search?q=${encodeURIComponent(companyName)}`;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
+      const logoUrl = `https://img.logo.dev/name/${encodeURIComponent(companyName)}?token=${token}&retina=true`;
 
-      const response = await fetch(url, {
-        method: 'GET',
-        signal: controller.signal,
-        headers: {
-          Authorization: `Bearer ${this.LOGO_DEV_API_TOKEN}`,
-        },
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        this.log(`Logo.dev API returned ${response.status} for "${companyName}"`);
-        return null;
-      }
-
-      const results = await response.json() as Array<{ name?: string; domain?: string; logo_url?: string; logoUrl?: string }>;
-
-      if (!Array.isArray(results) || results.length === 0) {
-        this.log(`Logo.dev returned no results for "${companyName}"`);
-        return null;
-      }
-
-      const first = results[0];
-      const logoUrl = first.logo_url || first.logoUrl;
-      const domain = first.domain || '';
-
-      if (!logoUrl) {
-        this.log(`Logo.dev result has no logo URL for "${companyName}"`);
-        return null;
-      }
-
-      // Validate the logo URL actually works
       const validated = await this.validateLogoUrl(logoUrl);
-      if (!validated) return null;
+      if (validated) {
+        this.log(`Logo.dev found logo for "${companyName}" via name search`);
+        return { logoUrl: validated, domain: '' };
+      }
 
-      this.log(`Logo.dev found logo for "${companyName}": ${validated} (domain: ${domain})`);
-      return { logoUrl: validated, domain };
+      this.log(`Logo.dev returned no valid logo for "${companyName}"`);
+      return null;
     } catch (error) {
-      this.log(`Logo.dev API error for "${companyName}": ${error.message}`);
+      this.log(`Logo.dev name lookup failed for "${companyName}": ${error.message}`);
       return null;
     }
   }
