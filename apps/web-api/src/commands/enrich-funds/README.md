@@ -130,6 +130,8 @@ DEBUG_ENRICHMENT=true npm run api:enrich-funds -- dry-run --limit 1
         "website": "https://example.com",
         "blog": null,
         "linkedinHandler": "company/example",
+        "twitterHandler": "exampleco",
+        "telegramHandler": "exampleco",
         "shortDescription": "...",
         "longDescription": "...",
         "moreDetails": "...",
@@ -139,7 +141,7 @@ DEBUG_ENRICHMENT=true npm run api:enrich-funds -- dry-run --limit 1
       "confidence": { ... },
       "sources": ["https://..."],
       "status": "enriched",
-      "fieldsUpdated": ["website", "investmentFocus"]
+      "fieldsUpdated": ["website", "twitterHandler", "investmentFocus"]
     }
   ],
   "skipped": []
@@ -153,6 +155,8 @@ DEBUG_ENRICHMENT=true npm run api:enrich-funds -- dry-run --limit 1
 | `website` | Official website URL |
 | `blog` | Blog URL |
 | `linkedinHandler` | LinkedIn company handle (e.g., `company/example`) |
+| `twitterHandler` | Twitter/X handle (e.g., `exampleco`) |
+| `telegramHandler` | Telegram handle (e.g., `exampleco`) |
 | `shortDescription` | 1-2 sentence summary (max 200 chars) |
 | `longDescription` | Detailed description (max 1000 chars) |
 | `moreDetails` | Additional context (team, history, achievements) |
@@ -164,3 +168,5 @@ DEBUG_ENRICHMENT=true npm run api:enrich-funds -- dry-run --limit 1
 - Logo URLs are validated via HEAD request to ensure they exist and return an image
 - Only fields that were originally empty/null will be marked for update
 - The script only updates funds where `isFund=true` in the database
+- Existing Twitter/Telegram handles are passed to the AI as context for more accurate research
+- Social handles are sanitized (strips `@` prefix and extracts handles from full URLs)

@@ -33,11 +33,15 @@ FIELDS TO POPULATE:
 
 3. linkedinHandler: LinkedIn company handle (e.g., "company/puma-ai")
 
-4. shortDescription: 1-2 sentence summary (max 200 chars)
+4. twitterHandler: Twitter/X handle without @ (e.g., "companyname")
 
-5. longDescription: Detailed description of mission, products, and value proposition (max 1000 chars)
+5. telegramHandler: Telegram handle without @ (e.g., "companyname")
 
-6. moreDetails: IMPORTANT - This should contain additional context such as:
+6. shortDescription: 1-2 sentence summary (max 200 chars)
+
+7. longDescription: Detailed description of mission, products, and value proposition (max 1000 chars)
+
+8. moreDetails: IMPORTANT - This should contain additional context such as:
    - Team information (founders, key people)
    - Company history or founding date
    - Notable achievements or milestones
@@ -46,7 +50,7 @@ FIELDS TO POPULATE:
    - Partnerships or integrations
    NEVER leave this empty if any additional information was found.
 
-7. investmentFocus: IMPORTANT - Array of 3-8 SHORT TAGS (1-2 words each) that describe what the company focuses on.
+9. investmentFocus: IMPORTANT - Array of 3-8 SHORT TAGS (1-2 words each) that describe what the company focuses on.
    DERIVE these tags from:
    - The company's products/services
    - The industry they operate in
@@ -60,7 +64,7 @@ FIELDS TO POPULATE:
 
    ALWAYS populate this field based on what the company does.
 
-8. logoUrl: Direct, publicly accessible URL to the company's logo image.
+10. logoUrl: Direct, publicly accessible URL to the company's logo image.
    IMPORTANT: Only return URLs that are directly accessible (no authentication required).
 
    Best sources for logos (in order of preference):
@@ -77,9 +81,10 @@ FIELDS TO POPULATE:
 
 SEARCH STRATEGY:
 1. Search for "[Company Name]" + website or official site
-2. Search for "[Company Name] Twitter" or "[Company Name] X" to find their Twitter profile
-3. Search for "[Company Name] Crunchbase" for company profile with logo
-4. Search for "[Company Name]" + about or team
+2. Search for "[Company Name] Twitter" or "[Company Name] X" to find their Twitter/X handle
+3. Search for "[Company Name] Telegram" to find their Telegram channel/group
+4. Search for "[Company Name] Crunchbase" for company profile with logo
+5. Search for "[Company Name]" + about or team
 
 CRITICAL: You MUST ALWAYS respond with valid JSON. Never leave investmentFocus empty - derive tags from what you know about the company.
 
@@ -88,6 +93,8 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
   "website": "https://...",
   "blog": "https://..." or null,
   "linkedinHandler": "company/..." or null,
+  "twitterHandler": "handle" or null,
+  "telegramHandler": "handle" or null,
   "shortDescription": "...",
   "longDescription": "...",
   "moreDetails": "Additional context about team, history, achievements...",
@@ -95,6 +102,8 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
   "logoUrl": "https://..." or null,
   "confidence": {
     "website": "high" | "medium" | "low",
+    "twitterHandler": "high" | "medium" | "low",
+    "telegramHandler": "high" | "medium" | "low",
     "shortDescription": "high" | "medium" | "low",
     "longDescription": "high" | "medium" | "low",
     "moreDetails": "high" | "medium" | "low",
@@ -146,6 +155,10 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
           { blog: null },
           { linkedinHandler: null },
           { linkedinHandler: '' },
+          { twitterHandler: null },
+          { twitterHandler: '' },
+          { telegramHandler: null },
+          { telegramHandler: '' },
           { shortDescription: null },
           { shortDescription: '' },
           { longDescription: null },
@@ -165,6 +178,8 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
         website: true,
         blog: true,
         linkedinHandler: true,
+        twitterHandler: true,
+        telegramHandler: true,
         shortDescription: true,
         longDescription: true,
         moreDetails: true,
@@ -196,6 +211,8 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
       website: fund.website,
       blog: fund.blog,
       linkedinHandler: fund.linkedinHandler,
+      twitterHandler: fund.twitterHandler,
+      telegramHandler: fund.telegramHandler,
       shortDescription: fund.shortDescription,
       longDescription: fund.longDescription,
       moreDetails: fund.moreDetails,
@@ -249,6 +266,8 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
           website: fieldsUpdated.includes('website') ? aiResponse.website : originalData.website,
           blog: fieldsUpdated.includes('blog') ? aiResponse.blog : originalData.blog,
           linkedinHandler: fieldsUpdated.includes('linkedinHandler') ? aiResponse.linkedinHandler : originalData.linkedinHandler,
+          twitterHandler: fieldsUpdated.includes('twitterHandler') ? aiResponse.twitterHandler : originalData.twitterHandler,
+          telegramHandler: fieldsUpdated.includes('telegramHandler') ? aiResponse.telegramHandler : originalData.telegramHandler,
           shortDescription: fieldsUpdated.includes('shortDescription') ? aiResponse.shortDescription : originalData.shortDescription,
           longDescription: fieldsUpdated.includes('longDescription') ? aiResponse.longDescription : originalData.longDescription,
           moreDetails: fieldsUpdated.includes('moreDetails') ? aiResponse.moreDetails : originalData.moreDetails,
@@ -271,6 +290,8 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
           website: null,
           blog: null,
           linkedinHandler: null,
+          twitterHandler: null,
+          telegramHandler: null,
           shortDescription: null,
           longDescription: null,
           moreDetails: null,
@@ -298,6 +319,8 @@ Research and enrich the profile for this company/fund:
 Company Name: ${fund.name}
 ${fund.website ? `Existing Website: ${fund.website}` : 'Website: Unknown'}
 ${fund.linkedinHandler ? `Existing LinkedIn: ${fund.linkedinHandler}` : 'LinkedIn: Unknown'}
+${fund.twitterHandler ? `Existing Twitter/X: ${fund.twitterHandler}` : 'Twitter/X: Unknown'}
+${fund.telegramHandler ? `Existing Telegram: ${fund.telegramHandler}` : 'Telegram: Unknown'}
 ${existingDescription ? `Existing Description: ${existingDescription}` : 'Description: Not available'}
 
 TASK:
@@ -347,6 +370,8 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         website: this.validateUrl(parsed.website),
         blog: this.validateUrl(parsed.blog),
         linkedinHandler: this.sanitizeLinkedInHandler(parsed.linkedinHandler),
+        twitterHandler: this.sanitizeHandle(parsed.twitterHandler),
+        telegramHandler: this.sanitizeHandle(parsed.telegramHandler),
         shortDescription: this.truncateString(parsed.shortDescription, 200),
         longDescription: this.truncateString(parsed.longDescription, 1000),
         moreDetails: parsed.moreDetails || null,
@@ -371,6 +396,8 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       website: null,
       blog: null,
       linkedinHandler: null,
+      twitterHandler: null,
+      telegramHandler: null,
       shortDescription: null,
       longDescription: null,
       moreDetails: null,
@@ -455,6 +482,21 @@ Current Date: ${new Date().toISOString().split('T')[0]}
   }
 
   /**
+   * Sanitize a social media handle (remove @, URLs, etc.)
+   */
+  private sanitizeHandle(handle: string | null | undefined): string | null {
+    if (!handle) return null;
+    // Remove @ prefix if present
+    let cleaned = handle.replace(/^@/, '');
+    // Remove full URL if provided (twitter.com/..., t.me/..., etc.)
+    const urlMatch = cleaned.match(/(?:twitter\.com|x\.com|t\.me)\/([a-zA-Z0-9_]+)/);
+    if (urlMatch) {
+      cleaned = urlMatch[1];
+    }
+    return cleaned || null;
+  }
+
+  /**
    * Truncate string to max length
    */
   private truncateString(str: string | null | undefined, maxLength: number): string | null {
@@ -472,6 +514,8 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     if (!original.website && enriched.website) fields.push('website');
     if (!original.blog && enriched.blog) fields.push('blog');
     if (!original.linkedinHandler && enriched.linkedinHandler) fields.push('linkedinHandler');
+    if (!original.twitterHandler && enriched.twitterHandler) fields.push('twitterHandler');
+    if (!original.telegramHandler && enriched.telegramHandler) fields.push('telegramHandler');
     if (!original.shortDescription && enriched.shortDescription) fields.push('shortDescription');
     if (!original.longDescription && enriched.longDescription) fields.push('longDescription');
     if (!original.moreDetails && enriched.moreDetails) fields.push('moreDetails');
@@ -538,6 +582,8 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         { field: 'website', oldVal: fund.originalData.website, newVal: fund.enrichedData.website },
         { field: 'blog', oldVal: fund.originalData.blog, newVal: fund.enrichedData.blog },
         { field: 'linkedinHandler', oldVal: fund.originalData.linkedinHandler, newVal: fund.enrichedData.linkedinHandler },
+        { field: 'twitterHandler', oldVal: fund.originalData.twitterHandler, newVal: fund.enrichedData.twitterHandler },
+        { field: 'telegramHandler', oldVal: fund.originalData.telegramHandler, newVal: fund.enrichedData.telegramHandler },
         { field: 'shortDescription', oldVal: fund.originalData.shortDescription, newVal: fund.enrichedData.shortDescription },
         { field: 'longDescription', oldVal: fund.originalData.longDescription, newVal: fund.enrichedData.longDescription },
         { field: 'moreDetails', oldVal: fund.originalData.moreDetails, newVal: fund.enrichedData.moreDetails },
@@ -629,6 +675,8 @@ Current Date: ${new Date().toISOString().split('T')[0]}
             website: true,
             blog: true,
             linkedinHandler: true,
+            twitterHandler: true,
+            telegramHandler: true,
             shortDescription: true,
             longDescription: true,
             moreDetails: true,
@@ -658,6 +706,12 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         }
         if (fund.fieldsUpdated.includes('linkedinHandler')) {
           teamRollbackFields.push(`"linkedinHandler" = ${this.sqlValue(currentTeam.linkedinHandler)}`);
+        }
+        if (fund.fieldsUpdated.includes('twitterHandler')) {
+          teamRollbackFields.push(`"twitterHandler" = ${this.sqlValue(currentTeam.twitterHandler)}`);
+        }
+        if (fund.fieldsUpdated.includes('telegramHandler')) {
+          teamRollbackFields.push(`"telegramHandler" = ${this.sqlValue(currentTeam.telegramHandler)}`);
         }
         if (fund.fieldsUpdated.includes('shortDescription')) {
           teamRollbackFields.push(`"shortDescription" = ${this.sqlValue(currentTeam.shortDescription)}`);
@@ -702,6 +756,12 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         }
         if (fund.fieldsUpdated.includes('linkedinHandler') && fund.enrichedData.linkedinHandler) {
           teamUpdateData.linkedinHandler = fund.enrichedData.linkedinHandler;
+        }
+        if (fund.fieldsUpdated.includes('twitterHandler') && fund.enrichedData.twitterHandler) {
+          teamUpdateData.twitterHandler = fund.enrichedData.twitterHandler;
+        }
+        if (fund.fieldsUpdated.includes('telegramHandler') && fund.enrichedData.telegramHandler) {
+          teamUpdateData.telegramHandler = fund.enrichedData.telegramHandler;
         }
         if (fund.fieldsUpdated.includes('shortDescription') && fund.enrichedData.shortDescription) {
           teamUpdateData.shortDescription = fund.enrichedData.shortDescription;
@@ -750,7 +810,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     rollbackStatements.push('COMMIT;');
     rollbackStatements.push('');
     rollbackStatements.push('-- Verification Query:');
-    rollbackStatements.push('-- SELECT uid, name, website, blog, "linkedinHandler" FROM "Team"');
+    rollbackStatements.push('-- SELECT uid, name, website, blog, "linkedinHandler", "twitterHandler", "telegramHandler" FROM "Team"');
     rollbackStatements.push(
       `-- WHERE uid IN (${input.funds
         .filter((f) => f.status === 'enriched')
@@ -851,6 +911,8 @@ Current Date: ${new Date().toISOString().split('T')[0]}
               website: fund.website,
               blog: fund.blog,
               linkedinHandler: fund.linkedinHandler,
+              twitterHandler: fund.twitterHandler,
+              telegramHandler: fund.telegramHandler,
               shortDescription: fund.shortDescription,
               longDescription: fund.longDescription,
               moreDetails: fund.moreDetails,
@@ -866,6 +928,8 @@ Current Date: ${new Date().toISOString().split('T')[0]}
               website: null,
               blog: null,
               linkedinHandler: null,
+              twitterHandler: null,
+              telegramHandler: null,
               shortDescription: null,
               longDescription: null,
               moreDetails: null,

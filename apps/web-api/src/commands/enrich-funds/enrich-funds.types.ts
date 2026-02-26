@@ -9,6 +9,8 @@ export interface FundToEnrich {
   website: string | null;
   blog: string | null;
   linkedinHandler: string | null;
+  twitterHandler: string | null;
+  telegramHandler: string | null;
   shortDescription: string | null;
   longDescription: string | null;
   moreDetails: string | null;
@@ -27,6 +29,8 @@ export interface EnrichableFields {
   website: string | null;
   blog: string | null;
   linkedinHandler: string | null;
+  twitterHandler: string | null;
+  telegramHandler: string | null;
   shortDescription: string | null;
   longDescription: string | null;
   moreDetails: string | null;
@@ -41,6 +45,8 @@ export interface ConfidenceMap {
   website?: ConfidenceLevel;
   blog?: ConfidenceLevel;
   linkedinHandler?: ConfidenceLevel;
+  twitterHandler?: ConfidenceLevel;
+  telegramHandler?: ConfidenceLevel;
   shortDescription?: ConfidenceLevel;
   longDescription?: ConfidenceLevel;
   moreDetails?: ConfidenceLevel;
@@ -53,6 +59,8 @@ export interface AIEnrichmentResponse {
   website: string | null;
   blog: string | null;
   linkedinHandler: string | null;
+  twitterHandler: string | null;
+  telegramHandler: string | null;
   shortDescription: string | null;
   longDescription: string | null;
   moreDetails: string | null;
@@ -70,6 +78,8 @@ export interface EnrichedFundData {
     website: string | null;
     blog: string | null;
     linkedinHandler: string | null;
+    twitterHandler: string | null;
+    telegramHandler: string | null;
     shortDescription: string | null;
     longDescription: string | null;
     moreDetails: string | null;
