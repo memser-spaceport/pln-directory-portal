@@ -87,6 +87,7 @@ export class ApplySubcommand extends CommandRunner {
     console.log('='.repeat(50));
     console.log(`Teams updated: ${result.teamsUpdated}`);
     console.log(`Investor profiles updated: ${result.investorProfilesUpdated}`);
+    console.log(`Logos uploaded: ${result.logosUploaded}`);
     console.log(`Errors: ${result.errors.length}`);
 
     if (result.errors.length > 0) {

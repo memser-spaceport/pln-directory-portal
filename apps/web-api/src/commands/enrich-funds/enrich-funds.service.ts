@@ -3,6 +3,8 @@ import { PrismaClient } from '@prisma/client';
 import { generateText, LanguageModel } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import * as fs from 'fs';
+import * as path from 'path';
+import { Readable } from 'stream';
 
 import {
   AIEnrichmentResponse,
@@ -12,6 +14,7 @@ import {
   FundToEnrich,
   SkippedFund,
 } from './enrich-funds.types';
+import { FileUploadService } from '../../utils/file-upload/file-upload.service';
 
 // System prompt for fund enrichment
 const FUND_ENRICHMENT_SYSTEM_PROMPT = `
@@ -64,27 +67,13 @@ FIELDS TO POPULATE:
 
    ALWAYS populate this field based on what the company does.
 
-10. logoUrl: Direct, publicly accessible URL to the company's logo image.
-   IMPORTANT: Only return URLs that are directly accessible (no authentication required).
-
-   Best sources for logos (in order of preference):
-   - Twitter/X profile image: https://pbs.twimg.com/profile_images/... (search for company Twitter)
-   - Company website Open Graph image: Look for og:image meta tag
-   - Crunchbase or PitchBook company profile images
-   - GitHub organization avatar (if tech company)
-   - Company press kit or media page
-
-   DO NOT use:
-   - LinkedIn logos (require authentication)
-   - Made-up URLs like "/logo.png" without verification
-   - URLs that return 404 or require login
+NOTE: Logo discovery is handled separately via Logo.dev API — do NOT search for logos.
 
 SEARCH STRATEGY:
 1. Search for "[Company Name]" + website or official site
 2. Search for "[Company Name] Twitter" or "[Company Name] X" to find their Twitter/X handle
 3. Search for "[Company Name] Telegram" to find their Telegram channel/group
-4. Search for "[Company Name] Crunchbase" for company profile with logo
-5. Search for "[Company Name]" + about or team
+4. Search for "[Company Name]" + about or team
 
 CRITICAL: You MUST ALWAYS respond with valid JSON. Never leave investmentFocus empty - derive tags from what you know about the company.
 
@@ -99,7 +88,6 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
   "longDescription": "...",
   "moreDetails": "Additional context about team, history, achievements...",
   "investmentFocus": ["Tag1", "Tag2", "Tag3", ...],
-  "logoUrl": "https://..." or null,
   "confidence": {
     "website": "high" | "medium" | "low",
     "twitterHandler": "high" | "medium" | "low",
@@ -107,8 +95,7 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
     "shortDescription": "high" | "medium" | "low",
     "longDescription": "high" | "medium" | "low",
     "moreDetails": "high" | "medium" | "low",
-    "investmentFocus": "high" | "medium" | "low",
-    "logoUrl": "high" | "medium" | "low"
+    "investmentFocus": "high" | "medium" | "low"
   },
   "sources": ["url1", "url2", ...]
 }
@@ -118,9 +105,11 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
 export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
   private readonly MODEL_NAME: string;
   private prisma: PrismaClient;
+  private readonly LOGO_DEV_API_TOKEN: string;
 
-  constructor() {
+  constructor(private readonly fileUploadService: FileUploadService) {
     this.MODEL_NAME = process.env.OPENAI_FUND_ENRICHMENT_MODEL || 'gpt-4o';
+    this.LOGO_DEV_API_TOKEN = process.env.LOGO_DEV_API_TOKEN || '';
     this.prisma = new PrismaClient();
   }
 
@@ -248,9 +237,19 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
 
       const aiResponse = this.parseAIResponse(text);
 
-      // Validate logo URL exists (returns null if 404 or invalid)
-      const validatedLogoUrl = await this.validateLogoUrl(aiResponse.logoUrl);
-      aiResponse.logoUrl = validatedLogoUrl;
+      // Fetch logo from Logo.dev API if the team has no logo
+      let logoDevUrl: string | null = null;
+      let logoDomain: string | null = null;
+      if (!fund.logo) {
+        const logoResult = await this.fetchLogoFromLogoDev(fund.name);
+        if (logoResult) {
+          logoDevUrl = logoResult.logoUrl;
+          logoDomain = logoResult.domain;
+        }
+      }
+
+      // Merge Logo.dev result into AI response for unified field handling
+      aiResponse.logoUrl = logoDevUrl;
 
       const fieldsUpdated = this.getUpdatedFields(originalData, aiResponse);
 
@@ -272,7 +271,8 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
           longDescription: fieldsUpdated.includes('longDescription') ? aiResponse.longDescription : originalData.longDescription,
           moreDetails: fieldsUpdated.includes('moreDetails') ? aiResponse.moreDetails : originalData.moreDetails,
           investmentFocus: fieldsUpdated.includes('investmentFocus') ? (aiResponse.investmentFocus || []) : originalFocus,
-          logoUrl: fieldsUpdated.includes('logoUrl') ? validatedLogoUrl : originalData.logoUrl,
+          logoUrl: fieldsUpdated.includes('logoUrl') ? logoDevUrl : originalData.logoUrl,
+          logoDomain: fieldsUpdated.includes('logoUrl') ? logoDomain : null,
         },
         confidence: aiResponse.confidence,
         sources: aiResponse.sources,
@@ -297,6 +297,7 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
           moreDetails: null,
           investmentFocus: [],
           logoUrl: null,
+          logoDomain: null,
         },
         confidence: {},
         sources: [],
@@ -325,9 +326,8 @@ ${existingDescription ? `Existing Description: ${existingDescription}` : 'Descri
 
 TASK:
 1. Search for "${fund.name}" to find additional information
-2. Search for "${fund.name} Twitter" or "${fund.name} Crunchbase" to find their logo
-3. Gather information about their team, history, and achievements for moreDetails
-4. DERIVE investmentFocus tags based on:
+2. Gather information about their team, history, and achievements for moreDetails
+3. DERIVE investmentFocus tags based on:
    - What the company does (from description: "${existingDescription}")
    - Information found in search results
    - Their products, services, and target market
@@ -337,8 +337,6 @@ REQUIRED OUTPUT:
 - investmentFocus: MUST contain 3-8 tags derived from what the company does
   Example: If description mentions "Browser with LLMs & Wallets, Private by design"
   Tags should be: ["AI", "Privacy", "Web3", "Crypto", "Browser"]
-- logoUrl: MUST be a publicly accessible URL (Twitter profile image, Crunchbase, or verified website image)
-  DO NOT guess URLs - only use URLs found in search results
 
 Respond with ONLY a valid JSON object as specified in system prompt.
 
@@ -378,7 +376,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         investmentFocus: Array.isArray(parsed.investmentFocus)
           ? parsed.investmentFocus.filter((f: any) => typeof f === 'string')
           : null,
-        logoUrl: this.validateUrl(parsed.logoUrl),
+        logoUrl: null,
         confidence: parsed.confidence || {},
         sources: Array.isArray(parsed.sources) ? parsed.sources : [],
       };
@@ -448,6 +446,100 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       this.log(`Logo URL validation failed: ${url} - ${error.message}`);
       return null;
     }
+  }
+
+  /**
+   * Fetch company logo from Logo.dev API
+   */
+  private async fetchLogoFromLogoDev(companyName: string): Promise<{ logoUrl: string; domain: string } | null> {
+    if (!this.LOGO_DEV_API_TOKEN) {
+      this.log('LOGO_DEV_API_TOKEN not configured, skipping logo fetch');
+      return null;
+    }
+
+    try {
+      const url = `https://api.logo.dev/search?q=${encodeURIComponent(companyName)}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${this.LOGO_DEV_API_TOKEN}`,
+        },
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        this.log(`Logo.dev API returned ${response.status} for "${companyName}"`);
+        return null;
+      }
+
+      const results = await response.json() as Array<{ name?: string; domain?: string; logo_url?: string; logoUrl?: string }>;
+
+      if (!Array.isArray(results) || results.length === 0) {
+        this.log(`Logo.dev returned no results for "${companyName}"`);
+        return null;
+      }
+
+      const first = results[0];
+      const logoUrl = first.logo_url || first.logoUrl;
+      const domain = first.domain || '';
+
+      if (!logoUrl) {
+        this.log(`Logo.dev result has no logo URL for "${companyName}"`);
+        return null;
+      }
+
+      // Validate the logo URL actually works
+      const validated = await this.validateLogoUrl(logoUrl);
+      if (!validated) return null;
+
+      this.log(`Logo.dev found logo for "${companyName}": ${validated} (domain: ${domain})`);
+      return { logoUrl: validated, domain };
+    } catch (error) {
+      this.log(`Logo.dev API error for "${companyName}": ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Download image from URL and create an Express.Multer.File-like object
+   */
+  private async downloadImageAsMulterFile(imageUrl: string, filename: string): Promise<Express.Multer.File> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(imageUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; PLNEnrichment/1.0)',
+      },
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      throw new Error(`Failed to download image: HTTP ${response.status}`);
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    return {
+      fieldname: 'file',
+      originalname: filename,
+      encoding: '7bit',
+      mimetype: contentType,
+      size: buffer.length,
+      buffer,
+      stream: Readable.from(buffer),
+      destination: '',
+      filename,
+      path: '',
+    };
   }
 
   /**
@@ -652,6 +744,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     const errors: Array<{ uid: string; error: string }> = [];
     let teamsUpdated = 0;
     let investorProfilesUpdated = 0;
+    let logosUploaded = 0;
 
     // Generate rollback SQL before making changes
     const rollbackStatements: string[] = [];
@@ -680,6 +773,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
             shortDescription: true,
             longDescription: true,
             moreDetails: true,
+            logoUid: true,
             updatedAt: true,
             investorProfile: {
               select: {
@@ -802,6 +896,54 @@ Current Date: ${new Date().toISOString().split('T')[0]}
             investorProfilesUpdated++;
           }
         }
+
+        // Apply logo: download from Logo.dev URL, upload to S3, create Image, link to Team
+        if (fund.fieldsUpdated.includes('logoUrl') && fund.enrichedData.logoUrl) {
+          try {
+            const logoUrl = fund.enrichedData.logoUrl;
+            const ext = path.extname(new URL(logoUrl).pathname) || '.png';
+            const filename = `${fund.uid}-logo${ext}`;
+
+            this.log(`Downloading logo for ${fund.name} from ${logoUrl}`);
+            const multerFile = await this.downloadImageAsMulterFile(logoUrl, filename);
+
+            this.log(`Uploading logo for ${fund.name} to S3`);
+            const s3Url = await this.fileUploadService.storeImageFiles([multerFile]);
+
+            // Create Image record
+            const image = await this.prisma.image.create({
+              data: {
+                cid: s3Url,
+                url: s3Url,
+                filename,
+                size: multerFile.size,
+                type: multerFile.mimetype.split('/')[1] || 'png',
+                width: 0,
+                height: 0,
+                version: 'ORIGINAL',
+              },
+            });
+
+            // Link to Team
+            await this.prisma.team.update({
+              where: { uid: fund.uid },
+              data: { logoUid: image.uid },
+            });
+
+            // Add rollback SQL for logo
+            rollbackStatements.push(`-- Logo for Team: ${fund.name} (${fund.uid})`);
+            rollbackStatements.push(
+              `UPDATE "Team" SET "logoUid" = ${this.sqlValue(currentTeam.logoUid)} WHERE "uid" = '${fund.uid}';`
+            );
+            rollbackStatements.push('');
+
+            logosUploaded++;
+            this.log(`Logo uploaded for ${fund.name}: ${s3Url} (Image uid: ${image.uid})`);
+          } catch (logoError) {
+            this.logError(`Failed to upload logo for ${fund.name}: ${logoError.message}`, logoError);
+            errors.push({ uid: fund.uid, error: `Logo upload failed: ${logoError.message}` });
+          }
+        }
       } catch (error) {
         errors.push({ uid: fund.uid, error: error.message });
       }
@@ -826,6 +968,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       success: errors.length === 0,
       teamsUpdated,
       investorProfilesUpdated,
+      logosUploaded,
       rollbackFilePath: rollbackPath,
       errors,
     };
@@ -935,6 +1078,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
               moreDetails: null,
               investmentFocus: [],
               logoUrl: null,
+              logoDomain: null,
             },
             confidence: {},
             sources: [],

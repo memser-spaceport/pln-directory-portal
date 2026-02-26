@@ -36,6 +36,7 @@ export interface EnrichableFields {
   moreDetails: string | null;
   investmentFocus: string[];
   logoUrl: string | null;
+  logoDomain: string | null;
 }
 
 // Confidence levels for enriched data
@@ -126,6 +127,7 @@ export interface ApplyResult {
   success: boolean;
   teamsUpdated: number;
   investorProfilesUpdated: number;
+  logosUploaded: number;
   rollbackFilePath: string;
   errors: Array<{ uid: string; error: string }>;
 }

@@ -5,12 +5,12 @@ A CLI tool to enrich investment fund/company data using AI-powered web search.
 ## Features
 
 - **AI-Powered Enrichment**: Uses GPT-4o with web search to find missing company information
+- **Logo Discovery via Logo.dev**: Fetches company logos from the Logo.dev API, downloads them, uploads to S3, and creates Image records
 - **Dry-Run Mode**: Generate JSON for review before applying changes
 - **Markdown Reports**: Generate side-by-side old vs new comparison tables (`--format md`)
 - **Team Whitelist**: Process only specific teams by name via a whitelist JSON file
 - **Safe Apply**: Updates database and generates rollback SQL automatically
 - **Rollback Support**: Easily revert changes using generated SQL scripts
-- **Logo Validation**: Validates logo URLs exist before including them
 
 ## Usage
 
@@ -76,6 +76,16 @@ OPENAI_FUND_ENRICHMENT_MODEL=gpt-5
 ```
 
 The script uses the existing `OPENAI_API_KEY` already configured in the project.
+
+### Logo.dev API
+
+Logo discovery uses the [Logo.dev API](https://logo.dev) instead of AI web search. Add the API token to `.env`:
+
+```bash
+LOGO_DEV_API_TOKEN=sk_your_token_here
+```
+
+During **dry-run**, the Logo.dev URL is stored in the output JSON (`enrichedData.logoUrl`). During **apply**, the logo image is downloaded, uploaded to S3, an `Image` record is created in the database, and the team's `logoUid` is linked to it.
 
 ### Debug Mode
 
@@ -161,11 +171,12 @@ DEBUG_ENRICHMENT=true npm run api:enrich-funds -- dry-run --limit 1
 | `longDescription` | Detailed description (max 1000 chars) |
 | `moreDetails` | Additional context (team, history, achievements) |
 | `investmentFocus` | Array of 3-8 tags (e.g., `["AI", "Crypto", "Web3"]`) |
-| `logoUrl` | Validated logo image URL |
+| `logoUrl` | Company logo from Logo.dev API (uploaded to S3 on apply) |
+| `logoDomain` | Domain associated with the logo (from Logo.dev) |
 
 ## Notes
 
-- Logo URLs are validated via HEAD request to ensure they exist and return an image
+- Logos are fetched from the Logo.dev API (not AI-generated), validated via HEAD request, then downloaded and uploaded to S3 during apply
 - Only fields that were originally empty/null will be marked for update
 - The script only updates funds where `isFund=true` in the database
 - Existing Twitter/Telegram handles are passed to the AI as context for more accurate research
