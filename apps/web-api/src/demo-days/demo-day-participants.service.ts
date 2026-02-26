@@ -577,6 +577,7 @@ export class DemoDayParticipantsService {
                     accessLevel: 'L0',
                     accessLevelUpdatedAt: new Date(),
                     tier: -1,
+                    priority: 99,
                   },
                 });
                 summary.createdTeams++;
@@ -802,6 +803,8 @@ export class DemoDayParticipantsService {
 
     if (params.status) {
       where.status = params.status as any;
+    } else if (params.type) {
+      where.status = { not: 'PENDING' } as any;
     }
 
     if (params.type) {

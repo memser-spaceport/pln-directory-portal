@@ -95,7 +95,15 @@ export class TeamsController {
         this.teamsService.buildRecentTeamsFilter(request.query),
         this.teamsService.buildParticipationTypeFilter(request.query),
         this.teamsService.buildAskTagFilter(request.query),
-        this.teamsService.buildTierFilter(request.query['tiers'] as string),
+        // Support BOTH legacy `tiers` and new `priorities`.
+        (() => {
+          const tierWhere = this.teamsService.buildTierFilter(request.query['tiers'] as string);
+          const priorityWhere = this.teamsService.buildPriorityFilter(request.query['priorities'] as string);
+          if (Object.keys(tierWhere).length && Object.keys(priorityWhere).length) {
+            return { OR: [tierWhere, priorityWhere] };
+          }
+          return Object.keys(priorityWhere).length ? priorityWhere : tierWhere;
+        })(),
       ],
     };
     // Check for the office hours blank when OH not null is passed

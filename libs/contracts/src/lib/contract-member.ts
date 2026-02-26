@@ -242,4 +242,15 @@ export const apiMembers = contract.router({
     },
     summary: 'Get member investor setting',
   },
+  deleteMemberImage: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/members/:uid/image`,
+    body: contract.body<unknown>(),
+    responses: {
+      200: contract.response<unknown>(),
+      403: z.object({ message: z.string() }),
+      404: z.object({ message: z.string() }),
+    },
+    summary: 'Delete member profile image',
+  },
 });

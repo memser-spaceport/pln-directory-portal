@@ -996,7 +996,7 @@ const DemoDayDetailPage = () => {
                   Investors{' '}
                   {participants &&
                     activeTab === 'investors' &&
-                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
+                    `(${participants.total})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'founders' })}
@@ -1005,7 +1005,7 @@ const DemoDayDetailPage = () => {
                   Founders{' '}
                   {participants &&
                     activeTab === 'founders' &&
-                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
+                    `(${participants.total})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'support' })}
@@ -1014,7 +1014,7 @@ const DemoDayDetailPage = () => {
                   Support{' '}
                   {participants &&
                     activeTab === 'support' &&
-                    `(${participants.participants.filter((p) => p.status !== 'PENDING').length})`}
+                    `(${participants.total})`}
                 </button>
               </div>
 
@@ -1090,7 +1090,6 @@ const DemoDayDetailPage = () => {
 
                 {/* Body */}
                 {participants.participants
-                  .filter((participant) => activeTab === 'applications' || participant.status !== 'PENDING')
                   .map((participant) => (
                     <div key={participant.uid} className={s.tableRow}>
                       <div className={clsx(s.bodyCell, s.first, s.flexible)}>
@@ -1105,8 +1104,13 @@ const DemoDayDetailPage = () => {
                             />
                           )}
                           <div>
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
                               {participant.member?.name || participant.name}
+                              {activeTab === 'applications' &&
+                                participant.member?.accessLevel === 'L0' &&
+                                !!participant.member?.investorProfile && (
+                                  <span className={s.newBadge}>new</span>
+                                )}
                             </div>
                             <div className="text-sm text-gray-500">
                               {participant.member?.email || participant.email}

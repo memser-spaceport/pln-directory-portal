@@ -1430,9 +1430,11 @@ export class DemoDaysService {
       memberUid: member.uid,
       applicantName: applicationData.name ?? null,
       applicantEmail: normalizedEmail,
+      role: applicationData.role ?? null,
       teamName: resolvedTeamName,
       teamUid: createdTeamUid ?? applicationData.teamUid ?? null,
-      applicationStartDate: participant.createdAt
+      applicationStartDate: participant.createdAt,
+      isNewMember,
     });
 
     this.logger.debug(
@@ -2172,8 +2174,10 @@ export class DemoDaysService {
     memberUid: string;
     applicantName: string | null;
     applicantEmail: string;
+    role?: string | null;
     teamName?: string | null;
     teamUid?: string | null;
+    isNewMember?: boolean;
   }): Promise<void> {
     const adminLink = this.buildAdminDemoDayLink(args.demoDay.slugURL);
 
@@ -2183,19 +2187,23 @@ export class DemoDaysService {
     });
 
     this.logger.log(
-      `demoDayApplication: channel=${channelType}, host="${args.demoDay.host ?? ''}", applicationDate=${applicationDate}`
+      `demoDayApplication: channel=${channelType}, host="${
+        args.demoDay.host ?? ''
+      }", applicationDate=${applicationDate}`
     );
 
+    const userType = args.isNewMember ? 'new' : 'returning';
     try {
       await this.notificationServiceClient.sendTelegramOutboxMessage({
         channelType,
         text: [
-          '🔔 New Demo Day Application',
+          `🔔 New Demo Day Application`,
+          `User type: ${userType} (investor)`,
           `Application Date: ${applicationDate}`,
           `Host: ${args.demoDay.host ?? '-'}`,
           `Name: ${args.applicantName ?? '-'}`,
           `Email: ${args.applicantEmail ?? '-'}`,
-          `Team: ${args.teamName ?? '-'}`,
+          `Role: ${args.role ?? '-'} @ Team: ${args.teamName ?? '-'}`,
           adminLink ? `Open in Admin: ${adminLink}` : 'Open in Admin: -',
         ].join('\n'),
         meta: {
@@ -2211,9 +2219,11 @@ export class DemoDaysService {
           name: args.applicantName,
           email: args.applicantEmail,
           teamUid: args.teamUid ?? null,
+          teamRole: args.role ?? null,
           teamName: args.teamName ?? null,
           adminLink,
           channelType,
+          isNewMember: args.isNewMember ?? false,
         },
       });
     } catch (e) {

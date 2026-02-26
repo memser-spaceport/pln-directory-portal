@@ -502,8 +502,31 @@ export class TeamsService {
       'moreDetails',
       'isFund',
       'tier',
+      'priority',
     ];
     copyObj(teamData, team, directFields);
+
+    // Keep tier <-> priority in sync on write paths.
+    // Priority is the new canonical name. If both are provided and conflict, we prefer priority.
+    const hasPriority = team.priority !== undefined && team.priority !== null;
+    const hasTier = team.tier !== undefined && team.tier !== null;
+
+    if (hasPriority && !hasTier) {
+      team.tier = this.priorityToTier(team.priority);
+      this.logger.info(`[Teams] Synced tier from provided priority=${team.priority} -> tier=${team.tier}`);
+    } else if (!hasPriority && hasTier) {
+      team.priority = this.tierToPriority(team.tier);
+      this.logger.info(`[Teams] Synced priority from provided tier=${team.tier} -> priority=${team.priority}`);
+    } else if (hasPriority && hasTier) {
+      const computedTier = this.priorityToTier(team.priority);
+      if (computedTier !== team.tier) {
+        this.logger.info(
+          `[Teams] Conflicting tier/priority provided (tier=${team.tier}, priority=${team.priority}). ` +
+          `Using priority and overwriting tier -> ${computedTier}.`
+        );
+        team.tier = computedTier;
+      }
+    }
     // Handle one-to-one or one-to-many mappings
     team['fundingStage'] = buildRelationMapping('fundingStage', teamData);
     team['industryTags'] = buildMultiRelationMapping('industryTags', teamData, type);
@@ -764,8 +787,26 @@ export class TeamsService {
     this.buildRecentTeamsFilter(queryParams, filter);
     this.buildAskTagFilter(queryParams, filter);
 
-    const tierFilter = this.buildTierFilter(queryParams.tiers);
-    if (Object.keys(tierFilter).length) filter.push(tierFilter);
+    // NOTE: We support BOTH legacy `tiers` and new `priorities`.
+    // - tiers: 0..4 and -1 (NA)
+    // - priorities: 1..5 and NA
+    // During migration, DB stores both `tier` and `priority`.
+    // Query behavior:
+    // - If `priorities` is provided, we filter using `priority`.
+    // - If `tiers` is provided, we filter using `tier`.
+    // - If both are provided, we apply an OR-union (either matches).
+    const priorityWhere = this.buildPriorityFilter(queryParams.priorities);
+    const tierWhere = this.buildTierFilter(queryParams.tiers);
+
+    if (Object.keys(priorityWhere).length && Object.keys(tierWhere).length) {
+      filter.push({ OR: [priorityWhere, tierWhere] });
+      this.logger.info('[Teams] Both priorities and tiers were provided. Applying OR-union filter.');
+    } else if (Object.keys(priorityWhere).length) {
+      filter.push(priorityWhere);
+    } else if (Object.keys(tierWhere).length) {
+      filter.push(tierWhere);
+      this.logger.info('[Teams] Legacy query param `tiers` was used. Consider migrating to `priorities`.');
+    }
 
     filter.push(this.buildParticipationTypeFilter(queryParams));
     return {
@@ -928,6 +969,51 @@ export class TeamsService {
 
     if (tiers.length === 0) return {};
     return { tier: { in: tiers } };
+  }
+
+  /**
+   * Build filter for new `priorities` query param.
+   * Supported values: 1..5, NA (case-insensitive).
+   * In DB we store NA as 99.
+   */
+  buildPriorityFilter(prioritiesCsv?: string) {
+    if (!prioritiesCsv) return {};
+
+    const tokens = prioritiesCsv
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s !== '');
+
+    const priorities: number[] = [];
+    for (const t of tokens) {
+      if (t.toLowerCase() === 'na') {
+        priorities.push(99);
+        continue;
+      }
+      const n = Number(t);
+      if (!Number.isNaN(n) && n >= 1 && n <= 5) priorities.push(n);
+    }
+
+    if (priorities.length === 0) return {};
+    return { priority: { in: priorities } };
+  }
+
+  /**
+   * Tier (legacy) <-> Priority (new) mapping.
+   * tier 4 -> priority 1
+   * tier 0 -> priority 5
+   * NA -> 99
+   */
+  tierToPriority(tier: number | null | undefined): number {
+    if (tier === null || tier === undefined) return 99;
+    if (tier >= 0 && tier <= 4) return 5 - tier;
+    return 99;
+  }
+
+  priorityToTier(priority: number | null | undefined): number {
+    if (priority === null || priority === undefined) return -1;
+    if (priority >= 1 && priority <= 5) return 5 - priority;
+    return -1;
   }
 
   buildAskTagFilter(queryParams, filter?) {
@@ -1150,7 +1236,7 @@ export class TeamsService {
     ]);
 
     const canSee = await this.canSeeTiers(userEmail || undefined);
-    const tiers = canSee ? await this.getTierCounts(queryParams.where ?? {}) : undefined;
+    const priorities = canSee ? await this.getPriorityCounts(queryParams.where ?? {}) : undefined;
 
     // Sort funding stages using universal sorting logic
     const sortedFundingStages = this.sortFundingStages(fundingStages.map((stage) => stage.title));
@@ -1161,7 +1247,7 @@ export class TeamsService {
       fundingStages: sortedFundingStages,
       technologies: technologies.map((tech) => tech.title),
       askTags: this.askService.formatAskFilterResponse(askTags),
-      ...(canSee ? { tiers } : {}),
+      ...(canSee ? { priorities } : {}),
     };
   }
 
@@ -1638,12 +1724,34 @@ export class TeamsService {
       });
     }
 
+    // Support both legacy tiers and new priorities.
+    // If both are provided, we apply OR-union.
+    const tierWhereConditions: any[] = [];
+
     if (filters.tiers) {
       const tiersCsv = Array.isArray(filters.tiers) ? filters.tiers.join(',') : (filters.tiers as string);
       const tierWhere = this.buildTierFilter(tiersCsv);
       if (Object.keys(tierWhere).length) {
-        whereConditions.push(tierWhere);
+        tierWhereConditions.push(tierWhere);
+        this.logger.info('[Teams] Legacy filter `tiers` used in search endpoint.');
       }
+    }
+
+    if ((filters as any).priorities) {
+      const prioritiesCsv = Array.isArray((filters as any).priorities)
+        ? (filters as any).priorities.join(',')
+        : ((filters as any).priorities as string);
+      const priorityWhere = this.buildPriorityFilter(prioritiesCsv);
+      if (Object.keys(priorityWhere).length) {
+        tierWhereConditions.push(priorityWhere);
+      }
+    }
+
+    if (tierWhereConditions.length === 1) {
+      whereConditions.push(tierWhereConditions[0]);
+    } else if (tierWhereConditions.length > 1) {
+      whereConditions.push({ OR: tierWhereConditions });
+      this.logger.info('[Teams] Both tiers and priorities filters provided. Applying OR-union.');
     }
 
     // Investment focus filter - using substring matching
@@ -1696,7 +1804,9 @@ export class TeamsService {
     } else if (filters.sort === 'name:asc') {
       orderBy.push({ name: 'asc' }, { uid: 'asc' });
     } else {
-      orderBy.push({ tier: 'desc' }, { uid: 'asc' }); // Default to descending tier order
+      // Default ordering is by Priority (ascending): 1..5 then NA (99).
+      // We keep `uid` as a stable secondary sort for deterministic pagination.
+      orderBy.push({ priority: 'asc' }, { uid: 'asc' });
     }
 
     try {
@@ -1712,6 +1822,7 @@ export class TeamsService {
             isFund: true,
             shortDescription: true,
             tier: true,
+            priority: true,
             website: true,
             logo: {
               select: {
@@ -1755,33 +1866,33 @@ export class TeamsService {
     }
   }
 
-  async getTierCounts(where: Prisma.TeamWhereInput) {
+  async getPriorityCounts(where: Prisma.TeamWhereInput) {
     const baseWhere: Prisma.TeamWhereInput = {
       accessLevel: { not: 'L0' },
       ...where,
     };
 
     const grouped = await this.prisma.team.groupBy({
-      by: ['tier'],
+      by: ['priority'],
       where: baseWhere,
       _count: { _all: true },
     });
 
-    const counts: Record<number, number> = { [-1]: 0, 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+    const counts: Record<number, number> = { 99: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     for (const row of grouped) {
-      if (row.tier !== null) {
-        const t = (row.tier ?? 0) as number;
-        if (t <= 4) counts[t] = row._count._all;
+      if (row.priority !== null) {
+        const p = (row.priority ?? 0) as number;
+        counts[p] = row._count._all;
       }
     }
 
     return [
-      { tier: 0, count: counts[0] },
-      { tier: 1, count: counts[1] },
-      { tier: 2, count: counts[2] },
-      { tier: 3, count: counts[3] },
-      { tier: 4, count: counts[4] },
-      { tier: -1, count: counts[-1] },
+      { priority: 1, count: counts[1] },
+      { priority: 2, count: counts[2] },
+      { priority: 3, count: counts[3] },
+      { priority: 4, count: counts[4] },
+      { priority: 5, count: counts[5] },
+      { priority: 99, count: counts[99] },
     ];
   }
 
@@ -1966,6 +2077,7 @@ export class TeamsService {
         accessLevel: team.accessLevel || 'L1',
         accessLevelUpdatedAt: new Date(),
         tier: -1,
+        priority: 99,
       };
 
       const createdTeam = await tx.team.create({

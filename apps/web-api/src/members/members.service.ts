@@ -3398,6 +3398,37 @@ export class MembersService {
   }
 
   /**
+   * Removes the profile image from a member by setting imageUid to null.
+   * Does not delete the Image record or the file from storage.
+   *
+   * @param memberUid - The UID of the member
+   * @returns The updated member
+   */
+  async deleteMemberImage(memberUid: string) {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      select: { uid: true, imageUid: true },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+
+    if (!member.imageUid) {
+      return member;
+    }
+
+    const updated = await this.prisma.member.update({
+      where: { uid: memberUid },
+      data: { imageUid: null },
+    });
+
+    await this.cacheService.reset({ service: 'members' });
+
+    return updated;
+  }
+
+  /**
    * Gets a member's investor settings.
    *
    * @param memberUid - The UID of the member
