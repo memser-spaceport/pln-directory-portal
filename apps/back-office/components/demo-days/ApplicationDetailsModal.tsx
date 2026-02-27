@@ -40,7 +40,7 @@ export const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = (
         </div>
 
         {/* Body */}
-        <div className="px-6 py-4 space-y-4">
+        <div className="space-y-4 px-6 py-4">
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-500">Name</label>
@@ -90,19 +90,26 @@ export const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = (
             <p className="mt-1 text-sm text-gray-900">{organizationName || '-'}</p>
           </div>
 
-          {/* Accredited Investor */}
+          {/* Investor Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-500">Accredited Investor</label>
+            <label className="block text-sm font-medium text-gray-500">Investor Type</label>
             <p className="mt-1 text-sm">
-              {member?.investorProfile?.secRulesAccepted ? (
-                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                  Yes
-                </span>
-              ) : (
-                <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
-                  No
+              {member?.investorProfile?.type === 'ANGEL' && (
+                <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                  Angel Investor
                 </span>
               )}
+              {member?.investorProfile?.type === 'FUND' && (
+                <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">
+                  Invest thru Fund(s)
+                </span>
+              )}
+              {member?.investorProfile?.type === 'ANGEL_AND_FUND' && (
+                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                  Angel + invest thru Fund(s)
+                </span>
+              )}
+              {!member?.investorProfile?.type && <span className="text-gray-400">-</span>}
             </p>
           </div>
 
