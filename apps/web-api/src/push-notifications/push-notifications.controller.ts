@@ -38,7 +38,7 @@ export class PushNotificationsController {
       return { notifications: [], total: 0, unreadCount: 0 };
     }
 
-    return this.pushNotificationsService.getForUser(member.externalId, {
+    return this.pushNotificationsService.getForUser(member.uid, {
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
       unreadOnly: unreadOnly === 'true',
@@ -57,7 +57,7 @@ export class PushNotificationsController {
       return { unreadCount: 0 };
     }
 
-    const unreadCount = await this.pushNotificationsService.getUnreadCount(member.externalId);
+    const unreadCount = await this.pushNotificationsService.getUnreadCount(member.uid);
     return { unreadCount };
   }
 
@@ -75,7 +75,7 @@ export class PushNotificationsController {
       return { unreadLinks: [] };
     }
 
-    const unreadLinks = await this.pushNotificationsService.getUnreadLinksForUser(member.externalId);
+    const unreadLinks = await this.pushNotificationsService.getUnreadLinksForUser(member.uid);
     return { unreadLinks };
   }
 
@@ -91,7 +91,7 @@ export class PushNotificationsController {
       return { success: false };
     }
 
-    const notification = await this.pushNotificationsService.markAsRead(uid, member.externalId);
+    const notification = await this.pushNotificationsService.markAsRead(uid, member.uid);
     return { success: !!notification, notification };
   }
 
@@ -107,7 +107,7 @@ export class PushNotificationsController {
       return { success: false };
     }
 
-    return this.pushNotificationsService.markAllAsRead(member.externalId);
+    return this.pushNotificationsService.markAllAsRead(member.uid);
   }
 
   /**
@@ -122,7 +122,7 @@ export class PushNotificationsController {
       return { success: false };
     }
 
-    const notification = await this.pushNotificationsService.delete(uid, member.externalId);
+    const notification = await this.pushNotificationsService.delete(uid, member.uid);
     return { success: !!notification };
   }
 }

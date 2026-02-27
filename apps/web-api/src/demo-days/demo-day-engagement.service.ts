@@ -303,19 +303,14 @@ export class DemoDayEngagementService {
           }`,
       };
 
-      // Send push notification to each founder (only those with externalId)
+      // Send push notification to each founder
       for (const founder of founders) {
-        if (!founder.member.externalId) {
-          this.logger.warn(`Skipping push notification for founder ${founder.member.uid}: no externalId`);
-          continue;
-        }
-
         try {
           await this.pushNotificationsService.create({
             category: pushCategoryMap[interestType],
             title: pushTitleMap[interestType],
             description: pushDescriptionMap[interestType],
-            recipientUid: founder.member.externalId,
+            recipientUid: founder.member.uid,
             link: `/members/${member.uid}`,
             metadata: {
               demoDayUid: demoDay.uid,
