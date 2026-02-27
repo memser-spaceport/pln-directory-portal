@@ -6,7 +6,7 @@ interface MutationParams {
   uid: string;
   authToken: string;
   payload: {
-    imageUid: string;
+    imageUid?: string;
     name: string;
     accessLevel: string;
     email: string;

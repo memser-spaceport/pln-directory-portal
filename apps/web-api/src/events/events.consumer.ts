@@ -39,7 +39,6 @@ export class EventsConsumer {
   async processEventOperation(message: any): Promise<void> {
     try {
       this.logger.info(`Processing event operation message with id: ${message.MessageId}`, 'EventsConsumer');
-      // Parse the message body
       const payload: EventCreationPayload = JSON.parse(message.Body)?.body;
       const { type, event, location = {}, isInferred=false } = payload;
       const formattedEvent = await this.helperService.mapEventData(event);
@@ -76,7 +75,6 @@ export class EventsConsumer {
   private async handleEventUpsert(event, location): Promise<void> {
     try {
       this.logger.info(`Upserting event: ${event.externalId}`, 'EventsConsumer');
-      
       await this.prisma.$transaction(async (tx) => {
         // Step 1: Handle location (only for physical events)
         const { locationUid, associationUid } = event?.type !== PLEventType.VIRTUAL 
@@ -93,8 +91,10 @@ export class EventsConsumer {
           : PLEventLocationStatus.MANUALLY_MAPPED;
         
         // Step 2: Sync event (create or update)
+        // Explicitly exclude associations as they're handled separately
+        const { associations, ...eventData } = event;
         const eventUid = await this.helperService.syncEvent(
-          event,
+          eventData,
           locationUid ?? null,
           associationUid ?? null,
           locationStatus,
