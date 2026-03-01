@@ -23,7 +23,9 @@
     "postinstall": "patch-package",
     "start:prod": "node dist/apps/web-api/main",
     "start:prod:inspect": "node dist/apps/web-api/main",
-    "start:migrate:prod": "npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma && npm run start:prod"
+    "start:migrate:prod": "npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma && npm run start:prod",
+    "opensearch:setup": "bash scripts/opensearch-local-setup.sh",
+    "opensearch:sync": "ts-node --project apps/web-api/tsconfig.json scripts/opensearch-local-sync.ts"
   },
   "private": true,
   "prisma": {
