@@ -13,6 +13,7 @@ export interface ProcessedAssociation {
   entityType: 'MEMBER' | 'TEAM';
   entityUid: string;
   role: AssociationRoleType;
+  associationUid: string;
 }
 
 /**
@@ -23,6 +24,7 @@ export interface GuestSyncInput {
   eventUid: string;
   locationUid: string;
   role: AssociationRoleType;
+  associationUid?: string;
 }
 
 /**
@@ -77,7 +79,8 @@ export class EventGuestSyncHelper {
               memberUid: association.entityUid,
               eventUid,
               locationUid,
-              role: association.role
+              role: association.role,
+              associationUid: association.associationUid
             }, tx);
           } else if (association.entityType === 'TEAM') {
             this.logger.info(`${logContext} - Team guest sync not implemented`, this.LOG_CONTEXT);
@@ -162,7 +165,7 @@ export class EventGuestSyncHelper {
     if (existingGuest) {
       return prisma.pLEventGuest.update({
         where: { uid: existingGuest.uid },
-        data: { teamUid, ...flags },
+        data: { teamUid, associationUid: input.associationUid, ...flags },
       });
     }
     return prisma.pLEventGuest.create({
@@ -171,6 +174,7 @@ export class EventGuestSyncHelper {
         eventUid: input.eventUid,
         locationUid: input.locationUid,
         teamUid,
+        associationUid: input.associationUid,
         ...flags,
       },
     });

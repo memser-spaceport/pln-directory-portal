@@ -561,6 +561,10 @@ model PLEventGuest {
   eventUid String?
   event    PLEvent? @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
 
+  // Link to association for synced guests (cascade delete when association is removed)
+  associationUid String?
+  association    PLEventAssociation? @relation(fields: [associationUid], references: [uid], onDelete: Cascade)
+
   additionalInfo Json?
   topics         String[]
   priority       Int?
@@ -585,6 +589,7 @@ model PLEventAssociation {
   externalAssociationId String?
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
+  guests                PLEventGuest[]
 
   @@unique([externalEventId, externalAssociationId])
 }
