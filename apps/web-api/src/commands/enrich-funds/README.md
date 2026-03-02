@@ -5,7 +5,7 @@ A CLI tool to enrich investment fund/company data using AI-powered web search.
 ## Features
 
 - **AI-Powered Enrichment**: Uses GPT-4o with web search to find missing company information
-- **Logo Discovery via Logo.dev**: Fetches company logos from the Logo.dev API, downloads them, uploads to S3, and creates Image records
+- **Logo Discovery via OG Image Scraping**: Extracts `og:image` / `twitter:image` meta tags from company websites, downloads them, uploads to S3, and creates Image records. Logo.dev can be re-enabled via the `USE_LOGO_DEV` flag.
 - **Dry-Run Mode**: Generate JSON for review before applying changes
 - **Markdown Reports**: Generate side-by-side old vs new comparison tables (`--format md`)
 - **Team Whitelist**: Process only specific teams by name via a whitelist JSON file
@@ -77,19 +77,24 @@ OPENAI_FUND_ENRICHMENT_MODEL=gpt-5
 
 The script uses the existing `OPENAI_API_KEY` already configured in the project.
 
-### Logo.dev API
+### Logo Discovery (OG Image Scraping)
 
-Logo discovery uses the [Logo.dev](https://logo.dev) image endpoints instead of AI web search. Add the publishable key to `.env`:
+By default, logo discovery extracts `og:image` and `twitter:image` meta tags from the company's website using `@jcottam/html-metadata`. This approach does not require any API keys.
+
+The lookup strategy is:
+1. Fetch the company's website and parse HTML metadata
+2. Use the `og:image` meta tag if present, otherwise fall back to `twitter:image`
+3. Resolve relative URLs and validate that the URL returns a valid image
+
+During **dry-run**, the logo URL is stored in the output JSON (`enrichedData.logoUrl`). During **apply**, the logo image is downloaded, uploaded to S3, an `Image` record is created in the database, and the team's `logoUid` is linked to it.
+
+#### Re-enabling Logo.dev
+
+To switch back to Logo.dev for logo discovery, set `USE_LOGO_DEV = true` in `enrich-funds.service.ts` and add the publishable key to `.env`:
 
 ```bash
 LOGO_DEV_PUBLISHABLE_KEY=pk_your_key_here
 ```
-
-The lookup strategy is:
-1. If the company has a website/domain, fetch via `https://img.logo.dev/{domain}?token=...&retina=true`
-2. Otherwise, fall back to name search via `https://img.logo.dev/name/{companyName}?token=...&retina=true`
-
-During **dry-run**, the Logo.dev URL is stored in the output JSON (`enrichedData.logoUrl`). During **apply**, the logo image is downloaded, uploaded to S3, an `Image` record is created in the database, and the team's `logoUid` is linked to it.
 
 ### Debug Mode
 
@@ -175,12 +180,12 @@ DEBUG_ENRICHMENT=true npm run api:enrich-funds -- dry-run --limit 1
 | `longDescription` | Detailed description (max 1000 chars) |
 | `moreDetails` | Additional context (team, history, achievements) |
 | `investmentFocus` | Array of 3-8 tags (e.g., `["AI", "Crypto", "Web3"]`) |
-| `logoUrl` | Company logo from Logo.dev API (uploaded to S3 on apply) |
-| `logoDomain` | Domain associated with the logo (from Logo.dev) |
+| `logoUrl` | Company logo from OG image scraping (uploaded to S3 on apply) |
+| `logoDomain` | Domain associated with the logo |
 
 ## Notes
 
-- Logos are fetched from the Logo.dev API (not AI-generated), validated via HEAD request, then downloaded and uploaded to S3 during apply
+- Logos are extracted from `og:image` / `twitter:image` meta tags on the company website (not AI-generated), validated, then downloaded and uploaded to S3 during apply. Logo.dev can be re-enabled via the `USE_LOGO_DEV` flag in the service.
 - Only fields that were originally empty/null will be marked for update
 - The script only updates funds where `isFund=true` in the database
 - Existing Twitter/Telegram handles are passed to the AI as context for more accurate research

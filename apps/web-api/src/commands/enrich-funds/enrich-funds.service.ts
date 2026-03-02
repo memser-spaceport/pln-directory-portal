@@ -67,7 +67,7 @@ FIELDS TO POPULATE:
 
    ALWAYS populate this field based on what the company does.
 
-NOTE: Logo discovery is handled separately via Logo.dev API — do NOT search for logos.
+NOTE: Logo discovery is handled separately — do NOT search for logos.
 
 SEARCH STRATEGY:
 1. Search for "[Company Name]" + website or official site
@@ -106,6 +106,7 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
   private readonly MODEL_NAME: string;
   private prisma: PrismaClient;
   private readonly LOGO_DEV_PUBLISHABLE_KEY: string;
+  private readonly USE_LOGO_DEV = false; // Set to true to re-enable Logo.dev
 
   constructor(private readonly fileUploadService: FileUploadService) {
     this.MODEL_NAME = process.env.OPENAI_FUND_ENRICHMENT_MODEL || 'gpt-4o';
@@ -237,13 +238,18 @@ export class EnrichFundsService implements OnModuleInit, OnModuleDestroy {
 
       const aiResponse = this.parseAIResponse(text);
 
-      // Fetch logo from Logo.dev if the team has no logo
+      // Fetch logo if the team has no logo
       let logoDevUrl: string | null = null;
       let logoDomain: string | null = null;
       if (!fund.logo) {
         // Prefer domain from existing or AI-enriched website
         const website = fund.website || aiResponse.website;
-        const logoResult = await this.fetchLogoFromLogoDev(fund.name, website);
+        let logoResult: { logoUrl: string; domain: string } | null = null;
+        if (this.USE_LOGO_DEV) {
+          logoResult = await this.fetchLogoFromLogoDev(fund.name, website);
+        } else {
+          logoResult = await this.fetchLogoFromWebsite(fund.name, website);
+        }
         if (logoResult) {
           logoDevUrl = logoResult.logoUrl;
           logoDomain = logoResult.domain;
@@ -497,6 +503,143 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       return null;
     } catch (error) {
       this.log(`Logo.dev name lookup failed for "${companyName}": ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Extract a meta tag's content from HTML by property or name attribute.
+   * Handles both <meta property="og:image" content="..."> and <meta name="twitter:image" content="...">
+   */
+  private extractMetaContent(html: string, tag: string): string | null {
+    // Match property="tag" or name="tag", with content before or after
+    const pattern = new RegExp(
+      `<meta\\s+(?:[^>]*?(?:property|name)\\s*=\\s*["']${tag}["'][^>]*?content\\s*=\\s*["']([^"']+)["']|[^>]*?content\\s*=\\s*["']([^"']+)["'][^>]*?(?:property|name)\\s*=\\s*["']${tag}["'])`,
+      'i',
+    );
+    const match = html.match(pattern);
+    return match?.[1] || match?.[2] || null;
+  }
+
+  /**
+   * Extract link-based icons from HTML (favicon, apple-touch-icon, etc.).
+   * Returns candidates sorted by size (largest first), filtered to known image extensions.
+   */
+  private extractLinkIcons(html: string): string[] {
+    const candidates: Array<{ href: string; size: number }> = [];
+    // Match <link rel="..." href="..." ...> with optional sizes attribute
+    const linkPattern = /<link\s+[^>]*?rel\s*=\s*["']([^"']+)["'][^>]*?href\s*=\s*["']([^"']+)["'][^>]*?\/?>/gi;
+    // Also match when href comes before rel
+    const linkPatternAlt = /<link\s+[^>]*?href\s*=\s*["']([^"']+)["'][^>]*?rel\s*=\s*["']([^"']+)["'][^>]*?\/?>/gi;
+
+    const iconRels = ['icon', 'shortcut icon', 'apple-touch-icon', 'apple-touch-icon-precomposed'];
+
+    for (const pattern of [linkPattern, linkPatternAlt]) {
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(html)) !== null) {
+        const isAlt = pattern === linkPatternAlt;
+        const rel = (isAlt ? match[2] : match[1]).toLowerCase();
+        const href = isAlt ? match[1] : match[2];
+
+        if (!iconRels.some((r) => rel.includes(r))) continue;
+
+        // Parse sizes attribute (e.g., sizes="192x192")
+        const sizesMatch = match[0].match(/sizes\s*=\s*["'](\d+)x(\d+)["']/i);
+        const size = sizesMatch ? parseInt(sizesMatch[1], 10) : 0;
+
+        candidates.push({ href, size });
+      }
+    }
+
+    // Sort by size descending (largest first); prefer sized icons over unsized ones
+    candidates.sort((a, b) => b.size - a.size);
+
+    // Filter to known image extensions or URLs without extension (often served as images)
+    return candidates
+      .map((c) => c.href)
+      .filter((href) => {
+        const ext = href.split('?')[0].split('.').pop()?.toLowerCase() || '';
+        // Accept common image formats, or no recognizable extension (dynamic URLs)
+        return ['png', 'jpg', 'jpeg', 'svg', 'ico', 'webp', 'gif'].includes(ext) || !ext.match(/^[a-z]{2,5}$/);
+      });
+  }
+
+  /**
+   * Fetch company logo from the website HTML.
+   * Priority: og:image > twitter:image > apple-touch-icon > large favicon > icon link
+   */
+  private async fetchLogoFromWebsite(
+    companyName: string,
+    websiteUrl?: string | null
+  ): Promise<{ logoUrl: string; domain: string } | null> {
+    if (!websiteUrl) {
+      this.log(`No website URL for "${companyName}", skipping website logo fetch`);
+      return null;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(websiteUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; PLNEnrichment/1.0)',
+          Accept: 'text/html',
+        },
+        redirect: 'follow',
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        this.log(`Website returned HTTP ${response.status} for "${companyName}" at ${websiteUrl}`);
+        return null;
+      }
+
+      const html = await response.text();
+      const domain = new URL(websiteUrl).hostname.replace(/^www\./, '');
+
+      // Build candidate list in priority order
+      const candidates: string[] = [];
+
+      // 1. og:image
+      const ogImage = this.extractMetaContent(html, 'og:image');
+      if (ogImage) candidates.push(ogImage);
+
+      // 2. twitter:image
+      const twitterImage = this.extractMetaContent(html, 'twitter:image');
+      if (twitterImage) candidates.push(twitterImage);
+
+      // 3. Link-based icons (apple-touch-icon, favicon, etc.) sorted by size
+      const linkIcons = this.extractLinkIcons(html);
+      candidates.push(...linkIcons);
+
+      if (candidates.length === 0) {
+        this.log(`No logo candidates found for "${companyName}" at ${websiteUrl}`);
+        return null;
+      }
+
+      // Try each candidate until one validates
+      for (const candidate of candidates) {
+        let resolvedUrl: string;
+        try {
+          resolvedUrl = new URL(candidate, websiteUrl).href;
+        } catch {
+          continue;
+        }
+
+        const validated = await this.validateLogoUrl(resolvedUrl);
+        if (validated) {
+          this.log(`Logo found for "${companyName}" via ${websiteUrl}: ${validated}`);
+          return { logoUrl: validated, domain };
+        }
+      }
+
+      this.log(`All ${candidates.length} logo candidates failed validation for "${companyName}"`);
+      return null;
+    } catch (error) {
+      this.log(`Website logo fetch failed for "${companyName}" at ${websiteUrl}: ${error.message}`);
       return null;
     }
   }
