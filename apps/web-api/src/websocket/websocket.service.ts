@@ -22,13 +22,12 @@ export class WebSocketService {
    * Send a new notification to a specific user
    */
   async notifyUser(memberUid: string, payload: NotificationPayload): Promise<void> {
-    const roomName = getRoomName(memberUid);
-
     if (!this.gateway.server) {
       this.logger.warn('WebSocket server not initialized');
       return;
     }
 
+    const roomName = getRoomName(memberUid);
     this.gateway.server.to(roomName).emit(WebSocketEvent.NOTIFICATION_NEW, payload);
     this.logger.debug(`Notification sent to user ${memberUid}: ${payload.id}`);
   }
@@ -37,13 +36,12 @@ export class WebSocketService {
    * Send notification update (read/deleted status) to a user
    */
   async notifyUpdate(memberUid: string, payload: NotificationUpdatePayload): Promise<void> {
-    const roomName = getRoomName(memberUid);
-
     if (!this.gateway.server) {
       this.logger.warn('WebSocket server not initialized');
       return;
     }
 
+    const roomName = getRoomName(memberUid);
     this.gateway.server.to(roomName).emit(WebSocketEvent.NOTIFICATION_UPDATE, payload);
     this.logger.debug(`Update sent to user ${memberUid}: ${payload.id} -> ${payload.status}`);
   }
@@ -52,13 +50,12 @@ export class WebSocketService {
    * Send unread count update to a user
    */
   async notifyCount(memberUid: string, payload: NotificationCountPayload): Promise<void> {
-    const roomName = getRoomName(memberUid);
-
     if (!this.gateway.server) {
       this.logger.warn('WebSocket server not initialized');
       return;
     }
 
+    const roomName = getRoomName(memberUid);
     this.gateway.server.to(roomName).emit(WebSocketEvent.NOTIFICATION_COUNT, payload);
     this.logger.debug(`Count update sent to user ${memberUid}: ${payload.unreadCount}`);
   }
@@ -107,24 +104,19 @@ export class WebSocketService {
     const members = await this.prisma.member.findMany({
       where: {
         accessLevel: { in: accessLevels },
-        externalId: { not: null },
       },
       select: {
         uid: true,
-        externalId: true,
       },
     });
 
-    // Send notification to all members with matching access levels (both connected and disconnected)
-    // Connected users will receive it immediately, others will see it when they fetch notifications
+    // Send notification to all members with matching access levels
     for (const member of members) {
-      if (member.externalId) {
-        if (options?.excludeUid && member.uid === options.excludeUid) {
-          continue;
-        }
-        const roomName = getRoomName(member.externalId);
-        this.gateway.server.to(roomName).emit(WebSocketEvent.NOTIFICATION_NEW, payload);
+      if (options?.excludeUid && member.uid === options.excludeUid) {
+        continue;
       }
+      const roomName = getRoomName(member.uid);
+      this.gateway.server.to(roomName).emit(WebSocketEvent.NOTIFICATION_NEW, payload);
     }
 
     this.logger.debug(

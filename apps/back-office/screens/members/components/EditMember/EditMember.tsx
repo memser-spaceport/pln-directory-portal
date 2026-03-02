@@ -39,20 +39,20 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
   }, []);
 
   const { mutateAsync } = useUpdateMember();
+  const { data } = useMember(uid, open);
 
   const onSubmit = useCallback(
     async (formData: TMemberForm) => {
       try {
-        let image;
+        let imageUid: string | undefined;
 
         if (formData.image) {
           const imgResponse = await saveRegistrationImage(formData.image);
-
-          image = imgResponse?.image.uid;
+          imageUid = imgResponse?.image?.uid;
         }
 
         const payload: {
-          imageUid: string;
+          imageUid?: string;
           name: string;
           accessLevel: string;
           email: string;
@@ -80,7 +80,7 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
             type: string;
           };
         } = {
-          imageUid: image || '', // Use empty string if no new image
+          ...(imageUid !== undefined && { imageUid }),
           name: formData.name,
           accessLevel: formData.accessLevel?.value || '',
           email: formData.email,
@@ -139,7 +139,6 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
     [mutateAsync, uid, authToken]
   );
 
-  const { data } = useMember(uid, open);
   const { data: formOptions } = useMemberFormOptions(open);
 
   const initialData = useMemo(() => {

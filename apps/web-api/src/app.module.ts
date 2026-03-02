@@ -75,9 +75,9 @@ import { WebSocketModule } from './websocket/websocket.module';
       max: 100, // maximum number of items in cache
       tls: process.env.REDIS_WITH_TLS
         ? {
-            rejectUnauthorized: false,
-            requestCert: true,
-          }
+          rejectUnauthorized: false,
+          requestCert: true,
+        }
         : null,
     }),
     BullModule.forRoot({
@@ -173,9 +173,18 @@ export class AppModule {
         { path: 'v1/demo-days/current/fundraising-profile/video', method: RequestMethod.PUT },
         { path: 'v1/admin/demo-days/current/teams/:teamUid/fundraising-profile/one-pager', method: RequestMethod.PUT },
         { path: 'v1/admin/demo-days/current/teams/:teamUid/fundraising-profile/video', method: RequestMethod.PUT },
+        {
+          path: 'v1/demo-days/:demoDayUidOrSlug/teams/:teamUid/fundraising-profile/one-pager',
+          method: RequestMethod.PUT,
+        },
+        { path: 'v1/demo-days/:demoDayUidOrSlug/teams/:teamUid/fundraising-profile/video', method: RequestMethod.PUT },
         { path: 'v1/demo-days/current/fundraising-profile/one-pager/preview', method: RequestMethod.POST },
         {
           path: 'v1/admin/demo-days/current/teams/:teamUid/fundraising-profile/one-pager/preview',
+          method: RequestMethod.POST,
+        },
+        {
+          path: 'v1/demo-days/:demoDayUidOrSlug/teams/:teamUid/fundraising-profile/one-pager/preview',
           method: RequestMethod.POST,
         },
         { path: 'v1/admin/teams/tiers/upload', method: RequestMethod.POST },

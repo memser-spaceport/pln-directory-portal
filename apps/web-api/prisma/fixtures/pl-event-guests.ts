@@ -87,6 +87,7 @@ const eventGuestFactory = Factory.define<Omit<PLEventGuest, 'id'>>(({ onCreate }
     isSpeaker: faker.datatype.boolean(),
     isSponsor: faker.datatype.boolean(),
     isFeatured: faker.datatype.boolean(),
+    associationUid: faker.datatype.uuid(),
   };
 });
 

@@ -264,3 +264,28 @@ export const MemberInvestorSettingResponseSchema = z.object({
 
 export class UpdateMemberInvestorSettingRequestDto extends createZodDto(UpdateMemberInvestorSettingRequestSchema) {}
 export class MemberInvestorSettingResponseDto extends createZodDto(MemberInvestorSettingResponseSchema) {}
+
+// ============================================
+// Member Search Schemas
+// ============================================
+
+export const MemberSearchQueryParams = z.object({
+  q: z.string().optional().describe('Name search query'),
+  email: z.string().email().optional().describe('Email for exact match boost'),
+  limit: z.number().default(5).describe('Max results to return'),
+});
+
+export const MemberSearchMatchSchema = z.object({
+  uid: z.string(),
+  name: z.string(),
+  email: z.string().nullable(),
+  score: z.number(),
+  image: z.string().nullable(),
+});
+
+export const ResponseMemberSearchResultSchema = z.object({
+  matches: z.array(MemberSearchMatchSchema),
+});
+
+export class MemberSearchQueryParamsDto extends createZodDto(MemberSearchQueryParams) {}
+export class ResponseMemberSearchResultDto extends createZodDto(ResponseMemberSearchResultSchema) {}

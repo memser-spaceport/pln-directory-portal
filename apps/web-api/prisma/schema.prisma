@@ -68,6 +68,7 @@ model Team {
   demoDayParticipants          DemoDayParticipant[]
   accessLevel                  String?                       @default("L1")
   accessLevelUpdatedAt         DateTime                      @default(now())
+  eventAssociations            PLEventAssociation[]
 }
 
 enum AskStatus {
@@ -178,6 +179,7 @@ model Member {
   demoDayAdminScopes               MemberDemoDayAdminScope[]
   pushNotifications                PushNotification[]                @relation("PushNotificationRecipient")
   pushNotificationReadStatuses     PushNotificationReadStatus[]      @relation("PushNotificationReadStatuses")
+  eventAssociations                PLEventAssociation[]
 }
 
 model MemberRole {
@@ -235,6 +237,19 @@ enum DiscoveryQuestionType {
 enum PLEventLocationStatus {
   AUTO_MAPPED
   MANUALLY_MAPPED
+}
+
+enum AssociationRole {
+  HOST
+  CO_HOST
+  SPEAKER
+  SPONSOR
+  ATTENDEE
+}
+
+enum AssociationEntityType {
+  MEMBER
+  TEAM
 }
 
 model ParticipantsRequest {
@@ -522,6 +537,7 @@ model PLEvent {
   aggregatedPriority            Int?
   pLEventLocationAssociationUid String?
   pLEventLocationAssociation    PLEventLocationAssociation? @relation(fields: [pLEventLocationAssociationUid], references: [uid])
+  eventAssociations             PLEventAssociation[]
 }
 
 model PLEventGuest {
@@ -545,6 +561,10 @@ model PLEventGuest {
   eventUid String?
   event    PLEvent? @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
 
+  // Link to association for synced guests (cascade delete when association is removed)
+  associationUid String?
+  association    PLEventAssociation? @relation(fields: [associationUid], references: [uid], onDelete: Cascade)
+
   additionalInfo Json?
   topics         String[]
   priority       Int?
@@ -552,6 +572,26 @@ model PLEventGuest {
   isSpeaker      Boolean  @default(false)
   isSponsor      Boolean  @default(false)
   isFeatured     Boolean  @default(false)
+}
+
+model PLEventAssociation {
+  id                    Int                   @id @default(autoincrement())
+  uid                   String                @unique @default(cuid())
+  eventUid              String
+  event                 PLEvent               @relation(fields: [eventUid], references: [uid], onDelete: Cascade)
+  entityType            AssociationEntityType
+  memberUid             String?
+  member                Member?               @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  teamUid               String?
+  team                  Team?                 @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  role                  AssociationRole
+  externalEventId       String?
+  externalAssociationId String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  guests                PLEventGuest[]
+
+  @@unique([externalEventId, externalAssociationId])
 }
 
 model FocusArea {
@@ -1242,8 +1282,8 @@ model PushNotification {
   link         String? // URL or route to navigate to
   metadata     Json?                    @default("{}")
   isPublic     Boolean                  @default(false) // If true, anyone can see; if false, only recipient
-  recipientUid String? // Optional: Member.externalId of user to notify (null = broadcast/public)
-  recipient    Member?                  @relation("PushNotificationRecipient", fields: [recipientUid], references: [externalId], onDelete: Cascade)
+  recipientUid String? // Optional: Member.uid of user to notify (null = broadcast/public)
+  recipient    Member?                  @relation("PushNotificationRecipient", fields: [recipientUid], references: [uid], onDelete: Cascade)
   accessLevels String[]                 @default([]) // Optional: list of access levels (L2, L3, L4, L5, L6) to target
   isRead       Boolean                  @default(false) // For private notifications only
   isSent       Boolean                  @default(false) // Whether sent via WebSocket
@@ -1269,7 +1309,7 @@ model PushNotificationReadStatus {
   notificationId Int
   notification   PushNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   memberUid      String
-  member         Member           @relation("PushNotificationReadStatuses", fields: [memberUid], references: [externalId], onDelete: Cascade)
+  member         Member           @relation("PushNotificationReadStatuses", fields: [memberUid], references: [uid], onDelete: Cascade)
   readAt         DateTime         @default(now())
 
   @@unique([notificationId, memberUid])

@@ -5,6 +5,7 @@ import { LogService } from './log.service';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
+  private static warned = false;
   constructor(
     private ingestionService: HuskyDataIngestionService,
     private readonly logger: LogService,
@@ -19,17 +20,24 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       if (params.model === 'Team' && params.action === 'update') {
         await this.createTeamFocusAreaVersionHistory(params);
       }
-      // Emit CUD events to Queue for selected entities
+
+      // DB event tracking
       try {
         if (process.env.ENABLE_DB_EVENT_TRACKING?.toLowerCase() === 'true') {
           await this.emitCUDEvents(params, result);
-        } else {
+        } else if (!PrismaService.warned) {
+          PrismaService.warned = true;
           this.logger.info('Skipping database event tracking. Set ENABLE_DB_EVENT_TRACKING=true to enable.');
         }
       } catch (error) {
         // swallow to not block db operation
-        this.logger.error('Error occurred in emitting CUD events to Queue', (error as any)?.stack, PrismaService.name);
+        this.logger.error(
+          'Error occurred in emitting CUD events to Queue',
+          (error as any)?.stack,
+          PrismaService.name,
+        );
       }
+
       return result;
     });
   }
@@ -177,24 +185,24 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   /**
    * Emits Create, Update, Delete (CUD) events to DynamoDB ingestion table
    * Tracks changes for specified entities and writes them to the ingestion table
-   * 
+   *
    * @param params - Prisma middleware parameters containing model and action information
    * @param result - The result of the database operation containing the uid
    * @private
    */
   private async emitCUDEvents(params, result) {
-    const models = process.env.TRACKED_DB_ENTITIES 
+    const models = process.env.TRACKED_DB_ENTITIES
       ? process.env.TRACKED_DB_ENTITIES.split(',').map(model => model.trim())
       : ['Member', 'Team', 'PLEvent', 'Project'];
     const actions = ['create', 'update', 'delete'];
     const { action, model } = params;
     const { uid } = result;
-    
+
     // Validate that we have all required data and that the entity is tracked
     if (!(model && models.includes(model) && action && actions.includes(action) && uid)) {
       return;
     }
-    
+
     // Write to DynamoDB ingestion table
     await this.ingestionService.ingestRecord({
       entity: model,

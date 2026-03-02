@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma.service';
 import { PushNotificationsService } from '../../push-notifications/push-notifications.service';
+import { WebSocketService } from '../../websocket/websocket.service';
 import { IrlGatheringPushRuleKind, PushNotificationCategory } from '@prisma/client';
 import { IrlGatheringPushConfigService } from './irl-gathering-push-config.service';
 import { IrlGatheringPushCandidatesService } from './irl-gathering-push-candidates.service';
@@ -105,6 +106,7 @@ export class IrlGatheringPushNotificationsProcessor {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pushNotificationsService: PushNotificationsService,
+    private readonly webSocketService: WebSocketService,
     private readonly configService: IrlGatheringPushConfigService,
     private readonly candidatesService: IrlGatheringPushCandidatesService,
     private readonly pleventGuestsService: PLEventGuestsService
@@ -839,7 +841,7 @@ export class IrlGatheringPushNotificationsProcessor {
         await this.prisma.pushNotificationReadStatus.deleteMany({ where: { notificationId: alreadySent.id } });
       }
 
-      await this.prisma.pushNotification.update({
+      const updatedNotification = await this.prisma.pushNotification.update({
         where: { uid: alreadySent.uid },
         data: {
           title,
@@ -856,6 +858,20 @@ export class IrlGatheringPushNotificationsProcessor {
             : {}),
         },
       });
+
+      // Notify connected clients when admin bumps the notification
+      if (bumpForAdmin) {
+        await this.webSocketService.broadcast({
+          id: alreadySent.uid,
+          category: PushNotificationCategory.IRL_GATHERING,
+          title,
+          description,
+          link,
+          metadata: payload,
+          isPublic: true,
+          createdAt: updatedNotification.createdAt.toISOString(),
+        });
+      }
     } else {
       action = 'created';
       const created = await this.pushNotificationsService.create({
