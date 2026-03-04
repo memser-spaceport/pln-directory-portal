@@ -233,6 +233,7 @@ export class AdminDemoDaysController {
         type: body.type?.toUpperCase() as 'INVESTOR' | 'FOUNDER',
         hasEarlyAccess: body.hasEarlyAccess,
         isDemoDayAdmin: body.isDemoDayAdmin,
+        isDemoDayReadOnlyAdmin: body.isDemoDayReadOnlyAdmin,
       },
       req.userEmail
     );
