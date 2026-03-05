@@ -11,7 +11,7 @@ import { AddParticipantModal } from '../../components/demo-days/AddParticipantMo
 import { UploadParticipantsModal } from '../../components/demo-days/UploadParticipantsModal';
 import { ApproveParticipantModal } from '../../components/demo-days/ApproveParticipantModal';
 import { ApplicationDetailsModal } from '../../components/demo-days/ApplicationDetailsModal';
-import { DemoDayParticipant, UpdateDemoDayDto } from '../../screens/demo-days/types/demo-day';
+import { DemoDayParticipant, UpdateDemoDayDto, UpdateParticipantDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL, API_ROUTE } from '../../utils/constants';
 import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
 import { RichText } from '../../components/common/rich-text';
@@ -454,6 +454,30 @@ const DemoDayDetailPage = () => {
     } catch (error) {
       console.error('Error updating early access:', error);
       toast.error('Failed to update early access. Please try again.');
+    }
+  };
+
+  const handleUpdateParticipantAdminAccess = async (
+    participantUid: string,
+    value: 'no' | 'full' | 'view-only'
+  ) => {
+    if (!authToken || !demoDay) return;
+    try {
+      const data: UpdateParticipantDto =
+        value === 'full'
+          ? { isDemoDayAdmin: true, isDemoDayReadOnlyAdmin: false }
+          : value === 'view-only'
+          ? { isDemoDayAdmin: false, isDemoDayReadOnlyAdmin: true }
+          : { isDemoDayAdmin: false, isDemoDayReadOnlyAdmin: false };
+      await updateParticipantMutation.mutateAsync({
+        authToken,
+        demoDayUid: demoDay.uid,
+        participantUid,
+        data,
+      });
+    } catch (error) {
+      console.error('Error updating admin access:', error);
+      toast.error('Failed to update admin access. Please try again.');
     }
   };
 
@@ -1086,6 +1110,11 @@ const DemoDayDetailPage = () => {
                   >
                     {activeTab === 'applications' ? 'Action' : 'Status'}
                   </div>
+                  {activeTab !== 'applications' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                      Admin Access
+                    </div>
+                  )}
                 </div>
 
                 {/* Body */}
@@ -1424,6 +1453,37 @@ const DemoDayDetailPage = () => {
                           </select>
                         )}
                       </div>
+                      {activeTab !== 'applications' && (
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                          <select
+                            value={
+                              participant.isDemoDayAdmin
+                                ? 'full'
+                                : participant.isDemoDayReadOnlyAdmin
+                                ? 'view-only'
+                                : 'no'
+                            }
+                            onChange={(e) =>
+                              handleUpdateParticipantAdminAccess(
+                                participant.uid,
+                                e.target.value as 'no' | 'full' | 'view-only'
+                              )
+                            }
+                            disabled={updateParticipantMutation.isPending}
+                            className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                              participant.isDemoDayAdmin
+                                ? 'bg-green-100 text-green-800'
+                                : participant.isDemoDayReadOnlyAdmin
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-600'
+                            } disabled:opacity-50`}
+                          >
+                            <option value="no">No</option>
+                            <option value="full">Full Access</option>
+                            <option value="view-only">View Only</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
                   ))}
               </div>
