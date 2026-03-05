@@ -101,6 +101,7 @@ export class DemoDaysService {
     teamsCount?: number;
     investorsCount?: number;
     isDemoDayAdmin?: boolean;
+    isDemoDayReadOnlyAdmin?: boolean;
     isEarlyAccess?: boolean;
     isPending?: boolean;
     confidentialityAccepted?: boolean;
@@ -212,6 +213,7 @@ export class DemoDaysService {
         ),
         isEarlyAccess: demoDay.status === DemoDayStatus.EARLY_ACCESS,
         isDemoDayAdmin: participant.isDemoDayAdmin || hasMemberLevelAdminAccess,
+        isDemoDayReadOnlyAdmin: participant.isDemoDayReadOnlyAdmin || false,
         confidentialityAccepted: participant.confidentialityAccepted,
         teamsCount,
         investorsCount,
@@ -454,6 +456,7 @@ export class DemoDaysService {
           // Determine access for this demo day
           let access: 'none' | 'INVESTOR' | 'FOUNDER' | 'SUPPORT' = 'none';
           let isDemoDayAdmin = false;
+          let isDemoDayReadOnlyAdmin = false;
           let isEarlyAccess = false;
           let isPending = false;
           let confidentialityAccepted = false;
@@ -466,6 +469,7 @@ export class DemoDaysService {
             if (participant && participant.status === 'ENABLED') {
               access = participant.type;
               isDemoDayAdmin = participant.isDemoDayAdmin || hasMemberLevelAdminAccess;
+              isDemoDayReadOnlyAdmin = participant.isDemoDayReadOnlyAdmin || false;
               isEarlyAccess = demoDay.status === DemoDayStatus.EARLY_ACCESS;
               confidentialityAccepted = participant.confidentialityAccepted;
             }
@@ -503,6 +507,7 @@ export class DemoDaysService {
               ...baseResponse,
               uid: demoDay.uid,
               isDemoDayAdmin,
+              isDemoDayReadOnlyAdmin,
               isEarlyAccess,
               isPending,
             };
@@ -1459,7 +1464,7 @@ export class DemoDaysService {
   async checkDemoDayAccess(
     memberEmail: string,
     demoDayUid: string
-  ): Promise<{ participantUid: string; isAdmin: boolean }> {
+  ): Promise<{ participantUid: string; isAdmin: boolean; isViewOnlyAdmin: boolean }> {
     const member = await this.membersService.findMemberByEmail(memberEmail);
 
     if (!member) {
@@ -1481,7 +1486,7 @@ export class DemoDaysService {
     // 1) Directory admins always have full access
     const isDirectoryAdmin = this.membersService.checkIfAdminUser(member);
     if (isDirectoryAdmin) {
-      return { participantUid: member.uid, isAdmin: true };
+      return { participantUid: member.uid, isAdmin: true, isViewOnlyAdmin: false };
     }
 
     // 2) Demo day admin with host-level scope (generic demoDayAdminScopes table)
@@ -1504,14 +1509,20 @@ export class DemoDaysService {
       const canManageByHost = allowedHosts.includes(demoDayHost);
 
       if (canManageByHost) {
-        return { participantUid: member.uid, isAdmin: true };
+        return { participantUid: member.uid, isAdmin: true, isViewOnlyAdmin: false };
       }
     }
 
     // 3) Participant-level demo day admin (existing behavior based on DemoDayParticipant)
-    const hasViewOnlyAdminAccess = await this.isDemoDayAdmin(member.uid, demoDayUid);
-    if (hasViewOnlyAdminAccess) {
-      return { participantUid: member.uid, isAdmin: true };
+    const hasParticipantAdminAccess = await this.isDemoDayAdmin(member.uid, demoDayUid);
+    if (hasParticipantAdminAccess) {
+      return { participantUid: member.uid, isAdmin: true, isViewOnlyAdmin: false };
+    }
+
+    // 3.5) Participant-level read-only admin
+    const hasReadOnlyAdminAccess = await this.isDemoDayReadOnlyAdmin(member.uid, demoDayUid);
+    if (hasReadOnlyAdminAccess) {
+      return { participantUid: member.uid, isAdmin: false, isViewOnlyAdmin: true };
     }
 
     // 4) Regular participant access
@@ -1531,7 +1542,7 @@ export class DemoDaysService {
     });
 
     if (participantAccess && participantAccess.demoDayParticipants.length > 0) {
-      return { participantUid: member.uid, isAdmin: false };
+      return { participantUid: member.uid, isAdmin: false, isViewOnlyAdmin: false };
     }
 
     // 5) No access
@@ -1731,6 +1742,7 @@ export class DemoDaysService {
             status: true,
             type: true,
             isDemoDayAdmin: true,
+            isDemoDayReadOnlyAdmin: true,
             hasEarlyAccess: true,
             confidentialityAccepted: true,
           },
@@ -1795,6 +1807,25 @@ export class DemoDaysService {
     });
 
     return participant?.isDemoDayAdmin || false;
+  }
+
+  /**
+   * Check if a member has read-only admin access to a demo day
+   * @param memberUid - UID of the member
+   * @param demoDayUid - UID of the demo day
+   * @returns True if the member has read-only admin access
+   */
+  private async isDemoDayReadOnlyAdmin(memberUid: string, demoDayUid: string): Promise<boolean> {
+    const participant = await this.prisma.demoDayParticipant.findFirst({
+      where: {
+        demoDayUid: demoDayUid,
+        memberUid: memberUid,
+        status: 'ENABLED',
+        isDeleted: false,
+      },
+    });
+
+    return participant?.isDemoDayReadOnlyAdmin || false;
   }
 
   /**
