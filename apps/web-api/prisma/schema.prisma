@@ -1129,6 +1129,7 @@ model DemoDayParticipant {
   type                    DemoDayParticipantType
   status                  DemoDayParticipantStatus @default(INVITED)
   isDemoDayAdmin          Boolean                  @default(false)
+  isDemoDayReadOnlyAdmin  Boolean                  @default(false)
   hasEarlyAccess          Boolean                  @default(false)
   confidentialityAccepted Boolean                  @default(false)
   teamUid                 String?

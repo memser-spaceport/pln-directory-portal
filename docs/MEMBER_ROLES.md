@@ -8,7 +8,7 @@ The system uses a multi-tier role architecture:
 
 1. **Member-level roles** (`MemberRole` table) - Global permissions across the system
 2. **Demo Day admin scopes** (`MemberDemoDayAdminScope` table) - Host-based permissions for demo day admins
-3. **Context-specific flags** (`DemoDayParticipant.isDemoDayAdmin`) - Per-resource permissions
+3. **Context-specific flags** (`DemoDayParticipant.isDemoDayAdmin`, `isDemoDayReadOnlyAdmin`) - Per-resource permissions
 
 ## Member Roles Enum
 
@@ -30,6 +30,7 @@ export enum MemberRole {
 | `DIRECTORY_ADMIN` | Global | Full system access - can manage everything including all demo days |
 | `DEMO_DAY_ADMIN` | Host-scoped | Admin access to demo days matching their `MemberDemoDayAdminScope.scopeValue` |
 | `isDemoDayAdmin` flag | Per Demo Day | Admin access to a SPECIFIC demo day only |
+| `isDemoDayReadOnlyAdmin` flag | Per Demo Day | **Read-only** admin access to a SPECIFIC demo day only |
 
 ## Role Descriptions
 
@@ -62,6 +63,16 @@ export enum MemberRole {
 - **Permissions**:
   - Admin access to the specific demo day they are assigned to
   - Cannot access back-office directly (unless they also have a MemberRole)
+
+### isDemoDayReadOnlyAdmin (Participant Flag)
+
+- **Location**: `DemoDayParticipant.isDemoDayReadOnlyAdmin` field
+- **Scope**: Single demo day
+- **Permissions**:
+  - Read-only admin access to the specific demo day (can view all teams, analytics)
+  - Cannot modify team data, upload files, or make changes
+  - Cannot access back-office directly (unless they also have a MemberRole)
+- **Mutually exclusive** with `isDemoDayAdmin` — setting one clears the other
 
 ## Demo Day Admin Scopes
 
@@ -113,6 +124,7 @@ Access is checked in the following order:
 1. **Directory Admin**: Full access to all demo days
 2. **Demo Day Admin with Host Scope**: Access if `MemberDemoDayAdminScope.scopeValue` matches `DemoDay.host`
 3. **Participant-level Admin**: Access if `DemoDayParticipant.isDemoDayAdmin` is true
+3.5. **Participant-level Read-Only Admin**: Read-only access if `DemoDayParticipant.isDemoDayReadOnlyAdmin` is true
 4. **Regular Participant**: Read-only access if they are an enabled participant
 
 ```typescript
@@ -137,7 +149,12 @@ if (hasDemoDayAdminRole) {
 
 // 3) Participant-level demo day admin
 if (participant?.isDemoDayAdmin) {
-  return { participantUid: member.uid, isAdmin: true };
+  return { participantUid: member.uid, isAdmin: true, isViewOnlyAdmin: false };
+}
+
+// 3.5) Participant-level read-only admin
+if (participant?.isDemoDayReadOnlyAdmin) {
+  return { participantUid: member.uid, isAdmin: false, isViewOnlyAdmin: true };
 }
 
 // 4) Regular participant access
@@ -197,6 +214,7 @@ model Member {
 model DemoDayParticipant {
   // ...
   isDemoDayAdmin Boolean @default(false)  // Per-demo-day admin flag
+  isDemoDayReadOnlyAdmin Boolean @default(false)  // Per-demo-day read-only admin flag (mutually exclusive with isDemoDayAdmin)
   // ...
 }
 ```
@@ -290,6 +308,26 @@ await prisma.demoDayParticipant.upsert({
   },
   update: {
     isDemoDayAdmin: true,
+  },
+});
+```
+
+### Assign Read-Only Admin for a Specific Demo Day
+
+```typescript
+await prisma.demoDayParticipant.upsert({
+  where: {
+    demoDayUid_memberUid: { demoDayUid, memberUid },
+  },
+  create: {
+    demoDayUid, memberUid,
+    type: 'SUPPORT',
+    status: 'ENABLED',
+    isDemoDayReadOnlyAdmin: true,
+  },
+  update: {
+    isDemoDayReadOnlyAdmin: true,
+    isDemoDayAdmin: false, // mutually exclusive
   },
 });
 ```

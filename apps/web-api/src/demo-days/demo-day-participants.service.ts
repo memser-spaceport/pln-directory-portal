@@ -954,6 +954,7 @@ export class DemoDayParticipantsService {
       type?: 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
       hasEarlyAccess?: boolean;
       isDemoDayAdmin?: boolean;
+      isDemoDayReadOnlyAdmin?: boolean;
     },
     actorEmail?: string
   ): Promise<DemoDayParticipant> {
@@ -1088,6 +1089,16 @@ export class DemoDayParticipantsService {
 
     if (data.isDemoDayAdmin !== undefined) {
       updateData.isDemoDayAdmin = data.isDemoDayAdmin;
+      if (data.isDemoDayAdmin) {
+        updateData.isDemoDayReadOnlyAdmin = false; // mutually exclusive
+      }
+    }
+
+    if (data.isDemoDayReadOnlyAdmin !== undefined) {
+      updateData.isDemoDayReadOnlyAdmin = data.isDemoDayReadOnlyAdmin;
+      if (data.isDemoDayReadOnlyAdmin) {
+        updateData.isDemoDayAdmin = false; // mutually exclusive
+      }
     }
 
     const updated = await this.prisma.demoDayParticipant.update({
