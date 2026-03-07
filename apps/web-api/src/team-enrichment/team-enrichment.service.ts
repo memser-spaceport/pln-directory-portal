@@ -22,11 +22,19 @@ export class TeamEnrichmentService {
   ) {}
 
   async markTeamForEnrichment(teamUid: string): Promise<void> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: { dataEnrichment: true },
+    });
+
+    const existing = this.parseEnrichmentMeta(team?.dataEnrichment);
+
     const enrichment: TeamDataEnrichment = {
+      ...existing,
       shouldEnrich: true,
       status: EnrichmentStatus.PendingEnrichment,
-      isAIGenerated: false,
-      fields: {},
+      isAIGenerated: existing?.isAIGenerated ?? false,
+      fields: existing?.fields ?? {},
     };
 
     await this.prisma.team.update({
