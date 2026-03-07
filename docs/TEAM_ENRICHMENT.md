@@ -56,14 +56,20 @@ Each enrichable field is tracked in `dataEnrichment.fields`:
 3. After promoting teams to L1, marks them for enrichment
 4. Sets `dataEnrichment = { shouldEnrich: true, status: 'PendingEnrichment', ... }`
 
+## Enrichment Behavior
+
+- Skips teams without a website (marks as `FailedToEnrich`)
+- Only fills null/empty fields — never overwrites existing data
+- **Re-run safe**: on subsequent runs, only fields with status `CannotEnrich` are retried. Fields already marked `Enriched` or `ChangedByUser` are skipped. Previous field statuses are preserved and merged with new results.
+- **Concurrency guard**: if enrichment is already `InProgress` for a team, duplicate requests are rejected immediately
+- **`enrichedBy`**: set to `'system-cron'` for cron jobs, `'manually'` for admin-triggered enrichment
+
 ## Cron Job
 
 - **Schedule**: `TEAM_ENRICHMENT_CRON` env var (default: `0 3 * * *` — daily at 3 AM UTC)
 - **Guard**: `IS_TEAM_ENRICHMENT_ENABLED` must be `'true'`
 - Finds all teams with `shouldEnrich=true` and `status=PendingEnrichment`
 - Processes sequentially to avoid rate limits
-- Skips teams without a website (marks as `FailedToEnrich`)
-- Only fills null/empty fields (never overwrites existing data)
 
 ## Endpoints
 
@@ -79,7 +85,7 @@ Body: { status: 'Reviewed' | 'Approved' }
 POST /v1/admin/teams/:uid/trigger-enrichment
 Guard: AdminAuthGuard
 ```
-Marks the team for enrichment and runs it in the background.
+Runs enrichment in the background. Returns `{ success: false, message: "..." }` if already in progress.
 Does NOT require `IS_TEAM_ENRICHMENT_ENABLED` — this is a manual override.
 
 ### Trigger Enrichment for All Pending Teams
@@ -87,8 +93,8 @@ Does NOT require `IS_TEAM_ENRICHMENT_ENABLED` — this is a manual override.
 POST /v1/admin/teams/trigger-enrichment
 Guard: AdminAuthGuard
 ```
-Finds all pending teams and enriches them in the background.
-Returns `{ success, total, message }`.
+Finds all pending teams and enriches them. Teams already in progress are skipped.
+Returns `{ success, total, started, skipped, message }`.
 
 ### Team Lead Review
 ```

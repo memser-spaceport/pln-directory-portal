@@ -15,7 +15,6 @@ import {
 @Injectable()
 export class TeamEnrichmentService {
   private readonly logger = new Logger(TeamEnrichmentService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileUploadService: FileUploadService,
@@ -86,7 +85,29 @@ export class TeamEnrichmentService {
     });
   }
 
-  async enrichTeam(teamUid: string, enrichedBy = 'system-cron'): Promise<void> {
+  async enrichTeam(teamUid: string, enrichedBy = 'system-cron'): Promise<{ status: 'started' | 'in_progress' }> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: { dataEnrichment: true },
+    });
+
+    const meta = this.parseEnrichmentMeta(team?.dataEnrichment);
+    if (meta?.status === EnrichmentStatus.InProgress) {
+      this.logger.warn(`Enrichment already in progress for team ${teamUid}, skipping`);
+      return { status: 'in_progress' };
+    }
+
+    // Mark as pending before kicking off background work
+    await this.markTeamForEnrichment(teamUid);
+
+    this.doEnrichTeam(teamUid, enrichedBy).catch((err) => {
+      this.logger.error(`Background enrichment failed for team ${teamUid}: ${err.message}`, err.stack);
+    });
+
+    return { status: 'started' };
+  }
+
+  private async doEnrichTeam(teamUid: string, enrichedBy: string): Promise<void> {
     const team = await this.prisma.team.findUnique({
       where: { uid: teamUid },
       select: {
@@ -140,31 +161,36 @@ export class TeamEnrichmentService {
         longDescription: team.longDescription,
       });
 
-      // Determine which fields to update (only null/empty fields)
+      // Preserve existing field statuses from previous enrichment runs
+      const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
+      const existingFields = existingMeta?.fields || {};
+
+      // Determine which fields need enrichment (skip already Enriched ones)
       const updateData: Prisma.TeamUpdateInput = {};
-      const enrichedFields: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};
+      const newFields: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};
+      let fieldsUpdatedCount = 0;
 
       for (const field of ENRICHABLE_TEAM_FIELDS) {
+        // Skip fields already successfully enriched
+        if (existingFields[field] === FieldEnrichmentStatus.Enriched) continue;
+
         const currentValue = team[field];
         const newValue = aiResponse[field];
 
         if (!currentValue || currentValue.trim() === '') {
           if (newValue) {
             (updateData as any)[field] = newValue;
-            enrichedFields[field] = FieldEnrichmentStatus.Enriched;
+            newFields[field] = FieldEnrichmentStatus.Enriched;
+            fieldsUpdatedCount++;
           } else {
-            enrichedFields[field] = FieldEnrichmentStatus.CannotEnrich;
+            newFields[field] = FieldEnrichmentStatus.CannotEnrich;
           }
         }
       }
 
-      // Handle industryTags (many-to-many) — only if team has none
-      this.logger.debug(
-        `Team ${teamUid}: current industryTags count = ${
-          team.industryTags.length
-        }, AI returned = [${aiResponse.industryTags.join(', ')}]`
-      );
-      if (team.industryTags.length === 0) {
+      // Handle industryTags — skip if already enriched
+      if (existingFields.industryTags !== FieldEnrichmentStatus.Enriched && team.industryTags.length === 0) {
+        this.logger.debug(`Team ${teamUid}: AI returned industryTags = [${aiResponse.industryTags.join(', ')}]`);
         if (aiResponse.industryTags.length > 0) {
           const matchedTags = await this.prisma.industryTag.findMany({
             where: { title: { in: aiResponse.industryTags, mode: 'insensitive' } },
@@ -177,27 +203,20 @@ export class TeamEnrichmentService {
           );
           if (matchedTags.length > 0) {
             updateData.industryTags = { connect: matchedTags.map((t) => ({ uid: t.uid })) };
-            enrichedFields.industryTags = FieldEnrichmentStatus.Enriched;
+            newFields.industryTags = FieldEnrichmentStatus.Enriched;
+            fieldsUpdatedCount++;
           } else {
-            enrichedFields.industryTags = FieldEnrichmentStatus.CannotEnrich;
+            newFields.industryTags = FieldEnrichmentStatus.CannotEnrich;
           }
         } else {
-          enrichedFields.industryTags = FieldEnrichmentStatus.CannotEnrich;
+          newFields.industryTags = FieldEnrichmentStatus.CannotEnrich;
         }
-      } else {
-        this.logger.log(
-          `Team ${teamUid}: skipping industryTags enrichment — team already has ${team.industryTags.length} tags`
-        );
       }
 
-      // Handle investmentFocus (String[] on InvestorProfile) — only if empty
+      // Handle investmentFocus — skip if already enriched
       const currentFocus = team.investorProfile?.investmentFocus || [];
-      this.logger.debug(
-        `Team ${teamUid}: current investmentFocus count = ${
-          currentFocus.length
-        }, AI returned = [${aiResponse.investmentFocus.join(', ')}]`
-      );
-      if (currentFocus.length === 0) {
+      if (existingFields.investmentFocus !== FieldEnrichmentStatus.Enriched && currentFocus.length === 0) {
+        this.logger.debug(`Team ${teamUid}: AI returned investmentFocus = [${aiResponse.investmentFocus.join(', ')}]`);
         if (aiResponse.investmentFocus.length > 0) {
           if (team.investorProfile) {
             await this.prisma.investorProfile.update({
@@ -212,9 +231,10 @@ export class TeamEnrichmentService {
               },
             });
           }
-          enrichedFields.investmentFocus = FieldEnrichmentStatus.Enriched;
+          newFields.investmentFocus = FieldEnrichmentStatus.Enriched;
+          fieldsUpdatedCount++;
         } else {
-          enrichedFields.investmentFocus = FieldEnrichmentStatus.CannotEnrich;
+          newFields.investmentFocus = FieldEnrichmentStatus.CannotEnrich;
         }
       }
 
@@ -258,16 +278,20 @@ export class TeamEnrichmentService {
         this.logger.log(`Team ${teamUid} (${team.name}) already has a logo, skipping logo fetch`);
       }
 
-      const hasUpdates = Object.keys(enrichedFields).length > 0 || updateData.logo;
+      // Merge new field statuses with existing ones (preserve previous Enriched/ChangedByUser)
+      const mergedFields: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {
+        ...existingFields,
+        ...newFields,
+      };
 
       // Build enrichment metadata
       const enrichment: TeamDataEnrichment = {
         shouldEnrich: false,
-        status: hasUpdates ? EnrichmentStatus.Enriched : EnrichmentStatus.Enriched,
-        isAIGenerated: Object.keys(enrichedFields).length > 0,
+        status: EnrichmentStatus.Enriched,
+        isAIGenerated: Object.values(mergedFields).some((s) => s === FieldEnrichmentStatus.Enriched),
         enrichedAt: new Date().toISOString(),
         enrichedBy,
-        fields: enrichedFields,
+        fields: mergedFields,
       };
 
       // Update team with enriched data + metadata
@@ -279,7 +303,7 @@ export class TeamEnrichmentService {
         },
       });
 
-      this.logger.log(`Enriched team ${teamUid} (${team.name}): ${Object.keys(enrichedFields).length} fields updated`);
+      this.logger.log(`Enriched team ${teamUid} (${team.name}): ${fieldsUpdatedCount} new fields updated`);
     } catch (error) {
       this.logger.error(`Failed to enrich team ${teamUid} (${team.name}): ${error.message}`, error.stack);
       await this.updateEnrichmentStatus(teamUid, team.dataEnrichment, EnrichmentStatus.FailedToEnrich, error.message);
@@ -288,24 +312,23 @@ export class TeamEnrichmentService {
 
   async triggerEnrichmentForAllPending(
     enrichedBy = 'system-cron'
-  ): Promise<{ total: number; enriched: number; failed: number }> {
+  ): Promise<{ total: number; started: number; skipped: number }> {
     const teams = await this.findTeamsPendingEnrichment();
-    this.logger.log(`Manual trigger: found ${teams.length} teams pending enrichment`);
+    this.logger.log(`Trigger all: found ${teams.length} teams pending enrichment`);
 
-    let enriched = 0;
-    let failed = 0;
+    let started = 0;
+    let skipped = 0;
 
     for (const team of teams) {
-      try {
-        await this.enrichTeam(team.uid, enrichedBy);
-        enriched++;
-      } catch (error) {
-        this.logger.error(`Failed to enrich team ${team.uid} (${team.name}): ${error.message}`, error.stack);
-        failed++;
+      const { status } = await this.enrichTeam(team.uid, enrichedBy);
+      if (status === 'started') {
+        started++;
+      } else {
+        skipped++;
       }
     }
 
-    return { total: teams.length, enriched, failed };
+    return { total: teams.length, started, skipped };
   }
 
   async handleUserFieldChange(teamUid: string, changedFields: string[], tx?: Prisma.TransactionClient): Promise<void> {

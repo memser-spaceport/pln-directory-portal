@@ -3,7 +3,6 @@ import {
   Body,
   CacheTTL,
   Controller,
-  Logger,
   Param,
   Patch,
   Post,
@@ -27,11 +26,9 @@ import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.servic
 @Controller('v1/admin/teams')
 @UseGuards(AdminAuthGuard)
 export class AdminTeamsController {
-  private readonly logger = new Logger(AdminTeamsController.name);
-
   constructor(
     private readonly adminTeamsService: AdminTeamsService,
-    private readonly teamEnrichmentService: TeamEnrichmentService,
+    private readonly teamEnrichmentService: TeamEnrichmentService
   ) {}
 
   @Post('tiers/upload')
@@ -97,20 +94,19 @@ export class AdminTeamsController {
   @Post('/:uid/trigger-enrichment')
   @NoCache()
   async triggerEnrichment(@Param('uid') uid: string) {
-    await this.teamEnrichmentService.markTeamForEnrichment(uid);
-    this.teamEnrichmentService.enrichTeam(uid, 'manually').catch((err) => {
-      this.logger.error(`Background enrichment failed for team ${uid}: ${err.message}`, err.stack);
-    });
+    const { status } = await this.teamEnrichmentService.enrichTeam(uid, 'manually');
+
+    if (status === 'in_progress') {
+      return { success: false, message: `Enrichment already in progress for team ${uid}` };
+    }
+
     return { success: true, message: `Enrichment triggered for team ${uid}` };
   }
 
   @Post('trigger-enrichment')
   @NoCache()
   async triggerEnrichmentAll() {
-    const teams = await this.teamEnrichmentService.findTeamsPendingEnrichment();
-    this.teamEnrichmentService.triggerEnrichmentForAllPending('manually').catch((err) => {
-      this.logger.error(`Background enrichment-all failed: ${err.message}`, err.stack);
-    });
-    return { success: true, total: teams.length, message: 'Enrichment triggered in background' };
+    const result = await this.teamEnrichmentService.triggerEnrichmentForAllPending('manually');
+    return { success: true, ...result, message: 'Enrichment triggered in background' };
   }
 }
