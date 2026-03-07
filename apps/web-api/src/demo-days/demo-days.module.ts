@@ -14,6 +14,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { TeamsModule } from '../teams/teams.module';
 import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
 import { DemoDayNotificationsJob } from './demo-day-notifications.job';
+import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { DemoDayNotificationsJob } from './demo-day-notifications.job';
     forwardRef(() => TeamsModule),
     NotificationsModule,
     PushNotificationsModule,
+    TeamEnrichmentModule,
   ],
   controllers: [DemoDaysController, DemoDaySubscriptionsController],
   providers: [
