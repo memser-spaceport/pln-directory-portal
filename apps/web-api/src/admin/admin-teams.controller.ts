@@ -98,7 +98,7 @@ export class AdminTeamsController {
   @NoCache()
   async triggerEnrichment(@Param('uid') uid: string) {
     await this.teamEnrichmentService.markTeamForEnrichment(uid);
-    this.teamEnrichmentService.enrichTeam(uid).catch((err) => {
+    this.teamEnrichmentService.enrichTeam(uid, 'manually').catch((err) => {
       this.logger.error(`Background enrichment failed for team ${uid}: ${err.message}`, err.stack);
     });
     return { success: true, message: `Enrichment triggered for team ${uid}` };
@@ -108,7 +108,7 @@ export class AdminTeamsController {
   @NoCache()
   async triggerEnrichmentAll() {
     const teams = await this.teamEnrichmentService.findTeamsPendingEnrichment();
-    this.teamEnrichmentService.triggerEnrichmentForAllPending().catch((err) => {
+    this.teamEnrichmentService.triggerEnrichmentForAllPending('manually').catch((err) => {
       this.logger.error(`Background enrichment-all failed: ${err.message}`, err.stack);
     });
     return { success: true, total: teams.length, message: 'Enrichment triggered in background' };

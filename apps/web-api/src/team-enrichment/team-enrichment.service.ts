@@ -86,7 +86,7 @@ export class TeamEnrichmentService {
     });
   }
 
-  async enrichTeam(teamUid: string): Promise<void> {
+  async enrichTeam(teamUid: string, enrichedBy = 'system-cron'): Promise<void> {
     const team = await this.prisma.team.findUnique({
       where: { uid: teamUid },
       select: {
@@ -266,7 +266,7 @@ export class TeamEnrichmentService {
         status: hasUpdates ? EnrichmentStatus.Enriched : EnrichmentStatus.Enriched,
         isAIGenerated: Object.keys(enrichedFields).length > 0,
         enrichedAt: new Date().toISOString(),
-        enrichedBy: 'system-cron',
+        enrichedBy,
         fields: enrichedFields,
       };
 
@@ -286,7 +286,9 @@ export class TeamEnrichmentService {
     }
   }
 
-  async triggerEnrichmentForAllPending(): Promise<{ total: number; enriched: number; failed: number }> {
+  async triggerEnrichmentForAllPending(
+    enrichedBy = 'system-cron'
+  ): Promise<{ total: number; enriched: number; failed: number }> {
     const teams = await this.findTeamsPendingEnrichment();
     this.logger.log(`Manual trigger: found ${teams.length} teams pending enrichment`);
 
@@ -295,7 +297,7 @@ export class TeamEnrichmentService {
 
     for (const team of teams) {
       try {
-        await this.enrichTeam(team.uid);
+        await this.enrichTeam(team.uid, enrichedBy);
         enriched++;
       } catch (error) {
         this.logger.error(`Failed to enrich team ${team.uid} (${team.name}): ${error.message}`, error.stack);
