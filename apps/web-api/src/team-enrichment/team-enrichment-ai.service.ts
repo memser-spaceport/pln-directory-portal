@@ -40,6 +40,18 @@ FIELDS TO POPULATE:
    - Partnerships or integrations
    NEVER leave this empty if any additional information was found.
 
+9. industryTags: Array of 2-6 SHORT industry/sector tags (1-3 words each) describing the industry or sector the company operates in.
+   Examples: ["Blockchain", "DeFi", "AI", "Cloud Infrastructure", "Developer Tools", "Data Analytics", "Gaming", "NFT", "Privacy", "Fintech", "SaaS", "IoT", "Cybersecurity"]
+   ALWAYS populate this field based on the company's domain.
+
+10. investmentFocus: Array of 3-8 SHORT TAGS (1-2 words each) describing what the company/fund focuses on or invests in.
+   DERIVE these tags from:
+   - The company's products/services
+   - Technologies they use or build
+   - Their target market
+   Examples: ["AI", "Crypto", "Web3", "Infrastructure", "Privacy", "Browser", "Fintech", "Mobile", "Security", "Data", "Payments"]
+   ALWAYS populate this field.
+
 NOTE: Logo discovery is handled separately — do NOT search for logos.
 
 SEARCH STRATEGY:
@@ -61,6 +73,8 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
   "shortDescription": "...",
   "longDescription": "...",
   "moreDetails": "Additional context about team, history, achievements...",
+  "industryTags": ["Tag1", "Tag2", ...],
+  "investmentFocus": ["Tag1", "Tag2", "Tag3", ...],
   "confidence": {
     "blog": "high" | "medium" | "low",
     "contactMethod": "high" | "medium" | "low",
@@ -68,7 +82,9 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
     "telegramHandler": "high" | "medium" | "low",
     "shortDescription": "high" | "medium" | "low",
     "longDescription": "high" | "medium" | "low",
-    "moreDetails": "high" | "medium" | "low"
+    "moreDetails": "high" | "medium" | "low",
+    "industryTags": "high" | "medium" | "low",
+    "investmentFocus": "high" | "medium" | "low"
   },
   "sources": ["url1", "url2", ...]
 }
@@ -181,6 +197,12 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         shortDescription: this.truncateString(parsed.shortDescription, 200),
         longDescription: this.truncateString(parsed.longDescription, 1000),
         moreDetails: parsed.moreDetails || null,
+        industryTags: Array.isArray(parsed.industryTags)
+          ? parsed.industryTags.filter((t: any) => typeof t === 'string')
+          : [],
+        investmentFocus: Array.isArray(parsed.investmentFocus)
+          ? parsed.investmentFocus.filter((t: any) => typeof t === 'string')
+          : [],
         confidence: parsed.confidence || {},
         sources: Array.isArray(parsed.sources) ? parsed.sources : [],
       };
@@ -200,6 +222,8 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       shortDescription: null,
       longDescription: null,
       moreDetails: null,
+      industryTags: [],
+      investmentFocus: [],
       confidence: {},
       sources: [],
     };
@@ -237,41 +261,59 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       const html = await response.text();
       const domain = new URL(websiteUrl).hostname.replace(/^www\./, '');
 
+      this.logger.log(`Fetched HTML for "${companyName}" (${websiteUrl}): ${html.length} chars`);
+
       const candidates: string[] = [];
 
       const ogImage = this.extractMetaContent(html, 'og:image');
-      if (ogImage) candidates.push(ogImage);
+      if (ogImage) {
+        this.logger.log(`Found og:image for "${companyName}": ${ogImage}`);
+        candidates.push(ogImage);
+      } else {
+        this.logger.log(`No og:image meta tag found for "${companyName}"`);
+      }
 
       const twitterImage = this.extractMetaContent(html, 'twitter:image');
-      if (twitterImage) candidates.push(twitterImage);
+      if (twitterImage) {
+        this.logger.log(`Found twitter:image for "${companyName}": ${twitterImage}`);
+        candidates.push(twitterImage);
+      }
 
       const linkIcons = this.extractLinkIcons(html);
+      if (linkIcons.length > 0) {
+        this.logger.log(`Found ${linkIcons.length} link icon(s) for "${companyName}": ${linkIcons.join(', ')}`);
+      }
       candidates.push(...linkIcons);
 
       if (candidates.length === 0) {
-        this.logger.debug(`No logo candidates found for "${companyName}" at ${websiteUrl}`);
+        this.logger.warn(`No logo candidates found for "${companyName}" at ${websiteUrl}`);
         return null;
       }
+
+      this.logger.log(`Total ${candidates.length} logo candidate(s) for "${companyName}", validating...`);
 
       for (const candidate of candidates) {
         let resolvedUrl: string;
         try {
           resolvedUrl = new URL(candidate, websiteUrl).href;
         } catch {
+          this.logger.warn(`Invalid logo URL candidate for "${companyName}": ${candidate}`);
           continue;
         }
 
         const validated = await this.validateLogoUrl(resolvedUrl);
         if (validated) {
-          this.logger.log(`Logo found for "${companyName}" via ${websiteUrl}: ${validated}`);
+          this.logger.log(`Logo validated for "${companyName}" via ${websiteUrl}: ${validated}`);
           return { logoUrl: validated, domain };
+        } else {
+          this.logger.warn(`Logo candidate failed validation for "${companyName}": ${resolvedUrl}`);
         }
       }
 
-      this.logger.debug(`All ${candidates.length} logo candidates failed validation for "${companyName}"`);
+      this.logger.warn(`All ${candidates.length} logo candidates failed validation for "${companyName}"`);
       return null;
     } catch (error) {
-      this.logger.debug(`Website logo fetch failed for "${companyName}" at ${websiteUrl}: ${error.message}`);
+      this.logger.warn(`Website logo fetch failed for "${companyName}" at ${websiteUrl}: ${error.message}`);
       return null;
     }
   }

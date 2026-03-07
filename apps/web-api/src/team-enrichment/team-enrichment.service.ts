@@ -5,6 +5,7 @@ import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import {
   ENRICHABLE_TEAM_FIELDS,
+  EnrichableField,
   EnrichableTeamField,
   EnrichmentStatus,
   FieldEnrichmentStatus,
@@ -102,6 +103,8 @@ export class TeamEnrichmentService {
         moreDetails: true,
         logoUid: true,
         dataEnrichment: true,
+        industryTags: { select: { uid: true, title: true } },
+        investorProfile: { select: { uid: true, investmentFocus: true } },
       },
     });
 
@@ -139,24 +142,70 @@ export class TeamEnrichmentService {
 
       // Determine which fields to update (only null/empty fields)
       const updateData: Prisma.TeamUpdateInput = {};
-      const enrichedFields: Partial<Record<EnrichableTeamField, FieldEnrichmentStatus>> = {};
+      const enrichedFields: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};
 
       for (const field of ENRICHABLE_TEAM_FIELDS) {
         const currentValue = team[field];
         const newValue = aiResponse[field];
 
-        if ((!currentValue || currentValue.trim() === '') && newValue) {
-          (updateData as any)[field] = newValue;
-          enrichedFields[field] = FieldEnrichmentStatus.Enriched;
+        if (!currentValue || currentValue.trim() === '') {
+          if (newValue) {
+            (updateData as any)[field] = newValue;
+            enrichedFields[field] = FieldEnrichmentStatus.Enriched;
+          } else {
+            enrichedFields[field] = FieldEnrichmentStatus.CannotEnrich;
+          }
+        }
+      }
+
+      // Handle industryTags (many-to-many) — only if team has none
+      if (team.industryTags.length === 0) {
+        if (aiResponse.industryTags.length > 0) {
+          const matchedTags = await this.prisma.industryTag.findMany({
+            where: { title: { in: aiResponse.industryTags, mode: 'insensitive' } },
+            select: { uid: true },
+          });
+          if (matchedTags.length > 0) {
+            updateData.industryTags = { connect: matchedTags.map((t) => ({ uid: t.uid })) };
+            enrichedFields.industryTags = FieldEnrichmentStatus.Enriched;
+          } else {
+            enrichedFields.industryTags = FieldEnrichmentStatus.CannotEnrich;
+          }
+        } else {
+          enrichedFields.industryTags = FieldEnrichmentStatus.CannotEnrich;
+        }
+      }
+
+      // Handle investmentFocus (String[] on InvestorProfile) — only if empty
+      const currentFocus = team.investorProfile?.investmentFocus || [];
+      if (currentFocus.length === 0) {
+        if (aiResponse.investmentFocus.length > 0) {
+          if (team.investorProfile) {
+            await this.prisma.investorProfile.update({
+              where: { uid: team.investorProfile.uid },
+              data: { investmentFocus: aiResponse.investmentFocus },
+            });
+          } else {
+            await this.prisma.investorProfile.create({
+              data: {
+                investmentFocus: aiResponse.investmentFocus,
+                team: { connect: { uid: teamUid } },
+              },
+            });
+          }
+          enrichedFields.investmentFocus = FieldEnrichmentStatus.Enriched;
+        } else {
+          enrichedFields.investmentFocus = FieldEnrichmentStatus.CannotEnrich;
         }
       }
 
       // Handle logo via OG tag scraping
       if (!team.logoUid) {
-        const effectiveWebsite = team.website;
-        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite);
+        this.logger.log(`Attempting logo fetch for team ${teamUid} (${team.name}) from website: ${team.website}`);
+        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, team.website);
 
         if (logoResult) {
+          this.logger.log(`Logo metadata found for team ${teamUid} (${team.name}): ${logoResult.logoUrl}`);
           try {
             const filename = `team-enrichment-${teamUid}-${Date.now()}.png`;
             const multerFile = await this.aiService.downloadImageAsMulterFile(logoResult.logoUrl, filename);
@@ -176,12 +225,18 @@ export class TeamEnrichmentService {
                 },
               });
               updateData.logo = { connect: { uid: image.uid } };
-              this.logger.log(`Uploaded logo for team ${teamUid} from ${logoResult.logoUrl}`);
+              this.logger.log(`Logo uploaded successfully for team ${teamUid} (${team.name}), image uid: ${image.uid}`);
+            } else {
+              this.logger.warn(`Logo upload returned no URL for team ${teamUid} (${team.name})`);
             }
           } catch (logoError) {
-            this.logger.warn(`Failed to upload logo for team ${teamUid}: ${logoError.message}`);
+            this.logger.warn(`Failed to download/upload logo for team ${teamUid} (${team.name}): ${logoError.message}`);
           }
+        } else {
+          this.logger.log(`No logo found in website metadata for team ${teamUid} (${team.name})`);
         }
+      } else {
+        this.logger.log(`Team ${teamUid} (${team.name}) already has a logo, skipping logo fetch`);
       }
 
       const hasUpdates = Object.keys(enrichedFields).length > 0 || updateData.logo;

@@ -13,6 +13,7 @@ export enum FieldEnrichmentStatus {
   CannotEnrich = 'CannotEnrich',
 }
 
+/** Scalar fields on the Team model that can be enriched directly. */
 export const ENRICHABLE_TEAM_FIELDS = [
   'blog',
   'contactMethod',
@@ -24,7 +25,12 @@ export const ENRICHABLE_TEAM_FIELDS = [
   'moreDetails',
 ] as const;
 
+/** Relational / array fields tracked in enrichment metadata but handled separately. */
+export const ENRICHABLE_RELATION_FIELDS = ['industryTags', 'investmentFocus'] as const;
+
 export type EnrichableTeamField = typeof ENRICHABLE_TEAM_FIELDS[number];
+export type EnrichableRelationField = typeof ENRICHABLE_RELATION_FIELDS[number];
+export type EnrichableField = EnrichableTeamField | EnrichableRelationField;
 
 export interface TeamDataEnrichment {
   shouldEnrich: boolean;
@@ -35,7 +41,7 @@ export interface TeamDataEnrichment {
   reviewedAt?: string;
   reviewedBy?: string;
   errorMessage?: string;
-  fields: Partial<Record<EnrichableTeamField, FieldEnrichmentStatus>>;
+  fields: Partial<Record<EnrichableField, FieldEnrichmentStatus>>;
 }
 
 export interface AITeamEnrichmentResponse {
@@ -47,6 +53,8 @@ export interface AITeamEnrichmentResponse {
   shortDescription: string | null;
   longDescription: string | null;
   moreDetails: string | null;
+  industryTags: string[];
+  investmentFocus: string[];
   confidence: Record<string, string>;
   sources: string[];
 }

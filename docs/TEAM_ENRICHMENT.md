@@ -31,7 +31,12 @@ interface TeamDataEnrichment {
 
 ### Enrichable Fields
 
+**Scalar fields** (directly on Team model):
 `blog`, `contactMethod`, `twitterHandler`, `linkedinHandler`, `telegramHandler`, `shortDescription`, `longDescription`, `moreDetails`
+
+**Relational fields** (handled separately):
+- `industryTags` — many-to-many relation via `IndustryTag` model. AI returns tag names; the system matches them case-insensitively against existing `IndustryTag` records and connects matches. Only enriched if the team has no existing industry tags.
+- `investmentFocus` — `String[]` on `InvestorProfile` (one-to-one with Team). AI returns focus tags; the system creates or updates the `InvestorProfile`. Only enriched if the current focus array is empty.
 
 > **Note:** `website` is NOT enrichable — it is a mandatory user-provided field and is always present before enrichment runs.
 
