@@ -261,7 +261,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       const html = await response.text();
       const domain = new URL(websiteUrl).hostname.replace(/^www\./, '');
 
-      this.logger.log(`Fetched HTML for "${companyName}" (${websiteUrl}): ${html.length} chars`);
+      this.logger.debug(`Fetched HTML for "${companyName}" (${websiteUrl}): ${html.length} chars`);
 
       const candidates: string[] = [];
 
@@ -270,7 +270,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         this.logger.log(`Found og:image for "${companyName}": ${ogImage}`);
         candidates.push(ogImage);
       } else {
-        this.logger.log(`No og:image meta tag found for "${companyName}"`);
+        this.logger.debug(`No og:image meta tag found for "${companyName}"`);
       }
 
       const twitterImage = this.extractMetaContent(html, 'twitter:image');

@@ -159,12 +159,22 @@ export class TeamEnrichmentService {
       }
 
       // Handle industryTags (many-to-many) — only if team has none
+      this.logger.debug(
+        `Team ${teamUid}: current industryTags count = ${
+          team.industryTags.length
+        }, AI returned = [${aiResponse.industryTags.join(', ')}]`
+      );
       if (team.industryTags.length === 0) {
         if (aiResponse.industryTags.length > 0) {
           const matchedTags = await this.prisma.industryTag.findMany({
             where: { title: { in: aiResponse.industryTags, mode: 'insensitive' } },
-            select: { uid: true },
+            select: { uid: true, title: true },
           });
+          this.logger.debug(
+            `Team ${teamUid}: matched ${matchedTags.length}/${
+              aiResponse.industryTags.length
+            } industryTags: [${matchedTags.map((t) => t.title).join(', ')}]`
+          );
           if (matchedTags.length > 0) {
             updateData.industryTags = { connect: matchedTags.map((t) => ({ uid: t.uid })) };
             enrichedFields.industryTags = FieldEnrichmentStatus.Enriched;
@@ -174,10 +184,19 @@ export class TeamEnrichmentService {
         } else {
           enrichedFields.industryTags = FieldEnrichmentStatus.CannotEnrich;
         }
+      } else {
+        this.logger.log(
+          `Team ${teamUid}: skipping industryTags enrichment — team already has ${team.industryTags.length} tags`
+        );
       }
 
       // Handle investmentFocus (String[] on InvestorProfile) — only if empty
       const currentFocus = team.investorProfile?.investmentFocus || [];
+      this.logger.debug(
+        `Team ${teamUid}: current investmentFocus count = ${
+          currentFocus.length
+        }, AI returned = [${aiResponse.investmentFocus.join(', ')}]`
+      );
       if (currentFocus.length === 0) {
         if (aiResponse.investmentFocus.length > 0) {
           if (team.investorProfile) {
