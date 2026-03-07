@@ -20,7 +20,7 @@ interface TeamDataEnrichment {
   reviewedAt?: string;             // ISO timestamp
   reviewedBy?: string;             // reviewer email
   errorMessage?: string;           // error details if FailedToEnrich
-  fields: Partial<Record<EnrichableTeamField, FieldEnrichmentStatus>>;
+  fields: Partial<Record<EnrichableField, FieldEnrichmentStatus>>;
 }
 ```
 
@@ -34,17 +34,26 @@ interface TeamDataEnrichment {
 **Scalar fields** (directly on Team model):
 `blog`, `contactMethod`, `twitterHandler`, `linkedinHandler`, `telegramHandler`, `shortDescription`, `longDescription`, `moreDetails`
 
-**Relational fields** (handled separately):
-- `industryTags` — many-to-many relation via `IndustryTag` model. AI returns tag names; the system matches them case-insensitively against existing `IndustryTag` records and connects matches. Only enriched if the team has no existing industry tags.
-- `investmentFocus` — `String[]` on `InvestorProfile` (one-to-one with Team). AI returns focus tags; the system creates or updates the `InvestorProfile`. Only enriched if the current focus array is empty.
+**Relational fields:**
+- `industryTags` — matched against existing `IndustryTag` records (case-insensitive). Only enriched if team has none.
+- `investmentFocus` — `String[]` on `InvestorProfile`. Only enriched if currently empty.
 
-> **Note:** `website` is NOT enrichable — it is a mandatory user-provided field and is always present before enrichment runs.
+**Logo** — extracted from website metadata (`og:image`, `twitter:image`, favicon) via `open-graph-scraper`. Only fetched if team has no logo.
+
+> **Note:** `website` is NOT enrichable — it is a mandatory user-provided field.
+
+### Field Statuses
+
+Each enrichable field is tracked in `dataEnrichment.fields`:
+- `Enriched` — field was empty and successfully filled by AI
+- `CannotEnrich` — field was empty but AI could not find a value
+- `ChangedByUser` — field was enriched by AI but later modified by a user
 
 ## Trigger Flow
 
 1. Admin approves investor via PATCH `/v1/demo-days/:uid/participants/:uid` with `status: 'ENABLED'`
-2. `DemoDayParticipantsService.updateParticipant()` identifies fund teams at L0 where participant is team lead
-3. After promoting teams to L1, calls `teamEnrichmentService.markTeamForEnrichment(teamUid)`
+2. System identifies fund teams at L0 where participant is team lead
+3. After promoting teams to L1, marks them for enrichment
 4. Sets `dataEnrichment = { shouldEnrich: true, status: 'PendingEnrichment', ... }`
 
 ## Cron Job
@@ -52,10 +61,9 @@ interface TeamDataEnrichment {
 - **Schedule**: `TEAM_ENRICHMENT_CRON` env var (default: `0 3 * * *` — daily at 3 AM UTC)
 - **Guard**: `IS_TEAM_ENRICHMENT_ENABLED` must be `'true'`
 - Finds all teams with `shouldEnrich=true` and `status=PendingEnrichment`
-- Processes sequentially to avoid OpenAI rate limits
+- Processes sequentially to avoid rate limits
 - Skips teams without a website (marks as `FailedToEnrich`)
 - Only fills null/empty fields (never overwrites existing data)
-- Logo: scraped via OG tags from website, uploaded to S3
 
 ## Endpoints
 
@@ -71,7 +79,7 @@ Body: { status: 'Reviewed' | 'Approved' }
 POST /v1/admin/teams/:uid/trigger-enrichment
 Guard: AdminAuthGuard
 ```
-Marks the team for enrichment and runs it immediately (synchronous).
+Marks the team for enrichment and runs it in the background.
 Does NOT require `IS_TEAM_ENRICHMENT_ENABLED` — this is a manual override.
 
 ### Trigger Enrichment for All Pending Teams
@@ -79,8 +87,8 @@ Does NOT require `IS_TEAM_ENRICHMENT_ENABLED` — this is a manual override.
 POST /v1/admin/teams/trigger-enrichment
 Guard: AdminAuthGuard
 ```
-Finds all teams with `shouldEnrich=true` + `status=PendingEnrichment` and enriches them sequentially.
-Returns `{ success, total, enriched, failed }`.
+Finds all pending teams and enriches them in the background.
+Returns `{ success, total, message }`.
 
 ### Team Lead Review
 ```
@@ -108,7 +116,7 @@ any modified enrichable fields are marked as `ChangedByUser` in the `fields` map
 ```
 apps/web-api/src/team-enrichment/
   team-enrichment.types.ts          # Enums, interfaces, enrichable fields
-  team-enrichment-ai.service.ts     # LLM wrapper + OG tag scraping
+  team-enrichment-ai.service.ts     # LLM wrapper + logo scraping
   team-enrichment.service.ts        # Core business logic
   team-enrichment.job.ts            # Daily cron job
   team-enrichment.module.ts         # NestJS module
@@ -118,5 +126,6 @@ apps/web-api/src/team-enrichment/
 
 - `TeamEnrichmentModule` is imported by: `AppModule`, `DemoDaysModule`, `TeamsModule`, `AdminModule`
 - Uses `forwardRef` for `TeamsModule` circular dependency
-- AI: `ai` + `@ai-sdk/openai` packages (same as existing fund enrichment)
+- AI: `ai` + `@ai-sdk/openai` packages
+- Logo extraction: `open-graph-scraper`
 - File upload: `FileUploadService` from `SharedModule` (global)

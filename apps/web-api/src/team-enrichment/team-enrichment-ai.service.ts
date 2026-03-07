@@ -241,50 +241,57 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
     try {
       const domain = new URL(websiteUrl).hostname.replace(/^www\./, '');
-      const userAgent =
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-
-      const { result } = await ogs({
-        url: websiteUrl,
-        timeout: 10,
-        fetchOptions: {
-          headers: { 'user-agent': userAgent },
-          redirect: 'follow' as RequestRedirect,
-        },
-      });
 
       const candidates: string[] = [];
 
-      // OG images (highest priority — usually the best quality)
-      if (result.ogImage?.length) {
-        for (const img of result.ogImage) {
-          if (img.url) candidates.push(img.url);
+      // 1. Try open-graph-scraper for OG/Twitter/favicon metadata
+      try {
+        const { result } = await ogs({
+          url: websiteUrl,
+          timeout: 10,
+          fetchOptions: {
+            headers: {
+              'user-agent':
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            },
+            redirect: 'follow' as RequestRedirect,
+          },
+        });
+
+        if (result.ogImage?.length) {
+          for (const img of result.ogImage) {
+            if (img.url) candidates.push(img.url);
+          }
+          this.logger.log(`Found ${result.ogImage.length} og:image(s) for "${companyName}": ${candidates.join(', ')}`);
         }
-        this.logger.log(`Found ${result.ogImage.length} og:image(s) for "${companyName}": ${candidates.join(', ')}`);
-      }
 
-      // Twitter/X images
-      if (result.twitterImage?.length) {
-        for (const img of result.twitterImage) {
-          if (img.url && !candidates.includes(img.url)) candidates.push(img.url);
+        if (result.twitterImage?.length) {
+          for (const img of result.twitterImage) {
+            if (img.url && !candidates.includes(img.url)) candidates.push(img.url);
+          }
+          this.logger.log(
+            `Found twitter:image for "${companyName}": ${result.twitterImage.map((i) => i.url).join(', ')}`
+          );
         }
-        this.logger.log(
-          `Found twitter:image for "${companyName}": ${result.twitterImage.map((i) => i.url).join(', ')}`
-        );
+
+        if (result.favicon) {
+          const faviconUrl = result.favicon.startsWith('http')
+            ? result.favicon
+            : new URL(result.favicon, websiteUrl).href;
+          if (!candidates.includes(faviconUrl)) candidates.push(faviconUrl);
+          this.logger.log(`Found favicon for "${companyName}": ${faviconUrl}`);
+        }
+      } catch (ogsError) {
+        this.logger.warn(`OG scraping failed for "${companyName}" at ${websiteUrl}: ${ogsError.message}`);
       }
 
-      // Favicon as last resort
-      if (result.favicon) {
-        const faviconUrl = result.favicon.startsWith('http')
-          ? result.favicon
-          : new URL(result.favicon, websiteUrl).href;
-        if (!candidates.includes(faviconUrl)) candidates.push(faviconUrl);
-        this.logger.log(`Found favicon for "${companyName}": ${faviconUrl}`);
-      }
-
+      // 2. Fallback: logo APIs by domain (no JS rendering needed)
       if (candidates.length === 0) {
-        this.logger.warn(`No logo candidates found for "${companyName}" at ${websiteUrl}`);
-        return null;
+        this.logger.log(`No OG metadata found for "${companyName}", trying logo APIs for domain: ${domain}`);
+        candidates.push(
+          `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+          `https://icons.duckduckgo.com/ip3/${domain}.ico`
+        );
       }
 
       this.logger.log(`Total ${candidates.length} logo candidate(s) for "${companyName}", validating...`);
