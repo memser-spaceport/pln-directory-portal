@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { generateText, LanguageModel } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import ogs from 'open-graph-scraper';
 import { Readable } from 'stream';
 import { AITeamEnrichmentResponse } from './team-enrichment.types';
 
@@ -239,51 +240,47 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     }
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-
-      const response = await fetch(websiteUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; PLNEnrichment/1.0)',
-          Accept: 'text/html',
-        },
-        redirect: 'follow',
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        this.logger.debug(`Website returned HTTP ${response.status} for "${companyName}" at ${websiteUrl}`);
-        return null;
-      }
-
-      const html = await response.text();
       const domain = new URL(websiteUrl).hostname.replace(/^www\./, '');
+      const userAgent =
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
-      this.logger.debug(`Fetched HTML for "${companyName}" (${websiteUrl}): ${html.length} chars`);
+      const { result } = await ogs({
+        url: websiteUrl,
+        timeout: 10,
+        fetchOptions: {
+          headers: { 'user-agent': userAgent },
+          redirect: 'follow' as RequestRedirect,
+        },
+      });
 
       const candidates: string[] = [];
 
-      const ogImage = this.extractMetaContent(html, 'og:image');
-      if (ogImage) {
-        this.logger.log(`Found og:image for "${companyName}": ${ogImage}`);
-        candidates.push(ogImage);
-      } else {
-        this.logger.debug(`No og:image meta tag found for "${companyName}"`);
+      // OG images (highest priority — usually the best quality)
+      if (result.ogImage?.length) {
+        for (const img of result.ogImage) {
+          if (img.url) candidates.push(img.url);
+        }
+        this.logger.log(`Found ${result.ogImage.length} og:image(s) for "${companyName}": ${candidates.join(', ')}`);
       }
 
-      const twitterImage = this.extractMetaContent(html, 'twitter:image');
-      if (twitterImage) {
-        this.logger.log(`Found twitter:image for "${companyName}": ${twitterImage}`);
-        candidates.push(twitterImage);
+      // Twitter/X images
+      if (result.twitterImage?.length) {
+        for (const img of result.twitterImage) {
+          if (img.url && !candidates.includes(img.url)) candidates.push(img.url);
+        }
+        this.logger.log(
+          `Found twitter:image for "${companyName}": ${result.twitterImage.map((i) => i.url).join(', ')}`
+        );
       }
 
-      const linkIcons = this.extractLinkIcons(html);
-      if (linkIcons.length > 0) {
-        this.logger.log(`Found ${linkIcons.length} link icon(s) for "${companyName}": ${linkIcons.join(', ')}`);
+      // Favicon as last resort
+      if (result.favicon) {
+        const faviconUrl = result.favicon.startsWith('http')
+          ? result.favicon
+          : new URL(result.favicon, websiteUrl).href;
+        if (!candidates.includes(faviconUrl)) candidates.push(faviconUrl);
+        this.logger.log(`Found favicon for "${companyName}": ${faviconUrl}`);
       }
-      candidates.push(...linkIcons);
 
       if (candidates.length === 0) {
         this.logger.warn(`No logo candidates found for "${companyName}" at ${websiteUrl}`);
@@ -429,47 +426,5 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     } catch {
       return null;
     }
-  }
-
-  private extractMetaContent(html: string, tag: string): string | null {
-    const pattern = new RegExp(
-      `<meta\\s+(?:[^>]*?(?:property|name)\\s*=\\s*["']${tag}["'][^>]*?content\\s*=\\s*["']([^"']+)["']|[^>]*?content\\s*=\\s*["']([^"']+)["'][^>]*?(?:property|name)\\s*=\\s*["']${tag}["'])`,
-      'i'
-    );
-    const match = html.match(pattern);
-    return match?.[1] || match?.[2] || null;
-  }
-
-  private extractLinkIcons(html: string): string[] {
-    const candidates: Array<{ href: string; size: number }> = [];
-    const linkPattern = /<link\s+[^>]*?rel\s*=\s*["']([^"']+)["'][^>]*?href\s*=\s*["']([^"']+)["'][^>]*?\/?>/gi;
-    const linkPatternAlt = /<link\s+[^>]*?href\s*=\s*["']([^"']+)["'][^>]*?rel\s*=\s*["']([^"']+)["'][^>]*?\/?>/gi;
-
-    const iconRels = ['icon', 'shortcut icon', 'apple-touch-icon', 'apple-touch-icon-precomposed'];
-
-    for (const pattern of [linkPattern, linkPatternAlt]) {
-      let match: RegExpExecArray | null;
-      while ((match = pattern.exec(html)) !== null) {
-        const isAlt = pattern === linkPatternAlt;
-        const rel = (isAlt ? match[2] : match[1]).toLowerCase();
-        const href = isAlt ? match[1] : match[2];
-
-        if (!iconRels.some((r) => rel.includes(r))) continue;
-
-        const sizesMatch = match[0].match(/sizes\s*=\s*["'](\d+)x(\d+)["']/i);
-        const size = sizesMatch ? parseInt(sizesMatch[1], 10) : 0;
-
-        candidates.push({ href, size });
-      }
-    }
-
-    candidates.sort((a, b) => b.size - a.size);
-
-    return candidates
-      .map((c) => c.href)
-      .filter((href) => {
-        const ext = href.split('?')[0].split('.').pop()?.toLowerCase() || '';
-        return ['png', 'jpg', 'jpeg', 'svg', 'ico', 'webp', 'gif'].includes(ext) || !ext.match(/^[a-z]{2,5}$/);
-      });
   }
 }
