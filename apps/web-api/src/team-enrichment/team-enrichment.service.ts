@@ -212,6 +212,26 @@ export class TeamEnrichmentService {
     }
   }
 
+  async triggerEnrichmentForAllPending(): Promise<{ total: number; enriched: number; failed: number }> {
+    const teams = await this.findTeamsPendingEnrichment();
+    this.logger.log(`Manual trigger: found ${teams.length} teams pending enrichment`);
+
+    let enriched = 0;
+    let failed = 0;
+
+    for (const team of teams) {
+      try {
+        await this.enrichTeam(team.uid);
+        enriched++;
+      } catch (error) {
+        this.logger.error(`Failed to enrich team ${team.uid} (${team.name}): ${error.message}`, error.stack);
+        failed++;
+      }
+    }
+
+    return { total: teams.length, enriched, failed };
+  }
+
   async handleUserFieldChange(teamUid: string, changedFields: string[], tx?: Prisma.TransactionClient): Promise<void> {
     const db = tx || this.prisma;
 

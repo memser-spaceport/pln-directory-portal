@@ -61,6 +61,22 @@ Guard: AdminAuthGuard
 Body: { status: 'Reviewed' | 'Approved' }
 ```
 
+### Trigger Enrichment for a Single Team
+```
+POST /v1/admin/teams/:uid/trigger-enrichment
+Guard: AdminAuthGuard
+```
+Marks the team for enrichment and runs it immediately (synchronous).
+Does NOT require `IS_TEAM_ENRICHMENT_ENABLED` — this is a manual override.
+
+### Trigger Enrichment for All Pending Teams
+```
+POST /v1/admin/teams/trigger-enrichment
+Guard: AdminAuthGuard
+```
+Finds all teams with `shouldEnrich=true` + `status=PendingEnrichment` and enriches them sequentially.
+Returns `{ success, total, enriched, failed }`.
+
 ### Team Lead Review
 ```
 PATCH /v1/teams/:uid/enrichment-review

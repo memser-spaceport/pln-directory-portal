@@ -90,4 +90,19 @@ export class AdminTeamsController {
     await this.teamEnrichmentService.reviewEnrichment(uid, body.status, req?.userEmail ?? 'admin');
     return { success: true };
   }
+
+  @Post('/:uid/trigger-enrichment')
+  @NoCache()
+  async triggerEnrichment(@Param('uid') uid: string) {
+    await this.teamEnrichmentService.markTeamForEnrichment(uid);
+    await this.teamEnrichmentService.enrichTeam(uid);
+    return { success: true, message: `Enrichment triggered for team ${uid}` };
+  }
+
+  @Post('trigger-enrichment')
+  @NoCache()
+  async triggerEnrichmentAll() {
+    const result = await this.teamEnrichmentService.triggerEnrichmentForAllPending();
+    return { success: true, ...result };
+  }
 }
