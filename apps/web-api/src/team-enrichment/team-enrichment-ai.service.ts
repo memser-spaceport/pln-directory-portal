@@ -93,7 +93,7 @@ export class TeamEnrichmentAiService {
       telegramHandler?: string | null;
       shortDescription?: string | null;
       longDescription?: string | null;
-    },
+    }
   ): Promise<AITeamEnrichmentResponse> {
     try {
       const userPrompt = this.buildUserPrompt(teamName, existingData);
@@ -132,7 +132,7 @@ export class TeamEnrichmentAiService {
       telegramHandler?: string | null;
       shortDescription?: string | null;
       longDescription?: string | null;
-    },
+    }
   ): string {
     const existingDescription = existingData.shortDescription || existingData.longDescription || '';
 
@@ -207,7 +207,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
   async fetchLogoFromWebsite(
     companyName: string,
-    websiteUrl?: string | null,
+    websiteUrl?: string | null
   ): Promise<{ logoUrl: string; domain: string } | null> {
     if (!websiteUrl) {
       this.logger.debug(`No website URL for "${companyName}", skipping website logo fetch`);
@@ -392,7 +392,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
   private extractMetaContent(html: string, tag: string): string | null {
     const pattern = new RegExp(
       `<meta\\s+(?:[^>]*?(?:property|name)\\s*=\\s*["']${tag}["'][^>]*?content\\s*=\\s*["']([^"']+)["']|[^>]*?content\\s*=\\s*["']([^"']+)["'][^>]*?(?:property|name)\\s*=\\s*["']${tag}["'])`,
-      'i',
+      'i'
     );
     const match = html.match(pattern);
     return match?.[1] || match?.[2] || null;

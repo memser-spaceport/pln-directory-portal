@@ -18,7 +18,7 @@ export class TeamEnrichmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileUploadService: FileUploadService,
-    private readonly aiService: TeamEnrichmentAiService,
+    private readonly aiService: TeamEnrichmentAiService
   ) {}
 
   async markTeamForEnrichment(teamUid: string): Promise<void> {
@@ -119,7 +119,7 @@ export class TeamEnrichmentService {
         teamUid,
         team.dataEnrichment,
         EnrichmentStatus.FailedToEnrich,
-        'Team has no website — cannot enrich without a website',
+        'Team has no website — cannot enrich without a website'
       );
       this.logger.warn(`Team ${teamUid} (${team.name}) has no website, skipping enrichment`);
       return;
@@ -205,25 +205,14 @@ export class TeamEnrichmentService {
         },
       });
 
-      this.logger.log(
-        `Enriched team ${teamUid} (${team.name}): ${Object.keys(enrichedFields).length} fields updated`,
-      );
+      this.logger.log(`Enriched team ${teamUid} (${team.name}): ${Object.keys(enrichedFields).length} fields updated`);
     } catch (error) {
       this.logger.error(`Failed to enrich team ${teamUid} (${team.name}): ${error.message}`, error.stack);
-      await this.updateEnrichmentStatus(
-        teamUid,
-        team.dataEnrichment,
-        EnrichmentStatus.FailedToEnrich,
-        error.message,
-      );
+      await this.updateEnrichmentStatus(teamUid, team.dataEnrichment, EnrichmentStatus.FailedToEnrich, error.message);
     }
   }
 
-  async handleUserFieldChange(
-    teamUid: string,
-    changedFields: string[],
-    tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  async handleUserFieldChange(teamUid: string, changedFields: string[], tx?: Prisma.TransactionClient): Promise<void> {
     const db = tx || this.prisma;
 
     const team = await db.team.findUnique({
@@ -254,11 +243,7 @@ export class TeamEnrichmentService {
     }
   }
 
-  async reviewEnrichment(
-    teamUid: string,
-    action: 'Reviewed' | 'Approved',
-    reviewerEmail: string,
-  ): Promise<void> {
+  async reviewEnrichment(teamUid: string, action: 'Reviewed' | 'Approved', reviewerEmail: string): Promise<void> {
     const team = await this.prisma.team.findUnique({
       where: { uid: teamUid },
       select: { dataEnrichment: true },
@@ -296,7 +281,7 @@ export class TeamEnrichmentService {
     teamUid: string,
     currentMeta: any,
     status: EnrichmentStatus,
-    errorMessage?: string,
+    errorMessage?: string
   ): Promise<void> {
     const meta = this.parseEnrichmentMeta(currentMeta) || {
       shouldEnrich: false,
