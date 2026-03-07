@@ -41,6 +41,7 @@ export const TeamSchema = z.object({
    * 1 = highest importance, 5 = lowest importance, 99 = NA (Not Assigned).
    */
   priority: z.number().int().nullish(),
+  dataEnrichment: z.any().nullish(),
 });
 
 export const CreateTeamSchema = TeamSchema.pick({

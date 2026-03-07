@@ -9,6 +9,7 @@ import { HuskyModule } from '../husky/husky.module';
 import { AdminModule } from "../admin/admin.module";
 import { ParticipantsRequestModule } from "../participants-request/participants-request.module";
 import { OpenSearchModule } from '../opensearch/opensearch.module';
+import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { OpenSearchModule } from '../opensearch/opensearch.module';
     forwardRef(() => AskModule),
     HuskyModule,
     OpenSearchModule,
+    forwardRef(() => TeamEnrichmentModule),
   ],
   controllers: [TeamsController],
   providers: [TeamsService, TeamsHooksService],

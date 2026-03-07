@@ -4,6 +4,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from './demo-days.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { TeamsService } from '../teams/teams.service';
+import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 
 @Injectable()
 export class DemoDayParticipantsService {
@@ -11,7 +12,8 @@ export class DemoDayParticipantsService {
     private readonly prisma: PrismaService,
     private readonly demoDaysService: DemoDaysService,
     private readonly analyticsService: AnalyticsService,
-    private readonly teamService: TeamsService
+    private readonly teamService: TeamsService,
+    private readonly teamEnrichmentService: TeamEnrichmentService,
   ) { }
 
   async addParticipant(
@@ -1040,6 +1042,12 @@ export class DemoDayParticipantsService {
           });
         }
 
+        // Identify fund teams at L0 before promotion (for enrichment)
+        const fundTeamsAtL0 =
+          participant.member?.teamMemberRoles
+            ?.filter((role) => role.teamLead && role.team.isFund && role.team.accessLevel === 'L0')
+            .map((role) => role.team.uid) || [];
+
         // Promote teams where this member is a lead to L1
         const teamUidsToUpdate =
           participant.member?.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.team.uid) || [];
@@ -1048,6 +1056,11 @@ export class DemoDayParticipantsService {
           await Promise.all(
             teamUidsToUpdate.map((teamUid) => this.teamService.updateTeamAccessLevel(teamUid, undefined, 'L1'))
           );
+        }
+
+        // Mark qualifying fund teams for AI enrichment
+        for (const teamUid of fundTeamsAtL0) {
+          await this.teamEnrichmentService.markTeamForEnrichment(teamUid);
         }
       }
     }

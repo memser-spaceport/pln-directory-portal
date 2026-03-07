@@ -20,12 +20,16 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 
 import { AdminTeamsService } from './admin-teams.service';
 import { UploadTeamTiersQueryDto } from './schema/admin-teams';
+import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 
 @ApiTags('Admin Teams')
 @Controller('v1/admin/teams')
 @UseGuards(AdminAuthGuard)
 export class AdminTeamsController {
-  constructor(private readonly adminTeamsService: AdminTeamsService) {}
+  constructor(
+    private readonly adminTeamsService: AdminTeamsService,
+    private readonly teamEnrichmentService: TeamEnrichmentService,
+  ) {}
 
   @Post('tiers/upload')
   @ApiConsumes('multipart/form-data')
@@ -71,5 +75,19 @@ export class AdminTeamsController {
   @NoCache()
   async adminUpdateTeamFull(@Param('uid') teamUid: string, @Body() body) {
     return this.adminTeamsService.updateTeam(teamUid, body);
+  }
+
+  @Patch('/:uid/enrichment-review')
+  @NoCache()
+  async reviewEnrichment(
+    @Param('uid') uid: string,
+    @Body() body: { status: 'Reviewed' | 'Approved' },
+    @Req() req: any,
+  ) {
+    if (!body.status || !['Reviewed', 'Approved'].includes(body.status)) {
+      throw new BadRequestException('status must be "Reviewed" or "Approved"');
+    }
+    await this.teamEnrichmentService.reviewEnrichment(uid, body.status, req?.userEmail ?? 'admin');
+    return { success: true };
   }
 }
