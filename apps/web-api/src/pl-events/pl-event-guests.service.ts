@@ -104,8 +104,8 @@ export class PLEventGuestsService {
       if (type === CREATE) {
         await this.eventLocationsService.subscribeLocationByUid(locationUid, data.memberUid);
         this.memberService.checkIfAdminUser(member) &&
-          !plEvents.length &&
-          (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
+        !plEvents.length &&
+        (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
 
       await this.updateGuestTopicsAndReason(data, locationUid, member, eventType, tx);
@@ -386,6 +386,8 @@ export class PLEventGuestsService {
       if (affectedEventUids.length > 0) {
         await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(affectedEventUids);
       }
+
+      await this.irlGatheringPushCandidatesService.refreshNotificationsForLocation(locationUid);
 
       this.logger.info(
         `[PLEventGuestsService] deletePLEventGuests ` +
@@ -958,7 +960,7 @@ export class PLEventGuestsService {
 
         location_only AS (
         ${includeLocationOnlyGuests
-        ? `
+      ? `
                   SELECT
                     pg."memberUid",
                     'none' AS guest_type,
@@ -1041,8 +1043,8 @@ export class PLEventGuestsService {
                     m.name,
                     tm.name
                 `
-        : `SELECT NULL::text AS "memberUid", 'none'::text AS guest_type, '{}'::json AS guest, '[]'::json AS events, '{}'::json AS member, '[]'::jsonb AS teamMemberRoles, '{}'::json AS team, 0::bigint AS count WHERE FALSE`
-      }
+      : `SELECT NULL::text AS "memberUid", 'none'::text AS guest_type, '{}'::json AS guest, '[]'::json AS events, '{}'::json AS member, '[]'::jsonb AS teamMemberRoles, '{}'::json AS team, 0::bigint AS count WHERE FALSE`
+    }
         ),
 
         combined AS (
