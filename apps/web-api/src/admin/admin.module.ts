@@ -21,6 +21,7 @@ import { AdminTeamsService } from './admin-teams.service';
 import { ParticipantsRequestModule } from '../participants-request/participants-request.module';
 import { TeamsModule } from '../teams/teams.module';
 import { AskModule } from '../asks/asks.module';
+import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AskModule } from '../asks/asks.module';
     forwardRef(() => MembersModule),
     DemoDaysModule,
     AnalyticsModule,
+    TeamEnrichmentModule,
   ],
   controllers: [
     AdminAuthController,

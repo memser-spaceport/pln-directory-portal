@@ -61,6 +61,7 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) =
     isFund: faker.datatype.boolean(),
     accessLevel: 'L1',
     accessLevelUpdatedAt: faker.date.past(),
+    dataEnrichment: null,
     // Keep tier/priority in sync in fixtures.
     ...((): { tier: number; priority: number } => {
       const tier = randTier();

@@ -69,6 +69,7 @@ model Team {
   accessLevel                  String?                       @default("L1")
   accessLevelUpdatedAt         DateTime                      @default(now())
   eventAssociations            PLEventAssociation[]
+  dataEnrichment               Json?            /// AI enrichment metadata
 }
 
 enum AskStatus {

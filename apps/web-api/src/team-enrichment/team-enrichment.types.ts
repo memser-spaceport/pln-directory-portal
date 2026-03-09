@@ -1,0 +1,60 @@
+export enum EnrichmentStatus {
+  PendingEnrichment = 'PendingEnrichment',
+  InProgress = 'InProgress',
+  Enriched = 'Enriched',
+  FailedToEnrich = 'FailedToEnrich',
+  Reviewed = 'Reviewed',
+  Approved = 'Approved',
+}
+
+export enum FieldEnrichmentStatus {
+  Enriched = 'Enriched',
+  ChangedByUser = 'ChangedByUser',
+  CannotEnrich = 'CannotEnrich',
+}
+
+/** Scalar fields on the Team model that can be enriched directly. */
+export const ENRICHABLE_TEAM_FIELDS = [
+  'blog',
+  'contactMethod',
+  'twitterHandler',
+  'linkedinHandler',
+  'telegramHandler',
+  'shortDescription',
+  'longDescription',
+  'moreDetails',
+] as const;
+
+/** Relational / array fields tracked in enrichment metadata but handled separately. */
+export const ENRICHABLE_RELATION_FIELDS = ['industryTags', 'investmentFocus'] as const;
+
+export type EnrichableTeamField = typeof ENRICHABLE_TEAM_FIELDS[number];
+export type EnrichableRelationField = typeof ENRICHABLE_RELATION_FIELDS[number];
+export type EnrichableField = EnrichableTeamField | EnrichableRelationField;
+
+export interface TeamDataEnrichment {
+  shouldEnrich: boolean;
+  status: EnrichmentStatus;
+  isAIGenerated: boolean;
+  enrichedAt?: string;
+  enrichedBy?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  errorMessage?: string;
+  fields: Partial<Record<EnrichableField, FieldEnrichmentStatus>>;
+}
+
+export interface AITeamEnrichmentResponse {
+  blog: string | null;
+  contactMethod: string | null;
+  linkedinHandler: string | null;
+  twitterHandler: string | null;
+  telegramHandler: string | null;
+  shortDescription: string | null;
+  longDescription: string | null;
+  moreDetails: string | null;
+  industryTags: string[];
+  investmentFocus: string[];
+  confidence: Record<string, string>;
+  sources: string[];
+}
