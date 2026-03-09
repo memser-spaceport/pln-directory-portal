@@ -6,7 +6,7 @@ import { TeamEnrichmentService } from './team-enrichment.service';
 export class TeamEnrichmentJob {
   private readonly logger = new Logger(TeamEnrichmentJob.name);
 
-  constructor(private readonly teamEnrichmentService: TeamEnrichmentService) {}
+  constructor(private readonly teamEnrichmentService: TeamEnrichmentService) { }
 
   // By default, every day at 3:00 AM
   @Cron(process.env.TEAM_ENRICHMENT_CRON || '0 3 * * *', {
@@ -14,7 +14,7 @@ export class TeamEnrichmentJob {
     timeZone: 'UTC',
   })
   async runEnrichment(): Promise<void> {
-    const isEnabled = (process.env.IS_TEAM_ENRICHMENT_ENABLED ?? 'false') === 'true';
+    const isEnabled = (process.env.IS_TEAM_ENRICHMENT_ENABLED?.toLowerCase() ?? 'false') === 'true';
     if (!isEnabled) {
       this.logger.log('Team enrichment is disabled via IS_TEAM_ENRICHMENT_ENABLED');
       return;
