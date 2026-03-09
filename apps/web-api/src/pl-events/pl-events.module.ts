@@ -52,7 +52,7 @@ import { IrlGatheringPushNotificationsProcessor } from './push/irl-gathering-pus
     forwardRef(() => AuthModule),
     forwardRef(() => TeamsModule),
     forwardRef(() => EventsModule),
-    PushNotificationsModule,
+    forwardRef(() => PushNotificationsModule),
   ],
 })
 export class PLEventsModule {}

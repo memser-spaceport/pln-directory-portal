@@ -20,6 +20,8 @@ const getUidsFrom = async (model: keyof typeof prisma, where: Record<string, any
  * - `locationUid` is REQUIRED by Prisma schema
  * - We always derive `locationUid` from the chosen `eventUid`
  *   to keep relations consistent.
+ * - `associationUid` must be null unless it references an existing
+ *   `PLEventAssociation.uid`
  */
 const eventGuestFactory = Factory.define<Omit<PLEventGuest, 'id'>>(({ onCreate }) => {
   onCreate(async (eventGuest) => {
@@ -59,6 +61,10 @@ const eventGuestFactory = Factory.define<Omit<PLEventGuest, 'id'>>(({ onCreate }
     }
 
     eventGuest.locationUid = ev.locationUid;
+
+    // Generic seed guests are not synced from associations
+    eventGuest.associationUid = null;
+
     return eventGuest;
   });
 
@@ -87,7 +93,7 @@ const eventGuestFactory = Factory.define<Omit<PLEventGuest, 'id'>>(({ onCreate }
     isSpeaker: faker.datatype.boolean(),
     isSponsor: faker.datatype.boolean(),
     isFeatured: faker.datatype.boolean(),
-    associationUid: faker.datatype.uuid(),
+    associationUid: null,
   };
 });
 
