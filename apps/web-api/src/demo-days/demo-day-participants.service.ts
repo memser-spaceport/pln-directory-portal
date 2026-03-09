@@ -1045,7 +1045,7 @@ export class DemoDayParticipantsService {
         // Identify fund teams at L0 before promotion (for enrichment)
         const fundTeamsAtL0 =
           participant.member?.teamMemberRoles
-            ?.filter((role) => role.teamLead && role.team.isFund && role.team.accessLevel === 'L0')
+            ?.filter((role) => role.teamLead && role.team.accessLevel === 'L0')
             .map((role) => role.team.uid) || [];
 
         // Promote teams where this member is a lead to L1
