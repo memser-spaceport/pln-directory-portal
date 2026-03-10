@@ -974,6 +974,7 @@ export class MembersService {
       'isSubscribedToNewsletter',
       'teamOrProjectURL',
       'aboutYou',
+      'role',
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();
@@ -1163,7 +1164,9 @@ export class MembersService {
           // Set roleTags for the new role based on default roleTags or split role string
           memberData.teamAndRoles[index].roleTags = foundDefaultRoleTag
             ? foundValue.roleTags
-            : t.role?.split(',').map((item: string) => item.trim());
+            : t.role
+              ? t.role.split(',').map((item: string) => item.trim())
+              : [];
           return true;
         }
       }
@@ -1215,12 +1218,14 @@ export class MembersService {
   async createTeamMemberRoles(tx: Prisma.TransactionClient, rolesToCreate: any[], memberUid: string) {
     if (rolesToCreate.length > 0) {
       const rolesToCreateData = rolesToCreate.map((t: any) => ({
-        role: t.role?.trim(),
+        role: t.role?.trim() ?? null,
         mainTeam: t.mainTeam || false,
         teamLead: false, // Set your default values here if needed
         teamUid: t.teamUid,
         memberUid,
-        roleTags: t.role?.split(',').map((item: string) => item.trim()), // Properly format roleTags
+        roleTags: t.role
+          ? t.role.split(',').map((item: string) => item.trim())
+          : [], // Properly format roleTags
       }));
 
       await tx.teamMemberRole.createMany({
@@ -1267,8 +1272,8 @@ export class MembersService {
             },
           },
           data: {
-            role: roleToUpdate.role?.trim(),
-            roleTags: roleToUpdate.roleTags,
+            role: roleToUpdate.role?.trim() ?? null,
+            roleTags: roleToUpdate.roleTags ?? [],
             mainTeam: roleToUpdate.mainTeam,
           },
         })
@@ -1286,11 +1291,13 @@ export class MembersService {
     return {
       createMany: {
         data: memberData.teamAndRoles.map((t) => ({
-          role: t.role?.trim(),
+          role: t.role?.trim() ?? null,
           mainTeam: t.mainTeam || false,
           teamLead: false,
           teamUid: t.teamUid,
-          roleTags: t.role?.split(',')?.map((item) => item.trim()),
+          roleTags: t.role
+            ? t.role.split(',').map((item) => item.trim())
+            : [],
         })),
       },
     };
