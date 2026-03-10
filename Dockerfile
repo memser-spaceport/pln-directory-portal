@@ -1,7 +1,7 @@
 # ============================
 # Stage 1: Builder
 # ============================
-FROM node:18-bookworm AS builder
+FROM node:20.19-bookworm AS builder
 
 WORKDIR /app
 
@@ -27,7 +27,7 @@ RUN yarn build
 # ============================
 # Stage 2: Production
 # ============================
-FROM node:18-bookworm
+FROM node:20.19-bookworm
 
 # Create a non-root user for security
 RUN groupadd -r app && useradd -r -g app app

@@ -28,6 +28,8 @@ import { ParticipantsRequest } from './dto/members.dto';
 import { SelfUpdatePayload } from './dto/teams.dto';
 import { MemberRole, isDirectoryAdmin } from '../utils/constants';
 import { OpenSearchService } from '../opensearch/opensearch.service';
+import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
+import { ENRICHABLE_TEAM_FIELDS } from '../team-enrichment/team-enrichment.types';
 
 /**
  * Interface for team search match result (used by entity association)
@@ -52,7 +54,9 @@ export class TeamsService {
     private cacheService: CacheService,
     private askService: AskService,
     private teamsHooksService: TeamsHooksService,
-    private openSearchService: OpenSearchService
+    private openSearchService: OpenSearchService,
+    @Inject(forwardRef(() => TeamEnrichmentService))
+    private teamEnrichmentService: TeamEnrichmentService,
   ) {}
 
   /**
@@ -94,6 +98,14 @@ export class TeamsService {
    * @param tx - Optional transaction client
    * @returns The updated team
    */
+  async isMemberTeamLead(teamUid: string, memberUid: string): Promise<boolean> {
+    const role = await this.prisma.teamMemberRole.findUnique({
+      where: { memberUid_teamUid: { memberUid, teamUid } },
+      select: { teamLead: true },
+    });
+    return role?.teamLead === true;
+  }
+
   async updateTeamAccessLevel(teamUid: string, tx?: Prisma.TransactionClient, accessLevel?: string): Promise<Team> {
     const prisma = tx || this.prisma;
 
@@ -373,6 +385,15 @@ export class TeamsService {
     await this.prisma.$transaction(async (tx) => {
       const { team, investorProfileData } = await this.formatTeam(teamUid, updatedTeam, tx, 'Update');
       result = await this.updateTeamByUid(teamUid, team, tx, requestorEmail);
+
+      // Track user changes to AI-enriched fields
+      const changedEnrichableFields = Object.keys(team).filter(
+        (key) => ENRICHABLE_TEAM_FIELDS.includes(key as any) && team[key] !== undefined,
+      );
+      if (changedEnrichableFields.length > 0) {
+        await this.teamEnrichmentService.handleUserFieldChange(teamUid, changedEnrichableFields, tx);
+      }
+
       const toAdd: any[] = [];
       const toDelete: { teamUid: string; memberUid: string }[] = [];
       this.logger.info(`Team data roles to update: ${JSON.stringify(updatedTeam.teamMemberRoles)}`);
@@ -2097,7 +2118,7 @@ export class TeamsService {
   /**
    * Search teams by name with relevance scoring.
    * Used by internal APIs for entity matching and lookups.
-   * 
+   *
    * @param params - Search parameters including team name query
    * @returns Array of matching teams with confidence scores (0-100), sorted by score desc
    */
@@ -2126,13 +2147,13 @@ export class TeamsService {
       return { matches };
     } catch (error) {
       this.logger.error('Error searching team matches:', error);
-      throw new InternalServerErrorException('Error searching team matches', error);   
+      throw new InternalServerErrorException('Error searching team matches', error);
     }
   }
 
   /**
    * Build OpenSearch query for team search by name.
-   * 
+   *
    * Fields indexed in OpenSearch team index:
    * - uid, name, image, shortDescription, longDescription, name_suggest, shortDescription_suggest
    */
@@ -2146,8 +2167,8 @@ export class TeamsService {
             {
               match_phrase: {
                 name: {
-                  query: safeName, 
-                  boost: 5.0 
+                  query: safeName,
+                  boost: 5.0
                 }
               }
             },
