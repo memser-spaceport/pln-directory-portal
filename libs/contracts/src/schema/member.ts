@@ -265,6 +265,12 @@ export const MemberInvestorSettingResponseSchema = z.object({
 export class UpdateMemberInvestorSettingRequestDto extends createZodDto(UpdateMemberInvestorSettingRequestSchema) {}
 export class MemberInvestorSettingResponseDto extends createZodDto(MemberInvestorSettingResponseSchema) {}
 
+export const MemberEmailQueryParams = z.object({
+  email: z.string().email().describe('Email address to look up member by'),
+});
+
+export class MemberEmailQueryParamsDto extends createZodDto(MemberEmailQueryParams) {}
+
 // ============================================
 // Member Search Schemas
 // ============================================

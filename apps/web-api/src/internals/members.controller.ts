@@ -1,4 +1,4 @@
-import { Controller, UseGuards, Body, BadRequestException, NotFoundException, Param, Req } from '@nestjs/common';
+import { Controller, UseGuards, Body, BadRequestException, NotFoundException, Param, Req, Query } from '@nestjs/common';
 import { Request } from 'express';
 import { Api, initNestServer, ApiDecorator } from '@ts-rest/nest';
 import { apiInternals } from 'libs/contracts/src/lib/contract-internals';
@@ -45,6 +45,24 @@ export class MembersController {
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema)
   async getMemberDetails(@Param('uid') uid: string) {
     return await this.internalsService.getMemberDetails(uid);
+  }
+
+  /**
+   * Get a member by their email address
+   * @param email - The email address of the member
+   * @returns The member details
+   */
+  @Api(server.route.getMemberByEmail)
+  @ApiOkResponseFromZod(ResponseMemberSchema)
+  async getMemberByEmail(@Query('email') email: string) {
+    if (!email) {
+      throw new BadRequestException('Email query parameter is required');
+    }
+    const member = await this.membersService.findMemberFromEmail(email);
+    if (!member) {
+      throw new NotFoundException(`Member with email ${email} not found`);
+    }
+    return member;
   }
 
   /**

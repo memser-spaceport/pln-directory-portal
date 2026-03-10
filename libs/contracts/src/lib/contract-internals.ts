@@ -15,6 +15,7 @@ import {
   CreatePLEventLocationSchemaDto,
   UpdatePLEventLocationSchemaDto,
   ResponsePLEventLocationSchema,
+  MemberEmailQueryParams,
   MemberSearchQueryParams,
   ResponseMemberSearchResultSchema,
   TeamSearchQueryParams,
@@ -178,5 +179,14 @@ export const apiInternals = contract.router({
       200: ResponsePLEventLocationSchema,
     },
     summary: 'Delete a PL event location by UID',
-  }
+  },
+  getMemberByEmail: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/members-by-email`,
+    query: MemberEmailQueryParams,
+    responses: {
+      200: ResponseMemberSchema,
+    },
+    summary: 'Get a member by their email address',
+  },
 });
