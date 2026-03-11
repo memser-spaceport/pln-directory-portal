@@ -191,14 +191,14 @@ export class DemoDayEngagementService {
       throw new BadRequestException('Invalid fundraising profile or not part of current demo day');
     }
 
-    // Get enabled founders for this team in this demo day
-    const founders = await this.prisma.demoDayParticipant.findMany({
+    // Get enabled participants (founders + investors) for this team in this demo day
+    const participants = await this.prisma.demoDayParticipant.findMany({
       where: {
         demoDayUid: demoDay.uid,
         teamUid: fundraisingProfile.teamUid,
         status: 'ENABLED',
         isDeleted: false,
-        type: 'FOUNDER',
+        type: { in: ['FOUNDER', 'INVESTOR'] },
       },
       include: {
         member: {
@@ -212,11 +212,11 @@ export class DemoDayEngagementService {
       },
     });
 
-    if (founders.length === 0) {
-      throw new BadRequestException('No enabled founders found for this team');
+    if (participants.length === 0) {
+      throw new BadRequestException('No enabled participants found for this team');
     }
 
-    const founderEmails = founders.map((f) => f.member.email);
+    const participantEmails = participants.map((f) => f.member.email);
 
     // Get investor team information
     const investorTeamRole = member.teamMemberRoles?.find((role) => role.investmentTeam);
@@ -270,10 +270,10 @@ export class DemoDayEngagementService {
 
     // Send notification
     if (!isPrepDemoDay) {
-      // Feedback emails go only to founders
+      // Feedback emails go to all participants (founders + investors)
       const isFeedback = interestType === 'feedback';
 
-      // Send push notifications to founders (WebSocket real-time)
+      // Send push notifications to participants (WebSocket real-time)
       const pushCategoryMap: Record<string, PushNotificationCategory> = {
         like: PushNotificationCategory.DEMO_DAY_LIKE,
         connect: PushNotificationCategory.DEMO_DAY_CONNECT,
@@ -291,26 +291,31 @@ export class DemoDayEngagementService {
       };
 
       const pushDescriptionMap: Record<string, string> = {
-        like: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} liked ${fundraisingProfile.team.name
-          } on ${demoDay.title}`,
-        connect: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} wants to connect with ${fundraisingProfile.team.name
-          }`,
-        invest: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} is interested in investing in ${fundraisingProfile.team.name
-          }`,
-        referral: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} referred ${referralData?.investorName || 'an investor'
-          } to ${fundraisingProfile.team.name}`,
-        feedback: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} sent feedback to ${fundraisingProfile.team.name
-          }`,
+        like: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} liked ${
+          fundraisingProfile.team.name
+        } on ${demoDay.title}`,
+        connect: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} wants to connect with ${
+          fundraisingProfile.team.name
+        }`,
+        invest: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} is interested in investing in ${
+          fundraisingProfile.team.name
+        }`,
+        referral: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} referred ${
+          referralData?.investorName || 'an investor'
+        } to ${fundraisingProfile.team.name}`,
+        feedback: `${investorName}${investorTeamName ? ` from ${investorTeamName}` : ''} sent feedback to ${
+          fundraisingProfile.team.name
+        }`,
       };
 
-      // Send push notification to each founder
-      for (const founder of founders) {
+      // Send push notification to each participant
+      for (const participant of participants) {
         try {
           await this.pushNotificationsService.create({
             category: pushCategoryMap[interestType],
             title: pushTitleMap[interestType],
             description: pushDescriptionMap[interestType],
-            recipientUid: founder.member.uid,
+            recipientUid: participant.member.uid,
             link: `/members/${member.uid}`,
             metadata: {
               demoDayUid: demoDay.uid,
@@ -330,10 +335,11 @@ export class DemoDayEngagementService {
           });
         } catch (error) {
           this.logger.error(
-            `Failed to send push notification to founder ${founder.member.uid}: ${error instanceof Error ? error.message : error
+            `Failed to send push notification to participant ${participant.member.uid}: ${
+              error instanceof Error ? error.message : error
             }`
           );
-          // Continue with other founders even if one fails
+          // Continue with other participants even if one fails
         }
       }
 
@@ -343,7 +349,7 @@ export class DemoDayEngagementService {
         templateName: template.templateName,
         recipientsInfo: {
           from: process.env.DEMO_DAY_EMAIL,
-          to: isFeedback ? founderEmails : [...founderEmails, referralData?.investorEmail].filter(Boolean),
+          to: isFeedback ? participantEmails : [...participantEmails, referralData?.investorEmail].filter(Boolean),
           cc: isFeedback ? [] : [member.email],
           bcc: [process.env.DEMO_DAY_EMAIL],
         },
@@ -353,7 +359,7 @@ export class DemoDayEngagementService {
             demoDayLink: `${process.env.WEB_UI_BASE_URL}/demoday?utm_source=email_intro`,
             subjectPrefix: isPrepDemoDay ? '[DEMO DAY PREP - PRACTICE EMAIL] ' : '',
             teamsSubject: teamsSubject,
-            founderNames: founders.map((f) => f.member.name).join(', '),
+            founderNames: participants.map((f) => f.member.name).join(', '),
             founderTeamName: founderTeamName,
             investorName: investorName,
             investorTeamName: investorTeamName,
@@ -361,16 +367,16 @@ export class DemoDayEngagementService {
             investorNameLink,
             ...(referralData
               ? {
-                referralTeamName: fundraisingProfile.team.name,
-                referralInvestorName: referralData.investorName || referralData.investorEmail,
-                referralInvestorEmail: referralData.investorEmail,
-                referralMessage: referralData.message,
-              }
+                  referralTeamName: fundraisingProfile.team.name,
+                  referralInvestorName: referralData.investorName || referralData.investorEmail,
+                  referralInvestorEmail: referralData.investorEmail,
+                  referralMessage: referralData.message,
+                }
               : {}),
             ...(feedbackData
               ? {
-                feedbackText: feedbackData.feedback,
-              }
+                  feedbackText: feedbackData.feedback,
+                }
               : {}),
           },
         },
@@ -410,23 +416,23 @@ export class DemoDayEngagementService {
           userId: member.uid,
           userName: member.name,
           userEmail: member.email,
-          founderNames: founders.map((f) => f.member.name).join(','),
-          founderEmails: founders.map((f) => f.member.email).join(','),
+          founderNames: participants.map((f) => f.member.name).join(','),
+          founderEmails: participants.map((f) => f.member.email).join(','),
           teamUid: fundraisingProfile.teamUid,
           teamName: fundraisingProfile.team.name,
           interestType,
           isPrepDemoDay,
           ...(referralData
             ? {
-              referralName: referralData.investorName,
-              referralEmail: referralData.investorEmail,
-              referralMessage: referralData.message,
-            }
+                referralName: referralData.investorName,
+                referralEmail: referralData.investorEmail,
+                referralMessage: referralData.message,
+              }
             : {}),
           ...(feedbackData
             ? {
-              feedbackText: feedbackData.feedback,
-            }
+                feedbackText: feedbackData.feedback,
+              }
             : {}),
         },
       });
