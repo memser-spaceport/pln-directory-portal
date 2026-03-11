@@ -8,8 +8,8 @@ export class TeamEnrichmentJob {
 
   constructor(private readonly teamEnrichmentService: TeamEnrichmentService) { }
 
-  // By default, every day at 3:00 AM
-  @Cron(process.env.TEAM_ENRICHMENT_CRON || '0 3 * * *', {
+  // By default, every minute
+  @Cron(process.env.TEAM_ENRICHMENT_CRON || '* * * * *', {
     name: 'daily-team-enrichment',
     timeZone: 'UTC',
   })
