@@ -37,7 +37,7 @@ export class HuskyAiService {
     private huskyPersistentDbService: MongoPersistantDbService,
     private prisma: PrismaService,
     private huskyAiToolsService: HuskyAiToolsService
-  ) { }
+  ) {}
 
   async createContextualToolsResponse(chatInfo: HuskyChatInterface, isLoggedIn: boolean) {
     const { question, threadId, chatId } = chatInfo;
@@ -63,6 +63,7 @@ export class HuskyAiService {
             - currentDate: ${currentDate}
           `,
           maxSteps: 5,
+          temperature: 0.001,
           onStepFinish: async (step) => {
             if (step.toolResults?.length > 0) {
               toolResults += step.toolResults.map((tool: { result: string }) => tool.result).join('\n\n');
@@ -94,12 +95,13 @@ export class HuskyAiService {
             - content: ${content}
             - context: ${toolResults}
           `,
+          temperature: 0.001,
           onFinish: async (response) => {
             this.updateChatSummary(threadId, { user: question, system: content })
               .then((res) => {
                 return this.updateChatSummaryInMongo(threadId, res);
               })
-              .then(() => { });
+              .then(() => {});
             this.persistContextualHistory(
               threadId,
               chatId,
@@ -108,7 +110,7 @@ export class HuskyAiService {
               response?.object?.sources || [],
               response?.object?.followUpQuestions || [],
               response?.object?.actions || []
-            ).then(() => { });
+            ).then(() => {});
           },
         });
 
@@ -142,7 +144,7 @@ export class HuskyAiService {
         chatSummary.sources || [],
         chatSummary.followUpQuestions || [],
         chatSummary.actions || []
-      ).then(() => { });
+      ).then(() => {});
     }
 
     // Rephrase the question and get the matching documents to create context
@@ -160,6 +162,7 @@ export class HuskyAiService {
       return streamObject({
         model: openai(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
         schema: HuskyResponseSchema,
+        temperature: 0.001,
         prompt: HUSKY_NO_INFO_PROMPT,
         onFinish: async (response) => {
           this.persistContextualHistory(
@@ -170,7 +173,7 @@ export class HuskyAiService {
             response?.object?.sources || [],
             response?.object?.followUpQuestions || [],
             response?.object?.actions || []
-          ).then(() => { });
+          ).then(() => {});
         },
       });
     }
@@ -189,6 +192,7 @@ export class HuskyAiService {
         - action List: ${JSON.stringify(directoryDocs)}
         - currentDate: ${new Date().toISOString().split('T')[0]}
       `,
+      temperature: 0.001,
       onFinish: async (response) => {
         this.updateChatSummary(threadId, { user: question, system: response?.object?.content })
           .then((res) => {
@@ -417,17 +421,17 @@ export class HuskyAiService {
 
     const aiPrompt = previousSummary
       ? Handlebars.compile(HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT)({
-        previousChatHistory: previousSummary,
-        question: rawChatHistory.user,
-        response: rawChatHistory.system,
-        maxLength,
-      })
+          previousChatHistory: previousSummary,
+          question: rawChatHistory.user,
+          response: rawChatHistory.system,
+          maxLength,
+        })
       : Handlebars.compile(HUSKY_CHAT_SUMMARY_SYSTEM_PROMPT)({
-        previousChatHistory: '',
-        question: rawChatHistory.user,
-        response: rawChatHistory.system,
-        maxLength,
-      });
+          previousChatHistory: '',
+          question: rawChatHistory.user,
+          response: rawChatHistory.system,
+          maxLength,
+        });
 
     const { text } = await generateText({
       model: openai(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
