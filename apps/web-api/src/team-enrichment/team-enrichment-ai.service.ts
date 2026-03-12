@@ -124,7 +124,6 @@ export class TeamEnrichmentAiService {
           }),
         },
         prompt: userPrompt,
-        temperature: 0.3,
         maxSteps: 3,
       });
 

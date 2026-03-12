@@ -77,8 +77,7 @@ export class HuskyGenerationService {
       - Professional Experience: ${member.experiences
         .map(
           (exp) =>
-            `${exp.title} at ${exp.company}${exp.location ? ` in ${exp.location}` : ''} (${exp.startDate} - ${
-              exp.endDate || 'Present'
+            `${exp.title} at ${exp.company}${exp.location ? ` in ${exp.location}` : ''} (${exp.startDate} - ${exp.endDate || 'Present'
             })`
         )
         .join('\n')}
@@ -89,7 +88,6 @@ export class HuskyGenerationService {
     const generateTextOptions: any = {
       model: openai.responses(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
       prompt,
-      temperature: 0.7,
     };
 
     if (hasEnoughIdentifyingInfo) {
@@ -169,8 +167,7 @@ export class HuskyGenerationService {
       - Professional Experience: ${member.experiences
         .map(
           (exp) =>
-            `${exp.title} at ${exp.company}${exp.location ? ` in ${exp.location}` : ''} (${exp.startDate} - ${
-              exp.endDate || 'Present'
+            `${exp.title} at ${exp.company}${exp.location ? ` in ${exp.location}` : ''} (${exp.startDate} - ${exp.endDate || 'Present'
             })`
         )
         .join('\n')}
@@ -185,7 +182,6 @@ export class HuskyGenerationService {
         JSON.stringify(availableSkills.map((s) => s.title))
       ),
       prompt,
-      temperature: 0.7,
     };
 
     if (hasEnoughIdentifyingInfo) {
@@ -251,7 +247,6 @@ export class HuskyGenerationService {
       model: openai.responses(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
       system: HUSKY_RECOMMENDATION_REASON_SYSTEM_PROMPT,
       prompt,
-      temperature: 0.7,
     };
 
     try {
@@ -297,16 +292,16 @@ export class HuskyGenerationService {
         userLocation:
           member.location?.city && countryCode
             ? {
-                type: 'approximate',
-                city: member.location.city,
-                country: countryCode,
-              }
+              type: 'approximate',
+              city: member.location.city,
+              country: countryCode,
+            }
             : member.location?.city
-            ? {
+              ? {
                 type: 'approximate',
                 city: member.location.city,
               }
-            : undefined,
+              : undefined,
       }),
     };
   }
