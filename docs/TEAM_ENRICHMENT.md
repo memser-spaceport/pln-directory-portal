@@ -114,7 +114,7 @@ any modified enrichable fields are marked as `ChangedByUser` in the `fields` map
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `IS_TEAM_ENRICHMENT_ENABLED` | `false` | Enable/disable the cron job |
-| `OPENAI_TEAM_ENRICHMENT_MODEL` | `gpt-4o` | OpenAI model for enrichment |
+| `OPENAI_TEAM_ENRICHMENT_MODEL` | `gpt-5` | OpenAI model for enrichment |
 | `TEAM_ENRICHMENT_CRON` | `0 3 * * *` | Cron schedule expression |
 
 ## Module Structure

@@ -97,7 +97,7 @@ export class TeamEnrichmentAiService {
   private readonly MODEL_NAME: string;
 
   constructor() {
-    this.MODEL_NAME = process.env.OPENAI_TEAM_ENRICHMENT_MODEL || 'gpt-4o';
+    this.MODEL_NAME = process.env.OPENAI_TEAM_ENRICHMENT_MODEL || 'gpt-5';
   }
 
   async enrichTeamViaAI(
