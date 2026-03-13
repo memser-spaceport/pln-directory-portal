@@ -45,6 +45,46 @@ export class TeamEnrichmentService {
     this.logger.log(`Marked team ${teamUid} for enrichment`);
   }
 
+  async findTeamsEligibleForEnrichment(): Promise<Array<{ uid: string }>> {
+    return this.prisma.team.findMany({
+      where: {
+        isFund: true,
+        accessLevel: 'L1',
+        website: { not: { equals: '' } },
+        NOT: { website: null },
+        dataEnrichment: { equals: Prisma.DbNull },
+        OR: [
+          { blog: null },
+          { blog: '' },
+          { contactMethod: null },
+          { contactMethod: '' },
+          { twitterHandler: null },
+          { twitterHandler: '' },
+          { linkedinHandler: null },
+          { linkedinHandler: '' },
+          { telegramHandler: null },
+          { telegramHandler: '' },
+          { shortDescription: null },
+          { shortDescription: '' },
+          { longDescription: null },
+          { longDescription: '' },
+          { moreDetails: null },
+          { moreDetails: '' },
+        ],
+      },
+      select: { uid: true },
+    });
+  }
+
+  async markEligibleTeamsForEnrichment(): Promise<number> {
+    const teams = await this.findTeamsEligibleForEnrichment();
+    this.logger.log(`Found ${teams.length} teams eligible for enrichment marking`);
+    for (const team of teams) {
+      await this.markTeamForEnrichment(team.uid);
+    }
+    return teams.length;
+  }
+
   async findTeamsPendingEnrichment(): Promise<
     Array<{
       uid: string;

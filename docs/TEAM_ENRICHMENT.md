@@ -65,6 +65,13 @@ Each enrichable field is tracked in `dataEnrichment.fields`:
 3. After creation, system marks the team for enrichment
 4. Sets `dataEnrichment = { shouldEnrich: true, status: 'PendingEnrichment', ... }`
 
+### Path C — Automatic marking of eligible existing teams
+
+1. A cron job (`TEAM_ENRICHMENT_MARKING_CRON`) periodically scans for L1 fund teams that have a website but have never been enriched (`dataEnrichment` is null)
+2. Teams must also have at least one empty enrichable scalar field (blog, contactMethod, twitterHandler, linkedinHandler, telegramHandler, shortDescription, longDescription, moreDetails)
+3. Matching teams are marked for enrichment: `dataEnrichment = { shouldEnrich: true, status: 'PendingEnrichment', ... }`
+4. The existing enrichment cron picks them up on its next run
+
 ## Enrichment Behavior
 
 - Skips teams without a website (marks as `FailedToEnrich`)
@@ -120,11 +127,12 @@ any modified enrichable fields are marked as `ChangedByUser` in the `fields` map
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `IS_TEAM_ENRICHMENT_ENABLED` | `false` | Enable/disable the cron job |
-| `OPENAI_TEAM_ENRICHMENT_MODEL` | `gpt-4o` | OpenAI model for enrichment |
+| Variable | Default     | Description |
+|----------|-------------|-------------|
+| `IS_TEAM_ENRICHMENT_ENABLED` | `false`     | Enable/disable the cron job |
+| `OPENAI_TEAM_ENRICHMENT_MODEL` | `gpt-4o`    | OpenAI model for enrichment |
 | `TEAM_ENRICHMENT_CRON` | `0 3 * * *` | Cron schedule expression |
+| `TEAM_ENRICHMENT_MARKING_CRON` | `0 2 * * *` | Cron schedule for auto-marking eligible teams |
 
 ## Module Structure
 
