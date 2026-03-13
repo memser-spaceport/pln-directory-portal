@@ -5,7 +5,8 @@ import { TeamEnrichmentService } from './team-enrichment.service';
 @Injectable()
 export class TeamEnrichmentJob {
   private readonly logger = new Logger(TeamEnrichmentJob.name);
-  private isRunning = false;
+  private isEnrichmentRunning = false;
+  private isMarkingRunning = false;
 
   constructor(private readonly teamEnrichmentService: TeamEnrichmentService) { }
 
@@ -15,7 +16,7 @@ export class TeamEnrichmentJob {
     timeZone: 'UTC',
   })
   async runEnrichment(): Promise<void> {
-    if (this.isRunning) {
+    if (this.isEnrichmentRunning) {
       this.logger.log('Team enrichment job already in progress, skipping this run');
       return;
     }
@@ -26,7 +27,7 @@ export class TeamEnrichmentJob {
       return;
     }
 
-    this.isRunning = true;
+    this.isEnrichmentRunning = true;
     this.logger.log('Starting team enrichment job');
 
     try {
@@ -52,7 +53,34 @@ export class TeamEnrichmentJob {
         `Team enrichment job completed: ${enriched} enriched, ${failed} failed out of ${teams.length} total`
       );
     } finally {
-      this.isRunning = false;
+      this.isEnrichmentRunning = false;
+    }
+  }
+
+  // Default: daily at 2 AM UTC
+  @Cron(process.env.TEAM_ENRICHMENT_MARKING_CRON || '0 2 * * *', {
+    name: 'daily-team-enrichment-marking',
+    timeZone: 'UTC',
+  })
+  async runEnrichmentMarking(): Promise<void> {
+    if (this.isMarkingRunning) {
+      this.logger.log('Team enrichment marking job already in progress, skipping this run');
+      return;
+    }
+
+    const isEnabled = (process.env.IS_TEAM_ENRICHMENT_ENABLED?.toLowerCase() ?? 'false') === 'true';
+    if (!isEnabled) {
+      return;
+    }
+
+    this.isMarkingRunning = true;
+    this.logger.log('Starting team enrichment marking job');
+
+    try {
+      const count = await this.teamEnrichmentService.markEligibleTeamsForEnrichment();
+      this.logger.log(`Team enrichment marking job completed: ${count} teams marked`);
+    } finally {
+      this.isMarkingRunning = false;
     }
   }
 }
