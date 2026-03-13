@@ -1,5 +1,6 @@
 /* eslint-disable prettier/prettier */
 import {
+  BadRequestException,
   Body,
   CacheTTL,
   Controller,
@@ -30,6 +31,7 @@ import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { ENABLED_RETRIEVAL_PROFILE } from '../utils/prisma-query-builder/profile/defaults';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { TeamsService } from './teams.service';
+import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
@@ -46,7 +48,11 @@ const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
 @Controller()
 export class TeamsController {
-  constructor(private readonly teamsService: TeamsService, private readonly membersService: MembersService) {}
+  constructor(
+    private readonly teamsService: TeamsService,
+    private readonly membersService: MembersService,
+    private readonly teamEnrichmentService: TeamEnrichmentService,
+  ) {}
 
   @Api(server.route.teamFilters)
   @ApiQueryFromZod(TeamQueryParams)
@@ -249,5 +255,30 @@ export class TeamsController {
   async getTeams() {
     const teams = await this.teamsService.findAllForAdmin();
     return { teams };
+  }
+
+  @Patch('v1/teams/:uid/enrichment-review')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async reviewEnrichment(
+    @Param('uid') uid: string,
+    @Body() body: { status: 'Reviewed' | 'Approved' },
+    @Req() req: Request,
+  ) {
+    if (!body.status || !['Reviewed', 'Approved'].includes(body.status)) {
+      throw new BadRequestException('status must be "Reviewed" or "Approved"');
+    }
+
+    const userEmail = req['userEmail'];
+    const member = await this.membersService.findMemberByEmail(userEmail);
+
+    // Verify requestor is team lead
+    const isTeamLead = await this.teamsService.isMemberTeamLead(uid, member.uid);
+    if (!isTeamLead) {
+      throw new ForbiddenException('Only team leads can review enrichment');
+    }
+
+    await this.teamEnrichmentService.reviewEnrichment(uid, body.status, userEmail);
+    return { success: true };
   }
 }

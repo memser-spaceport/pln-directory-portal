@@ -94,7 +94,8 @@ const newDataTeamSchema = z.object({
       investInStartupStages: z.array(z.string()).optional().default([]),
       investInFundTypes: z.array(z.string()).optional().default([]),
     })
-    .optional(),
+    .optional()
+    .nullable(),
 });
 
 export const ParticipantRequestMemberSchema = z.object({
@@ -136,6 +137,6 @@ const ProcessBulkRequest = z.object({
   participantType: participantTypeEnum,
   isVerified: z.boolean(),
 });
-export class ProcessBulkParticipantRequest extends createZodDto(ProcessBulkRequest) {}
-export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) {}
-export class FindUniqueIdentiferDto extends createZodDto(FindUniqueIdentiferSchema) {}
+export class ProcessBulkParticipantRequest extends createZodDto(ProcessBulkRequest) { }
+export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) { }
+export class FindUniqueIdentiferDto extends createZodDto(FindUniqueIdentiferSchema) { }

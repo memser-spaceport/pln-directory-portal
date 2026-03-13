@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {forwardRef, Inject, Injectable, Logger} from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { WebSocketService } from '../websocket/websocket.service';
 import { Prisma, PushNotificationCategory } from '@prisma/client';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
 
 export interface CreatePushNotificationDto {
   category: PushNotificationCategory;
@@ -47,7 +48,9 @@ export class PushNotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly webSocketService: WebSocketService,
-    private readonly notificationServiceClient: NotificationServiceClient
+    private readonly notificationServiceClient: NotificationServiceClient,
+    @Inject(forwardRef(() => PLEventGuestsService))
+    private readonly pleventGuestsService: PLEventGuestsService
   ) {}
 
   private isSelfAuthoredForumPost(
@@ -62,6 +65,60 @@ export class PushNotificationsService {
     );
   }
 
+  private async getFreshAttendeesTotal(locationUid: string): Promise<number> {
+    const rows = await this.pleventGuestsService.getPLEventGuestsByLocationAndType(
+      locationUid,
+      { type: 'upcoming' },
+      null
+    );
+
+    if (!rows || rows.length === 0) {
+      return 0;
+    }
+
+    return typeof rows[0]?.count === 'number' ? rows[0].count : rows.length;
+  }
+
+  private async checkIsAttendedForNotification(
+    memberUid: string,
+    notification: NotificationWithReadStatus
+  ): Promise<boolean> {
+    const metadata = notification.metadata as Record<string, any> | null;
+    const locationUid = metadata?.ui?.locationUid;
+    const eventUids = !Array.isArray(metadata?.events?.eventUids)
+      ? []
+      : metadata?.events.eventUids.filter(
+        (uid: unknown): uid is string => typeof uid === 'string' && uid.length > 0
+      );
+
+    if (!locationUid) {
+      return false;
+    }
+
+    const attended = await this.prisma.pLEventGuest.findFirst({
+      where: {
+        memberUid,
+        locationUid,
+        OR: [
+          { eventUid: null },
+          ...(eventUids.length > 0
+            ? [
+              {
+                eventUid: { in: eventUids },
+                event: {
+                  isDeleted: false,
+                  endDate: { gte: new Date() },
+                },
+              },
+            ]
+            : []),
+        ],
+      },
+      select: { uid: true },
+    });
+
+    return !!attended;
+  }
   /**
    * Create and send a push notification.
    * 1. Stores in database
@@ -187,19 +244,19 @@ export class PushNotificationsService {
     // Get access level notifications (where user's access level is in the accessLevels array)
     const accessLevelNotifications = userAccessLevel
       ? await this.prisma.pushNotification.findMany({
-          where: {
-            accessLevels: { has: userAccessLevel },
-            isPublic: false,
-            recipientUid: null,
+        where: {
+          accessLevels: { has: userAccessLevel },
+          isPublic: false,
+          recipientUid: null,
+        },
+        include: {
+          readStatuses: {
+            where: { memberUid },
+            take: 1,
           },
-          include: {
-            readStatuses: {
-              where: { memberUid },
-              take: 1,
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-        })
+        },
+        orderBy: { createdAt: 'desc' },
+      })
       : [];
 
     // Transform and combine notifications
@@ -261,17 +318,10 @@ export class PushNotificationsService {
       // Then by createdAt descending
       return b.createdAt.getTime() - a.createdAt.getTime();
     });
-    // Sort: unread first, then by createdAt desc
-    notifications.sort((a, b) => {
-      if (a.isRead !== b.isRead) {
-        return a.isRead ? 1 : -1;
-      }
-      return b.createdAt.getTime() - a.createdAt.getTime();
-    });
 
     const paginatedNotifications = notifications.slice(offset, offset + limit);
 
-    // ---- IRL: compute isAttended per user (only for returned page) ----
+    // ---- IRL: compute isAttended + refresh attendees.total from live attendees source ----
     const irlPage = paginatedNotifications.filter(
       (n) =>
         n.category === PushNotificationCategory.IRL_GATHERING &&
@@ -280,24 +330,49 @@ export class PushNotificationsService {
         (n.metadata as any)?.ui?.locationUid
     );
 
-    const locationUids = [...new Set(irlPage.map((n) => (n.metadata as any).ui.locationUid).filter(Boolean))];
+    const locationUids = [
+      ...new Set(irlPage.map((n) => (n.metadata as any)?.ui?.locationUid).filter(Boolean)),
+    ] as string[];
 
     if (locationUids.length > 0) {
-      const attendedRows = await this.prisma.pLEventGuest.findMany({
-        where: {
-          memberUid: memberUid,
-          locationUid: { in: locationUids },
-        },
-        select: { locationUid: true },
-        distinct: ['locationUid'],
-      });
+      const attendeesTotals = new Map<string, number>();
 
-      const attendedSet = new Set(attendedRows.map((r) => r.locationUid));
+      await Promise.all(
+        locationUids.map(async (locationUid) => {
+          try {
+            const total = await this.getFreshAttendeesTotal(locationUid);
+            attendeesTotals.set(locationUid, total);
+          } catch (error) {
+            this.logger.warn(
+              `Failed to refresh attendees total for IRL notification location ${locationUid}: ${
+                error instanceof Error ? error.message : error
+              }`
+            );
+          }
+        })
+      );
 
-      for (const n of irlPage) {
-        const loc = (n.metadata as any)?.ui?.locationUid;
-        n.isAttended = attendedSet.has(loc);
-      }
+      await Promise.all(
+        irlPage.map(async (n) => {
+          const metadata = n.metadata as Record<string, any>;
+          const loc = metadata?.ui?.locationUid;
+
+          n.isAttended = await this.checkIsAttendedForNotification(memberUid, n);
+
+          if (loc) {
+            const freshTotal = attendeesTotals.get(loc);
+
+            if (freshTotal !== undefined) {
+              metadata.attendees = {
+                ...(metadata.attendees ?? {}),
+                total: freshTotal,
+              };
+
+              n.metadata = metadata as Prisma.JsonValue;
+            }
+          }
+        })
+      );
     }
 
     return {
@@ -428,17 +503,17 @@ export class PushNotificationsService {
     // Unread access-level notifications with links
     const accessLevelLinks = userAccessLevel
       ? await this.prisma.pushNotification.findMany({
-          where: {
-            accessLevels: { has: userAccessLevel },
-            isPublic: false,
-            recipientUid: null,
-            link: { not: null },
-            readStatuses: {
-              none: { memberUid },
-            },
+        where: {
+          accessLevels: { has: userAccessLevel },
+          isPublic: false,
+          recipientUid: null,
+          link: { not: null },
+          readStatuses: {
+            none: { memberUid },
           },
-          select: { uid: true, link: true, category: true, metadata: true },
-        })
+        },
+        select: { uid: true, link: true, category: true, metadata: true },
+      })
       : [];
 
     const filteredAccessLevelLinks = accessLevelLinks.filter(

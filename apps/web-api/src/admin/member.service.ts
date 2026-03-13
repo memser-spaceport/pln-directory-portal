@@ -234,6 +234,7 @@ export class MemberService {
       'isSubscribedToNewsletter',
       'teamOrProjectURL',
       'aboutYou',
+      'role',
     ];
     copyObj(memberData, member, directFields);
     member.email = member.email.toLowerCase().trim();
@@ -425,7 +426,9 @@ export class MemberService {
           // Set roleTags for the new role based on default roleTags or split role string
           memberData.teamAndRoles[index].roleTags = foundDefaultRoleTag
             ? foundValue.roleTags
-            : t.role?.split(',').map((item: string) => item.trim());
+            : t.role
+              ? t.role.split(',').map((item: string) => item.trim())
+              : [];
           // Preserve investmentTeam if not explicitly provided
           if (t.investmentTeam === undefined) {
             memberData.teamAndRoles[index].investmentTeam = foundValue.investmentTeam;
@@ -506,8 +509,8 @@ export class MemberService {
             },
           },
           data: {
-            role: roleToUpdate.role,
-            roleTags: roleToUpdate.roleTags,
+            role: roleToUpdate.role?.trim() ?? null,
+            roleTags: roleToUpdate.roleTags ?? [],
             investmentTeam: roleToUpdate.investmentTeam || false,
           },
         })
@@ -525,12 +528,14 @@ export class MemberService {
     return {
       createMany: {
         data: memberData.teamAndRoles.map((t) => ({
-          role: t.role,
+          role: t.role?.trim() ?? null,
           mainTeam: false,
           teamLead: false,
           investmentTeam: t.investmentTeam || false,
           teamUid: t.teamUid,
-          roleTags: t.role?.split(',')?.map((item) => item.trim()),
+          roleTags: t.role
+            ? t.role.split(',').map((item) => item.trim())
+            : [],
         })),
       },
     };
