@@ -11,6 +11,7 @@ import { LogService } from '../shared/log.service';
 import { TeamsService } from '../teams/teams.service';
 import { Prisma } from '@prisma/client';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
+import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 
 type ParticipantTypeString = 'MEMBER' | 'TEAM';
 
@@ -21,6 +22,8 @@ export class ParticipantsRequestService {
     private readonly membersService: MembersService,
     @Inject(forwardRef(() => TeamsService))
     private readonly teamsService: TeamsService,
+    @Inject(forwardRef(() => TeamEnrichmentService))
+    private readonly teamEnrichmentService: TeamEnrichmentService,
     private readonly logger: LogService,
     private readonly locationTransferService: LocationTransferService,
   ) {}
@@ -221,6 +224,13 @@ export class ParticipantsRequestService {
       this.logger.info(
         `[ParticipantsRequestService.processImmediateRequest] Created team uid=${createdTeam.uid} from legacy request`,
       );
+
+      if (['L5', 'L6'].includes(requesterUser?.accessLevel)) {
+        await this.teamEnrichmentService.markTeamForEnrichment(createdTeam.uid);
+        this.logger.info(
+          `[ParticipantsRequestService.processImmediateRequest] Marked team uid=${createdTeam.uid} for enrichment (requester accessLevel=${requesterUser.accessLevel})`,
+        );
+      }
 
       return {
         type: 'TEAM',

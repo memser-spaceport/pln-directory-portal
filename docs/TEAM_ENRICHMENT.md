@@ -51,9 +51,18 @@ Each enrichable field is tracked in `dataEnrichment.fields`:
 
 ## Trigger Flow
 
+### Path A — Demo Day Approval (L0→L1 promotion)
+
 1. Admin approves investor via PATCH `/v1/demo-days/:uid/participants/:uid` with `status: 'ENABLED'`
 2. System identifies fund teams at L0 where participant is team lead
 3. After promoting teams to L1, marks them for enrichment
+4. Sets `dataEnrichment = { shouldEnrich: true, status: 'PendingEnrichment', ... }`
+
+### Path B — Team creation by L5-L6 members via participants-request
+
+1. L5/L6 member creates a team via POST `/v1/participants-request` with `participantType: 'TEAM'`
+2. Team is created with `accessLevel: 'L1'` (automatic for L5-L6 requesters)
+3. After creation, system marks the team for enrichment
 4. Sets `dataEnrichment = { shouldEnrich: true, status: 'PendingEnrichment', ... }`
 
 ## Enrichment Behavior
@@ -130,7 +139,7 @@ apps/web-api/src/team-enrichment/
 
 ## Dependencies
 
-- `TeamEnrichmentModule` is imported by: `AppModule`, `DemoDaysModule`, `TeamsModule`, `AdminModule`
+- `TeamEnrichmentModule` is imported by: `AppModule`, `DemoDaysModule`, `TeamsModule`, `AdminModule`, `ParticipantsRequestModule`
 - Uses `forwardRef` for `TeamsModule` circular dependency
 - AI: `ai` + `@ai-sdk/openai` packages
 - Logo extraction: `open-graph-scraper`

@@ -8,10 +8,11 @@ import { NotificationService } from '../utils/notification/notification.service'
 import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
 import {AdminModule} from "../admin/admin.module";
 import {MembersModule} from "../members/members.module";
+import {TeamEnrichmentModule} from "../team-enrichment/team-enrichment.module";
 @Module({
   imports: [forwardRef(() => AdminModule),
     forwardRef(() => MembersModule),
-    forwardRef(() => TeamsModule), SharedModule, NotificationSettingsModule],
+    forwardRef(() => TeamsModule), forwardRef(() => TeamEnrichmentModule), SharedModule, NotificationSettingsModule],
   controllers: [ParticipantsRequestController],
   providers: [
     ParticipantsRequestService,
