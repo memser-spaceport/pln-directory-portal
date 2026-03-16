@@ -518,9 +518,17 @@ export class DemoDaysService {
     );
   }
 
-  async getDemoDayByUidOrSlug(uidOrSlug: string): Promise<DemoDay & { logoUid?: string | null; logoUrl?: string | null }> {
+  async getDemoDayByUidOrSlug(
+    uidOrSlug: string
+  ): Promise<DemoDay & { logoUid?: string | null; logoUrl?: string | null }> {
     const demoDay = await this.prisma.demoDay.findFirst({
-      where: { OR: [{ uid: uidOrSlug }, { slugURL: uidOrSlug }], isDeleted: false },
+      where: {
+        OR: [
+          { uid: { equals: uidOrSlug, mode: 'insensitive' } },
+          { slugURL: { equals: uidOrSlug, mode: 'insensitive' } },
+        ],
+        isDeleted: false,
+      },
       select: {
         id: true,
         uid: true,
@@ -562,7 +570,7 @@ export class DemoDaysService {
 
   async getDemoDayBySlugURL(slugURL: string): Promise<DemoDay & { logoUid?: string | null; logoUrl?: string | null }> {
     const demoDay = await this.prisma.demoDay.findFirst({
-      where: { slugURL, isDeleted: false },
+      where: { slugURL: { equals: slugURL, mode: 'insensitive' }, isDeleted: false },
       select: {
         id: true,
         uid: true,
