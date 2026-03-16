@@ -63,7 +63,7 @@ export class TeamsController {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
-    const { focusAreas, isHost }: any = request.query;
+    const { focusAreas, communityAffiliations, isHost }: any = request.query;
     if (isHost) {
       //Remove isHost from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
@@ -72,6 +72,7 @@ export class TeamsController {
       AND: [
         builtQuery.where ? builtQuery.where : {},
         this.teamsService.buildFocusAreaFilters(focusAreas),
+        this.teamsService.buildCommunityAffiliationFilters(communityAffiliations),
         this.teamsService.buildRecentTeamsFilter(request.query),
         this.teamsService.buildParticipationTypeFilter(request.query),
         this.teamsService.buildAskTagFilter(request.query),
@@ -88,7 +89,7 @@ export class TeamsController {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
-    const { focusAreas, isHost, isSponsor }: any = request.query;
+    const { focusAreas, communityAffiliations, isHost, isSponsor }: any = request.query;
     if (isHost || isSponsor) {
       //Remove isHost from the default query since it is to be added in eventGuest.
       delete builtQuery.where?.isHost;
@@ -98,6 +99,7 @@ export class TeamsController {
       AND: [
         builtQuery.where ? builtQuery.where : {},
         this.teamsService.buildFocusAreaFilters(focusAreas),
+        this.teamsService.buildCommunityAffiliationFilters(communityAffiliations),
         this.teamsService.buildRecentTeamsFilter(request.query),
         this.teamsService.buildParticipationTypeFilter(request.query),
         this.teamsService.buildAskTagFilter(request.query),

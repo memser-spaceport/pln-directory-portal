@@ -51,6 +51,7 @@ model Team {
   teamMemberRoles              TeamMemberRole[]
   industryTags                 IndustryTag[]
   membershipSources            MembershipSource[]
+  communityAffiliations        CommunityAffiliation[]
   fundingStage                 FundingStage?                 @relation(fields: [fundingStageUid], references: [uid])
   fundingStageUid              String?
   technologies                 Technology[]
@@ -348,6 +349,15 @@ model FundingStage {
 }
 
 model MembershipSource {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  title     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teams     Team[]
+}
+
+model CommunityAffiliation {
   id        Int      @id @default(autoincrement())
   uid       String   @unique @default(cuid())
   title     String   @unique
