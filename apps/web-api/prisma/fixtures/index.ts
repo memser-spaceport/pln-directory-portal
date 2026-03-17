@@ -1,4 +1,5 @@
 export * from './membership-sources';
+export * from './community-affiliations';
 export * from './funding-stages';
 export * from './images';
 export * from './industry-categories';

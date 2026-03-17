@@ -11,7 +11,7 @@ export class DemoDayNotificationsJob {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pushNotificationsService: PushNotificationsService
-  ) {}
+  ) { }
 
   /**
    * Hourly job that runs to check and send scheduled demo day notifications:
@@ -56,7 +56,7 @@ export class DemoDayNotificationsJob {
 
       this.logger.log(`Found ${demoDays.length} demo days with notifications enabled`);
 
-      let startingSoonSent = 0;
+      const startingSoonSent = 0;
       let closingSoonSent = 0;
       let errors = 0;
 
@@ -65,18 +65,18 @@ export class DemoDayNotificationsJob {
       for (const demoDay of demoDays) {
         try {
           // Check "Starting Soon" notification
-          if (demoDay.notifyBeforeStartHours) {
-            const notifyBeforeHours = demoDay.notifyBeforeStartHours;
-            const startDate = new Date(demoDay.startDate);
-            const notificationDate = new Date(startDate);
-            notificationDate.setHours(notificationDate.getHours() - notifyBeforeHours);
+          // if (demoDay.notifyBeforeStartHours) {
+          //   const notifyBeforeHours = demoDay.notifyBeforeStartHours;
+          //   const startDate = new Date(demoDay.startDate);
+          //   const notificationDate = new Date(startDate);
+          //   notificationDate.setHours(notificationDate.getHours() - notifyBeforeHours);
 
-            // Check if we're at or past the notification date but before the start date
-            if (now >= notificationDate && now < startDate) {
-              const sent = await this.sendStartingSoonNotification(demoDay);
-              if (sent) startingSoonSent++;
-            }
-          }
+          //   // Check if we're at or past the notification date but before the start date
+          //   if (now >= notificationDate && now < startDate) {
+          //     const sent = await this.sendStartingSoonNotification(demoDay);
+          //     if (sent) startingSoonSent++;
+          //   }
+          // }
 
           // Check "Closing Soon" notification
           if (demoDay.notifyBeforeEndHours) {

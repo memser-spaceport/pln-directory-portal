@@ -4,12 +4,12 @@ import { PrismaService } from '../shared/prisma.service';
 import { TEAM } from '../utils/constants';
 
 @Injectable()
-export class MembershipSourcesService {
+export class CommunityAffiliationsService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(query: any) {
     const { type } = query;
-    return this.prisma.membershipSource.findMany({
+    return this.prisma.communityAffiliation.findMany({
       select: {
         uid: true,
         title: true,
@@ -53,22 +53,22 @@ export class MembershipSourcesService {
     return {};
   }
 
-  findOne(uid: string, queryOptions: Omit<Prisma.MembershipSourceFindUniqueArgsBase, 'where'> = {}) {
-    return this.prisma.membershipSource.findUniqueOrThrow({
+  findOne(uid: string, queryOptions: Omit<Prisma.CommunityAffiliationFindUniqueArgsBase, 'where'> = {}) {
+    return this.prisma.communityAffiliation.findUniqueOrThrow({
       where: { uid },
       ...queryOptions,
     });
   }
 
-  async insertManyFromList(membershipSources: string[]) {
-    const uniqueMembershipSources = Array.from(new Set(membershipSources));
+  async insertManyFromList(communityAffiliations: string[]) {
+    const uniqueCommunityAffiliations = Array.from(new Set(communityAffiliations));
     return await this.prisma.$transaction(
-      uniqueMembershipSources.map((membershipSource) =>
-        this.prisma.membershipSource.upsert({
-          where: { title: membershipSource },
+      uniqueCommunityAffiliations.map((communityAffiliation) =>
+        this.prisma.communityAffiliation.upsert({
+          where: { title: communityAffiliation },
           update: {},
           create: {
-            title: membershipSource,
+            title: communityAffiliation,
           },
         })
       )

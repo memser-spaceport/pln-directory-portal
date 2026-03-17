@@ -61,7 +61,7 @@ export class FocusAreasService {
   }
 
   buildAncestorFocusAreasFilterByType(type, query): any {
-    if (type === TEAM) {
+    if (type?.toLowerCase() === TEAM.toLowerCase()) {
       const { plnFriend } = query;
       const teamWhereClause: any = {
         accessLevel: {
