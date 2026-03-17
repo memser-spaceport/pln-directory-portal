@@ -194,6 +194,7 @@ export class TeamsService {
           industryTags: true,
           logo: true,
           membershipSources: true,
+          communityAffiliations: true,
           technologies: true,
           maintainingProjects: {
             orderBy: { name: 'asc' },
@@ -553,6 +554,7 @@ export class TeamsService {
     team['industryTags'] = buildMultiRelationMapping('industryTags', teamData, type);
     team['technologies'] = buildMultiRelationMapping('technologies', teamData, type);
     team['membershipSources'] = buildMultiRelationMapping('membershipSources', teamData, type);
+    team['communityAffiliations'] = buildMultiRelationMapping('communityAffiliations', teamData, type);
     if (type === 'create') {
       team['teamFocusAreas'] = await this.createTeamWithFocusAreas(teamData, tx);
     }
@@ -773,6 +775,22 @@ export class TeamsService {
    * @param focusAreas - Comma-separated focus area titles
    * @returns - Prisma filter for teamFocusAreas
    */
+  buildCommunityAffiliationFilters(communityAffiliations) {
+    const affiliations = communityAffiliations?.split(',').map((a) => a.trim());
+    if (affiliations?.length > 0) {
+      return {
+        communityAffiliations: {
+          some: {
+            title: {
+              in: affiliations,
+            },
+          },
+        },
+      };
+    }
+    return {};
+  }
+
   buildFocusAreaFilters(focusAreas) {
     if (focusAreas?.split(',')?.length > 0) {
       return {
@@ -796,13 +814,14 @@ export class TeamsService {
    * @returns - Prisma AND filter combining all conditions
    */
   buildTeamFilter(queryParams) {
-    const { name, plnFriend, industryTags, technologies, membershipSources, fundingStage, officeHours, isHost } =
+    const { name, plnFriend, industryTags, technologies, membershipSources, communityAffiliations, fundingStage, officeHours, isHost } =
       queryParams;
     const filter: any = [];
     this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
     this.buildIndustryTagsFilter(industryTags, filter);
     this.buildTechnologiesFilter(technologies, filter);
     this.buildMembershipSourcesFilter(membershipSources, filter);
+    this.buildCommunityAffiliationsFilter(communityAffiliations, filter);
     this.buildFundingStageFilter(fundingStage, filter);
     this.buildOfficeHoursFilter(officeHours, filter);
     this.buildRecentTeamsFilter(queryParams, filter);
@@ -915,6 +934,28 @@ export class TeamsService {
             some: {
               title: {
                 in: source,
+              },
+            },
+          },
+        });
+      });
+    }
+  }
+
+  /**
+   * Adds community affiliations filter to the filter array.
+   * @param communityAffiliations - Comma-separated community affiliation titles
+   * @param filter - Filter array to be appended to
+   */
+  buildCommunityAffiliationsFilter(communityAffiliations, filter) {
+    const affiliations = communityAffiliations?.split(',').map((affiliation) => affiliation.trim());
+    if (affiliations?.length > 0) {
+      affiliations.map((affiliation) => {
+        filter.push({
+          communityAffiliations: {
+            some: {
+              title: {
+                in: affiliation,
               },
             },
           },
@@ -1201,7 +1242,7 @@ export class TeamsService {
    * and technologies that contains atleast one team.
    */
   async getTeamFilters(queryParams, userEmail: string | null) {
-    const [industryTags, membershipSources, fundingStages, technologies, askTags] = await Promise.all([
+    const [industryTags, membershipSources, communityAffiliations, fundingStages, technologies, askTags] = await Promise.all([
       this.prisma.industryTag.findMany({
         where: {
           teams: {
@@ -1214,6 +1255,17 @@ export class TeamsService {
       }),
 
       this.prisma.membershipSource.findMany({
+        where: {
+          teams: {
+            some: { ...queryParams.where },
+          },
+        },
+        select: {
+          title: true,
+        },
+      }),
+
+      this.prisma.communityAffiliation.findMany({
         where: {
           teams: {
             some: { ...queryParams.where },
@@ -1265,6 +1317,7 @@ export class TeamsService {
     return {
       industryTags: industryTags.map((tag) => tag.title),
       membershipSources: membershipSources.map((source) => source.title),
+      communityAffiliations: communityAffiliations.map((affiliation) => affiliation.title),
       fundingStages: sortedFundingStages,
       technologies: technologies.map((tech) => tech.title),
       askTags: this.askService.formatAskFilterResponse(askTags),
@@ -1618,6 +1671,7 @@ export class TeamsService {
   async searchTeams(filters: {
     searchBy?: string;
     membershipSources?: string;
+    communityAffiliations?: string;
     focusAreas?: string;
     fundingStage?: string;
     tags?: string;
@@ -1676,6 +1730,19 @@ export class TeamsService {
           some: {
             title: {
               in: filters.membershipSources.split('|'),
+              mode: 'insensitive',
+            },
+          },
+        },
+      });
+    }
+
+    if (filters.communityAffiliations && filters.communityAffiliations.length > 0) {
+      whereConditions.push({
+        communityAffiliations: {
+          some: {
+            title: {
+              in: filters.communityAffiliations.split('|'),
               mode: 'insensitive',
             },
           },

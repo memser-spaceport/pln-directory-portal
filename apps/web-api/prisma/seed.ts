@@ -40,6 +40,7 @@ async function checkDatabaseSafety(): Promise<void> {
 
 import {
   membershipSources,
+  communityAffiliations,
   fundingStages,
   imageRelations,
   industryCategories,
@@ -200,6 +201,7 @@ async function main() {
     { [Prisma.ModelName.Skill]: skills },
     { [Prisma.ModelName.FundingStage]: fundingStages },
     { [Prisma.ModelName.MembershipSource]: membershipSources },
+    { [Prisma.ModelName.CommunityAffiliation]: communityAffiliations },
     { [Prisma.ModelName.IndustryCategory]: industryCategories },
     { [Prisma.ModelName.IndustryTag]: industryTags },
     { [Prisma.ModelName.Location]: locations },

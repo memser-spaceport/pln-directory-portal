@@ -36,3 +36,4 @@ export * from './forum';
 export * from './demo-day';
 export * from './demo-day-engagement-analytics';
 export * from './contact-support';
+export * from './community-affiliation';

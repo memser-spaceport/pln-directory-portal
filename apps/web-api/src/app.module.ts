@@ -15,6 +15,7 @@ import { ConcealEntityIDInterceptor } from './interceptors/conceal-entity-id.int
 import { LocationsModule } from './locations/locations.module';
 import { LinkedInVerificationModule } from './linkedin-verification/linkedin-verification.module';
 import { MembersModule } from './members/members.module';
+import { CommunityAffiliationsModule } from './community-affiliations/community-affiliations.module';
 import { MembershipSourcesModule } from './membership-sources/membership-sources.module';
 import { ContentTypeMiddleware } from './middlewares/content-type.middleware';
 import { ParticipantsRequestModule } from './participants-request/participants-request.module';
@@ -102,6 +103,7 @@ import { TeamEnrichmentModule } from './team-enrichment/team-enrichment.module';
     ImagesModule,
     LinkedInVerificationModule,
     MembershipSourcesModule,
+    CommunityAffiliationsModule,
     FundingStagesModule,
     SkillsModule,
     LocationsModule,
