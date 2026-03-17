@@ -23,37 +23,67 @@
   letter-spacing: -0.75px;
 }
 
-.headerActions {
+.controlBar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
 }
 
-.input {
+.searchInput {
   display: flex;
-  height: 40px;
-  padding: 10px 16px;
+  height: 36px;
+  padding: 0 12px 0 36px;
   align-items: center;
   border-radius: 8px;
-  border: 1px solid rgba(203, 213, 225, 0.5);
-  background: #fff;
+  border: 1px solid #e2e8f0;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center;
   outline: none;
-  min-width: 260px;
+  flex: 1;
+  min-width: 0;
   font-size: 14px;
+  color: #0f172a;
+
+  &::placeholder {
+    color: #94a3b8;
+  }
 
   &:focus {
-    border: 1px solid #5e718d;
-    box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12) !important;
+    border-color: #5e718d;
+    box-shadow: 0 0 0 3px rgba(27, 56, 96, 0.08);
+  }
+}
+
+.filterSelect {
+  height: 36px;
+  padding: 0 32px 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
+  appearance: none;
+  font-size: 14px;
+  color: #0f172a;
+  cursor: pointer;
+  outline: none;
+  white-space: nowrap;
+
+  &:focus {
+    border-color: #5e718d;
+    box-shadow: 0 0 0 3px rgba(27, 56, 96, 0.08);
   }
 }
 
 .addNewBtn {
   display: flex;
-  height: 40px;
+  height: 36px;
   padding: 0 16px;
   justify-content: center;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   border-radius: 8px;
   border: 1px solid rgba(14, 15, 17, 0.12);
   background: #1b4dff;
@@ -65,6 +95,7 @@
   letter-spacing: -0.2px;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
 
   &:hover {
     background: #1640e0;
@@ -131,8 +162,12 @@
   display: flex;
   flex-direction: column;
   border: 1px solid #ddd;
-  border-radius: 10px 10px 0 0;
+  border-radius: 0;
   overflow: hidden;
+}
+
+.tableWithControlBar {
+  border-top: none;
 }
 
 .tableRow {

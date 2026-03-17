@@ -42,54 +42,79 @@ export function useDealsTable({
 }: UseDealsTableArgs) {
   const columns = useMemo(
     () => [
+      // 1. Vendor
       columnHelper.accessor('vendorName', {
         header: 'Vendor',
         sortingFn: 'alphanumeric',
         cell: (info) => <VendorCell deal={info.row.original} />,
         size: 0,
       }),
+      // 2. Category
       columnHelper.accessor('category', {
         header: 'Category',
         cell: (info) => info.getValue(),
-        size: 160,
+        size: 150,
         enableSorting: false,
       }),
+      // 3. Audience
       columnHelper.accessor('audience', {
         header: 'Audience',
         cell: (info) => info.getValue(),
         size: 180,
         enableSorting: false,
       }),
+      // 4. Marked as Using
       columnHelper.accessor('markedAsUsingCount', {
-        header: 'Using',
+        header: 'Marked as Using',
         cell: (info) => info.getValue() ?? '—',
-        size: 80,
+        size: 130,
         enableSorting: true,
         meta: { align: 'center' },
       }),
+      // 5. Tapped How to Redeem
       columnHelper.accessor('tappedHowToRedeemCount', {
-        header: 'Redeem Taps',
+        header: 'Tapped How to Redeem',
         cell: (info) => info.getValue() ?? '—',
-        size: 120,
+        size: 160,
         enableSorting: true,
         meta: { align: 'center' },
       }),
+      // 6. Submitted Issues
       columnHelper.accessor('submittedIssuesCount', {
-        header: 'Issues',
+        header: 'Submitted Issues',
         cell: (info) => <IssuesBadge count={info.getValue()} />,
-        size: 100,
+        size: 130,
         enableSorting: true,
         meta: { align: 'center' },
       }),
+      // 7. Status
       columnHelper.accessor('status', {
         header: 'Status',
         cell: (info) => <StatusBadge status={info.getValue()} />,
         size: 120,
         enableSorting: true,
       }),
+      // 8. Last Updated
+      columnHelper.accessor('updatedAt', {
+        header: 'Last Updated',
+        cell: (info) => {
+          const date = new Date(info.getValue());
+          return (
+            <div>
+              <div>{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+              <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          );
+        },
+        size: 140,
+        enableSorting: true,
+      }),
+      // 9. Action
       columnHelper.display({
         id: 'actions',
-        header: '',
+        header: 'Action',
         cell: (info) => (
           <ActionMenu
             deal={info.row.original}
@@ -97,7 +122,7 @@ export function useDealsTable({
             onStatusChange={onStatusChange}
           />
         ),
-        size: 56,
+        size: 80,
         enableResizing: false,
         meta: { align: 'center' },
       }),

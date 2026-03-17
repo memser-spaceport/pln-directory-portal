@@ -22,7 +22,23 @@ import { useSubmittedDealsTable } from '../../screens/deals/hooks/useSubmittedDe
 import { useReportedIssuesTable } from '../../screens/deals/hooks/useReportedIssuesTable';
 
 import { DealForm } from '../../screens/deals/components/DealForm/DealForm';
-import { Deal, DealStatus, TDealForm } from '../../screens/deals/types/deal';
+import { Deal, DealAudience, DealStatus, TDealForm } from '../../screens/deals/types/deal';
+
+const CATEGORIES = [
+  'Analytics',
+  'CDN',
+  'Database',
+  'Design',
+  'Development',
+  'DevOps',
+  'Monitoring',
+  'Project Management',
+  'Security',
+  'Other',
+];
+
+const AUDIENCES: DealAudience[] = ['All Founders', 'PL Funded Founders'];
+const STATUSES: DealStatus[] = ['Draft', 'Active', 'Deactivated'];
 
 type Tab = 'catalog' | 'submitted' | 'issues';
 
@@ -36,6 +52,9 @@ const DealsPage = () => {
   const [catalogSorting, setCatalogSorting] = useState<SortingState>([]);
   const [catalogPagination, setCatalogPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [catalogFilter, setCatalogFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [audienceFilter, setAudienceFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const [submittedSorting, setSubmittedSorting] = useState<SortingState>([]);
   const [submittedPagination, setSubmittedPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
@@ -71,8 +90,16 @@ const DealsPage = () => {
     }
   };
 
+  // Apply client-side filters on top of global filter
+  const filteredDeals = (dealsData?.data ?? []).filter((deal) => {
+    if (categoryFilter && deal.category !== categoryFilter) return false;
+    if (audienceFilter && deal.audience !== audienceFilter) return false;
+    if (statusFilter && deal.status !== statusFilter) return false;
+    return true;
+  });
+
   const { table: catalogTable } = useDealsTable({
-    deals: dealsData?.data,
+    deals: filteredDeals,
     sorting: catalogSorting,
     setSorting: setCatalogSorting,
     pagination: catalogPagination,
@@ -120,8 +147,8 @@ const DealsPage = () => {
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renderTable = (activeTable: Table<any>) => (
-    <div className={s.table}>
+  const renderTable = (activeTable: Table<any>, noTopBorder = false) => (
+    <div className={clsx(s.table, { [s.tableWithControlBar]: noTopBorder })}>
       {activeTable.getHeaderGroups().map((headerGroup) => (
         <div key={headerGroup.id} className={s.tableRow}>
           {headerGroup.headers.map((header, i) =>
@@ -186,28 +213,6 @@ const DealsPage = () => {
       <div className={s.root}>
         <div className={s.header}>
           <span className={s.title}>Deals</span>
-          {tab === 'catalog' && (
-            <div className={s.headerActions}>
-              <input
-                value={catalogFilter}
-                onChange={(e) => setCatalogFilter(e.target.value)}
-                placeholder="Search by vendor"
-                className={s.input}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') setCatalogFilter('');
-                }}
-              />
-              <button
-                className={s.addNewBtn}
-                onClick={() => {
-                  setEditingDeal(undefined);
-                  setFormOpen(true);
-                }}
-              >
-                + Add Deal
-              </button>
-            </div>
-          )}
         </div>
 
         <div className={s.tabs}>
@@ -234,7 +239,63 @@ const DealsPage = () => {
         <div className={s.body}>
           {tab === 'catalog' && (
             <>
-              {renderTable(catalogTable)}
+              <div className={s.controlBar}>
+                <input
+                  value={catalogFilter}
+                  onChange={(e) => setCatalogFilter(e.target.value)}
+                  placeholder="Search deals"
+                  className={s.searchInput}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setCatalogFilter('');
+                  }}
+                />
+                <select
+                  className={s.filterSelect}
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                >
+                  <option value="">All categories</option>
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={s.filterSelect}
+                  value={audienceFilter}
+                  onChange={(e) => setAudienceFilter(e.target.value)}
+                >
+                  <option value="">All audiences</option>
+                  {AUDIENCES.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={s.filterSelect}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="">All statuses</option>
+                  {STATUSES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className={s.addNewBtn}
+                  onClick={() => {
+                    setEditingDeal(undefined);
+                    setFormOpen(true);
+                  }}
+                >
+                  + Create new deal
+                </button>
+              </div>
+              {renderTable(catalogTable, true)}
               <PaginationControls table={catalogTable} />
             </>
           )}
