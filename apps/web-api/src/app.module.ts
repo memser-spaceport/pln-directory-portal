@@ -1,3 +1,4 @@
+import { DealsModule } from './deals/deals.module';
 import { BullModule } from '@nestjs/bull';
 import { CacheModule, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';

@@ -128,8 +128,14 @@ async function load(fixtures: Array<Record<string, any>>) {
       ? await modelBlock.relations(fixturesToCreate).then((data: any[]) => Promise.all(data))
       : null;
 
+    const sanitizedFixturesToCreate = fixturesToCreate.map((item: Record<string, any>) =>
+      Object.fromEntries(
+        Object.entries(item).filter(([_, value]) => value !== null)
+      )
+    );
+
     await prisma[model].createMany({
-      data: fixturesToCreate,
+      data: sanitizedFixturesToCreate,
       skipDuplicates: true,
     });
     console.log(`✅ Added ${model} data\n`);
@@ -300,3 +306,22 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
+
+
+// DEALS_V1_SEED_MARKER
+// Optional seed examples:
+// await prisma.deal.createMany({ data: [
+//   {
+//     vendorName: 'Vercel',
+//     category: 'Hosting & Infrastructure',
+//     shortDescription: 'Free Vercel Pro plan.',
+//     fullDescription: 'V1 seeded deal.',
+//     redemptionInstructions: 'Contact PL admin for test redemption.',
+//     status: 'ACTIVE',
+//   },
+// ] });
+// await prisma.dealWhitelist.upsert({
+//   where: { memberUid: 'member_uid_here' },
+//   create: { memberUid: 'member_uid_here' },
+//   update: {},
+// });
