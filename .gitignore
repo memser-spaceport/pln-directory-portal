@@ -64,3 +64,6 @@ tsconfig.build.tsbuildinfo
 Thumbs.db
 
 /img-tmp
+AWSCLIV2.pkg
+docs
+env copy
