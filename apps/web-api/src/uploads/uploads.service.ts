@@ -58,6 +58,40 @@ export class UploadsService {
     return `https://${bucket}.${domain}/${key}`;
   }
 
+  private isHlsEnabled(): boolean {
+    return (
+      String(process.env.DEPLOYMENT_ENVIRONMENT || process.env.ENVIRONMENT || '').toLowerCase().includes('prod') &&
+      String(process.env.IS_HLS_ENABLED || '').toLowerCase() === 'true'
+    );
+  }
+
+  private buildPublicUrl(bucket: string, key: string): string {
+    const cdnBase = (process.env.UPLOAD_CDN_BASE_URL || '').replace(/\/+$/, '');
+    const uploadBucket = process.env.AWS_S3_UPLOAD_BUCKET_NAME || process.env.AWS_S3_BUCKET_NAME;
+
+    if (cdnBase && uploadBucket && bucket === uploadBucket) {
+      return `${cdnBase}/${key}`;
+    }
+
+    return this.buildS3Url(bucket, key);
+  }
+
+  private buildStreamUrl(kind: UploadKind, keyOrPath?: string | null): string | null {
+    if (!this.isHlsEnabled()) return null;
+    if (kind !== 'VIDEO') return null;
+    if (!keyOrPath) return null;
+    if (!/\.mp4$/i.test(keyOrPath)) return null;
+
+    const cdnBase = (process.env.UPLOAD_CDN_BASE_URL || '').replace(/\/+$/, '');
+    if (!cdnBase) return null;
+
+    const hlsKey = keyOrPath
+      .replace(/^uploads\//, 'hls/uploads/')
+      .replace(/\.mp4$/i, '.m3u8');
+
+    return `${cdnBase}/${hlsKey}`;
+  }
+
   // Builds the persistent app URL (does not expire).
   private buildAppUrl(uid: string, mode: Disposition = 'inline') {
     const base = process.env.APP_BASE_URL?.replace(/\/+$/, '') || '';
@@ -98,8 +132,11 @@ export class UploadsService {
     const uid = cuid();
 
     // Non-expiring app URL
-    const s3Url =
-      storageEnum === 'S3' && usedBucket && keyOrPath ? this.buildS3Url(usedBucket, keyOrPath) : this.buildAppUrl(uid);
+    const publicUrl =
+      storageEnum === 'S3' && usedBucket && keyOrPath ? this.buildPublicUrl(usedBucket, keyOrPath) : this.buildAppUrl(uid);
+
+    const streamUrl =
+      storageEnum === 'S3' ? this.buildStreamUrl(kind, keyOrPath) : null;
 
     const created = await this.prisma.upload.create({
       data: {
@@ -113,7 +150,8 @@ export class UploadsService {
         bucket: storageEnum === 'S3' ? usedBucket ?? null : null,
         key: storageEnum === 'S3' ? keyOrPath ?? null : null,
         cid: storageEnum === 'IPFS' ? keyOrPath ?? null : null,
-        url: s3Url,
+        url: publicUrl,
+        streamUrl,
         filename: file.originalname,
         mimetype: file.mimetype,
         size: file.size,
@@ -189,13 +227,15 @@ export class UploadsService {
       throw new BadRequestException('S3 object not found');
     }
 
-    const s3Url = this.buildS3Url(upload.bucket, upload.key);
+    const publicUrl = this.buildPublicUrl(upload.bucket, upload.key);
+    const streamUrl = this.buildStreamUrl(upload.kind, upload.key);
 
     const updated = await this.prisma.upload.update({
       where: { uid },
       data: {
         status: 'READY',
-        url: s3Url,
+        url: publicUrl,
+        streamUrl,
         size: actualSize ?? upload.size,
       },
     });
