@@ -7,6 +7,7 @@ export type Deal = {
   logoUid: string | null;
   logoUrl?: string | null;
   category: string;
+  audience: string;
   shortDescription: string;
   fullDescription: string;
   redemptionInstructions: string;

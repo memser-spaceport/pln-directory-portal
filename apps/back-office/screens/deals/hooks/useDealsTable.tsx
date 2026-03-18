@@ -52,10 +52,17 @@ export function useDealsTable({
       columnHelper.accessor('category', {
         header: 'Category',
         cell: (info) => info.getValue(),
-        size: 200,
+        size: 180,
         enableSorting: false,
       }),
-      // 3. Status
+      // 3. Audience
+      columnHelper.accessor('audience', {
+        header: 'Audience',
+        cell: (info) => info.getValue(),
+        size: 160,
+        enableSorting: false,
+      }),
+      // 4. Status
       columnHelper.accessor('status', {
         header: 'Status',
         cell: (info) => <StatusBadge status={info.getValue()} />,

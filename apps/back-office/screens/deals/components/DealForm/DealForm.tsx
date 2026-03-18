@@ -90,6 +90,7 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
         vendorTeamUid: initialData.vendorTeamUid,
         logoUid: initialData.logoUid,
         category: initialData.category,
+        audience: initialData.audience,
         shortDescription: initialData.shortDescription,
         fullDescription: initialData.fullDescription,
         redemptionInstructions: initialData.redemptionInstructions,
@@ -101,6 +102,8 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
       );
 
       setCategoryOption(initialData.category ? { value: initialData.category, label: initialData.category } : null);
+
+      setAudienceOption(initialData.audience ? { value: initialData.audience, label: initialData.audience } : null);
 
       if (initialData.logoUrl) {
         setLogoPreviewUrl(initialData.logoUrl);
@@ -342,7 +345,7 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
                   render={({ field }) => (
                     <Select
                       instanceId="audience-select"
-                      placeholder="Select category"
+                      placeholder="Select audience"
                       options={DEAL_AUDIENCE_OPTIONS}
                       value={audienceOption}
                       onChange={(option: { value: string; label: string } | null) => {

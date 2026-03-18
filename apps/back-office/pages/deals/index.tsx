@@ -37,13 +37,14 @@ const DealForm = dynamic<ComponentProps<typeof DealFormType>>(
   { ssr: false }
 );
 import { Deal, DealStatus, TDealForm } from '../../screens/deals/types/deal';
-import { DEAL_CATEGORIES } from '../../screens/deals/constants';
+import { DEAL_CATEGORIES, DEAL_AUDIENCE_OPTIONS } from '../../screens/deals/constants';
 
 const STATUSES: { value: DealStatus; label: string }[] = [
   { value: 'DRAFT', label: 'Draft' },
   { value: 'ACTIVE', label: 'Active' },
   { value: 'DEACTIVATED', label: 'Deactivated' },
 ];
+
 
 type Tab = 'catalog' | 'submitted' | 'issues' | 'access';
 
@@ -58,6 +59,7 @@ const DealsPage = () => {
   const [catalogPagination, setCatalogPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [catalogFilter, setCatalogFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [audienceFilter, setAudienceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<DealStatus | ''>('');
 
   /* Hidden tabs - Submitted Deals and Reported Issues
@@ -102,6 +104,7 @@ const DealsPage = () => {
   // Apply client-side filters on top of global filter
   const filteredDeals = (dealsData?.data ?? []).filter((deal) => {
     if (categoryFilter && deal.category !== categoryFilter) return false;
+    if (audienceFilter && deal.audience !== audienceFilter) return false;
     if (statusFilter && deal.status !== statusFilter) return false;
     return true;
   });
@@ -276,6 +279,18 @@ const DealsPage = () => {
                   {DEAL_CATEGORIES.map((c) => (
                     <option key={c} value={c}>
                       {c}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={s.filterSelect}
+                  value={audienceFilter}
+                  onChange={(e) => setAudienceFilter(e.target.value)}
+                >
+                  <option value="">All audiences</option>
+                  {DEAL_AUDIENCE_OPTIONS.map((a) => (
+                    <option key={a.value} value={a.value}>
+                      {a.label}
                     </option>
                   ))}
                 </select>
