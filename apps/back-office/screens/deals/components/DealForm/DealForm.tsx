@@ -90,6 +90,7 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
         vendorTeamUid: initialData.vendorTeamUid,
         logoUid: initialData.logoUid,
         category: initialData.category,
+        audience: initialData.audience,
         shortDescription: initialData.shortDescription,
         fullDescription: initialData.fullDescription,
         redemptionInstructions: initialData.redemptionInstructions,
@@ -101,6 +102,9 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
       );
 
       setCategoryOption(initialData.category ? { value: initialData.category, label: initialData.category } : null);
+
+      const audienceOpt = DEAL_AUDIENCE_OPTIONS.find((o) => o.value === initialData.audience);
+      setAudienceOption(audienceOpt ? { value: audienceOpt.value, label: audienceOpt.label } : null);
 
       if (initialData.logoUrl) {
         setLogoPreviewUrl(initialData.logoUrl);

@@ -55,7 +55,14 @@ export function useDealsTable({
         size: 200,
         enableSorting: false,
       }),
-      // 3. Status
+      // 3. Audience
+      columnHelper.accessor('audience', {
+        header: 'Audience',
+        cell: (info) => info.getValue(),
+        size: 150,
+        enableSorting: false,
+      }),
+      // 4. Status
       columnHelper.accessor('status', {
         header: 'Status',
         cell: (info) => <StatusBadge status={info.getValue()} />,
