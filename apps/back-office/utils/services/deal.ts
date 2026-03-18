@@ -108,10 +108,60 @@ export async function fetchReportedIssues(_params: { authToken: string | undefin
   return { data: MOCK_REPORTED_ISSUES };
 }
 
-export async function fetchDealCounts(_params: { authToken: string | undefined }): Promise<DealCounts> {
-  // TODO: replace with: api.get(API_ROUTE.ADMIN_DEALS_COUNTS, { headers }).then(r => r.data)
-  await delay(200);
-  return { catalog: 0, submitted: MOCK_SUBMITTED_DEALS.length, issues: MOCK_REPORTED_ISSUES.length };
+export async function fetchDealCounts(params: { authToken: string | undefined }): Promise<DealCounts> {
+  // Use the deals list length as the count since there's no dedicated counts endpoint
+  const response = await api.get<Deal[]>(API_ROUTE.ADMIN_DEALS, {
+    headers: { authorization: `Bearer ${params.authToken}` },
+  });
+  return {
+    catalog: response.data.length,
+    submitted: 0,
+    issues: 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Whitelist API functions
+// ---------------------------------------------------------------------------
+
+export interface DealWhitelistMember {
+  id: number;
+  memberUid: string;
+  createdAt: string;
+  updatedAt: string;
+  member: {
+    uid: string;
+    name: string | null;
+    email: string;
+    imageUrl: string | null;
+  };
+}
+
+export async function fetchDealWhitelist(params: { authToken: string | undefined }): Promise<{ data: DealWhitelistMember[] }> {
+  const response = await api.get<DealWhitelistMember[]>(API_ROUTE.ADMIN_DEALS_WHITELIST, {
+    headers: { authorization: `Bearer ${params.authToken}` },
+  });
+  return { data: response.data };
+}
+
+export async function addDealWhitelistMember(params: {
+  authToken: string | undefined;
+  memberUid: string;
+}): Promise<void> {
+  await api.post(
+    API_ROUTE.ADMIN_DEALS_WHITELIST,
+    { memberUid: params.memberUid },
+    { headers: { authorization: `Bearer ${params.authToken}` } }
+  );
+}
+
+export async function removeDealWhitelistMember(params: {
+  authToken: string | undefined;
+  memberUid: string;
+}): Promise<void> {
+  await api.delete(`${API_ROUTE.ADMIN_DEALS_WHITELIST}/${params.memberUid}`, {
+    headers: { authorization: `Bearer ${params.authToken}` },
+  });
 }
 
 // ---------------------------------------------------------------------------
