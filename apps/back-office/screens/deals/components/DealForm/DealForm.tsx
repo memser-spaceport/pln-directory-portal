@@ -9,6 +9,7 @@ import { DEAL_AUDIENCE_OPTIONS, DEAL_CATEGORY_OPTIONS } from '../../constants';
 import { fetchTeamsForAutocomplete } from '../../../../utils/services/team';
 import { saveRegistrationImage } from '../../../../utils/services/member';
 import RichTextEditor from '../../../../components/common/rich-text-editor';
+import { DealPreview } from '../DealPreview/DealPreview';
 import s from './DealForm.module.scss';
 
 interface Props {
@@ -24,19 +25,6 @@ const loadTeamOptions = async (inputValue: string): Promise<TeamOption[]> => {
   const results = await fetchTeamsForAutocomplete(inputValue);
   return results ?? [];
 };
-
-const AiBadge = ({ label }: { label: string }) => (
-  <span className={s.aiBadge}>
-    <span>{label}</span>
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M8 1.5C8.5 3.5 10 5 12 5.5C10 6 8.5 7.5 8 9.5C7.5 7.5 6 6 4 5.5C6 5 7.5 3.5 8 1.5Z" fill="#4174ff" />
-      <path
-        d="M13 9.5C13.3 10.7 14 11.5 15 11.8C14 12.1 13.3 12.9 13 14C12.7 12.9 12 12.1 11 11.8C12 11.5 12.7 10.7 13 9.5Z"
-        fill="#4174ff"
-      />
-    </svg>
-  </span>
-);
 
 type SelectOption = { value: string; label: string };
 
@@ -92,6 +80,8 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
   const [vendorOption, setVendorOption] = useState<TeamOption | null>(null);
   const [categoryOption, setCategoryOption] = useState<{ value: string; label: string } | null>(null);
   const [audienceOption, setAudienceOption] = useState<{ value: string; label: string } | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -157,10 +147,36 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
     onClose();
   };
 
+  const handlePreviewClick = async () => {
+    const isValid = await methods.trigger();
+    if (isValid) setShowPreview(true);
+  };
+
+  const handlePublish = async () => {
+    setIsPublishing(true);
+    try {
+      const data = methods.getValues();
+      await onSubmit({ ...data, status: 'ACTIVE' });
+      onClose();
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   return (
     <div className={s.modal}>
       <div className={s.modalContent}>
         <FormProvider {...methods}>
+          {showPreview && (
+            <DealPreview
+              data={methods.getValues()}
+              logoPreviewUrl={logoPreviewUrl}
+              isPublishing={isPublishing}
+              onBack={() => setShowPreview(false)}
+              onPublish={handlePublish}
+            />
+          )}
+          <div style={{ display: showPreview ? 'none' : 'contents' }}>
           <div className={s.header}>
             <div>
               <h4 className={s.title}>{isEdit ? 'Edit Deal' : 'Create New Deal'}</h4>
@@ -381,7 +397,11 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
                     />
                   )}
                 />
-                {!errors.fullDescription && <p className={s.helperText}>Max 600 characters.</p>}
+                {errors.fullDescription ? (
+                  <p className={s.error}>{errors.fullDescription.message}</p>
+                ) : (
+                  <p className={s.helperText}>Max 600 characters.</p>
+                )}
               </div>
             </div>
 
@@ -413,7 +433,11 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
                     />
                   )}
                 />
-                {!errors.redemptionInstructions && <p className={s.helperText}>Max 600 characters.</p>}
+                {errors.redemptionInstructions ? (
+                  <p className={s.error}>{errors.redemptionInstructions.message}</p>
+                ) : (
+                  <p className={s.helperText}>Max 600 characters.</p>
+                )}
               </div>
             </div>
 
@@ -421,11 +445,12 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
               <button type="submit" className={s.secondaryBtn} disabled={isSubmitting}>
                 {isSubmitting ? 'Saving...' : 'Save as Draft'}
               </button>
-              <button type="button" className={s.previewBtn} disabled title="Coming soon">
+              <button type="button" className={s.previewBtn} onClick={handlePreviewClick} disabled={isSubmitting}>
                 Preview Deal
               </button>
             </div>
           </form>
+          </div>
         </FormProvider>
       </div>
     </div>

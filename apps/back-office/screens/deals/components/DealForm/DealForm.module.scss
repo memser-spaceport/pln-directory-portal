@@ -352,6 +352,15 @@
   font-weight: 500;
   line-height: 20px;
   letter-spacing: -0.2px;
-  opacity: 0.4;
-  cursor: not-allowed;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #1640e8;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
 }
