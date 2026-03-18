@@ -21,7 +21,14 @@ import { useDealsTable } from '../../screens/deals/hooks/useDealsTable';
 import { useSubmittedDealsTable } from '../../screens/deals/hooks/useSubmittedDealsTable';
 import { useReportedIssuesTable } from '../../screens/deals/hooks/useReportedIssuesTable';
 
-import { DealForm } from '../../screens/deals/components/DealForm/DealForm';
+import dynamic from 'next/dynamic';
+import type { ComponentProps } from 'react';
+import type { DealForm as DealFormType } from '../../screens/deals/components/DealForm/DealForm';
+
+const DealForm = dynamic<ComponentProps<typeof DealFormType>>(
+  () => import('../../screens/deals/components/DealForm/DealForm').then((m) => m.DealForm),
+  { ssr: false }
+);
 import { Deal, DealStatus, TDealForm } from '../../screens/deals/types/deal';
 import { DEAL_CATEGORIES } from '../../screens/deals/constants';
 
