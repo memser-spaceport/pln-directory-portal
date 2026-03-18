@@ -54,6 +54,7 @@ export class DealsService {
     return {
       ...(status ? { status } : {}),
       ...(query?.category ? { category: query.category } : {}),
+      ...(query?.audience ? { audience: query.audience } : {}),
       ...(query?.search
         ? {
           OR: [
@@ -372,6 +373,7 @@ export class DealsService {
         vendorTeamUid: body.vendorTeamUid ?? null,
         logoUid: body.logoUid ?? null,
         category: body.category,
+        audience: body.audience,
         shortDescription: body.shortDescription,
         fullDescription: body.fullDescription,
         redemptionInstructions: body.redemptionInstructions,
@@ -396,6 +398,7 @@ export class DealsService {
         ...(body.vendorTeamUid !== undefined ? { vendorTeamUid: body.vendorTeamUid } : {}),
         ...(body.logoUid !== undefined ? { logoUid: body.logoUid } : {}),
         ...(body.category !== undefined ? { category: body.category } : {}),
+        ...(body.audience !== undefined ? { audience: body.audience } : {}),
         ...(body.shortDescription !== undefined ? { shortDescription: body.shortDescription } : {}),
         ...(body.fullDescription !== undefined ? { fullDescription: body.fullDescription } : {}),
         ...(body.redemptionInstructions !== undefined

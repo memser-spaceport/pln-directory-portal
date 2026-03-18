@@ -1421,6 +1421,7 @@ model Deal {
   logoUid                String?
   logo                   Image?           @relation("DealLogo", fields: [logoUid], references: [uid], onDelete: SetNull)
   category               String
+  audience               String
   shortDescription       String
   fullDescription        String
   redemptionInstructions String
@@ -1433,6 +1434,7 @@ model Deal {
   @@index([status])
   @@index([category])
   @@index([vendorName])
+  @@index([audience])
 }
 
 model DealRedemption {
