@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Deal, DealAudience, DealStatus, TDealForm } from '../../types/deal';
+import { Deal, DealStatus, TDealForm } from '../../types/deal';
 import s from './DealForm.module.scss';
 
 const CATEGORIES = [
@@ -16,8 +16,11 @@ const CATEGORIES = [
   'Other',
 ];
 
-const AUDIENCES: DealAudience[] = ['All Founders', 'PL Funded Founders'];
-const STATUSES: DealStatus[] = ['Draft', 'Active', 'Deactivated'];
+const STATUSES: { value: DealStatus; label: string }[] = [
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'DEACTIVATED', label: 'Deactivated' },
+];
 
 interface Props {
   onClose: () => void;
@@ -27,25 +30,20 @@ interface Props {
 
 export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
   const isEdit = Boolean(initialData);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
     handleSubmit,
     reset,
-    watch,
-    setValue,
     formState: { isSubmitting, errors },
   } = useForm<TDealForm>({
     defaultValues: {
       vendorName: '',
-      vendorLogo: null,
       category: '',
-      audience: null,
-      description: '',
-      dealUrl: '',
-      howToRedeem: '',
-      status: 'Draft',
+      shortDescription: '',
+      fullDescription: '',
+      redemptionInstructions: '',
+      status: 'DRAFT',
     },
   });
 
@@ -53,19 +51,14 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
     if (initialData) {
       reset({
         vendorName: initialData.vendorName,
-        vendorLogo: null,
         category: initialData.category,
-        audience: initialData.audience,
-        description: '',
-        dealUrl: '',
-        howToRedeem: '',
+        shortDescription: initialData.shortDescription,
+        fullDescription: initialData.fullDescription,
+        redemptionInstructions: initialData.redemptionInstructions,
         status: initialData.status,
       });
     }
   }, [initialData, reset]);
-
-  const logoFile = watch('vendorLogo');
-  const logoPreview = logoFile ? URL.createObjectURL(logoFile) : initialData?.vendorLogoUrl ?? null;
 
   const handleFormSubmit = async (data: TDealForm) => {
     await onSubmit(data);
@@ -89,39 +82,6 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
         </div>
 
         <form noValidate onSubmit={handleSubmit(handleFormSubmit)} className={s.form}>
-          {/* Vendor Logo */}
-          <div className={s.field}>
-            <label className={s.label}>Vendor Logo</label>
-            <div className={s.logoRow}>
-              <div className={s.logoPreview}>
-                {logoPreview ? (
-                  <img src={logoPreview} alt="Logo preview" />
-                ) : (
-                  <span className={s.logoPlaceholder}>
-                    {watch('vendorName')?.charAt(0)?.toUpperCase() || '?'}
-                  </span>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  setValue('vendorLogo', file);
-                }}
-              />
-              <button
-                type="button"
-                className={s.uploadBtn}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {logoPreview ? 'Change Logo' : 'Upload Logo'}
-              </button>
-            </div>
-          </div>
-
           {/* Vendor Name */}
           <div className={s.field}>
             <label className={s.label} htmlFor="vendorName">
@@ -156,69 +116,48 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
             {errors.category && <p className={s.error}>{errors.category.message}</p>}
           </div>
 
-          {/* Audience */}
+          {/* Short Description */}
           <div className={s.field}>
-            <label className={s.label} htmlFor="audience">
-              Audience <span className={s.required}>*</span>
-            </label>
-            <select
-              id="audience"
-              className={s.select}
-              {...register('audience', { required: 'Audience is required' })}
-            >
-              <option value="">Select audience</option>
-              {AUDIENCES.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-            {errors.audience && <p className={s.error}>{errors.audience.message}</p>}
-          </div>
-
-          {/* Description */}
-          <div className={s.field}>
-            <label className={s.label} htmlFor="description">
-              Description <span className={s.required}>*</span>
-            </label>
-            <textarea
-              id="description"
-              className={s.textarea}
-              rows={3}
-              placeholder="Brief description of the deal"
-              {...register('description', { required: 'Description is required' })}
-            />
-            {errors.description && <p className={s.error}>{errors.description.message}</p>}
-          </div>
-
-          {/* Deal URL */}
-          <div className={s.field}>
-            <label className={s.label} htmlFor="dealUrl">
-              Deal URL <span className={s.required}>*</span>
+            <label className={s.label} htmlFor="shortDescription">
+              Short Description <span className={s.required}>*</span>
             </label>
             <input
-              id="dealUrl"
-              type="url"
+              id="shortDescription"
               className={s.input}
-              placeholder="https://"
-              {...register('dealUrl', { required: 'Deal URL is required' })}
+              placeholder="Brief one-line description"
+              {...register('shortDescription', { required: 'Short description is required' })}
             />
-            {errors.dealUrl && <p className={s.error}>{errors.dealUrl.message}</p>}
+            {errors.shortDescription && <p className={s.error}>{errors.shortDescription.message}</p>}
           </div>
 
-          {/* How to Redeem */}
+          {/* Full Description */}
           <div className={s.field}>
-            <label className={s.label} htmlFor="howToRedeem">
-              How to Redeem <span className={s.required}>*</span>
+            <label className={s.label} htmlFor="fullDescription">
+              Full Description <span className={s.required}>*</span>
             </label>
             <textarea
-              id="howToRedeem"
+              id="fullDescription"
+              className={s.textarea}
+              rows={4}
+              placeholder="Detailed description of the deal"
+              {...register('fullDescription', { required: 'Full description is required' })}
+            />
+            {errors.fullDescription && <p className={s.error}>{errors.fullDescription.message}</p>}
+          </div>
+
+          {/* Redemption Instructions */}
+          <div className={s.field}>
+            <label className={s.label} htmlFor="redemptionInstructions">
+              Redemption Instructions <span className={s.required}>*</span>
+            </label>
+            <textarea
+              id="redemptionInstructions"
               className={s.textarea}
               rows={3}
-              placeholder="Instructions on how to redeem this deal"
-              {...register('howToRedeem', { required: 'Redemption instructions are required' })}
+              placeholder="Step-by-step instructions to redeem this deal"
+              {...register('redemptionInstructions', { required: 'Redemption instructions are required' })}
             />
-            {errors.howToRedeem && <p className={s.error}>{errors.howToRedeem.message}</p>}
+            {errors.redemptionInstructions && <p className={s.error}>{errors.redemptionInstructions.message}</p>}
           </div>
 
           {/* Status */}
@@ -228,8 +167,8 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
             </label>
             <select id="status" className={s.select} {...register('status')}>
               {STATUSES.map((st) => (
-                <option key={st} value={st}>
-                  {st}
+                <option key={st.value} value={st.value}>
+                  {st.label}
                 </option>
               ))}
             </select>

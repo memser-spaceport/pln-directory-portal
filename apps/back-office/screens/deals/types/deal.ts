@@ -1,17 +1,26 @@
-export type DealStatus = 'Draft' | 'Active' | 'Deactivated';
-export type DealAudience = 'All Founders' | 'PL Funded Founders';
+export type DealStatus = 'DRAFT' | 'ACTIVE' | 'DEACTIVATED';
 
 export type Deal = {
   uid: string;
   vendorName: string;
-  vendorLogoUrl: string | null;
+  vendorTeamUid: string | null;
+  logoUid: string | null;
   category: string;
-  audience: DealAudience;
-  markedAsUsingCount: number | null;
-  tappedHowToRedeemCount: number | null;
-  submittedIssuesCount: number;
+  shortDescription: string;
+  fullDescription: string;
+  redemptionInstructions: string;
   status: DealStatus;
-  updatedAt: string; // ISO date string
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TDealForm = {
+  vendorName: string;
+  category: string;
+  shortDescription: string;
+  fullDescription: string;
+  redemptionInstructions: string;
+  status: DealStatus;
 };
 
 export type SubmittedDeal = {
@@ -20,7 +29,6 @@ export type SubmittedDeal = {
   submittedBy: string;
   submittedByEmail: string;
   category: string;
-  audience: DealAudience;
   description: string;
   submittedAt: string;
 };
@@ -33,17 +41,6 @@ export type ReportedIssue = {
   reportedByEmail: string;
   issueDescription: string;
   reportedAt: string;
-};
-
-export type TDealForm = {
-  vendorName: string;
-  vendorLogo: File | null;
-  category: string;
-  audience: DealAudience | null;
-  description: string;
-  dealUrl: string;
-  howToRedeem: string;
-  status: DealStatus;
 };
 
 export type DealCounts = {

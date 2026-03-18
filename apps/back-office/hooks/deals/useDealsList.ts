@@ -5,14 +5,13 @@ import { fetchDealsList } from '../../utils/services/deal';
 interface QueryParams {
   authToken: string | undefined;
   category?: string;
-  audience?: string;
-  status?: string;
+  search?: string;
 }
 
 export function useDealsList(params: QueryParams) {
   return useQuery({
-    queryKey: [DealsQueryKeys.GET_DEALS_LIST, params.authToken, params.category, params.audience, params.status],
+    queryKey: [DealsQueryKeys.GET_DEALS_LIST, params.authToken, params.category, params.search],
     queryFn: () => fetchDealsList(params),
-    enabled: true, // mocked — no auth needed yet; set to !!params.authToken when real API is wired
+    enabled: !!params.authToken,
   });
 }

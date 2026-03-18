@@ -19,12 +19,12 @@ export const ActionMenu = ({ deal, onEdit, onStatusChange }: Props) => {
 
   const handleActivate = () => {
     setOpen(false);
-    onStatusChange(deal.uid, 'Active');
+    onStatusChange(deal.uid, 'ACTIVE');
   };
 
   const handleDeactivate = () => {
     setOpen(false);
-    onStatusChange(deal.uid, 'Deactivated');
+    onStatusChange(deal.uid, 'DEACTIVATED');
   };
 
   React.useEffect(() => {
@@ -49,12 +49,12 @@ export const ActionMenu = ({ deal, onEdit, onStatusChange }: Props) => {
           <button className={s.item} onClick={handleEdit}>
             Edit
           </button>
-          {deal.status !== 'Active' && (
+          {deal.status !== 'ACTIVE' && (
             <button className={s.item} onClick={handleActivate}>
               Activate
             </button>
           )}
-          {deal.status !== 'Deactivated' && (
+          {deal.status !== 'DEACTIVATED' && (
             <button className={s.item} onClick={handleDeactivate}>
               Deactivate
             </button>

@@ -53,12 +53,6 @@ export function useSubmittedDealsTable({
         size: 150,
         enableSorting: false,
       }),
-      columnHelper.accessor('audience', {
-        header: 'Audience',
-        cell: (info) => info.getValue(),
-        size: 180,
-        enableSorting: false,
-      }),
       columnHelper.accessor('description', {
         header: 'Description',
         cell: (info) => (

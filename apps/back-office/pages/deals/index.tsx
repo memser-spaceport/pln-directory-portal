@@ -22,7 +22,7 @@ import { useSubmittedDealsTable } from '../../screens/deals/hooks/useSubmittedDe
 import { useReportedIssuesTable } from '../../screens/deals/hooks/useReportedIssuesTable';
 
 import { DealForm } from '../../screens/deals/components/DealForm/DealForm';
-import { Deal, DealAudience, DealStatus, TDealForm } from '../../screens/deals/types/deal';
+import { Deal, DealStatus, TDealForm } from '../../screens/deals/types/deal';
 
 const CATEGORIES = [
   'Analytics',
@@ -31,14 +31,18 @@ const CATEGORIES = [
   'Design',
   'Development',
   'DevOps',
+  'Hosting',
   'Monitoring',
   'Project Management',
   'Security',
   'Other',
 ];
 
-const AUDIENCES: DealAudience[] = ['All Founders', 'PL Funded Founders'];
-const STATUSES: DealStatus[] = ['Draft', 'Active', 'Deactivated'];
+const STATUSES: { value: DealStatus; label: string }[] = [
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'DEACTIVATED', label: 'Deactivated' },
+];
 
 type Tab = 'catalog' | 'submitted' | 'issues';
 
@@ -53,8 +57,7 @@ const DealsPage = () => {
   const [catalogPagination, setCatalogPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [catalogFilter, setCatalogFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [audienceFilter, setAudienceFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<DealStatus | ''>('');
 
   const [submittedSorting, setSubmittedSorting] = useState<SortingState>([]);
   const [submittedPagination, setSubmittedPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
@@ -93,7 +96,6 @@ const DealsPage = () => {
   // Apply client-side filters on top of global filter
   const filteredDeals = (dealsData?.data ?? []).filter((deal) => {
     if (categoryFilter && deal.category !== categoryFilter) return false;
-    if (audienceFilter && deal.audience !== audienceFilter) return false;
     if (statusFilter && deal.status !== statusFilter) return false;
     return true;
   });
@@ -263,25 +265,13 @@ const DealsPage = () => {
                 </select>
                 <select
                   className={s.filterSelect}
-                  value={audienceFilter}
-                  onChange={(e) => setAudienceFilter(e.target.value)}
-                >
-                  <option value="">All audiences</option>
-                  {AUDIENCES.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className={s.filterSelect}
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  onChange={(e) => setStatusFilter(e.target.value as DealStatus | '')}
                 >
                   <option value="">All statuses</option>
                   {STATUSES.map((st) => (
-                    <option key={st} value={st}>
-                      {st}
+                    <option key={st.value} value={st.value}>
+                      {st.label}
                     </option>
                   ))}
                 </select>

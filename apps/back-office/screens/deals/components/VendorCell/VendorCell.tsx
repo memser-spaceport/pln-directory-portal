@@ -10,11 +10,7 @@ export const VendorCell = ({ deal }: Props) => {
   return (
     <div className={s.root}>
       <div className={s.avatar}>
-        {deal.vendorLogoUrl ? (
-          <img src={deal.vendorLogoUrl} alt={deal.vendorName} />
-        ) : (
-          <div className={s.placeholder}>{deal.vendorName.charAt(0)}</div>
-        )}
+        <div className={s.placeholder}>{deal.vendorName.charAt(0)}</div>
       </div>
       <div className={s.name}>{deal.vendorName}</div>
     </div>

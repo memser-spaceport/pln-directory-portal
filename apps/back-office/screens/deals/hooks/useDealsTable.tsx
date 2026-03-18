@@ -12,7 +12,6 @@ import {
 import { Deal, DealStatus } from '../types/deal';
 import { VendorCell } from '../components/VendorCell/VendorCell';
 import { StatusBadge } from '../components/StatusBadge/StatusBadge';
-import { IssuesBadge } from '../components/IssuesBadge/IssuesBadge';
 import { ActionMenu } from '../components/ActionMenu/ActionMenu';
 
 const columnHelper = createColumnHelper<Deal>();
@@ -53,41 +52,10 @@ export function useDealsTable({
       columnHelper.accessor('category', {
         header: 'Category',
         cell: (info) => info.getValue(),
-        size: 150,
+        size: 200,
         enableSorting: false,
       }),
-      // 3. Audience
-      columnHelper.accessor('audience', {
-        header: 'Audience',
-        cell: (info) => info.getValue(),
-        size: 180,
-        enableSorting: false,
-      }),
-      // 4. Marked as Using
-      columnHelper.accessor('markedAsUsingCount', {
-        header: 'Marked as Using',
-        cell: (info) => info.getValue() ?? '—',
-        size: 130,
-        enableSorting: true,
-        meta: { align: 'center' },
-      }),
-      // 5. Tapped How to Redeem
-      columnHelper.accessor('tappedHowToRedeemCount', {
-        header: 'Tapped How to Redeem',
-        cell: (info) => info.getValue() ?? '—',
-        size: 160,
-        enableSorting: true,
-        meta: { align: 'center' },
-      }),
-      // 6. Submitted Issues
-      columnHelper.accessor('submittedIssuesCount', {
-        header: 'Submitted Issues',
-        cell: (info) => <IssuesBadge count={info.getValue()} />,
-        size: 130,
-        enableSorting: true,
-        meta: { align: 'center' },
-      }),
-      // 7. Status
+      // 3. Status
       columnHelper.accessor('status', {
         header: 'Status',
         cell: (info) => <StatusBadge status={info.getValue()} />,
