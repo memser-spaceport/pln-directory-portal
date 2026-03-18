@@ -52,7 +52,7 @@ export function useDealsTable({
       columnHelper.accessor('category', {
         header: 'Category',
         cell: (info) => info.getValue(),
-        size: 200,
+        size: 180,
         enableSorting: false,
       }),
       // 3. Audience

@@ -346,7 +346,7 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
                   render={({ field }) => (
                     <Select
                       instanceId="audience-select"
-                      placeholder="Select category"
+                      placeholder="Select audience"
                       options={DEAL_AUDIENCE_OPTIONS}
                       value={audienceOption}
                       onChange={(option: { value: string; label: string } | null) => {

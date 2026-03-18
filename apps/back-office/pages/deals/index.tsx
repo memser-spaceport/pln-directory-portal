@@ -11,15 +11,22 @@ import { SortIcon } from '../../screens/members/components/icons';
 import PaginationControls from '../../screens/members/components/PaginationControls/PaginationControls';
 
 import { useDealsList } from '../../hooks/deals/useDealsList';
+/* Hidden tabs - Submitted Deals and Reported Issues
 import { useSubmittedDealsList } from '../../hooks/deals/useSubmittedDealsList';
 import { useReportedIssuesList } from '../../hooks/deals/useReportedIssuesList';
+*/
 import { useDealCounts } from '../../hooks/deals/useDealCounts';
 import { useCreateDeal } from '../../hooks/deals/useCreateDeal';
 import { useUpdateDeal } from '../../hooks/deals/useUpdateDeal';
+import { useDealsWhitelist } from '../../hooks/deals/useDealsWhitelist';
+
+import { DealsWhitelistSection } from '../../components/deals/DealsWhitelistSection';
 
 import { useDealsTable } from '../../screens/deals/hooks/useDealsTable';
+/* Hidden tabs - Submitted Deals and Reported Issues
 import { useSubmittedDealsTable } from '../../screens/deals/hooks/useSubmittedDealsTable';
 import { useReportedIssuesTable } from '../../screens/deals/hooks/useReportedIssuesTable';
+*/
 
 import dynamic from 'next/dynamic';
 import type { ComponentProps } from 'react';
@@ -38,7 +45,8 @@ const STATUSES: { value: DealStatus; label: string }[] = [
   { value: 'DEACTIVATED', label: 'Deactivated' },
 ];
 
-type Tab = 'catalog' | 'submitted' | 'issues';
+
+type Tab = 'catalog' | 'submitted' | 'issues' | 'access';
 
 const DealsPage = () => {
   const router = useRouter();
@@ -54,19 +62,24 @@ const DealsPage = () => {
   const [audienceFilter, setAudienceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<DealStatus | ''>('');
 
+  /* Hidden tabs - Submitted Deals and Reported Issues
   const [submittedSorting, setSubmittedSorting] = useState<SortingState>([]);
   const [submittedPagination, setSubmittedPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
 
   const [issuesSorting, setIssuesSorting] = useState<SortingState>([]);
   const [issuesPagination, setIssuesPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
+  */
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | undefined>();
 
   const { data: dealsData } = useDealsList({ authToken });
+  /* Hidden tabs - Submitted Deals and Reported Issues
   const { data: submittedData } = useSubmittedDealsList({ authToken });
   const { data: issuesData } = useReportedIssuesList({ authToken });
+  */
   const { data: counts } = useDealCounts({ authToken });
+  const { data: whitelistData } = useDealsWhitelist({ authToken });
 
   const createDeal = useCreateDeal();
   const updateDeal = useUpdateDeal();
@@ -108,6 +121,7 @@ const DealsPage = () => {
     onStatusChange: handleStatusChange,
   });
 
+  /* Hidden tabs - Submitted Deals and Reported Issues
   const { table: submittedTable } = useSubmittedDealsTable({
     deals: submittedData?.data,
     sorting: submittedSorting,
@@ -123,6 +137,7 @@ const DealsPage = () => {
     pagination: issuesPagination,
     setPagination: setIssuesPagination,
   });
+  */
 
   useEffect(() => {
     if (!authToken) {
@@ -220,6 +235,7 @@ const DealsPage = () => {
               {counts?.catalog ?? dealsData?.data?.length ?? 0}
             </span>
           </button>
+          {/* Hidden tabs - Submitted Deals and Reported Issues
           <button className={clsx(s.tab, { [s.active]: tab === 'submitted' })} onClick={() => setTab('submitted')}>
             Submitted Deals
             <span className={clsx(s.tabCount, { [s.active]: tab === 'submitted' })}>
@@ -230,6 +246,13 @@ const DealsPage = () => {
             Reported Issues
             <span className={clsx(s.tabCount, { [s.active]: tab === 'issues' })}>
               {counts?.issues ?? issuesData?.data?.length ?? 0}
+            </span>
+          </button>
+          */}
+          <button className={clsx(s.tab, { [s.active]: tab === 'access' })} onClick={() => setTab('access')}>
+            Access Management
+            <span className={clsx(s.tabCount, { [s.active]: tab === 'access' })}>
+              {whitelistData?.length ?? 0}
             </span>
           </button>
         </div>
@@ -297,6 +320,7 @@ const DealsPage = () => {
               <PaginationControls table={catalogTable} />
             </>
           )}
+          {/* Hidden tab content - Submitted Deals and Reported Issues
           {tab === 'submitted' && (
             <>
               {renderTable(submittedTable)}
@@ -309,6 +333,8 @@ const DealsPage = () => {
               <PaginationControls table={issuesTable} />
             </>
           )}
+          */}
+          {tab === 'access' && <DealsWhitelistSection authToken={authToken} />}
         </div>
       </div>
 
