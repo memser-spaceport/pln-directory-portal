@@ -12,7 +12,7 @@ export class ListDealsQueryDto {
 export class UpsertDealDto {
   vendorName!: string;
   vendorTeamUid?: string;
-  logoUid?: string;
+  logoUid?: string | null;
   category!: string;
   audience!: string;
   shortDescription!: string;

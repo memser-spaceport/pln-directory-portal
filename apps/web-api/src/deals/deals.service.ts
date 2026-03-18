@@ -295,10 +295,12 @@ export class DealsService {
   }
 
   async adminList(query: ListDealsQueryDto) {
-    return this.prisma.deal.findMany({
+    const deals = await this.prisma.deal.findMany({
       where: this.buildDealWhere(query),
       orderBy: { createdAt: 'desc' },
+      include: { logo: { select: { url: true } } },
     });
+    return deals.map(({ logo, ...deal }) => ({ ...deal, logoUrl: logo?.url ?? null }));
   }
 
   async getWhitelist() {
@@ -357,13 +359,15 @@ export class DealsService {
   async adminGetByUid(uid: string) {
     const deal = await this.prisma.deal.findUnique({
       where: { uid },
+      include: { logo: { select: { url: true } } },
     });
 
     if (!deal) {
       throw new NotFoundException('Deal not found');
     }
 
-    return deal;
+    const { logo, ...rest } = deal;
+    return { ...rest, logoUrl: logo?.url ?? null };
   }
 
   async adminCreate(body: UpsertDealDto) {
