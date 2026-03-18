@@ -69,7 +69,7 @@ model Team {
   accessLevel                  String?                       @default("L1")
   accessLevelUpdatedAt         DateTime                      @default(now())
   eventAssociations            PLEventAssociation[]
-  dataEnrichment               Json?            /// AI enrichment metadata
+  dataEnrichment               Json? /// AI enrichment metadata
 }
 
 enum AskStatus {
@@ -994,6 +994,7 @@ model Upload {
   key                  String?
   cid                  String?
   url                  String
+  streamUrl            String?
   filename             String
   mimetype             String
   size                 Int
