@@ -23,20 +23,7 @@ import { useReportedIssuesTable } from '../../screens/deals/hooks/useReportedIss
 
 import { DealForm } from '../../screens/deals/components/DealForm/DealForm';
 import { Deal, DealStatus, TDealForm } from '../../screens/deals/types/deal';
-
-const CATEGORIES = [
-  'Analytics',
-  'CDN',
-  'Database',
-  'Design',
-  'Development',
-  'DevOps',
-  'Hosting',
-  'Monitoring',
-  'Project Management',
-  'Security',
-  'Other',
-];
+import { DEAL_CATEGORIES } from '../../screens/deals/constants';
 
 const STATUSES: { value: DealStatus; label: string }[] = [
   { value: 'DRAFT', label: 'Draft' },
@@ -257,7 +244,7 @@ const DealsPage = () => {
                   onChange={(e) => setCategoryFilter(e.target.value)}
                 >
                   <option value="">All categories</option>
-                  {CATEGORIES.map((c) => (
+                  {DEAL_CATEGORIES.map((c) => (
                     <option key={c} value={c}>
                       {c}
                     </option>

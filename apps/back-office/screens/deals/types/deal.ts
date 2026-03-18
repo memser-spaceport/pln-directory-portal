@@ -5,6 +5,7 @@ export type Deal = {
   vendorName: string;
   vendorTeamUid: string | null;
   logoUid: string | null;
+  logoUrl?: string | null;
   category: string;
   shortDescription: string;
   fullDescription: string;
@@ -16,7 +17,10 @@ export type Deal = {
 
 export type TDealForm = {
   vendorName: string;
+  vendorTeamUid?: string | null;
+  logoUid?: string | null;
   category: string;
+  audience?: string;
   shortDescription: string;
   fullDescription: string;
   redemptionInstructions: string;
