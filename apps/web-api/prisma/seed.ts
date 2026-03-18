@@ -314,6 +314,7 @@ main()
 //   {
 //     vendorName: 'Vercel',
 //     category: 'Hosting & Infrastructure',
+//     audience: 'general',
 //     shortDescription: 'Free Vercel Pro plan.',
 //     fullDescription: 'V1 seeded deal.',
 //     redemptionInstructions: 'Contact PL admin for test redemption.',
