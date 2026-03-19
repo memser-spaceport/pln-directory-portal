@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
-import AsyncSelect from 'react-select/async';
+import AsyncCreatableSelect from 'react-select/async-creatable';
 import Select, { StylesConfig } from 'react-select';
 import { toast } from 'react-toastify';
 
@@ -280,25 +280,27 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
                       Vendor name <span className={s.required}>*</span>
                     </label>
                   </div>
-                  <AsyncSelect
+                  <AsyncCreatableSelect
                     instanceId="vendor-select"
                     placeholder="Search PL Network or enter the name"
                     loadOptions={loadTeamOptions}
                     value={vendorOption}
                     onChange={(option: TeamOption | null) => {
                       setVendorOption(option);
-                      setValue('vendorName', option?.label ?? '', { shouldValidate: true });
-                      setValue('vendorTeamUid', option?.value ?? null);
+                      setValue('vendorName', option?.label ?? '', { shouldValidate: true, shouldDirty: true });
+                      setValue('vendorTeamUid', option?.value ?? null, { shouldDirty: true });
                     }}
-                    onInputChange={(inputValue: string, { action }: { action: string }) => {
-                      if (action === 'input-change' && !vendorOption) {
-                        setValue('vendorName', inputValue, { shouldValidate: false });
-                      }
+                    onCreateOption={(inputValue: string) => {
+                      const newOption = { value: inputValue, label: inputValue };
+                      setVendorOption(newOption);
+                      setValue('vendorName', inputValue, { shouldValidate: true, shouldDirty: true });
+                      setValue('vendorTeamUid', null, { shouldDirty: true });
                     }}
                     isClearable
                     styles={reactSelectStyles}
                     noOptionsMessage={({ inputValue }) => (inputValue ? 'No teams found' : 'Start typing to search')}
                     loadingMessage={() => 'Searching...'}
+                    formatCreateLabel={(inputValue: string) => `Use "${inputValue}"`}
                   />
                   {/* Hidden input for vendorName validation */}
                   <input type="hidden" {...register('vendorName', { required: 'Vendor name is required' })} />
