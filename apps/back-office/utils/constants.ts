@@ -71,7 +71,11 @@ export const API_ROUTE = {
   ADMIN_IRL_GATHERING_PUSH_NOTIFICATIONS: `${APP_CONSTANTS.V1}admin/irl-gathering-push-notifications`,
   ADMIN_IRL_GATHERING_PUSH_NOTIFICATIONS_LOCATIONS: `${APP_CONSTANTS.V1}admin/irl-gathering-push-notifications/locations`,
   ADMIN_IRL_GATHERING_PUSH_NOTIFICATIONS_TRIGGER: `${APP_CONSTANTS.V1}admin/irl-gathering-push-notifications/trigger`,
-
+  ADMIN_DEALS: `${APP_CONSTANTS.V1}admin/deals`,
+  ADMIN_SUBMITTED_DEALS: `${APP_CONSTANTS.V1}admin/deals/submitted`,
+  ADMIN_REPORTED_ISSUES: `${APP_CONSTANTS.V1}admin/deals/reported-issues`,
+  ADMIN_DEALS_COUNTS: `${APP_CONSTANTS.V1}admin/deals/counts`,
+  ADMIN_DEALS_WHITELIST: `${APP_CONSTANTS.V1}admin/deals/whitelist`,
 };
 
 export const TOKEN = 'plnetwork@1';

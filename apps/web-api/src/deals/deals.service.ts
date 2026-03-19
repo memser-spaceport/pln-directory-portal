@@ -54,6 +54,7 @@ export class DealsService {
     return {
       ...(status ? { status } : {}),
       ...(query?.category ? { category: query.category } : {}),
+      ...(query?.audience ? { audience: query.audience } : {}),
       ...(query?.search
         ? {
           OR: [
@@ -105,6 +106,7 @@ export class DealsService {
     const deals = await this.prisma.deal.findMany({
       where: this.buildDealWhere(query, DealStatus.ACTIVE),
       orderBy: { createdAt: 'desc' },
+      include: { logo: { select: { url: true } } },
     });
 
     if (!deals.length) {
@@ -156,8 +158,9 @@ export class DealsService {
     const redemptionCountMap = this.countUniqueTeamsOrMembers(allRedemptions);
     const usageCountMap = this.countUniqueTeamsOrMembers(allUsages);
 
-    return deals.map((deal) => ({
+    return deals.map(({ logo, ...deal }) => ({
       ...deal,
+      logoUrl: logo?.url ?? null,
       isRedeemed: redeemedSet.has(deal.uid),
       isUsing: usingSet.has(deal.uid),
       teamsRedemptionCount: redemptionCountMap.get(deal.uid) ?? 0,
@@ -173,6 +176,7 @@ export class DealsService {
         uid,
         status: DealStatus.ACTIVE,
       },
+      include: { logo: { select: { url: true } } },
     });
 
     if (!deal) {
@@ -216,9 +220,11 @@ export class DealsService {
 
     const redemptionCountMap = this.countUniqueTeamsOrMembers(allRedemptions);
     const usageCountMap = this.countUniqueTeamsOrMembers(allUsages);
+    const { logo, ...rest } = deal;
 
     return {
-      ...deal,
+      ...rest,
+      logoUrl: logo?.url ?? null,
       isRedeemed: !!redemption,
       isUsing: !!usage,
       teamsRedemptionCount: redemptionCountMap.get(uid) ?? 0,
@@ -293,11 +299,61 @@ export class DealsService {
     return { success: true };
   }
 
+
+  private async getDealMetrics(dealUids: string[]) {
+    if (!dealUids.length) {
+      return new Map<string, { tappedHowToRedeemCount: number; markedAsUsingCount: number }>();
+    }
+
+    const [allRedemptions, allUsages] = await Promise.all([
+      this.prisma.dealRedemption.findMany({
+        where: { dealUid: { in: dealUids } },
+        select: {
+          dealUid: true,
+          teamUid: true,
+          memberUid: true,
+        },
+      }),
+      this.prisma.dealUsage.findMany({
+        where: { dealUid: { in: dealUids } },
+        select: {
+          dealUid: true,
+          teamUid: true,
+          memberUid: true,
+        },
+      }),
+    ]);
+
+    const redemptionCountMap = this.countUniqueTeamsOrMembers(allRedemptions);
+    const usageCountMap = this.countUniqueTeamsOrMembers(allUsages);
+
+    const metrics = new Map<string, { tappedHowToRedeemCount: number; markedAsUsingCount: number }>();
+
+    for (const dealUid of dealUids) {
+      metrics.set(dealUid, {
+        tappedHowToRedeemCount: redemptionCountMap.get(dealUid) ?? 0,
+        markedAsUsingCount: usageCountMap.get(dealUid) ?? 0,
+      });
+    }
+
+    return metrics;
+  }
+
   async adminList(query: ListDealsQueryDto) {
-    return this.prisma.deal.findMany({
+    const deals = await this.prisma.deal.findMany({
       where: this.buildDealWhere(query),
       orderBy: { createdAt: 'desc' },
+      include: { logo: { select: { url: true } } },
     });
+
+    const metrics = await this.getDealMetrics(deals.map((deal) => deal.uid));
+
+    return deals.map(({ logo, ...deal }) => ({
+      ...deal,
+      logoUrl: logo?.url ?? null,
+      tappedHowToRedeemCount: metrics.get(deal.uid)?.tappedHowToRedeemCount ?? 0,
+      markedAsUsingCount: metrics.get(deal.uid)?.markedAsUsingCount ?? 0,
+    }));
   }
 
   async getWhitelist() {
@@ -356,28 +412,42 @@ export class DealsService {
   async adminGetByUid(uid: string) {
     const deal = await this.prisma.deal.findUnique({
       where: { uid },
+      include: { logo: { select: { url: true } } },
     });
 
     if (!deal) {
       throw new NotFoundException('Deal not found');
     }
 
-    return deal;
+    const metrics = await this.getDealMetrics([uid]);
+    const { logo, ...rest } = deal;
+
+    return {
+      ...rest,
+      logoUrl: logo?.url ?? null,
+      tappedHowToRedeemCount: metrics.get(uid)?.tappedHowToRedeemCount ?? 0,
+      markedAsUsingCount: metrics.get(uid)?.markedAsUsingCount ?? 0,
+    };
   }
 
   async adminCreate(body: UpsertDealDto) {
-    return this.prisma.deal.create({
+    const deal = await this.prisma.deal.create({
       data: {
         vendorName: body.vendorName,
         vendorTeamUid: body.vendorTeamUid ?? null,
         logoUid: body.logoUid ?? null,
         category: body.category,
+        audience: body.audience,
         shortDescription: body.shortDescription,
         fullDescription: body.fullDescription,
         redemptionInstructions: body.redemptionInstructions,
         status: body.status ?? DealStatus.DRAFT,
       },
+      include: { logo: { select: { url: true } } },
     });
+
+    const { logo, ...rest } = deal;
+    return { ...rest, logoUrl: logo?.url ?? null };
   }
 
   async adminUpdate(uid: string, body: UpsertDealDto) {
@@ -389,13 +459,14 @@ export class DealsService {
       throw new NotFoundException('Deal not found');
     }
 
-    return this.prisma.deal.update({
+    const deal = await this.prisma.deal.update({
       where: { uid },
       data: {
         ...(body.vendorName !== undefined ? { vendorName: body.vendorName } : {}),
         ...(body.vendorTeamUid !== undefined ? { vendorTeamUid: body.vendorTeamUid } : {}),
         ...(body.logoUid !== undefined ? { logoUid: body.logoUid } : {}),
         ...(body.category !== undefined ? { category: body.category } : {}),
+        ...(body.audience !== undefined ? { audience: body.audience } : {}),
         ...(body.shortDescription !== undefined ? { shortDescription: body.shortDescription } : {}),
         ...(body.fullDescription !== undefined ? { fullDescription: body.fullDescription } : {}),
         ...(body.redemptionInstructions !== undefined
@@ -403,6 +474,10 @@ export class DealsService {
           : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
       },
+      include: { logo: { select: { url: true } } },
     });
+
+    const { logo, ...rest } = deal;
+    return { ...rest, logoUrl: logo?.url ?? null };
   }
 }

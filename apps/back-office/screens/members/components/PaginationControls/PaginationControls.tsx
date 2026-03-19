@@ -2,13 +2,13 @@ import { Table } from '@tanstack/react-table';
 import React from 'react';
 
 import s from './PaginationControls.module.scss';
-import { Member } from '../../types/member';
 
-interface Props {
-  table: Table<Member>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface Props<T = any> {
+  table: Table<T>;
 }
 
-const PaginationControls = ({ table }: Props) => {
+const PaginationControls = <T,>({ table }: Props<T>) => {
   const pageCount = table.getPageCount();
   const currentPage = table.getState().pagination.pageIndex;
 
