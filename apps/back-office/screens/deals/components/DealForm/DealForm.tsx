@@ -103,7 +103,8 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
 
       setCategoryOption(initialData.category ? { value: initialData.category, label: initialData.category } : null);
 
-      setAudienceOption(initialData.audience ? { value: initialData.audience, label: initialData.audience } : null);
+      const audienceOpt = DEAL_AUDIENCE_OPTIONS.find((o) => o.value === initialData.audience);
+      setAudienceOption(audienceOpt ? { value: audienceOpt.value, label: audienceOpt.label } : null);
 
       if (initialData.logoUrl) {
         setLogoPreviewUrl(initialData.logoUrl);

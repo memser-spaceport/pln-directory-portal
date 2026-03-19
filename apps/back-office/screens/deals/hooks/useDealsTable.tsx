@@ -59,7 +59,7 @@ export function useDealsTable({
       columnHelper.accessor('audience', {
         header: 'Audience',
         cell: (info) => info.getValue(),
-        size: 160,
+        size: 150,
         enableSorting: false,
       }),
       // 4. Status

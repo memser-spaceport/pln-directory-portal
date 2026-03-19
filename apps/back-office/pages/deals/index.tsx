@@ -37,7 +37,7 @@ const DealForm = dynamic<ComponentProps<typeof DealFormType>>(
   { ssr: false }
 );
 import { Deal, DealStatus, TDealForm } from '../../screens/deals/types/deal';
-import { DEAL_CATEGORIES, DEAL_AUDIENCE_OPTIONS } from '../../screens/deals/constants';
+import { DEAL_AUDIENCE_OPTIONS, DEAL_CATEGORIES } from '../../screens/deals/constants';
 
 const STATUSES: { value: DealStatus; label: string }[] = [
   { value: 'DRAFT', label: 'Draft' },

@@ -21,7 +21,7 @@ export type TDealForm = {
   vendorTeamUid?: string | null;
   logoUid?: string | null;
   category: string;
-  audience?: string;
+  audience: string;
   shortDescription: string;
   fullDescription: string;
   redemptionInstructions: string;
