@@ -106,6 +106,7 @@ export class DealsService {
     const deals = await this.prisma.deal.findMany({
       where: this.buildDealWhere(query, DealStatus.ACTIVE),
       orderBy: { createdAt: 'desc' },
+      include: { logo: { select: { url: true } } },
     });
 
     if (!deals.length) {
@@ -157,8 +158,9 @@ export class DealsService {
     const redemptionCountMap = this.countUniqueTeamsOrMembers(allRedemptions);
     const usageCountMap = this.countUniqueTeamsOrMembers(allUsages);
 
-    return deals.map((deal) => ({
+    return deals.map(({ logo, ...deal }) => ({
       ...deal,
+      logoUrl: logo?.url ?? null,
       isRedeemed: redeemedSet.has(deal.uid),
       isUsing: usingSet.has(deal.uid),
       teamsRedemptionCount: redemptionCountMap.get(deal.uid) ?? 0,
@@ -174,6 +176,7 @@ export class DealsService {
         uid,
         status: DealStatus.ACTIVE,
       },
+      include: { logo: { select: { url: true } } },
     });
 
     if (!deal) {
@@ -217,9 +220,11 @@ export class DealsService {
 
     const redemptionCountMap = this.countUniqueTeamsOrMembers(allRedemptions);
     const usageCountMap = this.countUniqueTeamsOrMembers(allUsages);
+    const { logo, ...rest } = deal;
 
     return {
-      ...deal,
+      ...rest,
+      logoUrl: logo?.url ?? null,
       isRedeemed: !!redemption,
       isUsing: !!usage,
       teamsRedemptionCount: redemptionCountMap.get(uid) ?? 0,
@@ -371,7 +376,7 @@ export class DealsService {
   }
 
   async adminCreate(body: UpsertDealDto) {
-    return this.prisma.deal.create({
+    const deal = await this.prisma.deal.create({
       data: {
         vendorName: body.vendorName,
         vendorTeamUid: body.vendorTeamUid ?? null,
@@ -383,7 +388,11 @@ export class DealsService {
         redemptionInstructions: body.redemptionInstructions,
         status: body.status ?? DealStatus.DRAFT,
       },
+      include: { logo: { select: { url: true } } },
     });
+
+    const { logo, ...rest } = deal;
+    return { ...rest, logoUrl: logo?.url ?? null };
   }
 
   async adminUpdate(uid: string, body: UpsertDealDto) {
@@ -395,7 +404,7 @@ export class DealsService {
       throw new NotFoundException('Deal not found');
     }
 
-    return this.prisma.deal.update({
+    const deal = await this.prisma.deal.update({
       where: { uid },
       data: {
         ...(body.vendorName !== undefined ? { vendorName: body.vendorName } : {}),
@@ -410,6 +419,10 @@ export class DealsService {
           : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
       },
+      include: { logo: { select: { url: true } } },
     });
+
+    const { logo, ...rest } = deal;
+    return { ...rest, logoUrl: logo?.url ?? null };
   }
 }
