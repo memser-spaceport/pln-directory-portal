@@ -8,11 +8,12 @@ interface Props {
   data: TDealForm;
   logoPreviewUrl: string | null;
   isPublishing: boolean;
+  publishDisabled?: boolean;
   onBack: () => void;
   onPublish: () => void;
 }
 
-export const DealPreview = ({ data, logoPreviewUrl, isPublishing, onBack, onPublish }: Props) => {
+export const DealPreview = ({ data, logoPreviewUrl, isPublishing, publishDisabled, onBack, onPublish }: Props) => {
   const audienceLabel = DEAL_AUDIENCE_OPTIONS.find((o) => o.value === data.audience)?.label ?? data.audience;
 
   return (
@@ -101,7 +102,7 @@ export const DealPreview = ({ data, logoPreviewUrl, isPublishing, onBack, onPubl
           </svg>
           Back to Edit
         </button>
-        <button type="button" className={s.publishBtn} onClick={onPublish} disabled={isPublishing}>
+        <button type="button" className={s.publishBtn} onClick={onPublish} disabled={isPublishing || publishDisabled}>
           {isPublishing ? 'Publishing...' : 'Publish Deal'}
         </button>
       </div>

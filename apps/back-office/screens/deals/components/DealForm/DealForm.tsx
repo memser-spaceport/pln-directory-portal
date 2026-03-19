@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import clsx from 'clsx';
 import { Controller, FormProvider, useForm } from 'react-hook-form';
 import AsyncSelect from 'react-select/async';
 import Select, { StylesConfig } from 'react-select';
@@ -71,7 +72,7 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
     reset,
     control,
     setValue,
-    formState: { isSubmitting, errors },
+    formState: { isSubmitting, isDirty, errors },
   } = methods;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -169,13 +170,14 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
 
   return (
     <div className={s.modal}>
-      <div className={s.modalContent}>
+      <div className={clsx(s.modalContent, { [s.previewMode]: showPreview })}>
         <FormProvider {...methods}>
           {showPreview && (
             <DealPreview
               data={methods.getValues()}
               logoPreviewUrl={logoPreviewUrl}
               isPublishing={isPublishing}
+              publishDisabled={isEdit && !isDirty}
               onBack={() => setShowPreview(false)}
               onPublish={handlePublish}
             />

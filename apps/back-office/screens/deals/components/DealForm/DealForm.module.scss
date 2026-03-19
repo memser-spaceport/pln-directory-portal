@@ -1,3 +1,19 @@
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .modal {
   position: fixed;
   top: 0;
@@ -11,6 +27,7 @@
   background: rgba(0, 0, 0, 0.4);
   overflow: auto;
   padding: 32px;
+  animation: backdropIn 0.2s ease-out both;
 }
 
 .modalContent {
@@ -24,6 +41,11 @@
   height: fit-content;
   min-height: 100%;
   flex-direction: column;
+  animation: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  &.previewMode {
+    min-height: unset;
+  }
   color: var(--foreground-neutral-secondary, #455468);
   font-size: 14px;
   font-weight: 500;
