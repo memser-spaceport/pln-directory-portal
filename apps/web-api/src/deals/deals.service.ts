@@ -299,13 +299,61 @@ export class DealsService {
     return { success: true };
   }
 
+
+  private async getDealMetrics(dealUids: string[]) {
+    if (!dealUids.length) {
+      return new Map<string, { tappedHowToRedeemCount: number; markedAsUsingCount: number }>();
+    }
+
+    const [allRedemptions, allUsages] = await Promise.all([
+      this.prisma.dealRedemption.findMany({
+        where: { dealUid: { in: dealUids } },
+        select: {
+          dealUid: true,
+          teamUid: true,
+          memberUid: true,
+        },
+      }),
+      this.prisma.dealUsage.findMany({
+        where: { dealUid: { in: dealUids } },
+        select: {
+          dealUid: true,
+          teamUid: true,
+          memberUid: true,
+        },
+      }),
+    ]);
+
+    const redemptionCountMap = this.countUniqueTeamsOrMembers(allRedemptions);
+    const usageCountMap = this.countUniqueTeamsOrMembers(allUsages);
+
+    const metrics = new Map<string, { tappedHowToRedeemCount: number; markedAsUsingCount: number }>();
+
+    for (const dealUid of dealUids) {
+      metrics.set(dealUid, {
+        tappedHowToRedeemCount: redemptionCountMap.get(dealUid) ?? 0,
+        markedAsUsingCount: usageCountMap.get(dealUid) ?? 0,
+      });
+    }
+
+    return metrics;
+  }
+
   async adminList(query: ListDealsQueryDto) {
     const deals = await this.prisma.deal.findMany({
       where: this.buildDealWhere(query),
       orderBy: { createdAt: 'desc' },
       include: { logo: { select: { url: true } } },
     });
-    return deals.map(({ logo, ...deal }) => ({ ...deal, logoUrl: logo?.url ?? null }));
+
+    const metrics = await this.getDealMetrics(deals.map((deal) => deal.uid));
+
+    return deals.map(({ logo, ...deal }) => ({
+      ...deal,
+      logoUrl: logo?.url ?? null,
+      tappedHowToRedeemCount: metrics.get(deal.uid)?.tappedHowToRedeemCount ?? 0,
+      markedAsUsingCount: metrics.get(deal.uid)?.markedAsUsingCount ?? 0,
+    }));
   }
 
   async getWhitelist() {
@@ -371,8 +419,15 @@ export class DealsService {
       throw new NotFoundException('Deal not found');
     }
 
+    const metrics = await this.getDealMetrics([uid]);
     const { logo, ...rest } = deal;
-    return { ...rest, logoUrl: logo?.url ?? null };
+
+    return {
+      ...rest,
+      logoUrl: logo?.url ?? null,
+      tappedHowToRedeemCount: metrics.get(uid)?.tappedHowToRedeemCount ?? 0,
+      markedAsUsingCount: metrics.get(uid)?.markedAsUsingCount ?? 0,
+    };
   }
 
   async adminCreate(body: UpsertDealDto) {

@@ -14,6 +14,8 @@ export type Deal = {
   status: DealStatus;
   createdAt: string;
   updatedAt: string;
+  tappedHowToRedeemCount: number;
+  markedAsUsingCount: number;
 };
 
 export type TDealForm = {

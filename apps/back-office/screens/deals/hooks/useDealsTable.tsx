@@ -62,14 +62,28 @@ export function useDealsTable({
         size: 150,
         enableSorting: false,
       }),
-      // 4. Status
+      // 4. Tapped How to Redeem
+      columnHelper.accessor('tappedHowToRedeemCount', {
+        header: 'Tapped How to Redeem',
+        cell: (info) => info.getValue() ?? 0,
+        size: 130,
+        enableSorting: true,
+      }),
+      // 5. Marked as Using
+      columnHelper.accessor('markedAsUsingCount', {
+        header: 'Marked as Using',
+        cell: (info) => info.getValue() ?? 0,
+        size: 120,
+        enableSorting: true,
+      }),
+      // 6. Status
       columnHelper.accessor('status', {
         header: 'Status',
         cell: (info) => <StatusBadge status={info.getValue()} />,
         size: 120,
         enableSorting: true,
       }),
-      // 8. Last Updated
+      // 7. Last Updated
       columnHelper.accessor('updatedAt', {
         header: 'Last Updated',
         cell: (info) => {
@@ -86,7 +100,7 @@ export function useDealsTable({
         size: 140,
         enableSorting: true,
       }),
-      // 9. Action
+      // 8. Action
       columnHelper.display({
         id: 'actions',
         header: 'Action',

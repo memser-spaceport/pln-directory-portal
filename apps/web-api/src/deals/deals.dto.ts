@@ -24,3 +24,9 @@ export class UpsertDealDto {
 export class UpdateDealAccessDto {
   memberUid!: string;
 }
+
+
+export class DealAdminMetricsDto {
+  tappedHowToRedeemCount!: number;
+  markedAsUsingCount!: number;
+}
