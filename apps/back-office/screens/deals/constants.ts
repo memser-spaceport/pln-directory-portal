@@ -1,15 +1,8 @@
 export const DEAL_CATEGORIES = [
-  'Analytics',
-  'CDN',
-  'Database',
-  'Design',
-  'Development',
-  'DevOps',
-  'Hosting',
-  'Monitoring',
-  'Project Management',
-  'Security',
-  'Other',
+  'Cloud Credits & Infra',
+  'Security & Audits',
+  'AI & Developer Tools',
+  'Finance',
 ] as const;
 
 export const DEAL_CATEGORY_OPTIONS = DEAL_CATEGORIES.map((cat) => ({ value: cat, label: cat }));
