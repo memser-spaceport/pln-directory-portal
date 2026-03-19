@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Deal, DealStatus } from '../../types/deal';
+import DeactivateDealModal from '../../../../components/deals/DeactivateDealModal';
 import s from './ActionMenu.module.scss';
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 
 export const ActionMenu = ({ deal, onEdit, onStatusChange }: Props) => {
   const [open, setOpen] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const handleEdit = () => {
@@ -24,6 +26,11 @@ export const ActionMenu = ({ deal, onEdit, onStatusChange }: Props) => {
 
   const handleDeactivate = () => {
     setOpen(false);
+    setShowDeactivateModal(true);
+  };
+
+  const handleConfirmDeactivate = () => {
+    setShowDeactivateModal(false);
     onStatusChange(deal.uid, 'DEACTIVATED');
   };
 
@@ -38,30 +45,38 @@ export const ActionMenu = ({ deal, onEdit, onStatusChange }: Props) => {
   }, [open]);
 
   return (
-    <div className={s.root} ref={ref}>
-      <button className={s.trigger} onClick={() => setOpen((v) => !v)} aria-label="Actions">
-        <span className={s.dot} />
-        <span className={s.dot} />
-        <span className={s.dot} />
-      </button>
-      {open && (
-        <div className={s.menu}>
-          <button className={s.item} onClick={handleEdit}>
-            Edit
-          </button>
-          {deal.status !== 'ACTIVE' && (
-            <button className={s.item} onClick={handleActivate}>
-              Activate
+    <>
+      <div className={s.root} ref={ref}>
+        <button className={s.trigger} onClick={() => setOpen((v) => !v)} aria-label="Actions">
+          <span className={s.dot} />
+          <span className={s.dot} />
+          <span className={s.dot} />
+        </button>
+        {open && (
+          <div className={s.menu}>
+            <button className={s.item} onClick={handleEdit}>
+              Edit
             </button>
-          )}
-          {deal.status !== 'DEACTIVATED' && (
-            <button className={s.item} onClick={handleDeactivate}>
-              Deactivate
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+            {deal.status !== 'ACTIVE' && (
+              <button className={s.item} onClick={handleActivate}>
+                Activate
+              </button>
+            )}
+            {deal.status !== 'DEACTIVATED' && (
+              <button className={s.item} onClick={handleDeactivate}>
+                Deactivate
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <DeactivateDealModal
+        isOpen={showDeactivateModal}
+        dealName={deal.vendorName}
+        onConfirm={handleConfirmDeactivate}
+        onClose={() => setShowDeactivateModal(false)}
+      />
+    </>
   );
 };
 
