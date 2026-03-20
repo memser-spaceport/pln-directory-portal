@@ -10,7 +10,7 @@ interface DeactivateDealModalProps {
 
 const DeactivateDealModal = ({ isOpen, dealName, onConfirm, onClose }: DeactivateDealModalProps) => {
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
+    <Modal isOpen={isOpen} onClose={onClose} blurBackdrop>
       <div className="relative w-[520px] rounded-[12px] bg-white p-6">
         <button
           className="absolute right-[16px] top-[16px] flex items-center justify-center"

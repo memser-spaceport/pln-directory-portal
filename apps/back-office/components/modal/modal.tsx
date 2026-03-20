@@ -12,6 +12,7 @@ type ModalProps = {
   enableFooter?: boolean;
   modalClassName?: string;
   modalRef?: LegacyRef<HTMLDivElement>;
+  blurBackdrop?: boolean;
 };
 
 type ModalHeaderProps = {
@@ -72,7 +73,8 @@ function Modal({
   isOpen,
   children,
   onClose,
-  modalRef
+  modalRef,
+  blurBackdrop,
 }: ModalProps) {
 
   return (
@@ -89,7 +91,7 @@ function Modal({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+            <div className={`fixed inset-0 bg-black/30${blurBackdrop ? ' backdrop-blur-sm' : ''}`} aria-hidden="true" />
           </Transition.Child>
 
           {/* Full-screen scrollable container */}
