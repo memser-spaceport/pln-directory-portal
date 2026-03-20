@@ -99,7 +99,9 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
       });
 
       setVendorOption(
-        initialData.vendorTeamUid ? { value: initialData.vendorTeamUid, label: initialData.vendorName } : null
+        initialData.vendorName
+          ? { value: initialData.vendorTeamUid ?? initialData.vendorName, label: initialData.vendorName }
+          : null
       );
 
       setCategoryOption(initialData.category ? { value: initialData.category, label: initialData.category } : null);
