@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { flexRender, PaginationState, SortingState, Table } from '@tanstack/react-table';
 import { useCookie } from 'react-use';
@@ -101,13 +101,21 @@ const DealsPage = () => {
     }
   };
 
+  useEffect(() => {
+    setCatalogPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [catalogFilter, categoryFilter, audienceFilter, statusFilter]);
+
   // Apply client-side filters on top of global filter
-  const filteredDeals = (dealsData?.data ?? []).filter((deal) => {
-    if (categoryFilter && deal.category !== categoryFilter) return false;
-    if (audienceFilter && deal.audience !== audienceFilter) return false;
-    if (statusFilter && deal.status !== statusFilter) return false;
-    return true;
-  });
+  const filteredDeals = useMemo(
+    () =>
+      (dealsData?.data ?? []).filter((deal) => {
+        if (categoryFilter && deal.category !== categoryFilter) return false;
+        if (audienceFilter && deal.audience !== audienceFilter) return false;
+        if (statusFilter && deal.status !== statusFilter) return false;
+        return true;
+      }),
+    [dealsData?.data, categoryFilter, audienceFilter, statusFilter]
+  );
 
   const { table: catalogTable } = useDealsTable({
     deals: filteredDeals,

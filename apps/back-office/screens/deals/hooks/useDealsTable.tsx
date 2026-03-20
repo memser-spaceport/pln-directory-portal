@@ -129,6 +129,7 @@ export function useDealsTable({
       pagination,
       globalFilter,
     },
+    autoResetPageIndex: false,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),

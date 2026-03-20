@@ -10,7 +10,12 @@ export const VendorCell = ({ deal }: Props) => {
   return (
     <div className={s.root}>
       <div className={s.avatar}>
-        <div className={s.placeholder}>{deal.vendorName.charAt(0)}</div>
+        {deal.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={deal.logoUrl} alt={deal.vendorName} />
+        ) : (
+          <div className={s.placeholder}>{deal.vendorName.charAt(0)}</div>
+        )}
       </div>
       <div className={s.name}>{deal.vendorName}</div>
     </div>
