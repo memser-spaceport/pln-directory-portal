@@ -185,77 +185,60 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
             />
           )}
           <div style={{ display: showPreview ? 'none' : 'contents' }}>
-          <div className={s.header}>
-            <div>
-              <h4 className={s.title}>{isEdit ? 'Edit Deal' : 'Create New Deal'}</h4>
-              <p className={s.desc}>{isEdit ? 'Update the deal details below.' : 'Fill in the details to add a new deal to the catalog.'}</p>
+            <div className={s.header}>
+              <div>
+                <h4 className={s.title}>{isEdit ? 'Edit Deal' : 'Create New Deal'}</h4>
+                <p className={s.desc}>
+                  {isEdit ? 'Update the deal details below.' : 'Fill in the details to add a new deal to the catalog.'}
+                </p>
+              </div>
+              <button type="button" className={s.closeButton} onClick={onClose} aria-label="Close">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M15 5L5 15M5 5l10 10" stroke="#455468" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
             </div>
-            <button type="button" className={s.closeButton} onClick={onClose} aria-label="Close">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M15 5L5 15M5 5l10 10" stroke="#455468" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
 
-          <form noValidate onSubmit={handleSubmit(handleFormSubmit)} className={s.form}>
-            {/* ── Deal Details section ── */}
-            <p className={s.sectionHeading}>Deal Details</p>
+            <form noValidate onSubmit={handleSubmit(handleFormSubmit)} className={s.form}>
+              {/* ── Deal Details section ── */}
+              <p className={s.sectionHeading}>Deal Details</p>
 
-            <div className={s.formFields}>
-              {/* Vendor row: avatar + team search */}
-              <div className={s.vendorRow}>
-                {/* Avatar */}
-                <div className={s.avatarWrapper}>
-                  <div className={s.avatar}>
-                    {logoPreviewUrl ? (
-                      <img src={logoPreviewUrl} alt="Vendor logo" className={s.avatarImg} />
-                    ) : (
-                      <div className={s.avatarPlaceholder}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                          <rect x="3" y="3" width="18" height="18" rx="4" stroke="#8897ae" strokeWidth="1.5" />
-                          <circle cx="9" cy="9" r="2" stroke="#8897ae" strokeWidth="1.5" />
-                          <path
-                            d="M3 17l4-4 3 3 4-5 7 6"
-                            stroke="#8897ae"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </div>
-                    )}
-                    {/* Overlay buttons */}
-                    <div className={s.avatarOverlay}>
-                      <button
-                        type="button"
-                        className={s.avatarBtn}
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploadingLogo || isSubmitting}
-                        title="Upload logo"
-                        aria-label="Upload logo"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <path
-                            d="M11 2.5L13.5 5M2 14l3.5-.5L13.5 5.5 10.5 2.5 2.5 10.5 2 14Z"
-                            stroke="#455468"
-                            strokeWidth="1.2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </button>
-                      {logoPreviewUrl && (
+              <div className={s.formFields}>
+                {/* Vendor row: avatar + team search */}
+                <div className={s.vendorRow}>
+                  {/* Avatar */}
+                  <div className={s.avatarWrapper}>
+                    <div className={s.avatar}>
+                      {logoPreviewUrl ? (
+                        <img src={logoPreviewUrl} alt="Vendor logo" className={s.avatarImg} />
+                      ) : (
+                        <div className={s.avatarPlaceholder}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect x="3" y="3" width="18" height="18" rx="4" stroke="#8897ae" strokeWidth="1.5" />
+                            <circle cx="9" cy="9" r="2" stroke="#8897ae" strokeWidth="1.5" />
+                            <path
+                              d="M3 17l4-4 3 3 4-5 7 6"
+                              stroke="#8897ae"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                      {/* Overlay buttons */}
+                      <div className={s.avatarOverlay}>
                         <button
                           type="button"
                           className={s.avatarBtn}
-                          onClick={handleLogoDelete}
-                          disabled={isSubmitting}
-                          title="Remove logo"
-                          aria-label="Remove logo"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploadingLogo || isSubmitting}
+                          title="Upload logo"
+                          aria-label="Upload logo"
                         >
                           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                             <path
-                              d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"
+                              d="M11 2.5L13.5 5M2 14l3.5-.5L13.5 5.5 10.5 2.5 2.5 10.5 2 14Z"
                               stroke="#455468"
                               strokeWidth="1.2"
                               strokeLinecap="round"
@@ -263,203 +246,214 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
                             />
                           </svg>
                         </button>
-                      )}
+                        {logoPreviewUrl && (
+                          <button
+                            type="button"
+                            className={s.avatarBtn}
+                            onClick={handleLogoDelete}
+                            disabled={isSubmitting}
+                            title="Remove logo"
+                            aria-label="Remove logo"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                              <path
+                                d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"
+                                stroke="#455468"
+                                strokeWidth="1.2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className={s.hiddenFileInput}
+                      onChange={handleFileSelect}
+                    />
                   </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className={s.hiddenFileInput}
-                    onChange={handleFileSelect}
-                  />
+
+                  {/* Vendor name async search */}
+                  <div className={s.vendorSelectWrapper}>
+                    <div className={s.labelRow}>
+                      <label className={s.label}>
+                        Vendor name <span className={s.required}>*</span>
+                      </label>
+                    </div>
+                    <AsyncCreatableSelect
+                      instanceId="vendor-select"
+                      placeholder="Search PL Network or enter the name"
+                      loadOptions={loadTeamOptions}
+                      value={vendorOption}
+                      onChange={(option: TeamOption | null) => {
+                        setVendorOption(option);
+                        setValue('vendorName', option?.label ?? '', { shouldValidate: true, shouldDirty: true });
+                        setValue('vendorTeamUid', option?.value ?? null, { shouldDirty: true });
+                      }}
+                      onCreateOption={(inputValue: string) => {
+                        const newOption = { value: inputValue, label: inputValue };
+                        setVendorOption(newOption);
+                        setValue('vendorName', inputValue, { shouldValidate: true, shouldDirty: true });
+                        setValue('vendorTeamUid', null, { shouldDirty: true });
+                      }}
+                      isClearable
+                      styles={reactSelectStyles}
+                      noOptionsMessage={({ inputValue }) => (inputValue ? 'No teams found' : 'Start typing to search')}
+                      loadingMessage={() => 'Searching...'}
+                      formatCreateLabel={(inputValue: string) => `Use "${inputValue}"`}
+                    />
+                    {/* Hidden input for vendorName validation */}
+                    <input type="hidden" {...register('vendorName', { required: 'Vendor name is required' })} />
+                    {errors.vendorName && <p className={s.error}>{errors.vendorName.message}</p>}
+                  </div>
                 </div>
 
-                {/* Vendor name async search */}
-                <div className={s.vendorSelectWrapper}>
+                {/* Category */}
+                <div className={s.field}>
                   <div className={s.labelRow}>
                     <label className={s.label}>
-                      Vendor name <span className={s.required}>*</span>
+                      Category <span className={s.required}>*</span>
                     </label>
                   </div>
-                  <AsyncCreatableSelect
-                    instanceId="vendor-select"
-                    placeholder="Search PL Network or enter the name"
-                    loadOptions={loadTeamOptions}
-                    value={vendorOption}
-                    onChange={(option: TeamOption | null) => {
-                      setVendorOption(option);
-                      setValue('vendorName', option?.label ?? '', { shouldValidate: true, shouldDirty: true });
-                      setValue('vendorTeamUid', option?.value ?? null, { shouldDirty: true });
-                    }}
-                    onCreateOption={(inputValue: string) => {
-                      const newOption = { value: inputValue, label: inputValue };
-                      setVendorOption(newOption);
-                      setValue('vendorName', inputValue, { shouldValidate: true, shouldDirty: true });
-                      setValue('vendorTeamUid', null, { shouldDirty: true });
-                    }}
-                    isClearable
-                    styles={reactSelectStyles}
-                    noOptionsMessage={({ inputValue }) => (inputValue ? 'No teams found' : 'Start typing to search')}
-                    loadingMessage={() => 'Searching...'}
-                    formatCreateLabel={(inputValue: string) => `Use "${inputValue}"`}
+                  <Controller
+                    name="category"
+                    control={control}
+                    rules={{ required: 'Category is required' }}
+                    render={({ field }) => (
+                      <Select
+                        instanceId="category-select"
+                        placeholder="Select category"
+                        options={DEAL_CATEGORY_OPTIONS}
+                        value={categoryOption}
+                        onChange={(option: { value: string; label: string } | null) => {
+                          setCategoryOption(option);
+                          field.onChange(option?.value ?? '');
+                        }}
+                        styles={reactSelectStyles}
+                      />
+                    )}
                   />
-                  {/* Hidden input for vendorName validation */}
-                  <input type="hidden" {...register('vendorName', { required: 'Vendor name is required' })} />
-                  {errors.vendorName && <p className={s.error}>{errors.vendorName.message}</p>}
+                  {errors.category && <p className={s.error}>{errors.category.message}</p>}
                 </div>
-              </div>
 
-              {/* Category */}
-              <div className={s.field}>
-                <div className={s.labelRow}>
-                  <label className={s.label}>
-                    Category <span className={s.required}>*</span>
-                  </label>
+                {/* Audience */}
+                <div className={s.field}>
+                  <div className={s.labelRow}>
+                    <label className={s.label}>
+                      Audience <span className={s.required}>*</span>
+                    </label>
+                  </div>
+                  <Controller
+                    name="audience"
+                    control={control}
+                    rules={{ required: 'Audience is required' }}
+                    render={({ field }) => (
+                      <Select
+                        instanceId="audience-select"
+                        placeholder="Select audience"
+                        options={DEAL_AUDIENCE_OPTIONS}
+                        value={audienceOption}
+                        onChange={(option: { value: string; label: string } | null) => {
+                          setAudienceOption(option);
+                          field.onChange(option?.value ?? '');
+                        }}
+                        styles={reactSelectStyles}
+                      />
+                    )}
+                  />
+                  {errors.audience && <p className={s.error}>{errors.audience.message}</p>}
                 </div>
-                <Controller
-                  name="category"
-                  control={control}
-                  rules={{ required: 'Category is required' }}
-                  render={({ field }) => (
-                    <Select
-                      instanceId="category-select"
-                      placeholder="Select category"
-                      options={DEAL_CATEGORY_OPTIONS}
-                      value={categoryOption}
-                      onChange={(option: { value: string; label: string } | null) => {
-                        setCategoryOption(option);
-                        field.onChange(option?.value ?? '');
-                      }}
-                      styles={reactSelectStyles}
-                    />
+
+                {/* Short Description */}
+                <div className={s.field}>
+                  <div className={s.labelRow}>
+                    <label className={s.label}>
+                      Short Description <span className={s.required}>*</span>
+                    </label>
+                  </div>
+                  <input
+                    className={s.input}
+                    maxLength={100}
+                    placeholder="Enter short title describing the offer"
+                    {...register('shortDescription', { required: 'Short description is required' })}
+                  />
+                  {errors.shortDescription ? (
+                    <p className={s.error}>{errors.shortDescription.message}</p>
+                  ) : (
+                    <p className={s.helperText}>Max. 100 characters.</p>
                   )}
-                />
-                {errors.category && <p className={s.error}>{errors.category.message}</p>}
-              </div>
-
-              {/* Audience */}
-              <div className={s.field}>
-                <div className={s.labelRow}>
-                  <label className={s.label}>
-                    Audience <span className={s.required}>*</span>
-                  </label>
                 </div>
-                <Controller
-                  name="audience"
-                  control={control}
-                  rules={{ required: 'Audience is required' }}
-                  render={({ field }) => (
-                    <Select
-                      instanceId="audience-select"
-                      placeholder="Select audience"
-                      options={DEAL_AUDIENCE_OPTIONS}
-                      value={audienceOption}
-                      onChange={(option: { value: string; label: string } | null) => {
-                        setAudienceOption(option);
-                        field.onChange(option?.value ?? '');
-                      }}
-                      styles={reactSelectStyles}
-                    />
-                  )}
-                />
-                {errors.audience && <p className={s.error}>{errors.audience.message}</p>}
-              </div>
 
-              {/* Short Description */}
-              <div className={s.field}>
-                <div className={s.labelRow}>
-                  <label className={s.label}>
-                    Short Description <span className={s.required}>*</span>
-                  </label>
+                {/* Full Description */}
+                <div className={s.field}>
+                  <div className={s.labelRow}>
+                    <label className={s.label}>
+                      Full Deal Description <span className={s.required}>*</span>
+                    </label>
+                  </div>
+                  <Controller
+                    name="fullDescription"
+                    control={control}
+                    rules={{ required: 'Full description is required' }}
+                    render={({ field, fieldState }) => (
+                      <RichTextEditor
+                        value={field.value}
+                        onChange={field.onChange}
+                        maxLength={600}
+                        placeholder="Explain the full details of the deal. Include eligibility, limits, and terms if known."
+                        errorMessage={fieldState.error?.message}
+                      />
+                    )}
+                  />
+                  {errors.fullDescription && <p className={s.error}>{errors.fullDescription.message}</p>}
                 </div>
-                <input
-                  className={s.input}
-                  maxLength={100}
-                  placeholder="Enter short title describing the offer"
-                  {...register('shortDescription', { required: 'Short description is required' })}
-                />
-                {errors.shortDescription ? (
-                  <p className={s.error}>{errors.shortDescription.message}</p>
-                ) : (
-                  <p className={s.helperText}>Max. 100 characters.</p>
-                )}
               </div>
 
-              {/* Full Description */}
-              <div className={s.field}>
-                <div className={s.labelRow}>
-                  <label className={s.label}>
-                    Full Deal Description <span className={s.required}>*</span>
-                  </label>
+              <div className={s.divider} />
+
+              {/* ── Redemption Instructions section ── */}
+              <p className={s.sectionHeading}>Redemption Instructions</p>
+
+              <div className={s.formFields}>
+                <div className={s.field}>
+                  <div className={s.labelRow}>
+                    <label className={s.label}>
+                      Redemption instructions <span className={s.required}>*</span>
+                    </label>
+                  </div>
+                  <Controller
+                    name="redemptionInstructions"
+                    control={control}
+                    rules={{ required: 'Redemption instructions are required' }}
+                    render={({ field, fieldState }) => (
+                      <RichTextEditor
+                        value={field.value}
+                        onChange={field.onChange}
+                        maxLength={600}
+                        placeholder={
+                          'Explain how founders can redeem the deal.\nExample:\n1. Visit the signup link\n2. Create an account\n3. Enter the promo code during onboarding'
+                        }
+                        errorMessage={fieldState.error?.message}
+                      />
+                    )}
+                  />
+                  {errors.redemptionInstructions && <p className={s.error}>{errors.redemptionInstructions.message}</p>}
                 </div>
-                <Controller
-                  name="fullDescription"
-                  control={control}
-                  rules={{ required: 'Full description is required' }}
-                  render={({ field, fieldState }) => (
-                    <RichTextEditor
-                      value={field.value}
-                      onChange={field.onChange}
-                      maxLength={600}
-                      placeholder="Explain the full details of the deal. Include eligibility, limits, and terms if known."
-                      errorMessage={fieldState.error?.message}
-                    />
-                  )}
-                />
-                {errors.fullDescription ? (
-                  <p className={s.error}>{errors.fullDescription.message}</p>
-                ) : (
-                  <p className={s.helperText}>Max 600 characters.</p>
-                )}
               </div>
-            </div>
 
-            <div className={s.divider} />
-
-            {/* ── Redemption Instructions section ── */}
-            <p className={s.sectionHeading}>Redemption Instructions</p>
-
-            <div className={s.formFields}>
-              <div className={s.field}>
-                <div className={s.labelRow}>
-                  <label className={s.label}>
-                    Redemption instructions <span className={s.required}>*</span>
-                  </label>
-                </div>
-                <Controller
-                  name="redemptionInstructions"
-                  control={control}
-                  rules={{ required: 'Redemption instructions are required' }}
-                  render={({ field, fieldState }) => (
-                    <RichTextEditor
-                      value={field.value}
-                      onChange={field.onChange}
-                      maxLength={600}
-                      placeholder={
-                        'Explain how founders can redeem the deal.\nExample:\n1. Visit the signup link\n2. Create an account\n3. Enter the promo code during onboarding'
-                      }
-                      errorMessage={fieldState.error?.message}
-                    />
-                  )}
-                />
-                {errors.redemptionInstructions ? (
-                  <p className={s.error}>{errors.redemptionInstructions.message}</p>
-                ) : (
-                  <p className={s.helperText}>Max 600 characters.</p>
-                )}
+              <div className={s.footer}>
+                <button type="submit" className={s.secondaryBtn} disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving...' : 'Save as Draft'}
+                </button>
+                <button type="button" className={s.previewBtn} onClick={handlePreviewClick} disabled={isSubmitting}>
+                  Preview Deal
+                </button>
               </div>
-            </div>
-
-            <div className={s.footer}>
-              <button type="submit" className={s.secondaryBtn} disabled={isSubmitting}>
-                {isSubmitting ? 'Saving...' : 'Save as Draft'}
-              </button>
-              <button type="button" className={s.previewBtn} onClick={handlePreviewClick} disabled={isSubmitting}>
-                Preview Deal
-              </button>
-            </div>
-          </form>
+            </form>
           </div>
         </FormProvider>
       </div>

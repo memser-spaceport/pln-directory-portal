@@ -69,7 +69,13 @@ export const DealPreview = ({ data, logoPreviewUrl, isPublishing, publishDisable
             <span className={s.metaItem}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="5.5" stroke="#455468" strokeWidth="1.2" />
-                <path d="M5.5 8l2 2 3-3" stroke="#455468" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M5.5 8l2 2 3-3"
+                  stroke="#455468"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
               No issues
             </span>
@@ -91,14 +97,23 @@ export const DealPreview = ({ data, logoPreviewUrl, isPublishing, publishDisable
 
         <section className={s.section}>
           <h3 className={s.sectionTitle}>Redemption Instructions</h3>
-          <div className={s.richText} dangerouslySetInnerHTML={{ __html: data.redemptionInstructions || '' }} />
+          <div
+            className={s.redemptionInstructionsBody}
+            dangerouslySetInnerHTML={{ __html: data.redemptionInstructions || '' }}
+          />
         </section>
       </div>
 
       <div className={s.footer}>
         <button type="button" className={s.backBtn} onClick={onBack}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M11.25 13.5L6.75 9l4.5-4.5" stroke="#455468" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M11.25 13.5L6.75 9l4.5-4.5"
+              stroke="#455468"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
           Back to Edit
         </button>
