@@ -3725,12 +3725,12 @@ export class MembersService {
   /**
    * Search members by name and/or email with relevance scoring.
    * Used by internal APIs for entity matching and lookups.
-   * 
+   *
    * Strategy:
    * 1. If email is provided, first check database for exact match (email not indexed in OpenSearch)
    * 2. Then search OpenSearch by name for additional candidates
    * 3. Merge and deduplicate results
-   * 
+   *
    * @param params - Search parameters including optional searchTerm and email
    * @returns Array of matching members with confidence scores (0-100), sorted by score desc
    */
@@ -3792,16 +3792,16 @@ export class MembersService {
       return { matches };
     } catch (error) {
       this.logger.error('Error searching member matches:', error);
-      throw new InternalServerErrorException('Error searching member matches', error);   
+      throw new InternalServerErrorException('Error searching member matches', error);
     }
   }
 
   /**
    * Build OpenSearch query for member search by name.
-   * 
+   *
    * Fields indexed in OpenSearch member index:
    * - uid, name, image, bio, scheduleMeetingCount, officeHoursUrl, availableToConnect, name_suggest
-   * 
+   *
    * Note: Email is NOT indexed in OpenSearch. Email lookup is done via Prisma.
    */
   private buildMemberSearchQuery(name: string) {

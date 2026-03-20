@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ResponseFundingStageSchema } from './funding-stage';
 import { ResponseImageWithRelationsSchema } from './image';
 import { ResponseIndustryTagSchema } from './industry-tag';
+import { ResponseCommunityAffiliationSchema } from './community-affiliation';
 import { ResponseMembershipSourceSchema } from './membership-source';
 import { QueryParams, RETRIEVAL_QUERY_FILTERS } from './query-params';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
@@ -62,6 +63,7 @@ export const ResponseTeamSchema = TeamSchema.omit({ id: true }).strict();
 export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
   logo: ResponseImageWithRelationsSchema.optional(),
   membershipSources: ResponseMembershipSourceSchema.array().optional(),
+  communityAffiliations: ResponseCommunityAffiliationSchema.array().optional(),
   industryTags: ResponseIndustryTagSchema.array().optional(),
   fundingStage: ResponseFundingStageSchema.optional(),
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
@@ -74,6 +76,7 @@ export const TeamQueryableFields = ResponseTeamSchema.keyof();
 export const TeamRelationalFields = ResponseTeamWithRelationsSchema.pick({
   logo: true,
   membershipSources: true,
+  communityAffiliations: true,
   industryTags: true,
   fundingStage: true,
   teamMemberRoles: true,
@@ -91,6 +94,7 @@ export const TeamDetailQueryParams = TeamQueryParams.unwrap().pick(RETRIEVAL_QUE
 export const TeamFilterQueryParams = z.object({
   searchBy: z.string().optional(),
   membershipSources: z.string().optional(),
+  communityAffiliations: z.string().optional(),
   focusAreas: z.string().optional(),
   tags: z.string().optional(),
   fundingStage: z.string().optional(),

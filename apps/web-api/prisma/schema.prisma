@@ -51,6 +51,7 @@ model Team {
   teamMemberRoles              TeamMemberRole[]
   industryTags                 IndustryTag[]
   membershipSources            MembershipSource[]
+  communityAffiliations        CommunityAffiliation[]
   fundingStage                 FundingStage?                 @relation(fields: [fundingStageUid], references: [uid])
   fundingStageUid              String?
   technologies                 Technology[]
@@ -69,7 +70,11 @@ model Team {
   accessLevel                  String?                       @default("L1")
   accessLevelUpdatedAt         DateTime                      @default(now())
   eventAssociations            PLEventAssociation[]
-  dataEnrichment               Json? /// AI enrichment metadata
+  dataEnrichment               Json?            /// AI enrichment metadata
+
+  vendorDeals                  Deal[]           @relation("DealVendorTeam")
+  dealRedemptions              DealRedemption[] @relation("TeamDealRedemptions")
+  dealUsages                   DealUsage[]      @relation("TeamDealUsages")
 }
 
 enum AskStatus {
@@ -181,6 +186,10 @@ model Member {
   pushNotifications                PushNotification[]                @relation("PushNotificationRecipient")
   pushNotificationReadStatuses     PushNotificationReadStatus[]      @relation("PushNotificationReadStatuses")
   eventAssociations                PLEventAssociation[]
+
+  dealRedemptions                  DealRedemption[]                  @relation("MemberDealRedemptions")
+  dealUsages                       DealUsage[]                       @relation("MemberDealUsages")
+  dealWhitelist                    DealWhitelist?                    @relation("MemberDealWhitelist")
 }
 
 model MemberRole {
@@ -356,6 +365,15 @@ model MembershipSource {
   teams     Team[]
 }
 
+model CommunityAffiliation {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  title     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teams     Team[]
+}
+
 model Technology {
   id        Int      @id @default(autoincrement())
   uid       String   @unique @default(cuid())
@@ -392,6 +410,7 @@ model Image {
   eventLogo            PLEvent[]         @relation("logo")
   eventBanner          PLEvent[]         @relation("banner")
   demoDayBrandingLogos DemoDayBranding[]
+  dealLogos            Deal[]            @relation("DealLogo")
 }
 
 model Faq {
@@ -1385,4 +1404,80 @@ model IrlGatheringPushConfig {
   @@index([isActive])
   @@index([enabled])
   @@index([updatedAt])
+}
+
+
+enum DealStatus {
+  DRAFT
+  ACTIVE
+  DEACTIVATED
+}
+
+model Deal {
+  id                     Int              @id @default(autoincrement())
+  uid                    String           @unique @default(cuid())
+  vendorName             String
+  vendorTeamUid          String?
+  vendorTeam             Team?            @relation("DealVendorTeam", fields: [vendorTeamUid], references: [uid], onDelete: SetNull)
+  logoUid                String?
+  logo                   Image?           @relation("DealLogo", fields: [logoUid], references: [uid], onDelete: SetNull)
+  category               String
+  audience               String
+  shortDescription       String
+  fullDescription        String
+  redemptionInstructions String
+  status                 DealStatus       @default(DRAFT)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  redemptions            DealRedemption[]
+  usages                 DealUsage[]
+
+  @@index([status])
+  @@index([category])
+  @@index([vendorName])
+  @@index([audience])
+}
+
+model DealRedemption {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  dealUid   String
+  deal      Deal     @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
+  memberUid String
+  member    Member   @relation("MemberDealRedemptions", fields: [memberUid], references: [uid], onDelete: Cascade)
+  teamUid   String?
+  team      Team?    @relation("TeamDealRedemptions", fields: [teamUid], references: [uid], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@unique([dealUid, memberUid])
+  @@index([dealUid])
+  @@index([memberUid])
+  @@index([teamUid])
+}
+
+model DealUsage {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  dealUid   String
+  deal      Deal     @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
+  memberUid String
+  member    Member   @relation("MemberDealUsages", fields: [memberUid], references: [uid], onDelete: Cascade)
+  teamUid   String?
+  team      Team?    @relation("TeamDealUsages", fields: [teamUid], references: [uid], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@unique([dealUid, memberUid])
+  @@index([dealUid])
+  @@index([memberUid])
+  @@index([teamUid])
+}
+
+model DealWhitelist {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  memberUid String   @unique
+  member    Member   @relation("MemberDealWhitelist", fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([memberUid])
 }

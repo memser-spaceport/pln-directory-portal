@@ -22,7 +22,7 @@ export class MembershipSourcesService {
   }
 
   private buildTeamsFilterByType(type: any, query: any): any {
-    if (type === TEAM) {
+    if (type?.toLowerCase() === TEAM.toLowerCase()) {
       const { plnFriend } = query;
       const whereClause: any = {
         accessLevel: {
