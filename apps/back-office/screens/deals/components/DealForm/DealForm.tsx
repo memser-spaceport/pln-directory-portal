@@ -188,7 +188,7 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
           <div className={s.header}>
             <div>
               <h4 className={s.title}>{isEdit ? 'Edit Deal' : 'Create New Deal'}</h4>
-              <p className={s.desc}>Fill in the details to add a new deal to the catalog.</p>
+              <p className={s.desc}>{isEdit ? 'Update the deal details below.' : 'Fill in the details to add a new deal to the catalog.'}</p>
             </div>
             <button type="button" className={s.closeButton} onClick={onClose} aria-label="Close">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
