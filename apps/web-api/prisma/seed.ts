@@ -268,6 +268,101 @@ async function main() {
 
   // Link InvestorProfiles to Members (update Member.investorProfileId)
   await linkInvestorProfilesToMembers();
+
+  // DEALS_V1_SEED_MARKER
+  const seedMember = await prisma.member.findFirst({
+    select: { uid: true },
+  });
+
+  if (!seedMember) {
+    throw new Error('No member found for deals seed');
+  }
+
+  await prisma.deal.createMany({
+    data: [
+      {
+        uid: 'deal_vercel',
+        vendorName: 'Vercel',
+        category: 'Hosting & Infrastructure',
+        audience: 'All Founders',
+        shortDescription: 'Free Vercel credits for startups.',
+        fullDescription: 'Seeded Vercel deal.',
+        redemptionInstructions: 'Contact admin',
+        status: 'ACTIVE',
+      },
+      {
+        uid: 'deal_figma',
+        vendorName: 'Figma',
+        category: 'Design',
+        audience: 'PL Funded Founders',
+        shortDescription: 'Free Figma plan.',
+        fullDescription: 'Seeded Figma deal.',
+        redemptionInstructions: 'Contact admin',
+        status: 'ACTIVE',
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  await prisma.dealSubmission.createMany({
+    data: [
+      {
+        uid: 'deal_submission_datadog',
+        vendorName: 'Datadog',
+        category: 'Monitoring',
+        audience: 'All Founders',
+        shortDescription: 'Free credits',
+        fullDescription: 'Monitoring platform',
+        redemptionInstructions: 'Apply',
+        authorMemberUid: seedMember.uid,
+        status: 'OPEN',
+      },
+      {
+        uid: 'deal_submission_aws',
+        vendorName: 'AWS',
+        category: 'Cloud',
+        audience: 'PL Funded Founders',
+        shortDescription: 'AWS credits',
+        fullDescription: 'Cloud credits',
+        redemptionInstructions: 'Apply',
+        authorMemberUid: seedMember.uid,
+        status: 'APPROVED',
+        reviewedByMemberUid: seedMember.uid,
+        reviewedAt: new Date(),
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  await prisma.dealIssue.createMany({
+    data: [
+      {
+        uid: 'deal_issue_vercel_1',
+        dealUid: 'deal_vercel',
+        authorMemberUid: seedMember.uid,
+        description: 'Promo code not working',
+        status: 'OPEN',
+      },
+      {
+        uid: 'deal_issue_vercel_2',
+        dealUid: 'deal_vercel',
+        authorMemberUid: seedMember.uid,
+        description: 'Instructions outdated',
+        status: 'RESOLVED',
+        resolvedByMemberUid: seedMember.uid,
+        resolvedAt: new Date(),
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  await prisma.dealWhitelist.upsert({
+    where: { memberUid: seedMember.uid },
+    create: { memberUid: seedMember.uid },
+    update: {},
+  });
+
+  console.log('✅ Deals V1 seed added');
 }
 
 /**
