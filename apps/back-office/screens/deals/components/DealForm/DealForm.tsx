@@ -22,7 +22,7 @@ interface Props {
   mode?: DealFormMode;
 }
 
-type TeamOption = { value: string; label: string };
+type TeamOption = { value: string; label: string; logoUid?: string | null; logoUrl?: string | null };
 
 const loadTeamOptions = async (inputValue: string): Promise<TeamOption[]> => {
   if (!inputValue || inputValue.length < 1) return [];
@@ -298,6 +298,13 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
                         setVendorOption(option);
                         setValue('vendorName', option?.label ?? '', { shouldValidate: true, shouldDirty: true });
                         setValue('vendorTeamUid', option?.value ?? null, { shouldDirty: true });
+                        // Auto-set logoUid and preview from team if selecting an existing team (not creating new)
+                        if (option?.logoUid) {
+                          setValue('logoUid', option.logoUid, { shouldDirty: true });
+                        }
+                        if (option?.logoUrl) {
+                          setLogoPreviewUrl(option.logoUrl);
+                        }
                       }}
                       onCreateOption={(inputValue: string) => {
                         const newOption = { value: inputValue, label: inputValue };
