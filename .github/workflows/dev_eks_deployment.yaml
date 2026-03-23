@@ -3,7 +3,7 @@ name: Deploy to EKS with Helm [Dev]
 on:
   push:
     branches:
-      - feat/LAB-1529/deals-v11-implement-report-a-problem-flow-api   # Triggers Dev deployment
+      - develop   # Triggers Dev deployment
   workflow_dispatch:
 jobs:
   dev-deploy:
