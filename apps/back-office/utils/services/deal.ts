@@ -68,6 +68,19 @@ export async function fetchReportedIssues(params: { authToken: string | undefine
   return { data: response.data };
 }
 
+export async function updateIssueStatus(params: {
+  authToken: string | undefined;
+  uid: string;
+  status: 'OPEN' | 'RESOLVED';
+}): Promise<ReportedIssue> {
+  const response = await api.patch<ReportedIssue>(
+    `${API_ROUTE.ADMIN_REPORTED_ISSUES}/${params.uid}`,
+    { status: params.status },
+    { headers: { authorization: `Bearer ${params.authToken}` } }
+  );
+  return response.data;
+}
+
 export async function fetchDealCounts(params: { authToken: string | undefined }): Promise<DealCounts> {
   // Use the deals list length as the count since there's no dedicated counts endpoint
   const response = await api.get<Deal[]>(API_ROUTE.ADMIN_DEALS, {

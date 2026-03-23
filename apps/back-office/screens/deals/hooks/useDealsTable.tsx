@@ -12,6 +12,7 @@ import {
 import { Deal, DealStatus } from '../types/deal';
 import { VendorCell } from '../components/VendorCell/VendorCell';
 import { StatusBadge } from '../components/StatusBadge/StatusBadge';
+import { IssuesBadge } from '../components/IssuesBadge/IssuesBadge';
 import { ActionMenu } from '../components/ActionMenu/ActionMenu';
 
 const columnHelper = createColumnHelper<Deal>();
@@ -65,18 +66,30 @@ export function useDealsTable({
       // 4. Tapped How to Redeem
       columnHelper.accessor('tappedHowToRedeemCount', {
         header: 'Tapped How to Redeem',
-        cell: (info) => info.getValue() ?? 0,
+        cell: (info) => info.row.original.status === 'DRAFT' ? '-' : (info.getValue() ?? 0),
         size: 130,
         enableSorting: true,
       }),
       // 5. Marked as Using
       columnHelper.accessor('markedAsUsingCount', {
         header: 'Marked as Using',
-        cell: (info) => info.getValue() ?? 0,
+        cell: (info) => info.row.original.status === 'DRAFT' ? '-' : (info.getValue() ?? 0),
         size: 120,
         enableSorting: true,
       }),
-      // 6. Status
+      // 6. Submitted Issues
+      columnHelper.accessor('submittedIssuesCount', {
+        header: 'Submitted Issues',
+        cell: (info) => (
+          <IssuesBadge
+            count={info.getValue() ?? 0}
+            isDraft={info.row.original.status === 'DRAFT'}
+          />
+        ),
+        size: 120,
+        enableSorting: true,
+      }),
+      // 7. Status
       columnHelper.accessor('status', {
         header: 'Status',
         cell: (info) => <StatusBadge status={info.getValue()} />,
