@@ -90,48 +90,62 @@ export function useSubmittedDealsTable({
         id: 'vendorDeal',
         header: 'Vendor & Deal',
         size: 0,
-        cell: (info) => (
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <VendorAvatar name={info.row.original.vendorName} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
-                {info.row.original.vendorName}
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: '#64748b',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  maxWidth: 300,
-                }}
-              >
-                {info.row.original.description}
+        cell: (info) => {
+          const { vendorName, shortDescription, logo } = info.row.original;
+          return (
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              {logo?.url ? (
+                <img
+                  src={logo.url}
+                  alt={vendorName}
+                  style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', border: '1px solid rgba(27,56,96,0.24)', flexShrink: 0 }}
+                />
+              ) : (
+                <VendorAvatar name={vendorName} />
+              )}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
+                  {vendorName}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: '#64748b',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: 300,
+                  }}
+                >
+                  {shortDescription}
+                </div>
               </div>
             </div>
-          </div>
-        ),
+          );
+        },
       }),
       columnHelper.display({
         id: 'submittedBy',
         header: 'Submitted By',
         size: 272,
-        cell: (info) => (
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <SubmitterAvatar name={info.row.original.submittedBy} />
-            <div>
-              <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
-                {info.row.original.submittedBy}
-              </div>
-              <div style={{ fontSize: 12, color: '#64748b' }}>
-                {info.row.original.submittedByEmail}
+        cell: (info) => {
+          const { authorMember } = info.row.original;
+          return (
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <SubmitterAvatar name={authorMember.name} />
+              <div>
+                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
+                  {authorMember.name}
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  {authorMember.email}
+                </div>
               </div>
             </div>
-          </div>
-        ),
+          );
+        },
       }),
-      columnHelper.accessor('submittedAt', {
+      columnHelper.accessor('createdAt', {
         header: 'Submission Date',
         sortingFn: 'datetime',
         enableSorting: true,

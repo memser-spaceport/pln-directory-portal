@@ -30,24 +30,27 @@ export function useReportedIssuesTable({
 }: UseReportedIssuesTableArgs) {
   const columns = useMemo(
     () => [
-      columnHelper.accessor('vendorName', {
+      columnHelper.display({
+        id: 'vendor',
         header: 'Vendor',
-        sortingFn: 'alphanumeric',
-        cell: (info) => info.getValue(),
         size: 160,
+        cell: (info) => info.row.original.deal.vendorName,
       }),
-      columnHelper.accessor('reportedBy', {
+      columnHelper.display({
+        id: 'reportedBy',
         header: 'Reported By',
-        cell: (info) => (
-          <div>
-            <div>{info.getValue()}</div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>{info.row.original.reportedByEmail}</div>
-          </div>
-        ),
         size: 200,
-        enableSorting: false,
+        cell: (info) => {
+          const { authorMember } = info.row.original;
+          return (
+            <div>
+              <div>{authorMember.name}</div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>{authorMember.email}</div>
+            </div>
+          );
+        },
       }),
-      columnHelper.accessor('issueDescription', {
+      columnHelper.accessor('description', {
         header: 'Issue',
         cell: (info) => (
           <div
@@ -64,11 +67,12 @@ export function useReportedIssuesTable({
         size: 0,
         enableSorting: false,
       }),
-      columnHelper.accessor('reportedAt', {
+      columnHelper.accessor('createdAt', {
         header: 'Reported At',
         cell: (info) => new Date(info.getValue()).toLocaleDateString(),
         size: 140,
         enableSorting: true,
+        sortingFn: 'datetime',
       }),
     ],
     []

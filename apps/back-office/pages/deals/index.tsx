@@ -108,24 +108,23 @@ const DealsPage = () => {
 
   const handleReview = (submitted: SubmittedDeal) => {
     // Map SubmittedDeal → Deal for DealForm pre-population.
-    // uid is intentionally empty so handleFormSubmit takes the createDeal path.
-    // Fields absent from SubmittedDeal (audience, fullDescription, redemptionInstructions)
-    // are left blank for the admin to fill in.
-    // TODO: replace with approve endpoint — see docs/plans/2026-03-17-feat-wire-deals-admin-api-remove-mocks-plan.md
+    // uid is intentionally empty so handleFormSubmit takes the createDeal path
+    // (creating a catalog deal from the submission).
+    // TODO: also call approveSubmission after save — see docs/plans/2026-03-17-feat-wire-deals-admin-api-remove-mocks-plan.md
     const prefilled: Deal = {
       uid: '',
       vendorName: submitted.vendorName,
-      vendorTeamUid: null,
-      logoUid: null,
-      logoUrl: null,
+      vendorTeamUid: submitted.vendorTeamUid,
+      logoUid: submitted.logoUid,
+      logoUrl: submitted.logo?.url ?? null,
       category: submitted.category,
-      audience: '',
-      shortDescription: submitted.description.slice(0, 100),
-      fullDescription: submitted.description,
-      redemptionInstructions: '',
+      audience: submitted.audience,
+      shortDescription: submitted.shortDescription,
+      fullDescription: submitted.fullDescription,
+      redemptionInstructions: submitted.redemptionInstructions,
       status: 'DRAFT',
-      createdAt: submitted.submittedAt,
-      updatedAt: submitted.submittedAt,
+      createdAt: submitted.createdAt,
+      updatedAt: submitted.updatedAt,
       tappedHowToRedeemCount: 0,
       markedAsUsingCount: 0,
     };

@@ -1,4 +1,4 @@
-import { Deal, DealCounts, ReportedIssue, SubmittedDeal, TDealForm } from '../../screens/deals/types/deal';
+import { Deal, DealCounts, ReportedIssue, SubmissionStatus, SubmittedDeal, TDealForm } from '../../screens/deals/types/deal';
 import api from '../api';
 import { API_ROUTE } from '../constants';
 
@@ -41,71 +41,31 @@ export async function updateDeal(params: {
   return response.data;
 }
 
-// ---------------------------------------------------------------------------
-// Mocked functions — backend endpoints not yet available
-// ---------------------------------------------------------------------------
-
-const MOCK_SUBMITTED_DEALS: SubmittedDeal[] = [
-  {
-    uid: 'sub-001',
-    vendorName: 'AWS Activate',
-    submittedBy: 'Alice Johnson',
-    submittedByEmail: 'alice@startup.io',
-    category: 'Cloud Computing',
-    description: 'AWS Activate provides startups with free credits and resources.',
-    submittedAt: '2026-03-10T09:00:00.000Z',
-  },
-  {
-    uid: 'sub-002',
-    vendorName: 'Stripe Atlas',
-    submittedBy: 'Bob Smith',
-    submittedByEmail: 'bob@newco.com',
-    category: 'Finance & Legal',
-    description: 'Stripe Atlas helps startups incorporate quickly and easily.',
-    submittedAt: '2026-03-12T14:30:00.000Z',
-  },
-];
-
-const MOCK_REPORTED_ISSUES: ReportedIssue[] = [
-  {
-    uid: 'issue-001',
-    dealUid: 'deal-002',
-    vendorName: 'Vercel',
-    reportedBy: 'Carol White',
-    reportedByEmail: 'carol@founder.dev',
-    issueDescription: 'The promo code on the Vercel deal page is expired.',
-    reportedAt: '2026-03-14T11:00:00.000Z',
-  },
-  {
-    uid: 'issue-002',
-    dealUid: 'deal-005',
-    vendorName: 'Figma',
-    reportedBy: 'Dan Brown',
-    reportedByEmail: 'dan@designco.io',
-    issueDescription: 'Figma deal link redirects to a 404 page.',
-    reportedAt: '2026-03-15T16:45:00.000Z',
-  },
-  {
-    uid: 'issue-003',
-    dealUid: 'deal-008',
-    vendorName: 'Datadog',
-    reportedBy: 'Eve Davis',
-    reportedByEmail: 'eve@monitoring.tech',
-    issueDescription: 'The discount percentage listed is incorrect — shows 20% but actual is 10%.',
-    reportedAt: '2026-03-16T08:20:00.000Z',
-  },
-];
-
-export async function fetchSubmittedDeals(_params: { authToken: string | undefined }): Promise<{ data: SubmittedDeal[] }> {
-  // TODO: replace with: api.get(API_ROUTE.ADMIN_SUBMITTED_DEALS, { headers }).then(r => r.data)
-  await delay(300);
-  return { data: MOCK_SUBMITTED_DEALS };
+export async function fetchSubmittedDeals(params: { authToken: string | undefined }): Promise<{ data: SubmittedDeal[] }> {
+  const response = await api.get<SubmittedDeal[]>(API_ROUTE.ADMIN_SUBMITTED_DEALS, {
+    headers: { authorization: `Bearer ${params.authToken}` },
+  });
+  return { data: response.data };
 }
 
-export async function fetchReportedIssues(_params: { authToken: string | undefined }): Promise<{ data: ReportedIssue[] }> {
-  // TODO: replace with: api.get(API_ROUTE.ADMIN_REPORTED_ISSUES, { headers }).then(r => r.data)
-  await delay(300);
-  return { data: MOCK_REPORTED_ISSUES };
+export async function approveSubmission(params: {
+  authToken: string | undefined;
+  uid: string;
+  status: SubmissionStatus;
+}): Promise<SubmittedDeal> {
+  const response = await api.patch<SubmittedDeal>(
+    `${API_ROUTE.ADMIN_SUBMITTED_DEALS}/${params.uid}`,
+    { status: params.status },
+    { headers: { authorization: `Bearer ${params.authToken}` } }
+  );
+  return response.data;
+}
+
+export async function fetchReportedIssues(params: { authToken: string | undefined }): Promise<{ data: ReportedIssue[] }> {
+  const response = await api.get<ReportedIssue[]>(API_ROUTE.ADMIN_REPORTED_ISSUES, {
+    headers: { authorization: `Bearer ${params.authToken}` },
+  });
+  return { data: response.data };
 }
 
 export async function fetchDealCounts(params: { authToken: string | undefined }): Promise<DealCounts> {
@@ -164,10 +124,3 @@ export async function removeDealWhitelistMember(params: {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function delay(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
