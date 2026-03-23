@@ -239,6 +239,23 @@
   min-width: 0;
 }
 
+.reviewBtn {
+  background: rgba(14, 15, 17, 0.04);
+  border: 1px solid rgba(14, 15, 17, 0.02);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #455468;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: inset 0px -2px 4px 0px rgba(14, 15, 17, 0.02);
+
+  &:hover {
+    background: rgba(14, 15, 17, 0.08);
+  }
+}
+
 .emptyState {
   display: flex;
   flex-direction: column;

@@ -10,8 +10,58 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { SubmittedDeal } from '../types/deal';
+import s from '../../../pages/deals/styles.module.scss';
 
 const columnHelper = createColumnHelper<SubmittedDeal>();
+
+// 40×40 rounded-square avatar with vendor initial
+function VendorAvatar({ name }: { name: string }) {
+  const initial = name.charAt(0).toUpperCase() || '?';
+  return (
+    <div
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        background: '#f1f5f9',
+        border: '1px solid rgba(27,56,96,0.24)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 16,
+        fontWeight: 600,
+        color: '#455468',
+        flexShrink: 0,
+      }}
+    >
+      {initial}
+    </div>
+  );
+}
+
+// 40×40 circular avatar with submitter initial
+function SubmitterAvatar({ name }: { name: string }) {
+  const initial = name.charAt(0).toUpperCase() || '?';
+  return (
+    <div
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: '50%',
+        background: '#f1f5f9',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 16,
+        fontWeight: 600,
+        color: '#455468',
+        flexShrink: 0,
+      }}
+    >
+      {initial}
+    </div>
+  );
+}
 
 type UseSubmittedDealsTableArgs = {
   deals: SubmittedDeal[] | undefined;
@@ -19,6 +69,9 @@ type UseSubmittedDealsTableArgs = {
   setSorting: Dispatch<SetStateAction<SortingState>>;
   pagination: PaginationState;
   setPagination: Dispatch<SetStateAction<PaginationState>>;
+  globalFilter: string;
+  setGlobalFilter: Dispatch<SetStateAction<string>>;
+  onReview: (deal: SubmittedDeal) => void;
 };
 
 export function useSubmittedDealsTable({
@@ -27,57 +80,94 @@ export function useSubmittedDealsTable({
   setSorting,
   pagination,
   setPagination,
+  globalFilter,
+  setGlobalFilter,
+  onReview,
 }: UseSubmittedDealsTableArgs) {
   const columns = useMemo(
     () => [
-      columnHelper.accessor('vendorName', {
-        header: 'Vendor',
-        sortingFn: 'alphanumeric',
-        cell: (info) => info.getValue(),
+      columnHelper.display({
+        id: 'vendorDeal',
+        header: 'Vendor & Deal',
         size: 0,
+        cell: (info) => (
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <VendorAvatar name={info.row.original.vendorName} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
+                {info.row.original.vendorName}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: '#64748b',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: 300,
+                }}
+              >
+                {info.row.original.description}
+              </div>
+            </div>
+          </div>
+        ),
       }),
-      columnHelper.accessor('submittedBy', {
+      columnHelper.display({
+        id: 'submittedBy',
         header: 'Submitted By',
+        size: 272,
         cell: (info) => (
-          <div>
-            <div>{info.getValue()}</div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>{info.row.original.submittedByEmail}</div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <SubmitterAvatar name={info.row.original.submittedBy} />
+            <div>
+              <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
+                {info.row.original.submittedBy}
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                {info.row.original.submittedByEmail}
+              </div>
+            </div>
           </div>
         ),
-        size: 200,
-        enableSorting: false,
-      }),
-      columnHelper.accessor('category', {
-        header: 'Category',
-        cell: (info) => info.getValue(),
-        size: 150,
-        enableSorting: false,
-      }),
-      columnHelper.accessor('description', {
-        header: 'Description',
-        cell: (info) => (
-          <div
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              maxWidth: 300,
-            }}
-          >
-            {info.getValue()}
-          </div>
-        ),
-        size: 0,
-        enableSorting: false,
       }),
       columnHelper.accessor('submittedAt', {
-        header: 'Submitted At',
-        cell: (info) => new Date(info.getValue()).toLocaleDateString(),
-        size: 140,
+        header: 'Submission Date',
+        sortingFn: 'datetime',
         enableSorting: true,
+        size: 160,
+        cell: (info) => {
+          const d = new Date(info.getValue());
+          return (
+            <div>
+              <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
+                {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }).toLowerCase()}
+              </div>
+            </div>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'action',
+        header: 'Action',
+        size: 140,
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        meta: { align: 'center' },
+        cell: (info) => (
+          <button
+            className={s.reviewBtn}
+            onClick={() => onReview(info.row.original)}
+          >
+            Review Deal
+          </button>
+        ),
       }),
     ],
-    []
+    [onReview]
   );
 
   const data = useMemo(() => deals ?? [], [deals]);
@@ -88,6 +178,7 @@ export function useSubmittedDealsTable({
     state: {
       sorting,
       pagination,
+      globalFilter,
     },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -95,6 +186,7 @@ export function useSubmittedDealsTable({
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
     onPaginationChange: setPagination,
+    onGlobalFilterChange: setGlobalFilter,
     getRowId: (row) => row.uid,
   });
 
