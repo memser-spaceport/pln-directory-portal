@@ -13,10 +13,13 @@ import RichTextEditor from '../../../../components/common/rich-text-editor';
 import { DealPreview } from '../DealPreview/DealPreview';
 import s from './DealForm.module.scss';
 
+export type DealFormMode = 'create' | 'edit' | 'complete';
+
 interface Props {
   onClose: () => void;
   onSubmit: (data: TDealForm) => Promise<void>;
   initialData?: Deal;
+  mode?: DealFormMode;
 }
 
 type TeamOption = { value: string; label: string; logoUid?: string | null; logoUrl?: string | null };
@@ -49,8 +52,18 @@ const reactSelectStyles: StylesConfig<SelectOption> = {
   menu: (base) => ({ ...base, zIndex: 100 }),
 };
 
-export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
-  const isEdit = Boolean(initialData);
+const MODAL_COPY: Record<DealFormMode, { title: string; desc: string }> = {
+  create: { title: 'Create New Deal', desc: 'Fill in the details to add a new deal to the catalog.' },
+  edit: { title: 'Edit Deal', desc: 'Update the deal details below.' },
+  complete: {
+    title: 'Complete Deal',
+    desc: 'A draft deal has been created and can now be completed before publishing.',
+  },
+};
+
+export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
+  const resolvedMode = mode ?? (initialData ? 'edit' : 'create');
+  const isEdit = resolvedMode === 'edit';
 
   const methods = useForm<TDealForm>({
     defaultValues: {
@@ -148,7 +161,7 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
   const handleFormSubmit = async (data: TDealForm) => {
     const payload: TDealForm = {
       ...data,
-      status: isEdit ? initialData?.status ?? 'DRAFT' : 'DRAFT',
+      status: resolvedMode === 'edit' ? initialData?.status ?? 'DRAFT' : 'DRAFT',
     };
     await onSubmit(payload);
     onClose();
@@ -179,7 +192,7 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
               data={methods.getValues()}
               logoPreviewUrl={logoPreviewUrl}
               isPublishing={isPublishing}
-              publishDisabled={isEdit && !isDirty}
+              publishDisabled={resolvedMode === 'edit' && !isDirty}
               onBack={() => setShowPreview(false)}
               onPublish={handlePublish}
             />
@@ -187,18 +200,10 @@ export const DealForm = ({ onClose, onSubmit, initialData }: Props) => {
           <div style={{ display: showPreview ? 'none' : 'contents' }}>
             <div className={s.header}>
               <div>
-                <h4 className={s.title}>{isEdit ? 'Edit Deal' : 'Create New Deal'}</h4>
-                <p className={s.desc}>
-                  {isEdit ? 'Update the deal details below.' : 'Fill in the details to add a new deal to the catalog.'}
-                </p>
+                <h4 className={s.title}>{MODAL_COPY[resolvedMode].title}</h4>
+                <p className={s.desc}>{MODAL_COPY[resolvedMode].desc}</p>
               </div>
-              <button type="button" className={s.closeButton} onClick={onClose} aria-label="Close">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M15 5L5 15M5 5l10 10" stroke="#455468" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </button>
             </div>
-
             <form noValidate onSubmit={handleSubmit(handleFormSubmit)} className={s.form}>
               {/* ── Deal Details section ── */}
               <p className={s.sectionHeading}>Deal Details</p>

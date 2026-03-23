@@ -1,7 +1,16 @@
 import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { DealStatus, Prisma } from '@prisma/client';
+import { DealIssueStatus, DealStatus, DealSubmissionStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
-import { ListDealsQueryDto, UpsertDealDto } from './deals.dto';
+import {
+  ListDealIssuesQueryDto,
+  ListDealsQueryDto,
+  ListDealSubmissionsQueryDto,
+  ReportDealIssueDto,
+  SubmitDealDto,
+  UpdateDealIssueDto,
+  UpdateDealSubmissionDto,
+  UpsertDealDto,
+} from './deals.dto';
 
 @Injectable()
 export class DealsService {
@@ -57,12 +66,65 @@ export class DealsService {
       ...(query?.audience ? { audience: query.audience } : {}),
       ...(query?.search
         ? {
-          OR: [
-            { vendorName: { contains: query.search, mode: 'insensitive' } },
-            { shortDescription: { contains: query.search, mode: 'insensitive' } },
-            { fullDescription: { contains: query.search, mode: 'insensitive' } },
-          ],
-        }
+            OR: [
+              { vendorName: { contains: query.search, mode: 'insensitive' } },
+              { shortDescription: { contains: query.search, mode: 'insensitive' } },
+              { fullDescription: { contains: query.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+  }
+
+  private buildSubmissionWhere(query: ListDealSubmissionsQueryDto): Prisma.DealSubmissionWhereInput {
+    return {
+      ...(query?.status ? { status: query.status } : {}),
+      ...(query?.search
+        ? {
+            OR: [
+              { vendorName: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+              { shortDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+              { fullDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+              {
+                authorMember: {
+                  OR: [
+                    { name: { contains: query.search, mode: 'insensitive' } },
+                    { email: { contains: query.search, mode: 'insensitive' } },
+                  ],
+                },
+              } as Prisma.DealSubmissionWhereInput,
+            ],
+          }
+        : {}),
+    };
+  }
+
+  private buildIssueWhere(query: ListDealIssuesQueryDto): Prisma.DealIssueWhereInput {
+    return {
+      ...(query?.status ? { status: query.status } : {}),
+      ...(query?.dealUid ? { dealUid: query.dealUid } : {}),
+      ...(query?.search
+        ? {
+            OR: [
+              { description: { contains: query.search, mode: 'insensitive' } } as Prisma.DealIssueWhereInput,
+              {
+                deal: {
+                  OR: [
+                    { vendorName: { contains: query.search, mode: 'insensitive' } },
+                    { shortDescription: { contains: query.search, mode: 'insensitive' } },
+                  ],
+                },
+              } as Prisma.DealIssueWhereInput,
+              {
+                authorMember: {
+                  OR: [
+                    { name: { contains: query.search, mode: 'insensitive' } },
+                    { email: { contains: query.search, mode: 'insensitive' } },
+                  ],
+                },
+              } as Prisma.DealIssueWhereInput,
+            ],
+          }
         : {}),
     };
   }
@@ -299,13 +361,72 @@ export class DealsService {
     return { success: true };
   }
 
+  async submitDeal(userEmail: string, body: SubmitDealDto) {
+    const { memberUid, teamUid } = await this.ensureDealsAccess(userEmail);
+
+    return this.prisma.dealSubmission.create({
+      data: {
+        vendorName: body.vendorName,
+        vendorTeamUid: body.vendorTeamUid ?? null,
+        logoUid: body.logoUid ?? null,
+        category: body.category,
+        audience: body.audience,
+        shortDescription: body.shortDescription,
+        fullDescription: body.fullDescription,
+        redemptionInstructions: body.redemptionInstructions,
+        authorMemberUid: memberUid,
+        authorTeamUid: teamUid,
+        status: DealSubmissionStatus.OPEN,
+      },
+      include: {
+        logo: { select: { url: true } },
+        authorMember: { select: { uid: true, name: true, email: true } },
+        authorTeam: { select: { uid: true, name: true } },
+      },
+    });
+  }
+
+  async reportIssue(userEmail: string, dealUid: string, body: ReportDealIssueDto) {
+    const { memberUid, teamUid } = await this.ensureDealsAccess(userEmail);
+
+    const deal = await this.prisma.deal.findFirst({
+      where: { uid: dealUid, status: DealStatus.ACTIVE },
+      select: { uid: true },
+    });
+
+    if (!deal) {
+      throw new NotFoundException('Deal not found');
+    }
+
+    return this.prisma.dealIssue.create({
+      data: {
+        dealUid,
+        authorMemberUid: memberUid,
+        authorTeamUid: teamUid,
+        description: body.description,
+        status: DealIssueStatus.OPEN,
+      },
+      include: {
+        deal: { select: { uid: true, vendorName: true, category: true, audience: true } },
+        authorMember: { select: { uid: true, name: true, email: true } },
+        authorTeam: { select: { uid: true, name: true } },
+      },
+    });
+  }
 
   private async getDealMetrics(dealUids: string[]) {
     if (!dealUids.length) {
-      return new Map<string, { tappedHowToRedeemCount: number; markedAsUsingCount: number }>();
+      return new Map<
+        string,
+        {
+          tappedHowToRedeemCount: number;
+          markedAsUsingCount: number;
+          submittedIssuesCount: number;
+        }
+      >();
     }
 
-    const [allRedemptions, allUsages] = await Promise.all([
+    const [allRedemptions, allUsages, allIssues] = await Promise.all([
       this.prisma.dealRedemption.findMany({
         where: { dealUid: { in: dealUids } },
         select: {
@@ -322,17 +443,33 @@ export class DealsService {
           memberUid: true,
         },
       }),
+      this.prisma.dealIssue.groupBy({
+        by: ['dealUid'],
+        where: { dealUid: { in: dealUids } },
+        _count: { dealUid: true },
+      }),
     ]);
 
     const redemptionCountMap = this.countUniqueTeamsOrMembers(allRedemptions);
     const usageCountMap = this.countUniqueTeamsOrMembers(allUsages);
+    const issueCountMap = new Map<string, number>(
+      allIssues.map((item) => [item.dealUid, item._count.dealUid]),
+    );
 
-    const metrics = new Map<string, { tappedHowToRedeemCount: number; markedAsUsingCount: number }>();
+    const metrics = new Map<
+      string,
+      {
+        tappedHowToRedeemCount: number;
+        markedAsUsingCount: number;
+        submittedIssuesCount: number;
+      }
+    >();
 
     for (const dealUid of dealUids) {
       metrics.set(dealUid, {
         tappedHowToRedeemCount: redemptionCountMap.get(dealUid) ?? 0,
         markedAsUsingCount: usageCountMap.get(dealUid) ?? 0,
+        submittedIssuesCount: issueCountMap.get(dealUid) ?? 0,
       });
     }
 
@@ -353,6 +490,7 @@ export class DealsService {
       logoUrl: logo?.url ?? null,
       tappedHowToRedeemCount: metrics.get(deal.uid)?.tappedHowToRedeemCount ?? 0,
       markedAsUsingCount: metrics.get(deal.uid)?.markedAsUsingCount ?? 0,
+      submittedIssuesCount: metrics.get(deal.uid)?.submittedIssuesCount ?? 0,
     }));
   }
 
@@ -427,6 +565,7 @@ export class DealsService {
       logoUrl: logo?.url ?? null,
       tappedHowToRedeemCount: metrics.get(uid)?.tappedHowToRedeemCount ?? 0,
       markedAsUsingCount: metrics.get(uid)?.markedAsUsingCount ?? 0,
+      submittedIssuesCount: metrics.get(uid)?.submittedIssuesCount ?? 0,
     };
   }
 
@@ -479,5 +618,171 @@ export class DealsService {
 
     const { logo, ...rest } = deal;
     return { ...rest, logoUrl: logo?.url ?? null };
+  }
+
+  async adminListSubmissions(query: ListDealSubmissionsQueryDto) {
+    return this.prisma.dealSubmission.findMany({
+      where: this.buildSubmissionWhere(query),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        logo: { select: { url: true } },
+        vendorTeam: { select: { uid: true, name: true } },
+        authorMember: { select: { uid: true, name: true, email: true } },
+        authorTeam: { select: { uid: true, name: true } },
+        reviewedByMember: { select: { uid: true, name: true, email: true } },
+      },
+    });
+  }
+
+  async adminGetSubmission(uid: string) {
+    const submission = await this.prisma.dealSubmission.findUnique({
+      where: { uid },
+      include: {
+        logo: { select: { url: true } },
+        vendorTeam: { select: { uid: true, name: true } },
+        authorMember: { select: { uid: true, name: true, email: true } },
+        authorTeam: { select: { uid: true, name: true } },
+        reviewedByMember: { select: { uid: true, name: true, email: true } },
+      },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Deal submission not found');
+    }
+
+    return submission;
+  }
+
+  async adminUpdateSubmission(uid: string, body: UpdateDealSubmissionDto) {
+    const existing = await this.prisma.dealSubmission.findUnique({
+      where: { uid },
+      select: { uid: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Deal submission not found');
+    }
+
+    return this.prisma.dealSubmission.update({
+      where: { uid },
+      data: {
+        status: body.status,
+        reviewedAt: body.status === DealSubmissionStatus.OPEN ? null : new Date(),
+      },
+      include: {
+        logo: { select: { url: true } },
+        vendorTeam: { select: { uid: true, name: true } },
+        authorMember: { select: { uid: true, name: true, email: true } },
+        authorTeam: { select: { uid: true, name: true } },
+        reviewedByMember: { select: { uid: true, name: true, email: true } },
+      },
+    });
+  }
+
+  async adminListIssues(query: ListDealIssuesQueryDto) {
+    return this.prisma.dealIssue.findMany({
+      where: this.buildIssueWhere(query),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        deal: {
+          select: {
+            uid: true,
+            vendorName: true,
+            category: true,
+            audience: true,
+            status: true,
+          },
+        },
+        authorMember: { select: { uid: true, name: true, email: true } },
+        authorTeam: { select: { uid: true, name: true } },
+        resolvedByMember: { select: { uid: true, name: true, email: true } },
+      },
+    });
+  }
+
+  async adminGetIssue(uid: string) {
+    const issue = await this.prisma.dealIssue.findUnique({
+      where: { uid },
+      include: {
+        deal: {
+          select: {
+            uid: true,
+            vendorName: true,
+            category: true,
+            audience: true,
+            status: true,
+          },
+        },
+        authorMember: { select: { uid: true, name: true, email: true } },
+        authorTeam: { select: { uid: true, name: true } },
+        resolvedByMember: { select: { uid: true, name: true, email: true } },
+      },
+    });
+
+    if (!issue) {
+      throw new NotFoundException('Deal issue not found');
+    }
+
+    return issue;
+  }
+
+  async adminUpdateIssue(uid: string, body: UpdateDealIssueDto, memberUid?: string) {
+    const existing = await this.prisma.dealIssue.findUnique({
+      where: { uid },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Deal issue not found');
+    }
+
+    const data: any = {
+      status: body.status,
+    };
+
+    if (body.status === 'RESOLVED') {
+      data.resolvedAt = new Date();
+      data.resolvedByMemberUid = memberUid ?? null;
+    }
+
+    if (body.status === 'OPEN') {
+      data.resolvedAt = null;
+      data.resolvedByMemberUid = null;
+    }
+
+    return this.prisma.dealIssue.update({
+      where: { uid },
+      data,
+      include: {
+        deal: {
+          select: {
+            uid: true,
+            vendorName: true,
+            category: true,
+            audience: true,
+            status: true,
+          },
+        },
+        authorMember: {
+          select: {
+            uid: true,
+            name: true,
+            email: true,
+          },
+        },
+        authorTeam: {
+          select: {
+            uid: true,
+            name: true,
+          },
+        },
+        resolvedByMember: {
+          select: {
+            uid: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
   }
 }

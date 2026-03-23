@@ -70,11 +70,14 @@ model Team {
   accessLevel                  String?                       @default("L1")
   accessLevelUpdatedAt         DateTime                      @default(now())
   eventAssociations            PLEventAssociation[]
-  dataEnrichment               Json?            /// AI enrichment metadata
+  dataEnrichment               Json? /// AI enrichment metadata
 
-  vendorDeals                  Deal[]           @relation("DealVendorTeam")
-  dealRedemptions              DealRedemption[] @relation("TeamDealRedemptions")
-  dealUsages                   DealUsage[]      @relation("TeamDealUsages")
+  vendorDeals             Deal[]           @relation("DealVendorTeam")
+  dealSubmissionsAsVendor DealSubmission[] @relation("DealSubmissionVendorTeam")
+  dealSubmissionsAsAuthor DealSubmission[] @relation("TeamDealSubmissions")
+  dealIssues              DealIssue[]      @relation("TeamDealIssues")
+  dealRedemptions         DealRedemption[] @relation("TeamDealRedemptions")
+  dealUsages              DealUsage[]      @relation("TeamDealUsages")
 }
 
 enum AskStatus {
@@ -187,9 +190,13 @@ model Member {
   pushNotificationReadStatuses     PushNotificationReadStatus[]      @relation("PushNotificationReadStatuses")
   eventAssociations                PLEventAssociation[]
 
-  dealRedemptions                  DealRedemption[]                  @relation("MemberDealRedemptions")
-  dealUsages                       DealUsage[]                       @relation("MemberDealUsages")
-  dealWhitelist                    DealWhitelist?                    @relation("MemberDealWhitelist")
+  dealSubmissions         DealSubmission[] @relation("MemberDealSubmissions")
+  reviewedDealSubmissions DealSubmission[] @relation("MemberReviewedDealSubmissions")
+  dealIssues              DealIssue[]      @relation("MemberDealIssues")
+  resolvedDealIssues      DealIssue[]      @relation("MemberResolvedDealIssues")
+  dealRedemptions         DealRedemption[] @relation("MemberDealRedemptions")
+  dealUsages              DealUsage[]      @relation("MemberDealUsages")
+  dealWhitelist           DealWhitelist?   @relation("MemberDealWhitelist")
 }
 
 model MemberRole {
@@ -411,6 +418,7 @@ model Image {
   eventBanner          PLEvent[]         @relation("banner")
   demoDayBrandingLogos DemoDayBranding[]
   dealLogos            Deal[]            @relation("DealLogo")
+  dealSubmissionLogos  DealSubmission[]  @relation("DealSubmissionLogo")
 }
 
 model Faq {
@@ -965,6 +973,7 @@ model TeamFundraisingProfile {
   lastModifiedBy            String?
   lastModifier              Member?                           @relation("TfpLastModifiedBy", fields: [lastModifiedBy], references: [uid])
   expressInterestStatistics DemoDayExpressInterestStatistic[]
+  analyticsReportUrl        String?
 
   @@unique([teamUid, demoDayUid])
   @@index([status])
@@ -1406,11 +1415,21 @@ model IrlGatheringPushConfig {
   @@index([updatedAt])
 }
 
-
 enum DealStatus {
   DRAFT
   ACTIVE
   DEACTIVATED
+}
+
+enum DealSubmissionStatus {
+  OPEN
+  APPROVED
+  REJECTED
+}
+
+enum DealIssueStatus {
+  OPEN
+  RESOLVED
 }
 
 model Deal {
@@ -1431,11 +1450,67 @@ model Deal {
   updatedAt              DateTime         @updatedAt
   redemptions            DealRedemption[]
   usages                 DealUsage[]
+  issues                 DealIssue[]
 
   @@index([status])
   @@index([category])
   @@index([vendorName])
   @@index([audience])
+}
+
+model DealSubmission {
+  id                     Int                  @id @default(autoincrement())
+  uid                    String               @unique @default(cuid())
+  vendorName             String
+  vendorTeamUid          String?
+  vendorTeam             Team?                @relation("DealSubmissionVendorTeam", fields: [vendorTeamUid], references: [uid], onDelete: SetNull)
+  logoUid                String?
+  logo                   Image?               @relation("DealSubmissionLogo", fields: [logoUid], references: [uid], onDelete: SetNull)
+  category               String
+  audience               String
+  shortDescription       String
+  fullDescription        String
+  redemptionInstructions String
+  authorMemberUid        String
+  authorMember           Member               @relation("MemberDealSubmissions", fields: [authorMemberUid], references: [uid], onDelete: Cascade)
+  authorTeamUid          String?
+  authorTeam             Team?                @relation("TeamDealSubmissions", fields: [authorTeamUid], references: [uid], onDelete: SetNull)
+  status                 DealSubmissionStatus @default(OPEN)
+  reviewedByMemberUid    String?
+  reviewedByMember       Member?              @relation("MemberReviewedDealSubmissions", fields: [reviewedByMemberUid], references: [uid], onDelete: SetNull)
+  reviewedAt             DateTime?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  @@index([vendorTeamUid])
+  @@index([authorMemberUid])
+  @@index([authorTeamUid])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DealIssue {
+  id                  Int             @id @default(autoincrement())
+  uid                 String          @unique @default(cuid())
+  dealUid             String
+  deal                Deal            @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
+  authorMemberUid     String
+  authorMember        Member          @relation("MemberDealIssues", fields: [authorMemberUid], references: [uid], onDelete: Cascade)
+  authorTeamUid       String?
+  authorTeam          Team?           @relation("TeamDealIssues", fields: [authorTeamUid], references: [uid], onDelete: SetNull)
+  description         String
+  status              DealIssueStatus @default(OPEN)
+  resolvedByMemberUid String?
+  resolvedByMember    Member?         @relation("MemberResolvedDealIssues", fields: [resolvedByMemberUid], references: [uid], onDelete: SetNull)
+  resolvedAt          DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([dealUid])
+  @@index([authorMemberUid])
+  @@index([authorTeamUid])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model DealRedemption {

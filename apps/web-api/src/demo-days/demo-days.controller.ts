@@ -101,6 +101,21 @@ export class DemoDaysController {
     );
   }
 
+  @Get(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile')
+  @UseGuards(UserTokenValidation)
+  @NoCache()
+  async getFundraisingProfileByTeam(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Param('teamUid') teamUid: string,
+    @Req() req
+  ) {
+    return this.demoDayFundraisingProfilesService.getFundraisingProfileByTeamUid(
+      req.userEmail,
+      teamUid,
+      demoDayUidOrSlug
+    );
+  }
+
   @Put(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/one-pager')
   @UseGuards(UserTokenValidation)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'onePagerFile', maxCount: 1 }]))

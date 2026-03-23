@@ -11,22 +11,19 @@ import { SortIcon } from '../../screens/members/components/icons';
 import PaginationControls from '../../screens/members/components/PaginationControls/PaginationControls';
 
 import { useDealsList } from '../../hooks/deals/useDealsList';
-/* Hidden tabs - Submitted Deals and Reported Issues
 import { useSubmittedDealsList } from '../../hooks/deals/useSubmittedDealsList';
 import { useReportedIssuesList } from '../../hooks/deals/useReportedIssuesList';
-*/
 import { useDealCounts } from '../../hooks/deals/useDealCounts';
 import { useCreateDeal } from '../../hooks/deals/useCreateDeal';
 import { useUpdateDeal } from '../../hooks/deals/useUpdateDeal';
+import { useUpdateIssueStatus } from '../../hooks/deals/useUpdateIssueStatus';
 import { useDealsWhitelist } from '../../hooks/deals/useDealsWhitelist';
 
 import { DealsWhitelistSection } from '../../components/deals/DealsWhitelistSection';
 
 import { useDealsTable } from '../../screens/deals/hooks/useDealsTable';
-/* Hidden tabs - Submitted Deals and Reported Issues
 import { useSubmittedDealsTable } from '../../screens/deals/hooks/useSubmittedDealsTable';
 import { useReportedIssuesTable } from '../../screens/deals/hooks/useReportedIssuesTable';
-*/
 
 import dynamic from 'next/dynamic';
 import type { ComponentProps } from 'react';
@@ -36,7 +33,10 @@ const DealForm = dynamic<ComponentProps<typeof DealFormType>>(
   () => import('../../screens/deals/components/DealForm/DealForm').then((m) => m.DealForm),
   { ssr: false }
 );
-import { Deal, DealStatus, TDealForm } from '../../screens/deals/types/deal';
+import { Deal, DealStatus, IssueStatus, ReportedIssue, SubmittedDeal, TDealForm } from '../../screens/deals/types/deal';
+import type { DealFormMode } from '../../screens/deals/components/DealForm/DealForm';
+import { ReportedIssueModal } from '../../screens/deals/components/ReportedIssueModal/ReportedIssueModal';
+import { approveSubmission } from '../../utils/services/deal';
 import { DEAL_AUDIENCE_OPTIONS, DEAL_CATEGORIES } from '../../screens/deals/constants';
 
 const STATUSES: { value: DealStatus; label: string }[] = [
@@ -44,7 +44,6 @@ const STATUSES: { value: DealStatus; label: string }[] = [
   { value: 'ACTIVE', label: 'Active' },
   { value: 'DEACTIVATED', label: 'Deactivated' },
 ];
-
 
 type Tab = 'catalog' | 'submitted' | 'issues' | 'access';
 
@@ -62,30 +61,39 @@ const DealsPage = () => {
   const [audienceFilter, setAudienceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<DealStatus | ''>('');
 
-  /* Hidden tabs - Submitted Deals and Reported Issues
   const [submittedSorting, setSubmittedSorting] = useState<SortingState>([]);
   const [submittedPagination, setSubmittedPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
+  const [submittedFilter, setSubmittedFilter] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- setter used when Submitted Deals tab is enabled
+  const [submittedCategoryFilter, setSubmittedCategoryFilter] = useState('');
 
   const [issuesSorting, setIssuesSorting] = useState<SortingState>([]);
   const [issuesPagination, setIssuesPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
-  */
+  const [issuesFilter, setIssuesFilter] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- setter used when Reported Issues tab is enabled
+  const [issuesStatusFilter, setIssuesStatusFilter] = useState<IssueStatus | ''>('');
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | undefined>();
+  const [formMode, setFormMode] = useState<DealFormMode>('create');
+  const [reviewingSubmissionUid, setReviewingSubmissionUid] = useState<string | null>(null);
+  const [viewingIssue, setViewingIssue] = useState<ReportedIssue | null>(null);
 
   const { data: dealsData } = useDealsList({ authToken });
-  /* Hidden tabs - Submitted Deals and Reported Issues
   const { data: submittedData } = useSubmittedDealsList({ authToken });
   const { data: issuesData } = useReportedIssuesList({ authToken });
-  */
+  // TODO: fetchDealCounts must return real submitted count after API wiring
   const { data: counts } = useDealCounts({ authToken });
   const { data: whitelistData } = useDealsWhitelist({ authToken });
 
   const createDeal = useCreateDeal();
   const updateDeal = useUpdateDeal();
+  const updateIssueStatus = useUpdateIssueStatus();
 
   const handleEdit = (deal: Deal) => {
     setEditingDeal(deal);
+    setFormMode('edit');
+    setReviewingSubmissionUid(null);
     setFormOpen(true);
   };
 
@@ -93,17 +101,66 @@ const DealsPage = () => {
     updateDeal.mutate({ authToken, uid, payload: { status } });
   };
 
+  const handleIssueStatusChange = (uid: string, status: IssueStatus) => {
+    updateIssueStatus.mutate(
+      { authToken: authToken ?? undefined, uid, status },
+      { onSuccess: () => setViewingIssue(null) }
+    );
+  };
+
   const handleFormSubmit = async (data: TDealForm) => {
-    if (editingDeal) {
+    // Use editingDeal?.uid (not just editingDeal) so Review Deal pre-population
+    // uses the create path — a submitted deal uid is not a catalog deal uid.
+    if (editingDeal?.uid) {
       await updateDeal.mutateAsync({ authToken, uid: editingDeal.uid, payload: data });
     } else {
       await createDeal.mutateAsync({ authToken, payload: data });
+      // Approve the submission after successfully creating the catalog deal
+      if (reviewingSubmissionUid) {
+        await approveSubmission({ authToken: authToken ?? undefined, uid: reviewingSubmissionUid, status: 'APPROVED' });
+      }
     }
+  };
+
+  const handleReview = (submitted: SubmittedDeal) => {
+    // Map SubmittedDeal → Deal for DealForm pre-population.
+    // uid is intentionally empty so handleFormSubmit takes the createDeal path
+    // (creating a catalog deal from the submission).
+    setFormMode('complete');
+    setReviewingSubmissionUid(submitted.uid);
+    const prefilled: Deal = {
+      uid: '',
+      vendorName: submitted.vendorName,
+      vendorTeamUid: submitted.vendorTeamUid,
+      logoUid: submitted.logoUid,
+      logoUrl: submitted.logo?.url ?? null,
+      category: submitted.category,
+      audience: submitted.audience,
+      shortDescription: submitted.shortDescription,
+      fullDescription: submitted.fullDescription,
+      redemptionInstructions: submitted.redemptionInstructions,
+      status: 'DRAFT',
+      createdAt: submitted.createdAt,
+      updatedAt: submitted.updatedAt,
+      tappedHowToRedeemCount: 0,
+      markedAsUsingCount: 0,
+      submittedIssuesCount: 0,
+    };
+    setEditingDeal(prefilled);
+    setFormOpen(true);
   };
 
   useEffect(() => {
     setCatalogPagination((p) => ({ ...p, pageIndex: 0 }));
   }, [catalogFilter, categoryFilter, audienceFilter, statusFilter]);
+
+  useEffect(() => {
+    setSubmittedPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [submittedFilter, submittedCategoryFilter]);
+
+  useEffect(() => {
+    setIssuesPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [issuesFilter, issuesStatusFilter]);
 
   // Apply client-side filters on top of global filter
   const filteredDeals = useMemo(
@@ -115,6 +172,15 @@ const DealsPage = () => {
         return true;
       }),
     [dealsData?.data, categoryFilter, audienceFilter, statusFilter]
+  );
+
+  const filteredSubmittedDeals = useMemo(
+    () =>
+      (submittedData?.data ?? []).filter((deal) => {
+        if (submittedCategoryFilter && deal.category !== submittedCategoryFilter) return false;
+        return true;
+      }),
+    [submittedData?.data, submittedCategoryFilter]
   );
 
   const { table: catalogTable } = useDealsTable({
@@ -129,23 +195,40 @@ const DealsPage = () => {
     onStatusChange: handleStatusChange,
   });
 
-  /* Hidden tabs - Submitted Deals and Reported Issues
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used when Submitted Deals tab is enabled
   const { table: submittedTable } = useSubmittedDealsTable({
-    deals: submittedData?.data,
+    deals: filteredSubmittedDeals,
     sorting: submittedSorting,
     setSorting: setSubmittedSorting,
     pagination: submittedPagination,
     setPagination: setSubmittedPagination,
+    globalFilter: submittedFilter,
+    setGlobalFilter: setSubmittedFilter,
+    onReview: handleReview,
   });
 
+  const filteredIssues = useMemo(
+    () =>
+      (issuesData?.data ?? []).filter((issue) => {
+        if (issuesStatusFilter && issue.status !== issuesStatusFilter) return false;
+        return true;
+      }),
+    [issuesData?.data, issuesStatusFilter]
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used when Reported Issues tab is enabled
   const { table: issuesTable } = useReportedIssuesTable({
-    issues: issuesData?.data,
+    issues: filteredIssues,
     sorting: issuesSorting,
     setSorting: setIssuesSorting,
     pagination: issuesPagination,
     setPagination: setIssuesPagination,
+    globalFilter: issuesFilter,
+    setGlobalFilter: setIssuesFilter,
+    onStatusChange: handleIssueStatusChange,
+    onView: setViewingIssue,
+    onDeactivateDeal: (dealUid: string) => handleStatusChange(dealUid, 'DEACTIVATED'),
   });
-  */
 
   useEffect(() => {
     if (!authToken) {
@@ -259,9 +342,7 @@ const DealsPage = () => {
           */}
           <button className={clsx(s.tab, { [s.active]: tab === 'access' })} onClick={() => setTab('access')}>
             Access Management
-            <span className={clsx(s.tabCount, { [s.active]: tab === 'access' })}>
-              {whitelistData?.length ?? 0}
-            </span>
+            <span className={clsx(s.tabCount, { [s.active]: tab === 'access' })}>{whitelistData?.length ?? 0}</span>
           </button>
         </div>
 
@@ -328,16 +409,82 @@ const DealsPage = () => {
               <PaginationControls table={catalogTable} />
             </>
           )}
-          {/* Hidden tab content - Submitted Deals and Reported Issues
+          {/* Hidden tab - Submitted Deals
           {tab === 'submitted' && (
             <>
-              {renderTable(submittedTable)}
+              <div className={s.controlBar}>
+                <input
+                  value={submittedFilter}
+                  onChange={(e) => setSubmittedFilter(e.target.value)}
+                  placeholder="Search deals"
+                  className={s.searchInput}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setSubmittedFilter('');
+                  }}
+                />
+                <select
+                  className={s.filterSelect}
+                  value={submittedCategoryFilter}
+                  onChange={(e) => setSubmittedCategoryFilter(e.target.value)}
+                >
+                  <option value="">All categories</option>
+                  {DEAL_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <select className={s.filterSelect} disabled>
+                  <option value="">All statuses</option>
+                </select>
+                <button
+                  className={s.addNewBtn}
+                  onClick={() => {
+                    setEditingDeal(undefined);
+                    setFormOpen(true);
+                  }}
+                >
+                  + Create new deal
+                </button>
+              </div>
+              {renderTable(submittedTable, true)}
               <PaginationControls table={submittedTable} />
             </>
           )}
+          */}
+          {/* Hidden tab - Reported Issues
           {tab === 'issues' && (
             <>
-              {renderTable(issuesTable)}
+              <div className={s.controlBar}>
+                <input
+                  value={issuesFilter}
+                  onChange={(e) => setIssuesFilter(e.target.value)}
+                  placeholder="Search deals"
+                  className={s.searchInput}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setIssuesFilter('');
+                  }}
+                />
+                <select
+                  className={s.filterSelect}
+                  value={issuesStatusFilter}
+                  onChange={(e) => setIssuesStatusFilter(e.target.value as IssueStatus | '')}
+                >
+                  <option value="">All statuses</option>
+                  <option value="OPEN">Open</option>
+                  <option value="RESOLVED">Resolved</option>
+                </select>
+                <button
+                  className={s.addNewBtn}
+                  onClick={() => {
+                    setEditingDeal(undefined);
+                    setFormOpen(true);
+                  }}
+                >
+                  + Create new deal
+                </button>
+              </div>
+              {renderTable(issuesTable, true)}
               <PaginationControls table={issuesTable} />
             </>
           )}
@@ -351,9 +498,20 @@ const DealsPage = () => {
           onClose={() => {
             setFormOpen(false);
             setEditingDeal(undefined);
+            setFormMode('create');
+            setReviewingSubmissionUid(null);
           }}
           onSubmit={handleFormSubmit}
           initialData={editingDeal}
+          mode={formMode}
+        />
+      )}
+      {viewingIssue && (
+        <ReportedIssueModal
+          issue={viewingIssue}
+          isUpdating={updateIssueStatus.isPending}
+          onClose={() => setViewingIssue(null)}
+          onStatusChange={handleIssueStatusChange}
         />
       )}
     </ApprovalLayout>
