@@ -55,7 +55,10 @@ const reactSelectStyles: StylesConfig<SelectOption> = {
 const MODAL_COPY: Record<DealFormMode, { title: string; desc: string }> = {
   create: { title: 'Create New Deal', desc: 'Fill in the details to add a new deal to the catalog.' },
   edit: { title: 'Edit Deal', desc: 'Update the deal details below.' },
-  complete: { title: 'Complete Deal', desc: 'A draft deal has been created and can now be completed before publishing.' },
+  complete: {
+    title: 'Complete Deal',
+    desc: 'A draft deal has been created and can now be completed before publishing.',
+  },
 };
 
 export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
@@ -195,12 +198,12 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
             />
           )}
           <div style={{ display: showPreview ? 'none' : 'contents' }}>
-          <div className={s.header}>
-            <div>
-              <h4 className={s.title}>{MODAL_COPY[resolvedMode].title}</h4>
-              <p className={s.desc}>{MODAL_COPY[resolvedMode].desc}</p>
+            <div className={s.header}>
+              <div>
+                <h4 className={s.title}>{MODAL_COPY[resolvedMode].title}</h4>
+                <p className={s.desc}>{MODAL_COPY[resolvedMode].desc}</p>
+              </div>
             </div>
-
             <form noValidate onSubmit={handleSubmit(handleFormSubmit)} className={s.form}>
               {/* ── Deal Details section ── */}
               <p className={s.sectionHeading}>Deal Details</p>
