@@ -37,6 +37,8 @@ const DealForm = dynamic<ComponentProps<typeof DealFormType>>(
   { ssr: false }
 );
 import { Deal, DealStatus, SubmittedDeal, TDealForm } from '../../screens/deals/types/deal';
+import type { DealFormMode } from '../../screens/deals/components/DealForm/DealForm';
+import { approveSubmission } from '../../utils/services/deal';
 import { DEAL_AUDIENCE_OPTIONS, DEAL_CATEGORIES } from '../../screens/deals/constants';
 
 const STATUSES: { value: DealStatus; label: string }[] = [
@@ -74,6 +76,8 @@ const DealsPage = () => {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | undefined>();
+  const [formMode, setFormMode] = useState<DealFormMode>('create');
+  const [reviewingSubmissionUid, setReviewingSubmissionUid] = useState<string | null>(null);
 
   const { data: dealsData } = useDealsList({ authToken });
   const { data: submittedData } = useSubmittedDealsList({ authToken });
@@ -89,6 +93,8 @@ const DealsPage = () => {
 
   const handleEdit = (deal: Deal) => {
     setEditingDeal(deal);
+    setFormMode('edit');
+    setReviewingSubmissionUid(null);
     setFormOpen(true);
   };
 
@@ -103,6 +109,10 @@ const DealsPage = () => {
       await updateDeal.mutateAsync({ authToken, uid: editingDeal.uid, payload: data });
     } else {
       await createDeal.mutateAsync({ authToken, payload: data });
+      // Approve the submission after successfully creating the catalog deal
+      if (reviewingSubmissionUid) {
+        await approveSubmission({ authToken: authToken ?? undefined, uid: reviewingSubmissionUid, status: 'APPROVED' });
+      }
     }
   };
 
@@ -110,7 +120,8 @@ const DealsPage = () => {
     // Map SubmittedDeal → Deal for DealForm pre-population.
     // uid is intentionally empty so handleFormSubmit takes the createDeal path
     // (creating a catalog deal from the submission).
-    // TODO: also call approveSubmission after save — see docs/plans/2026-03-17-feat-wire-deals-admin-api-remove-mocks-plan.md
+    setFormMode('complete');
+    setReviewingSubmissionUid(submitted.uid);
     const prefilled: Deal = {
       uid: '',
       vendorName: submitted.vendorName,
@@ -434,9 +445,12 @@ const DealsPage = () => {
           onClose={() => {
             setFormOpen(false);
             setEditingDeal(undefined);
+            setFormMode('create');
+            setReviewingSubmissionUid(null);
           }}
           onSubmit={handleFormSubmit}
           initialData={editingDeal}
+          mode={formMode}
         />
       )}
     </ApprovalLayout>
