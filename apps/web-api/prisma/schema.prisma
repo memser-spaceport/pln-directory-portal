@@ -973,6 +973,7 @@ model TeamFundraisingProfile {
   lastModifiedBy            String?
   lastModifier              Member?                           @relation("TfpLastModifiedBy", fields: [lastModifiedBy], references: [uid])
   expressInterestStatistics DemoDayExpressInterestStatistic[]
+  analyticsReportUrl        String?
 
   @@unique([teamUid, demoDayUid])
   @@index([status])

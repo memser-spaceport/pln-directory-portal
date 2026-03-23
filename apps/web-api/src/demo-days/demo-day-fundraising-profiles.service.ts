@@ -16,7 +16,12 @@ export class DemoDayFundraisingProfilesService {
     private readonly awsService: AwsService
   ) { }
 
-  async getCurrentDemoDayFundraisingProfileByTeamUid(teamUid: string, demoDayUid: string): Promise<any> {
+  async getCurrentDemoDayFundraisingProfileByTeamUid(
+    teamUid: string,
+    demoDayUid: string,
+    memberEmail?: string,
+    createIfMissing = true
+  ): Promise<any> {
     // Get team details with required fields
     const teamWithDetails = await this.prisma.team.findUnique({
       where: { uid: teamUid },
@@ -61,6 +66,9 @@ export class DemoDayFundraisingProfilesService {
     });
 
     if (!fundraisingProfile) {
+      if (!createIfMissing) {
+        throw new NotFoundException('Fundraising profile not found for this team and demo day');
+      }
       fundraisingProfile = await this.prisma.teamFundraisingProfile.create({
         data: {
           teamUid: teamUid,
@@ -125,6 +133,9 @@ export class DemoDayFundraisingProfilesService {
       officeHours: participant.member.officeHours,
     }));
 
+    const includeAnalyticsReportUrl =
+      memberEmail && (await this.canViewAnalyticsReportUrl(memberEmail, teamUid, demoDayUid));
+
     return {
       uid: fundraisingProfile.uid,
       teamUid: teamUid,
@@ -135,7 +146,26 @@ export class DemoDayFundraisingProfilesService {
       videoUploadUid: fundraisingProfile.videoUploadUid,
       videoUpload: fundraisingProfile.videoUpload,
       description: fundraisingProfile.description,
+      ...(includeAnalyticsReportUrl && { analyticsReportUrl: fundraisingProfile.analyticsReportUrl }),
     };
+  }
+
+  async getFundraisingProfileByTeamUid(
+    memberEmail: string,
+    teamUid: string,
+    demoDayUidOrSlug: string
+  ): Promise<any> {
+    const demoDay = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!demoDay) {
+      throw new ForbiddenException('No demo day access');
+    }
+    await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(
+      teamUid,
+      demoDay.uid,
+      memberEmail,
+      false
+    );
   }
 
   async getCurrentDemoDayFundraisingProfile(memberEmail: string, demoDayUidOrSlug: string): Promise<any> {
@@ -185,7 +215,18 @@ export class DemoDayFundraisingProfilesService {
       });
     }
 
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid, memberEmail);
+  }
+
+  async canViewAnalyticsReportUrl(memberEmail: string, teamUid: string, demoDayUid: string): Promise<boolean> {
+    try {
+      const access = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDayUid);
+      if (access.isAdmin || access.isViewOnlyAdmin) return true;
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDayUid);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -359,7 +400,7 @@ export class DemoDayFundraisingProfilesService {
     });
 
     await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid, memberEmail);
   }
 
   async deleteFundraisingOnePager(memberEmail: string, teamUid: string, demoDayUidOrSlug: string): Promise<any> {
@@ -404,7 +445,7 @@ export class DemoDayFundraisingProfilesService {
     }
 
     await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid, memberEmail);
   }
 
   async updateFundraisingVideo(
@@ -455,7 +496,7 @@ export class DemoDayFundraisingProfilesService {
     });
 
     await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid, memberEmail);
   }
 
   async updateFundraisingDescription(
@@ -496,7 +537,7 @@ export class DemoDayFundraisingProfilesService {
     });
 
     await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid, memberEmail);
   }
 
   async deleteFundraisingVideo(memberEmail: string, teamUid: string, demoDayUidOrSlug: string): Promise<any> {
@@ -541,7 +582,7 @@ export class DemoDayFundraisingProfilesService {
     }
 
     await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid, memberEmail);
   }
 
   async updateFundraisingTeam(
@@ -604,7 +645,7 @@ export class DemoDayFundraisingProfilesService {
     });
 
     await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid, memberEmail);
   }
 
   async getCurrentDemoDayFundraisingProfiles(
@@ -619,7 +660,10 @@ export class DemoDayFundraisingProfilesService {
     }
 
     // Check access and get user info - throws if no access
-    const { participantUid } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+    const { participantUid, isAdmin, isViewOnlyAdmin } = await this.demoDaysService.checkDemoDayAccess(
+      memberEmail,
+      demoDay.uid
+    );
 
     //Condition #1: admins with showDraft get all profiles - otherwise only published ones
     const where = this.buildProfilesWhere(params, demoDay.uid, showDraft);
@@ -660,6 +704,25 @@ export class DemoDayFundraisingProfilesService {
       };
       return acc;
     }, {} as Record<string, { saved: boolean; liked: boolean; connected: boolean; invested: boolean; referral: boolean; feedback: boolean }>);
+    const canViewAllAnalytics = isAdmin || isViewOnlyAdmin;
+    let founderTeamUids: Set<string> | null = null;
+    if (!canViewAllAnalytics) {
+      const founderParticipants = await this.prisma.demoDayParticipant.findMany({
+        where: {
+          demoDayUid: demoDay.uid,
+          member: { email: memberEmail },
+          status: 'ENABLED',
+          isDeleted: false,
+          type: 'FOUNDER',
+          teamUid: { not: null },
+        },
+        select: { teamUid: true },
+      });
+      founderTeamUids = new Set(
+        founderParticipants.map((p) => p.teamUid).filter((uid): uid is string => uid != null)
+      );
+    }
+
     for (const p of filtered) {
       const f = flagsByProfile[p.uid] || {
         saved: false,
@@ -675,6 +738,12 @@ export class DemoDayFundraisingProfilesService {
       (p as any).invested = f.invested;
       (p as any).referral = f.referral;
       (p as any).feedback = f.feedback;
+
+      const canViewAnalytics =
+        canViewAllAnalytics || (founderTeamUids != null && founderTeamUids.has(p.teamUid));
+      if (!canViewAnalytics) {
+        delete (p as any).analyticsReportUrl;
+      }
     }
 
     // Stable personalized order based on user email
@@ -982,7 +1051,7 @@ export class DemoDayFundraisingProfilesService {
 
     await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
 
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid, memberEmail);
   }
 
   async generateOnePagerUploadUrl(
@@ -1097,7 +1166,7 @@ export class DemoDayFundraisingProfilesService {
 
     await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
 
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid, memberEmail);
   }
 
   async uploadOnePagerPreviewByMember(
@@ -1134,7 +1203,7 @@ export class DemoDayFundraisingProfilesService {
 
     await this.uploadOnePagerPreview(profile, previewImage, previewImageSmall);
 
-    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid);
+    return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid, memberEmail);
   }
 
   async uploadOnePagerPreviewByTeam(
