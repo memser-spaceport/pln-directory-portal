@@ -1,0 +1,433 @@
+
+1) 
+curl --location 'http://localhost:3003/v1/deals/submissions' \
+--header 'Content-Type: application/json' \
+--header 'authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im9sZWd2ZXJ6dW5vdkBnbWFpbC5jb20iLCJhdWQiOlsiY2xvcmlnMG13MDVsaW9kZ3ZlbHR2cjhwciJdLCJpYXQiOjE3NzM3MzQ5NjMsImV4cCI6MTc4NDEwMjk2MywiaXNzIjoiaHR0cHM6Ly9kZXYtYXV0aC5wbG5ldHdvcmsuaW8iLCJzdWIiOiJjbWlzancwbmwwMDNoYnMzOXpzaDBydmpqIiwianRpIjoiMjY3NjdmNDZkM2IxYzg0MThkNTAxMzM4MTMwMTQwZjEifQ.FaRmgPQGYDtGKTtChjf1cqt7WasI3iHrO14I-5mab2c' \
+--header 'Cookie: _csrf=9Jy3KDVTDxGHQIb04b4yCw' \
+--data '{
+  "vendorName": "Stripe",
+  "category": "Payments",
+  "audience": "All Founders",
+  "shortDescription": "Stripe credits",
+  "fullDescription": "Stripe startup credits",
+  "redemptionInstructions": "Apply via Stripe Atlas",
+  "websiteUrl": "https://stripe.com"
+}'
+
+
+
+{
+    "uid": "cmn1n29210000o7bk74be53wo",
+    "vendorName": "Stripe",
+    "vendorTeamUid": null,
+    "logoUid": null,
+    "category": "Payments",
+    "audience": "All Founders",
+    "shortDescription": "Stripe credits",
+    "fullDescription": "Stripe startup credits",
+    "redemptionInstructions": "Apply via Stripe Atlas",
+    "authorMemberUid": "uid-cristal",
+    "authorTeamUid": "uid-marvin-mann-and-goodwin",
+    "status": "OPEN",
+    "reviewedByMemberUid": null,
+    "reviewedAt": null,
+    "createdAt": "2026-03-22T10:53:26.233Z",
+    "updatedAt": "2026-03-22T10:53:26.233Z",
+    "logo": null,
+    "authorMember": {
+        "uid": "uid-cristal",
+        "name": "Cristal",
+        "email": "olegverzunov@gmail.com"
+    },
+    "authorTeam": {
+        "uid": "uid-marvin-mann-and-goodwin",
+        "name": "Marvin, Mann and Goodwin"
+    }
+}
+
+
+2) report issue 
+
+curl --location 'http://localhost:3003/v1/deals/deal_vercel/issues' \
+--header 'Content-Type: application/json' \
+--header 'authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im9sZWd2ZXJ6dW5vdkBnbWFpbC5jb20iLCJhdWQiOlsiY2xvcmlnMG13MDVsaW9kZ3ZlbHR2cjhwciJdLCJpYXQiOjE3NzM3MzQ5NjMsImV4cCI6MTc4NDEwMjk2MywiaXNzIjoiaHR0cHM6Ly9kZXYtYXV0aC5wbG5ldHdvcmsuaW8iLCJzdWIiOiJjbWlzancwbmwwMDNoYnMzOXpzaDBydmpqIiwianRpIjoiMjY3NjdmNDZkM2IxYzg0MThkNTAxMzM4MTMwMTQwZjEifQ.FaRmgPQGYDtGKTtChjf1cqt7WasI3iHrO14I-5mab2c' \
+--header 'Cookie: _csrf=9Jy3KDVTDxGHQIb04b4yCw' \
+--data '{
+  "description": "Promo code still not working"
+}'
+
+
+{
+    "uid": "cmn1n3hq30002o7bklydj5n3c",
+    "dealUid": "deal_vercel",
+    "authorMemberUid": "uid-cristal",
+    "authorTeamUid": "uid-marvin-mann-and-goodwin",
+    "description": "Promo code still not working",
+    "status": "OPEN",
+    "resolvedByMemberUid": null,
+    "resolvedAt": null,
+    "createdAt": "2026-03-22T10:54:24.123Z",
+    "updatedAt": "2026-03-22T10:54:24.123Z",
+    "deal": {
+        "uid": "deal_vercel",
+        "vendorName": "Vercel",
+        "category": "Hosting & Infrastructure",
+        "audience": "All Founders"
+    },
+    "authorMember": {
+        "uid": "uid-cristal",
+        "name": "Cristal",
+        "email": "olegverzunov@gmail.com"
+    },
+    "authorTeam": {
+        "uid": "uid-marvin-mann-and-goodwin",
+        "name": "Marvin, Mann and Goodwin"
+    }
+}
+
+
+3) list submission
+curl --location 'http://localhost:3003/v1/admin/deals/submissions' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJ1aWQtbWFsbG9yeSIsImV4cCI6MTc3NjU0NTg0OCwiaWF0IjoxNzczOTUzODQ4fQ.CV3m6dmTJ6iYtrXRDyks4SoE3uKodY0JfKduxYjNEhk' \
+--header 'Cookie: _csrf=9Jy3KDVTDxGHQIb04b4yCw'
+
+
+[
+    {
+        "uid": "cmn1n29210000o7bk74be53wo",
+        "vendorName": "Stripe",
+        "vendorTeamUid": null,
+        "logoUid": null,
+        "category": "Payments",
+        "audience": "All Founders",
+        "shortDescription": "Stripe credits",
+        "fullDescription": "Stripe startup credits",
+        "redemptionInstructions": "Apply via Stripe Atlas",
+        "authorMemberUid": "uid-cristal",
+        "authorTeamUid": "uid-marvin-mann-and-goodwin",
+        "status": "OPEN",
+        "reviewedByMemberUid": null,
+        "reviewedAt": null,
+        "createdAt": "2026-03-22T10:53:26.233Z",
+        "updatedAt": "2026-03-22T10:53:26.233Z",
+        "logo": null,
+        "vendorTeam": null,
+        "authorMember": {
+            "uid": "uid-cristal",
+            "name": "Cristal",
+            "email": "olegverzunov@gmail.com"
+        },
+        "authorTeam": {
+            "uid": "uid-marvin-mann-and-goodwin",
+            "name": "Marvin, Mann and Goodwin"
+        },
+        "reviewedByMember": null
+    },
+    {
+        "uid": "deal_submission_datadog",
+        "vendorName": "Datadog",
+        "vendorTeamUid": null,
+        "logoUid": null,
+        "category": "Monitoring",
+        "audience": "All Founders",
+        "shortDescription": "Free credits",
+        "fullDescription": "Monitoring platform",
+        "redemptionInstructions": "Apply",
+        "authorMemberUid": "uid-cristal",
+        "authorTeamUid": null,
+        "status": "OPEN",
+        "reviewedByMemberUid": null,
+        "reviewedAt": null,
+        "createdAt": "2026-03-22T10:20:15.534Z",
+        "updatedAt": "2026-03-22T10:20:15.534Z",
+        "logo": null,
+        "vendorTeam": null,
+        "authorMember": {
+            "uid": "uid-cristal",
+            "name": "Cristal",
+            "email": "olegverzunov@gmail.com"
+        },
+        "authorTeam": null,
+        "reviewedByMember": null
+    },
+    {
+        "uid": "deal_submission_aws",
+        "vendorName": "AWS",
+        "vendorTeamUid": null,
+        "logoUid": null,
+        "category": "Cloud",
+        "audience": "PL Funded Founders",
+        "shortDescription": "AWS credits",
+        "fullDescription": "Cloud credits",
+        "redemptionInstructions": "Apply",
+        "authorMemberUid": "uid-cristal",
+        "authorTeamUid": null,
+        "status": "APPROVED",
+        "reviewedByMemberUid": "uid-cristal",
+        "reviewedAt": "2026-03-22T10:20:15.533Z",
+        "createdAt": "2026-03-22T10:20:15.534Z",
+        "updatedAt": "2026-03-22T10:20:15.534Z",
+        "logo": null,
+        "vendorTeam": null,
+        "authorMember": {
+            "uid": "uid-cristal",
+            "name": "Cristal",
+            "email": "olegverzunov@gmail.com"
+        },
+        "authorTeam": null,
+        "reviewedByMember": {
+            "uid": "uid-cristal",
+            "name": "Cristal",
+            "email": "olegverzunov@gmail.com"
+        }
+    }
+]
+
+
+4) Get submission by id
+curl --location 'http://localhost:3003/v1/admin/deals/submissions/deal_submission_datadog' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJ1aWQtbWFsbG9yeSIsImV4cCI6MTc3NjU0NTg0OCwiaWF0IjoxNzczOTUzODQ4fQ.CV3m6dmTJ6iYtrXRDyks4SoE3uKodY0JfKduxYjNEhk' \
+--header 'Cookie: _csrf=mv1riv9cIe01GHhJzYmZig'
+
+{
+    "uid": "deal_submission_datadog",
+    "vendorName": "Datadog",
+    "vendorTeamUid": null,
+    "logoUid": null,
+    "category": "Monitoring",
+    "audience": "All Founders",
+    "shortDescription": "Free credits",
+    "fullDescription": "Monitoring platform",
+    "redemptionInstructions": "Apply",
+    "authorMemberUid": "uid-cristal",
+    "authorTeamUid": null,
+    "status": "OPEN",
+    "reviewedByMemberUid": null,
+    "reviewedAt": null,
+    "createdAt": "2026-03-22T10:20:15.534Z",
+    "updatedAt": "2026-03-22T10:20:15.534Z",
+    "logo": null,
+    "vendorTeam": null,
+    "authorMember": {
+        "uid": "uid-cristal",
+        "name": "Cristal",
+        "email": "olegverzunov@gmail.com"
+    },
+    "authorTeam": null,
+    "reviewedByMember": null
+}
+
+
+5) approve submission 
+
+curl --location --request PATCH 'http://localhost:3003/v1/admin/deals/submissions/deal_submission_datadog' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJ1aWQtbWFsbG9yeSIsImV4cCI6MTc3NjU0NTg0OCwiaWF0IjoxNzczOTUzODQ4fQ.CV3m6dmTJ6iYtrXRDyks4SoE3uKodY0JfKduxYjNEhk' \
+--header 'Cookie: _csrf=mv1riv9cIe01GHhJzYmZig' \
+--data '{
+  "status": "APPROVED"
+}'
+
+
+{
+    "uid": "deal_submission_datadog",
+    "vendorName": "Datadog",
+    "vendorTeamUid": null,
+    "logoUid": null,
+    "category": "Monitoring",
+    "audience": "All Founders",
+    "shortDescription": "Free credits",
+    "fullDescription": "Monitoring platform",
+    "redemptionInstructions": "Apply",
+    "authorMemberUid": "uid-cristal",
+    "authorTeamUid": null,
+    "status": "APPROVED",
+    "reviewedByMemberUid": null,
+    "reviewedAt": "2026-03-22T10:59:42.607Z",
+    "createdAt": "2026-03-22T10:20:15.534Z",
+    "updatedAt": "2026-03-22T10:59:42.610Z",
+    "logo": null,
+    "vendorTeam": null,
+    "authorMember": {
+        "uid": "uid-cristal",
+        "name": "Cristal",
+        "email": "olegverzunov@gmail.com"
+    },
+    "authorTeam": null,
+    "reviewedByMember": null
+}
+
+
+6) all issues [admin endpoint]
+
+curl --location 'http://localhost:3003/v1/admin/deals/issues' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJ1aWQtbWFsbG9yeSIsImV4cCI6MTc3NjU0NTg0OCwiaWF0IjoxNzczOTUzODQ4fQ.CV3m6dmTJ6iYtrXRDyks4SoE3uKodY0JfKduxYjNEhk' \
+--header 'Cookie: _csrf=cgrWnMx7uzOGrgSERs5b0Q'
+
+
+[
+    {
+        "uid": "cmn1n3hq30002o7bklydj5n3c",
+        "dealUid": "deal_vercel",
+        "authorMemberUid": "uid-cristal",
+        "authorTeamUid": "uid-marvin-mann-and-goodwin",
+        "description": "Promo code still not working",
+        "status": "OPEN",
+        "resolvedByMemberUid": null,
+        "resolvedAt": null,
+        "createdAt": "2026-03-22T10:54:24.123Z",
+        "updatedAt": "2026-03-22T10:54:24.123Z",
+        "deal": {
+            "uid": "deal_vercel",
+            "vendorName": "Vercel",
+            "category": "Hosting & Infrastructure",
+            "audience": "All Founders",
+            "status": "ACTIVE"
+        },
+        "authorMember": {
+            "uid": "uid-cristal",
+            "name": "Cristal",
+            "email": "olegverzunov@gmail.com"
+        },
+        "authorTeam": {
+            "uid": "uid-marvin-mann-and-goodwin",
+            "name": "Marvin, Mann and Goodwin"
+        },
+        "resolvedByMember": null
+    },
+    {
+        "uid": "deal_issue_vercel_1",
+        "dealUid": "deal_vercel",
+        "authorMemberUid": "uid-cristal",
+        "authorTeamUid": null,
+        "description": "Promo code not working",
+        "status": "OPEN",
+        "resolvedByMemberUid": null,
+        "resolvedAt": null,
+        "createdAt": "2026-03-22T10:20:15.537Z",
+        "updatedAt": "2026-03-22T10:20:15.537Z",
+        "deal": {
+            "uid": "deal_vercel",
+            "vendorName": "Vercel",
+            "category": "Hosting & Infrastructure",
+            "audience": "All Founders",
+            "status": "ACTIVE"
+        },
+        "authorMember": {
+            "uid": "uid-cristal",
+            "name": "Cristal",
+            "email": "olegverzunov@gmail.com"
+        },
+        "authorTeam": null,
+        "resolvedByMember": null
+    },
+    {
+        "uid": "deal_issue_vercel_2",
+        "dealUid": "deal_vercel",
+        "authorMemberUid": "uid-cristal",
+        "authorTeamUid": null,
+        "description": "Instructions outdated",
+        "status": "RESOLVED",
+        "resolvedByMemberUid": "uid-cristal",
+        "resolvedAt": "2026-03-22T10:20:15.536Z",
+        "createdAt": "2026-03-22T10:20:15.537Z",
+        "updatedAt": "2026-03-22T10:20:15.537Z",
+        "deal": {
+            "uid": "deal_vercel",
+            "vendorName": "Vercel",
+            "category": "Hosting & Infrastructure",
+            "audience": "All Founders",
+            "status": "ACTIVE"
+        },
+        "authorMember": {
+            "uid": "uid-cristal",
+            "name": "Cristal",
+            "email": "olegverzunov@gmail.com"
+        },
+        "authorTeam": null,
+        "resolvedByMember": {
+            "uid": "uid-cristal",
+            "name": "Cristal",
+            "email": "olegverzunov@gmail.com"
+        }
+    }
+]
+
+
+7) get issue by id 
+curl --location 'http://localhost:3003/v1/admin/deals/issues/deal_issue_vercel_1' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJ1aWQtbWFsbG9yeSIsImV4cCI6MTc3NjU0NTg0OCwiaWF0IjoxNzczOTUzODQ4fQ.CV3m6dmTJ6iYtrXRDyks4SoE3uKodY0JfKduxYjNEhk' \
+--header 'Cookie: _csrf=cgrWnMx7uzOGrgSERs5b0Q'
+
+{
+    "uid": "deal_issue_vercel_1",
+    "dealUid": "deal_vercel",
+    "authorMemberUid": "uid-cristal",
+    "authorTeamUid": null,
+    "description": "Promo code not working",
+    "status": "RESOLVED",
+    "resolvedByMemberUid": "uid-mallory",
+    "resolvedAt": "2026-03-22T11:21:32.036Z",
+    "createdAt": "2026-03-22T10:20:15.537Z",
+    "updatedAt": "2026-03-22T11:21:32.043Z",
+    "deal": {
+        "uid": "deal_vercel",
+        "vendorName": "Vercel",
+        "category": "Hosting & Infrastructure",
+        "audience": "All Founders",
+        "status": "ACTIVE"
+    },
+    "authorMember": {
+        "uid": "uid-cristal",
+        "name": "Cristal",
+        "email": "olegverzunov@gmail.com"
+    },
+    "authorTeam": null,
+    "resolvedByMember": {
+        "uid": "uid-mallory",
+        "name": "Norris",
+        "email": "Linnie_OHara@yahoo.com"
+    }
+}
+
+8) resolved issue
+curl --location --request PATCH 'http://localhost:3003/v1/admin/deals/issues/deal_issue_vercel_1' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJ1aWQtbWFsbG9yeSIsImV4cCI6MTc3NjU0NTg0OCwiaWF0IjoxNzczOTUzODQ4fQ.CV3m6dmTJ6iYtrXRDyks4SoE3uKodY0JfKduxYjNEhk' \
+--header 'Cookie: _csrf=cgrWnMx7uzOGrgSERs5b0Q' \
+--data '{
+  "status": "RESOLVED"
+}'
+
+
+{
+    "uid": "deal_issue_vercel_1",
+    "dealUid": "deal_vercel",
+    "authorMemberUid": "uid-cristal",
+    "authorTeamUid": null,
+    "description": "Promo code not working",
+    "status": "RESOLVED",
+    "resolvedByMemberUid": "uid-mallory",
+    "resolvedAt": "2026-03-22T11:21:32.036Z",
+    "createdAt": "2026-03-22T10:20:15.537Z",
+    "updatedAt": "2026-03-22T11:21:32.043Z",
+    "deal": {
+        "uid": "deal_vercel",
+        "vendorName": "Vercel",
+        "category": "Hosting & Infrastructure",
+        "audience": "All Founders",
+        "status": "ACTIVE"
+    },
+    "authorMember": {
+        "uid": "uid-cristal",
+        "name": "Cristal",
+        "email": "olegverzunov@gmail.com"
+    },
+    "authorTeam": null,
+    "resolvedByMember": {
+        "uid": "uid-mallory",
+        "name": "Norris",
+        "email": "Linnie_OHara@yahoo.com"
+    }
+}
+
