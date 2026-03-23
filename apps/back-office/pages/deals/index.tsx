@@ -12,21 +12,18 @@ import PaginationControls from '../../screens/members/components/PaginationContr
 
 import { useDealsList } from '../../hooks/deals/useDealsList';
 import { useSubmittedDealsList } from '../../hooks/deals/useSubmittedDealsList';
-/* Hidden tab - Reported Issues
 import { useReportedIssuesList } from '../../hooks/deals/useReportedIssuesList';
-*/
 import { useDealCounts } from '../../hooks/deals/useDealCounts';
 import { useCreateDeal } from '../../hooks/deals/useCreateDeal';
 import { useUpdateDeal } from '../../hooks/deals/useUpdateDeal';
+import { useUpdateIssueStatus } from '../../hooks/deals/useUpdateIssueStatus';
 import { useDealsWhitelist } from '../../hooks/deals/useDealsWhitelist';
 
 import { DealsWhitelistSection } from '../../components/deals/DealsWhitelistSection';
 
 import { useDealsTable } from '../../screens/deals/hooks/useDealsTable';
 import { useSubmittedDealsTable } from '../../screens/deals/hooks/useSubmittedDealsTable';
-/* Hidden tab - Reported Issues
 import { useReportedIssuesTable } from '../../screens/deals/hooks/useReportedIssuesTable';
-*/
 
 import dynamic from 'next/dynamic';
 import type { ComponentProps } from 'react';
@@ -36,8 +33,9 @@ const DealForm = dynamic<ComponentProps<typeof DealFormType>>(
   () => import('../../screens/deals/components/DealForm/DealForm').then((m) => m.DealForm),
   { ssr: false }
 );
-import { Deal, DealStatus, SubmittedDeal, TDealForm } from '../../screens/deals/types/deal';
+import { Deal, DealStatus, IssueStatus, ReportedIssue, SubmittedDeal, TDealForm } from '../../screens/deals/types/deal';
 import type { DealFormMode } from '../../screens/deals/components/DealForm/DealForm';
+import { ReportedIssueModal } from '../../screens/deals/components/ReportedIssueModal/ReportedIssueModal';
 import { approveSubmission } from '../../utils/services/deal';
 import { DEAL_AUDIENCE_OPTIONS, DEAL_CATEGORIES } from '../../screens/deals/constants';
 
@@ -69,27 +67,27 @@ const DealsPage = () => {
   const [submittedFilter, setSubmittedFilter] = useState('');
   const [submittedCategoryFilter, setSubmittedCategoryFilter] = useState('');
 
-  /* Hidden tab - Reported Issues
   const [issuesSorting, setIssuesSorting] = useState<SortingState>([]);
   const [issuesPagination, setIssuesPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
-  */
+  const [issuesFilter, setIssuesFilter] = useState('');
+  const [issuesStatusFilter, setIssuesStatusFilter] = useState<IssueStatus | ''>('');
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | undefined>();
   const [formMode, setFormMode] = useState<DealFormMode>('create');
   const [reviewingSubmissionUid, setReviewingSubmissionUid] = useState<string | null>(null);
+  const [viewingIssue, setViewingIssue] = useState<ReportedIssue | null>(null);
 
   const { data: dealsData } = useDealsList({ authToken });
   const { data: submittedData } = useSubmittedDealsList({ authToken });
-  /* Hidden tab - Reported Issues
   const { data: issuesData } = useReportedIssuesList({ authToken });
-  */
   // TODO: fetchDealCounts must return real submitted count after API wiring
   const { data: counts } = useDealCounts({ authToken });
   const { data: whitelistData } = useDealsWhitelist({ authToken });
 
   const createDeal = useCreateDeal();
   const updateDeal = useUpdateDeal();
+  const updateIssueStatus = useUpdateIssueStatus();
 
   const handleEdit = (deal: Deal) => {
     setEditingDeal(deal);
@@ -100,6 +98,13 @@ const DealsPage = () => {
 
   const handleStatusChange = (uid: string, status: DealStatus) => {
     updateDeal.mutate({ authToken, uid, payload: { status } });
+  };
+
+  const handleIssueStatusChange = (uid: string, status: IssueStatus) => {
+    updateIssueStatus.mutate(
+      { authToken: authToken ?? undefined, uid, status },
+      { onSuccess: () => setViewingIssue(null) }
+    );
   };
 
   const handleFormSubmit = async (data: TDealForm) => {
@@ -138,6 +143,7 @@ const DealsPage = () => {
       updatedAt: submitted.updatedAt,
       tappedHowToRedeemCount: 0,
       markedAsUsingCount: 0,
+      submittedIssuesCount: 0,
     };
     setEditingDeal(prefilled);
     setFormOpen(true);
@@ -150,6 +156,10 @@ const DealsPage = () => {
   useEffect(() => {
     setSubmittedPagination((p) => ({ ...p, pageIndex: 0 }));
   }, [submittedFilter, submittedCategoryFilter]);
+
+  useEffect(() => {
+    setIssuesPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [issuesFilter, issuesStatusFilter]);
 
   // Apply client-side filters on top of global filter
   const filteredDeals = useMemo(
@@ -195,15 +205,27 @@ const DealsPage = () => {
     onReview: handleReview,
   });
 
-  /* Hidden tab - Reported Issues
+  const filteredIssues = useMemo(
+    () =>
+      (issuesData?.data ?? []).filter((issue) => {
+        if (issuesStatusFilter && issue.status !== issuesStatusFilter) return false;
+        return true;
+      }),
+    [issuesData?.data, issuesStatusFilter]
+  );
+
   const { table: issuesTable } = useReportedIssuesTable({
-    issues: issuesData?.data,
+    issues: filteredIssues,
     sorting: issuesSorting,
     setSorting: setIssuesSorting,
     pagination: issuesPagination,
     setPagination: setIssuesPagination,
+    globalFilter: issuesFilter,
+    setGlobalFilter: setIssuesFilter,
+    onStatusChange: handleIssueStatusChange,
+    onView: setViewingIssue,
+    onDeactivateDeal: (dealUid: string) => handleStatusChange(dealUid, 'DEACTIVATED'),
   });
-  */
 
   useEffect(() => {
     if (!authToken) {
@@ -307,14 +329,12 @@ const DealsPage = () => {
               {counts?.submitted ?? submittedData?.data?.length ?? 0}
             </span>
           </button>
-          {/* Hidden tab - Reported Issues
           <button className={clsx(s.tab, { [s.active]: tab === 'issues' })} onClick={() => setTab('issues')}>
             Reported Issues
             <span className={clsx(s.tabCount, { [s.active]: tab === 'issues' })}>
               {counts?.issues ?? issuesData?.data?.length ?? 0}
             </span>
           </button>
-          */}
           <button className={clsx(s.tab, { [s.active]: tab === 'access' })} onClick={() => setTab('access')}>
             Access Management
             <span className={clsx(s.tabCount, { [s.active]: tab === 'access' })}>
@@ -428,14 +448,41 @@ const DealsPage = () => {
               <PaginationControls table={submittedTable} />
             </>
           )}
-          {/* Hidden tab - Reported Issues
           {tab === 'issues' && (
             <>
-              {renderTable(issuesTable)}
+              <div className={s.controlBar}>
+                <input
+                  value={issuesFilter}
+                  onChange={(e) => setIssuesFilter(e.target.value)}
+                  placeholder="Search deals"
+                  className={s.searchInput}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setIssuesFilter('');
+                  }}
+                />
+                <select
+                  className={s.filterSelect}
+                  value={issuesStatusFilter}
+                  onChange={(e) => setIssuesStatusFilter(e.target.value as IssueStatus | '')}
+                >
+                  <option value="">All statuses</option>
+                  <option value="OPEN">Open</option>
+                  <option value="RESOLVED">Resolved</option>
+                </select>
+                <button
+                  className={s.addNewBtn}
+                  onClick={() => {
+                    setEditingDeal(undefined);
+                    setFormOpen(true);
+                  }}
+                >
+                  + Create new deal
+                </button>
+              </div>
+              {renderTable(issuesTable, true)}
               <PaginationControls table={issuesTable} />
             </>
           )}
-          */}
           {tab === 'access' && <DealsWhitelistSection authToken={authToken} />}
         </div>
       </div>
@@ -451,6 +498,14 @@ const DealsPage = () => {
           onSubmit={handleFormSubmit}
           initialData={editingDeal}
           mode={formMode}
+        />
+      )}
+      {viewingIssue && (
+        <ReportedIssueModal
+          issue={viewingIssue}
+          isUpdating={updateIssueStatus.isPending}
+          onClose={() => setViewingIssue(null)}
+          onStatusChange={handleIssueStatusChange}
         />
       )}
     </ApprovalLayout>

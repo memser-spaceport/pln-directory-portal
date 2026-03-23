@@ -16,6 +16,7 @@ export type Deal = {
   updatedAt: string;
   tappedHowToRedeemCount: number;
   markedAsUsingCount: number;
+  submittedIssuesCount: number;
 };
 
 export type TDealForm = {
