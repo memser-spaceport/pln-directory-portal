@@ -45,7 +45,6 @@ const STATUSES: { value: DealStatus; label: string }[] = [
   { value: 'DEACTIVATED', label: 'Deactivated' },
 ];
 
-
 type Tab = 'catalog' | 'submitted' | 'issues' | 'access';
 
 const DealsPage = () => {
@@ -65,11 +64,13 @@ const DealsPage = () => {
   const [submittedSorting, setSubmittedSorting] = useState<SortingState>([]);
   const [submittedPagination, setSubmittedPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [submittedFilter, setSubmittedFilter] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- setter used when Submitted Deals tab is enabled
   const [submittedCategoryFilter, setSubmittedCategoryFilter] = useState('');
 
   const [issuesSorting, setIssuesSorting] = useState<SortingState>([]);
   const [issuesPagination, setIssuesPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [issuesFilter, setIssuesFilter] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- setter used when Reported Issues tab is enabled
   const [issuesStatusFilter, setIssuesStatusFilter] = useState<IssueStatus | ''>('');
 
   const [formOpen, setFormOpen] = useState(false);
@@ -194,6 +195,7 @@ const DealsPage = () => {
     onStatusChange: handleStatusChange,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used when Submitted Deals tab is enabled
   const { table: submittedTable } = useSubmittedDealsTable({
     deals: filteredSubmittedDeals,
     sorting: submittedSorting,
@@ -214,6 +216,7 @@ const DealsPage = () => {
     [issuesData?.data, issuesStatusFilter]
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used when Reported Issues tab is enabled
   const { table: issuesTable } = useReportedIssuesTable({
     issues: filteredIssues,
     sorting: issuesSorting,
@@ -323,6 +326,7 @@ const DealsPage = () => {
               {counts?.catalog ?? dealsData?.data?.length ?? 0}
             </span>
           </button>
+          {/* Hidden tabs - Submitted Deals and Reported Issues
           <button className={clsx(s.tab, { [s.active]: tab === 'submitted' })} onClick={() => setTab('submitted')}>
             Submitted Deals
             <span className={clsx(s.tabCount, { [s.active]: tab === 'submitted' })}>
@@ -335,11 +339,10 @@ const DealsPage = () => {
               {counts?.issues ?? issuesData?.data?.length ?? 0}
             </span>
           </button>
+          */}
           <button className={clsx(s.tab, { [s.active]: tab === 'access' })} onClick={() => setTab('access')}>
             Access Management
-            <span className={clsx(s.tabCount, { [s.active]: tab === 'access' })}>
-              {whitelistData?.length ?? 0}
-            </span>
+            <span className={clsx(s.tabCount, { [s.active]: tab === 'access' })}>{whitelistData?.length ?? 0}</span>
           </button>
         </div>
 
@@ -406,6 +409,7 @@ const DealsPage = () => {
               <PaginationControls table={catalogTable} />
             </>
           )}
+          {/* Hidden tab - Submitted Deals
           {tab === 'submitted' && (
             <>
               <div className={s.controlBar}>
@@ -430,7 +434,6 @@ const DealsPage = () => {
                     </option>
                   ))}
                 </select>
-                {/* status filter not applicable to submitted deals — rendered for visual parity with Figma */}
                 <select className={s.filterSelect} disabled>
                   <option value="">All statuses</option>
                 </select>
@@ -448,6 +451,8 @@ const DealsPage = () => {
               <PaginationControls table={submittedTable} />
             </>
           )}
+          */}
+          {/* Hidden tab - Reported Issues
           {tab === 'issues' && (
             <>
               <div className={s.controlBar}>
@@ -483,6 +488,7 @@ const DealsPage = () => {
               <PaginationControls table={issuesTable} />
             </>
           )}
+          */}
           {tab === 'access' && <DealsWhitelistSection authToken={authToken} />}
         </div>
       </div>
