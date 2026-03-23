@@ -16,10 +16,10 @@ export const fetchTeams = async () => {
 
 export const fetchTeamsForAutocomplete = async (searchTerm) => {
   try {
-    const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}`);
+    const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&with=logo`);
     if (response.data) {
       return response.data?.teams?.map((item) => {
-        return { value: item.uid, label: item.name };
+        return { value: item.uid, label: item.name, logoUid: item.logoUid, logoUrl: item.logo?.url };
       });
     }
   } catch (error) {
