@@ -1610,7 +1610,6 @@ model ArticleStatistic {
   article    Article  @relation(fields: [articleUid], references: [uid], onDelete: Cascade)
   memberUid  String
   member     Member   @relation("MemberArticleStatistics", fields: [memberUid], references: [uid], onDelete: Cascade)
-  liked      Boolean  @default(false)
   viewCount  Int      @default(0)
   likeCount  Int      @default(0)
   createdAt  DateTime @default(now())

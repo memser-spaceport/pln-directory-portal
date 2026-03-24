@@ -385,7 +385,7 @@ export async function articleStatistics() {
       uid: 'article_stat_1',
       articleUid: 'article_entity_formation',
       memberUid: members[0].uid,
-      liked: true,
+
       viewCount: 3,
       likeCount: 1,
     },
@@ -394,7 +394,7 @@ export async function articleStatistics() {
       uid: 'article_stat_2',
       articleUid: 'article_entity_formation',
       memberUid: members[1].uid,
-      liked: false,
+
       viewCount: 1,
       likeCount: 0,
     },
@@ -403,7 +403,7 @@ export async function articleStatistics() {
       uid: 'article_stat_3',
       articleUid: 'article_visa_options',
       memberUid: members[0].uid,
-      liked: true,
+
       viewCount: 2,
       likeCount: 1,
     },
@@ -412,7 +412,7 @@ export async function articleStatistics() {
       uid: 'article_stat_4',
       articleUid: 'article_seed_fundraising',
       memberUid: members[1].uid,
-      liked: true,
+
       viewCount: 5,
       likeCount: 1,
     },
@@ -421,7 +421,7 @@ export async function articleStatistics() {
       uid: 'article_stat_5',
       articleUid: 'article_press_coverage',
       memberUid: members[0].uid,
-      liked: false,
+
       viewCount: 1,
       likeCount: 0,
     },
@@ -432,7 +432,7 @@ export async function articleStatistics() {
             uid: 'article_stat_6',
             articleUid: 'article_token_launch',
             memberUid: members[2].uid,
-            liked: true,
+      
             viewCount: 4,
             likeCount: 1,
           },

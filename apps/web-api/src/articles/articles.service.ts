@@ -2,8 +2,8 @@ import { ForbiddenException, Injectable, NotFoundException, UnauthorizedExceptio
 import { ArticleStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './articles.dto';
-import { ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE } from './articles.constants';
 import type { ArticleCategory } from './articles.constants';
+import { ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE } from './articles.constants';
 
 @Injectable()
 export class ArticlesService {
@@ -54,19 +54,12 @@ export class ArticlesService {
     return resolved;
   }
 
-  private async ensureArticleOwnership(
-    articleUid: string,
-    memberUid: string,
-    teamUid: string | null,
-  ) {
+  private async ensureArticleOwnership(articleUid: string, memberUid: string, teamUid: string | null) {
     const article = await this.prisma.article.findFirst({
       where: {
         uid: articleUid,
         isDeleted: false,
-        OR: [
-          { authorMemberUid: memberUid },
-          ...(teamUid ? [{ authorTeamUid: teamUid }] : []),
-        ],
+        OR: [{ authorMemberUid: memberUid }, ...(teamUid ? [{ authorTeamUid: teamUid }] : [])],
       },
     });
 
@@ -77,10 +70,7 @@ export class ArticlesService {
     return article;
   }
 
-  private buildArticleWhere(
-    query: ListArticlesQueryDto,
-    status?: ArticleStatus,
-  ): Prisma.ArticleWhereInput {
+  private buildArticleWhere(query: ListArticlesQueryDto, status?: ArticleStatus): Prisma.ArticleWhereInput {
     return {
       isDeleted: false,
       ...(status ? { status } : {}),
@@ -174,7 +164,7 @@ export class ArticlesService {
 
     const likeCounts = await this.prisma.articleStatistic.groupBy({
       by: ['articleUid'],
-      where: { articleUid: { in: articleUids }, liked: true },
+      where: { articleUid: { in: articleUids }, likeCount: { gt: 0 } },
       _count: { _all: true },
     });
 
@@ -212,9 +202,7 @@ export class ArticlesService {
     if (userEmail) {
       try {
         const { memberUid, teamUid } = await this.resolveMemberByEmail(userEmail);
-        isAuthor =
-          article.authorMemberUid === memberUid ||
-          (!!teamUid && article.authorTeamUid === teamUid);
+        isAuthor = article.authorMemberUid === memberUid || (!!teamUid && article.authorTeamUid === teamUid);
       } catch {
         // Not logged in or member not found -- treat as non-author
       }
@@ -231,15 +219,17 @@ export class ArticlesService {
         _sum: { viewCount: true },
       }),
       this.prisma.articleStatistic.count({
-        where: { articleUid: article.uid, liked: true },
+        where: { articleUid: article.uid, likeCount: { gt: 0 } },
       }),
       userEmail
-        ? this.resolveMemberByEmail(userEmail).then(({ memberUid }) =>
-            this.prisma.articleStatistic.findUnique({
-              where: { articleUid_memberUid: { articleUid: article.uid, memberUid } },
-              select: { liked: true, viewCount: true },
-            }),
-          ).catch(() => null)
+        ? this.resolveMemberByEmail(userEmail)
+            .then(({ memberUid }) =>
+              this.prisma.articleStatistic.findUnique({
+                where: { articleUid_memberUid: { articleUid: article.uid, memberUid } },
+                select: { likeCount: true, viewCount: true },
+              })
+            )
+            .catch(() => null)
         : Promise.resolve(null),
     ]);
 
@@ -286,7 +276,7 @@ export class ArticlesService {
       ...article,
       totalViews: viewAgg._sum.viewCount ?? 0,
       totalLikes: likeCount,
-      currentUserLiked: userStat?.liked ?? false,
+      currentUserLiked: (userStat?.likeCount ?? 0) > 0,
       relatedArticles,
       prevArticle,
       nextArticle,
@@ -307,8 +297,8 @@ export class ArticlesService {
 
     return this.prisma.articleStatistic.upsert({
       where: { articleUid_memberUid: { articleUid, memberUid } },
-      update: { liked: true, likeCount: 1 },
-      create: { articleUid, memberUid, liked: true, likeCount: 1 },
+      update: { likeCount: 1 },
+      create: { articleUid, memberUid, likeCount: 1 },
     });
   }
 
@@ -325,7 +315,7 @@ export class ArticlesService {
 
     return this.prisma.articleStatistic.update({
       where: { articleUid_memberUid: { articleUid, memberUid } },
-      data: { liked: false, likeCount: 0 },
+      data: { likeCount: 0 },
     });
   }
 
@@ -459,10 +449,7 @@ export class ArticlesService {
 
     const where: Prisma.ArticleWhereInput = {
       isDeleted: false,
-      OR: [
-        { authorMemberUid: memberUid },
-        ...(teamUid ? [{ authorTeamUid: teamUid }] : []),
-      ],
+      OR: [{ authorMemberUid: memberUid }, ...(teamUid ? [{ authorTeamUid: teamUid }] : [])],
       ...(query?.search
         ? {
             AND: {
@@ -530,7 +517,7 @@ export class ArticlesService {
 
     const likeCounts = await this.prisma.articleStatistic.groupBy({
       by: ['articleUid'],
-      where: { articleUid: { in: articleUids }, liked: true },
+      where: { articleUid: { in: articleUids }, likeCount: { gt: 0 } },
       _count: { _all: true },
     });
 
@@ -640,7 +627,7 @@ export class ArticlesService {
         _sum: { viewCount: true },
       }),
       this.prisma.articleStatistic.count({
-        where: { articleUid: uid, liked: true },
+        where: { articleUid: uid, likeCount: { gt: 0 } },
       }),
     ]);
 

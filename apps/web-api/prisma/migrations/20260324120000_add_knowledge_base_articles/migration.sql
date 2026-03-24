@@ -31,7 +31,6 @@ CREATE TABLE "ArticleStatistic" (
     "uid" TEXT NOT NULL,
     "articleUid" TEXT NOT NULL,
     "memberUid" TEXT NOT NULL,
-    "liked" BOOLEAN NOT NULL DEFAULT false,
     "viewCount" INTEGER NOT NULL DEFAULT 0,
     "likeCount" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
