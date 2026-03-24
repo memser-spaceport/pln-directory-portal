@@ -3,7 +3,7 @@ import { faker } from '@faker-js/faker';
 // Seed data for predefined focus areas
 export const focusAreas = [
   'Build Innovation Network',
-  'Develop Advanced Technologies',
+  'AI & Robotics',
   'Public Goods',
   'Digital Human Rights',
 ].map((title) => ({
