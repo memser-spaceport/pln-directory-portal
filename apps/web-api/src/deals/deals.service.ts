@@ -572,14 +572,15 @@ export class DealsService {
   async adminCreate(body: UpsertDealDto) {
     const deal = await this.prisma.deal.create({
       data: {
-        vendorName: body.vendorName,
+        vendorName: body.vendorName ?? '',
         vendorTeamUid: body.vendorTeamUid ?? null,
         logoUid: body.logoUid ?? null,
-        category: body.category,
-        audience: body.audience,
+        category: body.category ?? '',
+        audience: body.audience ?? '',
         shortDescription: body.shortDescription,
         fullDescription: body.fullDescription,
         redemptionInstructions: body.redemptionInstructions,
+        contact: body.contact,
         status: body.status ?? DealStatus.DRAFT,
       },
       include: { logo: { select: { url: true } } },
@@ -611,6 +612,7 @@ export class DealsService {
         ...(body.redemptionInstructions !== undefined
           ? { redemptionInstructions: body.redemptionInstructions }
           : {}),
+        ...(body.contact !== undefined ? { contact: body.contact } : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
       },
       include: { logo: { select: { url: true } } },

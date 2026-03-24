@@ -1445,6 +1445,7 @@ model Deal {
   shortDescription       String
   fullDescription        String
   redemptionInstructions String
+  contact                String           @default("")
   status                 DealStatus       @default(DRAFT)
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
