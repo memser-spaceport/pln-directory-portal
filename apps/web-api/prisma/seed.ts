@@ -85,6 +85,7 @@ import { demoDayInvestorProfiles } from './fixtures/demoDayInvestorProfiles';
 import { demoDayTeamFundraisingProfiles } from './fixtures/demoDayTeamFundraisingProfiles';
 import { demoDayParticipants } from './fixtures/demoDayParticipants';
 import { demoDayExpressInterestStats } from './fixtures/demoDayExpressInterestStats';
+import { articles, articleStatistics, articleWhitelists } from './fixtures/articles';
 
 /**
  * Truncate all public tables (except _prisma_migrations) and reset identities.
@@ -363,6 +364,30 @@ async function main() {
   });
 
   console.log('✅ Deals V1 seed added');
+
+  // ARTICLES_SEED_MARKER
+  const articleData = await articles();
+  await prisma.article.createMany({
+    data: articleData,
+    skipDuplicates: true,
+  });
+
+  const articleStatData = await articleStatistics();
+  await prisma.articleStatistic.createMany({
+    data: articleStatData,
+    skipDuplicates: true,
+  });
+
+  const articleWhitelistData = await articleWhitelists();
+  for (const entry of articleWhitelistData) {
+    await prisma.articleWhitelist.upsert({
+      where: { memberUid: entry.memberUid },
+      create: { memberUid: entry.memberUid },
+      update: {},
+    });
+  }
+
+  console.log('✅ Articles seed added');
 }
 
 /**

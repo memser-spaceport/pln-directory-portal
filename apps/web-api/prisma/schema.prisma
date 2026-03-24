@@ -78,6 +78,8 @@ model Team {
   dealIssues              DealIssue[]      @relation("TeamDealIssues")
   dealRedemptions         DealRedemption[] @relation("TeamDealRedemptions")
   dealUsages              DealUsage[]      @relation("TeamDealUsages")
+
+  articles                Article[]        @relation("TeamArticles")
 }
 
 enum AskStatus {
@@ -197,6 +199,10 @@ model Member {
   dealRedemptions         DealRedemption[] @relation("MemberDealRedemptions")
   dealUsages              DealUsage[]      @relation("MemberDealUsages")
   dealWhitelist           DealWhitelist?   @relation("MemberDealWhitelist")
+
+  articles                Article[]                 @relation("MemberArticles")
+  articleStatistics       ArticleStatistic[]        @relation("MemberArticleStatistics")
+  articleWhitelist        ArticleWhitelist?         @relation("MemberArticleWhitelist")
 }
 
 model MemberRole {
@@ -419,6 +425,7 @@ model Image {
   demoDayBrandingLogos DemoDayBranding[]
   dealLogos            Deal[]            @relation("DealLogo")
   dealSubmissionLogos  DealSubmission[]  @relation("DealSubmissionLogo")
+  articleCoverImages   Article[]         @relation("ArticleCoverImage")
 }
 
 model Faq {
@@ -1556,4 +1563,68 @@ model DealWhitelist {
   createdAt DateTime @default(now())
 
   @@index([memberUid])
+}
+
+// ── Knowledge Base (Articles) ──────────────────────────────────────────
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model Article {
+  id              Int              @id @default(autoincrement())
+  uid             String           @unique @default(cuid())
+  slugURL         String           @unique
+  title           String
+  summary         String
+  category        String
+  tags            String[]         @default([])
+  content         String
+  readingTime     Int              @default(0)
+  coverImageUid   String?
+  coverImage      Image?           @relation("ArticleCoverImage", fields: [coverImageUid], references: [uid], onDelete: SetNull)
+  authorMemberUid String?
+  authorMember    Member?          @relation("MemberArticles", fields: [authorMemberUid], references: [uid], onDelete: SetNull)
+  authorTeamUid   String?
+  authorTeam      Team?            @relation("TeamArticles", fields: [authorTeamUid], references: [uid], onDelete: SetNull)
+  status          ArticleStatus    @default(DRAFT)
+  publishedAt     DateTime?
+  isDeleted       Boolean          @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  statistics      ArticleStatistic[]
+
+  @@index([status])
+  @@index([category])
+  @@index([authorMemberUid])
+  @@index([authorTeamUid])
+  @@index([isDeleted])
+}
+
+model ArticleStatistic {
+  id         Int      @id @default(autoincrement())
+  uid        String   @unique @default(cuid())
+  articleUid String
+  article    Article  @relation(fields: [articleUid], references: [uid], onDelete: Cascade)
+  memberUid  String
+  member     Member   @relation("MemberArticleStatistics", fields: [memberUid], references: [uid], onDelete: Cascade)
+  liked      Boolean  @default(false)
+  viewCount  Int      @default(0)
+  likeCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([articleUid, memberUid])
+  @@index([articleUid])
+  @@index([memberUid])
+}
+
+model ArticleWhitelist {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  memberUid String   @unique
+  member    Member   @relation("MemberArticleWhitelist", fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }
