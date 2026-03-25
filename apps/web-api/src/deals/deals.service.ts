@@ -366,17 +366,41 @@ export class DealsService {
 
     return this.prisma.dealSubmission.create({
       data: {
-        vendorName: body.vendorName,
-        vendorTeamUid: body.vendorTeamUid ?? null,
-        logoUid: body.logoUid ?? null,
-        category: body.category,
-        audience: body.audience,
+        ...(body.vendorName !== undefined ? { vendorName: body.vendorName } : {}),
+        ...(body.category !== undefined ? { category: body.category } : {}),
+        ...(body.audience !== undefined ? { audience: body.audience } : {}),
         shortDescription: body.shortDescription,
         fullDescription: body.fullDescription,
         redemptionInstructions: body.redemptionInstructions,
-        authorMemberUid: memberUid,
-        authorTeamUid: teamUid,
         status: DealSubmissionStatus.OPEN,
+
+        authorMember: {
+          connect: { uid: memberUid },
+        },
+
+        ...(teamUid
+          ? {
+              authorTeam: {
+                connect: { uid: teamUid },
+              },
+            }
+          : {}),
+
+        ...(body.vendorTeamUid
+          ? {
+              vendorTeam: {
+                connect: { uid: body.vendorTeamUid },
+              },
+            }
+          : {}),
+
+        ...(body.logoUid
+          ? {
+              logo: {
+                connect: { uid: body.logoUid },
+              },
+            }
+          : {}),
       },
       include: {
         logo: { select: { url: true } },
