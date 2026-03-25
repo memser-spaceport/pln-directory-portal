@@ -1469,13 +1469,13 @@ model Deal {
 model DealSubmission {
   id                     Int                  @id @default(autoincrement())
   uid                    String               @unique @default(cuid())
-  vendorName             String
+  vendorName             String?
   vendorTeamUid          String?
   vendorTeam             Team?                @relation("DealSubmissionVendorTeam", fields: [vendorTeamUid], references: [uid], onDelete: SetNull)
   logoUid                String?
   logo                   Image?               @relation("DealSubmissionLogo", fields: [logoUid], references: [uid], onDelete: SetNull)
-  category               String
-  audience               String
+  category               String?
+  audience               String?
   shortDescription       String
   fullDescription        String
   redemptionInstructions String

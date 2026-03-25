@@ -245,6 +245,17 @@ export function useReportedIssuesTable({
     onPaginationChange: setPagination,
     onGlobalFilterChange: setGlobalFilter,
     getRowId: (row) => row.uid,
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const q = (filterValue as string).toLowerCase();
+      const issue = row.original;
+      return (
+        issue.deal.vendorName.toLowerCase().includes(q) ||
+        issue.deal.category.toLowerCase().includes(q) ||
+        issue.authorMember.name.toLowerCase().includes(q) ||
+        issue.authorMember.email.toLowerCase().includes(q) ||
+        issue.description.toLowerCase().includes(q)
+      );
+    },
   });
 
   return { table };
