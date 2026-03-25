@@ -36,6 +36,7 @@ const DealForm = dynamic<ComponentProps<typeof DealFormType>>(
 import { Deal, DealStatus, IssueStatus, ReportedIssue, SubmittedDeal, TDealForm } from '../../screens/deals/types/deal';
 import type { DealFormMode } from '../../screens/deals/components/DealForm/DealForm';
 import { ReportedIssueModal } from '../../screens/deals/components/ReportedIssueModal/ReportedIssueModal';
+import DeactivateDealModal from '../../components/deals/DeactivateDealModal';
 import { approveSubmission } from '../../utils/services/deal';
 import { DEAL_AUDIENCE_OPTIONS, DEAL_CATEGORIES } from '../../screens/deals/constants';
 
@@ -76,6 +77,7 @@ const DealsPage = () => {
   const [formMode, setFormMode] = useState<DealFormMode>('create');
   const [reviewingSubmissionUid, setReviewingSubmissionUid] = useState<string | null>(null);
   const [viewingIssue, setViewingIssue] = useState<ReportedIssue | null>(null);
+  const [deactivatingDeal, setDeactivatingDeal] = useState<{ uid: string; vendorName: string } | null>(null);
 
   const { data: dealsData } = useDealsList({ authToken });
   const { data: submittedData } = useSubmittedDealsList({ authToken });
@@ -223,7 +225,10 @@ const DealsPage = () => {
     setGlobalFilter: setIssuesFilter,
     onStatusChange: handleIssueStatusChange,
     onView: setViewingIssue,
-    onDeactivateDeal: (dealUid: string) => handleStatusChange(dealUid, 'DEACTIVATED'),
+    onDeactivateDeal: (dealUid: string) => {
+      const issue = filteredIssues.find((i) => i.dealUid === dealUid);
+      setDeactivatingDeal({ uid: dealUid, vendorName: issue?.deal.vendorName ?? 'this' });
+    },
   });
 
   useEffect(() => {
@@ -505,6 +510,17 @@ const DealsPage = () => {
           onStatusChange={handleIssueStatusChange}
         />
       )}
+      <DeactivateDealModal
+        isOpen={!!deactivatingDeal}
+        dealName={deactivatingDeal?.vendorName ?? ''}
+        onClose={() => setDeactivatingDeal(null)}
+        onConfirm={() => {
+          if (deactivatingDeal) {
+            handleStatusChange(deactivatingDeal.uid, 'DEACTIVATED');
+            setDeactivatingDeal(null);
+          }
+        }}
+      />
     </ApprovalLayout>
   );
 };
