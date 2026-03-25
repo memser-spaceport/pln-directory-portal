@@ -87,19 +87,21 @@ export const IssueActionMenu = ({ issue, onStatusChange, onView, onDeactivateDea
               Reopen
             </button>
           )}
-          <button
-            className={s.item}
-            onClick={() => {
-              setOpen(false);
-              onDeactivateDeal(issue.dealUid);
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="6" stroke="#64748b" strokeWidth="1.2" />
-              <path d="M10 6L6 10M6 6l4 4" stroke="#64748b" strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-            Deactivate Deal
-          </button>
+          {issue.deal.status !== 'DEACTIVATED' && (
+            <button
+              className={s.item}
+              onClick={() => {
+                setOpen(false);
+                onDeactivateDeal(issue.dealUid);
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="#64748b" strokeWidth="1.2" />
+                <path d="M10 6L6 10M6 6l4 4" stroke="#64748b" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              Deactivate Deal
+            </button>
+          )}
         </div>
       )}
     </div>

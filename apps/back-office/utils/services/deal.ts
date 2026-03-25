@@ -82,14 +82,16 @@ export async function updateIssueStatus(params: {
 }
 
 export async function fetchDealCounts(params: { authToken: string | undefined }): Promise<DealCounts> {
-  // Use the deals list length as the count since there's no dedicated counts endpoint
-  const response = await api.get<Deal[]>(API_ROUTE.ADMIN_DEALS, {
-    headers: { authorization: `Bearer ${params.authToken}` },
-  });
+  const headers = { authorization: `Bearer ${params.authToken}` };
+  const [dealsRes, submissionsRes, issuesRes] = await Promise.all([
+    api.get<Deal[]>(API_ROUTE.ADMIN_DEALS, { headers }),
+    api.get<SubmittedDeal[]>(API_ROUTE.ADMIN_SUBMITTED_DEALS, { headers }),
+    api.get<ReportedIssue[]>(API_ROUTE.ADMIN_REPORTED_ISSUES, { headers }),
+  ]);
   return {
-    catalog: response.data.length,
-    submitted: 0,
-    issues: 0,
+    catalog: dealsRes.data.length,
+    submitted: submissionsRes.data.length,
+    issues: issuesRes.data.length,
   };
 }
 
