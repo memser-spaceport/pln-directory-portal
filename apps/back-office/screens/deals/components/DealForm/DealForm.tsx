@@ -203,6 +203,11 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
                 <h4 className={s.title}>{MODAL_COPY[resolvedMode].title}</h4>
                 <p className={s.desc}>{MODAL_COPY[resolvedMode].desc}</p>
               </div>
+              <button type="button" className={s.closeButton} onClick={onClose} aria-label="Close">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M15 5L5 15M5 5l10 10" stroke="#455468" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
             </div>
             <form noValidate onSubmit={handleSubmit(handleFormSubmit)} className={s.form}>
               {/* ── Deal Details section ── */}
