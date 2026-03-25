@@ -445,7 +445,7 @@ export class DemoDaysService {
           // Same status: sort by startDate ascending
           const aDate = a.startDate instanceof Date ? a.startDate.getTime() : new Date(a.startDate).getTime();
           const bDate = b.startDate instanceof Date ? b.startDate.getTime() : new Date(b.startDate).getTime();
-          return aDate - bDate;
+          return bDate - aDate;
         })
         .map(async (demoDay) => {
           const teamsCount = await this.getTeamsCountForDemoDay(demoDay.uid);
@@ -2226,8 +2226,7 @@ export class DemoDaysService {
     });
 
     this.logger.log(
-      `demoDayApplication: channel=${channelType}, host="${
-        args.demoDay.host ?? ''
+      `demoDayApplication: channel=${channelType}, host="${args.demoDay.host ?? ''
       }", applicationDate=${applicationDate}`
     );
 
