@@ -16,7 +16,7 @@ const columnHelper = createColumnHelper<SubmittedDeal>();
 
 // 40×40 rounded-square avatar with vendor initial
 function VendorAvatar({ name }: { name: string }) {
-  const initial = name.charAt(0).toUpperCase() || '?';
+  const initial = name?.charAt(0).toUpperCase() || '?';
   return (
     <div
       style={{
@@ -98,15 +98,20 @@ export function useSubmittedDealsTable({
                 <img
                   src={logo.url}
                   alt={vendorName}
-                  style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', border: '1px solid rgba(27,56,96,0.24)', flexShrink: 0 }}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 8,
+                    objectFit: 'contain',
+                    border: '1px solid rgba(27,56,96,0.24)',
+                    flexShrink: 0,
+                  }}
                 />
               ) : (
                 <VendorAvatar name={vendorName} />
               )}
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
-                  {vendorName}
-                </div>
+                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{vendorName}</div>
                 <div
                   style={{
                     fontSize: 12,
@@ -134,12 +139,8 @@ export function useSubmittedDealsTable({
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <SubmitterAvatar name={authorMember.name} />
               <div>
-                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
-                  {authorMember.name}
-                </div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>
-                  {authorMember.email}
-                </div>
+                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{authorMember.name}</div>
+                <div style={{ fontSize: 12, color: '#64748b' }}>{authorMember.email}</div>
               </div>
             </div>
           );
@@ -172,10 +173,7 @@ export function useSubmittedDealsTable({
         // @ts-ignore
         meta: { align: 'center' },
         cell: (info) => (
-          <button
-            className={s.reviewBtn}
-            onClick={() => onReview(info.row.original)}
-          >
+          <button className={s.reviewBtn} onClick={() => onReview(info.row.original)}>
             Review Deal
           </button>
         ),
