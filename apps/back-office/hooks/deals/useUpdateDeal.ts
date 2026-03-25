@@ -13,6 +13,7 @@ export function useUpdateDeal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [DealsQueryKeys.GET_DEALS_LIST] });
       queryClient.invalidateQueries({ queryKey: [DealsQueryKeys.GET_DEALS_COUNTS] });
+      queryClient.invalidateQueries({ queryKey: [DealsQueryKeys.GET_REPORTED_ISSUES_LIST] });
       toast.success('Deal updated successfully');
     },
     onError: () => {
