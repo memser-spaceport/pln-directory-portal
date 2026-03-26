@@ -192,6 +192,16 @@ export function useSubmittedDealsTable({
       pagination,
       globalFilter,
     },
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const search = String(filterValue).toLowerCase();
+      const { vendorName, shortDescription, authorMember } = row.original;
+      return (
+        vendorName?.toLowerCase().includes(search) ||
+        shortDescription?.toLowerCase().includes(search) ||
+        authorMember?.name?.toLowerCase().includes(search) ||
+        authorMember?.email?.toLowerCase().includes(search)
+      );
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
