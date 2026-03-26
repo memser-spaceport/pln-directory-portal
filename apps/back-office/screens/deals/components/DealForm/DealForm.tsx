@@ -85,8 +85,12 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
     reset,
     control,
     setValue,
+    watch,
     formState: { isSubmitting, isDirty, errors },
   } = methods;
+
+  const shortDescriptionValue = watch('shortDescription');
+  const SHORT_DESC_MAX = 100;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
@@ -401,7 +405,10 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
                   {errors.shortDescription ? (
                     <p className={s.error}>{errors.shortDescription.message}</p>
                   ) : (
-                    <p className={s.helperText}>Max. 100 characters.</p>
+                    <p className={s.helperText}>
+                      <span>Max. {SHORT_DESC_MAX} characters.</span>
+                      <span>{shortDescriptionValue?.length ?? 0}/{SHORT_DESC_MAX}</span>
+                    </p>
                   )}
                 </div>
 

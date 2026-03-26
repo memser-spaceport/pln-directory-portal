@@ -165,6 +165,8 @@
   letter-spacing: -0.2px;
   line-height: 18px;
   margin: 0;
+  display: flex;
+  justify-content: space-between;
 }
 
 .error {
