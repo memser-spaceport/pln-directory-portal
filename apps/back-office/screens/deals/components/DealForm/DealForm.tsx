@@ -85,8 +85,12 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
     reset,
     control,
     setValue,
+    watch,
     formState: { isSubmitting, isDirty, errors },
   } = methods;
+
+  const shortDescriptionValue = watch('shortDescription');
+  const SHORT_DESC_MAX = 100;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
@@ -401,7 +405,9 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
                   {errors.shortDescription ? (
                     <p className={s.error}>{errors.shortDescription.message}</p>
                   ) : (
-                    <p className={s.helperText}>Max. 100 characters.</p>
+                    <p className={s.helperText}>
+                      {shortDescriptionValue?.length ?? 0}/{SHORT_DESC_MAX} characters left
+                    </p>
                   )}
                 </div>
 
@@ -415,18 +421,23 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
                   <Controller
                     name="fullDescription"
                     control={control}
-                    rules={{ required: 'Full description is required' }}
+                    rules={{
+                      validate: (value) =>
+                        !!value?.replace(/<[^>]*>/g, '').trim() || 'Full description is required',
+                    }}
                     render={({ field, fieldState }) => (
                       <RichTextEditor
                         value={field.value}
-                        onChange={field.onChange}
+                        onChange={(val) => {
+                          field.onChange(val);
+                          if (fieldState.error) void methods.trigger('fullDescription');
+                        }}
                         maxLength={600}
                         placeholder="Explain the full details of the deal. Include eligibility, limits, and terms if known."
                         errorMessage={fieldState.error?.message}
                       />
                     )}
                   />
-                  {errors.fullDescription && <p className={s.error}>{errors.fullDescription.message}</p>}
                 </div>
               </div>
 
@@ -445,11 +456,17 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
                   <Controller
                     name="redemptionInstructions"
                     control={control}
-                    rules={{ required: 'Redemption instructions are required' }}
+                    rules={{
+                      validate: (value) =>
+                        !!value?.replace(/<[^>]*>/g, '').trim() || 'Redemption instructions are required',
+                    }}
                     render={({ field, fieldState }) => (
                       <RichTextEditor
                         value={field.value}
-                        onChange={field.onChange}
+                        onChange={(val) => {
+                          field.onChange(val);
+                          if (fieldState.error) void methods.trigger('redemptionInstructions');
+                        }}
                         maxLength={600}
                         placeholder={
                           'Explain how founders can redeem the deal.\nExample:\n1. Visit the signup link\n2. Create an account\n3. Enter the promo code during onboarding'
@@ -458,7 +475,6 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
                       />
                     )}
                   />
-                  {errors.redemptionInstructions && <p className={s.error}>{errors.redemptionInstructions.message}</p>}
                 </div>
               </div>
 

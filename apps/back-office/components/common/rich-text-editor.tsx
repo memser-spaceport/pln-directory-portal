@@ -122,12 +122,12 @@ const RichTextEditor = forwardRef<ReactQuill, Props>((props, ref) => {
         placeholder={placeholder}
       />
       <div className={s.footer}>
-        {errorMessage && <div className={s.errorMessage}>{errorMessage}</div>}
         {maxLength && (
           <div className={clsx(s.charCounter, { [s.limit]: charCount >= maxLength })}>
-            {charCount}/{maxLength}
+            {charCount}/{maxLength} characters left
           </div>
         )}
+        {errorMessage && <div className={s.errorMessage}>{errorMessage}</div>}
       </div>
     </div>
   );
