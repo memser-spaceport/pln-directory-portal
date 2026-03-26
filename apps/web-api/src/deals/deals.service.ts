@@ -404,7 +404,7 @@ export class DealsService {
       },
       include: {
         logo: { select: { url: true } },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
       },
     });
@@ -432,7 +432,7 @@ export class DealsService {
       },
       include: {
         deal: { select: { uid: true, vendorName: true, category: true, audience: true } },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
       },
     });
@@ -653,7 +653,7 @@ export class DealsService {
       include: {
         logo: { select: { url: true } },
         vendorTeam: { select: { uid: true, name: true } },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
         reviewedByMember: { select: { uid: true, name: true, email: true } },
       },
@@ -666,7 +666,7 @@ export class DealsService {
       include: {
         logo: { select: { url: true } },
         vendorTeam: { select: { uid: true, name: true } },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
         reviewedByMember: { select: { uid: true, name: true, email: true } },
       },
@@ -698,7 +698,7 @@ export class DealsService {
       include: {
         logo: { select: { url: true } },
         vendorTeam: { select: { uid: true, name: true } },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
         reviewedByMember: { select: { uid: true, name: true, email: true } },
       },
@@ -719,7 +719,7 @@ export class DealsService {
             status: true,
           },
         },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
         resolvedByMember: { select: { uid: true, name: true, email: true } },
       },
@@ -739,7 +739,7 @@ export class DealsService {
             status: true,
           },
         },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
         resolvedByMember: { select: { uid: true, name: true, email: true } },
       },
