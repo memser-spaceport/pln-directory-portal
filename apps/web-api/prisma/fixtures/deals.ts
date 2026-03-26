@@ -116,3 +116,32 @@ export async function dealWhitelists() {
     },
   ];
 }
+
+
+export async function dealRequests() {
+  const member = await prisma.member.findFirst({
+    orderBy: { id: 'asc' },
+    select: { uid: true },
+  });
+
+  if (!member) {
+    throw new Error('No Member found for dealRequests seed');
+  }
+
+  return [
+    {
+      uid: 'deal_request_vercel_1',
+      dealUid: 'deal_vercel',
+      description: 'Please enable this deal for our team.',
+      requestedByUserUid: member.uid,
+      requestedDate: new Date('2026-03-26T10:00:00.000Z'),
+    },
+    {
+      uid: 'deal_request_figma_1',
+      dealUid: 'deal_figma',
+      description: 'We want access to the Figma offer.',
+      requestedByUserUid: member.uid,
+      requestedDate: new Date('2026-03-26T11:00:00.000Z'),
+    },
+  ];
+}

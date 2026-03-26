@@ -197,6 +197,7 @@ model Member {
   dealRedemptions         DealRedemption[] @relation("MemberDealRedemptions")
   dealUsages              DealUsage[]      @relation("MemberDealUsages")
   dealWhitelist           DealWhitelist?   @relation("MemberDealWhitelist")
+  dealRequests            DealRequest[]    @relation("MemberDealRequests")
 }
 
 model MemberRole {
@@ -1452,6 +1453,7 @@ model Deal {
   redemptions            DealRedemption[]
   usages                 DealUsage[]
   issues                 DealIssue[]
+  requests               DealRequest[]
 
   @@index([status])
   @@index([category])
@@ -1512,6 +1514,26 @@ model DealIssue {
   @@index([authorTeamUid])
   @@index([status])
   @@index([createdAt])
+}
+
+model DealRequest {
+  id                       Int      @id @default(autoincrement())
+  uid                      String   @unique @default(cuid())
+  dealUid                  String
+  deal                     Deal     @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
+  description              String
+  whatDealAreYouLookingFor String
+  howToReachOutToYou       String
+  requestedByUserUid       String
+  requestedByUser          Member   @relation("MemberDealRequests", fields: [requestedByUserUid], references: [uid], onDelete: Cascade)
+  requestedDate            DateTime @default(now())
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([dealUid, requestedByUserUid])
+  @@index([dealUid])
+  @@index([requestedByUserUid])
+  @@index([requestedDate])
 }
 
 model DealRedemption {
