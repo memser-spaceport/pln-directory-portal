@@ -406,8 +406,7 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
                     <p className={s.error}>{errors.shortDescription.message}</p>
                   ) : (
                     <p className={s.helperText}>
-                      <span>Max. {SHORT_DESC_MAX} characters.</span>
-                      <span>{shortDescriptionValue?.length ?? 0}/{SHORT_DESC_MAX}</span>
+                      {shortDescriptionValue?.length ?? 0}/{SHORT_DESC_MAX} characters left
                     </p>
                   )}
                 </div>
