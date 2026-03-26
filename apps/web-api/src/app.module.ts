@@ -1,3 +1,4 @@
+import { ArticlesModule } from './articles/articles.module';
 import { BullModule } from '@nestjs/bull';
 import { CacheModule, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -67,6 +68,7 @@ import { DealRequestsModule } from "./deal-requests/deal-requests.module";
   controllers: [AppController, MetricsController],
   imports: [
     AnalyticsModule,
+    ArticlesModule,
     ThrottlerModule.forRoot({
       ttl: 1,
       limit: 10,
