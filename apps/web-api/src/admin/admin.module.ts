@@ -22,7 +22,8 @@ import { ParticipantsRequestModule } from '../participants-request/participants-
 import { TeamsModule } from '../teams/teams.module';
 import { AskModule } from '../asks/asks.module';
 import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
-import { DealsModule } from '../deals/deals.module';
+import {DealsModule} from "../deals/deals.module";
+import { DealRequestsModule } from "../deal-requests/deal-requests.module";
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { DealsModule } from '../deals/deals.module';
     AnalyticsModule,
     TeamEnrichmentModule,
     DealsModule,
+    DealRequestsModule
   ],
   controllers: [
     AdminAuthController,
