@@ -92,6 +92,7 @@ export function useSubmittedDealsTable({
         size: 0,
         cell: (info) => {
           const { vendorName, shortDescription, logo } = info.row.original;
+
           return (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               {logo?.url ? (
@@ -137,7 +138,21 @@ export function useSubmittedDealsTable({
           const { authorMember } = info.row.original;
           return (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <SubmitterAvatar name={authorMember.name} />
+              {authorMember.image?.url ? (
+                <img
+                  src={authorMember.image?.url}
+                  alt={authorMember?.name}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <SubmitterAvatar name={authorMember.name} />
+              )}
               <div>
                 <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{authorMember.name}</div>
                 <div style={{ fontSize: 12, color: '#64748b' }}>{authorMember.email}</div>

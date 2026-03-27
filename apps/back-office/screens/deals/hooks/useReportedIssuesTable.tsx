@@ -114,9 +114,7 @@ export function useReportedIssuesTable({
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <VendorAvatar name={deal.vendorName} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
-                  {deal.vendorName}
-                </div>
+                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{deal.vendorName}</div>
                 <div
                   style={{
                     fontSize: 12,
@@ -144,14 +142,24 @@ export function useReportedIssuesTable({
           const { authorMember } = info.row.original;
           return (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <ReporterAvatar name={authorMember.name} />
+              {authorMember.image?.url ? (
+                <img
+                  src={authorMember.image?.url}
+                  alt={authorMember?.name}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <ReporterAvatar name={authorMember.name} />
+              )}
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
-                  {authorMember.name}
-                </div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>
-                  {authorMember.email}
-                </div>
+                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{authorMember.name}</div>
+                <div style={{ fontSize: 12, color: '#64748b' }}>{authorMember.email}</div>
               </div>
             </div>
           );
