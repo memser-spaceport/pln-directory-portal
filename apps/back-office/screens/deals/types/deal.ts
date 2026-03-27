@@ -29,6 +29,8 @@ export type TDealForm = {
   fullDescription: string;
   redemptionInstructions: string;
   status: DealStatus;
+  /** Set when creating a catalog deal from a submission (Review Deal). */
+  submissionUid?: string;
 };
 
 export type SubmissionStatus = 'OPEN' | 'APPROVED' | 'REJECTED';

@@ -20,6 +20,7 @@ export class UpsertDealDto {
   redemptionInstructions!: string;
   contact!: string;
   status?: DealStatus;
+  submissionUid?: string;
 }
 
 export class SubmitDealDto {

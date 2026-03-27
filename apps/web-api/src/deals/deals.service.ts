@@ -14,7 +14,7 @@ import {
 
 @Injectable()
 export class DealsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   private async resolveMemberByEmail(userEmail: string) {
     if (!userEmail) {
@@ -66,12 +66,12 @@ export class DealsService {
       ...(query?.audience ? { audience: query.audience } : {}),
       ...(query?.search
         ? {
-            OR: [
-              { vendorName: { contains: query.search, mode: 'insensitive' } },
-              { shortDescription: { contains: query.search, mode: 'insensitive' } },
-              { fullDescription: { contains: query.search, mode: 'insensitive' } },
-            ],
-          }
+          OR: [
+            { vendorName: { contains: query.search, mode: 'insensitive' } },
+            { shortDescription: { contains: query.search, mode: 'insensitive' } },
+            { fullDescription: { contains: query.search, mode: 'insensitive' } },
+          ],
+        }
         : {}),
     };
   }
@@ -81,20 +81,20 @@ export class DealsService {
       ...(query?.status ? { status: query.status } : {}),
       ...(query?.search
         ? {
-            OR: [
-              { vendorName: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
-              { shortDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
-              { fullDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
-              {
-                authorMember: {
-                  OR: [
-                    { name: { contains: query.search, mode: 'insensitive' } },
-                    { email: { contains: query.search, mode: 'insensitive' } },
-                  ],
-                },
-              } as Prisma.DealSubmissionWhereInput,
-            ],
-          }
+          OR: [
+            { vendorName: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+            { shortDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+            { fullDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+            {
+              authorMember: {
+                OR: [
+                  { name: { contains: query.search, mode: 'insensitive' } },
+                  { email: { contains: query.search, mode: 'insensitive' } },
+                ],
+              },
+            } as Prisma.DealSubmissionWhereInput,
+          ],
+        }
         : {}),
     };
   }
@@ -105,26 +105,26 @@ export class DealsService {
       ...(query?.dealUid ? { dealUid: query.dealUid } : {}),
       ...(query?.search
         ? {
-            OR: [
-              { description: { contains: query.search, mode: 'insensitive' } } as Prisma.DealIssueWhereInput,
-              {
-                deal: {
-                  OR: [
-                    { vendorName: { contains: query.search, mode: 'insensitive' } },
-                    { shortDescription: { contains: query.search, mode: 'insensitive' } },
-                  ],
-                },
-              } as Prisma.DealIssueWhereInput,
-              {
-                authorMember: {
-                  OR: [
-                    { name: { contains: query.search, mode: 'insensitive' } },
-                    { email: { contains: query.search, mode: 'insensitive' } },
-                  ],
-                },
-              } as Prisma.DealIssueWhereInput,
-            ],
-          }
+          OR: [
+            { description: { contains: query.search, mode: 'insensitive' } } as Prisma.DealIssueWhereInput,
+            {
+              deal: {
+                OR: [
+                  { vendorName: { contains: query.search, mode: 'insensitive' } },
+                  { shortDescription: { contains: query.search, mode: 'insensitive' } },
+                ],
+              },
+            } as Prisma.DealIssueWhereInput,
+            {
+              authorMember: {
+                OR: [
+                  { name: { contains: query.search, mode: 'insensitive' } },
+                  { email: { contains: query.search, mode: 'insensitive' } },
+                ],
+              },
+            } as Prisma.DealIssueWhereInput,
+          ],
+        }
         : {}),
     };
   }
@@ -381,26 +381,26 @@ export class DealsService {
 
         ...(teamUid
           ? {
-              authorTeam: {
-                connect: { uid: teamUid },
-              },
-            }
+            authorTeam: {
+              connect: { uid: teamUid },
+            },
+          }
           : {}),
 
         ...(body.vendorTeamUid
           ? {
-              vendorTeam: {
-                connect: { uid: body.vendorTeamUid },
-              },
-            }
+            vendorTeam: {
+              connect: { uid: body.vendorTeamUid },
+            },
+          }
           : {}),
 
         ...(body.logoUid
           ? {
-              logo: {
-                connect: { uid: body.logoUid },
-              },
-            }
+            logo: {
+              connect: { uid: body.logoUid },
+            },
+          }
           : {}),
       },
       include: {
@@ -610,6 +610,13 @@ export class DealsService {
       },
       include: { logo: { select: { url: true } } },
     });
+
+    if (body.submissionUid) {
+      await this.prisma.dealSubmission.update({
+        where: { uid: body.submissionUid },
+        data: { status: DealSubmissionStatus.APPROVED },
+      });
+    }
 
     const { logo, ...rest } = deal;
     return { ...rest, logoUrl: logo?.url ?? null };

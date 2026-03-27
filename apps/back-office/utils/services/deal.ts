@@ -53,6 +53,7 @@ export async function fetchSubmittedDeals(params: {
 }): Promise<{ data: SubmittedDeal[] }> {
   const response = await api.get<SubmittedDeal[]>(API_ROUTE.ADMIN_SUBMITTED_DEALS, {
     headers: { authorization: `Bearer ${params.authToken}` },
+    params: { status: 'OPEN' },
   });
   return { data: response.data };
 }
@@ -96,7 +97,7 @@ export async function fetchDealCounts(params: { authToken: string | undefined })
   const headers = { authorization: `Bearer ${params.authToken}` };
   const [dealsRes, submissionsRes, issuesRes] = await Promise.all([
     api.get<Deal[]>(API_ROUTE.ADMIN_DEALS, { headers }),
-    api.get<SubmittedDeal[]>(API_ROUTE.ADMIN_SUBMITTED_DEALS, { headers }),
+    api.get<SubmittedDeal[]>(API_ROUTE.ADMIN_SUBMITTED_DEALS, { headers, params: { status: 'OPEN' } }),
     api.get<ReportedIssue[]>(API_ROUTE.ADMIN_REPORTED_ISSUES, { headers }),
   ]);
   return {

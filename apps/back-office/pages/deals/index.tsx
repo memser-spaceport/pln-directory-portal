@@ -37,7 +37,6 @@ import { Deal, DealStatus, IssueStatus, ReportedIssue, SubmittedDeal, TDealForm 
 import type { DealFormMode } from '../../screens/deals/components/DealForm/DealForm';
 import { ReportedIssueModal } from '../../screens/deals/components/ReportedIssueModal/ReportedIssueModal';
 import DeactivateDealModal from '../../components/deals/DeactivateDealModal';
-import { approveSubmission } from '../../utils/services/deal';
 import { DEAL_AUDIENCE_OPTIONS, DEAL_CATEGORIES } from '../../screens/deals/constants';
 
 const STATUSES: { value: DealStatus; label: string }[] = [
@@ -114,11 +113,10 @@ const DealsPage = () => {
     if (editingDeal?.uid) {
       await updateDeal.mutateAsync({ authToken, uid: editingDeal.uid, payload: data });
     } else {
-      await createDeal.mutateAsync({ authToken, payload: data });
-      // Approve the submission after successfully creating the catalog deal
-      if (reviewingSubmissionUid) {
-        await approveSubmission({ authToken: authToken ?? undefined, uid: reviewingSubmissionUid, status: 'APPROVED' });
-      }
+      const payload: TDealForm = reviewingSubmissionUid
+        ? { ...data, submissionUid: reviewingSubmissionUid }
+        : data;
+      await createDeal.mutateAsync({ authToken, payload });
     }
   };
 
