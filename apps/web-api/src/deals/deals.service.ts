@@ -372,6 +372,7 @@ export class DealsService {
         shortDescription: body.shortDescription,
         fullDescription: body.fullDescription,
         redemptionInstructions: body.redemptionInstructions,
+        ...(body.howToReachOutToYou !== undefined ? { howToReachOutToYou: body.howToReachOutToYou } : {}),
         status: DealSubmissionStatus.OPEN,
 
         authorMember: {

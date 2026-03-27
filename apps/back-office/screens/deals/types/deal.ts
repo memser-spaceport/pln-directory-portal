@@ -43,6 +43,7 @@ export type SubmittedDeal = {
   shortDescription: string;
   fullDescription: string;
   redemptionInstructions: string;
+  howToReachOutToYou: string | null;
   authorMemberUid: string;
   authorTeamUid: string | null;
   status: SubmissionStatus;

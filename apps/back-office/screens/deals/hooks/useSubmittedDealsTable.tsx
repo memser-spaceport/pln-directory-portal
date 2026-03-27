@@ -146,6 +146,18 @@ export function useSubmittedDealsTable({
           );
         },
       }),
+      columnHelper.accessor('howToReachOutToYou', {
+        header: 'Contact Method',
+        size: 200,
+        cell: (info) => {
+          const value = info.getValue();
+          return (
+            <div style={{ fontSize: 14, color: value ? '#455468' : '#94a3b8' }}>
+              {value ?? '—'}
+            </div>
+          );
+        },
+      }),
       columnHelper.accessor('createdAt', {
         header: 'Submission Date',
         sortingFn: 'datetime',
