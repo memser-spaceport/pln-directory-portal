@@ -31,6 +31,7 @@ export class SubmitDealDto {
   shortDescription!: string;
   fullDescription!: string;
   redemptionInstructions!: string;
+  howToReachOutToYou?: string;
 }
 
 export class ReportDealIssueDto {
