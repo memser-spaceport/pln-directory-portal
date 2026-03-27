@@ -15,6 +15,7 @@ export enum FieldEnrichmentStatus {
 
 /** Scalar fields on the Team model that can be enriched directly. */
 export const ENRICHABLE_TEAM_FIELDS = [
+  'website',
   'blog',
   'contactMethod',
   'twitterHandler',
@@ -45,6 +46,7 @@ export interface TeamDataEnrichment {
 }
 
 export interface AITeamEnrichmentResponse {
+  website: string | null;
   blog: string | null;
   contactMethod: string | null;
   linkedinHandler: string | null;

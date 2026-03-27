@@ -50,10 +50,10 @@ export class TeamEnrichmentService {
       where: {
         isFund: true,
         accessLevel: 'L1',
-        website: { not: { equals: '' } },
-        NOT: { website: null },
         dataEnrichment: { equals: Prisma.DbNull },
         OR: [
+          { website: null },
+          { website: '' },
           { blog: null },
           { blog: '' },
           { contactMethod: null },
@@ -185,18 +185,6 @@ export class TeamEnrichmentService {
     // Mark as in-progress
     await this.updateEnrichmentStatus(teamUid, team.dataEnrichment, EnrichmentStatus.InProgress);
 
-    const website = team.website;
-    if (!website) {
-      await this.updateEnrichmentStatus(
-        teamUid,
-        team.dataEnrichment,
-        EnrichmentStatus.FailedToEnrich,
-        'Team has no website — cannot enrich without a website'
-      );
-      this.logger.warn(`Team ${teamUid} (${team.name}) has no website, skipping enrichment`);
-      return;
-    }
-
     try {
       // Call AI for enrichment
       const aiResponse = await this.aiService.enrichTeamViaAI(team.name, {
@@ -287,9 +275,11 @@ export class TeamEnrichmentService {
       }
 
       // Handle logo via OG tag scraping
+      // If AI discovered a website and team didn't have one, use it for logo fetch
+      const effectiveWebsite = team.website || aiResponse.website || null;
       if (!team.logoUid) {
-        this.logger.log(`Attempting logo fetch for team ${teamUid} (${team.name}) from website: ${team.website}`);
-        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, team.website);
+        this.logger.log(`Attempting logo fetch for team ${teamUid} (${team.name}) from website: ${effectiveWebsite}`);
+        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite);
 
         if (logoResult) {
           this.logger.log(`Logo metadata found for team ${teamUid} (${team.name}): ${logoResult.logoUrl}`);

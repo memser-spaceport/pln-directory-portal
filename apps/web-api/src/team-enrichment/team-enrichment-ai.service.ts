@@ -18,21 +18,23 @@ CRITICAL REQUIREMENTS:
 
 FIELDS TO POPULATE:
 
-1. blog: Blog URL if available
+1. website: The company's official website URL (e.g., "https://example.com"). Only populate if not already known.
 
-2. contactMethod: Preferred method of contact. Could be an email address, Slack workspace/channel link, Discord server link/handle, or other contact method. Prefer email when found. Return exactly the value (e.g., "team@example.com", "https://slack.com/...", "discord.gg/...").
+2. blog: Blog URL if available
 
-3. linkedinHandler: LinkedIn company handle (e.g., "company/puma-ai")
+3. contactMethod: Preferred method of contact. Could be an email address, Slack workspace/channel link, Discord server link/handle, or other contact method. Prefer email when found. Return exactly the value (e.g., "team@example.com", "https://slack.com/...", "discord.gg/...").
 
-4. twitterHandler: Twitter/X handle without @ (e.g., "companyname")
+4. linkedinHandler: LinkedIn company handle (e.g., "company/puma-ai")
 
-5. telegramHandler: Telegram handle without @ (e.g., "companyname")
+5. twitterHandler: Twitter/X handle without @ (e.g., "companyname")
 
-6. shortDescription: 1-2 sentence summary (max 200 chars)
+6. telegramHandler: Telegram handle without @ (e.g., "companyname")
 
-7. longDescription: Detailed description of mission, products, and value proposition (max 1000 chars)
+7. shortDescription: 1-2 sentence summary (max 200 chars)
 
-8. moreDetails: IMPORTANT - This should contain additional context such as:
+8. longDescription: Detailed description of mission, products, and value proposition (max 1000 chars)
+
+9. moreDetails: IMPORTANT - This should contain additional context such as:
    - Team information (founders, key people)
    - Company history or founding date
    - Notable achievements or milestones
@@ -41,11 +43,11 @@ FIELDS TO POPULATE:
    - Partnerships or integrations
    NEVER leave this empty if any additional information was found.
 
-9. industryTags: Array of 2-6 SHORT industry/sector tags (1-3 words each) describing the industry or sector the company operates in.
+10. industryTags: Array of 2-6 SHORT industry/sector tags (1-3 words each) describing the industry or sector the company operates in.
    Examples: ["Blockchain", "DeFi", "AI", "Cloud Infrastructure", "Developer Tools", "Data Analytics", "Gaming", "NFT", "Privacy", "Fintech", "SaaS", "IoT", "Cybersecurity"]
    ALWAYS populate this field based on the company's domain.
 
-10. investmentFocus: Array of 3-8 SHORT TAGS (1-2 words each) describing what the company/fund focuses on or invests in.
+11. investmentFocus: Array of 3-8 SHORT TAGS (1-2 words each) describing what the company/fund focuses on or invests in.
    DERIVE these tags from:
    - The company's products/services
    - Technologies they use or build
@@ -56,16 +58,18 @@ FIELDS TO POPULATE:
 NOTE: Logo discovery is handled separately — do NOT search for logos.
 
 SEARCH STRATEGY:
-1. Search for "[Company Name]" to find general information
-2. Search for "[Company Name] Twitter" or "[Company Name] X" to find their Twitter/X handle
-3. Search for "[Company Name] Telegram" to find their Telegram channel/group
-4. Search for "[Company Name] contact" or "[Company Name] email" to find contact info
-5. Search for "[Company Name]" + about or team
+1. Search for "[Company Name]" to find general information and their official website
+2. If the website is unknown, prioritize finding the official website first — this helps validate other information
+3. Search for "[Company Name] Twitter" or "[Company Name] X" to find their Twitter/X handle
+4. Search for "[Company Name] Telegram" to find their Telegram channel/group
+5. Search for "[Company Name] contact" or "[Company Name] email" to find contact info
+6. Search for "[Company Name]" + about or team
 
 CRITICAL: You MUST ALWAYS respond with valid JSON.
 
 OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
 {
+  "website": "https://..." or null,
   "blog": "https://..." or null,
   "contactMethod": "email@example.com" or "https://slack.com/..." or "discord.gg/..." or null,
   "linkedinHandler": "company/..." or null,
@@ -77,6 +81,7 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
   "industryTags": ["Tag1", "Tag2", ...],
   "investmentFocus": ["Tag1", "Tag2", "Tag3", ...],
   "confidence": {
+    "website": "high" | "medium" | "low",
     "blog": "high" | "medium" | "low",
     "contactMethod": "high" | "medium" | "low",
     "twitterHandler": "high" | "medium" | "low",
@@ -165,9 +170,12 @@ ${existingData.telegramHandler ? `Existing Telegram: ${existingData.telegramHand
 ${existingDescription ? `Existing Description: ${existingDescription}` : 'Description: Not available'}
 
 TASK:
-1. Search for "${teamName}" to find additional information
+1. Search for "${teamName}" to find additional information${!existingData.website ? `
+2. The website is unknown — use the company name and any available identifiers (contact, LinkedIn, Twitter/X, Telegram) to find the official website first
+3. Gather information about their team, history, and achievements for moreDetails
+4. Find a contact method (email preferred, otherwise Slack, Discord, etc.)` : `
 2. Gather information about their team, history, and achievements for moreDetails
-3. Find a contact method (email preferred, otherwise Slack, Discord, etc.)
+3. Find a contact method (email preferred, otherwise Slack, Discord, etc.)`}
 
 Respond with ONLY a valid JSON object as specified in system prompt.
 
@@ -190,6 +198,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     try {
       const parsed = JSON.parse(jsonMatch[0]);
       return {
+        website: this.validateUrl(parsed.website),
         blog: this.validateUrl(parsed.blog),
         contactMethod: this.sanitizeContactMethod(parsed.contactMethod),
         linkedinHandler: this.sanitizeLinkedInHandler(parsed.linkedinHandler),
@@ -215,6 +224,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
   private getEmptyResponse(): AITeamEnrichmentResponse {
     return {
+      website: null,
       blog: null,
       contactMethod: null,
       linkedinHandler: null,
