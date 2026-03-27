@@ -114,9 +114,7 @@ export function useReportedIssuesTable({
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <VendorAvatar name={deal.vendorName} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
-                  {deal.vendorName}
-                </div>
+                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{deal.vendorName}</div>
                 <div
                   style={{
                     fontSize: 12,
@@ -144,14 +142,24 @@ export function useReportedIssuesTable({
           const { authorMember } = info.row.original;
           return (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <ReporterAvatar name={authorMember.name} />
+              {authorMember.image?.url ? (
+                <img
+                  src={authorMember.image?.url}
+                  alt={authorMember?.name}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <ReporterAvatar name={authorMember.name} />
+              )}
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
-                  {authorMember.name}
-                </div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>
-                  {authorMember.email}
-                </div>
+                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{authorMember.name}</div>
+                <div style={{ fontSize: 12, color: '#64748b' }}>{authorMember.email}</div>
               </div>
             </div>
           );
@@ -245,6 +253,17 @@ export function useReportedIssuesTable({
     onPaginationChange: setPagination,
     onGlobalFilterChange: setGlobalFilter,
     getRowId: (row) => row.uid,
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const q = (filterValue as string).toLowerCase();
+      const issue = row.original;
+      return (
+        issue.deal.vendorName.toLowerCase().includes(q) ||
+        issue.deal.category.toLowerCase().includes(q) ||
+        issue.authorMember.name.toLowerCase().includes(q) ||
+        issue.authorMember.email.toLowerCase().includes(q) ||
+        issue.description.toLowerCase().includes(q)
+      );
+    },
   });
 
   return { table };

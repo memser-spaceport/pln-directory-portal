@@ -1,4 +1,11 @@
-import { Deal, DealCounts, ReportedIssue, SubmissionStatus, SubmittedDeal, TDealForm } from '../../screens/deals/types/deal';
+import {
+  Deal,
+  DealCounts,
+  ReportedIssue,
+  SubmissionStatus,
+  SubmittedDeal,
+  TDealForm,
+} from '../../screens/deals/types/deal';
 import api from '../api';
 import { API_ROUTE } from '../constants';
 
@@ -41,9 +48,12 @@ export async function updateDeal(params: {
   return response.data;
 }
 
-export async function fetchSubmittedDeals(params: { authToken: string | undefined }): Promise<{ data: SubmittedDeal[] }> {
+export async function fetchSubmittedDeals(params: {
+  authToken: string | undefined;
+}): Promise<{ data: SubmittedDeal[] }> {
   const response = await api.get<SubmittedDeal[]>(API_ROUTE.ADMIN_SUBMITTED_DEALS, {
     headers: { authorization: `Bearer ${params.authToken}` },
+    params: { status: 'OPEN' },
   });
   return { data: response.data };
 }
@@ -61,7 +71,9 @@ export async function approveSubmission(params: {
   return response.data;
 }
 
-export async function fetchReportedIssues(params: { authToken: string | undefined }): Promise<{ data: ReportedIssue[] }> {
+export async function fetchReportedIssues(params: {
+  authToken: string | undefined;
+}): Promise<{ data: ReportedIssue[] }> {
   const response = await api.get<ReportedIssue[]>(API_ROUTE.ADMIN_REPORTED_ISSUES, {
     headers: { authorization: `Bearer ${params.authToken}` },
   });
@@ -82,14 +94,16 @@ export async function updateIssueStatus(params: {
 }
 
 export async function fetchDealCounts(params: { authToken: string | undefined }): Promise<DealCounts> {
-  // Use the deals list length as the count since there's no dedicated counts endpoint
-  const response = await api.get<Deal[]>(API_ROUTE.ADMIN_DEALS, {
-    headers: { authorization: `Bearer ${params.authToken}` },
-  });
+  const headers = { authorization: `Bearer ${params.authToken}` };
+  const [dealsRes, submissionsRes, issuesRes] = await Promise.all([
+    api.get<Deal[]>(API_ROUTE.ADMIN_DEALS, { headers }),
+    api.get<SubmittedDeal[]>(API_ROUTE.ADMIN_SUBMITTED_DEALS, { headers, params: { status: 'OPEN' } }),
+    api.get<ReportedIssue[]>(API_ROUTE.ADMIN_REPORTED_ISSUES, { headers }),
+  ]);
   return {
-    catalog: response.data.length,
-    submitted: 0,
-    issues: 0,
+    catalog: dealsRes.data.length,
+    submitted: submissionsRes.data.length,
+    issues: issuesRes.data.length,
   };
 }
 
@@ -110,7 +124,9 @@ export interface DealWhitelistMember {
   };
 }
 
-export async function fetchDealWhitelist(params: { authToken: string | undefined }): Promise<{ data: DealWhitelistMember[] }> {
+export async function fetchDealWhitelist(params: {
+  authToken: string | undefined;
+}): Promise<{ data: DealWhitelistMember[] }> {
   const response = await api.get<DealWhitelistMember[]>(API_ROUTE.ADMIN_DEALS_WHITELIST, {
     headers: { authorization: `Bearer ${params.authToken}` },
   });
@@ -136,4 +152,3 @@ export async function removeDealWhitelistMember(params: {
     headers: { authorization: `Bearer ${params.authToken}` },
   });
 }
-

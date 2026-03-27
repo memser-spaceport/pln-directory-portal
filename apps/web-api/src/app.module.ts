@@ -1,4 +1,4 @@
-import { DealsModule } from './deals/deals.module';
+import { ArticlesModule } from './articles/articles.module';
 import { BullModule } from '@nestjs/bull';
 import { CacheModule, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -61,11 +61,14 @@ import { ContactSupportModule } from './contact-support/contact-support.module';
 import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { TeamEnrichmentModule } from './team-enrichment/team-enrichment.module';
+import { DealsModule } from "./deals/deals.module";
+import { DealRequestsModule } from "./deal-requests/deal-requests.module";
 
 @Module({
   controllers: [AppController, MetricsController],
   imports: [
     AnalyticsModule,
+    ArticlesModule,
     ThrottlerModule.forRoot({
       ttl: 1,
       limit: 10,
@@ -142,6 +145,8 @@ import { TeamEnrichmentModule } from './team-enrichment/team-enrichment.module';
     PushNotificationsModule,
     WebSocketModule,
     TeamEnrichmentModule,
+    DealsModule,
+    DealRequestsModule,
   ],
   providers: [
     {

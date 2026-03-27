@@ -14,7 +14,7 @@ import {
 
 @Injectable()
 export class DealsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   private async resolveMemberByEmail(userEmail: string) {
     if (!userEmail) {
@@ -66,12 +66,12 @@ export class DealsService {
       ...(query?.audience ? { audience: query.audience } : {}),
       ...(query?.search
         ? {
-            OR: [
-              { vendorName: { contains: query.search, mode: 'insensitive' } },
-              { shortDescription: { contains: query.search, mode: 'insensitive' } },
-              { fullDescription: { contains: query.search, mode: 'insensitive' } },
-            ],
-          }
+          OR: [
+            { vendorName: { contains: query.search, mode: 'insensitive' } },
+            { shortDescription: { contains: query.search, mode: 'insensitive' } },
+            { fullDescription: { contains: query.search, mode: 'insensitive' } },
+          ],
+        }
         : {}),
     };
   }
@@ -81,20 +81,20 @@ export class DealsService {
       ...(query?.status ? { status: query.status } : {}),
       ...(query?.search
         ? {
-            OR: [
-              { vendorName: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
-              { shortDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
-              { fullDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
-              {
-                authorMember: {
-                  OR: [
-                    { name: { contains: query.search, mode: 'insensitive' } },
-                    { email: { contains: query.search, mode: 'insensitive' } },
-                  ],
-                },
-              } as Prisma.DealSubmissionWhereInput,
-            ],
-          }
+          OR: [
+            { vendorName: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+            { shortDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+            { fullDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+            {
+              authorMember: {
+                OR: [
+                  { name: { contains: query.search, mode: 'insensitive' } },
+                  { email: { contains: query.search, mode: 'insensitive' } },
+                ],
+              },
+            } as Prisma.DealSubmissionWhereInput,
+          ],
+        }
         : {}),
     };
   }
@@ -105,26 +105,26 @@ export class DealsService {
       ...(query?.dealUid ? { dealUid: query.dealUid } : {}),
       ...(query?.search
         ? {
-            OR: [
-              { description: { contains: query.search, mode: 'insensitive' } } as Prisma.DealIssueWhereInput,
-              {
-                deal: {
-                  OR: [
-                    { vendorName: { contains: query.search, mode: 'insensitive' } },
-                    { shortDescription: { contains: query.search, mode: 'insensitive' } },
-                  ],
-                },
-              } as Prisma.DealIssueWhereInput,
-              {
-                authorMember: {
-                  OR: [
-                    { name: { contains: query.search, mode: 'insensitive' } },
-                    { email: { contains: query.search, mode: 'insensitive' } },
-                  ],
-                },
-              } as Prisma.DealIssueWhereInput,
-            ],
-          }
+          OR: [
+            { description: { contains: query.search, mode: 'insensitive' } } as Prisma.DealIssueWhereInput,
+            {
+              deal: {
+                OR: [
+                  { vendorName: { contains: query.search, mode: 'insensitive' } },
+                  { shortDescription: { contains: query.search, mode: 'insensitive' } },
+                ],
+              },
+            } as Prisma.DealIssueWhereInput,
+            {
+              authorMember: {
+                OR: [
+                  { name: { contains: query.search, mode: 'insensitive' } },
+                  { email: { contains: query.search, mode: 'insensitive' } },
+                ],
+              },
+            } as Prisma.DealIssueWhereInput,
+          ],
+        }
         : {}),
     };
   }
@@ -366,21 +366,46 @@ export class DealsService {
 
     return this.prisma.dealSubmission.create({
       data: {
-        vendorName: body.vendorName,
-        vendorTeamUid: body.vendorTeamUid ?? null,
-        logoUid: body.logoUid ?? null,
-        category: body.category,
-        audience: body.audience,
+        ...(body.vendorName !== undefined ? { vendorName: body.vendorName } : {}),
+        ...(body.category !== undefined ? { category: body.category } : {}),
+        ...(body.audience !== undefined ? { audience: body.audience } : {}),
         shortDescription: body.shortDescription,
         fullDescription: body.fullDescription,
         redemptionInstructions: body.redemptionInstructions,
-        authorMemberUid: memberUid,
-        authorTeamUid: teamUid,
+        ...(body.howToReachOutToYou !== undefined ? { howToReachOutToYou: body.howToReachOutToYou } : {}),
         status: DealSubmissionStatus.OPEN,
+
+        authorMember: {
+          connect: { uid: memberUid },
+        },
+
+        ...(teamUid
+          ? {
+            authorTeam: {
+              connect: { uid: teamUid },
+            },
+          }
+          : {}),
+
+        ...(body.vendorTeamUid
+          ? {
+            vendorTeam: {
+              connect: { uid: body.vendorTeamUid },
+            },
+          }
+          : {}),
+
+        ...(body.logoUid
+          ? {
+            logo: {
+              connect: { uid: body.logoUid },
+            },
+          }
+          : {}),
       },
       include: {
         logo: { select: { url: true } },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
       },
     });
@@ -408,7 +433,7 @@ export class DealsService {
       },
       include: {
         deal: { select: { uid: true, vendorName: true, category: true, audience: true } },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
       },
     });
@@ -572,18 +597,26 @@ export class DealsService {
   async adminCreate(body: UpsertDealDto) {
     const deal = await this.prisma.deal.create({
       data: {
-        vendorName: body.vendorName,
+        vendorName: body.vendorName ?? '',
         vendorTeamUid: body.vendorTeamUid ?? null,
         logoUid: body.logoUid ?? null,
-        category: body.category,
-        audience: body.audience,
+        category: body.category ?? '',
+        audience: body.audience ?? '',
         shortDescription: body.shortDescription,
         fullDescription: body.fullDescription,
         redemptionInstructions: body.redemptionInstructions,
+        contact: body.contact,
         status: body.status ?? DealStatus.DRAFT,
       },
       include: { logo: { select: { url: true } } },
     });
+
+    if (body.submissionUid) {
+      await this.prisma.dealSubmission.update({
+        where: { uid: body.submissionUid },
+        data: { status: DealSubmissionStatus.APPROVED },
+      });
+    }
 
     const { logo, ...rest } = deal;
     return { ...rest, logoUrl: logo?.url ?? null };
@@ -611,6 +644,7 @@ export class DealsService {
         ...(body.redemptionInstructions !== undefined
           ? { redemptionInstructions: body.redemptionInstructions }
           : {}),
+        ...(body.contact !== undefined ? { contact: body.contact } : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
       },
       include: { logo: { select: { url: true } } },
@@ -627,7 +661,7 @@ export class DealsService {
       include: {
         logo: { select: { url: true } },
         vendorTeam: { select: { uid: true, name: true } },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
         reviewedByMember: { select: { uid: true, name: true, email: true } },
       },
@@ -640,7 +674,7 @@ export class DealsService {
       include: {
         logo: { select: { url: true } },
         vendorTeam: { select: { uid: true, name: true } },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
         reviewedByMember: { select: { uid: true, name: true, email: true } },
       },
@@ -672,7 +706,7 @@ export class DealsService {
       include: {
         logo: { select: { url: true } },
         vendorTeam: { select: { uid: true, name: true } },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
         reviewedByMember: { select: { uid: true, name: true, email: true } },
       },
@@ -693,7 +727,7 @@ export class DealsService {
             status: true,
           },
         },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
         resolvedByMember: { select: { uid: true, name: true, email: true } },
       },
@@ -713,7 +747,7 @@ export class DealsService {
             status: true,
           },
         },
-        authorMember: { select: { uid: true, name: true, email: true } },
+        authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
         authorTeam: { select: { uid: true, name: true } },
         resolvedByMember: { select: { uid: true, name: true, email: true } },
       },

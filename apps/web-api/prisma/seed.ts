@@ -85,6 +85,7 @@ import { demoDayInvestorProfiles } from './fixtures/demoDayInvestorProfiles';
 import { demoDayTeamFundraisingProfiles } from './fixtures/demoDayTeamFundraisingProfiles';
 import { demoDayParticipants } from './fixtures/demoDayParticipants';
 import { demoDayExpressInterestStats } from './fixtures/demoDayExpressInterestStats';
+import { articles, articleStatistics, articleWhitelists } from './fixtures/articles';
 
 /**
  * Truncate all public tables (except _prisma_migrations) and reset identities.
@@ -189,6 +190,67 @@ async function seedAdminRoleAssignments() {
   console.log('=== Seed: admin role assignments (done) ===');
 }
 
+
+async function seedDealRequests() {
+  console.log('=== Seed: deal requests (start) ===');
+
+  const deals = await prisma.deal.findMany({
+    take: 2,
+    orderBy: { createdAt: 'asc' },
+    select: { uid: true },
+  });
+
+  const members = await prisma.member.findMany({
+    take: 2,
+    orderBy: { createdAt: 'asc' },
+    select: { uid: true },
+  });
+
+  if (!deals.length || !members.length) {
+    console.log('⚠️  Skipping deal request seed: deals or members not found');
+    return;
+  }
+
+  const seedRows = [
+    {
+      dealUid: deals[0].uid,
+      description: 'Interested in this deal for our team. Please share activation details and current availability.',
+      requestedByUserUid: members[0].uid,
+      whatDealAreYouLookingFor: 'Vercel credits, Stripe discount, AI tools',
+      howToReachOutToYou: 'telegram: @member1',
+    },
+    deals[1] && members[1]
+      ? {
+          dealUid: deals[1].uid,
+          description: 'Would like to request access to this deal and understand the eligibility requirements.',
+          requestedByUserUid: members[1].uid,
+          whatDealAreYouLookingFor: 'Vercel credits, Stripe discount, AI tools',
+          howToReachOutToYou: 'telegram: @member1',
+        }
+      : null,
+  ].filter(Boolean) as Array<{ dealUid: string; description: string; requestedByUserUid: string; howToReachOutToYou: string; whatDealAreYouLookingFor: string }>;
+
+  for (const row of seedRows) {
+    await prisma.dealRequest.upsert({
+      where: {
+        dealUid_requestedByUserUid: {
+          dealUid: row.dealUid,
+          requestedByUserUid: row.requestedByUserUid,
+        },
+      },
+      create: row,
+      update: {
+        description: row.description,
+        whatDealAreYouLookingFor: row.whatDealAreYouLookingFor,
+        howToReachOutToYou: row.howToReachOutToYou
+      },
+    });
+  }
+
+  console.log(`✅ Added ${seedRows.length} deal request records`);
+  console.log('=== Seed: deal requests (done) ===');
+}
+
 async function main() {
   // Safety check to prevent accidental data loss
   await checkDatabaseSafety();
@@ -265,6 +327,7 @@ async function main() {
 
   // After members + roles are created, assign DEMO_DAY_ADMIN role to demo day admins
   await seedAdminRoleAssignments();
+  await seedDealRequests();
 
   // Link InvestorProfiles to Members (update Member.investorProfileId)
   await linkInvestorProfilesToMembers();
@@ -362,7 +425,55 @@ async function main() {
     update: {},
   });
 
+  await prisma.dealRequest.createMany({
+    data: [
+      {
+        uid: 'deal_request_vercel_1',
+        dealUid: 'deal_vercel',
+        description: 'Please enable this deal for our team.',
+        requestedByUserUid: seedMember.uid,
+        requestedDate: new Date('2026-03-26T10:00:00.000Z'),
+        howToReachOutToYou: 'test',
+        whatDealAreYouLookingFor: 'test'
+      },
+      {
+        uid: 'deal_request_figma_1',
+        dealUid: 'deal_figma',
+        description: 'We want access to the Figma offer.',
+        requestedByUserUid: seedMember.uid,
+        requestedDate: new Date('2026-03-26T11:00:00.000Z'),
+        howToReachOutToYou: 'test',
+        whatDealAreYouLookingFor: 'test'
+      },
+    ],
+    skipDuplicates: true,
+  });
+
   console.log('✅ Deals V1 seed added');
+
+  // ARTICLES_SEED_MARKER
+  const articleData = await articles();
+  await prisma.article.createMany({
+    data: articleData,
+    skipDuplicates: true,
+  });
+
+  const articleStatData = await articleStatistics();
+  await prisma.articleStatistic.createMany({
+    data: articleStatData,
+    skipDuplicates: true,
+  });
+
+  const articleWhitelistData = await articleWhitelists();
+  for (const entry of articleWhitelistData) {
+    await prisma.articleWhitelist.upsert({
+      where: { memberUid: entry.memberUid },
+      create: { memberUid: entry.memberUid },
+      update: {},
+    });
+  }
+
+  console.log('✅ Articles seed added');
 }
 
 /**

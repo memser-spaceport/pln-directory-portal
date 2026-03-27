@@ -16,7 +16,7 @@ const columnHelper = createColumnHelper<SubmittedDeal>();
 
 // 40×40 rounded-square avatar with vendor initial
 function VendorAvatar({ name }: { name: string }) {
-  const initial = name.charAt(0).toUpperCase() || '?';
+  const initial = name?.charAt(0).toUpperCase() || '?';
   return (
     <div
       style={{
@@ -92,21 +92,27 @@ export function useSubmittedDealsTable({
         size: 0,
         cell: (info) => {
           const { vendorName, shortDescription, logo } = info.row.original;
+
           return (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               {logo?.url ? (
                 <img
                   src={logo.url}
                   alt={vendorName}
-                  style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', border: '1px solid rgba(27,56,96,0.24)', flexShrink: 0 }}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 8,
+                    objectFit: 'contain',
+                    border: '1px solid rgba(27,56,96,0.24)',
+                    flexShrink: 0,
+                  }}
                 />
               ) : (
                 <VendorAvatar name={vendorName} />
               )}
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
-                  {vendorName}
-                </div>
+                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{vendorName}</div>
                 <div
                   style={{
                     fontSize: 12,
@@ -132,15 +138,37 @@ export function useSubmittedDealsTable({
           const { authorMember } = info.row.original;
           return (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <SubmitterAvatar name={authorMember.name} />
+              {authorMember.image?.url ? (
+                <img
+                  src={authorMember.image?.url}
+                  alt={authorMember?.name}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <SubmitterAvatar name={authorMember.name} />
+              )}
               <div>
-                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
-                  {authorMember.name}
-                </div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>
-                  {authorMember.email}
-                </div>
+                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{authorMember.name}</div>
+                <div style={{ fontSize: 12, color: '#64748b' }}>{authorMember.email}</div>
               </div>
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor('howToReachOutToYou', {
+        header: 'Contact Method',
+        size: 200,
+        cell: (info) => {
+          const value = info.getValue();
+          return (
+            <div style={{ fontSize: 14, color: value ? '#455468' : '#94a3b8' }}>
+              {value ?? '—'}
             </div>
           );
         },
@@ -172,10 +200,7 @@ export function useSubmittedDealsTable({
         // @ts-ignore
         meta: { align: 'center' },
         cell: (info) => (
-          <button
-            className={s.reviewBtn}
-            onClick={() => onReview(info.row.original)}
-          >
+          <button className={s.reviewBtn} onClick={() => onReview(info.row.original)}>
             Review Deal
           </button>
         ),
@@ -193,6 +218,16 @@ export function useSubmittedDealsTable({
       sorting,
       pagination,
       globalFilter,
+    },
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const search = String(filterValue).toLowerCase();
+      const { vendorName, shortDescription, authorMember } = row.original;
+      return (
+        vendorName?.toLowerCase().includes(search) ||
+        shortDescription?.toLowerCase().includes(search) ||
+        authorMember?.name?.toLowerCase().includes(search) ||
+        authorMember?.email?.toLowerCase().includes(search)
+      );
     },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),

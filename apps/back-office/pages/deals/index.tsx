@@ -36,7 +36,7 @@ const DealForm = dynamic<ComponentProps<typeof DealFormType>>(
 import { Deal, DealStatus, IssueStatus, ReportedIssue, SubmittedDeal, TDealForm } from '../../screens/deals/types/deal';
 import type { DealFormMode } from '../../screens/deals/components/DealForm/DealForm';
 import { ReportedIssueModal } from '../../screens/deals/components/ReportedIssueModal/ReportedIssueModal';
-import { approveSubmission } from '../../utils/services/deal';
+import DeactivateDealModal from '../../components/deals/DeactivateDealModal';
 import { DEAL_AUDIENCE_OPTIONS, DEAL_CATEGORIES } from '../../screens/deals/constants';
 
 const STATUSES: { value: DealStatus; label: string }[] = [
@@ -64,13 +64,11 @@ const DealsPage = () => {
   const [submittedSorting, setSubmittedSorting] = useState<SortingState>([]);
   const [submittedPagination, setSubmittedPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [submittedFilter, setSubmittedFilter] = useState('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- setter used when Submitted Deals tab is enabled
   const [submittedCategoryFilter, setSubmittedCategoryFilter] = useState('');
 
   const [issuesSorting, setIssuesSorting] = useState<SortingState>([]);
   const [issuesPagination, setIssuesPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [issuesFilter, setIssuesFilter] = useState('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- setter used when Reported Issues tab is enabled
   const [issuesStatusFilter, setIssuesStatusFilter] = useState<IssueStatus | ''>('');
 
   const [formOpen, setFormOpen] = useState(false);
@@ -78,6 +76,7 @@ const DealsPage = () => {
   const [formMode, setFormMode] = useState<DealFormMode>('create');
   const [reviewingSubmissionUid, setReviewingSubmissionUid] = useState<string | null>(null);
   const [viewingIssue, setViewingIssue] = useState<ReportedIssue | null>(null);
+  const [deactivatingDeal, setDeactivatingDeal] = useState<{ uid: string; vendorName: string } | null>(null);
 
   const { data: dealsData } = useDealsList({ authToken });
   const { data: submittedData } = useSubmittedDealsList({ authToken });
@@ -114,11 +113,10 @@ const DealsPage = () => {
     if (editingDeal?.uid) {
       await updateDeal.mutateAsync({ authToken, uid: editingDeal.uid, payload: data });
     } else {
-      await createDeal.mutateAsync({ authToken, payload: data });
-      // Approve the submission after successfully creating the catalog deal
-      if (reviewingSubmissionUid) {
-        await approveSubmission({ authToken: authToken ?? undefined, uid: reviewingSubmissionUid, status: 'APPROVED' });
-      }
+      const payload: TDealForm = reviewingSubmissionUid
+        ? { ...data, submissionUid: reviewingSubmissionUid }
+        : data;
+      await createDeal.mutateAsync({ authToken, payload });
     }
   };
 
@@ -195,7 +193,6 @@ const DealsPage = () => {
     onStatusChange: handleStatusChange,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used when Submitted Deals tab is enabled
   const { table: submittedTable } = useSubmittedDealsTable({
     deals: filteredSubmittedDeals,
     sorting: submittedSorting,
@@ -216,7 +213,6 @@ const DealsPage = () => {
     [issuesData?.data, issuesStatusFilter]
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used when Reported Issues tab is enabled
   const { table: issuesTable } = useReportedIssuesTable({
     issues: filteredIssues,
     sorting: issuesSorting,
@@ -227,7 +223,10 @@ const DealsPage = () => {
     setGlobalFilter: setIssuesFilter,
     onStatusChange: handleIssueStatusChange,
     onView: setViewingIssue,
-    onDeactivateDeal: (dealUid: string) => handleStatusChange(dealUid, 'DEACTIVATED'),
+    onDeactivateDeal: (dealUid: string) => {
+      const issue = filteredIssues.find((i) => i.dealUid === dealUid);
+      setDeactivatingDeal({ uid: dealUid, vendorName: issue?.deal.vendorName ?? 'this' });
+    },
   });
 
   useEffect(() => {
@@ -326,7 +325,6 @@ const DealsPage = () => {
               {counts?.catalog ?? dealsData?.data?.length ?? 0}
             </span>
           </button>
-          {/* Hidden tabs - Submitted Deals and Reported Issues
           <button className={clsx(s.tab, { [s.active]: tab === 'submitted' })} onClick={() => setTab('submitted')}>
             Submitted Deals
             <span className={clsx(s.tabCount, { [s.active]: tab === 'submitted' })}>
@@ -339,7 +337,6 @@ const DealsPage = () => {
               {counts?.issues ?? issuesData?.data?.length ?? 0}
             </span>
           </button>
-          */}
           <button className={clsx(s.tab, { [s.active]: tab === 'access' })} onClick={() => setTab('access')}>
             Access Management
             <span className={clsx(s.tabCount, { [s.active]: tab === 'access' })}>{whitelistData?.length ?? 0}</span>
@@ -409,7 +406,6 @@ const DealsPage = () => {
               <PaginationControls table={catalogTable} />
             </>
           )}
-          {/* Hidden tab - Submitted Deals
           {tab === 'submitted' && (
             <>
               <div className={s.controlBar}>
@@ -434,6 +430,7 @@ const DealsPage = () => {
                     </option>
                   ))}
                 </select>
+                {/* status filter not applicable to submitted deals — rendered for visual parity with Figma */}
                 <select className={s.filterSelect} disabled>
                   <option value="">All statuses</option>
                 </select>
@@ -451,8 +448,6 @@ const DealsPage = () => {
               <PaginationControls table={submittedTable} />
             </>
           )}
-          */}
-          {/* Hidden tab - Reported Issues
           {tab === 'issues' && (
             <>
               <div className={s.controlBar}>
@@ -488,7 +483,6 @@ const DealsPage = () => {
               <PaginationControls table={issuesTable} />
             </>
           )}
-          */}
           {tab === 'access' && <DealsWhitelistSection authToken={authToken} />}
         </div>
       </div>
@@ -514,6 +508,17 @@ const DealsPage = () => {
           onStatusChange={handleIssueStatusChange}
         />
       )}
+      <DeactivateDealModal
+        isOpen={!!deactivatingDeal}
+        dealName={deactivatingDeal?.vendorName ?? ''}
+        onClose={() => setDeactivatingDeal(null)}
+        onConfirm={() => {
+          if (deactivatingDeal) {
+            handleStatusChange(deactivatingDeal.uid, 'DEACTIVATED');
+            setDeactivatingDeal(null);
+          }
+        }}
+      />
     </ApprovalLayout>
   );
 };

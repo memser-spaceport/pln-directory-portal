@@ -10,26 +10,29 @@ export class ListDealsQueryDto {
 }
 
 export class UpsertDealDto {
-  vendorName!: string;
+  vendorName?: string;
   vendorTeamUid?: string;
   logoUid?: string | null;
-  category!: string;
-  audience!: string;
+  category?: string;
+  audience?: string;
   shortDescription!: string;
   fullDescription!: string;
   redemptionInstructions!: string;
+  contact!: string;
   status?: DealStatus;
+  submissionUid?: string;
 }
 
 export class SubmitDealDto {
-  vendorName!: string;
+  vendorName?: string;
   vendorTeamUid?: string;
   logoUid?: string | null;
-  category!: string;
-  audience!: string;
+  category?: string;
+  audience?: string;
   shortDescription!: string;
   fullDescription!: string;
   redemptionInstructions!: string;
+  howToReachOutToYou?: string;
 }
 
 export class ReportDealIssueDto {

@@ -29,6 +29,8 @@ export type TDealForm = {
   fullDescription: string;
   redemptionInstructions: string;
   status: DealStatus;
+  /** Set when creating a catalog deal from a submission (Review Deal). */
+  submissionUid?: string;
 };
 
 export type SubmissionStatus = 'OPEN' | 'APPROVED' | 'REJECTED';
@@ -43,6 +45,7 @@ export type SubmittedDeal = {
   shortDescription: string;
   fullDescription: string;
   redemptionInstructions: string;
+  howToReachOutToYou: string | null;
   authorMemberUid: string;
   authorTeamUid: string | null;
   status: SubmissionStatus;
@@ -55,6 +58,7 @@ export type SubmittedDeal = {
     uid: string;
     name: string;
     email: string;
+    image: { url: string } | null;
   };
   authorTeam: {
     uid: string;
@@ -86,6 +90,7 @@ export type ReportedIssue = {
     uid: string;
     name: string;
     email: string;
+    image: { url: string } | null;
   };
   authorTeam: {
     uid: string;
