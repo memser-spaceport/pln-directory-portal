@@ -67,8 +67,8 @@ Each enrichable field is tracked in `dataEnrichment.fields`:
 
 ### Path C — Automatic marking of eligible existing teams
 
-1. A cron job (`TEAM_ENRICHMENT_MARKING_CRON`) periodically scans for L1 fund teams that have never been enriched (`dataEnrichment` is null)
-2. Teams must also have at least one empty enrichable scalar field (blog, contactMethod, twitterHandler, linkedinHandler, telegramHandler, shortDescription, longDescription, moreDetails)
+1. A cron job (`TEAM_ENRICHMENT_MARKING_CRON`) periodically scans for fund teams that have never been enriched (`dataEnrichment` is null)
+2. Teams must also have at least one empty enrichable scalar field (website, blog, contactMethod, twitterHandler, linkedinHandler, telegramHandler, shortDescription, longDescription, moreDetails)
 3. Matching teams are marked for enrichment: `dataEnrichment = { shouldEnrich: true, status: 'PendingEnrichment', ... }`
 4. The existing enrichment cron picks them up on its next run
 

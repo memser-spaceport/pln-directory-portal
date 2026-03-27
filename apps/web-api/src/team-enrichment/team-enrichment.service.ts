@@ -49,7 +49,6 @@ export class TeamEnrichmentService {
     return this.prisma.team.findMany({
       where: {
         isFund: true,
-        accessLevel: 'L1',
         dataEnrichment: { equals: Prisma.DbNull },
         OR: [
           { website: null },
