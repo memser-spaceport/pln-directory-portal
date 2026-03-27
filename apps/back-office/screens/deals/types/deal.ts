@@ -55,6 +55,7 @@ export type SubmittedDeal = {
     uid: string;
     name: string;
     email: string;
+    image: { url: string } | null;
   };
   authorTeam: {
     uid: string;
@@ -86,6 +87,7 @@ export type ReportedIssue = {
     uid: string;
     name: string;
     email: string;
+    image: { url: string } | null;
   };
   authorTeam: {
     uid: string;
