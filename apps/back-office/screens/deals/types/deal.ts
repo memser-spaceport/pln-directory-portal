@@ -122,7 +122,7 @@ export type DealRequest = {
   deal: {
     uid: string;
     vendorName: string;
-  };
+  } | null;
   requestedByUser: {
     uid: string;
     name: string;

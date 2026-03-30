@@ -66,10 +66,12 @@ export function useDealRequestsTable({
 }: UseDealRequestsTableArgs) {
   const columns = useMemo(
     () => [
-      columnHelper.display({
+      columnHelper.accessor((row) => row.requestedByUser.name, {
         id: 'requestedBy',
         header: 'Requested by',
         size: 272,
+        enableSorting: true,
+        sortingFn: 'alphanumeric',
         cell: (info) => {
           const { name, email, image } = info.row.original.requestedByUser;
           return (
@@ -83,30 +85,33 @@ export function useDealRequestsTable({
           );
         },
       }),
-      columnHelper.display({
+      columnHelper.accessor('whatDealAreYouLookingFor', {
         id: 'requestedDeal',
         header: 'Requested Deal',
-        size: 144,
-        cell: (info) => (
-          <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
-            {info.row.original.deal.vendorName}
-          </div>
-        ),
+        size: 200,
+        enableSorting: true,
+        sortingFn: 'alphanumeric',
+        cell: (info) => <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{info.getValue() ?? '—'}</div>,
       }),
-      columnHelper.accessor('whatDealAreYouLookingFor', {
+      columnHelper.accessor('description', {
         header: 'Reason',
-        cell: (info) => (
-          <div
-            style={{
-              fontSize: 14,
-              color: '#455468',
-              whiteSpace: 'normal',
-              wordBreak: 'break-word',
-            }}
-          >
-            {info.getValue()}
-          </div>
-        ),
+        size: 0,
+        cell: (info) => {
+          const raw = info.getValue() ?? '';
+          const text = raw.replace(/<[^>]*>/g, '').trim();
+          return (
+            <div
+              style={{
+                fontSize: 14,
+                color: '#455468',
+                whiteSpace: 'normal',
+                wordBreak: 'break-word',
+              }}
+            >
+              {text}
+            </div>
+          );
+        },
       }),
       columnHelper.accessor('createdAt', {
         header: 'Date Submitted',
@@ -143,7 +148,7 @@ export function useDealRequestsTable({
       return (
         requestedByUser.name?.toLowerCase().includes(search) ||
         requestedByUser.email?.toLowerCase().includes(search) ||
-        deal.vendorName?.toLowerCase().includes(search)
+        deal?.vendorName?.toLowerCase().includes(search)
       );
     },
     getCoreRowModel: getCoreRowModel(),

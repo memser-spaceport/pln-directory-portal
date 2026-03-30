@@ -120,9 +120,7 @@ const DealsPage = () => {
     if (editingDeal?.uid) {
       await updateDeal.mutateAsync({ authToken, uid: editingDeal.uid, payload: data });
     } else {
-      const payload: TDealForm = reviewingSubmissionUid
-        ? { ...data, submissionUid: reviewingSubmissionUid }
-        : data;
+      const payload: TDealForm = reviewingSubmissionUid ? { ...data, submissionUid: reviewingSubmissionUid } : data;
       await createDeal.mutateAsync({ authToken, payload });
     }
   };
@@ -336,7 +334,8 @@ const DealsPage = () => {
     <ApprovalLayout>
       <div className={s.root}>
         <div className={s.header}>
-          <span className={s.title}>Deals</span>
+          <span className={s.title}>Deals Management</span>
+          <p className={s.subtitle}>Manage the deal catalog, review submissions, and handle reported issues.</p>
         </div>
 
         <div className={s.tabs}>
