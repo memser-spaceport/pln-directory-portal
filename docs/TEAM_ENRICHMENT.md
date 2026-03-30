@@ -32,7 +32,7 @@ interface TeamDataEnrichment {
 ### Enrichable Fields
 
 **Scalar fields** (directly on Team model):
-`blog`, `contactMethod`, `twitterHandler`, `linkedinHandler`, `telegramHandler`, `shortDescription`, `longDescription`, `moreDetails`
+`website`, `blog`, `contactMethod`, `twitterHandler`, `linkedinHandler`, `telegramHandler`, `shortDescription`, `longDescription`, `moreDetails`
 
 **Relational fields:**
 - `industryTags` — matched against existing `IndustryTag` records (case-insensitive). Only enriched if team has none.
@@ -40,7 +40,7 @@ interface TeamDataEnrichment {
 
 **Logo** — extracted from website metadata (`og:image`, `twitter:image`, favicon) via `open-graph-scraper`. Only fetched if team has no logo.
 
-> **Note:** `website` is NOT enrichable — it is a mandatory user-provided field.
+> **Note:** `website` is enrichable — if a team has no website, the AI will attempt to discover it via web search.
 
 ### Field Statuses
 
@@ -67,14 +67,14 @@ Each enrichable field is tracked in `dataEnrichment.fields`:
 
 ### Path C — Automatic marking of eligible existing teams
 
-1. A cron job (`TEAM_ENRICHMENT_MARKING_CRON`) periodically scans for L1 fund teams that have a website but have never been enriched (`dataEnrichment` is null)
-2. Teams must also have at least one empty enrichable scalar field (blog, contactMethod, twitterHandler, linkedinHandler, telegramHandler, shortDescription, longDescription, moreDetails)
+1. A cron job (`TEAM_ENRICHMENT_MARKING_CRON`) periodically scans for fund teams that have never been enriched (`dataEnrichment` is null)
+2. Teams must also have at least one empty enrichable scalar field (website, blog, contactMethod, twitterHandler, linkedinHandler, telegramHandler, shortDescription, longDescription, moreDetails)
 3. Matching teams are marked for enrichment: `dataEnrichment = { shouldEnrich: true, status: 'PendingEnrichment', ... }`
 4. The existing enrichment cron picks them up on its next run
 
 ## Enrichment Behavior
 
-- Skips teams without a website (marks as `FailedToEnrich`)
+- Teams without a website are enriched using team name and other available identifiers; the AI will attempt to discover the website
 - Only fills null/empty fields — never overwrites existing data
 - **Re-run safe**: on subsequent runs, only fields with status `CannotEnrich` are retried. Fields already marked `Enriched` or `ChangedByUser` are skipped. Previous field statuses are preserved and merged with new results.
 - **Concurrency guard**: if enrichment is already `InProgress` for a team, duplicate requests are rejected immediately

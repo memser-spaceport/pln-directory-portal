@@ -49,11 +49,10 @@ export class TeamEnrichmentService {
     return this.prisma.team.findMany({
       where: {
         isFund: true,
-        accessLevel: 'L1',
-        website: { not: { equals: '' } },
-        NOT: { website: null },
         dataEnrichment: { equals: Prisma.DbNull },
         OR: [
+          { website: null },
+          { website: '' },
           { blog: null },
           { blog: '' },
           { contactMethod: null },
@@ -185,18 +184,6 @@ export class TeamEnrichmentService {
     // Mark as in-progress
     await this.updateEnrichmentStatus(teamUid, team.dataEnrichment, EnrichmentStatus.InProgress);
 
-    const website = team.website;
-    if (!website) {
-      await this.updateEnrichmentStatus(
-        teamUid,
-        team.dataEnrichment,
-        EnrichmentStatus.FailedToEnrich,
-        'Team has no website — cannot enrich without a website'
-      );
-      this.logger.warn(`Team ${teamUid} (${team.name}) has no website, skipping enrichment`);
-      return;
-    }
-
     try {
       // Call AI for enrichment
       const aiResponse = await this.aiService.enrichTeamViaAI(team.name, {
@@ -212,6 +199,45 @@ export class TeamEnrichmentService {
       // Preserve existing field statuses from previous enrichment runs
       const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
       const existingFields = existingMeta?.fields || {};
+
+      // If the team had no website and AI couldn't find one, skip all enrichment —
+      // without a verified website, other data (descriptions, socials) is unreliable
+      const hadNoWebsite = !team.website || team.website.trim() === '';
+      const aiFoundNoWebsite = !aiResponse.website;
+      if (hadNoWebsite && aiFoundNoWebsite) {
+        this.logger.warn(
+          `Team ${teamUid} (${team.name}): website could not be enriched — skipping all fields to avoid incorrect data`
+        );
+
+        const allCannotEnrich: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};
+        for (const field of ENRICHABLE_TEAM_FIELDS) {
+          if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
+            allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
+          }
+        }
+        for (const field of ['industryTags', 'investmentFocus'] as const) {
+          if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
+            allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
+          }
+        }
+
+        const enrichment: TeamDataEnrichment = {
+          shouldEnrich: false,
+          status: EnrichmentStatus.Enriched,
+          isAIGenerated: false,
+          enrichedAt: new Date().toISOString(),
+          enrichedBy,
+          fields: { ...existingFields, ...allCannotEnrich },
+        };
+
+        await this.prisma.team.update({
+          where: { uid: teamUid },
+          data: { dataEnrichment: enrichment as any },
+        });
+
+        this.logger.log(`Team ${teamUid} (${team.name}): marked all fields as CannotEnrich (no verified website)`);
+        return;
+      }
 
       // Determine which fields need enrichment (skip already Enriched ones)
       const updateData: Prisma.TeamUpdateInput = {};
@@ -287,9 +313,11 @@ export class TeamEnrichmentService {
       }
 
       // Handle logo via OG tag scraping
+      // If AI discovered a website and team didn't have one, use it for logo fetch
+      const effectiveWebsite = team.website || aiResponse.website || null;
       if (!team.logoUid) {
-        this.logger.log(`Attempting logo fetch for team ${teamUid} (${team.name}) from website: ${team.website}`);
-        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, team.website);
+        this.logger.log(`Attempting logo fetch for team ${teamUid} (${team.name}) from website: ${effectiveWebsite}`);
+        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite);
 
         if (logoResult) {
           this.logger.log(`Logo metadata found for team ${teamUid} (${team.name}): ${logoResult.logoUrl}`);
