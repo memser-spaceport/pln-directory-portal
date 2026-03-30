@@ -76,6 +76,7 @@ export const API_ROUTE = {
   ADMIN_REPORTED_ISSUES: `${APP_CONSTANTS.V1}admin/deals/issues`,
   ADMIN_DEALS_COUNTS: `${APP_CONSTANTS.V1}admin/deals/counts`,
   ADMIN_DEALS_WHITELIST: `${APP_CONSTANTS.V1}admin/deals/whitelist`,
+  ADMIN_DEAL_REQUESTS: `${APP_CONSTANTS.V1}admin/deal-requests`,
 };
 
 export const TOKEN = 'plnetwork@1';

@@ -18,7 +18,7 @@ export class DealRequestsService {
 
   private normalizePagination(page = 1, limit = 20) {
     const safePage = Number.isFinite(Number(page)) ? Math.max(1, Number(page)) : 1;
-    const safeLimit = Number.isFinite(Number(limit)) ? Math.min(100, Math.max(1, Number(limit))) : 20;
+    const safeLimit = Number.isFinite(Number(limit)) ? Math.min(1000, Math.max(1, Number(limit))) : 20;
 
     return {
       page: safePage,
@@ -180,6 +180,7 @@ export class DealRequestsService {
               uid: true,
               name: true,
               email: true,
+              image: { select: { uid: true, url: true } },
             },
           },
           deal: {
@@ -217,6 +218,7 @@ export class DealRequestsService {
             uid: true,
             name: true,
             email: true,
+            image: { select: { uid: true, url: true } },
           },
         },
         deal: {
