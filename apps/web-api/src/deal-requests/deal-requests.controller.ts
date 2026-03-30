@@ -14,7 +14,7 @@ export class DealRequestsController {
     @Req() req: Request,
     @Body() body: CreateDealRequestDto,
   ) {
-    return this.dealRequestsService.create((req as any)['userUid'], undefined, body);
+    return this.dealRequestsService.create((req as any)['userEmail'], undefined, body);
   }
 
   @UseGuards(UserTokenCheckGuard)
@@ -24,7 +24,7 @@ export class DealRequestsController {
     @Param('dealUid') dealUid: string,
     @Body() body: CreateDealRequestDto,
   ) {
-    return this.dealRequestsService.create((req as any)['userUid'], dealUid, body);
+    return this.dealRequestsService.create((req as any)['userEmail'], dealUid, body);
   }
 
   @UseGuards(UserTokenCheckGuard)
@@ -33,6 +33,6 @@ export class DealRequestsController {
     @Req() req: Request,
     @Param('requestUid') requestUid: string,
   ) {
-    return this.dealRequestsService.getByUidForUser((req as any)['userUid'], requestUid);
+    return this.dealRequestsService.getByUidForUser((req as any)['userEmail'], requestUid);
   }
 }
