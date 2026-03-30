@@ -9,8 +9,17 @@ export class DealRequestsController {
   constructor(private readonly dealRequestsService: DealRequestsService) {}
 
   @UseGuards(UserTokenCheckGuard)
+  @Post('requests')
+  async createWithoutParam(
+    @Req() req: Request,
+    @Body() body: CreateDealRequestDto,
+  ) {
+    return this.dealRequestsService.create((req as any)['userUid'], undefined, body);
+  }
+
+  @UseGuards(UserTokenCheckGuard)
   @Post(':dealUid/requests')
-  async create(
+  async createWithParam(
     @Req() req: Request,
     @Param('dealUid') dealUid: string,
     @Body() body: CreateDealRequestDto,

@@ -129,6 +129,24 @@ export class DealsService {
     };
   }
 
+  private withDefinedDealUid(
+    rows: Array<{ dealUid: string | null; teamUid: string | null; memberUid: string }>,
+  ): Array<{ dealUid: string; teamUid: string | null; memberUid: string }> {
+    return rows.filter(
+      (row): row is { dealUid: string; teamUid: string | null; memberUid: string } =>
+        row.dealUid !== null,
+    );
+  }
+
+  private withDefinedIssueDealUid(
+    rows: Array<{ dealUid: string | null; _count: { dealUid: number } }>,
+  ): Array<{ dealUid: string; _count: { dealUid: number } }> {
+    return rows.filter(
+      (row): row is { dealUid: string; _count: { dealUid: number } } =>
+        row.dealUid !== null,
+    );
+  }
+
   private countUniqueTeamsOrMembers(
     rows: Array<{ dealUid: string; teamUid: string | null; memberUid: string }>,
   ): Map<string, number> {
@@ -217,8 +235,8 @@ export class DealsService {
     const redeemedSet = new Set(redemptions.map((r) => r.dealUid));
     const usingSet = new Set(usages.map((u) => u.dealUid));
 
-    const redemptionCountMap = this.countUniqueTeamsOrMembers(allRedemptions);
-    const usageCountMap = this.countUniqueTeamsOrMembers(allUsages);
+    const redemptionCountMap = this.countUniqueTeamsOrMembers(this.withDefinedDealUid(allRedemptions));
+    const usageCountMap = this.countUniqueTeamsOrMembers(this.withDefinedDealUid(allUsages));
 
     return deals.map(({ logo, ...deal }) => ({
       ...deal,
@@ -280,8 +298,8 @@ export class DealsService {
       }),
     ]);
 
-    const redemptionCountMap = this.countUniqueTeamsOrMembers(allRedemptions);
-    const usageCountMap = this.countUniqueTeamsOrMembers(allUsages);
+    const redemptionCountMap = this.countUniqueTeamsOrMembers(this.withDefinedDealUid(allRedemptions));
+    const usageCountMap = this.countUniqueTeamsOrMembers(this.withDefinedDealUid(allUsages));
     const { logo, ...rest } = deal;
 
     return {
@@ -374,34 +392,10 @@ export class DealsService {
         redemptionInstructions: body.redemptionInstructions,
         ...(body.howToReachOutToYou !== undefined ? { howToReachOutToYou: body.howToReachOutToYou } : {}),
         status: DealSubmissionStatus.OPEN,
-
-        authorMember: {
-          connect: { uid: memberUid },
-        },
-
-        ...(teamUid
-          ? {
-            authorTeam: {
-              connect: { uid: teamUid },
-            },
-          }
-          : {}),
-
-        ...(body.vendorTeamUid
-          ? {
-            vendorTeam: {
-              connect: { uid: body.vendorTeamUid },
-            },
-          }
-          : {}),
-
-        ...(body.logoUid
-          ? {
-            logo: {
-              connect: { uid: body.logoUid },
-            },
-          }
-          : {}),
+        authorMember: { connect: { uid: memberUid } },
+        ...(teamUid ? { authorTeam: { connect: { uid: teamUid } } } : {}),
+        ...(body.vendorTeamUid ? { vendorTeam: { connect: { uid: body.vendorTeamUid } } } : {}),
+        ...(body.logoUid ? { logo: { connect: { uid: body.logoUid } } } : {}),
       },
       include: {
         logo: { select: { url: true } },
@@ -440,33 +434,16 @@ export class DealsService {
   }
 
   private async getDealMetrics(dealUids: string[]) {
-    if (!dealUids.length) {
-      return new Map<
-        string,
-        {
-          tappedHowToRedeemCount: number;
-          markedAsUsingCount: number;
-          submittedIssuesCount: number;
-        }
-      >();
-    }
+    if (!dealUids.length) return new Map();
 
     const [allRedemptions, allUsages, allIssues] = await Promise.all([
       this.prisma.dealRedemption.findMany({
         where: { dealUid: { in: dealUids } },
-        select: {
-          dealUid: true,
-          teamUid: true,
-          memberUid: true,
-        },
+        select: { dealUid: true, teamUid: true, memberUid: true },
       }),
       this.prisma.dealUsage.findMany({
         where: { dealUid: { in: dealUids } },
-        select: {
-          dealUid: true,
-          teamUid: true,
-          memberUid: true,
-        },
+        select: { dealUid: true, teamUid: true, memberUid: true },
       }),
       this.prisma.dealIssue.groupBy({
         by: ['dealUid'],
@@ -475,20 +452,13 @@ export class DealsService {
       }),
     ]);
 
-    const redemptionCountMap = this.countUniqueTeamsOrMembers(allRedemptions);
-    const usageCountMap = this.countUniqueTeamsOrMembers(allUsages);
+    const redemptionCountMap = this.countUniqueTeamsOrMembers(this.withDefinedDealUid(allRedemptions));
+    const usageCountMap = this.countUniqueTeamsOrMembers(this.withDefinedDealUid(allUsages));
     const issueCountMap = new Map<string, number>(
-      allIssues.map((item) => [item.dealUid, item._count.dealUid]),
+      this.withDefinedIssueDealUid(allIssues).map((item) => [item.dealUid, item._count.dealUid]),
     );
 
-    const metrics = new Map<
-      string,
-      {
-        tappedHowToRedeemCount: number;
-        markedAsUsingCount: number;
-        submittedIssuesCount: number;
-      }
-    >();
+    const metrics = new Map();
 
     for (const dealUid of dealUids) {
       metrics.set(dealUid, {
@@ -508,14 +478,12 @@ export class DealsService {
       include: { logo: { select: { url: true } } },
     });
 
-    const metrics = await this.getDealMetrics(deals.map((deal) => deal.uid));
+    const metrics = await this.getDealMetrics(deals.map((d) => d.uid));
 
     return deals.map(({ logo, ...deal }) => ({
       ...deal,
       logoUrl: logo?.url ?? null,
-      tappedHowToRedeemCount: metrics.get(deal.uid)?.tappedHowToRedeemCount ?? 0,
-      markedAsUsingCount: metrics.get(deal.uid)?.markedAsUsingCount ?? 0,
-      submittedIssuesCount: metrics.get(deal.uid)?.submittedIssuesCount ?? 0,
+      ...metrics.get(deal.uid),
     }));
   }
 

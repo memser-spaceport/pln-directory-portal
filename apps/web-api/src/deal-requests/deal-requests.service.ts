@@ -27,11 +27,12 @@ export class DealRequestsService {
     };
   }
 
-  async create(userUid: string | undefined, dealUid: string, body: CreateDealRequestDto) {
+  async create(userUid: string | undefined, dealUidFromParam: string | undefined, body: CreateDealRequestDto) {
     if (!userUid) {
       throw new UnauthorizedException('User uid not found');
     }
 
+    const resolvedDealUid = (dealUidFromParam ?? body?.dealUid)?.trim() || undefined;
     const description = body?.description?.trim();
     const whatDealAreYouLookingFor = body?.whatDealAreYouLookingFor?.trim();
     const howToReachOutToYou = body?.howToReachOutToYou?.trim();
@@ -48,37 +49,39 @@ export class DealRequestsService {
       throw new BadRequestException('How to reach out to you is required');
     }
 
-    const deal = await this.prisma.deal.findUnique({
-      where: { uid: dealUid },
-      select: { uid: true },
-    });
+    if (resolvedDealUid) {
+      const deal = await this.prisma.deal.findUnique({
+        where: { uid: resolvedDealUid },
+        select: { uid: true },
+      });
 
-    if (!deal) {
-      throw new NotFoundException('Deal not found');
-    }
+      if (!deal) {
+        throw new NotFoundException('Deal not found');
+      }
 
-    const existing = await this.prisma.dealRequest.findUnique({
-      where: {
-        dealUid_requestedByUserUid: {
-          dealUid,
-          requestedByUserUid: userUid,
+      const existing = await this.prisma.dealRequest.findUnique({
+        where: {
+          dealUid_requestedByUserUid: {
+            dealUid: resolvedDealUid,
+            requestedByUserUid: userUid,
+          },
         },
-      },
-      select: { uid: true },
-    });
+        select: { uid: true },
+      });
 
-    if (existing) {
-      return {
-        uid: existing.uid,
-        dealUid,
-        requestedByUserUid: userUid,
-        alreadyExists: true,
-      };
+      if (existing) {
+        return {
+          uid: existing.uid,
+          dealUid: resolvedDealUid,
+          requestedByUserUid: userUid,
+          alreadyExists: true,
+        };
+      }
     }
 
     const created = await this.prisma.dealRequest.create({
       data: {
-        dealUid,
+        ...(resolvedDealUid ? { dealUid: resolvedDealUid } : {}),
         description,
         whatDealAreYouLookingFor,
         howToReachOutToYou,

@@ -1502,8 +1502,8 @@ model DealSubmission {
 model DealIssue {
   id                  Int             @id @default(autoincrement())
   uid                 String          @unique @default(cuid())
-  dealUid             String
-  deal                Deal            @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
+  dealUid             String?
+  deal                Deal?            @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
   authorMemberUid     String
   authorMember        Member          @relation("MemberDealIssues", fields: [authorMemberUid], references: [uid], onDelete: Cascade)
   authorTeamUid       String?
@@ -1526,8 +1526,8 @@ model DealIssue {
 model DealRequest {
   id                       Int      @id @default(autoincrement())
   uid                      String   @unique @default(cuid())
-  dealUid                  String
-  deal                     Deal     @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
+  dealUid                  String?
+  deal                     Deal?     @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
   description              String
   whatDealAreYouLookingFor String
   howToReachOutToYou       String
@@ -1546,8 +1546,8 @@ model DealRequest {
 model DealRedemption {
   id        Int      @id @default(autoincrement())
   uid       String   @unique @default(cuid())
-  dealUid   String
-  deal      Deal     @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
+  dealUid   String?
+  deal      Deal?     @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
   memberUid String
   member    Member   @relation("MemberDealRedemptions", fields: [memberUid], references: [uid], onDelete: Cascade)
   teamUid   String?
@@ -1563,8 +1563,8 @@ model DealRedemption {
 model DealUsage {
   id        Int      @id @default(autoincrement())
   uid       String   @unique @default(cuid())
-  dealUid   String
-  deal      Deal     @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
+  dealUid   String?
+  deal      Deal?     @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
   memberUid String
   member    Member   @relation("MemberDealUsages", fields: [memberUid], references: [uid], onDelete: Cascade)
   teamUid   String?
