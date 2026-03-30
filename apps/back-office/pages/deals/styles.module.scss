@@ -9,9 +9,17 @@
 
 .header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 8px;
   padding: 24px 0 16px;
+}
+
+.subtitle {
+  color: #475569;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  letter-spacing: -0.2px;
 }
 
 .title {

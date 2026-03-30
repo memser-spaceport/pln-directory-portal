@@ -107,4 +107,26 @@ export type DealCounts = {
   catalog: number;
   submitted: number;
   issues: number;
+  requests: number;
+};
+
+export type DealRequest = {
+  uid: string;
+  dealUid: string;
+  requestedByUserUid: string;
+  description: string;
+  whatDealAreYouLookingFor: string;
+  howToReachOutToYou: string;
+  createdAt: string;
+  updatedAt: string;
+  deal: {
+    uid: string;
+    vendorName: string;
+  } | null;
+  requestedByUser: {
+    uid: string;
+    name: string;
+    email: string;
+    image: { uid: string; url: string } | null;
+  };
 };

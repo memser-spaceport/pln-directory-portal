@@ -18,7 +18,7 @@ export class DealRequestsService {
 
   private normalizePagination(page = 1, limit = 20) {
     const safePage = Number.isFinite(Number(page)) ? Math.max(1, Number(page)) : 1;
-    const safeLimit = Number.isFinite(Number(limit)) ? Math.min(100, Math.max(1, Number(limit))) : 20;
+    const safeLimit = Number.isFinite(Number(limit)) ? Math.min(1000, Math.max(1, Number(limit))) : 20;
 
     return {
       page: safePage,
@@ -27,10 +27,25 @@ export class DealRequestsService {
     };
   }
 
-  async create(userUid: string | undefined, dealUidFromParam: string | undefined, body: CreateDealRequestDto) {
-    if (!userUid) {
-      throw new UnauthorizedException('User uid not found');
+  private async resolveMemberByEmail(userEmail: string | undefined) {
+    if (!userEmail) {
+      throw new UnauthorizedException('User email not found');
     }
+
+    const member = await this.prisma.member.findFirst({
+      where: { email: userEmail },
+      select: { uid: true },
+    });
+
+    if (!member) {
+      throw new UnauthorizedException('Member not found');
+    }
+
+    return member;
+  }
+
+  async create(userEmail: string | undefined, dealUidFromParam: string | undefined, body: CreateDealRequestDto) {
+    const member = await this.resolveMemberByEmail(userEmail);
 
     const resolvedDealUid = (dealUidFromParam ?? body?.dealUid)?.trim() || undefined;
     const description = body?.description?.trim();
@@ -63,7 +78,7 @@ export class DealRequestsService {
         where: {
           dealUid_requestedByUserUid: {
             dealUid: resolvedDealUid,
-            requestedByUserUid: userUid,
+            requestedByUserUid: member.uid,
           },
         },
         select: { uid: true },
@@ -73,7 +88,7 @@ export class DealRequestsService {
         return {
           uid: existing.uid,
           dealUid: resolvedDealUid,
-          requestedByUserUid: userUid,
+          requestedByUserUid: member.uid,
           alreadyExists: true,
         };
       }
@@ -85,7 +100,7 @@ export class DealRequestsService {
         description,
         whatDealAreYouLookingFor,
         howToReachOutToYou,
-        requestedByUserUid: userUid,
+        requestedByUserUid: member.uid,
       },
       select: {
         uid: true,
@@ -165,6 +180,7 @@ export class DealRequestsService {
               uid: true,
               name: true,
               email: true,
+              image: { select: { uid: true, url: true } },
             },
           },
           deal: {
@@ -202,6 +218,7 @@ export class DealRequestsService {
             uid: true,
             name: true,
             email: true,
+            image: { select: { uid: true, url: true } },
           },
         },
         deal: {
@@ -279,15 +296,13 @@ export class DealRequestsService {
     }
   }
 
-  async getByUidForUser(userUid: string | undefined, requestUid: string) {
-    if (!userUid) {
-      throw new UnauthorizedException('User uid not found');
-    }
+  async getByUidForUser(userEmail: string | undefined, requestUid: string) {
+    const member = await this.resolveMemberByEmail(userEmail);
 
     const request = await this.prisma.dealRequest.findFirst({
       where: {
         uid: requestUid,
-        requestedByUserUid: userUid,
+        requestedByUserUid: member.uid,
       },
       select: {
         uid: true,
