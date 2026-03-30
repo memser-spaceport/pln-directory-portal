@@ -47,6 +47,7 @@ export interface TeamDataEnrichment {
 
 export interface AITeamEnrichmentResponse {
   website: string | null;
+  websiteOwnerName: string | null;
   blog: string | null;
   contactMethod: string | null;
   linkedinHandler: string | null;

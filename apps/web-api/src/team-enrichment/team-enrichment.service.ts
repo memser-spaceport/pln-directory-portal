@@ -200,6 +200,45 @@ export class TeamEnrichmentService {
       const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
       const existingFields = existingMeta?.fields || {};
 
+      // If the team had no website and AI couldn't find one, skip all enrichment —
+      // without a verified website, other data (descriptions, socials) is unreliable
+      const hadNoWebsite = !team.website || team.website.trim() === '';
+      const aiFoundNoWebsite = !aiResponse.website;
+      if (hadNoWebsite && aiFoundNoWebsite) {
+        this.logger.warn(
+          `Team ${teamUid} (${team.name}): website could not be enriched — skipping all fields to avoid incorrect data`
+        );
+
+        const allCannotEnrich: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};
+        for (const field of ENRICHABLE_TEAM_FIELDS) {
+          if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
+            allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
+          }
+        }
+        for (const field of ['industryTags', 'investmentFocus'] as const) {
+          if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
+            allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
+          }
+        }
+
+        const enrichment: TeamDataEnrichment = {
+          shouldEnrich: false,
+          status: EnrichmentStatus.Enriched,
+          isAIGenerated: false,
+          enrichedAt: new Date().toISOString(),
+          enrichedBy,
+          fields: { ...existingFields, ...allCannotEnrich },
+        };
+
+        await this.prisma.team.update({
+          where: { uid: teamUid },
+          data: { dataEnrichment: enrichment as any },
+        });
+
+        this.logger.log(`Team ${teamUid} (${team.name}): marked all fields as CannotEnrich (no verified website)`);
+        return;
+      }
+
       // Determine which fields need enrichment (skip already Enriched ones)
       const updateData: Prisma.TeamUpdateInput = {};
       const newFields: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};

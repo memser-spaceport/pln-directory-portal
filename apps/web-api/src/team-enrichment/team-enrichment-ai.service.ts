@@ -20,6 +20,8 @@ FIELDS TO POPULATE:
 
 1. website: The company's official website URL (e.g., "https://example.com"). Only populate if not already known.
 
+1b. websiteOwnerName: The EXACT company/organization name as displayed on the found website (from its homepage, about page, or meta tags). This is used to verify the website belongs to the correct company. If website is null, set this to null too.
+
 2. blog: Blog URL if available
 
 3. contactMethod: Preferred method of contact. Could be an email address, Slack workspace/channel link, Discord server link/handle, or other contact method. Prefer email when found. Return exactly the value (e.g., "team@example.com", "https://slack.com/...", "discord.gg/...").
@@ -70,6 +72,7 @@ CRITICAL: You MUST ALWAYS respond with valid JSON.
 OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
 {
   "website": "https://..." or null,
+  "websiteOwnerName": "Exact Company Name from website" or null,
   "blog": "https://..." or null,
   "contactMethod": "email@example.com" or "https://slack.com/..." or "discord.gg/..." or null,
   "linkedinHandler": "company/..." or null,
@@ -137,7 +140,7 @@ export class TeamEnrichmentAiService {
         this.logger.debug(`AI response: ${text?.substring(0, 100)}...`);
       }
 
-      return this.parseAIResponse(text);
+      return this.parseAIResponse(text, teamName);
     } catch (error) {
       this.logger.error(`AI enrichment failed for "${teamName}": ${error.message}`, error.stack);
       return this.getEmptyResponse();
@@ -170,8 +173,8 @@ ${existingData.telegramHandler ? `Existing Telegram: ${existingData.telegramHand
 ${existingDescription ? `Existing Description: ${existingDescription}` : 'Description: Not available'}
 
 TASK:
-1. Search for "${teamName}" to find additional information${!existingData.website ? `
-2. The website is unknown — use the company name and any available identifiers (contact, LinkedIn, Twitter/X, Telegram) to find the official website first
+1. Search for "${teamName}" to find additional information ${!existingData.website ? `
+2. The website is unknown — prioritize finding the official website first and set "websiteOwnerName" to the exact company name displayed on the found website
 3. Gather information about their team, history, and achievements for moreDetails
 4. Find a contact method (email preferred, otherwise Slack, Discord, etc.)` : `
 2. Gather information about their team, history, and achievements for moreDetails
@@ -183,7 +186,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 `;
   }
 
-  private parseAIResponse(text: string): AITeamEnrichmentResponse {
+  private parseAIResponse(text: string, teamName?: string): AITeamEnrichmentResponse {
     if (!text || text.trim().length === 0) {
       this.logger.warn('AI returned empty response');
       return this.getEmptyResponse();
@@ -197,8 +200,32 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
     try {
       const parsed = JSON.parse(jsonMatch[0]);
+
+      // Filter out low-confidence website results
+      const websiteConfidence = parsed.confidence?.website?.toLowerCase();
+      if (parsed.website && websiteConfidence !== 'high') {
+        this.logger.warn(
+          `Website confidence is "${websiteConfidence || 'unknown'}" (not "high"), discarding website: ${
+            parsed.website
+          }`
+        );
+        parsed.website = null;
+      }
+
+      // Verify websiteOwnerName matches the team name
+      if (parsed.website && teamName && parsed.websiteOwnerName) {
+        const nameMatch = this.isCompanyNameMatch(teamName, parsed.websiteOwnerName);
+        if (!nameMatch) {
+          this.logger.warn(
+            `Website owner name mismatch: expected "${teamName}", found "${parsed.websiteOwnerName}" on ${parsed.website} — discarding website`
+          );
+          parsed.website = null;
+        }
+      }
+
       return {
         website: this.validateUrl(parsed.website),
+        websiteOwnerName: parsed.websiteOwnerName || null,
         blog: this.validateUrl(parsed.blog),
         contactMethod: this.sanitizeContactMethod(parsed.contactMethod),
         linkedinHandler: this.sanitizeLinkedInHandler(parsed.linkedinHandler),
@@ -225,6 +252,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
   private getEmptyResponse(): AITeamEnrichmentResponse {
     return {
       website: null,
+      websiteOwnerName: null,
       blog: null,
       contactMethod: null,
       linkedinHandler: null,
@@ -432,6 +460,35 @@ Current Date: ${new Date().toISOString().split('T')[0]}
   truncateString(str: string | null | undefined, maxLength: number): string | null {
     if (!str) return null;
     return str.length > maxLength ? str.substring(0, maxLength - 3) + '...' : str;
+  }
+
+  /**
+   * Check if the website owner name matches the expected team name.
+   */
+  private isCompanyNameMatch(expectedName: string, foundName: string): boolean {
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim();
+    const expected = normalize(expectedName);
+    const found = normalize(foundName);
+
+    // Exact match
+    if (expected === found) return true;
+
+    // If the found name has extra words not in the expected name, reject
+    const expectedWords = expected.split(/\s+/);
+    const foundWords = found.split(/\s+/);
+
+    // All words in the found name must be present in the expected name
+    const extraWords = foundWords.filter((w) => !expectedWords.includes(w));
+    if (extraWords.length > 0) {
+      this.logger.warn(`Website owner has extra words not in team name: [${extraWords.join(', ')}]`);
+      return false;
+    }
+
+    return true;
   }
 
   private validateUrl(url: string | null | undefined): string | null {
