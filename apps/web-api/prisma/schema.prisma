@@ -1526,8 +1526,8 @@ model DealIssue {
 model DealRequest {
   id                       Int      @id @default(autoincrement())
   uid                      String   @unique @default(cuid())
-  dealUid                  String
-  deal                     Deal     @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
+  dealUid                  String?
+  deal                     Deal?     @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
   description              String
   whatDealAreYouLookingFor String
   howToReachOutToYou       String
