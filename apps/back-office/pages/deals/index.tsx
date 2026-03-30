@@ -521,6 +521,19 @@ const DealsPage = () => {
                     if (e.key === 'Escape') setRequestsFilter('');
                   }}
                 />
+                {/* status filter not applicable to deal requests — rendered for visual parity with Figma */}
+                <select className={s.filterSelect} disabled>
+                  <option value="">All statuses</option>
+                </select>
+                <button
+                  className={s.addNewBtn}
+                  onClick={() => {
+                    setEditingDeal(undefined);
+                    setFormOpen(true);
+                  }}
+                >
+                  + Create new deal
+                </button>
               </div>
               {renderTable(requestsTable, true)}
               <PaginationControls table={requestsTable} />
