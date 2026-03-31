@@ -221,7 +221,7 @@ export class DemoDayFundraisingProfilesService {
   async canViewAnalyticsReportUrl(memberEmail: string, teamUid: string, demoDayUid: string): Promise<boolean> {
     try {
       const access = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDayUid);
-      if (access.isAdmin || access.isViewOnlyAdmin) return true;
+      if (access.isAdmin) return true;
       await this.validateTeamFounderAccess(memberEmail, teamUid, demoDayUid);
       return true;
     } catch {
@@ -660,7 +660,7 @@ export class DemoDayFundraisingProfilesService {
     }
 
     // Check access and get user info - throws if no access
-    const { participantUid, isAdmin, isViewOnlyAdmin } = await this.demoDaysService.checkDemoDayAccess(
+    const { participantUid, isAdmin } = await this.demoDaysService.checkDemoDayAccess(
       memberEmail,
       demoDay.uid
     );
@@ -704,7 +704,7 @@ export class DemoDayFundraisingProfilesService {
       };
       return acc;
     }, {} as Record<string, { saved: boolean; liked: boolean; connected: boolean; invested: boolean; referral: boolean; feedback: boolean }>);
-    const canViewAllAnalytics = isAdmin || isViewOnlyAdmin;
+    const canViewAllAnalytics = isAdmin;
     let founderTeamUids: Set<string> | null = null;
     if (!canViewAllAnalytics) {
       const founderParticipants = await this.prisma.demoDayParticipant.findMany({
