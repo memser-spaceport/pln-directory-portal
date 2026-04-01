@@ -9,12 +9,11 @@ import {AuthModule} from "../auth/auth.module";
 import {MembersModule} from "../members/members.module";
 import {JwtService} from "../utils/jwt/jwt.service";
 import {ArticlesRbacExampleController} from "./articles-rbac-example";
+import {AdminModule} from "../admin/admin.module";
 
 @Module({
   imports: [
-    SharedModule,
-    AuthModule,
-    forwardRef(() => MembersModule),
+    SharedModule
   ],
   controllers: [RbacController, AdminRbacController, ArticlesRbacExampleController],
   providers: [RbacService, RbacGuard, PrismaService, JwtService],

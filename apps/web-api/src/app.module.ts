@@ -63,7 +63,6 @@ import { WebSocketModule } from './websocket/websocket.module';
 import { TeamEnrichmentModule } from './team-enrichment/team-enrichment.module';
 import { DealsModule } from "./deals/deals.module";
 import { DealRequestsModule } from "./deal-requests/deal-requests.module";
-import {RbacModule} from "./rbac/rbac.module";
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -147,8 +146,7 @@ import {RbacModule} from "./rbac/rbac.module";
     WebSocketModule,
     TeamEnrichmentModule,
     DealsModule,
-    DealRequestsModule,
-    RbacModule
+    DealRequestsModule
   ],
   providers: [
     {
