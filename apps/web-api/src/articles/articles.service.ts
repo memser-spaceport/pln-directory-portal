@@ -1,9 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { ArticleStatus, Prisma } from '@prisma/client';
-import { PrismaService } from '../shared/prisma.service';
-import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './articles.dto';
-import type { ArticleCategory } from './articles.constants';
-import { ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE } from './articles.constants';
+import {ForbiddenException, Injectable, NotFoundException, UnauthorizedException} from '@nestjs/common';
+import {ArticleStatus, Prisma} from '@prisma/client';
+import {PrismaService} from '../shared/prisma.service';
+import {CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto} from './articles.dto';
+import type {ArticleCategory} from './articles.constants';
+import {ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE} from './articles.constants';
 
 @Injectable()
 export class ArticlesService {
@@ -40,19 +40,6 @@ export class ArticlesService {
     };
   }
 
-  private async ensureWhitelistAccess(userEmail: string) {
-    const resolved = await this.resolveMemberByEmail(userEmail);
-
-    const whitelist = await this.prisma.articleWhitelist.findUnique({
-      where: { memberUid: resolved.memberUid },
-    });
-
-    if (!whitelist) {
-      throw new ForbiddenException('Articles access denied');
-    }
-
-    return resolved;
-  }
 
   private async ensureArticleOwnership(articleUid: string, memberUid: string, teamUid: string | null) {
     const article = await this.prisma.article.findFirst({
@@ -380,7 +367,7 @@ export class ArticlesService {
   }
 
   async createArticle(userEmail: string, body: CreateArticleDto) {
-    const { memberUid, teamUid } = await this.ensureWhitelistAccess(userEmail);
+    const { memberUid, teamUid } = await this.resolveMemberByEmail(userEmail);
 
     const slugURL = body.slugURL || (await this.generateSlug(body.title));
     const readingTime = this.calculateReadingTime(body.content);
@@ -406,7 +393,7 @@ export class ArticlesService {
   }
 
   async updateOwnArticle(userEmail: string, uid: string, body: UpdateArticleDto) {
-    const { memberUid, teamUid } = await this.ensureWhitelistAccess(userEmail);
+    const { memberUid, teamUid } = await this.resolveMemberByEmail(userEmail);
     await this.ensureArticleOwnership(uid, memberUid, teamUid);
 
     const existing = await this.prisma.article.findUnique({ where: { uid } });
