@@ -1,5 +1,5 @@
 /** Shown on the high-value checkbox and catalog table for `isHighValue` deals. */
-export const HIGH_VALUE_DEAL_LABEL = '⭐ High Value Deal';
+export const HIGH_VALUE_DEAL_LABEL = 'This deal is High Value ⭐';
 
 export const DEAL_CATEGORIES = [
   'Cloud Credits & Infra',

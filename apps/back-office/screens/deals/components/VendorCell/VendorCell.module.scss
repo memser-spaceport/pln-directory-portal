@@ -58,11 +58,17 @@
 }
 
 .highValueLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  padding: 2px 8px;
+  margin: 0 4px;
+  border-radius: 9999px;
   font-size: 14px;
   font-weight: 500;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: #475569;
   white-space: nowrap;
+  background: rgba(27, 77, 255, 0.04);
 }
