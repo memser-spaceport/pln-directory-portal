@@ -52,16 +52,8 @@ export class DealRequestsService {
     const whatDealAreYouLookingFor = body?.whatDealAreYouLookingFor?.trim();
     const howToReachOutToYou = body?.howToReachOutToYou?.trim();
 
-    if (!description) {
-      throw new BadRequestException('Description is required');
-    }
-
     if (!whatDealAreYouLookingFor) {
       throw new BadRequestException('What deal are you looking for is required');
-    }
-
-    if (!howToReachOutToYou) {
-      throw new BadRequestException('How to reach out to you is required');
     }
 
     if (resolvedDealUid) {
@@ -97,9 +89,9 @@ export class DealRequestsService {
     const created = await this.prisma.dealRequest.create({
       data: {
         ...(resolvedDealUid ? { dealUid: resolvedDealUid } : {}),
-        description,
+        ...(description ? { description } : {}),
         whatDealAreYouLookingFor,
-        howToReachOutToYou,
+        ...(howToReachOutToYou ? { howToReachOutToYou } : {}),
         requestedByUserUid: member.uid,
       },
       select: {
