@@ -6,10 +6,11 @@ import Select, { StylesConfig } from 'react-select';
 import { toast } from 'react-toastify';
 
 import { Deal, TDealForm } from '../../types/deal';
-import { DEAL_AUDIENCE_OPTIONS, DEAL_CATEGORY_OPTIONS } from '../../constants';
+import { DEAL_AUDIENCE_OPTIONS, DEAL_CATEGORY_OPTIONS, HIGH_VALUE_DEAL_LABEL } from '../../constants';
 import { fetchTeamsForAutocomplete } from '../../../../utils/services/team';
 import { saveRegistrationImage } from '../../../../utils/services/member';
 import RichTextEditor from '../../../../components/common/rich-text-editor';
+import { FormCheckboxField } from '../../../../components/FormCheckboxField/FormCheckboxField';
 import { DealPreview } from '../DealPreview/DealPreview';
 import s from './DealForm.module.scss';
 
@@ -75,6 +76,7 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
       shortDescription: '',
       fullDescription: '',
       redemptionInstructions: '',
+      isHighValue: false,
       status: 'DRAFT',
     },
   });
@@ -112,6 +114,7 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
         shortDescription: initialData.shortDescription,
         fullDescription: initialData.fullDescription,
         redemptionInstructions: initialData.redemptionInstructions,
+        isHighValue: initialData.isHighValue ?? false,
         status: initialData.status,
       });
 
@@ -389,6 +392,8 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
                   {errors.audience && <p className={s.error}>{errors.audience.message}</p>}
                 </div>
 
+                <FormCheckboxField name="isHighValue" label={HIGH_VALUE_DEAL_LABEL} labelClassName={s.highValueLabel} />
+
                 {/* Short Description */}
                 <div className={s.field}>
                   <div className={s.labelRow}>
@@ -422,8 +427,7 @@ export const DealForm = ({ onClose, onSubmit, initialData, mode }: Props) => {
                     name="fullDescription"
                     control={control}
                     rules={{
-                      validate: (value) =>
-                        !!value?.replace(/<[^>]*>/g, '').trim() || 'Full description is required',
+                      validate: (value) => !!value?.replace(/<[^>]*>/g, '').trim() || 'Full description is required',
                     }}
                     render={({ field, fieldState }) => (
                       <RichTextEditor

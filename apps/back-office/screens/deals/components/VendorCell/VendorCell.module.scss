@@ -37,6 +37,14 @@
   }
 }
 
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
 .name {
   color: var(--foreground-neutral-primary, #0a0c11);
   font-size: 14px;
@@ -45,5 +53,16 @@
   letter-spacing: -0.2px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.highValueLabel {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: -0.2px;
+  color: #475569;
   white-space: nowrap;
 }

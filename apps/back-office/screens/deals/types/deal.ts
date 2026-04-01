@@ -11,6 +11,7 @@ export type Deal = {
   shortDescription: string;
   fullDescription: string;
   redemptionInstructions: string;
+  isHighValue: boolean;
   status: DealStatus;
   createdAt: string;
   updatedAt: string;
@@ -28,6 +29,7 @@ export type TDealForm = {
   shortDescription: string;
   fullDescription: string;
   redemptionInstructions: string;
+  isHighValue: boolean;
   status: DealStatus;
   /** Set when creating a catalog deal from a submission (Review Deal). */
   submissionUid?: string;

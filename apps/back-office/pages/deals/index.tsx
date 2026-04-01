@@ -148,6 +148,7 @@ const DealsPage = () => {
       tappedHowToRedeemCount: 0,
       markedAsUsingCount: 0,
       submittedIssuesCount: 0,
+      isHighValue: false,
     };
     setEditingDeal(prefilled);
     setFormOpen(true);

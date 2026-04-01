@@ -607,6 +607,7 @@ export class DealsService {
         redemptionInstructions: body.redemptionInstructions,
         contact: body.contact,
         status: body.status ?? DealStatus.DRAFT,
+        isHighValue: body.isHighValue ?? false,
       },
       include: { logo: { select: { url: true } } },
     });
@@ -646,6 +647,7 @@ export class DealsService {
           : {}),
         ...(body.contact !== undefined ? { contact: body.contact } : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
+        ...(body.isHighValue !== undefined ? { isHighValue: body.isHighValue } : {}),
       },
       include: { logo: { select: { url: true } } },
     });

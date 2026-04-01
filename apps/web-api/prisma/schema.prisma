@@ -1456,6 +1456,7 @@ model Deal {
   shortDescription       String
   fullDescription        String
   redemptionInstructions String
+  isHighValue            Boolean          @default(false)
   contact                String           @default("")
   status                 DealStatus       @default(DRAFT)
   createdAt              DateTime         @default(now())

@@ -10,9 +10,10 @@ interface Props {
   label: string;
   description?: string;
   isRequired?: boolean;
+  labelClassName?: string;
 }
 
-export const FormCheckboxField = ({ name, label, description, isRequired }: Props) => {
+export const FormCheckboxField = ({ name, label, description, isRequired, labelClassName }: Props) => {
   const {
     register,
     formState: { errors },
@@ -31,6 +32,7 @@ export const FormCheckboxField = ({ name, label, description, isRequired }: Prop
       <label
         className={clsx(s.label, s.checkboxLabel, {
           [s.required]: isRequired,
+          [labelClassName]: labelClassName,
         })}
       >
         <input
