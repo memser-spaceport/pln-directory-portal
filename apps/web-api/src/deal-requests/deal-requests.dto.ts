@@ -1,8 +1,8 @@
 export class CreateDealRequestDto {
   dealUid?: string;
-  description!: string;
+  description?: string;
   whatDealAreYouLookingFor!: string;
-  howToReachOutToYou!: string;
+  howToReachOutToYou?: string;
 }
 
 export class UpdateDealRequestDto {

@@ -1533,9 +1533,9 @@ model DealRequest {
   uid                      String   @unique @default(cuid())
   dealUid                  String?
   deal                     Deal?    @relation(fields: [dealUid], references: [uid], onDelete: Cascade)
-  description              String
+  description              String?
   whatDealAreYouLookingFor String
-  howToReachOutToYou       String
+  howToReachOutToYou       String?
   requestedByUserUid       String
   requestedByUser          Member   @relation("MemberDealRequests", fields: [requestedByUserUid], references: [uid], onDelete: Cascade)
   requestedDate            DateTime @default(now())
