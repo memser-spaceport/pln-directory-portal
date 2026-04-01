@@ -98,8 +98,23 @@ export class ArticlesService {
 
   private readonly articleInclude = {
     coverImage: { select: { uid: true, url: true } },
-    authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
-    authorTeam: { select: { uid: true, name: true, logo: { select: { url: true } } } },
+    authorMember: {
+      select: {
+        uid: true,
+        name: true,
+        email: true,
+        officeHours: true,
+        image: { select: { url: true } },
+      },
+    },
+    authorTeam: {
+      select: {
+        uid: true,
+        name: true,
+        officeHours: true,
+        logo: { select: { url: true } },
+      },
+    },
   };
 
   // ── Public ─────────────────────────────────────────────────────────────
