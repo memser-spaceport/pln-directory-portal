@@ -91,7 +91,7 @@ export function useDealRequestsTable({
         size: 200,
         enableSorting: true,
         sortingFn: 'alphanumeric',
-        cell: (info) => <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{info.getValue() ?? '—'}</div>,
+        cell: (info) => <div style={{ fontWeight: 500, fontSize: 14, color: '#455468', whiteSpace: 'normal' }}>{info.getValue() ?? '—'}</div>,
       }),
       columnHelper.accessor('description', {
         header: 'Reason',
