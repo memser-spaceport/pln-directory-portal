@@ -19,12 +19,14 @@ export const VendorCell = ({ deal }: Props) => {
         )}
       </div>
       <div className={s.nameRow}>
-        <span className={s.name}>{deal.vendorName}</span>
-        {deal.isHighValue && (
-          <span className={s.highValueLabel} title={HIGH_VALUE_DEAL_LABEL} aria-label={HIGH_VALUE_DEAL_LABEL}>
-            ⭐
-          </span>
-        )}
+        <span className={s.name}>
+          <span className={s.nameText}>{deal.vendorName}</span>
+          {deal.isHighValue && (
+            <span className={s.highValueLabel} title={HIGH_VALUE_DEAL_LABEL} aria-label={HIGH_VALUE_DEAL_LABEL}>
+              ⭐
+            </span>
+          )}
+        </span>
       </div>
     </div>
   );

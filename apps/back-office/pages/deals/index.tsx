@@ -269,6 +269,9 @@ const DealsPage = () => {
     router.replace({ query: { tab: t } }, undefined, { shallow: true });
   };
 
+  const columnSizeStyle = (size: number) =>
+    size > 0 ? { width: size, flexBasis: size } : undefined;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderTable = (activeTable: Table<any>, noTopBorder = false) => (
     <div className={clsx(s.table, { [s.tableWithControlBar]: noTopBorder })}>
@@ -285,8 +288,7 @@ const DealsPage = () => {
                   [s.flexible]: !header.column.columnDef.size,
                 })}
                 style={{
-                  width: header.column.getSize(),
-                  flexBasis: header.column.getSize(),
+                  ...columnSizeStyle(header.column.getSize()),
                   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                   // @ts-ignore
                   justifyContent: header.column.columnDef.meta?.align === 'center' ? 'center' : 'flex-start',
@@ -315,8 +317,7 @@ const DealsPage = () => {
                   [s.flexible]: !cell.column.columnDef.size,
                 })}
                 style={{
-                  width: cell.column.getSize(),
-                  flexBasis: cell.column.getSize(),
+                  ...columnSizeStyle(cell.column.getSize()),
                   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                   // @ts-ignore
                   justifyContent: cell.column.columnDef.meta?.align === 'center' ? 'center' : 'flex-start',
