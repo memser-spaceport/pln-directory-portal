@@ -1,4 +1,4 @@
-import {ForbiddenException, Injectable, NotFoundException, UnauthorizedException} from '@nestjs/common';
+import {BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException} from '@nestjs/common';
 import {ArticleStatus, Prisma} from '@prisma/client';
 import {PrismaService} from '../shared/prisma.service';
 import {CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto} from './articles.dto';
@@ -381,8 +381,13 @@ export class ArticlesService {
     return !!whitelist;
   }
 
-  async createArticle(userEmail: string, body: CreateArticleDto) {
-    const { memberUid, teamUid } = await this.resolveMemberByEmail(userEmail);
+  async createArticle(body: CreateArticleDto) {
+    if (body.authorMemberUid && body.authorTeamUid) {
+      throw new BadRequestException('Provide either authorMemberUid or authorTeamUid, not both');
+    }
+    if (!body.authorMemberUid && !body.authorTeamUid) {
+      throw new BadRequestException('Either authorMemberUid or authorTeamUid is required');
+    }
 
     const slugURL = body.slugURL || (await this.generateSlug(body.title));
     const readingTime = this.calculateReadingTime(body.content);
@@ -398,8 +403,8 @@ export class ArticlesService {
         content: body.content,
         readingTime,
         coverImageUid: body.coverImageUid ?? null,
-        authorMemberUid: body.authorMemberUid ?? memberUid,
-        authorTeamUid: body.authorTeamUid ?? teamUid,
+        authorMemberUid: body.authorMemberUid ?? null,
+        authorTeamUid: body.authorTeamUid ?? null,
         status,
         publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
       },

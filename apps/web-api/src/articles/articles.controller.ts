@@ -36,8 +36,8 @@ export class ArticlesController {
 
   @Post()
   @RequirePermissions(RBAC_PERMISSION_CODES.FOUNDER_GUIDES_CREATE)
-  async create(@Req() req: Request, @Body() body: CreateArticleDto) {
-    return this.articlesService.createArticle(req['userEmail'], body);
+  async create(@Body() body: CreateArticleDto) {
+    return this.articlesService.createArticle(body);
   }
 
   @Put(':uid')
