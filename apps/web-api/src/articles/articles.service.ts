@@ -831,4 +831,116 @@ export class ArticlesService {
 
     return { success: true };
   }
+
+  async searchArticleAuthors(search: string) {
+    const q = search?.trim() ?? '';
+    if (!q) {
+      return { members: [], teams: [] };
+    }
+
+    const memberAccessOk: Prisma.MemberWhereInput = {
+      OR: [{ accessLevel: null }, { accessLevel: { notIn: ['L0', 'L1'] } }],
+    };
+
+    const teamAccessOk: Prisma.TeamWhereInput = {
+      OR: [{ accessLevel: null }, { accessLevel: { not: 'L0' } }],
+    };
+
+    const [memberRows, teamRows] = await Promise.all([
+      this.prisma.member.findMany({
+        where: {
+          deletedAt: null,
+          AND: [
+            memberAccessOk,
+            {
+              OR: [{ name: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }],
+            },
+          ],
+        },
+        select: {
+          uid: true,
+          name: true,
+          email: true,
+          officeHours: true,
+          image: { select: { url: true } },
+        },
+        take: 500,
+      }),
+      this.prisma.team.findMany({
+        where: {
+          AND: [
+            teamAccessOk,
+            {
+              name: { contains: q, mode: 'insensitive' },
+            },
+          ],
+        },
+        select: {
+          uid: true,
+          name: true,
+          officeHours: true,
+          logo: { select: { url: true } },
+        },
+        take: 500,
+      }),
+    ]);
+
+    const qLower = q.toLowerCase();
+
+    const members = memberRows
+      .map((m) => ({
+        uid: m.uid,
+        name: m.name,
+        officeHours: m.officeHours,
+        image: m.image,
+        rank: this.bestTextRank(m.name, m.email, qLower),
+      }))
+      .sort((a, b) => {
+        if (a.rank !== b.rank) return a.rank - b.rank;
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 20)
+      .map(({ uid, name, officeHours, image }) => ({
+        uid,
+        name,
+        officeHoursUrl: officeHours ?? undefined,
+        image: image?.url ?? '',
+      }));
+
+    const teams = teamRows
+      .map((t) => ({
+        uid: t.uid,
+        name: t.name,
+        officeHours: t.officeHours,
+        logo: t.logo,
+        rank: this.rankSingleField(t.name, qLower),
+      }))
+      .sort((a, b) => {
+        if (a.rank !== b.rank) return a.rank - b.rank;
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 20)
+      .map(({ uid, name, officeHours, logo }) => ({
+        uid,
+        name,
+        officeHoursUrl: officeHours ?? undefined,
+        image: logo?.url ?? '',
+      }));
+
+    return { members, teams };
+  }
+
+  private rankSingleField(text: string, qLower: string): number {
+    const t = text.toLowerCase();
+    if (t === qLower) return 0;
+    if (t.startsWith(qLower)) return 1;
+    if (t.includes(qLower)) return 2;
+    return 99;
+  }
+
+  private bestTextRank(name: string, email: string | null, qLower: string): number {
+    const nameR = this.rankSingleField(name, qLower);
+    const emailR = email ? this.rankSingleField(email, qLower) : 99;
+    return Math.min(nameR, emailR);
+  }
 }

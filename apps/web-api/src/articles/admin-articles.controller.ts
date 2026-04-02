@@ -2,7 +2,13 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuard
 import { Request } from 'express';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { ArticlesService } from './articles.service';
-import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleAccessDto, UpdateArticleDto } from './articles.dto';
+import {
+  ArticleAuthorSearchQueryDto,
+  CreateArticleDto,
+  ListArticlesQueryDto,
+  UpdateArticleAccessDto,
+  UpdateArticleDto,
+} from './articles.dto';
 import { NoCache } from '../decorators/no-cache.decorator';
 
 @Controller('v1/admin/articles')
@@ -29,6 +35,12 @@ export class AdminArticlesController {
   @Delete(':uid')
   async remove(@Param('uid') uid: string) {
     return this.articlesService.adminDelete(uid);
+  }
+
+  @NoCache()
+  @Get('author-search')
+  async searchArticleAuthors(@Query() query: ArticleAuthorSearchQueryDto) {
+    return this.articlesService.searchArticleAuthors(query.search ?? '');
   }
 
   @NoCache()

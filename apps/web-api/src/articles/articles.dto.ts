@@ -8,6 +8,10 @@ export class ListArticlesQueryDto {
   sort?: 'mostRecent' | 'mostViewed' | 'alphabetical' = 'mostRecent';
 }
 
+export class ArticleAuthorSearchQueryDto {
+  search?: string;
+}
+
 export class CreateArticleDto {
   title!: string;
   slugURL?: string;

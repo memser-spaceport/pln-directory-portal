@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { ArticlesService } from './articles.service';
-import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './articles.dto';
+import { ArticleAuthorSearchQueryDto, CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './articles.dto';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { RequirePermissions } from '../rbac/rbac.decorator';
@@ -25,6 +25,13 @@ export class ArticlesController {
   @RequirePermissions(RBAC_PERMISSION_CODES.FOUNDER_GUIDES_VIEW)
   async myArticles(@Req() req: Request, @Query() query: ListArticlesQueryDto) {
     return this.articlesService.listMyArticles(req['userEmail'], query);
+  }
+
+  @NoCache()
+  @Get('author-search')
+  @RequirePermissions(RBAC_PERMISSION_CODES.FOUNDER_GUIDES_CREATE)
+  async searchArticleAuthors(@Query() query: ArticleAuthorSearchQueryDto) {
+    return this.articlesService.searchArticleAuthors(query.search ?? '');
   }
 
   @NoCache()
