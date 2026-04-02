@@ -31,13 +31,13 @@ export class ArticlesController {
   @Get()
   @RequirePermissions(RBAC_PERMISSION_CODES.FOUNDER_GUIDES_VIEW)
   async list(@Req() req: Request, @Query() query: ListArticlesQueryDto) {
-    return this.articlesService.listPublished(query);
+    return this.articlesService.listPublished(query, req['userEmail']);
   }
 
   @Post()
   @RequirePermissions(RBAC_PERMISSION_CODES.FOUNDER_GUIDES_CREATE)
-  async create(@Body() body: CreateArticleDto) {
-    return this.articlesService.createArticle(body);
+  async create(@Req() req: Request, @Body() body: CreateArticleDto) {
+    return this.articlesService.createArticle(body, req['userEmail']);
   }
 
   @Put(':uid')

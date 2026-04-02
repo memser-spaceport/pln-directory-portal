@@ -25,37 +25,23 @@ export function usePermissionsTable({ permissions, sorting, setSorting }: UsePer
     () => [
       columnHelper.accessor('code', {
         header: 'Permission',
-        cell: (info) => (
-          <div className="text-sm font-medium text-gray-900">{info.getValue()}</div>
-        ),
+        cell: (info) => <div className="text-sm font-medium text-gray-900">{info.getValue()}</div>,
         size: 250,
       }),
       columnHelper.accessor('description', {
         header: 'Description',
-        cell: (info) => (
-          <div className="text-sm text-gray-600 truncate max-w-xs">
-            {info.getValue() || '-'}
-          </div>
-        ),
+        cell: (info) => <div className="max-w-xs truncate text-sm text-gray-600">{info.getValue() || '-'}</div>,
         size: 0,
         enableSorting: false,
       }),
       columnHelper.accessor('roleCount', {
         header: 'Roles Count',
-        cell: (info) => (
-          <div className="text-sm text-gray-900">{info.getValue()}</div>
-        ),
+        cell: (info) => <div className="text-sm text-gray-900">{info.getValue()}</div>,
         size: 120,
       }),
-      columnHelper.display({
-        id: 'memberCount',
+      columnHelper.accessor('totalMemberCount', {
         header: 'Members Count',
-        cell: (info) => {
-          const permission = info.row.original;
-          // Total unique members (direct + from roles, need to calculate unique)
-          const totalMembers = permission.directMembers.length + permission.roles.reduce((acc, role) => acc + (role as any).memberCount || 0, 0);
-          return <div className="text-sm text-gray-900">{totalMembers || permission.directMemberCount}</div>;
-        },
+        cell: (info) => <div className="text-sm text-gray-900">{info.getValue()}</div>,
         size: 130,
       }),
       columnHelper.display({

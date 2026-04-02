@@ -53,9 +53,10 @@ export interface RoleDetails extends RoleBasic {
 
 export interface PermissionWithCounts extends PermissionBasic {
   roleCount: number;
-  roles: RoleBasic[];
+  roles: Array<RoleBasic & { memberCount: number }>;
   directMemberCount: number;
   directMembers: MemberBasic[];
+  totalMemberCount: number;
 }
 
 export interface PermissionDetails extends PermissionBasic {
