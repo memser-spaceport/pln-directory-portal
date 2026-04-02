@@ -19,6 +19,7 @@ export class CreateArticleDto {
   authorMemberUid?: string;
   authorTeamUid?: string;
   status?: ArticleStatus;
+  officeHours?: string | null;
 }
 
 export class UpdateArticleDto {
@@ -32,6 +33,7 @@ export class UpdateArticleDto {
   authorMemberUid?: string;
   authorTeamUid?: string;
   status?: ArticleStatus;
+  officeHours?: string | null;
 }
 
 export class UpdateArticleAccessDto {

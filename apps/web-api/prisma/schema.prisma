@@ -1615,6 +1615,8 @@ model Article {
   authorMember    Member?            @relation("MemberArticles", fields: [authorMemberUid], references: [uid], onDelete: SetNull)
   authorTeamUid   String?
   authorTeam      Team?              @relation("TeamArticles", fields: [authorTeamUid], references: [uid], onDelete: SetNull)
+  createdBy       String?
+  updatedBy       String?
   status          ArticleStatus      @default(DRAFT)
   publishedAt     DateTime?
   isDeleted       Boolean            @default(false)
@@ -1628,6 +1630,8 @@ model Article {
   @@index([authorMemberUid])
   @@index([authorTeamUid])
   @@index([isDeleted])
+  @@index([createdBy])
+  @@index([updatedBy])
 }
 
 model ArticleStatistic {

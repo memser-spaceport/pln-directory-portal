@@ -697,12 +697,62 @@ export class RbacService {
       },
     });
 
+    // Get all role UIDs to fetch member counts in bulk
+    const allRoleUids = new Set<string>();
+    for (const permission of permissions) {
+      for (const rp of permission.rolePermissions) {
+        allRoleUids.add(rp.role.uid);
+      }
+    }
+
+    // Fetch member counts for all roles in a single query
+    const roleMemberCounts = await this.prisma.roleAssignment.groupBy({
+      by: ['roleUid'],
+      where: {
+        roleUid: { in: Array.from(allRoleUids) },
+        status: 'ACTIVE',
+        revokedAt: null,
+      },
+      _count: {
+        memberUid: true,
+      },
+    });
+
+    // Create a map of roleUid to member count
+    const roleMemberCountMap = new Map<string, number>();
+    for (const rc of roleMemberCounts) {
+      roleMemberCountMap.set(rc.roleUid, rc._count.memberUid);
+    }
+
+    // Fetch all member UIDs per role for calculating unique members
+    const roleAssignments = await this.prisma.roleAssignment.findMany({
+      where: {
+        roleUid: { in: Array.from(allRoleUids) },
+        status: 'ACTIVE',
+        revokedAt: null,
+      },
+      select: {
+        roleUid: true,
+        memberUid: true,
+      },
+    });
+
+    // Create a map of roleUid to member UIDs
+    const roleToMembersMap = new Map<string, Set<string>>();
+    for (const assignment of roleAssignments) {
+      if (!roleToMembersMap.has(assignment.roleUid)) {
+        roleToMembersMap.set(assignment.roleUid, new Set());
+      }
+      roleToMembersMap.get(assignment.roleUid)!.add(assignment.memberUid);
+    }
+
     return permissions.map((permission) => {
-      // Get unique roles that have this permission
+      // Get unique roles that have this permission with member counts
       const roles = permission.rolePermissions.map((rp) => ({
         uid: rp.role.uid,
         code: rp.role.code,
         name: rp.role.name,
+        memberCount: roleMemberCountMap.get(rp.role.uid) || 0,
       }));
 
       // Get unique members with direct permission
@@ -713,9 +763,14 @@ export class RbacService {
       }));
 
       // Calculate total unique members (direct + from roles)
-      const memberUidsFromRoles = new Set<string>();
+      const allMemberUids = new Set<string>(directMembers.map((m) => m.uid));
       for (const rp of permission.rolePermissions) {
-        // Need to count members per role
+        const membersInRole = roleToMembersMap.get(rp.role.uid);
+        if (membersInRole) {
+          for (const memberUid of membersInRole) {
+            allMemberUids.add(memberUid);
+          }
+        }
       }
 
       return {
@@ -726,6 +781,7 @@ export class RbacService {
         roles,
         directMemberCount: directMembers.length,
         directMembers,
+        totalMemberCount: allMemberUids.size,
       };
     });
   }

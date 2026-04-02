@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { ArticlesService } from './articles.service';
 import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleAccessDto, UpdateArticleDto } from './articles.dto';
@@ -16,13 +17,13 @@ export class AdminArticlesController {
   }
 
   @Post()
-  async create(@Body() body: CreateArticleDto) {
-    return this.articlesService.adminCreate(body);
+  async create(@Req() req: Request, @Body() body: CreateArticleDto) {
+    return this.articlesService.adminCreate(body, req['userEmail']);
   }
 
   @Patch(':uid')
-  async update(@Param('uid') uid: string, @Body() body: UpdateArticleDto) {
-    return this.articlesService.adminUpdate(uid, body);
+  async update(@Req() req: Request, @Param('uid') uid: string, @Body() body: UpdateArticleDto) {
+    return this.articlesService.adminUpdate(uid, body, req['userEmail']);
   }
 
   @Delete(':uid')

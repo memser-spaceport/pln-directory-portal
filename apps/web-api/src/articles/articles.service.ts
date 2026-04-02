@@ -1,13 +1,13 @@
-import {BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException} from '@nestjs/common';
-import {ArticleStatus, Prisma} from '@prisma/client';
-import {PrismaService} from '../shared/prisma.service';
-import {CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto} from './articles.dto';
-import type {ArticleCategory} from './articles.constants';
-import {ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE} from './articles.constants';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ArticleStatus, Prisma } from '@prisma/client';
+import { PrismaService } from '../shared/prisma.service';
+import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './articles.dto';
+import type { ArticleCategory } from './articles.constants';
+import { ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE } from './articles.constants';
 
 @Injectable()
 export class ArticlesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -64,12 +64,12 @@ export class ArticlesService {
       ...(query?.category ? { category: query.category } : {}),
       ...(query?.search
         ? {
-            OR: [
-              { title: { contains: query.search, mode: 'insensitive' } },
-              { summary: { contains: query.search, mode: 'insensitive' } },
-              { content: { contains: query.search, mode: 'insensitive' } },
-            ],
-          }
+          OR: [
+            { title: { contains: query.search, mode: 'insensitive' } },
+            { summary: { contains: query.search, mode: 'insensitive' } },
+            { content: { contains: query.search, mode: 'insensitive' } },
+          ],
+        }
         : {}),
     };
   }
@@ -119,7 +119,7 @@ export class ArticlesService {
 
   // ── Public ─────────────────────────────────────────────────────────────
 
-  async listPublished(query: ListArticlesQueryDto) {
+  async listPublished(query: ListArticlesQueryDto, userEmail?: string) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
@@ -157,18 +157,33 @@ export class ArticlesService {
 
     const articleUids = articles.map((a) => a.uid);
 
-    const statsAgg = await this.prisma.articleStatistic.groupBy({
-      by: ['articleUid'],
-      where: { articleUid: { in: articleUids } },
-      _sum: { viewCount: true },
-      _count: { _all: true },
-    });
-
-    const likeCounts = await this.prisma.articleStatistic.groupBy({
-      by: ['articleUid'],
-      where: { articleUid: { in: articleUids }, likeCount: { gt: 0 } },
-      _count: { _all: true },
-    });
+    // Run all stats queries in parallel
+    const [statsAgg, likeCounts, userLikedUids] = await Promise.all([
+      // Get view counts for all articles
+      this.prisma.articleStatistic.groupBy({
+        by: ['articleUid'],
+        where: { articleUid: { in: articleUids } },
+        _sum: { viewCount: true },
+      }),
+      // Get like counts for all articles (count of records with likeCount > 0)
+      this.prisma.articleStatistic.groupBy({
+        by: ['articleUid'],
+        where: { articleUid: { in: articleUids }, likeCount: { gt: 0 } },
+        _count: { _all: true },
+      }),
+      // Resolve member and fetch likes in one go if userEmail provided
+      userEmail
+        ? this.resolveMemberByEmail(userEmail)
+          .then(({ memberUid }) =>
+            this.prisma.articleStatistic.findMany({
+              where: { articleUid: { in: articleUids }, memberUid, likeCount: { gt: 0 } },
+              select: { articleUid: true },
+            })
+          )
+          .then((likes) => new Set(likes.map((l) => l.articleUid)))
+          .catch(() => new Set<string>())
+        : Promise.resolve(new Set<string>()),
+    ]);
 
     const viewMap = new Map(statsAgg.map((s) => [s.articleUid, s._sum.viewCount ?? 0]));
     const likeMap = new Map(likeCounts.map((s) => [s.articleUid, s._count._all]));
@@ -177,6 +192,7 @@ export class ArticlesService {
       ...article,
       totalViews: viewMap.get(article.uid) ?? 0,
       totalLikes: likeMap.get(article.uid) ?? 0,
+      isLiked: userLikedUids.has(article.uid),
     }));
 
     if (query.sort === 'mostViewed') {
@@ -225,13 +241,13 @@ export class ArticlesService {
       }),
       userEmail
         ? this.resolveMemberByEmail(userEmail)
-            .then(({ memberUid }) =>
-              this.prisma.articleStatistic.findUnique({
-                where: { articleUid_memberUid: { articleUid: article.uid, memberUid } },
-                select: { likeCount: true, viewCount: true },
-              })
-            )
-            .catch(() => null)
+          .then(({ memberUid }) =>
+            this.prisma.articleStatistic.findUnique({
+              where: { articleUid_memberUid: { articleUid: article.uid, memberUid } },
+              select: { likeCount: true, viewCount: true },
+            })
+          )
+          .catch(() => null)
         : Promise.resolve(null),
     ]);
 
@@ -278,7 +294,7 @@ export class ArticlesService {
       ...article,
       totalViews: viewAgg._sum.viewCount ?? 0,
       totalLikes: likeCount,
-      currentUserLiked: (userStat?.likeCount ?? 0) > 0,
+      isLiked: (userStat?.likeCount ?? 0) > 0,
       relatedArticles,
       prevArticle,
       nextArticle,
@@ -381,7 +397,7 @@ export class ArticlesService {
     return !!whitelist;
   }
 
-  async createArticle(body: CreateArticleDto) {
+  async createArticle(body: CreateArticleDto, userEmail?: string) {
     if (body.authorMemberUid && body.authorTeamUid) {
       throw new BadRequestException('Provide either authorMemberUid or authorTeamUid, not both');
     }
@@ -393,22 +409,45 @@ export class ArticlesService {
     const readingTime = this.calculateReadingTime(body.content);
     const status = body.status ?? ArticleStatus.DRAFT;
 
-    return this.prisma.article.create({
-      data: {
-        title: body.title,
-        slugURL,
-        summary: body.summary,
-        category: body.category,
-        tags: body.tags ?? [],
-        content: body.content,
-        readingTime,
-        coverImageUid: body.coverImageUid ?? null,
-        authorMemberUid: body.authorMemberUid ?? null,
-        authorTeamUid: body.authorTeamUid ?? null,
-        status,
-        publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
-      },
-      include: this.articleInclude,
+    // Resolve creator memberUid from email
+    let createdBy: string | null = null;
+    if (userEmail) {
+      try {
+        const { memberUid } = await this.resolveMemberByEmail(userEmail);
+        createdBy = memberUid;
+      } catch {
+        // Ignore - user not found
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // If officeHours provided for a team, update the team's officeHours
+      if (body.authorTeamUid && body.officeHours !== undefined) {
+        await tx.team.update({
+          where: { uid: body.authorTeamUid },
+          data: { officeHours: body.officeHours },
+        });
+      }
+
+      return tx.article.create({
+        data: {
+          title: body.title,
+          slugURL,
+          summary: body.summary,
+          category: body.category,
+          tags: body.tags ?? [],
+          content: body.content,
+          readingTime,
+          coverImageUid: body.coverImageUid ?? null,
+          authorMemberUid: body.authorMemberUid ?? null,
+          authorTeamUid: body.authorTeamUid ?? null,
+          createdBy,
+          updatedBy: createdBy,
+          status,
+          publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
+        },
+        include: this.articleInclude,
+      });
     });
   }
 
@@ -439,11 +478,25 @@ export class ArticlesService {
         data.publishedAt = new Date();
       }
     }
+    data.updatedBy = memberUid;
 
-    return this.prisma.article.update({
-      where: { uid },
-      data,
-      include: this.articleInclude,
+    return this.prisma.$transaction(async (tx) => {
+      // If officeHours provided, update the associated team's officeHours
+      if (body.officeHours !== undefined) {
+        const teamToUpdate = body.authorTeamUid ?? existing.authorTeamUid;
+        if (teamToUpdate) {
+          await tx.team.update({
+            where: { uid: teamToUpdate },
+            data: { officeHours: body.officeHours },
+          });
+        }
+      }
+
+      return tx.article.update({
+        where: { uid },
+        data,
+        include: this.articleInclude,
+      });
     });
   }
 
@@ -459,13 +512,13 @@ export class ArticlesService {
       OR: [{ authorMemberUid: memberUid }, ...(teamUid ? [{ authorTeamUid: teamUid }] : [])],
       ...(query?.search
         ? {
-            AND: {
-              OR: [
-                { title: { contains: query.search, mode: 'insensitive' as const } },
-                { summary: { contains: query.search, mode: 'insensitive' as const } },
-              ],
-            },
-          }
+          AND: {
+            OR: [
+              { title: { contains: query.search, mode: 'insensitive' as const } },
+              { summary: { contains: query.search, mode: 'insensitive' as const } },
+            ],
+          },
+        }
         : {}),
       ...(query?.category ? { category: query.category } : {}),
     };
@@ -481,7 +534,21 @@ export class ArticlesService {
       this.prisma.article.count({ where }),
     ]);
 
-    return { data: articles, total, page, limit };
+    const articleUids = articles.map((a) => a.uid);
+
+    // Get user's liked articles
+    const userLikes = await this.prisma.articleStatistic.findMany({
+      where: { articleUid: { in: articleUids }, memberUid, likeCount: { gt: 0 } },
+      select: { articleUid: true },
+    });
+    const userLikedUids = new Set(userLikes.map((l) => l.articleUid));
+
+    const data = articles.map((article) => ({
+      ...article,
+      isLiked: userLikedUids.has(article.uid),
+    }));
+
+    return { data, total, page, limit };
   }
 
   // ── Admin ──────────────────────────────────────────────────────────────
@@ -496,12 +563,12 @@ export class ArticlesService {
       ...(query?.category ? { category: query.category } : {}),
       ...(query?.search
         ? {
-            OR: [
-              { title: { contains: query.search, mode: 'insensitive' } },
-              { summary: { contains: query.search, mode: 'insensitive' } },
-              { content: { contains: query.search, mode: 'insensitive' } },
-            ],
-          }
+          OR: [
+            { title: { contains: query.search, mode: 'insensitive' } },
+            { summary: { contains: query.search, mode: 'insensitive' } },
+            { content: { contains: query.search, mode: 'insensitive' } },
+          ],
+        }
         : {}),
     };
 
@@ -546,31 +613,54 @@ export class ArticlesService {
     return { data, total, page, limit };
   }
 
-  async adminCreate(body: CreateArticleDto) {
+  async adminCreate(body: CreateArticleDto, userEmail?: string) {
     const slugURL = body.slugURL || (await this.generateSlug(body.title));
     const readingTime = this.calculateReadingTime(body.content);
     const status = body.status ?? ArticleStatus.DRAFT;
 
-    return this.prisma.article.create({
-      data: {
-        title: body.title,
-        slugURL,
-        summary: body.summary,
-        category: body.category,
-        tags: body.tags ?? [],
-        content: body.content,
-        readingTime,
-        coverImageUid: body.coverImageUid ?? null,
-        authorMemberUid: body.authorMemberUid ?? null,
-        authorTeamUid: body.authorTeamUid ?? null,
-        status,
-        publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
-      },
-      include: this.articleInclude,
+    // Resolve creator memberUid from email
+    let createdBy: string | null = null;
+    if (userEmail) {
+      try {
+        const { memberUid } = await this.resolveMemberByEmail(userEmail);
+        createdBy = memberUid;
+      } catch {
+        // Ignore - user not found
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // If officeHours provided for a team, update the team's officeHours
+      if (body.authorTeamUid && body.officeHours !== undefined) {
+        await tx.team.update({
+          where: { uid: body.authorTeamUid },
+          data: { officeHours: body.officeHours },
+        });
+      }
+
+      return tx.article.create({
+        data: {
+          title: body.title,
+          slugURL,
+          summary: body.summary,
+          category: body.category,
+          tags: body.tags ?? [],
+          content: body.content,
+          readingTime,
+          coverImageUid: body.coverImageUid ?? null,
+          authorMemberUid: body.authorMemberUid ?? null,
+          authorTeamUid: body.authorTeamUid ?? null,
+          createdBy,
+          updatedBy: createdBy,
+          status,
+          publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
+        },
+        include: this.articleInclude,
+      });
     });
   }
 
-  async adminUpdate(uid: string, body: UpdateArticleDto) {
+  async adminUpdate(uid: string, body: UpdateArticleDto, userEmail?: string) {
     const existing = await this.prisma.article.findUnique({ where: { uid } });
 
     if (!existing) {
@@ -598,10 +688,33 @@ export class ArticlesService {
       }
     }
 
-    return this.prisma.article.update({
-      where: { uid },
-      data,
-      include: this.articleInclude,
+    // Resolve editor memberUid from email
+    if (userEmail) {
+      try {
+        const { memberUid } = await this.resolveMemberByEmail(userEmail);
+        data.updatedBy = memberUid;
+      } catch {
+        // Ignore - user not found
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // If officeHours provided, update the associated team's officeHours
+      if (body.officeHours !== undefined) {
+        const teamToUpdate = body.authorTeamUid ?? existing.authorTeamUid;
+        if (teamToUpdate) {
+          await tx.team.update({
+            where: { uid: teamToUpdate },
+            data: { officeHours: body.officeHours },
+          });
+        }
+      }
+
+      return tx.article.update({
+        where: { uid },
+        data,
+        include: this.articleInclude,
+      });
     });
   }
 
