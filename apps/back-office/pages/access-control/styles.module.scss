@@ -42,6 +42,11 @@
   border-radius: 10px 10px 0 0;
 }
 
+.placeholderControl {
+  height: 36px;
+  flex: 1;
+}
+
 .searchInput {
   display: flex;
   height: 36px;
@@ -82,35 +87,11 @@
   cursor: pointer;
   outline: none;
   white-space: nowrap;
+  min-width: 160px;
 
   &:focus {
     border-color: #5e718d;
     box-shadow: 0 0 0 3px rgba(27, 56, 96, 0.08);
-  }
-}
-
-.addNewBtn {
-  display: flex;
-  height: 36px;
-  padding: 0 16px;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
-  border-radius: 8px;
-  border: 1px solid rgba(14, 15, 17, 0.12);
-  background: #1b4dff;
-  box-shadow: 0px 1px 3px 0px rgba(255, 255, 255, 0.32) inset, 0px 1px 5px 0px rgba(27, 77, 255, 0.16);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-  letter-spacing: -0.2px;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-
-  &:hover {
-    background: #1640e0;
   }
 }
 
@@ -173,19 +154,14 @@
 .table {
   display: flex;
   flex-direction: column;
-  border: 1px solid #ddd;
+  border: 1px solid #e2e8f0;
   border-radius: 0;
   overflow: hidden;
 }
 
-.tableWithControlBar {
-  border-top: none;
-  overflow: visible;
-}
-
 .tableRow {
   display: flex;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #e2e8f0;
 
   &:last-child {
     border-bottom: none;
@@ -204,7 +180,7 @@
   line-height: 20px;
   letter-spacing: -0.2px;
   overflow: hidden;
-  white-space: normal;
+  white-space: nowrap;
   text-overflow: ellipsis;
   flex: 1;
   user-select: none;
@@ -252,21 +228,14 @@
   min-width: 0;
 }
 
-.reviewBtn {
-  background: rgba(14, 15, 17, 0.04);
-  border: 1px solid rgba(14, 15, 17, 0.02);
-  border-radius: 8px;
-  padding: 6px 14px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #455468;
-  cursor: pointer;
-  white-space: nowrap;
-  box-shadow: inset 0px -2px 4px 0px rgba(14, 15, 17, 0.02);
+.actionsCell {
+  justify-content: flex-end;
+  padding-right: 12px;
+}
 
-  &:hover {
-    background: rgba(14, 15, 17, 0.08);
-  }
+.actionsCellFill {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .emptyState {

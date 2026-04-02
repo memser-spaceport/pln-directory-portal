@@ -1,0 +1,86 @@
+export interface MemberBasic {
+  uid: string;
+  name: string;
+  email: string;
+  image?: { url: string } | null;
+}
+
+export interface TeamInfo {
+  uid: string;
+  project: {
+    uid: string;
+    name: string;
+  };
+}
+
+export interface RoleBasic {
+  uid: string;
+  code: string;
+  name: string;
+  description?: string | null;
+}
+
+export interface PermissionBasic {
+  uid: string;
+  code: string;
+  description?: string | null;
+}
+
+export interface MemberWithRoles extends MemberBasic {
+  projectContributions: TeamInfo[];
+  roles: RoleBasic[];
+  directPermissions: PermissionBasic[];
+}
+
+export interface RoleWithCounts extends RoleBasic {
+  memberCount: number;
+  permissionCount: number;
+  permissions: PermissionBasic[];
+}
+
+export interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface RoleDetails extends RoleBasic {
+  permissions: PermissionBasic[];
+  members: Array<MemberBasic & { projectContributions: TeamInfo[] }>;
+  pagination: PaginationInfo;
+}
+
+export interface PermissionWithCounts extends PermissionBasic {
+  roleCount: number;
+  roles: RoleBasic[];
+  directMemberCount: number;
+  directMembers: MemberBasic[];
+}
+
+export interface PermissionDetails extends PermissionBasic {
+  roles: Array<RoleBasic & { memberCount: number }>;
+  members: Array<MemberBasic & { viaRoles: string[]; isDirect: boolean; projectContributions: TeamInfo[] }>;
+  pagination: PaginationInfo;
+}
+
+export interface MemberAccessDetails {
+  member: MemberBasic & {
+    projectContributions: TeamInfo[];
+  };
+  roles: Array<RoleBasic & { permissions: PermissionBasic[] }>;
+  directPermissions: PermissionBasic[];
+  allPermissions: Array<PermissionBasic & { viaRoles: string[]; isDirect: boolean }>;
+}
+
+export interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+export interface MembersListResponse {
+  members: MemberWithRoles[];
+  pagination: PaginationInfo;
+}
