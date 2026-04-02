@@ -504,7 +504,10 @@ export class DealsService {
   async adminList(query: ListDealsQueryDto) {
     const deals = await this.prisma.deal.findMany({
       where: this.buildDealWhere(query),
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { isHighValue: 'desc' },
+        { createdAt: 'desc' },
+      ],
       include: { logo: { select: { url: true } } },
     });
 
