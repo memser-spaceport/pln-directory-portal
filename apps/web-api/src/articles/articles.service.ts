@@ -4,6 +4,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './articles.dto';
 import type { ArticleCategory } from './articles.constants';
 import { ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE } from './articles.constants';
+import { MemberRole } from "../utils/constants";
 
 @Injectable()
 export class ArticlesService {
@@ -22,6 +23,7 @@ export class ArticlesService {
         uid: true,
         email: true,
         name: true,
+        memberRoles: true,
         teamMemberRoles: {
           where: { mainTeam: true },
           select: { teamUid: true },
@@ -33,25 +35,42 @@ export class ArticlesService {
     if (!member) {
       throw new UnauthorizedException('Member not found');
     }
+    const isAdmin = member.memberRoles.some(
+      (r) => r.name === MemberRole.DIRECTORY_ADMIN
+    );
 
     return {
       memberUid: member.uid,
       teamUid: member.teamMemberRoles?.[0]?.teamUid ?? null,
+      isDirectoryAdmin: isAdmin,
     };
   }
 
 
-  private async ensureArticleOwnership(articleUid: string, memberUid: string, teamUid: string | null) {
-    const article = await this.prisma.article.findFirst({
-      where: {
-        uid: articleUid,
-        isDeleted: false,
-        OR: [{ authorMemberUid: memberUid }, ...(teamUid ? [{ authorTeamUid: teamUid }] : [])],
-      },
-    });
+  private async ensureArticleOwnership(
+    articleUid: string,
+    memberUid: string,
+    teamUid: string | null,
+    isDirectoryAdmin: boolean,
+  ) {
+    const where: any = {
+      uid: articleUid,
+      isDeleted: false,
+    };
+
+    if (!isDirectoryAdmin) {
+      where.OR = [
+        { authorMemberUid: memberUid },
+        ...(teamUid ? [{ authorTeamUid: teamUid }] : []),
+      ];
+    }
+
+    const article = await this.prisma.article.findFirst({ where });
 
     if (!article) {
-      throw new ForbiddenException('You do not have permission to edit this article');
+      throw isDirectoryAdmin
+        ? new NotFoundException('Article not found')
+        : new ForbiddenException('You do not have permission to edit this article');
     }
 
     return article;
@@ -452,8 +471,8 @@ export class ArticlesService {
   }
 
   async updateOwnArticle(userEmail: string, uid: string, body: UpdateArticleDto) {
-    const { memberUid, teamUid } = await this.resolveMemberByEmail(userEmail);
-    await this.ensureArticleOwnership(uid, memberUid, teamUid);
+    const { memberUid, teamUid, isDirectoryAdmin } = await this.resolveMemberByEmail(userEmail);
+    await this.ensureArticleOwnership(uid, memberUid, teamUid, isDirectoryAdmin);
 
     const existing = await this.prisma.article.findUnique({ where: { uid } });
     if (!existing) {
