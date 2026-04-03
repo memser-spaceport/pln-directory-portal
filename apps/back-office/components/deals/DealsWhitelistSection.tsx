@@ -25,11 +25,11 @@ export const DealsWhitelistSection: React.FC<DealsWhitelistSectionProps> = ({ au
     if (!searchTerm) return whitelist;
 
     const lowerSearch = searchTerm.toLowerCase();
-    return whitelist.filter(
-      (item) =>
-        item.member.name?.toLowerCase().includes(lowerSearch) ||
-        item.member.email.toLowerCase().includes(lowerSearch)
-    );
+    return whitelist.filter((item) => {
+      const name = String(item.member.name ?? '').toLowerCase();
+      const email = String(item.member.email ?? '').toLowerCase();
+      return name.includes(lowerSearch) || email.includes(lowerSearch);
+    });
   }, [whitelist, searchTerm]);
 
   const existingMemberUids = useMemo(() => {
