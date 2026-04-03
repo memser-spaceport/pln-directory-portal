@@ -1,7 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { ArticlesService } from './articles.service';
-import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleAccessDto, UpdateArticleDto } from './articles.dto';
+import {
+  ArticleAuthorSearchQueryDto,
+  CreateArticleDto,
+  ListArticlesQueryDto,
+  UpdateArticleAccessDto,
+  UpdateArticleDto,
+} from './articles.dto';
 import { NoCache } from '../decorators/no-cache.decorator';
 
 @Controller('v1/admin/articles')
@@ -16,18 +23,24 @@ export class AdminArticlesController {
   }
 
   @Post()
-  async create(@Body() body: CreateArticleDto) {
-    return this.articlesService.adminCreate(body);
+  async create(@Req() req: Request, @Body() body: CreateArticleDto) {
+    return this.articlesService.adminCreate(body, req['userEmail']);
   }
 
   @Patch(':uid')
-  async update(@Param('uid') uid: string, @Body() body: UpdateArticleDto) {
-    return this.articlesService.adminUpdate(uid, body);
+  async update(@Req() req: Request, @Param('uid') uid: string, @Body() body: UpdateArticleDto) {
+    return this.articlesService.adminUpdate(uid, body, req['userEmail']);
   }
 
   @Delete(':uid')
   async remove(@Param('uid') uid: string) {
     return this.articlesService.adminDelete(uid);
+  }
+
+  @NoCache()
+  @Get('author-search')
+  async searchArticleAuthors(@Query() query: ArticleAuthorSearchQueryDto) {
+    return this.articlesService.searchArticleAuthors(query.search ?? '');
   }
 
   @NoCache()

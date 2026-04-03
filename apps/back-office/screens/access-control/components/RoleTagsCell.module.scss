@@ -1,0 +1,45 @@
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.tag {
+  display: inline-flex;
+  padding: 2px 8px;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+
+  border-radius: 4px;
+  background: var(--fill-blue-subtle, #eff6ff);
+
+  color: var(--foreground-blue-secondary, #1d4ed8);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.overflowTag {
+  display: inline-flex;
+  padding: 2px 8px;
+  justify-content: center;
+  align-items: center;
+
+  border-radius: 4px;
+  background: var(--fill-blue, #dbeafe);
+
+  color: var(--foreground-blue-secondary, #1d4ed8);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.empty {
+  color: var(--foreground-neutral-tertiary, #94a3b8);
+  font-size: 14px;
+}

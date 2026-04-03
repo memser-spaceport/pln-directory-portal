@@ -1,13 +1,14 @@
-import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ArticleStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './articles.dto';
 import type { ArticleCategory } from './articles.constants';
 import { ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE } from './articles.constants';
+import { MemberRole } from "../utils/constants";
 
 @Injectable()
 export class ArticlesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ export class ArticlesService {
         uid: true,
         email: true,
         name: true,
+        memberRoles: true,
         teamMemberRoles: {
           where: { mainTeam: true },
           select: { teamUid: true },
@@ -33,38 +35,42 @@ export class ArticlesService {
     if (!member) {
       throw new UnauthorizedException('Member not found');
     }
+    const isAdmin = member.memberRoles.some(
+      (r) => r.name === MemberRole.DIRECTORY_ADMIN
+    );
 
     return {
       memberUid: member.uid,
       teamUid: member.teamMemberRoles?.[0]?.teamUid ?? null,
+      isDirectoryAdmin: isAdmin,
     };
   }
 
-  private async ensureWhitelistAccess(userEmail: string) {
-    const resolved = await this.resolveMemberByEmail(userEmail);
 
-    const whitelist = await this.prisma.articleWhitelist.findUnique({
-      where: { memberUid: resolved.memberUid },
-    });
+  private async ensureArticleOwnership(
+    articleUid: string,
+    memberUid: string,
+    teamUid: string | null,
+    isDirectoryAdmin: boolean,
+  ) {
+    const where: any = {
+      uid: articleUid,
+      isDeleted: false,
+    };
 
-    if (!whitelist) {
-      throw new ForbiddenException('Articles access denied');
+    if (!isDirectoryAdmin) {
+      where.OR = [
+        { authorMemberUid: memberUid },
+        ...(teamUid ? [{ authorTeamUid: teamUid }] : []),
+      ];
     }
 
-    return resolved;
-  }
-
-  private async ensureArticleOwnership(articleUid: string, memberUid: string, teamUid: string | null) {
-    const article = await this.prisma.article.findFirst({
-      where: {
-        uid: articleUid,
-        isDeleted: false,
-        OR: [{ authorMemberUid: memberUid }, ...(teamUid ? [{ authorTeamUid: teamUid }] : [])],
-      },
-    });
+    const article = await this.prisma.article.findFirst({ where });
 
     if (!article) {
-      throw new ForbiddenException('You do not have permission to edit this article');
+      throw isDirectoryAdmin
+        ? new NotFoundException('Article not found')
+        : new ForbiddenException('You do not have permission to edit this article');
     }
 
     return article;
@@ -77,12 +83,12 @@ export class ArticlesService {
       ...(query?.category ? { category: query.category } : {}),
       ...(query?.search
         ? {
-            OR: [
-              { title: { contains: query.search, mode: 'insensitive' } },
-              { summary: { contains: query.search, mode: 'insensitive' } },
-              { content: { contains: query.search, mode: 'insensitive' } },
-            ],
-          }
+          OR: [
+            { title: { contains: query.search, mode: 'insensitive' } },
+            { summary: { contains: query.search, mode: 'insensitive' } },
+            { content: { contains: query.search, mode: 'insensitive' } },
+          ],
+        }
         : {}),
     };
   }
@@ -111,13 +117,28 @@ export class ArticlesService {
 
   private readonly articleInclude = {
     coverImage: { select: { uid: true, url: true } },
-    authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },
-    authorTeam: { select: { uid: true, name: true, logo: { select: { url: true } } } },
+    authorMember: {
+      select: {
+        uid: true,
+        name: true,
+        email: true,
+        officeHours: true,
+        image: { select: { url: true } },
+      },
+    },
+    authorTeam: {
+      select: {
+        uid: true,
+        name: true,
+        officeHours: true,
+        logo: { select: { url: true } },
+      },
+    },
   };
 
   // ── Public ─────────────────────────────────────────────────────────────
 
-  async listPublished(query: ListArticlesQueryDto) {
+  async listPublished(query: ListArticlesQueryDto, userEmail?: string) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
@@ -155,18 +176,33 @@ export class ArticlesService {
 
     const articleUids = articles.map((a) => a.uid);
 
-    const statsAgg = await this.prisma.articleStatistic.groupBy({
-      by: ['articleUid'],
-      where: { articleUid: { in: articleUids } },
-      _sum: { viewCount: true },
-      _count: { _all: true },
-    });
-
-    const likeCounts = await this.prisma.articleStatistic.groupBy({
-      by: ['articleUid'],
-      where: { articleUid: { in: articleUids }, likeCount: { gt: 0 } },
-      _count: { _all: true },
-    });
+    // Run all stats queries in parallel
+    const [statsAgg, likeCounts, userLikedUids] = await Promise.all([
+      // Get view counts for all articles
+      this.prisma.articleStatistic.groupBy({
+        by: ['articleUid'],
+        where: { articleUid: { in: articleUids } },
+        _sum: { viewCount: true },
+      }),
+      // Get like counts for all articles (count of records with likeCount > 0)
+      this.prisma.articleStatistic.groupBy({
+        by: ['articleUid'],
+        where: { articleUid: { in: articleUids }, likeCount: { gt: 0 } },
+        _count: { _all: true },
+      }),
+      // Resolve member and fetch likes in one go if userEmail provided
+      userEmail
+        ? this.resolveMemberByEmail(userEmail)
+          .then(({ memberUid }) =>
+            this.prisma.articleStatistic.findMany({
+              where: { articleUid: { in: articleUids }, memberUid, likeCount: { gt: 0 } },
+              select: { articleUid: true },
+            })
+          )
+          .then((likes) => new Set(likes.map((l) => l.articleUid)))
+          .catch(() => new Set<string>())
+        : Promise.resolve(new Set<string>()),
+    ]);
 
     const viewMap = new Map(statsAgg.map((s) => [s.articleUid, s._sum.viewCount ?? 0]));
     const likeMap = new Map(likeCounts.map((s) => [s.articleUid, s._count._all]));
@@ -175,6 +211,7 @@ export class ArticlesService {
       ...article,
       totalViews: viewMap.get(article.uid) ?? 0,
       totalLikes: likeMap.get(article.uid) ?? 0,
+      isLiked: userLikedUids.has(article.uid),
     }));
 
     if (query.sort === 'mostViewed') {
@@ -223,13 +260,13 @@ export class ArticlesService {
       }),
       userEmail
         ? this.resolveMemberByEmail(userEmail)
-            .then(({ memberUid }) =>
-              this.prisma.articleStatistic.findUnique({
-                where: { articleUid_memberUid: { articleUid: article.uid, memberUid } },
-                select: { likeCount: true, viewCount: true },
-              })
-            )
-            .catch(() => null)
+          .then(({ memberUid }) =>
+            this.prisma.articleStatistic.findUnique({
+              where: { articleUid_memberUid: { articleUid: article.uid, memberUid } },
+              select: { likeCount: true, viewCount: true },
+            })
+          )
+          .catch(() => null)
         : Promise.resolve(null),
     ]);
 
@@ -276,7 +313,7 @@ export class ArticlesService {
       ...article,
       totalViews: viewAgg._sum.viewCount ?? 0,
       totalLikes: likeCount,
-      currentUserLiked: (userStat?.likeCount ?? 0) > 0,
+      isLiked: (userStat?.likeCount ?? 0) > 0,
       relatedArticles,
       prevArticle,
       nextArticle,
@@ -379,35 +416,63 @@ export class ArticlesService {
     return !!whitelist;
   }
 
-  async createArticle(userEmail: string, body: CreateArticleDto) {
-    const { memberUid, teamUid } = await this.ensureWhitelistAccess(userEmail);
+  async createArticle(body: CreateArticleDto, userEmail?: string) {
+    if (body.authorMemberUid && body.authorTeamUid) {
+      throw new BadRequestException('Provide either authorMemberUid or authorTeamUid, not both');
+    }
+    if (!body.authorMemberUid && !body.authorTeamUid) {
+      throw new BadRequestException('Either authorMemberUid or authorTeamUid is required');
+    }
 
     const slugURL = body.slugURL || (await this.generateSlug(body.title));
     const readingTime = this.calculateReadingTime(body.content);
     const status = body.status ?? ArticleStatus.DRAFT;
 
-    return this.prisma.article.create({
-      data: {
-        title: body.title,
-        slugURL,
-        summary: body.summary,
-        category: body.category,
-        tags: body.tags ?? [],
-        content: body.content,
-        readingTime,
-        coverImageUid: body.coverImageUid ?? null,
-        authorMemberUid: body.authorMemberUid ?? memberUid,
-        authorTeamUid: body.authorTeamUid ?? teamUid,
-        status,
-        publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
-      },
-      include: this.articleInclude,
+    // Resolve creator memberUid from email
+    let createdBy: string | null = null;
+    if (userEmail) {
+      try {
+        const { memberUid } = await this.resolveMemberByEmail(userEmail);
+        createdBy = memberUid;
+      } catch {
+        // Ignore - user not found
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // If officeHours provided for a team, update the team's officeHours
+      if (body.authorTeamUid && body.officeHours !== undefined) {
+        await tx.team.update({
+          where: { uid: body.authorTeamUid },
+          data: { officeHours: body.officeHours },
+        });
+      }
+
+      return tx.article.create({
+        data: {
+          title: body.title,
+          slugURL,
+          summary: body.summary,
+          category: body.category,
+          tags: body.tags ?? [],
+          content: body.content,
+          readingTime,
+          coverImageUid: body.coverImageUid ?? null,
+          authorMemberUid: body.authorMemberUid ?? null,
+          authorTeamUid: body.authorTeamUid ?? null,
+          createdBy,
+          updatedBy: createdBy,
+          status,
+          publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
+        },
+        include: this.articleInclude,
+      });
     });
   }
 
   async updateOwnArticle(userEmail: string, uid: string, body: UpdateArticleDto) {
-    const { memberUid, teamUid } = await this.ensureWhitelistAccess(userEmail);
-    await this.ensureArticleOwnership(uid, memberUid, teamUid);
+    const { memberUid, teamUid, isDirectoryAdmin } = await this.resolveMemberByEmail(userEmail);
+    await this.ensureArticleOwnership(uid, memberUid, teamUid, isDirectoryAdmin);
 
     const existing = await this.prisma.article.findUnique({ where: { uid } });
     if (!existing) {
@@ -432,11 +497,25 @@ export class ArticlesService {
         data.publishedAt = new Date();
       }
     }
+    data.updatedBy = memberUid;
 
-    return this.prisma.article.update({
-      where: { uid },
-      data,
-      include: this.articleInclude,
+    return this.prisma.$transaction(async (tx) => {
+      // If officeHours provided, update the associated team's officeHours
+      if (body.officeHours !== undefined) {
+        const teamToUpdate = body.authorTeamUid ?? existing.authorTeamUid;
+        if (teamToUpdate) {
+          await tx.team.update({
+            where: { uid: teamToUpdate },
+            data: { officeHours: body.officeHours },
+          });
+        }
+      }
+
+      return tx.article.update({
+        where: { uid },
+        data,
+        include: this.articleInclude,
+      });
     });
   }
 
@@ -452,13 +531,13 @@ export class ArticlesService {
       OR: [{ authorMemberUid: memberUid }, ...(teamUid ? [{ authorTeamUid: teamUid }] : [])],
       ...(query?.search
         ? {
-            AND: {
-              OR: [
-                { title: { contains: query.search, mode: 'insensitive' as const } },
-                { summary: { contains: query.search, mode: 'insensitive' as const } },
-              ],
-            },
-          }
+          AND: {
+            OR: [
+              { title: { contains: query.search, mode: 'insensitive' as const } },
+              { summary: { contains: query.search, mode: 'insensitive' as const } },
+            ],
+          },
+        }
         : {}),
       ...(query?.category ? { category: query.category } : {}),
     };
@@ -474,7 +553,21 @@ export class ArticlesService {
       this.prisma.article.count({ where }),
     ]);
 
-    return { data: articles, total, page, limit };
+    const articleUids = articles.map((a) => a.uid);
+
+    // Get user's liked articles
+    const userLikes = await this.prisma.articleStatistic.findMany({
+      where: { articleUid: { in: articleUids }, memberUid, likeCount: { gt: 0 } },
+      select: { articleUid: true },
+    });
+    const userLikedUids = new Set(userLikes.map((l) => l.articleUid));
+
+    const data = articles.map((article) => ({
+      ...article,
+      isLiked: userLikedUids.has(article.uid),
+    }));
+
+    return { data, total, page, limit };
   }
 
   // ── Admin ──────────────────────────────────────────────────────────────
@@ -489,12 +582,12 @@ export class ArticlesService {
       ...(query?.category ? { category: query.category } : {}),
       ...(query?.search
         ? {
-            OR: [
-              { title: { contains: query.search, mode: 'insensitive' } },
-              { summary: { contains: query.search, mode: 'insensitive' } },
-              { content: { contains: query.search, mode: 'insensitive' } },
-            ],
-          }
+          OR: [
+            { title: { contains: query.search, mode: 'insensitive' } },
+            { summary: { contains: query.search, mode: 'insensitive' } },
+            { content: { contains: query.search, mode: 'insensitive' } },
+          ],
+        }
         : {}),
     };
 
@@ -539,31 +632,54 @@ export class ArticlesService {
     return { data, total, page, limit };
   }
 
-  async adminCreate(body: CreateArticleDto) {
+  async adminCreate(body: CreateArticleDto, userEmail?: string) {
     const slugURL = body.slugURL || (await this.generateSlug(body.title));
     const readingTime = this.calculateReadingTime(body.content);
     const status = body.status ?? ArticleStatus.DRAFT;
 
-    return this.prisma.article.create({
-      data: {
-        title: body.title,
-        slugURL,
-        summary: body.summary,
-        category: body.category,
-        tags: body.tags ?? [],
-        content: body.content,
-        readingTime,
-        coverImageUid: body.coverImageUid ?? null,
-        authorMemberUid: body.authorMemberUid ?? null,
-        authorTeamUid: body.authorTeamUid ?? null,
-        status,
-        publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
-      },
-      include: this.articleInclude,
+    // Resolve creator memberUid from email
+    let createdBy: string | null = null;
+    if (userEmail) {
+      try {
+        const { memberUid } = await this.resolveMemberByEmail(userEmail);
+        createdBy = memberUid;
+      } catch {
+        // Ignore - user not found
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // If officeHours provided for a team, update the team's officeHours
+      if (body.authorTeamUid && body.officeHours !== undefined) {
+        await tx.team.update({
+          where: { uid: body.authorTeamUid },
+          data: { officeHours: body.officeHours },
+        });
+      }
+
+      return tx.article.create({
+        data: {
+          title: body.title,
+          slugURL,
+          summary: body.summary,
+          category: body.category,
+          tags: body.tags ?? [],
+          content: body.content,
+          readingTime,
+          coverImageUid: body.coverImageUid ?? null,
+          authorMemberUid: body.authorMemberUid ?? null,
+          authorTeamUid: body.authorTeamUid ?? null,
+          createdBy,
+          updatedBy: createdBy,
+          status,
+          publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
+        },
+        include: this.articleInclude,
+      });
     });
   }
 
-  async adminUpdate(uid: string, body: UpdateArticleDto) {
+  async adminUpdate(uid: string, body: UpdateArticleDto, userEmail?: string) {
     const existing = await this.prisma.article.findUnique({ where: { uid } });
 
     if (!existing) {
@@ -591,10 +707,33 @@ export class ArticlesService {
       }
     }
 
-    return this.prisma.article.update({
-      where: { uid },
-      data,
-      include: this.articleInclude,
+    // Resolve editor memberUid from email
+    if (userEmail) {
+      try {
+        const { memberUid } = await this.resolveMemberByEmail(userEmail);
+        data.updatedBy = memberUid;
+      } catch {
+        // Ignore - user not found
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // If officeHours provided, update the associated team's officeHours
+      if (body.officeHours !== undefined) {
+        const teamToUpdate = body.authorTeamUid ?? existing.authorTeamUid;
+        if (teamToUpdate) {
+          await tx.team.update({
+            where: { uid: teamToUpdate },
+            data: { officeHours: body.officeHours },
+          });
+        }
+      }
+
+      return tx.article.update({
+        where: { uid },
+        data,
+        include: this.articleInclude,
+      });
     });
   }
 
@@ -691,5 +830,117 @@ export class ArticlesService {
     });
 
     return { success: true };
+  }
+
+  async searchArticleAuthors(search: string) {
+    const q = search?.trim() ?? '';
+    if (!q) {
+      return { members: [], teams: [] };
+    }
+
+    const memberAccessOk: Prisma.MemberWhereInput = {
+      OR: [{ accessLevel: null }, { accessLevel: { notIn: ['L0', 'L1'] } }],
+    };
+
+    const teamAccessOk: Prisma.TeamWhereInput = {
+      OR: [{ accessLevel: null }, { accessLevel: { not: 'L0' } }],
+    };
+
+    const [memberRows, teamRows] = await Promise.all([
+      this.prisma.member.findMany({
+        where: {
+          deletedAt: null,
+          AND: [
+            memberAccessOk,
+            {
+              OR: [{ name: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }],
+            },
+          ],
+        },
+        select: {
+          uid: true,
+          name: true,
+          email: true,
+          officeHours: true,
+          image: { select: { url: true } },
+        },
+        take: 500,
+      }),
+      this.prisma.team.findMany({
+        where: {
+          AND: [
+            teamAccessOk,
+            {
+              name: { contains: q, mode: 'insensitive' },
+            },
+          ],
+        },
+        select: {
+          uid: true,
+          name: true,
+          officeHours: true,
+          logo: { select: { url: true } },
+        },
+        take: 500,
+      }),
+    ]);
+
+    const qLower = q.toLowerCase();
+
+    const members = memberRows
+      .map((m) => ({
+        uid: m.uid,
+        name: m.name,
+        officeHours: m.officeHours,
+        image: m.image,
+        rank: this.bestTextRank(m.name, m.email, qLower),
+      }))
+      .sort((a, b) => {
+        if (a.rank !== b.rank) return a.rank - b.rank;
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 20)
+      .map(({ uid, name, officeHours, image }) => ({
+        uid,
+        name,
+        officeHoursUrl: officeHours ?? undefined,
+        image: image?.url ?? '',
+      }));
+
+    const teams = teamRows
+      .map((t) => ({
+        uid: t.uid,
+        name: t.name,
+        officeHours: t.officeHours,
+        logo: t.logo,
+        rank: this.rankSingleField(t.name, qLower),
+      }))
+      .sort((a, b) => {
+        if (a.rank !== b.rank) return a.rank - b.rank;
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 20)
+      .map(({ uid, name, officeHours, logo }) => ({
+        uid,
+        name,
+        officeHoursUrl: officeHours ?? undefined,
+        image: logo?.url ?? '',
+      }));
+
+    return { members, teams };
+  }
+
+  private rankSingleField(text: string, qLower: string): number {
+    const t = text.toLowerCase();
+    if (t === qLower) return 0;
+    if (t.startsWith(qLower)) return 1;
+    if (t.includes(qLower)) return 2;
+    return 99;
+  }
+
+  private bestTextRank(name: string, email: string | null, qLower: string): number {
+    const nameR = this.rankSingleField(name, qLower);
+    const emailR = email ? this.rankSingleField(email, qLower) : 99;
+    return Math.min(nameR, emailR);
   }
 }

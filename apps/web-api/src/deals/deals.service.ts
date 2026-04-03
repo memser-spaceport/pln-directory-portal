@@ -504,7 +504,10 @@ export class DealsService {
   async adminList(query: ListDealsQueryDto) {
     const deals = await this.prisma.deal.findMany({
       where: this.buildDealWhere(query),
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { isHighValue: 'desc' },
+        { createdAt: 'desc' },
+      ],
       include: { logo: { select: { url: true } } },
     });
 
@@ -607,6 +610,7 @@ export class DealsService {
         redemptionInstructions: body.redemptionInstructions,
         contact: body.contact,
         status: body.status ?? DealStatus.DRAFT,
+        isHighValue: body.isHighValue ?? false,
       },
       include: { logo: { select: { url: true } } },
     });
@@ -646,6 +650,7 @@ export class DealsService {
           : {}),
         ...(body.contact !== undefined ? { contact: body.contact } : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
+        ...(body.isHighValue !== undefined ? { isHighValue: body.isHighValue } : {}),
       },
       include: { logo: { select: { url: true } } },
     });

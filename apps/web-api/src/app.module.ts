@@ -146,7 +146,7 @@ import { DealRequestsModule } from "./deal-requests/deal-requests.module";
     WebSocketModule,
     TeamEnrichmentModule,
     DealsModule,
-    DealRequestsModule,
+    DealRequestsModule
   ],
   providers: [
     {

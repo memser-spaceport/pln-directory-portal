@@ -1,6 +1,7 @@
 import {
   Deal,
   DealCounts,
+  DealRequest,
   ReportedIssue,
   SubmissionStatus,
   SubmittedDeal,
@@ -93,17 +94,36 @@ export async function updateIssueStatus(params: {
   return response.data;
 }
 
+interface DealRequestsResponse {
+  page: number;
+  limit: number;
+  total: number;
+  items: DealRequest[];
+}
+
+export async function fetchDealRequestsList(params: {
+  authToken: string | undefined;
+}): Promise<DealRequest[]> {
+  const response = await api.get<DealRequestsResponse>(API_ROUTE.ADMIN_DEAL_REQUESTS, {
+    headers: { authorization: `Bearer ${params.authToken}` },
+    params: { limit: 1000 },
+  });
+  return response.data.items;
+}
+
 export async function fetchDealCounts(params: { authToken: string | undefined }): Promise<DealCounts> {
   const headers = { authorization: `Bearer ${params.authToken}` };
-  const [dealsRes, submissionsRes, issuesRes] = await Promise.all([
+  const [dealsRes, submissionsRes, issuesRes, requestsRes] = await Promise.all([
     api.get<Deal[]>(API_ROUTE.ADMIN_DEALS, { headers }),
     api.get<SubmittedDeal[]>(API_ROUTE.ADMIN_SUBMITTED_DEALS, { headers, params: { status: 'OPEN' } }),
     api.get<ReportedIssue[]>(API_ROUTE.ADMIN_REPORTED_ISSUES, { headers }),
+    api.get<DealRequestsResponse>(API_ROUTE.ADMIN_DEAL_REQUESTS, { headers, params: { limit: 1 } }),
   ]);
   return {
     catalog: dealsRes.data.length,
     submitted: submissionsRes.data.length,
     issues: issuesRes.data.length,
+    requests: requestsRes.data.total,
   };
 }
 

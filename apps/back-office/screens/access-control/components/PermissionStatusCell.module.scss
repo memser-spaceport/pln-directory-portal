@@ -1,0 +1,66 @@
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.tagGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.viaRoleTag {
+  display: inline-flex;
+  padding: 2px 8px;
+  justify-content: center;
+  align-items: center;
+
+  border-radius: 4px;
+  background: var(--fill-green-subtle, #f0fdf4);
+
+  color: var(--foreground-green-secondary, #15803d);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.directBadge {
+  display: inline-flex;
+  padding: 2px 8px;
+  justify-content: center;
+  align-items: center;
+
+  border-radius: 4px;
+  background: var(--fill-green-subtle, #f0fdf4);
+
+  color: var(--foreground-green-secondary, #15803d);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.notDirectBadge {
+  display: inline-flex;
+  padding: 2px 8px;
+  justify-content: center;
+  align-items: center;
+
+  border-radius: 4px;
+  background: var(--fill-neutral-subtle, #f1f5f9);
+
+  color: var(--foreground-neutral-tertiary, #64748b);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.empty {
+  color: var(--foreground-neutral-tertiary, #94a3b8);
+  font-size: 14px;
+}

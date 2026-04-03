@@ -1,0 +1,23 @@
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--corner-radius-3xl, 20px);
+  color: #455468;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: var(--transparent-dark-4, rgba(14, 15, 17, 0.04));
+  }
+
+  svg {
+    color: currentColor;
+  }
+}
+
+.menuItemLabel {
+  white-space: nowrap;
+}

@@ -18,7 +18,7 @@ export class DealRequestsService {
 
   private normalizePagination(page = 1, limit = 20) {
     const safePage = Number.isFinite(Number(page)) ? Math.max(1, Number(page)) : 1;
-    const safeLimit = Number.isFinite(Number(limit)) ? Math.min(100, Math.max(1, Number(limit))) : 20;
+    const safeLimit = Number.isFinite(Number(limit)) ? Math.min(1000, Math.max(1, Number(limit))) : 20;
 
     return {
       page: safePage,
@@ -27,62 +27,72 @@ export class DealRequestsService {
     };
   }
 
-  async create(userUid: string | undefined, dealUid: string, body: CreateDealRequestDto) {
-    if (!userUid) {
-      throw new UnauthorizedException('User uid not found');
+  private async resolveMemberByEmail(userEmail: string | undefined) {
+    if (!userEmail) {
+      throw new UnauthorizedException('User email not found');
     }
 
+    const member = await this.prisma.member.findFirst({
+      where: { email: userEmail },
+      select: { uid: true },
+    });
+
+    if (!member) {
+      throw new UnauthorizedException('Member not found');
+    }
+
+    return member;
+  }
+
+  async create(userEmail: string | undefined, dealUidFromParam: string | undefined, body: CreateDealRequestDto) {
+    const member = await this.resolveMemberByEmail(userEmail);
+
+    const resolvedDealUid = (dealUidFromParam ?? body?.dealUid)?.trim() || undefined;
     const description = body?.description?.trim();
     const whatDealAreYouLookingFor = body?.whatDealAreYouLookingFor?.trim();
     const howToReachOutToYou = body?.howToReachOutToYou?.trim();
-
-    if (!description) {
-      throw new BadRequestException('Description is required');
-    }
 
     if (!whatDealAreYouLookingFor) {
       throw new BadRequestException('What deal are you looking for is required');
     }
 
-    if (!howToReachOutToYou) {
-      throw new BadRequestException('How to reach out to you is required');
-    }
+    if (resolvedDealUid) {
+      const deal = await this.prisma.deal.findUnique({
+        where: { uid: resolvedDealUid },
+        select: { uid: true },
+      });
 
-    const deal = await this.prisma.deal.findUnique({
-      where: { uid: dealUid },
-      select: { uid: true },
-    });
+      if (!deal) {
+        throw new NotFoundException('Deal not found');
+      }
 
-    if (!deal) {
-      throw new NotFoundException('Deal not found');
-    }
-
-    const existing = await this.prisma.dealRequest.findUnique({
-      where: {
-        dealUid_requestedByUserUid: {
-          dealUid,
-          requestedByUserUid: userUid,
+      const existing = await this.prisma.dealRequest.findUnique({
+        where: {
+          dealUid_requestedByUserUid: {
+            dealUid: resolvedDealUid,
+            requestedByUserUid: member.uid,
+          },
         },
-      },
-      select: { uid: true },
-    });
+        select: { uid: true },
+      });
 
-    if (existing) {
-      return {
-        uid: existing.uid,
-        dealUid,
-        requestedByUserUid: userUid,
-        alreadyExists: true,
-      };
+      if (existing) {
+        return {
+          uid: existing.uid,
+          dealUid: resolvedDealUid,
+          requestedByUserUid: member.uid,
+          alreadyExists: true,
+        };
+      }
     }
 
     const created = await this.prisma.dealRequest.create({
       data: {
-        dealUid,
-        description,
+        ...(resolvedDealUid ? { dealUid: resolvedDealUid } : {}),
+        ...(description ? { description } : {}),
         whatDealAreYouLookingFor,
-        howToReachOutToYou,
-        requestedByUserUid: userUid,
+        ...(howToReachOutToYou ? { howToReachOutToYou } : {}),
+        requestedByUserUid: member.uid,
       },
       select: {
         uid: true,
@@ -109,29 +119,29 @@ export class DealRequestsService {
       ...(query?.requestedByUserUid ? { requestedByUserUid: query.requestedByUserUid } : {}),
       ...(query?.search
         ? {
-            OR: [
-              { description: { contains: query.search, mode: 'insensitive' } },
-              { whatDealAreYouLookingFor: { contains: query.search, mode: 'insensitive' } },
-              { howToReachOutToYou: { contains: query.search, mode: 'insensitive' } },
-              { requestedByUserUid: { contains: query.search, mode: 'insensitive' } },
-              {
-                requestedByUser: {
-                  OR: [
-                    { name: { contains: query.search, mode: 'insensitive' } },
-                    { email: { contains: query.search, mode: 'insensitive' } },
-                  ],
-                },
+          OR: [
+            { description: { contains: query.search, mode: 'insensitive' } },
+            { whatDealAreYouLookingFor: { contains: query.search, mode: 'insensitive' } },
+            { howToReachOutToYou: { contains: query.search, mode: 'insensitive' } },
+            { requestedByUserUid: { contains: query.search, mode: 'insensitive' } },
+            {
+              requestedByUser: {
+                OR: [
+                  { name: { contains: query.search, mode: 'insensitive' } },
+                  { email: { contains: query.search, mode: 'insensitive' } },
+                ],
               },
-              {
-                deal: {
-                  OR: [
-                    { vendorName: { contains: query.search, mode: 'insensitive' } },
-                    { shortDescription: { contains: query.search, mode: 'insensitive' } },
-                  ],
-                },
+            },
+            {
+              deal: {
+                OR: [
+                  { vendorName: { contains: query.search, mode: 'insensitive' } },
+                  { shortDescription: { contains: query.search, mode: 'insensitive' } },
+                ],
               },
-            ],
-          }
+            },
+          ],
+        }
         : {}),
     };
   }
@@ -162,6 +172,7 @@ export class DealRequestsService {
               uid: true,
               name: true,
               email: true,
+              image: { select: { uid: true, url: true } },
             },
           },
           deal: {
@@ -199,6 +210,7 @@ export class DealRequestsService {
             uid: true,
             name: true,
             email: true,
+            image: { select: { uid: true, url: true } },
           },
         },
         deal: {
@@ -274,5 +286,43 @@ export class DealRequestsService {
       }
       throw error;
     }
+  }
+
+  async getByUidForUser(userEmail: string | undefined, requestUid: string) {
+    const member = await this.resolveMemberByEmail(userEmail);
+
+    const request = await this.prisma.dealRequest.findFirst({
+      where: {
+        uid: requestUid,
+        requestedByUserUid: member.uid,
+      },
+      select: {
+        uid: true,
+        dealUid: true,
+        description: true,
+        whatDealAreYouLookingFor: true,
+        howToReachOutToYou: true,
+        requestedByUserUid: true,
+        requestedDate: true,
+        createdAt: true,
+        updatedAt: true,
+        deal: {
+          select: {
+            uid: true,
+            vendorName: true,
+            shortDescription: true,
+            category: true,
+            audience: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Deal request not found');
+    }
+
+    return request;
   }
 }

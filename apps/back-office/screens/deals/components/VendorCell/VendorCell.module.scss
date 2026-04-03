@@ -3,6 +3,8 @@
   align-items: center;
   gap: 12px;
   flex: 1;
+  min-width: 0;
+  white-space: normal;
 }
 
 .avatar {
@@ -37,13 +39,43 @@
   }
 }
 
+.nameRow {
+  min-width: 0;
+  flex: 1;
+}
+
 .name {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.nameText {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--foreground-neutral-primary, #0a0c11);
   font-size: 14px;
   font-weight: 500;
   line-height: 20px;
   letter-spacing: -0.2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.highValueLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: -0.2px;
   white-space: nowrap;
+  background: rgba(27, 77, 255, 0.04);
 }

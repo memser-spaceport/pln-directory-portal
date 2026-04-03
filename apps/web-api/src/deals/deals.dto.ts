@@ -21,6 +21,7 @@ export class UpsertDealDto {
   contact!: string;
   status?: DealStatus;
   submissionUid?: string;
+  isHighValue?: boolean;
 }
 
 export class SubmitDealDto {

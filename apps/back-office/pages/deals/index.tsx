@@ -13,6 +13,7 @@ import PaginationControls from '../../screens/members/components/PaginationContr
 import { useDealsList } from '../../hooks/deals/useDealsList';
 import { useSubmittedDealsList } from '../../hooks/deals/useSubmittedDealsList';
 import { useReportedIssuesList } from '../../hooks/deals/useReportedIssuesList';
+import { useDealRequestsList } from '../../hooks/deals/useDealRequestsList';
 import { useDealCounts } from '../../hooks/deals/useDealCounts';
 import { useCreateDeal } from '../../hooks/deals/useCreateDeal';
 import { useUpdateDeal } from '../../hooks/deals/useUpdateDeal';
@@ -24,6 +25,7 @@ import { DealsWhitelistSection } from '../../components/deals/DealsWhitelistSect
 import { useDealsTable } from '../../screens/deals/hooks/useDealsTable';
 import { useSubmittedDealsTable } from '../../screens/deals/hooks/useSubmittedDealsTable';
 import { useReportedIssuesTable } from '../../screens/deals/hooks/useReportedIssuesTable';
+import { useDealRequestsTable } from '../../screens/deals/hooks/useDealRequestsTable';
 
 import dynamic from 'next/dynamic';
 import type { ComponentProps } from 'react';
@@ -45,7 +47,7 @@ const STATUSES: { value: DealStatus; label: string }[] = [
   { value: 'DEACTIVATED', label: 'Deactivated' },
 ];
 
-type Tab = 'catalog' | 'submitted' | 'issues' | 'access';
+type Tab = 'catalog' | 'submitted' | 'issues' | 'access' | 'requests';
 
 const DealsPage = () => {
   const router = useRouter();
@@ -71,6 +73,10 @@ const DealsPage = () => {
   const [issuesFilter, setIssuesFilter] = useState('');
   const [issuesStatusFilter, setIssuesStatusFilter] = useState<IssueStatus | ''>('');
 
+  const [requestsSorting, setRequestsSorting] = useState<SortingState>([{ id: 'createdAt', desc: true }]);
+  const [requestsPagination, setRequestsPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
+  const [requestsFilter, setRequestsFilter] = useState('');
+
   const [formOpen, setFormOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | undefined>();
   const [formMode, setFormMode] = useState<DealFormMode>('create');
@@ -81,6 +87,7 @@ const DealsPage = () => {
   const { data: dealsData } = useDealsList({ authToken });
   const { data: submittedData } = useSubmittedDealsList({ authToken });
   const { data: issuesData } = useReportedIssuesList({ authToken });
+  const { data: requestsData } = useDealRequestsList({ authToken });
   // TODO: fetchDealCounts must return real submitted count after API wiring
   const { data: counts } = useDealCounts({ authToken });
   const { data: whitelistData } = useDealsWhitelist({ authToken });
@@ -113,9 +120,7 @@ const DealsPage = () => {
     if (editingDeal?.uid) {
       await updateDeal.mutateAsync({ authToken, uid: editingDeal.uid, payload: data });
     } else {
-      const payload: TDealForm = reviewingSubmissionUid
-        ? { ...data, submissionUid: reviewingSubmissionUid }
-        : data;
+      const payload: TDealForm = reviewingSubmissionUid ? { ...data, submissionUid: reviewingSubmissionUid } : data;
       await createDeal.mutateAsync({ authToken, payload });
     }
   };
@@ -143,6 +148,7 @@ const DealsPage = () => {
       tappedHowToRedeemCount: 0,
       markedAsUsingCount: 0,
       submittedIssuesCount: 0,
+      isHighValue: false,
     };
     setEditingDeal(prefilled);
     setFormOpen(true);
@@ -159,6 +165,10 @@ const DealsPage = () => {
   useEffect(() => {
     setIssuesPagination((p) => ({ ...p, pageIndex: 0 }));
   }, [issuesFilter, issuesStatusFilter]);
+
+  useEffect(() => {
+    setRequestsPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [requestsFilter]);
 
   // Apply client-side filters on top of global filter
   const filteredDeals = useMemo(
@@ -229,6 +239,16 @@ const DealsPage = () => {
     },
   });
 
+  const { table: requestsTable } = useDealRequestsTable({
+    requests: requestsData,
+    sorting: requestsSorting,
+    setSorting: setRequestsSorting,
+    pagination: requestsPagination,
+    setPagination: setRequestsPagination,
+    globalFilter: requestsFilter,
+    setGlobalFilter: setRequestsFilter,
+  });
+
   useEffect(() => {
     if (!authToken) {
       router.push(`/?backlink=${router.asPath}`);
@@ -249,6 +269,9 @@ const DealsPage = () => {
     router.replace({ query: { tab: t } }, undefined, { shallow: true });
   };
 
+  const columnSizeStyle = (size: number) =>
+    size > 0 ? { width: size, flexBasis: size } : undefined;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderTable = (activeTable: Table<any>, noTopBorder = false) => (
     <div className={clsx(s.table, { [s.tableWithControlBar]: noTopBorder })}>
@@ -265,8 +288,7 @@ const DealsPage = () => {
                   [s.flexible]: !header.column.columnDef.size,
                 })}
                 style={{
-                  width: header.column.getSize(),
-                  flexBasis: header.column.getSize(),
+                  ...columnSizeStyle(header.column.getSize()),
                   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                   // @ts-ignore
                   justifyContent: header.column.columnDef.meta?.align === 'center' ? 'center' : 'flex-start',
@@ -295,8 +317,7 @@ const DealsPage = () => {
                   [s.flexible]: !cell.column.columnDef.size,
                 })}
                 style={{
-                  width: cell.column.getSize(),
-                  flexBasis: cell.column.getSize(),
+                  ...columnSizeStyle(cell.column.getSize()),
                   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                   // @ts-ignore
                   justifyContent: cell.column.columnDef.meta?.align === 'center' ? 'center' : 'flex-start',
@@ -315,7 +336,8 @@ const DealsPage = () => {
     <ApprovalLayout>
       <div className={s.root}>
         <div className={s.header}>
-          <span className={s.title}>Deals</span>
+          <span className={s.title}>Deals Management</span>
+          <p className={s.subtitle}>Manage the deal catalog, review submissions, and handle reported issues.</p>
         </div>
 
         <div className={s.tabs}>
@@ -340,6 +362,10 @@ const DealsPage = () => {
           <button className={clsx(s.tab, { [s.active]: tab === 'access' })} onClick={() => setTab('access')}>
             Access Management
             <span className={clsx(s.tabCount, { [s.active]: tab === 'access' })}>{whitelistData?.length ?? 0}</span>
+          </button>
+          <button className={clsx(s.tab, { [s.active]: tab === 'requests' })} onClick={() => setTab('requests')}>
+            Deal Requests
+            <span className={clsx(s.tabCount, { [s.active]: tab === 'requests' })}>{counts?.requests ?? 0}</span>
           </button>
         </div>
 
@@ -484,6 +510,36 @@ const DealsPage = () => {
             </>
           )}
           {tab === 'access' && <DealsWhitelistSection authToken={authToken} />}
+          {tab === 'requests' && (
+            <>
+              <div className={s.controlBar}>
+                <input
+                  value={requestsFilter}
+                  onChange={(e) => setRequestsFilter(e.target.value)}
+                  placeholder="Search deals"
+                  className={s.searchInput}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setRequestsFilter('');
+                  }}
+                />
+                {/* status filter not applicable to deal requests — rendered for visual parity with Figma */}
+                <select className={s.filterSelect} disabled>
+                  <option value="">All statuses</option>
+                </select>
+                <button
+                  className={s.addNewBtn}
+                  onClick={() => {
+                    setEditingDeal(undefined);
+                    setFormOpen(true);
+                  }}
+                >
+                  + Create new deal
+                </button>
+              </div>
+              {renderTable(requestsTable, true)}
+              <PaginationControls table={requestsTable} />
+            </>
+          )}
         </div>
       </div>
 

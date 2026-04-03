@@ -75,6 +75,7 @@ function Modal({
   onClose,
   modalRef,
   blurBackdrop,
+  modalClassName,
 }: ModalProps) {
 
   return (
@@ -108,7 +109,7 @@ function Modal({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="mx-auto rounded-lg bg-white">
+                <Dialog.Panel className={['mx-auto rounded-lg bg-white', modalClassName].filter(Boolean).join(' ')}>
                   <div>{children}</div>
                 </Dialog.Panel>
               </Transition.Child>
