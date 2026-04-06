@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { generateText, LanguageModel } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
 import ogs from 'open-graph-scraper';
 import { Readable } from 'stream';
 import { AITeamEnrichmentResponse } from './team-enrichment.types';
+import { AiProviderService } from '../shared/ai-provider.service';
 
 const TEAM_ENRICHMENT_SYSTEM_PROMPT = `
 You are a professional research assistant specializing in company/fund data enrichment.
@@ -11,7 +11,7 @@ You are a professional research assistant specializing in company/fund data enri
 TASK: Research and enrich the profile of the company or investment fund described below.
 
 CRITICAL REQUIREMENTS:
-1. Use web_search_preview tool to find information about the company/fund
+1. Use the available web search tool to find information about the company/fund
 2. All URLs must be valid and directly related to the company
 3. Never fabricate URLs - only return URLs you found in search results
 4. LinkedIn handlers should be in format "company/name" (without full URL)
@@ -102,11 +102,8 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
 @Injectable()
 export class TeamEnrichmentAiService {
   private readonly logger = new Logger(TeamEnrichmentAiService.name);
-  private readonly MODEL_NAME: string;
 
-  constructor() {
-    this.MODEL_NAME = process.env.OPENAI_TEAM_ENRICHMENT_MODEL || 'gpt-4o';
-  }
+  constructor(private readonly aiProvider: AiProviderService) {}
 
   async enrichTeamViaAI(
     teamName: string,
@@ -123,14 +120,15 @@ export class TeamEnrichmentAiService {
     try {
       const userPrompt = this.buildUserPrompt(teamName, existingData);
 
+      const providerEnvVar = 'TEAM_ENRICHMENT_AI_PROVIDER';
+      const tools = this.aiProvider.getWebSearchTool(providerEnvVar, { searchContextSize: 'high' });
+
       const { text } = await generateText({
-        model: openai.responses(this.MODEL_NAME) as LanguageModel,
+        model: this.aiProvider.getResponsesModel(providerEnvVar, 'OPENAI_TEAM_ENRICHMENT_MODEL', {
+          useSearchGrounding: true,
+        }),
         system: TEAM_ENRICHMENT_SYSTEM_PROMPT,
-        tools: {
-          web_search_preview: openai.tools.webSearchPreview({
-            searchContextSize: 'high',
-          }),
-        },
+        ...(Object.keys(tools).length > 0 && { tools }),
         prompt: userPrompt,
         temperature: 0.3,
         maxSteps: 3,
