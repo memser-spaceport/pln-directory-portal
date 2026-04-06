@@ -11,16 +11,24 @@ You are a professional research assistant specializing in company/fund data enri
 TASK: Research and enrich the profile of the company or investment fund described below.
 
 CRITICAL REQUIREMENTS:
-1. Use the available web search tool to find information about the company/fund
-2. All URLs must be valid and directly related to the company
-3. Never fabricate URLs - only return URLs you found in search results
-4. LinkedIn handlers should be in format "company/name" (without full URL)
+1. All URLs must be valid and directly related to the company
+2. Never fabricate URLs - only return URLs you found in search results
+3. LinkedIn handlers should be in format "company/name" (without full URL)
+4. Pay close attention to the EXACT entity name provided. If multiple entities with similar names exist, choose the one that EXACTLY matches the provided name.
+
+WEBSITE DISCOVERY:
+- The company may have its own standalone domain OR a dedicated page on a parent organization's website
+- Web3/blockchain entities often exist as pages on ecosystem hubs, foundation sites, DAO portals, or governance forums
+- Both standalone domains AND subpages on parent organization sites are acceptable as "website"
+- Return ALL relevant candidate URLs in "websiteCandidates" (forum pages, hub pages, foundation pages, third-party profiles)
+- Pick the best one as "website" — prefer official ecosystem hubs and dedicated pages over third-party aggregators
+- For "websiteOwnerName": return the name as displayed on the found website/page
 
 FIELDS TO POPULATE:
 
-1. website: The company's official website URL (e.g., "https://example.com"). Only populate if not already known.
-
-1b. websiteOwnerName: The EXACT company/organization name as displayed on the found website (from its homepage, about page, or meta tags). This is used to verify the website belongs to the correct company. If website is null, set this to null too.
+1. website: The company's best official website URL or dedicated page
+1b. websiteOwnerName: The name as displayed on the found website/page. This is used to verify the website belongs to the correct entity.
+1c. websiteCandidates: Array of ALL relevant URLs found for this entity (official pages, forum posts, hub pages, third-party profiles)
 
 2. blog: Blog URL if available
 
@@ -60,19 +68,22 @@ FIELDS TO POPULATE:
 NOTE: Logo discovery is handled separately — do NOT search for logos.
 
 SEARCH STRATEGY:
-1. Search for "[Company Name]" to find general information and their official website
-2. If the website is unknown, prioritize finding the official website first — this helps validate other information
-3. Search for "[Company Name] Twitter" or "[Company Name] X" to find their Twitter/X handle
-4. Search for "[Company Name] Telegram" to find their Telegram channel/group
-5. Search for "[Company Name] contact" or "[Company Name] email" to find contact info
-6. Search for "[Company Name]" + about or team
+1. Search for "[Company Name]" (exact, in quotes) to find general information
+2. Search "[Company Name] official website"
+3. Search "[Company Name] initiative" or "[Company Name] program" or "[Company Name] working group" (many Web3/crypto entities are initiatives within larger ecosystems)
+4. Search for "[Company Name] Twitter" or "[Company Name] X" to find their Twitter/X handle
+5. Search for "[Company Name] Telegram" to find their Telegram channel/group
+6. Search for "[Company Name] contact" or "[Company Name] email" to find contact info
+7. Search for "[Company Name]" + about or team
+8. If the entity is part of a larger ecosystem (e.g., a DAO working group), search for it within that ecosystem's website
 
 CRITICAL: You MUST ALWAYS respond with valid JSON.
 
 OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
 {
   "website": "https://..." or null,
-  "websiteOwnerName": "Exact Company Name from website" or null,
+  "websiteOwnerName": "Name as shown on website" or null,
+  "websiteCandidates": ["https://url1", "https://url2", ...],
   "blog": "https://..." or null,
   "contactMethod": "email@example.com" or "https://slack.com/..." or "discord.gg/..." or null,
   "linkedinHandler": "company/..." or null,
@@ -170,11 +181,19 @@ ${existingData.twitterHandler ? `Existing Twitter/X: ${existingData.twitterHandl
 ${existingData.telegramHandler ? `Existing Telegram: ${existingData.telegramHandler}` : 'Telegram: Unknown'}
 ${existingDescription ? `Existing Description: ${existingDescription}` : 'Description: Not available'}
 
+IMPORTANT: The entity name is EXACTLY "${teamName}". If there are similarly-named entities, make sure you find information about this exact one.
+
+CONTEXT:
+- This entity may operate in the Web3/blockchain/crypto ecosystem
+- It could be a DAO initiative, working group, or venture fund within a larger protocol ecosystem
+- Look for dedicated pages within ecosystem hubs and foundation sites, not just standalone domains
+
 TASK:
 1. Search for "${teamName}" to find additional information ${!existingData.website ? `
-2. The website is unknown — prioritize finding the official website first and set "websiteOwnerName" to the exact company name displayed on the found website
-3. Gather information about their team, history, and achievements for moreDetails
-4. Find a contact method (email preferred, otherwise Slack, Discord, etc.)` : `
+2. The website is unknown — prioritize finding the official website or dedicated page first
+3. Return ALL candidate URLs found in "websiteCandidates"
+4. Gather information about their team, history, and achievements for moreDetails
+5. Find a contact method (email preferred, otherwise Slack, Discord, etc.)` : `
 2. Gather information about their team, history, and achievements for moreDetails
 3. Find a contact method (email preferred, otherwise Slack, Discord, etc.)`}
 
@@ -198,6 +217,10 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
     try {
       const parsed = JSON.parse(jsonMatch[0]);
+
+      const websiteCandidates: string[] = Array.isArray(parsed.websiteCandidates)
+        ? parsed.websiteCandidates.map((u: string) => this.validateUrl(u)).filter(Boolean)
+        : [];
 
       // Filter out low-confidence website results
       const websiteConfidence = parsed.confidence?.website?.toLowerCase();
@@ -224,6 +247,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       return {
         website: this.validateUrl(parsed.website),
         websiteOwnerName: parsed.websiteOwnerName || null,
+        websiteCandidates,
         blog: this.validateUrl(parsed.blog),
         contactMethod: this.sanitizeContactMethod(parsed.contactMethod),
         linkedinHandler: this.sanitizeLinkedInHandler(parsed.linkedinHandler),
@@ -251,6 +275,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     return {
       website: null,
       websiteOwnerName: null,
+      websiteCandidates: [],
       blog: null,
       contactMethod: null,
       linkedinHandler: null,
@@ -462,6 +487,9 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
   /**
    * Check if the website owner name matches the expected team name.
+   * Uses contiguous substring matching only — NOT individual word presence.
+   * e.g., "Arbitrum Ventures Program" matches "Arbitrum Ventures" (contiguous)
+   * but  "Arbitrum Gaming Ventures" does NOT match "Arbitrum Ventures" (different entity)
    */
   private isCompanyNameMatch(expectedName: string, foundName: string): boolean {
     const normalize = (s: string) =>
@@ -475,18 +503,13 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     // Exact match
     if (expected === found) return true;
 
-    // If the found name has extra words not in the expected name, reject
-    const expectedWords = expected.split(/\s+/);
-    const foundWords = found.split(/\s+/);
+    // Contiguous substring match: one name fully contains the other as a continuous string
+    if (found.includes(expected) || expected.includes(found)) return true;
 
-    // All words in the found name must be present in the expected name
-    const extraWords = foundWords.filter((w) => !expectedWords.includes(w));
-    if (extraWords.length > 0) {
-      this.logger.warn(`Website owner has extra words not in team name: [${extraWords.join(', ')}]`);
-      return false;
-    }
-
-    return true;
+    this.logger.warn(
+      `Website owner name "${foundName}" does not match expected "${expectedName}"`
+    );
+    return false;
   }
 
   private validateUrl(url: string | null | undefined): string | null {

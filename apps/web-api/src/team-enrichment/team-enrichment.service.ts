@@ -200,43 +200,46 @@ export class TeamEnrichmentService {
       const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
       const existingFields = existingMeta?.fields || {};
 
-      // If the team had no website and AI couldn't find one, skip all enrichment —
-      // without a verified website, other data (descriptions, socials) is unreliable
+      // Verify entity identity: if the AI found the wrong entity, ALL data is suspect.
+      // We check the website owner name AND the short/long descriptions for the team name.
+      // If we can't verify identity via any source, skip all enrichment to avoid poisoning fields.
       const hadNoWebsite = !team.website || team.website.trim() === '';
-      const aiFoundNoWebsite = !aiResponse.website;
-      if (hadNoWebsite && aiFoundNoWebsite) {
-        this.logger.warn(
-          `Team ${teamUid} (${team.name}): website could not be enriched — skipping all fields to avoid incorrect data`
-        );
+      if (hadNoWebsite) {
+        const isEntityVerified = this.verifyEntityIdentity(team.name, aiResponse);
+        if (!isEntityVerified) {
+          this.logger.warn(
+            `Team ${teamUid} (${team.name}): could not verify entity identity — skipping all fields to avoid incorrect data`
+          );
 
-        const allCannotEnrich: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};
-        for (const field of ENRICHABLE_TEAM_FIELDS) {
-          if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
-            allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
+          const allCannotEnrich: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};
+          for (const field of ENRICHABLE_TEAM_FIELDS) {
+            if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
+              allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
+            }
           }
-        }
-        for (const field of ['industryTags', 'investmentFocus'] as const) {
-          if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
-            allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
+          for (const field of ['industryTags', 'investmentFocus'] as const) {
+            if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
+              allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
+            }
           }
+
+          const enrichment: TeamDataEnrichment = {
+            shouldEnrich: false,
+            status: EnrichmentStatus.Enriched,
+            isAIGenerated: false,
+            enrichedAt: new Date().toISOString(),
+            enrichedBy,
+            fields: { ...existingFields, ...allCannotEnrich },
+          };
+
+          await this.prisma.team.update({
+            where: { uid: teamUid },
+            data: { dataEnrichment: enrichment as any },
+          });
+
+          this.logger.log(`Team ${teamUid} (${team.name}): marked all fields as CannotEnrich (entity not verified)`);
+          return;
         }
-
-        const enrichment: TeamDataEnrichment = {
-          shouldEnrich: false,
-          status: EnrichmentStatus.Enriched,
-          isAIGenerated: false,
-          enrichedAt: new Date().toISOString(),
-          enrichedBy,
-          fields: { ...existingFields, ...allCannotEnrich },
-        };
-
-        await this.prisma.team.update({
-          where: { uid: teamUid },
-          data: { dataEnrichment: enrichment as any },
-        });
-
-        this.logger.log(`Team ${teamUid} (${team.name}): marked all fields as CannotEnrich (no verified website)`);
-        return;
       }
 
       // Determine which fields need enrichment (skip already Enriched ones)
@@ -313,11 +316,21 @@ export class TeamEnrichmentService {
       }
 
       // Handle logo via OG tag scraping
-      // If AI discovered a website and team didn't have one, use it for logo fetch
+      // Try the effective website first, then fall back to websiteCandidates
       const effectiveWebsite = team.website || aiResponse.website || null;
       if (!team.logoUid) {
         this.logger.log(`Attempting logo fetch for team ${teamUid} (${team.name}) from website: ${effectiveWebsite}`);
-        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite);
+        let logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite);
+
+        // If primary website didn't yield a logo, try websiteCandidates
+        if (!logoResult && aiResponse.websiteCandidates.length > 0) {
+          for (const candidateUrl of aiResponse.websiteCandidates) {
+            if (candidateUrl === effectiveWebsite) continue;
+            this.logger.log(`Trying logo from website candidate: ${candidateUrl}`);
+            logoResult = await this.aiService.fetchLogoFromWebsite(team.name, candidateUrl);
+            if (logoResult) break;
+          }
+        }
 
         if (logoResult) {
           this.logger.log(`Logo metadata found for team ${teamUid} (${team.name}): ${logoResult.logoUrl}`);
@@ -469,6 +482,134 @@ export class TeamEnrichmentService {
       return data as TeamDataEnrichment;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Cross-validates that the AI response is about the correct entity.
+   * Checks multiple signals: website owner name, descriptions, and sources.
+   * Returns true only if we're confident the data is about the right team.
+   */
+  private verifyEntityIdentity(
+    teamName: string,
+    aiResponse: { website: string | null; websiteOwnerName: string | null; shortDescription: string | null; longDescription: string | null; sources: string[] }
+  ): boolean {
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim();
+
+    const normalizedTeamName = normalize(teamName);
+    const teamWords = normalizedTeamName.split(/\s+/);
+
+    // Signal 1: Website owner name matches the team name
+    // Must be a substring match (contiguous words), NOT just individual word presence.
+    // e.g., "Arbitrum Ventures Program" matches "Arbitrum Ventures" (contiguous substring)
+    // but "Arbitrum Gaming Ventures" does NOT match "Arbitrum Ventures" (different entity)
+    let websiteNameMatch = false;
+    if (aiResponse.websiteOwnerName) {
+      const normalizedOwner = normalize(aiResponse.websiteOwnerName);
+      websiteNameMatch =
+        normalizedOwner.includes(normalizedTeamName) ||
+        normalizedTeamName.includes(normalizedOwner);
+    }
+
+    // Signal 2: Descriptions mention the exact team name as a standalone phrase
+    // We check that the team name appears in the description and is NOT part of a longer entity name
+    // e.g., "Arbitrum Ventures" in "Arbitrum Gaming Ventures focuses on..." is NOT a match
+    let descriptionMatch = false;
+    const descriptionsToCheck = [aiResponse.shortDescription, aiResponse.longDescription].filter((d): d is string => !!d);
+    for (const desc of descriptionsToCheck) {
+      if (this.containsExactEntityName(normalize(desc), normalizedTeamName)) {
+        descriptionMatch = true;
+        break;
+      }
+    }
+
+    // Signal 3: Sources contain URLs that reference the team name
+    let sourceMatch = false;
+    const urlSlug = teamWords.join('-');
+    const urlSlugAlt = teamWords.join('');
+    for (const source of aiResponse.sources || []) {
+      const lowerSource = source.toLowerCase();
+      if (lowerSource.includes(urlSlug) || lowerSource.includes(urlSlugAlt)) {
+        sourceMatch = true;
+        break;
+      }
+    }
+
+    const matchCount = [websiteNameMatch, descriptionMatch, sourceMatch].filter(Boolean).length;
+
+    this.logger.log(
+      `Entity verification for "${teamName}": website=${websiteNameMatch}, description=${descriptionMatch}, sources=${sourceMatch} (${matchCount}/3 signals)`
+    );
+
+    // If website owner name matches, we trust it (strongest signal)
+    if (websiteNameMatch) return true;
+
+    // Otherwise need at least 2 of 3 signals to confirm identity
+    if (matchCount >= 2) return true;
+
+    // If description matches with exact entity name, it's a decent signal on its own
+    if (descriptionMatch) return true;
+
+    return false;
+  }
+
+  /**
+   * Checks if a text contains the entity name as a standalone phrase,
+   * NOT as part of a longer entity name.
+   * e.g., "arbitrum ventures is a fund" → true for "arbitrum ventures"
+   *        "arbitrum gaming ventures is a fund" → false for "arbitrum ventures"
+   */
+  private containsExactEntityName(text: string, entityName: string): boolean {
+    let startIndex = 0;
+    while (true) {
+      const idx = text.indexOf(entityName, startIndex);
+      if (idx === -1) return false;
+
+      // Check what comes before and after the match
+      const charBefore = idx > 0 ? text[idx - 1] : ' ';
+      const charAfter = idx + entityName.length < text.length ? text[idx + entityName.length] : ' ';
+
+      // Must be at a word boundary
+      const isWordBoundaryBefore = charBefore === ' ' || idx === 0;
+      const isWordBoundaryAfter = charAfter === ' ' || charAfter === ',' || charAfter === '.' ||
+        charAfter === ')' || charAfter === ':' || charAfter === ';' || idx + entityName.length === text.length;
+
+      if (isWordBoundaryBefore && isWordBoundaryAfter) {
+        // It's at a word boundary, but we also need to check the surrounding context
+        // isn't forming a longer entity name. Check if the word before or after is a capitalized
+        // word that could be part of a compound entity name.
+        // Since text is already normalized (lowercase), we check for adjacent name-like words
+
+        // Get the word right before the entity name
+        const textBefore = text.substring(0, idx).trim();
+        const wordBefore = textBefore.split(/\s+/).pop() || '';
+
+        // Get the word right after the entity name
+        const textAfter = text.substring(idx + entityName.length).trim();
+        const wordAfter = textAfter.split(/\s+/)[0] || '';
+
+        // Words that suggest a different entity when prepended/appended
+        // e.g., "gaming" before "ventures" in "arbitrum gaming ventures"
+        const entityExtendingWords = ['gaming', 'capital', 'labs', 'studio', 'studios', 'digital', 'global', 'network'];
+
+        // Check if the word before is NOT an entity-extending word
+        const beforeSafe = !entityExtendingWords.includes(wordBefore);
+        // Check if the word after is NOT an entity-extending word (but allow common suffixes)
+        const safeSuffixes = ['is', 'was', 'has', 'are', 'aims', 'provides', 'offers', 'focuses',
+          'represents', 'initiative', 'program', 'fund', 'working', 'group', 'agv', 'avi',
+          'formerly', 'also', 'the', 'a', 'an', 'and', 'or', 'for', 'to', 'in', 'on', 'at', 'by', 'with', ''];
+        const afterSafe = safeSuffixes.includes(wordAfter) || !entityExtendingWords.includes(wordAfter);
+
+        if (beforeSafe && afterSafe) {
+          return true;
+        }
+      }
+
+      startIndex = idx + 1;
     }
   }
 
