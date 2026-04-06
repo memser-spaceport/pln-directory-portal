@@ -203,6 +203,7 @@ model Member {
   articles                Article[]          @relation("MemberArticles")
   articleStatistics       ArticleStatistic[] @relation("MemberArticleStatistics")
   articleWhitelist        ArticleWhitelist?  @relation("MemberArticleWhitelist")
+  articleRequests         ArticleRequest[]    @relation("MemberArticleRequests")
   roleAssignments         RoleAssignment[]   @relation("MemberRoleAssignments")
   roleAssignmentsGiven    RoleAssignment[]   @relation("MemberRoleAssignmentsGiven")
   memberPermissions       MemberPermission[] @relation("MemberDirectPermissions")
@@ -1599,6 +1600,26 @@ enum ArticleStatus {
   PUBLISHED
 }
 
+
+model ArticleRequest {
+  id                 Int      @id @default(autoincrement())
+  uid                String   @unique @default(cuid())
+  articleUid         String?
+  article            Article? @relation(fields: [articleUid], references: [uid], onDelete: Cascade)
+  title              String
+  description        String?
+  requestedByUserUid String
+  requestedByUser    Member   @relation("MemberArticleRequests", fields: [requestedByUserUid], references: [uid], onDelete: Cascade)
+  requestedDate      DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([articleUid, requestedByUserUid])
+  @@index([articleUid])
+  @@index([requestedByUserUid])
+  @@index([requestedDate])
+}
+
 model Article {
   id              Int                @id @default(autoincrement())
   uid             String             @unique @default(cuid())
@@ -1624,6 +1645,7 @@ model Article {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   statistics      ArticleStatistic[]
+  requests        ArticleRequest[]
 
   @@index([status])
   @@index([category])
