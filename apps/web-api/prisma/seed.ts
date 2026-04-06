@@ -191,6 +191,101 @@ async function seedAdminRoleAssignments() {
 }
 
 
+
+async function seedArticleRequests() {
+  console.log('=== Seed: article requests (start) ===');
+
+  const articles = await prisma.article.findMany({
+    take: 2,
+    orderBy: { createdAt: 'asc' },
+    select: { uid: true },
+  });
+
+  const members = await prisma.member.findMany({
+    take: 2,
+    orderBy: { createdAt: 'asc' },
+    select: { uid: true },
+  });
+
+  const firstMember = members[0];
+  const secondMember = members[1];
+  const firstArticle = articles[0];
+  const secondArticle = articles[1];
+
+  if (!firstMember) {
+    console.log('⚠️ Skipping article request seed: members not found');
+    return;
+  }
+
+  const seedRows: Array<{
+    articleUid?: string;
+    title: string;
+    description: string;
+    requestedByUserUid: string;
+  }> = [];
+
+  if (firstArticle) {
+    seedRows.push({
+      articleUid: firstArticle.uid,
+      title: 'Guide about raising a pre-seed round',
+      description:
+        'Would be helpful to have a practical guide with examples and common investor questions.',
+      requestedByUserUid: firstMember.uid,
+    });
+  }
+
+  if (secondMember && secondArticle) {
+    seedRows.push({
+      articleUid: secondArticle.uid,
+      title: 'Guide about Delaware C-Corp setup',
+      description:
+        'Please add a founder guide covering incorporation flow, costs, and legal pitfalls.',
+      requestedByUserUid: secondMember.uid,
+    });
+  }
+
+  seedRows.push({
+    title: 'Guide request without linked article',
+    description: 'General request not attached to any existing article.',
+    requestedByUserUid: firstMember.uid,
+  });
+
+  for (const row of seedRows) {
+    if (row.articleUid) {
+      await prisma.articleRequest.upsert({
+        where: {
+          articleUid_requestedByUserUid: {
+            articleUid: row.articleUid,
+            requestedByUserUid: row.requestedByUserUid,
+          },
+        },
+        create: {
+          articleUid: row.articleUid,
+          title: row.title,
+          description: row.description,
+          requestedByUserUid: row.requestedByUserUid,
+        },
+        update: {
+          title: row.title,
+          description: row.description,
+        },
+      });
+    } else {
+      await prisma.articleRequest.create({
+        data: {
+          title: row.title,
+          description: row.description,
+          requestedByUserUid: row.requestedByUserUid,
+        },
+      });
+    }
+  }
+
+  console.log(`✅ Added ${seedRows.length} article request records`);
+  console.log('=== Seed: article requests (done) ===');
+}
+
+
 async function seedDealRequests() {
   console.log('=== Seed: deal requests (start) ===');
 
@@ -328,6 +423,7 @@ async function main() {
   // After members + roles are created, assign DEMO_DAY_ADMIN role to demo day admins
   await seedAdminRoleAssignments();
   await seedDealRequests();
+  await seedArticleRequests();
 
   // Link InvestorProfiles to Members (update Member.investorProfileId)
   await linkInvestorProfilesToMembers();
