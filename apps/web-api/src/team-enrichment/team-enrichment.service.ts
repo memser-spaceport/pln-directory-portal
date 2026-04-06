@@ -200,46 +200,19 @@ export class TeamEnrichmentService {
       const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
       const existingFields = existingMeta?.fields || {};
 
-      // Verify entity identity: if the AI found the wrong entity, ALL data is suspect.
-      // We check the website owner name AND the short/long descriptions for the team name.
-      // If we can't verify identity via any source, skip all enrichment to avoid poisoning fields.
+      // Verify entity identity to decide which fields are safe to enrich.
+      // Website and logo require high confidence (verified entity).
+      // Other fields (descriptions, socials, tags) are enriched regardless — the AI
+      // was asked about the exact name, and these fields are usually correct even when the website match fails.
       const hadNoWebsite = !team.website || team.website.trim() === '';
-      if (hadNoWebsite) {
-        const isEntityVerified = this.verifyEntityIdentity(team.name, aiResponse);
-        if (!isEntityVerified) {
-          this.logger.warn(
-            `Team ${teamUid} (${team.name}): could not verify entity identity — skipping all fields to avoid incorrect data`
-          );
-
-          const allCannotEnrich: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};
-          for (const field of ENRICHABLE_TEAM_FIELDS) {
-            if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
-              allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
-            }
-          }
-          for (const field of ['industryTags', 'investmentFocus'] as const) {
-            if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
-              allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
-            }
-          }
-
-          const enrichment: TeamDataEnrichment = {
-            shouldEnrich: false,
-            status: EnrichmentStatus.Enriched,
-            isAIGenerated: false,
-            enrichedAt: new Date().toISOString(),
-            enrichedBy,
-            fields: { ...existingFields, ...allCannotEnrich },
-          };
-
-          await this.prisma.team.update({
-            where: { uid: teamUid },
-            data: { dataEnrichment: enrichment as any },
-          });
-
-          this.logger.log(`Team ${teamUid} (${team.name}): marked all fields as CannotEnrich (entity not verified)`);
-          return;
-        }
+      const isEntityVerified = hadNoWebsite ? this.verifyEntityIdentity(team.name, aiResponse) : true;
+      if (!isEntityVerified) {
+        this.logger.warn(
+          `Team ${teamUid} (${team.name}): entity identity not verified — will skip website and logo, but still enrich other fields`
+        );
+        // Clear website from AI response so it won't be used for enrichment or logo
+        aiResponse.website = null;
+        aiResponse.websiteCandidates = [];
       }
 
       // Determine which fields need enrichment (skip already Enriched ones)
@@ -372,6 +345,7 @@ export class TeamEnrichmentService {
         isAIGenerated: Object.values(mergedFields).some((s) => s === FieldEnrichmentStatus.Enriched),
         enrichedAt: new Date().toISOString(),
         enrichedBy,
+        aiModel: this.aiService.getModelName(),
         fields: mergedFields,
       };
 
@@ -484,7 +458,13 @@ export class TeamEnrichmentService {
    */
   private verifyEntityIdentity(
     teamName: string,
-    aiResponse: { website: string | null; websiteOwnerName: string | null; shortDescription: string | null; longDescription: string | null; sources: string[] }
+    aiResponse: {
+      website: string | null;
+      websiteOwnerName: string | null;
+      shortDescription: string | null;
+      longDescription: string | null;
+      sources: string[];
+    }
   ): boolean {
     const normalize = (s: string) =>
       s
@@ -502,16 +482,16 @@ export class TeamEnrichmentService {
     let websiteNameMatch = false;
     if (aiResponse.websiteOwnerName) {
       const normalizedOwner = normalize(aiResponse.websiteOwnerName);
-      websiteNameMatch =
-        normalizedOwner.includes(normalizedTeamName) ||
-        normalizedTeamName.includes(normalizedOwner);
+      websiteNameMatch = normalizedOwner.includes(normalizedTeamName) || normalizedTeamName.includes(normalizedOwner);
     }
 
     // Signal 2: Descriptions mention the exact team name as a standalone phrase
     // We check that the team name appears in the description and is NOT part of a longer entity name
     // e.g., "Arbitrum Ventures" in "Arbitrum Gaming Ventures focuses on..." is NOT a match
     let descriptionMatch = false;
-    const descriptionsToCheck = [aiResponse.shortDescription, aiResponse.longDescription].filter((d): d is string => !!d);
+    const descriptionsToCheck = [aiResponse.shortDescription, aiResponse.longDescription].filter(
+      (d): d is string => !!d
+    );
     for (const desc of descriptionsToCheck) {
       if (this.containsExactEntityName(normalize(desc), normalizedTeamName)) {
         descriptionMatch = true;
@@ -567,8 +547,14 @@ export class TeamEnrichmentService {
 
       // Must be at a word boundary
       const isWordBoundaryBefore = charBefore === ' ' || idx === 0;
-      const isWordBoundaryAfter = charAfter === ' ' || charAfter === ',' || charAfter === '.' ||
-        charAfter === ')' || charAfter === ':' || charAfter === ';' || idx + entityName.length === text.length;
+      const isWordBoundaryAfter =
+        charAfter === ' ' ||
+        charAfter === ',' ||
+        charAfter === '.' ||
+        charAfter === ')' ||
+        charAfter === ':' ||
+        charAfter === ';' ||
+        idx + entityName.length === text.length;
 
       if (isWordBoundaryBefore && isWordBoundaryAfter) {
         // It's at a word boundary, but we also need to check the surrounding context
@@ -591,9 +577,39 @@ export class TeamEnrichmentService {
         // Check if the word before is NOT an entity-extending word
         const beforeSafe = !entityExtendingWords.includes(wordBefore);
         // Check if the word after is NOT an entity-extending word (but allow common suffixes)
-        const safeSuffixes = ['is', 'was', 'has', 'are', 'aims', 'provides', 'offers', 'focuses',
-          'represents', 'initiative', 'program', 'fund', 'working', 'group', 'agv', 'avi',
-          'formerly', 'also', 'the', 'a', 'an', 'and', 'or', 'for', 'to', 'in', 'on', 'at', 'by', 'with', ''];
+        const safeSuffixes = [
+          'is',
+          'was',
+          'has',
+          'are',
+          'aims',
+          'provides',
+          'offers',
+          'focuses',
+          'represents',
+          'initiative',
+          'program',
+          'fund',
+          'working',
+          'group',
+          'agv',
+          'avi',
+          'formerly',
+          'also',
+          'the',
+          'a',
+          'an',
+          'and',
+          'or',
+          'for',
+          'to',
+          'in',
+          'on',
+          'at',
+          'by',
+          'with',
+          '',
+        ];
         const afterSafe = safeSuffixes.includes(wordAfter) || !entityExtendingWords.includes(wordAfter);
 
         if (beforeSafe && afterSafe) {

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { generateText } from 'ai';
 import ogs from 'open-graph-scraper';
 import { Readable } from 'stream';
+import sizeOf from 'image-size';
 import { AITeamEnrichmentResponse } from './team-enrichment.types';
 import { AiProviderService } from '../shared/ai-provider.service';
 
@@ -114,7 +115,20 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
 export class TeamEnrichmentAiService {
   private readonly logger = new Logger(TeamEnrichmentAiService.name);
 
+  private static readonly PROVIDER_ENV_VAR = 'TEAM_ENRICHMENT_AI_PROVIDER';
+  private static readonly MODEL_ENV_VAR = 'OPENAI_TEAM_ENRICHMENT_MODEL';
+
   constructor(private readonly aiProvider: AiProviderService) {}
+
+  /**
+   * Returns the AI model name used for team enrichment (e.g., "gpt-4o", "gemini-2.5-flash").
+   */
+  getModelName(): string {
+    return this.aiProvider.getModelName(
+      TeamEnrichmentAiService.PROVIDER_ENV_VAR,
+      TeamEnrichmentAiService.MODEL_ENV_VAR
+    );
+  }
 
   async enrichTeamViaAI(
     teamName: string,
@@ -131,11 +145,11 @@ export class TeamEnrichmentAiService {
     try {
       const userPrompt = this.buildUserPrompt(teamName, existingData);
 
-      const providerEnvVar = 'TEAM_ENRICHMENT_AI_PROVIDER';
+      const providerEnvVar = TeamEnrichmentAiService.PROVIDER_ENV_VAR;
       const tools = this.aiProvider.getWebSearchTool(providerEnvVar, { searchContextSize: 'high' });
 
       const { text } = await generateText({
-        model: this.aiProvider.getResponsesModel(providerEnvVar, 'OPENAI_TEAM_ENRICHMENT_MODEL', {
+        model: this.aiProvider.getResponsesModel(providerEnvVar, TeamEnrichmentAiService.MODEL_ENV_VAR, {
           useSearchGrounding: true,
         }),
         system: TEAM_ENRICHMENT_SYSTEM_PROMPT,
@@ -305,7 +319,8 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
       const candidates: string[] = [];
 
-      // 1. Try open-graph-scraper for OG/Twitter/favicon metadata
+      // 1. Try open-graph-scraper — prioritize favicon (most reliable logo source)
+      // Skip og:image and twitter:image as they are often banners/hero images, not logos
       try {
         const { result } = await ogs({
           url: websiteUrl,
@@ -319,27 +334,12 @@ Current Date: ${new Date().toISOString().split('T')[0]}
           },
         });
 
-        if (result.ogImage?.length) {
-          for (const img of result.ogImage) {
-            if (img.url) candidates.push(img.url);
-          }
-          this.logger.log(`Found ${result.ogImage.length} og:image(s) for "${companyName}": ${candidates.join(', ')}`);
-        }
-
-        if (result.twitterImage?.length) {
-          for (const img of result.twitterImage) {
-            if (img.url && !candidates.includes(img.url)) candidates.push(img.url);
-          }
-          this.logger.log(
-            `Found twitter:image for "${companyName}": ${result.twitterImage.map((i) => i.url).join(', ')}`
-          );
-        }
-
+        // Favicon first — if it passes validation, use it immediately (it's almost always the actual logo)
         if (result.favicon) {
           const faviconUrl = result.favicon.startsWith('http')
             ? result.favicon
             : new URL(result.favicon, websiteUrl).href;
-          if (!candidates.includes(faviconUrl)) candidates.push(faviconUrl);
+          candidates.push(faviconUrl);
           this.logger.log(`Found favicon for "${companyName}": ${faviconUrl}`);
         }
       } catch (ogsError) {
@@ -348,14 +348,19 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
       // 2. Fallback: logo APIs by domain (no JS rendering needed)
       if (candidates.length === 0) {
-        this.logger.log(`No OG metadata found for "${companyName}", trying logo APIs for domain: ${domain}`);
-        candidates.push(
-          `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-          `https://icons.duckduckgo.com/ip3/${domain}.ico`
-        );
+        this.logger.log(`No favicon found for "${companyName}", trying logo APIs for domain: ${domain}`);
       }
+      candidates.push(
+        `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+        `https://icons.duckduckgo.com/ip3/${domain}.ico`
+      );
 
       this.logger.log(`Total ${candidates.length} logo candidate(s) for "${companyName}", validating...`);
+
+      // Validate all candidates: reject too small or too wide, prefer square
+      const MIN_DIMENSION = 100; // reject images smaller than 100px on either side
+      const MAX_ASPECT_RATIO = 1.5; // reject images wider/taller than 3:2
+      let bestCandidate: { url: string; score: number } | null = null;
 
       for (const candidate of candidates) {
         let resolvedUrl: string;
@@ -367,12 +372,54 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         }
 
         const validated = await this.validateLogoUrl(resolvedUrl);
-        if (validated) {
-          this.logger.log(`Logo validated for "${companyName}" via ${websiteUrl}: ${validated}`);
-          return { logoUrl: validated, domain };
-        } else {
+        if (!validated) {
           this.logger.warn(`Logo candidate failed validation for "${companyName}": ${resolvedUrl}`);
+          continue;
         }
+
+        // Check image dimensions and prefer square-ish logos
+        const dimensions = await this.getImageDimensions(validated.buffer);
+        if (dimensions) {
+          const { width, height } = dimensions;
+          const aspectRatio = Math.max(width, height) / Math.min(width, height);
+          this.logger.log(
+            `Logo candidate for "${companyName}": ${resolvedUrl} (${width}x${height}, ratio=${aspectRatio.toFixed(2)})`
+          );
+
+          if (width < MIN_DIMENSION || height < MIN_DIMENSION) {
+            this.logger.warn(
+              `Logo candidate too small for "${companyName}": ${resolvedUrl} (${width}x${height}, min=${MIN_DIMENSION}px)`
+            );
+            continue;
+          }
+
+          if (aspectRatio > MAX_ASPECT_RATIO) {
+            this.logger.warn(
+              `Logo candidate too wide/tall for "${companyName}": ${resolvedUrl} (ratio=${aspectRatio.toFixed(
+                2
+              )}, max=${MAX_ASPECT_RATIO})`
+            );
+            continue;
+          }
+
+          // Score: lower aspect ratio = better (1.0 = perfect square)
+          const score = 1 / aspectRatio;
+          if (!bestCandidate || score > bestCandidate.score) {
+            bestCandidate = { url: validated.url, score };
+          }
+        } else {
+          // Can't determine dimensions — skip, we require known dimensions >= 100px
+          this.logger.warn(`Logo candidate dimensions unknown for "${companyName}": ${resolvedUrl}, skipping`);
+        }
+      }
+
+      if (bestCandidate) {
+        this.logger.log(
+          `Best logo for "${companyName}" via ${websiteUrl}: ${bestCandidate.url} (score=${bestCandidate.score.toFixed(
+            2
+          )})`
+        );
+        return { logoUrl: bestCandidate.url, domain };
       }
 
       this.logger.warn(`All ${candidates.length} logo candidates failed validation for "${companyName}"`);
@@ -417,7 +464,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     };
   }
 
-  async validateLogoUrl(url: string | null | undefined): Promise<string | null> {
+  async validateLogoUrl(url: string | null | undefined): Promise<{ url: string; buffer: Buffer } | null> {
     if (!url) return null;
 
     try {
@@ -440,10 +487,23 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       if (response.ok) {
         const contentType = response.headers.get('content-type') || '';
         if (contentType.startsWith('image/')) {
-          return url;
+          const buffer = Buffer.from(await response.arrayBuffer());
+          return { url, buffer };
         }
       }
 
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getImageDimensions(buffer: Buffer): Promise<{ width: number; height: number } | null> {
+    try {
+      const result = sizeOf(buffer);
+      if (result.width && result.height) {
+        return { width: result.width, height: result.height };
+      }
       return null;
     } catch {
       return null;
@@ -506,9 +566,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     // Contiguous substring match: one name fully contains the other as a continuous string
     if (found.includes(expected) || expected.includes(found)) return true;
 
-    this.logger.warn(
-      `Website owner name "${foundName}" does not match expected "${expectedName}"`
-    );
+    this.logger.warn(`Website owner name "${foundName}" does not match expected "${expectedName}"`);
     return false;
   }
 

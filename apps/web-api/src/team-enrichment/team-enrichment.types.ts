@@ -42,6 +42,7 @@ export interface TeamDataEnrichment {
   reviewedAt?: string;
   reviewedBy?: string;
   errorMessage?: string;
+  aiModel?: string;
   fields: Partial<Record<EnrichableField, FieldEnrichmentStatus>>;
 }
 

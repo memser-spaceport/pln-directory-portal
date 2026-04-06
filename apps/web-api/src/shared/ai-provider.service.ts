@@ -55,10 +55,7 @@ export class AiProviderService {
       }) as unknown as LanguageModel;
     }
 
-    const model =
-      (modelEnvVar && process.env[modelEnvVar]) ||
-      process.env.OPENAI_LLM_MODEL ||
-      'gpt-4o';
+    const model = (modelEnvVar && process.env[modelEnvVar]) || process.env.OPENAI_LLM_MODEL || 'gpt-4o';
     return openai.responses(model) as LanguageModel;
   }
 
@@ -89,7 +86,14 @@ export class AiProviderService {
     };
   }
 
-  getProviderName(featureProviderEnvVar?: string): AiProviderType {
-    return this.resolveProvider(featureProviderEnvVar);
+  /**
+   * Returns the resolved model name string (e.g., "gpt-4o", "gemini-2.5-flash").
+   */
+  getModelName(featureProviderEnvVar?: string, modelEnvVar?: string): string {
+    const provider = this.resolveProvider(featureProviderEnvVar);
+    if (provider === 'gemini') {
+      return process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    }
+    return (modelEnvVar && process.env[modelEnvVar]) || process.env.OPENAI_LLM_MODEL || 'gpt-4o';
   }
 }
