@@ -315,22 +315,12 @@ export class TeamEnrichmentService {
         }
       }
 
-      // Handle logo via OG tag scraping
-      // Try the effective website first, then fall back to websiteCandidates
+      // Handle logo via OG tag scraping — only from a verified website
+      // Do NOT use websiteCandidates for logo since they are unverified and may belong to a different entity
       const effectiveWebsite = team.website || aiResponse.website || null;
-      if (!team.logoUid) {
+      if (!team.logoUid && effectiveWebsite) {
         this.logger.log(`Attempting logo fetch for team ${teamUid} (${team.name}) from website: ${effectiveWebsite}`);
-        let logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite);
-
-        // If primary website didn't yield a logo, try websiteCandidates
-        if (!logoResult && aiResponse.websiteCandidates.length > 0) {
-          for (const candidateUrl of aiResponse.websiteCandidates) {
-            if (candidateUrl === effectiveWebsite) continue;
-            this.logger.log(`Trying logo from website candidate: ${candidateUrl}`);
-            logoResult = await this.aiService.fetchLogoFromWebsite(team.name, candidateUrl);
-            if (logoResult) break;
-          }
-        }
+        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite);
 
         if (logoResult) {
           this.logger.log(`Logo metadata found for team ${teamUid} (${team.name}): ${logoResult.logoUrl}`);
@@ -363,8 +353,10 @@ export class TeamEnrichmentService {
         } else {
           this.logger.log(`No logo found in website metadata for team ${teamUid} (${team.name})`);
         }
-      } else {
+      } else if (team.logoUid) {
         this.logger.log(`Team ${teamUid} (${team.name}) already has a logo, skipping logo fetch`);
+      } else {
+        this.logger.log(`Team ${teamUid} (${team.name}): no verified website available, skipping logo fetch`);
       }
 
       // Merge new field statuses with existing ones (preserve previous Enriched/ChangedByUser)
