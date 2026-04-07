@@ -108,7 +108,16 @@ export function useGuideRequestsTable({
         enableSorting: true,
         sortingFn: 'alphanumeric',
         cell: (info) => (
-          <div style={{ fontWeight: 500, fontSize: 14, color: '#455468', whiteSpace: 'normal' }}>
+          <div
+            style={{
+              fontWeight: 500,
+              fontSize: 14,
+              color: '#455468',
+              whiteSpace: 'normal',
+              whiteSpace: 'normal',
+              wordBreak: 'break-word',
+            }}
+          >
             {info.getValue() ?? '—'}
           </div>
         ),
