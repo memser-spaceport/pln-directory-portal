@@ -114,7 +114,6 @@ export function useGuideRequestsTable({
               fontSize: 14,
               color: '#455468',
               whiteSpace: 'normal',
-              whiteSpace: 'normal',
               wordBreak: 'break-word',
             }}
           >
