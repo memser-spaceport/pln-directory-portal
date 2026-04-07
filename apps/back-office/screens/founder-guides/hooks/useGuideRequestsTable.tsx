@@ -73,7 +73,7 @@ export function useGuideRequestsTable({
       columnHelper.accessor((row) => row.requestedByUser.name, {
         id: 'requestedBy',
         header: 'Requested by',
-        size: 272,
+        size: 280,
         enableSorting: true,
         sortingFn: 'alphanumeric',
         cell: (info) => {
@@ -82,8 +82,20 @@ export function useGuideRequestsTable({
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <RequesterAvatar name={name} imageUrl={image?.url} />
               <div>
-                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{name}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>{email}</div>
+                <div
+                  style={{
+                    fontWeight: 500,
+                    fontSize: 14,
+                    color: '#455468',
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {name}
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                  {email}
+                </div>
               </div>
             </div>
           );
@@ -92,7 +104,7 @@ export function useGuideRequestsTable({
       columnHelper.accessor((row) => guideLabel(row), {
         id: 'guideTitle',
         header: 'Requested guide',
-        size: 200,
+        size: 280,
         enableSorting: true,
         sortingFn: 'alphanumeric',
         cell: (info) => (
