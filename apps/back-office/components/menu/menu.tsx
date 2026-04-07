@@ -6,6 +6,7 @@ import { RolesMenu } from './components/RolesMenu/RolesMenu';
 import { AccessControlMenu } from './components/AccessControlMenu/AccessControlMenu';
 import { IrlGatheringMenu } from './components/IrlGatheringMenu/IrlGatheringMenu';
 import { DealsMenu } from './components/DealsMenu/DealsMenu';
+import { FounderGuidesMenu } from './components/FounderGuidesMenu/FounderGuidesMenu';
 
 export function Menu() {
   const { isDirectoryAdmin, isDemoDayAdmin } = useAuth();
@@ -19,6 +20,7 @@ export function Menu() {
       {(isDirectoryAdmin || isDemoDayAdmin) && <DemoDaysMenu />}
       {isDirectoryAdmin && <IrlGatheringMenu />}
       {isDirectoryAdmin && <DealsMenu />}
+      {isDirectoryAdmin && <FounderGuidesMenu />}
     </ul>
   );
 }

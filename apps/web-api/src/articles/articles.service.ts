@@ -124,6 +124,23 @@ export class ArticlesService {
         email: true,
         officeHours: true,
         image: { select: { url: true } },
+        teamMemberRoles: {
+          select: {
+            mainTeam: true,
+            role: true,
+            team: {
+              select: {
+                uid: true,
+                name: true,
+              },
+            },
+          },
+          where: {
+            team: {
+              accessLevel: { not: 'L0' },
+            },
+          },
+        },
       },
     },
     authorTeam: {
