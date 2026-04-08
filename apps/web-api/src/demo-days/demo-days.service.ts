@@ -81,6 +81,16 @@ export class DemoDaysService {
     private readonly notificationServiceClient: NotificationServiceClient
   ) { }
 
+  getDemoDayReportLink(): { url: string } {
+    const url = process.env.DEMO_DAY_REPORT_LINK;
+
+    if (!url) {
+      throw new NotFoundException('DEMO_DAY_REPORT_LINK is not configured');
+    }
+
+    return { url };
+  }
+
   // Public methods
 
   async getDemoDayAccess(

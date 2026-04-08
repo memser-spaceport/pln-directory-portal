@@ -35,6 +35,9 @@ import {
 } from 'libs/contracts/src/schema/admin-demo-day';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { QueryCache } from '../decorators/query-cache.decorator';
+import { RequirePermissions } from '../rbac/rbac.decorator';
+import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
+import { RbacGuard } from '../rbac/rbac.guard';
 
 @ApiTags('Admin Demo Days')
 @Controller('v1/admin/demo-days')
@@ -44,6 +47,14 @@ export class AdminDemoDaysController {
     private readonly demoDayParticipantsService: DemoDayParticipantsService,
     private readonly notificationServiceClient: NotificationServiceClient
   ) { }
+
+  @Get('report-link')
+  @UseGuards(DemoDayAdminAuthGuard, RbacGuard)
+  @RequirePermissions(RBAC_PERMISSION_CODES.DEMO_DAY_REPORT_LINK_VIEW)
+  @NoCache()
+  getDemoDayReportLink(): { url: string } {
+    return this.demoDaysService.getDemoDayReportLink();
+  }
 
   @Get('subscribers')
   @UseGuards(DemoDayAdminAuthGuard)
