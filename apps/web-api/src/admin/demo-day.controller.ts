@@ -38,6 +38,7 @@ import { QueryCache } from '../decorators/query-cache.decorator';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 import { RbacGuard } from '../rbac/rbac.guard';
+import {UserTokenCheckGuard} from "../guards/user-token-check.guard";
 
 @ApiTags('Admin Demo Days')
 @Controller('v1/admin/demo-days')
@@ -49,11 +50,11 @@ export class AdminDemoDaysController {
   ) { }
 
   @Get('report-link')
-  @UseGuards(DemoDayAdminAuthGuard, RbacGuard)
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(RBAC_PERMISSION_CODES.DEMO_DAY_REPORT_LINK_VIEW)
   @NoCache()
-  getDemoDayReportLink(): { url: string } {
-    return this.demoDaysService.getDemoDayReportLink();
+  async getDemoDayReportLink(@Req() req): Promise<{ url: string }> {
+    return this.demoDaysService.getDemoDayReportLink(req.userEmail);
   }
 
   @Get('subscribers')

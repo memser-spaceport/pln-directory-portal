@@ -28,8 +28,6 @@ abstract class BaseAdminAuthGuard implements CanActivate {
       // 💡 We're assigning the payload to the request object here
       // so that we can access it in our route handlers
       request['user'] = payload;
-      request['userEmail'] = payload.email;
-      request['memberUid'] = payload.memberUid;
 
       // Verify user has at least one of the allowed roles
       const roles: string[] = payload.roles || [];
