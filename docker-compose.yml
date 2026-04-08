@@ -104,6 +104,22 @@ services:
     networks:
       - pl-directory-backend
 
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: opensearch
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    networks:
+      - pl-directory-backend
+
 volumes:
   db_data:
   oso_db_data:
@@ -116,6 +132,8 @@ volumes:
   mongodb_data:
     driver: local
   qdrant-storage:
+    driver: local
+  opensearch_data:
     driver: local
 
 networks:
