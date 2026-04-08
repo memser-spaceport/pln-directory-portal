@@ -1639,6 +1639,7 @@ model Article {
   createdBy       String?
   updatedBy       String?
   status          ArticleStatus      @default(DRAFT)
+  scope           String?
   publishedAt     DateTime?
   isDeleted       Boolean            @default(false)
   deletedAt       DateTime?
@@ -1654,6 +1655,7 @@ model Article {
   @@index([isDeleted])
   @@index([createdBy])
   @@index([updatedBy])
+  @@index([scope])
 }
 
 model ArticleStatistic {
@@ -1707,6 +1709,7 @@ model Permission {
 model RolePermission {
   roleUid       String
   permissionUid String
+  scopes        String[] @default([])
   createdAt     DateTime @default(now())
 
   role       Role       @relation(fields: [roleUid], references: [uid], onDelete: Restrict, onUpdate: Cascade)
@@ -1743,6 +1746,7 @@ model MemberPermission {
   grantedByMemberUid String?
   revokedAt          DateTime?
   status             String    @default("ACTIVE")
+  scopes             String[]  @default([])
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 

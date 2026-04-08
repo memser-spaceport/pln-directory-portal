@@ -24,7 +24,11 @@ export interface PermissionBasic {
   uid: string;
   code: string;
   description?: string | null;
+  scopes?: string[];
 }
+
+// Keep in sync with apps/web-api/src/rbac/rbac.constants.ts RBAC_SCOPES
+export const AVAILABLE_SCOPES = ['PLVS', 'PLCC'] as const;
 
 export interface MemberWithRoles extends MemberBasic {
   projectContributions: TeamInfo[];
@@ -71,7 +75,7 @@ export interface MemberAccessDetails {
   };
   roles: Array<RoleBasic & { permissions: PermissionBasic[] }>;
   directPermissions: PermissionBasic[];
-  allPermissions: Array<PermissionBasic & { viaRoles: string[]; isDirect: boolean }>;
+  allPermissions: Array<PermissionBasic & { viaRoles: string[]; isDirect: boolean; scopes: string[] }>;
 }
 
 export interface PaginationInfo {

@@ -4,4 +4,6 @@ export class GrantPermissionDto {
   permissionCode: string;
 
   grantedByMemberUid?: string;
+
+  scopes?: string[];
 }

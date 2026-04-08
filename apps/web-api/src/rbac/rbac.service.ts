@@ -1,14 +1,23 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from "../shared/prisma.service";
 import { CurrentUserAccessDto } from './rbac.types';
+import { AVAILABLE_SCOPES } from './rbac.constants';
 
 @Injectable()
 export class RbacService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private validateScopes(scopes: string[]): void {
+    const invalid = scopes.filter((s) => !AVAILABLE_SCOPES.includes(s as any));
+    if (invalid.length > 0) {
+      throw new BadRequestException(`Invalid scope(s): ${invalid.join(', ')}. Allowed: ${AVAILABLE_SCOPES.join(', ')}`);
+    }
+  }
 
   async getAccessForMember(memberUid: string): Promise<CurrentUserAccessDto> {
     const [roleAssignments, directPermissions] = await Promise.all([
@@ -44,20 +53,36 @@ export class RbacService {
 
     const roleCodes = [...new Set(roleAssignments.map((x) => x.role.code))];
 
-    const permissionCodes = new Set<string>();
+    const permissionScopesMap = new Map<string, Set<string>>();
     for (const ra of roleAssignments) {
       for (const rp of ra.role.rolePermissions) {
-        permissionCodes.add(rp.permission.code);
+        const code = rp.permission.code;
+        if (!permissionScopesMap.has(code)) {
+          permissionScopesMap.set(code, new Set());
+        }
+        for (const s of rp.scopes) {
+          permissionScopesMap.get(code)!.add(s);
+        }
       }
     }
     for (const mp of directPermissions) {
-      permissionCodes.add(mp.permission.code);
+      const code = mp.permission.code;
+      if (!permissionScopesMap.has(code)) {
+        permissionScopesMap.set(code, new Set());
+      }
+      for (const s of mp.scopes) {
+        permissionScopesMap.get(code)!.add(s);
+      }
     }
+
+    const permissions = [...permissionScopesMap.entries()]
+      .map(([name, scopes]) => ({ name, scopes: [...scopes].sort() }))
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     return {
       memberUid,
       roles: roleCodes.sort(),
-      permissions: [...permissionCodes].sort(),
+      permissions,
     };
   }
 
@@ -172,7 +197,9 @@ export class RbacService {
     });
   }
 
-  async grantPermission(memberUid: string, permissionCode: string, grantedByMemberUid?: string) {
+  async grantPermission(memberUid: string, permissionCode: string, grantedByMemberUid?: string, scopes?: string[]) {
+    if (scopes?.length) this.validateScopes(scopes);
+
     const permission = await this.prisma.permission.findUnique({
       where: { code: permissionCode },
     });
@@ -201,6 +228,7 @@ export class RbacService {
         permissionUid: permission.uid,
         grantedByMemberUid: grantedByMemberUid ?? null,
         status: 'ACTIVE',
+        scopes: scopes ?? [],
       },
     });
   }
@@ -225,6 +253,106 @@ export class RbacService {
         status: 'REVOKED',
         revokedAt: new Date(),
       },
+    });
+  }
+
+  async getScopesForPermission(memberUid: string, permissionCode: string): Promise<string[]> {
+    const [roleAssignments, directPermissions] = await Promise.all([
+      this.prisma.roleAssignment.findMany({
+        where: {
+          memberUid,
+          status: 'ACTIVE',
+          revokedAt: null,
+          role: {
+            rolePermissions: {
+              some: {
+                permission: { code: permissionCode },
+              },
+            },
+          },
+        },
+        include: {
+          role: {
+            include: {
+              rolePermissions: {
+                where: { permission: { code: permissionCode } },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.memberPermission.findMany({
+        where: {
+          memberUid,
+          status: 'ACTIVE',
+          revokedAt: null,
+          permission: { code: permissionCode },
+        },
+      }),
+    ]);
+
+    const allScopes = new Set<string>();
+    for (const ra of roleAssignments) {
+      for (const rp of ra.role.rolePermissions) {
+        for (const s of rp.scopes) allScopes.add(s);
+      }
+    }
+    for (const mp of directPermissions) {
+      for (const s of mp.scopes) allScopes.add(s);
+    }
+
+    return [...allScopes].sort();
+  }
+
+  async updateMemberPermissionScopes(memberUid: string, permissionCode: string, scopes: string[]) {
+    this.validateScopes(scopes);
+
+    const permission = await this.prisma.permission.findUnique({
+      where: { code: permissionCode },
+    });
+
+    if (!permission) {
+      throw new NotFoundException(`Permission not found: ${permissionCode}`);
+    }
+
+    const result = await this.prisma.memberPermission.updateMany({
+      where: {
+        memberUid,
+        permissionUid: permission.uid,
+        status: 'ACTIVE',
+        revokedAt: null,
+      },
+      data: { scopes },
+    });
+
+    if (result.count === 0) {
+      throw new NotFoundException(`Active permission grant not found for member`);
+    }
+
+    return { updated: result.count };
+  }
+
+  async updateRolePermissionScopes(roleCode: string, permissionCode: string, scopes: string[]) {
+    this.validateScopes(scopes);
+
+    const role = await this.prisma.role.findUnique({ where: { code: roleCode } });
+    if (!role) {
+      throw new NotFoundException(`Role not found: ${roleCode}`);
+    }
+
+    const permission = await this.prisma.permission.findUnique({ where: { code: permissionCode } });
+    if (!permission) {
+      throw new NotFoundException(`Permission not found: ${permissionCode}`);
+    }
+
+    return this.prisma.rolePermission.update({
+      where: {
+        roleUid_permissionUid: {
+          roleUid: role.uid,
+          permissionUid: permission.uid,
+        },
+      },
+      data: { scopes },
     });
   }
 
@@ -300,6 +428,7 @@ export class RbacService {
         uid: rp.permission.uid,
         code: rp.permission.code,
         description: rp.permission.description,
+        scopes: rp.scopes,
       })),
     }));
 
@@ -308,10 +437,11 @@ export class RbacService {
       uid: mp.permission.uid,
       code: mp.permission.code,
       description: mp.permission.description,
+      scopes: mp.scopes,
     }));
 
     // Build all permissions with source info
-    const permissionMap = new Map<string, { permission: any; viaRoles: string[]; isDirect: boolean }>();
+    const permissionMap = new Map<string, { permission: any; viaRoles: string[]; isDirect: boolean; scopes: Set<string> }>();
 
     // Add role-based permissions
     for (const role of roles) {
@@ -319,11 +449,13 @@ export class RbacService {
         const existing = permissionMap.get(perm.code);
         if (existing) {
           existing.viaRoles.push(role.name);
+          for (const s of perm.scopes) existing.scopes.add(s);
         } else {
           permissionMap.set(perm.code, {
             permission: perm,
             viaRoles: [role.name],
             isDirect: false,
+            scopes: new Set(perm.scopes),
           });
         }
       }
@@ -334,11 +466,13 @@ export class RbacService {
       const existing = permissionMap.get(perm.code);
       if (existing) {
         existing.isDirect = true;
+        for (const s of perm.scopes) existing.scopes.add(s);
       } else {
         permissionMap.set(perm.code, {
           permission: perm,
           viaRoles: [],
           isDirect: true,
+          scopes: new Set(perm.scopes),
         });
       }
     }
@@ -357,6 +491,7 @@ export class RbacService {
         ...p.permission,
         viaRoles: p.viaRoles,
         isDirect: p.isDirect,
+        scopes: [...p.scopes].sort(),
       })),
     };
   }
@@ -569,6 +704,7 @@ export class RbacService {
         uid: rp.permission.uid,
         code: rp.permission.code,
         description: rp.permission.description,
+        scopes: rp.scopes,
       })),
     }));
   }
@@ -654,6 +790,7 @@ export class RbacService {
         uid: rp.permission.uid,
         code: rp.permission.code,
         description: rp.permission.description,
+        scopes: rp.scopes,
       })),
       members: assignments.map((ra: any) => ({
         uid: ra.member.uid,
@@ -753,6 +890,7 @@ export class RbacService {
         code: rp.role.code,
         name: rp.role.name,
         memberCount: roleMemberCountMap.get(rp.role.uid) || 0,
+        scopes: rp.scopes,
       }));
 
       // Get unique members with direct permission
@@ -828,6 +966,7 @@ export class RbacService {
           name: rp.role.name,
           description: rp.role.description,
           memberCount,
+          scopes: rp.scopes,
         };
       })
     );
