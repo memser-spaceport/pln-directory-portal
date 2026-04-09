@@ -81,9 +81,11 @@ export class ArticlesService {
     return article;
   }
 
-  private validateArticleScope(scope: string | null | undefined): void {
-    if (scope && !AVAILABLE_SCOPES.includes(scope as any)) {
-      throw new BadRequestException(`Invalid article scope: ${scope}. Allowed: ${AVAILABLE_SCOPES.join(', ')}`);
+  private validateArticleScopes(scopes: string[] | undefined): void {
+    if (!scopes?.length) return;
+    const invalid = scopes.filter((s) => !AVAILABLE_SCOPES.includes(s as any));
+    if (invalid.length > 0) {
+      throw new BadRequestException(`Invalid article scope(s): ${invalid.join(', ')}. Allowed: ${AVAILABLE_SCOPES.join(', ')}`);
     }
   }
 
@@ -101,8 +103,8 @@ export class ArticlesService {
   private buildScopeFilter(userScopes: string[]): Prisma.ArticleWhereInput {
     return {
       OR: [
-        { scope: null },
-        ...(userScopes.length > 0 ? [{ scope: { in: userScopes } }] : []),
+        { scopes: { isEmpty: true } },
+        ...(userScopes.length > 0 ? [{ scopes: { hasSome: userScopes } }] : []),
       ],
     };
   }
@@ -301,10 +303,10 @@ export class ArticlesService {
       throw new NotFoundException('Article not found');
     }
 
-    // Scope check: if the article has a scope, verify user has access (authors bypass)
-    if (article.scope && !isAuthor) {
+    // Scope check: if the article has scopes, verify user has access (authors bypass)
+    if (article.scopes.length > 0 && !isAuthor) {
       const userScopes = await this.resolveUserScopes(userEmail);
-      if (!userScopes.includes(article.scope)) {
+      if (!article.scopes.some((s) => userScopes.includes(s))) {
         throw new ForbiddenException('You do not have access to this article');
       }
     }
@@ -383,11 +385,11 @@ export class ArticlesService {
   private async assertArticleScopeAccess(articleUid: string, userEmail: string): Promise<void> {
     const article = await this.prisma.article.findFirst({
       where: { uid: articleUid, isDeleted: false },
-      select: { scope: true },
+      select: { scopes: true },
     });
-    if (article?.scope) {
+    if (article?.scopes?.length) {
       const userScopes = await this.resolveUserScopes(userEmail);
-      if (!userScopes.includes(article.scope)) {
+      if (!article.scopes.some((s) => userScopes.includes(s))) {
         throw new ForbiddenException('You do not have access to this article');
       }
     }
@@ -496,7 +498,7 @@ export class ArticlesService {
   }
 
   async createArticle(body: CreateArticleDto, userEmail?: string) {
-    this.validateArticleScope(body.scope);
+    this.validateArticleScopes(body.scopes);
     if (body.authorMemberUid && body.authorTeamUid) {
       throw new BadRequestException('Provide either authorMemberUid or authorTeamUid, not both');
     }
@@ -543,7 +545,7 @@ export class ArticlesService {
           createdBy,
           updatedBy: createdBy,
           status,
-          scope: body.scope ?? null,
+          scopes: body.scopes ?? [],
           publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
         },
         include: this.articleInclude,
@@ -552,7 +554,7 @@ export class ArticlesService {
   }
 
   async updateOwnArticle(userEmail: string, uid: string, body: UpdateArticleDto) {
-    if (body.scope !== undefined) this.validateArticleScope(body.scope);
+    if (body.scopes !== undefined) this.validateArticleScopes(body.scopes);
     const { memberUid, teamUid, isDirectoryAdmin } = await this.resolveMemberByEmail(userEmail);
     await this.ensureArticleOwnership(uid, memberUid, teamUid, isDirectoryAdmin);
 
@@ -573,7 +575,7 @@ export class ArticlesService {
       data.readingTime = this.calculateReadingTime(body.content);
     }
     if (body.coverImageUid !== undefined) data.coverImageUid = body.coverImageUid;
-    if (body.scope !== undefined) data.scope = body.scope;
+    if (body.scopes !== undefined) data.scopes = body.scopes;
     if (body.status !== undefined) {
       data.status = body.status;
       if (body.status === ArticleStatus.PUBLISHED && existing.status !== ArticleStatus.PUBLISHED) {
@@ -718,7 +720,7 @@ export class ArticlesService {
   }
 
   async adminCreate(body: CreateArticleDto, userEmail?: string) {
-    this.validateArticleScope(body.scope);
+    this.validateArticleScopes(body.scopes);
     const slugURL = body.slugURL || (await this.generateSlug(body.title));
     const readingTime = this.calculateReadingTime(body.content);
     const status = body.status ?? ArticleStatus.DRAFT;
@@ -758,7 +760,7 @@ export class ArticlesService {
           createdBy,
           updatedBy: createdBy,
           status,
-          scope: body.scope ?? null,
+          scopes: body.scopes ?? [],
           publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
         },
         include: this.articleInclude,
@@ -767,7 +769,7 @@ export class ArticlesService {
   }
 
   async adminUpdate(uid: string, body: UpdateArticleDto, userEmail?: string) {
-    if (body.scope !== undefined) this.validateArticleScope(body.scope);
+    if (body.scopes !== undefined) this.validateArticleScopes(body.scopes);
     const existing = await this.prisma.article.findUnique({ where: { uid } });
 
     if (!existing) {
@@ -788,7 +790,7 @@ export class ArticlesService {
     if (body.coverImageUid !== undefined) data.coverImageUid = body.coverImageUid;
     if (body.authorMemberUid !== undefined) data.authorMemberUid = body.authorMemberUid;
     if (body.authorTeamUid !== undefined) data.authorTeamUid = body.authorTeamUid;
-    if (body.scope !== undefined) data.scope = body.scope;
+    if (body.scopes !== undefined) data.scopes = body.scopes;
     if (body.status !== undefined) {
       data.status = body.status;
       if (body.status === ArticleStatus.PUBLISHED && existing.status !== ArticleStatus.PUBLISHED) {

@@ -1640,7 +1640,7 @@ model Article {
   createdBy       String?
   updatedBy       String?
   status          ArticleStatus      @default(DRAFT)
-  scope           String?
+  scopes          String[]           @default([])
   publishedAt     DateTime?
   isDeleted       Boolean            @default(false)
   deletedAt       DateTime?
@@ -1657,7 +1657,7 @@ model Article {
   @@index([isDeleted])
   @@index([createdBy])
   @@index([updatedBy])
-  @@index([scope])
+  @@index([scopes])
 }
 
 model ArticleStatistic {
