@@ -49,7 +49,7 @@ export class AdminDemoDaysController {
     private readonly notificationServiceClient: NotificationServiceClient
   ) { }
 
-  @Get('report-link')
+  @Get('reports/link')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(RBAC_PERMISSION_CODES.DEMO_DAY_REPORT_LINK_VIEW)
   @NoCache()
