@@ -1,11 +1,12 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
-import { CreateArticleCommentDto } from './article-comments.dto';
+import { CreateArticleCommentDto, UpdateArticleCommentDto } from './article-comments.dto';
 
 type ArticleCommentResponse = {
   uid: string;
@@ -83,6 +84,24 @@ export class ArticleCommentsService {
     };
   }
 
+  private async getCommentForOwnerCheck(commentUid: string) {
+    const comment = await this.prisma.articleComment.findUnique({
+      where: { uid: commentUid },
+      select: {
+        uid: true,
+        articleUid: true,
+        authorUid: true,
+        parentUid: true,
+      },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    return comment;
+  }
+
   async createComment(userEmail: string, articleUid: string, body: CreateArticleCommentDto) {
     const member = await this.resolveMemberByEmail(userEmail);
     await this.ensurePublishedArticle(articleUid);
@@ -150,9 +169,9 @@ export class ArticleCommentsService {
         },
         likes: member
           ? {
-            where: { memberUid: member.uid },
-            select: { uid: true },
-          }
+              where: { memberUid: member.uid },
+              select: { uid: true },
+            }
           : false,
       },
     });
@@ -181,6 +200,63 @@ export class ArticleCommentsService {
     return {
       data: roots,
       total: mapped.length,
+    };
+  }
+
+  async updateComment(userEmail: string, commentUid: string, body: UpdateArticleCommentDto) {
+    const member = await this.resolveMemberByEmail(userEmail);
+
+    const content = (body.content || '').trim();
+    if (!content) {
+      throw new BadRequestException('Comment content is required');
+    }
+
+    const comment = await this.getCommentForOwnerCheck(commentUid);
+
+    if (comment.authorUid !== member.uid) {
+      throw new ForbiddenException('You can edit only your own comment');
+    }
+
+    await this.ensurePublishedArticle(comment.articleUid);
+
+    const updated = await this.prisma.articleComment.update({
+      where: { uid: commentUid },
+      data: { content },
+      include: {
+        author: {
+          select: {
+            uid: true,
+            name: true,
+            officeHours: true,
+            image: { select: { url: true } },
+          },
+        },
+        likes: {
+          where: { memberUid: member.uid },
+          select: { uid: true },
+        },
+      },
+    });
+
+    return this.mapComment(updated, updated.likes.length > 0);
+  }
+
+  async deleteComment(userEmail: string, commentUid: string) {
+    const member = await this.resolveMemberByEmail(userEmail);
+
+    const comment = await this.getCommentForOwnerCheck(commentUid);
+
+    if (comment.authorUid !== member.uid) {
+      throw new ForbiddenException('You can delete only your own comment');
+    }
+
+    await this.prisma.articleComment.delete({
+      where: { uid: commentUid },
+    });
+
+    return {
+      uid: commentUid,
+      deleted: true,
     };
   }
 

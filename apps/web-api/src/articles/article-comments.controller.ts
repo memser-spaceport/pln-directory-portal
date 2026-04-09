@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -15,7 +16,7 @@ import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { ArticleCommentsService } from './article-comments.service';
-import { CreateArticleCommentDto } from './article-comments.dto';
+import { CreateArticleCommentDto, UpdateArticleCommentDto } from './article-comments.dto';
 
 @Controller('v1/articles')
 @UseGuards(UserTokenCheckGuard, RbacGuard)
@@ -37,6 +38,22 @@ export class ArticleCommentsController {
   @RequirePermissions(RBAC_PERMISSION_CODES.FOUNDER_GUIDES_VIEW)
   async listComments(@Req() req: Request, @Param('uid') articleUid: string) {
     return this.articleCommentsService.listComments(req['userEmail'], articleUid);
+  }
+
+  @Patch('comments/:commentUid')
+  @RequirePermissions(RBAC_PERMISSION_CODES.FOUNDER_GUIDES_VIEW)
+  async updateComment(
+    @Req() req: Request,
+    @Param('commentUid') commentUid: string,
+    @Body() body: UpdateArticleCommentDto,
+  ) {
+    return this.articleCommentsService.updateComment(req['userEmail'], commentUid, body);
+  }
+
+  @Delete('comments/:commentUid')
+  @RequirePermissions(RBAC_PERMISSION_CODES.FOUNDER_GUIDES_VIEW)
+  async deleteComment(@Req() req: Request, @Param('commentUid') commentUid: string) {
+    return this.articleCommentsService.deleteComment(req['userEmail'], commentUid);
   }
 
   @Post('comments/:commentUid/like')
