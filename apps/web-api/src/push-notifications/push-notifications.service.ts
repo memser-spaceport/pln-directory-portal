@@ -25,6 +25,20 @@ export interface ForumMentionEmailDto {
   metadata?: Record<string, unknown>;
 }
 
+export interface GuideCommentNotificationDto {
+  recipientUid: string;
+  category: 'GUIDE_POST' | 'GUIDE_REPLY';
+  commentAuthor: {
+    uid: string;
+    name: string | null;
+    image?: { url: string } | null;
+  };
+  articleTitle: string;
+  commentContent: string;
+  link: string;
+  eventType: 'guide_comment' | 'guide_reply' | 'guide_mention';
+}
+
 interface NotificationWithReadStatus {
   uid: string;
   category: PushNotificationCategory;
@@ -778,5 +792,131 @@ export class PushNotificationsService {
         }`
       );
     }
+  }
+
+  /**
+   * Send push notification + email for guide comment events
+   */
+  async sendGuideCommentNotification(dto: GuideCommentNotificationDto): Promise<void> {
+    const authorName = dto.commentAuthor.name || 'Unknown User';
+    const authorPicture = dto.commentAuthor.image?.url || '';
+
+    let title: string;
+
+    switch (dto.eventType) {
+      case 'guide_comment':
+        title = `${authorName} commented on your Guide "${dto.articleTitle}"`;
+        break;
+      case 'guide_reply':
+        title = `${authorName} replied to your comment on "${dto.articleTitle}"`;
+        break;
+      case 'guide_mention':
+        title = `${authorName} mentioned you in a comment on "${dto.articleTitle}"`;
+        break;
+    }
+
+    // 1. Send push notification (in-app)
+    try {
+      await this.create({
+        category: dto.category as PushNotificationCategory,
+        title,
+        description: dto.commentContent,
+        link: dto.link,
+        recipientUid: dto.recipientUid,
+        isPublic: false,
+        metadata: {
+          authorName,
+          authorUid: dto.commentAuthor.uid,
+          authorPicture,
+          eventType: dto.eventType,
+          articleTitle: dto.articleTitle,
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send guide push notification: ${error instanceof Error ? error.message : error}`);
+    }
+
+    // 2. Send email notification
+    try {
+      await this.sendGuideCommentEmail({
+        recipientUid: dto.recipientUid,
+        authorName,
+        authorUid: dto.commentAuthor.uid,
+        authorPicture,
+        articleTitle: dto.articleTitle,
+        commentContent: dto.commentContent,
+        link: dto.link,
+        eventType: dto.eventType,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send guide email notification: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  /**
+   * Send email notification for guide comment events
+   */
+  private async sendGuideCommentEmail(params: {
+    recipientUid: string;
+    authorName: string;
+    authorUid: string;
+    authorPicture: string;
+    articleTitle: string;
+    commentContent: string;
+    link: string;
+    eventType: 'guide_comment' | 'guide_reply' | 'guide_mention';
+  }): Promise<void> {
+    const member = await this.prisma.member.findFirst({
+      where: { uid: params.recipientUid },
+      select: { email: true, name: true, uid: true },
+    });
+
+    if (!member?.email) {
+      this.logger.warn(`Cannot send guide email: member email not found for ${params.recipientUid}`);
+      return;
+    }
+
+    const templateMap: Record<string, { templateName: string; actionType: string }> = {
+      guide_comment: { templateName: 'GUIDE_COMMENT', actionType: 'COMMENT' },
+      guide_reply: { templateName: 'GUIDE_REPLY', actionType: 'REPLY' },
+      guide_mention: { templateName: 'GUIDE_MENTION', actionType: 'MENTION' },
+    };
+
+    const { templateName, actionType } = templateMap[params.eventType];
+    const postLink = `${process.env.WEB_UI_BASE_URL}${params.link}`;
+
+    await this.notificationServiceClient.sendNotification({
+      isPriority: true,
+      deliveryChannel: 'EMAIL',
+      templateName,
+      recipientsInfo: {
+        to: [member.email],
+      },
+      deliveryPayload: {
+        body: {
+          recipientName: member.name || 'there',
+          authorName: params.authorName,
+          authorPicture: params.authorPicture,
+          postContent: params.commentContent,
+          postLink,
+          postTitle: params.articleTitle,
+        },
+      },
+      entityType: 'GUIDE',
+      actionType,
+      sourceMeta: {
+        activityId: '',
+        activityType: `GUIDE_${actionType}`,
+        activityUserId: params.authorUid,
+        activityUserName: params.authorName,
+      },
+      targetMeta: {
+        emailId: member.email,
+        userId: member.uid,
+        userName: member.name || '',
+      },
+    });
+
+    this.logger.log(`Guide ${params.eventType} email sent to ${member.email}`);
   }
 }
