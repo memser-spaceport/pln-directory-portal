@@ -244,6 +244,17 @@ export class RbacService {
     });
   }
 
+  async findMemberByUid(memberUid: string) {
+    return this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      select: {
+        uid: true,
+        email: true,
+        name: true,
+      },
+    });
+  }
+
   /**
    * Get detailed access info for a member including role permissions
    */

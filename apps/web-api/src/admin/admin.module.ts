@@ -24,6 +24,7 @@ import { AskModule } from '../asks/asks.module';
 import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
 import {DealsModule} from "../deals/deals.module";
 import { DealRequestsModule } from "../deal-requests/deal-requests.module";
+import { RbacModule } from "../rbac/rbac.module";
 
 @Module({
   imports: [
@@ -43,7 +44,8 @@ import { DealRequestsModule } from "../deal-requests/deal-requests.module";
     AnalyticsModule,
     TeamEnrichmentModule,
     DealsModule,
-    DealRequestsModule
+    DealRequestsModule,
+    RbacModule
   ],
   controllers: [
     AdminAuthController,
