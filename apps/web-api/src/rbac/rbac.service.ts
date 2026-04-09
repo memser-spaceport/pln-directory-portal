@@ -1045,6 +1045,7 @@ export class RbacService {
           projectContributions: assignment.member.projectContributions,
           viaRoles: [assignment.role.name],
           isDirect: false,
+          scopes: [],
         });
       }
     }
@@ -1054,6 +1055,7 @@ export class RbacService {
       const existing = memberMap.get(mp.member.uid);
       if (existing) {
         existing.isDirect = true;
+        existing.scopes = mp.scopes ?? [];
       } else {
         memberMap.set(mp.member.uid, {
           uid: mp.member.uid,
@@ -1063,6 +1065,7 @@ export class RbacService {
           projectContributions: mp.member.projectContributions,
           viaRoles: [],
           isDirect: true,
+          scopes: mp.scopes ?? [],
         });
       }
     }

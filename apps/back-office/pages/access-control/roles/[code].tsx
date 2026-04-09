@@ -74,7 +74,7 @@ const RoleEditPage = () => {
     setPage(1); // Reset to first page on search
   };
 
-  const handleAddMember = async (member: MemberBasic) => {
+  const handleAddMember = async (member: MemberBasic, _scopes: string[]) => {
     try {
       await assignRole.mutateAsync({
         authToken,

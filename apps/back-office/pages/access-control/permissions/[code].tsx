@@ -9,11 +9,13 @@ import { useAuth } from '../../../context/auth-context';
 import { useRbacPermission } from '../../../hooks/access-control/useRbacPermission';
 import { useGrantPermission } from '../../../hooks/access-control/useGrantPermission';
 import { useRevokePermission } from '../../../hooks/access-control/useRevokePermission';
+import { useUpdateMemberPermissionScopes } from '../../../hooks/access-control/useUpdateMemberPermissionScopes';
 
 import MemberCell from '../../../screens/access-control/components/MemberCell';
 import TeamCell from '../../../screens/access-control/components/TeamCell';
 import PermissionStatusCell from '../../../screens/access-control/components/PermissionStatusCell';
 import AddMemberModal from '../../../screens/access-control/components/AddMemberModal';
+import EditScopesModal from '../../../screens/access-control/components/EditScopesModal';
 import ConfirmDeleteModal from '../../../screens/access-control/components/ConfirmDeleteModal';
 import InfoModal from '../../../screens/access-control/components/InfoModal';
 import { MemberBasic, TeamInfo } from '../../../screens/access-control/types';
@@ -23,7 +25,7 @@ import s from './styles.module.scss';
 type Tab = 'roles' | 'members';
 type MemberFilter = 'all' | 'direct' | 'viaRoles';
 
-type PermissionMemberRow = MemberBasic & { viaRoles: string[]; isDirect: boolean; projectContributions: TeamInfo[] };
+type PermissionMemberRow = MemberBasic & { viaRoles: string[]; isDirect: boolean; projectContributions: TeamInfo[]; scopes: string[] };
 
 const REMOVE_DIRECT_AND_ROLE_WARNING =
   'This member also has this permission through assigned role(s). Removing the direct grant will not remove access from those roles—the member will still have this permission until you change or remove those role assignments.';
@@ -45,6 +47,7 @@ const PermissionEditPage = () => {
   const [confirmRemoveMember, setConfirmRemoveMember] = useState<PermissionMemberRow | null>(null);
   const [removePermissionWarningNote, setRemovePermissionWarningNote] = useState<string | null>(null);
   const [infoMember, setInfoMember] = useState<PermissionMemberRow | null>(null);
+  const [editScopesMember, setEditScopesMember] = useState<PermissionMemberRow | null>(null);
 
   // Fetch data
   const { data: permissionData, isLoading: permissionLoading } = useRbacPermission({
@@ -59,6 +62,7 @@ const PermissionEditPage = () => {
   // Mutations
   const grantPermission = useGrantPermission();
   const revokePermission = useRevokePermission();
+  const updateMemberPermissionScopes = useUpdateMemberPermissionScopes();
 
   // Redirects
   useEffect(() => {
@@ -98,13 +102,14 @@ const PermissionEditPage = () => {
     return []; // Will be populated by search
   }, [members]);
 
-  const handleAddMember = async (member: MemberBasic) => {
+  const handleAddMember = async (member: MemberBasic, scopes: string[]) => {
     try {
       await grantPermission.mutateAsync({
         authToken,
         memberUid: member.uid,
         permissionCode: code as string,
         grantedByMemberUid: user?.uid,
+        scopes,
       });
       toast.success(`Granted "${permission?.code}" to ${member.name}`);
       setShowAddMemberModal(false);
@@ -126,6 +131,22 @@ const PermissionEditPage = () => {
       setRemovePermissionWarningNote(null);
     } catch (error) {
       toast.error('Failed to revoke permission');
+    }
+  };
+
+  const handleSaveScopes = async (scopes: string[]) => {
+    if (!editScopesMember) return;
+    try {
+      await updateMemberPermissionScopes.mutateAsync({
+        authToken,
+        memberUid: editScopesMember.uid,
+        permissionCode: code as string,
+        scopes,
+      });
+      toast.success(`Updated scopes for "${editScopesMember.name}"`);
+      setEditScopesMember(null);
+    } catch (error) {
+      toast.error('Failed to update scopes');
     }
   };
 
@@ -262,6 +283,7 @@ const PermissionEditPage = () => {
                   <div className={clsx(s.headerCell, s.teamCell)}>Team</div>
                   <div className={clsx(s.headerCell, s.viaRolesCell)}>Via Roles</div>
                   <div className={clsx(s.headerCell, s.directCell)}>Direct</div>
+                  <div className={clsx(s.headerCell, s.scopesCol)}>Scopes</div>
                   <div className={clsx(s.headerCell, s.actionCell)}>Action</div>
                 </div>
               </div>
@@ -286,6 +308,29 @@ const PermissionEditPage = () => {
                       </div>
                       <div className={clsx(s.bodyCell, s.directCell)}>
                         <PermissionStatusCell viaRoles={member.viaRoles} isDirect={member.isDirect} variant="badges" />
+                      </div>
+                      <div className={clsx(s.bodyCell, s.scopesCol)}>
+                        <div className={s.scopesCell}>
+                          {member.scopes?.length > 0 ? (
+                            member.scopes.map((scope) => (
+                              <span key={scope} className={s.scopeTag}>{scope}</span>
+                            ))
+                          ) : (
+                            <span className={s.scopeEmpty}>--</span>
+                          )}
+                          {member.isDirect && (
+                            <button
+                              type="button"
+                              onClick={() => setEditScopesMember(member)}
+                              className={s.scopeEditButton}
+                              title="Edit scopes"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className={clsx(s.bodyCell, s.actionCell)}>
                         {member.isDirect ? (
@@ -392,10 +437,11 @@ const PermissionEditPage = () => {
         <AddMemberModal
           isOpen={showAddMemberModal}
           onClose={() => setShowAddMemberModal(false)}
-          onAdd={handleAddMember as any}
+          onAdd={handleAddMember}
           title={`Grant "${permission?.code}" to Member`}
           existingMemberUids={members.filter((m) => m.isDirect).map((m) => m.uid)}
           isLoading={grantPermission.isPending}
+          showScopes
         />
 
         {/* Confirm Remove Member Modal */}
@@ -419,6 +465,18 @@ const PermissionEditPage = () => {
             title="Cannot Remove Permission"
             message={`This member has this permission via the following role(s):`}
             items={infoMember.viaRoles}
+          />
+        )}
+
+        {/* Edit Scopes Modal */}
+        {editScopesMember && (
+          <EditScopesModal
+            isOpen={!!editScopesMember}
+            onClose={() => setEditScopesMember(null)}
+            onSave={handleSaveScopes}
+            title={`Edit Scopes for ${editScopesMember.name}`}
+            currentScopes={editScopesMember.scopes ?? []}
+            isLoading={updateMemberPermissionScopes.isPending}
           />
         )}
       </div>
