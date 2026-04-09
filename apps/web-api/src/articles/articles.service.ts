@@ -5,10 +5,15 @@ import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './arti
 import type { ArticleCategory } from './articles.constants';
 import { ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE } from './articles.constants';
 import { MemberRole } from "../utils/constants";
+import { RbacService } from '../rbac/rbac.service';
+import { RBAC_PERMISSION_CODES, AVAILABLE_SCOPES } from '../rbac/rbac.constants';
 
 @Injectable()
 export class ArticlesService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rbacService: RbacService,
+  ) { }
 
   // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -74,6 +79,32 @@ export class ArticlesService {
     }
 
     return article;
+  }
+
+  private validateArticleScope(scope: string | null | undefined): void {
+    if (scope && !AVAILABLE_SCOPES.includes(scope as any)) {
+      throw new BadRequestException(`Invalid article scope: ${scope}. Allowed: ${AVAILABLE_SCOPES.join(', ')}`);
+    }
+  }
+
+  private async resolveUserScopes(userEmail?: string): Promise<string[]> {
+    if (!userEmail) return [];
+    try {
+      const member = await this.rbacService.findMemberByEmail(userEmail);
+      if (!member) return [];
+      return this.rbacService.getScopesForPermission(member.uid, RBAC_PERMISSION_CODES.FOUNDER_GUIDES_VIEW);
+    } catch {
+      return [];
+    }
+  }
+
+  private buildScopeFilter(userScopes: string[]): Prisma.ArticleWhereInput {
+    return {
+      OR: [
+        { scope: null },
+        ...(userScopes.length > 0 ? [{ scope: { in: userScopes } }] : []),
+      ],
+    };
   }
 
   private buildArticleWhere(query: ListArticlesQueryDto, status?: ArticleStatus): Prisma.ArticleWhereInput {
@@ -160,7 +191,11 @@ export class ArticlesService {
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const where = this.buildArticleWhere(query, ArticleStatus.PUBLISHED);
+    const userScopes = await this.resolveUserScopes(userEmail);
+    const where: Prisma.ArticleWhereInput = {
+      ...this.buildArticleWhere(query, ArticleStatus.PUBLISHED),
+      ...this.buildScopeFilter(userScopes),
+    };
 
     let orderBy: Prisma.ArticleOrderByWithRelationInput;
     switch (query.sort) {
@@ -266,6 +301,14 @@ export class ArticlesService {
       throw new NotFoundException('Article not found');
     }
 
+    // Scope check: if the article has a scope, verify user has access (authors bypass)
+    if (article.scope && !isAuthor) {
+      const userScopes = await this.resolveUserScopes(userEmail);
+      if (!userScopes.includes(article.scope)) {
+        throw new ForbiddenException('You do not have access to this article');
+      }
+    }
+
     // Aggregate stats
     const [viewAgg, likeCount, userStat] = await Promise.all([
       this.prisma.articleStatistic.aggregate({
@@ -337,6 +380,19 @@ export class ArticlesService {
     };
   }
 
+  private async assertArticleScopeAccess(articleUid: string, userEmail: string): Promise<void> {
+    const article = await this.prisma.article.findFirst({
+      where: { uid: articleUid, isDeleted: false },
+      select: { scope: true },
+    });
+    if (article?.scope) {
+      const userScopes = await this.resolveUserScopes(userEmail);
+      if (!userScopes.includes(article.scope)) {
+        throw new ForbiddenException('You do not have access to this article');
+      }
+    }
+  }
+
   async likeArticle(userEmail: string, articleUid: string) {
     const { memberUid } = await this.resolveMemberByEmail(userEmail);
 
@@ -349,6 +405,8 @@ export class ArticlesService {
       throw new NotFoundException('Article not found');
     }
 
+    await this.assertArticleScopeAccess(articleUid, userEmail);
+
     return this.prisma.articleStatistic.upsert({
       where: { articleUid_memberUid: { articleUid, memberUid } },
       update: { likeCount: 1 },
@@ -358,6 +416,8 @@ export class ArticlesService {
 
   async unlikeArticle(userEmail: string, articleUid: string) {
     const { memberUid } = await this.resolveMemberByEmail(userEmail);
+
+    await this.assertArticleScopeAccess(articleUid, userEmail);
 
     const stat = await this.prisma.articleStatistic.findUnique({
       where: { articleUid_memberUid: { articleUid, memberUid } },
@@ -384,6 +444,8 @@ export class ArticlesService {
     if (!article) {
       throw new NotFoundException('Article not found');
     }
+
+    await this.assertArticleScopeAccess(articleUid, userEmail);
 
     return this.prisma.articleStatistic.upsert({
       where: { articleUid_memberUid: { articleUid, memberUid } },
@@ -434,6 +496,7 @@ export class ArticlesService {
   }
 
   async createArticle(body: CreateArticleDto, userEmail?: string) {
+    this.validateArticleScope(body.scope);
     if (body.authorMemberUid && body.authorTeamUid) {
       throw new BadRequestException('Provide either authorMemberUid or authorTeamUid, not both');
     }
@@ -480,6 +543,7 @@ export class ArticlesService {
           createdBy,
           updatedBy: createdBy,
           status,
+          scope: body.scope ?? null,
           publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
         },
         include: this.articleInclude,
@@ -488,6 +552,7 @@ export class ArticlesService {
   }
 
   async updateOwnArticle(userEmail: string, uid: string, body: UpdateArticleDto) {
+    if (body.scope !== undefined) this.validateArticleScope(body.scope);
     const { memberUid, teamUid, isDirectoryAdmin } = await this.resolveMemberByEmail(userEmail);
     await this.ensureArticleOwnership(uid, memberUid, teamUid, isDirectoryAdmin);
 
@@ -508,6 +573,7 @@ export class ArticlesService {
       data.readingTime = this.calculateReadingTime(body.content);
     }
     if (body.coverImageUid !== undefined) data.coverImageUid = body.coverImageUid;
+    if (body.scope !== undefined) data.scope = body.scope;
     if (body.status !== undefined) {
       data.status = body.status;
       if (body.status === ArticleStatus.PUBLISHED && existing.status !== ArticleStatus.PUBLISHED) {
@@ -543,6 +609,8 @@ export class ArticlesService {
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
 
+    // My articles only shows user's own articles -- no scope restriction needed
+    // (authors always see their own articles regardless of scope)
     const where: Prisma.ArticleWhereInput = {
       isDeleted: false,
       OR: [{ authorMemberUid: memberUid }, ...(teamUid ? [{ authorTeamUid: teamUid }] : [])],
@@ -650,6 +718,7 @@ export class ArticlesService {
   }
 
   async adminCreate(body: CreateArticleDto, userEmail?: string) {
+    this.validateArticleScope(body.scope);
     const slugURL = body.slugURL || (await this.generateSlug(body.title));
     const readingTime = this.calculateReadingTime(body.content);
     const status = body.status ?? ArticleStatus.DRAFT;
@@ -689,6 +758,7 @@ export class ArticlesService {
           createdBy,
           updatedBy: createdBy,
           status,
+          scope: body.scope ?? null,
           publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
         },
         include: this.articleInclude,
@@ -697,6 +767,7 @@ export class ArticlesService {
   }
 
   async adminUpdate(uid: string, body: UpdateArticleDto, userEmail?: string) {
+    if (body.scope !== undefined) this.validateArticleScope(body.scope);
     const existing = await this.prisma.article.findUnique({ where: { uid } });
 
     if (!existing) {
@@ -717,6 +788,7 @@ export class ArticlesService {
     if (body.coverImageUid !== undefined) data.coverImageUid = body.coverImageUid;
     if (body.authorMemberUid !== undefined) data.authorMemberUid = body.authorMemberUid;
     if (body.authorTeamUid !== undefined) data.authorTeamUid = body.authorTeamUid;
+    if (body.scope !== undefined) data.scope = body.scope;
     if (body.status !== undefined) {
       data.status = body.status;
       if (body.status === ArticleStatus.PUBLISHED && existing.status !== ArticleStatus.PUBLISHED) {

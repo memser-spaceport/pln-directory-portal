@@ -4,6 +4,7 @@ import { AssignRoleDto } from './dto/assign-role.dto';
 import { GrantPermissionDto } from './dto/grant-permission.dto';
 import { RevokePermissionDto } from './dto/revoke-permission.dto';
 import { RevokeRoleDto } from './dto/revoke-role.dto';
+import { UpdateMemberPermissionScopesDto, UpdateRolePermissionScopesDto } from './dto/update-scopes.dto';
 import { RbacService } from './rbac.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 
@@ -98,11 +99,21 @@ export class AdminRbacController {
 
   @Post('permissions/grant')
   async grantPermission(@Body() body: GrantPermissionDto) {
-    return this.rbacService.grantPermission(body.memberUid, body.permissionCode, body.grantedByMemberUid);
+    return this.rbacService.grantPermission(body.memberUid, body.permissionCode, body.grantedByMemberUid, body.scopes);
   }
 
   @Post('permissions/revoke')
   async revokePermission(@Body() body: RevokePermissionDto) {
     return this.rbacService.revokePermission(body.memberUid, body.permissionCode);
+  }
+
+  @Post('permissions/scopes')
+  async updateMemberPermissionScopes(@Body() body: UpdateMemberPermissionScopesDto) {
+    return this.rbacService.updateMemberPermissionScopes(body.memberUid, body.permissionCode, body.scopes);
+  }
+
+  @Post('roles/permission-scopes')
+  async updateRolePermissionScopes(@Body() body: UpdateRolePermissionScopesDto) {
+    return this.rbacService.updateRolePermissionScopes(body.roleCode, body.permissionCode, body.scopes);
   }
 }
