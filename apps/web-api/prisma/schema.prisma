@@ -1314,6 +1314,10 @@ enum PushNotificationCategory {
   SYSTEM
 
   IRL_GATHERING
+
+  // Guide comments
+  GUIDE_POST
+  GUIDE_REPLY
 }
 
 // Push notifications for WebSocket delivery
