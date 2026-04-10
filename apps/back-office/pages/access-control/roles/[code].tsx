@@ -211,7 +211,7 @@ const RoleEditPage = () => {
                         <MemberCell member={member} />
                       </div>
                       <div className={clsx(s.bodyCell, s.flexible)}>
-                        <TeamCell projectContributions={member.projectContributions ?? []} />
+                        <TeamCell teamMemberRoles={member.teamMemberRoles ?? []} />
                       </div>
                       <div className={clsx(s.bodyCell, s.fixed)}>
                         <button

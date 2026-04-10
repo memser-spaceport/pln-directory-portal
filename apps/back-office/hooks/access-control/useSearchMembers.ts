@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { RbacQueryKeys } from './constants/queryKeys';
 import api from '../../utils/api';
 import { API_ROUTE } from '../../utils/constants';
-import { MemberBasic } from '../../screens/access-control/types';
+import { MemberBasic, TeamMemberRoleInfo } from '../../screens/access-control/types';
+
+export type RbacMemberSearchRow = MemberBasic & { teamMemberRoles: TeamMemberRoleInfo[] };
 
 interface QueryParams {
   authToken: string | undefined;
@@ -12,14 +14,14 @@ interface QueryParams {
   enabled?: boolean;
 }
 
-async function fetcher(params: QueryParams): Promise<MemberBasic[]> {
+async function fetcher(params: QueryParams): Promise<RbacMemberSearchRow[]> {
   const { authToken, query, limit = 20 } = params;
 
   const queryParams = new URLSearchParams();
   queryParams.set('q', query);
   queryParams.set('limit', String(limit));
 
-  const { data } = await api.get<MemberBasic[]>(
+  const { data } = await api.get<RbacMemberSearchRow[]>(
     `${API_ROUTE.ADMIN_RBAC_MEMBERS}/search?${queryParams.toString()}`,
     {
       headers: {

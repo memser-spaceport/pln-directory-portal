@@ -23,14 +23,19 @@ import AddRoleModal from '../../../screens/access-control/components/AddRoleModa
 import EditScopesModal from '../../../screens/access-control/components/EditScopesModal';
 import ConfirmDeleteModal from '../../../screens/access-control/components/ConfirmDeleteModal';
 import InfoModal from '../../../screens/access-control/components/InfoModal';
-import { MemberBasic, RoleBasic, TeamInfo } from '../../../screens/access-control/types';
+import { MemberBasic, RoleBasic, TeamMemberRoleInfo } from '../../../screens/access-control/types';
 
 import s from './styles.module.scss';
 
 type Tab = 'roles' | 'members';
 type MemberFilter = 'all' | 'direct' | 'viaRoles';
 
-type PermissionMemberRow = MemberBasic & { viaRoles: string[]; isDirect: boolean; projectContributions: TeamInfo[]; scopes: string[] };
+type PermissionMemberRow = MemberBasic & {
+  viaRoles: string[];
+  isDirect: boolean;
+  teamMemberRoles: TeamMemberRoleInfo[];
+  scopes: string[];
+};
 
 type PermissionRoleRow = RoleBasic & { memberCount: number; scopes: string[] };
 
@@ -411,7 +416,7 @@ const PermissionEditPage = () => {
                         <MemberCell member={member} />
                       </div>
                       <div className={clsx(s.bodyCell, s.teamCell)}>
-                        <TeamCell projectContributions={member.projectContributions ?? []} />
+                        <TeamCell teamMemberRoles={member.teamMemberRoles ?? []} />
                       </div>
                       <div className={clsx(s.bodyCell, s.viaRolesCell)}>
                         <PermissionStatusCell viaRoles={member.viaRoles} isDirect={member.isDirect} variant="tags" />

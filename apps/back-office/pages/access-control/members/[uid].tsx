@@ -254,7 +254,7 @@ const MemberEditPage = () => {
             <>
               <MemberCell member={member} linkNameToDirectory />
               <div className={s.memberMeta}>
-                <TeamCell projectContributions={member.projectContributions} />
+                <TeamCell teamMemberRoles={member.teamMemberRoles} />
               </div>
             </>
           )}
@@ -420,7 +420,9 @@ const MemberEditPage = () => {
                         <div className={s.scopesCell}>
                           {perm.scopes?.length > 0 ? (
                             perm.scopes.map((scope) => (
-                              <span key={scope} className={s.scopeTag}>{scope}</span>
+                              <span key={scope} className={s.scopeTag}>
+                                {scope}
+                              </span>
                             ))
                           ) : (
                             <span className={s.scopeEmpty}>--</span>
@@ -433,7 +435,12 @@ const MemberEditPage = () => {
                               title="Edit scopes"
                             >
                               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                                />
                               </svg>
                             </button>
                           )}

@@ -4,12 +4,14 @@ import { useSearchMembers } from '../../../hooks/access-control/useSearchMembers
 import { useRbacMembers } from '../../../hooks/access-control/useRbacMembers';
 import { useCookie } from 'react-use';
 import clsx from 'clsx';
-import { MemberBasic, AVAILABLE_SCOPES } from '../types';
+import { MemberBasic, TeamMemberRoleInfo, AVAILABLE_SCOPES } from '../types';
+
+type MemberPickerRow = MemberBasic & { teamMemberRoles?: TeamMemberRoleInfo[] };
 
 interface AddMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (member: MemberBasic, scopes: string[]) => void;
+  onAdd: (member: MemberPickerRow, scopes: string[]) => void;
   title: string;
   existingMemberUids?: string[];
   excludeRoleCode?: string;
@@ -28,7 +30,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   showScopes = false,
 }) => {
   const [authToken] = useCookie('plnadmin');
-  const [selectedMember, setSelectedMember] = useState<MemberBasic | null>(null);
+  const [selectedMember, setSelectedMember] = useState<MemberPickerRow | null>(null);
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedScopes, setSelectedScopes] = useState<Set<string>>(new Set());
 
@@ -195,6 +197,22 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-gray-900">{member.name}</p>
                             <p className="truncate text-sm text-gray-500">{member.email}</p>
+                            {member.teamMemberRoles && member.teamMemberRoles.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {member.teamMemberRoles.map((tmr) => (
+                                  <span
+                                    key={tmr.team.uid}
+                                    className="inline-flex max-w-full rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600"
+                                    title={tmr.role ? `${tmr.team.name} — ${tmr.role}` : tmr.team.name}
+                                  >
+                                    <span className="truncate">
+                                      {tmr.team.name}
+                                      {tmr.role ? ` · ${tmr.role}` : ''}
+                                    </span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           {selectedMember?.uid === member.uid && (
                             <div className="flex-shrink-0">
