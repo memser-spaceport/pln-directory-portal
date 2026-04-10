@@ -13,6 +13,15 @@ import { AVAILABLE_SCOPES } from './rbac.constants';
 export class RbacService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private mapTeamMemberRolesForRbac(
+    teamMemberRoles: Array<{ role: string | null; team: { uid: string; name: string } }>
+  ) {
+    return teamMemberRoles.map((tmr) => ({
+      role: tmr.role,
+      team: { uid: tmr.team.uid, name: tmr.team.name },
+    }));
+  }
+
   private validateScopes(scopes: string[]): void {
     const invalid = scopes.filter((s) => !AVAILABLE_SCOPES.includes(s as any));
     if (invalid.length > 0) {
@@ -455,9 +464,14 @@ export class RbacService {
       where: { uid: memberUid },
       include: {
         image: true,
-        projectContributions: {
+        teamMemberRoles: {
           include: {
-            project: true,
+            team: {
+              select: {
+                uid: true,
+                name: true,
+              },
+            },
           },
         },
         roleAssignments: {
@@ -558,7 +572,7 @@ export class RbacService {
         name: member.name,
         email: member.email,
         image: member.image,
-        projectContributions: member.projectContributions,
+        teamMemberRoles: this.mapTeamMemberRolesForRbac(member.teamMemberRoles),
       },
       roles,
       directPermissions,
@@ -602,10 +616,24 @@ export class RbacService {
             url: true,
           },
         },
+        teamMemberRoles: {
+          select: {
+            role: true,
+            team: {
+              select: {
+                uid: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    return members;
+    return members.map((m) => ({
+      ...m,
+      teamMemberRoles: this.mapTeamMemberRolesForRbac(m.teamMemberRoles),
+    }));
   }
 
   /**
@@ -678,9 +706,14 @@ export class RbacService {
       },
       include: {
         image: true,
-        projectContributions: {
+        teamMemberRoles: {
           include: {
-            project: true,
+            team: {
+              select: {
+                uid: true,
+                name: true,
+              },
+            },
           },
         },
         roleAssignments: {
@@ -710,7 +743,7 @@ export class RbacService {
       name: member.name,
       email: member.email,
       image: member.image,
-      projectContributions: member.projectContributions,
+      teamMemberRoles: this.mapTeamMemberRolesForRbac(member.teamMemberRoles),
       roles: member.roleAssignments.map((ra) => ({
         uid: ra.role.uid,
         code: ra.role.code,
@@ -846,9 +879,14 @@ export class RbacService {
         member: {
           include: {
             image: true,
-            projectContributions: {
+            teamMemberRoles: {
               include: {
-                project: true,
+                team: {
+                  select: {
+                    uid: true,
+                    name: true,
+                  },
+                },
               },
             },
           },
@@ -872,7 +910,7 @@ export class RbacService {
         name: ra.member.name,
         email: ra.member.email,
         image: ra.member.image,
-        projectContributions: ra.member.projectContributions,
+        teamMemberRoles: this.mapTeamMemberRolesForRbac(ra.member.teamMemberRoles),
       })),
       pagination: {
         page,
@@ -1057,9 +1095,14 @@ export class RbacService {
         member: {
           include: {
             image: true,
-            projectContributions: {
+            teamMemberRoles: {
               include: {
-                project: true,
+                team: {
+                  select: {
+                    uid: true,
+                    name: true,
+                  },
+                },
               },
             },
           },
@@ -1080,9 +1123,14 @@ export class RbacService {
         member: {
           include: {
             image: true,
-            projectContributions: {
+            teamMemberRoles: {
               include: {
-                project: true,
+                team: {
+                  select: {
+                    uid: true,
+                    name: true,
+                  },
+                },
               },
             },
           },
@@ -1106,7 +1154,7 @@ export class RbacService {
           name: assignment.member.name,
           email: assignment.member.email,
           image: assignment.member.image,
-          projectContributions: assignment.member.projectContributions,
+          teamMemberRoles: this.mapTeamMemberRolesForRbac(assignment.member.teamMemberRoles),
           viaRoles: [assignment.role.name],
           isDirect: false,
           scopes: [],
@@ -1126,7 +1174,7 @@ export class RbacService {
           name: mp.member.name,
           email: mp.member.email,
           image: mp.member.image,
-          projectContributions: mp.member.projectContributions,
+          teamMemberRoles: this.mapTeamMemberRolesForRbac(mp.member.teamMemberRoles),
           viaRoles: [],
           isDirect: true,
           scopes: mp.scopes ?? [],
@@ -1169,7 +1217,7 @@ export class RbacService {
         name: mp.member.name,
         email: mp.member.email,
         image: mp.member.image,
-        projectContributions: mp.member.projectContributions,
+        teamMemberRoles: this.mapTeamMemberRolesForRbac(mp.member.teamMemberRoles),
       })),
       pagination: {
         page,

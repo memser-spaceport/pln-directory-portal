@@ -1,18 +1,18 @@
 import React from 'react';
-import { TeamInfo } from '../types';
+import { TeamMemberRoleInfo } from '../types';
 import s from './TeamCell.module.scss';
 
 interface TeamCellProps {
-  projectContributions: TeamInfo[];
+  teamMemberRoles: TeamMemberRoleInfo[];
   maxDisplay?: number;
 }
 
-export const TeamCell = ({ projectContributions, maxDisplay = 3 }: TeamCellProps) => {
-  if (!projectContributions || projectContributions.length === 0) {
+export const TeamCell = ({ teamMemberRoles, maxDisplay = 3 }: TeamCellProps) => {
+  if (!teamMemberRoles || teamMemberRoles.length === 0) {
     return <span className={s.empty}>-</span>;
   }
 
-  const teams = projectContributions.map((pc) => pc.project.name);
+  const teams = teamMemberRoles.map((tmr) => tmr.team.name);
   const displayTeams = teams.slice(0, maxDisplay);
   const remaining = teams.length - maxDisplay;
 
