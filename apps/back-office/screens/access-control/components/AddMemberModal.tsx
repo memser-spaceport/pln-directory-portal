@@ -5,6 +5,9 @@ import { useRbacMembers } from '../../../hooks/access-control/useRbacMembers';
 import { useCookie } from 'react-use';
 import clsx from 'clsx';
 import { MemberBasic, TeamMemberRoleInfo, AVAILABLE_SCOPES } from '../types';
+import teamCellS from './TeamCell.module.scss';
+
+const MAX_TEAM_TAGS = 3;
 
 type MemberPickerRow = MemberBasic & { teamMemberRoles?: TeamMemberRoleInfo[] };
 
@@ -159,7 +162,12 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
               <div className="max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm">
                 {displayMembers.length > 0 ? (
                   <div className="divide-y divide-gray-100">
-                    {displayMembers.map((member) => (
+                    {displayMembers.map((member) => {
+                      const teamRoles = member.teamMemberRoles ?? [];
+                      const visibleTeams = teamRoles.slice(0, MAX_TEAM_TAGS);
+                      const overflowTeamCount = teamRoles.length - MAX_TEAM_TAGS;
+
+                      return (
                       <div
                         key={member.uid}
                         role="button"
@@ -197,20 +205,25 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-gray-900">{member.name}</p>
                             <p className="truncate text-sm text-gray-500">{member.email}</p>
-                            {member.teamMemberRoles && member.teamMemberRoles.length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {member.teamMemberRoles.map((tmr) => (
+                            {teamRoles.length > 0 && (
+                              <div className={clsx('mt-1', teamCellS.root)}>
+                                {visibleTeams.map((tmr) => (
                                   <span
                                     key={tmr.team.uid}
-                                    className="inline-flex max-w-full rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600"
+                                    className={teamCellS.tag}
                                     title={tmr.role ? `${tmr.team.name} — ${tmr.role}` : tmr.team.name}
                                   >
-                                    <span className="truncate">
+                                    <span className="max-w-[12rem] truncate">
                                       {tmr.team.name}
                                       {tmr.role ? ` · ${tmr.role}` : ''}
                                     </span>
                                   </span>
                                 ))}
+                                {overflowTeamCount > 0 && (
+                                  <span className={teamCellS.overflowTag} title={`${overflowTeamCount} more team(s)`}>
+                                    +{overflowTeamCount}
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -227,7 +240,8 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                           )}
                         </div>
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                 ) : (
                   <div className="p-4 text-center text-gray-500">
