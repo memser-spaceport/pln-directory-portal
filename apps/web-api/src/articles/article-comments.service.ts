@@ -393,9 +393,32 @@ export class ArticleCommentsService {
     const link = `/founder-guides/${article.slugURL}`;
     const recipientUids = new Set<string>();
 
-    // Scenario 1: Top-level comment → notify article author (+ team leads if team-authored)
+    // Scenario 1: Mentions → notify mentioned members (highest priority — a mention is the
+    // most specific signal, so a mentioned user should always get the mention notification
+    // even if they would also be eligible as the article author or parent comment author).
+    const mentionedUids = this.extractMentionUids(comment.content);
+    for (const mentionedUid of mentionedUids) {
+      if (mentionedUid !== commentAuthor.uid && !recipientUids.has(mentionedUid)) {
+        recipientUids.add(mentionedUid);
+        await this.pushNotificationsService.sendGuideCommentNotification({
+          recipientUid: mentionedUid,
+          category: comment.parentUid ? 'GUIDE_REPLY' : 'GUIDE_POST',
+          commentAuthor,
+          articleTitle: article.title,
+          commentContent: comment.content,
+          link,
+          eventType: 'guide_mention',
+        });
+      }
+    }
+
+    // Scenario 2: Top-level comment → notify article author (+ team leads if team-authored)
     if (!comment.parentUid) {
-      if (article.authorMemberUid && article.authorMemberUid !== commentAuthor.uid) {
+      if (
+        article.authorMemberUid &&
+        article.authorMemberUid !== commentAuthor.uid &&
+        !recipientUids.has(article.authorMemberUid)
+      ) {
         recipientUids.add(article.authorMemberUid);
         await this.pushNotificationsService.sendGuideCommentNotification({
           recipientUid: article.authorMemberUid,
@@ -427,7 +450,7 @@ export class ArticleCommentsService {
       }
     }
 
-    // Scenario 2: Reply → notify parent comment author
+    // Scenario 3: Reply → notify parent comment author
     if (comment.parentUid) {
       const parentComment = await this.prisma.articleComment.findUnique({
         where: { uid: comment.parentUid },
@@ -447,23 +470,6 @@ export class ArticleCommentsService {
             eventType: 'guide_reply',
           });
         }
-      }
-    }
-
-    // Scenario 3: Mentions → notify mentioned members
-    const mentionedUids = this.extractMentionUids(comment.content);
-    for (const mentionedUid of mentionedUids) {
-      if (mentionedUid !== commentAuthor.uid && !recipientUids.has(mentionedUid)) {
-        recipientUids.add(mentionedUid);
-        await this.pushNotificationsService.sendGuideCommentNotification({
-          recipientUid: mentionedUid,
-          category: comment.parentUid ? 'GUIDE_REPLY' : 'GUIDE_POST',
-          commentAuthor,
-          articleTitle: article.title,
-          commentContent: comment.content,
-          link,
-          eventType: 'guide_mention',
-        });
       }
     }
   }
