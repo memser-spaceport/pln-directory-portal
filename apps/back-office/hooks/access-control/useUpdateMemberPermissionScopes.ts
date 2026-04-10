@@ -7,25 +7,19 @@ interface MutationParams {
   authToken: string | undefined;
   memberUid: string;
   permissionCode: string;
-  grantedByMemberUid?: string;
-  scopes?: string[];
+  scopes: string[];
 }
 
-export function useGrantPermission() {
+export function useUpdateMemberPermissionScopes() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (params: MutationParams) => {
-      const { authToken, memberUid, permissionCode, grantedByMemberUid, scopes } = params;
+      const { authToken, memberUid, permissionCode, scopes } = params;
 
       const { data } = await api.post(
-        `${API_ROUTE.ADMIN_RBAC_PERMISSIONS}/grant`,
-        {
-          memberUid,
-          permissionCode,
-          grantedByMemberUid,
-          scopes,
-        },
+        `${API_ROUTE.ADMIN_RBAC_PERMISSIONS}/scopes`,
+        { memberUid, permissionCode, scopes },
         {
           headers: {
             authorization: `Bearer ${authToken}`,

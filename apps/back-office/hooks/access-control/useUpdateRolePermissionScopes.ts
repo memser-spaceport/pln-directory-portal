@@ -5,27 +5,21 @@ import { RbacQueryKeys } from './constants/queryKeys';
 
 interface MutationParams {
   authToken: string | undefined;
-  memberUid: string;
+  roleCode: string;
   permissionCode: string;
-  grantedByMemberUid?: string;
-  scopes?: string[];
+  scopes: string[];
 }
 
-export function useGrantPermission() {
+export function useUpdateRolePermissionScopes() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (params: MutationParams) => {
-      const { authToken, memberUid, permissionCode, grantedByMemberUid, scopes } = params;
+      const { authToken, roleCode, permissionCode, scopes } = params;
 
       const { data } = await api.post(
-        `${API_ROUTE.ADMIN_RBAC_PERMISSIONS}/grant`,
-        {
-          memberUid,
-          permissionCode,
-          grantedByMemberUid,
-          scopes,
-        },
+        `${API_ROUTE.ADMIN_RBAC_ROLES}/permission-scopes`,
+        { roleCode, permissionCode, scopes },
         {
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -37,10 +31,10 @@ export function useGrantPermission() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: [RbacQueryKeys.MEMBER_DETAILS, variables.authToken, variables.memberUid],
+        queryKey: [RbacQueryKeys.ROLE_DETAILS, variables.authToken, variables.roleCode],
       });
       queryClient.invalidateQueries({
-        queryKey: [RbacQueryKeys.MEMBERS_LIST, variables.authToken],
+        queryKey: [RbacQueryKeys.ROLES_LIST, variables.authToken],
       });
       queryClient.invalidateQueries({
         queryKey: [RbacQueryKeys.PERMISSION_DETAILS, variables.authToken, variables.permissionCode],

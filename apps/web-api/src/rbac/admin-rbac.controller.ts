@@ -2,8 +2,11 @@ import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/co
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { GrantPermissionDto } from './dto/grant-permission.dto';
+import { GrantRolePermissionDto } from './dto/grant-role-permission.dto';
 import { RevokePermissionDto } from './dto/revoke-permission.dto';
+import { RevokeRolePermissionDto } from './dto/revoke-role-permission.dto';
 import { RevokeRoleDto } from './dto/revoke-role.dto';
+import { UpdateMemberPermissionScopesDto, UpdateRolePermissionScopesDto } from './dto/update-scopes.dto';
 import { RbacService } from './rbac.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 
@@ -73,6 +76,16 @@ export class AdminRbacController {
     return this.rbacService.revokeRole(body.memberUid, body.roleCode);
   }
 
+  @Post('roles/permissions/grant')
+  async grantRolePermission(@Body() body: GrantRolePermissionDto) {
+    return this.rbacService.grantRolePermission(body.roleCode, body.permissionCode, body.scopes);
+  }
+
+  @Post('roles/permissions/revoke')
+  async revokeRolePermission(@Body() body: RevokeRolePermissionDto) {
+    return this.rbacService.revokeRolePermission(body.roleCode, body.permissionCode);
+  }
+
   @NoCache()
   @Get('permissions')
   async listPermissions() {
@@ -98,11 +111,21 @@ export class AdminRbacController {
 
   @Post('permissions/grant')
   async grantPermission(@Body() body: GrantPermissionDto) {
-    return this.rbacService.grantPermission(body.memberUid, body.permissionCode, body.grantedByMemberUid);
+    return this.rbacService.grantPermission(body.memberUid, body.permissionCode, body.grantedByMemberUid, body.scopes);
   }
 
   @Post('permissions/revoke')
   async revokePermission(@Body() body: RevokePermissionDto) {
     return this.rbacService.revokePermission(body.memberUid, body.permissionCode);
+  }
+
+  @Post('permissions/scopes')
+  async updateMemberPermissionScopes(@Body() body: UpdateMemberPermissionScopesDto) {
+    return this.rbacService.updateMemberPermissionScopes(body.memberUid, body.permissionCode, body.scopes);
+  }
+
+  @Post('roles/permission-scopes')
+  async updateRolePermissionScopes(@Body() body: UpdateRolePermissionScopesDto) {
+    return this.rbacService.updateRolePermissionScopes(body.roleCode, body.permissionCode, body.scopes);
   }
 }
