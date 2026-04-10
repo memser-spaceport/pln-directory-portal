@@ -64,7 +64,7 @@ export interface PermissionWithCounts extends PermissionBasic {
 }
 
 export interface PermissionDetails extends PermissionBasic {
-  roles: Array<RoleBasic & { memberCount: number }>;
+  roles: Array<RoleBasic & { memberCount: number; scopes: string[] }>;
   members: Array<MemberBasic & { viaRoles: string[]; isDirect: boolean; projectContributions: TeamInfo[]; scopes: string[] }>;
   pagination: PaginationInfo;
 }

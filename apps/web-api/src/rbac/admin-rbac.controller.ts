@@ -2,7 +2,9 @@ import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/co
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { GrantPermissionDto } from './dto/grant-permission.dto';
+import { GrantRolePermissionDto } from './dto/grant-role-permission.dto';
 import { RevokePermissionDto } from './dto/revoke-permission.dto';
+import { RevokeRolePermissionDto } from './dto/revoke-role-permission.dto';
 import { RevokeRoleDto } from './dto/revoke-role.dto';
 import { UpdateMemberPermissionScopesDto, UpdateRolePermissionScopesDto } from './dto/update-scopes.dto';
 import { RbacService } from './rbac.service';
@@ -72,6 +74,16 @@ export class AdminRbacController {
   @Post('roles/revoke')
   async revokeRole(@Body() body: RevokeRoleDto) {
     return this.rbacService.revokeRole(body.memberUid, body.roleCode);
+  }
+
+  @Post('roles/permissions/grant')
+  async grantRolePermission(@Body() body: GrantRolePermissionDto) {
+    return this.rbacService.grantRolePermission(body.roleCode, body.permissionCode, body.scopes);
+  }
+
+  @Post('roles/permissions/revoke')
+  async revokeRolePermission(@Body() body: RevokeRolePermissionDto) {
+    return this.rbacService.revokeRolePermission(body.roleCode, body.permissionCode);
   }
 
   @NoCache()
