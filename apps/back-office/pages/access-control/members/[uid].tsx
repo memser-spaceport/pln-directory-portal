@@ -129,7 +129,7 @@ const MemberEditPage = () => {
     });
   };
 
-  const handleAddRole = async (role: RoleBasic) => {
+  const handleAddRole = async (role: RoleBasic, _scopes: string[]) => {
     try {
       await assignRole.mutateAsync({
         authToken,

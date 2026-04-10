@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -354,6 +355,69 @@ export class RbacService {
       },
       data: { scopes },
     });
+  }
+
+  async grantRolePermission(roleCode: string, permissionCode: string, scopes?: string[]) {
+    const normalized = scopes ?? [];
+    if (normalized.length) {
+      this.validateScopes(normalized);
+    }
+
+    const role = await this.prisma.role.findUnique({ where: { code: roleCode } });
+    if (!role) {
+      throw new NotFoundException(`Role not found: ${roleCode}`);
+    }
+
+    const permission = await this.prisma.permission.findUnique({ where: { code: permissionCode } });
+    if (!permission) {
+      throw new NotFoundException(`Permission not found: ${permissionCode}`);
+    }
+
+    const existing = await this.prisma.rolePermission.findUnique({
+      where: {
+        roleUid_permissionUid: {
+          roleUid: role.uid,
+          permissionUid: permission.uid,
+        },
+      },
+    });
+    if (existing) {
+      throw new ConflictException(`Role "${roleCode}" already has permission "${permissionCode}"`);
+    }
+
+    return this.prisma.rolePermission.create({
+      data: {
+        roleUid: role.uid,
+        permissionUid: permission.uid,
+        scopes: normalized,
+      },
+    });
+  }
+
+  async revokeRolePermission(roleCode: string, permissionCode: string) {
+    const role = await this.prisma.role.findUnique({ where: { code: roleCode } });
+    if (!role) {
+      throw new NotFoundException(`Role not found: ${roleCode}`);
+    }
+
+    const permission = await this.prisma.permission.findUnique({ where: { code: permissionCode } });
+    if (!permission) {
+      throw new NotFoundException(`Permission not found: ${permissionCode}`);
+    }
+
+    const result = await this.prisma.rolePermission.deleteMany({
+      where: {
+        roleUid: role.uid,
+        permissionUid: permission.uid,
+      },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException(
+        `Permission "${permissionCode}" is not assigned to role "${roleCode}"`
+      );
+    }
+
+    return { removed: true };
   }
 
   async findMemberByEmail(email: string) {
@@ -1045,6 +1109,7 @@ export class RbacService {
           projectContributions: assignment.member.projectContributions,
           viaRoles: [assignment.role.name],
           isDirect: false,
+          scopes: [],
         });
       }
     }
@@ -1054,6 +1119,7 @@ export class RbacService {
       const existing = memberMap.get(mp.member.uid);
       if (existing) {
         existing.isDirect = true;
+        existing.scopes = mp.scopes ?? [];
       } else {
         memberMap.set(mp.member.uid, {
           uid: mp.member.uid,
@@ -1063,6 +1129,7 @@ export class RbacService {
           projectContributions: mp.member.projectContributions,
           viaRoles: [],
           isDirect: true,
+          scopes: mp.scopes ?? [],
         });
       }
     }
