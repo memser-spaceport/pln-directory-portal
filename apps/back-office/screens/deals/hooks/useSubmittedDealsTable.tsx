@@ -115,7 +115,7 @@ export function useSubmittedDealsTable({
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{vendorName}</div>
-                  {isExternal && (
+                  {isExternal ? (
                     <span
                       style={{
                         fontSize: 10,
@@ -128,7 +128,22 @@ export function useSubmittedDealsTable({
                         letterSpacing: '0.5px',
                       }}
                     >
-                      External
+                      Out-of-network
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: '#3b82f6',
+                        background: '#dbeafe',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      In-network
                     </span>
                   )}
                 </div>
@@ -162,7 +177,7 @@ export function useSubmittedDealsTable({
                 <SubmitterAvatar name={vendorName} />
                 <div>
                   <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{vendorName}</div>
-                  <div style={{ fontSize: 12, color: '#94a3b8' }}>External submission</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Out-of-network submission</div>
                 </div>
               </div>
             );
