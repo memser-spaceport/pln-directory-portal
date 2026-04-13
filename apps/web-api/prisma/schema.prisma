@@ -1493,8 +1493,8 @@ model DealSubmission {
   fullDescription        String
   redemptionInstructions String
   howToReachOutToYou     String?
-  authorMemberUid        String
-  authorMember           Member               @relation("MemberDealSubmissions", fields: [authorMemberUid], references: [uid], onDelete: Cascade)
+  authorMemberUid        String?
+  authorMember           Member?              @relation("MemberDealSubmissions", fields: [authorMemberUid], references: [uid], onDelete: SetNull)
   authorTeamUid          String?
   authorTeam             Team?                @relation("TeamDealSubmissions", fields: [authorTeamUid], references: [uid], onDelete: SetNull)
   status                 DealSubmissionStatus @default(OPEN)
