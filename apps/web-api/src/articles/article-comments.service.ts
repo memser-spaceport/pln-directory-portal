@@ -412,40 +412,38 @@ export class ArticleCommentsService {
       }
     }
 
-    // Scenario 2: Top-level comment → notify article author (+ team leads if team-authored)
-    if (!comment.parentUid) {
-      if (
-        article.authorMemberUid &&
-        article.authorMemberUid !== commentAuthor.uid &&
-        !recipientUids.has(article.authorMemberUid)
-      ) {
-        recipientUids.add(article.authorMemberUid);
-        await this.pushNotificationsService.sendGuideCommentNotification({
-          recipientUid: article.authorMemberUid,
-          category: 'GUIDE_POST',
-          commentAuthor,
-          articleTitle: article.title,
-          commentContent: comment.content,
-          link,
-          eventType: 'guide_comment',
-        });
-      }
+    // Scenario 2: Notify article author (+ team leads if team-authored) for any comment or reply
+    if (
+      article.authorMemberUid &&
+      article.authorMemberUid !== commentAuthor.uid &&
+      !recipientUids.has(article.authorMemberUid)
+    ) {
+      recipientUids.add(article.authorMemberUid);
+      await this.pushNotificationsService.sendGuideCommentNotification({
+        recipientUid: article.authorMemberUid,
+        category: comment.parentUid ? 'GUIDE_REPLY' : 'GUIDE_POST',
+        commentAuthor,
+        articleTitle: article.title,
+        commentContent: comment.content,
+        link,
+        eventType: comment.parentUid ? 'guide_reply' : 'guide_comment',
+      });
+    }
 
-      if (article.authorTeamUid) {
-        const teamLeads = await this.resolveTeamLeads(article.authorTeamUid, commentAuthor.uid);
-        for (const lead of teamLeads) {
-          if (!recipientUids.has(lead.uid)) {
-            recipientUids.add(lead.uid);
-            await this.pushNotificationsService.sendGuideCommentNotification({
-              recipientUid: lead.uid,
-              category: 'GUIDE_POST',
-              commentAuthor,
-              articleTitle: article.title,
-              commentContent: comment.content,
-              link,
-              eventType: 'guide_comment',
-            });
-          }
+    if (article.authorTeamUid) {
+      const teamLeads = await this.resolveTeamLeads(article.authorTeamUid, commentAuthor.uid);
+      for (const lead of teamLeads) {
+        if (!recipientUids.has(lead.uid)) {
+          recipientUids.add(lead.uid);
+          await this.pushNotificationsService.sendGuideCommentNotification({
+            recipientUid: lead.uid,
+            category: comment.parentUid ? 'GUIDE_REPLY' : 'GUIDE_POST',
+            commentAuthor,
+            articleTitle: article.title,
+            commentContent: comment.content,
+            link,
+            eventType: comment.parentUid ? 'guide_reply' : 'guide_comment',
+          });
         }
       }
     }
