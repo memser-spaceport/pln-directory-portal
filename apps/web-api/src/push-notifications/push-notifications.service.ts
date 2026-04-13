@@ -877,7 +877,7 @@ export class PushNotificationsService {
     }
 
     const templateMap: Record<string, { templateName: string; actionType: string }> = {
-      guide_comment: { templateName: 'GUIDE_POST_REPLIED', actionType: 'COMMENT' },
+      guide_comment: { templateName: 'GUIDE_POST_COMMENT', actionType: 'COMMENT' },
       guide_reply: { templateName: 'GUIDE_POST_REPLIED', actionType: 'REPLY' },
       guide_mention: { templateName: 'GUIDE_MENTION', actionType: 'MENTION' },
     };
