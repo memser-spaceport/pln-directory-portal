@@ -1314,6 +1314,10 @@ enum PushNotificationCategory {
   SYSTEM
 
   IRL_GATHERING
+
+  // Guide comments
+  GUIDE_POST
+  GUIDE_REPLY
 }
 
 // Push notifications for WebSocket delivery
@@ -1489,8 +1493,8 @@ model DealSubmission {
   fullDescription        String
   redemptionInstructions String
   howToReachOutToYou     String?
-  authorMemberUid        String
-  authorMember           Member               @relation("MemberDealSubmissions", fields: [authorMemberUid], references: [uid], onDelete: Cascade)
+  authorMemberUid        String?
+  authorMember           Member?              @relation("MemberDealSubmissions", fields: [authorMemberUid], references: [uid], onDelete: SetNull)
   authorTeamUid          String?
   authorTeam             Team?                @relation("TeamDealSubmissions", fields: [authorTeamUid], references: [uid], onDelete: SetNull)
   status                 DealSubmissionStatus @default(OPEN)

@@ -361,48 +361,51 @@ export class DealsService {
     return { success: true };
   }
 
-  async submitDeal(userEmail: string, body: SubmitDealDto) {
-    const { memberUid, teamUid } = await this.ensureDealsAccess(userEmail);
+  async submitDeal(userEmail: string | null, body: SubmitDealDto) {
+    let memberUid: string | undefined;
+    let teamUid: string | null = null;
+
+    if (userEmail) {
+      const resolved = await this.resolveMemberByEmail(userEmail);
+      memberUid = resolved.memberUid;
+      teamUid = resolved.teamUid;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any = {
+      shortDescription: body.shortDescription,
+      fullDescription: body.fullDescription,
+      redemptionInstructions: body.redemptionInstructions,
+      status: DealSubmissionStatus.OPEN,
+    };
+
+    if (body.vendorName !== undefined) {
+      data.vendorName = body.vendorName;
+    }
+    if (body.category !== undefined) {
+      data.category = body.category;
+    }
+    if (body.audience !== undefined) {
+      data.audience = body.audience;
+    }
+    if (body.howToReachOutToYou !== undefined) {
+      data.howToReachOutToYou = body.howToReachOutToYou;
+    }
+    if (memberUid) {
+      data.authorMember = { connect: { uid: memberUid } };
+    }
+    if (teamUid) {
+      data.authorTeam = { connect: { uid: teamUid } };
+    }
+    if (body.vendorTeamUid) {
+      data.vendorTeam = { connect: { uid: body.vendorTeamUid } };
+    }
+    if (body.logoUid) {
+      data.logo = { connect: { uid: body.logoUid } };
+    }
 
     return this.prisma.dealSubmission.create({
-      data: {
-        ...(body.vendorName !== undefined ? { vendorName: body.vendorName } : {}),
-        ...(body.category !== undefined ? { category: body.category } : {}),
-        ...(body.audience !== undefined ? { audience: body.audience } : {}),
-        shortDescription: body.shortDescription,
-        fullDescription: body.fullDescription,
-        redemptionInstructions: body.redemptionInstructions,
-        ...(body.howToReachOutToYou !== undefined ? { howToReachOutToYou: body.howToReachOutToYou } : {}),
-        status: DealSubmissionStatus.OPEN,
-
-        authorMember: {
-          connect: { uid: memberUid },
-        },
-
-        ...(teamUid
-          ? {
-            authorTeam: {
-              connect: { uid: teamUid },
-            },
-          }
-          : {}),
-
-        ...(body.vendorTeamUid
-          ? {
-            vendorTeam: {
-              connect: { uid: body.vendorTeamUid },
-            },
-          }
-          : {}),
-
-        ...(body.logoUid
-          ? {
-            logo: {
-              connect: { uid: body.logoUid },
-            },
-          }
-          : {}),
-      },
+      data,
       include: {
         logo: { select: { url: true } },
         authorMember: { select: { uid: true, name: true, email: true, image: { select: { url: true } } } },

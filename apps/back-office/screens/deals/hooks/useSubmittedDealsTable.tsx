@@ -91,7 +91,8 @@ export function useSubmittedDealsTable({
         header: 'Vendor & Deal',
         size: 0,
         cell: (info) => {
-          const { vendorName, shortDescription, logo } = info.row.original;
+          const { vendorName, shortDescription, logo, authorMember } = info.row.original;
+          const isExternal = !authorMember;
 
           return (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -112,7 +113,40 @@ export function useSubmittedDealsTable({
                 <VendorAvatar name={vendorName} />
               )}
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{vendorName}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{vendorName}</div>
+                  {isExternal ? (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: '#f59e0b',
+                        background: '#fef3c7',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      Out-of-network
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: '#3b82f6',
+                        background: '#dbeafe',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      In-network
+                    </span>
+                  )}
+                </div>
                 <div
                   style={{
                     fontSize: 12,
@@ -135,7 +169,20 @@ export function useSubmittedDealsTable({
         header: 'Submitted By',
         size: 272,
         cell: (info) => {
-          const { authorMember } = info.row.original;
+          const { authorMember, vendorName } = info.row.original;
+
+          if (!authorMember) {
+            return (
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <SubmitterAvatar name={vendorName} />
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{vendorName}</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Out-of-network submission</div>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               {authorMember.image?.url ? (
@@ -226,7 +273,8 @@ export function useSubmittedDealsTable({
         vendorName?.toLowerCase().includes(search) ||
         shortDescription?.toLowerCase().includes(search) ||
         authorMember?.name?.toLowerCase().includes(search) ||
-        authorMember?.email?.toLowerCase().includes(search)
+        authorMember?.email?.toLowerCase().includes(search) ||
+        (!authorMember && vendorName?.toLowerCase().includes(search))
       );
     },
     getCoreRowModel: getCoreRowModel(),

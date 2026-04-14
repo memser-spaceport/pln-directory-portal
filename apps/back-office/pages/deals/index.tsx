@@ -67,6 +67,7 @@ const DealsPage = () => {
   const [submittedPagination, setSubmittedPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [submittedFilter, setSubmittedFilter] = useState('');
   const [submittedCategoryFilter, setSubmittedCategoryFilter] = useState('');
+  const [submittedNetworkFilter, setSubmittedNetworkFilter] = useState<'in-network' | 'out-of-network' | ''>('');
 
   const [issuesSorting, setIssuesSorting] = useState<SortingState>([]);
   const [issuesPagination, setIssuesPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
@@ -186,9 +187,11 @@ const DealsPage = () => {
     () =>
       (submittedData?.data ?? []).filter((deal) => {
         if (submittedCategoryFilter && deal.category !== submittedCategoryFilter) return false;
+        if (submittedNetworkFilter === 'in-network' && !deal.authorMember) return false;
+        if (submittedNetworkFilter === 'out-of-network' && deal.authorMember) return false;
         return true;
       }),
-    [submittedData?.data, submittedCategoryFilter]
+    [submittedData?.data, submittedCategoryFilter, submittedNetworkFilter]
   );
 
   const { table: catalogTable } = useDealsTable({
@@ -269,8 +272,7 @@ const DealsPage = () => {
     router.replace({ query: { tab: t } }, undefined, { shallow: true });
   };
 
-  const columnSizeStyle = (size: number) =>
-    size > 0 ? { width: size, flexBasis: size } : undefined;
+  const columnSizeStyle = (size: number) => (size > 0 ? { width: size, flexBasis: size } : undefined);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderTable = (activeTable: Table<any>, noTopBorder = false) => (
@@ -456,9 +458,14 @@ const DealsPage = () => {
                     </option>
                   ))}
                 </select>
-                {/* status filter not applicable to submitted deals — rendered for visual parity with Figma */}
-                <select className={s.filterSelect} disabled>
-                  <option value="">All statuses</option>
+                <select
+                  className={s.filterSelect}
+                  value={submittedNetworkFilter}
+                  onChange={(e) => setSubmittedNetworkFilter(e.target.value as 'in-network' | 'out-of-network' | '')}
+                >
+                  <option value="">All networks</option>
+                  <option value="in-network">In-network</option>
+                  <option value="out-of-network">Out-of-network</option>
                 </select>
                 <button
                   className={s.addNewBtn}
