@@ -192,22 +192,24 @@ model Member {
   pushNotificationReadStatuses     PushNotificationReadStatus[]      @relation("PushNotificationReadStatuses")
   eventAssociations                PLEventAssociation[]
 
-  dealSubmissions         DealSubmission[]   @relation("MemberDealSubmissions")
-  reviewedDealSubmissions DealSubmission[]   @relation("MemberReviewedDealSubmissions")
-  dealIssues              DealIssue[]        @relation("MemberDealIssues")
-  resolvedDealIssues      DealIssue[]        @relation("MemberResolvedDealIssues")
-  dealRedemptions         DealRedemption[]   @relation("MemberDealRedemptions")
-  dealUsages              DealUsage[]        @relation("MemberDealUsages")
-  dealWhitelist           DealWhitelist?     @relation("MemberDealWhitelist")
-  dealRequests            DealRequest[]      @relation("MemberDealRequests")
-  articles                Article[]          @relation("MemberArticles")
-  articleStatistics       ArticleStatistic[] @relation("MemberArticleStatistics")
-  articleWhitelist        ArticleWhitelist?  @relation("MemberArticleWhitelist")
-  articleRequests         ArticleRequest[]    @relation("MemberArticleRequests")
-  roleAssignments         RoleAssignment[]   @relation("MemberRoleAssignments")
-  roleAssignmentsGiven    RoleAssignment[]   @relation("MemberRoleAssignmentsGiven")
-  memberPermissions       MemberPermission[] @relation("MemberDirectPermissions")
-  memberPermissionsGiven  MemberPermission[] @relation("MemberDirectPermissionsGiven")
+  dealSubmissions         DealSubmission[]     @relation("MemberDealSubmissions")
+  reviewedDealSubmissions DealSubmission[]     @relation("MemberReviewedDealSubmissions")
+  dealIssues              DealIssue[]          @relation("MemberDealIssues")
+  resolvedDealIssues      DealIssue[]          @relation("MemberResolvedDealIssues")
+  dealRedemptions         DealRedemption[]     @relation("MemberDealRedemptions")
+  dealUsages              DealUsage[]          @relation("MemberDealUsages")
+  dealWhitelist           DealWhitelist?       @relation("MemberDealWhitelist")
+  dealRequests            DealRequest[]        @relation("MemberDealRequests")
+  articles                Article[]            @relation("MemberArticles")
+  articleStatistics       ArticleStatistic[]   @relation("MemberArticleStatistics")
+  articleWhitelist        ArticleWhitelist?    @relation("MemberArticleWhitelist")
+  articleRequests         ArticleRequest[]     @relation("MemberArticleRequests")
+  articleComments         ArticleComment[]     @relation("MemberArticleComments")
+  articleCommentLikes     ArticleCommentLike[] @relation("MemberArticleCommentLikes")
+  roleAssignments         RoleAssignment[]     @relation("MemberRoleAssignments")
+  roleAssignmentsGiven    RoleAssignment[]     @relation("MemberRoleAssignmentsGiven")
+  memberPermissions       MemberPermission[]   @relation("MemberDirectPermissions")
+  memberPermissionsGiven  MemberPermission[]   @relation("MemberDirectPermissionsGiven")
 }
 
 model MemberRole {
@@ -1312,6 +1314,10 @@ enum PushNotificationCategory {
   SYSTEM
 
   IRL_GATHERING
+
+  // Guide comments
+  GUIDE_POST
+  GUIDE_REPLY
 }
 
 // Push notifications for WebSocket delivery
@@ -1487,8 +1493,8 @@ model DealSubmission {
   fullDescription        String
   redemptionInstructions String
   howToReachOutToYou     String?
-  authorMemberUid        String
-  authorMember           Member               @relation("MemberDealSubmissions", fields: [authorMemberUid], references: [uid], onDelete: Cascade)
+  authorMemberUid        String?
+  authorMember           Member?              @relation("MemberDealSubmissions", fields: [authorMemberUid], references: [uid], onDelete: SetNull)
   authorTeamUid          String?
   authorTeam             Team?                @relation("TeamDealSubmissions", fields: [authorTeamUid], references: [uid], onDelete: SetNull)
   status                 DealSubmissionStatus @default(OPEN)
@@ -1600,7 +1606,6 @@ enum ArticleStatus {
   PUBLISHED
 }
 
-
 model ArticleRequest {
   id                 Int      @id @default(autoincrement())
   uid                String   @unique @default(cuid())
@@ -1639,6 +1644,7 @@ model Article {
   createdBy       String?
   updatedBy       String?
   status          ArticleStatus      @default(DRAFT)
+  scope           String?
   publishedAt     DateTime?
   isDeleted       Boolean            @default(false)
   deletedAt       DateTime?
@@ -1646,6 +1652,7 @@ model Article {
   updatedAt       DateTime           @updatedAt
   statistics      ArticleStatistic[]
   requests        ArticleRequest[]
+  comments        ArticleComment[]
 
   @@index([status])
   @@index([category])
@@ -1654,6 +1661,7 @@ model Article {
   @@index([isDeleted])
   @@index([createdBy])
   @@index([updatedBy])
+  @@index([scope])
 }
 
 model ArticleStatistic {
@@ -1670,6 +1678,41 @@ model ArticleStatistic {
 
   @@unique([articleUid, memberUid])
   @@index([articleUid])
+  @@index([memberUid])
+}
+
+model ArticleComment {
+  id         Int                  @id @default(autoincrement())
+  uid        String               @unique @default(cuid())
+  articleUid String
+  article    Article              @relation(fields: [articleUid], references: [uid], onDelete: Cascade)
+  parentUid  String?
+  parent     ArticleComment?      @relation("ArticleCommentReplies", fields: [parentUid], references: [uid], onDelete: Cascade)
+  replies    ArticleComment[]     @relation("ArticleCommentReplies")
+  content    String
+  likesCount Int                  @default(0)
+  authorUid  String
+  author     Member               @relation("MemberArticleComments", fields: [authorUid], references: [uid], onDelete: Cascade)
+  likes      ArticleCommentLike[]
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  @@index([articleUid])
+  @@index([parentUid])
+  @@index([authorUid])
+}
+
+model ArticleCommentLike {
+  id         Int            @id @default(autoincrement())
+  uid        String         @unique @default(cuid())
+  commentUid String
+  comment    ArticleComment @relation(fields: [commentUid], references: [uid], onDelete: Cascade)
+  memberUid  String
+  member     Member         @relation("MemberArticleCommentLikes", fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt  DateTime       @default(now())
+
+  @@unique([commentUid, memberUid])
+  @@index([commentUid])
   @@index([memberUid])
 }
 
@@ -1707,6 +1750,7 @@ model Permission {
 model RolePermission {
   roleUid       String
   permissionUid String
+  scopes        String[] @default([])
   createdAt     DateTime @default(now())
 
   role       Role       @relation(fields: [roleUid], references: [uid], onDelete: Restrict, onUpdate: Cascade)
@@ -1743,6 +1787,7 @@ model MemberPermission {
   grantedByMemberUid String?
   revokedAt          DateTime?
   status             String    @default("ACTIVE")
+  scopes             String[]  @default([])
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 

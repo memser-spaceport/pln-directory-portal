@@ -81,6 +81,33 @@ export class DemoDaysService {
     private readonly notificationServiceClient: NotificationServiceClient
   ) { }
 
+  async getDemoDayReportLink(userEmail: string): Promise<{ url: string }> {
+    if (!userEmail) {
+      throw new ForbiddenException('User email is missing');
+    }
+
+    const member = await this.membersService.findMemberByEmail(userEmail);
+
+    if (!member) {
+      throw new ForbiddenException('Member not found');
+    }
+
+    const isAdmin = isDirectoryAdmin(member);
+    const isDemoAdmin = hasDemoDayAdminRole(member);
+
+    if (!isAdmin && !isDemoAdmin) {
+      throw new ForbiddenException('Access denied: requires admin or demo day admin');
+    }
+
+    const url = process.env.DEMO_DAY_REPORT_LINK;
+
+    if (!url) {
+      throw new NotFoundException('DEMO_DAY_REPORT_LINK is not configured');
+    }
+
+    return { url };
+  }
+
   // Public methods
 
   async getDemoDayAccess(

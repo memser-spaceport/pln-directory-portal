@@ -48,7 +48,7 @@ export type SubmittedDeal = {
   fullDescription: string;
   redemptionInstructions: string;
   howToReachOutToYou: string | null;
-  authorMemberUid: string;
+  authorMemberUid: string | null;
   authorTeamUid: string | null;
   status: SubmissionStatus;
   reviewedByMemberUid: string | null;
@@ -61,7 +61,7 @@ export type SubmittedDeal = {
     name: string;
     email: string;
     image: { url: string } | null;
-  };
+  } | null;
   authorTeam: {
     uid: string;
     name: string;

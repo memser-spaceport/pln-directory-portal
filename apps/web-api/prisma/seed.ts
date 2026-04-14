@@ -86,6 +86,7 @@ import { demoDayTeamFundraisingProfiles } from './fixtures/demoDayTeamFundraisin
 import { demoDayParticipants } from './fixtures/demoDayParticipants';
 import { demoDayExpressInterestStats } from './fixtures/demoDayExpressInterestStats';
 import { articles, articleStatistics, articleWhitelists } from './fixtures/articles';
+import { seedArticleComments } from './seed-article-comments';
 
 /**
  * Truncate all public tables (except _prisma_migrations) and reset identities.
@@ -424,6 +425,7 @@ async function main() {
   await seedAdminRoleAssignments();
   await seedDealRequests();
   await seedArticleRequests();
+  await seedArticleComments();
 
   // Link InvestorProfiles to Members (update Member.investorProfileId)
   await linkInvestorProfilesToMembers();

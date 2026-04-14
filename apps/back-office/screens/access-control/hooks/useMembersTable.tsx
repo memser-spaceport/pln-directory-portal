@@ -44,9 +44,9 @@ export function useMembersTable({
         size: 320,
         maxSize: 320,
       }),
-      columnHelper.accessor('projectContributions', {
+      columnHelper.accessor('teamMemberRoles', {
         header: 'Team',
-        cell: (info) => <TeamCell projectContributions={info.row.original.projectContributions} />,
+        cell: (info) => <TeamCell teamMemberRoles={info.row.original.teamMemberRoles} />,
         size: 200,
         enableSorting: false,
       }),

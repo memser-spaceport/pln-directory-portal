@@ -7,7 +7,7 @@ import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 
 @Controller('v1/deals')
 export class DealsController {
-  constructor(private readonly dealsService: DealsService) {}
+  constructor(private readonly dealsService: DealsService) { }
 
   @NoCache()
   @UseGuards(UserTokenCheckGuard)
@@ -28,7 +28,7 @@ export class DealsController {
   @UseGuards(UserTokenCheckGuard)
   @Post('submissions')
   async submitDeal(@Req() req: Request, @Body() body: SubmitDealDto) {
-    return this.dealsService.submitDeal(req['userEmail'], body);
+    return this.dealsService.submitDeal(req['userEmail'] ?? null, body);
   }
 
   @NoCache()
