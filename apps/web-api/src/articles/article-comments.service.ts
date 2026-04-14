@@ -390,7 +390,7 @@ export class ArticleCommentsService {
 
     if (!article) return;
 
-    const link = `/founder-guides/${article.slugURL}`;
+    const link = `/founder-guides/${article.slugURL}?commentId=${comment.uid}`;
     const recipientUids = new Set<string>();
 
     // Scenario 1: Mentions → notify mentioned members (highest priority — a mention is the
