@@ -1,0 +1,80 @@
+.avatarImage {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.avatarFallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #455468;
+  flex-shrink: 0;
+}
+
+.requesterCell {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.requesterName {
+  font-weight: 500;
+  font-size: 14px;
+  color: #455468;
+}
+
+.requesterEmail {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.requestedDeal {
+  font-weight: 500;
+  font-size: 14px;
+  color: #455468;
+  white-space: normal;
+}
+
+.reason {
+  font-size: 14px;
+  color: #455468;
+  white-space: normal;
+  word-break: break-word;
+
+  a {
+    color: #06c;
+    text-decoration: underline;
+  }
+
+  ol, ul {
+    list-style-position: inside;
+  }
+
+  ul {
+    list-style-type: disc;
+  }
+
+  ol {
+    list-style-type: decimal;
+  }
+}
+
+.dateMain {
+  font-weight: 500;
+  font-size: 14px;
+  color: #455468;
+}
+
+.dateTime {
+  font-size: 12px;
+  color: #64748b;
+}
