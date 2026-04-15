@@ -4,10 +4,18 @@ import { TeamsModule } from '../teams/teams.module';
 import { TeamEnrichmentService } from './team-enrichment.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import { TeamEnrichmentJob } from './team-enrichment.job';
+import { LogoVerificationService } from './logo-verification.service';
+import { LogoVerificationController } from './logo-verification.controller';
 
 @Module({
   imports: [SharedModule, forwardRef(() => TeamsModule)],
-  providers: [TeamEnrichmentService, TeamEnrichmentAiService, TeamEnrichmentJob],
-  exports: [TeamEnrichmentService],
+  controllers: [LogoVerificationController],
+  providers: [
+    TeamEnrichmentService,
+    TeamEnrichmentAiService,
+    TeamEnrichmentJob,
+    LogoVerificationService,
+  ],
+  exports: [TeamEnrichmentService, LogoVerificationService],
 })
 export class TeamEnrichmentModule {}
