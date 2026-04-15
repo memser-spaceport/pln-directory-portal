@@ -2,6 +2,8 @@ import React from 'react';
 
 import { TDealForm } from '../../types/deal';
 import { DEAL_AUDIENCE_OPTIONS } from '../../constants';
+import { QuillContent } from '../../../../components/common/QuillContent';
+
 import s from './DealPreview.module.scss';
 
 interface Props {
@@ -92,15 +94,12 @@ export const DealPreview = ({ data, logoPreviewUrl, isPublishing, publishDisable
       <div className={s.content}>
         <section className={s.section}>
           <h3 className={s.sectionTitle}>About the deal</h3>
-          <div className={s.richText} dangerouslySetInnerHTML={{ __html: data.fullDescription || '' }} />
+          <QuillContent html={data.fullDescription || ''} className={s.richText} />
         </section>
 
         <section className={s.section}>
           <h3 className={s.sectionTitle}>Redemption Instructions</h3>
-          <div
-            className={s.redemptionInstructionsBody}
-            dangerouslySetInnerHTML={{ __html: data.redemptionInstructions || '' }}
-          />
+          <QuillContent html={data.redemptionInstructions || ''} className={s.redemptionInstructionsBody} />
         </section>
       </div>
 
