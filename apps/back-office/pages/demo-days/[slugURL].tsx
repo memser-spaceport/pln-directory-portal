@@ -559,7 +559,7 @@ const DemoDayDetailPage = () => {
     }
   };
 
-  const handleEditFormChange = (field: keyof UpdateDemoDayDto, value: string | boolean) => {
+  const handleEditFormChange = (field: keyof UpdateDemoDayDto, value: UpdateDemoDayDto[keyof UpdateDemoDayDto]) => {
     setEditFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -937,8 +937,16 @@ const DemoDayDetailPage = () => {
                       <MultiSelect
                         name="programFieldOptions"
                         options={DEMO_DAY_PROGRAM_OPTIONS.map((option) => ({ value: option, label: option }))}
-                        selectedValues={editFormData.programFieldOptions || []}
-                        onChange={(values) => handleEditFormChange('programFieldOptions', values)}
+                        selectedValues={(editFormData.programFieldOptions || []).map((option) => ({
+                          value: option,
+                          label: option,
+                        }))}
+                        onChange={(values) =>
+                          handleEditFormChange(
+                            'programFieldOptions',
+                            values.map((v) => v.value)
+                          )
+                        }
                         placeholder="Select program options"
                         label="Available Program Options"
                       />
@@ -1083,7 +1091,12 @@ const DemoDayDetailPage = () => {
                             }}
                           />
                           <div className="flex flex-col items-center gap-2 text-center text-sm text-gray-500">
-                            <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg
+                              className="h-8 w-8 text-gray-400"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                             </svg>
                             <span>Upload logo</span>
@@ -1163,7 +1176,12 @@ const DemoDayDetailPage = () => {
                             }}
                           />
                           <div className="flex flex-col items-center gap-2 text-center text-sm text-gray-500">
-                            <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg
+                              className="h-8 w-8 text-gray-400"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                             </svg>
                             <span>Upload header image</span>
@@ -1261,7 +1279,9 @@ const DemoDayDetailPage = () => {
                         className="h-5 w-5 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                       <span className="text-sm text-gray-600">
-                        {editFormData.landingLogosEnabled ?? demoDay.landingLogosEnabled ?? true ? 'Enabled' : 'Disabled'}
+                        {editFormData.landingLogosEnabled ?? demoDay.landingLogosEnabled ?? true
+                          ? 'Enabled'
+                          : 'Disabled'}
                       </span>
                     </label>
                   ) : (
@@ -1269,7 +1289,9 @@ const DemoDayDetailPage = () => {
                       <span
                         className={clsx(
                           'inline-flex rounded-full px-2 py-1 text-xs font-semibold',
-                          demoDay.landingLogosEnabled ?? true ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          demoDay.landingLogosEnabled ?? true
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
                         )}
                       >
                         {demoDay.landingLogosEnabled ?? true ? 'Yes' : 'No'}
