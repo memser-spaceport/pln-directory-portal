@@ -1070,7 +1070,7 @@ const DemoDayDetailPage = () => {
                             alt="Logo preview"
                             width={160}
                             height={120}
-                            style={{ objectFit: 'contain' }}
+                            objectFit="contain"
                           />
                         </div>
                       ) : (
@@ -1155,7 +1155,7 @@ const DemoDayDetailPage = () => {
                             alt="Header image preview"
                             width={280}
                             height={120}
-                            style={{ objectFit: 'contain' }}
+                            objectFit="contain"
                           />
                         </div>
                       ) : (
