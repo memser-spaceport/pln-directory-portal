@@ -18,6 +18,12 @@ export const UpdateFundraisingDescriptionSchema = z.object({
 
 export class UpdateFundraisingDescriptionDto extends createZodDto(UpdateFundraisingDescriptionSchema) { }
 
+export const UpdateFundraisingProgramSchema = z.object({
+  program: z.string().optional().nullable(),
+});
+
+export class UpdateFundraisingProgramDto extends createZodDto(UpdateFundraisingProgramSchema) { }
+
 export const ExpressInterestSchema = z.object({
   teamFundraisingProfileUid: z.string(),
   interestType: z.enum(['like', 'connect', 'invest', 'referral', 'feedback']),

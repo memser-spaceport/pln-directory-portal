@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useDemoDayDetails } from '../../hooks/demo-days/useDemoDayDetails';
 import { useDemoDayParticipants } from '../../hooks/demo-days/useDemoDayParticipants';
 import { useUpdateDemoDay } from '../../hooks/demo-days/useUpdateDemoDay';
+import { useUpdateBranding } from '../../hooks/demo-days/useUpdateBranding';
 import { useUpdateParticipant } from '../../hooks/demo-days/useUpdateParticipant';
 import { AddParticipantModal } from '../../components/demo-days/AddParticipantModal';
 import { UploadParticipantsModal } from '../../components/demo-days/UploadParticipantsModal';
@@ -13,7 +14,8 @@ import { ApproveParticipantModal } from '../../components/demo-days/ApproveParti
 import { ApplicationDetailsModal } from '../../components/demo-days/ApplicationDetailsModal';
 import { DemoDayParticipant, UpdateDemoDayDto, UpdateParticipantDto } from '../../screens/demo-days/types/demo-day';
 import { WEB_UI_BASE_URL, API_ROUTE } from '../../utils/constants';
-import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
+import { DEMO_DAY_HOSTS, DEMO_DAY_PROGRAM_OPTIONS } from '@protocol-labs-network/contracts/constants';
+import { MultiSelect } from '@protocol-labs-network/ui';
 import { RichText } from '../../components/common/rich-text';
 import clsx from 'clsx';
 import { toast } from 'react-toastify';
@@ -100,6 +102,9 @@ const DemoDayDetailPage = () => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [removeLogo, setRemoveLogo] = useState(false);
+  const [headerImageFile, setHeaderImageFile] = useState<File | null>(null);
+  const [headerImagePreview, setHeaderImagePreview] = useState<string | null>(null);
+  const [removeHeaderImage, setRemoveHeaderImage] = useState(false);
   const [isBrandingEditing, setIsBrandingEditing] = useState(false);
   const [showNotificationsConfirmModal, setShowNotificationsConfirmModal] = useState(false);
   const [modalNotifyBeforeStartHours, setModalNotifyBeforeStartHours] = useState(336);
@@ -114,6 +119,7 @@ const DemoDayDetailPage = () => {
   const [pendingSaveData, setPendingSaveData] = useState<UpdateDemoDayDto | null>(null);
 
   const updateDemoDayMutation = useUpdateDemoDay();
+  const updateBrandingMutation = useUpdateBranding();
   const updateParticipantMutation = useUpdateParticipant();
 
   const { data: demoDay, isLoading: demoDayLoading } = useDemoDayDetails({
@@ -224,6 +230,9 @@ const DemoDayDetailPage = () => {
       status: demoDay.status,
       notificationsEnabled: demoDay.notificationsEnabled,
       dashboardEnabled: demoDay.dashboardEnabled,
+      programFieldEnabled: demoDay.programFieldEnabled,
+      programFieldOptions: demoDay.programFieldOptions || [],
+      stageTagEnabled: demoDay.stageTagEnabled,
     });
     setIsEditing(true);
   };
@@ -350,11 +359,30 @@ const DemoDayDetailPage = () => {
     setRemoveLogo(true);
   };
 
+  const handleHeaderImageFileChange = (file: File | null) => {
+    if (file) {
+      setHeaderImageFile(file);
+      setRemoveHeaderImage(false);
+      const reader = new FileReader();
+      reader.onload = () => setHeaderImagePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveHeaderImage = () => {
+    setHeaderImageFile(null);
+    setHeaderImagePreview(null);
+    setRemoveHeaderImage(true);
+  };
+
   const handleBrandingEdit = () => {
     setIsBrandingEditing(true);
     setLogoFile(null);
     setLogoPreview(null);
     setRemoveLogo(false);
+    setHeaderImageFile(null);
+    setHeaderImagePreview(null);
+    setRemoveHeaderImage(false);
   };
 
   const handleBrandingCancel = () => {
@@ -362,6 +390,9 @@ const DemoDayDetailPage = () => {
     setLogoFile(null);
     setLogoPreview(null);
     setRemoveLogo(false);
+    setHeaderImageFile(null);
+    setHeaderImagePreview(null);
+    setRemoveHeaderImage(false);
   };
 
   const handleBrandingSave = async () => {
@@ -369,6 +400,7 @@ const DemoDayDetailPage = () => {
 
     try {
       let logoUid: string | null | undefined = undefined;
+      let headerImageUid: string | null | undefined = undefined;
 
       if (logoFile) {
         const formData = new FormData();
@@ -381,11 +413,35 @@ const DemoDayDetailPage = () => {
         logoUid = null;
       }
 
-      if (logoUid !== undefined) {
-        await updateDemoDayMutation.mutateAsync({
+      if (headerImageFile) {
+        const formData = new FormData();
+        formData.append('file', headerImageFile);
+        const imageResponse = await api.post(API_ROUTE.IMAGES, formData, {
+          headers: { 'content-type': 'multipart/form-data' },
+        });
+        headerImageUid = imageResponse?.data?.image?.uid;
+      } else if (removeHeaderImage) {
+        headerImageUid = null;
+      }
+
+      const hasBrandingUpdate =
+        logoUid !== undefined ||
+        headerImageUid !== undefined ||
+        editFormData.primaryColor !== undefined ||
+        editFormData.landingLogosEnabled !== undefined;
+
+      if (hasBrandingUpdate) {
+        await updateBrandingMutation.mutateAsync({
           authToken,
           uid: demoDay.uid,
-          data: { logoUid },
+          data: {
+            ...(logoUid !== undefined && { logoUid }),
+            ...(headerImageUid !== undefined && { headerImageUid }),
+            ...(editFormData.primaryColor !== undefined && { primaryColor: editFormData.primaryColor }),
+            ...(editFormData.landingLogosEnabled !== undefined && {
+              landingLogosEnabled: editFormData.landingLogosEnabled,
+            }),
+          },
         });
       }
 
@@ -393,6 +449,9 @@ const DemoDayDetailPage = () => {
       setLogoFile(null);
       setLogoPreview(null);
       setRemoveLogo(false);
+      setHeaderImageFile(null);
+      setHeaderImagePreview(null);
+      setRemoveHeaderImage(false);
     } catch (error) {
       console.error('Error saving branding:', error);
       toast.error('Failed to save branding. Please try again.');
@@ -457,10 +516,7 @@ const DemoDayDetailPage = () => {
     }
   };
 
-  const handleUpdateParticipantAdminAccess = async (
-    participantUid: string,
-    value: 'no' | 'full' | 'view-only'
-  ) => {
+  const handleUpdateParticipantAdminAccess = async (participantUid: string, value: 'no' | 'full' | 'view-only') => {
     if (!authToken || !demoDay) return;
     try {
       const data: UpdateParticipantDto =
@@ -862,6 +918,86 @@ const DemoDayDetailPage = () => {
                   </div>
                 )}
               </div>
+              <div className={clsx(s.overviewField)}>
+                <label className={s.fieldLabel}>Program Field</label>
+                {isEditing && isDirectoryAdmin ? (
+                  <div className="space-y-3">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editFormData.programFieldEnabled || false}
+                        onChange={(e) => handleEditFormChange('programFieldEnabled', e.target.checked)}
+                        className="h-5 w-5 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-600">
+                        {editFormData.programFieldEnabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </label>
+                    {editFormData.programFieldEnabled && (
+                      <MultiSelect
+                        name="programFieldOptions"
+                        options={DEMO_DAY_PROGRAM_OPTIONS.map((option) => ({ value: option, label: option }))}
+                        selectedValues={editFormData.programFieldOptions || []}
+                        onChange={(values) => handleEditFormChange('programFieldOptions', values)}
+                        placeholder="Select program options"
+                        label="Available Program Options"
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div className={s.fieldValue}>
+                    <span
+                      className={clsx(
+                        'inline-flex rounded-full px-2 py-1 text-xs font-semibold',
+                        demoDay.programFieldEnabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      )}
+                    >
+                      {demoDay.programFieldEnabled ? 'Yes' : 'No'}
+                    </span>
+                    {demoDay.programFieldEnabled &&
+                      demoDay.programFieldOptions &&
+                      demoDay.programFieldOptions.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {demoDay.programFieldOptions.map((option) => (
+                            <span
+                              key={option}
+                              className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800"
+                            >
+                              {option}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                  </div>
+                )}
+              </div>
+              <div className={clsx(s.overviewField)}>
+                <label className={s.fieldLabel}>Stage Tag</label>
+                {isEditing && isDirectoryAdmin ? (
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.stageTagEnabled || false}
+                      onChange={(e) => handleEditFormChange('stageTagEnabled', e.target.checked)}
+                      className="h-5 w-5 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-600">
+                      {editFormData.stageTagEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </label>
+                ) : (
+                  <div className={s.fieldValue}>
+                    <span
+                      className={clsx(
+                        'inline-flex rounded-full px-2 py-1 text-xs font-semibold',
+                        demoDay.stageTagEnabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      )}
+                    >
+                      {demoDay.stageTagEnabled ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
                 <label className={s.fieldLabel}>Short Description</label>
                 {isEditing ? (
@@ -903,53 +1039,34 @@ const DemoDayDetailPage = () => {
                   </button>
                   <button
                     onClick={handleBrandingSave}
-                    disabled={updateDemoDayMutation.isPending}
+                    disabled={updateBrandingMutation.isPending}
                     className={clsx(s.editButton, s.primary)}
                   >
-                    {updateDemoDayMutation.isPending ? 'Saving...' : 'Save'}
+                    {updateBrandingMutation.isPending ? 'Saving...' : 'Save'}
                   </button>
                 </div>
               )}
             </div>
 
-            <div className={s.overviewField}>
-              <label className={s.fieldLabel}>Logo</label>
-              {isBrandingEditing ? (
-                <div className="flex items-start gap-4">
-                  {logoPreview || (!removeLogo && demoDay.logoUrl) ? (
-                    <div className={s.logoPreview}>
-                      <Image src={logoPreview || demoDay.logoUrl || ''} alt="Logo preview" />
-                    </div>
-                  ) : (
-                    <label className={s.logoDropzone}>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 4 * 1024 * 1024) {
-                              toast.error('File size must be less than 4MB');
-                              return;
-                            }
-                            handleLogoFileChange(file);
-                          }
-                        }}
-                      />
-                      <div className="flex flex-col items-center gap-2 text-center text-sm text-gray-500">
-                        <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span>Upload logo</span>
-                        <span className="text-xs text-gray-400">PNG, JPG, WebP (max 4MB)</span>
-                      </div>
-                    </label>
-                  )}
-                  <div className="flex flex-col gap-2">
-                    {(logoPreview || (!removeLogo && demoDay.logoUrl)) && (
-                      <>
-                        <label className={clsx(s.editButton, 'cursor-pointer')}>
+            <div className={s.brandingGrid}>
+              {/* Left Column - Visual Assets */}
+              <div className={s.brandingColumn}>
+                <div className={s.overviewField}>
+                  <label className={s.fieldLabel}>Logo</label>
+                  {isBrandingEditing ? (
+                    <div className="flex items-start gap-4">
+                      {logoPreview || (!removeLogo && demoDay.logoUrl) ? (
+                        <div className={s.logoPreview}>
+                          <Image
+                            src={logoPreview || demoDay.logoUrl || ''}
+                            alt="Logo preview"
+                            width={160}
+                            height={120}
+                            style={{ objectFit: 'contain' }}
+                          />
+                        </div>
+                      ) : (
+                        <label className={s.logoDropzone}>
                           <input
                             type="file"
                             accept="image/png,image/jpeg,image/webp"
@@ -965,25 +1082,202 @@ const DemoDayDetailPage = () => {
                               }
                             }}
                           />
-                          Change
+                          <div className="flex flex-col items-center gap-2 text-center text-sm text-gray-500">
+                            <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span>Upload logo</span>
+                            <span className="text-xs text-gray-400">PNG, JPG, WebP (max 4MB)</span>
+                          </div>
                         </label>
-                        <button
-                          onClick={handleRemoveLogo}
-                          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                        >
-                          Remove
-                        </button>
-                      </>
-                    )}
-                  </div>
+                      )}
+                      <div className="flex flex-col gap-2">
+                        {(logoPreview || (!removeLogo && demoDay.logoUrl)) && (
+                          <>
+                            <label className={clsx(s.editButton, 'cursor-pointer')}>
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    if (file.size > 4 * 1024 * 1024) {
+                                      toast.error('File size must be less than 4MB');
+                                      return;
+                                    }
+                                    handleLogoFileChange(file);
+                                  }
+                                }}
+                              />
+                              Change
+                            </label>
+                            <button
+                              onClick={handleRemoveLogo}
+                              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                            >
+                              Remove
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : demoDay.logoUrl ? (
+                    <div className={s.logoPreview}>
+                      <img src={demoDay.logoUrl} alt="Demo day logo" />
+                    </div>
+                  ) : (
+                    <div className={s.logoPlaceholder}>No logo uploaded</div>
+                  )}
                 </div>
-              ) : demoDay.logoUrl ? (
-                <div className={s.logoPreview}>
-                  <img src={demoDay.logoUrl} alt="Demo day logo" />
+
+                <div className={s.overviewField}>
+                  <label className={s.fieldLabel}>Header Image</label>
+                  {isBrandingEditing ? (
+                    <div className="flex items-start gap-4">
+                      {headerImagePreview || (!removeHeaderImage && demoDay.headerImageUrl) ? (
+                        <div className={s.headerPreview}>
+                          <Image
+                            src={headerImagePreview || demoDay.headerImageUrl || ''}
+                            alt="Header image preview"
+                            width={280}
+                            height={120}
+                            style={{ objectFit: 'contain' }}
+                          />
+                        </div>
+                      ) : (
+                        <label className={s.headerDropzone}>
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                if (file.size > 4 * 1024 * 1024) {
+                                  toast.error('File size must be less than 4MB');
+                                  return;
+                                }
+                                handleHeaderImageFileChange(file);
+                              }
+                            }}
+                          />
+                          <div className="flex flex-col items-center gap-2 text-center text-sm text-gray-500">
+                            <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span>Upload header image</span>
+                            <span className="text-xs text-gray-400">PNG, JPG, WebP (max 4MB)</span>
+                          </div>
+                        </label>
+                      )}
+                      <div className="flex flex-col gap-2">
+                        {(headerImagePreview || (!removeHeaderImage && demoDay.headerImageUrl)) && (
+                          <>
+                            <label className={clsx(s.editButton, 'cursor-pointer')}>
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    if (file.size > 4 * 1024 * 1024) {
+                                      toast.error('File size must be less than 4MB');
+                                      return;
+                                    }
+                                    handleHeaderImageFileChange(file);
+                                  }
+                                }}
+                              />
+                              Change
+                            </label>
+                            <button
+                              onClick={handleRemoveHeaderImage}
+                              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                            >
+                              Remove
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : demoDay.headerImageUrl ? (
+                    <div className={s.headerPreview}>
+                      <img
+                        src={demoDay.headerImageUrl}
+                        alt="Demo day header"
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    </div>
+                  ) : (
+                    <div className={s.headerPlaceholder}>No header image uploaded</div>
+                  )}
                 </div>
-              ) : (
-                <div className={s.logoPlaceholder}>No logo uploaded</div>
-              )}
+              </div>
+
+              {/* Right Column - Settings */}
+              <div className={s.brandingColumn}>
+                <div className={s.overviewField}>
+                  <label className={s.fieldLabel}>Primary Color</label>
+                  {isBrandingEditing ? (
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={editFormData.primaryColor || demoDay.primaryColor || '#1a45e6'}
+                        onChange={(e) => handleEditFormChange('primaryColor', e.target.value)}
+                        className="h-10 w-20 cursor-pointer rounded border border-gray-300"
+                      />
+                      <input
+                        type="text"
+                        value={editFormData.primaryColor || demoDay.primaryColor || '#1a45e6'}
+                        onChange={(e) => handleEditFormChange('primaryColor', e.target.value)}
+                        className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="#1a45e6"
+                        pattern="^#[0-9A-Fa-f]{6}$"
+                      />
+                    </div>
+                  ) : (
+                    <div className={s.fieldValue}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-6 w-6 rounded border border-gray-300"
+                          style={{ backgroundColor: demoDay.primaryColor || '#1a45e6' }}
+                        />
+                        <span className="text-sm text-gray-600">{demoDay.primaryColor || '#1a45e6'}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className={s.overviewField}>
+                  <label className={s.fieldLabel}>Landing Logos Section</label>
+                  {isBrandingEditing ? (
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editFormData.landingLogosEnabled ?? demoDay.landingLogosEnabled ?? true}
+                        onChange={(e) => handleEditFormChange('landingLogosEnabled', e.target.checked)}
+                        className="h-5 w-5 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-600">
+                        {editFormData.landingLogosEnabled ?? demoDay.landingLogosEnabled ?? true ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </label>
+                  ) : (
+                    <div className={s.fieldValue}>
+                      <span
+                        className={clsx(
+                          'inline-flex rounded-full px-2 py-1 text-xs font-semibold',
+                          demoDay.landingLogosEnabled ?? true ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        )}
+                      >
+                        {demoDay.landingLogosEnabled ?? true ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1017,28 +1311,19 @@ const DemoDayDetailPage = () => {
                   className={clsx(s.tab, { [s.active]: activeTab === 'investors' })}
                   onClick={() => setActiveTab('investors')}
                 >
-                  Investors{' '}
-                  {participants &&
-                    activeTab === 'investors' &&
-                    `(${participants.total})`}
+                  Investors {participants && activeTab === 'investors' && `(${participants.total})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'founders' })}
                   onClick={() => setActiveTab('founders')}
                 >
-                  Founders{' '}
-                  {participants &&
-                    activeTab === 'founders' &&
-                    `(${participants.total})`}
+                  Founders {participants && activeTab === 'founders' && `(${participants.total})`}
                 </button>
                 <button
                   className={clsx(s.tab, { [s.active]: activeTab === 'support' })}
                   onClick={() => setActiveTab('support')}
                 >
-                  Support{' '}
-                  {participants &&
-                    activeTab === 'support' &&
-                    `(${participants.total})`}
+                  Support {participants && activeTab === 'support' && `(${participants.total})`}
                 </button>
               </div>
 
@@ -1118,307 +1403,300 @@ const DemoDayDetailPage = () => {
                 </div>
 
                 {/* Body */}
-                {participants.participants
-                  .map((participant) => (
-                    <div key={participant.uid} className={s.tableRow}>
-                      <div className={clsx(s.bodyCell, s.first, s.flexible)}>
-                        <div className="flex items-center">
-                          {participant.member?.profilePicture && (
-                            <Image
-                              className="mr-3 h-8 w-8 rounded-full"
-                              src={participant.member.profilePicture}
-                              alt=""
-                              width={32}
-                              height={32}
-                            />
-                          )}
-                          <div>
-                            <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                              {participant.member?.name || participant.name}
-                              {activeTab === 'applications' &&
-                                participant.member?.accessLevel === 'L0' &&
-                                !!participant.member?.investorProfile && (
-                                  <span className={s.newBadge}>new</span>
-                                )}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {participant.member?.email || participant.email}
-                            </div>
+                {participants.participants.map((participant) => (
+                  <div key={participant.uid} className={s.tableRow}>
+                    <div className={clsx(s.bodyCell, s.first, s.flexible)}>
+                      <div className="flex items-center">
+                        {participant.member?.profilePicture && (
+                          <Image
+                            className="mr-3 h-8 w-8 rounded-full"
+                            src={participant.member.profilePicture}
+                            alt=""
+                            width={32}
+                            height={32}
+                          />
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                            {participant.member?.name || participant.name}
+                            {activeTab === 'applications' &&
+                              participant.member?.accessLevel === 'L0' &&
+                              !!participant.member?.investorProfile && <span className={s.newBadge}>new</span>}
                           </div>
+                          <div className="text-sm text-gray-500">{participant.member?.email || participant.email}</div>
                         </div>
                       </div>
-                      {activeTab !== 'applications' && (
-                        <div className={clsx(s.bodyCell, s.flexible)}>
-                          {activeTab === 'founders'
-                            ? (() => {
-                                const memberTeams = participant.member?.teamMemberRoles || [];
-                                const currentTeamUid = participant.teamUid || '';
+                    </div>
+                    {activeTab !== 'applications' && (
+                      <div className={clsx(s.bodyCell, s.flexible)}>
+                        {activeTab === 'founders'
+                          ? (() => {
+                              const memberTeams = participant.member?.teamMemberRoles || [];
+                              const currentTeamUid = participant.teamUid || '';
 
-                                if (memberTeams.length === 0) {
-                                  return <span className="text-gray-400">No teams</span>;
-                                }
+                              if (memberTeams.length === 0) {
+                                return <span className="text-gray-400">No teams</span>;
+                              }
 
-                                return (
-                                  <div className="flex items-center gap-2">
-                                    <select
-                                      value={currentTeamUid}
-                                      onChange={(e) => {
-                                        const selectedTeam = memberTeams.find(
-                                          (role) => role.team.uid === e.target.value
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <select
+                                    value={currentTeamUid}
+                                    onChange={(e) => {
+                                      const selectedTeam = memberTeams.find((role) => role.team.uid === e.target.value);
+                                      if (selectedTeam) {
+                                        handleUpdateParticipantTeam(
+                                          participant.uid,
+                                          participant.member?.name || participant.name,
+                                          e.target.value,
+                                          selectedTeam.team.name
                                         );
-                                        if (selectedTeam) {
-                                          handleUpdateParticipantTeam(
-                                            participant.uid,
-                                            participant.member?.name || participant.name,
-                                            e.target.value,
-                                            selectedTeam.team.name
-                                          );
-                                        }
-                                      }}
-                                      disabled={updateParticipantMutation.isPending}
-                                      className={`flex-1 rounded-full border-0 px-2 py-1 text-xs font-semibold ${
-                                        currentTeamUid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                                      } disabled:opacity-50`}
-                                    >
-                                      <option value="">Select team...</option>
-                                      {memberTeams.map((role) => (
-                                        <option key={role.team.uid} value={role.team.uid}>
-                                          {role.team.name}
-                                          {role.mainTeam ? ' (Main)' : ''}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    {currentTeamUid && (
-                                      <a
-                                        href={`${WEB_UI_BASE_URL}/teams/${currentTeamUid}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center text-blue-600 hover:text-blue-800"
-                                        title="Open team page"
-                                      >
-                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
-                                          <path
-                                            d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
-                                            fill="currentColor"
-                                          />
-                                        </svg>
-                                      </a>
-                                    )}
-                                  </div>
-                                );
-                              })()
-                            : (() => {
-                                const team =
-                                  participant.member?.teamMemberRoles.find((role) => role.mainTeam)?.team ||
-                                  participant.member?.teamMemberRoles[0]?.team;
-
-                                return team ? (
-                                  <a
-                                    href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                                      }
+                                    }}
+                                    disabled={updateParticipantMutation.isPending}
+                                    className={`flex-1 rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                                      currentTeamUid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                                    } disabled:opacity-50`}
                                   >
-                                    {team.name}
-                                    <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
-                                      <path
-                                        d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
-                                        fill="currentColor"
-                                      />
-                                    </svg>
-                                  </a>
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                );
-                              })()}
-                        </div>
-                      )}
-                      {activeTab === 'founders' && (
-                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
-                          {(() => {
-                            const team = participant.team;
-                            if (!team) {
-                              return <span className="text-gray-400">-</span>;
-                            }
-
-                            const fundraisingProfile = team.fundraisingProfiles?.[0];
-                            if (!fundraisingProfile) {
-                              return (
-                                <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
-                                  not provided
-                                </span>
+                                    <option value="">Select team...</option>
+                                    {memberTeams.map((role) => (
+                                      <option key={role.team.uid} value={role.team.uid}>
+                                        {role.team.name}
+                                        {role.mainTeam ? ' (Main)' : ''}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {currentTeamUid && (
+                                    <a
+                                      href={`${WEB_UI_BASE_URL}/teams/${currentTeamUid}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                                      title="Open team page"
+                                    >
+                                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                                        <path
+                                          d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
+                                          fill="currentColor"
+                                        />
+                                      </svg>
+                                    </a>
+                                  )}
+                                </div>
                               );
-                            }
+                            })()
+                          : (() => {
+                              const team =
+                                participant.member?.teamMemberRoles.find((role) => role.mainTeam)?.team ||
+                                participant.member?.teamMemberRoles[0]?.team;
 
-                            const hasOnePager = !!fundraisingProfile.onePagerUpload;
-                            const hasVideo = !!fundraisingProfile.videoUpload;
+                              return team ? (
+                                <a
+                                  href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                                >
+                                  {team.name}
+                                  <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+                                    <path
+                                      d="M12.5003 4V10.5C12.5003 10.6326 12.4476 10.7598 12.3538 10.8536C12.2601 10.9473 12.1329 11 12.0003 11C11.8677 11 11.7405 10.9473 11.6467 10.8536C11.553 10.7598 11.5003 10.6326 11.5003 10.5V5.20687L4.35403 12.3538C4.26021 12.4476 4.13296 12.5003 4.00028 12.5003C3.8676 12.5003 3.74035 12.4476 3.64653 12.3538C3.55271 12.2599 3.5 12.1327 3.5 12C3.5 11.8673 3.55271 11.7401 3.64653 11.6462L10.7934 4.5H5.50028C5.36767 4.5 5.24049 4.44732 5.14672 4.35355C5.05296 4.25979 5.00028 4.13261 5.00028 4C5.00028 3.86739 5.05296 3.74021 5.14672 3.64645C5.24049 3.55268 5.36767 3.5 5.50028 3.5H12.0003C12.1329 3.5 12.2601 3.55268 12.3538 3.64645C12.4476 3.74021 12.5003 3.86739 12.5003 4Z"
+                                      fill="currentColor"
+                                    />
+                                  </svg>
+                                </a>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              );
+                            })()}
+                      </div>
+                    )}
+                    {activeTab === 'founders' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
+                        {(() => {
+                          const team = participant.team;
+                          if (!team) {
+                            return <span className="text-gray-400">-</span>;
+                          }
 
-                            let label = '';
-                            let bgColor = 'bg-gray-100';
-                            let textColor = 'text-gray-600';
-
-                            if (hasOnePager && hasVideo) {
-                              label = 'pitch deck, pitch video';
-                              bgColor = 'bg-green-100';
-                              textColor = 'text-green-800';
-                            } else if (hasOnePager) {
-                              label = 'pitch deck';
-                              bgColor = 'bg-blue-100';
-                              textColor = 'text-blue-800';
-                            } else if (hasVideo) {
-                              label = 'pitch video';
-                              bgColor = 'bg-purple-100';
-                              textColor = 'text-purple-800';
-                            } else {
-                              label = 'not provided';
-                            }
-
+                          const fundraisingProfile = team.fundraisingProfiles?.[0];
+                          if (!fundraisingProfile) {
                             return (
-                              <span
-                                className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${bgColor} ${textColor}`}
-                              >
-                                {label}
+                              <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
+                                not provided
                               </span>
                             );
-                          })()}
-                        </div>
-                      )}
-                      {activeTab === 'investors' && (
-                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
-                          {(() => {
-                            const profileType = participant.member?.investorProfile?.type;
-                            if (!profileType) {
-                              return (
-                                <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
-                                  not provided
-                                </span>
-                              );
-                            }
+                          }
 
-                            const typeConfig = {
-                              ANGEL: { label: 'Angel', bgColor: 'bg-blue-100', textColor: 'text-blue-800' },
-                              FUND: { label: 'Fund', bgColor: 'bg-green-100', textColor: 'text-green-800' },
-                              ANGEL_AND_FUND: {
-                                label: 'Angel + Fund',
-                                bgColor: 'bg-purple-100',
-                                textColor: 'text-purple-800',
-                              },
-                            };
+                          const hasOnePager = !!fundraisingProfile.onePagerUpload;
+                          const hasVideo = !!fundraisingProfile.videoUpload;
 
-                            const config = typeConfig[profileType as keyof typeof typeConfig];
+                          let label = '';
+                          let bgColor = 'bg-gray-100';
+                          let textColor = 'text-gray-600';
 
+                          if (hasOnePager && hasVideo) {
+                            label = 'pitch deck, pitch video';
+                            bgColor = 'bg-green-100';
+                            textColor = 'text-green-800';
+                          } else if (hasOnePager) {
+                            label = 'pitch deck';
+                            bgColor = 'bg-blue-100';
+                            textColor = 'text-blue-800';
+                          } else if (hasVideo) {
+                            label = 'pitch video';
+                            bgColor = 'bg-purple-100';
+                            textColor = 'text-purple-800';
+                          } else {
+                            label = 'not provided';
+                          }
+
+                          return (
+                            <span
+                              className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${bgColor} ${textColor}`}
+                            >
+                              {label}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    {activeTab === 'investors' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
+                        {(() => {
+                          const profileType = participant.member?.investorProfile?.type;
+                          if (!profileType) {
                             return (
-                              <span
-                                className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                                  config?.bgColor || 'bg-gray-100'
-                                } ${config?.textColor || 'text-gray-600'}`}
-                              >
-                                {config?.label || profileType}
+                              <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
+                                not provided
                               </span>
                             );
-                          })()}
-                        </div>
-                      )}
-                      {activeTab === 'investors' && (
-                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                          <select
-                            value={participant.hasEarlyAccess ? 'yes' : 'no'}
-                            onChange={(e) =>
-                              handleUpdateParticipantEarlyAccess(participant.uid, e.target.value === 'yes')
-                            }
-                            disabled={updateParticipantMutation.isPending}
-                            className={clsx(
-                              'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
-                              participant.hasEarlyAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                            )}
-                          >
-                            <option value="yes">Yes</option>
-                            <option value="no">No</option>
-                          </select>
-                        </div>
-                      )}
-                      {activeTab !== 'applications' && (
-                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                          {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
-                            <svg
-                              className="mx-auto h-5 w-5 text-red-500"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
+                          }
+
+                          const typeConfig = {
+                            ANGEL: { label: 'Angel', bgColor: 'bg-blue-100', textColor: 'text-blue-800' },
+                            FUND: { label: 'Fund', bgColor: 'bg-green-100', textColor: 'text-green-800' },
+                            ANGEL_AND_FUND: {
+                              label: 'Angel + Fund',
+                              bgColor: 'bg-purple-100',
+                              textColor: 'text-purple-800',
+                            },
+                          };
+
+                          const config = typeConfig[profileType as keyof typeof typeConfig];
+
+                          return (
+                            <span
+                              className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                                config?.bgColor || 'bg-gray-100'
+                              } ${config?.textColor || 'text-gray-600'}`}
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
-                          ) : (
-                            <svg
-                              className="mx-auto h-5 w-5 text-green-500"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
+                              {config?.label || profileType}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    {activeTab === 'investors' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        <select
+                          value={participant.hasEarlyAccess ? 'yes' : 'no'}
+                          onChange={(e) =>
+                            handleUpdateParticipantEarlyAccess(participant.uid, e.target.value === 'yes')
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={clsx(
+                            'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
+                            participant.hasEarlyAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           )}
-                        </div>
-                      )}
-
-                      {activeTab !== 'applications' && (
-                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                          <select
-                            value={participant.type}
-                            onChange={(e) =>
-                              handleUpdateParticipantType(
-                                participant.uid,
-                                participant.member?.name || participant.name,
-                                e.target.value as 'INVESTOR' | 'FOUNDER' | 'SUPPORT'
-                              )
-                            }
-                            disabled={updateParticipantMutation.isPending}
-                            className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
-                              participant.type === 'INVESTOR'
-                                ? 'bg-purple-100 text-purple-800'
-                                : participant.type === 'FOUNDER'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-amber-100 text-amber-800'
-                            } disabled:opacity-50`}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                    )}
+                    {activeTab !== 'applications' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
+                          <svg
+                            className="mx-auto h-5 w-5 text-red-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            <option value="INVESTOR">Investor</option>
-                            <option value="FOUNDER">Founder</option>
-                            <option value="SUPPORT">Support</option>
-                          </select>
-                        </div>
-                      )}
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            className="mx-auto h-5 w-5 text-green-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    )}
 
-                      <div
-                        className={clsx(s.bodyCell, s.fixed)}
-                        style={{ width: activeTab === 'applications' ? 250 : 150 }}
-                      >
-                        {activeTab === 'applications' ? (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                setSelectedParticipantForDetails(participant);
-                                setShowApplicationDetailsModal(true);
-                              }}
-                              className="flex-1 rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
-                              title="View application details"
-                            >
-                              View
-                            </button>
-                            <button
-                              onClick={() => handleApproveClick(participant)}
-                              disabled={updateParticipantMutation.isPending}
-                              className="flex-1 rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-                              title="Approve application"
-                            >
-                              Approve
-                            </button>
-                            {/* Temporarily disabled reject flow */}
-                            {/* <button
+                    {activeTab !== 'applications' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        <select
+                          value={participant.type}
+                          onChange={(e) =>
+                            handleUpdateParticipantType(
+                              participant.uid,
+                              participant.member?.name || participant.name,
+                              e.target.value as 'INVESTOR' | 'FOUNDER' | 'SUPPORT'
+                            )
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                            participant.type === 'INVESTOR'
+                              ? 'bg-purple-100 text-purple-800'
+                              : participant.type === 'FOUNDER'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-amber-100 text-amber-800'
+                          } disabled:opacity-50`}
+                        >
+                          <option value="INVESTOR">Investor</option>
+                          <option value="FOUNDER">Founder</option>
+                          <option value="SUPPORT">Support</option>
+                        </select>
+                      </div>
+                    )}
+
+                    <div
+                      className={clsx(s.bodyCell, s.fixed)}
+                      style={{ width: activeTab === 'applications' ? 250 : 150 }}
+                    >
+                      {activeTab === 'applications' ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedParticipantForDetails(participant);
+                              setShowApplicationDetailsModal(true);
+                            }}
+                            className="flex-1 rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                            title="View application details"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleApproveClick(participant)}
+                            disabled={updateParticipantMutation.isPending}
+                            className="flex-1 rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            title="Approve application"
+                          >
+                            Approve
+                          </button>
+                          {/* Temporarily disabled reject flow */}
+                          {/* <button
                               onClick={() =>
                                 handleReject(participant.uid, participant.member?.name || participant.name)
                               }
@@ -1428,64 +1706,64 @@ const DemoDayDetailPage = () => {
                             >
                               Reject
                             </button> */}
-                          </div>
-                        ) : (
-                          <select
-                            value={participant.status}
-                            onChange={(e) =>
-                              handleUpdateParticipantStatus(
-                                participant.uid,
-                                e.target.value as 'INVITED' | 'ENABLED' | 'DISABLED'
-                              )
-                            }
-                            disabled={updateParticipantMutation.isPending}
-                            className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${getParticipantStatusColor(
-                              participant.status
-                            )} disabled:opacity-50`}
-                          >
-                            {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
-                              <option value="INVITED">Invited</option>
-                            ) : (
-                              ''
-                            )}
-                            <option value="ENABLED">Enabled</option>
-                            <option value="DISABLED">Disabled</option>
-                          </select>
-                        )}
-                      </div>
-                      {activeTab !== 'applications' && (
-                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                          <select
-                            value={
-                              participant.isDemoDayAdmin
-                                ? 'full'
-                                : participant.isDemoDayReadOnlyAdmin
-                                ? 'view-only'
-                                : 'no'
-                            }
-                            onChange={(e) =>
-                              handleUpdateParticipantAdminAccess(
-                                participant.uid,
-                                e.target.value as 'no' | 'full' | 'view-only'
-                              )
-                            }
-                            disabled={updateParticipantMutation.isPending}
-                            className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
-                              participant.isDemoDayAdmin
-                                ? 'bg-green-100 text-green-800'
-                                : participant.isDemoDayReadOnlyAdmin
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-600'
-                            } disabled:opacity-50`}
-                          >
-                            <option value="no">No</option>
-                            <option value="full">Full Access</option>
-                            <option value="view-only">View Only</option>
-                          </select>
                         </div>
+                      ) : (
+                        <select
+                          value={participant.status}
+                          onChange={(e) =>
+                            handleUpdateParticipantStatus(
+                              participant.uid,
+                              e.target.value as 'INVITED' | 'ENABLED' | 'DISABLED'
+                            )
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${getParticipantStatusColor(
+                            participant.status
+                          )} disabled:opacity-50`}
+                        >
+                          {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
+                            <option value="INVITED">Invited</option>
+                          ) : (
+                            ''
+                          )}
+                          <option value="ENABLED">Enabled</option>
+                          <option value="DISABLED">Disabled</option>
+                        </select>
                       )}
                     </div>
-                  ))}
+                    {activeTab !== 'applications' && (
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        <select
+                          value={
+                            participant.isDemoDayAdmin
+                              ? 'full'
+                              : participant.isDemoDayReadOnlyAdmin
+                              ? 'view-only'
+                              : 'no'
+                          }
+                          onChange={(e) =>
+                            handleUpdateParticipantAdminAccess(
+                              participant.uid,
+                              e.target.value as 'no' | 'full' | 'view-only'
+                            )
+                          }
+                          disabled={updateParticipantMutation.isPending}
+                          className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
+                            participant.isDemoDayAdmin
+                              ? 'bg-green-100 text-green-800'
+                              : participant.isDemoDayReadOnlyAdmin
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-gray-100 text-gray-600'
+                          } disabled:opacity-50`}
+                        >
+                          <option value="no">No</option>
+                          <option value="full">Full Access</option>
+                          <option value="view-only">View Only</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>

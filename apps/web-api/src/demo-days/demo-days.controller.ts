@@ -36,6 +36,7 @@ import {
   InvestorActivityQueryDto,
   SaveFundraisingProfileDto,
   UpdateFundraisingDescriptionDto,
+  UpdateFundraisingProgramDto,
   UpdateFundraisingTeamDto,
 } from 'libs/contracts/src/schema';
 
@@ -200,6 +201,24 @@ export class DemoDaysController {
       req.userEmail,
       teamUid,
       body.description,
+      demoDayUidOrSlug
+    );
+  }
+
+  @Put(':demoDayUidOrSlug/teams/:teamUid/fundraising-profile/program')
+  @UseGuards(UserTokenValidation)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async updateProgramByTeam(
+    @Param('demoDayUidOrSlug') demoDayUidOrSlug: string,
+    @Req() req,
+    @Param('teamUid') teamUid: string,
+    @Body() body: UpdateFundraisingProgramDto
+  ) {
+    return this.demoDayFundraisingProfilesService.updateFundraisingProgram(
+      req.userEmail,
+      teamUid,
+      body.program,
       demoDayUidOrSlug
     );
   }

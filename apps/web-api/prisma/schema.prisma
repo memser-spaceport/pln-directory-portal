@@ -430,6 +430,7 @@ model Image {
   eventLogo            PLEvent[]         @relation("logo")
   eventBanner          PLEvent[]         @relation("banner")
   demoDayBrandingLogos DemoDayBranding[]
+  demoDayBrandingHeaders DemoDayBranding[] @relation("HeaderImage")
   dealLogos            Deal[]            @relation("DealLogo")
   dealSubmissionLogos  DealSubmission[]  @relation("DealSubmissionLogo")
   articleCoverImages   Article[]         @relation("ArticleCoverImage")
@@ -979,6 +980,7 @@ model TeamFundraisingProfile {
   videoUpload    Upload? @relation("TFP_videoUpload", fields: [videoUploadUid], references: [uid])
 
   description String?
+  program   String?
 
   status TeamFundraisingProfileStatus @default(DRAFT)
 
@@ -1128,6 +1130,9 @@ model DemoDay {
   dashboardEnabled          Boolean                           @default(false)
   notifyBeforeStartHours    Int?                              @default(336)
   notifyBeforeEndHours      Int?                              @default(48)
+  programFieldEnabled       Boolean                           @default(false)
+  programFieldOptions       String[]                          @default([])
+  stageTagEnabled           Boolean                           @default(false)
   createdAt                 DateTime                          @default(now())
   updatedAt                 DateTime                          @updatedAt
   isDeleted                 Boolean                           @default(false)
@@ -1141,14 +1146,18 @@ model DemoDay {
 }
 
 model DemoDayBranding {
-  id         Int      @id @default(autoincrement())
-  uid        String   @unique @default(cuid())
-  demoDayUid String   @unique
-  demoDay    DemoDay  @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
-  logoUid    String?
-  logo       Image?   @relation(fields: [logoUid], references: [uid])
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                  Int      @id @default(autoincrement())
+  uid                 String   @unique @default(cuid())
+  demoDayUid          String   @unique
+  demoDay             DemoDay  @relation(fields: [demoDayUid], references: [uid], onDelete: Cascade)
+  logoUid             String?
+  logo                Image?   @relation(fields: [logoUid], references: [uid])
+  primaryColor        String   @default("#1a45e6")
+  landingLogosEnabled Boolean  @default(true)
+  headerImageUid      String?
+  headerImage         Image?   @relation("HeaderImage", fields: [headerImageUid], references: [uid])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model MemberDemoDayAdminScope {
