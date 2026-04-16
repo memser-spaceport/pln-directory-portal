@@ -8,6 +8,7 @@ export const UpdateFundraisingTeamSchema = z.object({
   industryTags: z.array(z.string()).optional(),
   fundingStage: z.string().optional(),
   logo: z.string().optional(),
+  program: z.string().optional().nullable(),
 });
 
 export class UpdateFundraisingTeamDto extends createZodDto(UpdateFundraisingTeamSchema) { }
@@ -17,6 +18,12 @@ export const UpdateFundraisingDescriptionSchema = z.object({
 });
 
 export class UpdateFundraisingDescriptionDto extends createZodDto(UpdateFundraisingDescriptionSchema) { }
+
+export const UpdateFundraisingProgramSchema = z.object({
+  program: z.string().optional().nullable(),
+});
+
+export class UpdateFundraisingProgramDto extends createZodDto(UpdateFundraisingProgramSchema) { }
 
 export const ExpressInterestSchema = z.object({
   teamFundraisingProfileUid: z.string(),

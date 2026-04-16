@@ -15,7 +15,7 @@ export const CreateDemoDaySchema = z.object({
   status: z.enum(['UPCOMING', 'REGISTRATION_OPEN', 'EARLY_ACCESS', 'ACTIVE', 'COMPLETED', 'ARCHIVED']),
 });
 
-export class CreateDemoDayDto extends createZodDto(CreateDemoDaySchema) {}
+export class CreateDemoDayDto extends createZodDto(CreateDemoDaySchema) { }
 
 // Update Demo Day Schema
 export const UpdateDemoDaySchema = z.object({
@@ -34,9 +34,26 @@ export const UpdateDemoDaySchema = z.object({
   notifyBeforeEndHours: z.number().int().min(1).max(720).optional().nullable(),
   dashboardEnabled: z.boolean().optional(),
   logoUid: z.string().optional().nullable(),
+  // NEW FIELDS
+  programFieldEnabled: z.boolean().optional(),
+  programFieldOptions: z.array(z.string()).optional(),
+  stageTagEnabled: z.boolean().optional(),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+  landingLogosEnabled: z.boolean().optional(),
+  headerImageUid: z.string().optional().nullable(),
 });
 
-export class UpdateDemoDayDto extends createZodDto(UpdateDemoDaySchema) {}
+export class UpdateDemoDayDto extends createZodDto(UpdateDemoDaySchema) { }
+
+// Update Branding Schema (separate endpoint for branding values)
+export const UpdateBrandingSchema = z.object({
+  logoUid: z.string().optional().nullable(),
+  headerImageUid: z.string().optional().nullable(),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+  landingLogosEnabled: z.boolean().optional(),
+});
+
+export class UpdateBrandingDto extends createZodDto(UpdateBrandingSchema) { }
 
 // Add Single Participant Schema
 export const AddParticipantSchema = z
@@ -50,7 +67,7 @@ export const AddParticipantSchema = z
     message: 'Either memberUid or email must be provided',
   });
 
-export class AddParticipantDto extends createZodDto(AddParticipantSchema) {}
+export class AddParticipantDto extends createZodDto(AddParticipantSchema) { }
 
 // Add Bulk Participants Schema
 export const AddParticipantsBulkSchema = z.object({
@@ -75,7 +92,7 @@ export const AddParticipantsBulkSchema = z.object({
     .min(1, 'At least one participant is required'),
 });
 
-export class AddParticipantsBulkDto extends createZodDto(AddParticipantsBulkSchema) {}
+export class AddParticipantsBulkDto extends createZodDto(AddParticipantsBulkSchema) { }
 
 // Get Participants Query Schema
 export const GetParticipantsQuerySchema = z.object({
@@ -88,7 +105,7 @@ export const GetParticipantsQuerySchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 
-export class GetParticipantsQueryDto extends createZodDto(GetParticipantsQuerySchema) {}
+export class GetParticipantsQueryDto extends createZodDto(GetParticipantsQuerySchema) { }
 
 // Update Participant Schema
 export const UpdateParticipantSchema = z.object({
@@ -100,7 +117,7 @@ export const UpdateParticipantSchema = z.object({
   isDemoDayReadOnlyAdmin: z.boolean().optional(),
 });
 
-export class UpdateParticipantDto extends createZodDto(UpdateParticipantSchema) {}
+export class UpdateParticipantDto extends createZodDto(UpdateParticipantSchema) { }
 
 // Response DTOs
 export const ResponseDemoDaySchema = z.object({
@@ -125,9 +142,17 @@ export const ResponseDemoDaySchema = z.object({
   deletedAt: z.date().nullable(),
   logoUid: z.string().nullable().optional(),
   logoUrl: z.string().nullable().optional(),
+  // NEW FIELDS
+  programFieldEnabled: z.boolean().optional(),
+  programFieldOptions: z.array(z.string()).optional(),
+  stageTagEnabled: z.boolean().optional(),
+  primaryColor: z.string().nullable().optional(),
+  landingLogosEnabled: z.boolean().optional(),
+  headerImageUid: z.string().nullable().optional(),
+  headerImageUrl: z.string().nullable().optional(),
 });
 
-export class ResponseDemoDayDto extends createZodDto(ResponseDemoDaySchema) {}
+export class ResponseDemoDayDto extends createZodDto(ResponseDemoDaySchema) { }
 
 export const ResponseParticipantSchema = z.object({
   id: z.number(),
@@ -147,7 +172,7 @@ export const ResponseParticipantSchema = z.object({
   deletedAt: z.date().nullable(),
 });
 
-export class ResponseParticipantDto extends createZodDto(ResponseParticipantSchema) {}
+export class ResponseParticipantDto extends createZodDto(ResponseParticipantSchema) { }
 
 export const ResponseBulkParticipantsSchema = z.object({
   summary: z.object({
@@ -184,7 +209,7 @@ export const ResponseBulkParticipantsSchema = z.object({
   ),
 });
 
-export class ResponseBulkParticipantsDto extends createZodDto(ResponseBulkParticipantsSchema) {}
+export class ResponseBulkParticipantsDto extends createZodDto(ResponseBulkParticipantsSchema) { }
 
 export const ResponseParticipantsListSchema = z.object({
   participants: z.array(z.any()),
@@ -194,14 +219,14 @@ export const ResponseParticipantsListSchema = z.object({
   totalPages: z.number(),
 });
 
-export class ResponseParticipantsListDto extends createZodDto(ResponseParticipantsListSchema) {}
+export class ResponseParticipantsListDto extends createZodDto(ResponseParticipantsListSchema) { }
 
 // Dashboard Whitelist Member Schema
 export const AddDashboardWhitelistMemberSchema = z.object({
   memberUid: z.string().min(1, 'Member UID is required'),
 });
 
-export class AddDashboardWhitelistMemberDto extends createZodDto(AddDashboardWhitelistMemberSchema) {}
+export class AddDashboardWhitelistMemberDto extends createZodDto(AddDashboardWhitelistMemberSchema) { }
 
 // Dashboard Whitelist Response Schema
 export const DashboardWhitelistMemberSchema = z.object({
@@ -217,4 +242,4 @@ export const DashboardWhitelistMemberSchema = z.object({
   teamName: z.string().nullable(),
 });
 
-export class DashboardWhitelistMemberDto extends createZodDto(DashboardWhitelistMemberSchema) {}
+export class DashboardWhitelistMemberDto extends createZodDto(DashboardWhitelistMemberSchema) { }

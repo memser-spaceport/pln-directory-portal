@@ -18,6 +18,14 @@ export interface DemoDay {
   updatedAt: string;
   logoUid?: string | null;
   logoUrl?: string | null;
+  // NEW FIELDS
+  programFieldEnabled: boolean;
+  programFieldOptions: string[];
+  stageTagEnabled: boolean;
+  primaryColor?: string | null;
+  landingLogosEnabled: boolean;
+  headerImageUid?: string | null;
+  headerImageUrl?: string | null;
 }
 
 export interface CreateDemoDayDto {
@@ -49,6 +57,13 @@ export interface UpdateDemoDayDto {
   notifyBeforeEndHours?: number | null;
   dashboardEnabled?: boolean;
   logoUid?: string | null;
+  // NEW FIELDS
+  programFieldEnabled?: boolean;
+  programFieldOptions?: string[];
+  stageTagEnabled?: boolean;
+  primaryColor?: string | null;
+  landingLogosEnabled?: boolean;
+  headerImageUid?: string | null;
 }
 
 export interface DemoDayParticipant {

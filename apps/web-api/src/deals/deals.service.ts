@@ -1,6 +1,8 @@
 import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { DealIssueStatus, DealStatus, DealSubmissionStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { RbacService } from '../rbac/rbac.service';
+import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 import {
   ListDealIssuesQueryDto,
   ListDealsQueryDto,
@@ -14,7 +16,7 @@ import {
 
 @Injectable()
 export class DealsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService, private readonly rbacService: RbacService) {}
 
   private async resolveMemberByEmail(userEmail: string) {
     if (!userEmail) {
@@ -52,7 +54,16 @@ export class DealsService {
       where: { memberUid: resolved.memberUid },
     });
 
-    if (!whitelist) {
+    if (whitelist) {
+      return resolved;
+    }
+
+    const hasDealsViewPermission = await this.rbacService.hasPermission(
+      resolved.memberUid,
+      RBAC_PERMISSION_CODES.DEALS_VIEW
+    );
+
+    if (!hasDealsViewPermission) {
       throw new ForbiddenException('Deals access denied');
     }
 
@@ -66,12 +77,12 @@ export class DealsService {
       ...(query?.audience ? { audience: query.audience } : {}),
       ...(query?.search
         ? {
-          OR: [
-            { vendorName: { contains: query.search, mode: 'insensitive' } },
-            { shortDescription: { contains: query.search, mode: 'insensitive' } },
-            { fullDescription: { contains: query.search, mode: 'insensitive' } },
-          ],
-        }
+            OR: [
+              { vendorName: { contains: query.search, mode: 'insensitive' } },
+              { shortDescription: { contains: query.search, mode: 'insensitive' } },
+              { fullDescription: { contains: query.search, mode: 'insensitive' } },
+            ],
+          }
         : {}),
     };
   }
@@ -81,20 +92,20 @@ export class DealsService {
       ...(query?.status ? { status: query.status } : {}),
       ...(query?.search
         ? {
-          OR: [
-            { vendorName: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
-            { shortDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
-            { fullDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
-            {
-              authorMember: {
-                OR: [
-                  { name: { contains: query.search, mode: 'insensitive' } },
-                  { email: { contains: query.search, mode: 'insensitive' } },
-                ],
-              },
-            } as Prisma.DealSubmissionWhereInput,
-          ],
-        }
+            OR: [
+              { vendorName: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+              { shortDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+              { fullDescription: { contains: query.search, mode: 'insensitive' } } as Prisma.DealSubmissionWhereInput,
+              {
+                authorMember: {
+                  OR: [
+                    { name: { contains: query.search, mode: 'insensitive' } },
+                    { email: { contains: query.search, mode: 'insensitive' } },
+                  ],
+                },
+              } as Prisma.DealSubmissionWhereInput,
+            ],
+          }
         : {}),
     };
   }
@@ -105,32 +116,32 @@ export class DealsService {
       ...(query?.dealUid ? { dealUid: query.dealUid } : {}),
       ...(query?.search
         ? {
-          OR: [
-            { description: { contains: query.search, mode: 'insensitive' } } as Prisma.DealIssueWhereInput,
-            {
-              deal: {
-                OR: [
-                  { vendorName: { contains: query.search, mode: 'insensitive' } },
-                  { shortDescription: { contains: query.search, mode: 'insensitive' } },
-                ],
-              },
-            } as Prisma.DealIssueWhereInput,
-            {
-              authorMember: {
-                OR: [
-                  { name: { contains: query.search, mode: 'insensitive' } },
-                  { email: { contains: query.search, mode: 'insensitive' } },
-                ],
-              },
-            } as Prisma.DealIssueWhereInput,
-          ],
-        }
+            OR: [
+              { description: { contains: query.search, mode: 'insensitive' } } as Prisma.DealIssueWhereInput,
+              {
+                deal: {
+                  OR: [
+                    { vendorName: { contains: query.search, mode: 'insensitive' } },
+                    { shortDescription: { contains: query.search, mode: 'insensitive' } },
+                  ],
+                },
+              } as Prisma.DealIssueWhereInput,
+              {
+                authorMember: {
+                  OR: [
+                    { name: { contains: query.search, mode: 'insensitive' } },
+                    { email: { contains: query.search, mode: 'insensitive' } },
+                  ],
+                },
+              } as Prisma.DealIssueWhereInput,
+            ],
+          }
         : {}),
     };
   }
 
   private countUniqueTeamsOrMembers(
-    rows: Array<{ dealUid: string; teamUid: string | null; memberUid: string }>,
+    rows: Array<{ dealUid: string; teamUid: string | null; memberUid: string }>
   ): Map<string, number> {
     const uniqueMap = new Map<string, Set<string>>();
 
@@ -159,7 +170,13 @@ export class DealsService {
       where: { memberUid },
     });
 
-    return !!whitelist;
+    if (whitelist) {
+      return true;
+    }
+
+    const hasDealsViewPermission = await this.rbacService.hasPermission(memberUid, RBAC_PERMISSION_CODES.DEALS_VIEW);
+
+    return hasDealsViewPermission;
   }
 
   async listForUser(userEmail: string, query: ListDealsQueryDto) {
@@ -480,9 +497,7 @@ export class DealsService {
 
     const redemptionCountMap = this.countUniqueTeamsOrMembers(allRedemptions);
     const usageCountMap = this.countUniqueTeamsOrMembers(allUsages);
-    const issueCountMap = new Map<string, number>(
-      allIssues.map((item) => [item.dealUid, item._count.dealUid]),
-    );
+    const issueCountMap = new Map<string, number>(allIssues.map((item) => [item.dealUid, item._count.dealUid]));
 
     const metrics = new Map<
       string,
@@ -507,10 +522,7 @@ export class DealsService {
   async adminList(query: ListDealsQueryDto) {
     const deals = await this.prisma.deal.findMany({
       where: this.buildDealWhere(query),
-      orderBy: [
-        { isHighValue: 'desc' },
-        { createdAt: 'desc' },
-      ],
+      orderBy: [{ isHighValue: 'desc' }, { createdAt: 'desc' }],
       include: { logo: { select: { url: true } } },
     });
 
@@ -648,9 +660,7 @@ export class DealsService {
         ...(body.audience !== undefined ? { audience: body.audience } : {}),
         ...(body.shortDescription !== undefined ? { shortDescription: body.shortDescription } : {}),
         ...(body.fullDescription !== undefined ? { fullDescription: body.fullDescription } : {}),
-        ...(body.redemptionInstructions !== undefined
-          ? { redemptionInstructions: body.redemptionInstructions }
-          : {}),
+        ...(body.redemptionInstructions !== undefined ? { redemptionInstructions: body.redemptionInstructions } : {}),
         ...(body.contact !== undefined ? { contact: body.contact } : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
         ...(body.isHighValue !== undefined ? { isHighValue: body.isHighValue } : {}),
