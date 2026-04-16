@@ -165,6 +165,9 @@ export class AdminDemoDaysController {
         notifyBeforeEndHours: body.notifyBeforeEndHours,
         dashboardEnabled: body.dashboardEnabled,
         logoUid: body.logoUid,
+        programFieldEnabled: body.programFieldEnabled,
+        programFieldOptions: body.programFieldOptions,
+        stageTagEnabled: body.stageTagEnabled,
       },
       req.userEmail
     );
