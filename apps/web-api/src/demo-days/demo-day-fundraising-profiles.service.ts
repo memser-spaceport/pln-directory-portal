@@ -628,6 +628,7 @@ export class DemoDayFundraisingProfilesService {
       industryTags?: string[];
       fundingStage?: string;
       logo?: string;
+      program?: string | null;
     },
     demoDayUidOrSlug: string
   ): Promise<any> {
@@ -676,6 +677,27 @@ export class DemoDayFundraisingProfilesService {
       where: { uid: teamUid },
       data: updateData,
     });
+
+    // Update program on team fundraising profile if provided
+    if (data.program !== undefined) {
+      await this.prisma.teamFundraisingProfile.upsert({
+        where: {
+          teamUid_demoDayUid: {
+            teamUid: teamUid,
+            demoDayUid: demoDay.uid,
+          },
+        },
+        update: {
+          program: data.program,
+        },
+        create: {
+          teamUid: teamUid,
+          demoDayUid: demoDay.uid,
+          program: data.program,
+          status: 'DRAFT',
+        },
+      });
+    }
 
     await this.updateFundraisingProfileStatus(teamUid, demoDay.uid);
     return this.getCurrentDemoDayFundraisingProfileByTeamUid(teamUid, demoDay.uid, memberEmail);

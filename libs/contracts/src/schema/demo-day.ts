@@ -8,6 +8,7 @@ export const UpdateFundraisingTeamSchema = z.object({
   industryTags: z.array(z.string()).optional(),
   fundingStage: z.string().optional(),
   logo: z.string().optional(),
+  program: z.string().optional().nullable(),
 });
 
 export class UpdateFundraisingTeamDto extends createZodDto(UpdateFundraisingTeamSchema) { }
