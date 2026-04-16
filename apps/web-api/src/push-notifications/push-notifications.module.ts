@@ -8,6 +8,7 @@ import { MembersModule } from '../members/members.module';
 import { JwtService } from '../utils/jwt/jwt.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PLEventsModule } from '../pl-events/pl-events.module';
+import { RbacModule } from '../rbac/rbac.module';
 
 /**
  * Module for push notifications (WebSocket-based real-time notifications).
@@ -19,6 +20,7 @@ import { PLEventsModule } from '../pl-events/pl-events.module';
     forwardRef(() => MembersModule),
     forwardRef(() => NotificationsModule),
     forwardRef(() => PLEventsModule),
+    RbacModule,
   ],
   controllers: [PushNotificationsController, AdminPushNotificationsController, ForumPushNotificationsController],
   providers: [PushNotificationsService, JwtService],

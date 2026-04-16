@@ -1327,6 +1327,9 @@ enum PushNotificationCategory {
   // Guide comments
   GUIDE_POST
   GUIDE_REPLY
+
+  // New feature announcements
+  NEW_FEATURE
 }
 
 // Push notifications for WebSocket delivery
@@ -1338,12 +1341,14 @@ model PushNotification {
   description  String?
   image        String? // URL to image
   link         String? // URL or route to navigate to
+  linkText     String? // Display text for the link button (e.g., "Explore Guides")
   metadata     Json?                    @default("{}")
   isPublic     Boolean                  @default(false) // If true, anyone can see; if false, only recipient
   recipientUid String? // Optional: Member.uid of user to notify (null = broadcast/public)
   recipient    Member?                  @relation("PushNotificationRecipient", fields: [recipientUid], references: [uid], onDelete: Cascade)
-  accessLevels String[]                 @default([]) // Optional: list of access levels (L2, L3, L4, L5, L6) to target
-  isRead       Boolean                  @default(false) // For private notifications only
+  accessLevels       String[]                 @default([]) // Optional: list of access levels (L2, L3, L4, L5, L6) to target
+  requiredPermissions String[]                 @default([]) // Optional: list of permission codes; user needs ANY of these to see notification
+  isRead             Boolean                  @default(false) // For private notifications only
   isSent       Boolean                  @default(false) // Whether sent via WebSocket
   sentAt       DateTime? // When sent via WebSocket
   createdAt    DateTime                 @default(now())
