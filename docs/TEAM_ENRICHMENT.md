@@ -20,14 +20,15 @@ interface TeamDataEnrichment {
   reviewedAt?: string;             // ISO timestamp
   reviewedBy?: string;             // reviewer email
   errorMessage?: string;           // error details if FailedToEnrich
-  fields: Partial<Record<EnrichableField, FieldEnrichmentStatus>>;
-  fieldsMeta?: Partial<Record<EnrichableField | 'logo', {
+  fieldsMeta: Partial<Record<EnrichableField | 'logo', {
     status: FieldEnrichmentStatus;
     confidence?: 'high' | 'medium' | 'low';
     source?: 'ai' | 'open-graph' | 'scrapingdog';
   }>>;
 }
 ```
+
+> **Note:** The legacy `fields` property (a simple `field → status` map) may still exist in older records but is superseded by `fieldsMeta`, which includes the same `status` along with `confidence` and `source`. New code should use `fieldsMeta` exclusively.
 
 ### Enums
 
@@ -49,14 +50,14 @@ interface TeamDataEnrichment {
 
 ### Field Statuses
 
-Each enrichable field is tracked in `dataEnrichment.fields`:
+Each enrichable field is tracked in `dataEnrichment.fieldsMeta[<field>].status`:
 - `Enriched` — field was empty and successfully filled by AI
 - `CannotEnrich` — field was empty but AI could not find a value
 - `ChangedByUser` — field was enriched by AI but later modified by a user
 
 ### Field Confidence & Source
 
-In addition, `dataEnrichment.fieldsMeta[<field>]` records per-field `confidence` and `source`:
+`dataEnrichment.fieldsMeta[<field>]` also records per-field `confidence` and `source`:
 
 | Source | Confidence |
 |--------|------------|
@@ -178,7 +179,7 @@ Validates requestor is team lead of the team
 ## User Change Tracking
 
 When a team is updated via `updateTeamFromParticipantsRequest()`, if the team has `isAIGenerated=true`,
-any modified enrichable fields are marked as `ChangedByUser` in the `fields` map.
+any modified enrichable fields are marked as `ChangedByUser` in `fieldsMeta` (status is flipped but `confidence` and `source` are preserved as provenance).
 
 ## Environment Variables
 

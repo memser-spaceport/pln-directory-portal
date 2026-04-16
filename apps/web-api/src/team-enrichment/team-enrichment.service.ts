@@ -53,7 +53,7 @@ export class TeamEnrichmentService {
       shouldEnrich: true,
       status: EnrichmentStatus.PendingEnrichment,
       isAIGenerated: existing?.isAIGenerated ?? false,
-      fields: existing?.fields ?? {},
+      fieldsMeta: existing?.fieldsMeta ?? {},
     };
 
     await this.prisma.team.update({
@@ -217,7 +217,7 @@ export class TeamEnrichmentService {
 
       // Preserve existing field statuses from previous enrichment runs
       const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
-      const existingFields = existingMeta?.fields || {};
+      const existingFieldsMeta = (existingMeta?.fieldsMeta ?? {}) as FieldsMetaMap;
 
       // Verify entity identity to decide which fields are safe to enrich.
       // Website and logo require high confidence (verified entity).
@@ -236,13 +236,12 @@ export class TeamEnrichmentService {
 
       // Determine which fields need enrichment (skip already Enriched ones)
       const updateData: Prisma.TeamUpdateInput = {};
-      const newFields: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};
       const newFieldsMeta: FieldsMetaMap = {};
       let fieldsUpdatedCount = 0;
 
       for (const field of ENRICHABLE_TEAM_FIELDS) {
         // Skip fields already successfully enriched
-        if (existingFields[field] === FieldEnrichmentStatus.Enriched) continue;
+        if (existingFieldsMeta[field]?.status === FieldEnrichmentStatus.Enriched) continue;
 
         const currentValue = team[field];
         const newValue = aiResponse[field];
@@ -250,7 +249,6 @@ export class TeamEnrichmentService {
         if (!currentValue || currentValue.trim() === '') {
           if (newValue) {
             (updateData as any)[field] = newValue;
-            newFields[field] = FieldEnrichmentStatus.Enriched;
             newFieldsMeta[field] = {
               status: FieldEnrichmentStatus.Enriched,
               confidence: toConfidence(aiResponse.confidence?.[field]),
@@ -258,14 +256,13 @@ export class TeamEnrichmentService {
             };
             fieldsUpdatedCount++;
           } else {
-            newFields[field] = FieldEnrichmentStatus.CannotEnrich;
             newFieldsMeta[field] = { status: FieldEnrichmentStatus.CannotEnrich };
           }
         }
       }
 
       // Handle industryTags — skip if already enriched
-      if (existingFields.industryTags !== FieldEnrichmentStatus.Enriched && team.industryTags.length === 0) {
+      if (existingFieldsMeta.industryTags?.status !== FieldEnrichmentStatus.Enriched && team.industryTags.length === 0) {
         this.logger.debug(`Team ${teamUid}: AI returned industryTags = [${aiResponse.industryTags.join(', ')}]`);
         if (aiResponse.industryTags.length > 0) {
           const matchedTags = await this.prisma.industryTag.findMany({
@@ -279,7 +276,6 @@ export class TeamEnrichmentService {
           );
           if (matchedTags.length > 0) {
             updateData.industryTags = { connect: matchedTags.map((t) => ({ uid: t.uid })) };
-            newFields.industryTags = FieldEnrichmentStatus.Enriched;
             newFieldsMeta.industryTags = {
               status: FieldEnrichmentStatus.Enriched,
               confidence: toConfidence(aiResponse.confidence?.industryTags),
@@ -287,18 +283,16 @@ export class TeamEnrichmentService {
             };
             fieldsUpdatedCount++;
           } else {
-            newFields.industryTags = FieldEnrichmentStatus.CannotEnrich;
             newFieldsMeta.industryTags = { status: FieldEnrichmentStatus.CannotEnrich };
           }
         } else {
-          newFields.industryTags = FieldEnrichmentStatus.CannotEnrich;
           newFieldsMeta.industryTags = { status: FieldEnrichmentStatus.CannotEnrich };
         }
       }
 
       // Handle investmentFocus — skip if already enriched
       const currentFocus = team.investorProfile?.investmentFocus || [];
-      if (existingFields.investmentFocus !== FieldEnrichmentStatus.Enriched && currentFocus.length === 0) {
+      if (existingFieldsMeta.investmentFocus?.status !== FieldEnrichmentStatus.Enriched && currentFocus.length === 0) {
         this.logger.debug(`Team ${teamUid}: AI returned investmentFocus = [${aiResponse.investmentFocus.join(', ')}]`);
         if (aiResponse.investmentFocus.length > 0) {
           if (team.investorProfile) {
@@ -314,7 +308,6 @@ export class TeamEnrichmentService {
               },
             });
           }
-          newFields.investmentFocus = FieldEnrichmentStatus.Enriched;
           newFieldsMeta.investmentFocus = {
             status: FieldEnrichmentStatus.Enriched,
             confidence: toConfidence(aiResponse.confidence?.investmentFocus),
@@ -322,7 +315,6 @@ export class TeamEnrichmentService {
           };
           fieldsUpdatedCount++;
         } else {
-          newFields.investmentFocus = FieldEnrichmentStatus.CannotEnrich;
           newFieldsMeta.investmentFocus = { status: FieldEnrichmentStatus.CannotEnrich };
         }
       }
@@ -363,38 +355,34 @@ export class TeamEnrichmentService {
               this.logger.log(`Logo uploaded successfully for team ${teamUid} (${team.name}), image uid: ${image.uid}`);
             } else {
               this.logger.warn(`Logo upload returned no URL for team ${teamUid} (${team.name})`);
+              newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
             }
           } catch (logoError) {
             this.logger.warn(`Failed to download/upload logo for team ${teamUid} (${team.name}): ${logoError.message}`);
+            newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
           }
         } else {
           this.logger.log(`No logo found in website metadata for team ${teamUid} (${team.name})`);
+          newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
         }
       } else if (team.logoUid) {
         this.logger.log(`Team ${teamUid} (${team.name}) already has a logo, skipping logo fetch`);
       } else {
         this.logger.log(`Team ${teamUid} (${team.name}): no verified website available, skipping logo fetch`);
+        newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
       }
 
       // ScrapingDog fallback — only when primary enrichment left high-value gaps AND we have a LinkedIn handle
       const scrapingDogMeta = await this.maybeEnrichViaScrapingDog({
         teamUid,
         team,
-        existingFields,
+        existingFieldsMeta,
         aiLinkedinHandler: aiResponse.linkedinHandler,
         updateData,
-        newFields,
         newFieldsMeta,
       });
 
-      // Merge new field statuses with existing ones (preserve previous Enriched/ChangedByUser)
-      const mergedFields: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {
-        ...existingFields,
-        ...newFields,
-      };
-
       // Merge field metadata (confidence + source), preserving previous entries
-      const existingFieldsMeta = (existingMeta?.fieldsMeta ?? {}) as FieldsMetaMap;
       const mergedFieldsMeta: FieldsMetaMap = {
         ...existingFieldsMeta,
         ...newFieldsMeta,
@@ -404,11 +392,10 @@ export class TeamEnrichmentService {
       const enrichment: TeamDataEnrichment = {
         shouldEnrich: false,
         status: EnrichmentStatus.Enriched,
-        isAIGenerated: Object.values(mergedFields).some((s) => s === FieldEnrichmentStatus.Enriched),
+        isAIGenerated: Object.values(mergedFieldsMeta).some((m) => m.status === FieldEnrichmentStatus.Enriched),
         enrichedAt: new Date().toISOString(),
         enrichedBy,
         aiModel: this.aiService.getModelName(),
-        fields: mergedFields,
         fieldsMeta: mergedFieldsMeta,
         ...(scrapingDogMeta ? { scrapingDog: scrapingDogMeta } : {}),
       };
@@ -465,15 +452,12 @@ export class TeamEnrichmentService {
     for (const field of changedFields) {
       if (
         ENRICHABLE_TEAM_FIELDS.includes(field as EnrichableTeamField) &&
-        meta.fields[field as EnrichableTeamField] === FieldEnrichmentStatus.Enriched
+        meta.fieldsMeta?.[field as EnrichableTeamField]?.status === FieldEnrichmentStatus.Enriched
       ) {
-        meta.fields[field as EnrichableTeamField] = FieldEnrichmentStatus.ChangedByUser;
-        if (meta.fieldsMeta?.[field as EnrichableTeamField]) {
-          meta.fieldsMeta[field as EnrichableTeamField] = {
-            ...meta.fieldsMeta[field as EnrichableTeamField],
-            status: FieldEnrichmentStatus.ChangedByUser,
-          };
-        }
+        meta.fieldsMeta[field as EnrichableTeamField] = {
+          ...meta.fieldsMeta[field as EnrichableTeamField],
+          status: FieldEnrichmentStatus.ChangedByUser,
+        };
         updated = true;
       }
     }
@@ -523,13 +507,12 @@ export class TeamEnrichmentService {
       linkedinHandler: string | null;
       industryTags: Array<{ uid: string; title: string }>;
     };
-    existingFields: Partial<Record<EnrichableField, FieldEnrichmentStatus>>;
+    existingFieldsMeta: FieldsMetaMap;
     aiLinkedinHandler: string | null;
     updateData: Prisma.TeamUpdateInput;
-    newFields: Partial<Record<EnrichableField, FieldEnrichmentStatus>>;
     newFieldsMeta: FieldsMetaMap;
   }): Promise<TeamDataEnrichment['scrapingDog'] | null> {
-    const { teamUid, team, existingFields, aiLinkedinHandler, updateData, newFields, newFieldsMeta } = ctx;
+    const { teamUid, team, existingFieldsMeta, aiLinkedinHandler, updateData, newFieldsMeta } = ctx;
 
     const markSdField = (field: EnrichableField | 'logo') => {
       newFieldsMeta[field] = {
@@ -553,7 +536,7 @@ export class TeamEnrichmentService {
     const hasLongDescGap = !team.longDescription && !(updateData as any).longDescription;
     const hasMoreDetailsGap = !team.moreDetails && !(updateData as any).moreDetails;
     const hasIndustryTagsGap =
-      existingFields.industryTags !== FieldEnrichmentStatus.Enriched &&
+      existingFieldsMeta.industryTags?.status !== FieldEnrichmentStatus.Enriched &&
       team.industryTags.length === 0 &&
       !(updateData as any).industryTags;
 
@@ -584,21 +567,18 @@ export class TeamEnrichmentService {
 
     if (hasWebsiteGap && profile.website) {
       (updateData as any).website = profile.website;
-      newFields.website = FieldEnrichmentStatus.Enriched;
       markSdField('website');
       filledFields.push('website');
     }
 
     if (hasShortDescGap && profile.tagline) {
       (updateData as any).shortDescription = this.aiService.truncateString(profile.tagline, 200);
-      newFields.shortDescription = FieldEnrichmentStatus.Enriched;
       markSdField('shortDescription');
       filledFields.push('shortDescription');
     }
 
     if (hasLongDescGap && profile.about) {
       (updateData as any).longDescription = this.aiService.truncateString(profile.about, 1000);
-      newFields.longDescription = FieldEnrichmentStatus.Enriched;
       markSdField('longDescription');
       filledFields.push('longDescription');
     }
@@ -611,7 +591,6 @@ export class TeamEnrichmentService {
       if (profile.specialties.length) parts.push(`Specialties: ${profile.specialties.join(', ')}`);
       if (parts.length > 0) {
         (updateData as any).moreDetails = parts.join('\n');
-        newFields.moreDetails = FieldEnrichmentStatus.Enriched;
         markSdField('moreDetails');
         filledFields.push('moreDetails');
       }
@@ -626,7 +605,6 @@ export class TeamEnrichmentService {
         });
         if (matchedTags.length > 0) {
           (updateData as any).industryTags = { connect: matchedTags.map((t) => ({ uid: t.uid })) };
-          newFields.industryTags = FieldEnrichmentStatus.Enriched;
           markSdField('industryTags');
           filledFields.push('industryTags');
         }
@@ -887,7 +865,7 @@ export class TeamEnrichmentService {
       shouldEnrich: false,
       status,
       isAIGenerated: false,
-      fields: {},
+      fieldsMeta: {},
     };
 
     meta.status = status;

@@ -61,8 +61,7 @@ export interface TeamDataEnrichment {
   reviewedBy?: string;
   errorMessage?: string;
   aiModel?: string;
-  fields: Partial<Record<EnrichableField, FieldEnrichmentStatus>>;
-  fieldsMeta?: Partial<Record<EnrichableField | 'logo', FieldEnrichmentMeta>>;
+  fieldsMeta: Partial<Record<EnrichableField | 'logo', FieldEnrichmentMeta>>;
   scrapingDog?: {
     used: boolean;
     fetchedAt: string;
