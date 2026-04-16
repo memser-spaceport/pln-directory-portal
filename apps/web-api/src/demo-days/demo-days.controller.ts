@@ -52,7 +52,7 @@ export class DemoDaysController {
     private readonly uploadsService: UploadsService,
     private readonly demoDayEngagementService: DemoDayEngagementService,
     private readonly demoDayEngagementAnalyticsService: DemoDayEngagementAnalyticsService
-  ) { }
+  ) {}
 
   @Get()
   @UseGuards(UserTokenCheckGuard)

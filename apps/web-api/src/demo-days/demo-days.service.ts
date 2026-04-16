@@ -133,6 +133,12 @@ export class DemoDaysService {
     isPending?: boolean;
     confidentialityAccepted?: boolean;
     logoUrl?: string | null;
+    primaryColor?: string | null;
+    landingLogosEnabled?: boolean;
+    headerImageUrl?: string | null;
+    programFieldEnabled?: boolean | null;
+    programFieldOptions?: string[] | null;
+    stageTagEnabled?: boolean | null;
   }> {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
@@ -170,6 +176,12 @@ export class DemoDaysService {
         confidentialityAccepted: false,
         isPending: false,
         logoUrl: demoDay.logoUrl ?? null,
+        primaryColor: demoDay.primaryColor ?? '#1a45e6',
+        landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
+        headerImageUrl: demoDay.headerImageUrl ?? null,
+        programFieldEnabled: demoDay.programFieldEnabled ?? null,
+        programFieldOptions: demoDay.programFieldOptions ?? null,
+        stageTagEnabled: demoDay.stageTagEnabled ?? null,
       };
     }
 
@@ -183,6 +195,13 @@ export class DemoDaysService {
         status: this.getExternalDemoDayStatus(demoDay.status),
         host: demoDay.host,
         isPending: false,
+        logoUrl: demoDay.logoUrl ?? null,
+        primaryColor: demoDay.primaryColor ?? '#1a45e6',
+        landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
+        headerImageUrl: demoDay.headerImageUrl ?? null,
+        programFieldEnabled: demoDay.programFieldEnabled ?? null,
+        programFieldOptions: demoDay.programFieldOptions ?? null,
+        stageTagEnabled: demoDay.stageTagEnabled ?? null,
       };
     }
 
@@ -208,6 +227,13 @@ export class DemoDaysService {
         investorsCount,
         confidentialityAccepted: participant.confidentialityAccepted,
         isPending: participant.status === DemoDayParticipantStatus.PENDING,
+        logoUrl: demoDay.logoUrl ?? null,
+        primaryColor: demoDay.primaryColor ?? '#1a45e6',
+        landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
+        headerImageUrl: demoDay.headerImageUrl ?? null,
+        programFieldEnabled: demoDay.programFieldEnabled ?? null,
+        programFieldOptions: demoDay.programFieldOptions ?? null,
+        stageTagEnabled: demoDay.stageTagEnabled ?? null,
       };
     }
 
@@ -246,6 +272,12 @@ export class DemoDaysService {
         investorsCount,
         isPending: false,
         logoUrl: demoDay.logoUrl ?? null,
+        primaryColor: demoDay.primaryColor ?? '#1a45e6',
+        landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
+        headerImageUrl: demoDay.headerImageUrl ?? null,
+        programFieldEnabled: demoDay.programFieldEnabled ?? null,
+        programFieldOptions: demoDay.programFieldOptions ?? null,
+        stageTagEnabled: demoDay.stageTagEnabled ?? null,
       };
     }
 
@@ -264,6 +296,13 @@ export class DemoDaysService {
       investorsCount,
       confidentialityAccepted: false,
       isPending: false,
+      logoUrl: demoDay.logoUrl ?? null,
+      primaryColor: demoDay.primaryColor ?? '#1a45e6',
+      landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
+      headerImageUrl: demoDay.headerImageUrl ?? null,
+      programFieldEnabled: demoDay.programFieldEnabled ?? null,
+      programFieldOptions: demoDay.programFieldOptions ?? null,
+      stageTagEnabled: demoDay.stageTagEnabled ?? null,
     };
   }
 
@@ -535,6 +574,9 @@ export class DemoDaysService {
             primaryColor: demoDay.branding?.primaryColor ?? '#1a45e6',
             landingLogosEnabled: demoDay.branding?.landingLogosEnabled ?? true,
             headerImageUrl: demoDay.branding?.headerImage?.url ?? null,
+            programFieldEnabled: demoDay.programFieldEnabled ?? null,
+            programFieldOptions: demoDay.programFieldOptions ?? null,
+            stageTagEnabled: demoDay.stageTagEnabled ?? null,
           };
 
           // Only include these fields for authorized users
