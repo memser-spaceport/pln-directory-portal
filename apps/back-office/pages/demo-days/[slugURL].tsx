@@ -1144,6 +1144,7 @@ const DemoDayDetailPage = () => {
                   )}
                 </div>
 
+                {/*
                 <div className={s.overviewField}>
                   <label className={s.fieldLabel}>Header Image</label>
                   {isBrandingEditing ? (
@@ -1232,10 +1233,12 @@ const DemoDayDetailPage = () => {
                     <div className={s.headerPlaceholder}>No header image uploaded</div>
                   )}
                 </div>
+                */}
               </div>
 
               {/* Right Column - Settings */}
               <div className={s.brandingColumn}>
+                {/*
                 <div className={s.overviewField}>
                   <label className={s.fieldLabel}>Primary Color</label>
                   {isBrandingEditing ? (
@@ -1267,6 +1270,7 @@ const DemoDayDetailPage = () => {
                     </div>
                   )}
                 </div>
+                */}
 
                 <div className={s.overviewField}>
                   <label className={s.fieldLabel}>Landing Logos Section</label>
