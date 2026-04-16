@@ -13,6 +13,24 @@ export enum FieldEnrichmentStatus {
   CannotEnrich = 'CannotEnrich',
 }
 
+export enum FieldConfidence {
+  High = 'high',
+  Medium = 'medium',
+  Low = 'low',
+}
+
+export enum EnrichmentSource {
+  AI = 'ai',
+  OpenGraph = 'open-graph',
+  ScrapingDog = 'scrapingdog',
+}
+
+export interface FieldEnrichmentMeta {
+  status: FieldEnrichmentStatus;
+  confidence?: FieldConfidence;
+  source?: EnrichmentSource;
+}
+
 /** Scalar fields on the Team model that can be enriched directly. */
 export const ENRICHABLE_TEAM_FIELDS = [
   'website',
@@ -42,12 +60,20 @@ export interface TeamDataEnrichment {
   reviewedAt?: string;
   reviewedBy?: string;
   errorMessage?: string;
-  fields: Partial<Record<EnrichableField, FieldEnrichmentStatus>>;
+  aiModel?: string;
+  fieldsMeta: Partial<Record<EnrichableField | 'logo', FieldEnrichmentMeta>>;
+  scrapingDog?: {
+    used: boolean;
+    fetchedAt: string;
+    fields: string[];
+    linkedinInternalId?: string | null;
+  };
 }
 
 export interface AITeamEnrichmentResponse {
   website: string | null;
   websiteOwnerName: string | null;
+  websiteCandidates: string[];
   blog: string | null;
   contactMethod: string | null;
   linkedinHandler: string | null;

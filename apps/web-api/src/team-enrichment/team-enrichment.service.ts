@@ -4,13 +4,31 @@ import { PrismaService } from '../shared/prisma.service';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import {
+  ScrapingDogCompanyProfile,
+  TeamEnrichmentScrapingDogService,
+} from './team-enrichment-scrapingdog.service';
+import {
   ENRICHABLE_TEAM_FIELDS,
   EnrichableField,
   EnrichableTeamField,
+  EnrichmentSource,
   EnrichmentStatus,
+  FieldConfidence,
+  FieldEnrichmentMeta,
   FieldEnrichmentStatus,
   TeamDataEnrichment,
 } from './team-enrichment.types';
+
+type FieldsMetaMap = Partial<Record<EnrichableField | 'logo', FieldEnrichmentMeta>>;
+
+function toConfidence(raw: unknown): FieldConfidence | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const v = raw.toLowerCase();
+  if (v === 'high') return FieldConfidence.High;
+  if (v === 'medium') return FieldConfidence.Medium;
+  if (v === 'low') return FieldConfidence.Low;
+  return undefined;
+}
 
 @Injectable()
 export class TeamEnrichmentService {
@@ -18,7 +36,8 @@ export class TeamEnrichmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileUploadService: FileUploadService,
-    private readonly aiService: TeamEnrichmentAiService
+    private readonly aiService: TeamEnrichmentAiService,
+    private readonly scrapingDogService: TeamEnrichmentScrapingDogService
   ) {}
 
   async markTeamForEnrichment(teamUid: string): Promise<void> {
@@ -34,7 +53,7 @@ export class TeamEnrichmentService {
       shouldEnrich: true,
       status: EnrichmentStatus.PendingEnrichment,
       isAIGenerated: existing?.isAIGenerated ?? false,
-      fields: existing?.fields ?? {},
+      fieldsMeta: existing?.fieldsMeta ?? {},
     };
 
     await this.prisma.team.update({
@@ -198,55 +217,31 @@ export class TeamEnrichmentService {
 
       // Preserve existing field statuses from previous enrichment runs
       const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
-      const existingFields = existingMeta?.fields || {};
+      const existingFieldsMeta = (existingMeta?.fieldsMeta ?? {}) as FieldsMetaMap;
 
-      // If the team had no website and AI couldn't find one, skip all enrichment —
-      // without a verified website, other data (descriptions, socials) is unreliable
+      // Verify entity identity to decide which fields are safe to enrich.
+      // Website and logo require high confidence (verified entity).
+      // Other fields (descriptions, socials, tags) are enriched regardless — the AI
+      // was asked about the exact name, and these fields are usually correct even when the website match fails.
       const hadNoWebsite = !team.website || team.website.trim() === '';
-      const aiFoundNoWebsite = !aiResponse.website;
-      if (hadNoWebsite && aiFoundNoWebsite) {
+      const isEntityVerified = hadNoWebsite ? this.verifyEntityIdentity(team.name, aiResponse) : true;
+      if (!isEntityVerified) {
         this.logger.warn(
-          `Team ${teamUid} (${team.name}): website could not be enriched — skipping all fields to avoid incorrect data`
+          `Team ${teamUid} (${team.name}): entity identity not verified — will skip website and logo, but still enrich other fields`
         );
-
-        const allCannotEnrich: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};
-        for (const field of ENRICHABLE_TEAM_FIELDS) {
-          if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
-            allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
-          }
-        }
-        for (const field of ['industryTags', 'investmentFocus'] as const) {
-          if (existingFields[field] !== FieldEnrichmentStatus.Enriched) {
-            allCannotEnrich[field] = FieldEnrichmentStatus.CannotEnrich;
-          }
-        }
-
-        const enrichment: TeamDataEnrichment = {
-          shouldEnrich: false,
-          status: EnrichmentStatus.Enriched,
-          isAIGenerated: false,
-          enrichedAt: new Date().toISOString(),
-          enrichedBy,
-          fields: { ...existingFields, ...allCannotEnrich },
-        };
-
-        await this.prisma.team.update({
-          where: { uid: teamUid },
-          data: { dataEnrichment: enrichment as any },
-        });
-
-        this.logger.log(`Team ${teamUid} (${team.name}): marked all fields as CannotEnrich (no verified website)`);
-        return;
+        // Clear website from AI response so it won't be used for enrichment or logo
+        aiResponse.website = null;
+        aiResponse.websiteCandidates = [];
       }
 
       // Determine which fields need enrichment (skip already Enriched ones)
       const updateData: Prisma.TeamUpdateInput = {};
-      const newFields: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {};
+      const newFieldsMeta: FieldsMetaMap = {};
       let fieldsUpdatedCount = 0;
 
       for (const field of ENRICHABLE_TEAM_FIELDS) {
         // Skip fields already successfully enriched
-        if (existingFields[field] === FieldEnrichmentStatus.Enriched) continue;
+        if (existingFieldsMeta[field]?.status === FieldEnrichmentStatus.Enriched) continue;
 
         const currentValue = team[field];
         const newValue = aiResponse[field];
@@ -254,16 +249,20 @@ export class TeamEnrichmentService {
         if (!currentValue || currentValue.trim() === '') {
           if (newValue) {
             (updateData as any)[field] = newValue;
-            newFields[field] = FieldEnrichmentStatus.Enriched;
+            newFieldsMeta[field] = {
+              status: FieldEnrichmentStatus.Enriched,
+              confidence: toConfidence(aiResponse.confidence?.[field]),
+              source: EnrichmentSource.AI,
+            };
             fieldsUpdatedCount++;
           } else {
-            newFields[field] = FieldEnrichmentStatus.CannotEnrich;
+            newFieldsMeta[field] = { status: FieldEnrichmentStatus.CannotEnrich };
           }
         }
       }
 
       // Handle industryTags — skip if already enriched
-      if (existingFields.industryTags !== FieldEnrichmentStatus.Enriched && team.industryTags.length === 0) {
+      if (existingFieldsMeta.industryTags?.status !== FieldEnrichmentStatus.Enriched && team.industryTags.length === 0) {
         this.logger.debug(`Team ${teamUid}: AI returned industryTags = [${aiResponse.industryTags.join(', ')}]`);
         if (aiResponse.industryTags.length > 0) {
           const matchedTags = await this.prisma.industryTag.findMany({
@@ -277,19 +276,23 @@ export class TeamEnrichmentService {
           );
           if (matchedTags.length > 0) {
             updateData.industryTags = { connect: matchedTags.map((t) => ({ uid: t.uid })) };
-            newFields.industryTags = FieldEnrichmentStatus.Enriched;
+            newFieldsMeta.industryTags = {
+              status: FieldEnrichmentStatus.Enriched,
+              confidence: toConfidence(aiResponse.confidence?.industryTags),
+              source: EnrichmentSource.AI,
+            };
             fieldsUpdatedCount++;
           } else {
-            newFields.industryTags = FieldEnrichmentStatus.CannotEnrich;
+            newFieldsMeta.industryTags = { status: FieldEnrichmentStatus.CannotEnrich };
           }
         } else {
-          newFields.industryTags = FieldEnrichmentStatus.CannotEnrich;
+          newFieldsMeta.industryTags = { status: FieldEnrichmentStatus.CannotEnrich };
         }
       }
 
       // Handle investmentFocus — skip if already enriched
       const currentFocus = team.investorProfile?.investmentFocus || [];
-      if (existingFields.investmentFocus !== FieldEnrichmentStatus.Enriched && currentFocus.length === 0) {
+      if (existingFieldsMeta.investmentFocus?.status !== FieldEnrichmentStatus.Enriched && currentFocus.length === 0) {
         this.logger.debug(`Team ${teamUid}: AI returned investmentFocus = [${aiResponse.investmentFocus.join(', ')}]`);
         if (aiResponse.investmentFocus.length > 0) {
           if (team.investorProfile) {
@@ -305,17 +308,21 @@ export class TeamEnrichmentService {
               },
             });
           }
-          newFields.investmentFocus = FieldEnrichmentStatus.Enriched;
+          newFieldsMeta.investmentFocus = {
+            status: FieldEnrichmentStatus.Enriched,
+            confidence: toConfidence(aiResponse.confidence?.investmentFocus),
+            source: EnrichmentSource.AI,
+          };
           fieldsUpdatedCount++;
         } else {
-          newFields.investmentFocus = FieldEnrichmentStatus.CannotEnrich;
+          newFieldsMeta.investmentFocus = { status: FieldEnrichmentStatus.CannotEnrich };
         }
       }
 
-      // Handle logo via OG tag scraping
-      // If AI discovered a website and team didn't have one, use it for logo fetch
+      // Handle logo via OG tag scraping — only from a verified website
+      // Do NOT use websiteCandidates for logo since they are unverified and may belong to a different entity
       const effectiveWebsite = team.website || aiResponse.website || null;
-      if (!team.logoUid) {
+      if (!team.logoUid && effectiveWebsite) {
         this.logger.log(`Attempting logo fetch for team ${teamUid} (${team.name}) from website: ${effectiveWebsite}`);
         const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite);
 
@@ -340,34 +347,57 @@ export class TeamEnrichmentService {
                 },
               });
               updateData.logo = { connect: { uid: image.uid } };
+              newFieldsMeta.logo = {
+                status: FieldEnrichmentStatus.Enriched,
+                confidence: FieldConfidence.Medium,
+                source: EnrichmentSource.OpenGraph,
+              };
               this.logger.log(`Logo uploaded successfully for team ${teamUid} (${team.name}), image uid: ${image.uid}`);
             } else {
               this.logger.warn(`Logo upload returned no URL for team ${teamUid} (${team.name})`);
+              newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
             }
           } catch (logoError) {
             this.logger.warn(`Failed to download/upload logo for team ${teamUid} (${team.name}): ${logoError.message}`);
+            newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
           }
         } else {
           this.logger.log(`No logo found in website metadata for team ${teamUid} (${team.name})`);
+          newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
         }
-      } else {
+      } else if (team.logoUid) {
         this.logger.log(`Team ${teamUid} (${team.name}) already has a logo, skipping logo fetch`);
+      } else {
+        this.logger.log(`Team ${teamUid} (${team.name}): no verified website available, skipping logo fetch`);
+        newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
       }
 
-      // Merge new field statuses with existing ones (preserve previous Enriched/ChangedByUser)
-      const mergedFields: Partial<Record<EnrichableField, FieldEnrichmentStatus>> = {
-        ...existingFields,
-        ...newFields,
+      // ScrapingDog fallback — only when primary enrichment left high-value gaps AND we have a LinkedIn handle
+      const scrapingDogMeta = await this.maybeEnrichViaScrapingDog({
+        teamUid,
+        team,
+        existingFieldsMeta,
+        aiLinkedinHandler: aiResponse.linkedinHandler,
+        updateData,
+        newFieldsMeta,
+      });
+
+      // Merge field metadata (confidence + source), preserving previous entries
+      const mergedFieldsMeta: FieldsMetaMap = {
+        ...existingFieldsMeta,
+        ...newFieldsMeta,
       };
 
       // Build enrichment metadata
       const enrichment: TeamDataEnrichment = {
         shouldEnrich: false,
         status: EnrichmentStatus.Enriched,
-        isAIGenerated: Object.values(mergedFields).some((s) => s === FieldEnrichmentStatus.Enriched),
+        isAIGenerated: Object.values(mergedFieldsMeta).some((m) => m.status === FieldEnrichmentStatus.Enriched),
         enrichedAt: new Date().toISOString(),
         enrichedBy,
-        fields: mergedFields,
+        aiModel: this.aiService.getModelName(),
+        fieldsMeta: mergedFieldsMeta,
+        ...(scrapingDogMeta ? { scrapingDog: scrapingDogMeta } : {}),
       };
 
       // Update team with enriched data + metadata
@@ -422,9 +452,12 @@ export class TeamEnrichmentService {
     for (const field of changedFields) {
       if (
         ENRICHABLE_TEAM_FIELDS.includes(field as EnrichableTeamField) &&
-        meta.fields[field as EnrichableTeamField] === FieldEnrichmentStatus.Enriched
+        meta.fieldsMeta?.[field as EnrichableTeamField]?.status === FieldEnrichmentStatus.Enriched
       ) {
-        meta.fields[field as EnrichableTeamField] = FieldEnrichmentStatus.ChangedByUser;
+        meta.fieldsMeta[field as EnrichableTeamField] = {
+          ...meta.fieldsMeta[field as EnrichableTeamField],
+          status: FieldEnrichmentStatus.ChangedByUser,
+        };
         updated = true;
       }
     }
@@ -462,6 +495,186 @@ export class TeamEnrichmentService {
     this.logger.log(`Enrichment for team ${teamUid} marked as ${action} by ${reviewerEmail}`);
   }
 
+  private async maybeEnrichViaScrapingDog(ctx: {
+    teamUid: string;
+    team: {
+      name: string;
+      website: string | null;
+      shortDescription: string | null;
+      longDescription: string | null;
+      moreDetails: string | null;
+      logoUid: string | null;
+      linkedinHandler: string | null;
+      industryTags: Array<{ uid: string; title: string }>;
+    };
+    existingFieldsMeta: FieldsMetaMap;
+    aiLinkedinHandler: string | null;
+    updateData: Prisma.TeamUpdateInput;
+    newFieldsMeta: FieldsMetaMap;
+  }): Promise<TeamDataEnrichment['scrapingDog'] | null> {
+    const { teamUid, team, existingFieldsMeta, aiLinkedinHandler, updateData, newFieldsMeta } = ctx;
+
+    const markSdField = (field: EnrichableField | 'logo') => {
+      newFieldsMeta[field] = {
+        status: FieldEnrichmentStatus.Enriched,
+        confidence: FieldConfidence.High,
+        source: EnrichmentSource.ScrapingDog,
+      };
+    };
+
+    if (!this.scrapingDogService.isConfigured()) return null;
+
+    const handle = team.linkedinHandler || aiLinkedinHandler || null;
+    if (!handle) {
+      this.logger.debug(`Team ${teamUid}: no LinkedIn handle available, skipping ScrapingDog`);
+      return null;
+    }
+
+    const hasLogoGap = !team.logoUid && !(updateData as any).logo;
+    const hasWebsiteGap = !team.website && !(updateData as any).website;
+    const hasShortDescGap = !team.shortDescription && !(updateData as any).shortDescription;
+    const hasLongDescGap = !team.longDescription && !(updateData as any).longDescription;
+    const hasMoreDetailsGap = !team.moreDetails && !(updateData as any).moreDetails;
+    const hasIndustryTagsGap =
+      existingFieldsMeta.industryTags?.status !== FieldEnrichmentStatus.Enriched &&
+      team.industryTags.length === 0 &&
+      !(updateData as any).industryTags;
+
+    if (
+      !hasLogoGap &&
+      !hasWebsiteGap &&
+      !hasShortDescGap &&
+      !hasLongDescGap &&
+      !hasMoreDetailsGap &&
+      !hasIndustryTagsGap
+    ) {
+      this.logger.debug(`Team ${teamUid}: no gaps remain, skipping ScrapingDog`);
+      return null;
+    }
+
+    this.logger.log(`Team ${teamUid} (${team.name}): invoking ScrapingDog for handle "${handle}"`);
+    const profile = await this.scrapingDogService.fetchCompanyProfile(handle);
+    if (!profile) return null;
+
+    if (!this.verifyScrapingDogEntity(team.name, profile)) {
+      this.logger.warn(
+        `Team ${teamUid} (${team.name}): ScrapingDog profile name "${profile.companyName}" / "${profile.universalNameId}" does not match, discarding`
+      );
+      return null;
+    }
+
+    const filledFields: string[] = [];
+
+    if (hasWebsiteGap && profile.website) {
+      (updateData as any).website = profile.website;
+      markSdField('website');
+      filledFields.push('website');
+    }
+
+    if (hasShortDescGap && profile.tagline) {
+      (updateData as any).shortDescription = this.aiService.truncateString(profile.tagline, 200);
+      markSdField('shortDescription');
+      filledFields.push('shortDescription');
+    }
+
+    if (hasLongDescGap && profile.about) {
+      (updateData as any).longDescription = this.aiService.truncateString(profile.about, 1000);
+      markSdField('longDescription');
+      filledFields.push('longDescription');
+    }
+
+    if (hasMoreDetailsGap) {
+      const parts: string[] = [];
+      if (profile.founded) parts.push(`Founded: ${profile.founded}`);
+      if (profile.headquarters) parts.push(`Headquarters: ${profile.headquarters}`);
+      if (profile.industries.length) parts.push(`Industries: ${profile.industries.join(', ')}`);
+      if (profile.specialties.length) parts.push(`Specialties: ${profile.specialties.join(', ')}`);
+      if (parts.length > 0) {
+        (updateData as any).moreDetails = parts.join('\n');
+        markSdField('moreDetails');
+        filledFields.push('moreDetails');
+      }
+    }
+
+    if (hasIndustryTagsGap) {
+      const candidates = [...profile.industries, ...profile.specialties];
+      if (candidates.length > 0) {
+        const matchedTags = await this.prisma.industryTag.findMany({
+          where: { title: { in: candidates, mode: 'insensitive' } },
+          select: { uid: true, title: true },
+        });
+        if (matchedTags.length > 0) {
+          (updateData as any).industryTags = { connect: matchedTags.map((t) => ({ uid: t.uid })) };
+          markSdField('industryTags');
+          filledFields.push('industryTags');
+        }
+      }
+    }
+
+    if (hasLogoGap && profile.profilePhoto) {
+      try {
+        const filename = `team-enrichment-${teamUid}-scrapingdog-${Date.now()}.png`;
+        const multerFile = await this.aiService.downloadImageAsMulterFile(profile.profilePhoto, filename);
+        const s3Url = await this.fileUploadService.storeImageFiles([multerFile]);
+        if (s3Url) {
+          const image = await this.prisma.image.create({
+            data: {
+              cid: s3Url,
+              url: s3Url,
+              filename,
+              size: multerFile.size,
+              type: multerFile.mimetype.split('/')[1] || 'png',
+              width: 0,
+              height: 0,
+              version: 'ORIGINAL',
+            },
+          });
+          (updateData as any).logo = { connect: { uid: image.uid } };
+          markSdField('logo');
+          filledFields.push('logo');
+          this.logger.log(`Team ${teamUid} (${team.name}): logo set from ScrapingDog, image uid: ${image.uid}`);
+        }
+      } catch (error) {
+        this.logger.warn(`Team ${teamUid} (${team.name}): ScrapingDog logo download/upload failed: ${error.message}`);
+      }
+    }
+
+    if (filledFields.length === 0) {
+      this.logger.log(`Team ${teamUid} (${team.name}): ScrapingDog returned no fillable data`);
+      return {
+        used: true,
+        fetchedAt: new Date().toISOString(),
+        fields: [],
+        linkedinInternalId: profile.linkedinInternalId,
+      };
+    }
+
+    this.logger.log(
+      `Team ${teamUid} (${team.name}): ScrapingDog filled [${filledFields.join(', ')}]`
+    );
+
+    return {
+      used: true,
+      fetchedAt: new Date().toISOString(),
+      fields: filledFields,
+      linkedinInternalId: profile.linkedinInternalId,
+    };
+  }
+
+  private verifyScrapingDogEntity(teamName: string, profile: ScrapingDogCompanyProfile): boolean {
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim();
+    const normalizedTeam = normalize(teamName);
+    const candidates = [profile.companyName, profile.universalNameId]
+      .filter((v): v is string => !!v)
+      .map((v) => normalize(v));
+    if (candidates.length === 0) return false;
+    return candidates.some((c) => c === normalizedTeam || c.includes(normalizedTeam) || normalizedTeam.includes(c));
+  }
+
   parseEnrichmentMeta(raw: any): TeamDataEnrichment | null {
     if (!raw) return null;
     try {
@@ -469,6 +682,176 @@ export class TeamEnrichmentService {
       return data as TeamDataEnrichment;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Cross-validates that the AI response is about the correct entity.
+   * Checks multiple signals: website owner name, descriptions, and sources.
+   * Returns true only if we're confident the data is about the right team.
+   */
+  private verifyEntityIdentity(
+    teamName: string,
+    aiResponse: {
+      website: string | null;
+      websiteOwnerName: string | null;
+      shortDescription: string | null;
+      longDescription: string | null;
+      sources: string[];
+    }
+  ): boolean {
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim();
+
+    const normalizedTeamName = normalize(teamName);
+    const teamWords = normalizedTeamName.split(/\s+/);
+
+    // Signal 1: Website owner name matches the team name
+    // Must be a substring match (contiguous words), NOT just individual word presence.
+    // e.g., "Arbitrum Ventures Program" matches "Arbitrum Ventures" (contiguous substring)
+    // but "Arbitrum Gaming Ventures" does NOT match "Arbitrum Ventures" (different entity)
+    let websiteNameMatch = false;
+    if (aiResponse.websiteOwnerName) {
+      const normalizedOwner = normalize(aiResponse.websiteOwnerName);
+      websiteNameMatch = normalizedOwner.includes(normalizedTeamName) || normalizedTeamName.includes(normalizedOwner);
+    }
+
+    // Signal 2: Descriptions mention the exact team name as a standalone phrase
+    // We check that the team name appears in the description and is NOT part of a longer entity name
+    // e.g., "Arbitrum Ventures" in "Arbitrum Gaming Ventures focuses on..." is NOT a match
+    let descriptionMatch = false;
+    const descriptionsToCheck = [aiResponse.shortDescription, aiResponse.longDescription].filter(
+      (d): d is string => !!d
+    );
+    for (const desc of descriptionsToCheck) {
+      if (this.containsExactEntityName(normalize(desc), normalizedTeamName)) {
+        descriptionMatch = true;
+        break;
+      }
+    }
+
+    // Signal 3: Sources contain URLs that reference the team name
+    let sourceMatch = false;
+    const urlSlug = teamWords.join('-');
+    const urlSlugAlt = teamWords.join('');
+    for (const source of aiResponse.sources || []) {
+      const lowerSource = source.toLowerCase();
+      if (lowerSource.includes(urlSlug) || lowerSource.includes(urlSlugAlt)) {
+        sourceMatch = true;
+        break;
+      }
+    }
+
+    const matchCount = [websiteNameMatch, descriptionMatch, sourceMatch].filter(Boolean).length;
+
+    this.logger.log(
+      `Entity verification for "${teamName}": website=${websiteNameMatch}, description=${descriptionMatch}, sources=${sourceMatch} (${matchCount}/3 signals)`
+    );
+
+    // If website owner name matches, we trust it (strongest signal)
+    if (websiteNameMatch) return true;
+
+    // Otherwise need at least 2 of 3 signals to confirm identity
+    if (matchCount >= 2) return true;
+
+    // If description matches with exact entity name, it's a decent signal on its own
+    if (descriptionMatch) return true;
+
+    return false;
+  }
+
+  /**
+   * Checks if a text contains the entity name as a standalone phrase,
+   * NOT as part of a longer entity name.
+   * e.g., "arbitrum ventures is a fund" → true for "arbitrum ventures"
+   *        "arbitrum gaming ventures is a fund" → false for "arbitrum ventures"
+   */
+  private containsExactEntityName(text: string, entityName: string): boolean {
+    let startIndex = 0;
+    while (true) {
+      const idx = text.indexOf(entityName, startIndex);
+      if (idx === -1) return false;
+
+      // Check what comes before and after the match
+      const charBefore = idx > 0 ? text[idx - 1] : ' ';
+      const charAfter = idx + entityName.length < text.length ? text[idx + entityName.length] : ' ';
+
+      // Must be at a word boundary
+      const isWordBoundaryBefore = charBefore === ' ' || idx === 0;
+      const isWordBoundaryAfter =
+        charAfter === ' ' ||
+        charAfter === ',' ||
+        charAfter === '.' ||
+        charAfter === ')' ||
+        charAfter === ':' ||
+        charAfter === ';' ||
+        idx + entityName.length === text.length;
+
+      if (isWordBoundaryBefore && isWordBoundaryAfter) {
+        // It's at a word boundary, but we also need to check the surrounding context
+        // isn't forming a longer entity name. Check if the word before or after is a capitalized
+        // word that could be part of a compound entity name.
+        // Since text is already normalized (lowercase), we check for adjacent name-like words
+
+        // Get the word right before the entity name
+        const textBefore = text.substring(0, idx).trim();
+        const wordBefore = textBefore.split(/\s+/).pop() || '';
+
+        // Get the word right after the entity name
+        const textAfter = text.substring(idx + entityName.length).trim();
+        const wordAfter = textAfter.split(/\s+/)[0] || '';
+
+        // Words that suggest a different entity when prepended/appended
+        // e.g., "gaming" before "ventures" in "arbitrum gaming ventures"
+        const entityExtendingWords = ['gaming', 'capital', 'labs', 'studio', 'studios', 'digital', 'global', 'network'];
+
+        // Check if the word before is NOT an entity-extending word
+        const beforeSafe = !entityExtendingWords.includes(wordBefore);
+        // Check if the word after is NOT an entity-extending word (but allow common suffixes)
+        const safeSuffixes = [
+          'is',
+          'was',
+          'has',
+          'are',
+          'aims',
+          'provides',
+          'offers',
+          'focuses',
+          'represents',
+          'initiative',
+          'program',
+          'fund',
+          'working',
+          'group',
+          'agv',
+          'avi',
+          'formerly',
+          'also',
+          'the',
+          'a',
+          'an',
+          'and',
+          'or',
+          'for',
+          'to',
+          'in',
+          'on',
+          'at',
+          'by',
+          'with',
+          '',
+        ];
+        const afterSafe = safeSuffixes.includes(wordAfter) || !entityExtendingWords.includes(wordAfter);
+
+        if (beforeSafe && afterSafe) {
+          return true;
+        }
+      }
+
+      startIndex = idx + 1;
     }
   }
 
@@ -482,7 +865,7 @@ export class TeamEnrichmentService {
       shouldEnrich: false,
       status,
       isAIGenerated: false,
-      fields: {},
+      fieldsMeta: {},
     };
 
     meta.status = status;

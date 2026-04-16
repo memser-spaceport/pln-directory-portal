@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { generateText, LanguageModel } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
 import ogs from 'open-graph-scraper';
 import { Readable } from 'stream';
+import sizeOf from 'image-size';
 import { AITeamEnrichmentResponse } from './team-enrichment.types';
+import { AiProviderService } from '../shared/ai-provider.service';
 
 const TEAM_ENRICHMENT_SYSTEM_PROMPT = `
 You are a professional research assistant specializing in company/fund data enrichment.
@@ -11,16 +12,24 @@ You are a professional research assistant specializing in company/fund data enri
 TASK: Research and enrich the profile of the company or investment fund described below.
 
 CRITICAL REQUIREMENTS:
-1. Use web_search_preview tool to find information about the company/fund
-2. All URLs must be valid and directly related to the company
-3. Never fabricate URLs - only return URLs you found in search results
-4. LinkedIn handlers should be in format "company/name" (without full URL)
+1. All URLs must be valid and directly related to the company
+2. Never fabricate URLs - only return URLs you found in search results
+3. LinkedIn handlers should be in format "company/name" (without full URL)
+4. Pay close attention to the EXACT entity name provided. If multiple entities with similar names exist, choose the one that EXACTLY matches the provided name.
+
+WEBSITE DISCOVERY:
+- The company may have its own standalone domain OR a dedicated page on a parent organization's website
+- Web3/blockchain entities often exist as pages on ecosystem hubs, foundation sites, DAO portals, or governance forums
+- Both standalone domains AND subpages on parent organization sites are acceptable as "website"
+- Return ALL relevant candidate URLs in "websiteCandidates" (forum pages, hub pages, foundation pages, third-party profiles)
+- Pick the best one as "website" — prefer official ecosystem hubs and dedicated pages over third-party aggregators
+- For "websiteOwnerName": return the name as displayed on the found website/page
 
 FIELDS TO POPULATE:
 
-1. website: The company's official website URL (e.g., "https://example.com"). Only populate if not already known.
-
-1b. websiteOwnerName: The EXACT company/organization name as displayed on the found website (from its homepage, about page, or meta tags). This is used to verify the website belongs to the correct company. If website is null, set this to null too.
+1. website: The company's best official website URL or dedicated page
+1b. websiteOwnerName: The name as displayed on the found website/page. This is used to verify the website belongs to the correct entity.
+1c. websiteCandidates: Array of ALL relevant URLs found for this entity (official pages, forum posts, hub pages, third-party profiles)
 
 2. blog: Blog URL if available
 
@@ -60,19 +69,22 @@ FIELDS TO POPULATE:
 NOTE: Logo discovery is handled separately — do NOT search for logos.
 
 SEARCH STRATEGY:
-1. Search for "[Company Name]" to find general information and their official website
-2. If the website is unknown, prioritize finding the official website first — this helps validate other information
-3. Search for "[Company Name] Twitter" or "[Company Name] X" to find their Twitter/X handle
-4. Search for "[Company Name] Telegram" to find their Telegram channel/group
-5. Search for "[Company Name] contact" or "[Company Name] email" to find contact info
-6. Search for "[Company Name]" + about or team
+1. Search for "[Company Name]" (exact, in quotes) to find general information
+2. Search "[Company Name] official website"
+3. Search "[Company Name] initiative" or "[Company Name] program" or "[Company Name] working group" (many Web3/crypto entities are initiatives within larger ecosystems)
+4. Search for "[Company Name] Twitter" or "[Company Name] X" to find their Twitter/X handle
+5. Search for "[Company Name] Telegram" to find their Telegram channel/group
+6. Search for "[Company Name] contact" or "[Company Name] email" to find contact info
+7. Search for "[Company Name]" + about or team
+8. If the entity is part of a larger ecosystem (e.g., a DAO working group), search for it within that ecosystem's website
 
 CRITICAL: You MUST ALWAYS respond with valid JSON.
 
 OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
 {
   "website": "https://..." or null,
-  "websiteOwnerName": "Exact Company Name from website" or null,
+  "websiteOwnerName": "Name as shown on website" or null,
+  "websiteCandidates": ["https://url1", "https://url2", ...],
   "blog": "https://..." or null,
   "contactMethod": "email@example.com" or "https://slack.com/..." or "discord.gg/..." or null,
   "linkedinHandler": "company/..." or null,
@@ -102,10 +114,20 @@ OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
 @Injectable()
 export class TeamEnrichmentAiService {
   private readonly logger = new Logger(TeamEnrichmentAiService.name);
-  private readonly MODEL_NAME: string;
 
-  constructor() {
-    this.MODEL_NAME = process.env.OPENAI_TEAM_ENRICHMENT_MODEL || 'gpt-4o';
+  private static readonly PROVIDER_ENV_VAR = 'TEAM_ENRICHMENT_AI_PROVIDER';
+  private static readonly MODEL_ENV_VAR = 'OPENAI_TEAM_ENRICHMENT_MODEL';
+
+  constructor(private readonly aiProvider: AiProviderService) {}
+
+  /**
+   * Returns the AI model name used for team enrichment (e.g., "gpt-4o", "gemini-2.5-flash").
+   */
+  getModelName(): string {
+    return this.aiProvider.getModelName(
+      TeamEnrichmentAiService.PROVIDER_ENV_VAR,
+      TeamEnrichmentAiService.MODEL_ENV_VAR
+    );
   }
 
   async enrichTeamViaAI(
@@ -123,14 +145,15 @@ export class TeamEnrichmentAiService {
     try {
       const userPrompt = this.buildUserPrompt(teamName, existingData);
 
+      const providerEnvVar = TeamEnrichmentAiService.PROVIDER_ENV_VAR;
+      const tools = this.aiProvider.getWebSearchTool(providerEnvVar, { searchContextSize: 'high' });
+
       const { text } = await generateText({
-        model: openai.responses(this.MODEL_NAME) as LanguageModel,
+        model: this.aiProvider.getResponsesModel(providerEnvVar, TeamEnrichmentAiService.MODEL_ENV_VAR, {
+          useSearchGrounding: true,
+        }),
         system: TEAM_ENRICHMENT_SYSTEM_PROMPT,
-        tools: {
-          web_search_preview: openai.tools.webSearchPreview({
-            searchContextSize: 'high',
-          }),
-        },
+        ...(Object.keys(tools).length > 0 && { tools }),
         prompt: userPrompt,
         temperature: 0.3,
         maxSteps: 3,
@@ -172,11 +195,19 @@ ${existingData.twitterHandler ? `Existing Twitter/X: ${existingData.twitterHandl
 ${existingData.telegramHandler ? `Existing Telegram: ${existingData.telegramHandler}` : 'Telegram: Unknown'}
 ${existingDescription ? `Existing Description: ${existingDescription}` : 'Description: Not available'}
 
+IMPORTANT: The entity name is EXACTLY "${teamName}". If there are similarly-named entities, make sure you find information about this exact one.
+
+CONTEXT:
+- This entity may operate in the Web3/blockchain/crypto ecosystem
+- It could be a DAO initiative, working group, or venture fund within a larger protocol ecosystem
+- Look for dedicated pages within ecosystem hubs and foundation sites, not just standalone domains
+
 TASK:
 1. Search for "${teamName}" to find additional information ${!existingData.website ? `
-2. The website is unknown — prioritize finding the official website first and set "websiteOwnerName" to the exact company name displayed on the found website
-3. Gather information about their team, history, and achievements for moreDetails
-4. Find a contact method (email preferred, otherwise Slack, Discord, etc.)` : `
+2. The website is unknown — prioritize finding the official website or dedicated page first
+3. Return ALL candidate URLs found in "websiteCandidates"
+4. Gather information about their team, history, and achievements for moreDetails
+5. Find a contact method (email preferred, otherwise Slack, Discord, etc.)` : `
 2. Gather information about their team, history, and achievements for moreDetails
 3. Find a contact method (email preferred, otherwise Slack, Discord, etc.)`}
 
@@ -200,6 +231,10 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
     try {
       const parsed = JSON.parse(jsonMatch[0]);
+
+      const websiteCandidates: string[] = Array.isArray(parsed.websiteCandidates)
+        ? parsed.websiteCandidates.map((u: string) => this.validateUrl(u)).filter(Boolean)
+        : [];
 
       // Filter out low-confidence website results
       const websiteConfidence = parsed.confidence?.website?.toLowerCase();
@@ -226,6 +261,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       return {
         website: this.validateUrl(parsed.website),
         websiteOwnerName: parsed.websiteOwnerName || null,
+        websiteCandidates,
         blog: this.validateUrl(parsed.blog),
         contactMethod: this.sanitizeContactMethod(parsed.contactMethod),
         linkedinHandler: this.sanitizeLinkedInHandler(parsed.linkedinHandler),
@@ -253,6 +289,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     return {
       website: null,
       websiteOwnerName: null,
+      websiteCandidates: [],
       blog: null,
       contactMethod: null,
       linkedinHandler: null,
@@ -282,7 +319,8 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
       const candidates: string[] = [];
 
-      // 1. Try open-graph-scraper for OG/Twitter/favicon metadata
+      // 1. Try open-graph-scraper — prioritize favicon (most reliable logo source)
+      // Skip og:image and twitter:image as they are often banners/hero images, not logos
       try {
         const { result } = await ogs({
           url: websiteUrl,
@@ -296,27 +334,12 @@ Current Date: ${new Date().toISOString().split('T')[0]}
           },
         });
 
-        if (result.ogImage?.length) {
-          for (const img of result.ogImage) {
-            if (img.url) candidates.push(img.url);
-          }
-          this.logger.log(`Found ${result.ogImage.length} og:image(s) for "${companyName}": ${candidates.join(', ')}`);
-        }
-
-        if (result.twitterImage?.length) {
-          for (const img of result.twitterImage) {
-            if (img.url && !candidates.includes(img.url)) candidates.push(img.url);
-          }
-          this.logger.log(
-            `Found twitter:image for "${companyName}": ${result.twitterImage.map((i) => i.url).join(', ')}`
-          );
-        }
-
+        // Favicon first — if it passes validation, use it immediately (it's almost always the actual logo)
         if (result.favicon) {
           const faviconUrl = result.favicon.startsWith('http')
             ? result.favicon
             : new URL(result.favicon, websiteUrl).href;
-          if (!candidates.includes(faviconUrl)) candidates.push(faviconUrl);
+          candidates.push(faviconUrl);
           this.logger.log(`Found favicon for "${companyName}": ${faviconUrl}`);
         }
       } catch (ogsError) {
@@ -325,14 +348,19 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
       // 2. Fallback: logo APIs by domain (no JS rendering needed)
       if (candidates.length === 0) {
-        this.logger.log(`No OG metadata found for "${companyName}", trying logo APIs for domain: ${domain}`);
-        candidates.push(
-          `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-          `https://icons.duckduckgo.com/ip3/${domain}.ico`
-        );
+        this.logger.log(`No favicon found for "${companyName}", trying logo APIs for domain: ${domain}`);
       }
+      candidates.push(
+        `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+        `https://icons.duckduckgo.com/ip3/${domain}.ico`
+      );
 
       this.logger.log(`Total ${candidates.length} logo candidate(s) for "${companyName}", validating...`);
+
+      // Validate all candidates: reject too small or too wide, prefer square
+      const MIN_DIMENSION = 100; // reject images smaller than 100px on either side
+      const MAX_ASPECT_RATIO = 1.5; // reject images wider/taller than 3:2
+      let bestCandidate: { url: string; score: number } | null = null;
 
       for (const candidate of candidates) {
         let resolvedUrl: string;
@@ -344,12 +372,54 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         }
 
         const validated = await this.validateLogoUrl(resolvedUrl);
-        if (validated) {
-          this.logger.log(`Logo validated for "${companyName}" via ${websiteUrl}: ${validated}`);
-          return { logoUrl: validated, domain };
-        } else {
+        if (!validated) {
           this.logger.warn(`Logo candidate failed validation for "${companyName}": ${resolvedUrl}`);
+          continue;
         }
+
+        // Check image dimensions and prefer square-ish logos
+        const dimensions = await this.getImageDimensions(validated.buffer);
+        if (dimensions) {
+          const { width, height } = dimensions;
+          const aspectRatio = Math.max(width, height) / Math.min(width, height);
+          this.logger.log(
+            `Logo candidate for "${companyName}": ${resolvedUrl} (${width}x${height}, ratio=${aspectRatio.toFixed(2)})`
+          );
+
+          if (width < MIN_DIMENSION || height < MIN_DIMENSION) {
+            this.logger.warn(
+              `Logo candidate too small for "${companyName}": ${resolvedUrl} (${width}x${height}, min=${MIN_DIMENSION}px)`
+            );
+            continue;
+          }
+
+          if (aspectRatio > MAX_ASPECT_RATIO) {
+            this.logger.warn(
+              `Logo candidate too wide/tall for "${companyName}": ${resolvedUrl} (ratio=${aspectRatio.toFixed(
+                2
+              )}, max=${MAX_ASPECT_RATIO})`
+            );
+            continue;
+          }
+
+          // Score: lower aspect ratio = better (1.0 = perfect square)
+          const score = 1 / aspectRatio;
+          if (!bestCandidate || score > bestCandidate.score) {
+            bestCandidate = { url: validated.url, score };
+          }
+        } else {
+          // Can't determine dimensions — skip, we require known dimensions >= 100px
+          this.logger.warn(`Logo candidate dimensions unknown for "${companyName}": ${resolvedUrl}, skipping`);
+        }
+      }
+
+      if (bestCandidate) {
+        this.logger.log(
+          `Best logo for "${companyName}" via ${websiteUrl}: ${bestCandidate.url} (score=${bestCandidate.score.toFixed(
+            2
+          )})`
+        );
+        return { logoUrl: bestCandidate.url, domain };
       }
 
       this.logger.warn(`All ${candidates.length} logo candidates failed validation for "${companyName}"`);
@@ -394,7 +464,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     };
   }
 
-  async validateLogoUrl(url: string | null | undefined): Promise<string | null> {
+  async validateLogoUrl(url: string | null | undefined): Promise<{ url: string; buffer: Buffer } | null> {
     if (!url) return null;
 
     try {
@@ -417,10 +487,23 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       if (response.ok) {
         const contentType = response.headers.get('content-type') || '';
         if (contentType.startsWith('image/')) {
-          return url;
+          const buffer = Buffer.from(await response.arrayBuffer());
+          return { url, buffer };
         }
       }
 
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getImageDimensions(buffer: Buffer): Promise<{ width: number; height: number } | null> {
+    try {
+      const result = sizeOf(buffer);
+      if (result.width && result.height) {
+        return { width: result.width, height: result.height };
+      }
       return null;
     } catch {
       return null;
@@ -464,6 +547,9 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
   /**
    * Check if the website owner name matches the expected team name.
+   * Uses contiguous substring matching only — NOT individual word presence.
+   * e.g., "Arbitrum Ventures Program" matches "Arbitrum Ventures" (contiguous)
+   * but  "Arbitrum Gaming Ventures" does NOT match "Arbitrum Ventures" (different entity)
    */
   private isCompanyNameMatch(expectedName: string, foundName: string): boolean {
     const normalize = (s: string) =>
@@ -477,18 +563,11 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     // Exact match
     if (expected === found) return true;
 
-    // If the found name has extra words not in the expected name, reject
-    const expectedWords = expected.split(/\s+/);
-    const foundWords = found.split(/\s+/);
+    // Contiguous substring match: one name fully contains the other as a continuous string
+    if (found.includes(expected) || expected.includes(found)) return true;
 
-    // All words in the found name must be present in the expected name
-    const extraWords = foundWords.filter((w) => !expectedWords.includes(w));
-    if (extraWords.length > 0) {
-      this.logger.warn(`Website owner has extra words not in team name: [${extraWords.join(', ')}]`);
-      return false;
-    }
-
-    return true;
+    this.logger.warn(`Website owner name "${foundName}" does not match expected "${expectedName}"`);
+    return false;
   }
 
   private validateUrl(url: string | null | undefined): string | null {
