@@ -290,7 +290,7 @@ const RolesPage = () => {
     <ApprovalLayout>
       <div className={s.root}>
         <div className={s.header}>
-          <span className={s.title}>Roles</span>
+          <span className={s.title}>Demo Day Roles</span>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span className={s.filters}>
