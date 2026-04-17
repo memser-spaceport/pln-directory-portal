@@ -51,6 +51,13 @@ export type EnrichableTeamField = typeof ENRICHABLE_TEAM_FIELDS[number];
 export type EnrichableRelationField = typeof ENRICHABLE_RELATION_FIELDS[number];
 export type EnrichableField = EnrichableTeamField | EnrichableRelationField;
 
+/**
+ * Keys tracked in `dataEnrichment.fieldsMeta`. `logo` is included because the
+ * enrichment pipeline records provenance for it, even though it isn't filled
+ * by the AI text response (it comes from OG scraping or ScrapingDog).
+ */
+export type FieldMetaKey = EnrichableField | 'logo';
+
 export type ForceEnrichmentMode = 'all' | 'cannotEnrich';
 
 export interface TeamDataEnrichment {
@@ -63,7 +70,7 @@ export interface TeamDataEnrichment {
   reviewedBy?: string;
   errorMessage?: string;
   aiModel?: string;
-  fieldsMeta: Partial<Record<EnrichableField | 'logo', FieldEnrichmentMeta>>;
+  fieldsMeta: Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
   scrapingDog?: {
     used: boolean;
     fetchedAt: string;

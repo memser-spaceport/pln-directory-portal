@@ -20,7 +20,7 @@ interface TeamDataEnrichment {
   reviewedAt?: string;             // ISO timestamp
   reviewedBy?: string;             // reviewer email
   errorMessage?: string;           // error details if FailedToEnrich
-  fieldsMeta: Partial<Record<EnrichableField | 'logo', {
+  fieldsMeta: Partial<Record<FieldMetaKey, {
     status: FieldEnrichmentStatus;
     confidence?: 'high' | 'medium' | 'low';
     source?: 'ai' | 'open-graph' | 'scrapingdog';

@@ -9,18 +9,18 @@ import {
 } from './team-enrichment-scrapingdog.service';
 import {
   ENRICHABLE_TEAM_FIELDS,
-  EnrichableField,
   EnrichableTeamField,
   EnrichmentSource,
   EnrichmentStatus,
   FieldConfidence,
   FieldEnrichmentMeta,
   FieldEnrichmentStatus,
+  FieldMetaKey,
   ForceEnrichmentMode,
   TeamDataEnrichment,
 } from './team-enrichment.types';
 
-type FieldsMetaMap = Partial<Record<EnrichableField | 'logo', FieldEnrichmentMeta>>;
+type FieldsMetaMap = Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
 
 function toConfidence(raw: unknown): FieldConfidence | undefined {
   if (typeof raw !== 'string') return undefined;
@@ -191,14 +191,15 @@ export class TeamEnrichmentService {
       return { status: 'in_progress' };
     }
 
-    const resetFieldsMeta = this.buildForceEnrichmentFieldsMeta(existing?.fieldsMeta ?? {}, mode);
-
+    // Preserve all existing fieldsMeta entries (including Enriched, CannotEnrich, ChangedByUser)
+    // so provenance (confidence, source, prior status) is retained as history.
+    // doEnrichTeam decides per-field whether to skip or overwrite based on forceOverwrite + status.
     const enrichment: TeamDataEnrichment = {
       ...(existing ?? { isAIGenerated: false }),
       shouldEnrich: true,
       status: EnrichmentStatus.PendingEnrichment,
       isAIGenerated: existing?.isAIGenerated ?? false,
-      fieldsMeta: resetFieldsMeta,
+      fieldsMeta: existing?.fieldsMeta ?? {},
     };
 
     await this.prisma.team.update({
@@ -252,31 +253,6 @@ export class TeamEnrichmentService {
     }
 
     return { total: teams.length, started, skipped };
-  }
-
-  private buildForceEnrichmentFieldsMeta(
-    existing: FieldsMetaMap,
-    mode: ForceEnrichmentMode
-  ): FieldsMetaMap {
-    const reset: FieldsMetaMap = {};
-    for (const [field, meta] of Object.entries(existing) as Array<
-      [EnrichableField | 'logo', FieldEnrichmentMeta | undefined]
-    >) {
-      if (!meta) continue;
-      // User edits are sacrosanct in both modes.
-      if (meta.status === FieldEnrichmentStatus.ChangedByUser) {
-        reset[field] = meta;
-        continue;
-      }
-      if (mode === 'cannotEnrich') {
-        // Keep Enriched so the doEnrichTeam skip-logic leaves them alone; drop CannotEnrich to retry.
-        if (meta.status === FieldEnrichmentStatus.Enriched) {
-          reset[field] = meta;
-        }
-      }
-      // mode === 'all': drop Enriched and CannotEnrich so they get re-processed.
-    }
-    return reset;
   }
 
   private async doEnrichTeam(
@@ -517,11 +493,23 @@ export class TeamEnrichmentService {
         newFieldsMeta,
       });
 
-      // Merge field metadata (confidence + source), preserving previous entries
-      const mergedFieldsMeta: FieldsMetaMap = {
-        ...existingFieldsMeta,
-        ...newFieldsMeta,
-      };
+      // Merge field metadata per-field. Undefined keys on the fresh entry don't clobber
+      // prior provenance (confidence, source), so history is preserved when the new AI
+      // run doesn't re-supply them. Entries not touched this run remain as-is.
+      const mergedFieldsMeta: FieldsMetaMap = { ...existingFieldsMeta };
+      for (const [field, fresh] of Object.entries(newFieldsMeta) as Array<
+        [FieldMetaKey, FieldEnrichmentMeta | undefined]
+      >) {
+        if (!fresh) continue;
+        const prior = mergedFieldsMeta[field];
+        const freshDefined = Object.fromEntries(
+          Object.entries(fresh).filter(([, v]) => v !== undefined)
+        ) as Partial<FieldEnrichmentMeta>;
+        mergedFieldsMeta[field] = {
+          ...(prior ?? {}),
+          ...freshDefined,
+        } as FieldEnrichmentMeta;
+      }
 
       // Build enrichment metadata
       const enrichment: TeamDataEnrichment = {
@@ -670,7 +658,7 @@ export class TeamEnrichmentService {
   }): Promise<TeamDataEnrichment['scrapingDog'] | null> {
     const { teamUid, team, existingFieldsMeta, aiLinkedinHandler, updateData, newFieldsMeta } = ctx;
 
-    const markSdField = (field: EnrichableField | 'logo') => {
+    const markSdField = (field: FieldMetaKey) => {
       newFieldsMeta[field] = {
         status: FieldEnrichmentStatus.Enriched,
         confidence: FieldConfidence.High,
