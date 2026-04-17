@@ -2,11 +2,13 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { CreateArticleCommentDto, UpdateArticleCommentDto } from './article-comments.dto';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 
 type ArticleCommentResponse = {
   uid: string;
@@ -28,7 +30,12 @@ type ArticleCommentResponse = {
 
 @Injectable()
 export class ArticleCommentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ArticleCommentsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pushNotificationsService: PushNotificationsService
+  ) {}
 
   private async resolveMemberByEmail(userEmail: string) {
     if (!userEmail) {
@@ -145,15 +152,21 @@ export class ArticleCommentsService {
       },
     });
 
+    // Fire-and-forget: send notifications
+    this.sendCommentNotifications(
+      { uid: created.uid, parentUid: created.parentUid, content: created.content, articleUid },
+      { uid: member.uid, name: member.name, image: member.image }
+    ).catch((err) => {
+      this.logger.error(`Failed to send guide comment notifications: ${err?.message}`);
+    });
+
     return this.mapComment(created, false);
   }
 
   async listComments(userEmail: string | undefined, articleUid: string) {
     await this.ensurePublishedArticle(articleUid);
 
-    const member = userEmail
-      ? await this.resolveMemberByEmail(userEmail).catch(() => null)
-      : null;
+    const member = userEmail ? await this.resolveMemberByEmail(userEmail).catch(() => null) : null;
 
     const comments = await this.prisma.articleComment.findMany({
       where: { articleUid },
@@ -177,12 +190,10 @@ export class ArticleCommentsService {
     });
 
     const mapped: ArticleCommentResponse[] = comments.map((comment) =>
-      this.mapComment(comment, Array.isArray(comment.likes) ? comment.likes.length > 0 : false),
+      this.mapComment(comment, Array.isArray(comment.likes) ? comment.likes.length > 0 : false)
     );
 
-    const byUid = new Map<string, ArticleCommentResponse>(
-      mapped.map((comment) => [comment.uid, comment]),
-    );
+    const byUid = new Map<string, ArticleCommentResponse>(mapped.map((comment) => [comment.uid, comment]));
 
     const roots: ArticleCommentResponse[] = [];
 
@@ -360,5 +371,129 @@ export class ArticleCommentsService {
       likesCount: Math.max(updated!.likesCount, 0),
       likedByMe: false,
     };
+  }
+
+  private async sendCommentNotifications(
+    comment: { uid: string; parentUid: string | null; content: string; articleUid: string },
+    commentAuthor: { uid: string; name: string | null; image?: { url: string } | null }
+  ): Promise<void> {
+    const article = await this.prisma.article.findUnique({
+      where: { uid: comment.articleUid },
+      select: {
+        uid: true,
+        title: true,
+        slugURL: true,
+        authorMemberUid: true,
+        authorTeamUid: true,
+      },
+    });
+
+    if (!article) return;
+
+    const link = `/founder-guides/${article.slugURL}?commentId=${comment.uid}`;
+    const recipientUids = new Set<string>();
+
+    // Scenario 1: Mentions → notify mentioned members (highest priority — a mention is the
+    // most specific signal, so a mentioned user should always get the mention notification
+    // even if they would also be eligible as the article author or parent comment author).
+    const mentionedUids = this.extractMentionUids(comment.content);
+    for (const mentionedUid of mentionedUids) {
+      if (mentionedUid !== commentAuthor.uid && !recipientUids.has(mentionedUid)) {
+        recipientUids.add(mentionedUid);
+        await this.pushNotificationsService.sendGuideCommentNotification({
+          recipientUid: mentionedUid,
+          category: comment.parentUid ? 'GUIDE_REPLY' : 'GUIDE_POST',
+          commentAuthor,
+          articleTitle: article.title,
+          commentContent: comment.content,
+          link,
+          eventType: 'guide_mention',
+        });
+      }
+    }
+
+    // Scenario 2: Notify article author (+ team leads if team-authored) for any comment or reply
+    if (
+      article.authorMemberUid &&
+      article.authorMemberUid !== commentAuthor.uid &&
+      !recipientUids.has(article.authorMemberUid)
+    ) {
+      recipientUids.add(article.authorMemberUid);
+      await this.pushNotificationsService.sendGuideCommentNotification({
+        recipientUid: article.authorMemberUid,
+        category: comment.parentUid ? 'GUIDE_REPLY' : 'GUIDE_POST',
+        commentAuthor,
+        articleTitle: article.title,
+        commentContent: comment.content,
+        link,
+        eventType: comment.parentUid ? 'guide_reply' : 'guide_comment',
+      });
+    }
+
+    if (article.authorTeamUid) {
+      const teamLeads = await this.resolveTeamLeads(article.authorTeamUid, commentAuthor.uid);
+      for (const lead of teamLeads) {
+        if (!recipientUids.has(lead.uid)) {
+          recipientUids.add(lead.uid);
+          await this.pushNotificationsService.sendGuideCommentNotification({
+            recipientUid: lead.uid,
+            category: comment.parentUid ? 'GUIDE_REPLY' : 'GUIDE_POST',
+            commentAuthor,
+            articleTitle: article.title,
+            commentContent: comment.content,
+            link,
+            eventType: comment.parentUid ? 'guide_reply' : 'guide_comment',
+          });
+        }
+      }
+    }
+
+    // Scenario 3: Reply → notify parent comment author
+    if (comment.parentUid) {
+      const parentComment = await this.prisma.articleComment.findUnique({
+        where: { uid: comment.parentUid },
+        select: { authorUid: true },
+      });
+
+      if (parentComment && parentComment.authorUid !== commentAuthor.uid) {
+        if (!recipientUids.has(parentComment.authorUid)) {
+          recipientUids.add(parentComment.authorUid);
+          await this.pushNotificationsService.sendGuideCommentNotification({
+            recipientUid: parentComment.authorUid,
+            category: 'GUIDE_REPLY',
+            commentAuthor,
+            articleTitle: article.title,
+            commentContent: comment.content,
+            link,
+            eventType: 'guide_reply',
+          });
+        }
+      }
+    }
+  }
+
+  private async resolveTeamLeads(teamUid: string, excludeUid: string): Promise<Array<{ uid: string }>> {
+    const teamLeadRoles = await this.prisma.teamMemberRole.findMany({
+      where: {
+        teamUid,
+        teamLead: true,
+        memberUid: { not: excludeUid },
+      },
+      select: { memberUid: true },
+    });
+
+    return teamLeadRoles.map((r) => ({ uid: r.memberUid }));
+  }
+
+  private extractMentionUids(content: string): string[] {
+    const regex = /data-uid="([^"]+)"/g;
+    const uids: string[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(content)) !== null) {
+      if (match[1] && !uids.includes(match[1])) {
+        uids.push(match[1]);
+      }
+    }
+    return uids;
   }
 }

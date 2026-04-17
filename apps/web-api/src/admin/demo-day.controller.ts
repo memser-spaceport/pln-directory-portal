@@ -22,6 +22,7 @@ import { DemoDayStatus } from '@prisma/client';
 import {
   CreateDemoDayDto,
   UpdateDemoDayDto,
+  UpdateBrandingDto,
   AddParticipantDto,
   AddParticipantsBulkDto,
   GetParticipantsQueryDto,
@@ -38,7 +39,7 @@ import { QueryCache } from '../decorators/query-cache.decorator';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 import { RbacGuard } from '../rbac/rbac.guard';
-import {UserTokenCheckGuard} from "../guards/user-token-check.guard";
+import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 
 @ApiTags('Admin Demo Days')
 @Controller('v1/admin/demo-days')
@@ -47,7 +48,7 @@ export class AdminDemoDaysController {
     private readonly demoDaysService: DemoDaysService,
     private readonly demoDayParticipantsService: DemoDayParticipantsService,
     private readonly notificationServiceClient: NotificationServiceClient
-  ) { }
+  ) {}
 
   @Get('report-link')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
@@ -164,6 +165,30 @@ export class AdminDemoDaysController {
         notifyBeforeEndHours: body.notifyBeforeEndHours,
         dashboardEnabled: body.dashboardEnabled,
         logoUid: body.logoUid,
+        programFieldEnabled: body.programFieldEnabled,
+        programFieldOptions: body.programFieldOptions,
+        stageTagEnabled: body.stageTagEnabled,
+      },
+      req.userEmail
+    );
+  }
+
+  @Patch(':uid/branding')
+  @UseGuards(DemoDayAdminAuthGuard)
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async updateBranding(
+    @Req() req,
+    @Param('uid') uid: string,
+    @Body() body: UpdateBrandingDto
+  ): Promise<ResponseDemoDayDto> {
+    return this.demoDaysService.updateDemoDay(
+      uid,
+      {
+        logoUid: body.logoUid,
+        headerImageUid: body.headerImageUid,
+        primaryColor: body.primaryColor,
+        landingLogosEnabled: body.landingLogosEnabled,
       },
       req.userEmail
     );

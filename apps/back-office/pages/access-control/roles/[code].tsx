@@ -9,12 +9,14 @@ import { useAuth } from '../../../context/auth-context';
 import { useRbacRole } from '../../../hooks/access-control/useRbacRole';
 import { useAssignRole } from '../../../hooks/access-control/useAssignRole';
 import { useRevokeRole } from '../../../hooks/access-control/useRevokeRole';
+import { useUpdateRolePermissionScopes } from '../../../hooks/access-control/useUpdateRolePermissionScopes';
 
 import MemberCell from '../../../screens/access-control/components/MemberCell';
 import TeamCell from '../../../screens/access-control/components/TeamCell';
 import AddMemberModal from '../../../screens/access-control/components/AddMemberModal';
 import ConfirmDeleteModal from '../../../screens/access-control/components/ConfirmDeleteModal';
-import { MemberBasic } from '../../../screens/access-control/types';
+import EditScopesModal from '../../../screens/access-control/components/EditScopesModal';
+import { MemberBasic, PermissionBasic } from '../../../screens/access-control/types';
 
 import s from './styles.module.scss';
 
@@ -34,6 +36,7 @@ const RoleEditPage = () => {
   // Modal states
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [confirmRemoveMember, setConfirmRemoveMember] = useState<MemberBasic | null>(null);
+  const [editScopesPerm, setEditScopesPerm] = useState<PermissionBasic | null>(null);
 
   // Fetch data
   const { data: roleData, isLoading: roleLoading } = useRbacRole({
@@ -47,6 +50,7 @@ const RoleEditPage = () => {
   // Mutations
   const assignRole = useAssignRole();
   const revokeRole = useRevokeRole();
+  const updateRolePermissionScopes = useUpdateRolePermissionScopes();
 
   // Redirects
   useEffect(() => {
@@ -70,7 +74,7 @@ const RoleEditPage = () => {
     setPage(1); // Reset to first page on search
   };
 
-  const handleAddMember = async (member: MemberBasic) => {
+  const handleAddMember = async (member: MemberBasic, _scopes: string[]) => {
     try {
       await assignRole.mutateAsync({
         authToken,
@@ -97,6 +101,22 @@ const RoleEditPage = () => {
       setConfirmRemoveMember(null);
     } catch (error) {
       toast.error('Failed to remove member from role');
+    }
+  };
+
+  const handleSaveRoleScopes = async (scopes: string[]) => {
+    if (!editScopesPerm) return;
+    try {
+      await updateRolePermissionScopes.mutateAsync({
+        authToken,
+        roleCode: code as string,
+        permissionCode: editScopesPerm.code,
+        scopes,
+      });
+      toast.success(`Updated scopes for "${editScopesPerm.code}"`);
+      setEditScopesPerm(null);
+    } catch (error) {
+      toast.error('Failed to update scopes');
     }
   };
 
@@ -191,7 +211,7 @@ const RoleEditPage = () => {
                         <MemberCell member={member} />
                       </div>
                       <div className={clsx(s.bodyCell, s.flexible)}>
-                        <TeamCell projectContributions={member.projectContributions ?? []} />
+                        <TeamCell teamMemberRoles={member.teamMemberRoles ?? []} />
                       </div>
                       <div className={clsx(s.bodyCell, s.fixed)}>
                         <button
@@ -287,6 +307,7 @@ const RoleEditPage = () => {
                 <div className={s.tableRow}>
                   <div className={clsx(s.headerCell, s.permissionCode)}>Permission</div>
                   <div className={clsx(s.headerCell, s.flexible)}>Description</div>
+                  <div className={clsx(s.headerCell, s.fixed)}>Scopes</div>
                 </div>
               </div>
               <div className={s.tableBody}>
@@ -299,6 +320,27 @@ const RoleEditPage = () => {
                         <span className={s.codeText}>{permission.code}</span>
                       </div>
                       <div className={clsx(s.bodyCell, s.flexible)}>{permission.description || '-'}</div>
+                      <div className={clsx(s.bodyCell, s.fixed)}>
+                        <div className={s.scopesCell}>
+                          {permission.scopes?.length ? (
+                            permission.scopes.map((scope) => (
+                              <span key={scope} className={s.scopeTag}>{scope}</span>
+                            ))
+                          ) : (
+                            <span className={s.scopeEmpty}>--</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setEditScopesPerm(permission)}
+                            className={s.scopeEditButton}
+                            title="Edit scopes"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))
                 )}
@@ -326,6 +368,18 @@ const RoleEditPage = () => {
             title="Remove Member from Role"
             message={`Are you sure you want to remove "${confirmRemoveMember.name}" from the role "${roleData?.name}"?`}
             isLoading={revokeRole.isPending}
+          />
+        )}
+
+        {/* Edit Scopes Modal */}
+        {editScopesPerm && (
+          <EditScopesModal
+            isOpen={!!editScopesPerm}
+            onClose={() => setEditScopesPerm(null)}
+            onSave={handleSaveRoleScopes}
+            title={`Edit Scopes for ${editScopesPerm.code}`}
+            currentScopes={editScopesPerm.scopes ?? []}
+            isLoading={updateRolePermissionScopes.isPending}
           />
         )}
       </div>

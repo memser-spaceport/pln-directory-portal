@@ -298,6 +298,52 @@
   color: #0f172a;
 }
 
+// Scopes
+.scopesCell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.scopeTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e40af;
+  background: #dbeafe;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.scopeEmpty {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.scopeEditButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  margin-left: 4px;
+  flex-shrink: 0;
+
+  &:hover {
+    background: #f1f5f9;
+    color: #334155;
+    border-color: #cbd5e1;
+  }
+}
+
 .removeButton {
   display: inline-flex;
   align-items: center;

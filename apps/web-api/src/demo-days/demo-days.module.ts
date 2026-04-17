@@ -24,7 +24,7 @@ import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module'
     forwardRef(() => MembersModule),
     forwardRef(() => TeamsModule),
     NotificationsModule,
-    PushNotificationsModule,
+    forwardRef(() => PushNotificationsModule),
     TeamEnrichmentModule,
   ],
   controllers: [DemoDaysController, DemoDaySubscriptionsController],

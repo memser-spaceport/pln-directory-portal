@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Modal from '../../../components/modal/modal';
 import clsx from 'clsx';
-import { PermissionBasic } from '../types';
+import { PermissionBasic, AVAILABLE_SCOPES } from '../types';
 import { AccessControlSelect } from './AccessControlSelect';
 
 interface AddPermissionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (permission: PermissionBasic) => void;
+  onAdd: (permission: PermissionBasic, scopes: string[]) => void;
   title: string;
   permissions: PermissionBasic[];
   isLoading?: boolean;
@@ -22,24 +22,42 @@ export const AddPermissionModal: React.FC<AddPermissionModalProps> = ({
   isLoading = false,
 }) => {
   const [selectedCode, setSelectedCode] = useState('');
+  const [selectedScopes, setSelectedScopes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!isOpen) setSelectedCode('');
+    if (!isOpen) {
+      setSelectedCode('');
+      setSelectedScopes(new Set());
+    }
   }, [isOpen]);
 
   const selectedPermission = permissions.find((p) => p.code === selectedCode) ?? null;
   const submitDisabled = isLoading || !selectedPermission;
 
+  const toggleScope = (scope: string) => {
+    setSelectedScopes((prev) => {
+      const next = new Set(prev);
+      if (next.has(scope)) {
+        next.delete(scope);
+      } else {
+        next.add(scope);
+      }
+      return next;
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPermission) return;
-    onAdd(selectedPermission);
+    onAdd(selectedPermission, [...selectedScopes].sort());
     setSelectedCode('');
+    setSelectedScopes(new Set());
     onClose();
   };
 
   const handleClose = () => {
     setSelectedCode('');
+    setSelectedScopes(new Set());
     onClose();
   };
 
@@ -81,6 +99,33 @@ export const AddPermissionModal: React.FC<AddPermissionModalProps> = ({
             />
             {permissions.length === 0 && (
               <p className="text-sm text-gray-500">This member already has every permission granted directly.</p>
+            )}
+
+            {selectedPermission && (
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Scopes (optional)</label>
+                <div className="flex gap-3">
+                  {AVAILABLE_SCOPES.map((scope) => (
+                    <label
+                      key={scope}
+                      className={clsx(
+                        'flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer transition-colors text-sm',
+                        selectedScopes.has(scope)
+                          ? 'border-blue-300 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedScopes.has(scope)}
+                        onChange={() => toggleScope(scope)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      {scope}
+                    </label>
+                  ))}
+                </div>
+              </div>
             )}
           </form>
         </div>

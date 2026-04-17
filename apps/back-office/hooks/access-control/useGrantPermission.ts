@@ -8,6 +8,7 @@ interface MutationParams {
   memberUid: string;
   permissionCode: string;
   grantedByMemberUid?: string;
+  scopes?: string[];
 }
 
 export function useGrantPermission() {
@@ -15,7 +16,7 @@ export function useGrantPermission() {
 
   return useMutation({
     mutationFn: async (params: MutationParams) => {
-      const { authToken, memberUid, permissionCode, grantedByMemberUid } = params;
+      const { authToken, memberUid, permissionCode, grantedByMemberUid, scopes } = params;
 
       const { data } = await api.post(
         `${API_ROUTE.ADMIN_RBAC_PERMISSIONS}/grant`,
@@ -23,6 +24,7 @@ export function useGrantPermission() {
           memberUid,
           permissionCode,
           grantedByMemberUid,
+          scopes,
         },
         {
           headers: {

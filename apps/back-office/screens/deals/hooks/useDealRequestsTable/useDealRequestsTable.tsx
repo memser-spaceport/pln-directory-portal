@@ -9,40 +9,20 @@ import {
   SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import { DealRequest } from '../types/deal';
+import DOMPurify from 'isomorphic-dompurify';
+
+import { DealRequest } from '../../types/deal';
+
+import s from './useDealRequestsTable.module.scss';
 
 const columnHelper = createColumnHelper<DealRequest>();
 
 function RequesterAvatar({ name, imageUrl }: { name: string; imageUrl?: string | null }) {
   if (imageUrl) {
-    return (
-      <img
-        src={imageUrl}
-        alt={name}
-        style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-      />
-    );
+    return <img src={imageUrl} alt={name} className={s.avatarImage} />;
   }
   const initial = name?.charAt(0).toUpperCase() || '?';
-  return (
-    <div
-      style={{
-        width: 40,
-        height: 40,
-        borderRadius: '50%',
-        background: '#f1f5f9',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 16,
-        fontWeight: 600,
-        color: '#455468',
-        flexShrink: 0,
-      }}
-    >
-      {initial}
-    </div>
-  );
+  return <div className={s.avatarFallback}>{initial}</div>;
 }
 
 type UseDealRequestsTableArgs = {
@@ -55,15 +35,9 @@ type UseDealRequestsTableArgs = {
   setGlobalFilter: Dispatch<SetStateAction<string>>;
 };
 
-export function useDealRequestsTable({
-  requests,
-  sorting,
-  setSorting,
-  pagination,
-  setPagination,
-  globalFilter,
-  setGlobalFilter,
-}: UseDealRequestsTableArgs) {
+export function useDealRequestsTable(input: UseDealRequestsTableArgs) {
+  const { requests, sorting, setSorting, pagination, setPagination, globalFilter, setGlobalFilter } = input;
+
   const columns = useMemo(
     () => [
       columnHelper.accessor((row) => row.requestedByUser.name, {
@@ -75,11 +49,11 @@ export function useDealRequestsTable({
         cell: (info) => {
           const { name, email, image } = info.row.original.requestedByUser;
           return (
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div className={s.requesterCell}>
               <RequesterAvatar name={name} imageUrl={image?.url} />
               <div>
-                <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>{name}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>{email}</div>
+                <div className={s.requesterName}>{name}</div>
+                <div className={s.requesterEmail}>{email}</div>
               </div>
             </div>
           );
@@ -91,26 +65,20 @@ export function useDealRequestsTable({
         size: 200,
         enableSorting: true,
         sortingFn: 'alphanumeric',
-        cell: (info) => <div style={{ fontWeight: 500, fontSize: 14, color: '#455468', whiteSpace: 'normal' }}>{info.getValue() ?? '—'}</div>,
+        cell: (info) => <div className={s.requestedDeal}>{info.getValue() ?? '—'}</div>,
       }),
       columnHelper.accessor('description', {
         header: 'Reason',
         size: 0,
         cell: (info) => {
           const raw = info.getValue() ?? '';
-          const text = raw.replace(/<[^>]*>/g, '').trim();
-          return (
-            <div
-              style={{
-                fontSize: 14,
-                color: '#455468',
-                whiteSpace: 'normal',
-                wordBreak: 'break-word',
-              }}
-            >
-              {text}
-            </div>
-          );
+
+          const clean = DOMPurify.sanitize(raw, {
+            ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a'],
+            ALLOWED_ATTR: ['href', 'rel', 'target'],
+          });
+
+          return <div className={s.reason} dangerouslySetInnerHTML={{ __html: clean }} />;
         },
       }),
       columnHelper.accessor('createdAt', {
@@ -122,10 +90,10 @@ export function useDealRequestsTable({
           const d = new Date(info.getValue());
           return (
             <div>
-              <div style={{ fontWeight: 500, fontSize: 14, color: '#455468' }}>
+              <div className={s.dateMain}>
                 {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
-              <div style={{ fontSize: 12, color: '#64748b' }}>
+              <div className={s.dateTime}>
                 {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }).toLowerCase()}
               </div>
             </div>

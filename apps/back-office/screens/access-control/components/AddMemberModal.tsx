@@ -4,16 +4,22 @@ import { useSearchMembers } from '../../../hooks/access-control/useSearchMembers
 import { useRbacMembers } from '../../../hooks/access-control/useRbacMembers';
 import { useCookie } from 'react-use';
 import clsx from 'clsx';
-import { MemberBasic } from '../types';
+import { MemberBasic, TeamMemberRoleInfo, AVAILABLE_SCOPES } from '../types';
+import teamCellS from './TeamCell.module.scss';
+
+const MAX_TEAM_TAGS = 3;
+
+type MemberPickerRow = MemberBasic & { teamMemberRoles?: TeamMemberRoleInfo[] };
 
 interface AddMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (member: MemberBasic) => void;
+  onAdd: (member: MemberPickerRow, scopes: string[]) => void;
   title: string;
   existingMemberUids?: string[];
   excludeRoleCode?: string;
   isLoading?: boolean;
+  showScopes?: boolean;
 }
 
 export const AddMemberModal: React.FC<AddMemberModalProps> = ({
@@ -24,10 +30,12 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   existingMemberUids = [],
   excludeRoleCode,
   isLoading = false,
+  showScopes = false,
 }) => {
   const [authToken] = useCookie('plnadmin');
-  const [selectedMember, setSelectedMember] = useState<MemberBasic | null>(null);
+  const [selectedMember, setSelectedMember] = useState<MemberPickerRow | null>(null);
   const [memberSearch, setMemberSearch] = useState('');
+  const [selectedScopes, setSelectedScopes] = useState<Set<string>>(new Set());
 
   const searchActive = memberSearch.trim().length >= 2;
 
@@ -63,9 +71,22 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
   const submitDisabled = isLoading || !selectedMember;
 
+  const toggleScope = (scope: string) => {
+    setSelectedScopes((prev) => {
+      const next = new Set(prev);
+      if (next.has(scope)) {
+        next.delete(scope);
+      } else {
+        next.add(scope);
+      }
+      return next;
+    });
+  };
+
   const resetAll = () => {
     setSelectedMember(null);
     setMemberSearch('');
+    setSelectedScopes(new Set());
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -73,7 +94,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
     if (!selectedMember) return;
 
-    onAdd(selectedMember);
+    onAdd(selectedMember, [...selectedScopes].sort());
     resetAll();
     onClose();
   };
@@ -141,7 +162,12 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
               <div className="max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm">
                 {displayMembers.length > 0 ? (
                   <div className="divide-y divide-gray-100">
-                    {displayMembers.map((member) => (
+                    {displayMembers.map((member) => {
+                      const teamRoles = member.teamMemberRoles ?? [];
+                      const visibleTeams = teamRoles.slice(0, MAX_TEAM_TAGS);
+                      const overflowTeamCount = teamRoles.length - MAX_TEAM_TAGS;
+
+                      return (
                       <div
                         key={member.uid}
                         role="button"
@@ -179,6 +205,27 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-gray-900">{member.name}</p>
                             <p className="truncate text-sm text-gray-500">{member.email}</p>
+                            {teamRoles.length > 0 && (
+                              <div className={clsx('mt-1', teamCellS.root)}>
+                                {visibleTeams.map((tmr) => (
+                                  <span
+                                    key={tmr.team.uid}
+                                    className={teamCellS.tag}
+                                    title={tmr.role ? `${tmr.team.name} — ${tmr.role}` : tmr.team.name}
+                                  >
+                                    <span className="max-w-[12rem] truncate">
+                                      {tmr.team.name}
+                                      {tmr.role ? ` · ${tmr.role}` : ''}
+                                    </span>
+                                  </span>
+                                ))}
+                                {overflowTeamCount > 0 && (
+                                  <span className={teamCellS.overflowTag} title={`${overflowTeamCount} more team(s)`}>
+                                    +{overflowTeamCount}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                           {selectedMember?.uid === member.uid && (
                             <div className="flex-shrink-0">
@@ -193,7 +240,8 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                           )}
                         </div>
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                 ) : (
                   <div className="p-4 text-center text-gray-500">
@@ -218,6 +266,33 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                 )}
               </div>
             </div>
+
+            {showScopes && selectedMember && (
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Scopes (optional)</label>
+                <div className="flex gap-3">
+                  {AVAILABLE_SCOPES.map((scope) => (
+                    <label
+                      key={scope}
+                      className={clsx(
+                        'flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer transition-colors text-sm',
+                        selectedScopes.has(scope)
+                          ? 'border-blue-300 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedScopes.has(scope)}
+                        onChange={() => toggleScope(scope)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      {scope}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </form>
         </div>
 

@@ -3,6 +3,7 @@ import { SharedModule } from '../shared/shared.module';
 import { TeamsModule } from '../teams/teams.module';
 import { TeamEnrichmentService } from './team-enrichment.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
+import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import { TeamEnrichmentJob } from './team-enrichment.job';
 import { LogoVerificationService } from './logo-verification.service';
 import { LogoVerificationController } from './logo-verification.controller';
@@ -15,6 +16,7 @@ import { LogoVerificationController } from './logo-verification.controller';
     TeamEnrichmentAiService,
     TeamEnrichmentJob,
     LogoVerificationService,
+    TeamEnrichmentScrapingDogService
   ],
   exports: [TeamEnrichmentService, LogoVerificationService],
 })

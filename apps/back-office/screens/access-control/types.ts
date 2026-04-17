@@ -5,9 +5,9 @@ export interface MemberBasic {
   image?: { url: string } | null;
 }
 
-export interface TeamInfo {
-  uid: string;
-  project: {
+export interface TeamMemberRoleInfo {
+  role?: string | null;
+  team: {
     uid: string;
     name: string;
   };
@@ -24,10 +24,14 @@ export interface PermissionBasic {
   uid: string;
   code: string;
   description?: string | null;
+  scopes?: string[];
 }
 
+// Keep in sync with apps/web-api/src/rbac/rbac.constants.ts RBAC_SCOPES
+export const AVAILABLE_SCOPES = ['PLVS', 'PLCC'] as const;
+
 export interface MemberWithRoles extends MemberBasic {
-  projectContributions: TeamInfo[];
+  teamMemberRoles: TeamMemberRoleInfo[];
   roles: RoleBasic[];
   directPermissions: PermissionBasic[];
 }
@@ -47,7 +51,7 @@ export interface PaginationInfo {
 
 export interface RoleDetails extends RoleBasic {
   permissions: PermissionBasic[];
-  members: Array<MemberBasic & { projectContributions: TeamInfo[] }>;
+  members: Array<MemberBasic & { teamMemberRoles: TeamMemberRoleInfo[] }>;
   pagination: PaginationInfo;
 }
 
@@ -60,18 +64,20 @@ export interface PermissionWithCounts extends PermissionBasic {
 }
 
 export interface PermissionDetails extends PermissionBasic {
-  roles: Array<RoleBasic & { memberCount: number }>;
-  members: Array<MemberBasic & { viaRoles: string[]; isDirect: boolean; projectContributions: TeamInfo[] }>;
+  roles: Array<RoleBasic & { memberCount: number; scopes: string[] }>;
+  members: Array<
+    MemberBasic & { viaRoles: string[]; isDirect: boolean; teamMemberRoles: TeamMemberRoleInfo[]; scopes: string[] }
+  >;
   pagination: PaginationInfo;
 }
 
 export interface MemberAccessDetails {
   member: MemberBasic & {
-    projectContributions: TeamInfo[];
+    teamMemberRoles: TeamMemberRoleInfo[];
   };
   roles: Array<RoleBasic & { permissions: PermissionBasic[] }>;
   directPermissions: PermissionBasic[];
-  allPermissions: Array<PermissionBasic & { viaRoles: string[]; isDirect: boolean }>;
+  allPermissions: Array<PermissionBasic & { viaRoles: string[]; isDirect: boolean; scopes: string[] }>;
 }
 
 export interface PaginationInfo {
