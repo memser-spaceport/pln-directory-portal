@@ -5,6 +5,7 @@ export enum DemoDayHost {
   FOUNDERS_FORGE = 'Founders Forge',
   CRECIMIENTO = 'Crecimiento',
   FOUNDER_SCHOOL = 'Founder School',
+  CRECIMIENTO_FOUNDER_SCHOOL = 'Crecimento + Founder School',
   PROTOCOL_LABS = 'Protocol Labs',
 }
 

@@ -40,6 +40,7 @@ export type ChannelType =
   | 'DEMO_DAY_APPLICATION_FOUNDERS_FORGE'
   | 'DEMO_DAY_APPLICATION_CRECIMIENTO'
   | 'DEMO_DAY_APPLICATION_FOUNDER_SCHOOL'
+  | 'DEMO_DAY_APPLICATION_CRECIMIENTO_FOUNDER_SCHOOL'
   | 'DEMO_DAY_APPLICATION_PROTOCOL_LABS'
   | 'DEFAULT';
 
@@ -61,6 +62,7 @@ function resolveChannelTypeAndApplicationDate(args: { host?: string | null; appl
   if (host === 'founders forge') channelType = 'DEMO_DAY_APPLICATION_FOUNDERS_FORGE';
   else if (host === 'crecimiento') channelType = 'DEMO_DAY_APPLICATION_CRECIMIENTO';
   else if (host === 'founder school') channelType = 'DEMO_DAY_APPLICATION_FOUNDER_SCHOOL';
+  else if (host === 'crecimento + founder school') channelType = 'DEMO_DAY_APPLICATION_CRECIMIENTO_FOUNDER_SCHOOL';
   else if (host === 'protocol labs') channelType = 'DEMO_DAY_APPLICATION_PROTOCOL_LABS';
 
   return {
