@@ -14,9 +14,18 @@ export class AdminPushNotificationsController {
 
   /**
    * Send a broadcast notification to all users.
+   * Optionally filter by accessLevels or requiredPermissions.
    *
    * POST /v1/admin/push-notifications/broadcast
-   * Body: { category, title, description?, image?, link?, metadata? }
+   * Body: {
+   *   category, title, description?, image?, link?, linkText?, metadata?,
+   *   accessLevels?, requiredPermissions?
+   * }
+   *
+   * Note: If requiredPermissions is provided, notification will only be sent to users
+   * who have ANY of the specified permissions (e.g., ["founder_guides.view"]).
+   * If accessLevels is provided, notification will be sent to users with those access levels.
+   * If neither is provided, notification is broadcast to all users.
    */
   @Post('broadcast')
   async broadcastNotification(@Body() dto: Omit<CreatePushNotificationDto, 'recipientUid' | 'isPublic'>) {
@@ -31,6 +40,8 @@ export class AdminPushNotificationsController {
         uid: notification.uid,
         title: notification.title,
         category: notification.category,
+        linkText: notification.linkText,
+        requiredPermissions: notification.requiredPermissions,
         createdAt: notification.createdAt,
       },
     };
@@ -40,7 +51,9 @@ export class AdminPushNotificationsController {
    * Send a notification to a specific user.
    *
    * POST /v1/admin/push-notifications/send
-   * Body: { recipientUid, category, title, description?, image?, link?, metadata? }
+   * Body: {
+   *   recipientUid, category, title, description?, image?, link?, linkText?, metadata?
+   * }
    */
   @Post('send')
   async sendNotification(@Body() dto: CreatePushNotificationDto) {
@@ -60,6 +73,7 @@ export class AdminPushNotificationsController {
         title: notification.title,
         category: notification.category,
         recipientUid: notification.recipientUid,
+        linkText: notification.linkText,
         createdAt: notification.createdAt,
       },
     };

@@ -40,6 +40,7 @@ export type ChannelType =
   | 'DEMO_DAY_APPLICATION_FOUNDERS_FORGE'
   | 'DEMO_DAY_APPLICATION_CRECIMIENTO'
   | 'DEMO_DAY_APPLICATION_FOUNDER_SCHOOL'
+  | 'DEMO_DAY_APPLICATION_CRECIMIENTO_FOUNDER_SCHOOL'
   | 'DEMO_DAY_APPLICATION_PROTOCOL_LABS'
   | 'DEFAULT';
 
@@ -50,10 +51,10 @@ function formatDateMMDDYYYY(d: Date): string {
   return `${mm}.${dd}.${yyyy}`;
 }
 
-function resolveChannelTypeAndApplicationDate(args: {
-  host?: string | null;
-  applicationStartDate: Date;
-}): { channelType: ChannelType; applicationDate: string } {
+function resolveChannelTypeAndApplicationDate(args: { host?: string | null; applicationStartDate: Date }): {
+  channelType: ChannelType;
+  applicationDate: string;
+} {
   const host = (args.host ?? '').trim().toLowerCase();
 
   let channelType: ChannelType = 'DEMO_DAY_APPLICATION';
@@ -61,6 +62,7 @@ function resolveChannelTypeAndApplicationDate(args: {
   if (host === 'founders forge') channelType = 'DEMO_DAY_APPLICATION_FOUNDERS_FORGE';
   else if (host === 'crecimiento') channelType = 'DEMO_DAY_APPLICATION_CRECIMIENTO';
   else if (host === 'founder school') channelType = 'DEMO_DAY_APPLICATION_FOUNDER_SCHOOL';
+  else if (host === 'crecimento + founder school') channelType = 'DEMO_DAY_APPLICATION_CRECIMIENTO_FOUNDER_SCHOOL';
   else if (host === 'protocol labs') channelType = 'DEMO_DAY_APPLICATION_PROTOCOL_LABS';
 
   return {
@@ -79,7 +81,7 @@ export class DemoDaysService {
     private readonly membersService: MembersService,
     private readonly pushNotificationsService: PushNotificationsService,
     private readonly notificationServiceClient: NotificationServiceClient
-  ) { }
+  ) {}
 
   async getDemoDayReportLink(userEmail: string): Promise<{ url: string }> {
     if (!userEmail) {
@@ -133,6 +135,12 @@ export class DemoDaysService {
     isPending?: boolean;
     confidentialityAccepted?: boolean;
     logoUrl?: string | null;
+    primaryColor?: string | null;
+    landingLogosEnabled?: boolean;
+    headerImageUrl?: string | null;
+    programFieldEnabled?: boolean | null;
+    programFieldOptions?: string[] | null;
+    stageTagEnabled?: boolean | null;
   }> {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
     if (!demoDay) {
@@ -170,6 +178,12 @@ export class DemoDaysService {
         confidentialityAccepted: false,
         isPending: false,
         logoUrl: demoDay.logoUrl ?? null,
+        primaryColor: demoDay.primaryColor ?? '#1a45e6',
+        landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
+        headerImageUrl: demoDay.headerImageUrl ?? null,
+        programFieldEnabled: demoDay.programFieldEnabled ?? null,
+        programFieldOptions: demoDay.programFieldOptions ?? null,
+        stageTagEnabled: demoDay.stageTagEnabled ?? null,
       };
     }
 
@@ -183,6 +197,13 @@ export class DemoDaysService {
         status: this.getExternalDemoDayStatus(demoDay.status),
         host: demoDay.host,
         isPending: false,
+        logoUrl: demoDay.logoUrl ?? null,
+        primaryColor: demoDay.primaryColor ?? '#1a45e6',
+        landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
+        headerImageUrl: demoDay.headerImageUrl ?? null,
+        programFieldEnabled: demoDay.programFieldEnabled ?? null,
+        programFieldOptions: demoDay.programFieldOptions ?? null,
+        stageTagEnabled: demoDay.stageTagEnabled ?? null,
       };
     }
 
@@ -208,6 +229,13 @@ export class DemoDaysService {
         investorsCount,
         confidentialityAccepted: participant.confidentialityAccepted,
         isPending: participant.status === DemoDayParticipantStatus.PENDING,
+        logoUrl: demoDay.logoUrl ?? null,
+        primaryColor: demoDay.primaryColor ?? '#1a45e6',
+        landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
+        headerImageUrl: demoDay.headerImageUrl ?? null,
+        programFieldEnabled: demoDay.programFieldEnabled ?? null,
+        programFieldOptions: demoDay.programFieldOptions ?? null,
+        stageTagEnabled: demoDay.stageTagEnabled ?? null,
       };
     }
 
@@ -246,6 +274,12 @@ export class DemoDaysService {
         investorsCount,
         isPending: false,
         logoUrl: demoDay.logoUrl ?? null,
+        primaryColor: demoDay.primaryColor ?? '#1a45e6',
+        landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
+        headerImageUrl: demoDay.headerImageUrl ?? null,
+        programFieldEnabled: demoDay.programFieldEnabled ?? null,
+        programFieldOptions: demoDay.programFieldOptions ?? null,
+        stageTagEnabled: demoDay.stageTagEnabled ?? null,
       };
     }
 
@@ -264,6 +298,13 @@ export class DemoDaysService {
       investorsCount,
       confidentialityAccepted: false,
       isPending: false,
+      logoUrl: demoDay.logoUrl ?? null,
+      primaryColor: demoDay.primaryColor ?? '#1a45e6',
+      landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
+      headerImageUrl: demoDay.headerImageUrl ?? null,
+      programFieldEnabled: demoDay.programFieldEnabled ?? null,
+      programFieldOptions: demoDay.programFieldOptions ?? null,
+      stageTagEnabled: demoDay.stageTagEnabled ?? null,
     };
   }
 
@@ -365,6 +406,9 @@ export class DemoDaysService {
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
         dashboardEnabled: true,
+        programFieldEnabled: true,
+        programFieldOptions: true,
+        stageTagEnabled: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -432,6 +476,9 @@ export class DemoDaysService {
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
         dashboardEnabled: true,
+        programFieldEnabled: true,
+        programFieldOptions: true,
+        stageTagEnabled: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -443,7 +490,7 @@ export class DemoDaysService {
       this.prisma.demoDay.findMany({
         where: { isDeleted: false, status: { not: DemoDayStatus.ARCHIVED } },
         orderBy: { createdAt: 'desc' },
-        include: { branding: { include: { logo: true } } },
+        include: { branding: { include: { logo: true, headerImage: true } } },
       }),
       memberEmail ? this.getMemberWithDemoDayParticipants(memberEmail) : Promise.resolve(null),
       this.getQualifiedInvestorsCount(),
@@ -518,14 +565,20 @@ export class DemoDaysService {
             status: this.getExternalDemoDayStatus(
               demoDay.status,
               access === 'FOUNDER' ||
-              (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
-                ?.hasEarlyAccess ??
-                false)
+                (member?.demoDayParticipants.find((p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid)
+                  ?.hasEarlyAccess ??
+                  false)
             ),
             teamsCount: access !== 'none' ? teamsCount : 0,
             investorsCount: access !== 'none' ? investorsCount : 0,
             confidentialityAccepted,
             logoUrl: demoDay.branding?.logo?.url ?? null,
+            primaryColor: demoDay.branding?.primaryColor ?? '#1a45e6',
+            landingLogosEnabled: demoDay.branding?.landingLogosEnabled ?? true,
+            headerImageUrl: demoDay.branding?.headerImage?.url ?? null,
+            programFieldEnabled: demoDay.programFieldEnabled ?? null,
+            programFieldOptions: demoDay.programFieldOptions ?? null,
+            stageTagEnabled: demoDay.stageTagEnabled ?? null,
           };
 
           // Only include these fields for authorized users
@@ -545,9 +598,16 @@ export class DemoDaysService {
     );
   }
 
-  async getDemoDayByUidOrSlug(
-    uidOrSlug: string
-  ): Promise<DemoDay & { logoUid?: string | null; logoUrl?: string | null }> {
+  async getDemoDayByUidOrSlug(uidOrSlug: string): Promise<
+    DemoDay & {
+      logoUid?: string | null;
+      logoUrl?: string | null;
+      primaryColor?: string | null;
+      landingLogosEnabled?: boolean;
+      headerImageUid?: string | null;
+      headerImageUrl?: string | null;
+    }
+  > {
     const demoDay = await this.prisma.demoDay.findFirst({
       where: {
         OR: [
@@ -573,12 +633,15 @@ export class DemoDaysService {
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
         dashboardEnabled: true,
+        programFieldEnabled: true,
+        programFieldOptions: true,
+        stageTagEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
         deletedAt: true,
         branding: {
-          include: { logo: true },
+          include: { logo: true, headerImage: true },
         },
       },
     });
@@ -592,10 +655,23 @@ export class DemoDaysService {
       ...rest,
       logoUid: branding?.logoUid ?? null,
       logoUrl: branding?.logo?.url ?? null,
+      primaryColor: branding?.primaryColor ?? '#1a45e6',
+      landingLogosEnabled: branding?.landingLogosEnabled ?? true,
+      headerImageUid: branding?.headerImageUid ?? null,
+      headerImageUrl: branding?.headerImage?.url ?? null,
     };
   }
 
-  async getDemoDayBySlugURL(slugURL: string): Promise<DemoDay & { logoUid?: string | null; logoUrl?: string | null }> {
+  async getDemoDayBySlugURL(slugURL: string): Promise<
+    DemoDay & {
+      logoUid?: string | null;
+      logoUrl?: string | null;
+      primaryColor?: string | null;
+      landingLogosEnabled?: boolean;
+      headerImageUid?: string | null;
+      headerImageUrl?: string | null;
+    }
+  > {
     const demoDay = await this.prisma.demoDay.findFirst({
       where: { slugURL: { equals: slugURL, mode: 'insensitive' }, isDeleted: false },
       select: {
@@ -615,12 +691,15 @@ export class DemoDaysService {
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
         dashboardEnabled: true,
+        programFieldEnabled: true,
+        programFieldOptions: true,
+        stageTagEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
         deletedAt: true,
         branding: {
-          include: { logo: true },
+          include: { logo: true, headerImage: true },
         },
       },
     });
@@ -634,6 +713,10 @@ export class DemoDaysService {
       ...rest,
       logoUid: branding?.logoUid ?? null,
       logoUrl: branding?.logo?.url ?? null,
+      primaryColor: branding?.primaryColor ?? '#1a45e6',
+      landingLogosEnabled: branding?.landingLogosEnabled ?? true,
+      headerImageUid: branding?.headerImageUid ?? null,
+      headerImageUrl: branding?.headerImage?.url ?? null,
     };
   }
 
@@ -655,9 +738,25 @@ export class DemoDaysService {
       notifyBeforeEndHours?: number | null;
       dashboardEnabled?: boolean;
       logoUid?: string | null;
+      // NEW FIELDS
+      programFieldEnabled?: boolean;
+      programFieldOptions?: string[];
+      stageTagEnabled?: boolean;
+      primaryColor?: string | null;
+      landingLogosEnabled?: boolean;
+      headerImageUid?: string | null;
     },
     actorEmail?: string
-  ): Promise<DemoDay & { logoUid?: string | null; logoUrl?: string | null }> {
+  ): Promise<
+    DemoDay & {
+      logoUid?: string | null;
+      logoUrl?: string | null;
+      primaryColor?: string | null;
+      landingLogosEnabled?: boolean;
+      headerImageUid?: string | null;
+      headerImageUrl?: string | null;
+    }
+  > {
     // First check if demo day exists
     const before = await this.getDemoDayByUidOrSlug(uid);
 
@@ -724,6 +823,15 @@ export class DemoDaysService {
     if (data.dashboardEnabled !== undefined) {
       updateData.dashboardEnabled = data.dashboardEnabled;
     }
+    if (data.programFieldEnabled !== undefined) {
+      updateData.programFieldEnabled = data.programFieldEnabled;
+    }
+    if (data.programFieldOptions !== undefined) {
+      updateData.programFieldOptions = data.programFieldOptions;
+    }
+    if (data.stageTagEnabled !== undefined) {
+      updateData.stageTagEnabled = data.stageTagEnabled;
+    }
 
     const updated = await this.prisma.demoDay.update({
       where: { uid },
@@ -745,6 +853,9 @@ export class DemoDaysService {
         notifyBeforeStartHours: true,
         notifyBeforeEndHours: true,
         dashboardEnabled: true,
+        programFieldEnabled: true,
+        programFieldOptions: true,
+        stageTagEnabled: true,
         createdAt: true,
         updatedAt: true,
         isDeleted: true,
@@ -752,25 +863,52 @@ export class DemoDaysService {
       },
     });
 
-    // Handle branding logo update
-    if (data.logoUid !== undefined) {
+    // Handle branding updates (logo, primaryColor, landingLogosEnabled, headerImage)
+    const hasBrandingUpdate =
+      data.logoUid !== undefined ||
+      data.primaryColor !== undefined ||
+      data.landingLogosEnabled !== undefined ||
+      data.headerImageUid !== undefined;
+    if (hasBrandingUpdate) {
+      const updateData: Record<string, unknown> = {};
+      if (data.logoUid !== undefined) updateData.logoUid = data.logoUid;
+      if (data.primaryColor !== undefined) updateData.primaryColor = data.primaryColor;
+      if (data.landingLogosEnabled !== undefined) updateData.landingLogosEnabled = data.landingLogosEnabled;
+      if (data.headerImageUid !== undefined) updateData.headerImageUid = data.headerImageUid;
       await this.prisma.demoDayBranding.upsert({
         where: { demoDayUid: uid },
-        update: { logoUid: data.logoUid },
-        create: { demoDayUid: uid, logoUid: data.logoUid },
+        update: updateData,
+        create: {
+          demoDayUid: uid,
+          logoUid: data.logoUid ?? null,
+          primaryColor: data.primaryColor ?? '#1a45e6',
+          landingLogosEnabled: data.landingLogosEnabled ?? true,
+          headerImageUid: data.headerImageUid ?? null,
+        },
       });
     }
 
     // Fetch branding for response
     const branding = await this.prisma.demoDayBranding.findUnique({
       where: { demoDayUid: uid },
-      include: { logo: true },
+      include: { logo: true, headerImage: true },
     });
 
-    const result: DemoDay & { logoUid?: string | null; logoUrl?: string | null } = {
+    const result: DemoDay & {
+      logoUid?: string | null;
+      logoUrl?: string | null;
+      primaryColor?: string | null;
+      landingLogosEnabled?: boolean;
+      headerImageUid?: string | null;
+      headerImageUrl?: string | null;
+    } = {
       ...updated,
       logoUid: branding?.logoUid ?? null,
       logoUrl: branding?.logo?.url ?? null,
+      primaryColor: branding?.primaryColor ?? '#1a45e6',
+      landingLogosEnabled: branding?.landingLogosEnabled ?? true,
+      headerImageUid: branding?.headerImageUid ?? null,
+      headerImageUrl: branding?.headerImage?.url ?? null,
     };
 
     // Track "details updated" (name/description/startDate/endDate/slugURL) only if any changed
@@ -996,10 +1134,10 @@ export class DemoDaysService {
           investorEmail: stat.member.email,
           fundOrAngel: fundOrAngel
             ? {
-              uid: fundOrAngel.uid,
-              name: fundOrAngel.name,
-              isFund: fundOrAngel.isFund,
-            }
+                uid: fundOrAngel.uid,
+                name: fundOrAngel.name,
+                isFund: fundOrAngel.isFund,
+              }
             : null,
           activity: {
             liked: stat.liked,
@@ -1143,8 +1281,9 @@ export class DemoDaysService {
 
     this.logger.debug(
       `[submitInvestorApplication] start demoDay=${demoDay.uid} slug=${demoDay.slugURL} email=${normalizedEmail} ` +
-      `isTeamNew=${!!applicationData.isTeamNew} teamUid=${applicationData.teamUid ?? '-'} projectUid=${applicationData.projectUid ?? '-'
-      }`
+        `isTeamNew=${!!applicationData.isTeamNew} teamUid=${applicationData.teamUid ?? '-'} projectUid=${
+          applicationData.projectUid ?? '-'
+        }`
     );
 
     // Check if a member already exists
@@ -1260,7 +1399,8 @@ export class DemoDaysService {
       });
 
       this.logger.debug(
-        `[submitInvestorApplication] existing member found uid=${member.uid} email=${normalizedEmail} accessLevel=${member.accessLevel ?? '-'
+        `[submitInvestorApplication] existing member found uid=${member.uid} email=${normalizedEmail} accessLevel=${
+          member.accessLevel ?? '-'
         }`
       );
     }
@@ -1277,7 +1417,8 @@ export class DemoDaysService {
       const teamWebsite = applicationData.team.website?.trim() || null;
 
       this.logger.log(
-        `[submitInvestorApplication] creating NEW team for member uid=${member.uid} name="${teamName}" website=${teamWebsite ?? '-'
+        `[submitInvestorApplication] creating NEW team for member uid=${member.uid} name="${teamName}" website=${
+          teamWebsite ?? '-'
         }`
       );
 
@@ -1478,7 +1619,8 @@ export class DemoDaysService {
     });
 
     this.logger.debug(
-      `[submitInvestorApplication] done participantUid=${participant.uid} isNewMember=${isNewMember} createdTeamUid=${createdTeamUid ?? '-'
+      `[submitInvestorApplication] done participantUid=${participant.uid} isNewMember=${isNewMember} createdTeamUid=${
+        createdTeamUid ?? '-'
       }`
     );
 
@@ -1765,12 +1907,12 @@ export class DemoDaysService {
         demoDayParticipants: {
           where: demoDayUid
             ? {
-              demoDayUid,
-              isDeleted: false,
-            }
+                demoDayUid,
+                isDeleted: false,
+              }
             : {
-              isDeleted: false,
-            },
+                isDeleted: false,
+              },
           select: {
             uid: true,
             demoDayUid: true,
@@ -2253,7 +2395,8 @@ export class DemoDaysService {
     });
 
     this.logger.log(
-      `demoDayApplication: channel=${channelType}, host="${args.demoDay.host ?? ''
+      `demoDayApplication: channel=${channelType}, host="${
+        args.demoDay.host ?? ''
       }", applicationDate=${applicationDate}`
     );
 
@@ -2294,7 +2437,7 @@ export class DemoDaysService {
     } catch (e) {
       this.logger.warn(
         `Failed to send Telegram alert for demo-day application. demoDayUid=${args.demoDay.uid}, participantUid=${args.participantUid}. ` +
-        (e instanceof Error ? e.message : String(e))
+          (e instanceof Error ? e.message : String(e))
       );
     }
   }

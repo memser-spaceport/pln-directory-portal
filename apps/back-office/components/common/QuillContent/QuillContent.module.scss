@@ -1,0 +1,12 @@
+// Reset Quill editor chrome styles that are unwanted in a read-only context.
+// The ql-editor class is applied to get all content-rendering styles (alignment,
+// indent, direction, code blocks, etc.) but the editor-specific layout
+// properties need to be undone.
+.content {
+  padding: 0;
+  height: auto;
+  overflow-y: visible;
+  white-space: normal;
+  outline: none;
+  line-height: inherit;
+}
