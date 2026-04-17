@@ -16,6 +16,7 @@ import {
   FieldConfidence,
   FieldEnrichmentMeta,
   FieldEnrichmentStatus,
+  ForceEnrichmentMode,
   TeamDataEnrichment,
 } from './team-enrichment.types';
 
@@ -173,7 +174,117 @@ export class TeamEnrichmentService {
     return { status: 'started' };
   }
 
-  private async doEnrichTeam(teamUid: string, enrichedBy: string): Promise<void> {
+  async forceEnrichTeam(
+    teamUid: string,
+    mode: ForceEnrichmentMode,
+    enrichedBy = 'manually'
+  ): Promise<{ status: 'started' | 'in_progress' | 'not_found' }> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: { dataEnrichment: true },
+    });
+    if (!team) return { status: 'not_found' };
+
+    const existing = this.parseEnrichmentMeta(team.dataEnrichment);
+    if (existing?.status === EnrichmentStatus.InProgress) {
+      this.logger.warn(`Force-enrichment: already in progress for team ${teamUid}, skipping`);
+      return { status: 'in_progress' };
+    }
+
+    const resetFieldsMeta = this.buildForceEnrichmentFieldsMeta(existing?.fieldsMeta ?? {}, mode);
+
+    const enrichment: TeamDataEnrichment = {
+      ...(existing ?? { isAIGenerated: false }),
+      shouldEnrich: true,
+      status: EnrichmentStatus.PendingEnrichment,
+      isAIGenerated: existing?.isAIGenerated ?? false,
+      fieldsMeta: resetFieldsMeta,
+    };
+
+    await this.prisma.team.update({
+      where: { uid: teamUid },
+      data: { dataEnrichment: enrichment as any },
+    });
+
+    this.logger.log(`Force-enrichment queued for team ${teamUid} (mode=${mode})`);
+
+    this.doEnrichTeam(teamUid, enrichedBy, { forceOverwrite: mode === 'all' }).catch((err) => {
+      this.logger.error(`Background force-enrichment failed for team ${teamUid}: ${err.message}`, err.stack);
+    });
+
+    return { status: 'started' };
+  }
+
+  async findCompletedTeams(): Promise<Array<{ uid: string }>> {
+    const completedStatuses = [
+      EnrichmentStatus.Enriched,
+      EnrichmentStatus.Reviewed,
+      EnrichmentStatus.Approved,
+      EnrichmentStatus.FailedToEnrich,
+    ];
+    return this.prisma.team.findMany({
+      where: {
+        OR: completedStatuses.map((status) => ({
+          dataEnrichment: { path: ['status'], equals: status },
+        })),
+      },
+      select: { uid: true },
+    });
+  }
+
+  async forceEnrichAllCompletedTeams(
+    mode: ForceEnrichmentMode,
+    enrichedBy = 'manually'
+  ): Promise<{ total: number; started: number; skipped: number }> {
+    const teams = await this.findCompletedTeams();
+    this.logger.log(`Force-enrich all (mode=${mode}): found ${teams.length} completed teams`);
+
+    let started = 0;
+    let skipped = 0;
+
+    for (const team of teams) {
+      const { status } = await this.forceEnrichTeam(team.uid, mode, enrichedBy);
+      if (status === 'started') {
+        started++;
+      } else {
+        skipped++;
+      }
+    }
+
+    return { total: teams.length, started, skipped };
+  }
+
+  private buildForceEnrichmentFieldsMeta(
+    existing: FieldsMetaMap,
+    mode: ForceEnrichmentMode
+  ): FieldsMetaMap {
+    const reset: FieldsMetaMap = {};
+    for (const [field, meta] of Object.entries(existing) as Array<
+      [EnrichableField | 'logo', FieldEnrichmentMeta | undefined]
+    >) {
+      if (!meta) continue;
+      // User edits are sacrosanct in both modes.
+      if (meta.status === FieldEnrichmentStatus.ChangedByUser) {
+        reset[field] = meta;
+        continue;
+      }
+      if (mode === 'cannotEnrich') {
+        // Keep Enriched so the doEnrichTeam skip-logic leaves them alone; drop CannotEnrich to retry.
+        if (meta.status === FieldEnrichmentStatus.Enriched) {
+          reset[field] = meta;
+        }
+      }
+      // mode === 'all': drop Enriched and CannotEnrich so they get re-processed.
+    }
+    return reset;
+  }
+
+  private async doEnrichTeam(
+    teamUid: string,
+    enrichedBy: string,
+    opts: { forceOverwrite?: boolean } = {}
+  ): Promise<void> {
+    const forceOverwrite = opts.forceOverwrite === true;
     const team = await this.prisma.team.findUnique({
       where: { uid: teamUid },
       select: {
@@ -240,13 +351,20 @@ export class TeamEnrichmentService {
       let fieldsUpdatedCount = 0;
 
       for (const field of ENRICHABLE_TEAM_FIELDS) {
-        // Skip fields already successfully enriched
-        if (existingFieldsMeta[field]?.status === FieldEnrichmentStatus.Enriched) continue;
+        const fieldStatus = existingFieldsMeta[field]?.status;
+
+        // Never overwrite user-edited fields.
+        if (fieldStatus === FieldEnrichmentStatus.ChangedByUser) continue;
+
+        // In standard mode, skip fields already successfully enriched.
+        // In force mode, re-query them and overwrite with fresh AI data.
+        if (!forceOverwrite && fieldStatus === FieldEnrichmentStatus.Enriched) continue;
 
         const currentValue = team[field];
         const newValue = aiResponse[field];
+        const slotIsEmpty = !currentValue || currentValue.trim() === '';
 
-        if (!currentValue || currentValue.trim() === '') {
+        if (slotIsEmpty || forceOverwrite) {
           if (newValue) {
             (updateData as any)[field] = newValue;
             newFieldsMeta[field] = {
@@ -255,14 +373,21 @@ export class TeamEnrichmentService {
               source: EnrichmentSource.AI,
             };
             fieldsUpdatedCount++;
-          } else {
+          } else if (slotIsEmpty) {
             newFieldsMeta[field] = { status: FieldEnrichmentStatus.CannotEnrich };
           }
         }
       }
 
-      // Handle industryTags — skip if already enriched
-      if (existingFieldsMeta.industryTags?.status !== FieldEnrichmentStatus.Enriched && team.industryTags.length === 0) {
+      // Handle industryTags — skip Enriched in standard mode, skip ChangedByUser always.
+      const tagsStatus = existingFieldsMeta.industryTags?.status;
+      const tagsBlockedByUser = tagsStatus === FieldEnrichmentStatus.ChangedByUser;
+      const tagsAlreadyEnriched = tagsStatus === FieldEnrichmentStatus.Enriched;
+      const shouldProcessTags = forceOverwrite
+        ? !tagsBlockedByUser
+        : !tagsAlreadyEnriched && team.industryTags.length === 0;
+
+      if (shouldProcessTags) {
         this.logger.debug(`Team ${teamUid}: AI returned industryTags = [${aiResponse.industryTags.join(', ')}]`);
         if (aiResponse.industryTags.length > 0) {
           const matchedTags = await this.prisma.industryTag.findMany({
@@ -275,24 +400,34 @@ export class TeamEnrichmentService {
             } industryTags: [${matchedTags.map((t) => t.title).join(', ')}]`
           );
           if (matchedTags.length > 0) {
-            updateData.industryTags = { connect: matchedTags.map((t) => ({ uid: t.uid })) };
+            // In force mode, replace the existing tag set; otherwise the team had no tags so connect is equivalent.
+            updateData.industryTags = forceOverwrite
+              ? { set: matchedTags.map((t) => ({ uid: t.uid })) }
+              : { connect: matchedTags.map((t) => ({ uid: t.uid })) };
             newFieldsMeta.industryTags = {
               status: FieldEnrichmentStatus.Enriched,
               confidence: toConfidence(aiResponse.confidence?.industryTags),
               source: EnrichmentSource.AI,
             };
             fieldsUpdatedCount++;
-          } else {
+          } else if (team.industryTags.length === 0) {
             newFieldsMeta.industryTags = { status: FieldEnrichmentStatus.CannotEnrich };
           }
-        } else {
+        } else if (team.industryTags.length === 0) {
           newFieldsMeta.industryTags = { status: FieldEnrichmentStatus.CannotEnrich };
         }
       }
 
-      // Handle investmentFocus — skip if already enriched
+      // Handle investmentFocus — skip Enriched in standard mode, skip ChangedByUser always.
       const currentFocus = team.investorProfile?.investmentFocus || [];
-      if (existingFieldsMeta.investmentFocus?.status !== FieldEnrichmentStatus.Enriched && currentFocus.length === 0) {
+      const focusStatus = existingFieldsMeta.investmentFocus?.status;
+      const focusBlockedByUser = focusStatus === FieldEnrichmentStatus.ChangedByUser;
+      const focusAlreadyEnriched = focusStatus === FieldEnrichmentStatus.Enriched;
+      const shouldProcessFocus = forceOverwrite
+        ? !focusBlockedByUser
+        : !focusAlreadyEnriched && currentFocus.length === 0;
+
+      if (shouldProcessFocus) {
         this.logger.debug(`Team ${teamUid}: AI returned investmentFocus = [${aiResponse.investmentFocus.join(', ')}]`);
         if (aiResponse.investmentFocus.length > 0) {
           if (team.investorProfile) {
@@ -314,7 +449,7 @@ export class TeamEnrichmentService {
             source: EnrichmentSource.AI,
           };
           fieldsUpdatedCount++;
-        } else {
+        } else if (currentFocus.length === 0) {
           newFieldsMeta.investmentFocus = { status: FieldEnrichmentStatus.CannotEnrich };
         }
       }
@@ -437,7 +572,11 @@ export class TeamEnrichmentService {
     return { total: teams.length, started, skipped };
   }
 
-  async handleUserFieldChange(teamUid: string, changedFields: string[], tx?: Prisma.TransactionClient): Promise<void> {
+  async handleUserFieldChange(
+    teamUid: string,
+    changedFieldValues: Record<string, unknown>,
+    tx?: Prisma.TransactionClient
+  ): Promise<void> {
     const db = tx || this.prisma;
 
     const team = await db.team.findUnique({
@@ -447,27 +586,44 @@ export class TeamEnrichmentService {
 
     const meta = this.parseEnrichmentMeta(team?.dataEnrichment);
     if (!meta || !meta.isAIGenerated) return;
+    if (!meta.fieldsMeta) meta.fieldsMeta = {};
 
-    let updated = false;
-    for (const field of changedFields) {
+    const flipped: string[] = [];
+    for (const [field, newValue] of Object.entries(changedFieldValues)) {
+      if (!ENRICHABLE_TEAM_FIELDS.includes(field as EnrichableTeamField)) continue;
+      const currentStatus = meta.fieldsMeta[field as EnrichableTeamField]?.status;
+
+      // AI previously filled this field; user just edited it → flip to ChangedByUser.
+      if (currentStatus === FieldEnrichmentStatus.Enriched) {
+        meta.fieldsMeta[field as EnrichableTeamField] = {
+          ...meta.fieldsMeta[field as EnrichableTeamField],
+          status: FieldEnrichmentStatus.ChangedByUser,
+        };
+        flipped.push(field);
+        continue;
+      }
+
+      // AI couldn't enrich; user is supplying a non-empty value → flip to ChangedByUser
+      // so a later force-enrich run won't overwrite it.
       if (
-        ENRICHABLE_TEAM_FIELDS.includes(field as EnrichableTeamField) &&
-        meta.fieldsMeta?.[field as EnrichableTeamField]?.status === FieldEnrichmentStatus.Enriched
+        currentStatus === FieldEnrichmentStatus.CannotEnrich &&
+        typeof newValue === 'string' &&
+        newValue.trim() !== ''
       ) {
         meta.fieldsMeta[field as EnrichableTeamField] = {
           ...meta.fieldsMeta[field as EnrichableTeamField],
           status: FieldEnrichmentStatus.ChangedByUser,
         };
-        updated = true;
+        flipped.push(field);
       }
     }
 
-    if (updated) {
+    if (flipped.length > 0) {
       await db.team.update({
         where: { uid: teamUid },
         data: { dataEnrichment: meta as any },
       });
-      this.logger.log(`Marked fields as ChangedByUser for team ${teamUid}: ${changedFields.join(', ')}`);
+      this.logger.log(`Marked fields as ChangedByUser for team ${teamUid}: ${flipped.join(', ')}`);
     }
   }
 

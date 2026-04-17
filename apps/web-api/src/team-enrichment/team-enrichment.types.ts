@@ -51,6 +51,8 @@ export type EnrichableTeamField = typeof ENRICHABLE_TEAM_FIELDS[number];
 export type EnrichableRelationField = typeof ENRICHABLE_RELATION_FIELDS[number];
 export type EnrichableField = EnrichableTeamField | EnrichableRelationField;
 
+export type ForceEnrichmentMode = 'all' | 'cannotEnrich';
+
 export interface TeamDataEnrichment {
   shouldEnrich: boolean;
   status: EnrichmentStatus;
