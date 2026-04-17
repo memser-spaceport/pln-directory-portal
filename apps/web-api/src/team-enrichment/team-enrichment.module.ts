@@ -1,23 +1,28 @@
-import { Module, forwardRef } from '@nestjs/common';
-import { SharedModule } from '../shared/shared.module';
-import { TeamsModule } from '../teams/teams.module';
+import { Module } from '@nestjs/common';
 import { TeamEnrichmentService } from './team-enrichment.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
-import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import { TeamEnrichmentJob } from './team-enrichment.job';
+import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import { LogoVerificationService } from './logo-verification.service';
 import { LogoVerificationController } from './logo-verification.controller';
+import { LogoVerificationPersistenceService } from './logo-verification-persistence.service';
+import { LogoVerificationJobService } from './logo-verification-job.service';
 
 @Module({
-  imports: [SharedModule, forwardRef(() => TeamsModule)],
   controllers: [LogoVerificationController],
   providers: [
     TeamEnrichmentService,
     TeamEnrichmentAiService,
     TeamEnrichmentJob,
+    TeamEnrichmentScrapingDogService,
     LogoVerificationService,
-    TeamEnrichmentScrapingDogService
+    LogoVerificationPersistenceService,
+    LogoVerificationJobService,
   ],
-  exports: [TeamEnrichmentService, LogoVerificationService],
+  exports: [
+    TeamEnrichmentService,
+    LogoVerificationService,
+    LogoVerificationPersistenceService,
+  ],
 })
 export class TeamEnrichmentModule {}
