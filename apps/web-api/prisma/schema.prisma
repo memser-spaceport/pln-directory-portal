@@ -207,10 +207,14 @@ model Member {
   articleRequests         ArticleRequest[]     @relation("MemberArticleRequests")
   articleComments         ArticleComment[]     @relation("MemberArticleComments")
   articleCommentLikes     ArticleCommentLike[] @relation("MemberArticleCommentLikes")
-  roleAssignments         RoleAssignment[]     @relation("MemberRoleAssignments")
-  roleAssignmentsGiven    RoleAssignment[]     @relation("MemberRoleAssignmentsGiven")
-  memberPermissions       MemberPermission[]   @relation("MemberDirectPermissions")
-  memberPermissionsGiven  MemberPermission[]   @relation("MemberDirectPermissionsGiven")
+  roleAssignments             RoleAssignment[]     @relation("MemberRoleAssignments")
+  policyAssignmentsV2         PolicyAssignment[]   @relation("PolicyAssignmentMember")
+  policyAssignmentsV2Given    PolicyAssignment[]   @relation("PolicyAssignmentAssignedBy")
+  memberPermissionsV2         MemberPermissionV2[] @relation("MemberPermissionV2Member")
+  memberPermissionsV2Given    MemberPermissionV2[] @relation("MemberPermissionV2GrantedBy")
+  roleAssignmentsGiven        RoleAssignment[]     @relation("MemberRoleAssignmentsGiven")
+  memberPermissions           MemberPermission[]   @relation("MemberDirectPermissions")
+  memberPermissionsGiven      MemberPermission[]   @relation("MemberDirectPermissionsGiven")
 }
 
 model MemberRole {
@@ -1642,6 +1646,8 @@ model ArticleRequest {
 }
 
 model Article {
+  requiredPermissionCode String?
+
   id              Int                @id @default(autoincrement())
   uid             String             @unique @default(cuid())
   slugURL         String             @unique
@@ -1761,6 +1767,8 @@ model Permission {
 
   rolePermissions   RolePermission[]
   memberPermissions MemberPermission[]
+  policyPermissions   PolicyPermission[]
+  memberPermissionsV2 MemberPermissionV2[]
 }
 
 model RolePermission {
@@ -1841,4 +1849,65 @@ model TeamLogoVerificationResult {
   @@index([teamUid, createdAt])
   @@index([teamUid, provider])
   @@index([logoUid])
+}
+
+
+model Policy {
+  uid               String             @id @default(cuid())
+  code              String             @unique
+  name              String
+  description       String?
+  role              String
+  group             String
+  isSystem          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  policyPermissions PolicyPermission[]
+  assignments       PolicyAssignment[]
+}
+
+model PolicyPermission {
+  uid           String     @id @default(cuid())
+  policyUid     String
+  permissionUid String
+  createdAt     DateTime   @default(now())
+  policy        Policy     @relation(fields: [policyUid], references: [uid], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionUid], references: [uid], onDelete: Cascade)
+
+  @@unique([policyUid, permissionUid])
+  @@index([policyUid])
+  @@index([permissionUid])
+}
+
+model PolicyAssignment {
+  uid          String   @id @default(cuid())
+  memberUid    String
+  policyUid    String
+  assignedByUid String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  member       Member   @relation("PolicyAssignmentMember", fields: [memberUid], references: [uid], onDelete: Cascade)
+  policy       Policy   @relation(fields: [policyUid], references: [uid], onDelete: Cascade)
+  assignedBy   Member?  @relation("PolicyAssignmentAssignedBy", fields: [assignedByUid], references: [uid], onDelete: SetNull)
+
+  @@unique([memberUid, policyUid])
+  @@index([memberUid])
+  @@index([policyUid])
+}
+
+model MemberPermissionV2 {
+  uid          String     @id @default(cuid())
+  memberUid    String
+  permissionUid String
+  grantedByUid String?
+  reason       String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  member       Member     @relation("MemberPermissionV2Member", fields: [memberUid], references: [uid], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionUid], references: [uid], onDelete: Cascade)
+  grantedBy    Member?    @relation("MemberPermissionV2GrantedBy", fields: [grantedByUid], references: [uid], onDelete: SetNull)
+
+  @@unique([memberUid, permissionUid])
+  @@index([memberUid])
+  @@index([permissionUid])
 }
