@@ -352,6 +352,14 @@ export class TeamEnrichmentService {
           } else if (slotIsEmpty) {
             newFieldsMeta[field] = { status: FieldEnrichmentStatus.CannotEnrich };
           }
+        } else {
+          // Standard mode, field pre-populated by the user (predates enrichment, or
+          // filled in after a failed run). Mark ChangedByUser so a later force run
+          // treats it as user-controlled and won't overwrite it.
+          newFieldsMeta[field] = {
+            ...existingFieldsMeta[field],
+            status: FieldEnrichmentStatus.ChangedByUser,
+          };
         }
       }
 
@@ -392,6 +400,12 @@ export class TeamEnrichmentService {
         } else if (team.industryTags.length === 0) {
           newFieldsMeta.industryTags = { status: FieldEnrichmentStatus.CannotEnrich };
         }
+      } else if (!forceOverwrite && !tagsAlreadyEnriched && !tagsBlockedByUser && team.industryTags.length > 0) {
+        // Team had tags before any enrichment ran. Mark ChangedByUser so force mode won't replace them.
+        newFieldsMeta.industryTags = {
+          ...existingFieldsMeta.industryTags,
+          status: FieldEnrichmentStatus.ChangedByUser,
+        };
       }
 
       // Handle investmentFocus — skip Enriched in standard mode, skip ChangedByUser always.
@@ -428,6 +442,12 @@ export class TeamEnrichmentService {
         } else if (currentFocus.length === 0) {
           newFieldsMeta.investmentFocus = { status: FieldEnrichmentStatus.CannotEnrich };
         }
+      } else if (!forceOverwrite && !focusAlreadyEnriched && !focusBlockedByUser && currentFocus.length > 0) {
+        // Team had investmentFocus before any enrichment ran. Mark ChangedByUser so force mode won't replace it.
+        newFieldsMeta.investmentFocus = {
+          ...existingFieldsMeta.investmentFocus,
+          status: FieldEnrichmentStatus.ChangedByUser,
+        };
       }
 
       // Handle logo via OG tag scraping — only from a verified website

@@ -53,7 +53,7 @@ interface TeamDataEnrichment {
 Each enrichable field is tracked in `dataEnrichment.fieldsMeta[<field>].status`:
 - `Enriched` — field was empty and successfully filled by AI
 - `CannotEnrich` — field was empty but AI could not find a value
-- `ChangedByUser` — field was enriched by AI but later modified by a user
+- `ChangedByUser` — field is user-controlled: either (a) it was enriched by AI and later modified by a user, (b) it was already populated before enrichment ever ran, or (c) the user filled in a previously `CannotEnrich` field. In all three cases, future enrichment runs (including force mode) will not overwrite the field.
 
 ### Field Confidence & Source
 
@@ -201,14 +201,13 @@ Validates requestor is team lead of the team
 
 ## User Change Tracking
 
-When a team is updated via `updateTeamFromParticipantsRequest()`, if the team has `isAIGenerated=true`,
-modified enrichable fields are marked as `ChangedByUser` in `fieldsMeta` (status is flipped but `confidence` and `source` are preserved as provenance).
+`ChangedByUser` is the "user-controlled, don't touch" marker. It is set in three places so that a later force re-enrichment cannot overwrite user data:
 
-Two cases trigger the flip:
-- The field's prior status was `Enriched` (AI had filled it, user is now editing it).
-- The field's prior status was `CannotEnrich` and the user supplies a non-empty value (user is filling in what AI couldn't find).
+1. **During the first (or any non-force) enrichment run** — when the enrichment loop encounters a scalar field / `industryTags` / `investmentFocus` that is already non-empty, it writes `fieldsMeta[field] = { ..., status: ChangedByUser }`. This protects values the user had populated before enrichment ever ran.
+2. **When a user edits an AI-filled field** — `handleUserFieldChange()` flips `Enriched → ChangedByUser` for modified fields (called from `updateTeamFromParticipantsRequest()` when the team has `isAIGenerated=true`).
+3. **When a user fills in a `CannotEnrich` field** — `handleUserFieldChange()` also flips `CannotEnrich → ChangedByUser` when the user supplies a non-empty value for a field that AI had previously given up on.
 
-Marking these fields protects them from being overwritten by a later force re-enrichment run.
+In all cases, `confidence` and `source` from any prior status are preserved as provenance.
 
 ## Environment Variables
 
