@@ -201,13 +201,19 @@ Validates requestor is team lead of the team
 
 ## User Change Tracking
 
-`ChangedByUser` is the "user-controlled, don't touch" marker. It is set in three places so that a later force re-enrichment cannot overwrite user data:
+### Governing invariant
 
-1. **During the first (or any non-force) enrichment run** — when the enrichment loop encounters a scalar field / `industryTags` / `investmentFocus` that is already non-empty, it writes `fieldsMeta[field] = { ..., status: ChangedByUser }`. This protects values the user had populated before enrichment ever ran.
+**If a field has a value and its prior `fieldsMeta[field].status` is not `Enriched`, it is user-owned. Enrichment never overwrites it and marks it `ChangedByUser`.**
+
+This rule applies in both standard and force modes. Force mode can re-query fields marked `Enriched` (AI-owned), but it will not touch anything the user has populated — including on a team's very first enrichment where `dataEnrichment` is `null`.
+
+### Where `ChangedByUser` is written
+
+1. **During any enrichment run** — when the loop encounters a scalar field / `industryTags` / `investmentFocus` / `logo` that is non-empty and has no prior `Enriched` status, it writes `fieldsMeta[field] = { ..., status: ChangedByUser }`. Covers pre-existing user data on a first-ever run (whether triggered by cron or by force-enrichment) and any orphan user-supplied values that bypassed the team-update flow.
 2. **When a user edits an AI-filled field** — `handleUserFieldChange()` flips `Enriched → ChangedByUser` for modified fields (called from `updateTeamFromParticipantsRequest()` when the team has `isAIGenerated=true`).
-3. **When a user fills in a `CannotEnrich` field** — `handleUserFieldChange()` also flips `CannotEnrich → ChangedByUser` when the user supplies a non-empty value for a field that AI had previously given up on.
+3. **When a user fills in a `CannotEnrich` field** — `handleUserFieldChange()` also flips `CannotEnrich → ChangedByUser` when the user supplies a non-empty value for a field AI had previously given up on.
 
-In all cases, `confidence` and `source` from any prior status are preserved as provenance.
+`confidence` and `source` from any prior status are preserved as provenance across the status flip.
 
 ## Environment Variables
 
