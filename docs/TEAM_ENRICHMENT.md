@@ -20,7 +20,7 @@ interface TeamDataEnrichment {
   reviewedAt?: string;             // ISO timestamp
   reviewedBy?: string;             // reviewer email
   errorMessage?: string;           // error details if FailedToEnrich
-  fieldsMeta: Partial<Record<EnrichableField | 'logo', {
+  fieldsMeta: Partial<Record<FieldMetaKey, {
     status: FieldEnrichmentStatus;
     confidence?: 'high' | 'medium' | 'low';
     source?: 'ai' | 'open-graph' | 'scrapingdog';
@@ -93,8 +93,8 @@ When a user later edits an enriched field, its `fieldsMeta[field].status` is fli
 ## Enrichment Behavior
 
 - Teams without a website are enriched using team name and other available identifiers; the AI will attempt to discover the website
-- Only fills null/empty fields — never overwrites existing data
-- **Re-run safe**: on subsequent runs, only fields with status `CannotEnrich` are retried. Fields already marked `Enriched` or `ChangedByUser` are skipped. Previous field statuses are preserved and merged with new results.
+- **Standard mode** (cron, `trigger-enrichment`): only fills null/empty fields — never overwrites existing data. On subsequent runs, only fields with status `CannotEnrich` are retried. Fields already marked `Enriched` or `ChangedByUser` are skipped. Previous field statuses are preserved and merged with new results.
+- **Force mode** (`trigger-force-enrichment`): re-queries every field except those marked `ChangedByUser`. Overwrites existing scalar values, replaces `industryTags` with the new set, and replaces `investmentFocus`. Logo is NOT re-fetched when the team already has one, because user-uploaded logos are indistinguishable from AI-set logos.
 - **Concurrency guard**: if enrichment is already `InProgress` for a team, duplicate requests are rejected immediately
 - **`enrichedBy`**: set to `'system-cron'` for cron jobs, `'manually'` for admin-triggered enrichment
 
@@ -168,6 +168,29 @@ Guard: AdminAuthGuard
 Finds all pending teams and enriches them. Teams already in progress are skipped.
 Returns `{ success, total, started, skipped, message }`.
 
+### Force Re-Enrichment for a Single Team
+```
+POST /v1/admin/teams/:uid/trigger-force-enrichment?mode=all|cannotEnrich
+Guard: AdminAuthGuard
+```
+Re-queues an already-enriched team for re-processing. Use when a team's data is stale
+(e.g. they changed their website, pivoted focus) or when a new AI model has been rolled out.
+
+- `mode=all` (default) — re-queries every enrichable field except those with status `ChangedByUser`. Overwrites existing AI-filled values with fresh results.
+- `mode=cannotEnrich` — retries only fields whose prior status was `CannotEnrich`. Leaves `Enriched` fields untouched.
+
+User-edited fields (`ChangedByUser`) are never overwritten in either mode.
+Returns `{ success, message }` on success, or `{ success: false, message }` if enrichment is already in progress. Does NOT require `IS_TEAM_ENRICHMENT_ENABLED`.
+
+### Force Re-Enrichment for All Completed Teams
+```
+POST /v1/admin/teams/trigger-force-enrichment?mode=all|cannotEnrich
+Guard: AdminAuthGuard
+```
+Finds all teams with `status ∈ { Enriched, Reviewed, Approved, FailedToEnrich }` and re-queues them using the same `mode` semantics as the single-team variant.
+Teams currently `InProgress` or `PendingEnrichment` are skipped.
+Returns `{ success, total, started, skipped, message }`.
+
 ### Team Lead Review
 ```
 PATCH /v1/teams/:uid/enrichment-review
@@ -179,7 +202,13 @@ Validates requestor is team lead of the team
 ## User Change Tracking
 
 When a team is updated via `updateTeamFromParticipantsRequest()`, if the team has `isAIGenerated=true`,
-any modified enrichable fields are marked as `ChangedByUser` in `fieldsMeta` (status is flipped but `confidence` and `source` are preserved as provenance).
+modified enrichable fields are marked as `ChangedByUser` in `fieldsMeta` (status is flipped but `confidence` and `source` are preserved as provenance).
+
+Two cases trigger the flip:
+- The field's prior status was `Enriched` (AI had filled it, user is now editing it).
+- The field's prior status was `CannotEnrich` and the user supplies a non-empty value (user is filling in what AI couldn't find).
+
+Marking these fields protects them from being overwritten by a later force re-enrichment run.
 
 ## Environment Variables
 

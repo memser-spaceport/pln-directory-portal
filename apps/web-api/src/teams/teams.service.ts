@@ -388,11 +388,14 @@ export class TeamsService {
       result = await this.updateTeamByUid(teamUid, team, tx, requestorEmail);
 
       // Track user changes to AI-enriched fields
-      const changedEnrichableFields = Object.keys(team).filter(
-        (key) => ENRICHABLE_TEAM_FIELDS.includes(key as any) && team[key] !== undefined,
-      );
-      if (changedEnrichableFields.length > 0) {
-        await this.teamEnrichmentService.handleUserFieldChange(teamUid, changedEnrichableFields, tx);
+      const changedEnrichableFieldValues: Record<string, unknown> = {};
+      for (const key of Object.keys(team)) {
+        if (ENRICHABLE_TEAM_FIELDS.includes(key as any) && team[key] !== undefined) {
+          changedEnrichableFieldValues[key] = team[key];
+        }
+      }
+      if (Object.keys(changedEnrichableFieldValues).length > 0) {
+        await this.teamEnrichmentService.handleUserFieldChange(teamUid, changedEnrichableFieldValues, tx);
       }
 
       const toAdd: any[] = [];

@@ -19,7 +19,7 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 
 import { AdminTeamsService } from './admin-teams.service';
-import { UploadTeamTiersQueryDto } from './schema/admin-teams';
+import { TriggerForceEnrichmentQueryDto, UploadTeamTiersQueryDto } from './schema/admin-teams';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 
 @ApiTags('Admin Teams')
@@ -108,5 +108,34 @@ export class AdminTeamsController {
   async triggerEnrichmentAll() {
     const result = await this.teamEnrichmentService.triggerEnrichmentForAllPending('manually');
     return { success: true, ...result, message: 'Enrichment triggered in background' };
+  }
+
+  @Post('/:uid/trigger-force-enrichment')
+  @NoCache()
+  async triggerForceEnrichment(
+    @Param('uid') uid: string,
+    @Query(new ZodValidationPipe()) query: TriggerForceEnrichmentQueryDto
+  ) {
+    const { status } = await this.teamEnrichmentService.forceEnrichTeam(uid, query.mode, 'manually');
+
+    if (status === 'not_found') {
+      throw new BadRequestException(`Team ${uid} not found`);
+    }
+    if (status === 'in_progress') {
+      return { success: false, message: `Enrichment already in progress for team ${uid}` };
+    }
+
+    return { success: true, message: `Force enrichment (mode=${query.mode}) triggered for team ${uid}` };
+  }
+
+  @Post('trigger-force-enrichment')
+  @NoCache()
+  async triggerForceEnrichmentAll(@Query(new ZodValidationPipe()) query: TriggerForceEnrichmentQueryDto) {
+    const result = await this.teamEnrichmentService.forceEnrichAllCompletedTeams(query.mode, 'manually');
+    return {
+      success: true,
+      ...result,
+      message: `Force enrichment (mode=${query.mode}) triggered in background`,
+    };
   }
 }
