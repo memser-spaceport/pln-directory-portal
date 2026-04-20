@@ -329,7 +329,7 @@ export class TeamEnrichmentService {
       for (const field of ENRICHABLE_TEAM_FIELDS) {
         const fieldStatus = existingFieldsMeta[field]?.status;
 
-        // User-controlled fields are never touched.
+        // Never overwrite user-edited fields.
         if (fieldStatus === FieldEnrichmentStatus.ChangedByUser) continue;
 
         const currentValue = team[field];
