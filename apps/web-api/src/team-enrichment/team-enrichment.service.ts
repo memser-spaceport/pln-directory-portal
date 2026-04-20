@@ -332,38 +332,54 @@ export class TeamEnrichmentService {
         // Never overwrite user-edited fields.
         if (fieldStatus === FieldEnrichmentStatus.ChangedByUser) continue;
 
-        // In standard mode, skip fields already successfully enriched.
-        // In force mode, re-query them and overwrite with fresh AI data.
-        if (!forceOverwrite && fieldStatus === FieldEnrichmentStatus.Enriched) continue;
-
         const currentValue = team[field];
-        const newValue = aiResponse[field];
         const slotIsEmpty = !currentValue || currentValue.trim() === '';
 
-        if (slotIsEmpty || forceOverwrite) {
-          if (newValue) {
-            (updateData as any)[field] = newValue;
-            newFieldsMeta[field] = {
-              status: FieldEnrichmentStatus.Enriched,
-              confidence: toConfidence(aiResponse.confidence?.[field]),
-              source: EnrichmentSource.AI,
-            };
-            fieldsUpdatedCount++;
-          } else if (slotIsEmpty) {
-            newFieldsMeta[field] = { status: FieldEnrichmentStatus.CannotEnrich };
-          }
+        // User-owned: non-empty value with no prior AI enrichment. Applies in BOTH
+        // standard and force modes — force mode must NEVER overwrite user data whose
+        // only "crime" is that dataEnrichment was null on a team's first enrichment.
+        if (!slotIsEmpty && fieldStatus !== FieldEnrichmentStatus.Enriched) {
+          newFieldsMeta[field] = {
+            ...existingFieldsMeta[field],
+            status: FieldEnrichmentStatus.ChangedByUser,
+          };
+          continue;
         }
+
+        // Standard mode skips already-enriched fields; force mode re-queries them.
+        if (!forceOverwrite && fieldStatus === FieldEnrichmentStatus.Enriched) continue;
+
+        // Remaining shapes: slot empty, OR (slot non-empty && Enriched && forceOverwrite).
+        const newValue = aiResponse[field];
+        if (newValue) {
+          (updateData as any)[field] = newValue;
+          newFieldsMeta[field] = {
+            status: FieldEnrichmentStatus.Enriched,
+            confidence: toConfidence(aiResponse.confidence?.[field]),
+            source: EnrichmentSource.AI,
+          };
+          fieldsUpdatedCount++;
+        } else if (slotIsEmpty) {
+          newFieldsMeta[field] = { status: FieldEnrichmentStatus.CannotEnrich };
+        }
+        // Force mode + non-empty slot + AI returned null: preserve existing value + meta.
       }
 
-      // Handle industryTags — skip Enriched in standard mode, skip ChangedByUser always.
+      // Handle industryTags — same four-layer check as the scalar loop.
       const tagsStatus = existingFieldsMeta.industryTags?.status;
-      const tagsBlockedByUser = tagsStatus === FieldEnrichmentStatus.ChangedByUser;
-      const tagsAlreadyEnriched = tagsStatus === FieldEnrichmentStatus.Enriched;
-      const shouldProcessTags = forceOverwrite
-        ? !tagsBlockedByUser
-        : !tagsAlreadyEnriched && team.industryTags.length === 0;
 
-      if (shouldProcessTags) {
+      if (tagsStatus === FieldEnrichmentStatus.ChangedByUser) {
+        // User-controlled — skip entirely.
+      } else if (team.industryTags.length > 0 && tagsStatus !== FieldEnrichmentStatus.Enriched) {
+        // User-owned: team has tags with no prior AI enrichment. Protect in both modes.
+        newFieldsMeta.industryTags = {
+          ...existingFieldsMeta.industryTags,
+          status: FieldEnrichmentStatus.ChangedByUser,
+        };
+      } else if (!forceOverwrite && tagsStatus === FieldEnrichmentStatus.Enriched) {
+        // Standard mode, already enriched — skip.
+      } else {
+        // Either team has no tags, or force mode + Enriched — run AI matching.
         this.logger.debug(`Team ${teamUid}: AI returned industryTags = [${aiResponse.industryTags.join(', ')}]`);
         if (aiResponse.industryTags.length > 0) {
           const matchedTags = await this.prisma.industryTag.findMany({
@@ -376,7 +392,7 @@ export class TeamEnrichmentService {
             } industryTags: [${matchedTags.map((t) => t.title).join(', ')}]`
           );
           if (matchedTags.length > 0) {
-            // In force mode, replace the existing tag set; otherwise the team had no tags so connect is equivalent.
+            // Force mode: replace existing tag set; fresh-field mode: team had none, connect is equivalent.
             updateData.industryTags = forceOverwrite
               ? { set: matchedTags.map((t) => ({ uid: t.uid })) }
               : { connect: matchedTags.map((t) => ({ uid: t.uid })) };
@@ -394,16 +410,22 @@ export class TeamEnrichmentService {
         }
       }
 
-      // Handle investmentFocus — skip Enriched in standard mode, skip ChangedByUser always.
+      // Handle investmentFocus — same four-layer check.
       const currentFocus = team.investorProfile?.investmentFocus || [];
       const focusStatus = existingFieldsMeta.investmentFocus?.status;
-      const focusBlockedByUser = focusStatus === FieldEnrichmentStatus.ChangedByUser;
-      const focusAlreadyEnriched = focusStatus === FieldEnrichmentStatus.Enriched;
-      const shouldProcessFocus = forceOverwrite
-        ? !focusBlockedByUser
-        : !focusAlreadyEnriched && currentFocus.length === 0;
 
-      if (shouldProcessFocus) {
+      if (focusStatus === FieldEnrichmentStatus.ChangedByUser) {
+        // User-controlled — skip entirely.
+      } else if (currentFocus.length > 0 && focusStatus !== FieldEnrichmentStatus.Enriched) {
+        // User-owned: team has focus tags with no prior AI enrichment. Protect in both modes.
+        newFieldsMeta.investmentFocus = {
+          ...existingFieldsMeta.investmentFocus,
+          status: FieldEnrichmentStatus.ChangedByUser,
+        };
+      } else if (!forceOverwrite && focusStatus === FieldEnrichmentStatus.Enriched) {
+        // Standard mode, already enriched — skip.
+      } else {
+        // Either team has no focus, or force mode + Enriched — run AI matching.
         this.logger.debug(`Team ${teamUid}: AI returned investmentFocus = [${aiResponse.investmentFocus.join(', ')}]`);
         if (aiResponse.investmentFocus.length > 0) {
           if (team.investorProfile) {
@@ -478,6 +500,10 @@ export class TeamEnrichmentService {
         }
       } else if (team.logoUid) {
         this.logger.log(`Team ${teamUid} (${team.name}) already has a logo, skipping logo fetch`);
+        // Logo predates enrichment and has no meta entry — treat as user-owned.
+        if (!existingFieldsMeta.logo) {
+          newFieldsMeta.logo = { status: FieldEnrichmentStatus.ChangedByUser };
+        }
       } else {
         this.logger.log(`Team ${teamUid} (${team.name}): no verified website available, skipping logo fetch`);
         newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };

@@ -53,7 +53,7 @@ interface TeamDataEnrichment {
 Each enrichable field is tracked in `dataEnrichment.fieldsMeta[<field>].status`:
 - `Enriched` — field was empty and successfully filled by AI
 - `CannotEnrich` — field was empty but AI could not find a value
-- `ChangedByUser` — field was enriched by AI but later modified by a user
+- `ChangedByUser` — field is user-controlled: either (a) it was enriched by AI and later modified by a user, (b) it was already populated before enrichment ever ran, or (c) the user filled in a previously `CannotEnrich` field. In all three cases, future enrichment runs (including force mode) will not overwrite the field.
 
 ### Field Confidence & Source
 
@@ -201,14 +201,19 @@ Validates requestor is team lead of the team
 
 ## User Change Tracking
 
-When a team is updated via `updateTeamFromParticipantsRequest()`, if the team has `isAIGenerated=true`,
-modified enrichable fields are marked as `ChangedByUser` in `fieldsMeta` (status is flipped but `confidence` and `source` are preserved as provenance).
+### Governing invariant
 
-Two cases trigger the flip:
-- The field's prior status was `Enriched` (AI had filled it, user is now editing it).
-- The field's prior status was `CannotEnrich` and the user supplies a non-empty value (user is filling in what AI couldn't find).
+**If a field has a value and its prior `fieldsMeta[field].status` is not `Enriched`, it is user-owned. Enrichment never overwrites it and marks it `ChangedByUser`.**
 
-Marking these fields protects them from being overwritten by a later force re-enrichment run.
+This rule applies in both standard and force modes. Force mode can re-query fields marked `Enriched` (AI-owned), but it will not touch anything the user has populated — including on a team's very first enrichment where `dataEnrichment` is `null`.
+
+### Where `ChangedByUser` is written
+
+1. **During any enrichment run** — when the loop encounters a scalar field / `industryTags` / `investmentFocus` / `logo` that is non-empty and has no prior `Enriched` status, it writes `fieldsMeta[field] = { ..., status: ChangedByUser }`. Covers pre-existing user data on a first-ever run (whether triggered by cron or by force-enrichment) and any orphan user-supplied values that bypassed the team-update flow.
+2. **When a user edits an AI-filled field** — `handleUserFieldChange()` flips `Enriched → ChangedByUser` for modified fields (called from `updateTeamFromParticipantsRequest()` when the team has `isAIGenerated=true`).
+3. **When a user fills in a `CannotEnrich` field** — `handleUserFieldChange()` also flips `CannotEnrich → ChangedByUser` when the user supplies a non-empty value for a field AI had previously given up on.
+
+`confidence` and `source` from any prior status are preserved as provenance across the status flip.
 
 ## Environment Variables
 
