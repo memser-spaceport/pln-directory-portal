@@ -13,6 +13,7 @@ import axios from 'axios';
 import * as path from 'path';
 import { Member, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { MemberApprovalsService } from '../member-approvals/member-approvals.service';
 import { AirtableMemberSchema } from '../utils/airtable/schema/airtable-member.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
@@ -62,7 +63,8 @@ export class MembersService {
     private notificationSettingsService: NotificationSettingsService,
     @Inject(forwardRef(() => OfficeHoursService))
     private officeHoursService: OfficeHoursService,
-    private openSearchService: OpenSearchService
+    private openSearchService: OpenSearchService,
+    private memberApprovalsService: MemberApprovalsService
   ) {}
 
   /**
@@ -77,9 +79,13 @@ export class MembersService {
     tx: Prisma.TransactionClient = this.prisma
   ): Promise<Member> {
     try {
-      return await tx.member.create({
+      const createdMember = await tx.member.create({
         data: member,
       });
+
+      await this.memberApprovalsService.ensureApprovalExists(createdMember.uid);
+
+      return createdMember;
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -3710,6 +3716,8 @@ export class MembersService {
         accessLevel: 'L0', // default access level for newly created SSO users
       },
     });
+
+    await this.memberApprovalsService.ensureApprovalExists(newMember.uid);
 
     this.logger.info(
       `MembersService.createMemberFromSso → New member created. uid=${newMember.uid}, id=${newMember.id}, email=${newMember.email}`

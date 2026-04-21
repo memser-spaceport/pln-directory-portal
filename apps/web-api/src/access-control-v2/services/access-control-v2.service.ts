@@ -1,9 +1,13 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma.service';
+import { MemberApprovalsService } from '../../member-approvals/member-approvals.service';
 
 @Injectable()
 export class AccessControlV2Service {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly memberApprovalsService: MemberApprovalsService,
+  ) {}
 
   async listPolicies() {
     const policies = await this.prisma.policy.findMany({
@@ -192,6 +196,7 @@ export class AccessControlV2Service {
   }
 
   async assignPolicy(memberUid: string, policyCode: string, assignedByUid?: string) {
+    await this.memberApprovalsService.assertApproved(memberUid);
     const member = await this.ensureMember(memberUid);
     const policy = await this.ensurePolicy(policyCode);
     if (assignedByUid) await this.ensureMember(assignedByUid);
@@ -234,6 +239,7 @@ export class AccessControlV2Service {
   }
 
   async grantDirectPermission(memberUid: string, permissionCode: string, grantedByUid?: string, reason?: string) {
+    await this.memberApprovalsService.assertApproved(memberUid);
     const member = await this.ensureMember(memberUid);
     const permission = await this.ensurePermission(permissionCode);
     if (grantedByUid) await this.ensureMember(grantedByUid);
