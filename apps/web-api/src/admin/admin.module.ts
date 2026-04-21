@@ -25,6 +25,7 @@ import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module'
 import {DealsModule} from "../deals/deals.module";
 import { DealRequestsModule } from "../deal-requests/deal-requests.module";
 import { RbacModule } from "../rbac/rbac.module";
+import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 
 @Module({
   imports: [
@@ -45,7 +46,8 @@ import { RbacModule } from "../rbac/rbac.module";
     TeamEnrichmentModule,
     DealsModule,
     DealRequestsModule,
-    RbacModule
+    RbacModule,
+    AccessControlV2Module
   ],
   controllers: [
     AdminAuthController,

@@ -5,14 +5,13 @@ import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './arti
 import type { ArticleCategory } from './articles.constants';
 import { ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE } from './articles.constants';
 import { MemberRole } from "../utils/constants";
-import { RbacService } from '../rbac/rbac.service';
-import { RBAC_PERMISSION_CODES, AVAILABLE_SCOPES } from '../rbac/rbac.constants';
+import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 
 @Injectable()
 export class ArticlesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly rbacService: RbacService,
+    private readonly accessControlV2Service: AccessControlV2Service,
   ) { }
 
   // ── Helpers ────────────────────────────────────────────────────────────
@@ -81,30 +80,74 @@ export class ArticlesService {
     return article;
   }
 
-  private validateArticleScope(scope: string | null | undefined): void {
-    if (scope && !AVAILABLE_SCOPES.includes(scope as any)) {
-      throw new BadRequestException(`Invalid article scope: ${scope}. Allowed: ${AVAILABLE_SCOPES.join(', ')}`);
+  private readonly ARTICLE_PERMISSION_CODES = [
+    'founder_guides.view.plvs',
+    'founder_guides.view.plcc',
+    'founder_guides.view.all',
+  ] as const;
+
+  private validateRequiredPermissionCode(permissionCode: string | null | undefined): void {
+    if (!permissionCode) return;
+
+    if (!this.ARTICLE_PERMISSION_CODES.includes(permissionCode as any)) {
+      throw new BadRequestException(
+        `Invalid article permission: ${permissionCode}. Allowed: ${this.ARTICLE_PERMISSION_CODES.join(', ')}`,
+      );
     }
   }
 
-  private async resolveUserScopes(userEmail?: string): Promise<string[]> {
-    if (!userEmail) return [];
-    try {
-      const member = await this.rbacService.findMemberByEmail(userEmail);
-      if (!member) return [];
-      return this.rbacService.getScopesForPermission(member.uid, RBAC_PERMISSION_CODES.FOUNDER_GUIDES_VIEW);
-    } catch {
-      return [];
-    }
+  private async getArticlePermissionSet(memberUid: string): Promise<Set<string>> {
+    const access = await this.accessControlV2Service.getMemberAccess(memberUid);
+    return new Set(access.effectivePermissions);
   }
 
-  private buildScopeFilter(userScopes: string[]): Prisma.ArticleWhereInput {
-    return {
-      OR: [
-        { scope: null },
-        ...(userScopes.length > 0 ? [{ scope: { in: userScopes } }] : []),
-      ],
-    };
+  private hasArticlePermissionFromSet(
+    permissionSet: Set<string>,
+    permissionCode?: string | null,
+  ): boolean {
+    if (!permissionCode) return true;
+    if (permissionSet.has(permissionCode)) return true;
+
+    if (
+      (permissionCode === 'founder_guides.view.plvs' ||
+        permissionCode === 'founder_guides.view.plcc') &&
+      permissionSet.has('founder_guides.view.all')
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private async hasArticlePermission(memberUid: string, permissionCode?: string | null): Promise<boolean> {
+    const permissionSet = await this.getArticlePermissionSet(memberUid);
+    return this.hasArticlePermissionFromSet(permissionSet, permissionCode);
+  }
+
+
+  private stripLegacyScope<T extends { scope?: unknown }>(article: T): Omit<T, 'scope'> {
+    const { scope, ...rest } = article;
+    return rest;
+  }
+
+  private stripLegacyScopeFromMany<T extends { scope?: unknown }>(articles: T[]): Array<Omit<T, 'scope'>> {
+    return articles.map((article) => this.stripLegacyScope(article));
+  }
+
+  private async filterArticlesByPermission<T extends { requiredPermissionCode?: string | null }>(
+    articles: T[],
+    memberUid: string | null,
+    permissionSet?: Set<string> | null,
+  ): Promise<T[]> {
+    if (!articles.length) return articles;
+
+    if (!memberUid || !permissionSet) {
+      return articles.filter((article) => !article.requiredPermissionCode);
+    }
+
+    return articles.filter((article) =>
+      this.hasArticlePermissionFromSet(permissionSet, article.requiredPermissionCode),
+    );
   }
 
   private buildArticleWhere(query: ListArticlesQueryDto, status?: ArticleStatus): Prisma.ArticleWhereInput {
@@ -191,10 +234,8 @@ export class ArticlesService {
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const userScopes = await this.resolveUserScopes(userEmail);
-    const where: Prisma.ArticleWhereInput = {
+    const baseWhere: Prisma.ArticleWhereInput = {
       ...this.buildArticleWhere(query, ArticleStatus.PUBLISHED),
-      ...this.buildScopeFilter(userScopes),
     };
 
     let orderBy: Prisma.ArticleOrderByWithRelationInput;
@@ -211,55 +252,75 @@ export class ArticlesService {
         break;
     }
 
-    const [articles, total] = await Promise.all([
-      this.prisma.article.findMany({
-        where,
-        orderBy,
-        skip,
-        take: limit,
-        include: this.articleInclude,
-      }),
-      this.prisma.article.count({ where }),
-    ]);
+    const rawArticles = await this.prisma.article.findMany({
+      where: baseWhere,
+      orderBy,
+      include: this.articleInclude,
+    });
 
-    if (!articles.length) {
+    let memberUid: string | null = null;
+    let permissionSet: Set<string> | null = null;
+
+    if (userEmail) {
+      try {
+        const resolved = await this.resolveMemberByEmail(userEmail);
+        memberUid = resolved.memberUid;
+        permissionSet = await this.getArticlePermissionSet(resolved.memberUid);
+      } catch {
+        memberUid = null;
+        permissionSet = null;
+      }
+    }
+
+    let filtered = rawArticles.filter((article) => {
+      if (!article.requiredPermissionCode) {
+        return true;
+      }
+
+      if (!memberUid || !permissionSet) {
+        return false;
+      }
+
+      return this.hasArticlePermissionFromSet(permissionSet, article.requiredPermissionCode);
+    });
+
+    const total = filtered.length;
+    filtered = filtered.slice(skip, skip + limit);
+
+    const articleUids = filtered.map((a) => a.uid);
+
+    if (!articleUids.length) {
       return { data: [], total, page, limit };
     }
 
-    const articleUids = articles.map((a) => a.uid);
-
-    // Run all stats queries in parallel
-    const [statsAgg, likeCounts, userLikedUids] = await Promise.all([
-      // Get view counts for all articles
-      this.prisma.articleStatistic.groupBy({
-        by: ['articleUid'],
-        where: { articleUid: { in: articleUids } },
-        _sum: { viewCount: true },
-      }),
-      // Get like counts for all articles (count of records with likeCount > 0)
+    const [likeCounts, viewAgg, userLikes] = await Promise.all([
       this.prisma.articleStatistic.groupBy({
         by: ['articleUid'],
         where: { articleUid: { in: articleUids }, likeCount: { gt: 0 } },
         _count: { _all: true },
       }),
-      // Resolve member and fetch likes in one go if userEmail provided
-      userEmail
-        ? this.resolveMemberByEmail(userEmail)
-          .then(({ memberUid }) =>
-            this.prisma.articleStatistic.findMany({
-              where: { articleUid: { in: articleUids }, memberUid, likeCount: { gt: 0 } },
-              select: { articleUid: true },
-            })
-          )
-          .then((likes) => new Set(likes.map((l) => l.articleUid)))
-          .catch(() => new Set<string>())
-        : Promise.resolve(new Set<string>()),
+      this.prisma.articleStatistic.groupBy({
+        by: ['articleUid'],
+        where: { articleUid: { in: articleUids } },
+        _sum: { viewCount: true },
+      }),
+      memberUid
+        ? this.prisma.articleStatistic.findMany({
+            where: {
+              articleUid: { in: articleUids },
+              memberUid,
+              likeCount: { gt: 0 },
+            },
+            select: { articleUid: true },
+          })
+        : Promise.resolve([]),
     ]);
 
-    const viewMap = new Map(statsAgg.map((s) => [s.articleUid, s._sum.viewCount ?? 0]));
+    const viewMap = new Map(viewAgg.map((s) => [s.articleUid, s._sum.viewCount ?? 0]));
     const likeMap = new Map(likeCounts.map((s) => [s.articleUid, s._count._all]));
+    const userLikedUids = new Set(userLikes.map((l) => l.articleUid));
 
-    let data = articles.map((article) => ({
+    let data = filtered.map((article) => ({
       ...article,
       totalViews: viewMap.get(article.uid) ?? 0,
       totalLikes: likeMap.get(article.uid) ?? 0,
@@ -301,10 +362,15 @@ export class ArticlesService {
       throw new NotFoundException('Article not found');
     }
 
-    // Scope check: if the article has a scope, verify user has access (authors bypass)
-    if (article.scope && !isAuthor) {
-      const userScopes = await this.resolveUserScopes(userEmail);
-      if (!userScopes.includes(article.scope)) {
+    // Permission check: if the article requires a permission, verify user has access (authors bypass)
+    if (article.requiredPermissionCode && !isAuthor) {
+      if (!userEmail) {
+        throw new ForbiddenException('You do not have access to this article');
+      }
+
+      const { memberUid } = await this.resolveMemberByEmail(userEmail);
+      const allowed = await this.hasArticlePermission(memberUid, article.requiredPermissionCode);
+      if (!allowed) {
         throw new ForbiddenException('You do not have access to this article');
       }
     }
@@ -380,16 +446,20 @@ export class ArticlesService {
     };
   }
 
-  private async assertArticleScopeAccess(articleUid: string, userEmail: string): Promise<void> {
+  private async assertArticlePermissionAccess(articleUid: string, userEmail: string): Promise<void> {
     const article = await this.prisma.article.findFirst({
       where: { uid: articleUid, isDeleted: false },
-      select: { scope: true },
+      select: { requiredPermissionCode: true },
     });
-    if (article?.scope) {
-      const userScopes = await this.resolveUserScopes(userEmail);
-      if (!userScopes.includes(article.scope)) {
-        throw new ForbiddenException('You do not have access to this article');
-      }
+
+    if (!article?.requiredPermissionCode) {
+      return;
+    }
+
+    const { memberUid } = await this.resolveMemberByEmail(userEmail);
+    const allowed = await this.hasArticlePermission(memberUid, article.requiredPermissionCode);
+    if (!allowed) {
+      throw new ForbiddenException('You do not have access to this article');
     }
   }
 
@@ -405,7 +475,7 @@ export class ArticlesService {
       throw new NotFoundException('Article not found');
     }
 
-    await this.assertArticleScopeAccess(articleUid, userEmail);
+    await this.assertArticlePermissionAccess(articleUid, userEmail);
 
     return this.prisma.articleStatistic.upsert({
       where: { articleUid_memberUid: { articleUid, memberUid } },
@@ -417,7 +487,7 @@ export class ArticlesService {
   async unlikeArticle(userEmail: string, articleUid: string) {
     const { memberUid } = await this.resolveMemberByEmail(userEmail);
 
-    await this.assertArticleScopeAccess(articleUid, userEmail);
+    await this.assertArticlePermissionAccess(articleUid, userEmail);
 
     const stat = await this.prisma.articleStatistic.findUnique({
       where: { articleUid_memberUid: { articleUid, memberUid } },
@@ -445,7 +515,7 @@ export class ArticlesService {
       throw new NotFoundException('Article not found');
     }
 
-    await this.assertArticleScopeAccess(articleUid, userEmail);
+    await this.assertArticlePermissionAccess(articleUid, userEmail);
 
     return this.prisma.articleStatistic.upsert({
       where: { articleUid_memberUid: { articleUid, memberUid } },
@@ -496,7 +566,7 @@ export class ArticlesService {
   }
 
   async createArticle(body: CreateArticleDto, userEmail?: string) {
-    this.validateArticleScope(body.scope);
+    this.validateRequiredPermissionCode(body.requiredPermissionCode);
     if (body.authorMemberUid && body.authorTeamUid) {
       throw new BadRequestException('Provide either authorMemberUid or authorTeamUid, not both');
     }
@@ -543,7 +613,7 @@ export class ArticlesService {
           createdBy,
           updatedBy: createdBy,
           status,
-          scope: body.scope ?? null,
+          requiredPermissionCode: body.requiredPermissionCode ?? null,
           publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
         },
         include: this.articleInclude,
@@ -552,7 +622,7 @@ export class ArticlesService {
   }
 
   async updateOwnArticle(userEmail: string, uid: string, body: UpdateArticleDto) {
-    if (body.scope !== undefined) this.validateArticleScope(body.scope);
+    if (body.requiredPermissionCode !== undefined) this.validateRequiredPermissionCode(body.requiredPermissionCode);
     const { memberUid, teamUid, isDirectoryAdmin } = await this.resolveMemberByEmail(userEmail);
     await this.ensureArticleOwnership(uid, memberUid, teamUid, isDirectoryAdmin);
 
@@ -573,7 +643,7 @@ export class ArticlesService {
       data.readingTime = this.calculateReadingTime(body.content);
     }
     if (body.coverImageUid !== undefined) data.coverImageUid = body.coverImageUid;
-    if (body.scope !== undefined) data.scope = body.scope;
+    if (body.requiredPermissionCode !== undefined) data.requiredPermissionCode = body.requiredPermissionCode;
     if (body.status !== undefined) {
       data.status = body.status;
       if (body.status === ArticleStatus.PUBLISHED && existing.status !== ArticleStatus.PUBLISHED) {
@@ -718,7 +788,7 @@ export class ArticlesService {
   }
 
   async adminCreate(body: CreateArticleDto, userEmail?: string) {
-    this.validateArticleScope(body.scope);
+    this.validateRequiredPermissionCode(body.requiredPermissionCode);
     const slugURL = body.slugURL || (await this.generateSlug(body.title));
     const readingTime = this.calculateReadingTime(body.content);
     const status = body.status ?? ArticleStatus.DRAFT;
@@ -758,7 +828,7 @@ export class ArticlesService {
           createdBy,
           updatedBy: createdBy,
           status,
-          scope: body.scope ?? null,
+          requiredPermissionCode: body.requiredPermissionCode ?? null,
           publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
         },
         include: this.articleInclude,
@@ -767,7 +837,7 @@ export class ArticlesService {
   }
 
   async adminUpdate(uid: string, body: UpdateArticleDto, userEmail?: string) {
-    if (body.scope !== undefined) this.validateArticleScope(body.scope);
+    if (body.requiredPermissionCode !== undefined) this.validateRequiredPermissionCode(body.requiredPermissionCode);
     const existing = await this.prisma.article.findUnique({ where: { uid } });
 
     if (!existing) {
@@ -788,7 +858,7 @@ export class ArticlesService {
     if (body.coverImageUid !== undefined) data.coverImageUid = body.coverImageUid;
     if (body.authorMemberUid !== undefined) data.authorMemberUid = body.authorMemberUid;
     if (body.authorTeamUid !== undefined) data.authorTeamUid = body.authorTeamUid;
-    if (body.scope !== undefined) data.scope = body.scope;
+    if (body.requiredPermissionCode !== undefined) data.requiredPermissionCode = body.requiredPermissionCode;
     if (body.status !== undefined) {
       data.status = body.status;
       if (body.status === ArticleStatus.PUBLISHED && existing.status !== ArticleStatus.PUBLISHED) {
