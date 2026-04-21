@@ -40,7 +40,7 @@ Talk to a qualified startup attorney before making this decision. The cost of re
       authorMemberUid: author.uid,
       authorTeamUid: null,
       status: ArticleStatus.PUBLISHED,
-      scope: 'PLVS',
+      requiredPermissionCode: 'founder_guides.view.plvs',
       publishedAt: new Date('2026-01-15T10:00:00.000Z'),
     },
     {
@@ -69,7 +69,7 @@ Keep your cap table updated after every transaction — SAFEs, options grants, a
       authorMemberUid: null,
       authorTeamUid: team?.uid ?? null,
       status: ArticleStatus.PUBLISHED,
-      scope: 'PLCC',
+      requiredPermissionCode: 'founder_guides.view.plcc',
       publishedAt: new Date('2026-01-22T10:00:00.000Z'),
     },
     {
@@ -118,7 +118,7 @@ The best fundraising advice: build something people want, and the money will fol
       authorMemberUid: author.uid,
       authorTeamUid: null,
       status: ArticleStatus.PUBLISHED,
-      scope: null,
+      requiredPermissionCode: null,
       publishedAt: new Date('2026-03-01T10:00:00.000Z'),
     },
     {
@@ -142,7 +142,7 @@ Check back soon for the full guide.`,
       authorMemberUid: author.uid,
       authorTeamUid: null,
       status: ArticleStatus.DRAFT,
-      scope: 'PLVS',
+      requiredPermissionCode: 'founder_guides.view.plvs',
       publishedAt: null,
     },
     {
@@ -167,7 +167,7 @@ Draft notes: Most Series A rounds in 2026 require $1-2M ARR with 15-20% month-ov
       authorMemberUid: null,
       authorTeamUid: team?.uid ?? null,
       status: ArticleStatus.DRAFT,
-      scope: null,
+      requiredPermissionCode: null,
       publishedAt: null,
     },
   ];

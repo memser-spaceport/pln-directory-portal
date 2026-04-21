@@ -23,7 +23,7 @@ export class CreateArticleDto {
   authorMemberUid?: string;
   authorTeamUid?: string;
   status?: ArticleStatus;
-  scope?: string | null;
+  requiredPermissionCode?: string | null;
   officeHours?: string | null;
 }
 
@@ -38,7 +38,7 @@ export class UpdateArticleDto {
   authorMemberUid?: string;
   authorTeamUid?: string;
   status?: ArticleStatus;
-  scope?: string | null;
+  requiredPermissionCode?: string | null;
   officeHours?: string | null;
 }
 
