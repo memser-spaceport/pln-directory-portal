@@ -59,3 +59,13 @@ export const UploadTeamTiersResultSchema = z.object({
   failedKeys: z.array(z.string()).optional(),
 });
 export class UploadTeamTiersResultDto extends createZodDto(UploadTeamTiersResultSchema) {}
+
+/**
+ * Query parameters for the force-enrichment endpoints.
+ * - `all`: retry every enrichable field except those the user manually edited (overwrites AI-filled values).
+ * - `cannotEnrich`: retry only fields whose prior status was CannotEnrich.
+ */
+export const TriggerForceEnrichmentQuerySchema = z.object({
+  mode: z.enum(['all', 'cannotEnrich']).optional().default('all'),
+});
+export class TriggerForceEnrichmentQueryDto extends createZodDto(TriggerForceEnrichmentQuerySchema) {}

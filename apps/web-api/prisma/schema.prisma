@@ -71,6 +71,7 @@ model Team {
   accessLevelUpdatedAt         DateTime                      @default(now())
   eventAssociations            PLEventAssociation[]
   dataEnrichment               Json? /// AI enrichment metadata
+  logoVerificationResults      TeamLogoVerificationResult[]
 
   vendorDeals             Deal[]           @relation("DealVendorTeam")
   dealSubmissionsAsVendor DealSubmission[] @relation("DealSubmissionVendorTeam")
@@ -404,36 +405,37 @@ model Technology {
 }
 
 model Image {
-  id                   Int               @id @default(autoincrement())
-  uid                  String            @unique @default(cuid())
+  id                      Int                          @id @default(autoincrement())
+  uid                     String                       @unique @default(cuid())
   // The cid is not unique because this id represents an array of multiple images
   // with different sizes that can be accessed trough the cid and filename
-  cid                  String
-  width                Int
-  height               Int
-  url                  String
-  filename             String
-  size                 Int
-  type                 String
-  version              ImageSize
+  cid                     String
+  width                   Int
+  height                  Int
+  url                     String
+  filename                String
+  size                    Int
+  type                    String
+  version                 ImageSize
   // This image can be a thumbnail to other image
-  thumbnailToUid       String?
-  thumbnailTo          Image?            @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
+  thumbnailToUid          String?
+  thumbnailTo             Image?                       @relation("ImageThumbnails", fields: [thumbnailToUid], references: [uid])
   // This image can have multiple thumbnails
-  thumbnails           Image[]           @relation("ImageThumbnails")
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  thumbnails              Image[]                      @relation("ImageThumbnails")
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
   // Reverse Relations:
-  Team                 Team[]
-  Member               Member[]
-  Project              Project[]
-  eventLogo            PLEvent[]         @relation("logo")
-  eventBanner          PLEvent[]         @relation("banner")
-  demoDayBrandingLogos DemoDayBranding[]
-  demoDayBrandingHeaders DemoDayBranding[] @relation("HeaderImage")
-  dealLogos            Deal[]            @relation("DealLogo")
-  dealSubmissionLogos  DealSubmission[]  @relation("DealSubmissionLogo")
-  articleCoverImages   Article[]         @relation("ArticleCoverImage")
+  Team                    Team[]
+  Member                  Member[]
+  Project                 Project[]
+  eventLogo               PLEvent[]                    @relation("logo")
+  eventBanner             PLEvent[]                    @relation("banner")
+  demoDayBrandingLogos    DemoDayBranding[]
+  demoDayBrandingHeaders  DemoDayBranding[]            @relation("HeaderImage")
+  dealLogos               Deal[]                       @relation("DealLogo")
+  dealSubmissionLogos     DealSubmission[]             @relation("DealSubmissionLogo")
+  articleCoverImages      Article[]                    @relation("ArticleCoverImage")
+  logoVerificationResults TeamLogoVerificationResult[]
 }
 
 model Faq {
@@ -980,7 +982,7 @@ model TeamFundraisingProfile {
   videoUpload    Upload? @relation("TFP_videoUpload", fields: [videoUploadUid], references: [uid])
 
   description String?
-  program   String?
+  program     String?
 
   status TeamFundraisingProfileStatus @default(DRAFT)
 
@@ -1334,25 +1336,25 @@ enum PushNotificationCategory {
 
 // Push notifications for WebSocket delivery
 model PushNotification {
-  id           Int                      @id @default(autoincrement())
-  uid          String                   @unique @default(cuid())
-  category     PushNotificationCategory
-  title        String
-  description  String?
-  image        String? // URL to image
-  link         String? // URL or route to navigate to
-  linkText     String? // Display text for the link button (e.g., "Explore Guides")
-  metadata     Json?                    @default("{}")
-  isPublic     Boolean                  @default(false) // If true, anyone can see; if false, only recipient
-  recipientUid String? // Optional: Member.uid of user to notify (null = broadcast/public)
-  recipient    Member?                  @relation("PushNotificationRecipient", fields: [recipientUid], references: [uid], onDelete: Cascade)
-  accessLevels       String[]                 @default([]) // Optional: list of access levels (L2, L3, L4, L5, L6) to target
+  id                  Int                      @id @default(autoincrement())
+  uid                 String                   @unique @default(cuid())
+  category            PushNotificationCategory
+  title               String
+  description         String?
+  image               String? // URL to image
+  link                String? // URL or route to navigate to
+  linkText            String? // Display text for the link button (e.g., "Explore Guides")
+  metadata            Json?                    @default("{}")
+  isPublic            Boolean                  @default(false) // If true, anyone can see; if false, only recipient
+  recipientUid        String? // Optional: Member.uid of user to notify (null = broadcast/public)
+  recipient           Member?                  @relation("PushNotificationRecipient", fields: [recipientUid], references: [uid], onDelete: Cascade)
+  accessLevels        String[]                 @default([]) // Optional: list of access levels (L2, L3, L4, L5, L6) to target
   requiredPermissions String[]                 @default([]) // Optional: list of permission codes; user needs ANY of these to see notification
-  isRead             Boolean                  @default(false) // For private notifications only
-  isSent       Boolean                  @default(false) // Whether sent via WebSocket
-  sentAt       DateTime? // When sent via WebSocket
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
+  isRead              Boolean                  @default(false) // For private notifications only
+  isSent              Boolean                  @default(false) // Whether sent via WebSocket
+  sentAt              DateTime? // When sent via WebSocket
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
 
   // Read status for public notifications (tracked per user)
   readStatuses PushNotificationReadStatus[]
@@ -1811,4 +1813,32 @@ model MemberPermission {
 
   @@index([memberUid])
   @@index([permissionUid])
+}
+
+model TeamLogoVerificationResult {
+  id                   Int      @id @default(autoincrement())
+  uid                  String   @unique @default(cuid())
+  teamUid              String
+  team                 Team     @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  logoUid              String?
+  logo                 Image?   @relation(fields: [logoUid], references: [uid], onDelete: SetNull)
+  provider             String
+  model                String?
+  website              String?
+  logoUrl              String?
+  source               String?
+  verdict              String
+  confidence           String
+  quality              String
+  hasReadableText      Boolean  @default(false)
+  predictedCompanyName String?
+  reason               String?
+  brandSignals         Json?
+  rawResponse          Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([teamUid, createdAt])
+  @@index([teamUid, provider])
+  @@index([logoUid])
 }
