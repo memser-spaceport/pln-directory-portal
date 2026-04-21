@@ -1964,4 +1964,7 @@ model JobOpening {
   @@index([detectionDate])
   @@index([lastSeenLive])
   @@index([sourceType])
+  @@index([roleCategory])
+  @@index([seniority])
+  @@index([dwCompanyId])
 }

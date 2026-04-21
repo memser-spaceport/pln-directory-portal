@@ -66,6 +66,7 @@ import { DealsModule } from './deals/deals.module';
 import { DealRequestsModule } from './deal-requests/deal-requests.module';
 import { ArticleRequestsModule } from './article-requests/article-requests.module';
 import { JobOpeningsModule } from './job-openings/job-openings.module';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -153,6 +154,7 @@ import { JobOpeningsModule } from './job-openings/job-openings.module';
     DealRequestsModule,
     ArticleRequestsModule,
     JobOpeningsModule,
+    JobsModule,
   ],
   providers: [
     {
