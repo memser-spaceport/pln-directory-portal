@@ -193,28 +193,28 @@ model Member {
   pushNotificationReadStatuses     PushNotificationReadStatus[]      @relation("PushNotificationReadStatuses")
   eventAssociations                PLEventAssociation[]
 
-  dealSubmissions         DealSubmission[]     @relation("MemberDealSubmissions")
-  reviewedDealSubmissions DealSubmission[]     @relation("MemberReviewedDealSubmissions")
-  dealIssues              DealIssue[]          @relation("MemberDealIssues")
-  resolvedDealIssues      DealIssue[]          @relation("MemberResolvedDealIssues")
-  dealRedemptions         DealRedemption[]     @relation("MemberDealRedemptions")
-  dealUsages              DealUsage[]          @relation("MemberDealUsages")
-  dealWhitelist           DealWhitelist?       @relation("MemberDealWhitelist")
-  dealRequests            DealRequest[]        @relation("MemberDealRequests")
-  articles                Article[]            @relation("MemberArticles")
-  articleStatistics       ArticleStatistic[]   @relation("MemberArticleStatistics")
-  articleWhitelist        ArticleWhitelist?    @relation("MemberArticleWhitelist")
-  articleRequests         ArticleRequest[]     @relation("MemberArticleRequests")
-  articleComments         ArticleComment[]     @relation("MemberArticleComments")
-  articleCommentLikes     ArticleCommentLike[] @relation("MemberArticleCommentLikes")
-  roleAssignments             RoleAssignment[]     @relation("MemberRoleAssignments")
-  policyAssignmentsV2         PolicyAssignment[]   @relation("PolicyAssignmentMember")
-  policyAssignmentsV2Given    PolicyAssignment[]   @relation("PolicyAssignmentAssignedBy")
-  memberPermissionsV2         MemberPermissionV2[] @relation("MemberPermissionV2Member")
-  memberPermissionsV2Given    MemberPermissionV2[] @relation("MemberPermissionV2GrantedBy")
-  roleAssignmentsGiven        RoleAssignment[]     @relation("MemberRoleAssignmentsGiven")
-  memberPermissions           MemberPermission[]   @relation("MemberDirectPermissions")
-  memberPermissionsGiven      MemberPermission[]   @relation("MemberDirectPermissionsGiven")
+  dealSubmissions          DealSubmission[]     @relation("MemberDealSubmissions")
+  reviewedDealSubmissions  DealSubmission[]     @relation("MemberReviewedDealSubmissions")
+  dealIssues               DealIssue[]          @relation("MemberDealIssues")
+  resolvedDealIssues       DealIssue[]          @relation("MemberResolvedDealIssues")
+  dealRedemptions          DealRedemption[]     @relation("MemberDealRedemptions")
+  dealUsages               DealUsage[]          @relation("MemberDealUsages")
+  dealWhitelist            DealWhitelist?       @relation("MemberDealWhitelist")
+  dealRequests             DealRequest[]        @relation("MemberDealRequests")
+  articles                 Article[]            @relation("MemberArticles")
+  articleStatistics        ArticleStatistic[]   @relation("MemberArticleStatistics")
+  articleWhitelist         ArticleWhitelist?    @relation("MemberArticleWhitelist")
+  articleRequests          ArticleRequest[]     @relation("MemberArticleRequests")
+  articleComments          ArticleComment[]     @relation("MemberArticleComments")
+  articleCommentLikes      ArticleCommentLike[] @relation("MemberArticleCommentLikes")
+  roleAssignments          RoleAssignment[]     @relation("MemberRoleAssignments")
+  policyAssignmentsV2      PolicyAssignment[]   @relation("PolicyAssignmentMember")
+  policyAssignmentsV2Given PolicyAssignment[]   @relation("PolicyAssignmentAssignedBy")
+  memberPermissionsV2      MemberPermissionV2[] @relation("MemberPermissionV2Member")
+  memberPermissionsV2Given MemberPermissionV2[] @relation("MemberPermissionV2GrantedBy")
+  roleAssignmentsGiven     RoleAssignment[]     @relation("MemberRoleAssignmentsGiven")
+  memberPermissions        MemberPermission[]   @relation("MemberDirectPermissions")
+  memberPermissionsGiven   MemberPermission[]   @relation("MemberDirectPermissionsGiven")
 }
 
 model MemberRole {
@@ -1765,8 +1765,8 @@ model Permission {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  rolePermissions   RolePermission[]
-  memberPermissions MemberPermission[]
+  rolePermissions     RolePermission[]
+  memberPermissions   MemberPermission[]
   policyPermissions   PolicyPermission[]
   memberPermissionsV2 MemberPermissionV2[]
 }
@@ -1851,7 +1851,6 @@ model TeamLogoVerificationResult {
   @@index([logoUid])
 }
 
-
 model Policy {
   uid               String             @id @default(cuid())
   code              String             @unique
@@ -1880,15 +1879,15 @@ model PolicyPermission {
 }
 
 model PolicyAssignment {
-  uid          String   @id @default(cuid())
-  memberUid    String
-  policyUid    String
+  uid           String   @id @default(cuid())
+  memberUid     String
+  policyUid     String
   assignedByUid String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  member       Member   @relation("PolicyAssignmentMember", fields: [memberUid], references: [uid], onDelete: Cascade)
-  policy       Policy   @relation(fields: [policyUid], references: [uid], onDelete: Cascade)
-  assignedBy   Member?  @relation("PolicyAssignmentAssignedBy", fields: [assignedByUid], references: [uid], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  member        Member   @relation("PolicyAssignmentMember", fields: [memberUid], references: [uid], onDelete: Cascade)
+  policy        Policy   @relation(fields: [policyUid], references: [uid], onDelete: Cascade)
+  assignedBy    Member?  @relation("PolicyAssignmentAssignedBy", fields: [assignedByUid], references: [uid], onDelete: SetNull)
 
   @@unique([memberUid, policyUid])
   @@index([memberUid])
@@ -1896,18 +1895,73 @@ model PolicyAssignment {
 }
 
 model MemberPermissionV2 {
-  uid          String     @id @default(cuid())
-  memberUid    String
+  uid           String     @id @default(cuid())
+  memberUid     String
   permissionUid String
-  grantedByUid String?
-  reason       String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  member       Member     @relation("MemberPermissionV2Member", fields: [memberUid], references: [uid], onDelete: Cascade)
-  permission   Permission @relation(fields: [permissionUid], references: [uid], onDelete: Cascade)
-  grantedBy    Member?    @relation("MemberPermissionV2GrantedBy", fields: [grantedByUid], references: [uid], onDelete: SetNull)
+  grantedByUid  String?
+  reason        String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  member        Member     @relation("MemberPermissionV2Member", fields: [memberUid], references: [uid], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionUid], references: [uid], onDelete: Cascade)
+  grantedBy     Member?    @relation("MemberPermissionV2GrantedBy", fields: [grantedByUid], references: [uid], onDelete: SetNull)
 
   @@unique([memberUid, permissionUid])
   @@index([memberUid])
   @@index([permissionUid])
+}
+
+// ── Job Openings (TAP/WS3 Ingestion) ──────────────────────────────────────────
+
+enum JobOpeningStatus {
+  NEW
+  CONFIRMED
+  ROUTED_TO_WS4
+  STALE
+  CLOSED_DUPLICATE
+  CLOSED_INCORRECT_SIGNAL
+  CLOSED_NOT_HIRING_SIGNAL
+  CLOSED_ROLE_FILLED
+}
+
+model JobOpening {
+  id              Int              @id @default(autoincrement())
+  uid             String           @unique @default(cuid())
+  status          JobOpeningStatus @default(NEW)
+  companyName     String
+  signalType      String
+  roleTitle       String
+  roleCategory    String?
+  department      String?
+  seniority       String?
+  urgency         String?
+  summary         String?
+  location        String?
+  ws4AskId        String?
+  detectionDate   DateTime
+  sourceType      String?
+  sourceLink      String?
+  detectionMethod String?
+  companyPriority String?
+  focusAreas      String?
+  subFocusAreas   String?
+  teamNotified    String?
+  sourceDate      DateTime?
+  postedDate      DateTime?
+  lastSeenLive    DateTime?
+  signalId        String?
+  canonicalKey    String           @unique
+  dwCompanyId     String?
+  needsReview     String?
+  notes           String?
+  portfolio       String?
+  rawPayload      Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([status])
+  @@index([companyName])
+  @@index([detectionDate])
+  @@index([lastSeenLive])
+  @@index([sourceType])
 }
