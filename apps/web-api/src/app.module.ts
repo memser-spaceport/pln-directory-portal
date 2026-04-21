@@ -1,3 +1,4 @@
+import { AccessControlV2Module } from './access-control-v2/access-control-v2.module';
 import { ArticlesModule } from './articles/articles.module';
 import { BullModule } from '@nestjs/bull';
 import { CacheModule, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
@@ -68,6 +69,7 @@ import { ArticleRequestsModule } from "./article-requests/article-requests.modul
 @Module({
   controllers: [AppController, MetricsController],
   imports: [
+    AccessControlV2Module,
     AnalyticsModule,
     ArticlesModule,
     ThrottlerModule.forRoot({
