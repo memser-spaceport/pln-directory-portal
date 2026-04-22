@@ -8,9 +8,10 @@ import { DebugAccessControlV2Controller } from './controllers/debug-access-contr
 import { SelfAccessControlV2Controller } from './controllers/self-access-control-v2.controller';
 import { AdminAccessControlV2MetaController } from './controllers/admin-access-control-v2-meta.controller';
 import { AccessControlV2Service } from './services/access-control-v2.service';
+import { MemberApprovalsModule } from '../member-approvals/member-approvals.module';
 
 @Module({
-  imports: [SharedModule],
+  imports: [SharedModule, MemberApprovalsModule],
   controllers: [
     AdminAccessControlV2Controller,
     DebugAccessControlV2Controller,
