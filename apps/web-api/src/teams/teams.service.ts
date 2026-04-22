@@ -56,7 +56,7 @@ export class TeamsService {
     private teamsHooksService: TeamsHooksService,
     private openSearchService: OpenSearchService,
     @Inject(forwardRef(() => TeamEnrichmentService))
-    private teamEnrichmentService: TeamEnrichmentService,
+    private teamEnrichmentService: TeamEnrichmentService
   ) {}
 
   /**
@@ -251,7 +251,7 @@ export class TeamsService {
           eventAssociations: {
             where: {
               entityType: 'TEAM',
-              teamUid: uid
+              teamUid: uid,
             },
             select: {
               uid: true,
@@ -547,7 +547,7 @@ export class TeamsService {
       if (computedTier !== team.tier) {
         this.logger.info(
           `[Teams] Conflicting tier/priority provided (tier=${team.tier}, priority=${team.priority}). ` +
-          `Using priority and overwriting tier -> ${computedTier}.`
+            `Using priority and overwriting tier -> ${computedTier}.`
         );
         team.tier = computedTier;
       }
@@ -567,8 +567,8 @@ export class TeamsService {
     team['logo'] = teamData.logoUid
       ? { connect: { uid: teamData.logoUid } }
       : type === 'Update'
-        ? { disconnect: true }
-        : undefined;
+      ? { disconnect: true }
+      : undefined;
 
     // Handle investor profile
     let investorProfileData: any;
@@ -817,8 +817,17 @@ export class TeamsService {
    * @returns - Prisma AND filter combining all conditions
    */
   buildTeamFilter(queryParams) {
-    const { name, plnFriend, industryTags, technologies, membershipSources, communityAffiliations, fundingStage, officeHours, isHost } =
-      queryParams;
+    const {
+      name,
+      plnFriend,
+      industryTags,
+      technologies,
+      membershipSources,
+      communityAffiliations,
+      fundingStage,
+      officeHours,
+      isHost,
+    } = queryParams;
     const filter: any = [];
     this.buildNameAndPLNFriendFilter(name, plnFriend, filter);
     this.buildIndustryTagsFilter(industryTags, filter);
@@ -1245,71 +1254,72 @@ export class TeamsService {
    * and technologies that contains atleast one team.
    */
   async getTeamFilters(queryParams, userEmail: string | null) {
-    const [industryTags, membershipSources, communityAffiliations, fundingStages, technologies, askTags] = await Promise.all([
-      this.prisma.industryTag.findMany({
-        where: {
-          teams: {
-            some: { ...queryParams.where },
+    const [industryTags, membershipSources, communityAffiliations, fundingStages, technologies, askTags] =
+      await Promise.all([
+        this.prisma.industryTag.findMany({
+          where: {
+            teams: {
+              some: { ...queryParams.where },
+            },
           },
-        },
-        select: {
-          title: true,
-        },
-      }),
-
-      this.prisma.membershipSource.findMany({
-        where: {
-          teams: {
-            some: { ...queryParams.where },
+          select: {
+            title: true,
           },
-        },
-        select: {
-          title: true,
-        },
-      }),
+        }),
 
-      this.prisma.communityAffiliation.findMany({
-        where: {
-          teams: {
-            some: { ...queryParams.where },
+        this.prisma.membershipSource.findMany({
+          where: {
+            teams: {
+              some: { ...queryParams.where },
+            },
           },
-        },
-        select: {
-          title: true,
-        },
-      }),
-
-      this.prisma.fundingStage.findMany({
-        where: {
-          teams: {
-            some: { ...queryParams.where },
+          select: {
+            title: true,
           },
-        },
-        select: {
-          title: true,
-        },
-      }),
+        }),
 
-      this.prisma.technology.findMany({
-        where: {
-          teams: {
-            some: { ...queryParams.where },
+        this.prisma.communityAffiliation.findMany({
+          where: {
+            teams: {
+              some: { ...queryParams.where },
+            },
           },
-        },
-        select: {
-          title: true,
-        },
-      }),
+          select: {
+            title: true,
+          },
+        }),
 
-      this.prisma.ask.findMany({
-        where: {
-          team: queryParams.where,
-        },
-        select: {
-          tags: true,
-        },
-      }),
-    ]);
+        this.prisma.fundingStage.findMany({
+          where: {
+            teams: {
+              some: { ...queryParams.where },
+            },
+          },
+          select: {
+            title: true,
+          },
+        }),
+
+        this.prisma.technology.findMany({
+          where: {
+            teams: {
+              some: { ...queryParams.where },
+            },
+          },
+          select: {
+            title: true,
+          },
+        }),
+
+        this.prisma.ask.findMany({
+          where: {
+            team: queryParams.where,
+          },
+          select: {
+            tags: true,
+          },
+        }),
+      ]);
 
     const canSee = await this.canSeeTiers(userEmail || undefined);
     const priorities = canSee ? await this.getPriorityCounts(queryParams.where ?? {}) : undefined;
@@ -1414,19 +1424,16 @@ export class TeamsService {
     try {
       const search = (queryParams?.search ?? '').toString().trim();
 
-      const filter = (queryParams?.filter ?? 'all')
-        .toString()
-        .trim()
-        .toLowerCase(); // all | host | speaker | sponsor
+      const filter = (queryParams?.filter ?? 'all').toString().trim().toLowerCase(); // all | host | speaker | sponsor
 
       const whereGuests =
         filter === 'host'
           ? { isHost: true }
           : filter === 'speaker'
-            ? { isSpeaker: true }
-            : filter === 'sponsor'
-              ? { isSponsor: true }
-              : { OR: [{ isHost: true }, { isSpeaker: true }, { isSponsor: true }] };
+          ? { isSpeaker: true }
+          : filter === 'sponsor'
+          ? { isSponsor: true }
+          : { OR: [{ isHost: true }, { isSpeaker: true }, { isSponsor: true }] };
 
       let where: any = {
         eventGuests: {
@@ -1855,17 +1862,17 @@ export class TeamsService {
         SELECT DISTINCT t.id FROM "Team" t
         INNER JOIN "InvestorProfile" ip ON t."investorProfileId" = ip.uid
         WHERE ${Prisma.raw(
-        focusArray
-          .map(
-            (focus) => `
+          focusArray
+            .map(
+              (focus) => `
               EXISTS (
                 SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item
                 WHERE LOWER(focus_item) LIKE LOWER('%${focus.replace(/'/g, "''")}%')
               )
             `
-          )
-          .join(' OR ')
-      )}
+            )
+            .join(' OR ')
+        )}
       `;
 
       if (matchingTeamIds.length > 0) {
@@ -2238,9 +2245,9 @@ export class TeamsService {
               match_phrase: {
                 name: {
                   query: safeName,
-                  boost: 5.0
-                }
-              }
+                  boost: 5.0,
+                },
+              },
             },
             // Fuzzy name match
             {
@@ -2249,8 +2256,8 @@ export class TeamsService {
                   query: safeName,
                   fuzziness: 'AUTO',
                   boost: 3.0,
-                }
-              }
+                },
+              },
             },
             // Short description match
             {
@@ -2259,12 +2266,12 @@ export class TeamsService {
                   query: safeName,
                   fuzziness: 'AUTO',
                   boost: 1.0,
-                }
-              }
-            }
+                },
+              },
+            },
           ],
           minimum_should_match: 1,
-        }
+        },
       },
       _source: ['uid', 'name', 'image'],
       sort: [{ _score: 'desc' }],

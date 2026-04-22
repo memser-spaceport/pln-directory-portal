@@ -66,9 +66,7 @@ import { DealsModule } from './deals/deals.module';
 import { DealRequestsModule } from './deal-requests/deal-requests.module';
 import { ArticleRequestsModule } from './article-requests/article-requests.module';
 import { JobOpeningsModule } from './job-openings/job-openings.module';
-import { JobsModule } from './jobs/jobs.module';
 
-import { MemberApprovalsModule } from './member-approvals/member-approvals.module';
 @Module({
   controllers: [AppController, MetricsController],
   imports: [
@@ -155,7 +153,6 @@ import { MemberApprovalsModule } from './member-approvals/member-approvals.modul
     DealRequestsModule,
     ArticleRequestsModule,
     JobOpeningsModule,
-    JobsModule,
   ],
   providers: [
     {

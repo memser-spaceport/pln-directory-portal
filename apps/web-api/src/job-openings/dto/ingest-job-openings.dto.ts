@@ -23,7 +23,7 @@ export interface JobOpeningIngestItem {
   lastSeenLive?: string;
   signalId?: string;
   canonicalKey: string;
-  dwCompanyId?: string;
+  teamUid?: string;
   needsReview?: string;
   notes?: string;
   portfolio?: string;

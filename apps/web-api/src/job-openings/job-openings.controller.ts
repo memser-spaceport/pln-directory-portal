@@ -1,28 +1,28 @@
 import { Controller, Req } from '@nestjs/common';
 import { Api, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
-import { apiJobs } from 'libs/contracts/src/lib/contract-jobs';
+import { apiJobOpenings } from 'libs/contracts/src/lib/contract-job-openings';
 import { JobsListQueryParams } from 'libs/contracts/src/schema/job-opening';
 import { NoCache } from '../decorators/no-cache.decorator';
-import { JobsService } from './jobs.service';
+import { JobOpeningsQueryService } from './job-openings-query.service';
 
-const server = initNestServer(apiJobs);
+const server = initNestServer(apiJobOpenings);
 
 @Controller()
-export class JobsController {
-  constructor(private readonly jobsService: JobsService) {}
+export class JobOpeningsController {
+  constructor(private readonly jobOpeningsQueryService: JobOpeningsQueryService) {}
 
   @Api(server.route.getJobs)
   @NoCache()
   async getJobs(@Req() request: Request) {
     const params = JobsListQueryParams.parse(request.query);
-    return this.jobsService.listJobs(params);
+    return this.jobOpeningsQueryService.listJobOpenings(params);
   }
 
   @Api(server.route.getJobFilters)
   @NoCache()
   async getJobFilters(@Req() request: Request) {
     const params = JobsListQueryParams.parse(request.query);
-    return this.jobsService.getFilters(params);
+    return this.jobOpeningsQueryService.getFilters(params);
   }
 }

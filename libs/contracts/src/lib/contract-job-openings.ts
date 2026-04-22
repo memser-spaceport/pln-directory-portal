@@ -8,10 +8,10 @@ import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
 
-export const apiJobs = contract.router({
+export const apiJobOpenings = contract.router({
   getJobs: {
     method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/jobs`,
+    path: `${getAPIVersionAsPath('1')}/job-openings`,
     query: JobsListQueryParams,
     responses: {
       200: JobsListResponseSchema,
@@ -20,7 +20,7 @@ export const apiJobs = contract.router({
   },
   getJobFilters: {
     method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/jobs/filters`,
+    path: `${getAPIVersionAsPath('1')}/job-openings/filters`,
     query: JobsListQueryParams,
     responses: {
       200: JobsFiltersResponseSchema,

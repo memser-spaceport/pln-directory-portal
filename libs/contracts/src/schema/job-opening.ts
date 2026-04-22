@@ -22,11 +22,14 @@ export const JobsListQueryParams = z.object({
   location: ListParam,
   q: z.string().optional(),
   sort: z.enum(['newest', 'company_az']).optional().default('newest'),
+  page: z
+    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1))
+    .optional()
+    .default(1),
   limit: z
     .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1).max(100))
     .optional()
     .default(50),
-  cursor: z.string().optional(),
 });
 
 export type JobsListQuery = z.infer<typeof JobsListQueryParams>;
@@ -57,8 +60,10 @@ export const JobTeamGroupSchema = z.object({
 });
 
 export const JobsListResponseSchema = z.object({
+  page: z.number().int(),
+  limit: z.number().int(),
+  total: z.number().int(),
   groups: z.array(JobTeamGroupSchema),
-  nextCursor: z.string().nullable(),
   totalGroups: z.number().int(),
   totalRoles: z.number().int(),
 });
