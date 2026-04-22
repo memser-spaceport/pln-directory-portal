@@ -22,6 +22,24 @@ import {
 
 type FieldsMetaMap = Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
 
+/**
+ * User-owned = user explicitly asserted this value.
+ * True when the field is flagged ChangedByUser, OR has a non-empty value with no prior Enriched meta
+ * (pre-enrichment user data). User-owned values are highest-trust and should bypass downstream
+ * verification / fuzzy-matching checks.
+ */
+function isFieldUserOwned(
+  fieldsMeta: Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>,
+  field: FieldMetaKey,
+  slotHasValue: boolean
+): boolean {
+  const status = fieldsMeta[field]?.status;
+  if (status === FieldEnrichmentStatus.ChangedByUser) return true;
+  // Pre-enrichment user value: has a value but no meta entry at all.
+  if (slotHasValue && !fieldsMeta[field]) return true;
+  return false;
+}
+
 function toConfidence(raw: unknown): FieldConfidence | undefined {
   if (typeof raw !== 'string') return undefined;
   const v = raw.toLowerCase();
@@ -225,6 +243,7 @@ export class TeamEnrichmentService {
     ];
     return this.prisma.team.findMany({
       where: {
+        isFund: true,
         OR: completedStatuses.map((status) => ({
           dataEnrichment: { path: ['status'], equals: status },
         })),
@@ -253,6 +272,306 @@ export class TeamEnrichmentService {
     }
 
     return { total: teams.length, started, skipped };
+  }
+
+  async forceRefetchLogo(
+    teamUid: string,
+    enrichedBy = 'manually'
+  ): Promise<{
+    status: 'started' | 'in_progress' | 'not_found' | 'skipped_user_owned' | 'no_source';
+  }> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: {
+        website: true,
+        linkedinHandler: true,
+        dataEnrichment: true,
+      },
+    });
+    if (!team) return { status: 'not_found' };
+
+    const existing = this.parseEnrichmentMeta(team.dataEnrichment);
+    if (existing?.status === EnrichmentStatus.InProgress) {
+      this.logger.warn(`Logo refetch: enrichment already in progress for team ${teamUid}, skipping`);
+      return { status: 'in_progress' };
+    }
+
+    const existingFieldsMeta = (existing?.fieldsMeta ?? {}) as FieldsMetaMap;
+    if (existingFieldsMeta.logo?.status === FieldEnrichmentStatus.ChangedByUser) {
+      this.logger.log(`Logo refetch: team ${teamUid} logo is user-owned (ChangedByUser), skipping`);
+      return { status: 'skipped_user_owned' };
+    }
+
+    const hasWebsite = !!team.website && team.website.trim() !== '';
+    const hasLinkedin = !!team.linkedinHandler && team.linkedinHandler.trim() !== '';
+    if (!hasWebsite && !hasLinkedin) {
+      this.logger.log(`Logo refetch: team ${teamUid} has no website or linkedinHandler, skipping`);
+      return { status: 'no_source' };
+    }
+
+    const priorStatus = existing?.status ?? null;
+    await this.updateEnrichmentStatus(teamUid, team.dataEnrichment, EnrichmentStatus.InProgress);
+
+    this.logger.log(`Logo refetch queued for team ${teamUid}`);
+
+    this.doRefetchLogo(teamUid, enrichedBy, priorStatus).catch((err) => {
+      this.logger.error(`Background logo refetch failed for team ${teamUid}: ${err.message}`, err.stack);
+    });
+
+    return { status: 'started' };
+  }
+
+  async forceRefetchLogoForAllTeams(enrichedBy = 'manually'): Promise<{
+    total: number;
+    started: number;
+    skippedInProgress: number;
+    skippedUserOwned: number;
+    noSource: number;
+    notFound: number;
+  }> {
+    const teams = await this.prisma.team.findMany({
+      where: {
+        isFund: true,
+        OR: [
+          { AND: [{ website: { not: null } }, { website: { not: '' } }] },
+          { AND: [{ linkedinHandler: { not: null } }, { linkedinHandler: { not: '' } }] },
+        ],
+      },
+      select: { uid: true },
+    });
+
+    this.logger.log(`Force logo refetch all: found ${teams.length} isFund teams with website or linkedinHandler`);
+
+    const counters = { started: 0, skippedInProgress: 0, skippedUserOwned: 0, noSource: 0, notFound: 0 };
+
+    for (const team of teams) {
+      const { status } = await this.forceRefetchLogo(team.uid, enrichedBy);
+      switch (status) {
+        case 'started':
+          counters.started++;
+          break;
+        case 'in_progress':
+          counters.skippedInProgress++;
+          break;
+        case 'skipped_user_owned':
+          counters.skippedUserOwned++;
+          break;
+        case 'no_source':
+          counters.noSource++;
+          break;
+        case 'not_found':
+          counters.notFound++;
+          break;
+      }
+    }
+
+    return { total: teams.length, ...counters };
+  }
+
+  /**
+   * Refetch the logo for a single team using ScrapingDog (high confidence)
+   * with OG/website as a fallback. Runs in the background and restores the
+   * prior enrichment status when done.
+   */
+  private async doRefetchLogo(
+    teamUid: string,
+    enrichedBy: string,
+    priorStatus: EnrichmentStatus | null
+  ): Promise<void> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: {
+        uid: true,
+        name: true,
+        website: true,
+        linkedinHandler: true,
+        logoUid: true,
+        dataEnrichment: true,
+      },
+    });
+
+    if (!team) {
+      this.logger.warn(`Logo refetch: team ${teamUid} not found`);
+      return;
+    }
+
+    try {
+      const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
+      const existingFieldsMeta = (existingMeta?.fieldsMeta ?? {}) as FieldsMetaMap;
+
+      const updateData: Prisma.TeamUpdateInput = {};
+      let newLogoMeta: FieldEnrichmentMeta | null = null;
+      let sourceUsed: EnrichmentSource | null = null;
+      let scrapingDogInternalId: string | null | undefined;
+
+      // 1. Prefer ScrapingDog (high confidence) when LinkedIn handle is available.
+      if (this.scrapingDogService.isConfigured() && team.linkedinHandler) {
+        // User-asserted LinkedIn handle is ground truth — skip the fuzzy team-name entity check
+        // (it can falsely reject correct profiles when the LinkedIn company name differs from team.name).
+        const linkedinIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
+        this.logger.log(
+          `Logo refetch: trying ScrapingDog for team ${teamUid} (${team.name}) handle "${team.linkedinHandler}"${
+            linkedinIsUserOwned ? ' (user-owned handle, entity check bypassed)' : ''
+          }`
+        );
+        const profile = await this.scrapingDogService.fetchCompanyProfile(team.linkedinHandler);
+        if (profile) {
+          const entityOk = linkedinIsUserOwned || this.verifyScrapingDogEntity(team.name, profile);
+          if (entityOk && profile.profilePhoto) {
+            try {
+              const persisted = await this.persistLogoImage(teamUid, profile.profilePhoto, 'scrapingdog');
+              if (persisted) {
+                updateData.logo = { connect: { uid: persisted.imageUid } };
+                newLogoMeta = {
+                  status: FieldEnrichmentStatus.Enriched,
+                  confidence: FieldConfidence.High,
+                  source: EnrichmentSource.ScrapingDog,
+                };
+                sourceUsed = EnrichmentSource.ScrapingDog;
+                scrapingDogInternalId = profile.linkedinInternalId;
+                this.logger.log(
+                  `Logo refetch: ScrapingDog logo set for team ${teamUid} (${team.name}), image uid: ${persisted.imageUid}`
+                );
+              }
+            } catch (error) {
+              this.logger.warn(
+                `Logo refetch: ScrapingDog logo download/upload failed for team ${teamUid} (${team.name}): ${error.message}`
+              );
+            }
+          } else if (!entityOk) {
+            this.logger.warn(
+              `Logo refetch: ScrapingDog entity mismatch for team ${teamUid} (${team.name}), falling back to OG`
+            );
+          }
+        }
+      }
+
+      // 2. Fallback to OG / website favicon when ScrapingDog did not produce a logo.
+      if (!newLogoMeta && team.website && team.website.trim() !== '') {
+        this.logger.log(`Logo refetch: trying website/OG for team ${teamUid} (${team.name}) at ${team.website}`);
+        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, team.website);
+        if (logoResult) {
+          try {
+            const persisted = await this.persistLogoImage(teamUid, logoResult.logoUrl);
+            if (persisted) {
+              updateData.logo = { connect: { uid: persisted.imageUid } };
+              newLogoMeta = {
+                status: FieldEnrichmentStatus.Enriched,
+                confidence: FieldConfidence.Medium,
+                source: EnrichmentSource.OpenGraph,
+              };
+              sourceUsed = EnrichmentSource.OpenGraph;
+              this.logger.log(
+                `Logo refetch: OG logo set for team ${teamUid} (${team.name}), image uid: ${persisted.imageUid}`
+              );
+            }
+          } catch (error) {
+            this.logger.warn(
+              `Logo refetch: OG logo download/upload failed for team ${teamUid} (${team.name}): ${error.message}`
+            );
+          }
+        } else {
+          this.logger.log(`Logo refetch: no OG logo found for team ${teamUid} (${team.name})`);
+        }
+      }
+
+      // 3. Neither source produced a logo — keep the existing logoUid untouched
+      // (we don't make the team worse off), but record CannotEnrich for provenance.
+      if (!newLogoMeta) {
+        newLogoMeta = { status: FieldEnrichmentStatus.CannotEnrich };
+        this.logger.log(
+          `Logo refetch: no new logo found for team ${teamUid} (${team.name}); preserving existing logo`
+        );
+      }
+
+      // Restore the prior overall status (we clobbered it with InProgress earlier).
+      // If the team had no prior enrichment, default to Enriched only when we actually set a logo.
+      const restoredStatus = priorStatus && priorStatus !== EnrichmentStatus.InProgress
+        ? priorStatus
+        : EnrichmentStatus.Enriched;
+
+      const mergedFieldsMeta: FieldsMetaMap = {
+        ...existingFieldsMeta,
+        logo: {
+          ...(existingFieldsMeta.logo ?? {}),
+          ...newLogoMeta,
+        } as FieldEnrichmentMeta,
+      };
+
+      const enrichment: TeamDataEnrichment = {
+        ...(existingMeta ?? { isAIGenerated: false, fieldsMeta: {} }),
+        shouldEnrich: false,
+        status: restoredStatus,
+        isAIGenerated: existingMeta?.isAIGenerated ?? sourceUsed !== null,
+        fieldsMeta: mergedFieldsMeta,
+      };
+
+      if (sourceUsed === EnrichmentSource.ScrapingDog) {
+        enrichment.scrapingDog = {
+          used: true,
+          fetchedAt: new Date().toISOString(),
+          fields: ['logo'],
+          linkedinInternalId: scrapingDogInternalId ?? existingMeta?.scrapingDog?.linkedinInternalId ?? null,
+        };
+      }
+
+      // Track that a manual refetch touched the team without overwriting the original enrichment timestamp.
+      enrichment.enrichedBy = existingMeta?.enrichedBy ?? enrichedBy;
+      enrichment.enrichedAt = existingMeta?.enrichedAt;
+
+      await this.prisma.team.update({
+        where: { uid: teamUid },
+        data: {
+          ...updateData,
+          dataEnrichment: enrichment as any,
+        },
+      });
+
+      this.logger.log(
+        `Logo refetch completed for team ${teamUid} (${team.name}): source=${sourceUsed ?? 'none'}`
+      );
+    } catch (error) {
+      this.logger.error(
+        `Logo refetch failed for team ${teamUid} (${team.name}): ${error.message}`,
+        error.stack
+      );
+      await this.updateEnrichmentStatus(
+        teamUid,
+        team.dataEnrichment,
+        EnrichmentStatus.FailedToEnrich,
+        error.message
+      );
+    }
+  }
+
+  /**
+   * Downloads a logo image URL, uploads it to S3, and creates an Image row.
+   * Returns null if S3 upload did not return a URL; throws on download or DB errors
+   * so callers can decide how to record the failure.
+   */
+  private async persistLogoImage(
+    teamUid: string,
+    imageUrl: string,
+    filenameSuffix?: string
+  ): Promise<{ imageUid: string; s3Url: string } | null> {
+    const suffix = filenameSuffix ? `-${filenameSuffix}` : '';
+    const filename = `team-enrichment-${teamUid}${suffix}-${Date.now()}.png`;
+    const multerFile = await this.aiService.downloadImageAsMulterFile(imageUrl, filename);
+    const s3Url = await this.fileUploadService.storeImageFiles([multerFile]);
+    if (!s3Url) return null;
+    const image = await this.prisma.image.create({
+      data: {
+        cid: s3Url,
+        url: s3Url,
+        filename,
+        size: multerFile.size,
+        type: multerFile.mimetype.split('/')[1] || 'png',
+        width: 0,
+        height: 0,
+        version: 'ORIGINAL',
+      },
+    });
+    return { imageUid: image.uid, s3Url };
   }
 
   private async doEnrichTeam(
@@ -455,37 +774,34 @@ export class TeamEnrichmentService {
       // Handle logo via OG tag scraping — only from a verified website
       // Do NOT use websiteCandidates for logo since they are unverified and may belong to a different entity
       const effectiveWebsite = team.website || aiResponse.website || null;
-      if (!team.logoUid && effectiveWebsite) {
-        this.logger.log(`Attempting logo fetch for team ${teamUid} (${team.name}) from website: ${effectiveWebsite}`);
+      // User-owned: either explicitly flagged by a prior run, or a logo that predates enrichment
+      // (has logoUid but no fieldsMeta.logo entry). Protect in both standard and force modes.
+      const logoIsUserOwned =
+        existingFieldsMeta.logo?.status === FieldEnrichmentStatus.ChangedByUser ||
+        (!!team.logoUid && !existingFieldsMeta.logo);
+      // Re-fetch when: no existing logo, OR force mode and the logo isn't user-owned.
+      const shouldRefetchLogo = !logoIsUserOwned && (!team.logoUid || forceOverwrite);
+
+      if (shouldRefetchLogo && effectiveWebsite) {
+        this.logger.log(
+          `Attempting logo fetch for team ${teamUid} (${team.name}) from website: ${effectiveWebsite}${
+            team.logoUid ? ' (force overwrite)' : ''
+          }`
+        );
         const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite);
 
         if (logoResult) {
           this.logger.log(`Logo metadata found for team ${teamUid} (${team.name}): ${logoResult.logoUrl}`);
           try {
-            const filename = `team-enrichment-${teamUid}-${Date.now()}.png`;
-            const multerFile = await this.aiService.downloadImageAsMulterFile(logoResult.logoUrl, filename);
-            const s3Url = await this.fileUploadService.storeImageFiles([multerFile]);
-
-            if (s3Url) {
-              const image = await this.prisma.image.create({
-                data: {
-                  cid: s3Url,
-                  url: s3Url,
-                  filename,
-                  size: multerFile.size,
-                  type: multerFile.mimetype.split('/')[1] || 'png',
-                  width: 0,
-                  height: 0,
-                  version: 'ORIGINAL',
-                },
-              });
-              updateData.logo = { connect: { uid: image.uid } };
+            const persisted = await this.persistLogoImage(teamUid, logoResult.logoUrl);
+            if (persisted) {
+              updateData.logo = { connect: { uid: persisted.imageUid } };
               newFieldsMeta.logo = {
                 status: FieldEnrichmentStatus.Enriched,
                 confidence: FieldConfidence.Medium,
                 source: EnrichmentSource.OpenGraph,
               };
-              this.logger.log(`Logo uploaded successfully for team ${teamUid} (${team.name}), image uid: ${image.uid}`);
+              this.logger.log(`Logo uploaded successfully for team ${teamUid} (${team.name}), image uid: ${persisted.imageUid}`);
             } else {
               this.logger.warn(`Logo upload returned no URL for team ${teamUid} (${team.name})`);
               newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
@@ -498,12 +814,15 @@ export class TeamEnrichmentService {
           this.logger.log(`No logo found in website metadata for team ${teamUid} (${team.name})`);
           newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
         }
-      } else if (team.logoUid) {
-        this.logger.log(`Team ${teamUid} (${team.name}) already has a logo, skipping logo fetch`);
-        // Logo predates enrichment and has no meta entry — treat as user-owned.
+      } else if (logoIsUserOwned) {
+        this.logger.log(`Team ${teamUid} (${team.name}) logo is user-owned, skipping logo fetch`);
+        // Lock in ChangedByUser for pre-enrichment logos that had no meta entry.
         if (!existingFieldsMeta.logo) {
           newFieldsMeta.logo = { status: FieldEnrichmentStatus.ChangedByUser };
         }
+      } else if (team.logoUid) {
+        // Standard mode (not force) + has logo + not user-owned — preserve existing behavior: skip.
+        this.logger.log(`Team ${teamUid} (${team.name}) already has a logo, skipping logo fetch`);
       } else {
         this.logger.log(`Team ${teamUid} (${team.name}): no verified website available, skipping logo fetch`);
         newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
@@ -517,6 +836,7 @@ export class TeamEnrichmentService {
         aiLinkedinHandler: aiResponse.linkedinHandler,
         updateData,
         newFieldsMeta,
+        forceOverwrite,
       });
 
       // Merge field metadata per-field. Undefined keys on the fresh entry don't clobber
@@ -681,8 +1001,9 @@ export class TeamEnrichmentService {
     aiLinkedinHandler: string | null;
     updateData: Prisma.TeamUpdateInput;
     newFieldsMeta: FieldsMetaMap;
+    forceOverwrite?: boolean;
   }): Promise<TeamDataEnrichment['scrapingDog'] | null> {
-    const { teamUid, team, existingFieldsMeta, aiLinkedinHandler, updateData, newFieldsMeta } = ctx;
+    const { teamUid, team, existingFieldsMeta, aiLinkedinHandler, updateData, newFieldsMeta, forceOverwrite } = ctx;
 
     const markSdField = (field: FieldMetaKey) => {
       newFieldsMeta[field] = {
@@ -700,13 +1021,21 @@ export class TeamEnrichmentService {
       return null;
     }
 
-    const hasLogoGap = !team.logoUid && !(updateData as any).logo;
+    // In force mode we treat an existing AI-set logo as a gap so ScrapingDog can upgrade
+    // it to high-confidence; user-owned logos (ChangedByUser or predating enrichment) stay locked.
+    const logoIsUserOwned =
+      existingFieldsMeta.logo?.status === FieldEnrichmentStatus.ChangedByUser ||
+      (!!team.logoUid && !existingFieldsMeta.logo);
+    const hasLogoGap =
+      !logoIsUserOwned && (!team.logoUid || !!forceOverwrite) && !(updateData as any).logo;
     const hasWebsiteGap = !team.website && !(updateData as any).website;
     const hasShortDescGap = !team.shortDescription && !(updateData as any).shortDescription;
     const hasLongDescGap = !team.longDescription && !(updateData as any).longDescription;
     const hasMoreDetailsGap = !team.moreDetails && !(updateData as any).moreDetails;
+    const tagsStatus = existingFieldsMeta.industryTags?.status;
     const hasIndustryTagsGap =
-      existingFieldsMeta.industryTags?.status !== FieldEnrichmentStatus.Enriched &&
+      tagsStatus !== FieldEnrichmentStatus.Enriched &&
+      tagsStatus !== FieldEnrichmentStatus.ChangedByUser &&
       team.industryTags.length === 0 &&
       !(updateData as any).industryTags;
 
@@ -722,11 +1051,22 @@ export class TeamEnrichmentService {
       return null;
     }
 
-    this.logger.log(`Team ${teamUid} (${team.name}): invoking ScrapingDog for handle "${handle}"`);
+    // Trust user-asserted LinkedIn handles: if the team's linkedinHandler is user-owned, the user
+    // has already vouched that this handle belongs to them — don't reject the response over a fuzzy
+    // team-name mismatch. AI-discovered handles still need to pass verifyScrapingDogEntity.
+    const usingUserOwnedHandle =
+      handle === team.linkedinHandler &&
+      isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
+
+    this.logger.log(
+      `Team ${teamUid} (${team.name}): invoking ScrapingDog for handle "${handle}"${
+        usingUserOwnedHandle ? ' (user-owned handle, entity check bypassed)' : ''
+      }`
+    );
     const profile = await this.scrapingDogService.fetchCompanyProfile(handle);
     if (!profile) return null;
 
-    if (!this.verifyScrapingDogEntity(team.name, profile)) {
+    if (!usingUserOwnedHandle && !this.verifyScrapingDogEntity(team.name, profile)) {
       this.logger.warn(
         `Team ${teamUid} (${team.name}): ScrapingDog profile name "${profile.companyName}" / "${profile.universalNameId}" does not match, discarding`
       );
@@ -783,26 +1123,12 @@ export class TeamEnrichmentService {
 
     if (hasLogoGap && profile.profilePhoto) {
       try {
-        const filename = `team-enrichment-${teamUid}-scrapingdog-${Date.now()}.png`;
-        const multerFile = await this.aiService.downloadImageAsMulterFile(profile.profilePhoto, filename);
-        const s3Url = await this.fileUploadService.storeImageFiles([multerFile]);
-        if (s3Url) {
-          const image = await this.prisma.image.create({
-            data: {
-              cid: s3Url,
-              url: s3Url,
-              filename,
-              size: multerFile.size,
-              type: multerFile.mimetype.split('/')[1] || 'png',
-              width: 0,
-              height: 0,
-              version: 'ORIGINAL',
-            },
-          });
-          (updateData as any).logo = { connect: { uid: image.uid } };
+        const persisted = await this.persistLogoImage(teamUid, profile.profilePhoto, 'scrapingdog');
+        if (persisted) {
+          (updateData as any).logo = { connect: { uid: persisted.imageUid } };
           markSdField('logo');
           filledFields.push('logo');
-          this.logger.log(`Team ${teamUid} (${team.name}): logo set from ScrapingDog, image uid: ${image.uid}`);
+          this.logger.log(`Team ${teamUid} (${team.name}): logo set from ScrapingDog, image uid: ${persisted.imageUid}`);
         }
       } catch (error) {
         this.logger.warn(`Team ${teamUid} (${team.name}): ScrapingDog logo download/upload failed: ${error.message}`);
