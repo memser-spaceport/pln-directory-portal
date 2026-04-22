@@ -116,18 +116,15 @@ export class TeamEnrichmentAiService {
   private readonly logger = new Logger(TeamEnrichmentAiService.name);
 
   private static readonly PROVIDER_ENV_VAR = 'TEAM_ENRICHMENT_AI_PROVIDER';
-  private static readonly MODEL_ENV_VAR = 'OPENAI_TEAM_ENRICHMENT_MODEL';
 
   constructor(private readonly aiProvider: AiProviderService) {}
 
   /**
-   * Returns the AI model name used for team enrichment (e.g., "gpt-4o", "gemini-2.5-flash").
+   * Returns the AI model name used for team enrichment
+   * (e.g., "gpt-4o", "gemini-2.5-flash", "claude-sonnet-4-6").
    */
   getModelName(): string {
-    return this.aiProvider.getModelName(
-      TeamEnrichmentAiService.PROVIDER_ENV_VAR,
-      TeamEnrichmentAiService.MODEL_ENV_VAR
-    );
+    return this.aiProvider.getModelName(TeamEnrichmentAiService.PROVIDER_ENV_VAR);
   }
 
   async enrichTeamViaAI(
@@ -149,7 +146,7 @@ export class TeamEnrichmentAiService {
       const tools = this.aiProvider.getWebSearchTool(providerEnvVar, { searchContextSize: 'high' });
 
       const { text } = await generateText({
-        model: this.aiProvider.getResponsesModel(providerEnvVar, TeamEnrichmentAiService.MODEL_ENV_VAR, {
+        model: this.aiProvider.getResponsesModel(providerEnvVar, {
           useSearchGrounding: true,
         }),
         system: TEAM_ENRICHMENT_SYSTEM_PROMPT,
@@ -160,7 +157,7 @@ export class TeamEnrichmentAiService {
       });
 
       if (process.env.DEBUG_ENRICHMENT === 'true') {
-        this.logger.debug(`AI response: ${text?.substring(0, 100)}...`);
+        this.logger.debug(`AI response (len=${text?.length ?? 0}): ${text?.substring(0, 500)}`);
       }
 
       return this.parseAIResponse(text, teamName);
@@ -217,20 +214,60 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 `;
   }
 
+  /**
+   * Extracts the first balanced `{...}` block from an AI response.
+   * Handles markdown code fences, leading/trailing prose, and multiple JSON
+   * objects (greedy regex breaks when the model emits prose containing `}`
+   * after the first valid object — we scan braces instead).
+   */
+  private extractJsonObject(text: string): string | null {
+    const fenced = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
+    if (fenced) return fenced[1];
+
+    const start = text.indexOf('{');
+    if (start === -1) return null;
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) return text.substring(start, i + 1);
+      }
+    }
+    return null;
+  }
+
   private parseAIResponse(text: string, teamName?: string): AITeamEnrichmentResponse {
     if (!text || text.trim().length === 0) {
       this.logger.warn('AI returned empty response');
       return this.getEmptyResponse();
     }
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      this.logger.warn(`No JSON found in AI response: ${text.substring(0, 100)}...`);
+    const json = this.extractJsonObject(text);
+    if (!json) {
+      this.logger.warn(`No JSON found in AI response (len=${text.length}): ${text.substring(0, 300)}`);
       return this.getEmptyResponse();
     }
 
     try {
-      const parsed = JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(json);
 
       const websiteCandidates: string[] = Array.isArray(parsed.websiteCandidates)
         ? parsed.websiteCandidates.map((u: string) => this.validateUrl(u)).filter(Boolean)
@@ -280,7 +317,11 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         sources: Array.isArray(parsed.sources) ? parsed.sources : [],
       };
     } catch (e) {
-      this.logger.warn(`Failed to parse AI response JSON: ${e.message}`);
+      this.logger.warn(
+        `Failed to parse AI response JSON for "${teamName}": ${e.message}. Extracted JSON (len=${
+          json.length
+        }): ${json.substring(0, 500)}. Raw response (len=${text.length}): ${text.substring(0, 500)}`
+      );
       return this.getEmptyResponse();
     }
   }
