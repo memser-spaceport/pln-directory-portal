@@ -41,7 +41,7 @@ export class MemberController {
   @Get(':uid')
   @UseGuards(DemoDayAdminAuthGuard)
   @NoCache()
-  async getMemberByUid(@Param('uid') uid: string): Promise<Member> {
+  async getMemberByUid(@Param('uid') uid: string): Promise<any> {
     return await this.memberService.findMemberByUid(uid);
   }
 
