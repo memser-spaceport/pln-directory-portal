@@ -6,4 +6,5 @@ export const RbacQueryKeys = {
   PERMISSIONS_LIST: 'rbac-permissions-list',
   PERMISSION_DETAILS: 'rbac-permission-details',
   MEMBER_SEARCH: 'rbac-member-search',
+  POLICIES_LIST: 'rbac-policies-list',
 } as const;

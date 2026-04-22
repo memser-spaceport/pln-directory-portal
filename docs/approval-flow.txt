@@ -1,0 +1,351 @@
+1) List all member approvals
+curl --location 'http://localhost:3003/v1/admin/member-approvals' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJjbW53cWI5dGgwYTNrN2ozYXM5Z3RyZ2s3IiwiZXhwIjoxNzc5MjU1MDgzLCJpYXQiOjE3NzY2NjMwODN9.6UGXRbdbB8ITNWbloDzNNtLWp2X4eXC3KXDHWrlWJ5Q' \
+--header 'Cookie: _csrf=2_bBz4P-CyubVfDT-y9Caw'
+
+[
+    {
+        "uid": "cmo94l9yl0001o7y3ur2ijoxs",
+        "memberUid": "uid-anibal",
+        "state": "PENDING",
+        "requestedByUid": "uid-anibal",
+        "reviewedByUid": null,
+        "reason": "Initial approval request",
+        "requestedAt": "2026-04-21T21:18:12.908Z",
+        "reviewedAt": null,
+        "createdAt": "2026-04-21T21:18:12.908Z",
+        "updatedAt": "2026-04-21T21:18:12.908Z",
+        "member": {
+            "uid": "uid-anibal",
+            "name": "Anibal",
+            "email": "nataliia.kr.job+7@gmail.com",
+            "accessLevel": "Rejected",
+            "role": "National Integration Assistant",
+            "createdAt": "2026-04-01T05:19:30.494Z"
+        },
+        "requestedBy": {
+            "uid": "uid-anibal",
+            "name": "Anibal",
+            "email": "nataliia.kr.job+7@gmail.com"
+        },
+        "reviewedBy": null
+    }
+]
+
+
+2) Create member approval request
+curl --location 'http://localhost:3003/v1/admin/member-approvals' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJjbW53cWI5dGgwYTNrN2ozYXM5Z3RyZ2s3IiwiZXhwIjoxNzc5MjU1MDgzLCJpYXQiOjE3NzY2NjMwODN9.6UGXRbdbB8ITNWbloDzNNtLWp2X4eXC3KXDHWrlWJ5Q' \
+--header 'Content-Type: application/json' \
+--header 'Cookie: _csrf=2_bBz4P-CyubVfDT-y9Caw' \
+--data '{
+  "memberUid": "uid-anibal",
+  "reason": "Initial approval request"
+}'
+
+
+{
+    "uid": "cmo94l9yl0001o7y3ur2ijoxs",
+    "memberUid": "uid-anibal",
+    "state": "PENDING",
+    "requestedByUid": "uid-anibal",
+    "reviewedByUid": null,
+    "reason": "Initial approval request",
+    "requestedAt": "2026-04-21T21:18:12.908Z",
+    "reviewedAt": null,
+    "createdAt": "2026-04-21T21:18:12.908Z",
+    "updatedAt": "2026-04-21T21:18:12.908Z",
+    "member": {
+        "uid": "uid-anibal",
+        "name": "Anibal",
+        "email": "nataliia.kr.job+7@gmail.com",
+        "accessLevel": "Rejected",
+        "role": "National Integration Assistant",
+        "createdAt": "2026-04-01T05:19:30.494Z"
+    },
+    "requestedBy": {
+        "uid": "uid-anibal",
+        "name": "Anibal",
+        "email": "nataliia.kr.job+7@gmail.com"
+    },
+    "reviewedBy": null,
+    "events": [
+        {
+            "uid": "cmo94l9z00002o7y3akln0rif",
+            "approvalUid": "cmo94l9yl0001o7y3ur2ijoxs",
+            "memberUid": "uid-anibal",
+            "fromState": null,
+            "toState": "PENDING",
+            "actorUid": "uid-anibal",
+            "reason": "Initial approval request",
+            "createdAt": "2026-04-21T21:18:12.924Z"
+        }
+    ]
+}
+
+3) Get member approval by memberUid
+curl --location 'http://localhost:3003/v1/admin/member-approvals/uid-anibal' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJjbW53cWI5dGgwYTNrN2ozYXM5Z3RyZ2s3IiwiZXhwIjoxNzc5MjU1MDgzLCJpYXQiOjE3NzY2NjMwODN9.6UGXRbdbB8ITNWbloDzNNtLWp2X4eXC3KXDHWrlWJ5Q' \
+--header 'Cookie: _csrf=2_bBz4P-CyubVfDT-y9Caw'
+
+{
+    "uid": "cmo94l9yl0001o7y3ur2ijoxs",
+    "memberUid": "uid-anibal",
+    "state": "PENDING",
+    "requestedByUid": "uid-anibal",
+    "reviewedByUid": null,
+    "reason": "Initial approval request",
+    "requestedAt": "2026-04-21T21:18:12.908Z",
+    "reviewedAt": null,
+    "createdAt": "2026-04-21T21:18:12.908Z",
+    "updatedAt": "2026-04-21T21:18:12.908Z",
+    "member": {
+        "uid": "uid-anibal",
+        "name": "Anibal",
+        "email": "nataliia.kr.job+7@gmail.com",
+        "accessLevel": "Rejected",
+        "role": "National Integration Assistant",
+        "createdAt": "2026-04-01T05:19:30.494Z"
+    },
+    "requestedBy": {
+        "uid": "uid-anibal",
+        "name": "Anibal",
+        "email": "nataliia.kr.job+7@gmail.com"
+    },
+    "reviewedBy": null,
+    "events": [
+        {
+            "uid": "cmo94l9z00002o7y3akln0rif",
+            "approvalUid": "cmo94l9yl0001o7y3ur2ijoxs",
+            "memberUid": "uid-anibal",
+            "fromState": null,
+            "toState": "PENDING",
+            "actorUid": "uid-anibal",
+            "reason": "Initial approval request",
+            "createdAt": "2026-04-21T21:18:12.924Z"
+        }
+    ]
+}
+
+4) Approve member
+curl --location --request PATCH 'http://localhost:3003/v1/admin/member-approvals/uid-anibal' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJjbW53cWI5dGgwYTNrN2ozYXM5Z3RyZ2s3IiwiZXhwIjoxNzc5MjU1MDgzLCJpYXQiOjE3NzY2NjMwODN9.6UGXRbdbB8ITNWbloDzNNtLWp2X4eXC3KXDHWrlWJ5Q' \
+--header 'Content-Type: application/json' \
+--header 'Cookie: _csrf=wh4eNm5EjEHLIfNmgOP-NA' \
+--data '{
+  "state": "APPROVED",
+  "reason": "Validated by admin"
+}'
+
+{
+    "uid": "cmo94l9yl0001o7y3ur2ijoxs",
+    "memberUid": "uid-anibal",
+    "state": "APPROVED",
+    "requestedByUid": "uid-anibal",
+    "reviewedByUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+    "reason": "Validated by admin",
+    "requestedAt": "2026-04-21T21:18:12.908Z",
+    "reviewedAt": "2026-04-21T21:20:09.731Z",
+    "createdAt": "2026-04-21T21:18:12.908Z",
+    "updatedAt": "2026-04-21T21:20:09.732Z",
+    "member": {
+        "uid": "uid-anibal",
+        "name": "Anibal",
+        "email": "nataliia.kr.job+7@gmail.com",
+        "accessLevel": "Rejected",
+        "role": "National Integration Assistant",
+        "createdAt": "2026-04-01T05:19:30.494Z"
+    },
+    "requestedBy": {
+        "uid": "uid-anibal",
+        "name": "Anibal",
+        "email": "nataliia.kr.job+7@gmail.com"
+    },
+    "reviewedBy": {
+        "uid": "cmnwqb9th0a3k7j3as9gtrgk7",
+        "name": "Elissa",
+        "email": "nataliia.kr.job@gmail.com"
+    },
+    "events": [
+        {
+            "uid": "cmo94ns3s0004o7y3zgo1jfpk",
+            "approvalUid": "cmo94l9yl0001o7y3ur2ijoxs",
+            "memberUid": "uid-anibal",
+            "fromState": "PENDING",
+            "toState": "APPROVED",
+            "actorUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+            "reason": "Validated by admin",
+            "createdAt": "2026-04-21T21:20:09.737Z"
+        },
+        {
+            "uid": "cmo94l9z00002o7y3akln0rif",
+            "approvalUid": "cmo94l9yl0001o7y3ur2ijoxs",
+            "memberUid": "uid-anibal",
+            "fromState": null,
+            "toState": "PENDING",
+            "actorUid": "uid-anibal",
+            "reason": "Initial approval request",
+            "createdAt": "2026-04-21T21:18:12.924Z"
+        }
+    ]
+}
+
+
+5) Reject member
+curl --location --request PATCH 'http://localhost:3003/v1/admin/member-approvals/uid-anibal' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJjbW53cWI5dGgwYTNrN2ozYXM5Z3RyZ2s3IiwiZXhwIjoxNzc5MjU1MDgzLCJpYXQiOjE3NzY2NjMwODN9.6UGXRbdbB8ITNWbloDzNNtLWp2X4eXC3KXDHWrlWJ5Q' \
+--header 'Content-Type: application/json' \
+--header 'Cookie: _csrf=wh4eNm5EjEHLIfNmgOP-NA' \
+--data '{
+  "state": "REJECTED",
+  "reason": "Profile does not meet approval criteria"
+}'
+
+{
+    "uid": "cmo94l9yl0001o7y3ur2ijoxs",
+    "memberUid": "uid-anibal",
+    "state": "REJECTED",
+    "requestedByUid": "uid-anibal",
+    "reviewedByUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+    "reason": "Profile does not meet approval criteria",
+    "requestedAt": "2026-04-21T21:18:12.908Z",
+    "reviewedAt": "2026-04-21T21:21:37.242Z",
+    "createdAt": "2026-04-21T21:18:12.908Z",
+    "updatedAt": "2026-04-21T21:21:37.244Z",
+    "member": {
+        "uid": "uid-anibal",
+        "name": "Anibal",
+        "email": "nataliia.kr.job+7@gmail.com",
+        "accessLevel": "Rejected",
+        "role": "National Integration Assistant",
+        "createdAt": "2026-04-01T05:19:30.494Z"
+    },
+    "requestedBy": {
+        "uid": "uid-anibal",
+        "name": "Anibal",
+        "email": "nataliia.kr.job+7@gmail.com"
+    },
+    "reviewedBy": {
+        "uid": "cmnwqb9th0a3k7j3as9gtrgk7",
+        "name": "Elissa",
+        "email": "nataliia.kr.job@gmail.com"
+    },
+    "events": [
+        {
+            "uid": "cmo94pnmm0005o7y3po7jcpo5",
+            "approvalUid": "cmo94l9yl0001o7y3ur2ijoxs",
+            "memberUid": "uid-anibal",
+            "fromState": "APPROVED",
+            "toState": "REJECTED",
+            "actorUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+            "reason": "Profile does not meet approval criteria",
+            "createdAt": "2026-04-21T21:21:37.247Z"
+        },
+        {
+            "uid": "cmo94ns3s0004o7y3zgo1jfpk",
+            "approvalUid": "cmo94l9yl0001o7y3ur2ijoxs",
+            "memberUid": "uid-anibal",
+            "fromState": "PENDING",
+            "toState": "APPROVED",
+            "actorUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+            "reason": "Validated by admin",
+            "createdAt": "2026-04-21T21:20:09.737Z"
+        },
+        {
+            "uid": "cmo94l9z00002o7y3akln0rif",
+            "approvalUid": "cmo94l9yl0001o7y3ur2ijoxs",
+            "memberUid": "uid-anibal",
+            "fromState": null,
+            "toState": "PENDING",
+            "actorUid": "uid-anibal",
+            "reason": "Initial approval request",
+            "createdAt": "2026-04-21T21:18:12.924Z"
+        }
+    ]
+}
+
+6) Reset member to pending
+curl --location --request PATCH 'http://localhost:3003/v1/admin/member-approvals/uid-anibal' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiJdLCJtZW1iZXJVaWQiOiJjbW53cWI5dGgwYTNrN2ozYXM5Z3RyZ2s3IiwiZXhwIjoxNzc5MjU1MDgzLCJpYXQiOjE3NzY2NjMwODN9.6UGXRbdbB8ITNWbloDzNNtLWp2X4eXC3KXDHWrlWJ5Q' \
+--header 'Content-Type: application/json' \
+--header 'Cookie: _csrf=wh4eNm5EjEHLIfNmgOP-NA' \
+--data '{
+  "state": "PENDING",
+  "reason": "Returned for re-review"
+}'
+
+{
+    "uid": "cmo94l9yl0001o7y3ur2ijoxs",
+    "memberUid": "uid-anibal",
+    "state": "PENDING",
+    "requestedByUid": "uid-anibal",
+    "reviewedByUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+    "reason": "Returned for re-review",
+    "requestedAt": "2026-04-21T21:18:12.908Z",
+    "reviewedAt": "2026-04-21T21:22:33.763Z",
+    "createdAt": "2026-04-21T21:18:12.908Z",
+    "updatedAt": "2026-04-21T21:22:33.764Z",
+    "member": {
+        "uid": "uid-anibal",
+        "name": "Anibal",
+        "email": "nataliia.kr.job+7@gmail.com",
+        "accessLevel": "Rejected",
+        "role": "National Integration Assistant",
+        "createdAt": "2026-04-01T05:19:30.494Z"
+    },
+    "requestedBy": {
+        "uid": "uid-anibal",
+        "name": "Anibal",
+        "email": "nataliia.kr.job+7@gmail.com"
+    },
+    "reviewedBy": {
+        "uid": "cmnwqb9th0a3k7j3as9gtrgk7",
+        "name": "Elissa",
+        "email": "nataliia.kr.job@gmail.com"
+    },
+    "events": [
+        {
+            "uid": "cmo94qv8m0006o7y3pguxy8hh",
+            "approvalUid": "cmo94l9yl0001o7y3ur2ijoxs",
+            "memberUid": "uid-anibal",
+            "fromState": "REJECTED",
+            "toState": "PENDING",
+            "actorUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+            "reason": "Returned for re-review",
+            "createdAt": "2026-04-21T21:22:33.766Z"
+        },
+        {
+            "uid": "cmo94pnmm0005o7y3po7jcpo5",
+            "approvalUid": "cmo94l9yl0001o7y3ur2ijoxs",
+            "memberUid": "uid-anibal",
+            "fromState": "APPROVED",
+            "toState": "REJECTED",
+            "actorUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+            "reason": "Profile does not meet approval criteria",
+            "createdAt": "2026-04-21T21:21:37.247Z"
+        },
+        {
+            "uid": "cmo94ns3s0004o7y3zgo1jfpk",
+            "approvalUid": "cmo94l9yl0001o7y3ur2ijoxs",
+            "memberUid": "uid-anibal",
+            "fromState": "PENDING",
+            "toState": "APPROVED",
+            "actorUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+            "reason": "Validated by admin",
+            "createdAt": "2026-04-21T21:20:09.737Z"
+        },
+        {
+            "uid": "cmo94l9z00002o7y3akln0rif",
+            "approvalUid": "cmo94l9yl0001o7y3ur2ijoxs",
+            "memberUid": "uid-anibal",
+            "fromState": null,
+            "toState": "PENDING",
+            "actorUid": "uid-anibal",
+            "reason": "Initial approval request",
+            "createdAt": "2026-04-21T21:18:12.924Z"
+        }
+    ]
+}
+
+
+

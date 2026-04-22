@@ -20,6 +20,13 @@ export type Member = {
     scopeValue: string;
     config: unknown | null;
   }[];
+  memberState?: string;
+  rbacRoles?: { uid: string; code: string; name: string; description: string }[];
+  roleCodes?: string[];
+  memberPolicies?: { uid: string; code: string; name: string; role: string; group: string }[];
+  policyCodes?: string[];
+  effectivePermissions?: { uid: string; code: string; description: string }[];
+  effectivePermissionCodes?: string[];
 };
 
 export type TMemberForm = {

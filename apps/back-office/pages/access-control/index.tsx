@@ -115,8 +115,7 @@ const AccessControlPage = () => {
                   [s.fixed]: !!header.column.columnDef.size,
                   [s.flexible]: !header.column.columnDef.size,
                   [s.actionsCell]: header.column.id === 'actions',
-                  [s.actionsCellFill]:
-                    header.column.id === 'actions' && !header.column.columnDef.size,
+                  [s.actionsCellFill]: header.column.id === 'actions' && !header.column.columnDef.size,
                 })}
                 style={
                   header.column.id === 'actions' && !header.column.columnDef.size
