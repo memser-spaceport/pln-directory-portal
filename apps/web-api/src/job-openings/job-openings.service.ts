@@ -78,7 +78,7 @@ export class JobOpeningsService {
       lastSeenLive: item.lastSeenLive ? new Date(item.lastSeenLive) : null,
       signalId: item.signalId ?? null,
       canonicalKey: item.canonicalKey,
-      dwCompanyId: item.dwCompanyId ?? null,
+      teamUid: item.teamUid ?? null,
       needsReview: item.needsReview ?? null,
       notes: item.notes ?? null,
       portfolio: item.portfolio ?? null,

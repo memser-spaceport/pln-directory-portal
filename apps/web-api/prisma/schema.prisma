@@ -80,7 +80,8 @@ model Team {
   dealRedemptions         DealRedemption[] @relation("TeamDealRedemptions")
   dealUsages              DealUsage[]      @relation("TeamDealUsages")
 
-  articles Article[] @relation("TeamArticles")
+  articles    Article[]    @relation("TeamArticles")
+  jobOpenings JobOpening[]
 }
 
 enum AskStatus {
@@ -193,35 +194,34 @@ model Member {
   pushNotificationReadStatuses     PushNotificationReadStatus[]      @relation("PushNotificationReadStatuses")
   eventAssociations                PLEventAssociation[]
 
-  dealSubmissions          DealSubmission[]     @relation("MemberDealSubmissions")
-  reviewedDealSubmissions  DealSubmission[]     @relation("MemberReviewedDealSubmissions")
-  dealIssues               DealIssue[]          @relation("MemberDealIssues")
-  resolvedDealIssues       DealIssue[]          @relation("MemberResolvedDealIssues")
-  dealRedemptions          DealRedemption[]     @relation("MemberDealRedemptions")
-  dealUsages               DealUsage[]          @relation("MemberDealUsages")
-  dealWhitelist            DealWhitelist?       @relation("MemberDealWhitelist")
-  dealRequests             DealRequest[]        @relation("MemberDealRequests")
-  articles                 Article[]            @relation("MemberArticles")
-  articleStatistics        ArticleStatistic[]   @relation("MemberArticleStatistics")
-  articleWhitelist         ArticleWhitelist?    @relation("MemberArticleWhitelist")
-  articleRequests          ArticleRequest[]     @relation("MemberArticleRequests")
-  articleComments          ArticleComment[]     @relation("MemberArticleComments")
-  articleCommentLikes      ArticleCommentLike[] @relation("MemberArticleCommentLikes")
-  roleAssignments          RoleAssignment[]     @relation("MemberRoleAssignments")
-  policyAssignmentsV2      PolicyAssignment[]   @relation("PolicyAssignmentMember")
-  policyAssignmentsV2Given PolicyAssignment[]   @relation("PolicyAssignmentAssignedBy")
-  memberPermissionsV2      MemberPermissionV2[] @relation("MemberPermissionV2Member")
-  memberPermissionsV2Given MemberPermissionV2[] @relation("MemberPermissionV2GrantedBy")
-  roleAssignmentsGiven     RoleAssignment[]     @relation("MemberRoleAssignmentsGiven")
-  memberPermissions        MemberPermission[]   @relation("MemberDirectPermissions")
-  memberPermissionsGiven   MemberPermission[]   @relation("MemberDirectPermissionsGiven")
-  memberApproval                   MemberApproval?
-  requestedMemberApprovals         MemberApproval[]     @relation("MemberApprovalRequestedBy")
-  reviewedMemberApprovals          MemberApproval[]     @relation("MemberApprovalReviewedBy")
-  memberApprovalEvents             MemberApprovalEvent[] @relation("MemberApprovalEventMember")
-  actedMemberApprovalEvents        MemberApprovalEvent[] @relation("MemberApprovalEventActor")
+  dealSubmissions           DealSubmission[]      @relation("MemberDealSubmissions")
+  reviewedDealSubmissions   DealSubmission[]      @relation("MemberReviewedDealSubmissions")
+  dealIssues                DealIssue[]           @relation("MemberDealIssues")
+  resolvedDealIssues        DealIssue[]           @relation("MemberResolvedDealIssues")
+  dealRedemptions           DealRedemption[]      @relation("MemberDealRedemptions")
+  dealUsages                DealUsage[]           @relation("MemberDealUsages")
+  dealWhitelist             DealWhitelist?        @relation("MemberDealWhitelist")
+  dealRequests              DealRequest[]         @relation("MemberDealRequests")
+  articles                  Article[]             @relation("MemberArticles")
+  articleStatistics         ArticleStatistic[]    @relation("MemberArticleStatistics")
+  articleWhitelist          ArticleWhitelist?     @relation("MemberArticleWhitelist")
+  articleRequests           ArticleRequest[]      @relation("MemberArticleRequests")
+  articleComments           ArticleComment[]      @relation("MemberArticleComments")
+  articleCommentLikes       ArticleCommentLike[]  @relation("MemberArticleCommentLikes")
+  roleAssignments           RoleAssignment[]      @relation("MemberRoleAssignments")
+  policyAssignmentsV2       PolicyAssignment[]    @relation("PolicyAssignmentMember")
+  policyAssignmentsV2Given  PolicyAssignment[]    @relation("PolicyAssignmentAssignedBy")
+  memberPermissionsV2       MemberPermissionV2[]  @relation("MemberPermissionV2Member")
+  memberPermissionsV2Given  MemberPermissionV2[]  @relation("MemberPermissionV2GrantedBy")
+  roleAssignmentsGiven      RoleAssignment[]      @relation("MemberRoleAssignmentsGiven")
+  memberPermissions         MemberPermission[]    @relation("MemberDirectPermissions")
+  memberPermissionsGiven    MemberPermission[]    @relation("MemberDirectPermissionsGiven")
+  memberApproval            MemberApproval?
+  requestedMemberApprovals  MemberApproval[]      @relation("MemberApprovalRequestedBy")
+  reviewedMemberApprovals   MemberApproval[]      @relation("MemberApprovalReviewedBy")
+  memberApprovalEvents      MemberApprovalEvent[] @relation("MemberApprovalEventMember")
+  actedMemberApprovalEvents MemberApprovalEvent[] @relation("MemberApprovalEventActor")
 }
-
 
 model MemberApproval {
   uid            String              @id @default(cuid())
@@ -235,10 +235,10 @@ model MemberApproval {
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
-  member         Member              @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
-  requestedBy    Member?             @relation("MemberApprovalRequestedBy", fields: [requestedByUid], references: [uid], onDelete: SetNull)
-  reviewedBy     Member?             @relation("MemberApprovalReviewedBy", fields: [reviewedByUid], references: [uid], onDelete: SetNull)
-  events         MemberApprovalEvent[]
+  member      Member                @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  requestedBy Member?               @relation("MemberApprovalRequestedBy", fields: [requestedByUid], references: [uid], onDelete: SetNull)
+  reviewedBy  Member?               @relation("MemberApprovalReviewedBy", fields: [reviewedByUid], references: [uid], onDelete: SetNull)
+  events      MemberApprovalEvent[]
 
   @@index([state])
   @@index([requestedByUid])
@@ -246,24 +246,23 @@ model MemberApproval {
 }
 
 model MemberApprovalEvent {
-  uid            String              @id @default(cuid())
-  approvalUid    String
-  memberUid      String
-  fromState      MemberApprovalState?
-  toState        MemberApprovalState
-  actorUid       String?
-  reason         String?
-  createdAt      DateTime            @default(now())
+  uid         String               @id @default(cuid())
+  approvalUid String
+  memberUid   String
+  fromState   MemberApprovalState?
+  toState     MemberApprovalState
+  actorUid    String?
+  reason      String?
+  createdAt   DateTime             @default(now())
 
-  approval       MemberApproval      @relation(fields: [approvalUid], references: [uid], onDelete: Cascade)
-  member         Member              @relation("MemberApprovalEventMember", fields: [memberUid], references: [uid], onDelete: Cascade)
-  actor          Member?             @relation("MemberApprovalEventActor", fields: [actorUid], references: [uid], onDelete: SetNull)
+  approval MemberApproval @relation(fields: [approvalUid], references: [uid], onDelete: Cascade)
+  member   Member         @relation("MemberApprovalEventMember", fields: [memberUid], references: [uid], onDelete: Cascade)
+  actor    Member?        @relation("MemberApprovalEventActor", fields: [actorUid], references: [uid], onDelete: SetNull)
 
   @@index([approvalUid])
   @@index([memberUid])
   @@index([actorUid])
 }
-
 
 model MemberRole {
   id        Int      @id @default(autoincrement())
@@ -726,6 +725,7 @@ model TeamFocusArea {
   ancestorArea    FocusArea @relation("teamAncestorFocusAreas", fields: [ancestorAreaUid], references: [uid], onDelete: Cascade)
 
   @@unique([focusAreaUid, teamUid, ancestorAreaUid])
+  @@index([teamUid])
 }
 
 model ProjectFocusArea {
@@ -2005,7 +2005,8 @@ model JobOpening {
   lastSeenLive    DateTime?
   signalId        String?
   canonicalKey    String           @unique
-  dwCompanyId     String?
+  teamUid         String?
+  team            Team?            @relation(fields: [teamUid], references: [uid])
   needsReview     String?
   notes           String?
   portfolio       String?
@@ -2018,4 +2019,9 @@ model JobOpening {
   @@index([detectionDate])
   @@index([lastSeenLive])
   @@index([sourceType])
+  @@index([teamUid])
+  @@index([roleCategory])
+  @@index([seniority])
+  @@index([location])
+  @@index([updatedAt])
 }
