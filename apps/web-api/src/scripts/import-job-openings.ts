@@ -56,18 +56,6 @@ function mapSeniority(seniority: string): string | null {
   return seniority;
 }
 
-function deriveStatus(params: {
-  lastSeenLive: Date | null;
-  postedDate: Date | null;
-  sourceDate: Date | null;
-  detectionDate: Date;
-}): JobOpeningStatus {
-  const referenceDate = params.lastSeenLive ?? params.postedDate ?? params.sourceDate ?? params.detectionDate;
-  const staleThreshold = new Date();
-  staleThreshold.setDate(staleThreshold.getDate() - 7);
-  return referenceDate < staleThreshold ? JobOpeningStatus.STALE : JobOpeningStatus.NEW;
-}
-
 function isTerminalStatus(status: JobOpeningStatus): boolean {
   switch (status) {
     case JobOpeningStatus.CONFIRMED:
@@ -147,12 +135,7 @@ async function main() {
       const updatedAt = formatDate(row['Last Updated']) || new Date();
 
       const data = {
-        status: deriveStatus({
-          lastSeenLive,
-          postedDate,
-          sourceDate,
-          detectionDate,
-        }),
+        status: JobOpeningStatus.NEW,
         companyName: row['Company Name'] || '',
         signalType: row['Signal Type'] || 'Open Role',
         roleTitle: row['Role Title'] || '',
