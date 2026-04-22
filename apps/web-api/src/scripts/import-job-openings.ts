@@ -9,7 +9,7 @@ dotenv.config();
 
 import * as fs from 'fs';
 import { parse } from 'csv-parse/sync';
-import { PrismaClient } from '@prisma/client';
+import { JobOpeningStatus, PrismaClient } from '@prisma/client';
 import cuid from 'cuid';
 
 const prisma = new PrismaClient();
@@ -31,6 +31,7 @@ interface CsvRow {
   'Last Seen Live': string;
   'Canonical Key': string;
   dw_company_id: string;
+  'Last Updated': string;
   Notes: string;
 }
 
@@ -53,6 +54,32 @@ function formatDate(dateStr: string): Date | null {
 function mapSeniority(seniority: string): string | null {
   if (!seniority || seniority === 'Unknown') return null;
   return seniority;
+}
+
+function deriveStatus(params: {
+  lastSeenLive: Date | null;
+  postedDate: Date | null;
+  sourceDate: Date | null;
+  detectionDate: Date;
+}): JobOpeningStatus {
+  const referenceDate = params.lastSeenLive ?? params.postedDate ?? params.sourceDate ?? params.detectionDate;
+  const staleThreshold = new Date();
+  staleThreshold.setDate(staleThreshold.getDate() - 7);
+  return referenceDate < staleThreshold ? JobOpeningStatus.STALE : JobOpeningStatus.NEW;
+}
+
+function isTerminalStatus(status: JobOpeningStatus): boolean {
+  switch (status) {
+    case JobOpeningStatus.CONFIRMED:
+    case JobOpeningStatus.ROUTED_TO_WS4:
+    case JobOpeningStatus.CLOSED_DUPLICATE:
+    case JobOpeningStatus.CLOSED_INCORRECT_SIGNAL:
+    case JobOpeningStatus.CLOSED_NOT_HIRING_SIGNAL:
+    case JobOpeningStatus.CLOSED_ROLE_FILLED:
+      return true;
+    default:
+      return false;
+  }
 }
 
 async function main() {
@@ -114,9 +141,18 @@ async function main() {
       }
 
       const detectionDate = formatDate(row['Detection Date']) || new Date();
+      const sourceDate = formatDate(row['Source Date']);
+      const postedDate = formatDate(row['Posted Date']);
+      const lastSeenLive = formatDate(row['Last Seen Live']);
+      const updatedAt = formatDate(row['Last Updated']) || new Date();
 
       const data = {
-        status: 'NEW' as const,
+        status: deriveStatus({
+          lastSeenLive,
+          postedDate,
+          sourceDate,
+          detectionDate,
+        }),
         companyName: row['Company Name'] || '',
         signalType: row['Signal Type'] || 'Open Role',
         roleTitle: row['Role Title'] || '',
@@ -128,9 +164,10 @@ async function main() {
         detectionDate,
         sourceType: row['Source Type'] || null,
         sourceLink: row['Source Link'] || null,
-        sourceDate: formatDate(row['Source Date']),
-        postedDate: formatDate(row['Posted Date']),
-        lastSeenLive: formatDate(row['Last Seen Live']),
+        sourceDate,
+        postedDate,
+        lastSeenLive,
+        updatedAt,
         canonicalKey,
         teamUid: isValidTeam ? teamUid : null,
         notes: row.Notes || null,
@@ -141,10 +178,11 @@ async function main() {
       });
 
       if (existing) {
+        const nextStatus = isTerminalStatus(existing.status) ? existing.status : data.status;
         await prisma.jobOpening.update({
           where: { id: existing.id },
           data: {
-            status: data.status,
+            status: nextStatus,
             companyName: data.companyName,
             signalType: data.signalType,
             roleTitle: data.roleTitle,
@@ -161,7 +199,7 @@ async function main() {
             lastSeenLive: data.lastSeenLive,
             teamUid: data.teamUid,
             notes: data.notes,
-            updatedAt: new Date(),
+            updatedAt: data.updatedAt,
           },
         });
         updated++;
@@ -171,6 +209,7 @@ async function main() {
           data: {
             ...data,
             uid: cuid(),
+            updatedAt: data.updatedAt,
           },
         });
         created++;

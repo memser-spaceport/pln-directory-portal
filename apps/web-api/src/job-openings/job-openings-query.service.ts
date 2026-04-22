@@ -3,6 +3,16 @@ import { JobOpeningStatus, Prisma } from '@prisma/client';
 import type { JobsListQuery } from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
 
+const TOP_LEVEL_FOCUS_AREAS = [
+  'Digital Human Rights',
+  'Economies & Governance',
+  'AI & Robotics',
+  'Neurotech',
+  'Build Innovation Network',
+];
+
+const TOP_LEVEL_ORDER = new Map(TOP_LEVEL_FOCUS_AREAS.map((title, i) => [title, i]));
+
 type PagedTeamGroupRow = {
   teamUid: string;
   roleCount: number;
@@ -340,59 +350,87 @@ export class JobOpeningsQueryService {
 
     if (jobsByTeam.size === 0) return [];
 
-    const focusRows = await this.prisma.teamFocusArea.findMany({
-      where: { teamUid: { in: [...jobsByTeam.keys()] } },
-      select: {
-        teamUid: true,
-        focusAreaUid: true,
-        ancestorAreaUid: true,
-        focusArea: { select: { title: true } },
-        ancestorArea: { select: { title: true } },
-      },
+    const teamUids = [...jobsByTeam.keys()];
+
+    const [allFocusAreas, teamFocusRows] = await Promise.all([
+      this.prisma.focusArea.findMany({
+        select: { uid: true, title: true, parentUid: true },
+      }),
+      this.prisma.teamFocusArea.findMany({
+        where: { teamUid: { in: teamUids } },
+        select: {
+          teamUid: true,
+          focusAreaUid: true,
+          focusArea: { select: { title: true } },
+        },
+      }),
+    ]);
+
+    const focusAreaByUid = new Map<string, { uid: string; title: string; parentUid: string | null }>();
+    for (const fa of allFocusAreas) {
+      focusAreaByUid.set(fa.uid, fa);
+    }
+
+    const resolveTopLevel = (leafUid: string): string | null => {
+      let currentUid: string | null = leafUid;
+      const visited = new Set<string>();
+
+      while (currentUid && !visited.has(currentUid)) {
+        visited.add(currentUid);
+        const node = focusAreaByUid.get(currentUid);
+        if (!node) break;
+
+        if (TOP_LEVEL_ORDER.has(node.title)) {
+          return node.title;
+        }
+        currentUid = node.parentUid;
+      }
+      return null;
+    };
+
+    const topLevelCount = new Map<string, number>();
+    const childrenByTopLevel = new Map<string, Map<string, number>>();
+    const seenTeamLeaf = new Set<string>();
+
+    for (const row of teamFocusRows) {
+      const delta = jobsByTeam.get(row.teamUid) ?? 0;
+      const leafUid = row.focusAreaUid;
+      const leafTitle = row.focusArea.title;
+
+      const topLevel = resolveTopLevel(leafUid);
+      if (!topLevel) continue;
+
+      const teamLeafKey = `${row.teamUid}::${leafUid}`;
+      if (seenTeamLeaf.has(teamLeafKey)) continue;
+      seenTeamLeaf.add(teamLeafKey);
+
+      topLevelCount.set(topLevel, (topLevelCount.get(topLevel) ?? 0) + delta);
+
+      if (leafTitle === topLevel) continue;
+
+      let leafMap = childrenByTopLevel.get(topLevel);
+      if (!leafMap) {
+        leafMap = new Map();
+        childrenByTopLevel.set(topLevel, leafMap);
+      }
+      leafMap.set(leafTitle, (leafMap.get(leafTitle) ?? 0) + delta);
+    }
+
+    const result = TOP_LEVEL_FOCUS_AREAS.map((topLevel) => {
+      const leafMap = childrenByTopLevel.get(topLevel);
+      const children = leafMap
+        ? [...leafMap.entries()]
+            .map(([value, count]) => ({ value, count }))
+            .sort((a, b) => a.value.localeCompare(b.value))
+        : [];
+
+      return {
+        value: topLevel,
+        count: topLevelCount.get(topLevel) ?? 0,
+        children,
+      };
     });
 
-    const ancestorSeen = new Set<string>();
-    const ancestorCount = new Map<string, number>();
-    const leafSeen = new Set<string>();
-    const leafCount = new Map<string, { title: string; parentTitle: string; count: number }>();
-
-    for (const row of focusRows) {
-      const delta = jobsByTeam.get(row.teamUid) ?? 0;
-      const ancestorKey = `${row.teamUid}::${row.ancestorAreaUid}`;
-      if (!ancestorSeen.has(ancestorKey)) {
-        ancestorSeen.add(ancestorKey);
-        ancestorCount.set(row.ancestorArea.title, (ancestorCount.get(row.ancestorArea.title) ?? 0) + delta);
-      }
-
-      const leafKey = `${row.teamUid}::${row.focusAreaUid}`;
-      if (!leafSeen.has(leafKey)) {
-        leafSeen.add(leafKey);
-        const existing = leafCount.get(row.focusArea.title);
-        leafCount.set(row.focusArea.title, {
-          title: row.focusArea.title,
-          parentTitle: row.ancestorArea.title,
-          count: (existing?.count ?? 0) + delta,
-        });
-      }
-    }
-
-    const childrenByParent = new Map<string, { value: string; count: number }[]>();
-    for (const leaf of leafCount.values()) {
-      if (leaf.title === leaf.parentTitle) continue;
-      if (!childrenByParent.has(leaf.parentTitle)) childrenByParent.set(leaf.parentTitle, []);
-      childrenByParent.get(leaf.parentTitle)?.push({ value: leaf.title, count: leaf.count });
-    }
-
-    for (const children of childrenByParent.values()) {
-      children.sort((a, b) => a.value.localeCompare(b.value));
-    }
-
-    return [...ancestorCount.entries()]
-      .map(([value, count]) => ({
-        value,
-        count,
-        children: childrenByParent.get(value) ?? [],
-      }))
-      .sort((a, b) => a.value.localeCompare(b.value));
+    return result.filter((item) => item.count > 0);
   }
 }
