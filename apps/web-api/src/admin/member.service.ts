@@ -8,7 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
-import { InvestorProfileType, Location, Member, Prisma } from '@prisma/client';
+import { InvestorProfileType, Location, Member, MemberApprovalState, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { NotificationService } from '../utils/notification/notification.service';
@@ -46,6 +46,169 @@ export class MemberService {
     @Inject(forwardRef(() => TeamsService))
     private teamService: TeamsService
   ) {}
+
+  private fallbackMemberState(accessLevel?: string | null): MemberApprovalState {
+    if (!accessLevel) {
+      return MemberApprovalState.PENDING;
+    }
+
+    if (accessLevel.toUpperCase() === 'REJECTED') {
+      return MemberApprovalState.REJECTED;
+    }
+
+    const match = accessLevel.match(/^L(\d+)$/i);
+    if (!match) {
+      return MemberApprovalState.PENDING;
+    }
+
+    const level = Number(match[1]);
+    return level >= 3 ? MemberApprovalState.APPROVED : MemberApprovalState.PENDING;
+  }
+
+  private resolveMemberState(
+    accessLevel?: string | null,
+    approvalState?: MemberApprovalState | null
+  ): MemberApprovalState {
+    return approvalState ?? this.fallbackMemberState(accessLevel);
+  }
+
+  private mapPermission(permission?: { uid: string; code: string; description?: string | null } | null) {
+    if (!permission) {
+      return null;
+    }
+
+    return {
+      uid: permission.uid,
+      code: permission.code,
+      description: permission.description ?? null,
+    };
+  }
+
+  private mapPolicy(policy?: { uid: string; code: string; name: string; description?: string | null } | null) {
+    if (!policy) {
+      return null;
+    }
+
+    return {
+      uid: policy.uid,
+      code: policy.code,
+      name: policy.name,
+      description: policy.description ?? null,
+    };
+  }
+
+  private mapRole(role?: { uid: string; code: string; name: string; description?: string | null } | null) {
+    if (!role) {
+      return null;
+    }
+
+    return {
+      uid: role.uid,
+      code: role.code,
+      name: role.name,
+      description: role.description ?? null,
+    };
+  }
+
+  private uniqueByCode<T extends { code: string }>(items: T[]): T[] {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      if (seen.has(item.code)) {
+        return false;
+      }
+      seen.add(item.code);
+      return true;
+    });
+  }
+
+  private enrichMemberAccessData<T extends {
+    accessLevel?: string | null;
+    memberApproval?: { state?: MemberApprovalState | null } | null;
+    memberPermissionsV2?: Array<{
+      permission?: { uid: string; code: string; description?: string | null } | null;
+    }> | null;
+    policyAssignmentsV2?: Array<{
+      policy?: {
+        uid: string;
+        code: string;
+        name: string;
+        description?: string | null;
+        policyPermissions?: Array<{
+          permission?: { uid: string; code: string; description?: string | null } | null;
+        }>;
+      } | null;
+    }> | null;
+    roleAssignments?: Array<{
+      role?: {
+        uid: string;
+        code: string;
+        name: string;
+        description?: string | null;
+        rolePermissions?: Array<{
+          permission?: { uid: string; code: string; description?: string | null } | null;
+        }>;
+      } | null;
+    }> | null;
+  }>(member: T) {
+    const directPermissions = this.uniqueByCode(
+      (member.memberPermissionsV2 ?? [])
+        .map((item) => this.mapPermission(item.permission))
+        .filter(Boolean) as Array<{ uid: string; code: string; description?: string | null }>
+    );
+
+    const policies = this.uniqueByCode(
+      (member.policyAssignmentsV2 ?? [])
+        .map((item) => this.mapPolicy(item.policy))
+        .filter(Boolean) as Array<{ uid: string; code: string; name: string; description?: string | null }>
+    );
+
+    const policyPermissions = this.uniqueByCode(
+      (member.policyAssignmentsV2 ?? [])
+        .flatMap((assignment) => assignment.policy?.policyPermissions ?? [])
+        .map((item) => this.mapPermission(item.permission))
+        .filter(Boolean) as Array<{ uid: string; code: string; description?: string | null }>
+    );
+
+    const roles = this.uniqueByCode(
+      (member.roleAssignments ?? [])
+        .map((item) => this.mapRole(item.role))
+        .filter(Boolean) as Array<{ uid: string; code: string; name: string; description?: string | null }>
+    );
+
+    const rolePermissions = this.uniqueByCode(
+      (member.roleAssignments ?? [])
+        .flatMap((assignment) => assignment.role?.rolePermissions ?? [])
+        .map((item) => this.mapPermission(item.permission))
+        .filter(Boolean) as Array<{ uid: string; code: string; description?: string | null }>
+    );
+
+    const effectivePermissions = this.uniqueByCode([
+      ...directPermissions,
+      ...policyPermissions,
+      ...rolePermissions,
+    ]);
+
+    const {
+      memberPermissionsV2,
+      policyAssignmentsV2,
+      roleAssignments,
+      memberApproval,
+      ...safeMember
+    } = member as any;
+
+    return {
+      ...safeMember,
+      memberState: this.resolveMemberState(member.accessLevel, member.memberApproval?.state),
+      permissions: directPermissions,
+      permissionCodes: directPermissions.map((p) => p.code),
+      policies,
+      policyCodes: policies.map((p) => p.code),
+      roles,
+      roleCodes: roles.map((r) => r.code),
+      effectivePermissions,
+      effectivePermissionCodes: effectivePermissions.map((p) => p.code),
+    };
+  }
 
   /**
    * Creates a new member in the database within a transaction.
@@ -103,7 +266,7 @@ export class MemberService {
    */
   async findMemberByUid(uid: string, tx: Prisma.TransactionClient = this.prisma) {
     try {
-      return tx.member.findUniqueOrThrow({
+      const member = await tx.member.findUniqueOrThrow({
         where: { uid },
         include: {
           image: true,
@@ -112,8 +275,72 @@ export class MemberService {
           teamMemberRoles: true,
           memberRoles: true,
           projectContributions: true,
+          memberApproval: {
+            select: {
+              state: true,
+            },
+          },
+          memberPermissionsV2: {
+            select: {
+              permission: {
+                select: {
+                  uid: true,
+                  code: true,
+                  description: true,
+                },
+              },
+            },
+          },
+          policyAssignmentsV2: {
+            select: {
+              policy: {
+                select: {
+                  uid: true,
+                  code: true,
+                  name: true,
+                  description: true,
+                  policyPermissions: {
+                    select: {
+                      permission: {
+                        select: {
+                          uid: true,
+                          code: true,
+                          description: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          roleAssignments: {
+            select: {
+              role: {
+                select: {
+                  uid: true,
+                  code: true,
+                  name: true,
+                  description: true,
+                  rolePermissions: {
+                    select: {
+                      permission: {
+                        select: {
+                          uid: true,
+                          code: true,
+                          description: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       });
+
+      return this.enrichMemberAccessData(member);
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -908,6 +1135,68 @@ export class MemberService {
             type: true,
           },
         },
+        memberApproval: {
+          select: {
+            state: true,
+          },
+        },
+        memberPermissionsV2: {
+          select: {
+            permission: {
+              select: {
+                uid: true,
+                code: true,
+                description: true,
+              },
+            },
+          },
+        },
+        policyAssignmentsV2: {
+          select: {
+            policy: {
+              select: {
+                uid: true,
+                code: true,
+                name: true,
+                description: true,
+                policyPermissions: {
+                  select: {
+                    permission: {
+                      select: {
+                        uid: true,
+                        code: true,
+                        description: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        roleAssignments: {
+          select: {
+            role: {
+              select: {
+                uid: true,
+                code: true,
+                name: true,
+                description: true,
+                rolePermissions: {
+                  select: {
+                    permission: {
+                      select: {
+                        uid: true,
+                        code: true,
+                        description: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         demoDayAdminScopes: {
           select: {
             memberUid: true,
@@ -921,7 +1210,7 @@ export class MemberService {
     });
 
     const membersWithHosts = members.map((m) => ({
-      ...m,
+      ...this.enrichMemberAccessData(m),
       demoDayHosts: m.demoDayAdminScopes?.filter((s) => s.scopeType === 'HOST').map((s) => s.scopeValue) ?? [],
     }));
 
