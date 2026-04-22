@@ -68,7 +68,7 @@ export const JobFacetItemSchema = z.object({
   count: z.number().int(),
 });
 
-export const JobFacetTreeItemSchema: z.ZodType<{ value: string; count: number; children: { value: string; count: number }[] }> = z.object({
+export const JobFacetTreeItemSchema = z.object({
   value: z.string(),
   count: z.number().int(),
   children: z.array(JobFacetItemSchema),
