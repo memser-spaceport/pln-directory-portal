@@ -215,7 +215,55 @@ model Member {
   roleAssignmentsGiven     RoleAssignment[]     @relation("MemberRoleAssignmentsGiven")
   memberPermissions        MemberPermission[]   @relation("MemberDirectPermissions")
   memberPermissionsGiven   MemberPermission[]   @relation("MemberDirectPermissionsGiven")
+  memberApproval                   MemberApproval?
+  requestedMemberApprovals         MemberApproval[]     @relation("MemberApprovalRequestedBy")
+  reviewedMemberApprovals          MemberApproval[]     @relation("MemberApprovalReviewedBy")
+  memberApprovalEvents             MemberApprovalEvent[] @relation("MemberApprovalEventMember")
+  actedMemberApprovalEvents        MemberApprovalEvent[] @relation("MemberApprovalEventActor")
 }
+
+
+model MemberApproval {
+  uid            String              @id @default(cuid())
+  memberUid      String              @unique
+  state          MemberApprovalState @default(PENDING)
+  requestedByUid String?
+  reviewedByUid  String?
+  reason         String?
+  requestedAt    DateTime            @default(now())
+  reviewedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  member         Member              @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  requestedBy    Member?             @relation("MemberApprovalRequestedBy", fields: [requestedByUid], references: [uid], onDelete: SetNull)
+  reviewedBy     Member?             @relation("MemberApprovalReviewedBy", fields: [reviewedByUid], references: [uid], onDelete: SetNull)
+  events         MemberApprovalEvent[]
+
+  @@index([state])
+  @@index([requestedByUid])
+  @@index([reviewedByUid])
+}
+
+model MemberApprovalEvent {
+  uid            String              @id @default(cuid())
+  approvalUid    String
+  memberUid      String
+  fromState      MemberApprovalState?
+  toState        MemberApprovalState
+  actorUid       String?
+  reason         String?
+  createdAt      DateTime            @default(now())
+
+  approval       MemberApproval      @relation(fields: [approvalUid], references: [uid], onDelete: Cascade)
+  member         Member              @relation("MemberApprovalEventMember", fields: [memberUid], references: [uid], onDelete: Cascade)
+  actor          Member?             @relation("MemberApprovalEventActor", fields: [actorUid], references: [uid], onDelete: SetNull)
+
+  @@index([approvalUid])
+  @@index([memberUid])
+  @@index([actorUid])
+}
+
 
 model MemberRole {
   id        Int      @id @default(autoincrement())
@@ -229,6 +277,12 @@ model MemberRole {
 enum ParticipantType {
   MEMBER
   TEAM
+}
+
+enum MemberApprovalState {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum ApprovalStatus {
