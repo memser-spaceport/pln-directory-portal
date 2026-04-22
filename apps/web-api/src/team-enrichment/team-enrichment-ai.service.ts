@@ -35,7 +35,12 @@ FIELDS TO POPULATE:
 
 3. contactMethod: Preferred method of contact. Could be an email address, Slack workspace/channel link, Discord server link/handle, or other contact method. Prefer email when found. Return exactly the value (e.g., "team@example.com", "https://slack.com/...", "discord.gg/...").
 
-4. linkedinHandler: LinkedIn company handle (e.g., "company/puma-ai")
+4. linkedinHandler: LinkedIn company handle (e.g., "company/puma-ai").
+   CRITICAL: Before returning a handle, verify the page actually exists on LinkedIn.
+   - Visit https://www.linkedin.com/company/<slug>/ and confirm it resolves to a real company page.
+   - If LinkedIn redirects to /company/unavailable/ or the page 404s, the handle is invalid — return null.
+   - Do NOT guess the slug from the company name; only return a handle you actually found in search results and confirmed resolves to a live page.
+   - If you cannot confirm the page exists, return null rather than a speculative handle.
 
 5. twitterHandler: Twitter/X handle without @ (e.g., "companyname")
 
@@ -78,36 +83,32 @@ SEARCH STRATEGY:
 7. Search for "[Company Name]" + about or team
 8. If the entity is part of a larger ecosystem (e.g., a DAO working group), search for it within that ecosystem's website
 
-CRITICAL: You MUST ALWAYS respond with valid JSON.
+OUTPUT FORMAT — STRICT REQUIREMENTS:
+- Your ENTIRE response MUST be a single JSON object that passes JSON.parse() as-is.
+- Start the response with "{" and end with "}". No leading/trailing whitespace.
+- NO prose, NO commentary, NO explanation, NO preamble, NO epilogue.
+- NO markdown code fences (do not wrap the JSON in \`\`\`json or \`\`\`).
+- All strings MUST be valid JSON strings (escape quotes and backslashes).
+- Nullable fields: use null (not the string "null", not "N/A", not missing).
+- All listed keys MUST be present — use null or [] when you have no value.
 
-OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
+SCHEMA (all keys required, types must match exactly):
 {
-  "website": "https://..." or null,
-  "websiteOwnerName": "Name as shown on website" or null,
-  "websiteCandidates": ["https://url1", "https://url2", ...],
-  "blog": "https://..." or null,
-  "contactMethod": "email@example.com" or "https://slack.com/..." or "discord.gg/..." or null,
-  "linkedinHandler": "company/..." or null,
-  "twitterHandler": "handle" or null,
-  "telegramHandler": "handle" or null,
-  "shortDescription": "...",
-  "longDescription": "...",
-  "moreDetails": "Additional context about team, history, achievements...",
-  "industryTags": ["Tag1", "Tag2", ...],
-  "investmentFocus": ["Tag1", "Tag2", "Tag3", ...],
-  "confidence": {
-    "website": "high" | "medium" | "low",
-    "blog": "high" | "medium" | "low",
-    "contactMethod": "high" | "medium" | "low",
-    "twitterHandler": "high" | "medium" | "low",
-    "telegramHandler": "high" | "medium" | "low",
-    "shortDescription": "high" | "medium" | "low",
-    "longDescription": "high" | "medium" | "low",
-    "moreDetails": "high" | "medium" | "low",
-    "industryTags": "high" | "medium" | "low",
-    "investmentFocus": "high" | "medium" | "low"
-  },
-  "sources": ["url1", "url2", ...]
+  "website": string | null,
+  "websiteOwnerName": string | null,
+  "websiteCandidates": string[],
+  "blog": string | null,
+  "contactMethod": string | null,
+  "linkedinHandler": string | null,
+  "twitterHandler": string | null,
+  "telegramHandler": string | null,
+  "shortDescription": string | null,
+  "longDescription": string | null,
+  "moreDetails": string | null,
+  "industryTags": string[],
+  "investmentFocus": string[],
+  "confidence": { [field: string]: "high" | "medium" | "low" },
+  "sources": string[]
 }
 `;
 
@@ -214,61 +215,33 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 `;
   }
 
-  /**
-   * Extracts the first balanced `{...}` block from an AI response.
-   * Handles markdown code fences, leading/trailing prose, and multiple JSON
-   * objects (greedy regex breaks when the model emits prose containing `}`
-   * after the first valid object — we scan braces instead).
-   */
-  private extractJsonObject(text: string): string | null {
-    const fenced = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
-    if (fenced) return fenced[1];
-
-    const start = text.indexOf('{');
-    if (start === -1) return null;
-
-    let depth = 0;
-    let inString = false;
-    let escape = false;
-    for (let i = start; i < text.length; i++) {
-      const ch = text[i];
-      if (escape) {
-        escape = false;
-        continue;
-      }
-      if (ch === '\\') {
-        escape = true;
-        continue;
-      }
-      if (ch === '"') {
-        inString = !inString;
-        continue;
-      }
-      if (inString) continue;
-      if (ch === '{') depth++;
-      else if (ch === '}') {
-        depth--;
-        if (depth === 0) return text.substring(start, i + 1);
-      }
-    }
-    return null;
-  }
-
   private parseAIResponse(text: string, teamName?: string): AITeamEnrichmentResponse {
     if (!text || text.trim().length === 0) {
       this.logger.warn('AI returned empty response');
       return this.getEmptyResponse();
     }
 
-    const json = this.extractJsonObject(text);
-    if (!json) {
-      this.logger.warn(`No JSON found in AI response (len=${text.length}): ${text.substring(0, 300)}`);
+    // The system prompt demands a raw JSON object. We only strip an optional
+    // ```json ... ``` fence as a pragmatic fallback — if the model still emits
+    // prose, the JSON.parse below will throw and we log the raw text.
+    const trimmed = text
+      .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '');
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch (e) {
+      this.logger.warn(
+        `Failed to parse AI response JSON for "${teamName}": ${e.message}. Raw response (len=${
+          text.length
+        }): ${text.substring(0, 500)}`
+      );
       return this.getEmptyResponse();
     }
 
     try {
-      const parsed = JSON.parse(json);
-
       const websiteCandidates: string[] = Array.isArray(parsed.websiteCandidates)
         ? parsed.websiteCandidates.map((u: string) => this.validateUrl(u)).filter(Boolean)
         : [];
@@ -318,9 +291,9 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       };
     } catch (e) {
       this.logger.warn(
-        `Failed to parse AI response JSON for "${teamName}": ${e.message}. Extracted JSON (len=${
-          json.length
-        }): ${json.substring(0, 500)}. Raw response (len=${text.length}): ${text.substring(0, 500)}`
+        `Failed to normalize AI response for "${teamName}": ${e.message}. Raw response (len=${
+          text.length
+        }): ${text.substring(0, 500)}`
       );
       return this.getEmptyResponse();
     }
