@@ -148,18 +148,26 @@
   gap: 6px;
 }
 
+.showAllRow {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
 .showAllBtn {
-  margin-top: 8px;
-  background: none;
-  border: none;
-  padding: 0;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 7px 20px;
   font-size: 13px;
   font-weight: 500;
-  color: #4f71ff;
+  color: #374151;
   cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
 
   &:hover {
-    text-decoration: underline;
+    border-color: #9ca3af;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 }
 

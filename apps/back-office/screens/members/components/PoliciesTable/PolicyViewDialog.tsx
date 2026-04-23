@@ -51,23 +51,58 @@ const SearchIcon = () => (
   </svg>
 );
 
-const LayersIcon = () => (
+const FolderIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
   </svg>
 );
 
-const WrenchIcon = () => (
+const CalendarIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
+    <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);
+
+const ChatIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+  </svg>
+);
+
+const PeopleIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const BookIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 004 22h16V2H6.5A2.5 2.5 0 004 4.5v15z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+  </svg>
+);
+
+const StarCalendarIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <path d="M12 13l.9 2.6H16l-2.5 1.8.9 2.6L12 18.3l-2.4 1.7.9-2.6L8 15.6h3.1L12 13z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+  </svg>
+);
+
+const LayersIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const GridIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
   </svg>
 );
 
@@ -94,8 +129,14 @@ const ProjectIcon = () => (
 
 function getPermissionIcon(perm: string) {
   const lower = perm.toLowerCase();
+  if (lower.includes('directory')) return <FolderIcon />;
+  if (lower.includes('hour') || lower.includes('office')) return <CalendarIcon />;
+  if (lower.includes('forum') || lower.includes('chat') || lower.includes('message')) return <ChatIcon />;
+  if (lower.includes('gathering') || lower.includes('irl') || lower.includes('member') || lower.includes('people')) return <PeopleIcon />;
+  if (lower.includes('guide') || lower.includes('founder') || lower.includes('book') || lower.includes('doc')) return <BookIcon />;
+  if (lower.includes('demo') || lower.includes('event') || lower.includes('day')) return <StarCalendarIcon />;
   if (lower.includes('all') || lower.includes('module')) return <LayersIcon />;
-  return <WrenchIcon />;
+  return <GridIcon />;
 }
 
 const MemberNameCell = ({ member }: { member: Member }) => (
@@ -252,21 +293,20 @@ export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
                       <div className={s.permissionBadges}>
                         <span className={s.permissionBadge}>View</span>
                         <span className={s.permissionBadge}>Edit</span>
-                        <span className={s.permissionBadge}>Admin</span>
                       </div>
                     </div>
                   ))}
                 </div>
                 {hasMore && (
-                  <button
-                    type="button"
-                    className={s.showAllBtn}
-                    onClick={() => setShowAllPermissions((v) => !v)}
-                  >
-                    {showAllPermissions
-                      ? 'Show Less'
-                      : `Show All (${policy.permissions.length})`}
-                  </button>
+                  <div className={s.showAllRow}>
+                    <button
+                      type="button"
+                      className={s.showAllBtn}
+                      onClick={() => setShowAllPermissions((v) => !v)}
+                    >
+                      {showAllPermissions ? 'Show Less' : 'Show All'}
+                    </button>
+                  </div>
                 )}
               </>
             );
