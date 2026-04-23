@@ -200,66 +200,81 @@
   }
 }
 
-/* ─── Members table ───────────────────────────────────── */
+/* ─── Members TanStack table ──────────────────────────── */
 
-.memberTable {
+.memberTableWrap {
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   overflow: hidden;
 }
 
-.memberTableHeader {
+.tableHeaderRow {
   display: flex;
   align-items: center;
-  padding: 10px 16px;
   background: #f9fafb;
   border-bottom: 1px solid #e5e7eb;
+}
+
+.tableHeaderCell {
+  padding: 10px 16px;
   font-size: 13px;
   font-weight: 500;
   color: #6b7280;
+
+  &:first-child {
+    padding-left: 16px;
+  }
 }
 
-.memberTableBody {
+.tableBody {
   max-height: 340px;
   overflow-y: auto;
 }
 
-.memberTableRow {
+.tableBodyRow {
   display: flex;
   align-items: center;
-  padding: 14px 16px;
   border-bottom: 1px solid #f3f4f6;
-  gap: 12px;
 
   &:last-child {
     border-bottom: none;
   }
 }
 
-/* ─── Columns ─────────────────────────────────────────── */
-
-.colMember {
-  flex: 1;
+.tableBodyCell {
+  padding: 12px 16px;
   display: flex;
   align-items: center;
-  gap: 12px;
+
+  &:first-child {
+    padding-left: 16px;
+  }
+}
+
+.fixed {
+  flex: 0 0 auto;
+}
+
+.flexible {
+  flex: 1;
   min-width: 0;
 }
 
-.colTeam {
-  width: 220px;
-  flex-shrink: 0;
+.emptyState {
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: #9ca3af;
 }
 
-.colDate {
-  width: 110px;
-  flex-shrink: 0;
+/* ─── Member name cell ────────────────────────────────── */
+
+.memberNameCell {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
-
-/* ─── Member cell ─────────────────────────────────────── */
 
 .avatar {
   width: 40px;
@@ -312,7 +327,7 @@
   text-overflow: ellipsis;
 }
 
-/* ─── Team/Project column ─────────────────────────────── */
+/* ─── Team/Project cell ───────────────────────────────── */
 
 .teamList {
   display: flex;
@@ -334,7 +349,24 @@
   }
 }
 
-/* ─── Date column ─────────────────────────────────────── */
+.teamOverflow {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ─── Date cell ───────────────────────────────────────── */
+
+.dateCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 
 .dateLine {
   font-size: 13px;

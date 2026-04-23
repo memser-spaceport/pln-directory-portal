@@ -1,4 +1,12 @@
 import React, { useState } from 'react';
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import clsx from 'clsx';
 
 import Modal from '../../../../components/modal/modal';
 import { Policy } from '../../../../hooks/access-control/usePoliciesList';
@@ -12,9 +20,16 @@ interface Props {
   onClose: () => void;
 }
 
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
 const PolicyHeaderIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path
+      d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
   </svg>
 );
 
@@ -57,7 +72,7 @@ const WrenchIcon = () => (
 );
 
 const TeamIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path
       d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"
       stroke="currentColor"
@@ -69,11 +84,13 @@ const TeamIcon = () => (
 );
 
 const ProjectIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
     <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
   </svg>
 );
+
+// ─── Cell helpers ─────────────────────────────────────────────────────────────
 
 function getPermissionIcon(perm: string) {
   const lower = perm.toLowerCase();
@@ -81,19 +98,107 @@ function getPermissionIcon(perm: string) {
   return <WrenchIcon />;
 }
 
+const MemberNameCell = ({ member }: { member: Member }) => (
+  <div className={s.memberNameCell}>
+    <div className={s.avatar}>
+      {member.image?.url ? (
+        <img src={member.image.url} alt={member.name} />
+      ) : (
+        <div className={s.avatarPlaceholder}>{member.name.charAt(0)}</div>
+      )}
+    </div>
+    <div className={s.memberText}>
+      <span className={s.memberName}>{member.name}</span>
+      <span className={s.memberEmail}>{member.email}</span>
+    </div>
+  </div>
+);
+
+const TeamProjectCell = ({ member }: { member: Member }) => {
+  const items = [
+    ...(member.teamMemberRoles ?? []).map((t) => ({ icon: <TeamIcon />, label: t.team.name })),
+    ...member.projectContributions.map((c) => ({ icon: <ProjectIcon />, label: c.project.name })),
+  ];
+  if (!items.length) return <span className={s.muted}>—</span>;
+  const visible = items.slice(0, 2);
+  const overflow = items.length - 2;
+  return (
+    <div className={s.teamList}>
+      {visible.map((item, i) => (
+        <span key={i} className={s.teamBadge}>
+          {item.icon}
+          {item.label}
+        </span>
+      ))}
+      {overflow > 0 && <span className={s.teamOverflow}>+{overflow}</span>}
+    </div>
+  );
+};
+
+const DateCell = ({ member }: { member: Member }) => {
+  const dateObj = member.accessLevelUpdatedAt ? new Date(member.accessLevelUpdatedAt) : null;
+  if (!dateObj) return <span className={s.muted}>—</span>;
+  const dateLine = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const timeLine = dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+  return (
+    <div className={s.dateCell}>
+      <span className={s.dateLine}>{dateLine}</span>
+      <span className={s.timeLine}>{timeLine}</span>
+    </div>
+  );
+};
+
+// ─── TanStack Table setup ─────────────────────────────────────────────────────
+
+const columnHelper = createColumnHelper<Member>();
+
+const columns = [
+  columnHelper.display({
+    id: 'member',
+    header: 'Members',
+    size: 0, // flexible
+    cell: (info) => <MemberNameCell member={info.row.original} />,
+  }),
+  columnHelper.display({
+    id: 'teamProject',
+    header: 'Team/Project',
+    size: 220,
+    cell: (info) => <TeamProjectCell member={info.row.original} />,
+  }),
+  columnHelper.display({
+    id: 'date',
+    header: 'Date',
+    size: 120,
+    cell: (info) => <DateCell member={info.row.original} />,
+  }),
+];
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
   const [memberSearch, setMemberSearch] = useState('');
 
+  const policyMembers = members.filter((m) => m.policies?.some((p) => p.code === policy?.code));
+
+  const table = useReactTable({
+    data: policyMembers,
+    columns,
+    state: { globalFilter: memberSearch },
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    globalFilterFn: (row, _colId, value: string) => {
+      const q = value.toLowerCase();
+      return (
+        row.original.name.toLowerCase().includes(q) ||
+        row.original.email.toLowerCase().includes(q)
+      );
+    },
+    getRowId: (row) => row.uid,
+  });
+
   if (!policy) return null;
 
-  const policyMembers = members.filter((m) => m.policies?.some((p) => p.code === policy.code));
-
-  const filteredMembers = memberSearch
-    ? policyMembers.filter((m) => {
-        const q = memberSearch.toLowerCase();
-        return m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q);
-      })
-    : policyMembers;
+  const rows = table.getRowModel().rows;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} modalClassName={s.modal}>
@@ -159,78 +264,55 @@ export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
             />
           </div>
 
-          {filteredMembers.length === 0 ? (
-            <p className={s.muted}>No members found.</p>
-          ) : (
-            <div className={s.memberTable}>
-              {/* Column headers */}
-              <div className={s.memberTableHeader}>
-                <div className={s.colMember}>Members</div>
-                <div className={s.colTeam}>Team/Project</div>
-                <div className={s.colDate}>Date</div>
-              </div>
-
-              {/* Rows */}
-              <div className={s.memberTableBody}>
-                {filteredMembers.map((m) => {
-                  const teams = m.teamMemberRoles ?? [];
-                  const projects = m.projectContributions ?? [];
-
-                  const dateObj = m.accessLevelUpdatedAt ? new Date(m.accessLevelUpdatedAt) : null;
-                  const dateLine = dateObj
-                    ? dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                    : '—';
-                  const timeLine = dateObj
-                    ? dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()
-                    : null;
-
-                  return (
-                    <div key={m.uid} className={s.memberTableRow}>
-                      <div className={s.colMember}>
-                        <div className={s.avatar}>
-                          {m.image?.url ? (
-                            <img src={m.image.url} alt={m.name} />
-                          ) : (
-                            <div className={s.avatarPlaceholder}>{m.name.charAt(0)}</div>
-                          )}
-                        </div>
-                        <div className={s.memberText}>
-                          <span className={s.memberName}>{m.name}</span>
-                          <span className={s.memberEmail}>{m.email}</span>
-                        </div>
-                      </div>
-
-                      <div className={s.colTeam}>
-                        {teams.length === 0 && projects.length === 0 ? (
-                          <span className={s.muted}>—</span>
-                        ) : (
-                          <div className={s.teamList}>
-                            {teams.map((t) => (
-                              <span key={t.team.uid} className={s.teamBadge}>
-                                <TeamIcon />
-                                {t.team.name}
-                              </span>
-                            ))}
-                            {projects.map((c) => (
-                              <span key={c.uid} className={s.teamBadge}>
-                                <ProjectIcon />
-                                {c.project.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className={s.colDate}>
-                        <span className={s.dateLine}>{dateLine}</span>
-                        {timeLine && <span className={s.timeLine}>{timeLine}</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+          <div className={s.memberTableWrap}>
+            {/* Header row */}
+            <div className={s.tableHeaderRow}>
+              {table.getHeaderGroups().map((hg) =>
+                hg.headers.map((header) => (
+                  <div
+                    key={header.id}
+                    className={clsx(s.tableHeaderCell, {
+                      [s.fixed]: !!header.column.columnDef.size,
+                      [s.flexible]: !header.column.columnDef.size,
+                    })}
+                    style={{
+                      width: header.column.getSize() || undefined,
+                      flexBasis: header.column.getSize() || undefined,
+                    }}
+                  >
+                    {flexRender(header.column.columnDef.header, header.getContext())}
+                  </div>
+                ))
+              )}
             </div>
-          )}
+
+            {/* Body */}
+            <div className={s.tableBody}>
+              {rows.length === 0 ? (
+                <div className={s.emptyState}>No members found.</div>
+              ) : (
+                rows.map((row) => (
+                  <div key={row.id} className={s.tableBodyRow}>
+                    {row.getVisibleCells().map((cell) => (
+                      <div
+                        key={cell.id}
+                        className={clsx(s.tableBodyCell, {
+                          [s.fixed]: !!cell.column.columnDef.size,
+                          [s.flexible]: !cell.column.columnDef.size,
+                        })}
+                        style={{
+                          width: cell.column.getSize() || undefined,
+                          flexBasis: cell.column.getSize() || undefined,
+                        }}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </div>
+                    ))}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </section>
       </div>
     </Modal>
