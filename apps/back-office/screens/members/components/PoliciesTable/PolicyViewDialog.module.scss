@@ -5,6 +5,14 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+
+  // Modal component wraps children in a plain <div> — make it flex too
+  > div {
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+    overflow: hidden;
+  }
 }
 
 /* ─── Header ─────────────────────────────────────────── */
@@ -67,6 +75,7 @@
   padding: 0 24px 28px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .section {
