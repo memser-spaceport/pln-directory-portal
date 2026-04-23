@@ -20,7 +20,7 @@ export const MembersMenu = () => {
   return (
     <div className={s.root} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button className={s.trigger}>
-        <MembersIcon /> Members{' '}
+        <MembersIcon /> M{' '}
         <span
           className={clsx(s.chevron, {
             [s.open]: open,
