@@ -325,12 +325,22 @@ export class TeamEnrichmentService {
       const updateData: Prisma.TeamUpdateInput = {};
       const newFieldsMeta: FieldsMetaMap = {};
       let fieldsUpdatedCount = 0;
+      const skipReasons: Record<string, string[]> = {
+        userEdited: [],
+        userOwned: [],
+        alreadyEnriched: [],
+        aiReturnedNull: [],
+        aiCannotEnrich: [],
+      };
 
       for (const field of ENRICHABLE_TEAM_FIELDS) {
         const fieldStatus = existingFieldsMeta[field]?.status;
 
         // Never overwrite user-edited fields.
-        if (fieldStatus === FieldEnrichmentStatus.ChangedByUser) continue;
+        if (fieldStatus === FieldEnrichmentStatus.ChangedByUser) {
+          skipReasons.userEdited.push(field);
+          continue;
+        }
 
         const currentValue = team[field];
         const slotIsEmpty = !currentValue || currentValue.trim() === '';
@@ -343,11 +353,15 @@ export class TeamEnrichmentService {
             ...existingFieldsMeta[field],
             status: FieldEnrichmentStatus.ChangedByUser,
           };
+          skipReasons.userOwned.push(field);
           continue;
         }
 
         // Standard mode skips already-enriched fields; force mode re-queries them.
-        if (!forceOverwrite && fieldStatus === FieldEnrichmentStatus.Enriched) continue;
+        if (!forceOverwrite && fieldStatus === FieldEnrichmentStatus.Enriched) {
+          skipReasons.alreadyEnriched.push(field);
+          continue;
+        }
 
         // Remaining shapes: slot empty, OR (slot non-empty && Enriched && forceOverwrite).
         const newValue = aiResponse[field];
@@ -361,9 +375,22 @@ export class TeamEnrichmentService {
           fieldsUpdatedCount++;
         } else if (slotIsEmpty) {
           newFieldsMeta[field] = { status: FieldEnrichmentStatus.CannotEnrich };
+          skipReasons.aiCannotEnrich.push(field);
+        } else {
+          // Force mode + non-empty slot + AI returned null: preserve existing value + meta.
+          skipReasons.aiReturnedNull.push(field);
         }
-        // Force mode + non-empty slot + AI returned null: preserve existing value + meta.
       }
+
+      const skipSummary = Object.entries(skipReasons)
+        .filter(([, fields]) => fields.length > 0)
+        .map(([reason, fields]) => `${reason}=[${fields.join(',')}]`)
+        .join(' ');
+      this.logger.log(
+        `Team ${teamUid} (${team.name}) scalar field outcome: written=${fieldsUpdatedCount}${
+          skipSummary ? ' ' + skipSummary : ''
+        }`
+      );
 
       // Handle industryTags — same four-layer check as the scalar loop.
       const tagsStatus = existingFieldsMeta.industryTags?.status;

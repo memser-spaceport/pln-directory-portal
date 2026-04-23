@@ -1,4 +1,4 @@
-# Team Data Enrichment (LAB-1454)
+# Team Data Enrichment
 
 ## Overview
 
@@ -61,7 +61,7 @@ Each enrichable field is tracked in `dataEnrichment.fieldsMeta[<field>].status`:
 
 | Source | Confidence |
 |--------|------------|
-| `ai` (OpenAI/Gemini web search) | `high` / `medium` / `low` — taken from the model's `confidence` object |
+| `ai` (OpenAI / Gemini / Anthropic web search) | `high` / `medium` / `low` — taken from the model's `confidence` object |
 | `open-graph` (website favicon / OG scraping) | `medium` |
 | `scrapingdog` (LinkedIn first-party) | `high` |
 
@@ -220,10 +220,25 @@ This rule applies in both standard and force modes. Force mode can re-query fiel
 | Variable | Default     | Description |
 |----------|-------------|-------------|
 | `IS_TEAM_ENRICHMENT_ENABLED` | `false`     | Enable/disable the cron job |
-| `OPENAI_TEAM_ENRICHMENT_MODEL` | `gpt-4o`    | OpenAI model for enrichment |
+| `AI_PROVIDER` | `gemini`    | Global default AI provider. Accepts `openai`, `gemini`, or `anthropic`. |
+| `TEAM_ENRICHMENT_AI_PROVIDER` | —           | Overrides `AI_PROVIDER` for team enrichment only. Accepts `openai`, `gemini`, or `anthropic`. |
+| `OPENAI_LLM_MODEL` | `gpt-4o`    | OpenAI model |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model |
+| `CLAUDE_API_KEY` | —           | Anthropic API key. Required when the resolved provider is `anthropic`. Falls back to `ANTHROPIC_API_KEY` for SDK-default compatibility. |
+| `CLAUDE_MODEL` | `claude-sonnet-4-6` | Claude model. Also accepts `ANTHROPIC_MODEL`. |
 | `TEAM_ENRICHMENT_CRON` | `0 3 * * *` | Cron schedule expression |
 | `TEAM_ENRICHMENT_MARKING_CRON` | `0 2 * * *` | Cron schedule for auto-marking eligible teams |
 | `SCRAPINGDOG_API_KEY` | —           | ScrapingDog LinkedIn API key. When set, enables the ScrapingDog fallback for teams with a known `linkedinHandler`. |
+
+### AI provider selection
+
+The enrichment pipeline supports three providers: **OpenAI**, **Gemini**, and **Anthropic (Claude)**. The effective provider is resolved per request: `TEAM_ENRICHMENT_AI_PROVIDER` wins if set, otherwise the global `AI_PROVIDER`, otherwise `gemini`. The resolved model id is written to `dataEnrichment.aiModel` for telemetry.
+
+Web search behaviour differs by provider:
+
+- **OpenAI** — uses the Responses API `web_search_preview` tool.
+- **Gemini** — uses model-level search grounding (no tool object).
+- **Anthropic** — Claude receives a provider-defined `web_search` tool in the shape the AI SDK accepts. Note that `@ai-sdk/anthropic@1.x` does not yet forward this tool to the Anthropic API, so the SDK emits an `unsupported-tool` warning and Claude answers from training knowledge. The call shape is kept forward-compatible so that a future SDK upgrade enables server-side web search without code changes.
 
 ## Module Structure
 
@@ -241,6 +256,6 @@ apps/web-api/src/team-enrichment/
 
 - `TeamEnrichmentModule` is imported by: `AppModule`, `DemoDaysModule`, `TeamsModule`, `AdminModule`, `ParticipantsRequestModule`
 - Uses `forwardRef` for `TeamsModule` circular dependency
-- AI: `ai` + `@ai-sdk/openai` packages
+- AI: `ai` + `@ai-sdk/openai` + `@ai-sdk/google` + `@ai-sdk/anthropic` packages
 - Logo extraction: `open-graph-scraper`
 - File upload: `FileUploadService` from `SharedModule` (global)
