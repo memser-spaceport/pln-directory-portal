@@ -207,10 +207,12 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
     const memberStateStatus = { label: stateValue, value: stateValue } as TMemberForm['memberStateStatus'];
 
     // RBAC pre-population from the list member data
-    const rbacRoles = (member.roles ?? []).map((r) => ({ label: r.name, value: r.code }));
-
     const memberPolicyCodes = (member.policies ?? []).map((p) => p.code);
     const assignedPolicies = (policiesData ?? []).filter((p) => memberPolicyCodes.includes(p.code));
+
+    const roleValues = [...new Set(assignedPolicies.map((p) => p.role).filter(Boolean))].sort();
+    const rbacRoles = roleValues.map((r) => ({ label: r, value: r }));
+
     const groupValues = [...new Set(assignedPolicies.map((p) => p.group))];
     const rbacGroups = groupValues.map((g) => ({ label: g, value: g }));
 

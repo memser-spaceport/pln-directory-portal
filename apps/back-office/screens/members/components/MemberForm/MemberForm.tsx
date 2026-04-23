@@ -12,7 +12,6 @@ import { ContactDetails } from './ContactDetails/ContactDetails';
 import { RbacSection } from './RbacSection/RbacSection';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { memberFormSchema } from './helpers';
-import { useRbacRoles } from '../../../../hooks/access-control/useRbacRoles';
 import { useRbacPermissions } from '../../../../hooks/access-control/useRbacPermissions';
 import { usePoliciesList } from '../../../../hooks/access-control/usePoliciesList';
 
@@ -75,18 +74,15 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
     }
   }, [initialData, reset]);
 
-  const { data: rbacRolesData, isLoading: rolesLoading } = useRbacRoles({ authToken });
   const { data: policiesData, isLoading: policiesLoading } = usePoliciesList({ authToken });
   const { data: rbacPermissionsData, isLoading: permsLoading } = useRbacPermissions({ authToken });
-  const isLoadingOptions = rolesLoading || policiesLoading || permsLoading;
+  const isLoadingOptions = policiesLoading || permsLoading;
 
   const rolesOptions = useMemo(
-    () => (rbacRolesData ?? []).map((r) => ({ label: r.name, value: r.code })),
-    [rbacRolesData]
-  );
-
-  const groupsOptions = useMemo(
-    () => [...new Set((policiesData ?? []).map((p) => p.group))].sort().map((g) => ({ label: g, value: g })),
+    () =>
+      [...new Set((policiesData ?? []).map((p) => p.role).filter(Boolean))]
+        .sort()
+        .map((r) => ({ label: r, value: r })),
     [policiesData]
   );
 
@@ -120,7 +116,6 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
             {showRbacSection ? (
               <RbacSection
                 rolesOptions={rolesOptions}
-                groupsOptions={groupsOptions}
                 exceptionsOptions={exceptionsOptions}
                 isLoadingOptions={isLoadingOptions}
                 policiesData={policiesData ?? []}

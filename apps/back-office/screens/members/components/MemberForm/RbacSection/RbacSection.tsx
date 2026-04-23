@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import Select, { MultiValue, SingleValue } from 'react-select';
+import React, { useMemo, useState } from 'react';
+import Select, { GroupBase, MultiValue, OptionsOrGroups, SingleValue } from 'react-select';
 import { useFormContext } from 'react-hook-form';
 import clsx from 'clsx';
 
@@ -71,7 +71,7 @@ interface RbacMultiSelectProps {
   name: 'rbacRoles' | 'rbacGroups' | 'rbacExceptions';
   label: string;
   placeholder: string;
-  options: SelectOption[];
+  options: OptionsOrGroups<SelectOption, GroupBase<SelectOption>>;
   isDisabled?: boolean;
   required?: boolean;
   onChange?: (selected: SelectOption[]) => void;
@@ -115,7 +115,6 @@ const RbacMultiSelect = ({
 
 interface RbacSectionProps {
   rolesOptions: SelectOption[];
-  groupsOptions: SelectOption[];
   exceptionsOptions: SelectOption[];
   isLoadingOptions: boolean;
   policiesData?: Policy[];
@@ -123,7 +122,6 @@ interface RbacSectionProps {
 
 export const RbacSection = ({
   rolesOptions,
-  groupsOptions,
   exceptionsOptions,
   isLoadingOptions,
   policiesData,
@@ -132,6 +130,25 @@ export const RbacSection = ({
   const rbacExceptions = (watch('rbacExceptions') ?? []) as SelectOption[];
   const memberStateStatus = watch('memberStateStatus');
   const isApproved = memberStateStatus?.value === 'Approved';
+  const selectedRoles = (watch('rbacRoles') ?? []) as SelectOption[];
+
+  const groupedGroupOptions = useMemo(() => {
+    const targetRoles =
+      selectedRoles.length > 0 ? new Set(selectedRoles.map((r) => r.value)) : null;
+    const map = new Map<string, Set<string>>();
+    for (const p of policiesData ?? []) {
+      if (!p.role || !p.group) continue;
+      if (targetRoles && !targetRoles.has(p.role)) continue;
+      if (!map.has(p.role)) map.set(p.role, new Set());
+      map.get(p.role)!.add(p.group);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([role, groups]) => ({
+        label: role,
+        options: [...groups].sort().map((g) => ({ label: g, value: g })),
+      }));
+  }, [selectedRoles, policiesData]);
 
   const [removedGroupWarnings, setRemovedGroupWarnings] = useState<string[]>([]);
 
@@ -207,7 +224,7 @@ export const RbacSection = ({
           name="rbacGroups"
           label="Groups"
           placeholder="Select groups"
-          options={groupsOptions}
+          options={groupedGroupOptions}
           isDisabled={isLoadingOptions || !isApproved}
           required={isApproved}
         />
