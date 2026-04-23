@@ -14,7 +14,7 @@ import clsx from 'clsx';
 
 import { Member } from '../../types/member';
 import { MemberCell } from '../MemberCell/MemberCell';
-import { EditMember } from '../EditMember/EditMember';
+import { EditCell } from '../EditCell/EditCell';
 import PaginationControls from '../PaginationControls/PaginationControls';
 import s from './MembersTableV2.module.scss';
 
@@ -61,7 +61,7 @@ export function MembersTableV2({
       columnHelper.accessor('name', {
         header: 'Member',
         cell: (info) => <MemberCell member={info.row.original} />,
-        size: 0,
+        size: 200,
         sortingFn: 'alphanumeric',
       }),
       columnHelper.display({
@@ -73,9 +73,7 @@ export function MembersTableV2({
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
-        cell: (info) => (
-          <EditMember uid={info.row.original.uid} authToken={authToken} />
-        ),
+        cell: (info) => <EditCell member={info.row.original} authToken={authToken} />,
         size: 100,
       }),
     ],
@@ -98,10 +96,7 @@ export function MembersTableV2({
       return (
         (m.name?.toLowerCase().includes(q) ?? false) ||
         (m.email?.toLowerCase().includes(q) ?? false) ||
-        (m.projectContributions?.some((p) =>
-          p.project.name.toLowerCase().includes(q)
-        ) ??
-          false)
+        (m.projectContributions?.some((p) => p.project.name.toLowerCase().includes(q)) ?? false)
       );
     },
     getRowId: (row) => row.uid,
@@ -117,8 +112,14 @@ export function MembersTableV2({
             hg.headers.map((header) => (
               <div
                 key={header.id}
-                className={clsx(s.headerCell, header.column.getSize() === 0 ? s.flexible : s.fixed)}
-                style={header.column.getSize() !== 0 ? { width: header.column.getSize() } : undefined}
+                className={clsx(s.headerCell, {
+                  [s.fixed]: !!header.column.columnDef.size,
+                  [s.flexible]: !header.column.columnDef.size,
+                })}
+                style={{
+                  width: header.column.getSize(),
+                  flexBasis: header.column.getSize(),
+                }}
                 onClick={header.column.getToggleSortingHandler()}
               >
                 {flexRender(header.column.columnDef.header, header.getContext())}
@@ -135,8 +136,14 @@ export function MembersTableV2({
               {row.getVisibleCells().map((cell) => (
                 <div
                   key={cell.id}
-                  className={clsx(s.bodyCell, cell.column.getSize() === 0 ? s.flexible : s.fixed)}
-                  style={cell.column.getSize() !== 0 ? { width: cell.column.getSize() } : undefined}
+                  className={clsx(s.bodyCell, {
+                    [s.fixed]: !!cell.column.columnDef.size,
+                    [s.flexible]: !cell.column.columnDef.size,
+                  })}
+                  style={{
+                    width: cell.column.getSize(),
+                    flexBasis: cell.column.getSize(),
+                  }}
                 >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </div>
