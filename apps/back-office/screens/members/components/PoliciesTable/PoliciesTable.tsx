@@ -1,4 +1,4 @@
-import React, { Dispatch, SetStateAction } from 'react';
+import React, { Dispatch, SetStateAction, useState } from 'react';
 import {
   createColumnHelper,
   flexRender,
@@ -11,11 +11,14 @@ import {
 import clsx from 'clsx';
 
 import { Policy } from '../../../../hooks/access-control/usePoliciesList';
+import { Member } from '../../types/member';
 import PaginationControls from '../PaginationControls/PaginationControls';
+import { PolicyViewDialog } from './PolicyViewDialog';
 import s from './PoliciesTable.module.scss';
 
 interface Props {
   policies: Policy[];
+  members: Member[];
   pagination: PaginationState;
   setPagination: Dispatch<SetStateAction<PaginationState>>;
   globalFilter: string;
@@ -69,56 +72,62 @@ const ModulesCell = ({ permissions }: { permissions: string[] }) => {
 
 const columnHelper = createColumnHelper<Policy>();
 
-const columns = [
-  columnHelper.display({
-    id: 'policy',
-    size: 220,
-    header: () => 'Policy',
-    cell: (info) => (
-      <div className={s.policyCell}>
-        <ShieldIcon />
-        <span className={s.policyName}>{info.row.original.name}</span>
-      </div>
-    ),
-  }),
-  columnHelper.accessor('role', {
-    size: 160,
-    header: 'Role',
-  }),
-  columnHelper.display({
-    id: 'group',
-    size: 130,
-    header: () => 'Group',
-    cell: (info) => <span className={s.groupBadge}>{info.row.original.group}</span>,
-  }),
-  columnHelper.accessor('description', {
-    size: 0,
-    header: 'Description',
-    cell: (info) => info.getValue() ?? <span className={s.muted}>—</span>,
-  }),
-  columnHelper.display({
-    id: 'modules',
-    size: 200,
-    header: () => 'Modules',
-    cell: (info) => <ModulesCell permissions={info.row.original.permissions} />,
-  }),
-  columnHelper.accessor('assignmentsCount', {
-    size: 90,
-    header: 'Members',
-  }),
-  columnHelper.display({
-    id: 'action',
-    size: 80,
-    header: () => 'Action',
-    cell: () => (
-      <button type="button" className={s.viewBtn}>
-        <EyeIcon /> View
-      </button>
-    ),
-  }),
-];
+export function PoliciesTable({ policies, members, pagination, setPagination, globalFilter }: Props) {
+  const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
 
-export function PoliciesTable({ policies, pagination, setPagination, globalFilter }: Props) {
+  const columns = [
+    columnHelper.display({
+      id: 'policy',
+      size: 220,
+      header: () => 'Policy',
+      cell: (info) => (
+        <div className={s.policyCell}>
+          <ShieldIcon />
+          <span className={s.policyName}>{info.row.original.name}</span>
+        </div>
+      ),
+    }),
+    columnHelper.accessor('role', {
+      size: 160,
+      header: 'Role',
+    }),
+    columnHelper.display({
+      id: 'group',
+      size: 130,
+      header: () => 'Group',
+      cell: (info) => <span className={s.groupBadge}>{info.row.original.group}</span>,
+    }),
+    columnHelper.accessor('description', {
+      size: 0,
+      header: 'Description',
+      cell: (info) => info.getValue() ?? <span className={s.muted}>—</span>,
+    }),
+    columnHelper.display({
+      id: 'modules',
+      size: 200,
+      header: () => 'Modules',
+      cell: (info) => <ModulesCell permissions={info.row.original.permissions} />,
+    }),
+    columnHelper.accessor('assignmentsCount', {
+      size: 90,
+      header: 'Members',
+    }),
+    columnHelper.display({
+      id: 'action',
+      size: 80,
+      header: () => 'Action',
+      cell: (info) => (
+        <button
+          type="button"
+          className={s.viewBtn}
+          onClick={() => setSelectedPolicy(info.row.original)}
+        >
+          <EyeIcon /> View
+        </button>
+      ),
+    }),
+  ];
+
   const table = useReactTable({
     data: policies,
     columns,
@@ -189,6 +198,13 @@ export function PoliciesTable({ policies, pagination, setPagination, globalFilte
       </div>
 
       <PaginationControls table={table} />
+
+      <PolicyViewDialog
+        policy={selectedPolicy}
+        members={members}
+        isOpen={!!selectedPolicy}
+        onClose={() => setSelectedPolicy(null)}
+      />
     </div>
   );
 }

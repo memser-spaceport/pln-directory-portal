@@ -356,6 +356,7 @@ const MembersPageV2 = () => {
         {activeTab === 'POLICIES' && (
           <PoliciesTable
             policies={filteredPolicies}
+            members={members}
             pagination={policyPagination}
             setPagination={setPolicyPagination}
             globalFilter={policySearch}
