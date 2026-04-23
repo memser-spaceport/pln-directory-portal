@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { PaginationState, SortingState } from '@tanstack/react-table';
 import { useCookie } from 'react-use';
+import clsx from 'clsx';
 
 import { ApprovalLayout } from '../../layout/approval-layout';
-import { TableFilter } from '../../components/filters/TableFilter/TableFilter';
 import { AddMember } from '../../screens/members/components/AddMember/AddMember';
 import { MembersTableV2 } from '../../screens/members/components/MembersTableV2';
 import { useMembersList } from '../../hooks/members/useMembersList';
@@ -15,12 +15,24 @@ const ALL_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'Rejected'];
 
 type MemberStateTab = 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
 
-const TABS: { id: MemberStateTab; label: string; activeColor: string }[] = [
-  { id: 'PENDING', label: 'Pending Members', activeColor: '#D97706' },
-  { id: 'VERIFIED', label: 'Verified Members', activeColor: '#1B4DFF' },
-  { id: 'APPROVED', label: 'Approved Members', activeColor: '#0A9952' },
-  { id: 'REJECTED', label: 'Rejected Members', activeColor: '#D21A0E' },
+const TABS: { id: MemberStateTab; label: string }[] = [
+  { id: 'PENDING', label: 'Pending Members' },
+  { id: 'VERIFIED', label: 'Verified Members' },
+  { id: 'APPROVED', label: 'Approved Members' },
+  { id: 'REJECTED', label: 'Rejected Members' },
 ];
+
+const SearchIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M14.5 14.5L10.5 10.5M11.5 6.5C11.5 9.26142 9.26142 11.5 6.5 11.5C3.73858 11.5 1.5 9.26142 1.5 6.5C1.5 3.73858 3.73858 1.5 6.5 1.5C9.26142 1.5 11.5 3.73858 11.5 6.5Z"
+      stroke="#9CA3AF"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 const MembersPageV2 = () => {
   const router = useRouter();
@@ -60,8 +72,8 @@ const MembersPageV2 = () => {
     [members, activeTab]
   );
 
-  const handleTabChange = (id: string) => {
-    setActiveTab(id as MemberStateTab);
+  const handleTabChange = (id: MemberStateTab) => {
+    setActiveTab(id);
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
@@ -78,27 +90,34 @@ const MembersPageV2 = () => {
           <p className={s.subtitle}>Manage members and roles for LabOS.</p>
         </header>
 
-        <TableFilter
-          items={TABS.map((t) => ({
-            id: t.id,
-            label: t.label,
-            count: tabCounts[t.id],
-            activeColor: t.activeColor,
-            icon: null,
-          }))}
-          active={activeTab}
-          onFilterClick={handleTabChange}
-        >
-          <AddMember authToken={authToken} className={s.addBtn} />
-        </TableFilter>
+        {/* Underline tab bar */}
+        <nav className={s.tabBar}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              className={clsx(s.tab, { [s.tabActive]: activeTab === tab.id })}
+              onClick={() => handleTabChange(tab.id)}
+            >
+              {tab.label}
+              <span className={clsx(s.tabCount, { [s.tabCountActive]: activeTab === tab.id })}>
+                {tabCounts[tab.id]}
+              </span>
+            </button>
+          ))}
+        </nav>
 
+        {/* Search + Add Member row */}
         <div className={s.toolbar}>
-          <input
-            className={s.searchInput}
-            placeholder="Search members"
-            value={globalFilter}
-            onChange={handleSearchChange}
-          />
+          <div className={s.searchWrapper}>
+            <span className={s.searchIcon}><SearchIcon /></span>
+            <input
+              className={s.searchInput}
+              placeholder="Search members"
+              value={globalFilter}
+              onChange={handleSearchChange}
+            />
+          </div>
+          <AddMember authToken={authToken} className={s.addBtn} />
         </div>
 
         {isLoading && <div className={s.status}>Loading members…</div>}

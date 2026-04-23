@@ -1,23 +1,25 @@
 .root {
   max-width: 1343px;
   margin: 0 auto;
-  padding: 24px 20px;
+  padding: 32px 20px 80px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
 }
 
 .header {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  margin-bottom: 24px;
 }
 
 .title {
   font-size: 32px;
-  font-weight: 600;
-  color: #000;
+  font-weight: 700;
+  color: #0f172a;
   margin: 0;
+  line-height: 1.2;
 }
 
 .subtitle {
@@ -26,36 +28,135 @@
   margin: 0;
 }
 
+/* ─── Tab bar (underline style) ─────────────────────────── */
+
+.tabBar {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  margin-right: 24px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  cursor: pointer;
+  color: #5e718d;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+
+  &:hover {
+    color: #1b4dff;
+  }
+}
+
+.tabActive {
+  color: #1b4dff;
+  border-bottom-color: #1b4dff;
+}
+
+.tabCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.tabCountActive {
+  background: #eff3ff;
+  color: #1b4dff;
+}
+
+/* ─── Search + Add Member row ────────────────────────────── */
+
 .toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-bottom: 20px;
+}
+
+.searchWrapper {
+  position: relative;
+  flex: 1;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
 }
 
 .searchInput {
-  height: 48px;
   width: 100%;
-  max-width: 560px;
-  border: 1px solid #ddd;
+  height: 48px;
+  padding: 0 16px 0 40px;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  padding: 0 16px;
   font-size: 14px;
-  color: #374151;
-  outline: none;
+  color: #0f172a;
   background: #fff;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 
   &::placeholder {
-    color: #9ca3af;
+    color: #94a3b8;
   }
 
   &:focus {
     border-color: #1b4dff;
+    box-shadow: 0 0 0 3px rgba(27, 77, 255, 0.1);
   }
 }
 
-.addBtn {
-  margin-left: auto;
+/* Override AddMember default pill style → solid blue button */
+.addBtn.addBtn {
+  display: flex;
+  height: 48px;
+  padding: 0 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 8px;
+  border: none;
+  background: #1b4dff;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: none;
+
+  &:hover {
+    background: #1340e0;
+    border-color: transparent;
+    box-shadow: none;
+  }
 }
+
+/* ─── Status messages ────────────────────────────────────── */
 
 .status {
   padding: 48px;
