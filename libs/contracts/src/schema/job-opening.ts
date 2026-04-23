@@ -43,6 +43,7 @@ export const JobRoleSchema = z.object({
   applyUrl: z.string().nullable(),
   lastUpdated: z.string(),
   postedDate: z.string().nullable(),
+  detectionDate: z.string(),
 });
 
 export const JobTeamSchema = z.object({

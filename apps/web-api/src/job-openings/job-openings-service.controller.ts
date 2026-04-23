@@ -1,18 +1,28 @@
-import { Controller, Post, Body, UseGuards, BadRequestException, Logger } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, BadRequestException, Logger, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
 import { JobOpeningsService } from './job-openings.service';
+import { JobOpeningsEnrichmentService } from './job-openings-enrichment.service';
 import { IngestJobOpeningsDto, IngestJobOpeningsResponse } from './dto/ingest-job-openings.dto';
+import { BatchUpdateEnrichmentDto } from './dto/batch-update-enrichment.dto';
+import {
+  TeamsWithEnrichmentResponse,
+  JobOpeningsPerTeamResponse,
+  BatchUpdateEnrichmentResponse,
+} from 'libs/contracts/src/schema/team-job-enrichment';
 
 @ApiTags('Job Openings - Service')
-@Controller('v1/service/job-openings')
+@Controller('v1/service')
 @UseGuards(ServiceAuthGuard)
 export class JobOpeningsServiceController {
   private readonly logger = new Logger(JobOpeningsServiceController.name);
 
-  constructor(private readonly jobOpeningsService: JobOpeningsService) {}
+  constructor(
+    private readonly jobOpeningsService: JobOpeningsService,
+    private readonly enrichmentService: JobOpeningsEnrichmentService
+  ) {}
 
-  @Post('ingest')
+  @Post('job-openings/ingest')
   async ingest(@Body() dto: IngestJobOpeningsDto): Promise<IngestJobOpeningsResponse> {
     if (!dto.jobs || !Array.isArray(dto.jobs)) {
       throw new BadRequestException('jobs array is required');
@@ -44,6 +54,49 @@ export class JobOpeningsServiceController {
     const result = await this.jobOpeningsService.ingestJobOpenings(dto.jobs);
 
     this.logger.log(`Ingest complete: ${result.created} created, ${result.updated} updated, ${result.failed} failed`);
+
+    return result;
+  }
+
+  @Get('teams-with-enrichment')
+  async getTeamsWithEnrichment(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string
+  ): Promise<TeamsWithEnrichmentResponse> {
+    const parsedPage = Math.max(1, Number(page) || 1);
+    const parsedLimit = Math.min(1000, Math.max(1, Number(limit) || 100));
+    return this.enrichmentService.getTeamsWithEnrichment(parsedPage, parsedLimit);
+  }
+
+  @Get('teams/:uid/job-openings')
+  async getJobOpeningsByTeam(@Param('uid') uid: string): Promise<JobOpeningsPerTeamResponse> {
+    return this.enrichmentService.getJobOpeningsByTeam(uid);
+  }
+
+  @Post('team-enrichment/batch')
+  async batchUpdateEnrichment(@Body() dto: BatchUpdateEnrichmentDto): Promise<BatchUpdateEnrichmentResponse> {
+    if (!dto.items || !Array.isArray(dto.items)) {
+      throw new BadRequestException('items array is required');
+    }
+
+    if (dto.items.length === 0) {
+      throw new BadRequestException('items array cannot be empty');
+    }
+
+    for (let i = 0; i < dto.items.length; i++) {
+      const item = dto.items[i];
+      if (!item.teamUid) {
+        throw new BadRequestException(`Item at index ${i}: teamUid is required`);
+      }
+    }
+
+    this.logger.log(`Received batch enrichment update with ${dto.items.length} items`);
+
+    const result = await this.enrichmentService.batchUpdateEnrichment(dto.items);
+
+    this.logger.log(
+      `Batch update complete: ${result.created} created, ${result.updated} updated, ${result.failed} failed`
+    );
 
     return result;
   }
