@@ -69,9 +69,11 @@ const MembersPageV2 = () => {
   const { isDirectoryAdmin, isLoading: authLoading, user } = useAuth();
   const [authToken] = useCookie('plnadmin');
 
-  const initialTab = (['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED', 'POLICIES'].includes(router.query.tab as string)
-    ? router.query.tab
-    : 'PENDING') as ActiveTab;
+  const initialTab = (
+    ['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED', 'POLICIES'].includes(router.query.tab as string)
+      ? router.query.tab
+      : 'PENDING'
+  ) as ActiveTab;
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
 
   useEffect(() => {
@@ -104,7 +106,7 @@ const MembersPageV2 = () => {
 
   const { data: policiesData } = usePoliciesList({ authToken: authToken ?? undefined });
 
-  const members = data?.data ?? [];
+  const members = useMemo(() => data?.data ?? [], [data?.data]);
 
   const tabCounts = useMemo<Record<MemberStateTab, number>>(() => {
     const base: Record<MemberStateTab, number> = { PENDING: 0, VERIFIED: 0, APPROVED: 0, REJECTED: 0 };
@@ -116,29 +118,19 @@ const MembersPageV2 = () => {
     return base;
   }, [members]);
 
-  const policyMap = useMemo(
-    () => new Map((policiesData ?? []).map((p) => [p.uid, p])),
-    [policiesData]
-  );
+  const policyMap = useMemo(() => new Map((policiesData ?? []).map((p) => [p.uid, p])), [policiesData]);
 
-  const approvedMembers = useMemo(
-    () => members.filter((m) => m.memberState === 'APPROVED'),
-    [members]
-  );
+  const approvedMembers = useMemo(() => members.filter((m) => m.memberState === 'APPROVED'), [members]);
 
   const filteredMembers = useMemo(() => {
     if (activeTab === 'POLICIES') return [];
     let list = members.filter((m) => m.memberState === activeTab);
     if (activeTab === 'APPROVED') {
       if (groupFilter) {
-        list = list.filter((m) =>
-          m.policies?.some((mp) => policyMap.get(mp.uid)?.group === groupFilter)
-        );
+        list = list.filter((m) => m.policies?.some((mp) => policyMap.get(mp.uid)?.group === groupFilter));
       }
       if (roleFilter) {
-        list = list.filter((m) =>
-          m.policies?.some((mp) => policyMap.get(mp.uid)?.role === roleFilter)
-        );
+        list = list.filter((m) => m.policies?.some((mp) => policyMap.get(mp.uid)?.role === roleFilter));
       }
     }
     return list;
@@ -190,10 +182,7 @@ const MembersPageV2 = () => {
         .filter((p) => {
           if (!policySearch) return true;
           const q = policySearch.toLowerCase();
-          return (
-            p.name.toLowerCase().includes(q) ||
-            (p.description ?? '').toLowerCase().includes(q)
-          );
+          return p.name.toLowerCase().includes(q) || (p.description ?? '').toLowerCase().includes(q);
         }),
     [policiesData, policyRoleFilter, policyGroupFilter, policySearch]
   );
