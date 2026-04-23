@@ -69,7 +69,17 @@ const MembersPageV2 = () => {
   const { isDirectoryAdmin, isLoading: authLoading, user } = useAuth();
   const [authToken] = useCookie('plnadmin');
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('PENDING');
+  const initialTab = (['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED', 'POLICIES'].includes(router.query.tab as string)
+    ? router.query.tab
+    : 'PENDING') as ActiveTab;
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
+
+  useEffect(() => {
+    const tab = router.query.tab as string | undefined;
+    if (tab && ['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED', 'POLICIES'].includes(tab)) {
+      setActiveTab(tab as ActiveTab);
+    }
+  }, [router.query.tab]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
