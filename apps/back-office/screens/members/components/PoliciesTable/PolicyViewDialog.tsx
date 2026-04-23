@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   createColumnHelper,
   flexRender,
@@ -175,8 +175,16 @@ const columns = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+const PERMISSIONS_INITIAL_COUNT = 3;
+
 export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
   const [memberSearch, setMemberSearch] = useState('');
+  const [showAllPermissions, setShowAllPermissions] = useState(false);
+
+  useEffect(() => {
+    setShowAllPermissions(false);
+    setMemberSearch('');
+  }, [policy?.uid]);
 
   const policyMembers = members.filter((m) => m.policies?.some((p) => p.code === policy?.code));
 
@@ -229,23 +237,40 @@ export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
           <h4 className={s.sectionHeading}>Module Permissions</h4>
           {policy.permissions.length === 0 ? (
             <p className={s.muted}>No permissions configured.</p>
-          ) : (
-            <div className={s.permissionCards}>
-              {policy.permissions.map((perm) => (
-                <div key={perm} className={s.permissionCard}>
-                  <div className={s.permissionCardLeft}>
-                    <span className={s.permissionCardIcon}>{getPermissionIcon(perm)}</span>
-                    <span className={s.permissionCardName}>{perm}</span>
-                  </div>
-                  <div className={s.permissionBadges}>
-                    <span className={s.permissionBadge}>View</span>
-                    <span className={s.permissionBadge}>Edit</span>
-                    <span className={s.permissionBadge}>Admin</span>
-                  </div>
+          ) : (() => {
+            const hasMore = policy.permissions.length > PERMISSIONS_INITIAL_COUNT;
+            const visible = showAllPermissions ? policy.permissions : policy.permissions.slice(0, PERMISSIONS_INITIAL_COUNT);
+            return (
+              <>
+                <div className={s.permissionCards}>
+                  {visible.map((perm) => (
+                    <div key={perm} className={s.permissionCard}>
+                      <div className={s.permissionCardLeft}>
+                        <span className={s.permissionCardIcon}>{getPermissionIcon(perm)}</span>
+                        <span className={s.permissionCardName}>{perm}</span>
+                      </div>
+                      <div className={s.permissionBadges}>
+                        <span className={s.permissionBadge}>View</span>
+                        <span className={s.permissionBadge}>Edit</span>
+                        <span className={s.permissionBadge}>Admin</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+                {hasMore && (
+                  <button
+                    type="button"
+                    className={s.showAllBtn}
+                    onClick={() => setShowAllPermissions((v) => !v)}
+                  >
+                    {showAllPermissions
+                      ? 'Show Less'
+                      : `Show All (${policy.permissions.length})`}
+                  </button>
+                )}
+              </>
+            );
+          })()}
         </section>
 
         {/* Members */}

@@ -148,6 +148,21 @@
   gap: 6px;
 }
 
+.showAllBtn {
+  margin-top: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4f71ff;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .permissionBadge {
   display: inline-flex;
   align-items: center;
