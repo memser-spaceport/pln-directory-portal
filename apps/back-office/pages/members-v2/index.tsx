@@ -331,7 +331,7 @@ const MembersPageV2 = () => {
             </>
           )}
 
-          <AddMember authToken={authToken} className={s.addBtn} />
+          <AddMember authToken={authToken} className={s.addBtn} showRbacSection />
         </div>
 
         {activeTab !== 'POLICIES' && (
@@ -348,6 +348,7 @@ const MembersPageV2 = () => {
                 globalFilter={globalFilter}
                 sorting={sorting}
                 setSorting={setSorting}
+                showRbacSection
               />
             )}
           </>

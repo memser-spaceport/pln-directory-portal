@@ -23,9 +23,10 @@ interface Props {
   className?: string;
   authToken: string;
   onClick?: () => void;
+  showRbacSection?: boolean;
 }
 
-export const AddMember = ({ className, authToken, onClick }: Props) => {
+export const AddMember = ({ className, authToken, onClick, showRbacSection = false }: Props) => {
   const [open, setOpen] = useState(false);
 
   const handleSignUpClick = () => {
@@ -149,6 +150,7 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
               title="Add New Member"
               onSubmit={onSubmit}
               authToken={authToken}
+              showRbacSection={showRbacSection}
             />
           </motion.div>
         )}

@@ -24,9 +24,10 @@ interface Props {
   initialData?: TMemberForm;
   existingImageUrl?: string;
   authToken?: string;
+  showRbacSection?: boolean;
 }
 
-export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existingImageUrl, authToken }: Props) => {
+export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existingImageUrl, authToken, showRbacSection = false }: Props) => {
   const methods = useForm<TMemberForm>({
     defaultValues: {
       memberStateStatus: null,
@@ -116,13 +117,17 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
               }
             }}
           >
-            <RbacSection
-              rolesOptions={rolesOptions}
-              groupsOptions={groupsOptions}
-              exceptionsOptions={exceptionsOptions}
-              isLoadingOptions={isLoadingOptions}
-              policiesData={policiesData ?? []}
-            />
+            {showRbacSection ? (
+              <RbacSection
+                rolesOptions={rolesOptions}
+                groupsOptions={groupsOptions}
+                exceptionsOptions={exceptionsOptions}
+                isLoadingOptions={isLoadingOptions}
+                policiesData={policiesData ?? []}
+              />
+            ) : (
+              <StatusSelector isAddNew={!initialData} />
+            )}
             <ProfileDetails existingImageUrl={existingImageUrl} />
             <hr className="border-gray-200 dark:border-gray-200" />
             <ProfileLocationInput />

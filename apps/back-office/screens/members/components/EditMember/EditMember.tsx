@@ -29,6 +29,7 @@ interface Props {
   className?: string;
   member: Member;
   authToken: string;
+  showRbacSection?: boolean;
 }
 
 const MEMBER_STATE_MAP: Record<string, 'Pending' | 'Verified' | 'Approved' | 'Rejected'> = {
@@ -38,7 +39,7 @@ const MEMBER_STATE_MAP: Record<string, 'Pending' | 'Verified' | 'Approved' | 'Re
   REJECTED: 'Rejected',
 };
 
-export const EditMember = ({ className, member, authToken }: Props) => {
+export const EditMember = ({ className, member, authToken, showRbacSection = false }: Props) => {
   const uid = member.uid;
   const [open, setOpen] = useState(false);
 
@@ -297,6 +298,7 @@ export const EditMember = ({ className, member, authToken }: Props) => {
               initialData={initialData}
               existingImageUrl={data?.image?.url}
               authToken={authToken}
+              showRbacSection={showRbacSection}
             />
           </motion.div>
         )}

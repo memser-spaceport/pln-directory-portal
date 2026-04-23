@@ -28,6 +28,7 @@ interface Props {
   globalFilter: string;
   sorting: SortingState;
   setSorting: Dispatch<SetStateAction<SortingState>>;
+  showRbacSection?: boolean;
 }
 
 const columnHelper = createColumnHelper<Member>();
@@ -41,6 +42,7 @@ export function MembersTableV2({
   globalFilter,
   sorting,
   setSorting,
+  showRbacSection = false,
 }: Props) {
   const columns = useMemo(() => {
     const base = [
@@ -122,7 +124,7 @@ export function MembersTableV2({
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
-        cell: (info) => <EditCell member={info.row.original} authToken={authToken} />,
+        cell: (info) => <EditCell member={info.row.original} authToken={authToken} showRbacSection={showRbacSection} />,
         size: 100,
       }),
     ];
