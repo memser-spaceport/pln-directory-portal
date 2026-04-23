@@ -68,3 +68,40 @@
   color: #5e718d;
   font-size: 14px;
 }
+
+.stackedCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.groupBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.exceptionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}

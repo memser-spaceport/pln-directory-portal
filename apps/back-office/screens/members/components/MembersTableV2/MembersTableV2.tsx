@@ -22,6 +22,7 @@ import s from './MembersTableV2.module.scss';
 interface Props {
   members: Member[];
   authToken: string;
+  activeTab: string;
   pagination: PaginationState;
   setPagination: Dispatch<SetStateAction<PaginationState>>;
   globalFilter: string;
@@ -34,6 +35,7 @@ const columnHelper = createColumnHelper<Member>();
 export function MembersTableV2({
   members,
   authToken,
+  activeTab,
   pagination,
   setPagination,
   globalFilter,
@@ -41,27 +43,83 @@ export function MembersTableV2({
   setSorting,
 }: Props) {
   const columns = useMemo(
-    () => [
-      columnHelper.accessor('name', {
-        header: 'Member',
-        cell: (info) => <MemberCell member={info.row.original} />,
-        size: 350,
-        sortingFn: 'alphanumeric',
-      }),
-      columnHelper.display({
-        id: 'teamProject',
-        header: 'Team/Project',
-        cell: (info) => <ProjectsCell member={info.row.original} />,
-        size: 0,
-      }),
-      columnHelper.display({
-        id: 'actions',
-        header: 'Actions',
-        cell: (info) => <EditCell member={info.row.original} authToken={authToken} />,
-        size: 100,
-      }),
-    ],
-    [authToken]
+    () => {
+      const base = [
+        columnHelper.accessor('name', {
+          header: 'Member',
+          cell: (info) => <MemberCell member={info.row.original} />,
+          size: 350,
+          sortingFn: 'alphanumeric',
+        }),
+        columnHelper.display({
+          id: 'teamProject',
+          header: 'Team/Project',
+          cell: (info) => <ProjectsCell member={info.row.original} />,
+          size: 0,
+        }),
+      ];
+
+      const approvedExtras = activeTab === 'APPROVED' ? [
+        columnHelper.display({
+          id: 'role',
+          header: 'Role',
+          cell: (info) => {
+            const roles = info.row.original.roles ?? [];
+            if (!roles.length) return <span>—</span>;
+            return (
+              <div className={s.stackedCell}>
+                {roles.map((r) => <span key={r.code}>{r.name}</span>)}
+              </div>
+            );
+          },
+          size: 160,
+        }),
+        columnHelper.display({
+          id: 'group',
+          header: 'Group',
+          cell: (info) => {
+            const policies = info.row.original.policies ?? [];
+            if (!policies.length) return <span>—</span>;
+            return (
+              <div className={s.badgeRow}>
+                {policies.map((p) => (
+                  <span key={p.code} className={s.groupBadge}>{p.name}</span>
+                ))}
+              </div>
+            );
+          },
+          size: 180,
+        }),
+        columnHelper.display({
+          id: 'exceptions',
+          header: 'Exceptions',
+          cell: (info) => {
+            const perms = info.row.original.permissions ?? [];
+            if (!perms.length) return <span>—</span>;
+            return (
+              <div className={s.badgeRow}>
+                {perms.map((p) => (
+                  <span key={p.code} className={s.exceptionBadge}>⚠️ {p.code}</span>
+                ))}
+              </div>
+            );
+          },
+          size: 200,
+        }),
+      ] : [];
+
+      return [
+        ...base,
+        ...approvedExtras,
+        columnHelper.display({
+          id: 'actions',
+          header: 'Actions',
+          cell: (info) => <EditCell member={info.row.original} authToken={authToken} />,
+          size: 100,
+        }),
+      ];
+    },
+    [authToken, activeTab]
   );
 
   const table = useReactTable({

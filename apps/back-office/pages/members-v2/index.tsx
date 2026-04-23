@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { PaginationState, SortingState } from '@tanstack/react-table';
 import { useCookie } from 'react-use';
 import clsx from 'clsx';
+import Select, { StylesConfig } from 'react-select';
 
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { AddMember } from '../../screens/members/components/AddMember/AddMember';
@@ -21,6 +22,31 @@ const TABS: { id: MemberStateTab; label: string }[] = [
   { id: 'APPROVED', label: 'Approved Members' },
   { id: 'REJECTED', label: 'Rejected Members' },
 ];
+
+type SelectOption = { label: string; value: string };
+
+const selectStyles: StylesConfig<SelectOption> = {
+  container: (base) => ({ ...base, width: '100%' }),
+  control: (base) => ({
+    ...base,
+    borderRadius: '8px',
+    border: '1px solid rgba(203, 213, 225, 0.50)',
+    background: '#fff',
+    fontSize: '14px',
+    minWidth: '140px',
+    boxShadow: 'none',
+    borderColor: 'rgba(203, 213, 225, 0.50)',
+    '&:hover': { borderColor: '#5E718D', boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12)' },
+  }),
+  indicatorSeparator: () => ({ display: 'none' }),
+  option: (base) => ({
+    ...base,
+    fontSize: '14px',
+    color: '#455468',
+    '&:hover': { background: 'rgba(27, 56, 96, 0.12)' },
+  }),
+  menu: (base) => ({ ...base, zIndex: 3 }),
+};
 
 const SearchIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -41,6 +67,8 @@ const MembersPageV2 = () => {
 
   const [activeTab, setActiveTab] = useState<MemberStateTab>('PENDING');
   const [globalFilter, setGlobalFilter] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 });
   const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
 
@@ -67,11 +95,45 @@ const MembersPageV2 = () => {
     return base;
   }, [members]);
 
-  const filteredMembers = useMemo(() => members.filter((m) => m.memberState === activeTab), [members, activeTab]);
+  const approvedMembers = useMemo(
+    () => members.filter((m) => m.memberState === 'APPROVED'),
+    [members]
+  );
+
+  const filteredMembers = useMemo(() => {
+    let list = members.filter((m) => m.memberState === activeTab);
+    if (activeTab === 'APPROVED') {
+      if (groupFilter) {
+        list = list.filter((m) => m.policies?.some((p) => p.name === groupFilter));
+      }
+      if (roleFilter) {
+        list = list.filter((m) => m.roles?.some((r) => r.name === roleFilter));
+      }
+    }
+    return list;
+  }, [members, activeTab, groupFilter, roleFilter]);
+
+  const groupOptions = useMemo<SelectOption[]>(() => {
+    const names = new Set<string>();
+    for (const m of approvedMembers) {
+      for (const p of m.policies ?? []) names.add(p.name);
+    }
+    return [{ label: 'All groups', value: '' }, ...[...names].sort().map((n) => ({ label: n, value: n }))];
+  }, [approvedMembers]);
+
+  const roleOptions = useMemo<SelectOption[]>(() => {
+    const names = new Set<string>();
+    for (const m of approvedMembers) {
+      for (const r of m.roles ?? []) names.add(r.name);
+    }
+    return [{ label: 'All roles', value: '' }, ...[...names].sort().map((n) => ({ label: n, value: n }))];
+  }, [approvedMembers]);
 
   const handleTabChange = (id: MemberStateTab) => {
     setActiveTab(id);
     setPagination((p) => ({ ...p, pageIndex: 0 }));
+    setGroupFilter('');
+    setRoleFilter('');
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,7 +165,7 @@ const MembersPageV2 = () => {
           ))}
         </nav>
 
-        {/* Search + Add Member row */}
+        {/* Search + filters + Add Member row */}
         <div className={s.toolbar}>
           <div className={s.searchWrapper}>
             <span className={s.searchIcon}>
@@ -116,6 +178,36 @@ const MembersPageV2 = () => {
               onChange={handleSearchChange}
             />
           </div>
+          {activeTab === 'APPROVED' && (
+            <>
+              <div className={s.filterDropdown}>
+                <Select<SelectOption>
+                  menuPortalTarget={document.body}
+                  options={groupOptions}
+                  value={groupOptions.find((o) => o.value === groupFilter) ?? groupOptions[0]}
+                  onChange={(val) => {
+                    setGroupFilter(val?.value ?? '');
+                    setPagination((p) => ({ ...p, pageIndex: 0 }));
+                  }}
+                  isClearable={false}
+                  styles={selectStyles}
+                />
+              </div>
+              <div className={s.filterDropdown}>
+                <Select<SelectOption>
+                  menuPortalTarget={document.body}
+                  options={roleOptions}
+                  value={roleOptions.find((o) => o.value === roleFilter) ?? roleOptions[0]}
+                  onChange={(val) => {
+                    setRoleFilter(val?.value ?? '');
+                    setPagination((p) => ({ ...p, pageIndex: 0 }));
+                  }}
+                  isClearable={false}
+                  styles={selectStyles}
+                />
+              </div>
+            </>
+          )}
           <AddMember authToken={authToken} className={s.addBtn} />
         </div>
 
@@ -126,6 +218,7 @@ const MembersPageV2 = () => {
           <MembersTableV2
             members={filteredMembers}
             authToken={authToken}
+            activeTab={activeTab}
             pagination={pagination}
             setPagination={setPagination}
             globalFilter={globalFilter}

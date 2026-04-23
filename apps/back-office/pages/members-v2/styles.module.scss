@@ -131,6 +131,10 @@
   }
 }
 
+.filterDropdown {
+  min-width: 140px;
+}
+
 /* Override AddMember default pill style → solid blue button */
 .addBtn.addBtn {
   display: flex;

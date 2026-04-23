@@ -30,6 +30,12 @@ export const MembersMenu = () => {
         </span>
       </button>
       <div ref={menuRef} className={`${s.menu} ${open ? s.open : ''}`}>
+        <Link href="/members-v2" passHref>
+          <a className={s.menuItem}>
+            <span className={s.menuItemLabel}>Members V2</span>
+            <CaretIcon />
+          </a>
+        </Link>
         <Link href="/members?filter=level1" passHref>
           <a className={s.menuItem}>
             <Level1Icon />
