@@ -67,10 +67,7 @@ const MembersPageV2 = () => {
     return base;
   }, [members]);
 
-  const filteredMembers = useMemo(
-    () => members.filter((m) => m.memberState === activeTab),
-    [members, activeTab]
-  );
+  const filteredMembers = useMemo(() => members.filter((m) => m.memberState === activeTab), [members, activeTab]);
 
   const handleTabChange = (id: MemberStateTab) => {
     setActiveTab(id);
@@ -109,7 +106,9 @@ const MembersPageV2 = () => {
         {/* Search + Add Member row */}
         <div className={s.toolbar}>
           <div className={s.searchWrapper}>
-            <span className={s.searchIcon}><SearchIcon /></span>
+            <span className={s.searchIcon}>
+              <SearchIcon />
+            </span>
             <input
               className={s.searchInput}
               placeholder="Search members"
