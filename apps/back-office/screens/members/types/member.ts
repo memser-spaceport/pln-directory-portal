@@ -20,6 +20,7 @@ export type Member = {
     scopeValue: string;
     config: unknown | null;
   }[];
+  memberState?: 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
 };
 
 export type TMemberForm = {
