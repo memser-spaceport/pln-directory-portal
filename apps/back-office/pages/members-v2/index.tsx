@@ -8,20 +8,24 @@ import Select, { StylesConfig } from 'react-select';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { AddMember } from '../../screens/members/components/AddMember/AddMember';
 import { MembersTableV2 } from '../../screens/members/components/MembersTableV2';
+import { PoliciesTable } from '../../screens/members/components/PoliciesTable/PoliciesTable';
 import { useMembersList } from '../../hooks/members/useMembersList';
+import { usePoliciesList } from '../../hooks/access-control/usePoliciesList';
 import { useAuth } from '../../context/auth-context';
 import s from './styles.module.scss';
 
 const ALL_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'Rejected'];
 
 type MemberStateTab = 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
+type ActiveTab = MemberStateTab | 'POLICIES';
 
-const TABS: { id: MemberStateTab; label: string }[] = [
+const MEMBER_STATE_TABS: { id: MemberStateTab; label: string }[] = [
   { id: 'PENDING', label: 'Pending Members' },
   { id: 'VERIFIED', label: 'Verified Members' },
   { id: 'APPROVED', label: 'Approved Members' },
-  { id: 'REJECTED', label: 'Rejected Members' },
 ];
+
+const REJECTED_TAB: { id: MemberStateTab; label: string } = { id: 'REJECTED', label: 'Rejected Members' };
 
 type SelectOption = { label: string; value: string };
 
@@ -65,12 +69,17 @@ const MembersPageV2 = () => {
   const { isDirectoryAdmin, isLoading: authLoading, user } = useAuth();
   const [authToken] = useCookie('plnadmin');
 
-  const [activeTab, setActiveTab] = useState<MemberStateTab>('PENDING');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('PENDING');
   const [globalFilter, setGlobalFilter] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 });
   const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
+
+  const [policySearch, setPolicySearch] = useState('');
+  const [policyRoleFilter, setPolicyRoleFilter] = useState('');
+  const [policyGroupFilter, setPolicyGroupFilter] = useState('');
+  const [policyPagination, setPolicyPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
 
   useEffect(() => {
     if (!authLoading && user && !isDirectoryAdmin) {
@@ -82,6 +91,8 @@ const MembersPageV2 = () => {
     authToken: authToken ?? undefined,
     accessLevel: ALL_LEVELS,
   });
+
+  const { data: policiesData } = usePoliciesList({ authToken: authToken ?? undefined });
 
   const members = data?.data ?? [];
 
@@ -101,6 +112,7 @@ const MembersPageV2 = () => {
   );
 
   const filteredMembers = useMemo(() => {
+    if (activeTab === 'POLICIES') return [];
     let list = members.filter((m) => m.memberState === activeTab);
     if (activeTab === 'APPROVED') {
       if (groupFilter) {
@@ -129,16 +141,57 @@ const MembersPageV2 = () => {
     return [{ label: 'All roles', value: '' }, ...[...names].sort().map((n) => ({ label: n, value: n }))];
   }, [approvedMembers]);
 
-  const handleTabChange = (id: MemberStateTab) => {
+  const policyRoleOptions = useMemo<SelectOption[]>(
+    () => [
+      { label: 'All roles', value: '' },
+      ...[...new Set((policiesData ?? []).map((p) => p.role))].sort().map((r) => ({ label: r, value: r })),
+    ],
+    [policiesData]
+  );
+
+  const policyGroupOptions = useMemo<SelectOption[]>(
+    () => [
+      { label: 'All groups', value: '' },
+      ...[...new Set((policiesData ?? []).map((p) => p.group))].sort().map((g) => ({ label: g, value: g })),
+    ],
+    [policiesData]
+  );
+
+  const filteredPolicies = useMemo(
+    () =>
+      (policiesData ?? [])
+        .filter((p) => !policyRoleFilter || p.role === policyRoleFilter)
+        .filter((p) => !policyGroupFilter || p.group === policyGroupFilter)
+        .filter((p) => {
+          if (!policySearch) return true;
+          const q = policySearch.toLowerCase();
+          return (
+            p.name.toLowerCase().includes(q) ||
+            (p.description ?? '').toLowerCase().includes(q)
+          );
+        }),
+    [policiesData, policyRoleFilter, policyGroupFilter, policySearch]
+  );
+
+  const handleTabChange = (id: ActiveTab) => {
     setActiveTab(id);
     setPagination((p) => ({ ...p, pageIndex: 0 }));
     setGroupFilter('');
     setRoleFilter('');
+    setPolicySearch('');
+    setPolicyRoleFilter('');
+    setPolicyGroupFilter('');
+    setPolicyPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setGlobalFilter(e.target.value);
     setPagination((p) => ({ ...p, pageIndex: 0 }));
+  };
+
+  const handlePolicySearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPolicySearch(e.target.value);
+    setPolicyPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
   return (
@@ -151,7 +204,7 @@ const MembersPageV2 = () => {
 
         {/* Underline tab bar */}
         <nav className={s.tabBar}>
-          {TABS.map((tab) => (
+          {MEMBER_STATE_TABS.map((tab) => (
             <button
               key={tab.id}
               className={clsx(s.tab, { [s.tabActive]: activeTab === tab.id })}
@@ -163,21 +216,59 @@ const MembersPageV2 = () => {
               </span>
             </button>
           ))}
+
+          {/* Policies tab — between Approved and Rejected */}
+          <button
+            className={clsx(s.tab, { [s.tabActive]: activeTab === 'POLICIES' })}
+            onClick={() => handleTabChange('POLICIES')}
+          >
+            Policies
+            <span className={clsx(s.tabCount, { [s.tabCountActive]: activeTab === 'POLICIES' })}>
+              {policiesData?.length ?? 0}
+            </span>
+          </button>
+
+          <button
+            className={clsx(s.tab, { [s.tabActive]: activeTab === REJECTED_TAB.id })}
+            onClick={() => handleTabChange(REJECTED_TAB.id)}
+          >
+            {REJECTED_TAB.label}
+            <span className={clsx(s.tabCount, { [s.tabCountActive]: activeTab === REJECTED_TAB.id })}>
+              {tabCounts[REJECTED_TAB.id]}
+            </span>
+          </button>
         </nav>
 
         {/* Search + filters + Add Member row */}
         <div className={s.toolbar}>
-          <div className={s.searchWrapper}>
-            <span className={s.searchIcon}>
-              <SearchIcon />
-            </span>
-            <input
-              className={s.searchInput}
-              placeholder="Search members"
-              value={globalFilter}
-              onChange={handleSearchChange}
-            />
-          </div>
+          {activeTab !== 'POLICIES' && (
+            <div className={s.searchWrapper}>
+              <span className={s.searchIcon}>
+                <SearchIcon />
+              </span>
+              <input
+                className={s.searchInput}
+                placeholder="Search members"
+                value={globalFilter}
+                onChange={handleSearchChange}
+              />
+            </div>
+          )}
+
+          {activeTab === 'POLICIES' && (
+            <div className={s.searchWrapper}>
+              <span className={s.searchIcon}>
+                <SearchIcon />
+              </span>
+              <input
+                className={s.searchInput}
+                placeholder="Search policies"
+                value={policySearch}
+                onChange={handlePolicySearchChange}
+              />
+            </div>
+          )}
+
           {activeTab === 'APPROVED' && (
             <>
               <div className={s.filterDropdown}>
@@ -208,22 +299,66 @@ const MembersPageV2 = () => {
               </div>
             </>
           )}
+
+          {activeTab === 'POLICIES' && (
+            <>
+              <div className={s.filterDropdown}>
+                <Select<SelectOption>
+                  menuPortalTarget={document.body}
+                  options={policyRoleOptions}
+                  value={policyRoleOptions.find((o) => o.value === policyRoleFilter) ?? policyRoleOptions[0]}
+                  onChange={(val) => {
+                    setPolicyRoleFilter(val?.value ?? '');
+                    setPolicyPagination((p) => ({ ...p, pageIndex: 0 }));
+                  }}
+                  isClearable={false}
+                  styles={selectStyles}
+                />
+              </div>
+              <div className={s.filterDropdown}>
+                <Select<SelectOption>
+                  menuPortalTarget={document.body}
+                  options={policyGroupOptions}
+                  value={policyGroupOptions.find((o) => o.value === policyGroupFilter) ?? policyGroupOptions[0]}
+                  onChange={(val) => {
+                    setPolicyGroupFilter(val?.value ?? '');
+                    setPolicyPagination((p) => ({ ...p, pageIndex: 0 }));
+                  }}
+                  isClearable={false}
+                  styles={selectStyles}
+                />
+              </div>
+            </>
+          )}
+
           <AddMember authToken={authToken} className={s.addBtn} />
         </div>
 
-        {isLoading && <div className={s.status}>Loading members…</div>}
-        {isError && <div className={s.status}>Failed to load members.</div>}
+        {activeTab !== 'POLICIES' && (
+          <>
+            {isLoading && <div className={s.status}>Loading members…</div>}
+            {isError && <div className={s.status}>Failed to load members.</div>}
+            {!isLoading && !isError && (
+              <MembersTableV2
+                members={filteredMembers}
+                authToken={authToken}
+                activeTab={activeTab}
+                pagination={pagination}
+                setPagination={setPagination}
+                globalFilter={globalFilter}
+                sorting={sorting}
+                setSorting={setSorting}
+              />
+            )}
+          </>
+        )}
 
-        {!isLoading && !isError && (
-          <MembersTableV2
-            members={filteredMembers}
-            authToken={authToken}
-            activeTab={activeTab}
-            pagination={pagination}
-            setPagination={setPagination}
-            globalFilter={globalFilter}
-            sorting={sorting}
-            setSorting={setSorting}
+        {activeTab === 'POLICIES' && (
+          <PoliciesTable
+            policies={filteredPolicies}
+            pagination={policyPagination}
+            setPagination={setPolicyPagination}
+            globalFilter={policySearch}
           />
         )}
       </div>

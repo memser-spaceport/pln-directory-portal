@@ -1,0 +1,141 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.root {
+  border: 1px solid #ddd;
+  border-radius: 10px 10px 0 0;
+  overflow: hidden;
+}
+
+.headerRow {
+  display: flex;
+  border-bottom: 1px solid #eee;
+  background: #f9fafb;
+}
+
+.headerCell {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  padding: 0 16px;
+  user-select: none;
+
+  &:first-child {
+    padding-left: 20px;
+  }
+}
+
+.bodyRow {
+  display: flex;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.bodyCell {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #374151;
+  padding: 12px 16px;
+
+  &:first-child {
+    padding-left: 20px;
+  }
+}
+
+.fixed {
+  flex: 0 0 auto;
+}
+
+.flexible {
+  flex: 1;
+  min-width: 0;
+}
+
+.emptyState {
+  padding: 48px;
+  text-align: center;
+  color: #5e718d;
+  font-size: 14px;
+}
+
+.policyCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #5e718d;
+}
+
+.policyName {
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.groupBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.moduleBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: #374151;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.overflowBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.muted {
+  color: #94a3b8;
+}
+
+.viewBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #1b4dff;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
