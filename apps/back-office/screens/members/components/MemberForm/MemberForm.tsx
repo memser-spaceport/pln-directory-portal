@@ -1,16 +1,20 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 
 import s from './MemberForm.module.scss';
 import { CloseIcon } from '../icons';
-import { FormProvider, useForm } from 'react-hook-form';
+import { FormProvider, useForm, Resolver } from 'react-hook-form';
 import { options, StatusSelector } from './StatusSelector';
 import { TMemberForm } from '../../types/member';
 import { ProfileDetails } from './ProfileDetails/ProfileDetails';
 import { ProfileLocationInput } from './ProfileLocationInput';
 import { AdditionalDetails } from './AdditionalDetails/AdditionalDetails';
 import { ContactDetails } from './ContactDetails/ContactDetails';
+import { RbacSection } from './RbacSection/RbacSection';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { memberFormSchema } from './helpers';
+import { useRbacRoles } from '../../../../hooks/access-control/useRbacRoles';
+import { useRbacPermissions } from '../../../../hooks/access-control/useRbacPermissions';
+import { usePoliciesList } from '../../../../hooks/access-control/usePoliciesList';
 
 interface Props {
   onClose: () => void;
@@ -19,11 +23,16 @@ interface Props {
   onSubmit: (data: TMemberForm) => Promise<void>;
   initialData?: TMemberForm;
   existingImageUrl?: string;
+  authToken?: string;
 }
 
-export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existingImageUrl }: Props) => {
+export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existingImageUrl, authToken }: Props) => {
   const methods = useForm<TMemberForm>({
     defaultValues: {
+      memberStateStatus: null,
+      rbacRoles: [],
+      rbacGroups: [],
+      rbacExceptions: [],
       accessLevel: options.find((option) => option.value === 'L4') ?? null,
       image: null,
       name: '',
@@ -51,7 +60,7 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
       },
       teamsAndRoles: [],
     },
-    resolver: yupResolver(memberFormSchema),
+    resolver: yupResolver(memberFormSchema) as Resolver<TMemberForm>,
   });
   const {
     handleSubmit,
@@ -64,6 +73,29 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
       reset(initialData);
     }
   }, [initialData, reset]);
+
+  const { data: rbacRolesData, isLoading: rolesLoading } = useRbacRoles({ authToken });
+  const { data: policiesData, isLoading: policiesLoading } = usePoliciesList({ authToken });
+  const { data: rbacPermissionsData, isLoading: permsLoading } = useRbacPermissions({ authToken });
+  const isLoadingOptions = rolesLoading || policiesLoading || permsLoading;
+
+  const rolesOptions = useMemo(
+    () => (rbacRolesData ?? []).map((r) => ({ label: r.name, value: r.code })),
+    [rbacRolesData]
+  );
+
+  const groupsOptions = useMemo(
+    () =>
+      [...new Set((policiesData ?? []).map((p) => p.group))]
+        .sort()
+        .map((g) => ({ label: g, value: g })),
+    [policiesData]
+  );
+
+  const exceptionsOptions = useMemo(
+    () => (rbacPermissionsData ?? []).map((p) => ({ label: p.description ?? p.code, value: p.code })),
+    [rbacPermissionsData]
+  );
 
   return (
     <div className={s.modal}>
@@ -87,6 +119,13 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
               }
             }}
           >
+            <RbacSection
+              rolesOptions={rolesOptions}
+              groupsOptions={groupsOptions}
+              exceptionsOptions={exceptionsOptions}
+              isLoadingOptions={isLoadingOptions}
+              policiesData={policiesData ?? []}
+            />
             <StatusSelector isAddNew={!initialData} />
             <ProfileDetails existingImageUrl={existingImageUrl} />
             <hr className="border-gray-200 dark:border-gray-200" />

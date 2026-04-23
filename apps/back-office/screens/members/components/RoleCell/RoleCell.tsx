@@ -60,7 +60,7 @@ const RoleCell = ({ member, onRoleChange, onHostChange }: RoleCellProps) => {
 
   const baseRoles: string[] = useMemo(() => {
     if (Array.isArray(member.roles) && member.roles.length > 0) {
-      return member.roles;
+      return member.roles.map((r) => r.code);
     }
 
     if (Array.isArray(member.memberRoles)) {

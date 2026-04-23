@@ -1,10 +1,10 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { MemberForm } from '../MemberForm/MemberForm';
 import clsx from 'clsx';
 import { EditIcon } from '../icons';
-import { TMemberForm } from '../../types/member';
+import { Member, TMemberForm } from '../../types/member';
 import { saveRegistrationImage } from '../../../../utils/services/member';
 
 import s from './EditMember.module.scss';
@@ -14,6 +14,10 @@ import { useMemberFormOptions } from '../../../../hooks/members/useMemberFormOpt
 import { toast } from 'react-toastify';
 import { useUpdateMember } from '../../../../hooks/members/useUpdateMember';
 import { INVESTOR_PROFILE_CONSTANTS } from '../../../../utils/constants';
+import { useAssignPolicy } from '../../../../hooks/access-control/useAssignPolicy';
+import { useRevokePolicy } from '../../../../hooks/access-control/useRevokePolicy';
+import { useGrantDirectPermissionV2 } from '../../../../hooks/access-control/useGrantDirectPermissionV2';
+import { usePoliciesList } from '../../../../hooks/access-control/usePoliciesList';
 
 const fade = {
   hidden: { opacity: 0 },
@@ -23,11 +27,19 @@ const fade = {
 
 interface Props {
   className?: string;
-  uid: string;
+  member: Member;
   authToken: string;
 }
 
-export const EditMember = ({ className, uid, authToken }: Props) => {
+const MEMBER_STATE_MAP: Record<string, 'Pending' | 'Verified' | 'Approved' | 'Rejected'> = {
+  PENDING: 'Pending',
+  VERIFIED: 'Verified',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+};
+
+export const EditMember = ({ className, member, authToken }: Props) => {
+  const uid = member.uid;
   const [open, setOpen] = useState(false);
 
   const handleSignUpClick = () => {
@@ -39,7 +51,16 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
   }, []);
 
   const { mutateAsync } = useUpdateMember();
+  const { mutateAsync: assignPolicy } = useAssignPolicy();
+  const { mutateAsync: revokePolicy } = useRevokePolicy();
+  const { mutateAsync: grantPermission } = useGrantDirectPermissionV2();
+  const { data: policiesData } = usePoliciesList({ authToken });
   const { data } = useMember(uid, open);
+  const { data: formOptions } = useMemberFormOptions(open);
+
+  // Capture initial RBAC state for diff on save
+  const initialPolicyCodesRef = useRef<string[]>([]);
+  const initialExceptionCodesRef = useRef<string[]>([]);
 
   const onSubmit = useCallback(
     async (formData: TMemberForm) => {
@@ -106,7 +127,6 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
           githubHandler: formData.github,
         };
 
-        // Include investor profile data if it exists
         if (formData.investorProfile) {
           payload.investorProfile = {
             investmentFocus: formData.investorProfile.investmentFocus.map(
@@ -127,28 +147,83 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
         const res = await mutateAsync({ uid, payload, authToken });
 
         if (res?.data) {
+          const isApproved = formData.memberStateStatus?.value === 'Approved';
+
+          if (isApproved) {
+            const roleValues = (formData.rbacRoles ?? []).map((r) => r.value);
+            const groupValues = (formData.rbacGroups ?? []).map((g) => g.value);
+            const newMatchedPolicies = (policiesData ?? []).filter(
+              (p) => roleValues.includes(p.role) && groupValues.includes(p.group)
+            );
+            const newPolicyCodes = newMatchedPolicies.map((p) => p.code);
+            const newExceptionCodes = (formData.rbacExceptions ?? []).map((e) => e.value);
+
+            const policiesToAssign = newPolicyCodes.filter(
+              (c) => !initialPolicyCodesRef.current.includes(c)
+            );
+            const policiesToRevoke = initialPolicyCodesRef.current.filter(
+              (c) => !newPolicyCodes.includes(c)
+            );
+            const exceptionsToGrant = newExceptionCodes.filter(
+              (c) => !initialExceptionCodesRef.current.includes(c)
+            );
+
+            await Promise.allSettled([
+              ...policiesToAssign.map((c) => assignPolicy({ memberUid: uid, policyCode: c, authToken })),
+              ...policiesToRevoke.map((c) => revokePolicy({ memberUid: uid, policyCode: c, authToken })),
+              ...exceptionsToGrant.map((c) =>
+                grantPermission({ memberUid: uid, permissionCode: c, authToken })
+              ),
+            ]);
+          } else {
+            // Status changed to non-Approved — revoke all existing policies
+            await Promise.allSettled(
+              initialPolicyCodesRef.current.map((c) =>
+                revokePolicy({ memberUid: uid, policyCode: c, authToken })
+              )
+            );
+          }
+
           setOpen(false);
           toast.success('Member updated successfully!');
         } else {
           toast.error('Failed to update member. Please try again.');
         }
       } catch (e) {
-        toast.error(e?.response?.data?.message ?? 'Failed to add new member. Please try again.');
+        toast.error(e?.response?.data?.message ?? 'Failed to update member. Please try again.');
       }
     },
-    [mutateAsync, uid, authToken]
+    [mutateAsync, assignPolicy, revokePolicy, grantPermission, policiesData, uid, authToken]
   );
-
-  const { data: formOptions } = useMemberFormOptions(open);
 
   const initialData = useMemo(() => {
     if (!data || !formOptions) {
       return null;
     }
 
-    console.log('data.investorProfile?.investInStartupStages ', data.investorProfile?.investInStartupStages);
+    // Derive memberStateStatus from member.memberState
+    const stateValue = MEMBER_STATE_MAP[member.memberState ?? ''] ?? 'Pending';
+    const memberStateStatus = { label: stateValue, value: stateValue } as TMemberForm['memberStateStatus'];
+
+    // RBAC pre-population from the list member data
+    const rbacRoles = (member.roles ?? []).map((r) => ({ label: r.name, value: r.code }));
+
+    const memberPolicyCodes = (member.policies ?? []).map((p) => p.code);
+    const assignedPolicies = (policiesData ?? []).filter((p) => memberPolicyCodes.includes(p.code));
+    const groupValues = [...new Set(assignedPolicies.map((p) => p.group))];
+    const rbacGroups = groupValues.map((g) => ({ label: g, value: g }));
+
+    const rbacExceptions = (member.permissions ?? []).map((p) => ({ label: p.code, value: p.code }));
+
+    // Capture initial state for diff-based save
+    initialPolicyCodesRef.current = memberPolicyCodes;
+    initialExceptionCodesRef.current = (member.permissions ?? []).map((p) => p.code);
 
     return {
+      memberStateStatus,
+      rbacRoles,
+      rbacGroups,
+      rbacExceptions,
       accessLevel: options.find((option) => option.value === data.accessLevel) ?? null,
       image: null,
       name: data.name ?? '',
@@ -158,7 +233,6 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
       teamsAndRoles:
         data.teamMemberRoles?.map((item) => {
           const _team = formOptions.teams.find((team) => team.teamUid === item.teamUid);
-
           return { team: _team ? { value: _team.teamUid, label: _team.teamTitle } : null, role: item.role };
         }) ?? [],
       bio: data.bio ?? '',
@@ -197,7 +271,7 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
           }
         : undefined,
     };
-  }, [data, formOptions]);
+  }, [data, formOptions, member, policiesData]);
 
   return (
     <>
@@ -222,6 +296,7 @@ export const EditMember = ({ className, uid, authToken }: Props) => {
               onSubmit={onSubmit}
               initialData={initialData}
               existingImageUrl={data?.image?.url}
+              authToken={authToken}
             />
           </motion.div>
         )}

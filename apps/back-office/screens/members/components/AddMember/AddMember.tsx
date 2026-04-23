@@ -8,6 +8,9 @@ import { PlusIcon } from '../icons';
 import { TMemberForm } from '../../types/member';
 import { saveRegistrationImage } from '../../../../utils/services/member';
 import { useAddMember } from '../../../../hooks/members/useAddMember';
+import { useAssignPolicy } from '../../../../hooks/access-control/useAssignPolicy';
+import { useGrantDirectPermissionV2 } from '../../../../hooks/access-control/useGrantDirectPermissionV2';
+import { usePoliciesList } from '../../../../hooks/access-control/usePoliciesList';
 import { toast } from 'react-toastify';
 
 const fade = {
@@ -35,6 +38,9 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
   }, [onClick]);
 
   const { mutateAsync } = useAddMember();
+  const { mutateAsync: assignPolicy } = useAssignPolicy();
+  const { mutateAsync: grantPermission } = useGrantDirectPermissionV2();
+  const { data: policiesData } = usePoliciesList({ authToken });
 
   const onSubmit = useCallback(
     async (formData: TMemberForm) => {
@@ -43,7 +49,6 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
 
         if (formData.image) {
           const imgResponse = await saveRegistrationImage(formData.image);
-
           image = imgResponse?.image.uid;
         }
 
@@ -91,6 +96,25 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
         const res = await mutateAsync({ payload, authToken });
 
         if (res?.data) {
+          const memberUid = res.data.uid;
+          const isApproved = formData.memberStateStatus?.value === 'Approved';
+
+          if (isApproved && memberUid) {
+            const roleValues = (formData.rbacRoles ?? []).map((r) => r.value);
+            const groupValues = (formData.rbacGroups ?? []).map((g) => g.value);
+
+            const matchedPolicies = (policiesData ?? []).filter(
+              (p) => roleValues.includes(p.role) && groupValues.includes(p.group)
+            );
+
+            await Promise.allSettled([
+              ...matchedPolicies.map((p) => assignPolicy({ memberUid, policyCode: p.code, authToken })),
+              ...(formData.rbacExceptions ?? []).map((e) =>
+                grantPermission({ memberUid, permissionCode: e.value, authToken })
+              ),
+            ]);
+          }
+
           setOpen(false);
           toast.success('New member added successfully!');
         } else {
@@ -100,7 +124,7 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
         toast.error(e?.response?.data?.message ?? 'Failed to add new member. Please try again.');
       }
     },
-    [mutateAsync, authToken]
+    [mutateAsync, assignPolicy, grantPermission, policiesData, authToken]
   );
 
   return (
@@ -124,6 +148,7 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
               desc="Invite new members into the PL ecosystem."
               title="Add New Member"
               onSubmit={onSubmit}
+              authToken={authToken}
             />
           </motion.div>
         )}
