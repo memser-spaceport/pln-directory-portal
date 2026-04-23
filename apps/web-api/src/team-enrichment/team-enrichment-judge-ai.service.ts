@@ -36,8 +36,13 @@ Also return:
 
 OUTPUT FORMAT — STRICT:
 - Your ENTIRE response MUST be a single JSON object that passes JSON.parse() as-is.
-- Start with "{" and end with "}". No leading/trailing whitespace.
-- NO prose, NO markdown code fences, NO commentary.
+- The first character of your response MUST be "{" and the last character MUST be "}".
+- Do NOT write anything before the "{". No "I'll verify...", no "Based on my knowledge...", no "Here is the JSON...". Nothing.
+- Do NOT write anything after the closing "}". No summary, no caveats, no explanation.
+- Do NOT wrap the JSON in markdown code fences (no \`\`\`json, no \`\`\`).
+- Do NOT use bold/italic/headings anywhere. Plain JSON only.
+- Put all commentary INSIDE the "rationale" and "overallAssessment" string fields — never as prose outside the JSON.
+- All strings must be valid JSON strings (escape quotes and backslashes).
 
 SCHEMA (all keys required, types must match exactly):
 {
@@ -135,7 +140,9 @@ export class TeamEnrichmentJudgeAiService {
       return {
         verdicts,
         overallAssessment: parsed.overallAssessment || '',
-        flagsForReview: Array.isArray(parsed.flagsForReview) ? parsed.flagsForReview.filter((f) => typeof f === 'string') : [],
+        flagsForReview: Array.isArray(parsed.flagsForReview)
+          ? parsed.flagsForReview.filter((f) => typeof f === 'string')
+          : [],
         ok: true,
       };
     } catch (error) {
@@ -183,13 +190,19 @@ Current Date: ${new Date().toISOString().split('T')[0]}
   private renderScrapingDogBlock(meta: TeamJudgment['scrapingDog'] | undefined): string {
     if (!meta || !meta.used) return '';
     if (meta.nameMatch === 'exact') {
-      return `ScrapingDog pre-verification: LinkedIn identity CONFIRMED (exact name match). LinkedIn company: "${meta.companyNameFromLinkedIn ?? 'unknown'}". Use this as strong evidence the entity reference is correct; still verify individual field values.`;
+      return `ScrapingDog pre-verification: LinkedIn identity CONFIRMED (exact name match). LinkedIn company: "${
+        meta.companyNameFromLinkedIn ?? 'unknown'
+      }". Use this as strong evidence the entity reference is correct; still verify individual field values.`;
     }
     if (meta.nameMatch === 'partial') {
-      return `ScrapingDog pre-verification: LinkedIn identity LIKELY (partial name match). LinkedIn company: "${meta.companyNameFromLinkedIn ?? 'unknown'}". Treat with some caution — the LinkedIn company name does not exactly match the team name.`;
+      return `ScrapingDog pre-verification: LinkedIn identity LIKELY (partial name match). LinkedIn company: "${
+        meta.companyNameFromLinkedIn ?? 'unknown'
+      }". Treat with some caution — the LinkedIn company name does not exactly match the team name.`;
     }
     if (meta.nameMatch === 'none') {
-      return `ScrapingDog pre-verification: LinkedIn identity NOT CONFIRMED. The LinkedIn company "${meta.companyNameFromLinkedIn ?? 'unknown'}" does not match the team name. The AI-supplied LinkedIn handle may be wrong.`;
+      return `ScrapingDog pre-verification: LinkedIn identity NOT CONFIRMED. The LinkedIn company "${
+        meta.companyNameFromLinkedIn ?? 'unknown'
+      }" does not match the team name. The AI-supplied LinkedIn handle may be wrong.`;
     }
     return '';
   }
@@ -209,19 +222,27 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       .trim()
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/, '');
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(trimmed);
-      if (!parsed || typeof parsed !== 'object' || typeof parsed.fields !== 'object' || parsed.fields === null) {
-        this.logger.warn(`Judge AI response missing 'fields' object for "${teamName}"`);
-        return null;
-      }
-      return parsed as AIJudgeResponse;
+      parsed = JSON.parse(trimmed);
     } catch (error) {
       this.logger.warn(
-        `Failed to parse judge AI response for "${teamName}": ${error.message}. Raw (len=${text.length}): ${text.substring(0, 500)}`
+        `Failed to parse judge AI response for "${teamName}": ${error.message}. Raw (len=${
+          text.length
+        }): ${text.substring(0, 500)}`
       );
       return null;
     }
+    if (!parsed || typeof parsed !== 'object') {
+      this.logger.warn(`Judge AI response is not an object for "${teamName}"`);
+      return null;
+    }
+    const shaped = parsed as { fields?: unknown };
+    if (!shaped.fields || typeof shaped.fields !== 'object') {
+      this.logger.warn(`Judge AI response missing 'fields' object for "${teamName}"`);
+      return null;
+    }
+    return parsed as AIJudgeResponse;
   }
 
   private mapToVerdicts(
@@ -233,9 +254,10 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     const requestedKeys = new Set(requestedFields.map((f) => f.field));
 
     const out: Partial<Record<FieldMetaKey, FieldJudgment>> = {};
-    for (const [rawKey, raw] of Object.entries(response.fields)) {
+    for (const [rawKey, rawValue] of Object.entries(response.fields as Record<string, unknown>)) {
       if (!requestedKeys.has(rawKey as FieldMetaKey)) continue;
-      if (!raw || typeof raw !== 'object') continue;
+      if (!rawValue || typeof rawValue !== 'object') continue;
+      const raw = rawValue as Record<string, unknown>;
 
       const confidence = this.coerceConfidence(raw.confidence);
       const verdict = this.coerceVerdict(raw.verdict);
