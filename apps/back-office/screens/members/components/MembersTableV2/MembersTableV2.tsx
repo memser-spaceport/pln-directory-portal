@@ -14,6 +14,7 @@ import clsx from 'clsx';
 
 import { Member } from '../../types/member';
 import { MemberCell } from '../MemberCell/MemberCell';
+import { ProjectsCell } from '../ProjectsCell/ProjectsCell';
 import { EditCell } from '../EditCell/EditCell';
 import PaginationControls from '../PaginationControls/PaginationControls';
 import s from './MembersTableV2.module.scss';
@@ -26,23 +27,6 @@ interface Props {
   globalFilter: string;
   sorting: SortingState;
   setSorting: Dispatch<SetStateAction<SortingState>>;
-}
-
-function TeamProjectCell({ member }: { member: Member }) {
-  const teams = member.teamMemberRoles?.map((r) => r.team) ?? [];
-  const projects = member.projectContributions?.map((c) => c.project) ?? [];
-  const items = [...teams, ...projects];
-  if (items.length === 0) return <span>—</span>;
-  return (
-    <span>
-      {items.map((item, i) => (
-        <span key={item.uid}>
-          {i > 0 && ', '}
-          {item.name}
-        </span>
-      ))}
-    </span>
-  );
 }
 
 const columnHelper = createColumnHelper<Member>();
@@ -61,13 +45,13 @@ export function MembersTableV2({
       columnHelper.accessor('name', {
         header: 'Member',
         cell: (info) => <MemberCell member={info.row.original} />,
-        size: 200,
+        size: 350,
         sortingFn: 'alphanumeric',
       }),
       columnHelper.display({
         id: 'teamProject',
         header: 'Team/Project',
-        cell: (info) => <TeamProjectCell member={info.row.original} />,
+        cell: (info) => <ProjectsCell member={info.row.original} />,
         size: 0,
       }),
       columnHelper.display({
