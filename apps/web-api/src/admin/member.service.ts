@@ -84,7 +84,18 @@ export class MemberService {
     };
   }
 
-  private mapPolicy(policy?: { uid: string; code: string; name: string; description?: string | null } | null) {
+  private mapPolicy(
+    policy?:
+      | {
+          uid: string;
+          code: string;
+          name: string;
+          description?: string | null;
+          role?: string | null;
+          group?: string | null;
+        }
+      | null
+  ) {
     if (!policy) {
       return null;
     }
@@ -94,6 +105,8 @@ export class MemberService {
       code: policy.code,
       name: policy.name,
       description: policy.description ?? null,
+      role: policy.role ?? null,
+      group: policy.group ?? null,
     };
   }
 
@@ -133,6 +146,8 @@ export class MemberService {
         code: string;
         name: string;
         description?: string | null;
+        role?: string | null;
+        group?: string | null;
         policyPermissions?: Array<{
           permission?: { uid: string; code: string; description?: string | null } | null;
         }>;
@@ -159,7 +174,14 @@ export class MemberService {
     const policies = this.uniqueByCode(
       (member.policyAssignmentsV2 ?? [])
         .map((item) => this.mapPolicy(item.policy))
-        .filter(Boolean) as Array<{ uid: string; code: string; name: string; description?: string | null }>
+        .filter(Boolean) as Array<{
+          uid: string;
+          code: string;
+          name: string;
+          description?: string | null;
+          role?: string | null;
+          group?: string | null;
+        }>
     );
 
     const policyPermissions = this.uniqueByCode(
@@ -299,6 +321,8 @@ export class MemberService {
                   code: true,
                   name: true,
                   description: true,
+                  role: true,
+                  group: true,
                   policyPermissions: {
                     select: {
                       permission: {
