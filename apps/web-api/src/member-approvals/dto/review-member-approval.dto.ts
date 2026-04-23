@@ -1,4 +1,4 @@
 export class ReviewMemberApprovalDto {
-  state: 'APPROVED' | 'REJECTED' | 'PENDING';
+  state: 'APPROVED' | 'VERIFIED' | 'REJECTED' | 'PENDING';
   reason?: string;
 }

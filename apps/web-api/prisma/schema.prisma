@@ -282,6 +282,7 @@ enum ParticipantType {
 enum MemberApprovalState {
   PENDING
   APPROVED
+  VERIFIED
   REJECTED
 }
 
