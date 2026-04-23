@@ -31,7 +31,8 @@ const singleSelectStyles = {
     fontSize: 14,
     '&:hover': { border: '1px solid #5E718D', boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12)' },
   }),
-  menu: (base: object) => ({ ...base, zIndex: 5, fontSize: 14 }),
+  menuPortal: (base: object) => ({ ...base, zIndex: 9999 }),
+  menu: (base: object) => ({ ...base, zIndex: 9999, fontSize: 14 }),
   indicatorSeparator: () => ({ display: 'none' }),
   placeholder: (base: object) => ({ ...base, color: '#94a3b8', fontSize: 14 }),
 };
@@ -47,11 +48,10 @@ const multiSelectStyles = (isDisabled: boolean) => ({
     boxShadow: 'none',
     fontSize: 14,
     opacity: isDisabled ? 0.6 : 1,
-    '&:hover': isDisabled
-      ? {}
-      : { border: '1px solid #5E718D', boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12)' },
+    '&:hover': isDisabled ? {} : { border: '1px solid #5E718D', boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12)' },
   }),
-  menu: (base: object) => ({ ...base, zIndex: 5, fontSize: 14 }),
+  menuPortal: (base: object) => ({ ...base, zIndex: 9999 }),
+  menu: (base: object) => ({ ...base, zIndex: 9999, fontSize: 14 }),
   indicatorSeparator: () => ({ display: 'none' }),
   multiValue: (base: object) => ({
     ...base,
@@ -170,9 +170,7 @@ export const RbacSection = ({
 
     if (removedGroups.length > 0) {
       setValue('rbacGroups', validGroups, { shouldDirty: true });
-      setRemovedGroupWarnings(
-        removedGroups.map((g) => `${g.label} group removed — not available for selected roles`)
-      );
+      setRemovedGroupWarnings(removedGroups.map((g) => `${g.label} group removed — not available for selected roles`));
     } else {
       setRemovedGroupWarnings([]);
     }
@@ -200,7 +198,7 @@ export const RbacSection = ({
         placeholder="Select roles"
         options={rolesOptions}
         isDisabled={isLoadingOptions || !isApproved}
-        required
+        required={isApproved}
         onChange={handleRolesChange}
       />
 
@@ -211,7 +209,7 @@ export const RbacSection = ({
           placeholder="Select groups"
           options={groupsOptions}
           isDisabled={isLoadingOptions || !isApproved}
-          required
+          required={isApproved}
         />
         {removedGroupWarnings.map((msg, i) => (
           <p key={i} className={s.groupRemovedWarning}>
@@ -221,15 +219,11 @@ export const RbacSection = ({
       </div>
 
       <div className={s.exceptionsBlock}>
-        <div className={s.exceptionsHeader}>
-          <span className={s.exceptionsTitle}>Permissions exceptions</span>
-        </div>
-
         <div className={s.exceptionsSelectWrap}>
           <RbacMultiSelect
             name="rbacExceptions"
-            label=""
-            placeholder="+ Add Exception"
+            label="Permissions exceptions (Optional)"
+            placeholder="Select exceptions"
             options={exceptionsOptions}
             isDisabled={isLoadingOptions || !isApproved}
           />

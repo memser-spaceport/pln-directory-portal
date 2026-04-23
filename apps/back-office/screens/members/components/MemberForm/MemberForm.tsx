@@ -85,10 +85,7 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
   );
 
   const groupsOptions = useMemo(
-    () =>
-      [...new Set((policiesData ?? []).map((p) => p.group))]
-        .sort()
-        .map((g) => ({ label: g, value: g })),
+    () => [...new Set((policiesData ?? []).map((p) => p.group))].sort().map((g) => ({ label: g, value: g })),
     [policiesData]
   );
 
@@ -126,7 +123,6 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
               isLoadingOptions={isLoadingOptions}
               policiesData={policiesData ?? []}
             />
-            <StatusSelector isAddNew={!initialData} />
             <ProfileDetails existingImageUrl={existingImageUrl} />
             <hr className="border-gray-200 dark:border-gray-200" />
             <ProfileLocationInput />
