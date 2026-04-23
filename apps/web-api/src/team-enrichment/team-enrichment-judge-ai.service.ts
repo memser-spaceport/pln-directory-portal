@@ -6,8 +6,10 @@ import {
   FieldConfidence,
   FieldJudgment,
   FieldMetaKey,
+  FIELD_JUDGMENT_NOTE_MAX_LENGTH,
   JudgmentSource,
   JudgmentVerdict,
+  TEAM_JUDGMENT_ASSESSMENT_MAX_LENGTH,
   TeamJudgment,
 } from './team-enrichment.types';
 
@@ -20,19 +22,18 @@ For each field listed in the user prompt, decide:
 - confidence: "high" | "medium" | "low" — how confident you are in the enriched value
 - score: 0–100 — fine-grained score matching the confidence
 - verdict: "agrees" (value looks correct), "disagrees" (value looks wrong), or "uncertain" (you cannot verify)
-- rationale: 1–2 short sentences explaining the verdict
+- note: VERY SHORT tag-style mark explaining the verdict. Max 60 characters. Prefer hyphenated keywords like "domain-matches", "name-not-found-on-web", "url-404". NOT a sentence.
 
 If a "ScrapingDog pre-verification" block confirms the team's LinkedIn identity, treat that as strong evidence the entity reference is correct — but still verify each individual field value on its own merits.
 
 RULES:
 - Use "uncertain" rather than guessing when you cannot verify a value.
 - Do NOT propose new values. You are judging, not enriching.
-- Keep rationales factual and short. No preamble, no sales copy.
+- Keep "note" strictly under 60 chars. Hyphenated keyword style, not prose. No sentences, no "the value ...", no punctuation except hyphens.
 - Pay close attention to the EXACT team name. If similarly-named entities exist, verify values are about the provided team, not a lookalike.
 
 Also return:
-- overallAssessment: a single sentence summary of the team's enrichment quality
-- flagsForReview: short tag strings for manual review (e.g. "website-mismatch", "description-generic"). Use [] if none.
+- overallAssessment: a VERY SHORT summary (max 120 characters) — think compact one-liner, not a paragraph.
 
 OUTPUT FORMAT — STRICT:
 - Your ENTIRE response MUST be a single JSON object that passes JSON.parse() as-is.
@@ -51,11 +52,10 @@ SCHEMA (all keys required, types must match exactly):
       "confidence": "high" | "medium" | "low",
       "score": number (0-100),
       "verdict": "agrees" | "disagrees" | "uncertain",
-      "rationale": string
+      "note": string (max 60 chars, hyphenated keywords)
     }
   },
-  "overallAssessment": string,
-  "flagsForReview": string[]
+  "overallAssessment": string (max 120 chars)
 }
 `;
 
@@ -98,12 +98,11 @@ export class TeamEnrichmentJudgeAiService {
   ): Promise<{
     verdicts: Partial<Record<FieldMetaKey, FieldJudgment>>;
     overallAssessment: string;
-    flagsForReview: string[];
     ok: boolean;
     errorMessage?: string;
   }> {
     if (fields.length === 0) {
-      return { verdicts: {}, overallAssessment: 'No fields to judge.', flagsForReview: [], ok: true };
+      return { verdicts: {}, overallAssessment: 'No fields to judge.', ok: true };
     }
 
     const providerEnvVar = TeamEnrichmentJudgeAiService.PROVIDER_ENV_VAR;
@@ -130,7 +129,6 @@ export class TeamEnrichmentJudgeAiService {
         return {
           verdicts: {},
           overallAssessment: '',
-          flagsForReview: [],
           ok: false,
           errorMessage: 'Judge AI response could not be parsed as JSON',
         };
@@ -139,10 +137,7 @@ export class TeamEnrichmentJudgeAiService {
       const verdicts = this.mapToVerdicts(parsed, fields);
       return {
         verdicts,
-        overallAssessment: parsed.overallAssessment || '',
-        flagsForReview: Array.isArray(parsed.flagsForReview)
-          ? parsed.flagsForReview.filter((f) => typeof f === 'string')
-          : [],
+        overallAssessment: this.truncate(parsed.overallAssessment || '', TEAM_JUDGMENT_ASSESSMENT_MAX_LENGTH),
         ok: true,
       };
     } catch (error) {
@@ -150,7 +145,6 @@ export class TeamEnrichmentJudgeAiService {
       return {
         verdicts: {},
         overallAssessment: '',
-        flagsForReview: [],
         ok: false,
         errorMessage: error.message,
       };
@@ -249,8 +243,6 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     response: AIJudgeResponse,
     requestedFields: JudgeFieldInput[]
   ): Partial<Record<FieldMetaKey, FieldJudgment>> {
-    const now = new Date().toISOString();
-    const model = this.getModelName();
     const requestedKeys = new Set(requestedFields.map((f) => f.field));
 
     const out: Partial<Record<FieldMetaKey, FieldJudgment>> = {};
@@ -264,16 +256,15 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       if (!confidence || !verdict) continue;
 
       const score = typeof raw.score === 'number' ? Math.max(0, Math.min(100, Math.round(raw.score))) : undefined;
-      const rationale = typeof raw.rationale === 'string' && raw.rationale.trim() ? raw.rationale.trim() : undefined;
+      const rawNote = typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim() : undefined;
+      const note = rawNote ? this.truncate(rawNote, FIELD_JUDGMENT_NOTE_MAX_LENGTH) : undefined;
 
       out[rawKey as FieldMetaKey] = {
         confidence,
         verdict,
         score,
-        rationale,
-        judgedAt: now,
+        note,
         judgedVia: JudgmentSource.AI,
-        judgedModel: model,
       };
     }
     return out;
@@ -295,5 +286,11 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     if (v === 'disagrees') return JudgmentVerdict.Disagrees;
     if (v === 'uncertain') return JudgmentVerdict.Uncertain;
     return null;
+  }
+
+  private truncate(s: string, max: number): string {
+    if (!s) return s;
+    if (s.length <= max) return s;
+    return max > 3 ? s.substring(0, max - 3) + '...' : s.substring(0, max);
   }
 }

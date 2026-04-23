@@ -147,18 +147,16 @@ export class TeamEnrichmentScrapingDogService {
     if (nameMatch === 'none') return {};
 
     const result: Partial<Record<FieldMetaKey, FieldJudgment>> = {};
-    const now = new Date().toISOString();
     const mkJudgment = (
       confidence: FieldConfidence,
       verdict: JudgmentVerdict,
       score: number,
-      rationale: string
+      note: string
     ): FieldJudgment => ({
       confidence: nameMatch === 'partial' && confidence === FieldConfidence.High ? FieldConfidence.Medium : confidence,
       score,
       verdict,
-      rationale,
-      judgedAt: now,
+      note,
       judgedVia: JudgmentSource.ScrapingDog,
     });
 
@@ -168,19 +166,9 @@ export class TeamEnrichmentScrapingDogService {
       const profileHost = this.extractHost(profile.website);
       if (teamHost && profileHost) {
         if (teamHost === profileHost) {
-          result.website = mkJudgment(
-            FieldConfidence.High,
-            JudgmentVerdict.Agrees,
-            95,
-            `Team website host "${teamHost}" matches LinkedIn's canonical website "${profileHost}".`
-          );
+          result.website = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'host-match');
         } else {
-          result.website = mkJudgment(
-            FieldConfidence.Low,
-            JudgmentVerdict.Disagrees,
-            20,
-            `Team website "${team.website}" does not match LinkedIn's canonical website "${profile.website}".`
-          );
+          result.website = mkJudgment(FieldConfidence.Low, JudgmentVerdict.Disagrees, 20, 'host-mismatch');
         }
       }
     }
@@ -190,57 +178,27 @@ export class TeamEnrichmentScrapingDogService {
       const teamHandle = this.normalizeHandleForCompare(team.linkedinHandler);
       const profileHandle = this.normalizeHandleForCompare(profile.universalNameId);
       if (teamHandle === profileHandle) {
-        result.linkedinHandler = mkJudgment(
-          FieldConfidence.High,
-          JudgmentVerdict.Agrees,
-          100,
-          `Team LinkedIn handle matches LinkedIn's universal name id "${profile.universalNameId}".`
-        );
+        result.linkedinHandler = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'handle-match');
       } else {
-        result.linkedinHandler = mkJudgment(
-          FieldConfidence.Low,
-          JudgmentVerdict.Disagrees,
-          15,
-          `Team LinkedIn handle "${team.linkedinHandler}" does not match LinkedIn's universal name id "${profile.universalNameId}".`
-        );
+        result.linkedinHandler = mkJudgment(FieldConfidence.Low, JudgmentVerdict.Disagrees, 15, 'handle-mismatch');
       }
     }
 
     // shortDescription — tagline overlap
     if (team.shortDescription && profile.tagline) {
       if (this.textsOverlap(team.shortDescription, profile.tagline, 0.2)) {
-        result.shortDescription = mkJudgment(
-          FieldConfidence.High,
-          JudgmentVerdict.Agrees,
-          85,
-          'Team short description overlaps with LinkedIn tagline.'
-        );
+        result.shortDescription = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'tagline-overlap');
       } else {
-        result.shortDescription = mkJudgment(
-          FieldConfidence.Medium,
-          JudgmentVerdict.Uncertain,
-          50,
-          `Team short description differs from LinkedIn tagline ("${this.truncateForRationale(profile.tagline)}"). Deferring to AI judge.`
-        );
+        result.shortDescription = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'tagline-differs');
       }
     }
 
     // longDescription — about sentence overlap
     if (team.longDescription && profile.about) {
       if (this.sentenceOverlap(team.longDescription, profile.about, 0.4)) {
-        result.longDescription = mkJudgment(
-          FieldConfidence.High,
-          JudgmentVerdict.Agrees,
-          85,
-          'Team long description shares sentences with LinkedIn about text.'
-        );
+        result.longDescription = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'about-overlap');
       } else {
-        result.longDescription = mkJudgment(
-          FieldConfidence.Medium,
-          JudgmentVerdict.Uncertain,
-          50,
-          'Team long description shows low overlap with LinkedIn about text. Deferring to AI judge.'
-        );
+        result.longDescription = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'about-low-overlap');
       }
     }
 
@@ -253,19 +211,9 @@ export class TeamEnrichmentScrapingDogService {
         const teamTagsLower = team.industryTags.map((t) => t.title.toLowerCase());
         const overlap = teamTagsLower.some((t) => linkedinTags.some((l) => l.includes(t) || t.includes(l)));
         if (overlap) {
-          result.industryTags = mkJudgment(
-            FieldConfidence.High,
-            JudgmentVerdict.Agrees,
-            80,
-            'Team industry tags overlap with LinkedIn industries/specialties.'
-          );
+          result.industryTags = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 80, 'tags-overlap');
         } else {
-          result.industryTags = mkJudgment(
-            FieldConfidence.Medium,
-            JudgmentVerdict.Uncertain,
-            45,
-            'Team industry tags have no overlap with LinkedIn industries/specialties. Deferring to AI judge.'
-          );
+          result.industryTags = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 45, 'tags-no-overlap');
         }
       }
     }
@@ -276,19 +224,9 @@ export class TeamEnrichmentScrapingDogService {
       const foundedHit = !!profile.founded && text.includes(profile.founded.toLowerCase());
       const hqHit = !!profile.headquarters && this.extractCity(profile.headquarters).some((c) => text.includes(c));
       if (foundedHit || hqHit) {
-        result.moreDetails = mkJudgment(
-          FieldConfidence.Medium,
-          JudgmentVerdict.Agrees,
-          70,
-          'Team moreDetails mentions LinkedIn founded year or headquarters city.'
-        );
+        result.moreDetails = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Agrees, 70, 'details-match');
       } else {
-        result.moreDetails = mkJudgment(
-          FieldConfidence.Medium,
-          JudgmentVerdict.Uncertain,
-          50,
-          'Team moreDetails does not mention LinkedIn founded year or HQ city. Deferring to AI judge.'
-        );
+        result.moreDetails = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'details-no-match');
       }
     }
 
@@ -387,10 +325,6 @@ export class TeamEnrichmentScrapingDogService {
       .split(',')
       .map((p) => p.trim().toLowerCase())
       .filter((p) => p.length > 0);
-  }
-
-  private truncateForRationale(s: string): string {
-    return s.length > 80 ? s.substring(0, 77) + '...' : s;
   }
 
   private normalize(raw: Record<string, unknown>): ScrapingDogCompanyProfile {

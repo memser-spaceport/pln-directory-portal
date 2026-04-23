@@ -111,28 +111,28 @@ After enrichment completes, a separate **AI Judge** cron independently verifies 
 ### Two stages
 
 1. **Stage 1 — ScrapingDog LinkedIn match (deterministic).** Runs when `SCRAPINGDOG_API_KEY` is set and the team has a `linkedinHandler`. The judge fetches the canonical LinkedIn profile, classifies the name match as `exact` / `partial` / `none`, then performs direct field-to-field comparisons (URL host match for website, normalized equality for handle, tagline/about overlap for descriptions, set intersection for industries). Fields the comparison can resolve authoritatively (`agrees` at `high`, or `disagrees` at `low`) skip Stage 2. `partial` tier downshifts `high` verdicts to `medium`.
-2. **Stage 2 — AI judge.** For remaining fields (or all fields when Stage 1 is unavailable), the second AI model returns a per-field `{ confidence, score, verdict, rationale }` plus an `overallAssessment` and `flagsForReview[]`. Temperature is conservative so the judge prefers `uncertain` over guessing.
+2. **Stage 2 — AI judge.** For remaining fields (or all fields when Stage 1 is unavailable), the second AI model returns a per-field `{ confidence, score, verdict, note }` plus an `overallAssessment`. Temperature is conservative so the judge prefers `uncertain` over guessing.
 
 ### fieldsMeta after judgment
 
-Each judged field gets an extra `judgment` sub-object, and the top-level `confidence` is overwritten with the judge's verdict (the verdict detail is preserved inside `judgment` for provenance):
+The judge is **non-destructive**: it adds a `judgment` sub-object to each enriched field but does not overwrite any enrichment-time values. The top-level `confidence` remains as enrichment set it (including any ScrapingDog upgrade applied during enrichment). Admins who want the judge's independent confidence should read `fieldsMeta[field].judgment.confidence`.
 
 ```ts
 fieldsMeta[field]: {
   status: FieldEnrichmentStatus,
-  confidence: FieldConfidence,     // overwritten by judgment.confidence
+  confidence: FieldConfidence,     // enrichment-time value — never overwritten by the judge
   source: EnrichmentSource,
   judgment: {
-    confidence: 'high' | 'medium' | 'low',
+    confidence: 'high' | 'medium' | 'low',   // judge's independent assessment
     score: 0..100,
     verdict: 'agrees' | 'disagrees' | 'uncertain',
-    rationale: string,
-    judgedAt: ISO string,
+    note?: string,                 // max 60 chars, hyphenated-keyword style (e.g. 'host-match')
     judgedVia: 'scrapingdog' | 'ai',
-    judgedModel?: string,          // only when judgedVia === 'ai'
   }
 }
 ```
+
+Per-field `judgedAt` and `judgedModel` are intentionally omitted — they're the same for every field in a run, so they live only on the top-level `dataEnrichment.judgment.judgedAt` / `aiModel`.
 
 And on the team-level:
 
@@ -140,8 +140,10 @@ And on the team-level:
 dataEnrichment.judgment: {
   status: 'PendingJudgment' | 'InProgress' | 'Judged' | 'FailedToJudge',
   judgedAt, judgedBy, aiModel, errorMessage,
-  overallAssessment: string,
-  flagsForReview: string[],        // e.g. 'scrapingdog-website-mismatch'
+  overallAssessment: string,       // max 120 chars — compact one-liner
+  fieldsForReview: string[],       // DB column names needing manual check: ['website','contactMethod',...]
+                                   // — includes every field whose judge verdict is disagrees,
+                                   //   uncertain, or agrees-at-low-confidence
   scrapingDog?: { used, fetchedAt, nameMatch, companyNameFromLinkedIn, verifiedFields, linkedinInternalId }
 }
 ```

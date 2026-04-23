@@ -49,11 +49,12 @@ export interface FieldJudgment {
   confidence: FieldConfidence;
   score?: number;
   verdict: JudgmentVerdict;
-  rationale?: string;
-  judgedAt: string;
+  note?: string;
   judgedVia: JudgmentSource;
-  judgedModel?: string;
 }
+
+export const FIELD_JUDGMENT_NOTE_MAX_LENGTH = 60;
+export const TEAM_JUDGMENT_ASSESSMENT_MAX_LENGTH = 120;
 
 export interface FieldEnrichmentMeta {
   status: FieldEnrichmentStatus;
@@ -98,7 +99,7 @@ export interface TeamJudgment {
   aiModel?: string;
   errorMessage?: string;
   overallAssessment?: string;
-  flagsForReview?: string[];
+  fieldsForReview?: string[];
   scrapingDog?: {
     used: boolean;
     fetchedAt: string;
@@ -134,10 +135,9 @@ export interface AIJudgeResponse {
     confidence: 'high' | 'medium' | 'low';
     score: number;
     verdict: 'agrees' | 'disagrees' | 'uncertain';
-    rationale: string;
+    note: string;
   }>;
   overallAssessment: string;
-  flagsForReview: string[];
 }
 
 export interface AITeamEnrichmentResponse {

@@ -198,7 +198,6 @@ export class TeamEnrichmentJudgeService {
     judgedBy: string
   ): Promise<void> {
     const teamUid = team.uid;
-    const extraFlags: string[] = [];
 
     try {
       // --- Stage 1: ScrapingDog ---
@@ -215,9 +214,6 @@ export class TeamEnrichmentJudgeService {
           const handleIsUserOwned = this.isLinkedinHandleUserOwned(existingMeta, !!team.linkedinHandler);
           if (!handleIsUserOwned) {
             await this.nullBadLinkedinHandle(teamUid, existingMeta);
-            extraFlags.push('scrapingdog-linkedin-not-found');
-          } else {
-            extraFlags.push('scrapingdog-linkedin-not-found-user-owned');
           }
         } else if (result.kind === 'error') {
           this.logger.warn(
@@ -257,14 +253,6 @@ export class TeamEnrichmentJudgeService {
             verifiedFields,
             linkedinInternalId: profile.linkedinInternalId,
           };
-
-          if (nameMatch === 'partial') extraFlags.push('scrapingdog-partial-name-match');
-          if (nameMatch === 'none') extraFlags.push('scrapingdog-name-mismatch');
-          for (const [k, v] of Object.entries(stage1Verdicts)) {
-            if (v?.verdict === JudgmentVerdict.Disagrees) {
-              extraFlags.push(`scrapingdog-${k}-mismatch`);
-            }
-          }
         }
       }
 
@@ -281,7 +269,6 @@ export class TeamEnrichmentJudgeService {
 
       let stage2Verdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = {};
       let overallAssessment = 'All judgable fields verified by ScrapingDog; no AI judge needed.';
-      let judgeFlags: string[] = [];
       let judgeFailed = false;
       let judgeErrorMessage: string | undefined;
 
@@ -306,7 +293,6 @@ export class TeamEnrichmentJudgeService {
         } else {
           stage2Verdicts = aiOut.verdicts;
           overallAssessment = aiOut.overallAssessment || overallAssessment;
-          judgeFlags = aiOut.flagsForReview;
         }
       }
 
@@ -330,15 +316,19 @@ export class TeamEnrichmentJudgeService {
       const baseFieldsMeta = refreshedMeta?.fieldsMeta ?? existingMeta.fieldsMeta ?? {};
       const mergedFieldsMeta: FieldsMetaMap = { ...baseFieldsMeta };
 
+      // The judge is non-destructive: it annotates with a `judgment` sub-object but never
+      // overrides enrichment-time values like `confidence` or `source`. Readers who want the
+      // judge's verdict should read `fieldsMeta[field].judgment.confidence`.
+      const fieldsForReview: string[] = [];
       for (const [key, verdict] of Object.entries(allVerdicts) as Array<[FieldMetaKey, FieldJudgment | undefined]>) {
         if (!verdict) continue;
         const current = mergedFieldsMeta[key];
         if (!current || current.status !== FieldEnrichmentStatus.Enriched) continue;
         mergedFieldsMeta[key] = {
           ...current,
-          confidence: verdict.confidence,
           judgment: verdict,
         };
+        if (this.needsManualReview(verdict)) fieldsForReview.push(key);
       }
 
       const judgment: TeamJudgment = {
@@ -347,7 +337,7 @@ export class TeamEnrichmentJudgeService {
         judgedBy,
         aiModel: this.judgeAi.getModelName(),
         overallAssessment,
-        flagsForReview: this.dedupeFlags([...extraFlags, ...judgeFlags]),
+        fieldsForReview,
         ...(scrapingDogMeta ? { scrapingDog: scrapingDogMeta } : {}),
       };
 
@@ -363,7 +353,7 @@ export class TeamEnrichmentJudgeService {
       });
 
       this.logger.log(
-        `Judge: team ${teamUid} (${team.name}) judged — stage1=${Object.keys(stage1Verdicts).length} stage2=${Object.keys(stage2Verdicts).length} flags=[${judgment.flagsForReview?.join(',') ?? ''}]`
+        `Judge: team ${teamUid} (${team.name}) judged — stage1=${Object.keys(stage1Verdicts).length} stage2=${Object.keys(stage2Verdicts).length} fieldsForReview=[${fieldsForReview.join(',')}]`
       );
     } catch (error) {
       this.logger.error(
@@ -530,7 +520,14 @@ export class TeamEnrichmentJudgeService {
     });
   }
 
-  private dedupeFlags(flags: string[]): string[] {
-    return Array.from(new Set(flags.filter((f) => typeof f === 'string' && f.length > 0)));
+  /**
+   * A judged field needs manual review when the judge disagrees, is uncertain, or agrees
+   * only at low confidence. Agrees + high/medium is considered trusted — no manual check.
+   */
+  private needsManualReview(verdict: FieldJudgment): boolean {
+    if (verdict.verdict === JudgmentVerdict.Disagrees) return true;
+    if (verdict.verdict === JudgmentVerdict.Uncertain) return true;
+    if (verdict.confidence === 'low') return true;
+    return false;
   }
 }
