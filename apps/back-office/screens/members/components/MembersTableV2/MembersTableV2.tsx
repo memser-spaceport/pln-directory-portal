@@ -13,6 +13,7 @@ import {
 import clsx from 'clsx';
 
 import { Member } from '../../types/member';
+import { Policy } from '../../../../hooks/access-control/usePoliciesList';
 import { MemberCell } from '../MemberCell/MemberCell';
 import { ProjectsCell } from '../ProjectsCell/ProjectsCell';
 import { EditCell } from '../EditCell/EditCell';
@@ -29,6 +30,7 @@ interface Props {
   sorting: SortingState;
   setSorting: Dispatch<SetStateAction<SortingState>>;
   showRbacSection?: boolean;
+  allPolicies?: Policy[];
 }
 
 const columnHelper = createColumnHelper<Member>();
@@ -43,7 +45,13 @@ export function MembersTableV2({
   sorting,
   setSorting,
   showRbacSection = false,
+  allPolicies = [],
 }: Props) {
+  const policyMap = useMemo(
+    () => new Map(allPolicies.map((p) => [p.uid, p])),
+    [allPolicies]
+  );
+
   const columns = useMemo(() => {
     const base = [
       columnHelper.accessor('name', {
@@ -67,12 +75,18 @@ export function MembersTableV2({
               id: 'role',
               header: 'Role',
               cell: (info) => {
-                const roles = info.row.original.roles ?? [];
+                const roles = [
+                  ...new Set(
+                    (info.row.original.policies ?? [])
+                      .map((mp) => policyMap.get(mp.uid)?.role)
+                      .filter(Boolean) as string[]
+                  ),
+                ];
                 if (!roles.length) return <span>—</span>;
                 return (
                   <div className={s.stackedCell}>
                     {roles.map((r) => (
-                      <span key={r.code}>{r.name}</span>
+                      <span key={r}>{r}</span>
                     ))}
                   </div>
                 );
@@ -83,13 +97,19 @@ export function MembersTableV2({
               id: 'group',
               header: 'Group',
               cell: (info) => {
-                const policies = info.row.original.policies ?? [];
-                if (!policies.length) return <span>—</span>;
+                const groups = [
+                  ...new Set(
+                    (info.row.original.policies ?? [])
+                      .map((mp) => policyMap.get(mp.uid)?.group)
+                      .filter(Boolean) as string[]
+                  ),
+                ];
+                if (!groups.length) return <span>—</span>;
                 return (
                   <div className={s.badgeRow}>
-                    {policies.map((p) => (
-                      <span key={p.code} className={s.groupBadge}>
-                        {p.name}
+                    {groups.map((g) => (
+                      <span key={g} className={s.groupBadge}>
+                        {g}
                       </span>
                     ))}
                   </div>
@@ -128,7 +148,7 @@ export function MembersTableV2({
         size: 100,
       }),
     ];
-  }, [authToken, activeTab]);
+  }, [authToken, activeTab, policyMap, showRbacSection]);
 
   const table = useReactTable({
     data: members,

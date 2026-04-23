@@ -116,6 +116,11 @@ const MembersPageV2 = () => {
     return base;
   }, [members]);
 
+  const policyMap = useMemo(
+    () => new Map((policiesData ?? []).map((p) => [p.uid, p])),
+    [policiesData]
+  );
+
   const approvedMembers = useMemo(
     () => members.filter((m) => m.memberState === 'APPROVED'),
     [members]
@@ -126,30 +131,40 @@ const MembersPageV2 = () => {
     let list = members.filter((m) => m.memberState === activeTab);
     if (activeTab === 'APPROVED') {
       if (groupFilter) {
-        list = list.filter((m) => m.policies?.some((p) => p.name === groupFilter));
+        list = list.filter((m) =>
+          m.policies?.some((mp) => policyMap.get(mp.uid)?.group === groupFilter)
+        );
       }
       if (roleFilter) {
-        list = list.filter((m) => m.roles?.some((r) => r.name === roleFilter));
+        list = list.filter((m) =>
+          m.policies?.some((mp) => policyMap.get(mp.uid)?.role === roleFilter)
+        );
       }
     }
     return list;
-  }, [members, activeTab, groupFilter, roleFilter]);
+  }, [members, activeTab, groupFilter, roleFilter, policyMap]);
 
   const groupOptions = useMemo<SelectOption[]>(() => {
     const names = new Set<string>();
     for (const m of approvedMembers) {
-      for (const p of m.policies ?? []) names.add(p.name);
+      for (const mp of m.policies ?? []) {
+        const group = policyMap.get(mp.uid)?.group;
+        if (group) names.add(group);
+      }
     }
     return [{ label: 'All groups', value: '' }, ...[...names].sort().map((n) => ({ label: n, value: n }))];
-  }, [approvedMembers]);
+  }, [approvedMembers, policyMap]);
 
   const roleOptions = useMemo<SelectOption[]>(() => {
     const names = new Set<string>();
     for (const m of approvedMembers) {
-      for (const r of m.roles ?? []) names.add(r.name);
+      for (const mp of m.policies ?? []) {
+        const role = policyMap.get(mp.uid)?.role;
+        if (role) names.add(role);
+      }
     }
     return [{ label: 'All roles', value: '' }, ...[...names].sort().map((n) => ({ label: n, value: n }))];
-  }, [approvedMembers]);
+  }, [approvedMembers, policyMap]);
 
   const policyRoleOptions = useMemo<SelectOption[]>(
     () => [
@@ -359,6 +374,7 @@ const MembersPageV2 = () => {
                 sorting={sorting}
                 setSorting={setSorting}
                 showRbacSection
+                allPolicies={policiesData ?? []}
               />
             )}
           </>
