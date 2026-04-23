@@ -12,7 +12,7 @@ export class MemberApprovalsController {
 
   @NoCache()
   @Get()
-  list(@Query('state') state?: 'PENDING' | 'APPROVED' | 'REJECTED') {
+  list(@Query('state') state?: 'PENDING' | 'APPROVED' | 'VERIFIED' | 'REJECTED') {
     return this.service.list(state);
   }
 

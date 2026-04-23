@@ -988,26 +988,13 @@ export class MemberService {
       ),
     ]);
 
-    // Reload member with roles and demo day–related scopes/relations
-    const updatedMember = await this.prisma.member.findUnique({
-      where: { uid: memberUid },
-      include: {
-        memberRoles: true,
-        demoDayAdminScopes: true,
-        demoDayParticipants: {
-          include: {
-            demoDay: true,
-          },
-        },
-      },
-    });
+    const enrichedMember = await this.findMemberByUid(memberUid);
 
-    // This should not happen, but be defensive in case the record was removed meanwhile
-    if (!updatedMember) {
+    if (!enrichedMember) {
       throw new NotFoundException('Member not found after updating demo day admin hosts');
     }
 
-    return updatedMember;
+    return enrichedMember;
   }
 
   /**
@@ -1743,8 +1730,7 @@ export class MemberService {
     //   }
     // }
 
-    // Replace roles via "set" + "connect"
-    const updated = await this.prisma.member.update({
+    await this.prisma.member.update({
       where: { uid: memberUid },
       data: {
         memberRoles: {
@@ -1752,13 +1738,9 @@ export class MemberService {
           connect: roles.map((role) => ({ id: role.id })),
         },
       },
-      include: {
-        memberRoles: true,
-        demoDayAdminScopes: true,
-      },
     });
 
-    return updated;
+    return await this.findMemberByUid(memberUid);
   }
 
   /**
@@ -1768,7 +1750,7 @@ export class MemberService {
    * Only directory-level admins should be allowed to call this from controller.
    */
   async updateMemberRolesAndHosts(memberUid: string, roleNames?: string[], hosts?: string[]): Promise<Member> {
-    return await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       const member = await tx.member.findUnique({
         where: { uid: memberUid },
         include: {
@@ -1855,26 +1837,8 @@ export class MemberService {
           );
         }
       }
-
-      // Reload and return the final member state
-      const finalMember = await tx.member.findUnique({
-        where: { uid: memberUid },
-        include: {
-          memberRoles: true,
-          demoDayAdminScopes: true,
-          demoDayParticipants: {
-            include: {
-              demoDay: true,
-            },
-          },
-        },
-      });
-
-      if (!finalMember) {
-        throw new NotFoundException('Member not found after update');
-      }
-
-      return finalMember;
     });
+
+    return await this.findMemberByUid(memberUid);
   }
 }

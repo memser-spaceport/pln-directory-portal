@@ -10,7 +10,7 @@ import { PrismaService } from '../shared/prisma.service';
 export class MemberApprovalsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(state?: 'PENDING' | 'APPROVED' | 'REJECTED') {
+  async list(state?: 'PENDING' | 'APPROVED' | 'VERIFIED' | 'REJECTED') {
     return this.prisma.memberApproval.findMany({
       where: state ? { state } : {},
       include: {
@@ -131,7 +131,7 @@ export class MemberApprovalsService {
   async review(
     memberUid: string,
     body: {
-      state: 'APPROVED' | 'REJECTED' | 'PENDING';
+      state: 'APPROVED' | 'VERIFIED' | 'REJECTED' | 'PENDING';
       reviewedByUid?: string | null;
       reason?: string;
     },
@@ -219,9 +219,9 @@ export class MemberApprovalsService {
       select: { state: true },
     });
 
-    if (!approval || approval.state !== 'APPROVED') {
+    if (!approval || !['APPROVED', 'VERIFIED'].includes(approval.state)) {
       throw new ForbiddenException(
-        `Member ${memberUid} is not approved. Policies and direct permissions can be assigned only to APPROVED members.`,
+        `Member ${memberUid} is not approved. Policies and direct permissions can be assigned only to APPROVED or VERIFIED members.`,
       );
     }
   }
