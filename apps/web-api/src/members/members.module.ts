@@ -13,6 +13,7 @@ import { NotificationSettingsModule } from '../notification-settings/notificatio
 import { OfficeHoursModule } from '../office-hours/office-hours.module';
 import { TeamsModule } from "../teams/teams.module";
 import { OpenSearchModule } from '../opensearch/opensearch.module';
+import { MemberApprovalsModule } from '../member-approvals/member-approvals.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { OpenSearchModule } from '../opensearch/opensearch.module';
     ParticipantsRequestModule,
     HuskyModule,
     OpenSearchModule,
+    forwardRef(() => MemberApprovalsModule),
     forwardRef(() => NotificationSettingsModule),
     forwardRef(() => OfficeHoursModule),
     forwardRef(() => TeamsModule)

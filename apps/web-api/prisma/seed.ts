@@ -1,3 +1,4 @@
+import { seedAccessControlV2 } from './fixtures/access-control-v2.seed';
 import { Prisma } from '@prisma/client';
 import camelCase from 'camelcase';
 import { prisma } from './index';
@@ -572,6 +573,8 @@ async function main() {
   }
 
   console.log('✅ Articles seed added');
+
+  await seedAccessControlV2();
 }
 
 /**

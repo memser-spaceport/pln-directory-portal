@@ -8,7 +8,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
-import { InvestorProfileType, Location, Member, Prisma } from '@prisma/client';
+import crypto from 'node:crypto';
+import { InvestorProfileType, Location, Member, MemberApprovalState, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { NotificationService } from '../utils/notification/notification.service';
@@ -46,6 +47,433 @@ export class MemberService {
     @Inject(forwardRef(() => TeamsService))
     private teamService: TeamsService
   ) {}
+
+  private fallbackMemberState(accessLevel?: string | null): MemberApprovalState {
+    if (!accessLevel) {
+      return MemberApprovalState.PENDING;
+    }
+
+    if (accessLevel.toUpperCase() === 'REJECTED') {
+      return MemberApprovalState.REJECTED;
+    }
+
+    const match = accessLevel.match(/^L(\d+)$/i);
+    if (!match) {
+      return MemberApprovalState.PENDING;
+    }
+
+    const level = Number(match[1]);
+    return level === 0 ? MemberApprovalState.PENDING : MemberApprovalState.APPROVED;
+  }
+
+  private resolveMemberState(
+    accessLevel?: string | null,
+    approvalState?: MemberApprovalState | null
+  ): MemberApprovalState {
+    return approvalState ?? this.fallbackMemberState(accessLevel);
+  }
+
+  private resolveApprovalStateFromAccessLevel(accessLevel?: string | null): MemberApprovalState {
+    return this.fallbackMemberState(accessLevel);
+  }
+
+  private normalizeMemberStateFromPayload(
+    payload: { memberState?: string | null; state?: string | null },
+  ): MemberApprovalState | null {
+    const rawState = payload.memberState ?? payload.state;
+
+    if (!rawState) {
+      return null;
+    }
+
+    const normalized = rawState.toUpperCase();
+
+    if (normalized === 'PENDING') {
+      return MemberApprovalState.PENDING;
+    }
+
+    if (normalized === 'APPROVED' || normalized === 'VERIFIED') {
+      return MemberApprovalState.APPROVED;
+    }
+
+    if (normalized === 'REJECTED') {
+      return MemberApprovalState.REJECTED;
+    }
+
+    throw new BadRequestException(`Unknown memberState: ${rawState}`);
+  }
+
+  private async syncMemberApprovalFromPayload(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    payload: {
+      accessLevel?: string | null;
+      memberState?: string | null;
+      state?: string | null;
+    },
+    requestedByUid?: string | null,
+    reviewedByUid?: string | null,
+    reason = 'Synced from member payload',
+  ): Promise<void> {
+    const explicitMemberState = this.normalizeMemberStateFromPayload(payload);
+
+    const resolvedState =
+      explicitMemberState ??
+      (payload.accessLevel ? this.resolveApprovalStateFromAccessLevel(payload.accessLevel) : null);
+
+    if (!resolvedState) {
+      return;
+    }
+
+    await tx.memberApproval.upsert({
+      where: { memberUid },
+      update: {
+        state: resolvedState,
+        reason,
+        requestedByUid: requestedByUid ?? undefined,
+        reviewedByUid: reviewedByUid ?? null,
+        reviewedAt: resolvedState === MemberApprovalState.PENDING ? null : new Date(),
+      },
+      create: {
+        memberUid,
+        state: resolvedState,
+        requestedByUid: requestedByUid ?? null,
+        reviewedByUid: reviewedByUid ?? null,
+        reason,
+        reviewedAt: resolvedState === MemberApprovalState.PENDING ? null : new Date(),
+      },
+    });
+  }
+
+  private async syncMemberApprovalFromAccessLevel(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    accessLevel?: string | null,
+    requestedByUid?: string | null,
+    reviewedByUid?: string | null,
+    reason = 'Synced from accessLevel'
+  ): Promise<void> {
+    const state = this.resolveApprovalStateFromAccessLevel(accessLevel);
+    const reviewedAt = state === MemberApprovalState.PENDING ? null : new Date();
+
+    await tx.memberApproval.upsert({
+      where: { memberUid },
+      update: {
+        state,
+        reason,
+        requestedByUid: requestedByUid ?? undefined,
+        reviewedByUid: reviewedByUid ?? null,
+        reviewedAt,
+      },
+      create: {
+        memberUid,
+        state,
+        requestedByUid: requestedByUid ?? null,
+        reviewedByUid: reviewedByUid ?? null,
+        reason,
+        reviewedAt,
+      },
+    });
+  }
+
+  private async syncMemberStateForEditPayload(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    payload: {
+      accessLevel?: string | null;
+      memberState?: string | null;
+      state?: string | null;
+    },
+  ): Promise<void> {
+    await this.syncMemberApprovalFromPayload(
+      tx,
+      memberUid,
+      payload,
+      memberUid,
+      null,
+      payload.accessLevel ? 'Updated from accessLevel/memberState' : 'Updated from memberState',
+    );
+  }
+
+  private async assignAccessControl(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    payload: {
+      roleCodes?: string[];
+      policyCodes?: string[];
+      permissionCodes?: string[];
+      actorUid?: string | null;
+    }
+  ): Promise<void> {
+    const roleCodes = [...new Set((payload.roleCodes ?? []).filter(Boolean))];
+    const policyCodes = [...new Set((payload.policyCodes ?? []).filter(Boolean))];
+    const permissionCodes = [...new Set((payload.permissionCodes ?? []).filter(Boolean))];
+
+    if (roleCodes.length > 0) {
+      const roles = await tx.role.findMany({
+        where: { code: { in: roleCodes } },
+        select: { uid: true, code: true },
+      });
+
+      if (roles.length !== roleCodes.length) {
+        const found = new Set(roles.map((r) => r.code));
+        const missing = roleCodes.filter((code) => !found.has(code));
+        throw new BadRequestException(`Unknown role codes: ${missing.join(', ')}`);
+      }
+
+      for (const role of roles) {
+        const existing = await tx.roleAssignment.findFirst({
+          where: {
+            memberUid,
+            roleUid: role.uid,
+            revokedAt: null,
+            status: 'ACTIVE',
+          },
+          select: { uid: true },
+        });
+
+        if (!existing) {
+          await tx.roleAssignment.create({
+            data: {
+              uid: crypto.randomUUID(),
+              roleUid: role.uid,
+              memberUid,
+              assignedByMemberUid: payload.actorUid ?? null,
+              status: 'ACTIVE',
+            },
+          });
+        }
+      }
+    }
+
+    if (policyCodes.length > 0) {
+      const policies = await tx.policy.findMany({
+        where: { code: { in: policyCodes } },
+        select: { uid: true, code: true },
+      });
+
+      if (policies.length !== policyCodes.length) {
+        const found = new Set(policies.map((p) => p.code));
+        const missing = policyCodes.filter((code) => !found.has(code));
+        throw new BadRequestException(`Unknown policy codes: ${missing.join(', ')}`);
+      }
+
+      for (const policy of policies) {
+        const existing = await tx.policyAssignment.findFirst({
+          where: {
+            memberUid,
+            policyUid: policy.uid,
+          },
+          select: { uid: true },
+        });
+
+        if (!existing) {
+          await tx.policyAssignment.create({
+            data: {
+              uid: crypto.randomUUID(),
+              memberUid,
+              policyUid: policy.uid,
+              assignedByUid: payload.actorUid ?? null,
+            },
+          });
+        }
+      }
+    }
+
+    if (permissionCodes.length > 0) {
+      const permissions = await tx.permission.findMany({
+        where: { code: { in: permissionCodes } },
+        select: { uid: true, code: true },
+      });
+
+      if (permissions.length !== permissionCodes.length) {
+        const found = new Set(permissions.map((p) => p.code));
+        const missing = permissionCodes.filter((code) => !found.has(code));
+        throw new BadRequestException(`Unknown permission codes: ${missing.join(', ')}`);
+      }
+
+      for (const permission of permissions) {
+        const existing = await tx.memberPermissionV2.findFirst({
+          where: {
+            memberUid,
+            permissionUid: permission.uid,
+          },
+          select: { uid: true },
+        });
+
+        if (!existing) {
+          await tx.memberPermissionV2.create({
+            data: {
+              uid: crypto.randomUUID(),
+              memberUid,
+              permissionUid: permission.uid,
+              grantedByUid: payload.actorUid ?? null,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  private mapPermission(permission?: { uid: string; code: string; description?: string | null } | null) {
+    if (!permission) {
+      return null;
+    }
+
+    return {
+      uid: permission.uid,
+      code: permission.code,
+      description: permission.description ?? null,
+    };
+  }
+
+  private mapPolicy(
+    policy?:
+      | {
+          uid: string;
+          code: string;
+          name: string;
+          description?: string | null;
+          role?: string | null;
+          group?: string | null;
+        }
+      | null
+  ) {
+    if (!policy) {
+      return null;
+    }
+
+    return {
+      uid: policy.uid,
+      code: policy.code,
+      name: policy.name,
+      description: policy.description ?? null,
+      role: policy.role ?? null,
+      group: policy.group ?? null,
+    };
+  }
+
+  private mapRole(role?: { uid: string; code: string; name: string; description?: string | null } | null) {
+    if (!role) {
+      return null;
+    }
+
+    return {
+      uid: role.uid,
+      code: role.code,
+      name: role.name,
+      description: role.description ?? null,
+    };
+  }
+
+  private uniqueByCode<T extends { code: string }>(items: T[]): T[] {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      if (seen.has(item.code)) {
+        return false;
+      }
+      seen.add(item.code);
+      return true;
+    });
+  }
+
+  private enrichMemberAccessData<T extends {
+    accessLevel?: string | null;
+    memberApproval?: { state?: MemberApprovalState | null } | null;
+    memberPermissionsV2?: Array<{
+      permission?: { uid: string; code: string; description?: string | null } | null;
+    }> | null;
+    policyAssignmentsV2?: Array<{
+      policy?: {
+        uid: string;
+        code: string;
+        name: string;
+        description?: string | null;
+        role?: string | null;
+        group?: string | null;
+        policyPermissions?: Array<{
+          permission?: { uid: string; code: string; description?: string | null } | null;
+        }>;
+      } | null;
+    }> | null;
+    roleAssignments?: Array<{
+      role?: {
+        uid: string;
+        code: string;
+        name: string;
+        description?: string | null;
+        rolePermissions?: Array<{
+          permission?: { uid: string; code: string; description?: string | null } | null;
+        }>;
+      } | null;
+    }> | null;
+  }>(member: T) {
+    const directPermissions = this.uniqueByCode(
+      (member.memberPermissionsV2 ?? [])
+        .map((item) => this.mapPermission(item.permission))
+        .filter(Boolean) as Array<{ uid: string; code: string; description?: string | null }>
+    );
+
+    const policies = this.uniqueByCode(
+      (member.policyAssignmentsV2 ?? [])
+        .map((item) => this.mapPolicy(item.policy))
+        .filter(Boolean) as Array<{
+          uid: string;
+          code: string;
+          name: string;
+          description?: string | null;
+          role?: string | null;
+          group?: string | null;
+        }>
+    );
+
+    const policyPermissions = this.uniqueByCode(
+      (member.policyAssignmentsV2 ?? [])
+        .flatMap((assignment) => assignment.policy?.policyPermissions ?? [])
+        .map((item) => this.mapPermission(item.permission))
+        .filter(Boolean) as Array<{ uid: string; code: string; description?: string | null }>
+    );
+
+    const roles = this.uniqueByCode(
+      (member.roleAssignments ?? [])
+        .map((item) => this.mapRole(item.role))
+        .filter(Boolean) as Array<{ uid: string; code: string; name: string; description?: string | null }>
+    );
+
+    const rolePermissions = this.uniqueByCode(
+      (member.roleAssignments ?? [])
+        .flatMap((assignment) => assignment.role?.rolePermissions ?? [])
+        .map((item) => this.mapPermission(item.permission))
+        .filter(Boolean) as Array<{ uid: string; code: string; description?: string | null }>
+    );
+
+    const effectivePermissions = this.uniqueByCode([
+      ...directPermissions,
+      ...policyPermissions,
+      ...rolePermissions,
+    ]);
+
+    const {
+      memberPermissionsV2,
+      policyAssignmentsV2,
+      roleAssignments,
+      memberApproval,
+      ...safeMember
+    } = member as any;
+
+    return {
+      ...safeMember,
+      memberState: this.resolveMemberState(member.accessLevel, member.memberApproval?.state),
+      permissions: directPermissions,
+      permissionCodes: directPermissions.map((p) => p.code),
+      policies,
+      policyCodes: policies.map((p) => p.code),
+      roles,
+      roleCodes: roles.map((r) => r.code),
+      effectivePermissions,
+      effectivePermissionCodes: effectivePermissions.map((p) => p.code),
+    };
+  }
 
   /**
    * Creates a new member in the database within a transaction.
@@ -103,7 +531,7 @@ export class MemberService {
    */
   async findMemberByUid(uid: string, tx: Prisma.TransactionClient = this.prisma) {
     try {
-      return tx.member.findUniqueOrThrow({
+      const member = await tx.member.findUniqueOrThrow({
         where: { uid },
         include: {
           image: true,
@@ -112,8 +540,74 @@ export class MemberService {
           teamMemberRoles: true,
           memberRoles: true,
           projectContributions: true,
+          memberApproval: {
+            select: {
+              state: true,
+            },
+          },
+          memberPermissionsV2: {
+            select: {
+              permission: {
+                select: {
+                  uid: true,
+                  code: true,
+                  description: true,
+                },
+              },
+            },
+          },
+          policyAssignmentsV2: {
+            select: {
+              policy: {
+                select: {
+                  uid: true,
+                  code: true,
+                  name: true,
+                  description: true,
+                  role: true,
+                  group: true,
+                  policyPermissions: {
+                    select: {
+                      permission: {
+                        select: {
+                          uid: true,
+                          code: true,
+                          description: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          roleAssignments: {
+            select: {
+              role: {
+                select: {
+                  uid: true,
+                  code: true,
+                  name: true,
+                  description: true,
+                  rolePermissions: {
+                    select: {
+                      permission: {
+                        select: {
+                          uid: true,
+                          code: true,
+                          description: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       });
+
+      return this.enrichMemberAccessData(member);
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -125,6 +619,27 @@ export class MemberService {
     requestorEmail: string,
     isDirectoryAdmin = false
   ): Promise<Member> {
+    const updatePayload = (memberParticipantsRequest as any)?.newData ?? memberParticipantsRequest;
+
+    const onlyStateUpdate =
+      Object.keys(updatePayload ?? {}).length > 0 &&
+      Object.keys(updatePayload ?? {}).every((key) => ['memberState', 'state'].includes(key));
+
+    if (onlyStateUpdate) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.syncMemberApprovalFromPayload(
+          tx,
+          memberUid,
+          updatePayload as any,
+          memberUid,
+          null,
+          'Updated from memberState',
+        );
+      });
+
+      return this.findMemberByUid(memberUid);
+    }
+
     let result;
     await this.prisma.$transaction(async (tx) => {
       const memberData: any = memberParticipantsRequest.newData;
@@ -761,26 +1276,13 @@ export class MemberService {
       ),
     ]);
 
-    // Reload member with roles and demo day–related scopes/relations
-    const updatedMember = await this.prisma.member.findUnique({
-      where: { uid: memberUid },
-      include: {
-        memberRoles: true,
-        demoDayAdminScopes: true,
-        demoDayParticipants: {
-          include: {
-            demoDay: true,
-          },
-        },
-      },
-    });
+    const enrichedMember = await this.findMemberByUid(memberUid);
 
-    // This should not happen, but be defensive in case the record was removed meanwhile
-    if (!updatedMember) {
+    if (!enrichedMember) {
       throw new NotFoundException('Member not found after updating demo day admin hosts');
     }
 
-    return updatedMember;
+    return enrichedMember;
   }
 
   /**
@@ -908,6 +1410,68 @@ export class MemberService {
             type: true,
           },
         },
+        memberApproval: {
+          select: {
+            state: true,
+          },
+        },
+        memberPermissionsV2: {
+          select: {
+            permission: {
+              select: {
+                uid: true,
+                code: true,
+                description: true,
+              },
+            },
+          },
+        },
+        policyAssignmentsV2: {
+          select: {
+            policy: {
+              select: {
+                uid: true,
+                code: true,
+                name: true,
+                description: true,
+                policyPermissions: {
+                  select: {
+                    permission: {
+                      select: {
+                        uid: true,
+                        code: true,
+                        description: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        roleAssignments: {
+          select: {
+            role: {
+              select: {
+                uid: true,
+                code: true,
+                name: true,
+                description: true,
+                rolePermissions: {
+                  select: {
+                    permission: {
+                      select: {
+                        uid: true,
+                        code: true,
+                        description: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         demoDayAdminScopes: {
           select: {
             memberUid: true,
@@ -921,7 +1485,7 @@ export class MemberService {
     });
 
     const membersWithHosts = members.map((m) => ({
-      ...m,
+      ...this.enrichMemberAccessData(m),
       demoDayHosts: m.demoDayAdminScopes?.filter((s) => s.scopeType === 'HOST').map((s) => s.scopeValue) ?? [],
     }));
 
@@ -1021,6 +1585,31 @@ export class MemberService {
       data: updateData,
     });
 
+    if (accessLevel) {
+      const resolvedState = this.resolveApprovalStateFromAccessLevel(accessLevel);
+
+      await this.prisma.$transaction(
+        memberUids.map((memberUid) =>
+          this.prisma.memberApproval.upsert({
+            where: { memberUid },
+            update: {
+              state: resolvedState,
+              reason: 'Synced from accessLevel update',
+              reviewedAt: resolvedState === MemberApprovalState.PENDING ? null : now,
+            },
+            create: {
+              memberUid,
+              state: resolvedState,
+              requestedByUid: memberUid,
+              reviewedByUid: null,
+              reason: 'Synced from accessLevel update',
+              reviewedAt: resolvedState === MemberApprovalState.PENDING ? null : now,
+            },
+          })
+        )
+      );
+    }
+
     // Create investor profiles for L5/L6 members who don't have one
     await this.createInvestorProfileForHighLevelMembers(memberUids, this.prisma);
 
@@ -1086,6 +1675,12 @@ export class MemberService {
   async createMemberByAdmin(memberData: CreateMemberDto): Promise<Member> {
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {
+      const aclPayload = memberData as CreateMemberDto & {
+        roleCodes?: string[];
+        policyCodes?: string[];
+        permissionCodes?: string[];
+      };
+
       const location = await this.mapLocationToNewMember(memberData.city, memberData.country, memberData.region, tx);
 
       const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(memberData.accessLevel as AccessLevel);
@@ -1160,6 +1755,22 @@ export class MemberService {
 
       createdMember = await this.createMember(newMember, tx);
 
+      await this.syncMemberApprovalFromPayload(
+        tx,
+        createdMember.uid,
+        memberData as CreateMemberDto & { memberState?: string | null; state?: string | null },
+        createdMember.uid,
+        null,
+        'Created by admin'
+      );
+
+      await this.assignAccessControl(tx, createdMember.uid, {
+        roleCodes: aclPayload.roleCodes ?? [],
+        policyCodes: aclPayload.policyCodes ?? [],
+        permissionCodes: aclPayload.permissionCodes ?? [],
+        actorUid: null,
+      });
+
       if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(memberData.accessLevel as AccessLevel)) {
         await this.notificationService.notifyForMemberCreationApproval(
           createdMember.name,
@@ -1174,7 +1785,7 @@ export class MemberService {
 
       await this.membersHooksService.postCreateActions(createdMember, memberData.email);
     });
-    return createdMember;
+    return this.findMemberByUid(createdMember.uid);
   }
 
   async updateMemberByAdmin(uid: string, dto: UpdateMemberDto): Promise<string> {
@@ -1454,8 +2065,7 @@ export class MemberService {
     //   }
     // }
 
-    // Replace roles via "set" + "connect"
-    const updated = await this.prisma.member.update({
+    await this.prisma.member.update({
       where: { uid: memberUid },
       data: {
         memberRoles: {
@@ -1463,13 +2073,9 @@ export class MemberService {
           connect: roles.map((role) => ({ id: role.id })),
         },
       },
-      include: {
-        memberRoles: true,
-        demoDayAdminScopes: true,
-      },
     });
 
-    return updated;
+    return await this.findMemberByUid(memberUid);
   }
 
   /**
@@ -1479,7 +2085,7 @@ export class MemberService {
    * Only directory-level admins should be allowed to call this from controller.
    */
   async updateMemberRolesAndHosts(memberUid: string, roleNames?: string[], hosts?: string[]): Promise<Member> {
-    return await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       const member = await tx.member.findUnique({
         where: { uid: memberUid },
         include: {
@@ -1566,26 +2172,8 @@ export class MemberService {
           );
         }
       }
-
-      // Reload and return the final member state
-      const finalMember = await tx.member.findUnique({
-        where: { uid: memberUid },
-        include: {
-          memberRoles: true,
-          demoDayAdminScopes: true,
-          demoDayParticipants: {
-            include: {
-              demoDay: true,
-            },
-          },
-        },
-      });
-
-      if (!finalMember) {
-        throw new NotFoundException('Member not found after update');
-      }
-
-      return finalMember;
     });
+
+    return await this.findMemberByUid(memberUid);
   }
 }

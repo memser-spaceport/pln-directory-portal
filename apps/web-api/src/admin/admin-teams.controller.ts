@@ -21,6 +21,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { AdminTeamsService } from './admin-teams.service';
 import { TriggerForceEnrichmentQueryDto, UploadTeamTiersQueryDto } from './schema/admin-teams';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
+import { TeamEnrichmentJudgeService } from '../team-enrichment/team-enrichment-judge.service';
 
 @ApiTags('Admin Teams')
 @Controller('v1/admin/teams')
@@ -28,7 +29,8 @@ import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.servic
 export class AdminTeamsController {
   constructor(
     private readonly adminTeamsService: AdminTeamsService,
-    private readonly teamEnrichmentService: TeamEnrichmentService
+    private readonly teamEnrichmentService: TeamEnrichmentService,
+    private readonly teamEnrichmentJudgeService: TeamEnrichmentJudgeService
   ) {}
 
   @Post('tiers/upload')
@@ -137,5 +139,89 @@ export class AdminTeamsController {
       ...result,
       message: `Force enrichment (mode=${query.mode}) triggered in background`,
     };
+  }
+
+  @Post('/:uid/trigger-force-logo-refetch')
+  @NoCache()
+  async triggerForceLogoRefetch(@Param('uid') uid: string) {
+    const { status } = await this.teamEnrichmentService.forceRefetchLogo(uid, 'manually');
+
+    if (status === 'not_found') {
+      throw new BadRequestException(`Team ${uid} not found`);
+    }
+    if (status === 'in_progress') {
+      return { success: false, message: `Logo refetch already in progress for team ${uid}` };
+    }
+    if (status === 'skipped_user_owned') {
+      return { success: false, message: `Team ${uid} logo is user-owned (ChangedByUser); skipping` };
+    }
+    if (status === 'no_source') {
+      return { success: false, message: `Team ${uid} has no website or linkedinHandler; cannot refetch logo` };
+    }
+
+    return { success: true, message: `Logo refetch triggered for team ${uid}` };
+  }
+
+  @Post('trigger-force-logo-refetch')
+  @NoCache()
+  async triggerForceLogoRefetchAll() {
+    const result = await this.teamEnrichmentService.forceRefetchLogoForAllTeams('manually');
+    return {
+      success: true,
+      ...result,
+      message: 'Logo refetch triggered in background',
+    };
+  }
+
+  @Post('/:uid/trigger-judgment')
+  @NoCache()
+  async triggerJudgment(@Param('uid') uid: string) {
+    const { status } = await this.teamEnrichmentJudgeService.judgeTeam(uid, 'manually');
+
+    if (status === 'not_found') {
+      throw new BadRequestException(`Team ${uid} not found`);
+    }
+    if (status === 'in_progress') {
+      return { success: false, message: `Judgment already in progress for team ${uid}` };
+    }
+    if (status === 'already_judged') {
+      return {
+        success: false,
+        message: `Team ${uid} already judged — use trigger-force-judgment to re-judge`,
+      };
+    }
+    if (status === 'not_eligible') {
+      return {
+        success: false,
+        message: `Team ${uid} is not eligible for judgment (must be Enriched with judgable fields)`,
+      };
+    }
+
+    return { success: true, message: `Judgment triggered for team ${uid}` };
+  }
+
+  @Post('trigger-judgment')
+  @NoCache()
+  async triggerJudgmentAll() {
+    const result = await this.teamEnrichmentJudgeService.triggerJudgmentForAllPending('manually');
+    return { success: true, ...result, message: 'Judgment triggered in background' };
+  }
+
+  @Post('/:uid/trigger-force-judgment')
+  @NoCache()
+  async triggerForceJudgment(@Param('uid') uid: string) {
+    const { status } = await this.teamEnrichmentJudgeService.forceJudgeTeam(uid, 'manually');
+
+    if (status === 'not_found') {
+      throw new BadRequestException(`Team ${uid} not found`);
+    }
+    if (status === 'in_progress') {
+      return { success: false, message: `Judgment already in progress for team ${uid}` };
+    }
+    if (status === 'not_eligible') {
+      return { success: false, message: `Team ${uid} has no judgable fields` };
+    }
+
+    return { success: true, message: `Force-judgment triggered for team ${uid}` };
   }
 }

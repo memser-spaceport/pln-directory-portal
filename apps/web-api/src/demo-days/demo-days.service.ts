@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { DemoDay, DemoDayParticipantStatus, DemoDayStatus, PushNotificationCategory } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { MemberApprovalsService } from '../member-approvals/member-approvals.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';

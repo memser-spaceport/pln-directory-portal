@@ -35,7 +35,12 @@ FIELDS TO POPULATE:
 
 3. contactMethod: Preferred method of contact. Could be an email address, Slack workspace/channel link, Discord server link/handle, or other contact method. Prefer email when found. Return exactly the value (e.g., "team@example.com", "https://slack.com/...", "discord.gg/...").
 
-4. linkedinHandler: LinkedIn company handle (e.g., "company/puma-ai")
+4. linkedinHandler: LinkedIn company handle (e.g., "company/puma-ai").
+   CRITICAL: Before returning a handle, verify the page actually exists on LinkedIn.
+   - Visit https://www.linkedin.com/company/<slug>/ and confirm it resolves to a real company page.
+   - If LinkedIn redirects to /company/unavailable/ or the page 404s, the handle is invalid — return null.
+   - Do NOT guess the slug from the company name; only return a handle you actually found in search results and confirmed resolves to a live page.
+   - If you cannot confirm the page exists, return null rather than a speculative handle.
 
 5. twitterHandler: Twitter/X handle without @ (e.g., "companyname")
 
@@ -78,36 +83,32 @@ SEARCH STRATEGY:
 7. Search for "[Company Name]" + about or team
 8. If the entity is part of a larger ecosystem (e.g., a DAO working group), search for it within that ecosystem's website
 
-CRITICAL: You MUST ALWAYS respond with valid JSON.
+OUTPUT FORMAT — STRICT REQUIREMENTS:
+- Your ENTIRE response MUST be a single JSON object that passes JSON.parse() as-is.
+- Start the response with "{" and end with "}". No leading/trailing whitespace.
+- NO prose, NO commentary, NO explanation, NO preamble, NO epilogue.
+- NO markdown code fences (do not wrap the JSON in \`\`\`json or \`\`\`).
+- All strings MUST be valid JSON strings (escape quotes and backslashes).
+- Nullable fields: use null (not the string "null", not "N/A", not missing).
+- All listed keys MUST be present — use null or [] when you have no value.
 
-OUTPUT FORMAT - Respond with ONLY this JSON (no markdown, no explanation):
+SCHEMA (all keys required, types must match exactly):
 {
-  "website": "https://..." or null,
-  "websiteOwnerName": "Name as shown on website" or null,
-  "websiteCandidates": ["https://url1", "https://url2", ...],
-  "blog": "https://..." or null,
-  "contactMethod": "email@example.com" or "https://slack.com/..." or "discord.gg/..." or null,
-  "linkedinHandler": "company/..." or null,
-  "twitterHandler": "handle" or null,
-  "telegramHandler": "handle" or null,
-  "shortDescription": "...",
-  "longDescription": "...",
-  "moreDetails": "Additional context about team, history, achievements...",
-  "industryTags": ["Tag1", "Tag2", ...],
-  "investmentFocus": ["Tag1", "Tag2", "Tag3", ...],
-  "confidence": {
-    "website": "high" | "medium" | "low",
-    "blog": "high" | "medium" | "low",
-    "contactMethod": "high" | "medium" | "low",
-    "twitterHandler": "high" | "medium" | "low",
-    "telegramHandler": "high" | "medium" | "low",
-    "shortDescription": "high" | "medium" | "low",
-    "longDescription": "high" | "medium" | "low",
-    "moreDetails": "high" | "medium" | "low",
-    "industryTags": "high" | "medium" | "low",
-    "investmentFocus": "high" | "medium" | "low"
-  },
-  "sources": ["url1", "url2", ...]
+  "website": string | null,
+  "websiteOwnerName": string | null,
+  "websiteCandidates": string[],
+  "blog": string | null,
+  "contactMethod": string | null,
+  "linkedinHandler": string | null,
+  "twitterHandler": string | null,
+  "telegramHandler": string | null,
+  "shortDescription": string | null,
+  "longDescription": string | null,
+  "moreDetails": string | null,
+  "industryTags": string[],
+  "investmentFocus": string[],
+  "confidence": { [field: string]: "high" | "medium" | "low" },
+  "sources": string[]
 }
 `;
 
@@ -116,18 +117,15 @@ export class TeamEnrichmentAiService {
   private readonly logger = new Logger(TeamEnrichmentAiService.name);
 
   private static readonly PROVIDER_ENV_VAR = 'TEAM_ENRICHMENT_AI_PROVIDER';
-  private static readonly MODEL_ENV_VAR = 'OPENAI_TEAM_ENRICHMENT_MODEL';
 
   constructor(private readonly aiProvider: AiProviderService) {}
 
   /**
-   * Returns the AI model name used for team enrichment (e.g., "gpt-4o", "gemini-2.5-flash").
+   * Returns the AI model name used for team enrichment
+   * (e.g., "gpt-4o", "gemini-2.5-flash", "claude-sonnet-4-6").
    */
   getModelName(): string {
-    return this.aiProvider.getModelName(
-      TeamEnrichmentAiService.PROVIDER_ENV_VAR,
-      TeamEnrichmentAiService.MODEL_ENV_VAR
-    );
+    return this.aiProvider.getModelName(TeamEnrichmentAiService.PROVIDER_ENV_VAR);
   }
 
   async enrichTeamViaAI(
@@ -149,7 +147,7 @@ export class TeamEnrichmentAiService {
       const tools = this.aiProvider.getWebSearchTool(providerEnvVar, { searchContextSize: 'high' });
 
       const { text } = await generateText({
-        model: this.aiProvider.getResponsesModel(providerEnvVar, TeamEnrichmentAiService.MODEL_ENV_VAR, {
+        model: this.aiProvider.getResponsesModel(providerEnvVar, {
           useSearchGrounding: true,
         }),
         system: TEAM_ENRICHMENT_SYSTEM_PROMPT,
@@ -160,7 +158,7 @@ export class TeamEnrichmentAiService {
       });
 
       if (process.env.DEBUG_ENRICHMENT === 'true') {
-        this.logger.debug(`AI response: ${text?.substring(0, 100)}...`);
+        this.logger.debug(`AI response (len=${text?.length ?? 0}): ${text?.substring(0, 500)}`);
       }
 
       return this.parseAIResponse(text, teamName);
@@ -223,15 +221,27 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       return this.getEmptyResponse();
     }
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      this.logger.warn(`No JSON found in AI response: ${text.substring(0, 100)}...`);
+    // The system prompt demands a raw JSON object. We only strip an optional
+    // ```json ... ``` fence as a pragmatic fallback — if the model still emits
+    // prose, the JSON.parse below will throw and we log the raw text.
+    const trimmed = text
+      .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '');
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch (e) {
+      this.logger.warn(
+        `Failed to parse AI response JSON for "${teamName}": ${e.message}. Raw response (len=${
+          text.length
+        }): ${text.substring(0, 500)}`
+      );
       return this.getEmptyResponse();
     }
 
     try {
-      const parsed = JSON.parse(jsonMatch[0]);
-
       const websiteCandidates: string[] = Array.isArray(parsed.websiteCandidates)
         ? parsed.websiteCandidates.map((u: string) => this.validateUrl(u)).filter(Boolean)
         : [];
@@ -280,7 +290,11 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         sources: Array.isArray(parsed.sources) ? parsed.sources : [],
       };
     } catch (e) {
-      this.logger.warn(`Failed to parse AI response JSON: ${e.message}`);
+      this.logger.warn(
+        `Failed to normalize AI response for "${teamName}": ${e.message}. Raw response (len=${
+          text.length
+        }): ${text.substring(0, 500)}`
+      );
       return this.getEmptyResponse();
     }
   }

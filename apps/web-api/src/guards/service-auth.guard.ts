@@ -4,7 +4,7 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException, Logge
  * Guard for service-to-service authentication using a shared secret.
  * Used by external services (e.g., NodeBB forum) to call internal APIs.
  *
- * Expects: Authorization: Basic <FORUM_SERVICE_SECRET>
+ * Expects: Authorization: Basic <INTERNAL_SERVICE_SECRET>
  */
 @Injectable()
 export class ServiceAuthGuard implements CanActivate {
@@ -12,9 +12,9 @@ export class ServiceAuthGuard implements CanActivate {
   private readonly serviceSecret: string | undefined;
 
   constructor() {
-    this.serviceSecret = process.env.FORUM_SERVICE_SECRET;
+    this.serviceSecret = process.env.INTERNAL_SERVICE_SECRET;
     if (!this.serviceSecret) {
-      this.logger.warn('FORUM_SERVICE_SECRET is not configured - service auth will fail');
+      this.logger.warn('INTERNAL_SERVICE_SECRET is not configured - service auth will fail');
     }
   }
 
@@ -32,7 +32,7 @@ export class ServiceAuthGuard implements CanActivate {
 
     const [type, token] = authHeader.split(' ');
 
-    if (type !== 'Basic') {
+    if (type !== 'Basic' && type !== 'Bearer') {
       throw new UnauthorizedException('Invalid authorization type');
     }
 

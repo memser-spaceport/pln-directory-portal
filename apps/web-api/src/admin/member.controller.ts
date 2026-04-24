@@ -41,7 +41,7 @@ export class MemberController {
   @Get(':uid')
   @UseGuards(DemoDayAdminAuthGuard)
   @NoCache()
-  async getMemberByUid(@Param('uid') uid: string): Promise<Member> {
+  async getMemberByUid(@Param('uid') uid: string): Promise<any> {
     return await this.memberService.findMemberByUid(uid);
   }
 
@@ -54,9 +54,12 @@ export class MemberController {
 
   @Post('/create')
   @UseGuards(AdminAuthGuard)
-  @UsePipes(ZodValidationPipe)
-  async addNewMember(@Body() body: CreateMemberDto): Promise<Member> {
-    return this.memberService.createMemberByAdmin(body);
+  async addNewMember(@Body() body: any): Promise<Member> {
+    return this.memberService.createMemberByAdmin(body as CreateMemberDto & {
+      roleCodes?: string[];
+      policyCodes?: string[];
+      permissionCodes?: string[];
+    });
   }
 
   @Patch('/edit/:uid')

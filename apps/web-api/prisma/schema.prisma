@@ -80,7 +80,9 @@ model Team {
   dealRedemptions         DealRedemption[] @relation("TeamDealRedemptions")
   dealUsages              DealUsage[]      @relation("TeamDealUsages")
 
-  articles Article[] @relation("TeamArticles")
+  articles      Article[]          @relation("TeamArticles")
+  jobOpenings   JobOpening[]
+  jobEnrichment TeamJobEnrichment?
 }
 
 enum AskStatus {
@@ -193,24 +195,74 @@ model Member {
   pushNotificationReadStatuses     PushNotificationReadStatus[]      @relation("PushNotificationReadStatuses")
   eventAssociations                PLEventAssociation[]
 
-  dealSubmissions         DealSubmission[]     @relation("MemberDealSubmissions")
-  reviewedDealSubmissions DealSubmission[]     @relation("MemberReviewedDealSubmissions")
-  dealIssues              DealIssue[]          @relation("MemberDealIssues")
-  resolvedDealIssues      DealIssue[]          @relation("MemberResolvedDealIssues")
-  dealRedemptions         DealRedemption[]     @relation("MemberDealRedemptions")
-  dealUsages              DealUsage[]          @relation("MemberDealUsages")
-  dealWhitelist           DealWhitelist?       @relation("MemberDealWhitelist")
-  dealRequests            DealRequest[]        @relation("MemberDealRequests")
-  articles                Article[]            @relation("MemberArticles")
-  articleStatistics       ArticleStatistic[]   @relation("MemberArticleStatistics")
-  articleWhitelist        ArticleWhitelist?    @relation("MemberArticleWhitelist")
-  articleRequests         ArticleRequest[]     @relation("MemberArticleRequests")
-  articleComments         ArticleComment[]     @relation("MemberArticleComments")
-  articleCommentLikes     ArticleCommentLike[] @relation("MemberArticleCommentLikes")
-  roleAssignments         RoleAssignment[]     @relation("MemberRoleAssignments")
-  roleAssignmentsGiven    RoleAssignment[]     @relation("MemberRoleAssignmentsGiven")
-  memberPermissions       MemberPermission[]   @relation("MemberDirectPermissions")
-  memberPermissionsGiven  MemberPermission[]   @relation("MemberDirectPermissionsGiven")
+  dealSubmissions           DealSubmission[]      @relation("MemberDealSubmissions")
+  reviewedDealSubmissions   DealSubmission[]      @relation("MemberReviewedDealSubmissions")
+  dealIssues                DealIssue[]           @relation("MemberDealIssues")
+  resolvedDealIssues        DealIssue[]           @relation("MemberResolvedDealIssues")
+  dealRedemptions           DealRedemption[]      @relation("MemberDealRedemptions")
+  dealUsages                DealUsage[]           @relation("MemberDealUsages")
+  dealWhitelist             DealWhitelist?        @relation("MemberDealWhitelist")
+  dealRequests              DealRequest[]         @relation("MemberDealRequests")
+  articles                  Article[]             @relation("MemberArticles")
+  articleStatistics         ArticleStatistic[]    @relation("MemberArticleStatistics")
+  articleWhitelist          ArticleWhitelist?     @relation("MemberArticleWhitelist")
+  articleRequests           ArticleRequest[]      @relation("MemberArticleRequests")
+  articleComments           ArticleComment[]      @relation("MemberArticleComments")
+  articleCommentLikes       ArticleCommentLike[]  @relation("MemberArticleCommentLikes")
+  roleAssignments           RoleAssignment[]      @relation("MemberRoleAssignments")
+  policyAssignmentsV2       PolicyAssignment[]    @relation("PolicyAssignmentMember")
+  policyAssignmentsV2Given  PolicyAssignment[]    @relation("PolicyAssignmentAssignedBy")
+  memberPermissionsV2       MemberPermissionV2[]  @relation("MemberPermissionV2Member")
+  memberPermissionsV2Given  MemberPermissionV2[]  @relation("MemberPermissionV2GrantedBy")
+  roleAssignmentsGiven      RoleAssignment[]      @relation("MemberRoleAssignmentsGiven")
+  memberPermissions         MemberPermission[]    @relation("MemberDirectPermissions")
+  memberPermissionsGiven    MemberPermission[]    @relation("MemberDirectPermissionsGiven")
+  memberApproval            MemberApproval?
+  requestedMemberApprovals  MemberApproval[]      @relation("MemberApprovalRequestedBy")
+  reviewedMemberApprovals   MemberApproval[]      @relation("MemberApprovalReviewedBy")
+  memberApprovalEvents      MemberApprovalEvent[] @relation("MemberApprovalEventMember")
+  actedMemberApprovalEvents MemberApprovalEvent[] @relation("MemberApprovalEventActor")
+}
+
+model MemberApproval {
+  uid            String              @id @default(cuid())
+  memberUid      String              @unique
+  state          MemberApprovalState @default(PENDING)
+  requestedByUid String?
+  reviewedByUid  String?
+  reason         String?
+  requestedAt    DateTime            @default(now())
+  reviewedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  member      Member                @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  requestedBy Member?               @relation("MemberApprovalRequestedBy", fields: [requestedByUid], references: [uid], onDelete: SetNull)
+  reviewedBy  Member?               @relation("MemberApprovalReviewedBy", fields: [reviewedByUid], references: [uid], onDelete: SetNull)
+  events      MemberApprovalEvent[]
+
+  @@index([state])
+  @@index([requestedByUid])
+  @@index([reviewedByUid])
+}
+
+model MemberApprovalEvent {
+  uid         String               @id @default(cuid())
+  approvalUid String
+  memberUid   String
+  fromState   MemberApprovalState?
+  toState     MemberApprovalState
+  actorUid    String?
+  reason      String?
+  createdAt   DateTime             @default(now())
+
+  approval MemberApproval @relation(fields: [approvalUid], references: [uid], onDelete: Cascade)
+  member   Member         @relation("MemberApprovalEventMember", fields: [memberUid], references: [uid], onDelete: Cascade)
+  actor    Member?        @relation("MemberApprovalEventActor", fields: [actorUid], references: [uid], onDelete: SetNull)
+
+  @@index([approvalUid])
+  @@index([memberUid])
+  @@index([actorUid])
 }
 
 model MemberRole {
@@ -225,6 +277,13 @@ model MemberRole {
 enum ParticipantType {
   MEMBER
   TEAM
+}
+
+enum MemberApprovalState {
+  PENDING
+  APPROVED
+  VERIFIED
+  REJECTED
 }
 
 enum ApprovalStatus {
@@ -668,6 +727,7 @@ model TeamFocusArea {
   ancestorArea    FocusArea @relation("teamAncestorFocusAreas", fields: [ancestorAreaUid], references: [uid], onDelete: Cascade)
 
   @@unique([focusAreaUid, teamUid, ancestorAreaUid])
+  @@index([teamUid])
 }
 
 model ProjectFocusArea {
@@ -1642,6 +1702,8 @@ model ArticleRequest {
 }
 
 model Article {
+  requiredPermissionCode String?
+
   id              Int                @id @default(autoincrement())
   uid             String             @unique @default(cuid())
   slugURL         String             @unique
@@ -1759,8 +1821,10 @@ model Permission {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  rolePermissions   RolePermission[]
-  memberPermissions MemberPermission[]
+  rolePermissions     RolePermission[]
+  memberPermissions   MemberPermission[]
+  policyPermissions   PolicyPermission[]
+  memberPermissionsV2 MemberPermissionV2[]
 }
 
 model RolePermission {
@@ -1841,4 +1905,151 @@ model TeamLogoVerificationResult {
   @@index([teamUid, createdAt])
   @@index([teamUid, provider])
   @@index([logoUid])
+}
+
+model Policy {
+  uid               String             @id @default(cuid())
+  code              String             @unique
+  name              String
+  description       String?
+  role              String
+  group             String
+  isSystem          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  policyPermissions PolicyPermission[]
+  assignments       PolicyAssignment[]
+}
+
+model PolicyPermission {
+  uid           String     @id @default(cuid())
+  policyUid     String
+  permissionUid String
+  createdAt     DateTime   @default(now())
+  policy        Policy     @relation(fields: [policyUid], references: [uid], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionUid], references: [uid], onDelete: Cascade)
+
+  @@unique([policyUid, permissionUid])
+  @@index([policyUid])
+  @@index([permissionUid])
+}
+
+model PolicyAssignment {
+  uid           String   @id @default(cuid())
+  memberUid     String
+  policyUid     String
+  assignedByUid String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  member        Member   @relation("PolicyAssignmentMember", fields: [memberUid], references: [uid], onDelete: Cascade)
+  policy        Policy   @relation(fields: [policyUid], references: [uid], onDelete: Cascade)
+  assignedBy    Member?  @relation("PolicyAssignmentAssignedBy", fields: [assignedByUid], references: [uid], onDelete: SetNull)
+
+  @@unique([memberUid, policyUid])
+  @@index([memberUid])
+  @@index([policyUid])
+}
+
+model MemberPermissionV2 {
+  uid           String     @id @default(cuid())
+  memberUid     String
+  permissionUid String
+  grantedByUid  String?
+  reason        String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  member        Member     @relation("MemberPermissionV2Member", fields: [memberUid], references: [uid], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionUid], references: [uid], onDelete: Cascade)
+  grantedBy     Member?    @relation("MemberPermissionV2GrantedBy", fields: [grantedByUid], references: [uid], onDelete: SetNull)
+
+  @@unique([memberUid, permissionUid])
+  @@index([memberUid])
+  @@index([permissionUid])
+}
+
+// ── Job Openings (TAP/WS3 Ingestion) ──────────────────────────────────────────
+
+enum JobOpeningStatus {
+  NEW
+  CONFIRMED
+  ROUTED_TO_WS4
+  STALE
+  CLOSED_DUPLICATE
+  CLOSED_INCORRECT_SIGNAL
+  CLOSED_NOT_HIRING_SIGNAL
+  CLOSED_ROLE_FILLED
+}
+
+enum DataDiscrepancyFlag {
+  DEAD_URL
+  EMPTY_BOARD
+  MULTI_BOARD
+}
+
+model JobOpening {
+  id              Int              @id @default(autoincrement())
+  uid             String           @unique @default(cuid())
+  status          JobOpeningStatus @default(NEW)
+  companyName     String
+  signalType      String
+  roleTitle       String
+  roleCategory    String?
+  department      String?
+  seniority       String?
+  urgency         String?
+  summary         String?
+  location        String?
+  ws4AskId        String?
+  detectionDate   DateTime
+  sourceType      String?
+  sourceLink      String?
+  detectionMethod String?
+  companyPriority String?
+  focusAreas      String?
+  subFocusAreas   String?
+  teamNotified    String?
+  sourceDate      DateTime?
+  postedDate      DateTime?
+  lastSeenLive    DateTime?
+  signalId        String?
+  canonicalKey    String           @unique
+  teamUid         String?
+  team            Team?            @relation(fields: [teamUid], references: [uid])
+  needsReview     String?
+  notes           String?
+  portfolio       String?
+  rawPayload      Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([status])
+  @@index([companyName])
+  @@index([detectionDate])
+  @@index([lastSeenLive])
+  @@index([sourceType])
+  @@index([teamUid])
+  @@index([roleCategory])
+  @@index([seniority])
+  @@index([location])
+  @@index([updatedAt])
+}
+
+model TeamJobEnrichment {
+  id                  Int                  @id @default(autoincrement())
+  uid                 String               @unique @default(cuid())
+  teamUid             String               @unique
+  team                Team                 @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  careersPageUrl      String?
+  openRolesCount      Int?
+  lastEnrichmentDate  DateTime?
+  enrichmentSource    String?
+  dataDiscrepancyFlag DataDiscrepancyFlag?
+  discrepancyDetails  String?
+  needsReview         Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([teamUid])
+  @@index([needsReview])
+  @@index([dataDiscrepancyFlag])
 }

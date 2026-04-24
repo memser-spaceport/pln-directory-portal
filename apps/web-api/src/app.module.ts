@@ -1,3 +1,4 @@
+import { AccessControlV2Module } from './access-control-v2/access-control-v2.module';
 import { ArticlesModule } from './articles/articles.module';
 import { BullModule } from '@nestjs/bull';
 import { CacheModule, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
@@ -61,13 +62,15 @@ import { ContactSupportModule } from './contact-support/contact-support.module';
 import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { TeamEnrichmentModule } from './team-enrichment/team-enrichment.module';
-import { DealsModule } from "./deals/deals.module";
-import { DealRequestsModule } from "./deal-requests/deal-requests.module";
-import { ArticleRequestsModule } from "./article-requests/article-requests.module";
+import { DealsModule } from './deals/deals.module';
+import { DealRequestsModule } from './deal-requests/deal-requests.module';
+import { ArticleRequestsModule } from './article-requests/article-requests.module';
+import { JobOpeningsModule } from './job-openings/job-openings.module';
 
 @Module({
   controllers: [AppController, MetricsController],
   imports: [
+    AccessControlV2Module,
     AnalyticsModule,
     ArticlesModule,
     ThrottlerModule.forRoot({
@@ -82,9 +85,9 @@ import { ArticleRequestsModule } from "./article-requests/article-requests.modul
       max: 100, // maximum number of items in cache
       tls: process.env.REDIS_WITH_TLS
         ? {
-          rejectUnauthorized: false,
-          requestCert: true,
-        }
+            rejectUnauthorized: false,
+            requestCert: true,
+          }
         : null,
     }),
     BullModule.forRoot({
@@ -148,7 +151,8 @@ import { ArticleRequestsModule } from "./article-requests/article-requests.modul
     TeamEnrichmentModule,
     DealsModule,
     DealRequestsModule,
-    ArticleRequestsModule
+    ArticleRequestsModule,
+    JobOpeningsModule,
   ],
   providers: [
     {
@@ -199,12 +203,12 @@ export class AppModule {
           path: 'v1/demo-days/:demoDayUidOrSlug/teams/:teamUid/fundraising-profile/one-pager/preview',
           method: RequestMethod.POST,
         },
-        { path: 'v1/admin/teams/tiers/upload', method: RequestMethod.POST },
+        { path: 'v1/admin/teams/tiers/upload', method: RequestMethod.POST }
       )
       .forRoutes(
         { path: '*', method: RequestMethod.POST },
         { path: '*', method: RequestMethod.PUT },
-        { path: '*', method: RequestMethod.PATCH },
+        { path: '*', method: RequestMethod.PATCH }
       );
 
     consumer
