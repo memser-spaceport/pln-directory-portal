@@ -36,7 +36,7 @@ interface MutationParams {
 }
 
 async function mutation({ uid, payload, authToken }: MutationParams) {
-  return await api.patch(`/v1/admin/members/edit/${uid}`, payload, {
+  return await api.patch(`/v1/admin/members/${uid}`, payload, {
     headers: {
       authorization: `Bearer ${authToken}`,
     },
