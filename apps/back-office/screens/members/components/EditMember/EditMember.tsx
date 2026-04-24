@@ -55,8 +55,6 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
   const { data } = useMember(uid, open);
   const { data: formOptions } = useMemberFormOptions(open);
 
-  console.log({ member });
-
   const onSubmit = useCallback(
     async (formData: TMemberForm) => {
       try {
@@ -80,7 +78,8 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
           city: string;
           skills: string[];
           teamOrProjectURL: string;
-          teamMemberRoles: { teamUid: string; role: string }[];
+          teamAndRoles: { teamUid: string; role: string }[];
+          projectContributions: unknown[];
           linkedinHandler: string;
           discordHandler: string;
           twitterHandler: string;
@@ -112,12 +111,11 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
           city: formData.city || '',
           skills: formData.skills.map((item) => item.value),
           teamOrProjectURL: formData.teamOrProjectURL,
-          teamMemberRoles: formData.teamsAndRoles.map((item) => {
-            return {
-              teamUid: item.team?.value || '',
-              role: item.role || '',
-            };
-          }),
+          teamAndRoles: formData.teamsAndRoles.map((item) => ({
+            teamUid: item.team?.value || '',
+            role: item.role || '',
+          })),
+          projectContributions: [],
           linkedinHandler: formData.linkedin,
           discordHandler: formData.discord,
           twitterHandler: formData.twitter,

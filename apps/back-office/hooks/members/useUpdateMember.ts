@@ -12,16 +12,17 @@ interface MutationParams {
     email: string;
     joinDate: string;
     bio: string;
+    aboutYou: string;
     country: string;
     region: string;
     city: string;
     skills: string[];
     teamOrProjectURL: string;
-    teamMemberRoles: {
+    teamAndRoles: {
       teamUid: string;
       role: string;
-      investmentTeam?: boolean;
     }[];
+    projectContributions: unknown[];
     linkedinHandler: string;
     discordHandler: string;
     twitterHandler: string;
@@ -36,7 +37,7 @@ interface MutationParams {
 }
 
 async function mutation({ uid, payload, authToken }: MutationParams) {
-  return await api.patch(`/v1/admin/members/${uid}`, payload, {
+  return await api.patch(`/v1/admin/members/${uid}`, { newData: payload }, {
     headers: {
       authorization: `Bearer ${authToken}`,
     },
