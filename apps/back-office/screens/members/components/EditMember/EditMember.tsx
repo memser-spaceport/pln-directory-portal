@@ -55,6 +55,8 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
   const { data } = useMember(uid, open);
   const { data: formOptions } = useMemberFormOptions(open);
 
+  console.log({ member });
+
   const onSubmit = useCallback(
     async (formData: TMemberForm) => {
       try {
@@ -191,11 +193,11 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
     const rbacExceptions = (member.permissions ?? []).map((p) => ({ label: p.code, value: p.code }));
 
     return {
-      memberState: memberStateStatus?.value,
+      memberStateStatus,
       rbacRoles,
       rbacGroups,
       rbacExceptions,
-      accessLevel: options.find((option) => option.value === data.accessLevel) ?? null,
+      accessLevel: options.find((option) => option.value === (data.accessLevel ?? member.accessLevel)) ?? null,
       image: null,
       name: data.name ?? '',
       email: data.email ?? '',
