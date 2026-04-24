@@ -38,3 +38,4 @@ export * from './demo-day-engagement-analytics';
 export * from './contact-support';
 export * from './community-affiliation';
 export * from './job-opening';
+export * from './team-job-enrichment';

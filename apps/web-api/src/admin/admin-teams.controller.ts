@@ -138,4 +138,36 @@ export class AdminTeamsController {
       message: `Force enrichment (mode=${query.mode}) triggered in background`,
     };
   }
+
+  @Post('/:uid/trigger-force-logo-refetch')
+  @NoCache()
+  async triggerForceLogoRefetch(@Param('uid') uid: string) {
+    const { status } = await this.teamEnrichmentService.forceRefetchLogo(uid, 'manually');
+
+    if (status === 'not_found') {
+      throw new BadRequestException(`Team ${uid} not found`);
+    }
+    if (status === 'in_progress') {
+      return { success: false, message: `Logo refetch already in progress for team ${uid}` };
+    }
+    if (status === 'skipped_user_owned') {
+      return { success: false, message: `Team ${uid} logo is user-owned (ChangedByUser); skipping` };
+    }
+    if (status === 'no_source') {
+      return { success: false, message: `Team ${uid} has no website or linkedinHandler; cannot refetch logo` };
+    }
+
+    return { success: true, message: `Logo refetch triggered for team ${uid}` };
+  }
+
+  @Post('trigger-force-logo-refetch')
+  @NoCache()
+  async triggerForceLogoRefetchAll() {
+    const result = await this.teamEnrichmentService.forceRefetchLogoForAllTeams('manually');
+    return {
+      success: true,
+      ...result,
+      message: 'Logo refetch triggered in background',
+    };
+  }
 }

@@ -80,8 +80,9 @@ model Team {
   dealRedemptions         DealRedemption[] @relation("TeamDealRedemptions")
   dealUsages              DealUsage[]      @relation("TeamDealUsages")
 
-  articles    Article[]    @relation("TeamArticles")
-  jobOpenings JobOpening[]
+  articles      Article[]          @relation("TeamArticles")
+  jobOpenings   JobOpening[]
+  jobEnrichment TeamJobEnrichment?
 }
 
 enum AskStatus {
@@ -281,6 +282,7 @@ enum ParticipantType {
 enum MemberApprovalState {
   PENDING
   APPROVED
+  VERIFIED
   REJECTED
 }
 
@@ -1978,6 +1980,12 @@ enum JobOpeningStatus {
   CLOSED_ROLE_FILLED
 }
 
+enum DataDiscrepancyFlag {
+  DEAD_URL
+  EMPTY_BOARD
+  MULTI_BOARD
+}
+
 model JobOpening {
   id              Int              @id @default(autoincrement())
   uid             String           @unique @default(cuid())
@@ -2024,4 +2032,24 @@ model JobOpening {
   @@index([seniority])
   @@index([location])
   @@index([updatedAt])
+}
+
+model TeamJobEnrichment {
+  id                  Int                  @id @default(autoincrement())
+  uid                 String               @unique @default(cuid())
+  teamUid             String               @unique
+  team                Team                 @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  careersPageUrl      String?
+  openRolesCount      Int?
+  lastEnrichmentDate  DateTime?
+  enrichmentSource    String?
+  dataDiscrepancyFlag DataDiscrepancyFlag?
+  discrepancyDetails  String?
+  needsReview         Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([teamUid])
+  @@index([needsReview])
+  @@index([dataDiscrepancyFlag])
 }

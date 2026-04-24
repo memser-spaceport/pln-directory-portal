@@ -201,7 +201,7 @@ export class AccessControlV2Service {
     const policy = await this.ensurePolicy(policyCode);
     if (assignedByUid) await this.ensureMember(assignedByUid);
 
-    return this.prisma.policyAssignment.upsert({
+    const assignment = await this.prisma.policyAssignment.upsert({
       where: {
         memberUid_policyUid: {
           memberUid: member.uid,
@@ -220,6 +220,26 @@ export class AccessControlV2Service {
         policy: true,
       },
     });
+
+    return {
+      uid: assignment.uid,
+      memberUid: assignment.memberUid,
+      policyUid: assignment.policyUid,
+      assignedByUid: assignment.assignedByUid,
+      createdAt: assignment.createdAt,
+      updatedAt: assignment.updatedAt,
+      policy: assignment.policy
+        ? {
+            uid: assignment.policy.uid,
+            code: assignment.policy.code,
+            name: assignment.policy.name,
+            description: assignment.policy.description,
+            role: assignment.policy.role ?? null,
+            group: assignment.policy.group ?? null,
+            isSystem: assignment.policy.isSystem,
+          }
+        : null,
+    };
   }
 
   async revokePolicy(memberUid: string, policyCode: string) {

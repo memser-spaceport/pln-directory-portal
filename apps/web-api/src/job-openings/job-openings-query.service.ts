@@ -217,6 +217,7 @@ export class JobOpeningsQueryService {
               location: true,
               sourceLink: true,
               postedDate: true,
+              detectionDate: true,
               updatedAt: true,
             },
             orderBy: { updatedAt: 'desc' },
@@ -273,6 +274,7 @@ export class JobOpeningsQueryService {
             applyUrl: role.sourceLink,
             lastUpdated: role.updatedAt.toISOString(),
             postedDate: role.postedDate ? role.postedDate.toISOString() : null,
+            detectionDate: role.detectionDate.toISOString(),
           })),
         };
       })

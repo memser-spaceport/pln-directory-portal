@@ -54,9 +54,12 @@ export class MemberController {
 
   @Post('/create')
   @UseGuards(AdminAuthGuard)
-  @UsePipes(ZodValidationPipe)
-  async addNewMember(@Body() body: CreateMemberDto): Promise<Member> {
-    return this.memberService.createMemberByAdmin(body);
+  async addNewMember(@Body() body: any): Promise<Member> {
+    return this.memberService.createMemberByAdmin(body as CreateMemberDto & {
+      roleCodes?: string[];
+      policyCodes?: string[];
+      permissionCodes?: string[];
+    });
   }
 
   @Patch('/edit/:uid')

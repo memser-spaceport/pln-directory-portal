@@ -32,7 +32,7 @@ export class ServiceAuthGuard implements CanActivate {
 
     const [type, token] = authHeader.split(' ');
 
-    if (type !== 'Basic') {
+    if (type !== 'Basic' && type !== 'Bearer') {
       throw new UnauthorizedException('Invalid authorization type');
     }
 
