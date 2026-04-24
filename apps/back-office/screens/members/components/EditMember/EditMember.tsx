@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { MemberForm } from '../MemberForm/MemberForm';
@@ -14,10 +14,8 @@ import { useMemberFormOptions } from '../../../../hooks/members/useMemberFormOpt
 import { toast } from 'react-toastify';
 import { useUpdateMember } from '../../../../hooks/members/useUpdateMember';
 import { INVESTOR_PROFILE_CONSTANTS } from '../../../../utils/constants';
-import { useAssignPolicy } from '../../../../hooks/access-control/useAssignPolicy';
-import { useRevokePolicy } from '../../../../hooks/access-control/useRevokePolicy';
-import { useGrantDirectPermissionV2 } from '../../../../hooks/access-control/useGrantDirectPermissionV2';
 import { usePoliciesList } from '../../../../hooks/access-control/usePoliciesList';
+import { useRbacRoles } from '../../../../hooks/access-control/useRbacRoles';
 
 const fade = {
   hidden: { opacity: 0 },
@@ -52,16 +50,10 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
   }, []);
 
   const { mutateAsync } = useUpdateMember();
-  const { mutateAsync: assignPolicy } = useAssignPolicy();
-  const { mutateAsync: revokePolicy } = useRevokePolicy();
-  const { mutateAsync: grantPermission } = useGrantDirectPermissionV2();
   const { data: policiesData } = usePoliciesList({ authToken });
+  const { data: rbacRolesData } = useRbacRoles({ authToken });
   const { data } = useMember(uid, open);
   const { data: formOptions } = useMemberFormOptions(open);
-
-  // Capture initial RBAC state for diff on save
-  const initialPolicyCodesRef = useRef<string[]>([]);
-  const initialExceptionCodesRef = useRef<string[]>([]);
 
   const onSubmit = useCallback(
     async (formData: TMemberForm) => {
@@ -93,6 +85,9 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
           telegramHandler: string;
           officeHours: string;
           githubHandler: string;
+          roleCodes?: string[];
+          policyCodes?: string[];
+          permissionCodes?: string[];
           investorProfile?: {
             investmentFocus: string[];
             typicalCheckSize: number;
@@ -145,46 +140,20 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
           };
         }
 
+        const isApproved = formData.memberStateStatus?.value === 'Approved';
+        const roleNameToCode = new Map((rbacRolesData ?? []).map((r) => [r.name, r.code]));
+        const roleValues = isApproved ? (formData.rbacRoles ?? []).map((r) => r.value) : [];
+        const groupValues = isApproved ? (formData.rbacGroups ?? []).map((g) => g.value) : [];
+        const matchedPolicies = (policiesData ?? []).filter(
+          (p) => roleValues.includes(p.role) && groupValues.includes(p.group)
+        );
+        payload.roleCodes = roleValues.map((name) => roleNameToCode.get(name)).filter(Boolean) as string[];
+        payload.policyCodes = matchedPolicies.map((p) => p.code);
+        payload.permissionCodes = isApproved ? (formData.rbacExceptions ?? []).map((e) => e.value) : [];
+
         const res = await mutateAsync({ uid, payload, authToken });
 
         if (res?.data) {
-          const isApproved = formData.memberStateStatus?.value === 'Approved';
-
-          if (isApproved) {
-            const roleValues = (formData.rbacRoles ?? []).map((r) => r.value);
-            const groupValues = (formData.rbacGroups ?? []).map((g) => g.value);
-            const newMatchedPolicies = (policiesData ?? []).filter(
-              (p) => roleValues.includes(p.role) && groupValues.includes(p.group)
-            );
-            const newPolicyCodes = newMatchedPolicies.map((p) => p.code);
-            const newExceptionCodes = (formData.rbacExceptions ?? []).map((e) => e.value);
-
-            const policiesToAssign = newPolicyCodes.filter(
-              (c) => !initialPolicyCodesRef.current.includes(c)
-            );
-            const policiesToRevoke = initialPolicyCodesRef.current.filter(
-              (c) => !newPolicyCodes.includes(c)
-            );
-            const exceptionsToGrant = newExceptionCodes.filter(
-              (c) => !initialExceptionCodesRef.current.includes(c)
-            );
-
-            await Promise.allSettled([
-              ...policiesToAssign.map((c) => assignPolicy({ memberUid: uid, policyCode: c, authToken })),
-              ...policiesToRevoke.map((c) => revokePolicy({ memberUid: uid, policyCode: c, authToken })),
-              ...exceptionsToGrant.map((c) =>
-                grantPermission({ memberUid: uid, permissionCode: c, authToken })
-              ),
-            ]);
-          } else {
-            // Status changed to non-Approved — revoke all existing policies
-            await Promise.allSettled(
-              initialPolicyCodesRef.current.map((c) =>
-                revokePolicy({ memberUid: uid, policyCode: c, authToken })
-              )
-            );
-          }
-
           setOpen(false);
           toast.success('Member updated successfully!');
         } else {
@@ -194,7 +163,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
         toast.error(e?.response?.data?.message ?? 'Failed to update member. Please try again.');
       }
     },
-    [mutateAsync, assignPolicy, revokePolicy, grantPermission, policiesData, uid, authToken]
+    [mutateAsync, rbacRolesData, policiesData, uid, authToken]
   );
 
   const initialData = useMemo(() => {
@@ -217,10 +186,6 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
     const rbacGroups = groupValues.map((g) => ({ label: g, value: g }));
 
     const rbacExceptions = (member.permissions ?? []).map((p) => ({ label: p.code, value: p.code }));
-
-    // Capture initial state for diff-based save
-    initialPolicyCodesRef.current = memberPolicyCodes;
-    initialExceptionCodesRef.current = (member.permissions ?? []).map((p) => p.code);
 
     return {
       memberStateStatus,

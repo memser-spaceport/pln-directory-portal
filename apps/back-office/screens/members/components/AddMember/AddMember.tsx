@@ -8,8 +8,7 @@ import { PlusIcon } from '../icons';
 import { TMemberForm } from '../../types/member';
 import { saveRegistrationImage } from '../../../../utils/services/member';
 import { useAddMember } from '../../../../hooks/members/useAddMember';
-import { useAssignPolicy } from '../../../../hooks/access-control/useAssignPolicy';
-import { useGrantDirectPermissionV2 } from '../../../../hooks/access-control/useGrantDirectPermissionV2';
+import { useRbacRoles } from '../../../../hooks/access-control/useRbacRoles';
 import { usePoliciesList } from '../../../../hooks/access-control/usePoliciesList';
 import { toast } from 'react-toastify';
 
@@ -39,8 +38,7 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
   }, [onClick]);
 
   const { mutateAsync } = useAddMember();
-  const { mutateAsync: assignPolicy } = useAssignPolicy();
-  const { mutateAsync: grantPermission } = useGrantDirectPermissionV2();
+  const { data: rbacRolesData } = useRbacRoles({ authToken });
   const { data: policiesData } = usePoliciesList({ authToken });
 
   const onSubmit = useCallback(
@@ -52,6 +50,14 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
           const imgResponse = await saveRegistrationImage(formData.image);
           image = imgResponse?.image.uid;
         }
+
+        const isApproved = formData.memberStateStatus?.value === 'Approved';
+        const roleNameToCode = new Map((rbacRolesData ?? []).map((r) => [r.name, r.code]));
+        const roleValues = (formData.rbacRoles ?? []).map((r) => r.value);
+        const groupValues = (formData.rbacGroups ?? []).map((g) => g.value);
+        const matchedPolicies = (policiesData ?? []).filter(
+          (p) => roleValues.includes(p.role) && groupValues.includes(p.group)
+        );
 
         const payload = {
           imageUid: image ?? '',
@@ -92,30 +98,16 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
             ),
             type: formData.investorProfile.type?.value || '',
           },
+          ...(isApproved && {
+            roleCodes: roleValues.map((name) => roleNameToCode.get(name)).filter(Boolean) as string[],
+            policyCodes: matchedPolicies.map((p) => p.code),
+            permissionCodes: (formData.rbacExceptions ?? []).map((e) => e.value),
+          }),
         };
 
         const res = await mutateAsync({ payload, authToken });
 
         if (res?.data) {
-          const memberUid = res.data.uid;
-          const isApproved = formData.memberStateStatus?.value === 'Approved';
-
-          if (isApproved && memberUid) {
-            const roleValues = (formData.rbacRoles ?? []).map((r) => r.value);
-            const groupValues = (formData.rbacGroups ?? []).map((g) => g.value);
-
-            const matchedPolicies = (policiesData ?? []).filter(
-              (p) => roleValues.includes(p.role) && groupValues.includes(p.group)
-            );
-
-            await Promise.allSettled([
-              ...matchedPolicies.map((p) => assignPolicy({ memberUid, policyCode: p.code, authToken })),
-              ...(formData.rbacExceptions ?? []).map((e) =>
-                grantPermission({ memberUid, permissionCode: e.value, authToken })
-              ),
-            ]);
-          }
-
           setOpen(false);
           toast.success('New member added successfully!');
         } else {
@@ -125,7 +117,7 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
         toast.error(e?.response?.data?.message ?? 'Failed to add new member. Please try again.');
       }
     },
-    [mutateAsync, assignPolicy, grantPermission, policiesData, authToken]
+    [mutateAsync, rbacRolesData, policiesData, authToken]
   );
 
   return (
