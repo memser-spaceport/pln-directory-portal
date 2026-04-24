@@ -44,4 +44,13 @@ export const memberFormSchema = yup.object({
   github: yup.string().defined(),
   telegram: yup.string().defined(),
   officeHours: yup.string().defined(),
+  memberStateStatus: yup
+    .object({ label: yup.string().required(), value: yup.string().required() })
+    .nullable()
+    .optional(),
+  rbacPolicies: yup
+    .array()
+    .of(yup.object({ label: yup.string().required(), value: yup.string().required() }))
+    .optional(),
+  rbacExceptions: yup.array().of(yup.object({ label: yup.string(), value: yup.string() })).optional(),
 });

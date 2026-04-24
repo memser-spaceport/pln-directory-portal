@@ -11,7 +11,9 @@ export type Member = {
   teamOrProjectURL: string;
   uid: string;
   signUpSource: string | null;
-  roles?: string[];
+  roles?: { uid: string; code: string; name: string; description?: string | null }[];
+  policies?: { uid: string; code: string; name: string; description?: string | null }[];
+  permissions?: { uid: string; code: string; description?: string | null }[];
   memberRoles?: { name: string }[];
   demoDayHosts?: string[];
   demoDayAdminScopes?: {
@@ -20,9 +22,13 @@ export type Member = {
     scopeValue: string;
     config: unknown | null;
   }[];
+  memberState?: 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
 };
 
 export type TMemberForm = {
+  memberStateStatus?: { label: string; value: 'Pending' | 'Verified' | 'Approved' | 'Rejected' } | null;
+  rbacPolicies?: { label: string; value: string }[];
+  rbacExceptions?: { label: string; value: string }[];
   accessLevel: { label?: string; value?: string } | null;
   image: File | null;
   name: string;

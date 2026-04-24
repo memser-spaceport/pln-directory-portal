@@ -5,10 +5,10 @@ import { EditMember } from '../EditMember/EditMember';
 
 import s from './EditCell.module.scss';
 
-export const EditCell = ({ member, authToken }: { member: Member; authToken: string }) => {
+export const EditCell = ({ member, authToken, showRbacSection }: { member: Member; authToken: string; showRbacSection?: boolean }) => {
   return (
     <div className={s.root}>
-      <EditMember className={s.btn} uid={member.uid} authToken={authToken} />
+      <EditMember className={s.btn} member={member} authToken={authToken} showRbacSection={showRbacSection} />
     </div>
   );
 };
