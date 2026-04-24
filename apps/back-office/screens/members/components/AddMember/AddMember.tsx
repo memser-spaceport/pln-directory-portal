@@ -44,6 +44,11 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
   const onSubmit = useCallback(
     async (formData: TMemberForm) => {
       try {
+        if (!policiesData || !rbacRolesData) {
+          toast.error('RBAC options still loading — try again in a moment.');
+          return;
+        }
+
         let image;
 
         if (formData.image) {
@@ -52,12 +57,28 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
         }
 
         const isApproved = formData.memberStateStatus?.value === 'Approved';
-        const roleNameToCode = new Map((rbacRolesData ?? []).map((r) => [r.name, r.code]));
-        const roleValues = isApproved ? (formData.rbacRoles ?? []).map((r) => r.value) : [];
-        const groupValues = isApproved ? (formData.rbacGroups ?? []).map((g) => g.value) : [];
-        const matchedPolicies = (policiesData ?? []).filter(
-          (p) => roleValues.includes(p.role) && groupValues.includes(p.group)
-        );
+        const selectedPolicies = isApproved ? formData.rbacPolicies ?? [] : [];
+
+        const policyByCode = new Map(policiesData.map((p) => [p.code, p]));
+        const roleNameToCode = new Map(rbacRolesData.map((r) => [r.name, r.code]));
+
+        const selectedRoleNames = new Set<string>();
+        for (const p of selectedPolicies) {
+          const policy = policyByCode.get(p.value);
+          if (policy?.role) selectedRoleNames.add(policy.role);
+        }
+
+        const roleCodes: string[] = [];
+        const unresolvedRoleNames: string[] = [];
+        for (const name of selectedRoleNames) {
+          const code = roleNameToCode.get(name);
+          if (code) roleCodes.push(code);
+          else unresolvedRoleNames.push(name);
+        }
+        if (unresolvedRoleNames.length > 0) {
+          // eslint-disable-next-line no-console
+          console.warn('[RBAC] Could not resolve roleCodes for role names:', unresolvedRoleNames);
+        }
 
         const payload = {
           imageUid: image ?? '',
@@ -99,8 +120,8 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
             type: formData.investorProfile.type?.value || '',
           },
           memberState: formData.memberStateStatus?.value?.toUpperCase(),
-          roleCodes: roleValues.map((name) => roleNameToCode.get(name)).filter(Boolean) as string[],
-          policyCodes: matchedPolicies.map((p) => p.code),
+          roleCodes,
+          policyCodes: selectedPolicies.map((p) => p.value),
           permissionCodes: isApproved ? (formData.rbacExceptions ?? []).map((e) => e.value) : [],
         };
 

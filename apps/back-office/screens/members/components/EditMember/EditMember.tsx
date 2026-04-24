@@ -58,6 +58,11 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
   const onSubmit = useCallback(
     async (formData: TMemberForm) => {
       try {
+        if (!policiesData || !rbacRolesData) {
+          toast.error('RBAC options still loading — try again in a moment.');
+          return;
+        }
+
         let imageUid: string | undefined;
 
         if (formData.image) {
@@ -124,32 +129,49 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
           githubHandler: formData.github,
         };
 
-        if (formData.investorProfile) {
-          payload.investorProfile = {
-            investmentFocus: formData.investorProfile.investmentFocus.map(
-              (item: { label: string; value: string }) => item.value
-            ),
-            typicalCheckSize: Number(formData.investorProfile.typicalCheckSize),
-            secRulesAccepted: !!formData.investorProfile.secRulesAccepted,
-            investInStartupStages: formData.investorProfile.investInStartupStages.map(
-              (item: { label: string; value: string }) => item.value
-            ),
-            investInFundTypes: formData.investorProfile.investInFundTypes.map(
-              (item: { label: string; value: string }) => item.value
-            ),
-            type: formData.investorProfile.type?.value || '',
-          };
-        }
+        // if (formData.investorProfile) {
+        //   payload.investorProfile = {
+        //     investmentFocus: formData.investorProfile.investmentFocus.map(
+        //       (item: { label: string; value: string }) => item.value
+        //     ),
+        //     typicalCheckSize: Number(formData.investorProfile.typicalCheckSize),
+        //     secRulesAccepted: !!formData.investorProfile.secRulesAccepted,
+        //     investInStartupStages: formData.investorProfile.investInStartupStages.map(
+        //       (item: { label: string; value: string }) => item.value
+        //     ),
+        //     investInFundTypes: formData.investorProfile.investInFundTypes.map(
+        //       (item: { label: string; value: string }) => item.value
+        //     ),
+        //     type: formData.investorProfile.type?.value || '',
+        //   };
+        // }
 
         const isApproved = formData.memberStateStatus?.value === 'Approved';
-        const roleNameToCode = new Map((rbacRolesData ?? []).map((r) => [r.name, r.code]));
-        const roleValues = isApproved ? (formData.rbacRoles ?? []).map((r) => r.value) : [];
-        const groupValues = isApproved ? (formData.rbacGroups ?? []).map((g) => g.value) : [];
-        const matchedPolicies = (policiesData ?? []).filter(
-          (p) => roleValues.includes(p.role) && groupValues.includes(p.group)
-        );
-        payload.roleCodes = roleValues.map((name) => roleNameToCode.get(name)).filter(Boolean) as string[];
-        payload.policyCodes = matchedPolicies.map((p) => p.code);
+        const selectedPolicies = isApproved ? formData.rbacPolicies ?? [] : [];
+
+        const policyByCode = new Map(policiesData.map((p) => [p.code, p]));
+        const roleNameToCode = new Map(rbacRolesData.map((r) => [r.name, r.code]));
+
+        const selectedRoleNames = new Set<string>();
+        for (const p of selectedPolicies) {
+          const policy = policyByCode.get(p.value);
+          if (policy?.role) selectedRoleNames.add(policy.role);
+        }
+
+        const roleCodes: string[] = [];
+        const unresolvedRoleNames: string[] = [];
+        for (const name of selectedRoleNames) {
+          const code = roleNameToCode.get(name);
+          if (code) roleCodes.push(code);
+          else unresolvedRoleNames.push(name);
+        }
+        if (unresolvedRoleNames.length > 0) {
+          // eslint-disable-next-line no-console
+          console.warn('[RBAC] Could not resolve roleCodes for role names:', unresolvedRoleNames);
+        }
+
+        payload.roleCodes = roleCodes;
+        payload.policyCodes = selectedPolicies.map((p) => p.value);
         payload.permissionCodes = isApproved ? (formData.rbacExceptions ?? []).map((e) => e.value) : [];
 
         payload.memberState = formData.memberStateStatus?.value?.toUpperCase();
@@ -178,22 +200,21 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
     const stateValue = MEMBER_STATE_MAP[member.memberState ?? ''] ?? 'Pending';
     const memberStateStatus = { label: stateValue, value: stateValue } as TMemberForm['memberStateStatus'];
 
-    // RBAC pre-population from the list member data
-    const memberPolicyCodes = (member.policies ?? []).map((p) => p.code);
-    const assignedPolicies = (policiesData ?? []).filter((p) => memberPolicyCodes.includes(p.code));
-
-    const roleValues = [...new Set(assignedPolicies.map((p) => p.role).filter(Boolean))].sort();
-    const rbacRoles = roleValues.map((r) => ({ label: r, value: r }));
-
-    const groupValues = [...new Set(assignedPolicies.map((p) => p.group))];
-    const rbacGroups = groupValues.map((g) => ({ label: g, value: g }));
+    // RBAC pre-population — map member.policies directly to rbacPolicies.
+    // Prefer policiesData.name for the chip label (authoritative) and fall
+    // back to member.policies[].name when a code is not in the current
+    // policiesData fetch so stale codes survive save.
+    const policyByCode = new Map((policiesData ?? []).map((p) => [p.code, p]));
+    const rbacPolicies = (member.policies ?? []).map((mp) => ({
+      label: policyByCode.get(mp.code)?.name ?? mp.name ?? mp.code,
+      value: mp.code,
+    }));
 
     const rbacExceptions = (member.permissions ?? []).map((p) => ({ label: p.code, value: p.code }));
 
     return {
       memberStateStatus,
-      rbacRoles,
-      rbacGroups,
+      rbacPolicies,
       rbacExceptions,
       accessLevel: options.find((option) => option.value === (data.accessLevel ?? member.accessLevel)) ?? null,
       image: null,

@@ -27,8 +27,7 @@ export type Member = {
 
 export type TMemberForm = {
   memberStateStatus?: { label: string; value: 'Pending' | 'Verified' | 'Approved' | 'Rejected' } | null;
-  rbacRoles?: { label: string; value: string }[];
-  rbacGroups?: { label: string; value: string }[];
+  rbacPolicies?: { label: string; value: string }[];
   rbacExceptions?: { label: string; value: string }[];
   accessLevel: { label?: string; value?: string } | null;
   image: File | null;

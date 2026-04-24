@@ -10,6 +10,7 @@ import { ProfileLocationInput } from './ProfileLocationInput';
 import { AdditionalDetails } from './AdditionalDetails/AdditionalDetails';
 import { ContactDetails } from './ContactDetails/ContactDetails';
 import { RbacSection } from './RbacSection/RbacSection';
+import { PolicyOption } from './RbacSection/PolicyMultiSelect/PolicyMultiSelect';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { memberFormSchema } from './helpers';
 import { useRbacPermissions } from '../../../../hooks/access-control/useRbacPermissions';
@@ -29,8 +30,7 @@ interface Props {
 export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existingImageUrl, authToken, showRbacSection = false }: Props) => {
   const emptyDefaults: TMemberForm = {
     memberStateStatus: null,
-    rbacRoles: [],
-    rbacGroups: [],
+    rbacPolicies: [],
     rbacExceptions: [],
     accessLevel: options.find((option) => option.value === 'L4') ?? null,
     image: null,
@@ -81,11 +81,11 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
   const { data: rbacPermissionsData, isLoading: permsLoading } = useRbacPermissions({ authToken });
   const isLoadingOptions = policiesLoading || permsLoading;
 
-  const rolesOptions = useMemo(
+  const policyOptions = useMemo<PolicyOption[]>(
     () =>
-      [...new Set((policiesData ?? []).map((p) => p.role).filter(Boolean))]
-        .sort()
-        .map((r) => ({ label: r, value: r })),
+      (policiesData ?? [])
+        .filter((p) => p.role && p.group)
+        .map((p) => ({ label: p.name, value: p.code, role: p.role, group: p.group })),
     [policiesData]
   );
 
@@ -118,10 +118,9 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
           >
             {showRbacSection ? (
               <RbacSection
-                rolesOptions={rolesOptions}
+                policyOptions={policyOptions}
                 exceptionsOptions={exceptionsOptions}
                 isLoadingOptions={isLoadingOptions}
-                policiesData={policiesData ?? []}
               />
             ) : (
               <StatusSelector isAddNew={!initialData} />

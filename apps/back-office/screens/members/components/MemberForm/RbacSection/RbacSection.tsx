@@ -1,11 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import Select, { GroupBase, MultiValue, OptionsOrGroups, SingleValue } from 'react-select';
 import { useFormContext } from 'react-hook-form';
 import clsx from 'clsx';
 
 import s from './RbacSection.module.scss';
 import { TMemberForm } from '../../../types/member';
-import { Policy } from '../../../../../hooks/access-control/usePoliciesList';
+import { PolicyMultiSelect, PolicyOption, PolicySelection } from './PolicyMultiSelect/PolicyMultiSelect';
 
 interface SelectOption {
   label: string;
@@ -67,31 +67,20 @@ const multiSelectStyles = (isDisabled: boolean) => ({
   placeholder: (base: object) => ({ ...base, color: '#94a3b8', fontSize: 14 }),
 });
 
-interface RbacMultiSelectProps {
-  name: 'rbacRoles' | 'rbacGroups' | 'rbacExceptions';
+interface ExceptionsMultiSelectProps {
   label: string;
   placeholder: string;
   options: OptionsOrGroups<SelectOption, GroupBase<SelectOption>>;
   isDisabled?: boolean;
-  required?: boolean;
-  onChange?: (selected: SelectOption[]) => void;
 }
 
-const RbacMultiSelect = ({
-  name,
-  label,
-  placeholder,
-  options,
-  isDisabled = false,
-  required = false,
-  onChange,
-}: RbacMultiSelectProps) => {
+const ExceptionsMultiSelect = ({ label, placeholder, options, isDisabled = false }: ExceptionsMultiSelectProps) => {
   const { watch, setValue } = useFormContext<TMemberForm>();
-  const value = (watch(name) ?? []) as SelectOption[];
+  const value = (watch('rbacExceptions') ?? []) as SelectOption[];
 
   return (
     <div className={s.field}>
-      {label && <div className={clsx(s.label, { [s.required]: required })}>{label}</div>}
+      {label && <div className={s.label}>{label}</div>}
       <Select
         isMulti
         options={options}
@@ -101,12 +90,7 @@ const RbacMultiSelect = ({
         styles={multiSelectStyles(isDisabled)}
         menuPortalTarget={document.body}
         onChange={(selected: MultiValue<SelectOption>) => {
-          const next = selected as SelectOption[];
-          if (onChange) {
-            onChange(next);
-          } else {
-            setValue(name, next, { shouldDirty: true });
-          }
+          setValue('rbacExceptions', selected as SelectOption[], { shouldDirty: true });
         }}
       />
     </div>
@@ -114,83 +98,28 @@ const RbacMultiSelect = ({
 };
 
 interface RbacSectionProps {
-  rolesOptions: SelectOption[];
+  policyOptions: PolicyOption[];
   exceptionsOptions: SelectOption[];
   isLoadingOptions: boolean;
-  policiesData?: Policy[];
 }
 
-export const RbacSection = ({
-  rolesOptions,
-  exceptionsOptions,
-  isLoadingOptions,
-  policiesData,
-}: RbacSectionProps) => {
-  const { watch, setValue, getValues } = useFormContext<TMemberForm>();
+export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions }: RbacSectionProps) => {
+  const { watch, setValue } = useFormContext<TMemberForm>();
+  const rbacPolicies = (watch('rbacPolicies') ?? []) as PolicySelection[];
   const rbacExceptions = (watch('rbacExceptions') ?? []) as SelectOption[];
   const memberStateStatus = watch('memberStateStatus');
   const isApproved = memberStateStatus?.value === 'Approved';
-  const selectedRoles = (watch('rbacRoles') ?? []) as SelectOption[];
-
-  const groupedGroupOptions = useMemo(() => {
-    const targetRoles =
-      selectedRoles.length > 0 ? new Set(selectedRoles.map((r) => r.value)) : null;
-    const map = new Map<string, Set<string>>();
-    for (const p of policiesData ?? []) {
-      if (!p.role || !p.group) continue;
-      if (targetRoles && !targetRoles.has(p.role)) continue;
-      if (!map.has(p.role)) map.set(p.role, new Set());
-      map.get(p.role)!.add(p.group);
-    }
-    return [...map.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([role, groups]) => ({
-        label: role,
-        options: [...groups].sort().map((g) => ({ label: g, value: g })),
-      }));
-  }, [selectedRoles, policiesData]);
-
-  const [removedGroupWarnings, setRemovedGroupWarnings] = useState<string[]>([]);
 
   const handleMemberStateChange = (opt: SingleValue<SelectOption>) => {
     setValue('memberStateStatus', opt as TMemberForm['memberStateStatus'], { shouldDirty: true });
     if (opt?.value !== 'Approved') {
-      setValue('rbacRoles', [], { shouldDirty: true });
-      setValue('rbacGroups', [], { shouldDirty: true });
+      setValue('rbacPolicies', [], { shouldDirty: true });
       setValue('rbacExceptions', [], { shouldDirty: true });
-      setRemovedGroupWarnings([]);
     }
   };
 
-  const handleRolesChange = (newRoles: SelectOption[]) => {
-    setValue('rbacRoles', newRoles, { shouldDirty: true });
-
-    if (!policiesData || newRoles.length === 0) {
-      setRemovedGroupWarnings([]);
-      return;
-    }
-
-    const newRoleValues = newRoles.map((r) => r.value);
-    const currentGroups = (getValues('rbacGroups') ?? []) as SelectOption[];
-
-    const validGroups: SelectOption[] = [];
-    const removedGroups: SelectOption[] = [];
-
-    for (const g of currentGroups) {
-      const isValid = policiesData.some((p) => newRoleValues.includes(p.role) && p.group === g.value);
-      if (isValid) {
-        validGroups.push(g);
-      } else {
-        removedGroups.push(g);
-      }
-    }
-
-    if (removedGroups.length > 0) {
-      setValue('rbacGroups', validGroups, { shouldDirty: true });
-      setRemovedGroupWarnings(removedGroups.map((g) => `${g.label} group removed — not available for selected roles`));
-    } else {
-      setRemovedGroupWarnings([]);
-    }
+  const handlePoliciesChange = (next: PolicySelection[]) => {
+    setValue('rbacPolicies', next, { shouldDirty: true });
   };
 
   return (
@@ -206,39 +135,28 @@ export const RbacSection = ({
           isClearable={false}
           menuPortalTarget={document.body}
         />
-        <p className={s.hint}>Roles and groups can only be assigned to Approved members.</p>
+        <p className={s.hint}>Policies can only be assigned to Approved members.</p>
       </div>
 
-      <RbacMultiSelect
-        name="rbacRoles"
-        label="Roles"
-        placeholder="Select roles"
-        options={rolesOptions}
-        isDisabled={isLoadingOptions || !isApproved}
-        required={isApproved}
-        onChange={handleRolesChange}
-      />
-
       <div className={s.field}>
-        <RbacMultiSelect
-          name="rbacGroups"
-          label="Groups"
-          placeholder="Select groups"
-          options={groupedGroupOptions}
-          isDisabled={isLoadingOptions || !isApproved}
-          required={isApproved}
+        <div id="policy-field-label" className={clsx(s.label, { [s.required]: isApproved })}>
+          Policy
+        </div>
+        <PolicyMultiSelect
+          options={policyOptions}
+          value={rbacPolicies}
+          onChange={handlePoliciesChange}
+          isLoading={isLoadingOptions}
+          isDisabled={!isApproved}
+          placeholder="Select policies"
+          ariaLabelledBy="policy-field-label"
         />
-        {removedGroupWarnings.map((msg, i) => (
-          <p key={i} className={s.groupRemovedWarning}>
-            {msg}
-          </p>
-        ))}
+        <p className={s.hint}>Search and select one or more policies. Policies are grouped by role.</p>
       </div>
 
       <div className={s.exceptionsBlock}>
         <div className={s.exceptionsSelectWrap}>
-          <RbacMultiSelect
-            name="rbacExceptions"
+          <ExceptionsMultiSelect
             label="Permissions exceptions (Optional)"
             placeholder="Select exceptions"
             options={exceptionsOptions}

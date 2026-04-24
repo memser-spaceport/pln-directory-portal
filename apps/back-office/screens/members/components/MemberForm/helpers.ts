@@ -48,7 +48,9 @@ export const memberFormSchema = yup.object({
     .object({ label: yup.string().required(), value: yup.string().required() })
     .nullable()
     .optional(),
-  rbacRoles: yup.array().of(yup.object({ label: yup.string(), value: yup.string() })).optional(),
-  rbacGroups: yup.array().of(yup.object({ label: yup.string(), value: yup.string() })).optional(),
+  rbacPolicies: yup
+    .array()
+    .of(yup.object({ label: yup.string().required(), value: yup.string().required() }))
+    .optional(),
   rbacExceptions: yup.array().of(yup.object({ label: yup.string(), value: yup.string() })).optional(),
 });
