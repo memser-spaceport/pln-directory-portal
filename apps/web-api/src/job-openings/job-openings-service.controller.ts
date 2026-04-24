@@ -61,11 +61,19 @@ export class JobOpeningsServiceController {
   @Get('teams-with-enrichment')
   async getTeamsWithEnrichment(
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
+    @Query('priority') priority?: string | string[]
   ): Promise<TeamsWithEnrichmentResponse> {
     const parsedPage = Math.max(1, Number(page) || 1);
     const parsedLimit = Math.min(1000, Math.max(1, Number(limit) || 100));
-    return this.enrichmentService.getTeamsWithEnrichment(parsedPage, parsedLimit);
+
+    let priorityFilter: number[] | undefined;
+    if (priority) {
+      const priorities = Array.isArray(priority) ? priority : [priority];
+      priorityFilter = priorities.map((p) => Number(p)).filter((p) => !isNaN(p) && p >= 1);
+    }
+
+    return this.enrichmentService.getTeamsWithEnrichment(parsedPage, parsedLimit, priorityFilter);
   }
 
   @Get('teams/:uid/job-openings')

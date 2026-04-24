@@ -15,10 +15,22 @@ import {
   FieldConfidence,
   FieldEnrichmentMeta,
   FieldEnrichmentStatus,
+  FieldJudgment,
   FieldMetaKey,
   ForceEnrichmentMode,
+  JudgmentVerdict,
   TeamDataEnrichment,
 } from './team-enrichment.types';
+
+const CONFIDENCE_RANK: Record<string, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+};
+
+function rankConfidence(value: FieldConfidence | undefined): number {
+  return value ? CONFIDENCE_RANK[value] ?? 0 : 0;
+}
 
 type FieldsMetaMap = Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
 
@@ -414,7 +426,8 @@ export class TeamEnrichmentService {
             linkedinIsUserOwned ? ' (user-owned handle, entity check bypassed)' : ''
           }`
         );
-        const profile = await this.scrapingDogService.fetchCompanyProfile(team.linkedinHandler);
+        const result = await this.scrapingDogService.fetchCompanyProfile(team.linkedinHandler);
+        const profile = result.kind === 'ok' ? result.profile : null;
         if (profile) {
           const entityOk = linkedinIsUserOwned || this.verifyScrapingDogEntity(team.name, profile);
           if (entityOk && profile.profilePhoto) {
@@ -1090,10 +1103,44 @@ export class TeamEnrichmentService {
         usingUserOwnedHandle ? ' (user-owned handle, entity check bypassed)' : ''
       }`
     );
-    const profile = await this.scrapingDogService.fetchCompanyProfile(handle);
-    if (!profile) return null;
+    const fetchResult = await this.scrapingDogService.fetchCompanyProfile(handle);
 
-    if (!usingUserOwnedHandle && !this.verifyScrapingDogEntity(team.name, profile)) {
+    if (fetchResult.kind === 'error') {
+      this.logger.warn(
+        `Team ${teamUid} (${team.name}): ScrapingDog error "${fetchResult.reason}", leaving handle as-is`
+      );
+      return null;
+    }
+
+    if (fetchResult.kind === 'not-found') {
+      // Only null an AI-supplied handle. User-asserted handles stay on the team record so the
+      // user can correct them manually — we don't silently discard user data.
+      const handleIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
+      if (handleIsUserOwned) {
+        this.logger.warn(
+          `Team ${teamUid} (${team.name}): ScrapingDog reports "${handle}" not found, but handle is user-owned — leaving as-is`
+        );
+        return null;
+      }
+      this.logger.warn(
+        `Team ${teamUid} (${team.name}): LinkedIn handle "${handle}" is invalid per ScrapingDog, nulling`
+      );
+      // Null the stored handle if it was persisted; if only aiLinkedinHandler supplied the handle,
+      // it was never written to Team so nothing to clear there.
+      if (team.linkedinHandler === handle) {
+        (updateData as any).linkedinHandler = null;
+      }
+      newFieldsMeta.linkedinHandler = {
+        status: FieldEnrichmentStatus.CannotEnrich,
+        source: EnrichmentSource.AI,
+      };
+      return null;
+    }
+
+    const profile = fetchResult.profile;
+
+    const nameMatch = this.scrapingDogService.classifyNameMatch(team.name, profile);
+    if (!usingUserOwnedHandle && nameMatch === 'none') {
       this.logger.warn(
         `Team ${teamUid} (${team.name}): ScrapingDog profile name "${profile.companyName}" / "${profile.universalNameId}" does not match, discarding`
       );
@@ -1162,6 +1209,40 @@ export class TeamEnrichmentService {
       }
     }
 
+    // Confidence upgrade: on a valid ScrapingDog profile with a matching name, corroborate the
+    // AI-filled fields. Only upgrades — never downgrades — and never touches user-owned fields
+    // or fields ScrapingDog just filled (already at high). The judge's `fieldsMeta[field].judgment`
+    // sub-object is never written here — that stays judge-owned.
+    const postRunTeam = {
+      name: team.name,
+      website: ((updateData as any).website as string | null | undefined) ?? team.website,
+      linkedinHandler: team.linkedinHandler,
+      shortDescription:
+        ((updateData as any).shortDescription as string | null | undefined) ?? team.shortDescription,
+      longDescription:
+        ((updateData as any).longDescription as string | null | undefined) ?? team.longDescription,
+      moreDetails: ((updateData as any).moreDetails as string | null | undefined) ?? team.moreDetails,
+      industryTags: team.industryTags.map((t) => ({ title: t.title })),
+    };
+    const verdicts = this.scrapingDogService.compareProfileToTeam(postRunTeam, profile, nameMatch);
+    for (const [field, verdict] of Object.entries(verdicts) as Array<[FieldMetaKey, FieldJudgment | undefined]>) {
+      if (!verdict || verdict.verdict !== JudgmentVerdict.Agrees) continue;
+      const currentMeta = (newFieldsMeta[field] ?? existingFieldsMeta[field]) as FieldEnrichmentMeta | undefined;
+      if (!currentMeta || currentMeta.status !== FieldEnrichmentStatus.Enriched) continue;
+      if (currentMeta.source === EnrichmentSource.ScrapingDog) continue; // don't overwrite freshly-set SD values
+      const currentRank = rankConfidence(currentMeta.confidence);
+      const newRank = rankConfidence(verdict.confidence);
+      if (newRank > currentRank) {
+        newFieldsMeta[field] = {
+          ...currentMeta,
+          confidence: verdict.confidence,
+        };
+        this.logger.log(
+          `Team ${teamUid} (${team.name}): upgraded ${field} confidence to ${verdict.confidence} via ScrapingDog match`
+        );
+      }
+    }
+
     if (filledFields.length === 0) {
       this.logger.log(`Team ${teamUid} (${team.name}): ScrapingDog returned no fillable data`);
       return {
@@ -1185,17 +1266,7 @@ export class TeamEnrichmentService {
   }
 
   private verifyScrapingDogEntity(teamName: string, profile: ScrapingDogCompanyProfile): boolean {
-    const normalize = (s: string) =>
-      s
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '')
-        .trim();
-    const normalizedTeam = normalize(teamName);
-    const candidates = [profile.companyName, profile.universalNameId]
-      .filter((v): v is string => !!v)
-      .map((v) => normalize(v));
-    if (candidates.length === 0) return false;
-    return candidates.some((c) => c === normalizedTeam || c.includes(normalizedTeam) || normalizedTeam.includes(c));
+    return this.scrapingDogService.classifyNameMatch(teamName, profile) !== 'none';
   }
 
   parseEnrichmentMeta(raw: any): TeamDataEnrichment | null {

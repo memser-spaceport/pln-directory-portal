@@ -1,18 +1,27 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ArticleStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './articles.dto';
 import type { ArticleCategory } from './articles.constants';
 import { ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE } from './articles.constants';
-import { MemberRole } from "../utils/constants";
+import { MemberRole } from '../utils/constants';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
+import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
+import { RbacService } from '../rbac/rbac.service';
 
 @Injectable()
 export class ArticlesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly accessControlV2Service: AccessControlV2Service,
-  ) { }
+    private readonly rbacService: RbacService
+  ) {}
 
   // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -39,9 +48,7 @@ export class ArticlesService {
     if (!member) {
       throw new UnauthorizedException('Member not found');
     }
-    const isAdmin = member.memberRoles.some(
-      (r) => r.name === MemberRole.DIRECTORY_ADMIN
-    );
+    const isAdmin = member.memberRoles.some((r) => r.name === MemberRole.DIRECTORY_ADMIN);
 
     return {
       memberUid: member.uid,
@@ -50,12 +57,11 @@ export class ArticlesService {
     };
   }
 
-
   private async ensureArticleOwnership(
     articleUid: string,
     memberUid: string,
     teamUid: string | null,
-    isDirectoryAdmin: boolean,
+    isDirectoryAdmin: boolean
   ) {
     const where: any = {
       uid: articleUid,
@@ -63,10 +69,7 @@ export class ArticlesService {
     };
 
     if (!isDirectoryAdmin) {
-      where.OR = [
-        { authorMemberUid: memberUid },
-        ...(teamUid ? [{ authorTeamUid: teamUid }] : []),
-      ];
+      where.OR = [{ authorMemberUid: memberUid }, ...(teamUid ? [{ authorTeamUid: teamUid }] : [])];
     }
 
     const article = await this.prisma.article.findFirst({ where });
@@ -86,12 +89,31 @@ export class ArticlesService {
     'founder_guides.view.all',
   ] as const;
 
+  // TODO: Remove after RBAC V2 migration
+  private async resolveUserScopes(userEmail?: string): Promise<string[]> {
+    if (!userEmail) return [];
+    try {
+      const member = await this.rbacService.findMemberByEmail(userEmail);
+      if (!member) return [];
+      return this.rbacService.getScopesForPermission(member.uid, RBAC_PERMISSION_CODES.FOUNDER_GUIDES_VIEW);
+    } catch {
+      return [];
+    }
+  }
+
+  // TODO: Remove after RBAC V2 migration
+  private buildScopeFilter(userScopes: string[]): Prisma.ArticleWhereInput {
+    return {
+      OR: [{ scope: null }, ...(userScopes.length > 0 ? [{ scope: { in: userScopes } }] : [])],
+    };
+  }
+
   private validateRequiredPermissionCode(permissionCode: string | null | undefined): void {
     if (!permissionCode) return;
 
     if (!this.ARTICLE_PERMISSION_CODES.includes(permissionCode as any)) {
       throw new BadRequestException(
-        `Invalid article permission: ${permissionCode}. Allowed: ${this.ARTICLE_PERMISSION_CODES.join(', ')}`,
+        `Invalid article permission: ${permissionCode}. Allowed: ${this.ARTICLE_PERMISSION_CODES.join(', ')}`
       );
     }
   }
@@ -101,16 +123,12 @@ export class ArticlesService {
     return new Set(access.effectivePermissions);
   }
 
-  private hasArticlePermissionFromSet(
-    permissionSet: Set<string>,
-    permissionCode?: string | null,
-  ): boolean {
+  private hasArticlePermissionFromSet(permissionSet: Set<string>, permissionCode?: string | null): boolean {
     if (!permissionCode) return true;
     if (permissionSet.has(permissionCode)) return true;
 
     if (
-      (permissionCode === 'founder_guides.view.plvs' ||
-        permissionCode === 'founder_guides.view.plcc') &&
+      (permissionCode === 'founder_guides.view.plvs' || permissionCode === 'founder_guides.view.plcc') &&
       permissionSet.has('founder_guides.view.all')
     ) {
       return true;
@@ -124,7 +142,6 @@ export class ArticlesService {
     return this.hasArticlePermissionFromSet(permissionSet, permissionCode);
   }
 
-
   private stripLegacyScope<T extends { scope?: unknown }>(article: T): Omit<T, 'scope'> {
     const { scope, ...rest } = article;
     return rest;
@@ -137,7 +154,7 @@ export class ArticlesService {
   private async filterArticlesByPermission<T extends { requiredPermissionCode?: string | null }>(
     articles: T[],
     memberUid: string | null,
-    permissionSet?: Set<string> | null,
+    permissionSet?: Set<string> | null
   ): Promise<T[]> {
     if (!articles.length) return articles;
 
@@ -146,7 +163,7 @@ export class ArticlesService {
     }
 
     return articles.filter((article) =>
-      this.hasArticlePermissionFromSet(permissionSet, article.requiredPermissionCode),
+      this.hasArticlePermissionFromSet(permissionSet, article.requiredPermissionCode)
     );
   }
 
@@ -157,12 +174,12 @@ export class ArticlesService {
       ...(query?.category ? { category: query.category } : {}),
       ...(query?.search
         ? {
-          OR: [
-            { title: { contains: query.search, mode: 'insensitive' } },
-            { summary: { contains: query.search, mode: 'insensitive' } },
-            { content: { contains: query.search, mode: 'insensitive' } },
-          ],
-        }
+            OR: [
+              { title: { contains: query.search, mode: 'insensitive' } },
+              { summary: { contains: query.search, mode: 'insensitive' } },
+              { content: { contains: query.search, mode: 'insensitive' } },
+            ],
+          }
         : {}),
     };
   }
@@ -234,8 +251,10 @@ export class ArticlesService {
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
 
+    const userScopes = await this.resolveUserScopes(userEmail);
     const baseWhere: Prisma.ArticleWhereInput = {
       ...this.buildArticleWhere(query, ArticleStatus.PUBLISHED),
+      ...this.buildScopeFilter(userScopes),
     };
 
     let orderBy: Prisma.ArticleOrderByWithRelationInput;
@@ -358,6 +377,14 @@ export class ArticlesService {
       }
     }
 
+    // TODO: Remove after RBAC V2 migration
+    if (article.scope && !isAuthor) {
+      const userScopes = await this.resolveUserScopes(userEmail);
+      if (!userScopes.includes(article.scope)) {
+        throw new ForbiddenException('You do not have access to this article');
+      }
+    }
+
     if (article.status !== ArticleStatus.PUBLISHED && !isAuthor) {
       throw new NotFoundException('Article not found');
     }
@@ -386,13 +413,13 @@ export class ArticlesService {
       }),
       userEmail
         ? this.resolveMemberByEmail(userEmail)
-          .then(({ memberUid }) =>
-            this.prisma.articleStatistic.findUnique({
-              where: { articleUid_memberUid: { articleUid: article.uid, memberUid } },
-              select: { likeCount: true, viewCount: true },
-            })
-          )
-          .catch(() => null)
+            .then(({ memberUid }) =>
+              this.prisma.articleStatistic.findUnique({
+                where: { articleUid_memberUid: { articleUid: article.uid, memberUid } },
+                select: { likeCount: true, viewCount: true },
+              })
+            )
+            .catch(() => null)
         : Promise.resolve(null),
     ]);
 
@@ -614,6 +641,7 @@ export class ArticlesService {
           updatedBy: createdBy,
           status,
           requiredPermissionCode: body.requiredPermissionCode ?? null,
+          scope: body.scope ?? null,
           publishedAt: status === ArticleStatus.PUBLISHED ? new Date() : null,
         },
         include: this.articleInclude,
@@ -644,6 +672,7 @@ export class ArticlesService {
     }
     if (body.coverImageUid !== undefined) data.coverImageUid = body.coverImageUid;
     if (body.requiredPermissionCode !== undefined) data.requiredPermissionCode = body.requiredPermissionCode;
+    if (body.scope !== undefined) data.scope = body.scope;
     if (body.status !== undefined) {
       data.status = body.status;
       if (body.status === ArticleStatus.PUBLISHED && existing.status !== ArticleStatus.PUBLISHED) {
@@ -686,13 +715,13 @@ export class ArticlesService {
       OR: [{ authorMemberUid: memberUid }, ...(teamUid ? [{ authorTeamUid: teamUid }] : [])],
       ...(query?.search
         ? {
-          AND: {
-            OR: [
-              { title: { contains: query.search, mode: 'insensitive' as const } },
-              { summary: { contains: query.search, mode: 'insensitive' as const } },
-            ],
-          },
-        }
+            AND: {
+              OR: [
+                { title: { contains: query.search, mode: 'insensitive' as const } },
+                { summary: { contains: query.search, mode: 'insensitive' as const } },
+              ],
+            },
+          }
         : {}),
       ...(query?.category ? { category: query.category } : {}),
     };
@@ -737,12 +766,12 @@ export class ArticlesService {
       ...(query?.category ? { category: query.category } : {}),
       ...(query?.search
         ? {
-          OR: [
-            { title: { contains: query.search, mode: 'insensitive' } },
-            { summary: { contains: query.search, mode: 'insensitive' } },
-            { content: { contains: query.search, mode: 'insensitive' } },
-          ],
-        }
+            OR: [
+              { title: { contains: query.search, mode: 'insensitive' } },
+              { summary: { contains: query.search, mode: 'insensitive' } },
+              { content: { contains: query.search, mode: 'insensitive' } },
+            ],
+          }
         : {}),
     };
 
