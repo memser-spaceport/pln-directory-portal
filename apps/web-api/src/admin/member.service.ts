@@ -77,6 +77,74 @@ export class MemberService {
     return this.fallbackMemberState(accessLevel);
   }
 
+  private normalizeMemberStateFromPayload(
+    payload: { memberState?: string | null; state?: string | null },
+  ): MemberApprovalState | null {
+    const rawState = payload.memberState ?? payload.state;
+
+    if (!rawState) {
+      return null;
+    }
+
+    const normalized = rawState.toUpperCase();
+
+    if (normalized === 'PENDING') {
+      return MemberApprovalState.PENDING;
+    }
+
+    if (normalized === 'APPROVED' || normalized === 'VERIFIED') {
+      return MemberApprovalState.APPROVED;
+    }
+
+    if (normalized === 'REJECTED') {
+      return MemberApprovalState.REJECTED;
+    }
+
+    throw new BadRequestException(`Unknown memberState: ${rawState}`);
+  }
+
+  private async syncMemberApprovalFromPayload(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    payload: {
+      accessLevel?: string | null;
+      memberState?: string | null;
+      state?: string | null;
+    },
+    requestedByUid?: string | null,
+    reviewedByUid?: string | null,
+    reason = 'Synced from member payload',
+  ): Promise<void> {
+    const explicitMemberState = this.normalizeMemberStateFromPayload(payload);
+
+    const resolvedState =
+      explicitMemberState ??
+      (payload.accessLevel ? this.resolveApprovalStateFromAccessLevel(payload.accessLevel) : null);
+
+    if (!resolvedState) {
+      return;
+    }
+
+    await tx.memberApproval.upsert({
+      where: { memberUid },
+      update: {
+        state: resolvedState,
+        reason,
+        requestedByUid: requestedByUid ?? undefined,
+        reviewedByUid: reviewedByUid ?? null,
+        reviewedAt: resolvedState === MemberApprovalState.PENDING ? null : new Date(),
+      },
+      create: {
+        memberUid,
+        state: resolvedState,
+        requestedByUid: requestedByUid ?? null,
+        reviewedByUid: reviewedByUid ?? null,
+        reason,
+        reviewedAt: resolvedState === MemberApprovalState.PENDING ? null : new Date(),
+      },
+    });
+  }
+
   private async syncMemberApprovalFromAccessLevel(
     tx: Prisma.TransactionClient,
     memberUid: string,
@@ -106,6 +174,25 @@ export class MemberService {
         reviewedAt,
       },
     });
+  }
+
+  private async syncMemberStateForEditPayload(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    payload: {
+      accessLevel?: string | null;
+      memberState?: string | null;
+      state?: string | null;
+    },
+  ): Promise<void> {
+    await this.syncMemberApprovalFromPayload(
+      tx,
+      memberUid,
+      payload,
+      memberUid,
+      null,
+      payload.accessLevel ? 'Updated from accessLevel/memberState' : 'Updated from memberState',
+    );
   }
 
   private async assignAccessControl(
@@ -532,6 +619,27 @@ export class MemberService {
     requestorEmail: string,
     isDirectoryAdmin = false
   ): Promise<Member> {
+    const updatePayload = (memberParticipantsRequest as any)?.newData ?? memberParticipantsRequest;
+
+    const onlyStateUpdate =
+      Object.keys(updatePayload ?? {}).length > 0 &&
+      Object.keys(updatePayload ?? {}).every((key) => ['memberState', 'state'].includes(key));
+
+    if (onlyStateUpdate) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.syncMemberApprovalFromPayload(
+          tx,
+          memberUid,
+          updatePayload as any,
+          memberUid,
+          null,
+          'Updated from memberState',
+        );
+      });
+
+      return this.findMemberByUid(memberUid);
+    }
+
     let result;
     await this.prisma.$transaction(async (tx) => {
       const memberData: any = memberParticipantsRequest.newData;
@@ -1477,26 +1585,30 @@ export class MemberService {
       data: updateData,
     });
 
-    await this.prisma.$transaction(
-      memberUids.map((memberUid) =>
-        this.prisma.memberApproval.upsert({
-          where: { memberUid },
-          update: {
-            state: this.resolveApprovalStateFromAccessLevel(accessLevel),
-            reason: 'Synced from accessLevel update',
-            reviewedAt: this.resolveApprovalStateFromAccessLevel(accessLevel) === MemberApprovalState.PENDING ? null : now,
-          },
-          create: {
-            memberUid,
-            state: this.resolveApprovalStateFromAccessLevel(accessLevel),
-            requestedByUid: memberUid,
-            reviewedByUid: null,
-            reason: 'Synced from accessLevel update',
-            reviewedAt: this.resolveApprovalStateFromAccessLevel(accessLevel) === MemberApprovalState.PENDING ? null : now,
-          },
-        })
-      )
-    );
+    if (accessLevel) {
+      const resolvedState = this.resolveApprovalStateFromAccessLevel(accessLevel);
+
+      await this.prisma.$transaction(
+        memberUids.map((memberUid) =>
+          this.prisma.memberApproval.upsert({
+            where: { memberUid },
+            update: {
+              state: resolvedState,
+              reason: 'Synced from accessLevel update',
+              reviewedAt: resolvedState === MemberApprovalState.PENDING ? null : now,
+            },
+            create: {
+              memberUid,
+              state: resolvedState,
+              requestedByUid: memberUid,
+              reviewedByUid: null,
+              reason: 'Synced from accessLevel update',
+              reviewedAt: resolvedState === MemberApprovalState.PENDING ? null : now,
+            },
+          })
+        )
+      );
+    }
 
     // Create investor profiles for L5/L6 members who don't have one
     await this.createInvestorProfileForHighLevelMembers(memberUids, this.prisma);
@@ -1643,13 +1755,13 @@ export class MemberService {
 
       createdMember = await this.createMember(newMember, tx);
 
-      await this.syncMemberApprovalFromAccessLevel(
+      await this.syncMemberApprovalFromPayload(
         tx,
         createdMember.uid,
-        memberData.accessLevel,
+        memberData as CreateMemberDto & { memberState?: string | null; state?: string | null },
         createdMember.uid,
         null,
-        'Created by admin from accessLevel'
+        'Created by admin'
       );
 
       await this.assignAccessControl(tx, createdMember.uid, {
@@ -1673,7 +1785,7 @@ export class MemberService {
 
       await this.membersHooksService.postCreateActions(createdMember, memberData.email);
     });
-    return createdMember;
+    return this.findMemberByUid(createdMember.uid);
   }
 
   async updateMemberByAdmin(uid: string, dto: UpdateMemberDto): Promise<string> {
