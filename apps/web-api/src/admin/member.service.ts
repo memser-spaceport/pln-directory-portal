@@ -646,7 +646,7 @@ export class MemberService {
 
     let result;
     await this.prisma.$transaction(async (tx) => {
-      const memberData: any = memberParticipantsRequest.newData;
+      const memberData: any = (memberParticipantsRequest as any)?.newData ?? memberParticipantsRequest;
       const existingMember = await this.findMemberByUid(memberUid, tx);
       const isExternalIdAvailable = existingMember.externalId ? true : false;
       const isEmailChanged = await this.checkIfEmailChanged(memberData, existingMember, tx);
@@ -671,9 +671,26 @@ export class MemberService {
       );
       await this.updateMemberEmailChange(memberUid, isEmailChanged, isExternalIdAvailable, memberData, existingMember);
 
-      // Handle investor profile updates
-      if (investorProfileData) {
-        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, existingMember.accessLevel);
+      await this.syncMemberApprovalFromPayload(
+        tx,
+        memberUid,
+        memberData as any,
+        memberUid,
+        null,
+        'Updated by admin'
+      );
+
+      await this.assignAccessControl(tx, memberUid, {
+        roleCodes: (memberData as any).roleCodes ?? [],
+        policyCodes: (memberData as any).policyCodes ?? [],
+        permissionCodes: (memberData as any).permissionCodes ?? [],
+        actorUid: null,
+      });
+
+      // Handle investor profile updates only for L5/L6
+      const effectiveAccessLevel = memberData.accessLevel ?? existingMember.accessLevel;
+      if (investorProfileData && ['L5', 'L6'].includes(effectiveAccessLevel)) {
+        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, effectiveAccessLevel);
       }
 
       if (isEmailChanged && isDirectoryAdmin) {
@@ -687,7 +704,7 @@ export class MemberService {
       this.logger.info(`Member update request - completed, requestId -> ${result.uid}, requestor -> ${requestorEmail}`);
     });
     await this.membersHooksService.postUpdateActions(result, requestorEmail);
-    return result;
+    return this.findMemberByUid(memberUid);
   }
 
   /**
@@ -925,10 +942,10 @@ export class MemberService {
    */
   async updateTeamMemberRoles(memberData, existingMember, memberUid, tx: Prisma.TransactionClient) {
     const oldTeamUids = existingMember.teamMemberRoles.map((t: any) => t.teamUid);
-    const newTeamUids = memberData.teamAndRoles.map((t: any) => t.teamUid);
+    const newTeamUids = (memberData.teamAndRoles ?? []).map((t: any) => t.teamUid);
     // Determine which roles need to be deleted, updated, or created
     const rolesToDelete = existingMember.teamMemberRoles.filter((t: any) => !newTeamUids.includes(t.teamUid));
-    const rolesToUpdate = memberData.teamAndRoles.filter((t: any, index: number) => {
+    const rolesToUpdate = (memberData.teamAndRoles ?? []).filter((t: any, index: number) => {
       const foundIndex = existingMember.teamMemberRoles.findIndex((v: any) => v.teamUid === t.teamUid);
       if (foundIndex > -1) {
         const foundValue = existingMember.teamMemberRoles[foundIndex];
@@ -957,7 +974,7 @@ export class MemberService {
       }
       return false;
     });
-    const rolesToCreate = memberData.teamAndRoles.filter((t: any) => !oldTeamUids.includes(t.teamUid));
+    const rolesToCreate = (memberData.teamAndRoles ?? []).filter((t: any) => !oldTeamUids.includes(t.teamUid));
     // Process deletions, updates, and creations
     await this.deleteTeamMemberRoles(tx, rolesToDelete, memberUid);
     await this.modifyTeamMemberRoles(tx, rolesToUpdate, memberUid);
@@ -1732,10 +1749,10 @@ export class MemberService {
         teamOrProjectURL: memberData.teamOrProjectURL,
         locationUid: location?.uid || null,
         skills: {
-          connect: memberData.skills.map((uid) => ({ uid })),
+          connect: (memberData.skills ?? []).map((uid) => ({ uid })),
         },
         teamMemberRoles: {
-          create: memberData.teamMemberRoles.map(({ teamUid, role }) => ({
+          create: (memberData.teamMemberRoles ?? []).map(({ teamUid, role }) => ({
             role,
             team: {
               connect: { uid: teamUid },
