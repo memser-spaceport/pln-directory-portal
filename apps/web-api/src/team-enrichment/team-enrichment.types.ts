@@ -25,10 +25,42 @@ export enum EnrichmentSource {
   ScrapingDog = 'scrapingdog',
 }
 
+export enum JudgmentStatus {
+  PendingJudgment = 'PendingJudgment',
+  InProgress = 'InProgress',
+  Judged = 'Judged',
+  FailedToJudge = 'FailedToJudge',
+}
+
+export enum JudgmentVerdict {
+  Agrees = 'agrees',
+  Disagrees = 'disagrees',
+  Uncertain = 'uncertain',
+}
+
+export enum JudgmentSource {
+  ScrapingDog = 'scrapingdog',
+  AI = 'ai',
+}
+
+export type NameMatchTier = 'exact' | 'partial' | 'none';
+
+export interface FieldJudgment {
+  confidence: FieldConfidence;
+  score?: number;
+  verdict: JudgmentVerdict;
+  note?: string;
+  judgedVia: JudgmentSource;
+}
+
+export const FIELD_JUDGMENT_NOTE_MAX_LENGTH = 60;
+export const TEAM_JUDGMENT_ASSESSMENT_MAX_LENGTH = 120;
+
 export interface FieldEnrichmentMeta {
   status: FieldEnrichmentStatus;
   confidence?: FieldConfidence;
   source?: EnrichmentSource;
+  judgment?: FieldJudgment;
 }
 
 /** Scalar fields on the Team model that can be enriched directly. */
@@ -60,6 +92,24 @@ export type FieldMetaKey = EnrichableField | 'logo';
 
 export type ForceEnrichmentMode = 'all' | 'cannotEnrich';
 
+export interface TeamJudgment {
+  status: JudgmentStatus;
+  judgedAt?: string;
+  judgedBy?: string;
+  aiModel?: string;
+  errorMessage?: string;
+  overallAssessment?: string;
+  fieldsForReview?: string[];
+  scrapingDog?: {
+    used: boolean;
+    fetchedAt: string;
+    nameMatch: NameMatchTier;
+    companyNameFromLinkedIn: string | null;
+    verifiedFields: string[];
+    linkedinInternalId: string | null;
+  };
+}
+
 export interface TeamDataEnrichment {
   shouldEnrich: boolean;
   status: EnrichmentStatus;
@@ -77,6 +127,17 @@ export interface TeamDataEnrichment {
     fields: string[];
     linkedinInternalId?: string | null;
   };
+  judgment?: TeamJudgment;
+}
+
+export interface AIJudgeResponse {
+  fields: Record<string, {
+    confidence: 'high' | 'medium' | 'low';
+    score: number;
+    verdict: 'agrees' | 'disagrees' | 'uncertain';
+    note: string;
+  }>;
+  overallAssessment: string;
 }
 
 export interface AITeamEnrichmentResponse {
