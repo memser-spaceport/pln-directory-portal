@@ -85,6 +85,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
           telegramHandler: string;
           officeHours: string;
           githubHandler: string;
+          memberState?: string;
           roleCodes?: string[];
           policyCodes?: string[];
           permissionCodes?: string[];
@@ -151,6 +152,8 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
         payload.policyCodes = matchedPolicies.map((p) => p.code);
         payload.permissionCodes = isApproved ? (formData.rbacExceptions ?? []).map((e) => e.value) : [];
 
+        payload.memberState = formData.memberStateStatus?.value?.toUpperCase();
+
         const res = await mutateAsync({ uid, payload, authToken });
 
         if (res?.data) {
@@ -188,7 +191,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
     const rbacExceptions = (member.permissions ?? []).map((p) => ({ label: p.code, value: p.code }));
 
     return {
-      memberStateStatus,
+      memberState: memberStateStatus?.value,
       rbacRoles,
       rbacGroups,
       rbacExceptions,

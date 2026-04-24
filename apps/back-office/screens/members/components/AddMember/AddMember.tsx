@@ -53,8 +53,8 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
 
         const isApproved = formData.memberStateStatus?.value === 'Approved';
         const roleNameToCode = new Map((rbacRolesData ?? []).map((r) => [r.name, r.code]));
-        const roleValues = (formData.rbacRoles ?? []).map((r) => r.value);
-        const groupValues = (formData.rbacGroups ?? []).map((g) => g.value);
+        const roleValues = isApproved ? (formData.rbacRoles ?? []).map((r) => r.value) : [];
+        const groupValues = isApproved ? (formData.rbacGroups ?? []).map((g) => g.value) : [];
         const matchedPolicies = (policiesData ?? []).filter(
           (p) => roleValues.includes(p.role) && groupValues.includes(p.group)
         );
@@ -62,7 +62,7 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
         const payload = {
           imageUid: image ?? '',
           name: formData.name,
-          accessLevel: formData.accessLevel?.value,
+          accessLevel: formData.accessLevel?.value ?? '',
           email: formData.email,
           joinDate: formData.joinDate?.toISOString() ?? '',
           bio: formData.bio,
@@ -98,11 +98,10 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
             ),
             type: formData.investorProfile.type?.value || '',
           },
-          ...(isApproved && {
-            roleCodes: roleValues.map((name) => roleNameToCode.get(name)).filter(Boolean) as string[],
-            policyCodes: matchedPolicies.map((p) => p.code),
-            permissionCodes: (formData.rbacExceptions ?? []).map((e) => e.value),
-          }),
+          memberState: formData.memberStateStatus?.value?.toUpperCase(),
+          roleCodes: roleValues.map((name) => roleNameToCode.get(name)).filter(Boolean) as string[],
+          policyCodes: matchedPolicies.map((p) => p.code),
+          permissionCodes: isApproved ? (formData.rbacExceptions ?? []).map((e) => e.value) : [],
         };
 
         const res = await mutateAsync({ payload, authToken });
