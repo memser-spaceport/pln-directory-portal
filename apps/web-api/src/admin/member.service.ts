@@ -92,8 +92,12 @@ export class MemberService {
       return MemberApprovalState.PENDING;
     }
 
-    if (normalized === 'APPROVED' || normalized === 'VERIFIED') {
+    if (normalized === 'APPROVED') {
       return MemberApprovalState.APPROVED;
+    }
+
+    if (normalized === 'VERIFIED') {
+      return MemberApprovalState.VERIFIED;
     }
 
     if (normalized === 'REJECTED') {
