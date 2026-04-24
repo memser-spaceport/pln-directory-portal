@@ -24,6 +24,7 @@ export class CreateArticleDto {
   authorTeamUid?: string;
   status?: ArticleStatus;
   requiredPermissionCode?: string | null;
+  scope?: string | null;
   officeHours?: string | null;
 }
 
@@ -39,6 +40,7 @@ export class UpdateArticleDto {
   authorTeamUid?: string;
   status?: ArticleStatus;
   requiredPermissionCode?: string | null;
+  scope?: string | null;
   officeHours?: string | null;
 }
 
