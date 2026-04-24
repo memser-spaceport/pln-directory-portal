@@ -17,7 +17,7 @@ export class JobOpeningsEnrichmentService {
   async getTeamsWithEnrichment(page = 1, limit = 100, priorityFilter?: number[]): Promise<TeamsWithEnrichmentResponse> {
     const skip = (page - 1) * limit;
 
-    const where = priorityFilter?.length ? { priority: { in: priorityFilter } } : {};
+    const where = priorityFilter?.length ? { priority: { in: priorityFilter } } : { priority: { not: 99 } };
 
     const [teams, total] = await Promise.all([
       this.prisma.team.findMany({
