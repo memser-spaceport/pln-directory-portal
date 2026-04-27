@@ -24,6 +24,7 @@ export interface JobOpeningIngestItem {
   lastSeenLive?: string;
   signalId?: string;
   canonicalKey: string;
+  dedupKey: string;
   teamUid?: string;
   needsReview?: string;
   notes?: string;
