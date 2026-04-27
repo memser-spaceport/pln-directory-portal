@@ -45,6 +45,9 @@ export class JobOpeningsServiceController {
       if (!job.canonicalKey) {
         throw new BadRequestException(`Job at index ${i}: canonicalKey is required`);
       }
+      if (!job.dedupKey) {
+        throw new BadRequestException(`Job at index ${i}: dedupKey is required`);
+      }
       if (!job.detectionDate) {
         throw new BadRequestException(`Job at index ${i}: detectionDate is required`);
       }

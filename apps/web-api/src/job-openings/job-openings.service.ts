@@ -27,7 +27,7 @@ export class JobOpeningsService {
         await this.upsertJobOpening(item);
         // Count as created or updated based on whether it existed
         const existing = await this.prisma.jobOpening.findUnique({
-          where: { canonicalKey: item.canonicalKey },
+          where: { dedupKey: item.dedupKey },
           select: { id: true, createdAt: true },
         });
 
@@ -39,11 +39,11 @@ export class JobOpeningsService {
         }
       } catch (error) {
         this.logger.error(
-          `Failed to ingest job opening with canonicalKey ${item.canonicalKey}: ${error.message}`,
+          `Failed to ingest job opening with dedupKey ${item.dedupKey} (canonicalKey: ${item.canonicalKey}): ${error.message}`,
           error.stack
         );
         result.failed++;
-        result.errors?.push(`Failed to process ${item.canonicalKey}: ${error.message}`);
+        result.errors?.push(`Failed to process ${item.dedupKey}: ${error.message}`);
       }
     }
 
@@ -79,6 +79,7 @@ export class JobOpeningsService {
       lastSeenLive: item.lastSeenLive ? new Date(item.lastSeenLive) : null,
       signalId: item.signalId ?? null,
       canonicalKey: item.canonicalKey,
+      dedupKey: item.dedupKey,
       teamUid: item.teamUid ?? null,
       needsReview: item.needsReview ?? null,
       notes: item.notes ?? null,
@@ -86,11 +87,12 @@ export class JobOpeningsService {
     };
 
     await this.prisma.jobOpening.upsert({
-      where: { canonicalKey: item.canonicalKey },
+      where: { dedupKey: item.dedupKey },
       create: data,
       update: {
         status,
         sourceLink: data.sourceLink,
+        canonicalKey: data.canonicalKey,
         summary: data.summary,
         location: data.location,
         workMode: data.workMode,

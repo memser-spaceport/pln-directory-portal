@@ -2013,7 +2013,8 @@ model JobOpening {
   postedDate      DateTime?
   lastSeenLive    DateTime?
   signalId        String?
-  canonicalKey    String           @unique
+  canonicalKey    String
+  dedupKey        String           @unique
   teamUid         String?
   team            Team?            @relation(fields: [teamUid], references: [uid])
   needsReview     String?
