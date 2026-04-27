@@ -76,11 +76,7 @@ export const ProjectsCell = ({ member }: { member: Member }) => {
 
   return (
     <div className={s.root} ref={containerRef}>
-      {!items.length && (
-        <div className={s.empty}>
-          <EmptyIcon />
-        </div>
-      )}
+      {!items.length && <div className={s.empty}>-</div>}
       {items.map((item, idx) => {
         if (idx < visibleCount) {
           const badge = (

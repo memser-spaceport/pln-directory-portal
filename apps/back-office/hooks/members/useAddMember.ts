@@ -27,6 +27,10 @@ interface MutationParams {
     telegramHandler: string;
     officeHours: string;
     githubHandler: string;
+    memberState?: string;
+    roleCodes?: string[];
+    policyCodes?: string[];
+    permissionCodes?: string[];
   };
 }
 

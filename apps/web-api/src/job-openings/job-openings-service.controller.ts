@@ -1,5 +1,6 @@
 import { Controller, Post, Body, UseGuards, BadRequestException, Logger, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { NoCache } from '../decorators/no-cache.decorator';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
 import { JobOpeningsService } from './job-openings.service';
 import { JobOpeningsEnrichmentService } from './job-openings-enrichment.service';
@@ -59,6 +60,7 @@ export class JobOpeningsServiceController {
   }
 
   @Get('teams-with-enrichment')
+  @NoCache()
   async getTeamsWithEnrichment(
     @Query('page') page?: string,
     @Query('limit') limit?: string,

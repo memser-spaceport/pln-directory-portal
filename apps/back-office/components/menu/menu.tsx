@@ -1,5 +1,6 @@
 import { TeamsMenu } from './components/TeamsMenu/TeamsMenu';
 import { MembersMenu } from './components/MembersMenu/MembersMenu';
+import { MembersV2Menu } from './components/MembersV2Menu/MembersV2Menu';
 import { DemoDaysMenu } from './components/DemoDaysMenu/DemoDaysMenu';
 import { useAuth } from '../../context/auth-context';
 import { AccessControlMenu } from './components/AccessControlMenu/AccessControlMenu';
@@ -13,6 +14,7 @@ export function Menu() {
   return (
     <ul className="flex space-x-4 text-sm text-gray-700">
       {isDirectoryAdmin && <MembersMenu />}
+      {isDirectoryAdmin && <MembersV2Menu />}
       {isDirectoryAdmin && <AccessControlMenu />}
       {isDirectoryAdmin && <TeamsMenu />}
       {(isDirectoryAdmin || isDemoDayAdmin) && <DemoDaysMenu />}
