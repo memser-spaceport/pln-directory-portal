@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 
 @Injectable()
@@ -179,9 +180,12 @@ export class MemberApprovalsService {
     return this.get(memberUid);
   }
 
-
-  async ensureApprovalExists(memberUid: string, requestedByUid?: string | null) {
-    const existing = await this.prisma.memberApproval.findUnique({
+  async ensureApprovalExists(
+    memberUid: string,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+    requestedByUid?: string | null,
+  ) {
+    const existing = await tx.memberApproval.findUnique({
       where: { memberUid },
       select: { uid: true },
     });
@@ -190,7 +194,7 @@ export class MemberApprovalsService {
       return existing;
     }
 
-    const approval = await this.prisma.memberApproval.create({
+    const approval = await tx.memberApproval.create({
       data: {
         memberUid,
         requestedByUid: requestedByUid ?? null,
@@ -199,7 +203,7 @@ export class MemberApprovalsService {
       },
     });
 
-    await this.prisma.memberApprovalEvent.create({
+    await tx.memberApprovalEvent.create({
       data: {
         approvalUid: approval.uid,
         memberUid,
