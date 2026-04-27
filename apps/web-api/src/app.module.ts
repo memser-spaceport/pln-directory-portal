@@ -3,7 +3,8 @@ import { ArticlesModule } from './articles/articles.module';
 import { BullModule } from '@nestjs/bull';
 import { CacheModule, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { InternalServiceThrottlerGuard } from './guards/internal-service-throttler.guard';
 import { ScheduleModule } from '@nestjs/schedule';
 import * as redisStore from 'cache-manager-redis-store';
 import { AppController } from './app.controller';
@@ -157,7 +158,7 @@ import { JobOpeningsModule } from './job-openings/job-openings.module';
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: InternalServiceThrottlerGuard,
     },
     {
       provide: APP_INTERCEPTOR,
