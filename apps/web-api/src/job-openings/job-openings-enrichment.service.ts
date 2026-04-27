@@ -112,6 +112,7 @@ export class JobOpeningsEnrichmentService {
         roleCategory: job.roleCategory ?? null,
         seniority: job.seniority ?? null,
         location: job.location ?? null,
+        workMode: job.workMode ?? null,
         sourceLink: job.sourceLink ?? null,
         postedDate: job.postedDate?.toISOString() ?? null,
         status: job.status,

@@ -23,6 +23,7 @@ type FacetOverrides = {
   dropSeniority?: boolean;
   dropFocus?: boolean;
   dropLocation?: boolean;
+  dropWorkMode?: boolean;
   dropQ?: boolean;
 };
 
@@ -52,6 +53,10 @@ export class JobOpeningsQueryService {
 
     if (!overrides.dropLocation && query.location.length > 0) {
       and.push({ location: { in: query.location } });
+    }
+
+    if (!overrides.dropWorkMode && query.workMode.length > 0) {
+      and.push({ workMode: { in: query.workMode } });
     }
 
     if (!overrides.dropFocus && query.focus.length > 0) {
@@ -215,6 +220,7 @@ export class JobOpeningsQueryService {
               roleCategory: true,
               seniority: true,
               location: true,
+              workMode: true,
               sourceLink: true,
               postedDate: true,
               detectionDate: true,
@@ -271,6 +277,7 @@ export class JobOpeningsQueryService {
             roleCategory: role.roleCategory,
             seniority: role.seniority,
             location: role.location,
+            workMode: role.workMode,
             applyUrl: role.sourceLink,
             lastUpdated: role.updatedAt.toISOString(),
             postedDate: role.postedDate ? role.postedDate.toISOString() : null,
@@ -294,12 +301,14 @@ export class JobOpeningsQueryService {
     const functionWhere = this.buildWhere(query, { dropFunction: true });
     const seniorityWhere = this.buildWhere(query, { dropSeniority: true });
     const locationWhere = this.buildWhere(query, { dropLocation: true });
+    const workModeWhere = this.buildWhere(query, { dropWorkMode: true });
     const focusWhere = this.buildWhere(query, { dropFocus: true });
 
-    const [roleCategoryCounts, seniorityCounts, locationCounts, focusTree] = await Promise.all([
+    const [roleCategoryCounts, seniorityCounts, locationCounts, workModeCounts, focusTree] = await Promise.all([
       this.countByField('roleCategory', functionWhere),
       this.countByField('seniority', seniorityWhere, (value) => value !== 'Unknown'),
       this.countByField('location', locationWhere),
+      this.countByField('workMode', workModeWhere),
       this.buildFocusTree(focusWhere),
     ]);
 
@@ -307,12 +316,13 @@ export class JobOpeningsQueryService {
       roleCategory: roleCategoryCounts,
       seniority: seniorityCounts,
       location: locationCounts,
+      workMode: workModeCounts,
       focus: focusTree,
     };
   }
 
   private async countByField(
-    field: 'roleCategory' | 'seniority' | 'location',
+    field: 'roleCategory' | 'seniority' | 'location' | 'workMode',
     where: Prisma.JobOpeningWhereInput,
     include?: (value: string) => boolean
   ) {
@@ -326,10 +336,16 @@ export class JobOpeningsQueryService {
     return rows
       .map((row) => {
         const value =
-          field === 'roleCategory' ? row.roleCategory : field === 'seniority' ? row.seniority : row.location;
+          field === 'roleCategory'
+            ? row.roleCategory
+            : field === 'seniority'
+            ? row.seniority
+            : field === 'location'
+            ? row.location
+            : row.workMode;
         return {
           value,
-          count: row._count._all,
+          count: row._count?._all ?? 0,
         };
       })
       .filter((row): row is { value: string; count: number } => Boolean(row.value))

@@ -1999,6 +1999,7 @@ model JobOpening {
   urgency         String?
   summary         String?
   location        String?
+  workMode        String?
   ws4AskId        String?
   detectionDate   DateTime
   sourceType      String?
@@ -2031,6 +2032,7 @@ model JobOpening {
   @@index([roleCategory])
   @@index([seniority])
   @@index([location])
+  @@index([workMode])
   @@index([updatedAt])
 }
 

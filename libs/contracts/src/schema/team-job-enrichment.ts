@@ -80,6 +80,7 @@ export const JobOpeningsPerTeamResponseSchema = z.object({
       roleCategory: z.string().nullable(),
       seniority: z.string().nullable(),
       location: z.string().nullable(),
+      workMode: z.string().nullable(),
       sourceLink: z.string().nullable(),
       postedDate: z.string().nullable(),
       status: z.string(),

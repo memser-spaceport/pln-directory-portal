@@ -20,6 +20,7 @@ export const JobsListQueryParams = z.object({
   seniority: ListParam,
   focus: ListParam,
   location: ListParam,
+  workMode: ListParam,
   q: z.string().optional(),
   sort: z.enum(['newest', 'company_az']).optional().default('newest'),
   page: z
@@ -40,6 +41,7 @@ export const JobRoleSchema = z.object({
   roleCategory: z.string().nullable(),
   seniority: z.string().nullable(),
   location: z.string().nullable(),
+  workMode: z.string().nullable(),
   applyUrl: z.string().nullable(),
   lastUpdated: z.string(),
   postedDate: z.string().nullable(),
@@ -85,4 +87,5 @@ export const JobsFiltersResponseSchema = z.object({
   seniority: z.array(JobFacetItemSchema),
   focus: z.array(JobFacetTreeItemSchema),
   location: z.array(JobFacetItemSchema),
+  workMode: z.array(JobFacetItemSchema),
 });
