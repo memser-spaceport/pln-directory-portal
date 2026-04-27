@@ -83,7 +83,7 @@ export class MembersService {
         data: member,
       });
 
-      await this.memberApprovalsService.ensureApprovalExists(createdMember.uid);
+      await this.memberApprovalsService.ensureApprovalExists(createdMember.uid, tx);
 
       return createdMember;
     } catch (error) {
@@ -404,6 +404,46 @@ export class MembersService {
           location: true,
           skills: true,
           memberRoles: true,
+          memberApproval: {
+            select: {
+              state: true,
+            },
+          },
+          roleAssignments: {
+            where: {
+              status: 'ACTIVE',
+              revokedAt: null,
+            },
+            include: {
+              role: {
+                include: {
+                  rolePermissions: {
+                    include: {
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          policyAssignmentsV2: {
+            include: {
+              policy: {
+                include: {
+                  policyPermissions: {
+                    include: {
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          memberPermissionsV2: {
+            include: {
+              permission: true,
+            },
+          },
           linkedinProfile: true,
           investorProfile: true,
           teamMemberRoles: {
@@ -470,10 +510,146 @@ export class MembersService {
         },
       });
 
-      return { ...(member as any) };
+      const responseMember = { ...(member as any) };
+
+      responseMember.memberState = this.resolveMemberState(
+        responseMember.accessLevel,
+        responseMember.memberApproval?.state,
+      );
+
+      const authorization = this.buildMemberAuthorization(responseMember);
+
+      responseMember.roles = authorization.roles;
+      responseMember.policies = authorization.policies;
+      responseMember.permissions = authorization.permissions;
+      responseMember.effectivePermissions = authorization.effectivePermissions;
+
+      delete responseMember.memberApproval;
+      delete responseMember.roleAssignments;
+      delete responseMember.policyAssignmentsV2;
+      delete responseMember.memberPermissionsV2;
+
+      return responseMember;
     } catch (error) {
       return this.handleErrors(error);
     }
+  }
+
+
+
+  private fallbackMemberState(accessLevel?: string | null) {
+    if (!accessLevel) {
+      return 'PENDING';
+    }
+
+    if (accessLevel.toUpperCase() === 'REJECTED') {
+      return 'REJECTED';
+    }
+
+    const match = accessLevel.match(/^L(\d+)$/i);
+
+    if (!match) {
+      return 'PENDING';
+    }
+
+    const level = Number(match[1]);
+
+    return level === 0 ? 'PENDING' : 'APPROVED';
+  }
+
+  private resolveMemberState(accessLevel?: string | null, approvalState?: string | null) {
+    return approvalState ?? this.fallbackMemberState(accessLevel);
+  }
+
+  private buildMemberAuthorization(member: any) {
+    const uniqByCode = (items: any[]) => {
+      const seen = new Set<string>();
+      return items.filter((item) => {
+        if (!item?.code || seen.has(item.code)) return false;
+        seen.add(item.code);
+        return true;
+      });
+    };
+
+    const mapPermission = (permission: any) =>
+      permission
+        ? {
+            uid: permission.uid,
+            code: permission.code,
+            description: permission.description ?? null,
+          }
+        : null;
+
+    const mapRole = (role: any) =>
+      role
+        ? {
+            uid: role.uid,
+            code: role.code,
+            name: role.name,
+            description: role.description ?? null,
+          }
+        : null;
+
+    const mapPolicy = (policy: any) =>
+      policy
+        ? {
+            uid: policy.uid,
+            code: policy.code,
+            name: policy.name,
+            description: policy.description ?? null,
+            role: policy.role ?? null,
+            group: policy.group ?? null,
+          }
+        : null;
+
+    const directPermissions = uniqByCode(
+      (member.memberPermissionsV2 ?? [])
+        .map((item: any) => mapPermission(item.permission))
+        .filter(Boolean),
+    );
+
+    const policies = uniqByCode(
+      (member.policyAssignmentsV2 ?? [])
+        .map((item: any) => mapPolicy(item.policy))
+        .filter(Boolean),
+    );
+
+    const policyPermissions = uniqByCode(
+      (member.policyAssignmentsV2 ?? [])
+        .flatMap((assignment: any) => assignment.policy?.policyPermissions ?? [])
+        .map((item: any) => mapPermission(item.permission))
+        .filter(Boolean),
+    );
+
+    const roles = uniqByCode(
+      (member.roleAssignments ?? [])
+        .map((item: any) => mapRole(item.role))
+        .filter(Boolean),
+    );
+
+    const rolePermissions = uniqByCode(
+      (member.roleAssignments ?? [])
+        .flatMap((assignment: any) => assignment.role?.rolePermissions ?? [])
+        .map((item: any) => mapPermission(item.permission))
+        .filter(Boolean),
+    );
+
+    const effectivePermissions = uniqByCode([
+      ...directPermissions,
+      ...policyPermissions,
+      ...rolePermissions,
+    ]);
+
+    return {
+      roles,
+      roleCodes: roles.map((r: any) => r.code),
+      policies,
+      policyCodes: policies.map((p: any) => p.code),
+      permissions: directPermissions,
+      permissionCodes: directPermissions.map((p: any) => p.code),
+      effectivePermissions,
+      effectivePermissionCodes: effectivePermissions.map((p: any) => p.code),
+    };
   }
 
   /**
@@ -989,6 +1165,12 @@ export class MembersService {
       : type === 'Update'
         ? { disconnect: true }
         : undefined;
+    if (Array.isArray(memberData.skills)) {
+      memberData.skills = memberData.skills
+        .map((skill: any) => (typeof skill === 'string' ? { uid: skill } : skill))
+        .filter((skill: any) => skill?.uid);
+    }
+
     member['skills'] = buildMultiRelationMapping('skills', memberData, type);
     if (type === 'Create') {
       if (Array.isArray(memberData.teamAndRoles)) {
