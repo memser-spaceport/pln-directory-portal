@@ -13,7 +13,6 @@ export function Menu() {
 
   return (
     <ul className="flex space-x-4 text-sm text-gray-700">
-      {isDirectoryAdmin && <MembersMenu />}
       {isDirectoryAdmin && <MembersV2Menu />}
       {isDirectoryAdmin && <AccessControlMenu />}
       {isDirectoryAdmin && <TeamsMenu />}

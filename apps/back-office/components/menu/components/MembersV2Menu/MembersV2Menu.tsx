@@ -109,7 +109,7 @@ export const MembersV2Menu = () => {
   return (
     <div className={s.root} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button className={s.trigger}>
-        <MembersV2Icon /> M V2{' '}
+        <MembersV2Icon /> Members{' '}
         <span className={clsx(s.chevron, { [s.open]: open })}>
           <ChevronDownIcon />
         </span>
