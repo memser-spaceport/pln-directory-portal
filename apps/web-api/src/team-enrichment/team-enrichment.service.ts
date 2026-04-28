@@ -3,10 +3,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
-import {
-  ScrapingDogCompanyProfile,
-  TeamEnrichmentScrapingDogService,
-} from './team-enrichment-scrapingdog.service';
+import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
+import { ScrapingDogCompanyProfile, TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import {
   ENRICHABLE_TEAM_FIELDS,
   EnrichableTeamField,
@@ -98,27 +96,31 @@ export class TeamEnrichmentService {
   async findTeamsEligibleForEnrichment(): Promise<Array<{ uid: string }>> {
     return this.prisma.team.findMany({
       where: {
-        isFund: true,
-        dataEnrichment: { equals: Prisma.DbNull },
-        OR: [
-          { website: null },
-          { website: '' },
-          { blog: null },
-          { blog: '' },
-          { contactMethod: null },
-          { contactMethod: '' },
-          { twitterHandler: null },
-          { twitterHandler: '' },
-          { linkedinHandler: null },
-          { linkedinHandler: '' },
-          { telegramHandler: null },
-          { telegramHandler: '' },
-          { shortDescription: null },
-          { shortDescription: '' },
-          { longDescription: null },
-          { longDescription: '' },
-          { moreDetails: null },
-          { moreDetails: '' },
+        AND: [
+          buildTeamEnrichmentEligibilityFilter(),
+          { dataEnrichment: { equals: Prisma.DbNull } },
+          {
+            OR: [
+              { website: null },
+              { website: '' },
+              { blog: null },
+              { blog: '' },
+              { contactMethod: null },
+              { contactMethod: '' },
+              { twitterHandler: null },
+              { twitterHandler: '' },
+              { linkedinHandler: null },
+              { linkedinHandler: '' },
+              { telegramHandler: null },
+              { telegramHandler: '' },
+              { shortDescription: null },
+              { shortDescription: '' },
+              { longDescription: null },
+              { longDescription: '' },
+              { moreDetails: null },
+              { moreDetails: '' },
+            ],
+          },
         ],
       },
       select: { uid: true },
@@ -255,10 +257,14 @@ export class TeamEnrichmentService {
     ];
     return this.prisma.team.findMany({
       where: {
-        isFund: true,
-        OR: completedStatuses.map((status) => ({
-          dataEnrichment: { path: ['status'], equals: status },
-        })),
+        AND: [
+          buildTeamEnrichmentEligibilityFilter(),
+          {
+            OR: completedStatuses.map((status) => ({
+              dataEnrichment: { path: ['status'], equals: status },
+            })),
+          },
+        ],
       },
       select: { uid: true },
     });
@@ -343,16 +349,20 @@ export class TeamEnrichmentService {
   }> {
     const teams = await this.prisma.team.findMany({
       where: {
-        isFund: true,
-        OR: [
-          { AND: [{ website: { not: null } }, { website: { not: '' } }] },
-          { AND: [{ linkedinHandler: { not: null } }, { linkedinHandler: { not: '' } }] },
+        AND: [
+          buildTeamEnrichmentEligibilityFilter(),
+          {
+            OR: [
+              { AND: [{ website: { not: null } }, { website: { not: '' } }] },
+              { AND: [{ linkedinHandler: { not: null } }, { linkedinHandler: { not: '' } }] },
+            ],
+          },
         ],
       },
       select: { uid: true },
     });
 
-    this.logger.log(`Force logo refetch all: found ${teams.length} isFund teams with website or linkedinHandler`);
+    this.logger.log(`Force logo refetch all: found ${teams.length} eligible teams with website or linkedinHandler`);
 
     const counters = { started: 0, skippedInProgress: 0, skippedUserOwned: 0, noSource: 0, notFound: 0 };
 
