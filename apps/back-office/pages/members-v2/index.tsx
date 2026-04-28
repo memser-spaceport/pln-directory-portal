@@ -231,17 +231,6 @@ const MembersPageV2 = () => {
             </button>
           ))}
 
-          {/* Policies tab — between Approved and Rejected */}
-          <button
-            className={clsx(s.tab, { [s.tabActive]: activeTab === 'POLICIES' })}
-            onClick={() => handleTabChange('POLICIES')}
-          >
-            Policies
-            <span className={clsx(s.tabCount, { [s.tabCountActive]: activeTab === 'POLICIES' })}>
-              {policiesData?.length ?? 0}
-            </span>
-          </button>
-
           <button
             className={clsx(s.tab, { [s.tabActive]: activeTab === REJECTED_TAB.id })}
             onClick={() => handleTabChange(REJECTED_TAB.id)}
@@ -249,6 +238,16 @@ const MembersPageV2 = () => {
             {REJECTED_TAB.label}
             <span className={clsx(s.tabCount, { [s.tabCountActive]: activeTab === REJECTED_TAB.id })}>
               {tabCounts[REJECTED_TAB.id]}
+            </span>
+          </button>
+
+          <button
+            className={clsx(s.tab, { [s.tabActive]: activeTab === 'POLICIES' })}
+            onClick={() => handleTabChange('POLICIES')}
+          >
+            Policies
+            <span className={clsx(s.tabCount, { [s.tabCountActive]: activeTab === 'POLICIES' })}>
+              {policiesData?.length ?? 0}
             </span>
           </button>
         </nav>
