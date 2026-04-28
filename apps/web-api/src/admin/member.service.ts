@@ -199,7 +199,50 @@ export class MemberService {
     );
   }
 
-  private async assignAccessControl(
+
+  private async replaceAccessControl(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    payload: {
+      roleCodes?: string[];
+      policyCodes?: string[];
+      permissionCodes?: string[];
+      actorUid?: string | null;
+    },
+  ): Promise<void> {
+    const roleCodes = [...new Set((payload.roleCodes ?? []).filter(Boolean))];
+    const policyCodes = [...new Set((payload.policyCodes ?? []).filter(Boolean))];
+    const permissionCodes = [...new Set((payload.permissionCodes ?? []).filter(Boolean))];
+
+    await tx.policyAssignment.deleteMany({
+      where: { memberUid },
+    });
+
+    await tx.memberPermissionV2.deleteMany({
+      where: { memberUid },
+    });
+
+    await tx.roleAssignment.updateMany({
+      where: {
+        memberUid,
+        revokedAt: null,
+        status: 'ACTIVE',
+      },
+      data: {
+        revokedAt: new Date(),
+        status: 'REVOKED',
+      },
+    });
+
+    await this.assignAccessControl(tx, memberUid, {
+      roleCodes,
+      policyCodes,
+      permissionCodes,
+      actorUid: payload.actorUid ?? null,
+    });
+  }
+
+private async assignAccessControl(
     tx: Prisma.TransactionClient,
     memberUid: string,
     payload: {
@@ -230,13 +273,29 @@ export class MemberService {
           where: {
             memberUid,
             roleUid: role.uid,
-            revokedAt: null,
-            status: 'ACTIVE',
           },
-          select: { uid: true },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          select: {
+            uid: true,
+            status: true,
+            revokedAt: true,
+          },
         });
 
-        if (!existing) {
+        if (existing) {
+          await tx.roleAssignment.update({
+            where: {
+              uid: existing.uid,
+            },
+            data: {
+              revokedAt: null,
+              status: 'ACTIVE',
+              assignedByMemberUid: payload.actorUid ?? null,
+            },
+          });
+        } else {
           await tx.roleAssignment.create({
             data: {
               uid: crypto.randomUUID(),
@@ -680,7 +739,7 @@ export class MemberService {
         'Updated by admin'
       );
 
-      await this.assignAccessControl(tx, memberUid, {
+      await this.replaceAccessControl(tx, memberUid, {
         roleCodes: (memberData as any).roleCodes ?? [],
         policyCodes: (memberData as any).policyCodes ?? [],
         permissionCodes: (memberData as any).permissionCodes ?? [],
