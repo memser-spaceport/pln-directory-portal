@@ -51,6 +51,7 @@ const policies: PolicySeed[] = [
     group: 'PL Internal',
     permissions: [
       'directory.admin.full',
+      'member.contacts.read',
       'team.search.read',
       'member.search.read',
       'team.priority.read',
@@ -74,6 +75,7 @@ const policies: PolicySeed[] = [
     role: 'PL Infra team',
     group: 'PL Internal',
     permissions: [
+      'member.contacts.read',
       'team.priority.read',
       'membership.source.read',
       'founder_guides.view.all',
@@ -93,6 +95,7 @@ const policies: PolicySeed[] = [
     role: 'Demo Day Admin',
     group: 'PL Internal',
     permissions: [
+      'member.contacts.read',
       'demoday.prep.read',
       'demoday.prep.write',
       'demoday.showcase.read',
@@ -109,6 +112,7 @@ const policies: PolicySeed[] = [
     role: 'Demo Day Stakeholder',
     group: 'PL Internal',
     permissions: [
+      'member.contacts.read',
       'demoday.prep.read',
       'demoday.showcase.read',
       'demoday.active.read',
@@ -121,6 +125,7 @@ const policies: PolicySeed[] = [
     role: 'Demo Day Admin',
     group: 'PL Partner',
     permissions: [
+      'member.contacts.read',
       'demoday.prep.read',
       'demoday.prep.write',
       'demoday.showcase.read',
@@ -137,6 +142,7 @@ const policies: PolicySeed[] = [
     role: 'Demo Day Stakeholder',
     group: 'PL Partner',
     permissions: [
+      'member.contacts.read',
       'demoday.prep.read',
       'demoday.showcase.read',
       'demoday.active.read',
@@ -287,23 +293,14 @@ const policies: PolicySeed[] = [
     name: 'Investor / PL',
     role: 'Investor',
     group: 'PL',
-    permissions: [
-      'member.contacts.read',
-      'irlg.going.read',
-      'oh.demand.read',
-      'demoday.active.read',
-    ],
+    permissions: ['member.contacts.read', 'irlg.going.read', 'oh.demand.read', 'demoday.active.read'],
   },
   {
     code: 'investor_pl_partner',
     name: 'Investor / PL Partner',
     role: 'Investor',
     group: 'PL Partner',
-    permissions: [
-      'member.contacts.read',
-      'oh.demand.read',
-      'demoday.active.read',
-    ],
+    permissions: ['member.contacts.read', 'oh.demand.read', 'demoday.active.read'],
   },
   {
     code: 'unassigned_plc_plvs',
@@ -416,20 +413,6 @@ const policies: PolicySeed[] = [
       'oh.supply.read',
       'oh.supply.write',
       'oh.demand.read',
-    ],
-  },
-  {
-    code: 'advisor_future',
-    name: 'Advisor / Future',
-    role: 'Advisor',
-    group: 'Future',
-    permissions: [
-      'member.contacts.read',
-      'oh.supply.read',
-      'oh.supply.write',
-      'oh.demand.read',
-      'oh.demand.write',
-      'pl.advisors.access',
     ],
   },
 ];

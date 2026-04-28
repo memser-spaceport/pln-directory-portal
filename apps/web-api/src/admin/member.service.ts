@@ -1820,14 +1820,7 @@ private async assignAccessControl(
         },
         notificationSetting: {
           create: {
-            // Set onboarding notification attempts for L4 members
-            ...(memberData.accessLevel === AccessLevel.L4
-              ? {
-                  onboardingAttempts: 1,
-                  lastOnboardingSentAt: new Date(),
-                }
-              : {}),
-            recommendationsEnabled: memberData.accessLevel === AccessLevel.L4,
+            recommendationsEnabled: false,
           },
         },
         ...(investorProfileId && { investorProfileId }),

@@ -6,11 +6,11 @@ import { LogService } from '../../shared/log.service';
 
 @Injectable()
 export class ForestAdminService {
-  constructor(
-    private readonly logService: LogService
-  ) {
-  }
+  constructor(private readonly logService: LogService) {}
   async triggerAirtableSync() {
+    if (process.env.ENVIRONMENT !== APP_ENV.PRODUCTION) {
+      return;
+    }
     try {
       const allSlugs = airtableSlugs();
       await Promise.all([
@@ -27,7 +27,7 @@ export class ForestAdminService {
 function airtableSlugs() {
   //TODO - Move these to envs
   return process.env.ENVIRONMENT === APP_ENV.PRODUCTION
-    ? { 
+    ? {
         team: 'team-to-pln-airtable',
         member: 'member-to-pln-airtable',
         industry: 'industry-tag-to-pln-airtable',

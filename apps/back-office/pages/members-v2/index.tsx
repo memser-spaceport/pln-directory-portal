@@ -20,8 +20,8 @@ type MemberStateTab = 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
 type ActiveTab = MemberStateTab | 'POLICIES';
 
 const MEMBER_STATE_TABS: { id: MemberStateTab; label: string }[] = [
-  { id: 'PENDING', label: 'Pending Members' },
-  { id: 'VERIFIED', label: 'Verified Members' },
+  { id: 'PENDING', label: 'Pending Members (L0)' },
+  { id: 'VERIFIED', label: 'Verified Members (L1)' },
   { id: 'APPROVED', label: 'Approved Members' },
 ];
 
