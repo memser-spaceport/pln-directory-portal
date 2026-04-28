@@ -85,7 +85,7 @@ When a user later edits an enriched field, its `fieldsMeta[field].status` is fli
 
 ### Path C — Automatic marking of eligible existing teams
 
-1. A cron job (`TEAM_ENRICHMENT_MARKING_CRON`) periodically scans for fund teams that have never been enriched (`dataEnrichment` is null)
+1. A cron job (`TEAM_ENRICHMENT_MARKING_CRON`) periodically scans for **eligible** teams that have never been enriched (`dataEnrichment` is null). Eligibility is governed by `TEAM_ENRICHMENT_FILTER_PRIORITY` (see Environment Variables) — when set, teams are filtered by `priority IN (...)`; when empty/unset, teams are filtered by `isFund=true`.
 2. Teams must also have at least one empty enrichable scalar field (website, blog, contactMethod, twitterHandler, linkedinHandler, telegramHandler, shortDescription, longDescription, moreDetails)
 3. Matching teams are marked for enrichment: `dataEnrichment = { shouldEnrich: true, status: 'PendingEnrichment', ... }`
 4. The existing enrichment cron picks them up on its next run
@@ -104,7 +104,7 @@ After enrichment completes, a separate **AI Judge** cron independently verifies 
 
 ### What the judge evaluates
 
-- Only teams with `Team.isFund = true` and `dataEnrichment.status = Enriched`.
+- Only teams matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY` set → `priority IN (...)`; otherwise `isFund=true`) and `dataEnrichment.status = Enriched`.
 - Per-field: only fields whose `fieldsMeta[field].status === Enriched`.
 - **Excluded**: `logo` (binary presence, not a semantic value), anything `ChangedByUser` (user-owned), `CannotEnrich`.
 
@@ -220,7 +220,7 @@ scrapingDog?: {
 
 - **Schedule**: `TEAM_ENRICHMENT_CRON` env var (default: `0 3 * * *` — daily at 3 AM UTC)
 - **Guard**: `IS_TEAM_ENRICHMENT_ENABLED` must be `'true'`
-- Finds all teams with `shouldEnrich=true` and `status=PendingEnrichment`
+- Finds all teams with `shouldEnrich=true` and `status=PendingEnrichment` (the eligibility filter is applied at the *marking* step, so this cron processes everything that's been marked, regardless of current `isFund`/`priority`)
 - Processes sequentially to avoid rate limits
 
 ## Endpoints
@@ -267,7 +267,7 @@ Returns `{ success, message }` on success, or `{ success: false, message }` if e
 POST /v1/admin/teams/trigger-force-enrichment?mode=all|cannotEnrich
 Guard: AdminAuthGuard
 ```
-Finds all `isFund=true` teams with `status ∈ { Enriched, Reviewed, Approved, FailedToEnrich }` and re-queues them using the same `mode` semantics as the single-team variant.
+Finds all teams matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY`) with `status ∈ { Enriched, Reviewed, Approved, FailedToEnrich }` and re-queues them using the same `mode` semantics as the single-team variant.
 Teams currently `InProgress` or `PendingEnrichment` are skipped.
 Returns `{ success, total, started, skipped, message }`.
 
@@ -296,7 +296,7 @@ Returns `{ success: true, message }` when queued. Does NOT require `IS_TEAM_ENRI
 POST /v1/admin/teams/trigger-force-logo-refetch
 Guard: AdminAuthGuard
 ```
-Runs the single-team refetch for every `isFund=true` team with a non-empty `website` or `linkedinHandler`, regardless of current enrichment status. Teams whose logo is `ChangedByUser`, whose enrichment is `InProgress`, or which have no fetchable source are skipped with per-bucket counters.
+Runs the single-team refetch for every team matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY`) with a non-empty `website` or `linkedinHandler`, regardless of current enrichment status. Teams whose logo is `ChangedByUser`, whose enrichment is `InProgress`, or which have no fetchable source are skipped with per-bucket counters.
 Returns `{ success, total, started, skippedInProgress, skippedUserOwned, noSource, notFound, message }`.
 
 ### Team Lead Review
@@ -336,6 +336,7 @@ The shared `isFieldUserOwned(fieldsMeta, field, slotHasValue)` helper at the top
 | Variable | Default     | Description |
 |----------|-------------|-------------|
 | `IS_TEAM_ENRICHMENT_ENABLED` | `false`     | Enable/disable all enrichment-related cron jobs (enrichment, marking, judge) |
+| `TEAM_ENRICHMENT_FILTER_PRIORITY` | _(unset)_   | Comma-separated list of `Team.priority` values (e.g. `1,2,3`). When set, eligibility is `priority IN (...)`. When empty or unset, eligibility is `isFund = true`. |
 | `AI_PROVIDER` | `gemini`    | Global default AI provider. Accepts `openai`, `gemini`, or `anthropic`. |
 | `TEAM_ENRICHMENT_AI_PROVIDER` | —           | Overrides `AI_PROVIDER` for team enrichment only. Accepts `openai`, `gemini`, or `anthropic`. |
 | `TEAM_ENRICHMENT_JUDGE_AI_PROVIDER` | —      | Overrides `AI_PROVIDER` for the AI Judge only. Set to a **different** value from `TEAM_ENRICHMENT_AI_PROVIDER` for a meaningful second-opinion verification (e.g. enrichment=`gemini`, judge=`anthropic`). |
@@ -347,6 +348,18 @@ The shared `isFieldUserOwned(fieldsMeta, field, slotHasValue)` helper at the top
 | `TEAM_ENRICHMENT_MARKING_CRON` | `0 2 * * *` | Cron schedule for auto-marking eligible teams |
 | `TEAM_ENRICHMENT_JUDGE_CRON` | `0 4 * * *` | Cron schedule for the AI Judge second-pass verification job |
 | `SCRAPINGDOG_API_KEY` | —           | ScrapingDog LinkedIn API key. When set, enables the ScrapingDog fallback for teams with a known `linkedinHandler`. |
+
+### Eligibility filter
+
+`TEAM_ENRICHMENT_FILTER_PRIORITY` gates which teams the marking cron, force-enrich-all, force-logo-refetch-all, and the judge cron operate on:
+
+| Use case | `TEAM_ENRICHMENT_FILTER_PRIORITY` | Resulting WHERE clause |
+|----------|-----------------------------------|------------------------|
+| Default — fund teams only | _(unset / empty)_ | `isFund = true` |
+| P1/P2/P3 teams | `1,2,3` | `priority IN (1, 2, 3)` |
+| Only P1 teams | `1` | `priority IN (1)` |
+
+This filter does **not** affect single-team admin endpoints (`POST /v1/admin/teams/:uid/trigger-enrichment` etc.) — those are explicit overrides and run on whatever uid is provided. Path A (Demo Day approval) and Path B (participants-request team creation) are also unaffected; they continue to mark fund / new-L1 teams regardless of this env var.
 
 ### AI provider selection
 
@@ -363,6 +376,7 @@ Web search behaviour differs by provider:
 ```
 apps/web-api/src/team-enrichment/
   team-enrichment.types.ts          # Enums, interfaces, enrichable fields
+  team-enrichment-eligibility-filter.ts # Shared isFund/priority WHERE filter for cron + admin queries
   team-enrichment-ai.service.ts     # Enrichment LLM wrapper + logo scraping
   team-enrichment-scrapingdog.service.ts # LinkedIn fallback + classifyNameMatch/compareProfileToTeam helpers
   team-enrichment.service.ts        # Core enrichment business logic
