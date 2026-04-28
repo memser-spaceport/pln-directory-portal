@@ -1,13 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
-import {
-  JudgeFieldInput,
-  JudgeTeamContext,
-  TeamEnrichmentJudgeAiService,
-} from './team-enrichment-judge-ai.service';
-import {
-  TeamEnrichmentScrapingDogService,
-} from './team-enrichment-scrapingdog.service';
+import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
+import { JudgeFieldInput, JudgeTeamContext, TeamEnrichmentJudgeAiService } from './team-enrichment-judge-ai.service';
+import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import {
   EnrichmentStatus,
   FieldEnrichmentMeta,
@@ -16,7 +11,6 @@ import {
   FieldMetaKey,
   JudgmentStatus,
   JudgmentVerdict,
-  NameMatchTier,
   TeamDataEnrichment,
   TeamJudgment,
 } from './team-enrichment.types';
@@ -68,15 +62,18 @@ export class TeamEnrichmentJudgeService {
   ) {}
 
   /**
-   * Finds fund teams whose enrichment is complete but have not been judged yet.
-   * DB-level filter: isFund=true AND dataEnrichment.status=Enriched.
+   * Finds eligible teams whose enrichment is complete but have not been judged yet.
+   * DB-level filter: shared eligibility filter (isFund / priority, see
+   * `buildTeamEnrichmentEligibilityFilter`) AND dataEnrichment.status=Enriched.
    * In-memory filter: judgment.status not Judged/InProgress AND at least one judgable field.
    */
   async findTeamsPendingJudgment(): Promise<TeamRecord[]> {
     const candidates = await this.prisma.team.findMany({
       where: {
-        isFund: true,
-        dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched },
+        AND: [
+          buildTeamEnrichmentEligibilityFilter(),
+          { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched } },
+        ],
       },
       select: {
         uid: true,
