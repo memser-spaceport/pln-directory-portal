@@ -8,7 +8,7 @@ export interface JobOpeningIngestItem {
   seniority?: string;
   urgency?: string;
   summary?: string;
-  location?: string;
+  location?: string[];
   workMode?: string;
   ws4AskId?: string;
   detectionDate: string;

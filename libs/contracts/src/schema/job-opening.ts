@@ -40,7 +40,7 @@ export const JobRoleSchema = z.object({
   roleTitle: z.string(),
   roleCategory: z.string().nullable(),
   seniority: z.string().nullable(),
-  location: z.string().nullable(),
+  location: z.array(z.string()),
   workMode: z.string().nullable(),
   applyUrl: z.string().nullable(),
   lastUpdated: z.string(),

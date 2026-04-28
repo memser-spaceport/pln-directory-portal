@@ -52,7 +52,7 @@ export class JobOpeningsQueryService {
     }
 
     if (!overrides.dropLocation && query.location.length > 0) {
-      and.push({ location: { in: query.location } });
+      and.push({ location: { hasSome: query.location } });
     }
 
     if (!overrides.dropWorkMode && query.workMode.length > 0) {
@@ -326,6 +326,11 @@ export class JobOpeningsQueryService {
     where: Prisma.JobOpeningWhereInput,
     include?: (value: string) => boolean
   ) {
+    // For location array field, use special handling to unnest and count
+    if (field === 'location') {
+      return this.countLocationArray(where, include);
+    }
+
     const scopedWhere: Prisma.JobOpeningWhereInput = { ...where, [field]: { not: null } };
     const rows = await this.prisma.jobOpening.groupBy({
       by: [field],
@@ -340,8 +345,6 @@ export class JobOpeningsQueryService {
             ? row.roleCategory
             : field === 'seniority'
             ? row.seniority
-            : field === 'location'
-            ? row.location
             : row.workMode;
         return {
           value,
@@ -349,6 +352,36 @@ export class JobOpeningsQueryService {
         };
       })
       .filter((row): row is { value: string; count: number } => Boolean(row.value))
+      .filter((row) => (include ? include(row.value) : true))
+      .sort((a, b) => a.value.localeCompare(b.value));
+  }
+
+  private async countLocationArray(
+    where: Prisma.JobOpeningWhereInput,
+    include?: (value: string) => boolean
+  ) {
+    // Get all matching job IDs with non-empty location arrays
+    const jobs = await this.prisma.jobOpening.findMany({
+      where: {
+        ...where,
+        location: { isEmpty: false },
+      },
+      select: {
+        location: true,
+      },
+    });
+
+    // Count occurrences of each location value across all arrays
+    const counts = new Map<string, number>();
+    for (const job of jobs) {
+      for (const loc of job.location) {
+        counts.set(loc, (counts.get(loc) ?? 0) + 1);
+      }
+    }
+
+    // Convert to array, apply include filter, and sort
+    return [...counts.entries()]
+      .map(([value, count]) => ({ value, count }))
       .filter((row) => (include ? include(row.value) : true))
       .sort((a, b) => a.value.localeCompare(b.value));
   }

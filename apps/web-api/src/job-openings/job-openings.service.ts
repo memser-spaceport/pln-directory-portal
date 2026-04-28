@@ -63,7 +63,7 @@ export class JobOpeningsService {
       seniority: item.seniority ?? null,
       urgency: item.urgency ?? null,
       summary: item.summary ?? null,
-      location: item.location ?? null,
+      location: item.location ?? [],
       workMode: item.workMode ?? null,
       ws4AskId: item.ws4AskId ?? null,
       detectionDate: new Date(item.detectionDate),

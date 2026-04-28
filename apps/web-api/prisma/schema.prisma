@@ -1998,7 +1998,7 @@ model JobOpening {
   seniority       String?
   urgency         String?
   summary         String?
-  location        String?
+  location        String[]          @default([])
   workMode        String?
   ws4AskId        String?
   detectionDate   DateTime
@@ -2032,7 +2032,7 @@ model JobOpening {
   @@index([teamUid])
   @@index([roleCategory])
   @@index([seniority])
-  @@index([location])
+  @@index([location], map: "job_opening_location_idx", type: Gin)
   @@index([workMode])
   @@index([updatedAt])
 }
