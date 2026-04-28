@@ -147,7 +147,7 @@ async function main() {
         department: row.Department || null,
         seniority: mapSeniority(row.Seniority),
         summary: row.Summary || null,
-        location: row.Location || null,
+        location: row.Location ? [row.Location] : [],
         workMode: null,
         detectionDate,
         sourceType: row['Source Type'] || null,
