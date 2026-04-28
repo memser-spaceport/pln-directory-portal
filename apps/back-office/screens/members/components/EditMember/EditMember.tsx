@@ -63,7 +63,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
           return;
         }
 
-        let imageUid: string | undefined;
+        let imageUid: string | undefined = data?.image?.uid;
 
         if (formData.image) {
           const imgResponse = await saveRegistrationImage(formData.image);
@@ -188,7 +188,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
         toast.error(e?.response?.data?.message ?? 'Failed to update member. Please try again.');
       }
     },
-    [mutateAsync, rbacRolesData, policiesData, uid, authToken]
+    [mutateAsync, rbacRolesData, policiesData, uid, authToken, data?.image?.uid]
   );
 
   const initialData = useMemo(() => {
