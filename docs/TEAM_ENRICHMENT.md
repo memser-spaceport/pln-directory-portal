@@ -105,8 +105,11 @@ After enrichment completes, a separate **AI Judge** cron independently verifies 
 ### What the judge evaluates
 
 - Only teams matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY` set → `priority IN (...)`; otherwise `isFund=true`) and `dataEnrichment.status = Enriched`.
-- Per-field: only fields whose `fieldsMeta[field].status === Enriched`.
-- **Excluded**: `logo` (binary presence, not a semantic value), anything `ChangedByUser` (user-owned), `CannotEnrich`.
+- Per-field, the judge runs on either:
+  - any field whose `fieldsMeta[field].status === Enriched`, OR
+  - a **user-supplied** website / contact link (`fieldsMeta[field].status === ChangedByUser`) — restricted to: `website`, `blog`, `contactMethod`, `linkedinHandler`, `twitterHandler`, `telegramHandler`. These are the high-signal identity fields a team lead can fill in directly, and we want an independent check that the value really belongs to the team.
+- **Excluded**: `logo` (binary presence, not a semantic value), `CannotEnrich`, any `ChangedByUser` field outside the user-judgable subset above (descriptions, `industryTags`, `investmentFocus`).
+- **Non-destructive for user data**: when judging a `ChangedByUser` field, the judge still only writes the `judgment` sub-object. The field's value, `status`, `confidence`, and `source` on `Team` and in `fieldsMeta` are preserved verbatim. A "disagrees" verdict surfaces the field in `fieldsForReview` for admin review but never overwrites the user's input. The bad-LinkedIn-handle nulling path also continues to skip user-supplied handles.
 
 ### Two stages
 
@@ -115,7 +118,7 @@ After enrichment completes, a separate **AI Judge** cron independently verifies 
 
 ### fieldsMeta after judgment
 
-The judge is **non-destructive**: it adds a `judgment` sub-object to each enriched field but does not overwrite any enrichment-time values. The top-level `confidence` remains as enrichment set it (including any ScrapingDog upgrade applied during enrichment). Admins who want the judge's independent confidence should read `fieldsMeta[field].judgment.confidence`.
+The judge is **non-destructive**: it adds a `judgment` sub-object to each judged field but does not overwrite any enrichment-time values. The top-level `status`, `confidence`, and `source` remain as enrichment (or the user) set them — including any ScrapingDog confidence upgrade applied during enrichment, and including `ChangedByUser` for user-supplied website/contact-link fields that the judge now also evaluates. Admins who want the judge's independent confidence should read `fieldsMeta[field].judgment.confidence`.
 
 ```ts
 fieldsMeta[field]: {
