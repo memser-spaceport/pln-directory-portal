@@ -4,6 +4,7 @@ import * as path from 'path';
 import Handlebars from 'handlebars';
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import pLimit from 'p-limit';
 import type { JobAlertFilterState } from 'libs/contracts/src/schema/job-alert';
 import { JobOpeningsQueryService } from '../job-openings/job-openings-query.service';
 import { PrismaService } from '../shared/prisma.service';
@@ -15,6 +16,8 @@ import { seniorityLabel } from './job-alerts.utils';
 const DIGEST_TEMPLATE = path.join(__dirname, 'shared', 'jobAlertDigest.hbs');
 const CONFIRMATION_TEMPLATE = path.join(__dirname, 'shared', 'jobAlertConfirmation.hbs');
 const MAX_ROLES_IN_EMAIL = 10;
+const BATCH_SIZE = 50;
+const EMAIL_CONCURRENCY = 5;
 
 const buildAppUrl = (pathname: string) => {
   const base = process.env.WEB_UI_BASE_URL || process.env.APPLICATION_BASE_URL || 'https://www.plnetwork.io';
@@ -28,13 +31,13 @@ export class JobAlertsDispatchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jobOpeningsQueryService: JobOpeningsQueryService,
-    private readonly awsService: AwsService,
+    private readonly awsService: AwsService
   ) {}
 
   @OnEvent(JOB_INGEST_COMPLETED)
   async onJobIngestCompleted(payload: JobIngestCompletedPayload) {
     this.logger.log(
-      `Received ${JOB_INGEST_COMPLETED} runId=${payload.runId} created=${payload.created} updated=${payload.updated}`,
+      `Received ${JOB_INGEST_COMPLETED} runId=${payload.runId} created=${payload.created} updated=${payload.updated}`
     );
     if (payload.created === 0 && payload.updated === 0) {
       this.logger.log('Skipping dispatch: no new or updated jobs in this run');
@@ -44,81 +47,134 @@ export class JobAlertsDispatchService {
   }
 
   async dispatch(payload: JobIngestCompletedPayload): Promise<{ sent: number; skipped: number }> {
-    const activeAlerts = await this.prisma.jobAlert.findMany({
-      where: { deletedAt: null },
-      select: {
-        uid: true,
-        memberUid: true,
-        name: true,
-        filterState: true,
-        lastSentAt: true,
-        createdAt: true,
-        member: { select: { uid: true, email: true, name: true, deletedAt: true } },
-      },
-    });
-
     let sent = 0;
     let skipped = 0;
+    let cursor: string | undefined;
 
-    for (const alert of activeAlerts) {
-      if (!alert.member?.email || alert.member.deletedAt) {
-        skipped++;
-        continue;
-      }
-
-      const existingRun = await this.prisma.jobAlertSendRun.findUnique({
-        where: { alertUid_ingestRunId: { alertUid: alert.uid, ingestRunId: payload.runId } },
-        select: { uid: true },
+    do {
+      const batch = await this.prisma.jobAlert.findMany({
+        where: { deletedAt: null },
+        select: {
+          uid: true,
+          memberUid: true,
+          name: true,
+          filterState: true,
+          lastSentAt: true,
+          createdAt: true,
+          member: { select: { uid: true, email: true, name: true, deletedAt: true } },
+        },
+        take: BATCH_SIZE,
+        skip: cursor ? 1 : 0,
+        cursor: cursor ? { uid: cursor } : undefined,
+        orderBy: { uid: 'asc' },
       });
-      if (existingRun) {
-        this.logger.log(`Idempotency: alert ${alert.uid} already dispatched for run ${payload.runId}`);
-        skipped++;
-        continue;
-      }
 
-      const filterState = alert.filterState as unknown as JobAlertFilterState;
-      const sinceTs = alert.lastSentAt ?? alert.createdAt;
-      const matches = await this.jobOpeningsQueryService.findNewMatchesSince(
-        { ...filterState, page: 1, limit: 50, sort: 'newest' },
-        sinceTs,
+      if (batch.length === 0) break;
+
+      const validAlerts = batch.filter(
+        (alert): alert is typeof alert & { member: NonNullable<typeof alert.member> & { email: string } } =>
+          Boolean(alert.member?.email && !alert.member.deletedAt)
+      );
+      skipped += batch.length - validAlerts.length;
+
+      const alreadySent = await this.getAlreadySentAlerts(
+        validAlerts.map((a) => a.uid),
+        payload.runId
       );
 
-      if (matches.length === 0) {
-        this.logger.log(`Alert ${alert.uid}: no new matches since ${sinceTs.toISOString()}`);
-        skipped++;
-        continue;
+      const alertsToProcess = validAlerts.filter((alert) => !alreadySent.has(alert.uid));
+      skipped += validAlerts.length - alertsToProcess.length;
+
+      if (alertsToProcess.length > 0) {
+        const batchResults = await this.processBatch(alertsToProcess, payload.runId);
+        sent += batchResults.sent;
+        skipped += batchResults.skipped;
       }
 
-      try {
-        await this.sendDigestEmail({
-          alertUid: alert.uid,
-          alertName: alert.name,
-          memberEmail: alert.member.email,
-          matches,
-          filterState,
-        });
-        await this.prisma.jobAlertSendRun.create({
-          data: {
+      cursor = batch.length === BATCH_SIZE ? batch[batch.length - 1].uid : undefined;
+      this.logger.log(`Processed batch of ${batch.length} alerts, cursor: ${cursor ?? 'end'}`);
+    } while (cursor);
+
+    this.logger.log(`Dispatch complete for runId=${payload.runId}: ${sent} alerts had matches, ${skipped} skipped`);
+    return { sent, skipped };
+  }
+
+  private async getAlreadySentAlerts(alertUids: string[], runId: string): Promise<Set<string>> {
+    const existing = await this.prisma.jobAlertSendRun.findMany({
+      where: {
+        alertUid: { in: alertUids },
+        ingestRunId: runId,
+      },
+      select: { alertUid: true },
+    });
+    return new Set(existing.map((r) => r.alertUid));
+  }
+
+  private async processBatch(
+    alerts: Array<{
+      uid: string;
+      memberUid: string;
+      name: string;
+      filterState: unknown;
+      lastSentAt: Date | null;
+      createdAt: Date;
+      member: { uid: string; email: string; name: string | null; deletedAt: Date | null };
+    }>,
+    runId: string
+  ): Promise<{ sent: number; skipped: number }> {
+    let sent = 0;
+    let skipped = 0;
+    const limit = pLimit(EMAIL_CONCURRENCY);
+
+    const tasks = alerts.map((alert) =>
+      limit(async () => {
+        const filterState = alert.filterState as unknown as JobAlertFilterState;
+        const sinceTs = alert.lastSentAt ?? alert.createdAt;
+
+        try {
+          const matches = await this.jobOpeningsQueryService.findNewMatchesSince(
+            { ...filterState, page: 1, limit: 50, sort: 'newest' },
+            sinceTs
+          );
+
+          if (matches.length === 0) {
+            this.logger.log(`Alert ${alert.uid}: no new matches since ${sinceTs.toISOString()}`);
+            skipped++;
+            return;
+          }
+
+          await this.sendDigestEmail({
             alertUid: alert.uid,
-            ingestRunId: payload.runId,
-            matchCount: matches.length,
-            emailType: 'digest',
-          },
-        });
-        await this.prisma.jobAlert.update({
-          where: { uid: alert.uid },
-          data: { lastSentAt: new Date() },
-        });
-        sent++;
-      } catch (err) {
-        this.logger.error(`Failed to dispatch alert ${alert.uid}: ${(err as Error).message}`);
-        skipped++;
-      }
-    }
+            alertName: alert.name,
+            memberEmail: alert.member.email,
+            matches,
+            filterState,
+          });
 
-    this.logger.log(
-      `Dispatch complete for runId=${payload.runId}: ${sent} alerts had matches, ${skipped} skipped`,
+          await this.prisma.jobAlertSendRun.create({
+            data: {
+              alertUid: alert.uid,
+              ingestRunId: runId,
+              matchCount: matches.length,
+              emailType: 'digest',
+            },
+          });
+
+          await this.prisma.jobAlert.update({
+            where: { uid: alert.uid },
+            data: { lastSentAt: new Date() },
+          });
+
+          sent++;
+        } catch (err) {
+          this.logger.error(`Failed to dispatch alert ${alert.uid}: ${(err as Error).message}`);
+          skipped++;
+        }
+      })
     );
+
+    await Promise.all(tasks);
+
     return { sent, skipped };
   }
 
@@ -130,9 +186,7 @@ export class JobAlertsDispatchService {
     filterState: JobAlertFilterState;
   }) {
     const { alertUid, alertName, memberEmail, matches, filterState } = args;
-    const subject = `${matches.length} role${
-      matches.length === 1 ? '' : 's'
-    } match from PL network: ${alertName}`;
+    const subject = `${matches.length} role${matches.length === 1 ? '' : 's'} match from PL network: ${alertName}`;
     const data = this.buildEmailData({ alertUid, alertName, matches, filterState });
     await this.send({ template: CONFIRMATION_TEMPLATE, subject, data, to: memberEmail });
     await this.prisma.jobAlertSendRun.create({
@@ -153,9 +207,7 @@ export class JobAlertsDispatchService {
     filterState: JobAlertFilterState;
   }) {
     const { alertUid, alertName, memberEmail, matches, filterState } = args;
-    const subject = `${matches.length} new role${
-      matches.length === 1 ? '' : 's'
-    } match from PL network: ${alertName}`;
+    const subject = `${matches.length} new role${matches.length === 1 ? '' : 's'} match from PL network: ${alertName}`;
     const data = this.buildEmailData({ alertUid, alertName, matches, filterState });
     await this.send({ template: DIGEST_TEMPLATE, subject, data, to: memberEmail });
   }
@@ -173,10 +225,10 @@ export class JobAlertsDispatchService {
       const applyUrl = role.sourceLink
         ? buildAppUrl(
             `/jobs/redirect?token=${encodeURIComponent(
-              issueJobAlertToken({ purpose: 'redirect', alertUid, jobUid: role.uid, applyUrl: role.sourceLink }),
+              issueJobAlertToken({ purpose: 'redirect', alertUid, jobUid: role.uid, applyUrl: role.sourceLink })
             )}&utm_source=job_alerts&utm_medium=email&utm_code=${utmCode}&alert_uid=${alertUid}&job_uid=${
               role.uid
-            }&position=${idx + 1}`,
+            }&position=${idx + 1}`
           )
         : null;
       return {
@@ -232,7 +284,7 @@ export class JobAlertsDispatchService {
       args.subject,
       fromAddress,
       [args.to],
-      [],
+      []
     );
   }
 
@@ -251,7 +303,7 @@ export class JobAlertsDispatchService {
           `  To:      ${args.to}\n` +
           `  Subject: ${args.subject}\n` +
           `  Preview: file://${previewPath}\n` +
-          '─────────────────────────────────────────────────────────',
+          '─────────────────────────────────────────────────────────'
       );
     } catch (err) {
       this.logger.error(`Failed to render email preview: ${(err as Error).message}`);

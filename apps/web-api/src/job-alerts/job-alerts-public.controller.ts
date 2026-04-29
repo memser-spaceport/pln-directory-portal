@@ -1,15 +1,12 @@
-import { BadRequestException, Body, Controller, NotFoundException, Post } from '@nestjs/common';
-import {
-  UnsubscribeRequestSchema,
-  VerifyRedirectRequestSchema,
-} from 'libs/contracts/src/schema/job-alert';
+import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
+import { UnsubscribeRequestSchema, VerifyRedirectRequestSchema } from 'libs/contracts/src/schema/job-alert';
 import { NoCache } from '../decorators/no-cache.decorator';
-import { PrismaService } from '../shared/prisma.service';
+import { JobAlertsService } from './job-alerts.service';
 import { verifyJobAlertToken } from './job-alerts-token.util';
 
 @Controller('v1/job-alerts')
 export class JobAlertsPublicController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly service: JobAlertsService) {}
 
   @Post('verify-redirect')
   @NoCache()
@@ -35,26 +32,6 @@ export class JobAlertsPublicController {
   @NoCache()
   async unsubscribe(@Body() body: unknown) {
     const parsed = UnsubscribeRequestSchema.parse(body);
-    let payload;
-    try {
-      payload = verifyJobAlertToken(parsed.token, 'unsubscribe');
-    } catch (err) {
-      throw new BadRequestException((err as Error).message);
-    }
-    const alert = await this.prisma.jobAlert.findFirst({
-      where: { uid: payload.alertUid, deletedAt: null },
-      select: { uid: true, name: true, filterStateHash: true },
-    });
-    if (!alert) {
-      throw new NotFoundException('Job alert not found');
-    }
-    await this.prisma.jobAlert.update({
-      where: { uid: alert.uid },
-      data: {
-        deletedAt: new Date(),
-        filterStateHash: `${alert.filterStateHash}#deleted:${alert.uid}`,
-      },
-    });
-    return { alertUid: alert.uid, alertName: alert.name };
+    return this.service.unsubscribeByToken(parsed.token);
   }
 }

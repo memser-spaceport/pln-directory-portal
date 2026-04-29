@@ -12,6 +12,7 @@ import { JobOpeningsQueryService } from '../job-openings/job-openings-query.serv
 import { PrismaService } from '../shared/prisma.service';
 import { JobAlertsDispatchService } from './job-alerts-dispatch.service';
 import { canonicalizeFilterState, generateAutoName, hashFilterState } from './job-alerts.utils';
+import { verifyJobAlertToken } from './job-alerts-token.util';
 
 @Injectable()
 export class JobAlertsService {
@@ -162,6 +163,25 @@ export class JobAlertsService {
         filterStateHash: `${existing.filterStateHash}#deleted:${uid}`,
       },
     });
+  }
+
+  async unsubscribeByToken(token: string): Promise<{ alertUid: string; alertName: string }> {
+    const payload = verifyJobAlertToken(token, 'unsubscribe');
+    const alert = await this.prisma.jobAlert.findFirst({
+      where: { uid: payload.alertUid, deletedAt: null },
+      select: { uid: true, name: true, filterStateHash: true },
+    });
+    if (!alert) {
+      throw new NotFoundException('Job alert not found');
+    }
+    await this.prisma.jobAlert.update({
+      where: { uid: alert.uid },
+      data: {
+        deletedAt: new Date(),
+        filterStateHash: `${alert.filterStateHash}#deleted:${alert.uid}`,
+      },
+    });
+    return { alertUid: alert.uid, alertName: alert.name };
   }
 
   private hasAtLeastOneFilter(canonical: JobAlertFilterState): boolean {
