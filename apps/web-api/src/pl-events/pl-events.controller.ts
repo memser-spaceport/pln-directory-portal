@@ -48,7 +48,9 @@ import { InternalAuthGuard } from '../guards/auth.guard';
 import { TeamsService } from '../teams/teams.service';
 import { AccessLevelsGuard } from '../guards/access-levels.guard';
 import { AccessLevels } from '../decorators/access-levels.decorator';
-import { AccessLevel } from 'libs/contracts/src/schema/admin-member';
+import { RbacGuard } from '../rbac/rbac.guard';
+import { RequirePermissions } from '../rbac/rbac.decorator';
+import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
@@ -124,8 +126,8 @@ export class PLEventsController {
 
   @Api(server.route.createPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions(RBAC_PERMISSION_CODES.IRLG_GOING_WRITE)
   async createPLEventGuestByLocation(
     @Param("uid") locationUid,
     @Body() body: CreatePLEventGuestSchemaDto,
@@ -153,8 +155,8 @@ export class PLEventsController {
 
   @Api(server.route.modifyPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions(RBAC_PERMISSION_CODES.IRLG_GOING_WRITE)
   async modifyPLEventGuestByLocation(
     @Param("uid") locationUid,
     @Param("guestUid") guestUid,
@@ -180,8 +182,8 @@ export class PLEventsController {
 
   @Api(server.route.deletePLEventGuestsByLocation)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions(RBAC_PERMISSION_CODES.IRLG_GOING_WRITE)
   async deletePLEventGuestsByLocation(
     @Param("uid") locationUid,
     @Body() body: DeletePLEventGuestsSchemaDto,
@@ -282,7 +284,7 @@ export class PLEventsController {
   async getAllPLEventContributors(@Req() request: Request) {
     return await this.teamService.getAllPLEventContibutors(request.query);
   }
-  
+
   @Api(server.route.getAllAggregatedData)
   @ApiQueryFromZod(PLEventAggregatedDataQueryParams)
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
@@ -295,8 +297,8 @@ export class PLEventsController {
   }
 
   @Api(server.route.sendEventGuestPresenceRequest)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions(RBAC_PERMISSION_CODES.IRLG_GOING_WRITE)
   async sendEventGuestPresenceRequest(
     @Param('uid') locationUid: string,
     @Body() body,

@@ -4,6 +4,9 @@ import { DealsService } from './deals.service';
 import { ListDealsQueryDto, ReportDealIssueDto, SubmitDealDto } from './deals.dto';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { RbacGuard } from '../rbac/rbac.guard';
+import { RequirePermissions } from '../rbac/rbac.decorator';
+import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 
 @Controller('v1/deals')
 export class DealsController {
@@ -19,7 +22,8 @@ export class DealsController {
   }
 
   @NoCache()
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(RBAC_PERMISSION_CODES.DEALS_VIEW)
   @Get()
   async list(@Req() req: Request, @Query() query: ListDealsQueryDto) {
     return this.dealsService.listForUser(req['userEmail'], query);
@@ -32,7 +36,8 @@ export class DealsController {
   }
 
   @NoCache()
-  @UseGuards(UserTokenCheckGuard)
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(RBAC_PERMISSION_CODES.DEALS_VIEW)
   @Get(':uid')
   async getOne(@Req() req: Request, @Param('uid') uid: string) {
     return this.dealsService.getForUser(req['userEmail'], uid);

@@ -7,7 +7,8 @@ export const RBAC_PERMISSION_CODES = {
   FOUNDER_GUIDES_VIEW: 'founder_guides.view',
   FOUNDER_GUIDES_CREATE: 'founder_guides.create',
   DEMO_DAY_REPORT_LINK_VIEW: 'demo_day.report_link.view',
-  DEALS_VIEW: 'deals.view',
+  DEALS_VIEW: 'deals.read',
+  IRLG_GOING_WRITE: 'irlg.going.write',
 } as const;
 
 export const RBAC_SCOPES = {
