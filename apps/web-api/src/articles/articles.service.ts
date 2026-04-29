@@ -1026,10 +1026,6 @@ export class ArticlesService {
       return { members: [], teams: [] };
     }
 
-    const memberAccessOk: Prisma.MemberWhereInput = {
-      OR: [{ accessLevel: null }, { accessLevel: { notIn: ['L0', 'L1'] } }],
-    };
-
     const teamAccessOk: Prisma.TeamWhereInput = {
       OR: [{ accessLevel: null }, { accessLevel: { not: 'L0' } }],
     };
@@ -1039,7 +1035,7 @@ export class ArticlesService {
         where: {
           deletedAt: null,
           AND: [
-            memberAccessOk,
+            { memberApproval: { state: { in: ['APPROVED'] } } },
             {
               OR: [{ name: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }],
             },
