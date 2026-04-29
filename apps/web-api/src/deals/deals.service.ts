@@ -12,6 +12,7 @@ import {
   UpdateDealSubmissionDto,
   UpsertDealDto,
 } from './deals.dto';
+import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 
 @Injectable()
 export class DealsService {
