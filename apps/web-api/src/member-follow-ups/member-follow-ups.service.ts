@@ -42,9 +42,7 @@ export class MemberFollowUpsService {
           ...query.where,
           interaction: {
             sourceMember: {
-              accessLevel: {
-                notIn: ['L0', 'L1', 'Rejected'],
-              },
+              memberApproval: { state: { in: ['APPROVED'] } },
             },
           },
         },

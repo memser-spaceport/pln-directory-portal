@@ -103,11 +103,9 @@ export class MembersService {
    */
   async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: number; members: Member[] }> {
     try {
-      const where = {
+      const where: Prisma.MemberWhereInput = {
         ...queryOptions.where,
-        accessLevel: {
-          notIn: ['L0', 'L1', 'Rejected'],
-        },
+        memberApproval: { state: { in: ['APPROVED'] } },
       };
 
       const [members, membersCount] = await this.prisma.$transaction([
@@ -147,11 +145,11 @@ export class MembersService {
     loginEmail: string | null
   ): Promise<{ count: number; members: Member[] }> {
     try {
-      const accessLevelFilter: Prisma.MemberWhereInput = {
-        accessLevel: { notIn: ['L0', 'L1', 'Rejected'] },
+      const approvalFilter: Prisma.MemberWhereInput = {
+        memberApproval: { state: { in: ['APPROVED'] } },
       };
 
-      const filters: Prisma.MemberWhereInput[] = [accessLevelFilter];
+      const filters: Prisma.MemberWhereInput[] = [approvalFilter];
 
       if (loginEmail) {
         filters.push({ email: loginEmail });
@@ -1993,11 +1991,9 @@ export class MembersService {
     const limit = Math.min(filters.limit || 20, 100);
     const skip = (page - 1) * limit;
 
-    // Base where clause excluding rejected access levels
+    // Base where clause including only approved members
     const baseWhere: Prisma.MemberWhereInput = {
-      accessLevel: {
-        notIn: ['L0', 'L1', 'Rejected'],
-      },
+      memberApproval: { state: { in: ['APPROVED'] } },
     };
 
     const whereConditions: Prisma.MemberWhereInput[] = [baseWhere];
@@ -2606,9 +2602,7 @@ export class MembersService {
 
       // Build member filter for office hours
       const memberFilter: any = {
-        accessLevel: {
-          notIn: ['L0', 'L1', 'Rejected'],
-        },
+        memberApproval: { state: { in: ['APPROVED'] } },
         ...(hasOfficeHours && {
           AND: [
             {
@@ -2814,9 +2808,7 @@ export class MembersService {
     try {
       // Build member filter for office hours
       const memberFilter: any = {
-        accessLevel: {
-          notIn: ['L0', 'L1', 'Rejected'],
-        },
+        memberApproval: { state: { in: ['APPROVED'] } },
         ...(hasOfficeHours && {
           AND: [
             {

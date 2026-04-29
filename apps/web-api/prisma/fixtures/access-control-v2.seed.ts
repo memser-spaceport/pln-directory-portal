@@ -413,6 +413,8 @@ const policies: PolicySeed[] = [
       'oh.supply.read',
       'oh.supply.write',
       'oh.demand.read',
+      'forum.read',
+      'forum.write',
     ],
   },
 ];
