@@ -21,6 +21,8 @@ import {IrlGatheringPushConfigService} from "./push/irl-gathering-push-config.se
 import {IrlGatheringPushConfigController} from "./push/irl-gathering-push-config.controller";
 import {IrlGatheringPushNotificationsController} from "./push/irl-gathering-push-notifications.controller";
 import { IrlGatheringPushNotificationsProcessor } from './push/irl-gathering-push-notifications.processor';
+import { RbacModule } from '../rbac/rbac.module';
+import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 
 @Module({
   controllers: [PLEventsController, IrlGatheringPushConfigController, IrlGatheringPushNotificationsController],
@@ -53,6 +55,8 @@ import { IrlGatheringPushNotificationsProcessor } from './push/irl-gathering-pus
     forwardRef(() => TeamsModule),
     forwardRef(() => EventsModule),
     forwardRef(() => PushNotificationsModule),
+    RbacModule,
+    AccessControlV2Module,
   ],
 })
 export class PLEventsModule {}

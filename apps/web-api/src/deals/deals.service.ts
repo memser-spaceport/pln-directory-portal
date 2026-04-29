@@ -1,8 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { DealIssueStatus, DealStatus, DealSubmissionStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
-import { RbacService } from '../rbac/rbac.service';
-import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
+import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import {
   ListDealIssuesQueryDto,
   ListDealsQueryDto,
@@ -16,7 +15,7 @@ import {
 
 @Injectable()
 export class DealsService {
-  constructor(private readonly prisma: PrismaService, private readonly rbacService: RbacService) {}
+  constructor(private readonly prisma: PrismaService, private readonly accessControlV2Service: AccessControlV2Service) {}
 
   private async resolveMemberByEmail(userEmail: string) {
     if (!userEmail) {
@@ -58,12 +57,12 @@ export class DealsService {
       return resolved;
     }
 
-    const hasDealsViewPermission = await this.rbacService.hasPermission(
+    const { allowed } = await this.accessControlV2Service.hasPermission(
       resolved.memberUid,
       RBAC_PERMISSION_CODES.DEALS_VIEW
     );
 
-    if (!hasDealsViewPermission) {
+    if (!allowed) {
       throw new ForbiddenException('Deals access denied');
     }
 
@@ -174,9 +173,12 @@ export class DealsService {
       return true;
     }
 
-    const hasDealsViewPermission = await this.rbacService.hasPermission(memberUid, RBAC_PERMISSION_CODES.DEALS_VIEW);
+    const { allowed } = await this.accessControlV2Service.hasPermission(
+      memberUid,
+      RBAC_PERMISSION_CODES.DEALS_VIEW,
+    );
 
-    return hasDealsViewPermission;
+    return allowed;
   }
 
   async listForUser(userEmail: string, query: ListDealsQueryDto) {
