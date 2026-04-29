@@ -23,7 +23,9 @@
           "apps/web-api/src/shared/linkedinVerifiedAdmin.hbs",
           "apps/web-api/src/shared/memberApproved.hbs",
           "apps/web-api/src/shared/memberRejected.hbs",
-          "apps/web-api/src/shared/contactSupport.hbs"
+          "apps/web-api/src/shared/contactSupport.hbs",
+          "apps/web-api/src/shared/jobAlertConfirmation.hbs",
+          "apps/web-api/src/shared/jobAlertDigest.hbs"
         ]
       },
       "configurations": {
@@ -47,6 +49,17 @@
         "outputPath": "dist/apps/web-api/cli",
         "main": "apps/web-api/src/cli.ts",
         "outputFileName": "cli.js",
+        "tsConfig": "apps/web-api/tsconfig.build.json",
+        "tsPlugins": ["@nestjs/swagger/plugin"]
+      }
+    },
+    "build-jobs-seed": {
+      "executor": "@nrwl/node:webpack",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/web-api/jobs-seed",
+        "main": "apps/web-api/src/jobs-seed.ts",
+        "outputFileName": "jobs-seed.js",
         "tsConfig": "apps/web-api/tsconfig.build.json",
         "tsPlugins": ["@nestjs/swagger/plugin"]
       }

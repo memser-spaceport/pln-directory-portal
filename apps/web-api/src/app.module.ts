@@ -6,6 +6,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { InternalServiceThrottlerGuard } from './guards/internal-service-throttler.guard';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import * as redisStore from 'cache-manager-redis-store';
 import { AppController } from './app.controller';
 import { FundingStagesModule } from './funding-stages/funding-stages.module';
@@ -67,6 +68,7 @@ import { DealsModule } from './deals/deals.module';
 import { DealRequestsModule } from './deal-requests/deal-requests.module';
 import { ArticleRequestsModule } from './article-requests/article-requests.module';
 import { JobOpeningsModule } from './job-openings/job-openings.module';
+import { JobAlertsModule } from './job-alerts/job-alerts.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -104,6 +106,7 @@ import { JobOpeningsModule } from './job-openings/job-openings.module';
       },
     }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     MembersModule,
     HealthModule,
     TeamsModule,
@@ -154,6 +157,7 @@ import { JobOpeningsModule } from './job-openings/job-openings.module';
     DealRequestsModule,
     ArticleRequestsModule,
     JobOpeningsModule,
+    JobAlertsModule,
   ],
   providers: [
     {
