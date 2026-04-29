@@ -1417,11 +1417,15 @@ private async assignAccessControl(
   }
 
   async findMemberByAccessLevels(params: RequestMembersDto) {
-    const { accessLevel, page, limit } = params;
+    const { page, limit } = params;
 
     const members = await this.prisma.member.findMany({
       where: {
-        accessLevel: { in: accessLevel },
+        memberApproval: {
+          state: {
+            in: [MemberApprovalState.APPROVED, MemberApprovalState.VERIFIED],
+          },
+        },
       },
       // When no pagination params provided, fetch all members
       ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
@@ -1571,7 +1575,11 @@ private async assignAccessControl(
 
     const total = await this.prisma.member.count({
       where: {
-        accessLevel: { in: accessLevel },
+        memberApproval: {
+          state: {
+            in: [MemberApprovalState.APPROVED, MemberApprovalState.VERIFIED],
+          },
+        },
       },
     });
 

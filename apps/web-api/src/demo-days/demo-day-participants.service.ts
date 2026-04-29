@@ -44,14 +44,15 @@ export class DemoDayParticipantsService {
       member = await this.prisma.member.findUnique({
         where: { uid: data.memberUid },
         include: {
+          memberApproval: true,
           teamMemberRoles: {
             include: { team: true },
           },
         },
       });
 
-      if (!member || ['L0', 'L1', 'Rejected'].includes(member.accessLevel || '')) {
-        throw new BadRequestException('Member not found or has invalid access level');
+      if (!member || !['APPROVED', 'VERIFIED'].includes(member.memberApproval?.state || '')) {
+        throw new BadRequestException('Member not found or is not approved');
       }
 
       // Check if participant already exists
