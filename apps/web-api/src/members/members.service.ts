@@ -6,7 +6,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  InternalServerErrorException
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { z } from 'zod';
 import axios from 'axios';
@@ -184,42 +184,76 @@ export class MembersService {
    * @param memberIds - Array of member UIDs to retrieve
    * @returns A promise that resolves to an array of simplified member records
    */
-  async findMembersByIds(
-    memberIds: string[]
-  ): Promise<Array<{ uid: string; name: string; email: string; accessLevel: string }>> {
+  async findMembersByIds(memberIds: string[]): Promise<
+    Array<{
+      uid: string;
+      name: string;
+      email: string;
+      accessLevel: string;
+      policies: any[];
+      effectivePermissions: any[];
+    }>
+  > {
     try {
       const members = await this.prisma.member.findMany({
         where: {
           uid: {
             in: memberIds,
           },
-          accessLevel: {
-            notIn: ['L0', 'L1', 'Rejected'],
-          },
+          OR: [{ memberApproval: null }, { memberApproval: { state: { in: ['APPROVED'] } } }],
           email: {
             not: null,
           },
         },
-        select: {
-          uid: true,
-          name: true,
-          email: true,
-          accessLevel: true,
+        include: {
+          roleAssignments: {
+            include: {
+              role: {
+                include: {
+                  rolePermissions: {
+                    include: {
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          policyAssignmentsV2: {
+            include: {
+              policy: {
+                include: {
+                  policyPermissions: {
+                    include: {
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          memberPermissionsV2: {
+            include: {
+              permission: true,
+            },
+          },
         },
       });
 
-      // Filter out any members with null emails (type safety)
-      return members.filter(
-        (
-          member
-        ): member is {
-          uid: string;
-          name: string;
-          email: string;
-          accessLevel: string;
-          memberRoles: { name: string }[];
-        } => member.email !== null
-      );
+      // Build authorization for each member and map response
+      return members
+        .filter((member) => member.email !== null)
+        .map((member) => {
+          const authorization = this.buildMemberAuthorization(member as any);
+          return {
+            uid: member.uid,
+            name: member.name,
+            email: member.email!,
+            accessLevel: member.accessLevel ?? '',
+            policies: authorization.policies,
+            effectivePermissions: authorization.effectivePermissions,
+          };
+        });
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -514,7 +548,7 @@ export class MembersService {
 
       responseMember.memberState = this.resolveMemberState(
         responseMember.accessLevel,
-        responseMember.memberApproval?.state,
+        responseMember.memberApproval?.state
       );
 
       const authorization = this.buildMemberAuthorization(responseMember);
@@ -534,8 +568,6 @@ export class MembersService {
       return this.handleErrors(error);
     }
   }
-
-
 
   private fallbackMemberState(accessLevel?: string | null) {
     if (!accessLevel) {
@@ -603,42 +635,30 @@ export class MembersService {
         : null;
 
     const directPermissions = uniqByCode(
-      (member.memberPermissionsV2 ?? [])
-        .map((item: any) => mapPermission(item.permission))
-        .filter(Boolean),
+      (member.memberPermissionsV2 ?? []).map((item: any) => mapPermission(item.permission)).filter(Boolean)
     );
 
     const policies = uniqByCode(
-      (member.policyAssignmentsV2 ?? [])
-        .map((item: any) => mapPolicy(item.policy))
-        .filter(Boolean),
+      (member.policyAssignmentsV2 ?? []).map((item: any) => mapPolicy(item.policy)).filter(Boolean)
     );
 
     const policyPermissions = uniqByCode(
       (member.policyAssignmentsV2 ?? [])
         .flatMap((assignment: any) => assignment.policy?.policyPermissions ?? [])
         .map((item: any) => mapPermission(item.permission))
-        .filter(Boolean),
+        .filter(Boolean)
     );
 
-    const roles = uniqByCode(
-      (member.roleAssignments ?? [])
-        .map((item: any) => mapRole(item.role))
-        .filter(Boolean),
-    );
+    const roles = uniqByCode((member.roleAssignments ?? []).map((item: any) => mapRole(item.role)).filter(Boolean));
 
     const rolePermissions = uniqByCode(
       (member.roleAssignments ?? [])
         .flatMap((assignment: any) => assignment.role?.rolePermissions ?? [])
         .map((item: any) => mapPermission(item.permission))
-        .filter(Boolean),
+        .filter(Boolean)
     );
 
-    const effectivePermissions = uniqByCode([
-      ...directPermissions,
-      ...policyPermissions,
-      ...rolePermissions,
-    ]);
+    const effectivePermissions = uniqByCode([...directPermissions, ...policyPermissions, ...rolePermissions]);
 
     return {
       roles,
@@ -706,10 +726,7 @@ export class MembersService {
    * Gets member's main team UID.
    * Returns the team with mainTeam=true, or the first team if none is marked as main.
    */
-  async getMemberMainTeamByUid(
-    memberUid: string,
-    tx: Prisma.TransactionClient = this.prisma
-  ): Promise<string | null> {
+  async getMemberMainTeamByUid(memberUid: string, tx: Prisma.TransactionClient = this.prisma): Promise<string | null> {
     const teamRoles = await tx.teamMemberRole.findMany({
       where: { memberUid },
       select: { teamUid: true, mainTeam: true },
@@ -1163,8 +1180,8 @@ export class MembersService {
     member['image'] = memberData.imageUid
       ? { connect: { uid: memberData.imageUid } }
       : type === 'Update'
-        ? { disconnect: true }
-        : undefined;
+      ? { disconnect: true }
+      : undefined;
     if (Array.isArray(memberData.skills)) {
       memberData.skills = memberData.skills
         .map((skill: any) => (typeof skill === 'string' ? { uid: skill } : skill))
@@ -1238,7 +1255,7 @@ export class MembersService {
 
     const secRulesAcceptedAt =
       investorProfileData.secRulesAccepted &&
-        existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
+      existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
         ? new Date()
         : existingMember.investorProfile?.secRulesAcceptedAt;
 
@@ -1353,8 +1370,8 @@ export class MembersService {
           memberData.teamAndRoles[index].roleTags = foundDefaultRoleTag
             ? foundValue.roleTags
             : t.role
-              ? t.role.split(',').map((item: string) => item.trim())
-              : [];
+            ? t.role.split(',').map((item: string) => item.trim())
+            : [];
           return true;
         }
       }
@@ -1411,9 +1428,7 @@ export class MembersService {
         teamLead: false, // Set your default values here if needed
         teamUid: t.teamUid,
         memberUid,
-        roleTags: t.role
-          ? t.role.split(',').map((item: string) => item.trim())
-          : [], // Properly format roleTags
+        roleTags: t.role ? t.role.split(',').map((item: string) => item.trim()) : [], // Properly format roleTags
       }));
 
       await tx.teamMemberRole.createMany({
@@ -1483,9 +1498,7 @@ export class MembersService {
           mainTeam: t.mainTeam || false,
           teamLead: false,
           teamUid: t.teamUid,
-          roleTags: t.role
-            ? t.role.split(',').map((item) => item.trim())
-            : [],
+          roleTags: t.role ? t.role.split(',').map((item) => item.trim()) : [],
         })),
       },
     };
@@ -2043,32 +2056,32 @@ export class MembersService {
           this.prisma.$queryRaw<{ id: number }[]>`
             SELECT DISTINCT id FROM "Member"
             WHERE ${Prisma.raw(
-            topicsArray
-              .map(
-                (topic) => `
+              topicsArray
+                .map(
+                  (topic) => `
                   EXISTS (
                     SELECT 1 FROM unnest("ohInterest") AS interest_item
                     WHERE LOWER(interest_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
                   )
                 `
-              )
-              .join(' OR ')
-          )}
+                )
+                .join(' OR ')
+            )}
           `,
           this.prisma.$queryRaw<{ id: number }[]>`
             SELECT DISTINCT id FROM "Member"
             WHERE ${Prisma.raw(
-            topicsArray
-              .map(
-                (topic) => `
+              topicsArray
+                .map(
+                  (topic) => `
                   EXISTS (
                     SELECT 1 FROM unnest("ohHelpWith") AS help_item
                     WHERE LOWER(help_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
                   )
                 `
-              )
-              .join(' OR ')
-          )}
+                )
+                .join(' OR ')
+            )}
           `,
         ]);
 
@@ -2381,17 +2394,17 @@ export class MembersService {
         SELECT DISTINCT m.id FROM "Member" m
         INNER JOIN "InvestorProfile" ip ON m."investorProfileId" = ip.uid
         WHERE ${Prisma.raw(
-        focusArray
-          .map(
-            (focus) => `
+          focusArray
+            .map(
+              (focus) => `
               EXISTS (
                 SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item
                 WHERE LOWER(focus_item) LIKE LOWER('%${focus.replace(/'/g, "''")}%')
               )
             `
-          )
-          .join(' OR ')
-      )}
+            )
+            .join(' OR ')
+        )}
       `;
 
       if (matchingMemberIds.length > 0) {
@@ -2586,9 +2599,9 @@ export class MembersService {
       // Build where clause - if no query, get all topics; if query, filter by it
       const titleFilter = query.trim()
         ? {
-          contains: searchQuery,
-          mode: 'insensitive' as const,
-        }
+            contains: searchQuery,
+            mode: 'insensitive' as const,
+          }
         : undefined;
 
       // Build member filter for office hours
@@ -2672,10 +2685,10 @@ export class MembersService {
           ...memberFilter,
           ...(query.trim() &&
             ohMemberIds.length > 0 && {
-            id: {
-              in: ohMemberIds,
-            },
-          }),
+              id: {
+                in: ohMemberIds,
+              },
+            }),
           // If no query, get members with any ohInterest or ohHelpWith
           ...(!query.trim() && {
             OR: [
@@ -3482,7 +3495,8 @@ export class MembersService {
       select: { uid: true, teamUid: true },
     });
     this.logger.info(
-      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${newTeamUid ?? 'null'
+      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${
+        newTeamUid ?? 'null'
       }`
     );
     // If there are no FOUNDER participants, nothing to do
@@ -3924,7 +3938,11 @@ export class MembersService {
    * @param params - Search parameters including optional searchTerm and email
    * @returns Array of matching members with confidence scores (0-100), sorted by score desc
    */
-  async searchMemberMatches(params: { searchTerm?: string; email?: string; limit: number }): Promise<{ matches: MemberSearchMatch[] }> {
+  async searchMemberMatches(params: {
+    searchTerm?: string;
+    email?: string;
+    limit: number;
+  }): Promise<{ matches: MemberSearchMatch[] }> {
     try {
       const { searchTerm, email, limit } = params;
       const trimmedName = searchTerm?.trim();
@@ -4003,8 +4021,8 @@ export class MembersService {
             // Exact name match with highest boost
             {
               match_phrase: {
-                name: { query: safeName, boost: 5.0 }
-              }
+                name: { query: safeName, boost: 5.0 },
+              },
             },
             // Fuzzy name match
             {
@@ -4013,8 +4031,8 @@ export class MembersService {
                   query: safeName,
                   fuzziness: 'AUTO',
                   boost: 2.0,
-                }
-              }
+                },
+              },
             },
             // Bio match for additional context
             {
@@ -4023,12 +4041,12 @@ export class MembersService {
                   query: safeName,
                   fuzziness: 'AUTO',
                   boost: 0.5,
-                }
-              }
-            }
+                },
+              },
+            },
           ],
           minimum_should_match: 1,
-        }
+        },
       },
       _source: ['uid', 'name', 'image'],
       sort: [{ _score: 'desc' }],
