@@ -297,6 +297,29 @@ export class JobOpeningsQueryService {
     };
   }
 
+  async findNewMatchesSince(query: JobsListQuery, sinceTs: Date | null) {
+    const where = this.buildWhere(query);
+    const sinceFilter: Prisma.JobOpeningWhereInput[] = sinceTs ? [{ updatedAt: { gt: sinceTs } }] : [];
+    return this.prisma.jobOpening.findMany({
+      where: sinceFilter.length > 0 ? { AND: [where, ...sinceFilter] } : where,
+      select: {
+        uid: true,
+        teamUid: true,
+        roleTitle: true,
+        roleCategory: true,
+        seniority: true,
+        location: true,
+        workMode: true,
+        sourceLink: true,
+        postedDate: true,
+        detectionDate: true,
+        updatedAt: true,
+        team: { select: { uid: true, name: true, logo: { select: { url: true } } } },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
   async getFilters(query: JobsListQuery) {
     const functionWhere = this.buildWhere(query, { dropFunction: true });
     const seniorityWhere = this.buildWhere(query, { dropSeniority: true });

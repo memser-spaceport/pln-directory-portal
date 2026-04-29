@@ -55,7 +55,10 @@ export class JobOpeningsServiceController {
 
     this.logger.log(`Received ingest request with ${dto.jobs.length} jobs (runId: ${dto.runId ?? 'none'})`);
 
-    const result = await this.jobOpeningsService.ingestJobOpenings(dto.jobs);
+    const result = await this.jobOpeningsService.ingestJobOpenings(dto.jobs, {
+      runId: dto.runId ?? null,
+      source: dto.source ?? null,
+    });
 
     this.logger.log(`Ingest complete: ${result.created} created, ${result.updated} updated, ${result.failed} failed`);
 

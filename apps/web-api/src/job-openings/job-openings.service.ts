@@ -1,15 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../shared/prisma.service';
 import { JobOpeningStatus, Prisma } from '@prisma/client';
 import { JobOpeningIngestItem, IngestJobOpeningsResponse } from './dto/ingest-job-openings.dto';
+import { JOB_INGEST_COMPLETED, JobIngestCompletedPayload } from '../job-alerts/job-alerts.events';
 
 @Injectable()
 export class JobOpeningsService {
   private readonly logger = new Logger(JobOpeningsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly eventEmitter: EventEmitter2) {}
 
-  async ingestJobOpenings(items: JobOpeningIngestItem[]): Promise<IngestJobOpeningsResponse> {
+  async ingestJobOpenings(
+    items: JobOpeningIngestItem[],
+    meta?: { runId?: string | null; source?: string | null },
+  ): Promise<IngestJobOpeningsResponse> {
     const result: IngestJobOpeningsResponse = {
       received: items.length,
       created: 0,
@@ -46,6 +52,17 @@ export class JobOpeningsService {
         result.errors?.push(`Failed to process ${item.dedupKey}: ${error.message}`);
       }
     }
+
+    const eventPayload: JobIngestCompletedPayload = {
+      runId: meta?.runId || randomUUID(),
+      source: meta?.source ?? null,
+      received: result.received,
+      created: result.created,
+      updated: result.updated,
+      failed: result.failed,
+      completedAt: new Date().toISOString(),
+    };
+    this.eventEmitter.emit(JOB_INGEST_COMPLETED, eventPayload);
 
     return result;
   }
