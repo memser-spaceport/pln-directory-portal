@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 
 @Injectable()
@@ -31,10 +27,7 @@ export class MemberApprovalsService {
           select: { uid: true, name: true, email: true },
         },
       },
-      orderBy: [
-        { state: 'asc' },
-        { requestedAt: 'desc' },
-      ],
+      orderBy: [{ state: 'asc' }, { requestedAt: 'desc' }],
     });
   }
 
@@ -71,11 +64,7 @@ export class MemberApprovalsService {
     return approval;
   }
 
-  async create(body: {
-    memberUid: string;
-    requestedByUid?: string | null;
-    reason?: string;
-  }) {
+  async create(body: { memberUid: string; requestedByUid?: string | null; reason?: string }) {
     const member = await this.prisma.member.findUnique({
       where: { uid: body.memberUid },
       select: { uid: true },
@@ -134,7 +123,7 @@ export class MemberApprovalsService {
       state: 'APPROVED' | 'VERIFIED' | 'REJECTED' | 'PENDING';
       reviewedByUid?: string | null;
       reason?: string;
-    },
+    }
   ) {
     const approval = await this.prisma.memberApproval.findUnique({
       where: { memberUid },
@@ -179,9 +168,10 @@ export class MemberApprovalsService {
     return this.get(memberUid);
   }
 
+  async ensureApprovalExists(memberUid: string, requestedByUid?: string | null, tx?: Prisma.TransactionClient) {
+    const client = tx ?? this.prisma;
 
-  async ensureApprovalExists(memberUid: string, requestedByUid?: string | null) {
-    const existing = await this.prisma.memberApproval.findUnique({
+    const existing = await client.memberApproval.findUnique({
       where: { memberUid },
       select: { uid: true },
     });
@@ -190,7 +180,7 @@ export class MemberApprovalsService {
       return existing;
     }
 
-    const approval = await this.prisma.memberApproval.create({
+    const approval = await client.memberApproval.create({
       data: {
         memberUid,
         requestedByUid: requestedByUid ?? null,
@@ -199,7 +189,7 @@ export class MemberApprovalsService {
       },
     });
 
-    await this.prisma.memberApprovalEvent.create({
+    await client.memberApprovalEvent.create({
       data: {
         approvalUid: approval.uid,
         memberUid,
@@ -221,7 +211,7 @@ export class MemberApprovalsService {
 
     if (!approval || !['APPROVED', 'VERIFIED'].includes(approval.state)) {
       throw new ForbiddenException(
-        `Member ${memberUid} is not approved. Policies and direct permissions can be assigned only to APPROVED or VERIFIED members.`,
+        `Member ${memberUid} is not approved. Policies and direct permissions can be assigned only to APPROVED or VERIFIED members.`
       );
     }
   }

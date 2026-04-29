@@ -83,7 +83,7 @@ export class MembersService {
         data: member,
       });
 
-      await this.memberApprovalsService.ensureApprovalExists(createdMember.uid);
+      await this.memberApprovalsService.ensureApprovalExists(createdMember.uid, null, tx);
 
       return createdMember;
     } catch (error) {
