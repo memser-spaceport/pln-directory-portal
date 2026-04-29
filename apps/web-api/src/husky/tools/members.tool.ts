@@ -63,9 +63,7 @@ export class MembersTool {
     const members = await this.prisma.member.findMany({
       where: {
         ...where,
-        accessLevel: {
-          notIn: ['L0', 'L1', 'Rejected'],
-        },
+        memberApproval: { state: { in: ['APPROVED'] } },
       },
       include: {
         image: true,
@@ -97,10 +95,10 @@ export class MembersTool {
       },
       orderBy: args.orderBy
         ? {
-          ...(args.orderBy === 'name' && { name: 'asc' }),
-          ...(args.orderBy === 'date' && { createdAt: 'desc' }),
-          ...(args.orderBy === 'plnStartDate' && { plnStartDate: 'desc' }),
-        }
+            ...(args.orderBy === 'name' && { name: 'asc' }),
+            ...(args.orderBy === 'date' && { createdAt: 'desc' }),
+            ...(args.orderBy === 'plnStartDate' && { plnStartDate: 'desc' }),
+          }
         : undefined,
       take: 10,
     });

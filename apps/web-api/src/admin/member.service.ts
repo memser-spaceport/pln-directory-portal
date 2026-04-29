@@ -77,9 +77,10 @@ export class MemberService {
     return this.fallbackMemberState(accessLevel);
   }
 
-  private normalizeMemberStateFromPayload(
-    payload: { memberState?: string | null; state?: string | null },
-  ): MemberApprovalState | null {
+  private normalizeMemberStateFromPayload(payload: {
+    memberState?: string | null;
+    state?: string | null;
+  }): MemberApprovalState | null {
     const rawState = payload.memberState ?? payload.state;
 
     if (!rawState) {
@@ -117,7 +118,7 @@ export class MemberService {
     },
     requestedByUid?: string | null,
     reviewedByUid?: string | null,
-    reason = 'Synced from member payload',
+    reason = 'Synced from member payload'
   ): Promise<void> {
     const explicitMemberState = this.normalizeMemberStateFromPayload(payload);
 
@@ -187,7 +188,7 @@ export class MemberService {
       accessLevel?: string | null;
       memberState?: string | null;
       state?: string | null;
-    },
+    }
   ): Promise<void> {
     await this.syncMemberApprovalFromPayload(
       tx,
@@ -195,10 +196,9 @@ export class MemberService {
       payload,
       memberUid,
       null,
-      payload.accessLevel ? 'Updated from accessLevel/memberState' : 'Updated from memberState',
+      payload.accessLevel ? 'Updated from accessLevel/memberState' : 'Updated from memberState'
     );
   }
-
 
   private async replaceAccessControl(
     tx: Prisma.TransactionClient,
@@ -208,7 +208,7 @@ export class MemberService {
       policyCodes?: string[];
       permissionCodes?: string[];
       actorUid?: string | null;
-    },
+    }
   ): Promise<void> {
     const roleCodes = [...new Set((payload.roleCodes ?? []).filter(Boolean))];
     const policyCodes = [...new Set((payload.policyCodes ?? []).filter(Boolean))];
@@ -242,7 +242,7 @@ export class MemberService {
     });
   }
 
-private async assignAccessControl(
+  private async assignAccessControl(
     tx: Prisma.TransactionClient,
     memberUid: string,
     payload: {
@@ -391,16 +391,14 @@ private async assignAccessControl(
   }
 
   private mapPolicy(
-    policy?:
-      | {
-          uid: string;
-          code: string;
-          name: string;
-          description?: string | null;
-          role?: string | null;
-          group?: string | null;
-        }
-      | null
+    policy?: {
+      uid: string;
+      code: string;
+      name: string;
+      description?: string | null;
+      role?: string | null;
+      group?: string | null;
+    } | null
   ) {
     if (!policy) {
       return null;
@@ -440,54 +438,56 @@ private async assignAccessControl(
     });
   }
 
-  private enrichMemberAccessData<T extends {
-    accessLevel?: string | null;
-    memberApproval?: { state?: MemberApprovalState | null } | null;
-    memberPermissionsV2?: Array<{
-      permission?: { uid: string; code: string; description?: string | null } | null;
-    }> | null;
-    policyAssignmentsV2?: Array<{
-      policy?: {
-        uid: string;
-        code: string;
-        name: string;
-        description?: string | null;
-        role?: string | null;
-        group?: string | null;
-        policyPermissions?: Array<{
-          permission?: { uid: string; code: string; description?: string | null } | null;
-        }>;
-      } | null;
-    }> | null;
-    roleAssignments?: Array<{
-      role?: {
-        uid: string;
-        code: string;
-        name: string;
-        description?: string | null;
-        rolePermissions?: Array<{
-          permission?: { uid: string; code: string; description?: string | null } | null;
-        }>;
-      } | null;
-    }> | null;
-  }>(member: T) {
-    const directPermissions = this.uniqueByCode(
-      (member.memberPermissionsV2 ?? [])
-        .map((item) => this.mapPermission(item.permission))
-        .filter(Boolean) as Array<{ uid: string; code: string; description?: string | null }>
-    );
-
-    const policies = this.uniqueByCode(
-      (member.policyAssignmentsV2 ?? [])
-        .map((item) => this.mapPolicy(item.policy))
-        .filter(Boolean) as Array<{
+  private enrichMemberAccessData<
+    T extends {
+      accessLevel?: string | null;
+      memberApproval?: { state?: MemberApprovalState | null } | null;
+      memberPermissionsV2?: Array<{
+        permission?: { uid: string; code: string; description?: string | null } | null;
+      }> | null;
+      policyAssignmentsV2?: Array<{
+        policy?: {
           uid: string;
           code: string;
           name: string;
           description?: string | null;
           role?: string | null;
           group?: string | null;
-        }>
+          policyPermissions?: Array<{
+            permission?: { uid: string; code: string; description?: string | null } | null;
+          }>;
+        } | null;
+      }> | null;
+      roleAssignments?: Array<{
+        role?: {
+          uid: string;
+          code: string;
+          name: string;
+          description?: string | null;
+          rolePermissions?: Array<{
+            permission?: { uid: string; code: string; description?: string | null } | null;
+          }>;
+        } | null;
+      }> | null;
+    }
+  >(member: T) {
+    const directPermissions = this.uniqueByCode(
+      (member.memberPermissionsV2 ?? []).map((item) => this.mapPermission(item.permission)).filter(Boolean) as Array<{
+        uid: string;
+        code: string;
+        description?: string | null;
+      }>
+    );
+
+    const policies = this.uniqueByCode(
+      (member.policyAssignmentsV2 ?? []).map((item) => this.mapPolicy(item.policy)).filter(Boolean) as Array<{
+        uid: string;
+        code: string;
+        name: string;
+        description?: string | null;
+        role?: string | null;
+        group?: string | null;
+      }>
     );
 
     const policyPermissions = this.uniqueByCode(
@@ -498,9 +498,12 @@ private async assignAccessControl(
     );
 
     const roles = this.uniqueByCode(
-      (member.roleAssignments ?? [])
-        .map((item) => this.mapRole(item.role))
-        .filter(Boolean) as Array<{ uid: string; code: string; name: string; description?: string | null }>
+      (member.roleAssignments ?? []).map((item) => this.mapRole(item.role)).filter(Boolean) as Array<{
+        uid: string;
+        code: string;
+        name: string;
+        description?: string | null;
+      }>
     );
 
     const rolePermissions = this.uniqueByCode(
@@ -510,19 +513,9 @@ private async assignAccessControl(
         .filter(Boolean) as Array<{ uid: string; code: string; description?: string | null }>
     );
 
-    const effectivePermissions = this.uniqueByCode([
-      ...directPermissions,
-      ...policyPermissions,
-      ...rolePermissions,
-    ]);
+    const effectivePermissions = this.uniqueByCode([...directPermissions, ...policyPermissions, ...rolePermissions]);
 
-    const {
-      memberPermissionsV2,
-      policyAssignmentsV2,
-      roleAssignments,
-      memberApproval,
-      ...safeMember
-    } = member as any;
+    const { memberPermissionsV2, policyAssignmentsV2, roleAssignments, memberApproval, ...safeMember } = member as any;
 
     return {
       ...safeMember,
@@ -696,7 +689,7 @@ private async assignAccessControl(
           updatePayload as any,
           memberUid,
           null,
-          'Updated from memberState',
+          'Updated from memberState'
         );
       });
 
@@ -730,14 +723,7 @@ private async assignAccessControl(
       );
       await this.updateMemberEmailChange(memberUid, isEmailChanged, isExternalIdAvailable, memberData, existingMember);
 
-      await this.syncMemberApprovalFromPayload(
-        tx,
-        memberUid,
-        memberData as any,
-        memberUid,
-        null,
-        'Updated by admin'
-      );
+      await this.syncMemberApprovalFromPayload(tx, memberUid, memberData as any, memberUid, null, 'Updated by admin');
 
       await this.replaceAccessControl(tx, memberUid, {
         roleCodes: (memberData as any).roleCodes ?? [],
@@ -1022,8 +1008,8 @@ private async assignAccessControl(
           memberData.teamAndRoles[index].roleTags = foundDefaultRoleTag
             ? foundValue.roleTags
             : t.role
-              ? t.role.split(',').map((item: string) => item.trim())
-              : [];
+            ? t.role.split(',').map((item: string) => item.trim())
+            : [];
           // Preserve investmentTeam if not explicitly provided
           if (t.investmentTeam === undefined) {
             memberData.teamAndRoles[index].investmentTeam = foundValue.investmentTeam;
@@ -1128,9 +1114,7 @@ private async assignAccessControl(
           teamLead: false,
           investmentTeam: t.investmentTeam || false,
           teamUid: t.teamUid,
-          roleTags: t.role
-            ? t.role.split(',').map((item) => item.trim())
-            : [],
+          roleTags: t.role ? t.role.split(',').map((item) => item.trim()) : [],
         })),
       },
     };
@@ -1420,13 +1404,6 @@ private async assignAccessControl(
     const { page, limit } = params;
 
     const members = await this.prisma.member.findMany({
-      where: {
-        memberApproval: {
-          state: {
-            in: [MemberApprovalState.APPROVED, MemberApprovalState.VERIFIED],
-          },
-        },
-      },
       // When no pagination params provided, fetch all members
       ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
       select: {
@@ -1760,6 +1737,7 @@ private async assignAccessControl(
 
     return { updatedCount: result.count };
   }
+
   async createMemberByAdmin(memberData: CreateMemberDto): Promise<Member> {
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {

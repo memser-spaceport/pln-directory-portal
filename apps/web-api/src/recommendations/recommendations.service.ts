@@ -586,9 +586,7 @@ export class RecommendationsService {
       const members = await this.prisma.member.findMany({
         where: {
           ...where,
-          accessLevel: {
-            notIn: ['L0', 'L1', 'Rejected'],
-          },
+          memberApproval: { state: { in: ['APPROVED'] } },
         },
         skip,
         take: chunkSize,
@@ -642,9 +640,7 @@ export class RecommendationsService {
   async getMembersWithEnabledRecommendations() {
     return this.prisma.member.findMany({
       where: {
-        accessLevel: {
-          notIn: ['L0', 'L1', 'Rejected'],
-        },
+        memberApproval: { state: { in: ['APPROVED'] } },
         notificationSetting: {
           subscribed: true,
         },

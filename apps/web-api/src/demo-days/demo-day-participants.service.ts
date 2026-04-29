@@ -14,8 +14,8 @@ export class DemoDayParticipantsService {
     private readonly demoDaysService: DemoDaysService,
     private readonly analyticsService: AnalyticsService,
     private readonly teamService: TeamsService,
-    private readonly teamEnrichmentService: TeamEnrichmentService,
-  ) { }
+    private readonly teamEnrichmentService: TeamEnrichmentService
+  ) {}
 
   async addParticipant(
     demoDayUid: string,
@@ -98,6 +98,12 @@ export class DemoDayParticipantsService {
             name: data.name || data.email,
             email: data.email,
             accessLevel: 'L0',
+            memberApproval: {
+              create: {
+                state: 'PENDING',
+                reason: 'Auto-created on demo day participant addition',
+              },
+            },
           },
           include: {
             teamMemberRoles: {
@@ -474,25 +480,25 @@ export class DemoDayParticipantsService {
                   type: updatedInvestorType,
                   ...(isTeamInvestorProfile
                     ? {
-                      secRulesAccepted:
-                        participantData.secRulesAccepted !== undefined
-                          ? participantData.secRulesAccepted
-                          : existingMember.investorProfile.secRulesAccepted,
-                    }
+                        secRulesAccepted:
+                          participantData.secRulesAccepted !== undefined
+                            ? participantData.secRulesAccepted
+                            : existingMember.investorProfile.secRulesAccepted,
+                      }
                     : {
-                      typicalCheckSize:
-                        participantData.typicalCheckSize !== undefined
-                          ? participantData.typicalCheckSize
-                          : existingMember.investorProfile.typicalCheckSize,
-                      investInStartupStages:
-                        participantData.investInStartupStages !== undefined
-                          ? participantData.investInStartupStages
-                          : existingMember.investorProfile.investInStartupStages,
-                      secRulesAccepted:
-                        participantData.secRulesAccepted !== undefined
-                          ? participantData.secRulesAccepted
-                          : existingMember.investorProfile.secRulesAccepted,
-                    }),
+                        typicalCheckSize:
+                          participantData.typicalCheckSize !== undefined
+                            ? participantData.typicalCheckSize
+                            : existingMember.investorProfile.typicalCheckSize,
+                        investInStartupStages:
+                          participantData.investInStartupStages !== undefined
+                            ? participantData.investInStartupStages
+                            : existingMember.investorProfile.investInStartupStages,
+                        secRulesAccepted:
+                          participantData.secRulesAccepted !== undefined
+                            ? participantData.secRulesAccepted
+                            : existingMember.investorProfile.secRulesAccepted,
+                      }),
                 },
               };
             }
@@ -517,21 +523,27 @@ export class DemoDayParticipantsService {
               twitterHandler: normalizedTwitter,
               linkedinHandler: normalizedLinkedin,
               accessLevel: 'L0',
+              memberApproval: {
+                create: {
+                  state: 'PENDING',
+                  reason: 'Auto-created on demo day participant addition',
+                },
+              },
               investorProfile: isTeamInvestorProfile
                 ? {
-                  create: {
-                    type: investorType || undefined, // Keep as null if not provided
-                    secRulesAccepted: participantData.secRulesAccepted || false,
-                  },
-                }
+                    create: {
+                      type: investorType || undefined, // Keep as null if not provided
+                      secRulesAccepted: participantData.secRulesAccepted || false,
+                    },
+                  }
                 : {
-                  create: {
-                    type: investorType || undefined, // Keep as null if not provided
-                    typicalCheckSize: participantData.typicalCheckSize || undefined,
-                    investInStartupStages: participantData.investInStartupStages || undefined,
-                    secRulesAccepted: participantData.secRulesAccepted || false,
+                    create: {
+                      type: investorType || undefined, // Keep as null if not provided
+                      typicalCheckSize: participantData.typicalCheckSize || undefined,
+                      investInStartupStages: participantData.investInStartupStages || undefined,
+                      secRulesAccepted: participantData.secRulesAccepted || false,
+                    },
                   },
-                },
             };
 
             // Only set telegramHandler if it's not used by another member
@@ -981,6 +993,7 @@ export class DemoDayParticipantsService {
                 team: true,
               },
             },
+            memberApproval: true,
           },
         },
       },
