@@ -105,6 +105,17 @@ describe('generateAutoName', () => {
     expect(name).toBe('Design · Mid');
   });
 
+  it('joins all values within a multi-value filter category', () => {
+    const name = generateAutoName({
+      roleCategory: ['Design', 'Product'],
+      seniority: ['Mid (L3)', 'Senior (L4)'],
+      focus: [],
+      location: [],
+      workMode: [],
+    } as any);
+    expect(name).toBe('Design, Product · Mid, Senior');
+  });
+
   it('falls back to "Job alert" when nothing is selected', () => {
     const name = generateAutoName({
       roleCategory: [],

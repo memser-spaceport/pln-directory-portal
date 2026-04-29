@@ -53,10 +53,10 @@ export const seniorityLabel = (raw: string): string => SENIORITY_DISPLAY[raw] ??
 
 export const generateAutoName = (canonical: JobAlertFilterState, maxLen = 60): string => {
   const parts: string[] = [];
-  if (canonical.roleCategory[0]) parts.push(canonical.roleCategory[0]);
-  if (canonical.seniority[0]) parts.push(seniorityLabel(canonical.seniority[0]));
-  if (canonical.focus[0]) parts.push(canonical.focus[0]);
-  if (canonical.workMode[0]) parts.push(canonical.workMode[0]);
+  if (canonical.roleCategory.length) parts.push(canonical.roleCategory.join(', '));
+  if (canonical.seniority.length) parts.push(canonical.seniority.map(seniorityLabel).join(', '));
+  if (canonical.focus.length) parts.push(canonical.focus.join(', '));
+  if (canonical.workMode.length) parts.push(canonical.workMode.join(', '));
   if (canonical.q) parts.push(`"${canonical.q}"`);
   const joined = parts.join(' · ') || 'Job alert';
   if (joined.length <= maxLen) return joined;
