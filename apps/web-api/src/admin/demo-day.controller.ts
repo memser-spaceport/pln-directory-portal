@@ -55,7 +55,7 @@ export class AdminDemoDaysController {
   @RequirePermissions(RBAC_PERMISSION_CODES.DEMO_DAY_REPORT_LINK_READ)
   @NoCache()
   async getDemoDayReportLink(@Req() req): Promise<{ url: string }> {
-    return this.demoDaysService.getDemoDayReportLink(req.userEmail);
+    return this.demoDaysService.getDemoDayReportLink();
   }
 
   @Get('subscribers')
