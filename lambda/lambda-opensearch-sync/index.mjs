@@ -178,13 +178,32 @@ async function getMaxTimestampForTable(pgClient, table) {
   const r = await pgClient.query(q);
   return r.rows[0].max_timestamp;
 }
+
+async function getMaxTimestampForOptionalTable(pgClient, table) {
+  try {
+    return await getMaxTimestampForTable(pgClient, table);
+  } catch (err) {
+    if (['42P01', '42703'].includes(err?.code)) {
+      console.warn(`Skipping optional checkpoint table ${table}: ${err.message}`);
+      return null;
+    }
+    throw err;
+  }
+}
+
 async function getMaxTimestamp() {
   const ts = await Promise.all([
     getMaxTimestampForTable(pgClient, '"Member"'),
     getMaxTimestampForTable(pgClient, '"Team"'),
     getMaxTimestampForTable(pgClient, '"Project"'),
-    getMaxTimestampForTable(pgClient, '"PLEvent"')
+    getMaxTimestampForTable(pgClient, '"PLEvent"'),
+    getMaxTimestampForOptionalTable(pgClient, '"MemberApproval"'),
+    getMaxTimestampForOptionalTable(pgClient, '"PolicyAssignment"'),
+    getMaxTimestampForOptionalTable(pgClient, '"Policy"'),
+    getMaxTimestampForOptionalTable(pgClient, '"Permission"'),
+    getMaxTimestampForOptionalTable(pgClient, '"MemberPermissionV2"')
   ]);
+
   let max = null;
   for (const t of ts) {
     if (!t) continue;
@@ -221,16 +240,31 @@ function toDateFromNodebb(ts) {
 
 // ----- OpenSearch deletions (PG) -----
 async function deleteRejectedMembersFromOpenSearch() {
-  const r = await pgClient.query(`SELECT uid FROM "Member" WHERE "accessLevel" IN ('Rejected', 'L0', 'L1')`);
+  const r = await pgClient.query(`
+    WITH latest_approval AS (
+      SELECT DISTINCT ON (ma."memberUid")
+        ma."memberUid",
+        ma.state
+      FROM "MemberApproval" ma
+      ORDER BY ma."memberUid", COALESCE(ma."updatedAt", ma."createdAt") DESC
+    )
+    SELECT m.uid
+    FROM "Member" m
+    LEFT JOIN latest_approval la ON la."memberUid" = m.uid
+    WHERE COALESCE(la.state, 'PENDING') <> 'APPROVED'
+  `);
+
   const uids = r.rows.map(x => x.uid);
   if (!uids.length) return;
+
   const body = uids.flatMap(uid => [{ delete: { _index: 'member', _id: uid } }]);
   const resp = await osClient.bulk({ body });
+
   if (resp.body?.errors) {
     const failed = resp.body.items.filter(x => (x.delete && x.delete.error) || (x.index && x.index.error));
     console.error('Member deletes failed:', JSON.stringify(failed.slice(0, 10), null, 2));
   } else {
-    console.log(`Deleted ${uids.length} rejected/L0/L1 members`);
+    console.log(`Deleted ${uids.length} non-approved members`);
   }
 }
 async function deleteDeletedProjectsFromOpenSearch() {
@@ -250,11 +284,72 @@ async function deleteDeletedProjectsFromOpenSearch() {
 // ----- OpenSearch indexing (PG) -----
 async function indexMembers(lastCheckpoint) {
   const r = await pgClient.query(`
-    SELECT m.uid, m.name, m.bio, i.url, m."scheduleMeetingCount", m."officeHours"
+    WITH latest_approval AS (
+      SELECT DISTINCT ON (ma."memberUid")
+        ma."memberUid",
+        ma.state,
+        COALESCE(ma."updatedAt", ma."createdAt") AS "approvalUpdatedAt"
+      FROM "MemberApproval" ma
+      ORDER BY ma."memberUid", COALESCE(ma."updatedAt", ma."createdAt") DESC
+    )
+    SELECT
+      m.uid,
+      m.name,
+      m.bio,
+      i.url,
+      m."scheduleMeetingCount",
+      m."officeHours",
+      la.state AS "approvalState",
+      COALESCE(
+        jsonb_agg(
+          DISTINCT jsonb_build_object(
+            'uid', p.uid,
+            'name', p.name,
+            'role', p.role,
+            'group', p."group"
+          )
+        ) FILTER (WHERE p.uid IS NOT NULL),
+        '[]'::jsonb
+      ) AS policies,
+      COALESCE(
+        array_agg(DISTINCT policy_perm.code) FILTER (WHERE policy_perm.code IS NOT NULL),
+        ARRAY[]::text[]
+      ) AS "policyPermissions",
+      COALESCE(
+        array_agg(DISTINCT direct_perm.code) FILTER (WHERE direct_perm.code IS NOT NULL),
+        ARRAY[]::text[]
+      ) AS "directPermissions"
     FROM "Member" m
-           LEFT JOIN "Image" i ON m."imageUid" = i.uid
-    WHERE (m."createdAt" > $1 OR m."updatedAt" > $1)
-      AND m."accessLevel" NOT IN ('L0', 'L1', 'Rejected')
+      JOIN latest_approval la ON la."memberUid" = m.uid AND la.state = 'APPROVED'
+      LEFT JOIN "Image" i ON m."imageUid" = i.uid
+      LEFT JOIN "PolicyAssignment" pa ON pa."memberUid" = m.uid
+      LEFT JOIN "Policy" p ON p.uid = pa."policyUid"
+      LEFT JOIN "PolicyPermission" pp ON pp."policyUid" = p.uid
+      LEFT JOIN "Permission" policy_perm ON policy_perm.uid = pp."permissionUid"
+      LEFT JOIN "MemberPermissionV2" mpv2 ON mpv2."memberUid" = m.uid
+      LEFT JOIN "Permission" direct_perm ON direct_perm.uid = mpv2."permissionUid"
+    WHERE
+      m."createdAt" > $1
+      OR m."updatedAt" > $1
+      OR la."approvalUpdatedAt" > $1
+      OR pa."createdAt" > $1
+      OR pa."updatedAt" > $1
+      OR p."createdAt" > $1
+      OR p."updatedAt" > $1
+      OR policy_perm."createdAt" > $1
+      OR policy_perm."updatedAt" > $1
+      OR mpv2."createdAt" > $1
+      OR mpv2."updatedAt" > $1
+      OR direct_perm."createdAt" > $1
+      OR direct_perm."updatedAt" > $1
+    GROUP BY
+      m.uid,
+      m.name,
+      m.bio,
+      i.url,
+      m."scheduleMeetingCount",
+      m."officeHours",
+      la.state
   `, [lastCheckpoint]);
 
   console.log('Got data from Member table:', r.rows.length);
@@ -264,6 +359,11 @@ async function indexMembers(lastCheckpoint) {
     const officeHoursUrl = row.officeHours && String(row.officeHours).trim()
       ? String(row.officeHours).trim()
       : null;
+
+    const permissions = Array.from(new Set([
+      ...(row.policyPermissions || []),
+      ...(row.directPermissions || [])
+    ])).sort();
 
     return [
       { index: { _index: 'member', _id: row.uid } },
@@ -275,19 +375,25 @@ async function indexMembers(lastCheckpoint) {
         scheduleMeetingCount: row.scheduleMeetingCount,
         officeHoursUrl,
         availableToConnect: Boolean(officeHoursUrl),
+        approvalState: row.approvalState,
+        policies: row.policies || [],
+        permissions,
         name_suggest: { input: generateSuggestInput(row.name) }
       }
     ];
   });
 
   const resp = await osClient.bulk({ body });
+
   if (resp.body?.errors) {
     const failed = resp.body.items.filter(x => x.index && x.index.error);
     console.error('Member bulk errors:', JSON.stringify(failed.slice(0, 10), null, 2));
     return 0;
   }
+
   return r.rows.length;
 }
+
 async function indexTeams(lastCheckpoint) {
   const r = await pgClient.query(`
     SELECT t.uid, t.name, t."shortDescription", t."longDescription", i.url
