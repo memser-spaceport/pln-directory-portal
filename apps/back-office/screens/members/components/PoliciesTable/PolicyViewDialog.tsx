@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   createColumnHelper,
   flexRender,
@@ -127,16 +127,39 @@ const ProjectIcon = () => (
 
 // ─── Cell helpers ─────────────────────────────────────────────────────────────
 
-function getPermissionIcon(perm: string) {
-  const lower = perm.toLowerCase();
-  if (lower.includes('directory')) return <FolderIcon />;
-  if (lower.includes('hour') || lower.includes('office')) return <CalendarIcon />;
-  if (lower.includes('forum') || lower.includes('chat') || lower.includes('message')) return <ChatIcon />;
-  if (lower.includes('gathering') || lower.includes('irl') || lower.includes('member') || lower.includes('people')) return <PeopleIcon />;
-  if (lower.includes('guide') || lower.includes('founder') || lower.includes('book') || lower.includes('doc')) return <BookIcon />;
-  if (lower.includes('demo') || lower.includes('event') || lower.includes('day')) return <StarCalendarIcon />;
-  if (lower.includes('all') || lower.includes('module')) return <LayersIcon />;
-  return <GridIcon />;
+const ChevronIcon = ({ isOpen }: { isOpen: boolean }) => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 16 16"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+  >
+    <path d="M3.33301 5.33337L7.99967 10L12.6663 5.33337" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+function getModuleIcon(module: string) {
+  switch (module) {
+    case 'Directory':
+      return <FolderIcon />;
+    case 'Office Hours':
+      return <CalendarIcon />;
+    case 'Forum':
+      return <ChatIcon />;
+    case 'IRL Gatherings':
+      return <PeopleIcon />;
+    case 'Founder Guides':
+      return <BookIcon />;
+    case 'PL Demo Day':
+    case 'Partner Demo Day':
+      return <StarCalendarIcon />;
+    case 'Admin Tool':
+      return <LayersIcon />;
+    default:
+      return <GridIcon />;
+  }
 }
 
 const MemberNameCell = ({ member }: { member: Member }) => (
@@ -216,16 +239,40 @@ const columns = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const PERMISSIONS_INITIAL_COUNT = 3;
+const MODULES_INITIAL_COUNT = 6;
 
 export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
   const [memberSearch, setMemberSearch] = useState('');
-  const [showAllPermissions, setShowAllPermissions] = useState(false);
+  const [showAllModules, setShowAllModules] = useState(false);
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    setShowAllPermissions(false);
+    setShowAllModules(false);
+    setExpandedModules(new Set());
     setMemberSearch('');
   }, [policy?.uid]);
+
+  const modulesWithPermissions = useMemo(() => {
+    if (!policy) return [];
+    const grouped = new Map<
+      string,
+      Array<{ uid: string; code: string; module: string; description: string | null }>
+    >();
+    for (const permission of policy.permissionItems) {
+      const current = grouped.get(permission.module);
+      if (current) {
+        current.push(permission);
+      } else {
+        grouped.set(permission.module, [permission]);
+      }
+    }
+    return Array.from(grouped.entries())
+      .map(([module, permissions]) => ({
+        module,
+        permissions: permissions.slice().sort((a, b) => a.code.localeCompare(b.code)),
+      }))
+      .sort((a, b) => a.module.localeCompare(b.module));
+  }, [policy]);
 
   const policyMembers = members.filter((m) => m.policies?.some((p) => p.code === policy?.code));
 
@@ -276,35 +323,68 @@ export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
         {/* Module Permissions */}
         <section className={s.section}>
           <h4 className={s.sectionHeading}>Module Permissions</h4>
-          {policy.permissions.length === 0 ? (
+          {modulesWithPermissions.length === 0 ? (
             <p className={s.muted}>No permissions configured.</p>
           ) : (() => {
-            const hasMore = policy.permissions.length > PERMISSIONS_INITIAL_COUNT;
-            const visible = showAllPermissions ? policy.permissions : policy.permissions.slice(0, PERMISSIONS_INITIAL_COUNT);
+            const hasMore = modulesWithPermissions.length > MODULES_INITIAL_COUNT;
+            const visible = showAllModules
+              ? modulesWithPermissions
+              : modulesWithPermissions.slice(0, MODULES_INITIAL_COUNT);
             return (
               <>
-                <div className={s.permissionCards}>
-                  {visible.map((perm) => (
-                    <div key={perm} className={s.permissionCard}>
-                      <div className={s.permissionCardLeft}>
-                        <span className={s.permissionCardIcon}>{getPermissionIcon(perm)}</span>
-                        <span className={s.permissionCardName}>{perm}</span>
+                <div className={s.moduleCards}>
+                  {visible.map(({ module, permissions }) => {
+                    const isOpen = expandedModules.has(module);
+                    return (
+                      <div key={module} className={s.moduleCard}>
+                        <button
+                          type="button"
+                          className={s.moduleHeader}
+                          onClick={() =>
+                            setExpandedModules((current) => {
+                              const next = new Set(current);
+                              if (next.has(module)) {
+                                next.delete(module);
+                              } else {
+                                next.add(module);
+                              }
+                              return next;
+                            })
+                          }
+                        >
+                          <div className={s.moduleHeaderLeft}>
+                            <span className={s.permissionCardIcon}>{getModuleIcon(module)}</span>
+                            <span className={s.moduleName}>{module}</span>
+                            <span className={s.moduleCount}>{permissions.length}</span>
+                          </div>
+                          <span className={s.moduleChevron}>
+                            <ChevronIcon isOpen={isOpen} />
+                          </span>
+                        </button>
+                        {isOpen && (
+                          <div className={s.modulePermissions}>
+                            {permissions.map((permission) => (
+                              <div key={permission.code} className={s.permissionRow}>
+                                <span className={s.permissionCode}>{permission.code}</span>
+                                {permission.description ? (
+                                  <span className={s.permissionDescription}>{permission.description}</span>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div className={s.permissionBadges}>
-                        <span className={s.permissionBadge}>View</span>
-                        <span className={s.permissionBadge}>Edit</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 {hasMore && (
                   <div className={s.showAllRow}>
                     <button
                       type="button"
                       className={s.showAllBtn}
-                      onClick={() => setShowAllPermissions((v) => !v)}
+                      onClick={() => setShowAllModules((current) => !current)}
                     >
-                      {showAllPermissions ? 'Show Less' : 'Show All'}
+                      {showAllModules ? 'Show Less' : 'Show All'}
                     </button>
                   </div>
                 )}

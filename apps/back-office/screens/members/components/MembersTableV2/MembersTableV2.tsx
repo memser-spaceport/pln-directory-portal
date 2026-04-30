@@ -127,7 +127,8 @@ export function MembersTableV2({
                   <div className={s.badgeRow}>
                     {perms.map((p) => (
                       <span key={p.code} className={s.exceptionBadge}>
-                        ⚠️ {p.code}
+                        <span className={s.exceptionCode}>{p.code}</span>
+                        {p.description ? <span className={s.exceptionDescription}>{p.description}</span> : null}
                       </span>
                     ))}
                   </div>

@@ -6,7 +6,7 @@ import { MemberApprovalsService } from '../../member-approvals/member-approvals.
 export class AccessControlV2Service {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly memberApprovalsService: MemberApprovalsService,
+    private readonly memberApprovalsService: MemberApprovalsService
   ) {}
 
   async listPolicies() {
@@ -28,6 +28,14 @@ export class AccessControlV2Service {
       group: policy.group,
       isSystem: policy.isSystem,
       permissions: policy.policyPermissions.map((pp) => pp.permission.code).sort(),
+      permissionItems: policy.policyPermissions
+        .map((pp) => ({
+          uid: pp.permission.uid,
+          code: pp.permission.code,
+          description: pp.permission.description,
+          module: pp.permission.module,
+        }))
+        .sort((a, b) => a.code.localeCompare(b.code)),
       assignmentsCount: policy._count.assignments,
       permissionsCount: policy._count.policyPermissions,
       createdAt: policy.createdAt,
@@ -61,6 +69,7 @@ export class AccessControlV2Service {
         uid: pp.permission.uid,
         code: pp.permission.code,
         description: pp.permission.description,
+        module: pp.permission.module,
       })),
       assignments: policy.assignments.map((assignment) => ({
         uid: assignment.uid,
@@ -122,7 +131,7 @@ export class AccessControlV2Service {
 
   async updatePolicy(
     code: string,
-    body: { name?: string; description?: string | null; role?: string; group?: string; isSystem?: boolean },
+    body: { name?: string; description?: string | null; role?: string; group?: string; isSystem?: boolean }
   ) {
     await this.ensurePolicy(code);
 
@@ -366,22 +375,43 @@ export class AccessControlV2Service {
       role: assignment.policy.role,
       group: assignment.policy.group,
       permissions: assignment.policy.policyPermissions.map((pp) => pp.permission.code),
+      permissionItems: assignment.policy.policyPermissions.map((pp) => ({
+        uid: pp.permission.uid,
+        code: pp.permission.code,
+        description: pp.permission.description,
+        module: pp.permission.module,
+      })),
     }));
 
     const directPermissions = directPermissionRows.map((row) => row.permission.code);
 
+    const directPermissionItems = directPermissionRows.map((row) => ({
+      uid: row.permission.uid,
+      code: row.permission.code,
+      description: row.permission.description,
+      module: row.permission.module,
+    }));
+
     const effectivePermissions = Array.from(
-      new Set([
-        ...policies.flatMap((policy) => policy.permissions),
-        ...directPermissions,
-      ])
+      new Set([...policies.flatMap((policy) => policy.permissions), ...directPermissions])
     ).sort();
+
+    const effectivePermissionItems = Array.from(
+      new Map(
+        [...policies.flatMap((policy) => policy.permissionItems), ...directPermissionItems].map((permission) => [
+          permission.code,
+          permission,
+        ])
+      ).values()
+    ).sort((a, b) => a.code.localeCompare(b.code));
 
     return {
       memberUid: member.uid,
       policies,
       directPermissions,
+      directPermissionItems,
       effectivePermissions,
+      effectivePermissionItems,
     };
   }
 

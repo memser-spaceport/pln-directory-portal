@@ -45,6 +45,7 @@ export class AdminAccessControlV2MetaController {
       select: {
         uid: true,
         code: true,
+        module: true,
         description: true,
       },
     });

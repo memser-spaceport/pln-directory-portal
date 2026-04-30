@@ -80,3 +80,21 @@
 .exceptionsSelectWrap {
   width: 100%;
 }
+
+.exceptionOption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.exceptionOptionCode {
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 500;
+}
+
+.exceptionOptionDescription {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.3;
+}

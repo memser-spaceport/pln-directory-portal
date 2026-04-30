@@ -23,6 +23,7 @@ export interface RoleBasic {
 export interface PermissionBasic {
   uid: string;
   code: string;
+  module: string;
   description?: string | null;
   scopes?: string[];
 }

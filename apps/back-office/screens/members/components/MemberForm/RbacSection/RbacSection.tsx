@@ -10,6 +10,8 @@ import { PolicyMultiSelect, PolicyOption, PolicySelection } from './PolicyMultiS
 interface SelectOption {
   label: string;
   value: string;
+  module?: string;
+  description?: string | null;
 }
 
 const MEMBER_STATE_OPTIONS: SelectOption[] = [
@@ -89,6 +91,19 @@ const ExceptionsMultiSelect = ({ label, placeholder, options, isDisabled = false
         placeholder={placeholder}
         styles={multiSelectStyles(isDisabled)}
         menuPortalTarget={document.body}
+        formatOptionLabel={(option, meta) => {
+          if (meta.context === 'value') {
+            return <span>{option.label}</span>;
+          }
+          return (
+            <div className={s.exceptionOption}>
+              <span className={s.exceptionOptionCode}>{option.label}</span>
+              {option.description ? (
+                <span className={s.exceptionOptionDescription}>{option.description}</span>
+              ) : null}
+            </div>
+          );
+        }}
         onChange={(selected: MultiValue<SelectOption>) => {
           setValue('rbacExceptions', selected as SelectOption[], { shouldDirty: true });
         }}
@@ -99,7 +114,7 @@ const ExceptionsMultiSelect = ({ label, placeholder, options, isDisabled = false
 
 interface RbacSectionProps {
   policyOptions: PolicyOption[];
-  exceptionsOptions: SelectOption[];
+  exceptionsOptions: OptionsOrGroups<SelectOption, GroupBase<SelectOption>>;
   isLoadingOptions: boolean;
 }
 

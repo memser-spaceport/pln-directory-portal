@@ -210,7 +210,12 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
       value: mp.code,
     }));
 
-    const rbacExceptions = (member.permissions ?? []).map((p) => ({ label: p.code, value: p.code }));
+    const rbacExceptions = (member.permissions ?? []).map((p) => ({
+      label: p.code,
+      value: p.code,
+      module: p.module,
+      description: p.description ?? null,
+    }));
 
     return {
       memberStateStatus,

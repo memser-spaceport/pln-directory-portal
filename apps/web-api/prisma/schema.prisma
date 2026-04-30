@@ -1818,6 +1818,7 @@ model Role {
 model Permission {
   uid         String   @id
   code        String   @unique
+  module      String
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
