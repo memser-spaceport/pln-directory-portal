@@ -148,6 +148,30 @@ export class MemberService {
         reviewedAt: resolvedState === MemberApprovalState.PENDING ? null : new Date(),
       },
     });
+
+    if (resolvedState === MemberApprovalState.REJECTED) {
+      await tx.member.update({
+        where: { uid: memberUid },
+        data: { deletedAt: new Date(), deletionReason: 'Member state changed to Rejected' },
+      });
+    }
+
+    if (resolvedState === MemberApprovalState.APPROVED) {
+      const teamMemberRoles = await this.prisma.teamMemberRole.findMany({
+        where: { memberUid },
+        select: { team: { select: { uid: true, accessLevel: true } } },
+      });
+
+      const teamUidsToUpdate = Array.from(
+        new Set(teamMemberRoles?.filter((r) => r.team.accessLevel === 'L0').map((r) => r.team.uid) ?? [])
+      );
+
+      if (teamUidsToUpdate.length > 0) {
+        await Promise.all(
+          teamUidsToUpdate.map((teamUid) => this.teamService.updateTeamAccessLevel(teamUid, undefined, 'L1'))
+        );
+      }
+    }
   }
 
   private async syncMemberApprovalFromAccessLevel(
@@ -1589,6 +1613,48 @@ export class MemberService {
     }
 
     return result;
+  }
+
+  async updateMemberApprovalState(memberUid: string, memberState: MemberApprovalState): Promise<{ updated: boolean }> {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      include: {
+        memberApproval: true,
+        teamMemberRoles: {
+          select: {
+            team: {
+              select: {
+                uid: true,
+                accessLevel: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+
+    if (member.memberApproval?.state === memberState) {
+      return { updated: false };
+    }
+
+    this.syncMemberApprovalFromPayload(
+      this.prisma,
+      memberUid,
+      {
+        state: memberState,
+      },
+      memberUid,
+      null,
+      'Member state changed to ' + memberState
+    );
+
+    await this.forestAdminService.triggerAirtableSync();
+
+    return { updated: true };
   }
 
   async updateAccessLevel({

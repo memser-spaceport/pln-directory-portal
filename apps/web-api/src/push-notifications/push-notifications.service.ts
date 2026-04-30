@@ -4,7 +4,7 @@ import { WebSocketService } from '../websocket/websocket.service';
 import { Prisma, PushNotificationCategory } from '@prisma/client';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
-import { RbacService } from '../rbac/rbac.service';
+import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 
 export interface CreatePushNotificationDto {
   category: PushNotificationCategory;
@@ -70,7 +70,7 @@ export class PushNotificationsService {
     private readonly notificationServiceClient: NotificationServiceClient,
     @Inject(forwardRef(() => PLEventGuestsService))
     private readonly pleventGuestsService: PLEventGuestsService,
-    private readonly rbacService: RbacService
+    private readonly accessControlV2Service: AccessControlV2Service
   ) {}
 
   private isSelfAuthoredForumPost(
@@ -140,20 +140,18 @@ export class PushNotificationsService {
 
   /**
    * Get all member UIDs who have ANY of the specified permissions.
-   * Combines role-based permissions and direct member permissions.
+   * Uses the new policy-based permission system (PolicyAssignment + MemberPermissionV2).
    */
   private async getMemberUidsByPermissions(permissionCodes: string[]): Promise<string[]> {
     if (!permissionCodes || permissionCodes.length === 0) {
       return [];
     }
 
-    // Query members with role-based permissions
-    const roleBasedMembers = await this.prisma.roleAssignment.findMany({
+    // Query members with policy-based permissions (via PolicyAssignment -> Policy -> PolicyPermission -> Permission)
+    const policyBasedMembers = await this.prisma.policyAssignment.findMany({
       where: {
-        status: 'ACTIVE',
-        revokedAt: null,
-        role: {
-          rolePermissions: {
+        policy: {
+          policyPermissions: {
             some: {
               permission: {
                 code: { in: permissionCodes },
@@ -166,11 +164,9 @@ export class PushNotificationsService {
       distinct: ['memberUid'],
     });
 
-    // Query members with direct permissions
-    const directPermissionMembers = await this.prisma.memberPermission.findMany({
+    // Query members with direct permissions (MemberPermissionV2)
+    const directPermissionMembers = await this.prisma.memberPermissionV2.findMany({
       where: {
-        status: 'ACTIVE',
-        revokedAt: null,
         permission: {
           code: { in: permissionCodes },
         },
@@ -181,7 +177,7 @@ export class PushNotificationsService {
 
     // Combine and deduplicate
     const memberUids = new Set<string>([
-      ...roleBasedMembers.map((r) => r.memberUid),
+      ...policyBasedMembers.map((p) => p.memberUid),
       ...directPermissionMembers.map((p) => p.memberUid),
     ]);
 
@@ -190,6 +186,7 @@ export class PushNotificationsService {
 
   /**
    * Check if a user has ANY of the required permissions.
+   * Uses the new policy-based permission system (PolicyAssignment + MemberPermissionV2).
    */
   private async userHasAnyPermission(memberUid: string, permissionCodes: string[]): Promise<boolean> {
     if (!permissionCodes || permissionCodes.length === 0) {
@@ -197,8 +194,8 @@ export class PushNotificationsService {
     }
 
     for (const permissionCode of permissionCodes) {
-      const hasPermission = await this.rbacService.hasPermission(memberUid, permissionCode);
-      if (hasPermission) {
+      const result = await this.accessControlV2Service.hasPermission(memberUid, permissionCode);
+      if (result.allowed) {
         return true; // Has at least one required permission
       }
     }
@@ -307,6 +304,7 @@ export class PushNotificationsService {
    * - Public notifications: check PushNotificationReadStatus table
    * - Access level notifications: check if user's access level is in the accessLevels array
    * - Permission-based notifications: check if user has ANY of the requiredPermissions
+   *   (notifications with requiredPermissions set, but no accessLevels and no specific recipient)
    */
   async getForUser(
     memberUid: string,
@@ -353,25 +351,47 @@ export class PushNotificationsService {
       orderBy: { createdAt: 'desc' },
     });
 
+    // NOTE: Access level notifications are deprecated in favor of permission-based notifications
     // Get access level notifications (where user's access level is in the accessLevels array)
     // Filter: notifications created after member joined OR NEW_FEATURE category
-    const accessLevelNotifications = userAccessLevel
-      ? await this.prisma.pushNotification.findMany({
-          where: {
-            accessLevels: { has: userAccessLevel },
-            isPublic: false,
-            recipientUid: null,
-            OR: [{ createdAt: { gte: memberCreatedAt } }, { category: PushNotificationCategory.NEW_FEATURE }],
-          },
-          include: {
-            readStatuses: {
-              where: { memberUid },
-              take: 1,
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-        })
-      : [];
+    // const accessLevelNotifications = userAccessLevel
+    //   ? await this.prisma.pushNotification.findMany({
+    //       where: {
+    //         accessLevels: { has: userAccessLevel },
+    //         isPublic: false,
+    //         recipientUid: null,
+    //         OR: [{ createdAt: { gte: memberCreatedAt } }, { category: PushNotificationCategory.NEW_FEATURE }],
+    //       },
+    //       include: {
+    //         readStatuses: {
+    //           where: { memberUid },
+    //           take: 1,
+    //         },
+    //       },
+    //       orderBy: { createdAt: 'desc' },
+    //     })
+    //   : [];
+    const accessLevelNotifications: any[] = [];
+
+    // Get permission-based notifications (where requiredPermissions is set but no accessLevels/recipient)
+    // These are filtered by checking if user has any of the required permissions
+    // Filter: notifications created after member joined OR NEW_FEATURE category
+    const permissionBasedNotifications = await this.prisma.pushNotification.findMany({
+      where: {
+        requiredPermissions: { isEmpty: false },
+        accessLevels: { isEmpty: true },
+        isPublic: false,
+        recipientUid: null,
+        OR: [{ createdAt: { gte: memberCreatedAt } }, { category: PushNotificationCategory.NEW_FEATURE }],
+      },
+      include: {
+        readStatuses: {
+          where: { memberUid },
+          take: 1,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
     // Transform and combine notifications
     const allNotifications: NotificationWithReadStatus[] = [
@@ -410,6 +430,24 @@ export class PushNotificationsService {
           createdAt: n.createdAt,
         })),
       ...accessLevelNotifications
+        .filter((n) => !unreadOnly || n.readStatuses.length === 0)
+        .map((n) => ({
+          uid: n.uid,
+          category: n.category,
+          title: n.title,
+          description: n.description,
+          image: n.image,
+          link: n.link,
+          linkText: n.linkText,
+          metadata: n.metadata,
+          isPublic: n.isPublic,
+          recipientUid: n.recipientUid,
+          accessLevels: n.accessLevels,
+          requiredPermissions: n.requiredPermissions,
+          isRead: n.readStatuses.length > 0,
+          createdAt: n.createdAt,
+        })),
+      ...permissionBasedNotifications
         .filter((n) => !unreadOnly || n.readStatuses.length === 0)
         .map((n) => ({
           uid: n.uid,
@@ -580,39 +618,41 @@ export class PushNotificationsService {
       }
     }
 
+    // NOTE: Access level notifications are deprecated in favor of permission-based notifications
     // Count access level notifications not read by this user (filter by requiredPermissions)
     // Filter: notifications created after member joined OR NEW_FEATURE category
-    let accessLevelUnread = 0;
-    if (userAccessLevel) {
-      const accessLevelNotifications = await this.prisma.pushNotification.findMany({
-        where: {
-          accessLevels: { has: userAccessLevel },
-          isPublic: false,
-          recipientUid: null,
-          readStatuses: {
-            none: { memberUid },
-          },
-          OR: [{ createdAt: { gte: memberCreatedAt } }, { category: PushNotificationCategory.NEW_FEATURE }],
-        },
-        select: { requiredPermissions: true, category: true, metadata: true },
-      });
-
-      for (const notification of accessLevelNotifications) {
-        // Skip self-authored forum posts
-        if (this.isSelfAuthoredForumPost(notification as any, memberUid)) {
-          continue;
-        }
-
-        if (notification.requiredPermissions && notification.requiredPermissions.length > 0) {
-          const hasPermission = await this.userHasAnyPermission(memberUid, notification.requiredPermissions);
-          if (hasPermission) {
-            accessLevelUnread++;
-          }
-        } else {
-          accessLevelUnread++;
-        }
-      }
-    }
+    // let accessLevelUnread = 0;
+    // if (userAccessLevel) {
+    //   const accessLevelNotifications = await this.prisma.pushNotification.findMany({
+    //     where: {
+    //       accessLevels: { has: userAccessLevel },
+    //       isPublic: false,
+    //       recipientUid: null,
+    //       readStatuses: {
+    //         none: { memberUid },
+    //       },
+    //       OR: [{ createdAt: { gte: memberCreatedAt } }, { category: PushNotificationCategory.NEW_FEATURE }],
+    //     },
+    //     select: { requiredPermissions: true, category: true, metadata: true },
+    //   });
+    //
+    //   for (const notification of accessLevelNotifications) {
+    //     // Skip self-authored forum posts
+    //     if (this.isSelfAuthoredForumPost(notification as any, memberUid)) {
+    //       continue;
+    //     }
+    //
+    //     if (notification.requiredPermissions && notification.requiredPermissions.length > 0) {
+    //       const hasPermission = await this.userHasAnyPermission(memberUid, notification.requiredPermissions);
+    //       if (hasPermission) {
+    //         accessLevelUnread++;
+    //       }
+    //     } else {
+    //       accessLevelUnread++;
+    //     }
+    //   }
+    // }
+    const accessLevelUnread = 0;
 
     return privateUnread + publicUnread + accessLevelUnread;
   }
@@ -656,28 +696,51 @@ export class PushNotificationsService {
       select: { uid: true, link: true, requiredPermissions: true },
     });
 
+    // NOTE: Access level notifications are deprecated in favor of permission-based notifications
     // Unread access-level notifications with links
     // Filter: notifications created after member joined OR NEW_FEATURE category
-    const accessLevelLinks = userAccessLevel
-      ? await this.prisma.pushNotification.findMany({
-          where: {
-            accessLevels: { has: userAccessLevel },
-            isPublic: false,
-            recipientUid: null,
-            link: { not: null },
-            readStatuses: {
-              none: { memberUid },
-            },
-            OR: [{ createdAt: { gte: memberCreatedAt } }, { category: PushNotificationCategory.NEW_FEATURE }],
-          },
-          select: { uid: true, link: true, category: true, metadata: true, requiredPermissions: true },
-        })
-      : [];
+    // const accessLevelLinks = userAccessLevel
+    //   ? await this.prisma.pushNotification.findMany({
+    //       where: {
+    //         accessLevels: { has: userAccessLevel },
+    //         isPublic: false,
+    //         recipientUid: null,
+    //         link: { not: null },
+    //         readStatuses: {
+    //           none: { memberUid },
+    //         },
+    //         OR: [{ createdAt: { gte: memberCreatedAt } }, { category: PushNotificationCategory.NEW_FEATURE }],
+    //       },
+    //       select: { uid: true, link: true, category: true, metadata: true, requiredPermissions: true },
+    //     })
+    //   : [];
+    const accessLevelLinks: any[] = [];
 
     const filteredAccessLevelLinks = accessLevelLinks.filter((n) => !this.isSelfAuthoredForumPost(n as any, memberUid));
 
+    // Unread permission-based notifications with links
+    // Filter: notifications created after member joined OR NEW_FEATURE category
+    const permissionBasedLinks = await this.prisma.pushNotification.findMany({
+      where: {
+        requiredPermissions: { isEmpty: false },
+        accessLevels: { isEmpty: true },
+        isPublic: false,
+        recipientUid: null,
+        link: { not: null },
+        readStatuses: {
+          none: { memberUid },
+        },
+        OR: [{ createdAt: { gte: memberCreatedAt } }, { category: PushNotificationCategory.NEW_FEATURE }],
+      },
+      select: { uid: true, link: true, category: true, metadata: true, requiredPermissions: true },
+    });
+
+    const filteredPermissionBasedLinks = permissionBasedLinks.filter(
+      (n) => !this.isSelfAuthoredForumPost(n as any, memberUid)
+    );
+
     // Combine all links
-    const allLinks = [...privateLinks, ...publicLinks, ...filteredAccessLevelLinks];
+    const allLinks = [...privateLinks, ...publicLinks, ...filteredAccessLevelLinks, ...filteredPermissionBasedLinks];
 
     // Filter by requiredPermissions
     const result: Array<{ uid: string; link: string }> = [];
@@ -699,6 +762,7 @@ export class PushNotificationsService {
    * - Private notifications: update isRead field
    * - Public notifications: insert into PushNotificationReadStatus
    * - Access level notifications: insert into PushNotificationReadStatus
+   * - Permission-based notifications: insert into PushNotificationReadStatus
    */
   async markAsRead(uid: string, memberUid: string) {
     // Get user's access level
@@ -712,14 +776,23 @@ export class PushNotificationsService {
     // Build OR conditions for finding the notification
     const orConditions: Prisma.PushNotificationWhereInput[] = [{ recipientUid: memberUid }, { isPublic: true }];
 
+    // NOTE: Access level notifications are deprecated in favor of permission-based notifications
     // Add access level condition if user has an access level
-    if (userAccessLevel) {
-      orConditions.push({
-        accessLevels: { has: userAccessLevel },
-        isPublic: false,
-        recipientUid: null,
-      });
-    }
+    // if (userAccessLevel) {
+    //   orConditions.push({
+    //     accessLevels: { has: userAccessLevel },
+    //     isPublic: false,
+    //     recipientUid: null,
+    //   });
+    // }
+
+    // Add permission-based condition (notifications with requiredPermissions but no accessLevels/recipient)
+    orConditions.push({
+      requiredPermissions: { isEmpty: false },
+      accessLevels: { isEmpty: true },
+      isPublic: false,
+      recipientUid: null,
+    });
 
     const notification = await this.prisma.pushNotification.findFirst({
       where: {
@@ -732,8 +805,15 @@ export class PushNotificationsService {
       return null;
     }
 
-    if (notification.isPublic || (notification.accessLevels.length > 0 && !notification.recipientUid)) {
-      // For public and access level notifications, create a read status entry
+    if (
+      notification.isPublic ||
+      // NOTE: Access level notifications are deprecated
+      // (notification.accessLevels.length > 0 && !notification.recipientUid) ||
+      (notification.requiredPermissions.length > 0 &&
+        !notification.recipientUid &&
+        notification.accessLevels.length === 0)
+    ) {
+      // For public and permission-based notifications, create a read status entry
       await this.prisma.pushNotificationReadStatus.upsert({
         where: {
           notificationId_memberUid: {
@@ -768,16 +848,16 @@ export class PushNotificationsService {
    * Mark all notifications as read for a user.
    * - Private: update isRead field
    * - Public: insert read status for all unread public notifications
-   * - Access level: insert read status for all unread access level notifications
+   * - Permission-based: insert read status for unread permission-based notifications user has access to
    */
   async markAllAsRead(memberUid: string) {
+    // NOTE: Access level notifications are deprecated in favor of permission-based notifications
     // Get user's access level
-    const member = await this.prisma.member.findFirst({
-      where: { uid: memberUid },
-      select: { accessLevel: true },
-    });
-
-    const userAccessLevel = member?.accessLevel;
+    // const member = await this.prisma.member.findFirst({
+    //   where: { uid: memberUid },
+    //   select: { accessLevel: true },
+    // });
+    // const userAccessLevel = member?.accessLevel;
 
     // Mark all private notifications as read
     await this.prisma.pushNotification.updateMany({
@@ -811,30 +891,66 @@ export class PushNotificationsService {
       });
     }
 
+    // NOTE: Access level notifications are deprecated
     // Get all access level notifications not yet read by this user
-    if (userAccessLevel) {
-      const unreadAccessLevelNotifications = await this.prisma.pushNotification.findMany({
-        where: {
-          accessLevels: { has: userAccessLevel },
-          isPublic: false,
-          recipientUid: null,
-          readStatuses: {
-            none: { memberUid },
-          },
-        },
-        select: { id: true },
-      });
+    // if (userAccessLevel) {
+    //   const unreadAccessLevelNotifications = await this.prisma.pushNotification.findMany({
+    //     where: {
+    //       accessLevels: { has: userAccessLevel },
+    //       isPublic: false,
+    //       recipientUid: null,
+    //       readStatuses: {
+    //         none: { memberUid },
+    //       },
+    //     },
+    //     select: { id: true },
+    //   });
+    //
+    //   // Create read status for all unread access level notifications
+    //   if (unreadAccessLevelNotifications.length > 0) {
+    //     await this.prisma.pushNotificationReadStatus.createMany({
+    //       data: unreadAccessLevelNotifications.map((n) => ({
+    //         notificationId: n.id,
+    //         memberUid,
+    //       })),
+    //       skipDuplicates: true,
+    //     });
+    //   }
+    // }
 
-      // Create read status for all unread access level notifications
-      if (unreadAccessLevelNotifications.length > 0) {
-        await this.prisma.pushNotificationReadStatus.createMany({
-          data: unreadAccessLevelNotifications.map((n) => ({
-            notificationId: n.id,
-            memberUid,
-          })),
-          skipDuplicates: true,
-        });
+    // Get all permission-based notifications not yet read by this user
+    // Filter to only those the user has permissions for
+    const unreadPermissionBasedNotifications = await this.prisma.pushNotification.findMany({
+      where: {
+        requiredPermissions: { isEmpty: false },
+        accessLevels: { isEmpty: true },
+        isPublic: false,
+        recipientUid: null,
+        readStatuses: {
+          none: { memberUid },
+        },
+      },
+      select: { id: true, requiredPermissions: true },
+    });
+
+    // Filter notifications by requiredPermissions and mark as read
+    const permissionBasedIdsToMark: number[] = [];
+    for (const notification of unreadPermissionBasedNotifications) {
+      const hasPermission = await this.userHasAnyPermission(memberUid, notification.requiredPermissions);
+      if (hasPermission) {
+        permissionBasedIdsToMark.push(notification.id);
       }
+    }
+
+    // Create read status for unread permission-based notifications user has access to
+    if (permissionBasedIdsToMark.length > 0) {
+      await this.prisma.pushNotificationReadStatus.createMany({
+        data: permissionBasedIdsToMark.map((id) => ({
+          notificationId: id,
+          memberUid,
+        })),
+        skipDuplicates: true,
+      });
     }
 
     // Notify via WebSocket
