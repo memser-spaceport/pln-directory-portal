@@ -37,6 +37,8 @@ export const MemberForm = ({
   authToken,
   showRbacSection = false,
 }: Props) => {
+  const isAddNew = !initialData;
+
   const emptyDefaults: TMemberForm = {
     memberStateStatus: null,
     rbacPolicies: [],
