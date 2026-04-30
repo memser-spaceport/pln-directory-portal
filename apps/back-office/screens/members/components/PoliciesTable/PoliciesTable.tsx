@@ -14,6 +14,7 @@ import { Policy } from '../../../../hooks/access-control/usePoliciesList';
 import { Member } from '../../types/member';
 import PaginationControls from '../PaginationControls/PaginationControls';
 import { PolicyViewDialog } from './PolicyViewDialog';
+import { iconForRole } from '../MemberForm/RbacSection/PolicyMultiSelect/roleIconMap';
 import s from './PoliciesTable.module.scss';
 
 interface Props {
@@ -23,25 +24,6 @@ interface Props {
   setPagination: Dispatch<SetStateAction<PaginationState>>;
   globalFilter: string;
 }
-
-const ShieldIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M12 2L3 7V12C3 16.55 6.84 20.74 12 22C17.16 20.74 21 16.55 21 12V7L12 2Z"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M9 12L11 14L15 10"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 
 const EyeIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -64,7 +46,9 @@ const ModulesCell = ({ permissionItems }: { permissionItems: Policy['permissionI
   return (
     <div className={s.badgeRow}>
       {visible.map((module) => (
-        <span key={module} className={s.moduleBadge}>{module}</span>
+        <span key={module} className={s.moduleBadge}>
+          {module}
+        </span>
       ))}
       {overflow > 0 && <span className={s.overflowBadge}>+{overflow}</span>}
     </div>
@@ -79,22 +63,27 @@ export function PoliciesTable({ policies, members, pagination, setPagination, gl
   const columns = [
     columnHelper.display({
       id: 'policy',
-      size: 220,
+      size: 270,
       header: () => 'Policy',
-      cell: (info) => (
-        <div className={s.policyCell}>
-          <ShieldIcon />
-          <span className={s.policyName}>{info.row.original.name}</span>
-        </div>
-      ),
+      cell: (info) => {
+        const PolicyIcon = iconForRole(info.row.original.role ?? '');
+        return (
+          <div className={s.policyCell}>
+            <span className={s.policyIcon} aria-hidden>
+              <PolicyIcon />
+            </span>
+            <span className={s.policyName}>{info.row.original.name}</span>
+          </div>
+        );
+      },
     }),
     columnHelper.accessor('role', {
-      size: 160,
+      size: 185,
       header: 'Role',
     }),
     columnHelper.display({
       id: 'group',
-      size: 130,
+      size: 160,
       header: () => 'Group',
       cell: (info) => <span className={s.groupBadge}>{info.row.original.group}</span>,
     }),
@@ -118,11 +107,7 @@ export function PoliciesTable({ policies, members, pagination, setPagination, gl
       size: 80,
       header: () => 'Action',
       cell: (info) => (
-        <button
-          type="button"
-          className={s.viewBtn}
-          onClick={() => setSelectedPolicy(info.row.original)}
-        >
+        <button type="button" className={s.viewBtn} onClick={() => setSelectedPolicy(info.row.original)}>
           <EyeIcon /> View
         </button>
       ),
@@ -139,10 +124,7 @@ export function PoliciesTable({ policies, members, pagination, setPagination, gl
     getPaginationRowModel: getPaginationRowModel(),
     globalFilterFn: (row, _colId, value: string) => {
       const q = value.toLowerCase();
-      return (
-        row.original.name.toLowerCase().includes(q) ||
-        (row.original.description ?? '').toLowerCase().includes(q)
-      );
+      return row.original.name.toLowerCase().includes(q) || (row.original.description ?? '').toLowerCase().includes(q);
     },
     getRowId: (row) => row.uid,
     autoResetPageIndex: false,

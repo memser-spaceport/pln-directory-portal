@@ -1,23 +1,14 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RBAC_PERMISSIONS_KEY } from './rbac.decorator';
 import { RbacService } from './rbac.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 
 const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
-  'founder_guides.view': [
-    'founder_guides.view.all',
-    'founder_guides.view.plvs',
-    'founder_guides.view.plcc',
-  ],
+  'founder_guides.view': ['founder_guides.view.all', 'founder_guides.view.plvs', 'founder_guides.view.plcc'],
   'founder_guides.create': ['founder_guides.create'],
   'deals.view': ['deals.read'],
-  'demo_day.report_link.view': ['demo_day.report_link.view'],
+  'demo_day.report_link.view': ['demoday.report_link.read'],
 };
 
 @Injectable()
@@ -25,7 +16,7 @@ export class RbacGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly rbacService: RbacService,
-    private readonly accessControlV2Service: AccessControlV2Service,
+    private readonly accessControlV2Service: AccessControlV2Service
   ) {}
 
   private getPermissionCandidates(permission: string): string[] {
@@ -34,10 +25,8 @@ export class RbacGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredPermissions =
-      this.reflector.getAllAndOverride<string[]>(RBAC_PERMISSIONS_KEY, [
-        context.getHandler(),
-        context.getClass(),
-      ]) ?? [];
+      this.reflector.getAllAndOverride<string[]>(RBAC_PERMISSIONS_KEY, [context.getHandler(), context.getClass()]) ??
+      [];
 
     if (!requiredPermissions.length) {
       return true;

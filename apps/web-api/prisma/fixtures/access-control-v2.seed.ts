@@ -47,7 +47,7 @@ const permissionSeeds: PermissionSeed[] = [
   { code: 'demoday.active.read', module: 'PL Demo Day' },
   { code: 'demoday.active.write', module: 'PL Demo Day' },
   { code: 'demoday.stats.read', module: 'PL Demo Day' },
-  { code: 'demo_day.report_link.view', module: 'PL Demo Day' },
+  { code: 'demoday.report_link.read', module: 'PL Demo Day' },
   { code: 'pl.advisors.access', module: 'PL Advisors' },
 ];
 
@@ -67,7 +67,8 @@ const policies: PolicySeed[] = [
       'admin.tools.access',
       'founder_guides.view.all',
       'founder_guides.create',
-      'demo_day.report_link.view',
+      'demoday.report_link.read',
+      'demoday.stats.read',
       'deals.read',
       'forum.read',
       'forum.write',
@@ -83,7 +84,6 @@ const policies: PolicySeed[] = [
     role: 'PL Infra team',
     group: 'PL Internal',
     permissions: [
-      'directory.admin.full',
       'member.contacts.read',
       'team.priority.read',
       'membership.source.read',
@@ -112,7 +112,7 @@ const policies: PolicySeed[] = [
       'demoday.active.read',
       'demoday.active.write',
       'demoday.stats.read',
-      'demo_day.report_link.view',
+      'demoday.report_link.read',
     ],
   },
   {
@@ -142,7 +142,7 @@ const policies: PolicySeed[] = [
       'demoday.active.read',
       'demoday.active.write',
       'demoday.stats.read',
-      'demo_day.report_link.view',
+      'demoday.report_link.read',
     ],
   },
   {
@@ -258,7 +258,6 @@ const policies: PolicySeed[] = [
       'oh.demand.write',
       'forum.read',
       'forum.write',
-      'deals.read',
       'member.onboarding',
     ],
   },
@@ -277,7 +276,6 @@ const policies: PolicySeed[] = [
       'oh.demand.write',
       'forum.read',
       'forum.write',
-      'deals.read',
     ],
   },
   {
@@ -295,7 +293,6 @@ const policies: PolicySeed[] = [
       'oh.demand.write',
       'forum.read',
       'forum.write',
-      'deals.read',
     ],
   },
   {

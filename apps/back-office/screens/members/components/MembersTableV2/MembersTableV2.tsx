@@ -47,10 +47,7 @@ export function MembersTableV2({
   showRbacSection = false,
   allPolicies = [],
 }: Props) {
-  const policyMap = useMemo(
-    () => new Map(allPolicies.map((p) => [p.uid, p])),
-    [allPolicies]
-  );
+  const policyMap = useMemo(() => new Map(allPolicies.map((p) => [p.uid, p])), [allPolicies]);
 
   const columns = useMemo(() => {
     const base = [
@@ -128,7 +125,6 @@ export function MembersTableV2({
                     {perms.map((p) => (
                       <span key={p.code} className={s.exceptionBadge}>
                         <span className={s.exceptionCode}>{p.code}</span>
-                        {p.description ? <span className={s.exceptionDescription}>{p.description}</span> : null}
                       </span>
                     ))}
                   </div>

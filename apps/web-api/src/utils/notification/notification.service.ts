@@ -90,7 +90,8 @@ export class NotificationService {
    */
   async notifyForMemberCreationApproval(memberName: string, uid: string, memberEmail: string, isOnboarding: boolean) {
     if (isOnboarding) {
-      await this.notifyForOnboarding(memberName, memberEmail);
+      // TODO: Uncomment this when onboarding is resumed
+      // await this.notifyForOnboarding(memberName, memberEmail);
     } else {
       await this.notifyForMemberApproved(memberName, memberEmail, uid);
     }

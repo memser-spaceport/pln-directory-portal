@@ -4,13 +4,10 @@ import { DealsService } from './deals.service';
 import { ListDealsQueryDto, ReportDealIssueDto, SubmitDealDto } from './deals.dto';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
-import { RbacGuard } from '../rbac/rbac.guard';
-import { RequirePermissions } from '../rbac/rbac.decorator';
-import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 
 @Controller('v1/deals')
 export class DealsController {
-  constructor(private readonly dealsService: DealsService) { }
+  constructor(private readonly dealsService: DealsService) {}
 
   @NoCache()
   @UseGuards(UserTokenCheckGuard)
@@ -22,8 +19,7 @@ export class DealsController {
   }
 
   @NoCache()
-  @UseGuards(UserTokenCheckGuard, RbacGuard)
-  @RequirePermissions(RBAC_PERMISSION_CODES.DEALS_VIEW)
+  @UseGuards(UserTokenCheckGuard)
   @Get()
   async list(@Req() req: Request, @Query() query: ListDealsQueryDto) {
     return this.dealsService.listForUser(req['userEmail'], query);
@@ -36,8 +32,7 @@ export class DealsController {
   }
 
   @NoCache()
-  @UseGuards(UserTokenCheckGuard, RbacGuard)
-  @RequirePermissions(RBAC_PERMISSION_CODES.DEALS_VIEW)
+  @UseGuards(UserTokenCheckGuard)
   @Get(':uid')
   async getOne(@Req() req: Request, @Param('uid') uid: string) {
     return this.dealsService.getForUser(req['userEmail'], uid);
@@ -63,11 +58,7 @@ export class DealsController {
 
   @UseGuards(UserTokenCheckGuard)
   @Post(':uid/issues')
-  async reportIssue(
-    @Req() req: Request,
-    @Param('uid') uid: string,
-    @Body() body: ReportDealIssueDto,
-  ) {
+  async reportIssue(@Req() req: Request, @Param('uid') uid: string, @Body() body: ReportDealIssueDto) {
     return this.dealsService.reportIssue(req['userEmail'], uid, body);
   }
 }

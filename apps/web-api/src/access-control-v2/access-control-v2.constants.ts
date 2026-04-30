@@ -27,12 +27,9 @@ export const DEALS_PERMISSIONS = {
 
 // ── Demo Day ────────────────────────────────────────────────────────────
 
-export const DEMO_DAY_PERMISSIONS = {
-  /** View demo day report links */
-  REPORT_LINK_VIEW: 'demo_day.report_link.view',
-} as const;
-
 export const DEMODAY_PERMISSIONS = {
+  /** Read demo day fundraiser / analytics report link */
+  REPORT_LINK_READ: 'demoday.report_link.read',
   /** Read access to demo day prep */
   PREP_READ: 'demoday.prep.read',
   /** Write access to demo day prep */
@@ -137,7 +134,7 @@ export const LEGACY_PERMISSION_ALIASES = {
   ],
   'founder_guides.create': [FOUNDER_GUIDES_PERMISSIONS.CREATE],
   'deals.view': [DEALS_PERMISSIONS.READ],
-  'demo_day.report_link.view': [DEMO_DAY_PERMISSIONS.REPORT_LINK_VIEW],
+  'demo_day.report_link.view': [DEMODAY_PERMISSIONS.REPORT_LINK_READ],
 } as const;
 
 // ── All Permissions Array ────────────────────────────────────────────────
@@ -154,7 +151,7 @@ export const ALL_PERMISSION_CODES = [
   DEALS_PERMISSIONS.READ,
 
   // Demo Day
-  DEMO_DAY_PERMISSIONS.REPORT_LINK_VIEW,
+  DEMODAY_PERMISSIONS.REPORT_LINK_READ,
   DEMODAY_PERMISSIONS.PREP_READ,
   DEMODAY_PERMISSIONS.PREP_WRITE,
   DEMODAY_PERMISSIONS.SHOWCASE_READ,
@@ -205,10 +202,7 @@ export type PermissionCode = typeof ALL_PERMISSION_CODES[number];
 /** Type representing founder guides permission codes */
 export type FounderGuidesPermissionCode = typeof FOUNDER_GUIDES_PERMISSIONS[keyof typeof FOUNDER_GUIDES_PERMISSIONS];
 
-/** Type representing demo day permission codes */
-export type DemoDayPermissionCode = typeof DEMO_DAY_PERMISSIONS[keyof typeof DEMO_DAY_PERMISSIONS];
-
-/** Type representing demoday (detailed) permission codes */
+/** Type representing demoday permission codes */
 export type DemodayPermissionCode = typeof DEMODAY_PERMISSIONS[keyof typeof DEMODAY_PERMISSIONS];
 
 /** Type representing member permission codes */

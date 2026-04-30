@@ -402,7 +402,9 @@ export class MemberService {
     }
   }
 
-  private mapPermission(permission?: { uid: string; code: string; module: string; description?: string | null } | null) {
+  private mapPermission(
+    permission?: { uid: string; code: string; module: string; description?: string | null } | null
+  ) {
     if (!permission) {
       return null;
     }
@@ -876,15 +878,8 @@ export class MemberService {
       if (newState === MemberApprovalState.APPROVED && previousState !== MemberApprovalState.APPROVED) {
         const memberEmail = existingMemberBeforeUpdate?.email ?? result?.email;
         const memberName = existingMemberBeforeUpdate?.name ?? result?.name;
-        const hasOnboardingPermission = await this.memberHasOnboardingPermission(this.prisma, memberUid);
-        if (memberEmail && hasOnboardingPermission) {
-          await this.notificationService.notifyForMemberCreationApproval(
-            memberName,
-            memberUid,
-            memberEmail,
-            hasOnboardingPermission
-          );
-        }
+
+        await this.notificationService.notifyForMemberCreationApproval(memberName, memberUid, memberEmail, false);
       }
     }
 

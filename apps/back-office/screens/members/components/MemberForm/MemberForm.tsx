@@ -27,7 +27,16 @@ interface Props {
   showRbacSection?: boolean;
 }
 
-export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existingImageUrl, authToken, showRbacSection = false }: Props) => {
+export const MemberForm = ({
+  onClose,
+  title,
+  desc,
+  onSubmit,
+  initialData,
+  existingImageUrl,
+  authToken,
+  showRbacSection = false,
+}: Props) => {
   const emptyDefaults: TMemberForm = {
     memberStateStatus: null,
     rbacPolicies: [],
@@ -89,37 +98,34 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
     [policiesData]
   );
 
-  const exceptionsOptions = useMemo(
-    () => {
-      const grouped = new Map<
-        string,
-        Array<{ label: string; value: string; module: string; description?: string | null }>
-      >();
-      for (const permission of rbacPermissionsData ?? []) {
-        const module = permission.module || 'Other';
-        const option = {
-          label: permission.code,
-          value: permission.code,
-          module,
-          description: permission.description ?? null,
-        };
-        const current = grouped.get(module);
-        if (current) {
-          current.push(option);
-        } else {
-          grouped.set(module, [option]);
-        }
+  const exceptionsOptions = useMemo(() => {
+    const grouped = new Map<
+      string,
+      Array<{ label: string; value: string; module: string; description?: string | null }>
+    >();
+    for (const permission of rbacPermissionsData ?? []) {
+      const module = permission.module || 'Other';
+      const option = {
+        label: permission.code,
+        value: permission.code,
+        module,
+        description: permission.description ?? null,
+      };
+      const current = grouped.get(module);
+      if (current) {
+        current.push(option);
+      } else {
+        grouped.set(module, [option]);
       }
+    }
 
-      return Array.from(grouped.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([module, options]) => ({
-          label: module,
-          options: options.sort((a, b) => a.label.localeCompare(b.label)),
-        }));
-    },
-    [rbacPermissionsData]
-  );
+    return Array.from(grouped.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([module, options]) => ({
+        label: module,
+        options: options.sort((a, b) => a.label.localeCompare(b.label)),
+      }));
+  }, [rbacPermissionsData]);
 
   return (
     <div className={s.modal}>
@@ -150,7 +156,7 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
                 isLoadingOptions={isLoadingOptions}
               />
             ) : (
-              <StatusSelector isAddNew={!initialData} />
+              <StatusSelector isAddNew={isAddNew} />
             )}
             <ProfileDetails existingImageUrl={existingImageUrl} />
             <hr className="border-gray-200 dark:border-gray-200" />

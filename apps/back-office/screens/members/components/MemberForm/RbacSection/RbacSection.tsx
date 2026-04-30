@@ -98,9 +98,7 @@ const ExceptionsMultiSelect = ({ label, placeholder, options, isDisabled = false
           return (
             <div className={s.exceptionOption}>
               <span className={s.exceptionOptionCode}>{option.label}</span>
-              {option.description ? (
-                <span className={s.exceptionOptionDescription}>{option.description}</span>
-              ) : null}
+              {option.description ? <span className={s.exceptionOptionDescription}>{option.description}</span> : null}
             </div>
           );
         }}

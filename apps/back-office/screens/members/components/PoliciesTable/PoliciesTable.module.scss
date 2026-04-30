@@ -75,6 +75,12 @@
   color: #5e718d;
 }
 
+.policyIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
 .policyName {
   font-weight: 500;
   color: #0f172a;
