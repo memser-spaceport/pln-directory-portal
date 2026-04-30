@@ -51,6 +51,21 @@ const JUDGABLE_FIELD_KEYS: FieldMetaKey[] = [
   'investmentFocus',
 ];
 
+/**
+ * Subset of fields the judge will evaluate when their status is `ChangedByUser`.
+ * Limited to website + contact links
+ * The judge stays non-destructive: it only attaches `fieldsMeta[field].judgment`;
+ * the field's value, status, confidence, and source are preserved.
+ */
+const USER_JUDGABLE_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey>([
+  'website',
+  'blog',
+  'contactMethod',
+  'twitterHandler',
+  'linkedinHandler',
+  'telegramHandler',
+]);
+
 @Injectable()
 export class TeamEnrichmentJudgeService {
   private readonly logger = new Logger(TeamEnrichmentJudgeService.name);
@@ -118,9 +133,7 @@ export class TeamEnrichmentJudgeService {
       return { status: 'already_judged' };
     }
     if (meta.status !== EnrichmentStatus.Enriched) {
-      this.logger.log(
-        `Judge: team ${teamUid} enrichment status is "${meta.status}", not Enriched — skipping`
-      );
+      this.logger.log(`Judge: team ${teamUid} enrichment status is "${meta.status}", not Enriched — skipping`);
       return { status: 'not_eligible' };
     }
 
@@ -314,13 +327,19 @@ export class TeamEnrichmentJudgeService {
       const mergedFieldsMeta: FieldsMetaMap = { ...baseFieldsMeta };
 
       // The judge is non-destructive: it annotates with a `judgment` sub-object but never
-      // overrides enrichment-time values like `confidence` or `source`. Readers who want the
-      // judge's verdict should read `fieldsMeta[field].judgment.confidence`.
+      // overrides enrichment-time values like `confidence` or `source`, and never touches the
+      // field's `status` — including for ChangedByUser fields (the user's data is preserved
+      // verbatim). Readers who want the judge's verdict should read
+      // `fieldsMeta[field].judgment.confidence`.
       const fieldsForReview: string[] = [];
       for (const [key, verdict] of Object.entries(allVerdicts) as Array<[FieldMetaKey, FieldJudgment | undefined]>) {
         if (!verdict) continue;
         const current = mergedFieldsMeta[key];
-        if (!current || current.status !== FieldEnrichmentStatus.Enriched) continue;
+        if (!current) continue;
+        const isEnriched = current.status === FieldEnrichmentStatus.Enriched;
+        const isUserJudgable =
+          current.status === FieldEnrichmentStatus.ChangedByUser && USER_JUDGABLE_FIELD_KEYS.has(key);
+        if (!isEnriched && !isUserJudgable) continue;
         mergedFieldsMeta[key] = {
           ...current,
           judgment: verdict,
@@ -350,13 +369,12 @@ export class TeamEnrichmentJudgeService {
       });
 
       this.logger.log(
-        `Judge: team ${teamUid} (${team.name}) judged — stage1=${Object.keys(stage1Verdicts).length} stage2=${Object.keys(stage2Verdicts).length} fieldsForReview=[${fieldsForReview.join(',')}]`
+        `Judge: team ${teamUid} (${team.name}) judged — stage1=${Object.keys(stage1Verdicts).length} stage2=${
+          Object.keys(stage2Verdicts).length
+        } fieldsForReview=[${fieldsForReview.join(',')}]`
       );
     } catch (error) {
-      this.logger.error(
-        `Judge pipeline error for team ${teamUid} (${team.name}): ${error.message}`,
-        error.stack
-      );
+      this.logger.error(`Judge pipeline error for team ${teamUid} (${team.name}): ${error.message}`, error.stack);
       await this.writeJudgmentStatus(teamUid, existingMeta, {
         status: JudgmentStatus.FailedToJudge,
         errorMessage: error.message,
@@ -366,25 +384,27 @@ export class TeamEnrichmentJudgeService {
 
   /**
    * Returns the list of fieldsMeta keys that are candidates for judgment:
-   *  - status === Enriched
-   *  - excludes logo, ChangedByUser, CannotEnrich
+   *  - status === Enriched (any judgable key), OR
+   *  - status === ChangedByUser AND key is in USER_JUDGABLE_FIELD_KEYS (website + contact links)
+   *  - excludes logo and CannotEnrich
    */
   private collectJudgableFieldKeys(fieldsMeta: FieldsMetaMap): FieldMetaKey[] {
     const out: FieldMetaKey[] = [];
     for (const key of JUDGABLE_FIELD_KEYS) {
       const meta = fieldsMeta[key];
       if (!meta) continue;
-      if (meta.status !== FieldEnrichmentStatus.Enriched) continue;
-      out.push(key);
+      if (meta.status === FieldEnrichmentStatus.Enriched) {
+        out.push(key);
+        continue;
+      }
+      if (meta.status === FieldEnrichmentStatus.ChangedByUser && USER_JUDGABLE_FIELD_KEYS.has(key)) {
+        out.push(key);
+      }
     }
     return out;
   }
 
-  private buildFieldInput(
-    team: TeamRecord,
-    fieldsMeta: FieldsMetaMap,
-    key: FieldMetaKey
-  ): JudgeFieldInput | null {
+  private buildFieldInput(team: TeamRecord, fieldsMeta: FieldsMetaMap, key: FieldMetaKey): JudgeFieldInput | null {
     const meta = fieldsMeta[key];
     if (!meta) return null;
     const value = this.readFieldValue(team, key);
