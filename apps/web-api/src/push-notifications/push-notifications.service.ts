@@ -618,43 +618,37 @@ export class PushNotificationsService {
       }
     }
 
-    // NOTE: Access level notifications are deprecated in favor of permission-based notifications
-    // Count access level notifications not read by this user (filter by requiredPermissions)
+    // Count permission-based notifications not read by this user
+    // These are notifications with requiredPermissions set, but no accessLevels and no specific recipient
     // Filter: notifications created after member joined OR NEW_FEATURE category
-    // let accessLevelUnread = 0;
-    // if (userAccessLevel) {
-    //   const accessLevelNotifications = await this.prisma.pushNotification.findMany({
-    //     where: {
-    //       accessLevels: { has: userAccessLevel },
-    //       isPublic: false,
-    //       recipientUid: null,
-    //       readStatuses: {
-    //         none: { memberUid },
-    //       },
-    //       OR: [{ createdAt: { gte: memberCreatedAt } }, { category: PushNotificationCategory.NEW_FEATURE }],
-    //     },
-    //     select: { requiredPermissions: true, category: true, metadata: true },
-    //   });
-    //
-    //   for (const notification of accessLevelNotifications) {
-    //     // Skip self-authored forum posts
-    //     if (this.isSelfAuthoredForumPost(notification as any, memberUid)) {
-    //       continue;
-    //     }
-    //
-    //     if (notification.requiredPermissions && notification.requiredPermissions.length > 0) {
-    //       const hasPermission = await this.userHasAnyPermission(memberUid, notification.requiredPermissions);
-    //       if (hasPermission) {
-    //         accessLevelUnread++;
-    //       }
-    //     } else {
-    //       accessLevelUnread++;
-    //     }
-    //   }
-    // }
-    const accessLevelUnread = 0;
+    const permissionBasedNotifications = await this.prisma.pushNotification.findMany({
+      where: {
+        requiredPermissions: { isEmpty: false },
+        accessLevels: { isEmpty: true },
+        isPublic: false,
+        recipientUid: null,
+        readStatuses: {
+          none: { memberUid },
+        },
+        OR: [{ createdAt: { gte: memberCreatedAt } }, { category: PushNotificationCategory.NEW_FEATURE }],
+      },
+      select: { requiredPermissions: true, category: true, metadata: true },
+    });
 
-    return privateUnread + publicUnread + accessLevelUnread;
+    let permissionBasedUnread = 0;
+    for (const notification of permissionBasedNotifications) {
+      // Skip self-authored forum posts
+      if (this.isSelfAuthoredForumPost(notification as any, memberUid)) {
+        continue;
+      }
+
+      const hasPermission = await this.userHasAnyPermission(memberUid, notification.requiredPermissions);
+      if (hasPermission) {
+        permissionBasedUnread++;
+      }
+    }
+
+    return privateUnread + publicUnread + permissionBasedUnread;
   }
 
   /**
