@@ -873,7 +873,7 @@ export class MemberService {
     const memberStatePayload = (memberParticipantsRequest as any)?.newData ?? memberParticipantsRequest;
     if (memberStatePayload?.memberState || memberStatePayload?.state) {
       const newState = this.normalizeMemberStateFromPayload(memberStatePayload);
-      const previousState = existingMemberBeforeUpdate?.memberApproval?.state;
+      const previousState = existingMemberBeforeUpdate?.memberState;
 
       if (newState === MemberApprovalState.APPROVED && previousState !== MemberApprovalState.APPROVED) {
         const memberEmail = existingMemberBeforeUpdate?.email ?? result?.email;
