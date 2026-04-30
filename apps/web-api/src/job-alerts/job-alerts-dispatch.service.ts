@@ -258,14 +258,15 @@ export class JobAlertsDispatchService {
     const params = new URLSearchParams();
     if (filterState.q) params.set('q', filterState.q);
     for (const key of ['roleCategory', 'seniority', 'focus', 'location'] as const) {
-      for (const value of filterState[key] ?? []) params.append(key, value);
+      const values = filterState[key] ?? [];
+      if (values.length > 0) params.set(key, values.join('|'));
     }
     const workplaceTypes = new Set<string>();
     for (const m of filterState.workMode ?? []) {
       if (m === 'remote' || m === 'distributed') workplaceTypes.add('remote');
       else if (m === 'hybrid' || m === 'in-office') workplaceTypes.add(m);
     }
-    for (const wt of workplaceTypes) params.append('workplaceType', wt);
+    if (workplaceTypes.size > 0) params.set('workplaceType', [...workplaceTypes].join('|'));
     return params.toString();
   }
 
