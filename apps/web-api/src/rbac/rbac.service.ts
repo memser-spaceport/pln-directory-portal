@@ -517,6 +517,7 @@ export class RbacService {
         uid: rp.permission.uid,
         code: rp.permission.code,
         description: rp.permission.description,
+        module: rp.permission.module,
         scopes: rp.scopes,
       })),
     }));
@@ -526,6 +527,7 @@ export class RbacService {
       uid: mp.permission.uid,
       code: mp.permission.code,
       description: mp.permission.description,
+      module: mp.permission.module,
       scopes: mp.scopes,
     }));
 
@@ -753,6 +755,7 @@ export class RbacService {
         uid: mp.permission.uid,
         code: mp.permission.code,
         description: mp.permission.description,
+        module: mp.permission.module,
       })),
     }));
 
@@ -812,6 +815,7 @@ export class RbacService {
         uid: rp.permission.uid,
         code: rp.permission.code,
         description: rp.permission.description,
+        module: rp.permission.module,
         scopes: rp.scopes,
       })),
     }));
@@ -903,6 +907,7 @@ export class RbacService {
         uid: rp.permission.uid,
         code: rp.permission.code,
         description: rp.permission.description,
+        module: rp.permission.module,
         scopes: rp.scopes,
       })),
       members: assignments.map((ra: any) => ({
@@ -1028,6 +1033,7 @@ export class RbacService {
         uid: permission.uid,
         code: permission.code,
         description: permission.description,
+        module: permission.module,
         roleCount: roles.length,
         roles,
         directMemberCount: directMembers.length,
@@ -1210,6 +1216,7 @@ export class RbacService {
       uid: permission.uid,
       code: permission.code,
       description: permission.description,
+      module: permission.module,
       roles: rolesWithCounts,
       members: paginatedMembers,
       directMembers: directMemberPermissions.map((mp: any) => ({

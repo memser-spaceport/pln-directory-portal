@@ -13,7 +13,7 @@ export type Member = {
   signUpSource: string | null;
   roles?: { uid: string; code: string; name: string; description?: string | null }[];
   policies?: { uid: string; code: string; name: string; description?: string | null }[];
-  permissions?: { uid: string; code: string; description?: string | null }[];
+  permissions?: { uid: string; code: string; module: string; description?: string | null }[];
   memberRoles?: { name: string }[];
   demoDayHosts?: string[];
   demoDayAdminScopes?: {
@@ -28,7 +28,7 @@ export type Member = {
 export type TMemberForm = {
   memberStateStatus?: { label: string; value: 'Pending' | 'Verified' | 'Approved' | 'Rejected' } | null;
   rbacPolicies?: { label: string; value: string }[];
-  rbacExceptions?: { label: string; value: string }[];
+  rbacExceptions?: { label: string; value: string; module?: string; description?: string | null }[];
   accessLevel: { label?: string; value?: string } | null;
   image: File | null;
   name: string;

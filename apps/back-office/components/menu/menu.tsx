@@ -3,7 +3,7 @@ import { MembersMenu } from './components/MembersMenu/MembersMenu';
 import { MembersV2Menu } from './components/MembersV2Menu/MembersV2Menu';
 import { DemoDaysMenu } from './components/DemoDaysMenu/DemoDaysMenu';
 import { useAuth } from '../../context/auth-context';
-import { AccessControlMenu } from './components/AccessControlMenu/AccessControlMenu';
+import { DemoDayRolesNav } from './components/DemoDayRolesNav/DemoDayRolesNav';
 import { IrlGatheringMenu } from './components/IrlGatheringMenu/IrlGatheringMenu';
 import { DealsMenu } from './components/DealsMenu/DealsMenu';
 import { FounderGuidesMenu } from './components/FounderGuidesMenu/FounderGuidesMenu';
@@ -14,7 +14,7 @@ export function Menu() {
   return (
     <ul className="flex space-x-4 text-sm text-gray-700">
       {isDirectoryAdmin && <MembersV2Menu />}
-      {isDirectoryAdmin && <AccessControlMenu />}
+      {isDirectoryAdmin && <DemoDayRolesNav />}
       {isDirectoryAdmin && <TeamsMenu />}
       {(isDirectoryAdmin || isDemoDayAdmin) && <DemoDaysMenu />}
       {isDirectoryAdmin && <IrlGatheringMenu />}

@@ -10,6 +10,12 @@ export type Policy = {
   group: string;
   isSystem: boolean;
   permissions: string[];
+  permissionItems: Array<{
+    uid: string;
+    code: string;
+    module: string;
+    description: string | null;
+  }>;
   assignmentsCount: number;
   permissionsCount: number;
 };

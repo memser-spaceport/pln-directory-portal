@@ -56,14 +56,15 @@ const EyeIcon = () => (
   </svg>
 );
 
-const ModulesCell = ({ permissions }: { permissions: string[] }) => {
-  if (!permissions.length) return <span className={s.muted}>—</span>;
-  const visible = permissions.slice(0, 2);
-  const overflow = permissions.length - 2;
+const ModulesCell = ({ permissionItems }: { permissionItems: Policy['permissionItems'] }) => {
+  const modules = [...new Set(permissionItems.map((permission) => permission.module))];
+  if (!modules.length) return <span className={s.muted}>—</span>;
+  const visible = modules.slice(0, 2);
+  const overflow = modules.length - 2;
   return (
     <div className={s.badgeRow}>
-      {visible.map((p) => (
-        <span key={p} className={s.moduleBadge}>{p}</span>
+      {visible.map((module) => (
+        <span key={module} className={s.moduleBadge}>{module}</span>
       ))}
       {overflow > 0 && <span className={s.overflowBadge}>+{overflow}</span>}
     </div>
@@ -106,7 +107,7 @@ export function PoliciesTable({ policies, members, pagination, setPagination, gl
       id: 'modules',
       size: 200,
       header: () => 'Modules',
-      cell: (info) => <ModulesCell permissions={info.row.original.permissions} />,
+      cell: (info) => <ModulesCell permissionItems={info.row.original.permissionItems} />,
     }),
     columnHelper.accessor('assignmentsCount', {
       size: 90,

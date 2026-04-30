@@ -402,7 +402,7 @@ export class MemberService {
     }
   }
 
-  private mapPermission(permission?: { uid: string; code: string; description?: string | null } | null) {
+  private mapPermission(permission?: { uid: string; code: string; module: string; description?: string | null } | null) {
     if (!permission) {
       return null;
     }
@@ -410,6 +410,7 @@ export class MemberService {
     return {
       uid: permission.uid,
       code: permission.code,
+      module: permission.module,
       description: permission.description ?? null,
     };
   }
@@ -554,7 +555,7 @@ export class MemberService {
       accessLevel?: string | null;
       memberApproval?: { state?: MemberApprovalState | null } | null;
       memberPermissionsV2?: Array<{
-        permission?: { uid: string; code: string; description?: string | null } | null;
+        permission?: { uid: string; code: string; module: string; description?: string | null } | null;
       }> | null;
       policyAssignmentsV2?: Array<{
         policy?: {
@@ -565,7 +566,7 @@ export class MemberService {
           role?: string | null;
           group?: string | null;
           policyPermissions?: Array<{
-            permission?: { uid: string; code: string; description?: string | null } | null;
+            permission?: { uid: string; code: string; module: string; description?: string | null } | null;
           }>;
         } | null;
       }> | null;
@@ -576,7 +577,7 @@ export class MemberService {
           name: string;
           description?: string | null;
           rolePermissions?: Array<{
-            permission?: { uid: string; code: string; description?: string | null } | null;
+            permission?: { uid: string; code: string; module: string; description?: string | null } | null;
           }>;
         } | null;
       }> | null;
@@ -586,6 +587,7 @@ export class MemberService {
       (member.memberPermissionsV2 ?? []).map((item) => this.mapPermission(item.permission)).filter(Boolean) as Array<{
         uid: string;
         code: string;
+        module: string;
         description?: string | null;
       }>
     );
@@ -605,7 +607,7 @@ export class MemberService {
       (member.policyAssignmentsV2 ?? [])
         .flatMap((assignment) => assignment.policy?.policyPermissions ?? [])
         .map((item) => this.mapPermission(item.permission))
-        .filter(Boolean) as Array<{ uid: string; code: string; description?: string | null }>
+        .filter(Boolean) as Array<{ uid: string; code: string; module: string; description?: string | null }>
     );
 
     const roles = this.uniqueByCode(
@@ -621,7 +623,7 @@ export class MemberService {
       (member.roleAssignments ?? [])
         .flatMap((assignment) => assignment.role?.rolePermissions ?? [])
         .map((item) => this.mapPermission(item.permission))
-        .filter(Boolean) as Array<{ uid: string; code: string; description?: string | null }>
+        .filter(Boolean) as Array<{ uid: string; code: string; module: string; description?: string | null }>
     );
 
     const effectivePermissions = this.uniqueByCode([...directPermissions, ...policyPermissions, ...rolePermissions]);
@@ -718,6 +720,7 @@ export class MemberService {
                 select: {
                   uid: true,
                   code: true,
+                  module: true,
                   description: true,
                 },
               },
@@ -739,6 +742,7 @@ export class MemberService {
                         select: {
                           uid: true,
                           code: true,
+                          module: true,
                           description: true,
                         },
                       },
@@ -762,6 +766,7 @@ export class MemberService {
                         select: {
                           uid: true,
                           code: true,
+                          module: true,
                           description: true,
                         },
                       },
@@ -1617,6 +1622,7 @@ export class MemberService {
               select: {
                 uid: true,
                 code: true,
+                module: true,
                 description: true,
               },
             },
@@ -1636,6 +1642,7 @@ export class MemberService {
                       select: {
                         uid: true,
                         code: true,
+                        module: true,
                         description: true,
                       },
                     },
@@ -1659,6 +1666,7 @@ export class MemberService {
                       select: {
                         uid: true,
                         code: true,
+                        module: true,
                         description: true,
                       },
                     },

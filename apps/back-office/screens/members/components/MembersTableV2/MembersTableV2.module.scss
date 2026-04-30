@@ -95,13 +95,23 @@
 
 .exceptionBadge {
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 4px 8px;
+  border-radius: 10px;
   background: #fff7ed;
   color: #c2410c;
+}
+
+.exceptionCode {
   font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.exceptionDescription {
+  font-size: 10px;
+  color: #9a3412;
+  line-height: 1.2;
 }

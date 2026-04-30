@@ -90,7 +90,34 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
   );
 
   const exceptionsOptions = useMemo(
-    () => (rbacPermissionsData ?? []).map((p) => ({ label: p.description ?? p.code, value: p.code })),
+    () => {
+      const grouped = new Map<
+        string,
+        Array<{ label: string; value: string; module: string; description?: string | null }>
+      >();
+      for (const permission of rbacPermissionsData ?? []) {
+        const module = permission.module || 'Other';
+        const option = {
+          label: permission.code,
+          value: permission.code,
+          module,
+          description: permission.description ?? null,
+        };
+        const current = grouped.get(module);
+        if (current) {
+          current.push(option);
+        } else {
+          grouped.set(module, [option]);
+        }
+      }
+
+      return Array.from(grouped.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([module, options]) => ({
+          label: module,
+          options: options.sort((a, b) => a.label.localeCompare(b.label)),
+        }));
+    },
     [rbacPermissionsData]
   );
 
