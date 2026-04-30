@@ -85,6 +85,7 @@ export class JobOpeningsServiceController {
   }
 
   @Get('teams/:uid/job-openings')
+  @NoCache()
   async getJobOpeningsByTeam(@Param('uid') uid: string): Promise<JobOpeningsPerTeamResponse> {
     return this.enrichmentService.getJobOpeningsByTeam(uid);
   }
