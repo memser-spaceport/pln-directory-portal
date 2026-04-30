@@ -101,6 +101,7 @@ const RolesPage = () => {
   }, [data?.data, roleFilter, scopeFilter]);
 
   const handleRoleChange = useCallback((change: PendingRoleChange | null, memberUid: string) => {
+    console.log('handleRoleChange', change);
     setPendingRoleChanges((prev) => {
       const next = new Map(prev);
       if (change) {
@@ -167,6 +168,8 @@ const RolesPage = () => {
     const memberUids = new Set<string>();
     currentRoleChanges.forEach((change) => memberUids.add(change.memberUid));
     currentHostChanges.forEach((change) => memberUids.add(change.memberUid));
+
+    console.log(currentRoleChanges);
 
     const roleChangesMap = new Map<string, string[]>();
     currentRoleChanges.forEach((change) => {

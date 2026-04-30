@@ -75,6 +75,7 @@ const policies: PolicySeed[] = [
     role: 'PL Infra team',
     group: 'PL Internal',
     permissions: [
+      'directory.admin.full',
       'member.contacts.read',
       'team.priority.read',
       'membership.source.read',

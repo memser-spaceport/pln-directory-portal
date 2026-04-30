@@ -59,16 +59,12 @@ const RoleCell = ({ member, onRoleChange, onHostChange }: RoleCellProps) => {
   // ---- ROLES ----
 
   const baseRoles: string[] = useMemo(() => {
-    if (Array.isArray(member.roles) && member.roles.length > 0) {
-      return member.roles.map((r) => r.code);
-    }
-
     if (Array.isArray(member.memberRoles)) {
       return member.memberRoles.map((r) => r.name);
     }
 
     return [];
-  }, [member.roles, member.memberRoles]);
+  }, [member.memberRoles]);
 
   const hasDirectoryAdmin = useMemo(() => baseRoles.includes(MemberRole.DIRECTORY_ADMIN), [baseRoles]);
 

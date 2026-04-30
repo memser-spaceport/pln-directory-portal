@@ -11,6 +11,7 @@ export class AccessControlV2Service {
 
   async listPolicies() {
     const policies = await this.prisma.policy.findMany({
+      where: { hidden: false },
       include: {
         policyPermissions: { include: { permission: true } },
         _count: { select: { assignments: true, policyPermissions: true } },
