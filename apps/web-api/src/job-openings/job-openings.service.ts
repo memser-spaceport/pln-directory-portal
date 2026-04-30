@@ -14,7 +14,7 @@ export class JobOpeningsService {
 
   async ingestJobOpenings(
     items: JobOpeningIngestItem[],
-    meta?: { runId?: string | null; source?: string | null },
+    meta?: { runId?: string | null; source?: string | null }
   ): Promise<IngestJobOpeningsResponse> {
     const result: IngestJobOpeningsResponse = {
       received: items.length,
@@ -67,8 +67,16 @@ export class JobOpeningsService {
     return result;
   }
 
+  private resolveIngestLocations(item: JobOpeningIngestItem): string[] {
+    if (item.locations?.length) {
+      return item.locations;
+    }
+    return Array.isArray(item.location) ? item.location : item.location ? [item.location] : [];
+  }
+
   private async upsertJobOpening(item: JobOpeningIngestItem): Promise<void> {
     const status = this.mapStatus(item.status);
+    const location = this.resolveIngestLocations(item);
 
     const data: Prisma.JobOpeningUncheckedCreateInput = {
       status,
@@ -80,7 +88,7 @@ export class JobOpeningsService {
       seniority: item.seniority ?? null,
       urgency: item.urgency ?? null,
       summary: item.summary ?? null,
-      location: item.location ?? [],
+      location,
       workMode: item.workMode ?? null,
       ws4AskId: item.ws4AskId ?? null,
       detectionDate: new Date(item.detectionDate),

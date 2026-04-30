@@ -54,6 +54,7 @@ export class JobOpeningsServiceController {
     }
 
     this.logger.log(`Received ingest request with ${dto.jobs.length} jobs (runId: ${dto.runId ?? 'none'})`);
+    this.logger.log(`Job openings ingest payload: ${JSON.stringify(dto)}`);
 
     const result = await this.jobOpeningsService.ingestJobOpenings(dto.jobs, {
       runId: dto.runId ?? null,
