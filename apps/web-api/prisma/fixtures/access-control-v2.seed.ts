@@ -41,6 +41,7 @@ const permissionCodes = [
   'membership.source.read',
   'admin.tools.access',
   'pl.advisors.access',
+  'member.onboarding',
 ];
 
 const policies: PolicySeed[] = [
@@ -251,6 +252,7 @@ const policies: PolicySeed[] = [
       'forum.read',
       'forum.write',
       'deals.read',
+      'member.onboarding',
     ],
   },
   {

@@ -462,6 +462,93 @@ export class MemberService {
     });
   }
 
+  /**
+   * Get member UIDs that have the member.onboarding permission.
+   * Checks both direct permissions (MemberPermissionV2) and policy-based permissions.
+   */
+  private async getMemberUidsWithOnboardingPermission(memberUids: string[]): Promise<Set<string>> {
+    const onboardingPermission = await this.prisma.permission.findUnique({
+      where: { code: 'member.onboarding' },
+      select: { uid: true },
+    });
+
+    if (!onboardingPermission) {
+      return new Set();
+    }
+
+    // Get members with direct permission
+    const directPermissionMembers = await this.prisma.memberPermissionV2.findMany({
+      where: {
+        memberUid: { in: memberUids },
+        permissionUid: onboardingPermission.uid,
+      },
+      select: { memberUid: true },
+    });
+
+    // Get members with permission via policy assignment
+    const policyPermissionMembers = await this.prisma.policyAssignment.findMany({
+      where: {
+        memberUid: { in: memberUids },
+        policy: {
+          policyPermissions: {
+            some: {
+              permissionUid: onboardingPermission.uid,
+            },
+          },
+        },
+      },
+      select: { memberUid: true },
+    });
+
+    return new Set([
+      ...directPermissionMembers.map((m) => m.memberUid),
+      ...policyPermissionMembers.map((m) => m.memberUid),
+    ]);
+  }
+
+  /**
+   * Check if a specific member has the member.onboarding permission.
+   * Works within a transaction context.
+   */
+  private async memberHasOnboardingPermission(tx: Prisma.TransactionClient, memberUid: string): Promise<boolean> {
+    const onboardingPermission = await tx.permission.findUnique({
+      where: { code: 'member.onboarding' },
+      select: { uid: true },
+    });
+
+    if (!onboardingPermission) {
+      return false;
+    }
+
+    // Check direct permission
+    const directPermission = await tx.memberPermissionV2.findFirst({
+      where: {
+        memberUid,
+        permissionUid: onboardingPermission.uid,
+      },
+    });
+
+    if (directPermission) {
+      return true;
+    }
+
+    // Check policy-based permission
+    const policyPermission = await tx.policyAssignment.findFirst({
+      where: {
+        memberUid,
+        policy: {
+          policyPermissions: {
+            some: {
+              permissionUid: onboardingPermission.uid,
+            },
+          },
+        },
+      },
+    });
+
+    return !!policyPermission;
+  }
+
   private enrichMemberAccessData<
     T extends {
       accessLevel?: string | null;
@@ -721,9 +808,11 @@ export class MemberService {
     }
 
     let result;
+    let existingMemberBeforeUpdate: any = null;
     await this.prisma.$transaction(async (tx) => {
       const memberData: any = (memberParticipantsRequest as any)?.newData ?? memberParticipantsRequest;
       const existingMember = await this.findMemberByUid(memberUid, tx);
+      existingMemberBeforeUpdate = existingMember;
       const isExternalIdAvailable = existingMember.externalId ? true : false;
       const isEmailChanged = await this.checkIfEmailChanged(memberData, existingMember, tx);
       this.logger.info(
@@ -772,6 +861,28 @@ export class MemberService {
       }
       this.logger.info(`Member update request - completed, requestId -> ${result.uid}, requestor -> ${requestorEmail}`);
     });
+
+    // Send approval/onboarding notification when state changes to APPROVED (outside transaction)
+    const memberStatePayload = (memberParticipantsRequest as any)?.newData ?? memberParticipantsRequest;
+    if (memberStatePayload?.memberState || memberStatePayload?.state) {
+      const newState = this.normalizeMemberStateFromPayload(memberStatePayload);
+      const previousState = existingMemberBeforeUpdate?.memberApproval?.state;
+
+      if (newState === MemberApprovalState.APPROVED && previousState !== MemberApprovalState.APPROVED) {
+        const memberEmail = existingMemberBeforeUpdate?.email ?? result?.email;
+        const memberName = existingMemberBeforeUpdate?.name ?? result?.name;
+        const hasOnboardingPermission = await this.memberHasOnboardingPermission(this.prisma, memberUid);
+        if (memberEmail && hasOnboardingPermission) {
+          await this.notificationService.notifyForMemberCreationApproval(
+            memberName,
+            memberUid,
+            memberEmail,
+            hasOnboardingPermission
+          );
+        }
+      }
+    }
+
     await this.membersHooksService.postUpdateActions(result, requestorEmail);
     return this.findMemberByUid(memberUid);
   }
@@ -1761,14 +1872,19 @@ export class MemberService {
 
       // Notify users based on the new access level
       if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(accessLevel as AccessLevel)) {
+        // Get members with onboarding permission for targeted onboarding flow
+        const memberUidsWithOnboarding = await this.getMemberUidsWithOnboardingPermission(
+          notApprovedMembers.map((m) => m.uid)
+        );
+
         for (const member of notApprovedMembers) {
           if (!member.email) {
             this.logger.error(
               `Missing email for member with uid ${member.uid}. Can't send an approval notification email`
             );
           } else {
-            // Send onboarding email for L4 members, approval email for L2/L3
-            const isOnboarding = accessLevel === AccessLevel.L4;
+            // Send onboarding email for members with member.onboarding permission
+            const isOnboarding = memberUidsWithOnboarding.has(member.uid);
             await this.notificationService.notifyForMemberCreationApproval(
               member.name,
               member.uid,
@@ -1778,7 +1894,7 @@ export class MemberService {
           }
         }
 
-        // Enable recommendations only for L4
+        // Enable recommendations only for L4 (keep existing behavior)
         if (accessLevel === AccessLevel.L4) {
           await this.notificationSettingsService.enableRecommendationsFor(memberUids);
         }
@@ -1897,11 +2013,13 @@ export class MemberService {
       });
 
       if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(memberData.accessLevel as AccessLevel)) {
+        // Check if member has onboarding permission for targeted onboarding flow
+        const hasOnboardingPermission = await this.memberHasOnboardingPermission(tx, createdMember.uid);
         await this.notificationService.notifyForMemberCreationApproval(
           createdMember.name,
           createdMember.uid,
           createdMember.email,
-          memberData.accessLevel === AccessLevel.L4
+          hasOnboardingPermission
         );
       }
 

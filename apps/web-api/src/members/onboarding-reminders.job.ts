@@ -3,7 +3,6 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { NotificationService } from '../utils/notification/notification.service';
-import { AccessLevel } from 'libs/contracts/src/schema/admin-member';
 
 @Injectable()
 export class OnboardingRemindersJob {
@@ -32,9 +31,46 @@ export class OnboardingRemindersJob {
     this.logger.info('Starting daily onboarding reminders job');
 
     try {
+      // Get the onboarding permission UID
+      const onboardingPermission = await this.prisma.permission.findUnique({
+        where: { code: 'member.onboarding' },
+        select: { uid: true },
+      });
+
+      if (!onboardingPermission) {
+        this.logger.info('member.onboarding permission not found, skipping onboarding reminders');
+        this.logger.info(
+          'Daily onboarding reminders job completed: 0 successful, 0 skipped, 0 errors',
+          'daily-onboarding-reminders'
+        );
+        return;
+      }
+
       const members = await this.prisma.member.findMany({
         where: {
-          accessLevel: AccessLevel.L4,
+          // Target members with member.onboarding permission (via direct or policy)
+          OR: [
+            {
+              memberPermissionsV2: {
+                some: {
+                  permissionUid: onboardingPermission.uid,
+                },
+              },
+            },
+            {
+              policyAssignmentsV2: {
+                some: {
+                  policy: {
+                    policyPermissions: {
+                      some: {
+                        permissionUid: onboardingPermission.uid,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ],
           deletedAt: null,
           bio: null,
           githubHandler: null,

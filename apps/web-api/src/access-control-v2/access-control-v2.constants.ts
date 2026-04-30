@@ -56,6 +56,8 @@ export const MEMBER_PERMISSIONS = {
   SEARCH_READ: 'member.search.read',
   /** Read access to member contacts (email, etc.) */
   CONTACTS_READ: 'member.contacts.read',
+  /** Access to onboarding flow (replaces L4-based onboarding) */
+  ONBOARDING: 'member.onboarding',
 } as const;
 
 // ── Forum ───────────────────────────────────────────────────────────────
@@ -164,6 +166,7 @@ export const ALL_PERMISSION_CODES = [
   // Members
   MEMBER_PERMISSIONS.SEARCH_READ,
   MEMBER_PERMISSIONS.CONTACTS_READ,
+  MEMBER_PERMISSIONS.ONBOARDING,
 
   // Forum
   FORUM_PERMISSIONS.READ,
