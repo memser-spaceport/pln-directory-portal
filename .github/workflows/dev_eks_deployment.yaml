@@ -3,7 +3,7 @@ name: Deploy to EKS with Helm [Dev]
 on:
   push:
     branches:
-      - develop  # Triggers Dev deployment
+      - fix/LAB-1802/access-control-the-403-error-is-returned-when-newly-created-user-with  # Triggers Dev deployment
   workflow_dispatch:
 jobs:
   dev-deploy:
