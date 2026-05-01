@@ -12,6 +12,7 @@ import { PoliciesTable } from '../../screens/members/components/PoliciesTable/Po
 import { useMembersList } from '../../hooks/members/useMembersList';
 import { usePoliciesList } from '../../hooks/access-control/usePoliciesList';
 import { useAuth } from '../../context/auth-context';
+import { MEMBERS_V2_STATE_TAB_ICONS, PoliciesIcon } from '../../components/menu/components/MembersV2Menu/memberStateTabIcons';
 import s from './styles.module.scss';
 
 const ALL_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'Rejected'];
@@ -208,6 +209,8 @@ const MembersPageV2 = () => {
     setPolicyPagination((p) => ({ ...p, pageIndex: 0 }));
   };
 
+  const RejectedTabIcon = MEMBERS_V2_STATE_TAB_ICONS[REJECTED_TAB.id];
+
   return (
     <ApprovalLayout>
       <div className={s.root}>
@@ -218,23 +221,32 @@ const MembersPageV2 = () => {
 
         {/* Underline tab bar */}
         <nav className={s.tabBar}>
-          {MEMBER_STATE_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              className={clsx(s.tab, { [s.tabActive]: activeTab === tab.id })}
-              onClick={() => handleTabChange(tab.id)}
-            >
-              {tab.label}
-              <span className={clsx(s.tabCount, { [s.tabCountActive]: activeTab === tab.id })}>
-                {tabCounts[tab.id]}
-              </span>
-            </button>
-          ))}
+          {MEMBER_STATE_TABS.map((tab) => {
+            const TabIcon = MEMBERS_V2_STATE_TAB_ICONS[tab.id];
+            return (
+              <button
+                key={tab.id}
+                className={clsx(s.tab, { [s.tabActive]: activeTab === tab.id })}
+                onClick={() => handleTabChange(tab.id)}
+              >
+                <span className={s.tabIcon} aria-hidden>
+                  <TabIcon />
+                </span>
+                {tab.label}
+                <span className={clsx(s.tabCount, { [s.tabCountActive]: activeTab === tab.id })}>
+                  {tabCounts[tab.id]}
+                </span>
+              </button>
+            );
+          })}
 
           <button
             className={clsx(s.tab, { [s.tabActive]: activeTab === REJECTED_TAB.id })}
             onClick={() => handleTabChange(REJECTED_TAB.id)}
           >
+            <span className={s.tabIcon} aria-hidden>
+              <RejectedTabIcon />
+            </span>
             {REJECTED_TAB.label}
             <span className={clsx(s.tabCount, { [s.tabCountActive]: activeTab === REJECTED_TAB.id })}>
               {tabCounts[REJECTED_TAB.id]}
@@ -245,6 +257,9 @@ const MembersPageV2 = () => {
             className={clsx(s.tab, { [s.tabActive]: activeTab === 'POLICIES' })}
             onClick={() => handleTabChange('POLICIES')}
           >
+            <span className={s.tabIcon} aria-hidden>
+              <PoliciesIcon />
+            </span>
             Policies
             <span className={clsx(s.tabCount, { [s.tabCountActive]: activeTab === 'POLICIES' })}>
               {policiesData?.length ?? 0}
@@ -344,7 +359,9 @@ const MembersPageV2 = () => {
             </>
           )}
 
-          <AddMember authToken={authToken} className={s.addBtn} showRbacSection />
+          {activeTab !== 'POLICIES' && (
+            <AddMember authToken={authToken} className={s.addBtn} showRbacSection />
+          )}
         </div>
 
         {activeTab !== 'POLICIES' && (

@@ -5,7 +5,6 @@
   justify-content: center;
 }
 
-
 .trigger {
   display: flex;
   align-items: center;
@@ -35,8 +34,9 @@
   padding: 12px;
   align-items: flex-start;
   border-radius: var(--corner-radius-2xl, 16px);
-  background: var(--background-base-white, #FFF);
-  box-shadow: 0px 10px 20px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06)), 0px 20px 65px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06));
+  background: var(--background-base-white, #fff);
+  box-shadow: 0px 10px 20px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06)),
+    0px 20px 65px -5px var(--transparent-dark-6, rgba(14, 15, 17, 0.06));
 
   opacity: 0;
   visibility: hidden;
@@ -73,14 +73,14 @@
     .menuItemCount {
       border-radius: var(--corner-radius-Full-round, 9999px);
       background: var(--background-error-soft-surface, rgba(255, 56, 56, 0.08));
-      color: #FF3838;
+      color: #ff3838;
     }
   }
 }
 
 .menuItemLabel {
   overflow: hidden;
-  color: var(--action-foreground-neutral-active, #3D4A5C);
+  color: var(--action-foreground-neutral-active, #3d4a5c);
   text-overflow: ellipsis;
 
   font-size: 14px;
@@ -117,7 +117,7 @@
   /* Button/primay/light */
   box-shadow: 0px -1px 4px 0px var(--transparent-brand-8, rgba(27, 77, 255, 0.08)) inset;
 
-  color: var(--action-foreground-brand-inverted_normal, #1B4DFF);
+  color: var(--action-foreground-brand-inverted_normal, #1b4dff);
 
   font-size: 14px;
   font-style: normal;

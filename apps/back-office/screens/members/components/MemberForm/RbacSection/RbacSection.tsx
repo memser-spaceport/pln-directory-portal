@@ -6,20 +6,31 @@ import clsx from 'clsx';
 import s from './RbacSection.module.scss';
 import { TMemberForm } from '../../../types/member';
 import { PolicyMultiSelect, PolicyOption, PolicySelection } from './PolicyMultiSelect/PolicyMultiSelect';
+import {
+  ApprovedIcon,
+  PendingIcon,
+  RejectedIcon,
+  VerifiedIcon,
+} from '../../../../../components/menu/components/MembersV2Menu/memberStateTabIcons';
 
 interface SelectOption {
   label: string;
   value: string;
   module?: string;
   description?: string | null;
+  icon?: React.ReactNode;
 }
 
 const MEMBER_STATE_OPTIONS: SelectOption[] = [
-  { label: 'Pending', value: 'Pending' },
-  { label: 'Verified', value: 'Verified' },
-  { label: 'Approved', value: 'Approved' },
-  { label: 'Rejected', value: 'Rejected' },
+  { icon: <PendingIcon />, label: 'Pending', value: 'Pending' },
+  { icon: <VerifiedIcon />, label: 'Verified', value: 'Verified' },
+  { icon: <ApprovedIcon />, label: 'Approved', value: 'Approved' },
+  { icon: <RejectedIcon />, label: 'Rejected', value: 'Rejected' },
 ];
+
+function memberStateOptionForDisplay(option: SelectOption): SelectOption {
+  return MEMBER_STATE_OPTIONS.find((o) => o.value === option.value) ?? option;
+}
 
 const singleSelectStyles = {
   container: (base: object) => ({ ...base, width: '100%' }),
@@ -35,6 +46,15 @@ const singleSelectStyles = {
   }),
   menuPortal: (base: object) => ({ ...base, zIndex: 9999 }),
   menu: (base: object) => ({ ...base, zIndex: 9999, fontSize: 14 }),
+  option: (base: object, state: { isFocused: boolean; isSelected: boolean }) => ({
+    ...base,
+    backgroundColor: state.isSelected ? '#e2e8f0' : state.isFocused ? '#f1f5f9' : undefined,
+    color: '#334155',
+    cursor: 'pointer',
+    '&:active': {
+      backgroundColor: state.isSelected ? '#cbd5e1' : '#e2e8f0',
+    },
+  }),
   indicatorSeparator: () => ({ display: 'none' }),
   placeholder: (base: object) => ({ ...base, color: '#94a3b8', fontSize: 14 }),
 };
@@ -147,6 +167,15 @@ export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions
           styles={singleSelectStyles}
           isClearable={false}
           menuPortalTarget={document.body}
+          formatOptionLabel={(option) => {
+            const { icon, label } = memberStateOptionForDisplay(option);
+            return (
+              <div className={s.statusOption}>
+                {icon ? <span className={s.statusOptionIcon}>{icon}</span> : null}
+                <span>{label}</span>
+              </div>
+            );
+          }}
         />
         <p className={s.hint}>Policies can only be assigned to Approved members.</p>
       </div>
