@@ -9,6 +9,7 @@ export const RBAC_PERMISSION_CODES = {
   DEMO_DAY_REPORT_LINK_READ: 'demoday.report_link.read',
   DEALS_VIEW: 'deals.read',
   IRLG_GOING_WRITE: 'irlg.going.write',
+  DIRECTORY_ADMIN: 'directory.admin.full',
 } as const;
 
 export const RBAC_SCOPES = {
