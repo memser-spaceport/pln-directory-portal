@@ -2177,31 +2177,34 @@ export class MembersService {
 
     // Investor filters
     if (filters.isInvestor) {
+      const investorPolicyRoleCondition: Prisma.MemberWhereInput = {
+        policyAssignmentsV2: {
+          some: {
+            policy: {
+              role: {
+                equals: 'investor',
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      };
+
       whereConditions.push({
         AND: [
           {
             OR: [
-              // Members explicitly marked as investors with L5/L6 access level
               {
                 AND: [
                   {
                     isInvestor: true,
                   },
-                  {
-                    accessLevel: {
-                      in: ['L5', 'L6'],
-                    },
-                  },
+                  investorPolicyRoleCondition,
                 ],
               },
-              // Members with L5/L6 access level when isInvestor is null (legacy support)
               {
                 AND: [
-                  {
-                    accessLevel: {
-                      in: ['L5', 'L6'],
-                    },
-                  },
+                  investorPolicyRoleCondition,
                   {
                     isInvestor: null,
                   },
@@ -2481,6 +2484,15 @@ export class MembersService {
           title: true,
         },
       },
+      policyAssignmentsV2: {
+        select: {
+          policy: {
+            select: {
+              role: true,
+            },
+          },
+        },
+      },
       investorProfile: {
         select: {
           investmentFocus: true,
@@ -2529,10 +2541,10 @@ export class MembersService {
         // Apply pagination manually
         const paginatedMembers = scoredMembers.slice(skip, skip + limit);
 
-        // Remove internal score and filter investorProfile based on access level
+        // Remove internal score and filter investorProfile unless member has Investor policy role
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const filteredMembers = paginatedMembers.map(({ _relevanceScore, ...member }) => {
-          if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+          if (!this.memberHasInvestorPolicyRole(member)) {
             return { ...member, investorProfile: null };
           }
           return member;
@@ -2559,9 +2571,8 @@ export class MembersService {
         this.prisma.member.count({ where }),
       ]);
 
-      // Filter investorProfile based on access level (only show for L5 and L6 members)
       const filteredMembers = members.map((member) => {
-        if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+        if (!this.memberHasInvestorPolicyRole(member)) {
           return { ...member, investorProfile: null };
         }
         return member;
@@ -3001,11 +3012,42 @@ export class MembersService {
     try {
       // Base conditions array - same logic as searchMembers isInvestor filter
       const baseConditions: Prisma.MemberWhereInput[] = [
-        // Must be L5/L6 with isInvestor true or null
         {
           OR: [
-            { AND: [{ isInvestor: true }, { accessLevel: { in: ['L5', 'L6'] } }] },
-            { AND: [{ accessLevel: { in: ['L5', 'L6'] } }, { isInvestor: null }] },
+            {
+              AND: [
+                { isInvestor: true },
+                {
+                  policyAssignmentsV2: {
+                    some: {
+                      policy: {
+                        role: {
+                          equals: 'investor',
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+            {
+              AND: [
+                {
+                  policyAssignmentsV2: {
+                    some: {
+                      policy: {
+                        role: {
+                          equals: 'investor',
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
+                },
+                { isInvestor: null },
+              ],
+            },
           ],
         },
         // Must have accepted SEC rules
@@ -3140,6 +3182,12 @@ export class MembersService {
     } catch (error) {
       return this.handleErrors(error);
     }
+  }
+
+  private memberHasInvestorPolicyRole(member: {
+    policyAssignmentsV2?: Array<{ policy: { role: string } | null }> | null;
+  }): boolean {
+    return member.policyAssignmentsV2?.some((a) => a.policy?.role?.toLowerCase() === 'investor') ?? false;
   }
 
   /**
