@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module, forwardRef } from '@nestjs/common';
 import { SharedModule } from '../shared/shared.module';
 import { JwtService } from '../utils/jwt/jwt.service';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
@@ -10,15 +10,24 @@ import { AdminAccessControlV2MetaController } from './controllers/admin-access-c
 import { AccessControlV2Service } from './services/access-control-v2.service';
 import { MemberApprovalsModule } from '../member-approvals/member-approvals.module';
 
+@Global()
 @Module({
-  imports: [SharedModule, MemberApprovalsModule],
+  imports: [SharedModule, forwardRef(() => MemberApprovalsModule)],
   controllers: [
     AdminAccessControlV2Controller,
     DebugAccessControlV2Controller,
     SelfAccessControlV2Controller,
     AdminAccessControlV2MetaController,
   ],
-  providers: [AccessControlV2Service, AdminAuthGuard, UserAuthValidateGuard, JwtService],
-  exports: [AccessControlV2Service],
+  providers: [
+    AccessControlV2Service,
+    AdminAuthGuard,
+    UserAuthValidateGuard,
+    JwtService,
+  ],
+  exports: [
+    AccessControlV2Service,
+    AdminAuthGuard,
+  ],
 })
 export class AccessControlV2Module {}
