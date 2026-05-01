@@ -24,7 +24,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
 
   const { data: members } = useMembersList({
     authToken,
-    accessLevel: ['L2', 'L3', 'L4', 'L5', 'L6'],
+    accessLevel: ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'],
   });
 
   const addParticipantMutation = useAddParticipant();
@@ -32,8 +32,9 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
   const filteredMembers =
     members?.data?.filter(
       (member) =>
-        member.name?.toLowerCase().includes(memberSearch?.toLowerCase()) ||
-        member.email?.toLowerCase().includes(memberSearch?.toLowerCase())
+        member.memberState === 'APPROVED' &&
+        (member.name?.toLowerCase().includes(memberSearch?.toLowerCase()) ||
+          member.email?.toLowerCase().includes(memberSearch?.toLowerCase()))
     ) || [];
 
   const submitDisabled = addParticipantMutation.isPending || (addMethod === 'existing' && !selectedMemberUid);

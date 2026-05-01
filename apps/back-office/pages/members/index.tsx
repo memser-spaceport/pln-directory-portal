@@ -1,3 +1,14 @@
+import { GetServerSideProps } from 'next';
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  return {
+    redirect: {
+      destination: '/members-v2',
+      permanent: false,
+    },
+  };
+};
+
 import React, { useEffect, useMemo, useState } from 'react';
 
 import s from './styles.module.scss';

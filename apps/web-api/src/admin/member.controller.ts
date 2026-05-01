@@ -55,11 +55,13 @@ export class MemberController {
   @Post('/create')
   @UseGuards(AdminAuthGuard)
   async addNewMember(@Body() body: any): Promise<Member> {
-    return this.memberService.createMemberByAdmin(body as CreateMemberDto & {
-      roleCodes?: string[];
-      policyCodes?: string[];
-      permissionCodes?: string[];
-    });
+    return this.memberService.createMemberByAdmin(
+      body as CreateMemberDto & {
+        roleCodes?: string[];
+        policyCodes?: string[];
+        permissionCodes?: string[];
+      }
+    );
   }
 
   @Patch('/edit/:uid')

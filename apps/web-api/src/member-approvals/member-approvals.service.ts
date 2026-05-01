@@ -168,10 +168,12 @@ export class MemberApprovalsService {
     return this.get(memberUid);
   }
 
-  async ensureApprovalExists(memberUid: string, requestedByUid?: string | null, tx?: Prisma.TransactionClient) {
-    const client = tx ?? this.prisma;
-
-    const existing = await client.memberApproval.findUnique({
+  async ensureApprovalExists(
+    memberUid: string,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+    requestedByUid?: string | null
+  ) {
+    const existing = await tx.memberApproval.findUnique({
       where: { memberUid },
       select: { uid: true },
     });
@@ -180,7 +182,7 @@ export class MemberApprovalsService {
       return existing;
     }
 
-    const approval = await client.memberApproval.create({
+    const approval = await tx.memberApproval.create({
       data: {
         memberUid,
         requestedByUid: requestedByUid ?? null,
@@ -189,7 +191,7 @@ export class MemberApprovalsService {
       },
     });
 
-    await client.memberApprovalEvent.create({
+    await tx.memberApprovalEvent.create({
       data: {
         approvalUid: approval.uid,
         memberUid,

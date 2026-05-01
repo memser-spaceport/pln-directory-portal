@@ -11,36 +11,44 @@ type PolicySeed = {
   permissions: string[];
 };
 
-const permissionCodes = [
-  'founder_guides.view.plvs',
-  'founder_guides.view.plcc',
-  'founder_guides.view.all',
-  'founder_guides.create',
-  'deals.read',
-  'demo_day.report_link.view',
-  'member.search.read',
-  'forum.read',
-  'forum.write',
-  'oh.supply.read',
-  'oh.supply.write',
-  'oh.demand.read',
-  'oh.demand.write',
-  'irlg.going.read',
-  'irlg.going.write',
-  'demoday.prep.read',
-  'demoday.prep.write',
-  'demoday.showcase.read',
-  'demoday.showcase.write',
-  'demoday.active.read',
-  'demoday.active.write',
-  'demoday.stats.read',
-  'member.contacts.read',
-  'directory.admin.full',
-  'team.search.read',
-  'team.priority.read',
-  'membership.source.read',
-  'admin.tools.access',
-  'pl.advisors.access',
+type PermissionSeed = {
+  code: string;
+  module: string;
+};
+
+const permissionSeeds: PermissionSeed[] = [
+  { code: 'admin.tools.access', module: 'Admin Tool' },
+  { code: 'directory.admin.full', module: 'Directory' },
+  { code: 'member.search.read', module: 'Directory' },
+  { code: 'team.search.read', module: 'Directory' },
+  { code: 'team.priority.read', module: 'Directory' },
+  { code: 'membership.source.read', module: 'Directory' },
+  { code: 'member.contacts.read', module: 'Directory' },
+  { code: 'member.onboarding', module: 'Directory' },
+  { code: 'oh.supply.read', module: 'Office Hours' },
+  { code: 'oh.supply.write', module: 'Office Hours' },
+  { code: 'oh.demand.read', module: 'Office Hours' },
+  { code: 'oh.demand.write', module: 'Office Hours' },
+  { code: 'forum.read', module: 'Forum' },
+  { code: 'forum.write', module: 'Forum' },
+  { code: 'irlg.going.read', module: 'IRL Gatherings' },
+  { code: 'irlg.going.write', module: 'IRL Gatherings' },
+  { code: 'deals.read', module: 'Deals' },
+  { code: 'deals.view', module: 'Deals' },
+  { code: 'founder_guides.view', module: 'Founder Guides' },
+  { code: 'founder_guides.view.plvs', module: 'Founder Guides' },
+  { code: 'founder_guides.view.plcc', module: 'Founder Guides' },
+  { code: 'founder_guides.view.all', module: 'Founder Guides' },
+  { code: 'founder_guides.create', module: 'Founder Guides' },
+  { code: 'demoday.prep.read', module: 'PL Demo Day' },
+  { code: 'demoday.prep.write', module: 'PL Demo Day' },
+  { code: 'demoday.showcase.read', module: 'PL Demo Day' },
+  { code: 'demoday.showcase.write', module: 'PL Demo Day' },
+  { code: 'demoday.active.read', module: 'PL Demo Day' },
+  { code: 'demoday.active.write', module: 'PL Demo Day' },
+  { code: 'demoday.stats.read', module: 'PL Demo Day' },
+  { code: 'demoday.report_link.read', module: 'PL Demo Day' },
+  { code: 'pl.advisors.access', module: 'PL Advisors' },
 ];
 
 const policies: PolicySeed[] = [
@@ -51,6 +59,7 @@ const policies: PolicySeed[] = [
     group: 'PL Internal',
     permissions: [
       'directory.admin.full',
+      'member.contacts.read',
       'team.search.read',
       'member.search.read',
       'team.priority.read',
@@ -58,7 +67,8 @@ const policies: PolicySeed[] = [
       'admin.tools.access',
       'founder_guides.view.all',
       'founder_guides.create',
-      'demo_day.report_link.view',
+      'demoday.report_link.read',
+      'demoday.stats.read',
       'deals.read',
       'forum.read',
       'forum.write',
@@ -74,6 +84,7 @@ const policies: PolicySeed[] = [
     role: 'PL Infra team',
     group: 'PL Internal',
     permissions: [
+      'member.contacts.read',
       'team.priority.read',
       'membership.source.read',
       'founder_guides.view.all',
@@ -93,6 +104,7 @@ const policies: PolicySeed[] = [
     role: 'Demo Day Admin',
     group: 'PL Internal',
     permissions: [
+      'member.contacts.read',
       'demoday.prep.read',
       'demoday.prep.write',
       'demoday.showcase.read',
@@ -100,7 +112,7 @@ const policies: PolicySeed[] = [
       'demoday.active.read',
       'demoday.active.write',
       'demoday.stats.read',
-      'demo_day.report_link.view',
+      'demoday.report_link.read',
     ],
   },
   {
@@ -109,6 +121,7 @@ const policies: PolicySeed[] = [
     role: 'Demo Day Stakeholder',
     group: 'PL Internal',
     permissions: [
+      'member.contacts.read',
       'demoday.prep.read',
       'demoday.showcase.read',
       'demoday.active.read',
@@ -121,6 +134,7 @@ const policies: PolicySeed[] = [
     role: 'Demo Day Admin',
     group: 'PL Partner',
     permissions: [
+      'member.contacts.read',
       'demoday.prep.read',
       'demoday.prep.write',
       'demoday.showcase.read',
@@ -128,7 +142,7 @@ const policies: PolicySeed[] = [
       'demoday.active.read',
       'demoday.active.write',
       'demoday.stats.read',
-      'demo_day.report_link.view',
+      'demoday.report_link.read',
     ],
   },
   {
@@ -137,6 +151,7 @@ const policies: PolicySeed[] = [
     role: 'Demo Day Stakeholder',
     group: 'PL Partner',
     permissions: [
+      'member.contacts.read',
       'demoday.prep.read',
       'demoday.showcase.read',
       'demoday.active.read',
@@ -243,7 +258,7 @@ const policies: PolicySeed[] = [
       'oh.demand.write',
       'forum.read',
       'forum.write',
-      'deals.read',
+      'member.onboarding',
     ],
   },
   {
@@ -261,7 +276,6 @@ const policies: PolicySeed[] = [
       'oh.demand.write',
       'forum.read',
       'forum.write',
-      'deals.read',
     ],
   },
   {
@@ -279,7 +293,6 @@ const policies: PolicySeed[] = [
       'oh.demand.write',
       'forum.read',
       'forum.write',
-      'deals.read',
     ],
   },
   {
@@ -287,23 +300,14 @@ const policies: PolicySeed[] = [
     name: 'Investor / PL',
     role: 'Investor',
     group: 'PL',
-    permissions: [
-      'member.contacts.read',
-      'irlg.going.read',
-      'oh.demand.read',
-      'demoday.active.read',
-    ],
+    permissions: ['member.contacts.read', 'irlg.going.read', 'oh.demand.read', 'demoday.active.read'],
   },
   {
     code: 'investor_pl_partner',
     name: 'Investor / PL Partner',
     role: 'Investor',
     group: 'PL Partner',
-    permissions: [
-      'member.contacts.read',
-      'oh.demand.read',
-      'demoday.active.read',
-    ],
+    permissions: ['member.contacts.read', 'oh.demand.read', 'demoday.active.read'],
   },
   {
     code: 'unassigned_plc_plvs',
@@ -416,34 +420,24 @@ const policies: PolicySeed[] = [
       'oh.supply.read',
       'oh.supply.write',
       'oh.demand.read',
-    ],
-  },
-  {
-    code: 'advisor_future',
-    name: 'Advisor / Future',
-    role: 'Advisor',
-    group: 'Future',
-    permissions: [
-      'member.contacts.read',
-      'oh.supply.read',
-      'oh.supply.write',
-      'oh.demand.read',
-      'oh.demand.write',
-      'pl.advisors.access',
+      'forum.read',
+      'forum.write',
     ],
   },
 ];
 
 export async function seedAccessControlV2() {
-  for (const code of permissionCodes) {
+  for (const { code, module } of permissionSeeds) {
     await prisma.permission.upsert({
       where: { code },
       update: {
+        module,
         description: `Seeded by access-control-v2 bootstrap`,
       },
       create: {
         uid: code,
         code,
+        module,
         description: `Seeded by access-control-v2 bootstrap`,
       },
     });

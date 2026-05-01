@@ -51,7 +51,7 @@ export class TeamsController {
   constructor(
     private readonly teamsService: TeamsService,
     private readonly membersService: MembersService,
-    private readonly teamEnrichmentService: TeamEnrichmentService,
+    private readonly teamEnrichmentService: TeamEnrichmentService
   ) {}
 
   @Api(server.route.teamFilters)
@@ -168,8 +168,7 @@ export class TeamsController {
   }
 
   @Api(server.route.modifyTeam)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @UseGuards(UserTokenValidation)
   @UsePipes(new ParticipantsReqValidationPipe())
   async updateOne(@Param('uid') teamUid, @Body() body, @Req() req) {
     await this.teamsService.validateRequestor(req.userEmail, teamUid);
@@ -178,8 +177,7 @@ export class TeamsController {
 
   // TODO: Remove this endpoint after frontend integration with new ask api
   @Api(server.route.patchTeam)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @UseGuards(UserTokenValidation)
   async addAsk(@Param('uid') teamUid, @Body() body, @Req() req) {
     await this.teamsService.isTeamMemberOrAdmin(req.userEmail, teamUid);
     const res = await this.teamsService.addEditTeamAsk(teamUid, body.teamName, req.userEmail, body.ask);
@@ -265,7 +263,7 @@ export class TeamsController {
   async reviewEnrichment(
     @Param('uid') uid: string,
     @Body() body: { status: 'Reviewed' | 'Approved' },
-    @Req() req: Request,
+    @Req() req: Request
   ) {
     if (!body.status || !['Reviewed', 'Approved'].includes(body.status)) {
       throw new BadRequestException('status must be "Reviewed" or "Approved"');

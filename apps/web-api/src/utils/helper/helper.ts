@@ -72,13 +72,29 @@ export const buildRelationMapping = (field: string, rawData: any) => {
  */
 export const buildMultiRelationMapping = (field: string, rawData: any, type: string) => {
   const dataExists = rawData[field]?.length > 0;
+
   if (!dataExists) {
     return type === 'Update' ? { set: [] } : undefined;
   }
+
+  const refs = rawData[field]
+    .map((item: any) => {
+      if (typeof item === 'string') {
+        return { uid: item };
+      }
+
+      if (item?.uid) {
+        return { uid: item.uid };
+      }
+
+      return null;
+    })
+    .filter(Boolean);
+
   return {
-    [type === 'Create' ? 'connect' : 'set']: rawData[field].map((item: any) => ({ uid: item.uid }))
+    [type === 'Create' ? 'connect' : 'set']: refs,
   };
-}
+};
 
 /**
  * Extracts the filename from a given URL.

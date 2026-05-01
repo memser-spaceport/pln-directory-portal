@@ -40,6 +40,7 @@ import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 @ApiTags('Admin Demo Days')
 @Controller('v1/admin/demo-days')
@@ -52,10 +53,12 @@ export class AdminDemoDaysController {
 
   @Get('report-link')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
-  @RequirePermissions(RBAC_PERMISSION_CODES.DEMO_DAY_REPORT_LINK_VIEW)
+  @RequirePermissions({
+    anyOf: [RBAC_PERMISSION_CODES.DEMO_DAY_REPORT_LINK_READ, ADMIN_PERMISSIONS.DIRECTORY_FULL],
+  })
   @NoCache()
   async getDemoDayReportLink(@Req() req): Promise<{ url: string }> {
-    return this.demoDaysService.getDemoDayReportLink(req.userEmail);
+    return this.demoDaysService.getDemoDayReportLink();
   }
 
   @Get('subscribers')

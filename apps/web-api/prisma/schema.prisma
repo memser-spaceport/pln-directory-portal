@@ -222,6 +222,7 @@ model Member {
   reviewedMemberApprovals   MemberApproval[]      @relation("MemberApprovalReviewedBy")
   memberApprovalEvents      MemberApprovalEvent[] @relation("MemberApprovalEventMember")
   actedMemberApprovalEvents MemberApprovalEvent[] @relation("MemberApprovalEventActor")
+  jobAlerts                 JobAlert[]            @relation("MemberJobAlerts")
 }
 
 model MemberApproval {
@@ -1817,6 +1818,7 @@ model Role {
 model Permission {
   uid         String   @id
   code        String   @unique
+  module      String
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1915,6 +1917,7 @@ model Policy {
   role              String
   group             String
   isSystem          Boolean            @default(true)
+  hidden            Boolean            @default(false)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   policyPermissions PolicyPermission[]
@@ -1998,7 +2001,8 @@ model JobOpening {
   seniority       String?
   urgency         String?
   summary         String?
-  location        String?
+  location        String[]         @default([])
+  workMode        String?
   ws4AskId        String?
   detectionDate   DateTime
   sourceType      String?
@@ -2012,7 +2016,8 @@ model JobOpening {
   postedDate      DateTime?
   lastSeenLive    DateTime?
   signalId        String?
-  canonicalKey    String           @unique
+  canonicalKey    String
+  dedupKey        String           @unique
   teamUid         String?
   team            Team?            @relation(fields: [teamUid], references: [uid])
   needsReview     String?
@@ -2030,7 +2035,8 @@ model JobOpening {
   @@index([teamUid])
   @@index([roleCategory])
   @@index([seniority])
-  @@index([location])
+  @@index([location], map: "job_opening_location_idx", type: Gin)
+  @@index([workMode])
   @@index([updatedAt])
 }
 
@@ -2052,4 +2058,37 @@ model TeamJobEnrichment {
   @@index([teamUid])
   @@index([needsReview])
   @@index([dataDiscrepancyFlag])
+}
+
+model JobAlert {
+  id              Int               @id @default(autoincrement())
+  uid             String            @unique @default(cuid())
+  memberUid       String
+  member          Member            @relation("MemberJobAlerts", fields: [memberUid], references: [uid], onDelete: Cascade)
+  name            String            @db.VarChar(120)
+  filterState     Json
+  filterStateHash String
+  lastSentAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+  sendRuns        JobAlertSendRun[] @relation("JobAlertSendRuns")
+
+  @@unique([memberUid, filterStateHash])
+  @@index([memberUid, createdAt(sort: Desc)])
+  @@index([deletedAt])
+}
+
+model JobAlertSendRun {
+  id          Int      @id @default(autoincrement())
+  uid         String   @unique @default(cuid())
+  alertUid    String
+  alert       JobAlert @relation("JobAlertSendRuns", fields: [alertUid], references: [uid], onDelete: Cascade)
+  ingestRunId String
+  matchCount  Int
+  emailType   String
+  sentAt      DateTime @default(now())
+
+  @@unique([alertUid, ingestRunId])
+  @@index([ingestRunId])
 }

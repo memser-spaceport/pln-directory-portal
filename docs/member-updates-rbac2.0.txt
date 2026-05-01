@@ -1,0 +1,574 @@
+1) get  members
+
+curl --location 'http://localhost:3003/v1/admin/members?accessLevel=L6' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiIsIkRFTU9fREFZX0FETUlOIl0sIm1lbWJlclVpZCI6ImNtaXMyNGQzYzAwMDBuMjRmNHU2ZTlkcmciLCJleHAiOjE3NzgyMzc2NDQsImlhdCI6MTc3NTY0NTY0NH0.gyQEYex9sxef6lkNBXoJ02KIqaMiHxM__xwLWmA1eSk' \
+--header 'Content-Type: application/json' \
+--header 'Cookie: _csrf=amP_vHDb9zWBOpvjoqqtzA'
+
+
+
+{
+    "data": [
+        {
+            "uid": "demo-investor-2",
+            "name": "Carol Investor",
+            "imageUid": null,
+            "memberRoles": [],
+            "image": null,
+            "email": "nataliia.kr.job+7@gmail.com",
+            "isSubscribedToNewsletter": false,
+            "signUpSource": null,
+            "accessLevel": "L6",
+            "teamOrProjectURL": null,
+            "locationUid": null,
+            "location": null,
+            "teamMemberRoles": [],
+            "projectContributions": [],
+            "linkedinProfile": null,
+            "accessLevelUpdatedAt": "2026-04-23T10:41:47.108Z",
+            "investorProfile": {
+                "uid": "demo-investor-profile-2",
+                "investmentFocus": [
+                    "Gaming",
+                    "Metaverse",
+                    "NFT"
+                ],
+                "investInStartupStages": [
+                    "Pre-Seed",
+                    "Seed",
+                    "Series A"
+                ],
+                "investInFundTypes": [],
+                "typicalCheckSize": 100000,
+                "type": "ANGEL_AND_FUND"
+            },
+            "demoDayAdminScopes": [],
+            "memberState": "APPROVED",
+            "permissions": [
+                {
+                    "uid": "member.contacts.read",
+                    "code": "member.contacts.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                }
+            ],
+            "permissionCodes": [
+                "member.contacts.read"
+            ],
+            "policies": [
+                {
+                    "uid": "cmobcqjfq008f8oajdq42nxwg",
+                    "code": "unassigned_pln_other",
+                    "name": "Unassigned / PLN Other",
+                    "description": null
+                }
+            ],
+            "policyCodes": [
+                "unassigned_pln_other"
+            ],
+            "roles": [],
+            "roleCodes": [],
+            "effectivePermissions": [
+                {
+                    "uid": "member.contacts.read",
+                    "code": "member.contacts.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "irlg.going.read",
+                    "code": "irlg.going.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "irlg.going.write",
+                    "code": "irlg.going.write",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "oh.supply.read",
+                    "code": "oh.supply.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "oh.supply.write",
+                    "code": "oh.supply.write",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "oh.demand.read",
+                    "code": "oh.demand.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                }
+            ],
+            "effectivePermissionCodes": [
+                "member.contacts.read",
+                "irlg.going.read",
+                "irlg.going.write",
+                "oh.supply.read",
+                "oh.supply.write",
+                "oh.demand.read"
+            ],
+            "demoDayHosts": []
+        }
+    ],
+    "pagination": {
+        "total": 1,
+        "page": 1,
+        "limit": 1,
+        "pages": 1
+    }
+}
+
+2) curl --location 'http://localhost:3003/v1/admin/members/demo-investor-2' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiIsIkRFTU9fREFZX0FETUlOIl0sIm1lbWJlclVpZCI6ImNtaXMyNGQzYzAwMDBuMjRmNHU2ZTlkcmciLCJleHAiOjE3NzgyMzc2NDQsImlhdCI6MTc3NTY0NTY0NH0.gyQEYex9sxef6lkNBXoJ02KIqaMiHxM__xwLWmA1eSk' \
+--header 'Cookie: _csrf=bqJguQGVX1Hi60vMaK0cEg'
+
+
+{
+    "uid": "demo-investor-2",
+    "name": "Carol Investor",
+    "email": "nataliia.kr.job+7@gmail.com",
+    "imageUid": null,
+    "githubHandler": null,
+    "discordHandler": null,
+    "twitterHandler": null,
+    "linkedinHandler": null,
+    "telegramHandler": null,
+    "telegramUid": null,
+    "officeHours": null,
+    "ohStatus": null,
+    "ohInterest": [],
+    "ohHelpWith": [],
+    "moreDetails": null,
+    "bio": null,
+    "plnFriend": false,
+    "plnStartDate": null,
+    "airtableRecId": null,
+    "externalId": null,
+    "openToWork": false,
+    "isFeatured": false,
+    "isTierViewer": false,
+    "isVerified": true,
+    "signUpSource": null,
+    "signUpMedium": null,
+    "signUpCampaign": null,
+    "isUserConsent": false,
+    "isSubscribedToNewsletter": false,
+    "teamOrProjectURL": null,
+    "createdAt": "2026-04-23T10:41:45.658Z",
+    "updatedAt": "2026-04-23T10:41:47.169Z",
+    "approvedAt": "2026-04-23T10:41:45.658Z",
+    "locationUid": null,
+    "preferences": null,
+    "linkedInDetails": null,
+    "accessLevel": "L6",
+    "role": null,
+    "isInvestor": true,
+    "scheduleMeetingCount": 0,
+    "accessLevelUpdatedAt": "2026-04-23T10:41:47.108Z",
+    "deletedAt": null,
+    "deletionReason": null,
+    "aboutYou": null,
+    "investorProfileId": "demo-investor-profile-2",
+    "image": null,
+    "location": null,
+    "skills": [],
+    "teamMemberRoles": [],
+    "memberRoles": [],
+    "projectContributions": [],
+    "memberState": "APPROVED",
+    "permissions": [
+        {
+            "uid": "member.contacts.read",
+            "code": "member.contacts.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        }
+    ],
+    "permissionCodes": [
+        "member.contacts.read"
+    ],
+    "policies": [
+        {
+            "uid": "cmobcqjfq008f8oajdq42nxwg",
+            "code": "unassigned_pln_other",
+            "name": "Unassigned / PLN Other",
+            "description": null
+        }
+    ],
+    "policyCodes": [
+        "unassigned_pln_other"
+    ],
+    "roles": [],
+    "roleCodes": [],
+    "effectivePermissions": [
+        {
+            "uid": "member.contacts.read",
+            "code": "member.contacts.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "irlg.going.read",
+            "code": "irlg.going.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "irlg.going.write",
+            "code": "irlg.going.write",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.supply.read",
+            "code": "oh.supply.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.supply.write",
+            "code": "oh.supply.write",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.demand.read",
+            "code": "oh.demand.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        }
+    ],
+    "effectivePermissionCodes": [
+        "member.contacts.read",
+        "irlg.going.read",
+        "irlg.going.write",
+        "oh.supply.read",
+        "oh.supply.write",
+        "oh.demand.read"
+    ]
+}
+
+3) apply verified status
+curl --location --request PATCH 'http://localhost:3003/v1/admin/member-approvals/demo-investor-2' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiIsIkRFTU9fREFZX0FETUlOIl0sIm1lbWJlclVpZCI6ImNtaXMyNGQzYzAwMDBuMjRmNHU2ZTlkcmciLCJleHAiOjE3NzgyMzc2NDQsImlhdCI6MTc3NTY0NTY0NH0.gyQEYex9sxef6lkNBXoJ02KIqaMiHxM__xwLWmA1eSk' \
+--header 'Content-Type: application/json' \
+--header 'Cookie: _csrf=L7JEzWXuk_w7xTf5_ChFFA' \
+--data '{
+  "state": "VERIFIED",
+  "reason": "verified by admin test"
+}'
+
+
+
+{
+    "uid": "cmobei45b00008ocd9vrrwdx4",
+    "memberUid": "demo-investor-2",
+    "state": "VERIFIED",
+    "requestedByUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+    "reviewedByUid": "cmis24d3c0000n24f4u6e9drg",
+    "reason": "verified by admin test",
+    "requestedAt": "2026-04-23T11:31:13.918Z",
+    "reviewedAt": "2026-04-23T11:47:24.551Z",
+    "createdAt": "2026-04-23T11:31:13.918Z",
+    "updatedAt": "2026-04-23T11:47:24.554Z",
+    "member": {
+        "uid": "demo-investor-2",
+        "name": "Carol Investor",
+        "email": "nataliia.kr.job+7@gmail.com",
+        "accessLevel": "L6",
+        "role": null,
+        "createdAt": "2026-04-23T10:41:45.658Z"
+    },
+    "requestedBy": {
+        "uid": "cmnwqb9th0a3k7j3as9gtrgk7",
+        "name": "Chad",
+        "email": "nataliia.kr.job@gmail.com"
+    },
+    "reviewedBy": {
+        "uid": "cmis24d3c0000n24f4u6e9drg",
+        "name": "Earnest",
+        "email": "Verona_Denesik@yahoo.com"
+    },
+    "events": [
+        {
+            "uid": "cmobf2x3u00068ocdf2dy6kkh",
+            "approvalUid": "cmobei45b00008ocd9vrrwdx4",
+            "memberUid": "demo-investor-2",
+            "fromState": "APPROVED",
+            "toState": "VERIFIED",
+            "actorUid": "cmis24d3c0000n24f4u6e9drg",
+            "reason": "verified by admin test",
+            "createdAt": "2026-04-23T11:47:24.570Z"
+        },
+        {
+            "uid": "cmobei6wm00038ocdl2i89f8p",
+            "approvalUid": "cmobei45b00008ocd9vrrwdx4",
+            "memberUid": "demo-investor-2",
+            "fromState": "PENDING",
+            "toState": "APPROVED",
+            "actorUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+            "reason": "Validated by admin",
+            "createdAt": "2026-04-23T11:31:17.494Z"
+        },
+        {
+            "uid": "cmobei46000028ocdtv5anahn",
+            "approvalUid": "cmobei45b00008ocd9vrrwdx4",
+            "memberUid": "demo-investor-2",
+            "fromState": null,
+            "toState": "PENDING",
+            "actorUid": "cmnwqb9th0a3k7j3as9gtrgk7",
+            "reason": "Initial approval request",
+            "createdAt": "2026-04-23T11:31:13.945Z"
+        }
+    ]
+}
+
+4) check member with Verified state
+curl --location 'http://localhost:3003/v1/admin/members/demo-investor-2' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiIsIkRFTU9fREFZX0FETUlOIl0sIm1lbWJlclVpZCI6ImNtaXMyNGQzYzAwMDBuMjRmNHU2ZTlkcmciLCJleHAiOjE3NzgyMzc2NDQsImlhdCI6MTc3NTY0NTY0NH0.gyQEYex9sxef6lkNBXoJ02KIqaMiHxM__xwLWmA1eSk' \
+--header 'Cookie: _csrf=L7JEzWXuk_w7xTf5_ChFFA'
+
+{
+    "uid": "demo-investor-2",
+    "name": "Carol Investor",
+    "email": "nataliia.kr.job+7@gmail.com",
+    "imageUid": null,
+    "githubHandler": null,
+    "discordHandler": null,
+    "twitterHandler": null,
+    "linkedinHandler": null,
+    "telegramHandler": null,
+    "telegramUid": null,
+    "officeHours": null,
+    "ohStatus": null,
+    "ohInterest": [],
+    "ohHelpWith": [],
+    "moreDetails": null,
+    "bio": null,
+    "plnFriend": false,
+    "plnStartDate": null,
+    "airtableRecId": null,
+    "externalId": null,
+    "openToWork": false,
+    "isFeatured": false,
+    "isTierViewer": false,
+    "isVerified": true,
+    "signUpSource": null,
+    "signUpMedium": null,
+    "signUpCampaign": null,
+    "isUserConsent": false,
+    "isSubscribedToNewsletter": false,
+    "teamOrProjectURL": null,
+    "createdAt": "2026-04-23T10:41:45.658Z",
+    "updatedAt": "2026-04-23T10:41:47.169Z",
+    "approvedAt": "2026-04-23T10:41:45.658Z",
+    "locationUid": null,
+    "preferences": null,
+    "linkedInDetails": null,
+    "accessLevel": "L6",
+    "role": null,
+    "isInvestor": true,
+    "scheduleMeetingCount": 0,
+    "accessLevelUpdatedAt": "2026-04-23T10:41:47.108Z",
+    "deletedAt": null,
+    "deletionReason": null,
+    "aboutYou": null,
+    "investorProfileId": "demo-investor-profile-2",
+    "image": null,
+    "location": null,
+    "skills": [],
+    "teamMemberRoles": [],
+    "memberRoles": [],
+    "projectContributions": [],
+    "memberState": "VERIFIED",
+    "permissions": [
+        {
+            "uid": "member.contacts.read",
+            "code": "member.contacts.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        }
+    ],
+    "permissionCodes": [
+        "member.contacts.read"
+    ],
+    "policies": [
+        {
+            "uid": "cmobcqjfq008f8oajdq42nxwg",
+            "code": "unassigned_pln_other",
+            "name": "Unassigned / PLN Other",
+            "description": null
+        }
+    ],
+    "policyCodes": [
+        "unassigned_pln_other"
+    ],
+    "roles": [],
+    "roleCodes": [],
+    "effectivePermissions": [
+        {
+            "uid": "member.contacts.read",
+            "code": "member.contacts.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "irlg.going.read",
+            "code": "irlg.going.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "irlg.going.write",
+            "code": "irlg.going.write",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.supply.read",
+            "code": "oh.supply.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.supply.write",
+            "code": "oh.supply.write",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.demand.read",
+            "code": "oh.demand.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        }
+    ],
+    "effectivePermissionCodes": [
+        "member.contacts.read",
+        "irlg.going.read",
+        "irlg.going.write",
+        "oh.supply.read",
+        "oh.supply.write",
+        "oh.demand.read"
+    ]
+}
+
+
+5) curl --location --request PATCH 'http://localhost:3003/v1/admin/members/demo-investor-2/roles-and-hosts' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiIsIkRFTU9fREFZX0FETUlOIl0sIm1lbWJlclVpZCI6ImNtaXMyNGQzYzAwMDBuMjRmNHU2ZTlkcmciLCJleHAiOjE3NzgyMzc2NDQsImlhdCI6MTc3NTY0NTY0NH0.gyQEYex9sxef6lkNBXoJ02KIqaMiHxM__xwLWmA1eSk' \
+--header 'Content-Type: application/json' \
+--header 'Cookie: _csrf=tA-lsqL60ngXERJYLvu5hQ' \
+--data '{
+  "roles": [],
+  "hosts": []
+}'
+
+{
+    "uid": "demo-investor-2",
+    "name": "Carol Investor",
+    "email": "nataliia.kr.job+7@gmail.com",
+    "imageUid": null,
+    "githubHandler": null,
+    "discordHandler": null,
+    "twitterHandler": null,
+    "linkedinHandler": null,
+    "telegramHandler": null,
+    "telegramUid": null,
+    "officeHours": null,
+    "ohStatus": null,
+    "ohInterest": [],
+    "ohHelpWith": [],
+    "moreDetails": null,
+    "bio": null,
+    "plnFriend": false,
+    "plnStartDate": null,
+    "airtableRecId": null,
+    "externalId": null,
+    "openToWork": false,
+    "isFeatured": false,
+    "isTierViewer": false,
+    "isVerified": true,
+    "signUpSource": null,
+    "signUpMedium": null,
+    "signUpCampaign": null,
+    "isUserConsent": false,
+    "isSubscribedToNewsletter": false,
+    "teamOrProjectURL": null,
+    "createdAt": "2026-04-23T10:41:45.658Z",
+    "updatedAt": "2026-04-23T10:41:47.169Z",
+    "approvedAt": "2026-04-23T10:41:45.658Z",
+    "locationUid": null,
+    "preferences": null,
+    "linkedInDetails": null,
+    "accessLevel": "L6",
+    "role": null,
+    "isInvestor": true,
+    "scheduleMeetingCount": 0,
+    "accessLevelUpdatedAt": "2026-04-23T10:41:47.108Z",
+    "deletedAt": null,
+    "deletionReason": null,
+    "aboutYou": null,
+    "investorProfileId": "demo-investor-profile-2",
+    "image": null,
+    "location": null,
+    "skills": [],
+    "teamMemberRoles": [],
+    "memberRoles": [],
+    "projectContributions": [],
+    "memberState": "VERIFIED",
+    "permissions": [
+        {
+            "uid": "member.contacts.read",
+            "code": "member.contacts.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        }
+    ],
+    "permissionCodes": [
+        "member.contacts.read"
+    ],
+    "policies": [
+        {
+            "uid": "cmobcqjfq008f8oajdq42nxwg",
+            "code": "unassigned_pln_other",
+            "name": "Unassigned / PLN Other",
+            "description": null
+        }
+    ],
+    "policyCodes": [
+        "unassigned_pln_other"
+    ],
+    "roles": [],
+    "roleCodes": [],
+    "effectivePermissions": [
+        {
+            "uid": "member.contacts.read",
+            "code": "member.contacts.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "irlg.going.read",
+            "code": "irlg.going.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "irlg.going.write",
+            "code": "irlg.going.write",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.supply.read",
+            "code": "oh.supply.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.supply.write",
+            "code": "oh.supply.write",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.demand.read",
+            "code": "oh.demand.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        }
+    ],
+    "effectivePermissionCodes": [
+        "member.contacts.read",
+        "irlg.going.read",
+        "irlg.going.write",
+        "oh.supply.read",
+        "oh.supply.write",
+        "oh.demand.read"
+    ]
+}
+
+etc
+
+
+
+

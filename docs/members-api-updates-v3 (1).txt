@@ -1,0 +1,739 @@
+1) Get Members
+curl --location 'http://localhost:3003/v1/admin/members?accessLevel=L5%2CL6' \
+--header 'accept: application/json, text/plain, */*' \
+--header 'accept-language: en-GB,en-US;q=0.9,en;q=0.8' \
+--header 'authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiIsIkRFTU9fREFZX0FETUlOIl0sIm1lbWJlclVpZCI6ImNtaXMyNGQzYzAwMDBuMjRmNHU2ZTlkcmciLCJleHAiOjE3NzgyMzc2NDQsImlhdCI6MTc3NTY0NTY0NH0.gyQEYex9sxef6lkNBXoJ02KIqaMiHxM__xwLWmA1eSk' \
+--header 'if-none-match: W/"1a567-36Htv+VUCC8EYQ0Z9kj+CYVsvxs"' \
+--header 'origin: https://dev-admin.plnetwork.io' \
+--header 'priority: u=1, i' \
+--header 'referer: https://dev-admin.plnetwork.io/' \
+--header 'sec-ch-ua: "Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"' \
+--header 'sec-ch-ua-mobile: ?0' \
+--header 'sec-ch-ua-platform: "macOS"' \
+--header 'sec-fetch-dest: empty' \
+--header 'sec-fetch-mode: cors' \
+--header 'sec-fetch-site: same-site' \
+--header 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36' \
+--header 'Cookie: _csrf=oe98qU6nXunxoQdOdByN9Q'
+
+{
+    "data": [
+        {
+            "uid": "cmoblxgfo000t8oy68g3074sh",
+            "name": "AAA2",
+            "imageUid": null,
+            "memberRoles": [],
+            "image": null,
+            "email": "aaцццццlkajsdlf@aa.com",
+            "isSubscribedToNewsletter": false,
+            "signUpSource": null,
+            "accessLevel": "L6",
+            "teamOrProjectURL": null,
+            "locationUid": null,
+            "location": null,
+            "teamMemberRoles": [],
+            "projectContributions": [],
+            "linkedinProfile": null,
+            "accessLevelUpdatedAt": "2026-04-23T14:59:06.970Z",
+            "investorProfile": {
+                "uid": "cmoblxgf2000q8oy6gu8q6frd",
+                "investmentFocus": [],
+                "investInStartupStages": [],
+                "investInFundTypes": [],
+                "typicalCheckSize": 0,
+                "type": "ANGEL"
+            },
+            "demoDayAdminScopes": [],
+            "memberState": "APPROVED",
+            "permissions": [],
+            "permissionCodes": [],
+            "policies": [],
+            "policyCodes": [],
+            "roles": [],
+            "roleCodes": [],
+            "effectivePermissions": [],
+            "effectivePermissionCodes": [],
+            "demoDayHosts": []
+        },
+        {
+            "uid": "cmobmenbe00048oe4s71man6d",
+            "name": "AAA2",
+            "imageUid": null,
+            "memberRoles": [],
+            "image": null,
+            "email": "aaцццццlkkkkajkkksdlf@aa.com",
+            "isSubscribedToNewsletter": false,
+            "signUpSource": null,
+            "accessLevel": "L6",
+            "teamOrProjectURL": null,
+            "locationUid": null,
+            "location": null,
+            "teamMemberRoles": [],
+            "projectContributions": [],
+            "linkedinProfile": null,
+            "accessLevelUpdatedAt": "2026-04-23T15:12:28.996Z",
+            "investorProfile": {
+                "uid": "cmobmen9r00018oe4y8btzfli",
+                "investmentFocus": [],
+                "investInStartupStages": [],
+                "investInFundTypes": [],
+                "typicalCheckSize": 0,
+                "type": "ANGEL"
+            },
+            "demoDayAdminScopes": [],
+            "memberState": "APPROVED",
+            "permissions": [],
+            "permissionCodes": [],
+            "policies": [],
+            "policyCodes": [],
+            "roles": [],
+            "roleCodes": [],
+            "effectivePermissions": [],
+            "effectivePermissionCodes": [],
+            "demoDayHosts": []
+        },
+        {
+            "uid": "cmobmzihg00098oiq8dxwcl2v",
+            "name": "AAA2",
+            "imageUid": null,
+            "memberRoles": [],
+            "image": null,
+            "email": "uuuuu@aa.com",
+            "isSubscribedToNewsletter": false,
+            "signUpSource": null,
+            "accessLevel": "L6",
+            "teamOrProjectURL": null,
+            "locationUid": null,
+            "location": null,
+            "teamMemberRoles": [],
+            "projectContributions": [],
+            "linkedinProfile": null,
+            "accessLevelUpdatedAt": "2026-04-23T15:28:42.574Z",
+            "investorProfile": {
+                "uid": "cmobmziha00068oiqmehxxjce",
+                "investmentFocus": [],
+                "investInStartupStages": [],
+                "investInFundTypes": [],
+                "typicalCheckSize": 0,
+                "type": "ANGEL"
+            },
+            "demoDayAdminScopes": [],
+            "memberState": "APPROVED",
+            "permissions": [
+                {
+                    "uid": "perm_founder_guides_view",
+                    "code": "founder_guides.view",
+                    "description": "Can view Founder Guides"
+                }
+            ],
+            "permissionCodes": [
+                "founder_guides.view"
+            ],
+            "policies": [
+                {
+                    "uid": "cmobk2tzt0006o77ttl0r7ity",
+                    "code": "directory_admin_pl_internal",
+                    "name": "Directory Admin / PL Internal",
+                    "description": null,
+                    "role": null,
+                    "group": null
+                }
+            ],
+            "policyCodes": [
+                "directory_admin_pl_internal"
+            ],
+            "roles": [
+                {
+                    "uid": "role_pl_vs_founder",
+                    "code": "PL_VS_FOUNDER",
+                    "name": "PLC PLVS Founder",
+                    "description": "Can view Founder Guides only"
+                }
+            ],
+            "roleCodes": [
+                "PL_VS_FOUNDER"
+            ],
+            "effectivePermissions": [
+                {
+                    "uid": "perm_founder_guides_view",
+                    "code": "founder_guides.view",
+                    "description": "Can view Founder Guides"
+                },
+                {
+                    "uid": "directory.admin.full",
+                    "code": "directory.admin.full",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "team.search.read",
+                    "code": "team.search.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "member.search.read",
+                    "code": "member.search.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "team.priority.read",
+                    "code": "team.priority.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "membership.source.read",
+                    "code": "membership.source.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "admin.tools.access",
+                    "code": "admin.tools.access",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "founder_guides.view.all",
+                    "code": "founder_guides.view.all",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "founder_guides.create",
+                    "code": "founder_guides.create",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "demo_day.report_link.view",
+                    "code": "demo_day.report_link.view",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "deals.read",
+                    "code": "deals.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "forum.read",
+                    "code": "forum.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "forum.write",
+                    "code": "forum.write",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "oh.supply.read",
+                    "code": "oh.supply.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "oh.supply.write",
+                    "code": "oh.supply.write",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "oh.demand.read",
+                    "code": "oh.demand.read",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                },
+                {
+                    "uid": "oh.demand.write",
+                    "code": "oh.demand.write",
+                    "description": "Seeded by access-control-v2 bootstrap"
+                }
+            ],
+            "effectivePermissionCodes": [
+                "founder_guides.view",
+                "directory.admin.full",
+                "team.search.read",
+                "member.search.read",
+                "team.priority.read",
+                "membership.source.read",
+                "admin.tools.access",
+                "founder_guides.view.all",
+                "founder_guides.create",
+                "demo_day.report_link.view",
+                "deals.read",
+                "forum.read",
+                "forum.write",
+                "oh.supply.read",
+                "oh.supply.write",
+                "oh.demand.read",
+                "oh.demand.write"
+            ],
+            "demoDayHosts": []
+        },
+        {
+            "uid": "demo-investor-0",
+            "name": "Alice Investor",
+            "imageUid": null,
+            "memberRoles": [],
+            "image": null,
+            "email": "alice.investor@example.com",
+            "isSubscribedToNewsletter": false,
+            "signUpSource": null,
+            "accessLevel": "L5",
+            "teamOrProjectURL": null,
+            "locationUid": null,
+            "location": null,
+            "teamMemberRoles": [],
+            "projectContributions": [],
+            "linkedinProfile": null,
+            "accessLevelUpdatedAt": "2026-04-23T14:07:18.201Z",
+            "investorProfile": {
+                "uid": "demo-investor-profile-0",
+                "investmentFocus": [
+                    "DeFi",
+                    "Developer Tooling",
+                    "AI"
+                ],
+                "investInStartupStages": [
+                    "Pre-Seed",
+                    "Seed"
+                ],
+                "investInFundTypes": [],
+                "typicalCheckSize": 50000,
+                "type": "ANGEL"
+            },
+            "demoDayAdminScopes": [],
+            "memberState": "APPROVED",
+            "permissions": [],
+            "permissionCodes": [],
+            "policies": [],
+            "policyCodes": [],
+            "roles": [],
+            "roleCodes": [],
+            "effectivePermissions": [],
+            "effectivePermissionCodes": [],
+            "demoDayHosts": []
+        },
+        {
+            "uid": "demo-investor-1",
+            "name": "Bob Investor",
+            "imageUid": null,
+            "memberRoles": [],
+            "image": null,
+            "email": "bob.investor@example.com",
+            "isSubscribedToNewsletter": false,
+            "signUpSource": null,
+            "accessLevel": "L5",
+            "teamOrProjectURL": null,
+            "locationUid": null,
+            "location": null,
+            "teamMemberRoles": [],
+            "projectContributions": [],
+            "linkedinProfile": null,
+            "accessLevelUpdatedAt": "2026-04-23T14:07:18.201Z",
+            "investorProfile": {
+                "uid": "demo-investor-profile-1",
+                "investmentFocus": [
+                    "Frontier Tech",
+                    "Data Tooling"
+                ],
+                "investInStartupStages": [
+                    "Seed",
+                    "Series A"
+                ],
+                "investInFundTypes": [
+                    "Venture"
+                ],
+                "typicalCheckSize": 250000,
+                "type": "FUND"
+            },
+            "demoDayAdminScopes": [],
+            "memberState": "APPROVED",
+            "permissions": [],
+            "permissionCodes": [],
+            "policies": [],
+            "policyCodes": [],
+            "roles": [],
+            "roleCodes": [],
+            "effectivePermissions": [],
+            "effectivePermissionCodes": [],
+            "demoDayHosts": []
+        },
+        {
+            "uid": "demo-investor-2",
+            "name": "Carol Investor",
+            "imageUid": null,
+            "memberRoles": [],
+            "image": null,
+            "email": "carol.investor@example.com",
+            "isSubscribedToNewsletter": false,
+            "signUpSource": null,
+            "accessLevel": "L6",
+            "teamOrProjectURL": null,
+            "locationUid": null,
+            "location": null,
+            "teamMemberRoles": [],
+            "projectContributions": [],
+            "linkedinProfile": null,
+            "accessLevelUpdatedAt": "2026-04-23T14:07:18.201Z",
+            "investorProfile": {
+                "uid": "demo-investor-profile-2",
+                "investmentFocus": [
+                    "Gaming",
+                    "Metaverse",
+                    "NFT"
+                ],
+                "investInStartupStages": [
+                    "Pre-Seed",
+                    "Seed",
+                    "Series A"
+                ],
+                "investInFundTypes": [],
+                "typicalCheckSize": 100000,
+                "type": "ANGEL_AND_FUND"
+            },
+            "demoDayAdminScopes": [],
+            "memberState": "APPROVED",
+            "permissions": [],
+            "permissionCodes": [],
+            "policies": [],
+            "policyCodes": [],
+            "roles": [],
+            "roleCodes": [],
+            "effectivePermissions": [],
+            "effectivePermissionCodes": [],
+            "demoDayHosts": []
+        }
+    ],
+    "pagination": {
+        "total": 6,
+        "page": 1,
+        "limit": 6,
+        "pages": 1
+    }
+}
+
+
+2) Create Member (NEW LOGIC - memberState)
+
+
+curl --location 'http://localhost:3003/v1/admin/members/create' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiIsIkRFTU9fREFZX0FETUlOIl0sIm1lbWJlclVpZCI6ImNtaXMyNGQzYzAwMDBuMjRmNHU2ZTlkcmciLCJleHAiOjE3NzgyMzc2NDQsImlhdCI6MTc3NTY0NTY0NH0.gyQEYex9sxef6lkNBXoJ02KIqaMiHxM__xwLWmA1eSk' \
+--header 'Cookie: _csrf=ms98UUP2CjIueMpJFTJoww' \
+--data-raw '{
+  "name": "Test Member",
+  "email": "test_member@aa.com",
+  "memberState": "APPROVED",
+  "roleCodes": ["PL_VS_FOUNDER"],
+  "policyCodes": ["directory_admin_pl_internal"],
+  "permissionCodes": ["founder_guides.view"],
+  "skills": [],
+   "teamMemberRoles": []
+}'
+
+{
+    "uid": "cmocqm9eo0003o7059zn36deg",
+    "name": "Test Member",
+    "email": "test_member@aa.com",
+    "imageUid": null,
+    "githubHandler": null,
+    "discordHandler": null,
+    "twitterHandler": null,
+    "linkedinHandler": null,
+    "telegramHandler": null,
+    "telegramUid": null,
+    "officeHours": null,
+    "ohStatus": null,
+    "ohInterest": [],
+    "ohHelpWith": [],
+    "moreDetails": null,
+    "bio": null,
+    "plnFriend": false,
+    "plnStartDate": null,
+    "airtableRecId": null,
+    "externalId": null,
+    "openToWork": false,
+    "isFeatured": false,
+    "isTierViewer": false,
+    "isVerified": false,
+    "signUpSource": null,
+    "signUpMedium": null,
+    "signUpCampaign": null,
+    "isUserConsent": false,
+    "isSubscribedToNewsletter": false,
+    "teamOrProjectURL": null,
+    "createdAt": "2026-04-24T09:58:08.905Z",
+    "updatedAt": "2026-04-24T09:58:08.905Z",
+    "approvedAt": "2026-04-24T09:58:08.905Z",
+    "locationUid": null,
+    "preferences": null,
+    "linkedInDetails": null,
+    "accessLevel": null,
+    "role": null,
+    "isInvestor": null,
+    "scheduleMeetingCount": 0,
+    "accessLevelUpdatedAt": "2026-04-24T09:58:08.905Z",
+    "deletedAt": null,
+    "deletionReason": null,
+    "aboutYou": null,
+    "investorProfileId": null
+}
+
+
+3) Update member state only (example)
+curl --location --request PATCH 'http://localhost:3003/v1/admin/members/cmobmzihg00098oiq8dxwcl2v' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiIsIkRFTU9fREFZX0FETUlOIl0sIm1lbWJlclVpZCI6ImNtaXMyNGQzYzAwMDBuMjRmNHU2ZTlkcmciLCJleHAiOjE3NzgyMzc2NDQsImlhdCI6MTc3NTY0NTY0NH0.gyQEYex9sxef6lkNBXoJ02KIqaMiHxM__xwLWmA1eSk' \
+--header 'Cookie: _csrf=ms98UUP2CjIueMpJFTJoww' \
+--data '{
+  "memberState": "REJECTED"
+}'
+
+{
+    "uid": "cmobmzihg00098oiq8dxwcl2v",
+    "name": "AAA2",
+    "email": "uuuuu@aa.com",
+    "imageUid": null,
+    "githubHandler": null,
+    "discordHandler": null,
+    "twitterHandler": null,
+    "linkedinHandler": null,
+    "telegramHandler": null,
+    "telegramUid": null,
+    "officeHours": null,
+    "ohStatus": null,
+    "ohInterest": [],
+    "ohHelpWith": [],
+    "moreDetails": null,
+    "bio": null,
+    "plnFriend": false,
+    "plnStartDate": null,
+    "airtableRecId": null,
+    "externalId": null,
+    "openToWork": false,
+    "isFeatured": false,
+    "isTierViewer": false,
+    "isVerified": true,
+    "signUpSource": null,
+    "signUpMedium": null,
+    "signUpCampaign": null,
+    "isUserConsent": false,
+    "isSubscribedToNewsletter": false,
+    "teamOrProjectURL": null,
+    "createdAt": "2026-04-23T15:28:42.574Z",
+    "updatedAt": "2026-04-23T15:28:42.574Z",
+    "approvedAt": "2026-04-23T15:28:42.574Z",
+    "locationUid": null,
+    "preferences": null,
+    "linkedInDetails": null,
+    "accessLevel": "L6",
+    "role": null,
+    "isInvestor": null,
+    "scheduleMeetingCount": 0,
+    "accessLevelUpdatedAt": "2026-04-23T15:28:42.574Z",
+    "deletedAt": null,
+    "deletionReason": null,
+    "aboutYou": null,
+    "investorProfileId": "cmobmziha00068oiqmehxxjce",
+    "image": null,
+    "location": null,
+    "skills": [],
+    "teamMemberRoles": [],
+    "memberRoles": [],
+    "projectContributions": [],
+    "memberState": "REJECTED",
+    "permissions": [
+        {
+            "uid": "perm_founder_guides_view",
+            "code": "founder_guides.view",
+            "description": "Can view Founder Guides"
+        }
+    ],
+    "permissionCodes": [
+        "founder_guides.view"
+    ],
+    "policies": [
+        {
+            "uid": "cmobk2tzt0006o77ttl0r7ity",
+            "code": "directory_admin_pl_internal",
+            "name": "Directory Admin / PL Internal",
+            "description": null,
+            "role": "Directory Admin",
+            "group": "PL Internal"
+        }
+    ],
+    "policyCodes": [
+        "directory_admin_pl_internal"
+    ],
+    "roles": [
+        {
+            "uid": "role_pl_vs_founder",
+            "code": "PL_VS_FOUNDER",
+            "name": "PLC PLVS Founder",
+            "description": "Can view Founder Guides only"
+        }
+    ],
+    "roleCodes": [
+        "PL_VS_FOUNDER"
+    ],
+    "effectivePermissions": [
+        {
+            "uid": "perm_founder_guides_view",
+            "code": "founder_guides.view",
+            "description": "Can view Founder Guides"
+        },
+        {
+            "uid": "directory.admin.full",
+            "code": "directory.admin.full",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "team.search.read",
+            "code": "team.search.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "member.search.read",
+            "code": "member.search.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "team.priority.read",
+            "code": "team.priority.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "membership.source.read",
+            "code": "membership.source.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "admin.tools.access",
+            "code": "admin.tools.access",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "founder_guides.view.all",
+            "code": "founder_guides.view.all",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "founder_guides.create",
+            "code": "founder_guides.create",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "demo_day.report_link.view",
+            "code": "demo_day.report_link.view",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "deals.read",
+            "code": "deals.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "forum.read",
+            "code": "forum.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "forum.write",
+            "code": "forum.write",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.supply.read",
+            "code": "oh.supply.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.supply.write",
+            "code": "oh.supply.write",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.demand.read",
+            "code": "oh.demand.read",
+            "description": "Seeded by access-control-v2 bootstrap"
+        },
+        {
+            "uid": "oh.demand.write",
+            "code": "oh.demand.write",
+            "description": "Seeded by access-control-v2 bootstrap"
+        }
+    ],
+    "effectivePermissionCodes": [
+        "founder_guides.view",
+        "directory.admin.full",
+        "team.search.read",
+        "member.search.read",
+        "team.priority.read",
+        "membership.source.read",
+        "admin.tools.access",
+        "founder_guides.view.all",
+        "founder_guides.create",
+        "demo_day.report_link.view",
+        "deals.read",
+        "forum.read",
+        "forum.write",
+        "oh.supply.read",
+        "oh.supply.write",
+        "oh.demand.read",
+        "oh.demand.write"
+    ]
+}
+
+4) get access details for member
+curl --location 'http://localhost:3003/v2/admin/access-control-v2/members/cmobmzihg00098oiq8dxwcl2v/access' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJESVJFQ1RPUllBRE1JTiIsIkRFTU9fREFZX0FETUlOIl0sIm1lbWJlclVpZCI6ImNtaXMyNGQzYzAwMDBuMjRmNHU2ZTlkcmciLCJleHAiOjE3NzgyMzc2NDQsImlhdCI6MTc3NTY0NTY0NH0.gyQEYex9sxef6lkNBXoJ02KIqaMiHxM__xwLWmA1eSk' \
+--header 'Cookie: _csrf=sWkVFIhR5mHGiX8qhyPS2Q'
+
+{
+    "memberUid": "cmobmzihg00098oiq8dxwcl2v",
+    "policies": [
+        {
+            "uid": "38e22ddf-919d-42cd-ae2e-f8b9614c8c7f",
+            "code": "directory_admin_pl_internal",
+            "name": "Directory Admin / PL Internal",
+            "role": "Directory Admin",
+            "group": "PL Internal",
+            "permissions": [
+                "directory.admin.full",
+                "team.search.read",
+                "member.search.read",
+                "team.priority.read",
+                "membership.source.read",
+                "admin.tools.access",
+                "founder_guides.view.all",
+                "founder_guides.create",
+                "demo_day.report_link.view",
+                "deals.read",
+                "forum.read",
+                "forum.write",
+                "oh.supply.read",
+                "oh.supply.write",
+                "oh.demand.read",
+                "oh.demand.write"
+            ]
+        }
+    ],
+    "directPermissions": [
+        "founder_guides.view"
+    ],
+    "effectivePermissions": [
+        "admin.tools.access",
+        "deals.read",
+        "demo_day.report_link.view",
+        "directory.admin.full",
+        "forum.read",
+        "forum.write",
+        "founder_guides.create",
+        "founder_guides.view",
+        "founder_guides.view.all",
+        "member.search.read",
+        "membership.source.read",
+        "oh.demand.read",
+        "oh.demand.write",
+        "oh.supply.read",
+        "oh.supply.write",
+        "team.priority.read",
+        "team.search.read"
+    ]
+}
+
+
+
+

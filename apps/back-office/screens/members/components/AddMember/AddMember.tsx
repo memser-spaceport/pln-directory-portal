@@ -8,6 +8,8 @@ import { PlusIcon } from '../icons';
 import { TMemberForm } from '../../types/member';
 import { saveRegistrationImage } from '../../../../utils/services/member';
 import { useAddMember } from '../../../../hooks/members/useAddMember';
+import { useRbacRoles } from '../../../../hooks/access-control/useRbacRoles';
+import { usePoliciesList } from '../../../../hooks/access-control/usePoliciesList';
 import { toast } from 'react-toastify';
 
 const fade = {
@@ -20,9 +22,10 @@ interface Props {
   className?: string;
   authToken: string;
   onClick?: () => void;
+  showRbacSection?: boolean;
 }
 
-export const AddMember = ({ className, authToken, onClick }: Props) => {
+export const AddMember = ({ className, authToken, onClick, showRbacSection = false }: Props) => {
   const [open, setOpen] = useState(false);
 
   const handleSignUpClick = () => {
@@ -35,22 +38,52 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
   }, [onClick]);
 
   const { mutateAsync } = useAddMember();
+  const { data: rbacRolesData } = useRbacRoles({ authToken });
+  const { data: policiesData } = usePoliciesList({ authToken });
 
   const onSubmit = useCallback(
     async (formData: TMemberForm) => {
       try {
+        if (!policiesData || !rbacRolesData) {
+          toast.error('RBAC options still loading — try again in a moment.');
+          return;
+        }
+
         let image;
 
         if (formData.image) {
           const imgResponse = await saveRegistrationImage(formData.image);
-
           image = imgResponse?.image.uid;
+        }
+
+        const isApproved = formData.memberStateStatus?.value === 'Approved';
+        const selectedPolicies = isApproved ? formData.rbacPolicies ?? [] : [];
+
+        const policyByCode = new Map(policiesData.map((p) => [p.code, p]));
+        const roleNameToCode = new Map(rbacRolesData.map((r) => [r.name, r.code]));
+
+        const selectedRoleNames = new Set<string>();
+        for (const p of selectedPolicies) {
+          const policy = policyByCode.get(p.value);
+          if (policy?.role) selectedRoleNames.add(policy.role);
+        }
+
+        const roleCodes: string[] = [];
+        const unresolvedRoleNames: string[] = [];
+        for (const name of selectedRoleNames) {
+          const code = roleNameToCode.get(name);
+          if (code) roleCodes.push(code);
+          else unresolvedRoleNames.push(name);
+        }
+        if (unresolvedRoleNames.length > 0) {
+          // eslint-disable-next-line no-console
+          console.warn('[RBAC] Could not resolve roleCodes for role names:', unresolvedRoleNames);
         }
 
         const payload = {
           imageUid: image ?? '',
           name: formData.name,
-          accessLevel: formData.accessLevel?.value,
+          accessLevel: formData.accessLevel?.value ?? '',
           email: formData.email,
           joinDate: formData.joinDate?.toISOString() ?? '',
           bio: formData.bio,
@@ -86,6 +119,10 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
             ),
             type: formData.investorProfile.type?.value || '',
           },
+          memberState: formData.memberStateStatus?.value?.toUpperCase(),
+          roleCodes,
+          policyCodes: selectedPolicies.map((p) => p.value),
+          permissionCodes: isApproved ? (formData.rbacExceptions ?? []).map((e) => e.value) : [],
         };
 
         const res = await mutateAsync({ payload, authToken });
@@ -100,7 +137,7 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
         toast.error(e?.response?.data?.message ?? 'Failed to add new member. Please try again.');
       }
     },
-    [mutateAsync, authToken]
+    [mutateAsync, rbacRolesData, policiesData, authToken]
   );
 
   return (
@@ -124,6 +161,8 @@ export const AddMember = ({ className, authToken, onClick }: Props) => {
               desc="Invite new members into the PL ecosystem."
               title="Add New Member"
               onSubmit={onSubmit}
+              authToken={authToken}
+              showRbacSection={showRbacSection}
             />
           </motion.div>
         )}

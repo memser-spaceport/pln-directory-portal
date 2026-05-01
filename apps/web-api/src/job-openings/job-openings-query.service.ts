@@ -23,6 +23,7 @@ type FacetOverrides = {
   dropSeniority?: boolean;
   dropFocus?: boolean;
   dropLocation?: boolean;
+  dropWorkMode?: boolean;
   dropQ?: boolean;
 };
 
@@ -51,7 +52,11 @@ export class JobOpeningsQueryService {
     }
 
     if (!overrides.dropLocation && query.location.length > 0) {
-      and.push({ location: { in: query.location } });
+      and.push({ location: { hasSome: query.location } });
+    }
+
+    if (!overrides.dropWorkMode && query.workMode.length > 0) {
+      and.push({ workMode: { in: query.workMode } });
     }
 
     if (!overrides.dropFocus && query.focus.length > 0) {
@@ -215,6 +220,7 @@ export class JobOpeningsQueryService {
               roleCategory: true,
               seniority: true,
               location: true,
+              workMode: true,
               sourceLink: true,
               postedDate: true,
               detectionDate: true,
@@ -271,6 +277,7 @@ export class JobOpeningsQueryService {
             roleCategory: role.roleCategory,
             seniority: role.seniority,
             location: role.location,
+            workMode: role.workMode,
             applyUrl: role.sourceLink,
             lastUpdated: role.updatedAt.toISOString(),
             postedDate: role.postedDate ? role.postedDate.toISOString() : null,
@@ -290,16 +297,41 @@ export class JobOpeningsQueryService {
     };
   }
 
+  async findNewMatchesSince(query: JobsListQuery, sinceTs: Date | null) {
+    const where = this.buildWhere(query);
+    const sinceFilter: Prisma.JobOpeningWhereInput[] = sinceTs ? [{ updatedAt: { gt: sinceTs } }] : [];
+    return this.prisma.jobOpening.findMany({
+      where: sinceFilter.length > 0 ? { AND: [where, ...sinceFilter] } : where,
+      select: {
+        uid: true,
+        teamUid: true,
+        roleTitle: true,
+        roleCategory: true,
+        seniority: true,
+        location: true,
+        workMode: true,
+        sourceLink: true,
+        postedDate: true,
+        detectionDate: true,
+        updatedAt: true,
+        team: { select: { uid: true, name: true, logo: { select: { url: true } } } },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
   async getFilters(query: JobsListQuery) {
     const functionWhere = this.buildWhere(query, { dropFunction: true });
     const seniorityWhere = this.buildWhere(query, { dropSeniority: true });
     const locationWhere = this.buildWhere(query, { dropLocation: true });
+    const workModeWhere = this.buildWhere(query, { dropWorkMode: true });
     const focusWhere = this.buildWhere(query, { dropFocus: true });
 
-    const [roleCategoryCounts, seniorityCounts, locationCounts, focusTree] = await Promise.all([
+    const [roleCategoryCounts, seniorityCounts, locationCounts, workModeCounts, focusTree] = await Promise.all([
       this.countByField('roleCategory', functionWhere),
       this.countByField('seniority', seniorityWhere, (value) => value !== 'Unknown'),
       this.countByField('location', locationWhere),
+      this.countByField('workMode', workModeWhere),
       this.buildFocusTree(focusWhere),
     ]);
 
@@ -307,15 +339,21 @@ export class JobOpeningsQueryService {
       roleCategory: roleCategoryCounts,
       seniority: seniorityCounts,
       location: locationCounts,
+      workMode: workModeCounts,
       focus: focusTree,
     };
   }
 
   private async countByField(
-    field: 'roleCategory' | 'seniority' | 'location',
+    field: 'roleCategory' | 'seniority' | 'location' | 'workMode',
     where: Prisma.JobOpeningWhereInput,
     include?: (value: string) => boolean
   ) {
+    // For location array field, use special handling to unnest and count
+    if (field === 'location') {
+      return this.countLocationArray(where, include);
+    }
+
     const scopedWhere: Prisma.JobOpeningWhereInput = { ...where, [field]: { not: null } };
     const rows = await this.prisma.jobOpening.groupBy({
       by: [field],
@@ -326,13 +364,47 @@ export class JobOpeningsQueryService {
     return rows
       .map((row) => {
         const value =
-          field === 'roleCategory' ? row.roleCategory : field === 'seniority' ? row.seniority : row.location;
+          field === 'roleCategory'
+            ? row.roleCategory
+            : field === 'seniority'
+            ? row.seniority
+            : row.workMode;
         return {
           value,
-          count: row._count._all,
+          count: row._count?._all ?? 0,
         };
       })
       .filter((row): row is { value: string; count: number } => Boolean(row.value))
+      .filter((row) => (include ? include(row.value) : true))
+      .sort((a, b) => a.value.localeCompare(b.value));
+  }
+
+  private async countLocationArray(
+    where: Prisma.JobOpeningWhereInput,
+    include?: (value: string) => boolean
+  ) {
+    // Get all matching job IDs with non-empty location arrays
+    const jobs = await this.prisma.jobOpening.findMany({
+      where: {
+        ...where,
+        location: { isEmpty: false },
+      },
+      select: {
+        location: true,
+      },
+    });
+
+    // Count occurrences of each location value across all arrays
+    const counts = new Map<string, number>();
+    for (const job of jobs) {
+      for (const loc of job.location) {
+        counts.set(loc, (counts.get(loc) ?? 0) + 1);
+      }
+    }
+
+    // Convert to array, apply include filter, and sort
+    return [...counts.entries()]
+      .map(([value, count]) => ({ value, count }))
       .filter((row) => (include ? include(row.value) : true))
       .sort((a, b) => a.value.localeCompare(b.value));
   }

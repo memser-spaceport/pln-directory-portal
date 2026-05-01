@@ -8,7 +8,7 @@ import {
   Req,
   UnauthorizedException,
   UseGuards,
-  UsePipes
+  UsePipes,
 } from '@nestjs/common';
 import { ApiParam } from '@nestjs/swagger';
 import { Api, ApiDecorator, initNestServer } from '@ts-rest/nest';
@@ -27,7 +27,7 @@ import {
   ResponseUpcomingEvents,
   UpdatePLEventGuestSchemaDto,
   UpdatePLEventLocationSchemaDto,
-  UpdateIRLAggregatedPriorityDto
+  UpdateIRLAggregatedPriorityDto,
 } from 'libs/contracts/src/schema';
 import { ApiQueryFromZod } from '../decorators/api-query-from-zod';
 import { ApiOkResponseFromZod } from '../decorators/api-response-from-zod';
@@ -47,8 +47,10 @@ import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { InternalAuthGuard } from '../guards/auth.guard';
 import { TeamsService } from '../teams/teams.service';
 import { AccessLevelsGuard } from '../guards/access-levels.guard';
-import { AccessLevels } from '../decorators/access-levels.decorator';
-import { AccessLevel } from 'libs/contracts/src/schema/admin-member';
+import { RbacGuard } from '../rbac/rbac.guard';
+import { RequirePermissions } from '../rbac/rbac.decorator';
+import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
+import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
@@ -62,7 +64,7 @@ export class PLEventsController {
     private readonly eventGuestService: PLEventGuestsService,
     private readonly eventSyncService: PLEventSyncService,
     private readonly teamService: TeamsService
-  ) { }
+  ) {}
 
   /**
    * This method creates a new event associated with a specific location.
@@ -74,22 +76,16 @@ export class PLEventsController {
    */
   @Api(server.route.createPLEventByLocation)
   @UseGuards(AdminAuthGuard)
-  async createPLEventByLocation(
-    @Param('uid') locationUid: string,
-    @Body() body: CreatePLEventSchemaDto,
-  ) {
+  async createPLEventByLocation(@Param('uid') locationUid: string, @Body() body: CreatePLEventSchemaDto) {
     const event = { ...body };
     const requestor = await this.memberService.findMemberByRole();
-    return await this.eventService.createPLEvent(event)
+    return await this.eventService.createPLEvent(event);
   }
 
   @Api(server.route.getPLEventGuestsByLocation)
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
   @NoCache()
-  async findPLEventGuestsByLocation(
-    @Req() request: Request,
-    @Param('uid') locationUid: string
-  ) {
+  async findPLEventGuestsByLocation(@Req() request: Request, @Param('uid') locationUid: string) {
     const member = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
     return await this.eventGuestService.getPLEventGuestsByLocationAndType(locationUid, request.query, member);
   }
@@ -99,20 +95,14 @@ export class PLEventsController {
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema)
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
   @NoCache()
-  async findOne(
-    @ApiDecorator() { params: { slug } }: RouteShape['getPLEventBySlug'],
-    @Req() request: Request
-  ) {
+  async findOne(@ApiDecorator() { params: { slug } }: RouteShape['getPLEventBySlug'], @Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(PLEventGuestQuerySchema);
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
     if (request.query.searchBy) {
       delete builtQuery.where?.searchBy;
       builtQuery.where = {
-        AND: [
-          builtQuery.where,
-          this.eventService.buildSearchFilter(request.query),
-        ]
+        AND: [builtQuery.where, this.eventService.buildSearchFilter(request.query)],
       };
     }
     const event = await this.eventService.getPLEventBySlug(slug, builtQuery, request['isUserLoggedIn']);
@@ -124,18 +114,19 @@ export class PLEventsController {
 
   @Api(server.route.createPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions({ anyOf: [RBAC_PERMISSION_CODES.IRLG_GOING_WRITE, ADMIN_PERMISSIONS.DIRECTORY_FULL] })
   async createPLEventGuestByLocation(
-    @Param("uid") locationUid,
+    @Param('uid') locationUid,
     @Body() body: CreatePLEventGuestSchemaDto,
     @Req() request
   ): Promise<any> {
-    const userEmail = request["userEmail"];
+    const userEmail = request['userEmail'];
     const { type } = request.query;
-    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
-    const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]) ||
-      await this.memberService.checkIfAdminUser(member);
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    const result =
+      (await this.memberService.isMemberPartOfTeams(member, [body.teamUid])) ||
+      (await this.memberService.checkIfAdminUser(member));
     if (!result && !isEmpty(body.teamUid)) {
       throw new ForbiddenException(`Member with email ${userEmail} is not part of
         team with uid ${body.teamUid} or isn't admin.`);
@@ -148,50 +139,65 @@ export class PLEventsController {
     ) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
     }
-    return await this.eventGuestService.createPLEventGuestByLocation(body, member, locationUid, userEmail, location, "CREATE", undefined, type);
+    return await this.eventGuestService.createPLEventGuestByLocation(
+      body,
+      member,
+      locationUid,
+      userEmail,
+      location,
+      'CREATE',
+      undefined,
+      type
+    );
   }
 
   @Api(server.route.modifyPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions({ anyOf: [RBAC_PERMISSION_CODES.IRLG_GOING_WRITE, ADMIN_PERMISSIONS.DIRECTORY_FULL] })
   async modifyPLEventGuestByLocation(
-    @Param("uid") locationUid,
-    @Param("guestUid") guestUid,
+    @Param('uid') locationUid,
+    @Param('guestUid') guestUid,
     @Body() body: UpdatePLEventGuestSchemaDto,
     @Req() request
   ) {
-    const userEmail = request["userEmail"];
+    const userEmail = request['userEmail'];
     const { type } = request.query;
-    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
-    const result = await this.memberService.isMemberPartOfTeams(member, [body.teamUid]) ||
-      await this.memberService.checkIfAdminUser(member);
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    const result =
+      (await this.memberService.isMemberPartOfTeams(member, [body.teamUid])) ||
+      (await this.memberService.checkIfAdminUser(member));
     if (!result && !isEmpty(body.teamUid)) {
-      throw new ForbiddenException(`Member with email ${userEmail} is not part of team with uid ${body.teamUid} or isn't admin`);
+      throw new ForbiddenException(
+        `Member with email ${userEmail} is not part of team with uid ${body.teamUid} or isn't admin`
+      );
     }
     const location = await this.eventLocationService.getPLEventLocationByUid(locationUid);
-    if (
-      !this.memberService.checkIfAdminUser(member) && guestUid != member.uid
-    ) {
+    if (!this.memberService.checkIfAdminUser(member) && guestUid != member.uid) {
       throw new ForbiddenException(`Member with email ${userEmail} isn't admin to access past events or future events`);
     }
-    return await this.eventGuestService.modifyPLEventGuestByLocation(body, location, member, request["userEmail"], type);
+    return await this.eventGuestService.modifyPLEventGuestByLocation(
+      body,
+      location,
+      member,
+      request['userEmail'],
+      type
+    );
   }
 
   @Api(server.route.deletePLEventGuestsByLocation)
   @UsePipes(ZodValidationPipe)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions({ anyOf: [RBAC_PERMISSION_CODES.IRLG_GOING_WRITE, ADMIN_PERMISSIONS.DIRECTORY_FULL] })
   async deletePLEventGuestsByLocation(
-    @Param("uid") locationUid,
+    @Param('uid') locationUid,
     @Body() body: DeletePLEventGuestsSchemaDto,
     @Req() request
   ) {
-    const userEmail = request["userEmail"];
-    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
+    const userEmail = request['userEmail'];
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
     const result = await this.memberService.checkIfAdminUser(member);
-    if (!result && body.membersAndEvents?.length === 0
-      && body.membersAndEvents[0]?.memberUid != member.uid) {
+    if (!result && body.membersAndEvents?.length === 0 && body.membersAndEvents[0]?.memberUid != member.uid) {
       throw new ForbiddenException(`Member with email ${userEmail} is not admin`);
     }
     return await this.eventGuestService.deletePLEventGuests(locationUid, body.membersAndEvents);
@@ -202,11 +208,8 @@ export class PLEventsController {
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema.array())
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
   @NoCache()
-  async getPLEventsByLoggedInMember(
-    @Param("uid") locationUid,
-    @Req() request
-  ) {
-    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
+  async getPLEventsByLoggedInMember(@Param('uid') locationUid, @Req() request) {
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
     return await this.eventService.getPLEventsByMemberAndLocation(member, locationUid);
   }
 
@@ -215,9 +218,7 @@ export class PLEventsController {
   @ApiOkResponseFromZod(ResponsePLEventLocationWithRelationsSchema.array())
   @NoCache()
   findLocations(@Req() request: Request) {
-    const queryableFields = prismaQueryableFieldsFromZod(
-      ResponsePLEventLocationWithRelationsSchema
-    );
+    const queryableFields = prismaQueryableFieldsFromZod(ResponsePLEventLocationWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(request.query);
     return this.eventLocationService.getPLEventLocations(builtQuery);
@@ -225,11 +226,9 @@ export class PLEventsController {
 
   @Api(server.route.getPLEventTopicsByLocation)
   @UseGuards(UserAuthValidateGuard)
-  findPLEventTopicsByLocation(
-    @Req() request: Request,
-    @Param('uid') locationUid: string) {
+  findPLEventTopicsByLocation(@Req() request: Request, @Param('uid') locationUid: string) {
     const { type } = request.query;
-    return this.eventGuestService.getPLEventTopicsByLocationAndType(locationUid, type as string)
+    return this.eventGuestService.getPLEventTopicsByLocationAndType(locationUid, type as string);
   }
 
   @Api(server.route.getPLEventGuestByUidAndLocation)
@@ -240,18 +239,16 @@ export class PLEventsController {
     @Param('guestUid') guestUid: string
   ) {
     const { type } = request.query;
-    const member: any = await this.memberService.findMemberByEmail(request["userEmail"]);
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
     const memberUid = this.memberService.checkIfAdminUser(member) ? guestUid : member.uid;
     return await this.eventGuestService.getPLEventGuestByUidAndLocation(memberUid, locationUid, true, type);
   }
 
   @Api(server.route.syncPLEventsByLocation)
   @UseGuards(InternalAuthGuard)
-  async syncPLEventsByLocation(
-    @Body() body
-  ) {
+  async syncPLEventsByLocation(@Body() body) {
     const { selectedEventUids } = body;
-    return await this.eventSyncService.syncEvents({selectedEventUids });
+    return await this.eventSyncService.syncEvents({ selectedEventUids });
   }
 
   @Api(server.route.getAllPLEventGuests)
@@ -263,12 +260,8 @@ export class PLEventsController {
   @Api(server.route.getPLEventGuestTopics)
   @UseGuards(UserTokenValidation, AccessLevelsGuard)
   @NoCache()
-  async getPLEventGuestTopics(
-    @Param('uid') locationUid: string,
-    @Param('guestUid') guestUid: string,
-    @Req() request
-  ) {
-    const userEmail = request["userEmail"];
+  async getPLEventGuestTopics(@Param('uid') locationUid: string, @Param('guestUid') guestUid: string, @Req() request) {
+    const userEmail = request['userEmail'];
     const requestor = await this.memberService.findMemberByEmail(userEmail);
     const isAdmin = await this.memberService.checkIfAdminUser(requestor);
     if (isAdmin || requestor.uid == guestUid) {
@@ -282,28 +275,26 @@ export class PLEventsController {
   async getAllPLEventContributors(@Req() request: Request) {
     return await this.teamService.getAllPLEventContibutors(request.query);
   }
-  
+
   @Api(server.route.getAllAggregatedData)
   @ApiQueryFromZod(PLEventAggregatedDataQueryParams)
   @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
   @NoCache()
-  async getAllAggregatedData(
-    @Req() request: Request
-  ) {
-    const loggedInMember = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
+  async getAllAggregatedData(@Req() request: Request) {
+    const loggedInMember = request['userEmail']
+      ? await this.memberService.findMemberByEmail(request['userEmail'])
+      : null;
     return await this.eventGuestService.getAllAggregatedData(loggedInMember, request.query);
   }
 
   @Api(server.route.sendEventGuestPresenceRequest)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
-  async sendEventGuestPresenceRequest(
-    @Param('uid') locationUid: string,
-    @Body() body,
-    @Req() request
-  ) {
-    const loggedInMember = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
-    if(!loggedInMember) {
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions({ anyOf: [RBAC_PERMISSION_CODES.IRLG_GOING_WRITE, ADMIN_PERMISSIONS.DIRECTORY_FULL] })
+  async sendEventGuestPresenceRequest(@Param('uid') locationUid: string, @Body() body, @Req() request) {
+    const loggedInMember = request['userEmail']
+      ? await this.memberService.findMemberByEmail(request['userEmail'])
+      : null;
+    if (!loggedInMember) {
       throw new UnauthorizedException('User not logged in');
     }
     return await this.eventGuestService.sendEventGuestPresenceRequest(loggedInMember?.email, body);
@@ -318,13 +309,9 @@ export class PLEventsController {
 
   @Api(server.route.deleteEvent)
   @UseGuards(UserTokenValidation)
-  async deleteEvent(
-    @Param('uid') locationUid: string,
-    @Param('eventUid') eventUid: string,
-    @Req() request
-  ) {
+  async deleteEvent(@Param('uid') locationUid: string, @Param('eventUid') eventUid: string, @Req() request) {
     const requestor = await this.memberService.findMemberByEmail(request['userEmail']);
-    if ( !requestor.isDirectoryAdmin ) {
+    if (!requestor.isDirectoryAdmin) {
       throw new ForbiddenException(`Member isn't authorized to delete the event`);
     }
     return await this.eventService.deleteEventByUid(eventUid);
@@ -333,13 +320,12 @@ export class PLEventsController {
   @Api(server.route.modifyIRLAggregatedData)
   @UseGuards(UserTokenValidation)
   @UsePipes(ZodValidationPipe)
-  async modifyIRLAggregatedData(
-    @Body() body: UpdateIRLAggregatedPriorityDto,
-    @Req() request
-  ) {
+  async modifyIRLAggregatedData(@Body() body: UpdateIRLAggregatedPriorityDto, @Req() request) {
     const requestor = await this.memberService.findMemberByEmail(request['userEmail']);
-    if ( !requestor.isDirectoryAdmin ) {
-      throw new ForbiddenException(`Member with email ${request['userEmail']} isn't authorized to modify the event location`);
+    if (!requestor.isDirectoryAdmin) {
+      throw new ForbiddenException(
+        `Member with email ${request['userEmail']} isn't authorized to modify the event location`
+      );
     }
     return await this.eventLocationService.setAggregatedPriority(body);
   }
@@ -353,10 +339,11 @@ export class PLEventsController {
     @Req() request
   ) {
     const requestor = await this.memberService.findMemberByEmail(request['userEmail']);
-    if ( !requestor.isDirectoryAdmin ) {
-      throw new ForbiddenException(`Member with email ${request['userEmail']} isn't authorized to modify the event location`);
+    if (!requestor.isDirectoryAdmin) {
+      throw new ForbiddenException(
+        `Member with email ${request['userEmail']} isn't authorized to modify the event location`
+      );
     }
     return await this.eventLocationService.modifyPLEventLocation(locationUid, body);
   }
-
 }
