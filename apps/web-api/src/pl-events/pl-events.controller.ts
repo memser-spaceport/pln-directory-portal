@@ -47,10 +47,10 @@ import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { InternalAuthGuard } from '../guards/auth.guard';
 import { TeamsService } from '../teams/teams.service';
 import { AccessLevelsGuard } from '../guards/access-levels.guard';
-import { AccessLevels } from '../decorators/access-levels.decorator';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
+import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
@@ -115,7 +115,7 @@ export class PLEventsController {
   @Api(server.route.createPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation, RbacGuard)
-  @RequirePermissions([RBAC_PERMISSION_CODES.IRLG_GOING_WRITE, RBAC_PERMISSION_CODES.DIRECTORY_ADMIN])
+  @RequirePermissions({ anyOf: [RBAC_PERMISSION_CODES.IRLG_GOING_WRITE, ADMIN_PERMISSIONS.DIRECTORY_FULL] })
   async createPLEventGuestByLocation(
     @Param('uid') locationUid,
     @Body() body: CreatePLEventGuestSchemaDto,
@@ -154,7 +154,7 @@ export class PLEventsController {
   @Api(server.route.modifyPLEventGuestByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation, RbacGuard)
-  @RequirePermissions(RBAC_PERMISSION_CODES.IRLG_GOING_WRITE)
+  @RequirePermissions({ anyOf: [RBAC_PERMISSION_CODES.IRLG_GOING_WRITE, ADMIN_PERMISSIONS.DIRECTORY_FULL] })
   async modifyPLEventGuestByLocation(
     @Param('uid') locationUid,
     @Param('guestUid') guestUid,
@@ -188,7 +188,7 @@ export class PLEventsController {
   @Api(server.route.deletePLEventGuestsByLocation)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation, RbacGuard)
-  @RequirePermissions(RBAC_PERMISSION_CODES.IRLG_GOING_WRITE)
+  @RequirePermissions({ anyOf: [RBAC_PERMISSION_CODES.IRLG_GOING_WRITE, ADMIN_PERMISSIONS.DIRECTORY_FULL] })
   async deletePLEventGuestsByLocation(
     @Param('uid') locationUid,
     @Body() body: DeletePLEventGuestsSchemaDto,
@@ -289,7 +289,7 @@ export class PLEventsController {
 
   @Api(server.route.sendEventGuestPresenceRequest)
   @UseGuards(UserTokenValidation, RbacGuard)
-  @RequirePermissions(RBAC_PERMISSION_CODES.IRLG_GOING_WRITE)
+  @RequirePermissions({ anyOf: [RBAC_PERMISSION_CODES.IRLG_GOING_WRITE, ADMIN_PERMISSIONS.DIRECTORY_FULL] })
   async sendEventGuestPresenceRequest(@Param('uid') locationUid: string, @Body() body, @Req() request) {
     const loggedInMember = request['userEmail']
       ? await this.memberService.findMemberByEmail(request['userEmail'])
