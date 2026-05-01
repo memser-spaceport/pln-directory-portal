@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 
@@ -32,10 +27,7 @@ export class MemberApprovalsService {
           select: { uid: true, name: true, email: true },
         },
       },
-      orderBy: [
-        { state: 'asc' },
-        { requestedAt: 'desc' },
-      ],
+      orderBy: [{ state: 'asc' }, { requestedAt: 'desc' }],
     });
   }
 
@@ -72,11 +64,7 @@ export class MemberApprovalsService {
     return approval;
   }
 
-  async create(body: {
-    memberUid: string;
-    requestedByUid?: string | null;
-    reason?: string;
-  }) {
+  async create(body: { memberUid: string; requestedByUid?: string | null; reason?: string }) {
     const member = await this.prisma.member.findUnique({
       where: { uid: body.memberUid },
       select: { uid: true },
@@ -135,7 +123,7 @@ export class MemberApprovalsService {
       state: 'APPROVED' | 'VERIFIED' | 'REJECTED' | 'PENDING';
       reviewedByUid?: string | null;
       reason?: string;
-    },
+    }
   ) {
     const approval = await this.prisma.memberApproval.findUnique({
       where: { memberUid },
@@ -183,7 +171,7 @@ export class MemberApprovalsService {
   async ensureApprovalExists(
     memberUid: string,
     tx: Prisma.TransactionClient | PrismaService = this.prisma,
-    requestedByUid?: string | null,
+    requestedByUid?: string | null
   ) {
     const existing = await tx.memberApproval.findUnique({
       where: { memberUid },
@@ -225,7 +213,7 @@ export class MemberApprovalsService {
 
     if (!approval || !['APPROVED', 'VERIFIED'].includes(approval.state)) {
       throw new ForbiddenException(
-        `Member ${memberUid} is not approved. Policies and direct permissions can be assigned only to APPROVED or VERIFIED members.`,
+        `Member ${memberUid} is not approved. Policies and direct permissions can be assigned only to APPROVED or VERIFIED members.`
       );
     }
   }

@@ -12,19 +12,24 @@ the system marks the team for enrichment. A daily cron job processes pending tea
 
 ```typescript
 interface TeamDataEnrichment {
-  shouldEnrich: boolean;           // true = pending pickup by cron
-  status: EnrichmentStatus;        // PendingEnrichment | InProgress | Enriched | FailedToEnrich | Reviewed | Approved
-  isAIGenerated: boolean;          // true if any fields were filled by AI
-  enrichedAt?: string;             // ISO timestamp
-  enrichedBy?: string;             // 'system-cron' or user email
-  reviewedAt?: string;             // ISO timestamp
-  reviewedBy?: string;             // reviewer email
-  errorMessage?: string;           // error details if FailedToEnrich
-  fieldsMeta: Partial<Record<FieldMetaKey, {
-    status: FieldEnrichmentStatus;
-    confidence?: 'high' | 'medium' | 'low';
-    source?: 'ai' | 'open-graph' | 'scrapingdog';
-  }>>;
+  shouldEnrich: boolean; // true = pending pickup by cron
+  status: EnrichmentStatus; // PendingEnrichment | InProgress | Enriched | FailedToEnrich | Reviewed | Approved
+  isAIGenerated: boolean; // true if any fields were filled by AI
+  enrichedAt?: string; // ISO timestamp
+  enrichedBy?: string; // 'system-cron' or user email
+  reviewedAt?: string; // ISO timestamp
+  reviewedBy?: string; // reviewer email
+  errorMessage?: string; // error details if FailedToEnrich
+  fieldsMeta: Partial<
+    Record<
+      FieldMetaKey,
+      {
+        status: FieldEnrichmentStatus;
+        confidence?: 'high' | 'medium' | 'low';
+        source?: 'ai' | 'open-graph' | 'scrapingdog';
+      }
+    >
+  >;
 }
 ```
 
@@ -41,6 +46,7 @@ interface TeamDataEnrichment {
 `website`, `blog`, `contactMethod`, `twitterHandler`, `linkedinHandler`, `telegramHandler`, `shortDescription`, `longDescription`, `moreDetails`
 
 **Relational fields:**
+
 - `industryTags` — matched against existing `IndustryTag` records (case-insensitive). Only enriched if team has none.
 - `investmentFocus` — `String[]` on `InvestorProfile`. Only enriched if currently empty.
 
@@ -51,6 +57,7 @@ interface TeamDataEnrichment {
 ### Field Statuses
 
 Each enrichable field is tracked in `dataEnrichment.fieldsMeta[<field>].status`:
+
 - `Enriched` — field was empty and successfully filled by AI
 - `CannotEnrich` — field was empty but AI could not find a value
 - `ChangedByUser` — field is user-controlled: either (a) it was enriched by AI and later modified by a user, (b) it was already populated before enrichment ever ran, or (c) the user filled in a previously `CannotEnrich` field. In all three cases, future enrichment runs (including force mode) will not overwrite the field.
@@ -59,11 +66,11 @@ Each enrichable field is tracked in `dataEnrichment.fieldsMeta[<field>].status`:
 
 `dataEnrichment.fieldsMeta[<field>]` also records per-field `confidence` and `source`:
 
-| Source | Confidence |
-|--------|------------|
+| Source                                        | Confidence                                                             |
+| --------------------------------------------- | ---------------------------------------------------------------------- |
 | `ai` (OpenAI / Gemini / Anthropic web search) | `high` / `medium` / `low` — taken from the model's `confidence` object |
-| `open-graph` (website favicon / OG scraping) | `medium` |
-| `scrapingdog` (LinkedIn first-party) | `high` |
+| `open-graph` (website favicon / OG scraping)  | `medium`                                                               |
+| `scrapingdog` (LinkedIn first-party)          | `high`                                                                 |
 
 When a user later edits an enriched field, its `fieldsMeta[field].status` is flipped to `ChangedByUser` but the `confidence` and `source` are preserved as provenance.
 
@@ -168,6 +175,7 @@ POST /v1/admin/teams/:uid/trigger-judgment           # Run judge for a team (ski
 POST /v1/admin/teams/trigger-judgment                # Run judge for all pending teams
 POST /v1/admin/teams/:uid/trigger-force-judgment     # Re-run judge even if already judged
 ```
+
 All require `AdminAuthGuard`. They do NOT require `IS_TEAM_ENRICHMENT_ENABLED` — manual overrides.
 
 ## ScrapingDog Fallback (LinkedIn)
@@ -182,14 +190,14 @@ A secondary, high-confidence enrichment source that queries LinkedIn company pro
 
 ### What it populates (all as `FieldEnrichmentStatus.Enriched`)
 
-| Team field | ScrapingDog source |
-|------------|--------------------|
-| `logo` | `profile_photo` (high-confidence LinkedIn-hosted logo, no OG validation needed) |
-| `website` | `website` |
-| `shortDescription` | `tagline` (truncated to 200 chars) |
-| `longDescription` | `about` (truncated to 1000 chars) |
-| `moreDetails` | concatenation of `founded`, `headquarters`, `industries`, `specialties` |
-| `industryTags` | `industries` + `specialties` matched against `IndustryTag` records |
+| Team field         | ScrapingDog source                                                              |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `logo`             | `profile_photo` (high-confidence LinkedIn-hosted logo, no OG validation needed) |
+| `website`          | `website`                                                                       |
+| `shortDescription` | `tagline` (truncated to 200 chars)                                              |
+| `longDescription`  | `about` (truncated to 1000 chars)                                               |
+| `moreDetails`      | concatenation of `founded`, `headquarters`, `industries`, `specialties`         |
+| `industryTags`     | `industries` + `specialties` matched against `IndustryTag` records              |
 
 ### Entity verification
 
@@ -202,6 +210,7 @@ When ScrapingDog returns a profile with an `exact` or `partial` name match, `com
 ### Tagged fetch result
 
 `TeamEnrichmentScrapingDogService.fetchCompanyProfile()` returns a tagged union `{ kind: 'ok' | 'not-found' | 'error' }`. Callers switch on `kind`:
+
 - `ok` — profile is usable.
 - `not-found` — the handle is invalid (HTTP 200 with `success: false, message: /not found/i`, or a payload missing both `company_name` and `universal_name_id`). Enrichment and the judge both null AI-supplied handles on this outcome; user-supplied handles are preserved.
 - `error` — any other failure (HTTP non-200, timeout, malformed JSON). Callers leave the team state untouched.
@@ -223,12 +232,13 @@ scrapingDog?: {
 
 - **Schedule**: `TEAM_ENRICHMENT_CRON` env var (default: `0 3 * * *` — daily at 3 AM UTC)
 - **Guard**: `IS_TEAM_ENRICHMENT_ENABLED` must be `'true'`
-- Finds all teams with `shouldEnrich=true` and `status=PendingEnrichment` (the eligibility filter is applied at the *marking* step, so this cron processes everything that's been marked, regardless of current `isFund`/`priority`)
+- Finds all teams with `shouldEnrich=true` and `status=PendingEnrichment` (the eligibility filter is applied at the _marking_ step, so this cron processes everything that's been marked, regardless of current `isFund`/`priority`)
 - Processes sequentially to avoid rate limits
 
 ## Endpoints
 
 ### Admin Review
+
 ```
 PATCH /v1/admin/teams/:uid/enrichment-review
 Guard: AdminAuthGuard
@@ -236,26 +246,32 @@ Body: { status: 'Reviewed' | 'Approved' }
 ```
 
 ### Trigger Enrichment for a Single Team
+
 ```
 POST /v1/admin/teams/:uid/trigger-enrichment
 Guard: AdminAuthGuard
 ```
+
 Runs enrichment in the background. Returns `{ success: false, message: "..." }` if already in progress.
 Does NOT require `IS_TEAM_ENRICHMENT_ENABLED` — this is a manual override.
 
 ### Trigger Enrichment for All Pending Teams
+
 ```
 POST /v1/admin/teams/trigger-enrichment
 Guard: AdminAuthGuard
 ```
+
 Finds all pending teams and enriches them. Teams already in progress are skipped.
 Returns `{ success, total, started, skipped, message }`.
 
 ### Force Re-Enrichment for a Single Team
+
 ```
 POST /v1/admin/teams/:uid/trigger-force-enrichment?mode=all|cannotEnrich
 Guard: AdminAuthGuard
 ```
+
 Re-queues an already-enriched team for re-processing. Use when a team's data is stale
 (e.g. they changed their website, pivoted focus) or when a new AI model has been rolled out.
 
@@ -266,19 +282,23 @@ User-edited fields (`ChangedByUser`) are never overwritten in either mode.
 Returns `{ success, message }` on success, or `{ success: false, message }` if enrichment is already in progress. Does NOT require `IS_TEAM_ENRICHMENT_ENABLED`.
 
 ### Force Re-Enrichment for All Completed Teams
+
 ```
 POST /v1/admin/teams/trigger-force-enrichment?mode=all|cannotEnrich
 Guard: AdminAuthGuard
 ```
+
 Finds all teams matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY`) with `status ∈ { Enriched, Reviewed, Approved, FailedToEnrich }` and re-queues them using the same `mode` semantics as the single-team variant.
 Teams currently `InProgress` or `PendingEnrichment` are skipped.
 Returns `{ success, total, started, skipped, message }`.
 
 ### Force Logo Refetch for a Single Team
+
 ```
 POST /v1/admin/teams/:uid/trigger-force-logo-refetch
 Guard: AdminAuthGuard
 ```
+
 Re-fetches the team's logo only, bypassing the "skip if team already has a logo" guard in `trigger-force-enrichment`. Sources are tried in this order:
 
 1. **ScrapingDog** (high confidence) — used if `SCRAPINGDOG_API_KEY` is set and the team has a `linkedinHandler`. The response must pass entity-name verification.
@@ -295,14 +315,17 @@ Behavior:
 Returns `{ success: true, message }` when queued. Does NOT require `IS_TEAM_ENRICHMENT_ENABLED`.
 
 ### Force Logo Refetch for All Teams
+
 ```
 POST /v1/admin/teams/trigger-force-logo-refetch
 Guard: AdminAuthGuard
 ```
+
 Runs the single-team refetch for every team matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY`) with a non-empty `website` or `linkedinHandler`, regardless of current enrichment status. Teams whose logo is `ChangedByUser`, whose enrichment is `InProgress`, or which have no fetchable source are skipped with per-bucket counters.
 Returns `{ success, total, started, skippedInProgress, skippedUserOwned, noSource, notFound, message }`.
 
 ### Team Lead Review
+
 ```
 PATCH /v1/teams/:uid/enrichment-review
 Guard: UserTokenValidation
@@ -336,31 +359,31 @@ The shared `isFieldUserOwned(fieldsMeta, field, slotHasValue)` helper at the top
 
 ## Environment Variables
 
-| Variable | Default     | Description |
-|----------|-------------|-------------|
-| `IS_TEAM_ENRICHMENT_ENABLED` | `false`     | Enable/disable all enrichment-related cron jobs (enrichment, marking, judge) |
-| `TEAM_ENRICHMENT_FILTER_PRIORITY` | _(unset)_   | Comma-separated list of `Team.priority` values (e.g. `1,2,3`). When set, eligibility is `priority IN (...)`. When empty or unset, eligibility is `isFund = true`. |
-| `AI_PROVIDER` | `gemini`    | Global default AI provider. Accepts `openai`, `gemini`, or `anthropic`. |
-| `TEAM_ENRICHMENT_AI_PROVIDER` | —           | Overrides `AI_PROVIDER` for team enrichment only. Accepts `openai`, `gemini`, or `anthropic`. |
-| `TEAM_ENRICHMENT_JUDGE_AI_PROVIDER` | —      | Overrides `AI_PROVIDER` for the AI Judge only. Set to a **different** value from `TEAM_ENRICHMENT_AI_PROVIDER` for a meaningful second-opinion verification (e.g. enrichment=`gemini`, judge=`anthropic`). |
-| `OPENAI_LLM_MODEL` | `gpt-4o`    | OpenAI model |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model |
-| `CLAUDE_API_KEY` | —           | Anthropic API key. Required when the resolved provider is `anthropic`. Falls back to `ANTHROPIC_API_KEY` for SDK-default compatibility. |
-| `CLAUDE_MODEL` | `claude-sonnet-4-6` | Claude model. Also accepts `ANTHROPIC_MODEL`. |
-| `TEAM_ENRICHMENT_CRON` | `*/5 * * * *` | Cron schedule for the enrichment job |
-| `TEAM_ENRICHMENT_MARKING_CRON` | `0 2 * * *` | Cron schedule for auto-marking eligible teams |
-| `TEAM_ENRICHMENT_JUDGE_CRON` | `0 4 * * *` | Cron schedule for the AI Judge second-pass verification job |
-| `SCRAPINGDOG_API_KEY` | —           | ScrapingDog LinkedIn API key. When set, enables the ScrapingDog fallback for teams with a known `linkedinHandler`. |
+| Variable                            | Default             | Description                                                                                                                                                                                                |
+| ----------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IS_TEAM_ENRICHMENT_ENABLED`        | `false`             | Enable/disable all enrichment-related cron jobs (enrichment, marking, judge)                                                                                                                               |
+| `TEAM_ENRICHMENT_FILTER_PRIORITY`   | _(unset)_           | Comma-separated list of `Team.priority` values (e.g. `1,2,3`). When set, eligibility is `priority IN (...)`. When empty or unset, eligibility is `isFund = true`.                                          |
+| `AI_PROVIDER`                       | `gemini`            | Global default AI provider. Accepts `openai`, `gemini`, or `anthropic`.                                                                                                                                    |
+| `TEAM_ENRICHMENT_AI_PROVIDER`       | —                   | Overrides `AI_PROVIDER` for team enrichment only. Accepts `openai`, `gemini`, or `anthropic`.                                                                                                              |
+| `TEAM_ENRICHMENT_JUDGE_AI_PROVIDER` | —                   | Overrides `AI_PROVIDER` for the AI Judge only. Set to a **different** value from `TEAM_ENRICHMENT_AI_PROVIDER` for a meaningful second-opinion verification (e.g. enrichment=`gemini`, judge=`anthropic`). |
+| `OPENAI_LLM_MODEL`                  | `gpt-4o`            | OpenAI model                                                                                                                                                                                               |
+| `GEMINI_MODEL`                      | `gemini-2.5-flash`  | Gemini model                                                                                                                                                                                               |
+| `CLAUDE_API_KEY`                    | —                   | Anthropic API key. Required when the resolved provider is `anthropic`. Falls back to `ANTHROPIC_API_KEY` for SDK-default compatibility.                                                                    |
+| `CLAUDE_MODEL`                      | `claude-sonnet-4-6` | Claude model. Also accepts `ANTHROPIC_MODEL`.                                                                                                                                                              |
+| `TEAM_ENRICHMENT_CRON`              | `*/5 * * * *`       | Cron schedule for the enrichment job                                                                                                                                                                       |
+| `TEAM_ENRICHMENT_MARKING_CRON`      | `0 2 * * *`         | Cron schedule for auto-marking eligible teams                                                                                                                                                              |
+| `TEAM_ENRICHMENT_JUDGE_CRON`        | `0 4 * * *`         | Cron schedule for the AI Judge second-pass verification job                                                                                                                                                |
+| `SCRAPINGDOG_API_KEY`               | —                   | ScrapingDog LinkedIn API key. When set, enables the ScrapingDog fallback for teams with a known `linkedinHandler`.                                                                                         |
 
 ### Eligibility filter
 
 `TEAM_ENRICHMENT_FILTER_PRIORITY` gates which teams the marking cron, force-enrich-all, force-logo-refetch-all, and the judge cron operate on:
 
-| Use case | `TEAM_ENRICHMENT_FILTER_PRIORITY` | Resulting WHERE clause |
-|----------|-----------------------------------|------------------------|
-| Default — fund teams only | _(unset / empty)_ | `isFund = true` |
-| P1/P2/P3 teams | `1,2,3` | `priority IN (1, 2, 3)` |
-| Only P1 teams | `1` | `priority IN (1)` |
+| Use case                  | `TEAM_ENRICHMENT_FILTER_PRIORITY` | Resulting WHERE clause  |
+| ------------------------- | --------------------------------- | ----------------------- |
+| Default — fund teams only | _(unset / empty)_                 | `isFund = true`         |
+| P1/P2/P3 teams            | `1,2,3`                           | `priority IN (1, 2, 3)` |
+| Only P1 teams             | `1`                               | `priority IN (1)`       |
 
 This filter does **not** affect single-team admin endpoints (`POST /v1/admin/teams/:uid/trigger-enrichment` etc.) — those are explicit overrides and run on whatever uid is provided. Path A (Demo Day approval) and Path B (participants-request team creation) are also unaffected; they continue to mark fund / new-L1 teams regardless of this env var.
 
