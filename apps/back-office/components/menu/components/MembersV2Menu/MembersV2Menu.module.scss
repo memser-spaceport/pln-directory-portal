@@ -57,6 +57,7 @@
   border-radius: var(--corner-radius-3xl, 20px);
   width: 100%;
   transition: all 0.3s ease;
+  color: var(--action-foreground-neutral-active, #3d4a5c);
 
   .caret {
     width: 0;
