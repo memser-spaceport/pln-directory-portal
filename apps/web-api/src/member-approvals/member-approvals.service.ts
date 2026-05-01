@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { MemberApprovalState, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 
 @Injectable()
@@ -164,6 +164,13 @@ export class MemberApprovalsService {
         reason: body.reason ?? null,
       },
     });
+
+    if (body.state === MemberApprovalState.APPROVED) {
+      await this.prisma.member.updateMany({
+        where: { uid: memberUid, deletedAt: { not: null } },
+        data: { deletedAt: null, deletionReason: null },
+      });
+    }
 
     return this.get(memberUid);
   }

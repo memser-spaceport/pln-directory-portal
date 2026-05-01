@@ -157,6 +157,11 @@ export class MemberService {
     }
 
     if (resolvedState === MemberApprovalState.APPROVED) {
+      await tx.member.updateMany({
+        where: { uid: memberUid, deletedAt: { not: null } },
+        data: { deletedAt: null, deletionReason: null },
+      });
+
       const teamMemberRoles = await this.prisma.teamMemberRole.findMany({
         where: { memberUid },
         select: { team: { select: { uid: true, accessLevel: true } } },
