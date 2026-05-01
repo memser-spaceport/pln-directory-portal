@@ -663,6 +663,47 @@ export class TeamEnrichmentService {
         aiResponse.websiteCandidates = [];
       }
 
+      // Website-signal extraction: parse the team's website for self-declared socials in
+      // JSON-LD `sameAs` / `contactPoint` and footer anchor tags. We backfill ONLY the
+      // social handles + contact email that the AI couldn't find — never overwrite an
+      // AI-supplied value, never touch user-owned data.
+      const websiteToScan = team.website?.trim() || aiResponse.website?.trim() || null;
+      const websiteIsUserOwned = !!team.website && isFieldUserOwned(existingFieldsMeta, 'website', !!team.website);
+      const websiteBackfilledFields = new Set<EnrichableTeamField>();
+      const websiteHtml = websiteToScan ? await this.aiService.fetchWebsiteHtml(websiteToScan) : null;
+
+      if (websiteToScan) {
+        const signals = await this.aiService.fetchSocialSignalsFromWebsite(
+          websiteToScan,
+          websiteHtml ?? undefined
+        );
+        if (signals) {
+          aiResponse.confidence ||= {};
+          const backfillMap: Array<[EnrichableTeamField, string | undefined]> = [
+            ['twitterHandler', signals.twitterHandler],
+            ['linkedinHandler', signals.linkedinHandler],
+            ['telegramHandler', signals.telegramHandler],
+            ['contactMethod', signals.contactEmail],
+          ];
+          for (const [field, value] of backfillMap) {
+            if (!value) continue;
+            if (aiResponse[field]) continue; // AI already supplied a value — don't override.
+            aiResponse[field] = value;
+            aiResponse.confidence[field] = websiteIsUserOwned ? 'high' : 'medium';
+            websiteBackfilledFields.add(field);
+          }
+          if (websiteBackfilledFields.size > 0) {
+            this.logger.log(
+              `Team ${teamUid} (${team.name}): website signal backfill from ${websiteToScan} → [${[
+                ...websiteBackfilledFields,
+              ].join(', ')}]${websiteIsUserOwned ? ' (website user-owned)' : ''}${
+                signals.jsonLdOrgName ? ` jsonLdOrg="${signals.jsonLdOrgName}"` : ''
+              }`
+            );
+          }
+        }
+      }
+
       // Determine which fields need enrichment (skip already Enriched ones)
       const updateData: Prisma.TeamUpdateInput = {};
       const newFieldsMeta: FieldsMetaMap = {};
@@ -733,6 +774,16 @@ export class TeamEnrichmentService {
           skipSummary ? ' ' + skipSummary : ''
         }`
       );
+
+      // For fields backfilled from website signals (not from AI), retag the source so
+      // downstream consumers (judge, UI, ScrapingDog confidence-upgrade) see provenance
+      // as `open-graph` rather than `ai`.
+      for (const field of websiteBackfilledFields) {
+        const meta = newFieldsMeta[field];
+        if (meta?.status === FieldEnrichmentStatus.Enriched && meta.source === EnrichmentSource.AI) {
+          newFieldsMeta[field] = { ...meta, source: EnrichmentSource.OpenGraph };
+        }
+      }
 
       // Handle industryTags — same four-layer check as the scalar loop.
       const tagsStatus = existingFieldsMeta.industryTags?.status;
@@ -838,7 +889,8 @@ export class TeamEnrichmentService {
             team.logoUid ? ' (force overwrite)' : ''
           }`
         );
-        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite);
+        const logoHtml = websiteToScan === effectiveWebsite ? websiteHtml ?? undefined : undefined;
+        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite, logoHtml);
 
         if (logoResult) {
           this.logger.log(`Logo metadata found for team ${teamUid} (${team.name}): ${logoResult.logoUrl}`);
