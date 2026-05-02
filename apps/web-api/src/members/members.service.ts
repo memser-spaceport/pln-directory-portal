@@ -741,12 +741,33 @@ export class MembersService {
    */
   async findMemberFromEmail(email: string): Promise<Member> {
     try {
-      return await this.prisma.member.findUniqueOrThrow({
+      const member = await this.prisma.member.findUniqueOrThrow({
         where: { email: email.toLowerCase().trim() },
         include: {
           memberRoles: true,
+          roleAssignments: {
+            where: { status: 'ACTIVE', revokedAt: null },
+            include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+          },
+          policyAssignmentsV2: {
+            include: { policy: { include: { policyPermissions: { include: { permission: true } } } } },
+          },
+          memberPermissionsV2: {
+            include: { permission: true },
+          },
         },
       });
+
+      const authorization = this.buildMemberAuthorization(member as any);
+
+      return {
+        ...(member as any),
+        roles: authorization.roles,
+        policies: authorization.policies,
+        permissions: authorization.permissions,
+        effectivePermissions: authorization.effectivePermissions,
+        effectivePermissionCodes: authorization.effectivePermissionCodes,
+      } as any;
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -770,6 +791,16 @@ export class MembersService {
         include: {
           image: true,
           memberRoles: true,
+          roleAssignments: {
+            where: { status: 'ACTIVE', revokedAt: null },
+            include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+          },
+          policyAssignmentsV2: {
+            include: { policy: { include: { policyPermissions: { include: { permission: true } } } } },
+          },
+          memberPermissionsV2: {
+            include: { permission: true },
+          },
           teamMemberRoles: {
             include: {
               team: true,
@@ -781,10 +812,19 @@ export class MembersService {
       if (!foundMember) {
         return null;
       }
+      const authorization = this.buildMemberAuthorization(foundMember as any);
+      const enrichedMember = {
+        ...(foundMember as any),
+        roles: authorization.roles,
+        policies: authorization.policies,
+        permissions: authorization.permissions,
+        effectivePermissions: authorization.effectivePermissions,
+        effectivePermissionCodes: authorization.effectivePermissionCodes,
+      };
       const roleNames = foundMember.memberRoles.map((m) => m.name);
-      const memberIsDirectoryAdmin = isDirectoryAdmin(foundMember);
+      const memberIsDirectoryAdmin = isDirectoryAdmin(enrichedMember);
       return {
-        ...foundMember,
+        ...enrichedMember,
         isDirectoryAdmin: memberIsDirectoryAdmin,
         roleNames,
         leadingTeams: foundMember.teamMemberRoles.filter((role) => role.teamLead).map((role) => role.teamUid),
@@ -3504,7 +3544,52 @@ export class MembersService {
         },
       });
 
-      return members;
+      const memberUids = members.map((member) => member.uid);
+
+      if (!memberUids.length) {
+        return members;
+      }
+
+      const [policyAssignments, directPermissionRows] = await Promise.all([
+        this.prisma.policyAssignment.findMany({
+          where: { memberUid: { in: memberUids } },
+          include: {
+            policy: {
+              include: {
+                policyPermissions: {
+                  include: { permission: true },
+                },
+              },
+            },
+          },
+        }),
+        this.prisma.memberPermissionV2.findMany({
+          where: { memberUid: { in: memberUids } },
+          include: { permission: true },
+        }),
+      ]);
+
+      const permissionsByMemberUid = new Map<string, Set<string>>();
+
+      for (const memberUid of memberUids) {
+        permissionsByMemberUid.set(memberUid, new Set<string>());
+      }
+
+      for (const assignment of policyAssignments) {
+        const permissions = permissionsByMemberUid.get(assignment.memberUid);
+        for (const policyPermission of assignment.policy.policyPermissions) {
+          permissions?.add(policyPermission.permission.code);
+        }
+      }
+
+      for (const directPermission of directPermissionRows) {
+        permissionsByMemberUid.get(directPermission.memberUid)?.add(directPermission.permission.code);
+      }
+
+      return members.map((member) => ({
+        ...member,
+        permissions: Array.from(permissionsByMemberUid.get(member.uid) ?? []).sort(),
+      }));
     } catch (error) {
       return this.handleErrors(error);
     }
