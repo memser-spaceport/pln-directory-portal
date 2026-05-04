@@ -389,13 +389,51 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       }
     });
 
-    // 2. Anchor href fallback — catches sites that don't use JSON-LD.
+    // 2. Twitter Card meta — `twitter:site` is the brand's own canonical X-handle
+    // declaration. Falls back to `twitter:creator` (author rather than brand, but
+    // for many one-person companies it's the same handle and still useful).
+    if (!result.twitterHandler) {
+      const tw =
+        $('meta[name="twitter:site" i]').attr('content') || $('meta[name="twitter:creator" i]').attr('content');
+      if (tw) {
+        const handle = tw
+          .trim()
+          .replace(/^@/, '')
+          .replace(/^https?:\/\/(?:www\.)?(?:twitter|x)\.com\//i, '')
+          .replace(/\/.*$/, '');
+        const RESERVED = ['intent', 'share', 'home', 'i', 'search', 'explore', 'login'];
+        if (/^[A-Za-z0-9_]{1,15}$/.test(handle) && !RESERVED.includes(handle.toLowerCase())) {
+          result.twitterHandler = handle;
+        }
+      }
+    }
+
+    // 3. HTML microdata — older schema.org dialect (pre-JSON-LD). Feed `itemprop="sameAs"`
+    // hrefs into the same candidate-URL pipe so the existing matchers handle them.
+    $('[itemprop="sameAs"][href]').each((_, el) => {
+      const href = $(el).attr('href');
+      if (href) candidateUrls.push(href);
+    });
+
+    // 4. Anchor href fallback — catches sites that don't use JSON-LD or microdata.
     $('a[href]').each((_, el) => {
       const href = $(el).attr('href');
       if (href) candidateUrls.push(href);
     });
 
-    // 3. mailto: scan for contact email when JSON-LD didn't supply one.
+    // 5. Contact email — try microdata first, then mailto: anchors.
+    if (!result.contactEmail) {
+      const md = $('[itemprop="email"]').first();
+      if (md.length) {
+        const raw = md.attr('href') || md.text() || '';
+        const email = raw
+          .replace(/^mailto:/i, '')
+          .split('?')[0]
+          .trim()
+          .toLowerCase();
+        if (email && /@/.test(email)) result.contactEmail = email;
+      }
+    }
     if (!result.contactEmail) {
       const mailtoHref = $('a[href^="mailto:"]').first().attr('href');
       if (mailtoHref) {
