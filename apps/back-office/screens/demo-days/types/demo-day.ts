@@ -85,7 +85,7 @@ export interface DemoDayParticipant {
     name: string;
     email: string;
     profilePicture?: string;
-    accessLevel?: string;
+    memberState?: 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
     externalId?: string;
     linkedinHandler?: string;
     teamMemberRoles?: {

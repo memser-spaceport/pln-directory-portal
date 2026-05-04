@@ -100,15 +100,12 @@ export class WebSocketService {
       return;
     }
 
-    // Query database for all members with the specified access levels
-    const members = await this.prisma.member.findMany({
-      where: {
-        accessLevel: { in: accessLevels },
-      },
-      select: {
-        uid: true,
-      },
-    });
+    this.logger.warn(
+      `notifyByAccessLevels is deprecated and ignored. Use permission-targeted notifications instead. accessLevels=${accessLevels.join(
+        ', '
+      )}`
+    );
+    const members: Array<{ uid: string }> = [];
 
     // Send notification to all members with matching access levels
     for (const member of members) {

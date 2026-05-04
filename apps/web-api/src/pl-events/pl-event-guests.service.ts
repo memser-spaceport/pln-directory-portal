@@ -559,7 +559,6 @@ export class PLEventGuestsService {
           member: {
             select: {
               name: true,
-              accessLevel: true,
               image: {
                 select: {
                   url: true,
@@ -1024,7 +1023,12 @@ export class PLEventGuestsService {
                   WHERE
                     ($${locationUidPos}::text IS NULL OR pg."locationUid" = $${locationUidPos})
                     AND pg."eventUid" IS NULL
-                    AND m."accessLevel" NOT IN ('Rejected')
+                    AND NOT EXISTS (
+                      SELECT 1
+                      FROM "MemberApproval" ma
+                      WHERE ma."memberUid" = m.uid
+                        AND ma.state = 'REJECTED'
+                    )
 
                     -- prevent duplicates: if member already attends at least one of the requested events,
                     -- don't include their location-only row
@@ -1260,13 +1264,17 @@ export class PLEventGuestsService {
     if (search) {
       values.push(`%${search}%`);
       return ` WHERE
-        (m."accessLevel" NOT IN ('Rejected') AND (m."name" ILIKE $${values.length}) OR
+        (NOT EXISTS (
+          SELECT 1 FROM "MemberApproval" ma WHERE ma."memberUid" = m.uid AND ma.state = 'REJECTED'
+        ) AND (m."name" ILIKE $${values.length}) OR
         tm."name" ILIKE $${values.length} OR
         pc_project."name" ILIKE $${values.length} OR
         cp."name" ILIKE $${values.length}) `;
       // Append search term to the query values with wildcard matching
     }
-    return ` WHERE m."accessLevel" NOT IN ('Rejected')`;
+    return ` WHERE NOT EXISTS (
+      SELECT 1 FROM "MemberApproval" ma WHERE ma."memberUid" = m.uid AND ma.state = 'REJECTED'
+    )`;
   }
 
   /**

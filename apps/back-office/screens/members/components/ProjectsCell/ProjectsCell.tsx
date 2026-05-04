@@ -11,8 +11,7 @@ export const ProjectsCell = ({ member }: { member: Member }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
-  // Only highlight new teams for L0 and L1 members
-  const shouldHighlightNewTeams = ['L0', 'L1'].includes(member.accessLevel);
+  const shouldHighlightNewTeams = ['PENDING', 'VERIFIED'].includes(member.memberState ?? '');
 
   const items = useMemo(() => {
     const result: { icon: React.ReactNode; label: string; isNew?: boolean }[] = [];

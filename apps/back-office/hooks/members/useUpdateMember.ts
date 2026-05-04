@@ -8,7 +8,6 @@ interface MutationParams {
   payload: {
     imageUid?: string;
     name: string;
-    accessLevel: string;
     email: string;
     joinDate: string;
     bio: string;

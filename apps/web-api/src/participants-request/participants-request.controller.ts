@@ -14,9 +14,9 @@ import { ParticipantsReqValidationPipe } from '../pipes/participant-request-vali
 import { FindUniqueIdentiferDto } from '@protocol-labs-network/contracts';
 import { MembersService } from '../members/members.service';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
-import { AccessLevelsGuard } from '../guards/access-levels.guard';
-import { AccessLevels } from '../decorators/access-levels.decorator';
-import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
+import { RbacGuard } from '../rbac/rbac.guard';
+import { RequirePermissions } from '../rbac/rbac.decorator';
+import { ADMIN_PERMISSIONS, MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 @Controller('v1/participants-request')
 @NoCache()
@@ -40,16 +40,8 @@ export class ParticipantsRequestController {
    */
   @Post('/')
   @UsePipes(new ParticipantsReqValidationPipe())
-  @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
-  @AccessLevels(
-    AccessLevel.L0,
-    AccessLevel.L1,
-    AccessLevel.L2,
-    AccessLevel.L3,
-    AccessLevel.L4,
-    AccessLevel.L5,
-    AccessLevel.L6,
-  )
+  @UseGuards(UserAuthValidateGuard, RbacGuard)
+  @RequirePermissions({ anyOf: [MEMBER_PERMISSIONS.ONBOARDING, ADMIN_PERMISSIONS.DIRECTORY_FULL] })
   async addRequest(@Body() body: any, @Req() request: Request) {
     // Derive unique identifier (team name or member email) from the payload
     const uniqueIdentifier =
