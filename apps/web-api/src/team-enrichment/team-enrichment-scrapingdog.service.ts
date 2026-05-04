@@ -235,8 +235,19 @@ export class TeamEnrichmentScrapingDogService {
 
   private extractHandleId(handler: string): string | null {
     if (!handler) return null;
-    const match = handler.match(/(?:linkedin\.com\/)?(?:company\/)?([a-zA-Z0-9_-]+)/);
-    return match ? match[1] : null;
+    const trimmed = handler.trim();
+    if (!trimmed) return null;
+    // Full or partial LinkedIn URL — only accept company paths.
+    if (/linkedin\.com\//i.test(trimmed)) {
+      const m = trimmed.match(/linkedin\.com\/company\/([a-zA-Z0-9_.-]+)/i);
+      return m ? m[1].replace(/\/+$/, '') : null;
+    }
+    // Otherwise treat as a bare handle (optionally prefixed with `company/`), stripping query/path.
+    const cleaned = trimmed
+      .replace(/^company\//i, '')
+      .replace(/[\/?#].*$/, '')
+      .trim();
+    return /^[a-zA-Z0-9_.-]+$/.test(cleaned) ? cleaned : null;
   }
 
   private isNotFoundBody(raw: unknown): boolean {
