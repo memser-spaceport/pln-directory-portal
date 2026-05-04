@@ -3,7 +3,7 @@ import React, { useEffect, useMemo } from 'react';
 import s from './MemberForm.module.scss';
 import { CloseIcon } from '../icons';
 import { FormProvider, useForm, Resolver } from 'react-hook-form';
-import { options, StatusSelector } from './StatusSelector';
+import { StatusSelector } from './StatusSelector';
 import { TMemberForm } from '../../types/member';
 import { ProfileDetails } from './ProfileDetails/ProfileDetails';
 import { ProfileLocationInput } from './ProfileLocationInput';
@@ -43,7 +43,6 @@ export const MemberForm = ({
     memberStateStatus: null,
     rbacPolicies: [],
     rbacExceptions: [],
-    accessLevel: options.find((option) => option.value === 'L4') ?? null,
     image: null,
     name: '',
     email: '',

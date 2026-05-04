@@ -83,7 +83,6 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
         const payload = {
           imageUid: image ?? '',
           name: formData.name,
-          accessLevel: formData.accessLevel?.value ?? '',
           email: formData.email,
           joinDate: formData.joinDate?.toISOString() ?? '',
           bio: formData.bio,

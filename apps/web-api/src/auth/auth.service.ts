@@ -4,7 +4,8 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
-  InternalServerErrorException, NotFoundException,
+  InternalServerErrorException,
+  NotFoundException,
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -21,7 +22,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { AuthMetrics, extractErrorCode, statusClassOf } from '../metrics/auth.metrics';
 import { TeamsService } from '../teams/teams.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
-import { NotFoundError } from "@prisma/client/runtime";
+import { applyDemoDayParticipantPolicyAssignments } from '../demo-days/demo-day-investor-policy.util';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -35,7 +36,7 @@ export class AuthService implements OnModuleInit {
     private analyticsService: AnalyticsService,
     private prisma: PrismaService,
     private notificationServiceClient: NotificationServiceClient
-  ) { }
+  ) {}
 
   onModuleInit() {
     this.membersService = this.moduleRef.get(MembersService, { strict: false });
@@ -101,15 +102,13 @@ export class AuthService implements OnModuleInit {
     // externalId is usually Privy DID; if not present explicitly, fall back to `sub`
     const externalId: string | null = decoded?.externalId ?? decoded?.sub ?? null;
 
-    this.logger.info(
-      `AuthService.getTokenAndUserInfo → Decoded id_token: email=${email}, externalId=${externalId}`,
-    );
+    this.logger.info(`AuthService.getTokenAndUserInfo → Decoded id_token: email=${email}, externalId=${externalId}`);
 
     // 3. If there is no email, we cannot safely attach the login to any member.
     //    In this case we fall back to the "account linking" flow (OTP, etc.)
     if (!email) {
       this.logger.info(
-        `AuthService.getTokenAndUserInfo → No email in id_token for externalId=${externalId}. Starting account linking flow.`,
+        `AuthService.getTokenAndUserInfo → No email in id_token for externalId=${externalId}. Starting account linking flow.`
       );
       return {
         accessToken: access_token,
@@ -122,24 +121,22 @@ export class AuthService implements OnModuleInit {
     // ---------------------------------------------
     // 4. Try to find a member by externalId (Privy DID)
     // ---------------------------------------------
-    let foundUser =
-      externalId != null ? await this.membersService.findMemberByExternalId(externalId) : null;
+    let foundUser = externalId != null ? await this.membersService.findMemberByExternalId(externalId) : null;
 
     if (foundUser) {
       // Soft-deleted member should never be allowed to log in
       if (foundUser.deletedAt) {
         this.logger.error(
-          `AuthService.getTokenAndUserInfo → Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${foundUser.deletionReason || 'not specified'
-          }`,
+          `AuthService.getTokenAndUserInfo → Login attempt for deleted member [uid=${foundUser.uid}, email=${
+            foundUser.email
+          }]. Reason: ${foundUser.deletionReason || 'not specified'}`
         );
-        throw new ForbiddenException(
-          foundUser.deletionReason || 'Your account has been deactivated.',
-        );
+        throw new ForbiddenException(foundUser.deletionReason || 'Your account has been deactivated.');
       }
 
       if (foundUser.email === email) {
         this.logger.info(
-          `AuthService.getTokenAndUserInfo → Member found by externalId=${externalId} and email matches. uid=${foundUser.uid}`,
+          `AuthService.getTokenAndUserInfo → Member found by externalId=${externalId} and email matches. uid=${foundUser.uid}`
         );
 
         // Run demo-day upgrade logic if necessary
@@ -157,7 +154,7 @@ export class AuthService implements OnModuleInit {
       } else {
         // Same externalId but email changed – keep existing frontend semantics
         this.logger.error(
-          `AuthService.getTokenAndUserInfo → Email mismatch for uid=${foundUser.uid}. stored=${foundUser.email}, token=${email}`,
+          `AuthService.getTokenAndUserInfo → Email mismatch for uid=${foundUser.uid}. stored=${foundUser.email}, token=${email}`
         );
         return {
           isEmailChanged: true,
@@ -174,19 +171,18 @@ export class AuthService implements OnModuleInit {
       // Soft-deleted member should never be allowed to log in
       if (foundUser.deletedAt) {
         this.logger.error(
-          `AuthService.getTokenAndUserInfo → Login attempt for deleted member [uid=${foundUser.uid}, email=${foundUser.email}]. Reason: ${foundUser.deletionReason || 'not specified'
-          }`,
+          `AuthService.getTokenAndUserInfo → Login attempt for deleted member [uid=${foundUser.uid}, email=${
+            foundUser.email
+          }]. Reason: ${foundUser.deletionReason || 'not specified'}`
         );
-        throw new ForbiddenException(
-          foundUser.deletionReason || 'Your account has been deactivated.',
-        );
+        throw new ForbiddenException(foundUser.deletionReason || 'Your account has been deactivated.');
       }
 
       if (foundUser.externalId) {
         // Member already has some externalId, but auth token comes with a different one.
         // Preserve previous behavior – ask frontend to resolve the conflict.
         this.logger.error(
-          `AuthService.getTokenAndUserInfo → Member [uid=${foundUser.uid}, email=${foundUser.email}] already has externalId=${foundUser.externalId}, new externalId=${externalId}`,
+          `AuthService.getTokenAndUserInfo → Member [uid=${foundUser.uid}, email=${foundUser.email}] already has externalId=${foundUser.externalId}, new externalId=${externalId}`
         );
         return {
           isDeleteAccount: true,
@@ -194,14 +190,14 @@ export class AuthService implements OnModuleInit {
       } else {
         // Attach externalId (Privy DID) to existing member
         this.logger.info(
-          `AuthService.getTokenAndUserInfo → Attaching externalId=${externalId} to existing member with email=${email}`,
+          `AuthService.getTokenAndUserInfo → Attaching externalId=${externalId} to existing member with email=${email}`
         );
 
         if (externalId) {
           await this.membersService.updateExternalIdByEmail(email, externalId);
         } else {
           this.logger.info(
-            `AuthService.getTokenAndUserInfo → externalId is null while trying to attach it to member with email=${email}`,
+            `AuthService.getTokenAndUserInfo → externalId is null while trying to attach it to member with email=${email}`
           );
         }
 
@@ -264,7 +260,7 @@ export class AuthService implements OnModuleInit {
     //          Return 404 so frontend can trigger onboarding / registration flow.
     // ---------------------------------------------
     this.logger.error(
-      `AuthService.getTokenAndUserInfo → No member found for externalId=${externalId} or email=${email}`,
+      `AuthService.getTokenAndUserInfo → No member found for externalId=${externalId} or email=${email}`
     );
 
     throw new NotFoundException('Member not found for provided SSO credentials.');
@@ -479,7 +475,7 @@ export class AuthService implements OnModuleInit {
       roles: memberInfo.memberRoles?.map((r) => r.name),
       leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.teamUid),
       mainTeamName: team?.name,
-      accessLevel: memberInfo.accessLevel,
+      memberState: memberInfo.memberApproval?.state ?? 'PENDING',
       isTierViewer: memberInfo.isTierViewer ?? false,
       signUpSource: memberInfo.signUpSource,
     };
@@ -539,8 +535,7 @@ export class AuthService implements OnModuleInit {
   }
 
   private async checkAndUpgradeDemoDayParticipant(member: any): Promise<any> {
-    // Only process L0 members
-    if (member.accessLevel !== 'L0' && !!member.externalId) {
+    if (member.memberApproval?.state !== 'PENDING' && !!member.externalId) {
       return member;
     }
 
@@ -551,25 +546,42 @@ export class AuthService implements OnModuleInit {
         status: { in: ['INVITED', 'ENABLED'] },
         isDeleted: false,
       },
+      include: {
+        demoDay: { select: { host: true } },
+      },
     });
 
     if (!invitedParticipant) {
       return member;
     }
 
-    // Determine new access level based on participant type
-    const newAccessLevel = invitedParticipant.type === 'INVESTOR' ? 'L5' : 'L3';
+    const nextMemberState = 'APPROVED';
 
     // Update member access level and participant status in transaction
     await this.prisma.$transaction(async (tx) => {
-      // Update member access level
-      await tx.member.update({
-        where: { uid: member.uid },
-        data: {
-          accessLevel: newAccessLevel,
-          accessLevelUpdatedAt: new Date(),
+      await tx.memberApproval.upsert({
+        where: { memberUid: member.uid },
+        update: {
+          state: nextMemberState as any,
+          reason: 'Demo day participant invitation accepted',
+          reviewedAt: new Date(),
+        },
+        create: {
+          memberUid: member.uid,
+          state: nextMemberState as any,
+          requestedByUid: member.uid,
+          reviewedByUid: null,
+          reason: 'Demo day participant invitation accepted',
+          reviewedAt: new Date(),
         },
       });
+
+      await applyDemoDayParticipantPolicyAssignments(
+        tx,
+        member.uid,
+        invitedParticipant.type,
+        invitedParticipant.demoDay?.host
+      );
 
       // Save previous status for analytics
       const prevStatus = invitedParticipant.status;
@@ -595,8 +607,7 @@ export class AuthService implements OnModuleInit {
       }
 
       if (invitedParticipant.type === 'INVESTOR') {
-        // This is an additive analytics call; no changes to existing logs/comments
-        await this.trackInvestorSign(member, invitedParticipant, newAccessLevel);
+        await this.trackInvestorSign(member, invitedParticipant, nextMemberState);
       }
 
       // Track participant status change (INVITED -> ENABLED)
@@ -617,14 +628,13 @@ export class AuthService implements OnModuleInit {
     });
 
     this.logger.info(
-      `Upgraded demo day participant: member=${member.uid}, type=${invitedParticipant.type}, accessLevel=${newAccessLevel}`
+      `Upgraded demo day participant: member=${member.uid}, type=${invitedParticipant.type}, memberState=${nextMemberState}`
     );
 
     // Return updated member
     return {
       ...member,
-      accessLevel: newAccessLevel,
-      accessLevelUpdatedAt: new Date(),
+      memberState: nextMemberState,
     };
   }
 
@@ -632,7 +642,7 @@ export class AuthService implements OnModuleInit {
    * Track "investor sign" event once investor is enabled/upgraded
    * (This is additive only; no changes to existing code paths)
    */
-  private async trackInvestorSign(member: any, invitedParticipant: any, newAccessLevel: string) {
+  private async trackInvestorSign(member: any, invitedParticipant: any, newMemberState: string) {
     await this.analyticsService.trackEvent({
       name: 'investor-invitation-accepted',
       distinctId: member.uid,
@@ -642,7 +652,7 @@ export class AuthService implements OnModuleInit {
         name: member.name,
         demoDayUid: invitedParticipant.demoDayUid,
         participantUid: invitedParticipant.uid,
-        newAccessLevel,
+        newMemberState,
       },
     });
   }

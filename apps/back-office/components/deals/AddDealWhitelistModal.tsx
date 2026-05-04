@@ -23,7 +23,7 @@ export const AddDealWhitelistModal: React.FC<AddDealWhitelistModalProps> = ({
 
   const { data: members } = useMembersList({
     authToken,
-    accessLevel: ['L2', 'L3', 'L4', 'L5', 'L6'],
+    memberState: ['APPROVED'],
   });
 
   const addMutation = useAddDealWhitelistMember();

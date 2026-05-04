@@ -8,13 +8,14 @@ import {
 } from '@nestjs/common';
 import { DemoDay, DemoDayParticipantStatus, DemoDayStatus, PushNotificationCategory } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
-import { MemberApprovalsService } from '../member-approvals/member-approvals.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
+import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, MemberRole } from '../utils/constants';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { MemberApprovalsService } from '../member-approvals/member-approvals.service';
 
 type ExpressInterestStats = {
   saved: number;
@@ -81,7 +82,8 @@ export class DemoDaysService {
     private readonly analyticsService: AnalyticsService,
     private readonly membersService: MembersService,
     private readonly pushNotificationsService: PushNotificationsService,
-    private readonly notificationServiceClient: NotificationServiceClient
+    private readonly notificationServiceClient: NotificationServiceClient,
+    private readonly memberApprovalsService: MemberApprovalsService
   ) {}
 
   async getDemoDayReportLink(): Promise<{ url: string }> {
@@ -173,7 +175,7 @@ export class DemoDaysService {
 
     const member = await this.getMemberWithDemoDayParticipants(memberEmail, demoDay.uid);
 
-    if (!member || ['Rejected'].includes(member?.accessLevel ?? '')) {
+    if (!member || member.memberApproval?.state === 'REJECTED') {
       return {
         access: 'none',
         uid: demoDay.uid,
@@ -519,7 +521,7 @@ export class DemoDaysService {
           let isPending = false;
           let confidentialityAccepted = false;
 
-          if (member && !['L0', 'L1', 'Rejected'].includes(member.accessLevel ?? '')) {
+          if (member && member.memberApproval?.state === 'APPROVED') {
             const participant = member.demoDayParticipants.find(
               (p: { demoDayUid: string }) => p.demoDayUid === demoDay.uid
             );
@@ -1281,7 +1283,6 @@ export class DemoDaysService {
       select: {
         uid: true,
         email: true,
-        accessLevel: true,
         investorProfile: true,
         linkedinHandler: true,
         demoDayParticipants: {
@@ -1295,7 +1296,7 @@ export class DemoDaysService {
 
     let isNewMember = false;
 
-    // If a member doesn't exist, create a new one with L0 access level
+    // If a member doesn't exist, create a new member.
     if (!member) {
       isNewMember = true;
 
@@ -1307,7 +1308,6 @@ export class DemoDaysService {
         data: {
           email: normalizedEmail,
           name: applicationData.name,
-          accessLevel: 'L0',
           signUpSource: `demoday-${demoDay.slugURL}`,
           linkedinHandler: applicationData.linkedinProfile,
           role: applicationData.role?.trim(),
@@ -1315,7 +1315,6 @@ export class DemoDaysService {
         select: {
           uid: true,
           email: true,
-          accessLevel: true,
           investorProfile: true,
           linkedinHandler: true,
           demoDayParticipants: {
@@ -1382,11 +1381,7 @@ export class DemoDaysService {
         },
       });
 
-      this.logger.debug(
-        `[submitInvestorApplication] existing member found uid=${member.uid} email=${normalizedEmail} accessLevel=${
-          member.accessLevel ?? '-'
-        }`
-      );
+      this.logger.debug(`[submitInvestorApplication] existing member found uid=${member.uid} email=${normalizedEmail}`);
     }
 
     // ===========================
@@ -1425,7 +1420,6 @@ export class DemoDaysService {
         data: {
           name: teamName,
           website: teamWebsite,
-          accessLevel: 'L0',
         },
         select: {
           uid: true,
@@ -1509,6 +1503,11 @@ export class DemoDaysService {
       );
       throw new BadRequestException('You have already submitted an application for this demo day');
     }
+
+    // Align with other signup paths (MembersService.createMember, demo-day addParticipant):
+    // every member must have a MemberApproval row for RBAC / access-control-v2 consistency.
+    // Investor demo-day policies are applied when the participant becomes ENABLED (see updateParticipant).
+    await this.memberApprovalsService.ensureApprovalExists(member.uid);
 
     // If a teamUid is provided (existing team path), create TeamMemberRole
     if (!applicationData.isTeamNew && applicationData.teamUid) {
@@ -1717,8 +1716,36 @@ export class DemoDaysService {
       where: {
         AND: [
           {
-            accessLevel: {
-              in: ['L5', 'L6'],
+            OR: [
+              {
+                memberPermissionsV2: {
+                  some: {
+                    permission: {
+                      code: MEMBER_PERMISSIONS.INVESTOR_MANAGE,
+                    },
+                  },
+                },
+              },
+              {
+                policyAssignmentsV2: {
+                  some: {
+                    policy: {
+                      policyPermissions: {
+                        some: {
+                          permission: {
+                            code: MEMBER_PERMISSIONS.INVESTOR_MANAGE,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+          {
+            memberApproval: {
+              state: 'APPROVED',
             },
           },
           {
@@ -1874,7 +1901,11 @@ export class DemoDaysService {
       where: { email: memberEmail },
       select: {
         uid: true,
-        accessLevel: true,
+        memberApproval: {
+          select: {
+            state: true,
+          },
+        },
         memberRoles: {
           select: {
             name: true,

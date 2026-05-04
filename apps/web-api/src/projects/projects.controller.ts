@@ -11,9 +11,6 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { ResponseProjectWithRelationsSchema } from 'libs/contracts/src/schema';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
-import { AccessLevelsGuard } from '../guards/access-levels.guard';
-import { AccessLevels } from '../decorators/access-levels.decorator';
-import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 
 const server = initNestServer(apiProjects);
 type RouteShape = typeof server.routeShapes;

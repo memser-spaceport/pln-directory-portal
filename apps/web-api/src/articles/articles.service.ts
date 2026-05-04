@@ -11,6 +11,7 @@ import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './arti
 import type { ArticleCategory } from './articles.constants';
 import { ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE } from './articles.constants';
 import { MemberRole } from '../utils/constants';
+import { FOUNDER_GUIDES_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 
 @Injectable()
@@ -81,9 +82,9 @@ export class ArticlesService {
   }
 
   private readonly ARTICLE_PERMISSION_CODES = [
-    'founder_guides.view.plvs',
-    'founder_guides.view.plcc',
-    'founder_guides.view.all',
+    FOUNDER_GUIDES_PERMISSIONS.VIEW_PLVS,
+    FOUNDER_GUIDES_PERMISSIONS.VIEW_PLCC,
+    FOUNDER_GUIDES_PERMISSIONS.VIEW_ALL,
   ] as const;
 
   private validateRequiredPermissionCode(permissionCode: string | null | undefined): void {
@@ -106,8 +107,9 @@ export class ArticlesService {
     if (permissionSet.has(permissionCode)) return true;
 
     if (
-      (permissionCode === 'founder_guides.view.plvs' || permissionCode === 'founder_guides.view.plcc') &&
-      permissionSet.has('founder_guides.view.all')
+      (permissionCode === FOUNDER_GUIDES_PERMISSIONS.VIEW_PLVS ||
+        permissionCode === FOUNDER_GUIDES_PERMISSIONS.VIEW_PLCC) &&
+      permissionSet.has(FOUNDER_GUIDES_PERMISSIONS.VIEW_ALL)
     ) {
       return true;
     }

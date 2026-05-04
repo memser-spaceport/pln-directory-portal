@@ -9,7 +9,6 @@ import {
   LinkedInVerificationResponseDto,
   LinkedInVerificationStatusDto,
 } from 'libs/contracts/src/schema/linkedin-verification';
-import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import path from 'path';
 import { AwsService } from '../utils/aws/aws.service';
 import { Member, MemberApprovalState } from '@prisma/client';
@@ -190,19 +189,6 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         });
       }
 
-      // let accessLevel = member.accessLevel;
-      // if (member.accessLevel === AccessLevel.L0) {
-      //   const result = await this.memberService.updateAccessLevel({
-      //     memberUids: [member.uid],
-      //     accessLevel: AccessLevel.L1,
-      //   });
-      //   if (result.updatedCount > 0) {
-      //     accessLevel = AccessLevel.L1;
-      //     const emailData = await this.prepareEmailTemplateData(member);
-      //     await this.sendLinkedinVerifiedEmailToAdmin(emailData, `New Member LinkedIn Verified : ${member.name}`);
-      //   }
-      // }
-
       if (member.memberApproval?.state === MemberApprovalState.PENDING) {
         const result = await this.memberService.updateMemberApprovalState(member.uid, MemberApprovalState.VERIFIED);
         if (result.updated) {
@@ -219,7 +205,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         linkedinProfileId: linkedinProfile.linkedinProfileId,
         linkedinHandler: linkedinProfile.linkedinHandler || undefined,
         profileData: linkedinProfile.profileData as any,
-        redirectUrl: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}status=success&accesslevel=L1`,
+        redirectUrl: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}status=success&memberState=VERIFIED`,
         newMemberApprovalState: member.memberApproval?.state ?? null,
       };
     } catch (error) {
@@ -304,7 +290,9 @@ export class LinkedInVerificationService implements OnModuleDestroy {
   }> {
     const pendingMembers = await this.prisma.member.findMany({
       where: {
-        accessLevel: 'L1',
+        memberApproval: {
+          state: 'VERIFIED',
+        },
         uid: {
           not: member.uid,
         },

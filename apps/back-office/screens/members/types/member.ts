@@ -1,6 +1,5 @@
 export type Member = {
-  accessLevel: string;
-  accessLevelUpdatedAt: string;
+  accessLevelUpdatedAt?: string;
   email: string;
   image: { url: string };
   isSubscribedToNewsletter: boolean;
@@ -29,7 +28,6 @@ export type TMemberForm = {
   memberStateStatus?: { label: string; value: 'Pending' | 'Verified' | 'Approved' | 'Rejected' } | null;
   rbacPolicies?: { label: string; value: string }[];
   rbacExceptions?: { label: string; value: string; module?: string; description?: string | null }[];
-  accessLevel: { label?: string; value?: string } | null;
   image: File | null;
   name: string;
   email: string;

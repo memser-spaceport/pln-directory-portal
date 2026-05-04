@@ -15,7 +15,7 @@ import { useAuth } from '../../context/auth-context';
 import { MEMBERS_V2_STATE_TAB_ICONS, PoliciesIcon } from '../../components/menu/components/MembersV2Menu/memberStateTabIcons';
 import s from './styles.module.scss';
 
-const ALL_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'Rejected'];
+const ALL_MEMBER_STATES = ['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED'];
 
 type MemberStateTab = 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
 type ActiveTab = MemberStateTab | 'POLICIES';
@@ -102,7 +102,7 @@ const MembersPageV2 = () => {
 
   const { data, isLoading, isError } = useMembersList({
     authToken: authToken ?? undefined,
-    accessLevel: ALL_LEVELS,
+    memberState: ALL_MEMBER_STATES,
   });
 
   const { data: policiesData } = usePoliciesList({ authToken: authToken ?? undefined });

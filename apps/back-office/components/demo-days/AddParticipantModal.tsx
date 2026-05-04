@@ -24,7 +24,7 @@ export const AddParticipantModal: React.FC<AddParticipantModalProps> = ({ isOpen
 
   const { data: members } = useMembersList({
     authToken,
-    accessLevel: ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'],
+    memberState: ['APPROVED'],
   });
 
   const addParticipantMutation = useAddParticipant();

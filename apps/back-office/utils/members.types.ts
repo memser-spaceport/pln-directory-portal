@@ -68,7 +68,7 @@ export interface IFormValues {
   projectContributions: IProjectContribution[];
   teamOrProjectURL: string;
   isSubscribedToNewsletter: boolean;
-  accessLevel: string;
+  memberState?: string;
   investorProfile: {
     investmentFocus: string[];
     investInStartupStages: string[];

@@ -41,7 +41,7 @@ interface Member {
     keywordList?: any[];
   };
   scheduleMeetingCount?: number;
-  accessLevel: string;
+  memberState?: string;
 }
 
 export default function MembersWithRecommendationsPage() {

@@ -25,7 +25,7 @@ export const AddDashboardWhitelistModal: React.FC<AddDashboardWhitelistModalProp
 
   const { data: members } = useMembersList({
     authToken,
-    accessLevel: ['L2', 'L3', 'L4', 'L5', 'L6'],
+    memberState: ['APPROVED'],
   });
 
   const addMutation = useAddDashboardWhitelistMember();
