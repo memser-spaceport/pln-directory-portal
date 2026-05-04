@@ -9,7 +9,6 @@ import { saveRegistrationImage } from '../../../../utils/services/member';
 
 import s from './EditMember.module.scss';
 import { useMember } from '../../../../hooks/members/useMember';
-import { options } from '../MemberForm/StatusSelector';
 import { useMemberFormOptions } from '../../../../hooks/members/useMemberFormOptions';
 import { toast } from 'react-toastify';
 import { useUpdateMember } from '../../../../hooks/members/useUpdateMember';
@@ -73,7 +72,6 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
         const payload: {
           imageUid?: string;
           name: string;
-          accessLevel: string;
           email: string;
           joinDate: string;
           bio: string;
@@ -106,7 +104,6 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
         } = {
           ...(imageUid !== undefined && { imageUid }),
           name: formData.name,
-          accessLevel: formData.accessLevel?.value || '',
           email: formData.email,
           joinDate: formData.joinDate?.toISOString() ?? '',
           bio: formData.bio,
@@ -221,7 +218,6 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
       memberStateStatus,
       rbacPolicies,
       rbacExceptions,
-      accessLevel: options.find((option) => option.value === (data.accessLevel ?? member.accessLevel)) ?? null,
       image: null,
       name: data.name ?? '',
       email: data.email ?? '',

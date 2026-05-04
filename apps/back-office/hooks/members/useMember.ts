@@ -12,7 +12,6 @@ interface IMemberResponse {
   };
   email: string;
   isSubscribedToNewsletter: boolean;
-  accessLevel: string;
   memberRoles?: { name: string }[];
   teamOrProjectURL?: string;
   locationUid?: string;
@@ -31,7 +30,6 @@ interface IMemberResponse {
   }>;
   projectContributions: [];
   linkedinProfile?: string;
-  accessLevelUpdatedAt: string;
   // Other fields that might be present
   bio?: string;
   aboutYou?: string;

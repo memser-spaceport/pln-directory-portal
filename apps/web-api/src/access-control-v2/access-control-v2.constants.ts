@@ -55,6 +55,8 @@ export const MEMBER_PERMISSIONS = {
   CONTACTS_READ: 'member.contacts.read',
   /** Access to onboarding flow (replaces L4-based onboarding) */
   ONBOARDING: 'member.onboarding',
+  /** Manage investor-only settings and profile actions */
+  INVESTOR_MANAGE: 'member.investor.manage',
 } as const;
 
 // ── Forum ───────────────────────────────────────────────────────────────
@@ -164,6 +166,7 @@ export const ALL_PERMISSION_CODES = [
   MEMBER_PERMISSIONS.SEARCH_READ,
   MEMBER_PERMISSIONS.CONTACTS_READ,
   MEMBER_PERMISSIONS.ONBOARDING,
+  MEMBER_PERMISSIONS.INVESTOR_MANAGE,
 
   // Forum
   FORUM_PERMISSIONS.READ,

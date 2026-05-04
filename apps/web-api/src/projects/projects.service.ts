@@ -111,7 +111,6 @@ export class ProjectsService {
             ? {
                 select: {
                   ...queryOptions.select,
-                  creator: { select: { accessLevel: true } },
                   logo: true,
                 },
               }

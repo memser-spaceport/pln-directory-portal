@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { useMembersList } from './useMembersList';
 
-const ALL_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'Rejected'];
+const ALL_MEMBER_STATES = ['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED'];
 
 export function useMembersStateCounts({ authToken }: { authToken: string | null | undefined }) {
   const { data } = useMembersList({
     authToken: authToken ?? undefined,
-    accessLevel: ALL_LEVELS,
+    memberState: ALL_MEMBER_STATES,
   });
 
   return useMemo(() => {

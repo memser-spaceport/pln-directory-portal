@@ -13,8 +13,8 @@ export const options = [
         <Level0Icon />
       </span>
     ),
-    name: 'L0',
-    value: 'L0',
+    name: 'Pending',
+    value: 'Pending',
     desc: '- Pending Account Verification',
   },
   {
@@ -23,8 +23,8 @@ export const options = [
         <Level1Icon />
       </span>
     ),
-    name: 'L1',
-    value: 'L1',
+    name: 'Verified',
+    value: 'Verified',
     desc: '- Verified via LinkedIn',
   },
   {
@@ -33,49 +33,9 @@ export const options = [
         <Level2Icon />
       </span>
     ),
-    name: 'L2',
-    value: 'L2',
+    name: 'Approved',
+    value: 'Approved',
     desc: '- Approved - Pending Missing Alignment Check',
-  },
-  {
-    icon: (
-      <span className={s.green}>
-        <Level2Icon />
-      </span>
-    ),
-    name: 'L3',
-    value: 'L3',
-    desc: '- Approved - Mission Aligned',
-  },
-  {
-    icon: (
-      <span className={s.green}>
-        <Level2Icon />
-      </span>
-    ),
-    name: 'L4',
-    value: 'L4',
-    desc: '- Approved - Portco or CC (Close Contributor)',
-  },
-  {
-    icon: (
-      <span className={s.purple}>
-        <Level2Icon />
-      </span>
-    ),
-    name: 'L5',
-    value: 'L5',
-    desc: '- Investor Only',
-  },
-  {
-    icon: (
-      <span className={s.purple}>
-        <Level2Icon />
-      </span>
-    ),
-    name: 'L6',
-    value: 'L6',
-    desc: '- Investor + Other Role',
   },
   {
     icon: (
@@ -95,14 +55,14 @@ export const StatusSelector = ({ isAddNew }: { isAddNew: boolean }) => {
     setValue,
     formState: { errors },
   } = useFormContext<TMemberForm>();
-  const { accessLevel } = watch();
+  const { memberStateStatus } = watch();
 
   const _options = useMemo(() => {
     if (!isAddNew) {
       return options;
     }
 
-    return options.filter((option) => option.value !== 'L0' && option.value !== 'L1' && option.value !== 'Rejected');
+    return options.filter((option) => option.value === 'Approved');
   }, [isAddNew]);
 
   return (
@@ -112,9 +72,9 @@ export const StatusSelector = ({ isAddNew }: { isAddNew: boolean }) => {
         menuPlacement="bottom"
         options={_options}
         isClearable={false}
-        value={accessLevel}
+        value={memberStateStatus}
         onChange={(val) => {
-          setValue('accessLevel', val, { shouldValidate: true, shouldDirty: true });
+          setValue('memberStateStatus', val, { shouldValidate: true, shouldDirty: true });
         }}
         styles={{
           container: (base) => ({
@@ -191,7 +151,7 @@ export const StatusSelector = ({ isAddNew }: { isAddNew: boolean }) => {
                 {...innerProps}
                 ref={innerRef}
                 className={clsx(s.control, {
-                  [s.error]: errors?.accessLevel?.message,
+                  [s.error]: errors?.memberStateStatus?.message,
                 })}
               >
                 {selected ? (
@@ -223,7 +183,7 @@ export const StatusSelector = ({ isAddNew }: { isAddNew: boolean }) => {
           },
         }}
       />
-      <div className={s.errorMsg}>{(errors?.accessLevel?.message as string) ?? ''}</div>
+      <div className={s.errorMsg}>{(errors?.memberStateStatus?.message as string) ?? ''}</div>
     </div>
   );
 };

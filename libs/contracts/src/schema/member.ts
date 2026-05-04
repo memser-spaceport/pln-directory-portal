@@ -63,7 +63,6 @@ export const MemberSchema = z.object({
   isUserConsent: z.boolean().nullish(),
   isSubscribedToNewsletter: z.boolean().nullish(),
   teamOrProjectURL: z.string().nullish(),
-  accessLevel: z.string().nullish(),
 });
 
 export const ResponseMemberSchema = MemberSchema.omit({ id: true, telegramUid: true }).strict();
@@ -86,7 +85,6 @@ export const SimpleMemberSchema = ResponseMemberSchema.pick({
   uid: true,
   name: true,
   email: true,
-  accessLevel: true,
 });
 
 export const MembersByIdsRequestSchema = z.object({
@@ -216,7 +214,6 @@ export const MembersForNodebbSchema = ResponseMemberSchema.pick({
   name: true,
   externalId: true,
   email: true,
-  accessLevel: true,
   officeHours: true,
   ohStatus: true,
 }).extend({

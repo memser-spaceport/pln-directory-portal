@@ -35,9 +35,6 @@ import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.servic
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
-import { AccessLevelsGuard } from '../guards/access-levels.guard';
-import { AccessLevels } from '../decorators/access-levels.decorator';
-import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import { MembersService } from '../members/members.service';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { QueryCache } from '../decorators/query-cache.decorator';

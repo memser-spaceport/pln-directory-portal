@@ -1,12 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards, UsePipes } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
 import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
 
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import {
-  AccessLevelCounts,
   CreateMemberDto,
+  MemberStateCounts,
   RequestMembersDto,
-  UpdateAccessLevelDto,
   UpdateMemberDto,
 } from 'libs/contracts/src/schema/admin-member';
 import { NoCache } from '../decorators/no-cache.decorator';
@@ -24,32 +23,21 @@ export class MemberController {
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async getMembers(@Query() query: RequestMembersDto) {
-    return await this.memberService.findMemberByAccessLevels(query);
+    return await this.memberService.findMembers(query);
   }
 
-  @Get('access-level-counts')
+  @Get('member-state-counts')
   @UseGuards(AdminAuthGuard)
   @NoCache()
-  async getAccessLevelCounts(): Promise<AccessLevelCounts> {
-    return this.memberService.getAccessLevelCounts();
+  async getMemberStateCounts(): Promise<MemberStateCounts> {
+    return this.memberService.getMemberStateCounts();
   }
 
-  /**
-   * Returns a single member by uid.
-   * Used by Back Office to refresh roles and member data.
-   */
   @Get(':uid')
   @UseGuards(DemoDayAdminAuthGuard)
   @NoCache()
   async getMemberByUid(@Param('uid') uid: string): Promise<any> {
     return await this.memberService.findMemberByUid(uid);
-  }
-
-  @Put('access-level')
-  @UseGuards(AdminAuthGuard)
-  @UsePipes(ZodValidationPipe)
-  async updateAccessLevel(@Body() body: UpdateAccessLevelDto) {
-    return this.memberService.updateAccessLevel(body);
   }
 
   @Post('/create')

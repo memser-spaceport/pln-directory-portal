@@ -468,7 +468,7 @@ export const getServerSideProps = async (context) => {
         openToWork: requestData?.openToWork ?? '',
         projectContributions: requestData?.projectContributions ?? [],
         isSubscribedToNewsletter: requestData?.isSubscribedToNewsletter ?? false,
-        accessLevel: requestData?.accessLevel ?? '',
+        memberState: requestData?.memberState ?? '',
         investorProfile: requestData?.investorProfile ?? {
           investmentFocus: [],
           typicalCheckSize: null,
@@ -549,7 +549,7 @@ export const getServerSideProps = async (context) => {
         openToWork: requestData?.openToWork ?? '',
         projectContributions: requestData?.projectContributions ?? [],
         isSubscribedToNewsletter: requestData?.isSubscribedToNewsletter ?? false,
-        accessLevel: requestData?.accessLevel ?? '',
+        memberState: requestData?.memberState ?? '',
         investorProfile: requestData?.investorProfile ?? {
           investmentFocus: [],
           typicalCheckSize: null,

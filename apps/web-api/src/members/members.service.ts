@@ -27,11 +27,11 @@ import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
-import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
 import { TeamsService } from '../teams/teams.service';
 import { ParticipantsRequest } from './members.dto';
 import { OpenSearchService } from '../opensearch/opensearch.service';
+import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 /**
  * Interface for member search match result (used by entity association)
@@ -187,7 +187,6 @@ export class MembersService {
       uid: string;
       name: string;
       email: string;
-      accessLevel: string;
       policies: any[];
       effectivePermissions: any[];
     }>
@@ -247,7 +246,6 @@ export class MembersService {
             uid: member.uid,
             name: member.name,
             email: member.email!,
-            accessLevel: member.accessLevel ?? '',
             policies: authorization.policies,
             effectivePermissions: authorization.effectivePermissions,
           };
@@ -544,10 +542,7 @@ export class MembersService {
 
       const responseMember = { ...(member as any) };
 
-      responseMember.memberState = this.resolveMemberState(
-        responseMember.accessLevel,
-        responseMember.memberApproval?.state
-      );
+      responseMember.memberState = this.resolveMemberState(responseMember.memberApproval?.state);
 
       const authorization = this.buildMemberAuthorization(responseMember);
 
@@ -560,6 +555,7 @@ export class MembersService {
       delete responseMember.roleAssignments;
       delete responseMember.policyAssignmentsV2;
       delete responseMember.memberPermissionsV2;
+      delete responseMember.accessLevel;
 
       return responseMember;
     } catch (error) {
@@ -567,28 +563,8 @@ export class MembersService {
     }
   }
 
-  private fallbackMemberState(accessLevel?: string | null) {
-    if (!accessLevel) {
-      return 'PENDING';
-    }
-
-    if (accessLevel.toUpperCase() === 'REJECTED') {
-      return 'REJECTED';
-    }
-
-    const match = accessLevel.match(/^L(\d+)$/i);
-
-    if (!match) {
-      return 'PENDING';
-    }
-
-    const level = Number(match[1]);
-
-    return level === 0 ? 'PENDING' : 'APPROVED';
-  }
-
-  private resolveMemberState(accessLevel?: string | null, approvalState?: string | null) {
-    return approvalState ?? this.fallbackMemberState(accessLevel);
+  private resolveMemberState(approvalState?: string | null) {
+    return approvalState ?? 'PENDING';
   }
 
   private buildMemberAuthorization(member: any) {
@@ -790,6 +766,7 @@ export class MembersService {
         },
         include: {
           image: true,
+          memberApproval: true,
           memberRoles: true,
           roleAssignments: {
             where: { status: 'ACTIVE', revokedAt: null },
@@ -921,7 +898,7 @@ export class MembersService {
       uid: memberInfo.uid,
       roles: memberInfo.memberRoles?.map((r) => r.name) ?? [],
       leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.teamUid) ?? [],
-      accessLevel: memberInfo.accessLevel,
+      memberState: memberInfo.memberApproval?.state ?? 'PENDING',
     };
   }
 
@@ -1090,7 +1067,6 @@ export class MembersService {
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {
       const { member } = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
-      member.accessLevel = AccessLevel.L0;
       await this.mapLocationToMember(memberData, null, member, tx);
       createdMember = await this.createMember(member, tx);
       await this.membersHooksService.postCreateActions(createdMember, memberData.email);
@@ -1133,7 +1109,10 @@ export class MembersService {
 
       // Handle investor profile updates
       if (investorProfileData) {
-        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, existingMember.accessLevel);
+        const canManageInvestorProfile =
+          existingMember?.isDirectoryAdmin === true ||
+          existingMember?.effectivePermissionCodes?.includes(MEMBER_PERMISSIONS.INVESTOR_MANAGE);
+        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, canManageInvestorProfile);
       }
 
       if (isEmailChanged && isDirectoryAdmin) {
@@ -1275,10 +1254,9 @@ export class MembersService {
     memberUid: string,
     investorProfileData: any,
     tx: Prisma.TransactionClient,
-    memberAccessLevel?: string
+    canManageInvestorProfile = false
   ) {
-    // Check if member has permission to update investor profile (L5 or L6)
-    if (memberAccessLevel && !['L5', 'L6'].includes(memberAccessLevel)) {
+    if (!canManageInvestorProfile) {
       throw new ForbiddenException('Insufficient permissions to update investor profile');
     }
 
@@ -2479,7 +2457,6 @@ export class MembersService {
       uid: true,
       externalId: true,
       name: true,
-      accessLevel: true,
       officeHours: true,
       ohStatus: true,
       ohInterest: true,
@@ -3281,14 +3258,23 @@ export class MembersService {
     this.logger.error(error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error?.code) {
-        case 'P2002':
-          const target = error.meta?.target as string[] | undefined;
-          if (target && target.some((t) => t.includes('telegram'))) {
+        case 'P2002': {
+          const target = error.meta?.target as string[] | string | undefined;
+          const fields = Array.isArray(target) ? target.map(String) : target != null ? [String(target)] : [];
+          if (fields.some((t) => t.includes('telegram'))) {
             throw new ConflictException(
               'This Telegram is already in use by another member. Please use a different Telegram ID.'
             );
           }
-          throw new ConflictException('Unique key constraint error on Member:', error.message);
+          if (fields.includes('email')) {
+            throw new ConflictException(
+              'An account with this email already exists. Sign in or use a different email address.'
+            );
+          }
+          throw new ConflictException(
+            'A member with this information already exists. Please check your details and try again.'
+          );
+        }
         case 'P2003':
           throw new BadRequestException('Foreign key constraint error on Member', error.message);
         case 'P2025':
@@ -3489,7 +3475,6 @@ export class MembersService {
           name: true,
           externalId: true,
           email: true,
-          accessLevel: true,
           officeHours: true,
           ohStatus: true,
           image: {
@@ -4034,7 +4019,6 @@ export class MembersService {
         email: normalizedEmail,
         externalId: externalId ?? null,
         name: displayName,
-        accessLevel: 'L0', // default access level for newly created SSO users
       },
     });
 

@@ -6,7 +6,10 @@ import { Member } from '../../screens/members/types/member';
 
 interface QueryParams {
   authToken: string | undefined;
-  accessLevel: string[];
+  memberState?: string[];
+  policyCodes?: string[];
+  policyGroups?: string[];
+  policyRoles?: string[];
 }
 
 async function fetcher(params: QueryParams) {
@@ -16,17 +19,41 @@ async function fetcher(params: QueryParams) {
     },
   };
 
+  const search = new URLSearchParams();
+
+  if (params.memberState?.length) {
+    search.set('memberState', params.memberState.join(','));
+  }
+  if (params.policyCodes?.length) {
+    search.set('policyCodes', params.policyCodes.join(','));
+  }
+  if (params.policyGroups?.length) {
+    search.set('policyGroups', params.policyGroups.join(','));
+  }
+  if (params.policyRoles?.length) {
+    search.set('policyRoles', params.policyRoles.join(','));
+  }
+
+  const query = search.toString();
+
   const { data } = await api.get<{
     data: Member[];
     pagination: { total: number; page: number; limit: number; pages: number };
-  }>(`${API_ROUTE.ADMIN_MEMBERS}?accessLevel=${params.accessLevel.join(',')}`, config);
+  }>(query ? `${API_ROUTE.ADMIN_MEMBERS}?${query}` : API_ROUTE.ADMIN_MEMBERS, config);
 
   return data;
 }
 
 export function useMembersList(params: QueryParams) {
   return useQuery({
-    queryKey: [MembersQueryKeys.GET_MEMBERS_LIST, params.authToken, params.accessLevel],
+    queryKey: [
+      MembersQueryKeys.GET_MEMBERS_LIST,
+      params.authToken,
+      params.memberState,
+      params.policyCodes,
+      params.policyGroups,
+      params.policyRoles,
+    ],
     queryFn: () => fetcher(params),
     enabled: !!params.authToken,
   });

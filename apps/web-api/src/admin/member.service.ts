@@ -19,16 +19,15 @@ import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
 import {
-  AccessLevel,
-  AccessLevelCounts,
   CreateMemberDto,
+  MemberState,
   RequestMembersDto,
-  UpdateAccessLevelDto,
   UpdateMemberDto,
 } from '../../../../libs/contracts/src/schema/admin-member';
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { MembersHooksService } from '../members/members.hooks.service';
 import { ParticipantsRequest } from './members.dto';
+import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { TeamsService } from '../teams/teams.service';
 
 @Injectable()
@@ -48,33 +47,8 @@ export class MemberService {
     private teamService: TeamsService
   ) {}
 
-  private fallbackMemberState(accessLevel?: string | null): MemberApprovalState {
-    if (!accessLevel) {
-      return MemberApprovalState.PENDING;
-    }
-
-    if (accessLevel.toUpperCase() === 'REJECTED') {
-      return MemberApprovalState.REJECTED;
-    }
-
-    const match = accessLevel.match(/^L(\d+)$/i);
-    if (!match) {
-      return MemberApprovalState.PENDING;
-    }
-
-    const level = Number(match[1]);
-    return level === 0 ? MemberApprovalState.PENDING : MemberApprovalState.APPROVED;
-  }
-
-  private resolveMemberState(
-    accessLevel?: string | null,
-    approvalState?: MemberApprovalState | null
-  ): MemberApprovalState {
-    return approvalState ?? this.fallbackMemberState(accessLevel);
-  }
-
-  private resolveApprovalStateFromAccessLevel(accessLevel?: string | null): MemberApprovalState {
-    return this.fallbackMemberState(accessLevel);
+  private resolveMemberState(approvalState?: MemberApprovalState | null): MemberApprovalState {
+    return approvalState ?? MemberApprovalState.PENDING;
   }
 
   private normalizeMemberStateFromPayload(payload: {
@@ -112,7 +86,6 @@ export class MemberService {
     tx: Prisma.TransactionClient,
     memberUid: string,
     payload: {
-      accessLevel?: string | null;
       memberState?: string | null;
       state?: string | null;
     },
@@ -121,10 +94,7 @@ export class MemberService {
     reason = 'Synced from member payload'
   ): Promise<void> {
     const explicitMemberState = this.normalizeMemberStateFromPayload(payload);
-
-    const resolvedState =
-      explicitMemberState ??
-      (payload.accessLevel ? this.resolveApprovalStateFromAccessLevel(payload.accessLevel) : null);
+    const resolvedState = explicitMemberState;
 
     if (!resolvedState) {
       return;
@@ -177,56 +147,6 @@ export class MemberService {
         );
       }
     }
-  }
-
-  private async syncMemberApprovalFromAccessLevel(
-    tx: Prisma.TransactionClient,
-    memberUid: string,
-    accessLevel?: string | null,
-    requestedByUid?: string | null,
-    reviewedByUid?: string | null,
-    reason = 'Synced from accessLevel'
-  ): Promise<void> {
-    const state = this.resolveApprovalStateFromAccessLevel(accessLevel);
-    const reviewedAt = state === MemberApprovalState.PENDING ? null : new Date();
-
-    await tx.memberApproval.upsert({
-      where: { memberUid },
-      update: {
-        state,
-        reason,
-        requestedByUid: requestedByUid ?? undefined,
-        reviewedByUid: reviewedByUid ?? null,
-        reviewedAt,
-      },
-      create: {
-        memberUid,
-        state,
-        requestedByUid: requestedByUid ?? null,
-        reviewedByUid: reviewedByUid ?? null,
-        reason,
-        reviewedAt,
-      },
-    });
-  }
-
-  private async syncMemberStateForEditPayload(
-    tx: Prisma.TransactionClient,
-    memberUid: string,
-    payload: {
-      accessLevel?: string | null;
-      memberState?: string | null;
-      state?: string | null;
-    }
-  ): Promise<void> {
-    await this.syncMemberApprovalFromPayload(
-      tx,
-      memberUid,
-      payload,
-      memberUid,
-      null,
-      payload.accessLevel ? 'Updated from accessLevel/memberState' : 'Updated from memberState'
-    );
   }
 
   private async replaceAccessControl(
@@ -476,7 +396,7 @@ export class MemberService {
    */
   private async getMemberUidsWithOnboardingPermission(memberUids: string[]): Promise<Set<string>> {
     const onboardingPermission = await this.prisma.permission.findUnique({
-      where: { code: 'member.onboarding' },
+      where: { code: MEMBER_PERMISSIONS.ONBOARDING },
       select: { uid: true },
     });
 
@@ -519,20 +439,27 @@ export class MemberService {
    * Works within a transaction context.
    */
   private async memberHasOnboardingPermission(tx: Prisma.TransactionClient, memberUid: string): Promise<boolean> {
-    const onboardingPermission = await tx.permission.findUnique({
-      where: { code: 'member.onboarding' },
+    return this.memberHasPermissionCode(tx, memberUid, MEMBER_PERMISSIONS.ONBOARDING);
+  }
+
+  private async memberHasPermissionCode(
+    tx: Prisma.TransactionClient,
+    memberUid: string,
+    permissionCode: string
+  ): Promise<boolean> {
+    const permission = await tx.permission.findUnique({
+      where: { code: permissionCode },
       select: { uid: true },
     });
 
-    if (!onboardingPermission) {
+    if (!permission) {
       return false;
     }
 
-    // Check direct permission
     const directPermission = await tx.memberPermissionV2.findFirst({
       where: {
         memberUid,
-        permissionUid: onboardingPermission.uid,
+        permissionUid: permission.uid,
       },
     });
 
@@ -540,14 +467,13 @@ export class MemberService {
       return true;
     }
 
-    // Check policy-based permission
     const policyPermission = await tx.policyAssignment.findFirst({
       where: {
         memberUid,
         policy: {
           policyPermissions: {
             some: {
-              permissionUid: onboardingPermission.uid,
+              permissionUid: permission.uid,
             },
           },
         },
@@ -559,7 +485,6 @@ export class MemberService {
 
   private enrichMemberAccessData<
     T extends {
-      accessLevel?: string | null;
       memberApproval?: { state?: MemberApprovalState | null } | null;
       memberPermissionsV2?: Array<{
         permission?: { uid: string; code: string; module: string; description?: string | null } | null;
@@ -635,11 +560,12 @@ export class MemberService {
 
     const effectivePermissions = this.uniqueByCode([...directPermissions, ...policyPermissions, ...rolePermissions]);
 
-    const { memberPermissionsV2, policyAssignmentsV2, roleAssignments, memberApproval, ...safeMember } = member as any;
+    const { memberPermissionsV2, policyAssignmentsV2, roleAssignments, memberApproval, accessLevel, ...safeMember } =
+      member as any;
 
     return {
       ...safeMember,
-      memberState: this.resolveMemberState(member.accessLevel, member.memberApproval?.state),
+      memberState: this.resolveMemberState(member.memberApproval?.state),
       permissions: directPermissions,
       permissionCodes: directPermissions.map((p) => p.code),
       policies,
@@ -857,10 +783,13 @@ export class MemberService {
         actorUid: null,
       });
 
-      // Handle investor profile updates only for L5/L6
-      const effectiveAccessLevel = memberData.accessLevel ?? existingMember.accessLevel;
-      if (investorProfileData && ['L5', 'L6'].includes(effectiveAccessLevel)) {
-        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, effectiveAccessLevel);
+      const canManageInvestorProfile = await this.memberHasPermissionCode(
+        tx,
+        memberUid,
+        MEMBER_PERMISSIONS.INVESTOR_MANAGE
+      );
+      if (investorProfileData) {
+        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, canManageInvestorProfile);
       }
 
       if (isEmailChanged && isDirectoryAdmin) {
@@ -1003,21 +932,15 @@ export class MemberService {
   }
 
   /**
-   * Handles investor profile updates for a member
-   *
-   * @param memberUid - The unique identifier of the member
-   * @param investorProfileData - The investor profile data to update
-   * @param tx - Transaction client for atomic operations
-   * @param memberAccessLevel - The access level of the member to check permissions
+   * Handles investor profile updates for a member.
    */
   async updateMemberInvestorProfile(
     memberUid: string,
     investorProfileData: any,
     tx: Prisma.TransactionClient,
-    memberAccessLevel?: string
+    canManageInvestorProfile = false
   ) {
-    // Check if member has permission to update investor profile (L5 or L6)
-    if (memberAccessLevel && !['L5', 'L6'].includes(memberAccessLevel)) {
+    if (!canManageInvestorProfile) {
       throw new ForbiddenException('Insufficient permissions to update investor profile');
     }
 
@@ -1540,12 +1463,34 @@ export class MemberService {
     });
   }
 
-  async findMemberByAccessLevels(params: RequestMembersDto) {
-    const { page, limit } = params;
+  async findMembers(params: RequestMembersDto) {
+    const { page, limit, memberState, policyCodes, policyGroups, policyRoles } = params;
+    const where: Prisma.MemberWhereInput = {};
+
+    if (memberState?.length) {
+      where.memberApproval = {
+        state: {
+          in: memberState as MemberApprovalState[],
+        },
+      };
+    }
+
+    if (policyCodes?.length || policyGroups?.length || policyRoles?.length) {
+      where.policyAssignmentsV2 = {
+        some: {
+          policy: {
+            ...(policyCodes?.length ? { code: { in: policyCodes } } : {}),
+            ...(policyGroups?.length ? { group: { in: policyGroups } } : {}),
+            ...(policyRoles?.length ? { role: { in: policyRoles } } : {}),
+          },
+        },
+      };
+    }
 
     const members = await this.prisma.member.findMany({
       // When no pagination params provided, fetch all members
       ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
+      where,
       select: {
         uid: true,
         name: true,
@@ -1560,7 +1505,6 @@ export class MemberService {
         email: true,
         isSubscribedToNewsletter: true,
         signUpSource: true,
-        accessLevel: true,
         teamOrProjectURL: true,
         locationUid: true,
         location: {
@@ -1600,7 +1544,6 @@ export class MemberService {
             linkedinHandler: true,
           },
         },
-        accessLevelUpdatedAt: true,
         investorProfile: {
           select: {
             uid: true,
@@ -1693,15 +1636,7 @@ export class MemberService {
       demoDayHosts: m.demoDayAdminScopes?.filter((s) => s.scopeType === 'HOST').map((s) => s.scopeValue) ?? [],
     }));
 
-    const total = await this.prisma.member.count({
-      where: {
-        memberApproval: {
-          state: {
-            in: [MemberApprovalState.APPROVED, MemberApprovalState.VERIFIED],
-          },
-        },
-      },
-    });
+    const total = await this.prisma.member.count({ where });
 
     return {
       data: membersWithHosts,
@@ -1714,21 +1649,21 @@ export class MemberService {
     };
   }
 
-  async getAccessLevelCounts(): Promise<AccessLevelCounts> {
-    const counts = await this.prisma.member.groupBy({
-      by: ['accessLevel'],
+  async getMemberStateCounts(): Promise<Record<MemberState, number>> {
+    const counts = await this.prisma.memberApproval.groupBy({
+      by: ['state'],
       _count: true,
     });
 
-    // Initialize all levels with 0, then populate real values
-    const allLevels = Object.values(AccessLevel);
-    const result = allLevels.reduce((acc, level) => {
-      acc[level as AccessLevel] = 0;
-      return acc;
-    }, {} as Record<AccessLevel, number>);
+    const result: Record<MemberState, number> = {
+      [MemberState.PENDING]: 0,
+      [MemberState.VERIFIED]: 0,
+      [MemberState.APPROVED]: 0,
+      [MemberState.REJECTED]: 0,
+    };
 
     for (const item of counts) {
-      result[item.accessLevel as AccessLevel] = item._count;
+      result[item.state as MemberState] = item._count;
     }
 
     return result;
@@ -1776,158 +1711,6 @@ export class MemberService {
     return { updated: true };
   }
 
-  async updateAccessLevel({
-    memberUids,
-    accessLevel,
-    sendRejectEmail = false,
-  }: UpdateAccessLevelDto): Promise<{ updatedCount: number }> {
-    // Fetch members whose current access level is L0, L1, or Rejected
-    const notApprovedMembers = await this.prisma.member.findMany({
-      where: {
-        uid: { in: memberUids },
-        accessLevel: { in: ['L0', 'L1', 'Rejected'] },
-      },
-      select: {
-        uid: true,
-        name: true,
-        email: true,
-        accessLevel: true,
-        teamMemberRoles: {
-          where: {
-            team: {
-              accessLevel: 'L0',
-            },
-          },
-          select: {
-            teamUid: true,
-          },
-        },
-      },
-    });
-
-    // Resolve isVerified and plnFriend flags based on new access level
-    const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(accessLevel as AccessLevel);
-    const now = new Date();
-
-    // Determine if soft delete or restore logic should be applied
-    const updateData: Prisma.MemberUpdateManyArgs['data'] = {
-      accessLevel,
-      accessLevelUpdatedAt: now,
-      isVerified,
-      plnFriend,
-    };
-
-    if (accessLevel === AccessLevel.REJECTED) {
-      // Soft delete if access level is set to REJECTED
-      updateData.deletedAt = now;
-      updateData.deletionReason = 'Access level changed to Rejected';
-    } else {
-      // Restore if access level is changed from REJECTED to something else
-      updateData.deletedAt = null;
-      updateData.deletionReason = null;
-    }
-
-    // Update access level and associated flags
-    const result = await this.prisma.member.updateMany({
-      where: {
-        uid: { in: memberUids },
-      },
-      data: updateData,
-    });
-
-    if (accessLevel) {
-      const resolvedState = this.resolveApprovalStateFromAccessLevel(accessLevel);
-
-      await this.prisma.$transaction(
-        memberUids.map((memberUid) =>
-          this.prisma.memberApproval.upsert({
-            where: { memberUid },
-            update: {
-              state: resolvedState,
-              reason: 'Synced from accessLevel update',
-              reviewedAt: resolvedState === MemberApprovalState.PENDING ? null : now,
-            },
-            create: {
-              memberUid,
-              state: resolvedState,
-              requestedByUid: memberUid,
-              reviewedByUid: null,
-              reason: 'Synced from accessLevel update',
-              reviewedAt: resolvedState === MemberApprovalState.PENDING ? null : now,
-            },
-          })
-        )
-      );
-    }
-
-    // Create investor profiles for L5/L6 members who don't have one
-    await this.createInvestorProfileForHighLevelMembers(memberUids, this.prisma);
-
-    if (result.count > 0) {
-      const teamUidsToUpdate = Array.from(
-        new Set(notApprovedMembers.flatMap((m) => m.teamMemberRoles?.map((r) => r.teamUid) ?? []))
-      );
-
-      if (
-        [AccessLevel.L1, AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6].includes(
-          accessLevel as AccessLevel
-        )
-      ) {
-        await Promise.all(
-          teamUidsToUpdate.map((teamUid) => this.teamService.updateTeamAccessLevel(teamUid, undefined, 'L1'))
-        );
-      }
-
-      // Notify users based on the new access level
-      if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(accessLevel as AccessLevel)) {
-        // Get members with onboarding permission for targeted onboarding flow
-        const memberUidsWithOnboarding = await this.getMemberUidsWithOnboardingPermission(
-          notApprovedMembers.map((m) => m.uid)
-        );
-
-        for (const member of notApprovedMembers) {
-          if (!member.email) {
-            this.logger.error(
-              `Missing email for member with uid ${member.uid}. Can't send an approval notification email`
-            );
-          } else {
-            // Send onboarding email for members with member.onboarding permission
-            const isOnboarding = memberUidsWithOnboarding.has(member.uid);
-            await this.notificationService.notifyForMemberCreationApproval(
-              member.name,
-              member.uid,
-              member.email,
-              isOnboarding
-            );
-          }
-        }
-
-        // Enable recommendations only for L4 (keep existing behavior)
-        if (accessLevel === AccessLevel.L4) {
-          await this.notificationSettingsService.enableRecommendationsFor(memberUids);
-        }
-      }
-
-      // Send rejection emails for members marked as Rejected only if sendRejectEmail is true
-      if (sendRejectEmail && accessLevel === AccessLevel.REJECTED) {
-        for (const member of notApprovedMembers) {
-          if (!member.email) {
-            this.logger.error(
-              `Missing email for member with uid ${member.uid}. Can't send a rejection notification email`
-            );
-          } else {
-            await this.notificationService.notifyForRejection(member.name, member.email);
-          }
-        }
-      }
-
-      // Trigger external sync
-      await this.forestAdminService.triggerAirtableSync();
-    }
-
-    return { updatedCount: result.count };
-  }
-
   async createMemberByAdmin(memberData: CreateMemberDto): Promise<Member> {
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {
@@ -1939,7 +1722,7 @@ export class MemberService {
 
       const location = await this.mapLocationToNewMember(memberData.city, memberData.country, memberData.region, tx);
 
-      const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(memberData.accessLevel as AccessLevel);
+      const { isVerified = false, plnFriend = false } = this.resolveFlagsFromMemberState(memberData.memberState);
 
       let investorProfileId: string | null = null;
 
@@ -1967,7 +1750,6 @@ export class MemberService {
         name: memberData.name,
         email: memberData.email.toLowerCase().trim(),
         imageUid: memberData.imageUid,
-        accessLevel: memberData.accessLevel,
         isVerified,
         plnFriend,
         bio: memberData.bio,
@@ -2020,7 +1802,7 @@ export class MemberService {
         actorUid: null,
       });
 
-      if ([AccessLevel.L2, AccessLevel.L3, AccessLevel.L4].includes(memberData.accessLevel as AccessLevel)) {
+      if ((memberData.memberState ?? MemberState.PENDING) === MemberState.APPROVED) {
         // Check if member has onboarding permission for targeted onboarding flow
         const hasOnboardingPermission = await this.memberHasOnboardingPermission(tx, createdMember.uid);
         await this.notificationService.notifyForMemberCreationApproval(
@@ -2040,7 +1822,7 @@ export class MemberService {
   }
 
   async updateMemberByAdmin(uid: string, dto: UpdateMemberDto): Promise<string> {
-    const { country, region, city, skills, teamMemberRoles, joinDate, investorProfile, ...rest } = dto;
+    const { country, region, city, skills, teamMemberRoles, joinDate, investorProfile, memberState, ...rest } = dto;
 
     const data: any = {
       ...rest,
@@ -2058,9 +1840,11 @@ export class MemberService {
       // get existing member (for comparing email and externalId)
       existingMember = await tx.member.findUniqueOrThrow({ where: { uid } });
 
-      if (dto.accessLevel) {
-        const { isVerified, plnFriend } = this.resolveFlagsFromAccessLevel(dto.accessLevel as AccessLevel);
+      const { isVerified, plnFriend } = this.resolveFlagsFromMemberState(memberState);
+      if (isVerified !== undefined) {
         data.isVerified = isVerified;
+      }
+      if (plnFriend !== undefined) {
         data.plnFriend = plnFriend;
       }
 
@@ -2111,8 +1895,25 @@ export class MemberService {
         };
       }
 
-      // Handle investor profile updates
+      await this.syncMemberApprovalFromPayload(
+        tx,
+        uid,
+        { memberState: memberState ?? null },
+        uid,
+        null,
+        'Updated by admin'
+      );
+
       if (investorProfile) {
+        const canManageInvestorProfile = await this.memberHasPermissionCode(
+          tx,
+          uid,
+          MEMBER_PERMISSIONS.INVESTOR_MANAGE
+        );
+        if (!canManageInvestorProfile) {
+          throw new ForbiddenException('Insufficient permissions to update investor profile');
+        }
+
         const existingMember = await tx.member.findUnique({
           where: { uid },
           select: { investorProfileId: true, investorProfile: true },
@@ -2205,34 +2006,53 @@ export class MemberService {
     }
   }
 
-  async getAccessLevelByMemberEmail(email: string): Promise<string | null> {
-    try {
-      const member = await this.prisma.member.findUnique({
-        where: { email: email },
-        select: { accessLevel: true },
-      });
-
-      return member?.accessLevel ?? null;
-    } catch (error) {
-      return this.handleErrors(error);
-    }
-  }
-
-  /**
-   * Automatically create investor profile for L5/L6 members if they don't have one.
-   *
-   * @param memberUids - Array of member UIDs to check and potentially create profiles for
-   * @param tx - Transaction client for atomic operations
-   */
   private async createInvestorProfileForHighLevelMembers(
     memberUids: string[],
     tx: Prisma.TransactionClient
   ): Promise<void> {
+    const investorPermission = await tx.permission.findUnique({
+      where: { code: MEMBER_PERMISSIONS.INVESTOR_MANAGE },
+      select: { uid: true },
+    });
+
+    if (!investorPermission) {
+      return;
+    }
+
+    const directPermissionMembers = await tx.memberPermissionV2.findMany({
+      where: {
+        memberUid: { in: memberUids },
+        permissionUid: investorPermission.uid,
+      },
+      select: { memberUid: true },
+    });
+
+    const policyPermissionMembers = await tx.policyAssignment.findMany({
+      where: {
+        memberUid: { in: memberUids },
+        policy: {
+          policyPermissions: {
+            some: {
+              permissionUid: investorPermission.uid,
+            },
+          },
+        },
+      },
+      select: { memberUid: true },
+    });
+
+    const allowedMemberUids = Array.from(
+      new Set([...directPermissionMembers.map((m) => m.memberUid), ...policyPermissionMembers.map((m) => m.memberUid)])
+    );
+
+    if (!allowedMemberUids.length) {
+      return;
+    }
+
     const membersWithoutInvestorProfile = await tx.member.findMany({
       where: {
-        uid: { in: memberUids },
+        uid: { in: allowedMemberUids },
         investorProfileId: null,
-        accessLevel: { in: ['L5', 'L6'] },
       },
       select: {
         uid: true,
@@ -2256,18 +2076,20 @@ export class MemberService {
     }
   }
 
-  private resolveFlagsFromAccessLevel(accessLevel: AccessLevel): { isVerified: boolean; plnFriend: boolean } {
-    switch (accessLevel) {
-      case AccessLevel.L4:
-      case AccessLevel.L5:
-      case AccessLevel.L6:
-        return { isVerified: true, plnFriend: false };
-      case AccessLevel.L3:
-        return { isVerified: true, plnFriend: true };
-      case AccessLevel.L2:
-      default:
-        return { isVerified: false, plnFriend: false };
+  private resolveFlagsFromMemberState(memberState?: MemberState): { isVerified?: boolean; plnFriend?: boolean } {
+    if (!memberState) {
+      return {};
     }
+
+    if (memberState === MemberState.APPROVED) {
+      return { isVerified: true, plnFriend: false };
+    }
+
+    if (memberState === MemberState.VERIFIED) {
+      return { isVerified: true, plnFriend: false };
+    }
+
+    return { isVerified: false, plnFriend: false };
   }
 
   /**

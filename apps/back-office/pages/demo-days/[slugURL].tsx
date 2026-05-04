@@ -1446,7 +1446,7 @@ const DemoDayDetailPage = () => {
                           <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
                             {participant.member?.name || participant.name}
                             {activeTab === 'applications' &&
-                              participant.member?.accessLevel === 'L0' &&
+                              participant.member?.memberState === 'PENDING' &&
                               !!participant.member?.investorProfile && <span className={s.newBadge}>new</span>}
                           </div>
                           <div className="text-sm text-gray-500">{participant.member?.email || participant.email}</div>
@@ -1643,7 +1643,7 @@ const DemoDayDetailPage = () => {
                     )}
                     {activeTab !== 'applications' && (
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                        {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
+                        {participant.member?.memberState === 'PENDING' || !participant.member?.externalId ? (
                           <svg
                             className="mx-auto h-5 w-5 text-red-500"
                             fill="none"
@@ -1747,7 +1747,7 @@ const DemoDayDetailPage = () => {
                             participant.status
                           )} disabled:opacity-50`}
                         >
-                          {participant.member?.accessLevel === 'L0' || !participant.member?.externalId ? (
+                          {participant.member?.memberState === 'PENDING' || !participant.member?.externalId ? (
                             <option value="INVITED">Invited</option>
                           ) : (
                             ''
