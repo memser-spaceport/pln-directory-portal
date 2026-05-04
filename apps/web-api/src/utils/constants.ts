@@ -91,33 +91,50 @@ export enum MemberRole {
   DEMO_DAY_ADMIN = 'DEMO_DAY_ADMIN',
 }
 
+export const DIRECTORY_ADMIN_FULL_PERMISSION_CODE = 'directory.admin.full';
+
 /**
  * Type for member with roles, used in role checking utilities
  */
 export type MemberWithRoles = {
-  memberRoles: Array<{ name: string }>;
+  memberRoles?: Array<{ name: string }>;
+  effectivePermissionCodes?: string[];
+  effectivePermissions?: Array<string | { code?: string | null }>;
+  permissions?: Array<string | { code?: string | null }>;
 };
 
 /**
  * Check if a member has a specific admin role
  */
 export function hasAdminRole(member: MemberWithRoles, role: MemberRole): boolean {
-  return member.memberRoles.some((r) => r.name === role);
+  return Boolean(member?.memberRoles?.some((r) => r.name === role));
 }
 
 /**
  * Check if a member has any of the specified admin roles
  */
 export function hasAnyAdminRole(member: MemberWithRoles, roles: MemberRole[]): boolean {
-  const memberRoleNames = member.memberRoles.map((r) => r.name);
+  const memberRoleNames = member?.memberRoles?.map((r) => r.name) ?? [];
   return roles.some((role) => memberRoleNames.includes(role));
+}
+
+function hasPermissionCode(member: MemberWithRoles, permissionCode: string): boolean {
+  const effectivePermissionCodes = member?.effectivePermissionCodes ?? [];
+  const permissionLikeItems = [...(member?.effectivePermissions ?? []), ...(member?.permissions ?? [])];
+
+  return (
+    effectivePermissionCodes.includes(permissionCode) ||
+    permissionLikeItems.some((permission) =>
+      typeof permission === 'string' ? permission === permissionCode : permission?.code === permissionCode
+    )
+  );
 }
 
 /**
  * Check if a member is a directory admin (super role)
  */
 export function isDirectoryAdmin(member: MemberWithRoles): boolean {
-  return hasAdminRole(member, MemberRole.DIRECTORY_ADMIN);
+  return hasAdminRole(member, MemberRole.DIRECTORY_ADMIN) || hasPermissionCode(member, DIRECTORY_ADMIN_FULL_PERMISSION_CODE);
 }
 
 /**
