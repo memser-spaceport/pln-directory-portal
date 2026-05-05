@@ -1,10 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { generateText } from 'ai';
+import * as cheerio from 'cheerio';
 import ogs from 'open-graph-scraper';
 import { Readable } from 'stream';
 import sizeOf from 'image-size';
 import { AITeamEnrichmentResponse } from './team-enrichment.types';
 import { AiProviderService } from '../shared/ai-provider.service';
+
+export interface WebsiteSocialSignals {
+  twitterHandler?: string;
+  linkedinHandler?: string;
+  telegramHandler?: string;
+  contactEmail?: string;
+  jsonLdOrgName?: string;
+}
+
+// Browser-like User-Agent for HTML page fetches
+const BROWSER_USER_AGENT =
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 const TEAM_ENRICHMENT_SYSTEM_PROMPT = `
 You are a professional research assistant specializing in company/fund data enrichment.
@@ -319,9 +332,236 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     };
   }
 
+  /**
+   * One-shot HTML fetch with timeout / UA / content-type guard. Shared by the social-signal
+   * extractor and the logo path so a single enrichment run hits the website at most once.
+   * Returns null on any failure (network, non-2xx, non-HTML response).
+   */
+  async fetchWebsiteHtml(websiteUrl: string): Promise<string | null> {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(websiteUrl, {
+        signal: controller.signal,
+        redirect: 'follow' as RequestRedirect,
+        headers: {
+          'User-Agent': BROWSER_USER_AGENT,
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9',
+        },
+      });
+      clearTimeout(timeout);
+      if (!response.ok) {
+        this.logger.warn(`Website HTML fetch HTTP ${response.status} for ${websiteUrl}`);
+        return null;
+      }
+      const contentType = response.headers.get('content-type') || '';
+      if (!/text\/html|application\/xhtml/i.test(contentType)) return null;
+      return await response.text();
+    } catch (e) {
+      this.logger.warn(`Website HTML fetch failed for ${websiteUrl}: ${e.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Extracts self-declared social handles + contact email from a website page
+   * Returns null on fetch/parse failure or when no signals were found.
+   */
+  async fetchSocialSignalsFromWebsite(
+    websiteUrl: string,
+    prefetchedHtml?: string
+  ): Promise<WebsiteSocialSignals | null> {
+    const html = prefetchedHtml ?? (await this.fetchWebsiteHtml(websiteUrl));
+    if (!html) return null;
+
+    const $ = cheerio.load(html);
+    const candidateUrls: string[] = [];
+    const result: WebsiteSocialSignals = {};
+
+    // 1. Walk every <script type="application/ld+json"> block.
+    $('script[type="application/ld+json"]').each((_, el) => {
+      const raw = $(el).contents().text().trim();
+      if (!raw) return;
+      try {
+        this.collectJsonLdSignals(JSON.parse(raw), candidateUrls, result);
+      } catch {
+        // unparsable JSON-LD blocks are common (templating, CDATA); ignore.
+      }
+    });
+
+    // 2. Twitter Card meta — `twitter:site` is the brand's own canonical X-handle
+    // declaration. Falls back to `twitter:creator` (author rather than brand, but
+    // for many one-person companies it's the same handle and still useful).
+    if (!result.twitterHandler) {
+      const tw =
+        $('meta[name="twitter:site" i]').attr('content') || $('meta[name="twitter:creator" i]').attr('content');
+      if (tw) {
+        const handle = tw
+          .trim()
+          .replace(/^@/, '')
+          .replace(/^https?:\/\/(?:www\.)?(?:twitter|x)\.com\//i, '')
+          .replace(/\/.*$/, '');
+        const RESERVED = ['intent', 'share', 'home', 'i', 'search', 'explore', 'login'];
+        if (/^[A-Za-z0-9_]{1,15}$/.test(handle) && !RESERVED.includes(handle.toLowerCase())) {
+          result.twitterHandler = handle;
+        }
+      }
+    }
+
+    // 3. HTML microdata — older schema.org dialect (pre-JSON-LD). Feed `itemprop="sameAs"`
+    // hrefs into the same candidate-URL pipe so the existing matchers handle them.
+    $('[itemprop="sameAs"][href]').each((_, el) => {
+      const href = $(el).attr('href');
+      if (href) candidateUrls.push(href);
+    });
+
+    // 4. Anchor href fallback — catches sites that don't use JSON-LD or microdata.
+    $('a[href]').each((_, el) => {
+      const href = $(el).attr('href');
+      if (href) candidateUrls.push(href);
+    });
+
+    // 5. Contact email — try microdata first, then mailto: anchors.
+    if (!result.contactEmail) {
+      const md = $('[itemprop="email"]').first();
+      if (md.length) {
+        const raw = md.attr('href') || md.text() || '';
+        const email = raw
+          .replace(/^mailto:/i, '')
+          .split('?')[0]
+          .trim()
+          .toLowerCase();
+        if (email && /@/.test(email)) result.contactEmail = email;
+      }
+    }
+    if (!result.contactEmail) {
+      const mailtoHref = $('a[href^="mailto:"]').first().attr('href');
+      if (mailtoHref) {
+        const email = mailtoHref
+          .replace(/^mailto:/i, '')
+          .split('?')[0]
+          .trim()
+          .toLowerCase();
+        if (email) result.contactEmail = email;
+      }
+    }
+
+    for (const url of candidateUrls) {
+      this.assignSocialFromUrl(url, result);
+    }
+
+    if (!result.twitterHandler && !result.linkedinHandler && !result.telegramHandler && !result.contactEmail) {
+      return null;
+    }
+    return result;
+  }
+
+  private collectJsonLdSignals(node: any, urls: string[], result: WebsiteSocialSignals): void {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const child of node) this.collectJsonLdSignals(child, urls, result);
+      return;
+    }
+
+    if (Array.isArray(node['@graph'])) {
+      this.collectJsonLdSignals(node['@graph'], urls, result);
+    }
+
+    const type = node['@type'];
+    const types = Array.isArray(type) ? type : [type];
+    const isOrgLike = types.some(
+      (t) => t === 'Organization' || t === 'Corporation' || t === 'WebSite' || t === 'WebApplication'
+    );
+
+    if (isOrgLike) {
+      if (typeof node.name === 'string' && !result.jsonLdOrgName) {
+        result.jsonLdOrgName = node.name;
+      }
+      if (Array.isArray(node.sameAs)) {
+        for (const u of node.sameAs) if (typeof u === 'string') urls.push(u);
+      } else if (typeof node.sameAs === 'string') {
+        urls.push(node.sameAs);
+      }
+      if (typeof node.email === 'string' && !result.contactEmail) {
+        result.contactEmail = node.email
+          .replace(/^mailto:/i, '')
+          .trim()
+          .toLowerCase();
+      }
+    }
+
+    // Nested entities are common: a WebSite/WebApplication often nests creator/publisher Organization.
+    for (const key of ['creator', 'publisher', 'author', 'organization', 'parentOrganization', 'subOrganization']) {
+      if (node[key]) this.collectJsonLdSignals(node[key], urls, result);
+    }
+
+    // contactPoint — `email`/`contactType` carries the canonical email address.
+    if (node.contactPoint) {
+      const cps = Array.isArray(node.contactPoint) ? node.contactPoint : [node.contactPoint];
+      for (const cp of cps) {
+        if (cp && typeof cp.email === 'string' && !result.contactEmail) {
+          result.contactEmail = cp.email
+            .replace(/^mailto:/i, '')
+            .trim()
+            .toLowerCase();
+        }
+      }
+    }
+  }
+
+  private assignSocialFromUrl(rawUrl: string, result: WebsiteSocialSignals): void {
+    const trimmed = rawUrl.trim();
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('mailto:')) return;
+
+    let url: URL;
+    try {
+      url = new URL(trimmed);
+    } catch {
+      return; // relative or malformed href — not a social URL anyway
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    // Path segments without empty entries from leading/trailing slashes.
+    const segments = url.pathname.split('/').filter(Boolean);
+    if (segments.length === 0) return;
+
+    if (!result.twitterHandler && (host === 'twitter.com' || host === 'x.com')) {
+      // Profile URLs are exactly /<handle>; reject non-profile prefixes.
+      if (segments.length === 1) {
+        const handle = segments[0].replace(/^@/, '');
+        const RESERVED = ['intent', 'share', 'home', 'i', 'search', 'explore', 'login'];
+        if (/^[A-Za-z0-9_]{1,15}$/.test(handle) && !RESERVED.includes(handle.toLowerCase())) {
+          result.twitterHandler = handle;
+        }
+      }
+    }
+
+    if (!result.linkedinHandler && (host === 'linkedin.com' || /^[a-z]{2}\.linkedin\.com$/.test(host))) {
+      // Accept /company/<slug>, /school/<slug>, /in/<slug>.
+      const [kind, slug] = segments;
+      if (slug && (kind === 'company' || kind === 'school' || kind === 'in')) {
+        const decoded = decodeURIComponent(slug);
+        if (/^[A-Za-z0-9_-]+$/.test(decoded)) {
+          result.linkedinHandler = kind === 'in' ? decoded : `${kind}/${decoded}`;
+        }
+      }
+    }
+
+    if (!result.telegramHandler && (host === 't.me' || host === 'telegram.me')) {
+      // /<handle> or /s/<handle> (preview view).
+      const handle = segments[0] === 's' && segments[1] ? segments[1] : segments[0];
+      const RESERVED = ['share', 'joinchat'];
+      if (/^[A-Za-z0-9_]{3,32}$/.test(handle) && !RESERVED.includes(handle.toLowerCase())) {
+        result.telegramHandler = handle;
+      }
+    }
+  }
+
   async fetchLogoFromWebsite(
     companyName: string,
-    websiteUrl?: string | null
+    websiteUrl?: string | null,
+    prefetchedHtml?: string
   ): Promise<{ logoUrl: string; domain: string } | null> {
     if (!websiteUrl) {
       this.logger.debug(`No website URL for "${companyName}", skipping website logo fetch`);
@@ -334,19 +574,19 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       const candidates: string[] = [];
 
       // 1. Try open-graph-scraper — prioritize favicon (most reliable logo source)
-      // Skip og:image and twitter:image as they are often banners/hero images, not logos
+      // Skip og:image and twitter:image as they are often banners/hero images, not logos.
       try {
-        const { result } = await ogs({
-          url: websiteUrl,
-          timeout: 10,
-          fetchOptions: {
-            headers: {
-              'user-agent':
-                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            },
-            redirect: 'follow' as RequestRedirect,
-          },
-        });
+        const ogsInput = prefetchedHtml
+          ? { html: prefetchedHtml, url: websiteUrl }
+          : {
+              url: websiteUrl,
+              timeout: 10,
+              fetchOptions: {
+                headers: { 'user-agent': BROWSER_USER_AGENT },
+                redirect: 'follow' as RequestRedirect,
+              },
+            };
+        const { result } = await ogs(ogsInput as any);
 
         // Favicon first — if it passes validation, use it immediately (it's almost always the actual logo)
         if (result.favicon) {
