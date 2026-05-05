@@ -9,7 +9,7 @@ import {
 import axios from 'axios';
 import { PrismaService } from '../shared/prisma.service';
 import { JwtService } from '../utils/jwt/jwt.service';
-import { MemberRole, hasAnyAdminRole } from '../utils/constants';
+import { ADMIN_PERMISSIONS, DEMODAY_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 @Injectable()
 export class AuthOtpService {
@@ -20,8 +20,36 @@ export class AuthOtpService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly jwtService: JwtService,
+    private readonly jwtService: JwtService
   ) {}
+
+  private async getEffectivePermissionCodes(memberUid: string): Promise<string[]> {
+    const [direct, policyBased] = await Promise.all([
+      this.prisma.memberPermissionV2.findMany({
+        where: { memberUid },
+        select: { permission: { select: { code: true } } },
+      }),
+      this.prisma.policyAssignment.findMany({
+        where: { memberUid },
+        select: {
+          policy: {
+            select: {
+              policyPermissions: {
+                select: { permission: { select: { code: true } } },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    return Array.from(
+      new Set([
+        ...direct.map((p) => p.permission.code),
+        ...policyBased.flatMap((a) => a.policy.policyPermissions.map((p) => p.permission.code)),
+      ])
+    );
+  }
 
   /**
    * Retrieve a client_credentials token from the Auth Service.
@@ -77,9 +105,12 @@ export class AuthOtpService {
       throw new ForbiddenException('Member not found for this email');
     }
 
-    // Check that Member has back-office access via admin roles
-    const backofficeRoles = [MemberRole.DIRECTORY_ADMIN, MemberRole.DEMO_DAY_ADMIN];
-    const hasBackofficeAccess = hasAnyAdminRole(member, backofficeRoles);
+    // Check that Member has back-office access via RBAC v2.1 permissions only.
+    const permissionCodes = await this.getEffectivePermissionCodes(member.uid);
+    const hasBackofficeAccess =
+      permissionCodes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) ||
+      permissionCodes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
+      permissionCodes.some((code) => code.startsWith('demoday.admin.'));
 
     if (!hasBackofficeAccess) {
       this.logger.warn(`Member ${member.uid} (${normalizedEmail}) does not have back-office admin role`);
@@ -201,24 +232,21 @@ export class AuthOtpService {
       throw new ForbiddenException('Member not found for this email');
     }
 
-    // 3) Check that Member has back-office access via admin roles.
-    // A member can access back-office if they have DIRECTORY_ADMIN or DEMO_DAY_ADMIN role
-    const backofficeRoles = [MemberRole.DIRECTORY_ADMIN, MemberRole.DEMO_DAY_ADMIN];
-    const hasBackofficeAccess = hasAnyAdminRole(member, backofficeRoles);
+    // 3) Check that Member has back-office access via RBAC v2.1 permissions only.
+    const permissionCodes = await this.getEffectivePermissionCodes(member.uid);
+    const hasBackofficeAccess =
+      permissionCodes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) ||
+      permissionCodes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
+      permissionCodes.some((code) => code.startsWith('demoday.admin.'));
 
     if (!hasBackofficeAccess) {
       this.logger.warn(`Member ${member.uid} (${email}) does not have back-office admin role`);
       throw new ForbiddenException('Member does not have back-office admin access');
     }
 
-    // 4) Determine which roles to include in the JWT based on member's roles
-    const memberRoleNames = member.memberRoles.map((r) => r.name);
-    const jwtRoles = memberRoleNames.filter((role) =>
-      Object.values(MemberRole).includes(role as MemberRole)
-    );
-
-    // 5) Issue a LOCAL admin JWT for directory with the member's actual admin roles
-    const accessToken = await this.jwtService.getSignedToken(jwtRoles, member.uid);
+    // 4) Issue a LOCAL admin JWT with permissions as the authorization source.
+    const jwtRoles: string[] = [];
+    const accessToken = await this.jwtService.getSignedToken(jwtRoles, member.uid, permissionCodes);
 
     return {
       authToken: accessToken,
@@ -229,6 +257,8 @@ export class AuthOtpService {
         email: member.email,
         name: member.name,
         roles: jwtRoles,
+        permissions: permissionCodes,
+        effectivePermissionCodes: permissionCodes,
       },
     };
   }

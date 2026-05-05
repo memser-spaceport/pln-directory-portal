@@ -30,18 +30,14 @@ export const DEALS_PERMISSIONS = {
 export const DEMODAY_PERMISSIONS = {
   /** Read demo day fundraiser / analytics report link */
   REPORT_LINK_READ: 'demoday.report_link.read',
-  /** Read access to demo day prep */
-  PREP_READ: 'demoday.prep.read',
-  /** Write access to demo day prep */
-  PREP_WRITE: 'demoday.prep.write',
-  /** Read access to demo day showcase */
-  SHOWCASE_READ: 'demoday.showcase.read',
-  /** Write access to demo day showcase */
-  SHOWCASE_WRITE: 'demoday.showcase.write',
-  /** Read access to active demo days */
-  ACTIVE_READ: 'demoday.active.read',
-  /** Write access to active demo days */
-  ACTIVE_WRITE: 'demoday.active.write',
+  /** Full admin access to all Demo Day hosts */
+  ADMIN_ALL: 'demoday.admin.all',
+  /** Host-specific Demo Day admin access */
+  ADMIN_PROTOCOL_LABS: 'demoday.admin.protocol_labs',
+  ADMIN_FOUNDERS_FORGE: 'demoday.admin.founders_forge',
+  ADMIN_CRECIMIENTO: 'demoday.admin.crecimiento',
+  ADMIN_FOUNDER_SCHOOL: 'demoday.admin.founder_school',
+  ADMIN_CRECIMIENTO_FOUNDER_SCHOOL: 'demoday.admin.crecimiento_founder_school',
   /** Read demo day statistics */
   STATS_READ: 'demoday.stats.read',
 } as const;
@@ -110,10 +106,14 @@ export const TEAM_PERMISSIONS = {
 
 // ── Membership ────────────────────────────────────────────────────────────
 
-export const MEMBERSHIP_PERMISSIONS = {
-  /** Read access to membership source data */
-  SOURCE_READ: 'membership.source.read',
+export const TEAM_MEMBERSHIP_PERMISSIONS = {
+  /** Read access to the Membership Source section on team pages */
+  SOURCE_READ: 'team.membership_source.read',
+  /** @deprecated use team.membership_source.read */
+  SOURCE_READ_LEGACY: 'membership.source.read',
 } as const;
+
+export const MEMBERSHIP_PERMISSIONS = TEAM_MEMBERSHIP_PERMISSIONS;
 
 // ── PL Advisors ───────────────────────────────────────────────────────────
 
@@ -154,12 +154,12 @@ export const ALL_PERMISSION_CODES = [
 
   // Demo Day
   DEMODAY_PERMISSIONS.REPORT_LINK_READ,
-  DEMODAY_PERMISSIONS.PREP_READ,
-  DEMODAY_PERMISSIONS.PREP_WRITE,
-  DEMODAY_PERMISSIONS.SHOWCASE_READ,
-  DEMODAY_PERMISSIONS.SHOWCASE_WRITE,
-  DEMODAY_PERMISSIONS.ACTIVE_READ,
-  DEMODAY_PERMISSIONS.ACTIVE_WRITE,
+  DEMODAY_PERMISSIONS.ADMIN_ALL,
+  DEMODAY_PERMISSIONS.ADMIN_PROTOCOL_LABS,
+  DEMODAY_PERMISSIONS.ADMIN_FOUNDERS_FORGE,
+  DEMODAY_PERMISSIONS.ADMIN_CRECIMIENTO,
+  DEMODAY_PERMISSIONS.ADMIN_FOUNDER_SCHOOL,
+  DEMODAY_PERMISSIONS.ADMIN_CRECIMIENTO_FOUNDER_SCHOOL,
   DEMODAY_PERMISSIONS.STATS_READ,
 
   // Members
@@ -191,7 +191,8 @@ export const ALL_PERMISSION_CODES = [
   TEAM_PERMISSIONS.PRIORITY_READ,
 
   // Membership
-  MEMBERSHIP_PERMISSIONS.SOURCE_READ,
+  TEAM_MEMBERSHIP_PERMISSIONS.SOURCE_READ,
+  TEAM_MEMBERSHIP_PERMISSIONS.SOURCE_READ_LEGACY,
 
   // PL Advisors
   PL_ADVISORS_PERMISSIONS.ACCESS,

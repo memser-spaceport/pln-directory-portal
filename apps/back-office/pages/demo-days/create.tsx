@@ -8,7 +8,6 @@ import { CreateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../../context/auth-context';
 import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
-import { removeToken } from '../../utils/auth'; // ⬅️ NEW: used for logout on role = none / 403
 
 const RichTextEditor = dynamic(() => import('../../components/common/rich-text-editor'), { ssr: false });
 
@@ -24,34 +23,13 @@ const CreateDemoDayPage = () => {
     }
   }, [authToken, router]);
 
-  // Helper: logout when user has no roles (NONE) or forbidden
-  const forceLogout = () => {
-    console.log('[CreateDemoDayPage] Force logout (no roles / forbidden)');
-    removeToken();
-    // clear snapshot cookie with user info
-    document.cookie = 'plnadmin_user=; Max-Age=0; path=/;';
-    router.replace('/');
-  };
-
-  // Redirect non-directory admins:
-  // - if user has NO roles (none) -> full logout
-  // - if user has some roles but not directory admin -> back to demo-days list
+  // Redirect non-directory admins. Authorization is permission-based now;
+  // an empty roles array is valid for admins with RBAC v2 permissions.
   useEffect(() => {
-    if (!isLoading && user) {
-      const hasAnyRoles = Array.isArray((user as any).roles) && (user as any).roles.length > 0;
-
-      if (!hasAnyRoles) {
-        // User without roles (NONE) should be logged out from back-office
-        forceLogout();
-        return;
-      }
-
-      if (!isDirectoryAdmin) {
-        // Demo day admins (and any non-directory admins) should not see "Create" page
-        router.replace('/demo-days');
-      }
+    if (!isLoading && user && !isDirectoryAdmin) {
+      router.replace('/access-denied');
     }
-  }, [isLoading, user, isDirectoryAdmin, router]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoading, user, isDirectoryAdmin, router]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [slugError, setSlugError] = useState<string>('');
@@ -91,9 +69,8 @@ const CreateDemoDayPage = () => {
     } catch (error: any) {
       console.error('Error creating demo day:', error);
 
-      // NEW: if backend says "forbidden", we treat it as "roles = none" and log out
       if (error?.response?.status === 403) {
-        forceLogout();
+        router.replace('/access-denied');
         return;
       }
 

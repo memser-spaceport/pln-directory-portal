@@ -4,7 +4,6 @@ import { useRouter } from 'next/router';
 import { useDemoDaySubscribers } from '../../hooks/demo-days/useDemoDaySubscribers';
 import { useCookie } from 'react-use';
 import { useAuth } from '../../context/auth-context';
-import { removeToken } from '../../utils/auth';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
 
 const DemoDaySubscribersPage = () => {
@@ -21,17 +20,8 @@ const DemoDaySubscribersPage = () => {
   }, [authToken, router]);
 
   useEffect(() => {
-    if (!isLoading && authToken && user && (!user.roles || user.roles.length === 0)) {
-      removeToken();
+    if (!isLoading && authToken && user && !isDirectoryAdmin && !isDemoDayAdmin) {
       router.replace('/');
-    }
-  }, [authToken, user, isLoading, router]);
-
-  useEffect(() => {
-    if (!isLoading && authToken && user && user.roles && user.roles.length > 0) {
-      if (!isDirectoryAdmin && !isDemoDayAdmin) {
-        router.replace('/');
-      }
     }
   }, [authToken, user, isLoading, isDirectoryAdmin, isDemoDayAdmin, router]);
 
@@ -66,10 +56,6 @@ const DemoDaySubscribersPage = () => {
   };
 
   if (!authToken || isLoading) {
-    return null;
-  }
-
-  if (user && (!user.roles || user.roles.length === 0)) {
     return null;
   }
 

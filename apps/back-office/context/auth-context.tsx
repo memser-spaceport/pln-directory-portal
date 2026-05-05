@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState, useEffect, ReactNode } from 'react';
 import { useCookie } from 'react-use';
-import { MemberRole, API_ROUTE } from '../utils/constants';
+import { API_ROUTE, ADMIN_PERMISSIONS, DEMODAY_PERMISSIONS } from '../utils/constants';
 import api from '../utils/api';
 import { useRouter } from 'next/router';
 import { removeToken } from '../utils/auth';
@@ -10,12 +10,17 @@ export interface AdminUser {
   email: string;
   name: string;
   roles: string[];
+  permissions?: string[];
+  effectivePermissionCodes?: string[];
 }
 
 interface AuthContextValue {
   user: AdminUser | null;
   isDirectoryAdmin: boolean;
   isDemoDayAdmin: boolean;
+  isBackOfficeUser: boolean;
+  permissions: string[];
+  hasPermission: (permission: string) => boolean;
   isLoading: boolean;
   hasRole: (role: string) => boolean;
 }
@@ -24,6 +29,9 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   isDirectoryAdmin: false,
   isDemoDayAdmin: false,
+  isBackOfficeUser: false,
+  permissions: [],
+  hasPermission: () => false,
   isLoading: true,
   hasRole: () => false,
 });
@@ -38,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const router = useRouter();
 
-  // User from cookie (old behavior, preserved)
+  // User from cookie created at login. It contains RBAC v2 permissions from JWT.
   const user = useMemo<AdminUser | null>(() => {
     if (!userCookie) return null;
     try {
@@ -77,11 +85,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .filter((name: unknown): name is string => typeof name === 'string')
           : [];
 
+        const apiPermissionCodes = apiUser.effectivePermissionCodes ?? apiUser.permissionCodes ?? [];
+        const cookiePermissionCodes = user.effectivePermissionCodes ?? user.permissions ?? [];
+        const permissionCodes = apiPermissionCodes.length > 0 ? apiPermissionCodes : cookiePermissionCodes;
+
         const mergedUser: AdminUser = {
-          uid: apiUser.uid,
-          email: apiUser.email,
-          name: apiUser.name,
-          roles: mappedRoles,
+          uid: apiUser.uid ?? user.uid,
+          email: apiUser.email ?? user.email,
+          name: apiUser.name ?? user.name,
+          roles: mappedRoles.length > 0 ? mappedRoles : user.roles ?? [],
+          permissions: permissionCodes,
+          effectivePermissionCodes: permissionCodes,
         };
 
         console.log('[AuthContext] Loaded user from API:', mergedUser);
@@ -90,8 +104,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch((error) => {
         console.error('[AuthContext] Failed to load user from API:', error);
 
-        // If token is invalid — logout
-        if (error?.response?.status === 401 || error?.response?.status === 403) {
+        // Only an invalid/expired token should force logout.
+        // A 403 here must not log out a permission-based admin: the cookie/JWT
+        // already contains the effectivePermissionCodes needed by the UI.
+        if (error?.response?.status === 401) {
           removeToken();
           setUserCookie(undefined);
           router.replace('/');
@@ -106,22 +122,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return userFromApi || user;
   }, [userFromApi, user]);
 
-  // Debug logs for resolved user and roles
-  useEffect(() => {
-    console.log('[AuthContext] Resolved user =', resolvedUser);
-    console.log('[AuthContext] Resolved user roles =', resolvedUser?.roles);
-  }, [resolvedUser]);
-
-  // Auto logout when user has no roles (NONE)
-  useEffect(() => {
-    if (resolvedUser && Array.isArray(resolvedUser.roles) && resolvedUser.roles.length === 0) {
-      console.log('[AuthContext] User has no roles (NONE). Logging out.');
-
-      removeToken();
-      setUserCookie(undefined);
-      router.replace('/');
-    }
-  }, [resolvedUser, router, setUserCookie]);
 
   const hasRole = useMemo(
     () =>
@@ -131,18 +131,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [resolvedUser]
   );
 
-  const isDirectoryAdmin = hasRole(MemberRole.DIRECTORY_ADMIN);
-  const isDemoDayAdmin = hasRole(MemberRole.DEMO_DAY_ADMIN);
+  const permissions = resolvedUser?.effectivePermissionCodes ?? resolvedUser?.permissions ?? [];
+  const hasPermission = (permission: string): boolean => permissions.includes(permission);
+
+  // RBAC v2: page access is driven by effective permissions, not legacy MemberRole rows.
+  const isDirectoryAdmin = hasPermission(ADMIN_PERMISSIONS.DIRECTORY_FULL);
+  const isBackOfficeUser = isDirectoryAdmin || hasPermission(ADMIN_PERMISSIONS.TOOLS_ACCESS);
+  const isDemoDayAdmin =
+    isDirectoryAdmin ||
+    hasPermission(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
+    permissions.some((permission) => permission.startsWith('demoday.admin.'));
 
   const value = useMemo(
     () => ({
       user: resolvedUser,
       isDirectoryAdmin,
       isDemoDayAdmin,
+      isBackOfficeUser: isBackOfficeUser || isDemoDayAdmin,
       isLoading,
+      permissions,
+      hasPermission,
       hasRole,
     }),
-    [resolvedUser, isDirectoryAdmin, isDemoDayAdmin, isLoading, hasRole]
+    [resolvedUser, isDirectoryAdmin, isDemoDayAdmin, isBackOfficeUser, isLoading, hasRole, permissions]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

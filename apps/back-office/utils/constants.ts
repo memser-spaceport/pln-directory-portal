@@ -127,3 +127,30 @@ export const INVESTOR_PROFILE_CONSTANTS = {
     { label: 'I angel invest + invest through fund(s)', value: 'ANGEL_AND_FUND' },
   ],
 };
+
+
+export const ADMIN_PERMISSIONS = {
+  DIRECTORY_FULL: 'directory.admin.full',
+  TOOLS_ACCESS: 'admin.tools.access',
+} as const;
+
+export const DEMODAY_PERMISSIONS = {
+  ADMIN_ALL: 'demoday.admin.all',
+  ADMIN_PROTOCOL_LABS: 'demoday.admin.protocol_labs',
+  ADMIN_FOUNDERS_FORGE: 'demoday.admin.founders_forge',
+  ADMIN_CRECIMIENTO: 'demoday.admin.crecimiento',
+  ADMIN_FOUNDER_SCHOOL: 'demoday.admin.founder_school',
+  ADMIN_CRECIMIENTO_FOUNDER_SCHOOL: 'demoday.admin.crecimiento_founder_school',
+  STATS_READ: 'demoday.stats.read',
+  REPORT_LINK_READ: 'demoday.report_link.read',
+} as const;
+
+export const MEMBER_PERMISSIONS = {
+  CONTACTS_READ: 'member.contacts.read',
+} as const;
+
+export const TEAM_PERMISSIONS = {
+  MEMBERSHIP_SOURCE_READ: 'team.membership_source.read',
+  /** @deprecated use team.membership_source.read */
+  MEMBERSHIP_SOURCE_READ_LEGACY: 'membership.source.read',
+} as const;

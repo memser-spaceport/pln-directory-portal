@@ -6,6 +6,9 @@ import jwt_decode from 'jwt-decode';
 interface DecodedJwtPayload {
   exp: number;
   iat: number;
+  roles?: string[];
+  permissions?: string[];
+  effectivePermissionCodes?: string[];
 }
 
 interface VerifyOtpBody {
@@ -47,16 +50,27 @@ export default async function login(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Decode token to calculate cookie expiration time
+    // Decode token to calculate cookie expiration time and RBAC v2 permissions.
     let expiry: Date | undefined = undefined;
+    let decodedToken: DecodedJwtPayload | null = null;
     try {
-      const decoded = jwt_decode<DecodedJwtPayload>(authToken);
-      if (decoded?.exp) {
-        expiry = new Date(decoded.exp * 1000);
+      decodedToken = jwt_decode<DecodedJwtPayload>(authToken);
+      if (decodedToken?.exp) {
+        expiry = new Date(decodedToken.exp * 1000);
       }
     } catch (decodeError) {
       console.error('[login/otpVerify] Failed to decode auth token', decodeError);
     }
+
+    const tokenPermissionCodes = decodedToken?.effectivePermissionCodes ?? decodedToken?.permissions ?? [];
+    const enrichedUser = user
+      ? {
+          ...user,
+          roles: user.roles ?? decodedToken?.roles ?? [],
+          permissions: user.permissions ?? tokenPermissionCodes,
+          effectivePermissionCodes: user.effectivePermissionCodes ?? tokenPermissionCodes,
+        }
+      : user;
 
     // This cookie is used by back-office as admin auth token
     setCookie({ res }, 'plnadmin', authToken, {
@@ -66,9 +80,9 @@ export default async function login(req: NextApiRequest, res: NextApiResponse) {
       sameSite: 'lax',
     });
 
-    // Store user info (including roles) for UI role-based access control
-    if (user) {
-      setCookie({ res }, 'plnadmin_user', JSON.stringify(user), {
+    // Store user info with RBAC v2 permissions for UI access control.
+    if (enrichedUser) {
+      setCookie({ res }, 'plnadmin_user', JSON.stringify(enrichedUser), {
         expires: expiry,
         path: '/',
         httpOnly: false,
@@ -88,7 +102,7 @@ export default async function login(req: NextApiRequest, res: NextApiResponse) {
 
     return res.status(200).json({
       success: true,
-      user,
+      user: enrichedUser,
     });
   } catch (err: any) {
     console.error(

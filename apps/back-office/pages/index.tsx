@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useState } from 'react';
 import { InputField } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
 import { ReactComponent as Building } from '/public/assets/icons/building.svg';
-import APP_CONSTANTS, { MemberRole } from '../utils/constants';
+import APP_CONSTANTS, { ADMIN_PERMISSIONS } from '../utils/constants';
 import { parseCookies } from 'nookies';
 import Loader from '../components/common/loader';
 import { ReactComponent as LogoImage } from '/public/assets/images/Back_office_Logo.svg';
@@ -13,18 +13,31 @@ interface AdminUser {
   email: string;
   name: string;
   roles: string[];
+  permissions?: string[];
+  effectivePermissionCodes?: string[];
 }
 
 function getDefaultRedirect(user: AdminUser | null): string {
   if (!user) return '/members?filter=level1';
 
-  const isDirectoryAdmin = user.roles?.includes(MemberRole.DIRECTORY_ADMIN);
+  const permissions = user.effectivePermissionCodes ?? user.permissions ?? [];
+  const isDirectoryAdmin = permissions.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL);
   if (isDirectoryAdmin) {
     return '/members?filter=level1';
   }
 
-  // DEMO_DAY_ADMIN users go directly to demo-days
-  return '/demo-days';
+  const isDemoDayAdmin = permissions.includes('demoday.admin.all') || permissions.some((permission) => permission.startsWith('demoday.admin.'));
+  if (isDemoDayAdmin) {
+    return '/demo-days';
+  }
+
+  // admin.tools.access means the user may enter Back Office,
+  // but feature pages still require their own permissions.
+  if (permissions.includes(ADMIN_PERMISSIONS.TOOLS_ACCESS)) {
+    return '/access-denied';
+  }
+
+  return '/access-denied';
 }
 
 export function Index() {

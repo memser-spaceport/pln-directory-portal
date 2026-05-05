@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '../utils/jwt/jwt.service';
+import { ADMIN_PERMISSIONS, DEMODAY_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { MemberRole } from '../utils/constants';
 
 /**
@@ -16,6 +17,14 @@ abstract class BaseAdminAuthGuard implements CanActivate {
   constructor(protected jwtService: JwtService) {}
 
   protected abstract getAllowedRoles(): MemberRole[];
+
+  protected getAllowedPermissions(): string[] {
+    return [];
+  }
+
+  protected allowsPermissionPrefix(_permissionCode: string): boolean {
+    return false;
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -31,11 +40,16 @@ abstract class BaseAdminAuthGuard implements CanActivate {
 
       // Verify user has at least one of the allowed roles
       const roles: string[] = payload.roles || [];
+      const permissions: string[] = payload.permissions || payload.effectivePermissionCodes || [];
       const allowedRoles = this.getAllowedRoles();
+      const allowedPermissions = this.getAllowedPermissions();
       const hasValidRole = roles.some((role) => allowedRoles.includes(role as MemberRole));
+      const hasValidPermission = permissions.some(
+        (permission) => allowedPermissions.includes(permission) || this.allowsPermissionPrefix(permission)
+      );
 
-      if (!hasValidRole) {
-        throw new ForbiddenException('User does not have the required admin role');
+      if (!hasValidRole && !hasValidPermission) {
+        throw new ForbiddenException('User does not have the required admin permission');
       }
     } catch (e) {
       if (e instanceof ForbiddenException) {
@@ -65,6 +79,10 @@ export class AdminAuthGuard extends BaseAdminAuthGuard {
   protected getAllowedRoles(): MemberRole[] {
     return [MemberRole.DIRECTORY_ADMIN];
   }
+
+  protected getAllowedPermissions(): string[] {
+    return [ADMIN_PERMISSIONS.DIRECTORY_FULL];
+  }
 }
 
 /**
@@ -78,6 +96,14 @@ export class DemoDayAdminAuthGuard extends BaseAdminAuthGuard {
   }
 
   protected getAllowedRoles(): MemberRole[] {
-    return [MemberRole.DIRECTORY_ADMIN, MemberRole.DEMO_DAY_ADMIN];
+    return [];
+  }
+
+  protected getAllowedPermissions(): string[] {
+    return [ADMIN_PERMISSIONS.DIRECTORY_FULL, DEMODAY_PERMISSIONS.ADMIN_ALL];
+  }
+
+  protected allowsPermissionPrefix(permissionCode: string): boolean {
+    return permissionCode.startsWith('demoday.admin.');
   }
 }

@@ -54,7 +54,11 @@ export class AdminDemoDaysController {
   @Get('report-link')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions({
-    anyOf: [RBAC_PERMISSION_CODES.DEMO_DAY_REPORT_LINK_READ, ADMIN_PERMISSIONS.DIRECTORY_FULL],
+    anyOf: [
+      RBAC_PERMISSION_CODES.DEMO_DAY_REPORT_LINK_READ,
+      RBAC_PERMISSION_CODES.DEMO_DAY_STATS_READ,
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+    ],
   })
   @NoCache()
   async getDemoDayReportLink(@Req() req): Promise<{ url: string }> {

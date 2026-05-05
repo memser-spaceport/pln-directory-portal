@@ -1,4 +1,4 @@
-import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { ADMIN_PERMISSIONS, DEMODAY_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 export enum APP_ENV {
   DEV = 'development',
@@ -152,6 +152,20 @@ export function isDirectoryAdmin(member: MemberWithRoles): boolean {
  */
 export function hasDemoDayAdminRole(member: MemberWithRoles): boolean {
   return hasAdminRole(member, MemberRole.DEMO_DAY_ADMIN);
+}
+
+export function hasAnyDemoDayAdminPermissionCode(member: MemberWithRoles): boolean {
+  const permissionCodes = [
+    ...(member?.effectivePermissionCodes ?? []),
+    ...(member?.effectivePermissions ?? []).map((p) => (typeof p === 'string' ? p : p?.code)).filter(Boolean) as string[],
+    ...(member?.permissions ?? []).map((p) => (typeof p === 'string' ? p : p?.code)).filter(Boolean) as string[],
+  ];
+
+  return (
+    permissionCodes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) ||
+    permissionCodes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
+    permissionCodes.some((code) => code.startsWith('demoday.admin.'))
+  );
 }
 
 export const JOIN_NOW_SUBJECT = 'A request to be a part of network';

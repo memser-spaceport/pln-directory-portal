@@ -11,9 +11,13 @@ export const DEMO_DAY_POLICY_L4 = 'unassigned_plc_other';
 
 export type DemoDayParticipantTypeForPolicies = 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
 
-export function investorPolicyCodeForDemoDayHost(host: string | null | undefined): 'investor_pl' | 'investor_pl_partner' {
+export function investorPolicyCodeForDemoDayHost(
+  host: string | null | undefined
+): 'investor_pl' | 'investor_pl_crecimiento_founder_school' {
   const normalized = (host ?? '').trim().toLowerCase();
-  return normalized === PROTOCOL_LABS_DEMO_DAY_HOST.trim().toLowerCase() ? 'investor_pl' : 'investor_pl_partner';
+  return normalized === PROTOCOL_LABS_DEMO_DAY_HOST.trim().toLowerCase()
+    ? 'investor_pl'
+    : 'investor_pl_crecimiento_founder_school';
 }
 
 export async function upsertPolicyAssignmentByCode(
@@ -58,7 +62,7 @@ export async function upsertInvestorPolicyAssignmentForDemoDayHost(
  * Maps former demo-day access-level outcomes to policy assignments:
  * - L2 → `unassigned_pln_other` (SUPPORT)
  * - L4 → `unassigned_plc_other` (FOUNDER)
- * - L5 → `investor_pl` | `investor_pl_partner` by host (INVESTOR only on investment teams)
+ * - L5 → `investor_pl` | `investor_pl_crecimiento_founder_school` by host (INVESTOR only on investment teams)
  * - L6 → same investor policy + `unassigned_plc_other` (INVESTOR with any non–investment-team membership)
  */
 export async function applyDemoDayParticipantPolicyAssignments(

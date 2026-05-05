@@ -61,7 +61,7 @@ const RoleEditPage = () => {
 
   useEffect(() => {
     if (!authLoading && user && !isDirectoryAdmin) {
-      router.replace('/demo-days');
+      router.replace('/access-denied');
     }
   }, [authLoading, user, isDirectoryAdmin, router]);
 

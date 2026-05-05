@@ -13,7 +13,8 @@ import { MembersService } from '../members/members.service';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
-import { isDirectoryAdmin, hasDemoDayAdminRole, MemberWithRoles, MemberRole } from '../utils/constants';
+import { hasDemoDayAdminPermissionForHost, getDemoDayAdminPermissionForHost } from './utils/demo-day-admin-permissions.util';
+import { MemberWithRoles } from '../utils/constants';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { MemberApprovalsService } from '../member-approvals/member-approvals.service';
 
@@ -402,71 +403,47 @@ export class DemoDaysService {
 
   /**
    * Get all demo days for admin back-office.
-   * - DIRECTORYADMIN: sees all demo days
-   * - DEMO_DAY_ADMIN: sees only demo days where their MemberDemoDayAdminScope.scopeValue matches DemoDay.host
+   * Access is resolved from RBAC v2.1 permissions only:
+   * - directory.admin.full / demoday.admin.all: all demo days
+   * - demoday.admin.<host>: only matching host demo days
    */
   async getAllDemoDaysForAdmin(userRoles: string[], memberUid?: string): Promise<DemoDay[]> {
-    const isDirectoryAdmin = userRoles.includes(MemberRole.DIRECTORY_ADMIN);
+    const tokenPermissionCodes = new Set(userRoles);
 
-    // Directory admins see all demo days
-    if (isDirectoryAdmin) {
+    if (tokenPermissionCodes.has('directory.admin.full') || tokenPermissionCodes.has('demoday.admin.all')) {
       return this.getAllDemoDays();
     }
 
-    // DEMO_DAY_ADMIN: filter by their admin scopes
     if (!memberUid) {
       return [];
     }
 
-    // Get the member's demo day admin scopes (HOST type)
-    const adminScopes = await this.prisma.memberDemoDayAdminScope.findMany({
-      where: {
-        memberUid,
-        scopeType: 'HOST',
-      },
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
       select: {
-        scopeValue: true,
+        memberPermissionsV2: { select: { permission: { select: { code: true } } } },
+        policyAssignmentsV2: {
+          select: {
+            policy: { select: { policyPermissions: { select: { permission: { select: { code: true } } } } } },
+          },
+        },
       },
     });
 
-    const allowedHosts = adminScopes.map((scope) => scope.scopeValue);
+    const permissionCodes = new Set([
+      ...tokenPermissionCodes,
+      ...(member?.memberPermissionsV2 ?? []).map((p) => p.permission.code),
+      ...(member?.policyAssignmentsV2 ?? []).flatMap((a) => a.policy.policyPermissions.map((p) => p.permission.code)),
+    ]);
 
-    if (allowedHosts.length === 0) {
-      return [];
+    if (permissionCodes.has('directory.admin.full') || permissionCodes.has('demoday.admin.all')) {
+      return this.getAllDemoDays();
     }
 
-    // Return demo days that match the allowed hosts
-    return this.prisma.demoDay.findMany({
-      where: {
-        isDeleted: false,
-        host: { in: allowedHosts },
-      },
-      select: {
-        id: true,
-        uid: true,
-        slugURL: true,
-        startDate: true,
-        endDate: true,
-        approximateStartDate: true,
-        title: true,
-        description: true,
-        shortDescription: true,
-        supportEmail: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        isDeleted: true,
-        deletedAt: true,
-        host: true,
-        notificationsEnabled: true,
-        notifyBeforeStartHours: true,
-        notifyBeforeEndHours: true,
-        dashboardEnabled: true,
-        programFieldEnabled: true,
-        programFieldOptions: true,
-        stageTagEnabled: true,
-      },
-      orderBy: { createdAt: 'desc' },
+    const allDemoDays = await this.getAllDemoDays();
+    return allDemoDays.filter((demoDay) => {
+      const permission = getDemoDayAdminPermissionForHost(demoDay.host);
+      return !!permission && permissionCodes.has(permission);
     });
   }
 
@@ -1643,43 +1620,18 @@ export class DemoDaysService {
       throw new ForbiddenException('No demo day access');
     }
 
-    // 1) Directory admins always have full access
-    const isDirectoryAdmin = this.membersService.checkIfAdminUser(member);
-    if (isDirectoryAdmin) {
+    // 1) Member-level Demo Day admin access comes from RBAC v2.1 permissions only.
+    if (hasDemoDayAdminPermissionForHost(member, demoDay.host)) {
       return { participantUid: member.uid, isAdmin: true, isViewOnlyAdmin: false };
     }
 
-    // 2) Demo day admin with host-level scope (generic demoDayAdminScopes table)
-    const hasDemoDayAdminRoleFlag = hasDemoDayAdminRole(member);
-
-    if (hasDemoDayAdminRoleFlag) {
-      const hostScopes = await this.prisma.memberDemoDayAdminScope.findMany({
-        where: {
-          memberUid: member.uid,
-          scopeType: 'HOST',
-        },
-        select: {
-          scopeValue: true,
-        },
-      });
-
-      const allowedHosts = hostScopes.map((s) => s.scopeValue.toLowerCase());
-      const demoDayHost = demoDay.host.toLowerCase();
-
-      const canManageByHost = allowedHosts.includes(demoDayHost);
-
-      if (canManageByHost) {
-        return { participantUid: member.uid, isAdmin: true, isViewOnlyAdmin: false };
-      }
-    }
-
-    // 3) Participant-level demo day admin (existing behavior based on DemoDayParticipant)
+    // 2) Participant-level demo day admin (existing behavior based on DemoDayParticipant)
     const hasParticipantAdminAccess = await this.isDemoDayAdmin(member.uid, demoDayUid);
     if (hasParticipantAdminAccess) {
       return { participantUid: member.uid, isAdmin: true, isViewOnlyAdmin: false };
     }
 
-    // 3.5) Participant-level read-only admin
+    // 3) Participant-level read-only admin
     const hasReadOnlyAdminAccess = await this.isDemoDayReadOnlyAdmin(member.uid, demoDayUid);
     if (hasReadOnlyAdminAccess) {
       return { participantUid: member.uid, isAdmin: false, isViewOnlyAdmin: true };
@@ -1911,12 +1863,14 @@ export class DemoDaysService {
             name: true,
           },
         },
-        demoDayAdminScopes: {
-          where: {
-            scopeType: 'HOST',
-          },
+        memberPermissionsV2: { select: { permission: { select: { code: true } } } },
+        policyAssignmentsV2: {
           select: {
-            scopeValue: true,
+            policy: {
+              select: {
+                policyPermissions: { select: { permission: { select: { code: true } } } },
+              },
+            },
           },
         },
         demoDayParticipants: {
@@ -1946,40 +1900,20 @@ export class DemoDaysService {
   /**
    * Check if a member has demo day admin access for a specific demo day.
    * A member has demo day admin access if they:
-   * - Are a directory admin (DIRECTORY_ADMIN), OR
-   * - Have the DEMO_DAY_ADMIN role AND their MemberDemoDayAdminScope.scopeValue matches the DemoDay.host
+   * - Have directory.admin.full, OR
+   * - Have demoday.admin.all, OR
+   * - Have the host-specific demoday.admin.<host> permission
    *
    * Note: Participant-level isDemoDayAdmin is checked separately in getDemoDayAccess
    *
-   * @param member - Member with roles and demoDayAdminScopes
+   * @param member - Member with effective RBAC v2.1 permission codes
    * @param demoDayHost - The host of the demo day to check access for
    */
   private hasDemoDayAdminAccess(
     member: MemberWithRoles & { demoDayAdminScopes?: { scopeValue: string }[] },
-    demoDayHost?: string
+    demoDayHost?: string | null
   ): boolean {
-    // Directory admins always have access
-    if (isDirectoryAdmin(member)) {
-      return true;
-    }
-
-    // Check if member has DEMO_DAY_ADMIN role
-    if (!hasDemoDayAdminRole(member)) {
-      return false;
-    }
-
-    // If no host provided, or no scopes defined, deny access for DEMO_DAY_ADMIN
-    if (!demoDayHost || !member.demoDayAdminScopes || member.demoDayAdminScopes.length === 0) {
-      return false;
-    }
-
-    // Check if member's scopes include the demo day host (case-insensitive)
-    if (hasDemoDayAdminRole(member)) {
-      const allowedHosts = member.demoDayAdminScopes.map((s) => s.scopeValue.toLowerCase());
-      return allowedHosts.includes(demoDayHost.toLowerCase());
-    }
-
-    return false;
+    return hasDemoDayAdminPermissionForHost(member, demoDayHost);
   }
 
   /**
