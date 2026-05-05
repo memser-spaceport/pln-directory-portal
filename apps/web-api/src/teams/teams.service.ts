@@ -1778,7 +1778,7 @@ export class TeamsService {
         industryTags: {
           some: {
             title: {
-              in: filters.tags.split('searchTeams|'),
+              in: filters.tags.split('|'),
               mode: 'insensitive',
             },
           },
