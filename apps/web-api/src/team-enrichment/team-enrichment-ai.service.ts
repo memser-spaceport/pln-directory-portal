@@ -151,6 +151,11 @@ export class TeamEnrichmentAiService {
       telegramHandler?: string | null;
       shortDescription?: string | null;
       longDescription?: string | null;
+      userConfirmedIdentityHints?: {
+        shortDescription?: string | null;
+        longDescription?: string | null;
+        moreDetails?: string | null;
+      };
     }
   ): Promise<AITeamEnrichmentResponse> {
     try {
@@ -191,9 +196,37 @@ export class TeamEnrichmentAiService {
       telegramHandler?: string | null;
       shortDescription?: string | null;
       longDescription?: string | null;
+      userConfirmedIdentityHints?: {
+        shortDescription?: string | null;
+        longDescription?: string | null;
+        moreDetails?: string | null;
+      };
     }
   ): string {
-    const existingDescription = existingData.shortDescription || existingData.longDescription || '';
+    const hints = existingData.userConfirmedIdentityHints;
+    const userConfirmedShort = hints?.shortDescription?.trim();
+    const userConfirmedLong = hints?.longDescription?.trim();
+    const userConfirmedMore = hints?.moreDetails?.trim();
+    const hasUserConfirmedHints = !!(userConfirmedShort || userConfirmedLong || userConfirmedMore);
+
+    let descriptionBlock: string;
+    if (hasUserConfirmedHints) {
+      const lines: string[] = [];
+      if (userConfirmedShort) lines.push(`- Short description: ${userConfirmedShort}`);
+      if (userConfirmedLong) lines.push(`- Long description: ${userConfirmedLong}`);
+      if (userConfirmedMore) lines.push(`- More details: ${userConfirmedMore}`);
+      descriptionBlock = `USER-CONFIRMED IDENTITY HINTS — the team lead has explicitly asserted these about THIS team. Treat them as ground truth when disambiguating between similarly-named entities.
+${lines.join('\n')}`;
+    } else {
+      const existingDescription = existingData.shortDescription || existingData.longDescription || '';
+      descriptionBlock = existingDescription
+        ? `Existing Description: ${existingDescription}`
+        : 'Description: Not available';
+    }
+
+    const importantLine = hasUserConfirmedHints
+      ? `IMPORTANT: The entity name is EXACTLY "${teamName}". When user-confirmed identity hints are provided above, the target entity is the one matching BOTH the name AND those hints. If the bare name is ambiguous (e.g. "Neiro" with hint "NeiroCoin is a cryptocurrency"), search for the entity described by the hints, not just the bare name.`
+      : `IMPORTANT: The entity name is EXACTLY "${teamName}". If there are similarly-named entities, make sure you find information about this exact one.`;
 
     return `
 Research and enrich the profile for this company/fund:
@@ -204,9 +237,9 @@ ${existingData.contactMethod ? `Existing Contact: ${existingData.contactMethod}`
 ${existingData.linkedinHandler ? `Existing LinkedIn: ${existingData.linkedinHandler}` : 'LinkedIn: Unknown'}
 ${existingData.twitterHandler ? `Existing Twitter/X: ${existingData.twitterHandler}` : 'Twitter/X: Unknown'}
 ${existingData.telegramHandler ? `Existing Telegram: ${existingData.telegramHandler}` : 'Telegram: Unknown'}
-${existingDescription ? `Existing Description: ${existingDescription}` : 'Description: Not available'}
+${descriptionBlock}
 
-IMPORTANT: The entity name is EXACTLY "${teamName}". If there are similarly-named entities, make sure you find information about this exact one.
+${importantLine}
 
 CONTEXT:
 - This entity may operate in the Web3/blockchain/crypto ecosystem

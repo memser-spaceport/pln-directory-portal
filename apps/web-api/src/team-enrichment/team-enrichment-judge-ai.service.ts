@@ -26,6 +26,8 @@ For each field listed in the user prompt, decide:
 
 If a "ScrapingDog pre-verification" block confirms the team's LinkedIn identity, treat that as strong evidence the entity reference is correct — but still verify each individual field value on its own merits.
 
+If a "Website reachability" line is present, factor it in: when the team's website is reachable AND the LinkedIn profile reports a different website host, prefer to disagree with linkedinHandler rather than website (the website is real; the LinkedIn handle is the more likely culprit).
+
 RULES:
 - Use "uncertain" rather than guessing when you cannot verify a value.
 - Do NOT propose new values. You are judging, not enriching.
@@ -71,6 +73,10 @@ export interface JudgeTeamContext {
   linkedinHandler?: string | null;
   twitterHandler?: string | null;
   telegramHandler?: string | null;
+  /** Website reachability probe result. true=2xx, false=definitive 4xx/5xx, null=not probed/transient. */
+  websiteReachable?: boolean | null;
+  /** Post-redirect host (normalized) when reachable; null otherwise. */
+  websiteFinalHost?: string | null;
   scrapingDog?: TeamJudgment['scrapingDog'];
 }
 
@@ -159,6 +165,15 @@ export class TeamEnrichmentJudgeAiService {
     if (context.linkedinHandler) identityLines.push(`Known LinkedIn: ${context.linkedinHandler}`);
     if (context.twitterHandler) identityLines.push(`Known Twitter/X: ${context.twitterHandler}`);
     if (context.telegramHandler) identityLines.push(`Known Telegram: ${context.telegramHandler}`);
+    if (context.website && context.websiteReachable !== undefined) {
+      const reachabilityWord =
+        context.websiteReachable === true ? 'yes' : context.websiteReachable === false ? 'no' : 'unknown';
+      const finalHostNote =
+        context.websiteFinalHost && context.websiteReachable === true
+          ? `; final host after redirects: ${context.websiteFinalHost}`
+          : '';
+      identityLines.push(`Website reachability: ${reachabilityWord}${finalHostNote}`);
+    }
 
     const fieldsBlock = fields
       .map((f) => {
