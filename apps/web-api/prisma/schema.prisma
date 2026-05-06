@@ -80,9 +80,11 @@ model Team {
   dealRedemptions         DealRedemption[] @relation("TeamDealRedemptions")
   dealUsages              DealUsage[]      @relation("TeamDealUsages")
 
-  articles      Article[]          @relation("TeamArticles")
-  jobOpenings   JobOpening[]
-  jobEnrichment TeamJobEnrichment?
+  articles       Article[]           @relation("TeamArticles")
+  jobOpenings    JobOpening[]
+  jobEnrichment  TeamJobEnrichment?
+  newsItems      TeamNewsItem[]
+  newsEnrichment TeamNewsEnrichment?
 }
 
 enum AskStatus {
@@ -2058,6 +2060,60 @@ model TeamJobEnrichment {
   @@index([teamUid])
   @@index([needsReview])
   @@index([dataDiscrepancyFlag])
+}
+
+enum NewsEventType {
+  FUNDING
+  LAUNCH
+  PARTNERSHIP
+  ANNOUNCEMENT
+  MILESTONE
+  OTHER
+}
+
+enum NewsDiscoveryOutcome {
+  OK
+  NO_WEBSITE
+  AGENT_FAILED
+}
+
+model TeamNewsItem {
+  id           Int           @id @default(autoincrement())
+  uid          String        @unique @default(cuid())
+  teamUid      String
+  team         Team          @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  canonicalKey String        @unique
+  eventType    NewsEventType @default(OTHER)
+  eventDate    DateTime
+  title        String
+  summary      String?
+  sourceUrl    String
+  sourceDomain String?
+  tags         String[]      @default([])
+  rawPayload   Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([teamUid])
+  @@index([eventDate])
+  @@index([eventType])
+  @@index([teamUid, eventDate(sort: Desc)])
+}
+
+model TeamNewsEnrichment {
+  id                   Int                   @id @default(autoincrement())
+  uid                  String                @unique @default(cuid())
+  teamUid              String                @unique
+  team                 Team                  @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  lastDiscoveryAt      DateTime?
+  lastDiscoveryOutcome NewsDiscoveryOutcome?
+  recentNewsCount      Int                   @default(0)
+  enrichmentSource     String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([teamUid])
+  @@index([lastDiscoveryOutcome])
 }
 
 model JobAlert {
