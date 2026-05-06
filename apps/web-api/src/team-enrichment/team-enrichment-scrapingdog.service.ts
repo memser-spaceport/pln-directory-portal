@@ -277,7 +277,12 @@ export class TeamEnrichmentScrapingDogService {
       .trim();
   }
 
-  private extractHost(url: string): string | null {
+  /**
+   * Normalizes a URL to a comparable host string (strips `www.`, lowercases).
+   * Public so the judge can match a probe's redirect-final host against the same
+   * normalization the deterministic comparator uses.
+   */
+  extractHost(url: string): string | null {
     try {
       const parsed = new URL(url);
       return parsed.host.replace(/^www\./, '').toLowerCase();

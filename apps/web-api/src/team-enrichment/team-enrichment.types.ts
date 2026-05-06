@@ -107,6 +107,8 @@ export interface TeamJudgment {
     companyNameFromLinkedIn: string | null;
     verifiedFields: string[];
     linkedinInternalId: string | null;
+    websiteReachable?: boolean | null;
+    websiteFinalHost?: string | null;
   };
 }
 
@@ -131,12 +133,15 @@ export interface TeamDataEnrichment {
 }
 
 export interface AIJudgeResponse {
-  fields: Record<string, {
-    confidence: 'high' | 'medium' | 'low';
-    score: number;
-    verdict: 'agrees' | 'disagrees' | 'uncertain';
-    note: string;
-  }>;
+  fields: Record<
+    string,
+    {
+      confidence: 'high' | 'medium' | 'low';
+      score: number;
+      verdict: 'agrees' | 'disagrees' | 'uncertain';
+      note: string;
+    }
+  >;
   overallAssessment: string;
 }
 

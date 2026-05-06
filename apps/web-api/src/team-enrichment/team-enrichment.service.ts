@@ -633,6 +633,24 @@ export class TeamEnrichmentService {
     await this.updateEnrichmentStatus(teamUid, team.dataEnrichment, EnrichmentStatus.InProgress);
 
     try {
+      // Preserve existing field statuses from previous enrichment runs.
+      // Parsed here (above the AI call) so we can derive user-confirmed identity hints.
+      const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
+      const existingFieldsMeta = (existingMeta?.fieldsMeta ?? {}) as FieldsMetaMap;
+
+      // Pass user-confirmed shortDescription/longDescription/moreDetails to the AI as
+      // high-trust identity hints — disambiguates ambiguous team names (e.g. "Neiro" vs
+      // "NeiroCoin") so the AI searches for the entity described by the hint, not the bare name.
+      const userConfirmedIdentityHints = {
+        shortDescription: isFieldUserOwned(existingFieldsMeta, 'shortDescription', !!team.shortDescription)
+          ? team.shortDescription
+          : null,
+        longDescription: isFieldUserOwned(existingFieldsMeta, 'longDescription', !!team.longDescription)
+          ? team.longDescription
+          : null,
+        moreDetails: isFieldUserOwned(existingFieldsMeta, 'moreDetails', !!team.moreDetails) ? team.moreDetails : null,
+      };
+
       // Call AI for enrichment
       const aiResponse = await this.aiService.enrichTeamViaAI(team.name, {
         website: team.website,
@@ -642,11 +660,8 @@ export class TeamEnrichmentService {
         telegramHandler: team.telegramHandler,
         shortDescription: team.shortDescription,
         longDescription: team.longDescription,
+        userConfirmedIdentityHints,
       });
-
-      // Preserve existing field statuses from previous enrichment runs
-      const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
-      const existingFieldsMeta = (existingMeta?.fieldsMeta ?? {}) as FieldsMetaMap;
 
       // Verify entity identity to decide which fields are safe to enrich.
       // Website and logo require high confidence (verified entity).
@@ -673,10 +688,7 @@ export class TeamEnrichmentService {
       const websiteHtml = websiteToScan ? await this.aiService.fetchWebsiteHtml(websiteToScan) : null;
 
       if (websiteToScan) {
-        const signals = await this.aiService.fetchSocialSignalsFromWebsite(
-          websiteToScan,
-          websiteHtml ?? undefined
-        );
+        const signals = await this.aiService.fetchSocialSignalsFromWebsite(websiteToScan, websiteHtml ?? undefined);
         if (signals) {
           aiResponse.confidence ||= {};
           const backfillMap: Array<[EnrichableTeamField, string | undefined]> = [
@@ -903,7 +915,9 @@ export class TeamEnrichmentService {
                 confidence: FieldConfidence.Medium,
                 source: EnrichmentSource.OpenGraph,
               };
-              this.logger.log(`Logo uploaded successfully for team ${teamUid} (${team.name}), image uid: ${persisted.imageUid}`);
+              this.logger.log(
+                `Logo uploaded successfully for team ${teamUid} (${team.name}), image uid: ${persisted.imageUid}`
+              );
             } else {
               this.logger.warn(`Logo upload returned no URL for team ${teamUid} (${team.name})`);
               newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };

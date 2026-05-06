@@ -5,10 +5,12 @@ import { JudgeFieldInput, JudgeTeamContext, TeamEnrichmentJudgeAiService } from 
 import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import {
   EnrichmentStatus,
+  FieldConfidence,
   FieldEnrichmentMeta,
   FieldEnrichmentStatus,
   FieldJudgment,
   FieldMetaKey,
+  JudgmentSource,
   JudgmentStatus,
   JudgmentVerdict,
   TeamDataEnrichment,
@@ -251,6 +253,44 @@ export class TeamEnrichmentJudgeService {
             }
           }
 
+          // Reachability gate: a 'host-mismatch' verdict from compareProfileToTeam is purely a
+          // string comparison — it can't tell whether the team's website is real. If the website
+          // is reachable, host-mismatch is no longer evidence the website is wrong (more likely
+          // the LinkedIn profile is mismatched). Probe once, and adjust ONLY the website verdict
+          // per the team's direction (linkedinHandler verdict is left untouched).
+          let websiteReachable: boolean | null = null;
+          let websiteFinalHost: string | null = null;
+          if (team.website && stage1Verdicts.website?.note === 'host-mismatch') {
+            const probe = await this.probeWebsiteReachable(team.website);
+            if (probe) {
+              websiteReachable = probe.reachable;
+              websiteFinalHost = probe.finalHost;
+              if (probe.reachable) {
+                const profileHost = this.scrapingDogService.extractHost(profile.website ?? '');
+                if (profileHost && probe.finalHost && probe.finalHost === profileHost) {
+                  // Team's website redirects to the ScrapingDog-listed host — they're the same entity.
+                  stage1Verdicts.website = {
+                    confidence: FieldConfidence.Medium,
+                    verdict: JudgmentVerdict.Agrees,
+                    score: 75,
+                    note: 'redirects-to-scrapingdog-host',
+                    judgedVia: JudgmentSource.ScrapingDog,
+                  };
+                } else {
+                  // Reachable but host-mismatch persists: downshift to uncertain so the website
+                  // isn't condemned. Surfaces in fieldsForReview via needsManualReview.
+                  stage1Verdicts.website = {
+                    confidence: FieldConfidence.Medium,
+                    verdict: JudgmentVerdict.Uncertain,
+                    score: 50,
+                    note: 'host-mismatch-but-reachable',
+                    judgedVia: JudgmentSource.ScrapingDog,
+                  };
+                }
+              }
+            }
+          }
+
           const verifiedFields = Object.entries(stage1Verdicts)
             .filter(([, v]) => v?.verdict === JudgmentVerdict.Agrees && v.confidence === 'high')
             .map(([k]) => k);
@@ -262,6 +302,8 @@ export class TeamEnrichmentJudgeService {
             companyNameFromLinkedIn: profile.companyName,
             verifiedFields,
             linkedinInternalId: profile.linkedinInternalId,
+            websiteReachable,
+            websiteFinalHost,
           };
         }
       }
@@ -293,6 +335,8 @@ export class TeamEnrichmentJudgeService {
           linkedinHandler: team.linkedinHandler,
           twitterHandler: team.twitterHandler,
           telegramHandler: team.telegramHandler,
+          websiteReachable: scrapingDogMeta?.websiteReachable ?? null,
+          websiteFinalHost: scrapingDogMeta?.websiteFinalHost ?? null,
           scrapingDog: scrapingDogMeta,
         };
 
@@ -546,5 +590,37 @@ export class TeamEnrichmentJudgeService {
     if (verdict.verdict === JudgmentVerdict.Uncertain) return true;
     if (verdict.confidence === 'low') return true;
     return false;
+  }
+
+  /**
+   * Lightweight reachability probe: a single GET that follows redirects, with a 5s timeout.
+   * Returns:
+   *   - { reachable: true,  finalHost } when the final response is 2xx.
+   *   - { reachable: false, finalHost: null } when the final response is non-2xx.
+   *   - null on network errors (timeout, DNS, abort) — don't penalise flaky networks.
+   * Used by the Stage 1 verdict gate to avoid condemning a reachable website on host-mismatch
+   * alone (a frequent false negative when the team's LinkedIn profile is the wrong one).
+   */
+  private async probeWebsiteReachable(url: string): Promise<{ reachable: boolean; finalHost: string | null } | null> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        redirect: 'follow' as RequestRedirect,
+      });
+      const finalHost = (() => {
+        try {
+          return new URL(response.url || url).host.replace(/^www\./, '').toLowerCase();
+        } catch {
+          return null;
+        }
+      })();
+      return response.ok ? { reachable: true, finalHost } : { reachable: false, finalHost: null };
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }
