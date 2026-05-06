@@ -83,18 +83,18 @@ export function PoliciesTable({ policies, members, pagination, setPagination, gl
     }),
     columnHelper.display({
       id: 'group',
-      size: 160,
+      size: 200,
       header: () => 'Group',
       cell: (info) => <span className={s.groupBadge}>{info.row.original.group}</span>,
     }),
-    columnHelper.accessor('description', {
-      size: 0,
-      header: 'Description',
-      cell: (info) => info.getValue() ?? <span className={s.muted}>—</span>,
-    }),
+    // columnHelper.accessor('description', {
+    //   size: 0,
+    //   header: 'Description',
+    //   cell: (info) => info.getValue() ?? <span className={s.muted}>—</span>,
+    // }),
     columnHelper.display({
       id: 'modules',
-      size: 200,
+      size: 0,
       header: () => 'Modules',
       cell: (info) => <ModulesCell permissionItems={info.row.original.permissionItems} />,
     }),
