@@ -69,6 +69,7 @@ import { DealRequestsModule } from './deal-requests/deal-requests.module';
 import { ArticleRequestsModule } from './article-requests/article-requests.module';
 import { JobOpeningsModule } from './job-openings/job-openings.module';
 import { JobAlertsModule } from './job-alerts/job-alerts.module';
+import { TeamNewsModule } from './team-news/team-news.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -158,6 +159,7 @@ import { JobAlertsModule } from './job-alerts/job-alerts.module';
     ArticleRequestsModule,
     JobOpeningsModule,
     JobAlertsModule,
+    TeamNewsModule,
   ],
   providers: [
     {
