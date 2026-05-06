@@ -137,7 +137,7 @@ interface RbacSectionProps {
 }
 
 export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions }: RbacSectionProps) => {
-  const { watch, setValue } = useFormContext<TMemberForm>();
+  const { watch, setValue, formState: { errors } } = useFormContext<TMemberForm>();
   const rbacPolicies = (watch('rbacPolicies') ?? []) as PolicySelection[];
   const rbacExceptions = (watch('rbacExceptions') ?? []) as SelectOption[];
   const memberStateStatus = watch('memberStateStatus');
@@ -177,6 +177,9 @@ export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions
             );
           }}
         />
+        {errors.memberStateStatus && (
+          <p className={s.errorMsg}>{errors.memberStateStatus.message}</p>
+        )}
         <p className={s.hint}>Policies can only be assigned to Approved members.</p>
       </div>
 
@@ -193,6 +196,9 @@ export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions
           placeholder="Select policies"
           ariaLabelledBy="policy-field-label"
         />
+        {errors.rbacPolicies && (
+          <p className={s.errorMsg}>{errors.rbacPolicies.message}</p>
+        )}
         <p className={s.hint}>Search and select one or more policies. Policies are grouped by role.</p>
       </div>
 
