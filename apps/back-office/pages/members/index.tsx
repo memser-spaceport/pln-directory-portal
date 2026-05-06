@@ -40,7 +40,7 @@ const MembersPage = () => {
   useEffect(() => {
     // Wait for auth to load, then check if user has directory admin role
     if (!isLoading && user && !isDirectoryAdmin) {
-      router.replace('/demo-days');
+      router.replace('/access-denied');
     }
   }, [isLoading, user, isDirectoryAdmin, router]);
 

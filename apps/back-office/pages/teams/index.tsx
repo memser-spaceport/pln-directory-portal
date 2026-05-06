@@ -96,7 +96,7 @@ const TeamsPage: React.FC = () => {
   // Redirect non-directory admins to demo-days
   useEffect(() => {
     if (!isLoading && user && !isDirectoryAdmin) {
-      router.replace('/demo-days');
+      router.replace('/access-denied');
     }
   }, [isLoading, user, isDirectoryAdmin, router]);
 

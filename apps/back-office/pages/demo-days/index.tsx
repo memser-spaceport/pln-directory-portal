@@ -5,7 +5,6 @@ import { useDemoDaysList } from '../../hooks/demo-days/useDemoDaysList';
 import { useCookie } from 'react-use';
 import Link from 'next/link';
 import { useAuth } from '../../context/auth-context';
-import { removeToken } from '../../utils/auth';
 
 const DemoDaysPage = () => {
   const router = useRouter();
@@ -20,28 +19,14 @@ const DemoDaysPage = () => {
     }
   }, [authToken, router]);
 
-  // Logout completely if user has NO roles (NONE case)
+  // Block access to Demo Days if user has no required permission
   useEffect(() => {
-    if (!isLoading && authToken && user && (!user.roles || user.roles.length === 0)) {
-      removeToken();
+    if (!isLoading && authToken && user && !isDirectoryAdmin && !isDemoDayAdmin) {
       router.replace('/');
-    }
-  }, [authToken, user, isLoading, router]);
-
-  // Block access to Demo Days if user has no required role
-  useEffect(() => {
-    if (!isLoading && authToken && user && user.roles && user.roles.length > 0) {
-      if (!isDirectoryAdmin && !isDemoDayAdmin) {
-        router.replace('/');
-      }
     }
   }, [authToken, user, isLoading, isDirectoryAdmin, isDemoDayAdmin, router]);
 
   if (!authToken || isLoading) {
-    return null;
-  }
-
-  if (user && (!user.roles || user.roles.length === 0)) {
     return null;
   }
 

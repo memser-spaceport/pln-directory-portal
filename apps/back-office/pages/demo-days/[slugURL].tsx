@@ -22,7 +22,6 @@ import { toast } from 'react-toastify';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../../context/auth-context';
 import api from '../../utils/api';
-import { removeToken } from '../../utils/auth';
 
 import s from './styles.module.scss';
 
@@ -49,32 +48,6 @@ const DemoDayDetailPage = () => {
   const { slugURL } = router.query;
   const [authToken] = useCookie('plnadmin');
   const { isDirectoryAdmin, user } = useAuth();
-
-  /**
-   * Reloads current member from backend and returns role names.
-   * If member has no roles, returns an empty array.
-   */
-  const fetchMemberRolesFromApi = async (): Promise<string[]> => {
-    if (!authToken || !user?.uid) {
-      return [];
-    }
-
-    const config = {
-      headers: {
-        authorization: `Bearer ${authToken}`,
-      },
-    };
-
-    const res = await api.get(`${API_ROUTE.ADMIN_MEMBERS}/${user.uid}`, config);
-    const member = res.data;
-
-    const rolesFromApi: string[] = Array.isArray(member?.memberRoles)
-      ? member.memberRoles.map((r: any) => r.name).filter(Boolean)
-      : [];
-
-    console.log('[DemoDayDetailPage] Member roles from API =', rolesFromApi);
-    return rolesFromApi;
-  };
 
   // Redirect to log-in if not authenticated
   useEffect(() => {
@@ -207,14 +180,6 @@ const DemoDayDetailPage = () => {
     }
   };
 
-  // Force logout helper: use when member has no roles / forbidden
-  const forceLogout = () => {
-    console.log('[DemoDayDetailPage] Force logout (no roles / forbidden)');
-    removeToken();
-    document.cookie = 'plnadmin_user=; Max-Age=0; path=/;';
-    router.replace('/');
-  };
-
   const handleEditDemoDay = () => {
     if (!demoDay) return;
     setEditFormData({
@@ -284,20 +249,6 @@ const DemoDayDetailPage = () => {
     if (!authToken || !demoDay) return;
 
     try {
-      try {
-        const rolesFromApi = await fetchMemberRolesFromApi();
-
-        // If user has NO ROLES → cancel save + logout
-        if (!rolesFromApi.length) {
-          console.log('[DemoDayDetailPage] Save cancelled because user has NO ROLES');
-          forceLogout();
-          return;
-        }
-      } catch (preCheckError) {
-        console.error('[DemoDayDetailPage] Failed to reload member before save', preCheckError);
-        // If reload fails — do NOT block save, to avoid false positives
-      }
-
       await updateDemoDayMutation.mutateAsync({
         authToken,
         uid: demoDay.uid,
@@ -310,10 +261,8 @@ const DemoDayDetailPage = () => {
     } catch (error: any) {
       console.error('Error updating demo day:', error);
 
-      // If backend already returned FORBIDDEN → logout
       if (error?.response?.status === 403) {
-        console.log('[DemoDayDetailPage] Backend FORBIDDEN → force logout');
-        forceLogout();
+        router.replace('/access-denied');
         return;
       }
 

@@ -260,7 +260,7 @@ const DealsPage = () => {
 
   useEffect(() => {
     if (!isLoading && user && !isDirectoryAdmin) {
-      router.replace('/demo-days');
+      router.replace('/access-denied');
     }
   }, [isLoading, user, isDirectoryAdmin, router]);
 

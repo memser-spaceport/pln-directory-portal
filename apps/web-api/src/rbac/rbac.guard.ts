@@ -9,6 +9,8 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   'founder_guides.create': ['founder_guides.create'],
   'deals.view': ['deals.read'],
   'demo_day.report_link.view': ['demoday.report_link.read'],
+  'membership.source.read': ['team.membership_source.read'],
+  'team.membership_source.read': ['membership.source.read'],
 };
 
 @Injectable()

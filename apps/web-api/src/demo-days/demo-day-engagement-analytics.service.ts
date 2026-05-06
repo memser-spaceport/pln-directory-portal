@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { DemoDaysService } from './demo-days.service';
 import { ANALYTICS_EVENTS } from '../utils/constants';
-import { MemberRole } from '../../../back-office/utils/constants';
+import { hasDemoDayAdminPermissionForHost } from './utils/demo-day-admin-permissions.util';
 
 // Event type arrays for SQL queries
 const DD = ANALYTICS_EVENTS.DEMO_DAY_EVENT;
@@ -38,9 +38,11 @@ export class DemoDayEngagementAnalyticsService {
       where: { email: memberEmail },
       select: {
         uid: true,
-        memberRoles: { select: { name: true } },
-        demoDayAdminScopes: {
-          select: { scopeType: true, scopeValue: true },
+        memberPermissionsV2: { select: { permission: { select: { code: true } } } },
+        policyAssignmentsV2: {
+          select: {
+            policy: { select: { policyPermissions: { select: { permission: { select: { code: true } } } } } },
+          },
         },
         demoDayParticipants: {
           where: {
@@ -66,23 +68,17 @@ export class DemoDayEngagementAnalyticsService {
       throw new ForbiddenException('Dashboard access is not enabled for this Demo Day');
     }
 
-    // Check admin roles
-    const isDirectoryAdmin = member.memberRoles.some((r) => r.name === MemberRole.DIRECTORY_ADMIN);
-    const isDemoDayAdmin = member.memberRoles.some((r) => r.name === MemberRole.DEMO_DAY_ADMIN);
-
-    // Check admin scopes
-    const hasHostScope = member.demoDayAdminScopes?.some(
-      (s) => s.scopeType === 'HOST' && s.scopeValue.toLowerCase() === demoDay.host.toLowerCase()
-    );
-    const hasWhitelistAll = member.demoDayAdminScopes?.some(
-      (s) => s.scopeType === 'DASHBOARD_WHITELIST' && s.scopeValue === '*'
-    );
-    const hasWhitelistHost = member.demoDayAdminScopes?.some(
-      (s) => s.scopeType === 'DASHBOARD_WHITELIST' && s.scopeValue.toLowerCase() === demoDay.host.toLowerCase()
+    const permissionCodes = Array.from(
+      new Set([
+        ...(member.memberPermissionsV2 ?? []).map((p) => p.permission.code),
+        ...(member.policyAssignmentsV2 ?? []).flatMap((a) =>
+          a.policy.policyPermissions.map((p) => p.permission.code)
+        ),
+      ])
     );
 
-    // Determine access level
-    const isAdmin = isDirectoryAdmin || (isDemoDayAdmin && hasHostScope) || hasWhitelistAll || hasWhitelistHost;
+    // Member-level admin access is resolved from RBAC v2.1 permissions only.
+    const isAdmin = hasDemoDayAdminPermissionForHost({ effectivePermissionCodes: permissionCodes }, demoDay.host);
 
     // Get user's participant record for this demo day
     const participant = member.demoDayParticipants[0];
@@ -648,18 +644,9 @@ export class DemoDayEngagementAnalyticsService {
     const participantMap = new Map(participants.map((p) => [p.memberUid, p.type]));
 
     // Helper to determine member role
-    // Priority: DIRECTORY_ADMIN > DEMO_DAY_ADMIN > Participant type (INVESTOR/FOUNDER/SUPPORT)
+    // Priority: participant type (INVESTOR/FOUNDER/SUPPORT). Member-level admin is RBAC v2.1-only and
+    // is checked by endpoint authorization, not by legacy MemberRole labels.
     const getMemberRole = (uid: string): string | null => {
-      const member = memberMap.get(uid);
-      const roles = member?.memberRoles?.map((r) => r.name) ?? [];
-
-      if (roles.includes(MemberRole.DIRECTORY_ADMIN)) {
-        return 'DIRECTORY_ADMIN';
-      }
-      if (roles.includes(MemberRole.DEMO_DAY_ADMIN)) {
-        return 'DEMO_DAY_ADMIN';
-      }
-
       // Check DemoDayParticipant type
       const participantType = participantMap.get(uid);
       if (participantType) {

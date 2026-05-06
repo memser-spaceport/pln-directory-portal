@@ -11,30 +11,26 @@ import { SortIcon } from '../../screens/members/components/icons';
 import PaginationControls from '../../screens/members/components/PaginationControls/PaginationControls';
 
 import { useRbacMembers } from '../../hooks/access-control/useRbacMembers';
-import { useRbacRoles } from '../../hooks/access-control/useRbacRoles';
 import { useRbacPermissions } from '../../hooks/access-control/useRbacPermissions';
 
 import { useMembersTable } from '../../screens/access-control/hooks/useMembersTable';
-import { useRolesTable } from '../../screens/access-control/hooks/useRolesTable';
 import { usePermissionsTable } from '../../screens/access-control/hooks/usePermissionsTable';
 
-type Tab = 'members' | 'roles' | 'permissions';
+type Tab = 'members' | 'permissions';
 
 const AccessControlPage = () => {
   const router = useRouter();
   const { isDirectoryAdmin, isLoading, user } = useAuth();
   const [authToken] = useCookie('plnadmin');
 
-  const tab = (router.query.tab as Tab | undefined) ?? 'members';
+  const rawTab = router.query.tab as string | undefined;
+  const tab: Tab = rawTab === 'permissions' ? 'permissions' : 'members';
 
   // Members tab state
   const [membersSorting, setMembersSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
   const [membersPagination, setMembersPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [membersSearch, setMembersSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
-
-  // Roles tab state
-  const [rolesSorting, setRolesSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
 
   // Permissions tab state
   const [permissionsSorting, setPermissionsSorting] = useState<SortingState>([{ id: 'code', desc: false }]);
@@ -48,7 +44,6 @@ const AccessControlPage = () => {
     limit: membersPagination.pageSize,
   });
 
-  const { data: rolesData } = useRbacRoles({ authToken });
   const { data: permissionsData } = useRbacPermissions({ authToken });
 
   // Reset pagination on filter change
@@ -68,12 +63,6 @@ const AccessControlPage = () => {
     setPagination: setMembersPagination,
   });
 
-  const { table: rolesTable } = useRolesTable({
-    roles: rolesData ?? [],
-    sorting: rolesSorting,
-    setSorting: setRolesSorting,
-  });
-
   const { table: permissionsTable } = usePermissionsTable({
     permissions: permissionsData ?? [],
     sorting: permissionsSorting,
@@ -89,7 +78,7 @@ const AccessControlPage = () => {
 
   useEffect(() => {
     if (!isLoading && user && !isDirectoryAdmin) {
-      router.replace('/demo-days');
+      router.replace('/access-denied');
     }
   }, [isLoading, user, isDirectoryAdmin, router]);
 
@@ -182,9 +171,6 @@ const AccessControlPage = () => {
           <button className={clsx(s.tab, { [s.active]: tab === 'members' })} onClick={() => setTab('members')}>
             Members
           </button>
-          <button className={clsx(s.tab, { [s.active]: tab === 'roles' })} onClick={() => setTab('roles')}>
-            Roles
-          </button>
           <button className={clsx(s.tab, { [s.active]: tab === 'permissions' })} onClick={() => setTab('permissions')}>
             Permissions
           </button>
@@ -203,26 +189,9 @@ const AccessControlPage = () => {
                     if (e.key === 'Escape') setMembersSearch('');
                   }}
                 />
-                <select className={s.filterSelect} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
-                  <option value="">All roles</option>
-                  {rolesData?.map((role) => (
-                    <option key={role.code} value={role.code}>
-                      {role.name}
-                    </option>
-                  ))}
-                </select>
               </div>
               {renderTable(membersTable)}
               <PaginationControls table={membersTable} />
-            </>
-          )}
-
-          {tab === 'roles' && (
-            <>
-              <div className={s.controlBar}>
-                <div className={s.placeholderControl} />
-              </div>
-              {renderTable(rolesTable, 'No roles found.')}
             </>
           )}
 
