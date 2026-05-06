@@ -61,7 +61,7 @@ export function MembersTableV2({
         id: 'teamProject',
         header: 'Team/Project',
         cell: (info) => <ProjectsCell member={info.row.original} />,
-        size: 0,
+        size: 200,
       }),
     ];
 
@@ -112,7 +112,7 @@ export function MembersTableV2({
                   </div>
                 );
               },
-              size: 180,
+              size: 0,
             }),
             columnHelper.display({
               id: 'exceptions',
@@ -130,7 +130,7 @@ export function MembersTableV2({
                   </div>
                 );
               },
-              size: 200,
+              size: 0,
             }),
           ]
         : [];
