@@ -47,7 +47,7 @@ const DemoDayDetailPage = () => {
   const router = useRouter();
   const { slugURL } = router.query;
   const [authToken] = useCookie('plnadmin');
-  const { isDirectoryAdmin, user } = useAuth();
+  const { isDirectoryAdmin, user, permissions, hasPermission } = useAuth();
 
   // Redirect to log-in if not authenticated
   useEffect(() => {
@@ -90,6 +90,16 @@ const DemoDayDetailPage = () => {
   const updateDemoDayMutation = useUpdateDemoDay();
   const updateBrandingMutation = useUpdateBranding();
   const updateParticipantMutation = useUpdateParticipant();
+
+  const canManageDemoDay =
+    isDirectoryAdmin ||
+    hasPermission('demoday.admin.all') ||
+    permissions.some((permission) => permission.startsWith('demoday.admin.'));
+
+  const canReadDemoDay =
+    canManageDemoDay ||
+    hasPermission('demoday.stats.read') ||
+    hasPermission('demoday.report_link.read');
 
   const { data: demoDay, isLoading: demoDayLoading } = useDemoDayDetails({
     authToken,
@@ -538,6 +548,10 @@ const DemoDayDetailPage = () => {
   };
 
   const handleApproveClick = (participant: DemoDayParticipant) => {
+    if (!canManageDemoDay) {
+      return;
+    }
+
     setSelectedParticipantForApproval(participant);
     setShowApproveModal(true);
   };
@@ -656,7 +670,7 @@ const DemoDayDetailPage = () => {
           <div className={s.overview}>
             <div className={s.overviewHeader}>
               <h2 className={s.overviewTitle}>Overview</h2>
-              {!isEditing ? (
+              {canManageDemoDay && (!isEditing ? (
                 <button onClick={handleEditDemoDay} className={s.editButton}>
                   Edit
                 </button>
@@ -667,13 +681,13 @@ const DemoDayDetailPage = () => {
                   </button>
                   <button
                     onClick={handleSaveDemoDay}
-                    disabled={updateDemoDayMutation.isPending}
+                    disabled={updateDemoDayMutation.isPending || !canManageDemoDay}
                     className={clsx(s.editButton, s.primary)}
                   >
                     {updateDemoDayMutation.isPending ? 'Saving...' : 'Save'}
                   </button>
                 </div>
-              )}
+              ))}
             </div>
 
             <div className={s.overviewGrid}>
@@ -976,7 +990,7 @@ const DemoDayDetailPage = () => {
           <div className={s.branding}>
             <div className={s.overviewHeader}>
               <h2 className={s.brandingTitle}>Branding</h2>
-              {!isBrandingEditing ? (
+              {canManageDemoDay && (!isBrandingEditing ? (
                 <button onClick={handleBrandingEdit} className={s.editButton}>
                   Edit
                 </button>
@@ -987,13 +1001,13 @@ const DemoDayDetailPage = () => {
                   </button>
                   <button
                     onClick={handleBrandingSave}
-                    disabled={updateBrandingMutation.isPending}
+                    disabled={updateBrandingMutation.isPending || !canManageDemoDay}
                     className={clsx(s.editButton, s.primary)}
                   >
                     {updateBrandingMutation.isPending ? 'Saving...' : 'Save'}
                   </button>
                 </div>
-              )}
+              ))}
             </div>
 
             <div className={s.brandingGrid}>
@@ -1253,11 +1267,11 @@ const DemoDayDetailPage = () => {
               <div className={s.participantsHeaderTop}>
                 <h2 className={s.participantsTitle}>Participants</h2>
                 <div className={s.participantsActions}>
-                  <button onClick={() => setShowAddParticipantModal(true)} className={clsx(s.editButton, s.primary)}>
+                  <button onClick={() => canManageDemoDay && setShowAddParticipantModal(true)} className={clsx(s.editButton, s.primary)}>
                     Add Participant
                   </button>
                   <button
-                    onClick={() => setShowUploadModal(true)}
+                    onClick={() => canManageDemoDay && setShowUploadModal(true)}
                     className="rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
                   >
                     Upload Investors CSV
@@ -1419,7 +1433,7 @@ const DemoDayDetailPage = () => {
                                         );
                                       }
                                     }}
-                                    disabled={updateParticipantMutation.isPending}
+                                    disabled={updateParticipantMutation.isPending || !canManageDemoDay}
                                     className={`flex-1 rounded-full border-0 px-2 py-1 text-xs font-semibold ${
                                       currentTeamUid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
                                     } disabled:opacity-50`}
@@ -1570,7 +1584,7 @@ const DemoDayDetailPage = () => {
                           onChange={(e) =>
                             handleUpdateParticipantEarlyAccess(participant.uid, e.target.value === 'yes')
                           }
-                          disabled={updateParticipantMutation.isPending}
+                          disabled={updateParticipantMutation.isPending || !canManageDemoDay}
                           className={clsx(
                             'inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold disabled:opacity-50',
                             participant.hasEarlyAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
@@ -1621,7 +1635,7 @@ const DemoDayDetailPage = () => {
                               e.target.value as 'INVESTOR' | 'FOUNDER' | 'SUPPORT'
                             )
                           }
-                          disabled={updateParticipantMutation.isPending}
+                          disabled={updateParticipantMutation.isPending || !canManageDemoDay}
                           className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
                             participant.type === 'INVESTOR'
                               ? 'bg-purple-100 text-purple-800'
@@ -1655,7 +1669,7 @@ const DemoDayDetailPage = () => {
                           </button>
                           <button
                             onClick={() => handleApproveClick(participant)}
-                            disabled={updateParticipantMutation.isPending}
+                            disabled={updateParticipantMutation.isPending || !canManageDemoDay}
                             className="flex-1 rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                             title="Approve application"
                           >
@@ -1666,7 +1680,7 @@ const DemoDayDetailPage = () => {
                               onClick={() =>
                                 handleReject(participant.uid, participant.member?.name || participant.name)
                               }
-                              disabled={updateParticipantMutation.isPending}
+                              disabled={updateParticipantMutation.isPending || !canManageDemoDay}
                               className="flex-1 rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                               title="Reject application"
                             >
@@ -1682,7 +1696,7 @@ const DemoDayDetailPage = () => {
                               e.target.value as 'INVITED' | 'ENABLED' | 'DISABLED'
                             )
                           }
-                          disabled={updateParticipantMutation.isPending}
+                          disabled={updateParticipantMutation.isPending || !canManageDemoDay}
                           className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${getParticipantStatusColor(
                             participant.status
                           )} disabled:opacity-50`}
@@ -1713,7 +1727,7 @@ const DemoDayDetailPage = () => {
                               e.target.value as 'no' | 'full' | 'view-only'
                             )
                           }
-                          disabled={updateParticipantMutation.isPending}
+                          disabled={updateParticipantMutation.isPending || !canManageDemoDay}
                           className={`inline-flex rounded-full border-0 px-2 py-1 text-xs font-semibold ${
                             participant.isDemoDayAdmin
                               ? 'bg-green-100 text-green-800'
@@ -1952,7 +1966,7 @@ const DemoDayDetailPage = () => {
                     type="button"
                     className="inline-flex justify-center rounded-md border border-transparent bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
                     onClick={handleConfirmNotificationAndSave}
-                    disabled={updateDemoDayMutation.isPending}
+                    disabled={updateDemoDayMutation.isPending || !canManageDemoDay}
                   >
                     {updateDemoDayMutation.isPending ? 'Saving...' : 'Save & Send Notification'}
                   </button>

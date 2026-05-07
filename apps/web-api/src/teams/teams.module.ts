@@ -10,6 +10,7 @@ import { AdminModule } from "../admin/admin.module";
 import { ParticipantsRequestModule } from "../participants-request/participants-request.module";
 import { OpenSearchModule } from '../opensearch/opensearch.module';
 import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
+import { JwtService } from '../utils/jwt/jwt.service';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module'
     forwardRef(() => TeamEnrichmentModule),
   ],
   controllers: [TeamsController],
-  providers: [TeamsService, TeamsHooksService],
+  providers: [TeamsService, TeamsHooksService, JwtService],
   exports: [TeamsService, TeamsHooksService],
 })
 export class TeamsModule {}

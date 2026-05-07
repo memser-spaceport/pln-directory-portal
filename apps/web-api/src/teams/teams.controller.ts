@@ -34,9 +34,11 @@ import { TeamsService } from './teams.service';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 import { MembersService } from '../members/members.service';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { TeamMembershipSourceReadAuthGuard } from '../guards/admin-auth.guard';
 import { QueryCache } from '../decorators/query-cache.decorator';
 import { UpdateTeamAccessLevelDto } from './dto/teams.dto';
 import { ParticipantsRequest } from './dto/members.dto';
@@ -238,6 +240,7 @@ export class TeamsController {
    * body: { accessLevel: "L0" | "L1" | ... }
    */
   @Patch('v1/teams/:uid/access-level')
+  @UseGuards(AdminAuthGuard)
   @NoCache()
   async updateTeamAccessLevel(@Param('uid') uid: string, @Body() body: UpdateTeamAccessLevelDto) {
     return await this.teamsService.updateAccessLevel(uid, body.accessLevel);
@@ -248,6 +251,7 @@ export class TeamsController {
    * GET /teams?includeL0=true|false
    */
   @Get('v1/admin/teams')
+  @UseGuards(TeamMembershipSourceReadAuthGuard)
   @NoCache()
   async getTeams() {
     const teams = await this.teamsService.findAllForAdmin();

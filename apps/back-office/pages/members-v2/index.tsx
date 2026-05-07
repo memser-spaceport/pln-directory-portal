@@ -67,7 +67,7 @@ const SearchIcon = () => (
 
 const MembersPageV2 = () => {
   const router = useRouter();
-  const { isDirectoryAdmin, isLoading: authLoading, user } = useAuth();
+  const { isDirectoryAdmin, isLoading: authLoading, user, hasPermission } = useAuth();
   const [authToken] = useCookie('plnadmin');
 
   const initialTab = (
@@ -95,10 +95,10 @@ const MembersPageV2 = () => {
   const [policyPagination, setPolicyPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
 
   useEffect(() => {
-    if (!authLoading && user && !isDirectoryAdmin) {
+    if (!authLoading && user && !isDirectoryAdmin && !hasPermission('member.contacts.read')) {
       router.replace('/access-denied');
     }
-  }, [authLoading, user, isDirectoryAdmin, router]);
+  }, [authLoading, user, isDirectoryAdmin, hasPermission, router]);
 
   const { data, isLoading, isError } = useMembersList({
     authToken: authToken ?? undefined,

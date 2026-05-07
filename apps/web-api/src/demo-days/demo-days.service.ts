@@ -410,7 +410,12 @@ export class DemoDaysService {
   async getAllDemoDaysForAdmin(userRoles: string[], memberUid?: string): Promise<DemoDay[]> {
     const tokenPermissionCodes = new Set(userRoles);
 
-    if (tokenPermissionCodes.has('directory.admin.full') || tokenPermissionCodes.has('demoday.admin.all')) {
+    if (
+      tokenPermissionCodes.has('directory.admin.full') ||
+      tokenPermissionCodes.has('demoday.admin.all') ||
+      tokenPermissionCodes.has('demoday.stats.read') ||
+      tokenPermissionCodes.has('demoday.report_link.read')
+    ) {
       return this.getAllDemoDays();
     }
 
@@ -436,7 +441,12 @@ export class DemoDaysService {
       ...(member?.policyAssignmentsV2 ?? []).flatMap((a) => a.policy.policyPermissions.map((p) => p.permission.code)),
     ]);
 
-    if (permissionCodes.has('directory.admin.full') || permissionCodes.has('demoday.admin.all')) {
+    if (
+      permissionCodes.has('directory.admin.full') ||
+      permissionCodes.has('demoday.admin.all') ||
+      permissionCodes.has('demoday.stats.read') ||
+      permissionCodes.has('demoday.report_link.read')
+    ) {
       return this.getAllDemoDays();
     }
 
