@@ -139,7 +139,18 @@ After enrichment completes, a separate **AI Judge** cron independently verifies 
 
    **`website` (and other URL fields) — not judged by Stage 1.** Earlier revisions emitted a `host-match` / `host-mismatch` verdict by comparing the team's stored URL to the URL listed on the LinkedIn profile. This produced too many false negatives — companies routinely use alias domains, product subdomains, or rebrand without updating LinkedIn (e.g. team `Mercle` with website `mercle.ai` whose LinkedIn profile lists a different host) — so the comparator was condemning correct websites. The deterministic comparator is therefore intentionally silent on URL fields; the AI judge (Stage 2) verifies them via web search instead, and is explicitly instructed not to disagree on a URL solely because it differs from another URL we already have on file. Same reasoning as the `linkedinHandler` slug-equality removal.
 
+   **Website reachability probe.** Stage 1 still runs a lightweight reachability probe on `team.website` (single GET, follows redirects, 5s timeout). The result is **purely observability** — no Stage 1 verdict is produced from it, since the host comparator is gone. It's persisted to `dataEnrichment.judgment.scrapingDog.websiteReachable` / `websiteFinalHost` and forwarded to Stage 2 as a `Website reachability:` line so the AI judge can factor a definitive `4xx`/`5xx` (real negative signal) into its website verdict. The probe runs only when the team has a website that passes the value-validity gate below, so we never `fetch()` a placeholder string.
+
 2. **Stage 2 — AI judge.** For remaining fields (or all fields when Stage 1 is unavailable), the second AI model returns a per-field `{ confidence, score, verdict, note }` plus an `overallAssessment`. Temperature is conservative so the judge prefers `uncertain` over guessing.
+
+### Value-validity gate (URL-format skip)
+
+Before a field is judged at all, its stored value is checked. Fields that fail this check are **skipped entirely** — no Stage 1 verdict, no Stage 2 AI call, no entry in `fieldsForReview` (there is nothing meaningful to verify, and we don't want the AI to hallucinate a verdict against junk input):
+
+- **Empty / null** values are skipped. Empty arrays for `industryTags` / `investmentFocus` are skipped.
+- **URL-required fields (`website`, `blog`)** must pass `z.string().url()` (zod, backed by WHATWG `new URL()`). This rejects every common placeholder (`'n/a'`, `'na'`, `'tbd'`, `'tba'`, `'coming soon'`, `'pending'`, `'-'`, etc.) without maintaining an explicit blocklist, because none of them parse as URLs. It also rejects schemeless values like `mercle.ai` or `discord.gg/xxx` typed directly into `website` — the user still sees the value, but the judge won't fabricate a verdict for it.
+
+Other URL-ish fields (`contactMethod`, social handles) are not URL-gated, because they legitimately accept bare handles, `mailto:` addresses, or invite-style links. The AI judge handles those with its standard "prefer `uncertain` over guessing" rule.
 
 ### fieldsMeta after judgment
 
@@ -173,7 +184,9 @@ dataEnrichment.judgment: {
                                    // — includes every field whose judge verdict is disagrees,
                                    //   uncertain, or agrees-at-low-confidence
   scrapingDog?: {
-    used, fetchedAt, nameMatch, companyNameFromLinkedIn, verifiedFields, linkedinInternalId
+    used, fetchedAt, nameMatch, companyNameFromLinkedIn, verifiedFields, linkedinInternalId,
+    websiteReachable?: boolean | null,   // true = 2xx final, false = 4xx/5xx, null = not probed / transient / invalid URL
+    websiteFinalHost?: string | null     // post-redirect normalized host when reachable
   }
 }
 ```

@@ -28,6 +28,11 @@ If a "ScrapingDog pre-verification" block confirms the team's LinkedIn identity,
 
 URL fields (website, blog, contactMethod, social handles): do NOT mark a value as "disagrees" merely because it differs from another URL we already have on file (e.g. the LinkedIn-listed website). Companies routinely use alias domains, product subdomains, or rebrand without updating LinkedIn. Verify each URL on its own merits via web search; prefer "uncertain" when you cannot independently confirm or refute it.
 
+If a "Website reachability" line is present, treat it as a signal — never the only signal:
+- "yes" (reachable, 2xx) — the URL is live, but liveness alone does not prove brand identity. Continue to verify the URL belongs to the team via web search.
+- "no" (definitive 4xx/5xx) — meaningful negative signal that the URL is stale or wrong. Lean toward "disagrees" for the website verdict if you also can't confirm it via web search.
+- "unknown" (not probed or transient network failure) — do not infer either way.
+
 RULES:
 - Use "uncertain" rather than guessing when you cannot verify a value.
 - Do NOT propose new values. You are judging, not enriching.
@@ -73,6 +78,10 @@ export interface JudgeTeamContext {
   linkedinHandler?: string | null;
   twitterHandler?: string | null;
   telegramHandler?: string | null;
+  /** Website reachability probe result. true=2xx, false=definitive 4xx/5xx, null=not probed/transient/invalid URL. */
+  websiteReachable?: boolean | null;
+  /** Post-redirect host (normalized) when reachable; null otherwise. */
+  websiteFinalHost?: string | null;
   scrapingDog?: TeamJudgment['scrapingDog'];
 }
 
@@ -161,6 +170,15 @@ export class TeamEnrichmentJudgeAiService {
     if (context.linkedinHandler) identityLines.push(`Known LinkedIn: ${context.linkedinHandler}`);
     if (context.twitterHandler) identityLines.push(`Known Twitter/X: ${context.twitterHandler}`);
     if (context.telegramHandler) identityLines.push(`Known Telegram: ${context.telegramHandler}`);
+    if (context.website && context.websiteReachable !== undefined) {
+      const reachabilityWord =
+        context.websiteReachable === true ? 'yes' : context.websiteReachable === false ? 'no' : 'unknown';
+      const finalHostNote =
+        context.websiteFinalHost && context.websiteReachable === true
+          ? `; final host after redirects: ${context.websiteFinalHost}`
+          : '';
+      identityLines.push(`Website reachability: ${reachabilityWord}${finalHostNote}`);
+    }
 
     const fieldsBlock = fields
       .map((f) => {

@@ -107,6 +107,8 @@ export interface TeamJudgment {
     companyNameFromLinkedIn: string | null;
     verifiedFields: string[];
     linkedinInternalId: string | null;
+    websiteReachable?: boolean | null;
+    websiteFinalHost?: string | null;
   };
 }
 
