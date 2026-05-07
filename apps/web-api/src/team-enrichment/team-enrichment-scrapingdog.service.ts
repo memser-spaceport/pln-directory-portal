@@ -105,7 +105,9 @@ export class TeamEnrichmentScrapingDogService {
       // treat as not-found rather than ok. Preserves the original callers' ability to trust
       // classifyNameMatch on an 'ok' response.
       if (!profile.companyName && !profile.universalNameId) {
-        this.logger.warn(`ScrapingDog returned profile with no company_name/universal_name_id for id "${id}", treating as not-found`);
+        this.logger.warn(
+          `ScrapingDog returned profile with no company_name/universal_name_id for id "${id}", treating as not-found`
+        );
         return { kind: 'not-found' };
       }
 
@@ -173,14 +175,38 @@ export class TeamEnrichmentScrapingDogService {
       }
     }
 
-    // linkedinHandler — normalized equality with universal_name_id
-    if (team.linkedinHandler && profile.universalNameId) {
-      const teamHandle = this.normalizeHandleForCompare(team.linkedinHandler);
-      const profileHandle = this.normalizeHandleForCompare(profile.universalNameId);
-      if (teamHandle === profileHandle) {
-        result.linkedinHandler = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'handle-match');
+    // linkedinHandler — corroborated by company_name match (and optionally website host).
+    // The actual identity signal is that ScrapingDog returned a profile whose `company_name` matches the team.
+    // Website host equality is a strong corroborating signal when both sides declare a website.
+    if (team.linkedinHandler && profile.companyName) {
+      const websiteCorroborates =
+        !!team.website && !!profile.website && this.extractHost(team.website) === this.extractHost(profile.website);
+
+      if (nameMatch === 'exact') {
+        result.linkedinHandler = mkJudgment(
+          FieldConfidence.High,
+          JudgmentVerdict.Agrees,
+          websiteCorroborates ? 100 : 95,
+          websiteCorroborates ? 'name-match+website' : 'name-match'
+        );
       } else {
-        result.linkedinHandler = mkJudgment(FieldConfidence.Low, JudgmentVerdict.Disagrees, 15, 'handle-mismatch');
+        // nameMatch === 'partial'. A partial-only match (e.g. "Acme Inc" vs "Acme BV")
+        // is too risky to mark as Agrees on its own — surface it for review.
+        if (websiteCorroborates) {
+          result.linkedinHandler = mkJudgment(
+            FieldConfidence.High,
+            JudgmentVerdict.Agrees,
+            90,
+            'name-match-partial+website'
+          );
+        } else {
+          result.linkedinHandler = mkJudgment(
+            FieldConfidence.Medium,
+            JudgmentVerdict.Uncertain,
+            55,
+            'name-match-partial-only'
+          );
+        }
       }
     }
 
@@ -265,15 +291,6 @@ export class TeamEnrichmentScrapingDogService {
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '')
       .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  private normalizeHandleForCompare(s: string): string {
-    return s
-      .toLowerCase()
-      .replace(/^https?:\/\/(www\.)?linkedin\.com\//, '')
-      .replace(/^company\//, '')
-      .replace(/[\/\s]+$/, '')
       .trim();
   }
 
