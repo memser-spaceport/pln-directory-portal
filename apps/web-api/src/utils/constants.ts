@@ -126,7 +126,7 @@ export function hasAnyAdminRole(member: MemberWithRoles, roles: MemberRole[]): b
   return roles.some((role) => memberRoleNames.includes(role));
 }
 
-function hasPermissionCode(member: MemberWithRoles, permissionCode: string): boolean {
+export function memberHasPermissionCode(member: MemberWithRoles, permissionCode: string): boolean {
   const effectivePermissionCodes = member?.effectivePermissionCodes ?? [];
   const permissionLikeItems = [...(member?.effectivePermissions ?? []), ...(member?.permissions ?? [])];
 
@@ -143,7 +143,8 @@ function hasPermissionCode(member: MemberWithRoles, permissionCode: string): boo
  */
 export function isDirectoryAdmin(member: MemberWithRoles): boolean {
   return (
-    hasAdminRole(member, MemberRole.DIRECTORY_ADMIN) || hasPermissionCode(member, DIRECTORY_ADMIN_FULL_PERMISSION_CODE)
+    hasAdminRole(member, MemberRole.DIRECTORY_ADMIN) ||
+    memberHasPermissionCode(member, DIRECTORY_ADMIN_FULL_PERMISSION_CODE)
   );
 }
 
