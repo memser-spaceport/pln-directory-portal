@@ -123,7 +123,19 @@ After enrichment completes, a separate **AI Judge** cron independently verifies 
 
 ### Two stages
 
-1. **Stage 1 — ScrapingDog LinkedIn match (deterministic).** Runs when `SCRAPINGDOG_API_KEY` is set and the team has a `linkedinHandler`. The judge fetches the canonical LinkedIn profile, classifies the name match as `exact` / `partial` / `none`, then performs direct field-to-field comparisons (URL host match for website, normalized equality for handle, tagline/about overlap for descriptions, set intersection for industries). Fields the comparison can resolve authoritatively (`agrees` at `high`, or `disagrees` at `low`) skip Stage 2. `partial` tier downshifts `high` verdicts to `medium`.
+1. **Stage 1 — ScrapingDog LinkedIn match (deterministic).** Runs when `SCRAPINGDOG_API_KEY` is set and the team has a `linkedinHandler`. The judge fetches the canonical LinkedIn profile, classifies the name match as `exact` / `partial` / `none`, then performs direct field-to-field comparisons (URL host match for website, **`company_name` match + optional website-host corroboration for the LinkedIn handle itself**, tagline/about overlap for descriptions, set intersection for industries). Fields the comparison can resolve authoritatively (`agrees` at `high`, or `disagrees` at `low`) skip Stage 2. `partial` tier downshifts `high` verdicts to `medium`.
+
+   **`linkedinHandler` verification — name match, not slug match.** The handle verdict is **not** produced by comparing the team's stored slug to ScrapingDog's `universal_name_id`. LinkedIn 301-redirects renamed companies to their canonical slug, so a stored `company/oldco` resolving to a profile whose `universal_name_id` is `newco-rebrand` would falsely look like a mismatch even though it points at the correct entity. Instead, Stage 1 trusts the precondition that produced this comparator run: ScrapingDog returned a profile whose `company_name` matched the team (per `classifyNameMatch`), so the handle pointed at the right company. Optionally, a website-host equality between `team.website` and `profile.website` corroborates the match and bumps confidence/score. Verdict matrix:
+
+   | `nameMatch` | website host equal | verdict     | confidence | score | note                          |
+   | ----------- | ------------------ | ----------- | ---------- | ----- | ----------------------------- |
+   | `exact`     | yes                | `agrees`    | `high`     | 100   | `name-match+website`          |
+   | `exact`     | no / unknown       | `agrees`    | `high`     | 95    | `name-match`                  |
+   | `partial`   | yes                | `agrees`    | `medium`¹  | 90    | `name-match-partial+website`  |
+   | `partial`   | no / unknown       | `uncertain` | `medium`   | 55    | `name-match-partial-only`     |
+   | `none`      | —                  | —           | —          | —     | _no Stage 1 verdict — falls through to Stage 2 AI judge_ |
+
+   ¹ via the existing `partial → medium` downshift in `mkJudgment`. A partial-only name match with no corroborating website (e.g. "Acme Inc" vs "Acme BV") is intentionally surfaced as `uncertain` rather than silently agreed, so it lands in `fieldsForReview`. `nameMatch === 'none'` continues to skip the comparator entirely; the AI judge handles those.
 
    **Website reachability gate.** A `host-mismatch` verdict from the host comparator is purely a string check — it can't tell whether the team's own website is real. To avoid condemning a reachable website on host-mismatch alone (a frequent false negative when the LinkedIn handle is the wrong one), Stage 1 probes `team.website` once with a lightweight `HEAD` request (5s timeout, follows redirects, falls back to a `Range`-limited `GET` on `405` / `501` / `403`). The probe runs **only** when the team has a website AND the comparator emitted `host-mismatch`; it is otherwise skipped. Verdict adjustments:
 
