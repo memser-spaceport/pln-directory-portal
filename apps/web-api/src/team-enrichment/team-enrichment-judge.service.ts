@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { PrismaService } from '../shared/prisma.service';
+import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
 import { JudgeFieldInput, JudgeTeamContext, TeamEnrichmentJudgeAiService } from './team-enrichment-judge-ai.service';
 import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import {
+  AIUsageEntry,
   EnrichmentStatus,
   FieldEnrichmentMeta,
   FieldEnrichmentStatus,
@@ -317,6 +319,7 @@ export class TeamEnrichmentJudgeService {
       let overallAssessment = 'All judgable fields verified by ScrapingDog; no AI judge needed.';
       let judgeFailed = false;
       let judgeErrorMessage: string | undefined;
+      let judgeUsage: AIUsageEntry | null = null;
 
       if (stage2FieldKeys.length > 0) {
         const fieldsForAi: JudgeFieldInput[] = stage2FieldKeys
@@ -335,6 +338,7 @@ export class TeamEnrichmentJudgeService {
         };
 
         const aiOut = await this.judgeAi.judgeTeamFields(judgeContext, fieldsForAi);
+        judgeUsage = aiOut.usage;
         if (!aiOut.ok) {
           judgeFailed = true;
           judgeErrorMessage = aiOut.errorMessage;
@@ -350,6 +354,13 @@ export class TeamEnrichmentJudgeService {
           errorMessage: judgeErrorMessage,
           scrapingDog: scrapingDogMeta,
         });
+        // Persist judge token usage even on failure — we still paid for the AI call.
+        if (judgeUsage) {
+          await this.appendJudgeUsage(teamUid, judgeUsage);
+          this.logger.log(
+            `Judge usage rollup team=${teamUid} name="${team.name}" stage=judge ${formatUsageLog(judgeUsage)} (failed)`
+          );
+        }
         this.logger.warn(
           `Judge: team ${teamUid} (${team.name}) marked FailedToJudge: ${judgeErrorMessage ?? 'unknown reason'}`
         );
@@ -395,10 +406,23 @@ export class TeamEnrichmentJudgeService {
         ...(scrapingDogMeta ? { scrapingDog: scrapingDogMeta } : {}),
       };
 
+      // Accumulate judge token usage on top of any prior judge runs (force-judge bumps the
+      // counters rather than overwriting). Enrichment usage on the existing record is preserved.
+      const baseUsage = (refreshedMeta ?? existingMeta).usage;
+      const mergedJudgeUsage = mergeUsageEntries(baseUsage?.judge, judgeUsage);
+      const usageBlock: TeamDataEnrichment['usage'] | undefined =
+        mergedJudgeUsage || baseUsage?.enrichment
+          ? {
+              ...(baseUsage?.enrichment ? { enrichment: baseUsage.enrichment } : {}),
+              ...(mergedJudgeUsage ? { judge: mergedJudgeUsage } : {}),
+            }
+          : undefined;
+
       const updated: TeamDataEnrichment = {
         ...(refreshedMeta ?? existingMeta),
         fieldsMeta: mergedFieldsMeta,
         judgment,
+        ...(usageBlock ? { usage: usageBlock } : {}),
       };
 
       await this.prisma.team.update({
@@ -411,6 +435,11 @@ export class TeamEnrichmentJudgeService {
           Object.keys(stage2Verdicts).length
         } fieldsForReview=[${fieldsForReview.join(',')}]`
       );
+      if (mergedJudgeUsage) {
+        this.logger.log(
+          `Judge usage rollup team=${teamUid} name="${team.name}" stage=judge ${formatUsageLog(mergedJudgeUsage)}`
+        );
+      }
     } catch (error) {
       this.logger.error(`Judge pipeline error for team ${teamUid} (${team.name}): ${error.message}`, error.stack);
       await this.writeJudgmentStatus(teamUid, existingMeta, {
@@ -571,6 +600,28 @@ export class TeamEnrichmentJudgeService {
       },
     });
     this.logger.warn(`Judge: nulled invalid AI-supplied LinkedIn handle on team ${teamUid}`);
+  }
+
+  /**
+   * Appends judge token usage to the team without touching anything else on `dataEnrichment`.
+   * Used on the FailedToJudge path so we still record what the failed AI call cost.
+   */
+  private async appendJudgeUsage(teamUid: string, fresh: AIUsageEntry): Promise<void> {
+    const latest = await this.readEnrichmentMeta(teamUid);
+    if (!latest) return;
+    const merged = mergeUsageEntries(latest.usage?.judge, fresh);
+    if (!merged) return;
+    const updated: TeamDataEnrichment = {
+      ...latest,
+      usage: {
+        ...(latest.usage?.enrichment ? { enrichment: latest.usage.enrichment } : {}),
+        judge: merged,
+      },
+    };
+    await this.prisma.team.update({
+      where: { uid: teamUid },
+      data: { dataEnrichment: updated as any },
+    });
   }
 
   private async writeJudgmentStatus(

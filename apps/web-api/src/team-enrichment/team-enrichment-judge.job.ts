@@ -54,7 +54,8 @@ export class TeamEnrichmentJudgeJob {
       }
 
       this.logger.log(
-        `Team enrichment judge job completed: ${started} started, ${skipped} skipped, ${failed} errored out of ${teams.length} total`
+        `Team enrichment judge job completed: ${started} started, ${skipped} skipped, ${failed} errored out of ${teams.length} total. ` +
+          `Per-team token usage + USD cost is logged separately as "Judge usage rollup" lines and persisted on dataEnrichment.usage.`
       );
     } finally {
       this.isJudgmentRunning = false;

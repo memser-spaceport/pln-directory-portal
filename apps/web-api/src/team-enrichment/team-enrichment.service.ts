@@ -4,6 +4,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
+import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { ScrapingDogCompanyProfile, TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import {
   ENRICHABLE_TEAM_FIELDS,
@@ -639,7 +640,7 @@ export class TeamEnrichmentService {
       };
 
       // Call AI for enrichment
-      const aiResponse = await this.aiService.enrichTeamViaAI(team.name, {
+      const aiResult = await this.aiService.enrichTeamViaAI(team.name, {
         website: team.website,
         contactMethod: team.contactMethod,
         linkedinHandler: team.linkedinHandler,
@@ -649,6 +650,8 @@ export class TeamEnrichmentService {
         longDescription: team.longDescription,
         userConfirmedIdentityHints,
       });
+      const aiResponse = aiResult.response;
+      const enrichmentUsage = aiResult.usage;
 
       // Verify entity identity to decide which fields are safe to enrich.
       // Website and logo require high confidence (verified entity).
@@ -960,6 +963,17 @@ export class TeamEnrichmentService {
         } as FieldEnrichmentMeta;
       }
 
+      // Accumulate AI token usage on top of any prior runs (force-enrichment bumps the
+      // counters rather than overwriting). Judge usage on the existing record is preserved.
+      const mergedEnrichmentUsage = mergeUsageEntries(existingMeta?.usage?.enrichment, enrichmentUsage);
+      const usageBlock: TeamDataEnrichment['usage'] | undefined =
+        mergedEnrichmentUsage || existingMeta?.usage?.judge
+          ? {
+              ...(mergedEnrichmentUsage ? { enrichment: mergedEnrichmentUsage } : {}),
+              ...(existingMeta?.usage?.judge ? { judge: existingMeta.usage.judge } : {}),
+            }
+          : undefined;
+
       // Build enrichment metadata
       const enrichment: TeamDataEnrichment = {
         shouldEnrich: false,
@@ -970,6 +984,7 @@ export class TeamEnrichmentService {
         aiModel: this.aiService.getModelName(),
         fieldsMeta: mergedFieldsMeta,
         ...(scrapingDogMeta ? { scrapingDog: scrapingDogMeta } : {}),
+        ...(usageBlock ? { usage: usageBlock } : {}),
       };
 
       // Update team with enriched data + metadata
@@ -982,6 +997,11 @@ export class TeamEnrichmentService {
       });
 
       this.logger.log(`Enriched team ${teamUid} (${team.name}): ${fieldsUpdatedCount} new fields updated`);
+      if (mergedEnrichmentUsage) {
+        this.logger.log(
+          `Enrichment usage rollup team=${teamUid} name="${team.name}" stage=enrichment ${formatUsageLog(mergedEnrichmentUsage)}`
+        );
+      }
     } catch (error) {
       this.logger.error(`Failed to enrich team ${teamUid} (${team.name}): ${error.message}`, error.stack);
       await this.updateEnrichmentStatus(teamUid, team.dataEnrichment, EnrichmentStatus.FailedToEnrich, error.message);
