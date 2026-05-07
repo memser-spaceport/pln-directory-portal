@@ -198,6 +198,66 @@ POST /v1/admin/teams/:uid/trigger-force-judgment     # Re-run judge even if alre
 
 All require `AdminAuthGuard`. They do NOT require `IS_TEAM_ENRICHMENT_ENABLED` — manual overrides.
 
+## Logo Verification (Vision-Model Pass)
+
+A separate, **logo-only** verification pipeline. It runs independently of the enrichment / judge crons and writes its results to the `TeamLogoVerificationResult` Postgres table — it never mutates `Team.logo`, `Team.logoUid`, or `dataEnrichment`. Output is an append-only audit log that admins (or downstream review tooling) can query to spot wrong-brand logos uploaded or auto-fetched onto a team.
+
+### What it does
+
+For each candidate team, the job downloads the current logo image (SVG is rasterized to PNG via `sharp`) and sends it to a vision-language model (VLM) along with the team name + website. The VLM returns a JSON verdict:
+
+```ts
+{
+  predictedCompanyName: string | null,
+  verdict: 'verified' | 'weak_match' | 'mismatch' | 'unverifiable',
+  confidence: 'high' | 'medium' | 'low',
+  quality: 'good' | 'poor' | 'unusable',
+  hasReadableText: boolean,
+  reason: string,
+  brandSignals: string[]
+}
+```
+
+A new row is inserted into `TeamLogoVerificationResult` per run — history is preserved across re-runs (logo swaps, model bumps, force re-verifies). The row carries `teamUid`, `logoUid`, `provider`, `model`, the snapshotted `website` / `logoUrl` / `source`, the parsed verdict fields, and the `rawResponse` for debugging.
+
+### Cron
+
+- **Schedule**: `LOGO_VERIFICATION_CRON` env var (default `0 */6 * * *` — every 6 hours UTC). Runs separately from the enrichment / marking / judge crons and on its own toggle.
+- **Guard**: `IS_LOGO_VERIFICATION_ENABLED` must be `'true'` (default `false`). Independent of `IS_TEAM_ENRICHMENT_ENABLED`.
+- **In-process re-entry guard**: an `isRunning` flag prevents two ticks from overlapping if a batch outlives its interval.
+- **Batch size**: `LOGO_VERIFICATION_BATCH_SIZE` (default `20`) — number of teams pulled per tick. Sequential per-team processing keeps VLM rate-limits manageable.
+
+### How teams are picked
+
+Two filters run in order:
+
+1. **DB-level candidates** — `team-logo-verification` selects teams where `logoUid IS NOT NULL`, ordered by `updatedAt DESC`, limited to `LOGO_VERIFICATION_BATCH_SIZE`. Recently-changed teams surface first so a freshly-uploaded or freshly-enriched logo gets verified on the next tick. There is no `isFund` / priority filter — every team that has a logo is eligible.
+2. **Per-team `shouldVerifyTeam` gate** — for each candidate, the persistence layer looks up the latest `TeamLogoVerificationResult` for the same `(teamUid, provider)` pair and skips if all of the following hold:
+   - a prior result exists,
+   - its `logoUid` matches the team's current `logoUid` (i.e. the logo wasn't replaced),
+   - its `model` matches the currently-resolved model name.
+
+   If the logo was swapped, or the VLM model was upgraded (e.g. `gemini-2.5-flash` → a newer Gemini), the team re-verifies. Teams with no `logoUid` are also skipped at this stage (defensive — the DB filter already excludes them).
+
+3. **Force re-verify** — set `LOGO_VERIFICATION_FORCE_UPDATE=true` to bypass the per-team gate and re-verify every batched team regardless of prior results. Useful when calibrating against a new VLM or after a prompt change.
+
+### Provider selection
+
+Resolved per run from `LOGO_VLM_PROVIDER` (default `gemini`). Each provider has its own model env var: `GEMINI_LOGO_VERIFICATION_MODEL` (default `gemini-2.5-flash`), `OPENAI_LOGO_VERIFICATION_MODEL` (default `gpt-4.1-mini`), `ANTHROPIC_LOGO_VERIFICATION_MODEL` (default `claude-3-5-sonnet-latest`). The chosen `provider` and `model` are persisted on every row, so the table remains queryable when defaults change.
+
+### On-demand admin endpoints
+
+The same VLM service is also exposed via on-demand HTTP endpoints (no auth guard wired here — intended for internal tooling). These do **not** write to `TeamLogoVerificationResult`; only the cron persists.
+
+```
+POST /team-enrichment/verify-logo                       # single image, default provider
+POST /team-enrichment/verify-logo/all                   # runs gemini + openai + anthropic in parallel + composite decision
+POST /team-enrichment/verify-logo/provider/:provider    # single image, specific provider
+POST /team-enrichment/verify-logo/batch                 # batch of images, mode: all | gemini | openai | anthropic
+```
+
+The `/all` variant returns a composite `decision: 'accept' | 'reject' | 'review'` derived from cross-provider agreement (e.g. both Gemini and OpenAI saying `verified` → `accept`; Gemini saying `mismatch` at high confidence → `reject`; otherwise → `review`).
+
 ## ScrapingDog Fallback (LinkedIn)
 
 A secondary, high-confidence enrichment source that queries LinkedIn company profiles via the [ScrapingDog](https://www.scrapingdog.com/) API. Because the API is paid, it is **only** called when the primary AI+OG pass leaves high-value gaps.
@@ -394,6 +454,14 @@ The shared `isFieldUserOwned(fieldsMeta, field, slotHasValue)` helper at the top
 | `TEAM_ENRICHMENT_MARKING_CRON`      | `0 2 * * *`         | Cron schedule for auto-marking eligible teams                                                                                                                                                              |
 | `TEAM_ENRICHMENT_JUDGE_CRON`        | `0 4 * * *`         | Cron schedule for the AI Judge second-pass verification job                                                                                                                                                |
 | `SCRAPINGDOG_API_KEY`               | —                   | ScrapingDog LinkedIn API key. When set, enables the ScrapingDog fallback for teams with a known `linkedinHandler`.                                                                                         |
+| `IS_LOGO_VERIFICATION_ENABLED`      | `false`             | Enable/disable the Logo Verification cron. Independent of `IS_TEAM_ENRICHMENT_ENABLED`.                                                                                                                    |
+| `LOGO_VERIFICATION_CRON`            | `0 */6 * * *`       | Cron schedule for the Logo Verification job (every 6 hours UTC by default).                                                                                                                                |
+| `LOGO_VERIFICATION_BATCH_SIZE`      | `20`                | Max teams pulled per Logo Verification tick. Sequential per-team to keep VLM rate-limits manageable.                                                                                                       |
+| `LOGO_VERIFICATION_FORCE_UPDATE`    | `false`             | When `true`, bypasses the per-team `shouldVerifyTeam` gate and re-verifies every batched team regardless of prior results.                                                                                 |
+| `LOGO_VLM_PROVIDER`                 | `gemini`            | Vision-language model provider for Logo Verification. Accepts `gemini`, `openai`, or `anthropic`. Independent of `AI_PROVIDER`.                                                                            |
+| `GEMINI_LOGO_VERIFICATION_MODEL`    | `gemini-2.5-flash`  | Gemini model used by the Logo Verification job when `LOGO_VLM_PROVIDER=gemini`.                                                                                                                            |
+| `OPENAI_LOGO_VERIFICATION_MODEL`    | `gpt-4.1-mini`      | OpenAI model used by the Logo Verification job when `LOGO_VLM_PROVIDER=openai`.                                                                                                                            |
+| `ANTHROPIC_LOGO_VERIFICATION_MODEL` | `claude-3-5-sonnet-latest` | Anthropic model used by the Logo Verification job when `LOGO_VLM_PROVIDER=anthropic`.                                                                                                              |
 
 ### Eligibility filter
 
@@ -430,6 +498,11 @@ apps/web-api/src/team-enrichment/
   team-enrichment-judge-ai.service.ts # Judge LLM wrapper (independent model)
   team-enrichment-judge.service.ts  # Two-stage judgment pipeline orchestration
   team-enrichment-judge.job.ts      # Judge cron job
+  logo-verification.types.ts        # Verdict / confidence / quality types for the VLM pass
+  logo-verification.service.ts      # VLM wrapper (gemini / openai / anthropic) + image prep
+  logo-verification-persistence.service.ts # Candidate selection + shouldVerify gate + TeamLogoVerificationResult writes
+  logo-verification-job.service.ts  # Logo Verification cron job
+  logo-verification.controller.ts   # On-demand /team-enrichment/verify-logo* endpoints
   team-enrichment.module.ts         # NestJS module
 ```
 
