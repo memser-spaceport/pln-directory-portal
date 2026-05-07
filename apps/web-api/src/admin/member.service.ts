@@ -1464,7 +1464,7 @@ export class MemberService {
   }
 
   async findMembers(params: RequestMembersDto) {
-    const { page, limit, memberState, policyCodes, policyGroups, policyRoles } = params;
+    const { page, limit, memberState, policyCodes, policyGroups, policyRoles, search } = params;
     const where: Prisma.MemberWhereInput = {};
 
     if (memberState?.length) {
@@ -1473,6 +1473,13 @@ export class MemberService {
           in: memberState as MemberApprovalState[],
         },
       };
+    }
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
     }
 
     if (policyCodes?.length || policyGroups?.length || policyRoles?.length) {

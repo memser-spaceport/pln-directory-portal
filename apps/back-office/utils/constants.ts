@@ -64,6 +64,7 @@ export const API_ROUTE = {
   ADMIN_APPROVAL: APP_CONSTANTS.V1 + 'admin/members',
   ADMIN_RECOMMENDATIONS: APP_CONSTANTS.V1 + 'admin/recommendations',
   ADMIN_MEMBERS: `${APP_CONSTANTS.V1}admin/members`,
+  ADMIN_MEMBERS_COUNTS: `${APP_CONSTANTS.V1}admin/members/member-state-counts`,
   ADMIN_DEMO_DAYS: `${APP_CONSTANTS.V1}admin/demo-days`,
   ADMIN_DEMO_DAY_SUBSCRIBERS: `${APP_CONSTANTS.V1}admin/demo-days/subscribers`,
   ADMIN_IRL_GATHERING_PUSH_CONFIG: `${APP_CONSTANTS.V1}admin/irl-gathering-push-config`,

@@ -31,6 +31,7 @@ interface Props {
   setSorting: Dispatch<SetStateAction<SortingState>>;
   showRbacSection?: boolean;
   allPolicies?: Policy[];
+  pageCount?: number;
 }
 
 const columnHelper = createColumnHelper<Member>();
@@ -46,6 +47,7 @@ export function MembersTableV2({
   setSorting,
   showRbacSection = false,
   allPolicies = [],
+  pageCount,
 }: Props) {
   const policyMap = useMemo(() => new Map(allPolicies.map((p) => [p.uid, p])), [allPolicies]);
 
@@ -147,12 +149,17 @@ export function MembersTableV2({
     ];
   }, [authToken, activeTab, policyMap, showRbacSection]);
 
+  const isServerSide = pageCount !== undefined;
+
   const table = useReactTable({
     data: members,
     columns,
-    state: { pagination, globalFilter, sorting },
+    state: { pagination, globalFilter: isServerSide ? '' : globalFilter, sorting },
     onPaginationChange: setPagination,
     onSortingChange: setSorting,
+    manualPagination: isServerSide,
+    manualFiltering: isServerSide,
+    pageCount: isServerSide ? pageCount : undefined,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),

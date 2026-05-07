@@ -1,20 +1,29 @@
-import { useMemo } from 'react';
-import { useMembersList } from './useMembersList';
-import { ALL_MEMBER_STATES } from '../../pages/members-v2/constants';
+import { useQuery } from '@tanstack/react-query';
+import { MembersQueryKeys } from './constants/queryKeys';
+import api from '../../utils/api';
+import { API_ROUTE } from '../../utils/constants';
+import { MemberState, MemberStateCounts } from 'libs/contracts/src/schema/admin-member';
+
+async function fetcher(authToken: string) {
+  const { data } = await api.get<MemberStateCounts>(API_ROUTE.ADMIN_MEMBERS_COUNTS, {
+    headers: { authorization: `Bearer ${authToken}` },
+  });
+  return data;
+}
 
 export function useMembersStateCounts({ authToken }: { authToken: string | null | undefined }) {
-  const { data } = useMembersList({
-    authToken: authToken ?? undefined,
-    memberState: [...ALL_MEMBER_STATES],
+  const { data } = useQuery({
+    queryKey: [MembersQueryKeys.GET_MEMBERS_STATE_COUNTS, authToken],
+    queryFn: () => fetcher(authToken!),
+    enabled: !!authToken,
   });
 
-  return useMemo(() => {
-    const counts = { PENDING: 0, VERIFIED: 0, APPROVED: 0, REJECTED: 0 };
-    for (const m of data?.data ?? []) {
-      if (m.memberState && m.memberState in counts) {
-        counts[m.memberState as keyof typeof counts]++;
-      }
+  return (
+    data ?? {
+      [MemberState.PENDING]: 0,
+      [MemberState.VERIFIED]: 0,
+      [MemberState.APPROVED]: 0,
+      [MemberState.REJECTED]: 0,
     }
-    return counts;
-  }, [data]);
+  );
 }

@@ -10,6 +10,10 @@ interface QueryParams {
   policyCodes?: string[];
   policyGroups?: string[];
   policyRoles?: string[];
+  page?: number;
+  limit?: number;
+  search?: string;
+  enabled?: boolean;
 }
 
 async function fetcher(params: QueryParams) {
@@ -33,6 +37,15 @@ async function fetcher(params: QueryParams) {
   if (params.policyRoles?.length) {
     search.set('policyRoles', params.policyRoles.join(','));
   }
+  if (params.page) {
+    search.set('page', String(params.page));
+  }
+  if (params.limit) {
+    search.set('limit', String(params.limit));
+  }
+  if (params.search) {
+    search.set('search', params.search);
+  }
 
   const query = search.toString();
 
@@ -45,6 +58,7 @@ async function fetcher(params: QueryParams) {
 }
 
 export function useMembersList(params: QueryParams) {
+  const { enabled = true } = params;
   return useQuery({
     queryKey: [
       MembersQueryKeys.GET_MEMBERS_LIST,
@@ -53,8 +67,11 @@ export function useMembersList(params: QueryParams) {
       params.policyCodes,
       params.policyGroups,
       params.policyRoles,
+      params.page,
+      params.limit,
+      params.search,
     ],
     queryFn: () => fetcher(params),
-    enabled: !!params.authToken,
+    enabled: !!params.authToken && enabled,
   });
 }

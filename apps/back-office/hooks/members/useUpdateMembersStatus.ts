@@ -30,6 +30,9 @@ export function useUpdateMembersStatus() {
         queryKey: [MembersQueryKeys.GET_MEMBERS_LIST],
       });
       queryClient.invalidateQueries({
+        queryKey: [MembersQueryKeys.GET_MEMBERS_STATE_COUNTS],
+      });
+      queryClient.invalidateQueries({
         queryKey: [MembersQueryKeys.GET_MEMBERS_ACCESS_LEVEL_COUNTS],
       });
     },

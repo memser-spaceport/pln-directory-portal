@@ -38,6 +38,7 @@ export const RequestMembersSchema = z.object({
     .optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
+  search: z.string().optional(),
 });
 
 export const CreateMemberSchema = z.object({
