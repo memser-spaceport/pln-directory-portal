@@ -41,16 +41,13 @@ const EyeIcon = () => (
 const ModulesCell = ({ permissionItems }: { permissionItems: Policy['permissionItems'] }) => {
   const modules = [...new Set(permissionItems.map((permission) => permission.module))];
   if (!modules.length) return <span className={s.muted}>—</span>;
-  const visible = modules.slice(0, 2);
-  const overflow = modules.length - 2;
   return (
     <div className={s.badgeRow}>
-      {visible.map((module) => (
+      {modules.map((module) => (
         <span key={module} className={s.moduleBadge}>
           {module}
         </span>
       ))}
-      {overflow > 0 && <span className={s.overflowBadge}>+{overflow}</span>}
     </div>
   );
 };
