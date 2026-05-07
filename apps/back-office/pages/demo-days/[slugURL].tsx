@@ -66,11 +66,7 @@ const DemoDayDetailPage = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showApplicationDetailsModal, setShowApplicationDetailsModal] = useState(false);
-  const [selectedParticipantForApproval, setSelectedParticipantForApproval] = useState<{
-    uid: string;
-    name: string;
-    email: string;
-  } | null>(null);
+  const [selectedParticipantForApproval, setSelectedParticipantForApproval] = useState<DemoDayParticipant | null>(null);
   const [selectedParticipantForDetails, setSelectedParticipantForDetails] = useState<DemoDayParticipant | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -541,26 +537,21 @@ const DemoDayDetailPage = () => {
     setShowNotificationsConfirmModal(false);
   };
 
-  const handleApproveClick = (participant: any) => {
-    setSelectedParticipantForApproval({
-      uid: participant.uid,
-      name: participant.member?.name || participant.name,
-      email: participant.member?.email || participant.email,
-    });
+  const handleApproveClick = (participant: DemoDayParticipant) => {
+    setSelectedParticipantForApproval(participant);
     setShowApproveModal(true);
   };
 
-  const handleApprove = async (participantUid: string, type: 'INVESTOR' | 'FOUNDER' | 'SUPPORT') => {
+  const handleApprove = async (participantUid: string) => {
     if (!authToken || !demoDay) return;
 
     try {
-      // Update both type and status to ENABLED
       await updateParticipantMutation.mutateAsync({
         authToken,
         demoDayUid: demoDay.uid,
         participantUid,
         data: {
-          type,
+          type: 'INVESTOR',
           status: 'ENABLED',
         },
       });
