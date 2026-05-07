@@ -13,20 +13,9 @@ import { useMembersList } from '../../hooks/members/useMembersList';
 import { usePoliciesList } from '../../hooks/access-control/usePoliciesList';
 import { useAuth } from '../../context/auth-context';
 import { MEMBERS_V2_STATE_TAB_ICONS, PoliciesIcon } from '../../components/menu/components/MembersV2Menu/memberStateTabIcons';
+import { ALL_MEMBER_STATES, MEMBER_STATE_TABS, REJECTED_TAB } from './constants';
+import type { MemberStateTab, ActiveTab } from './types';
 import s from './styles.module.scss';
-
-const ALL_MEMBER_STATES = ['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED'];
-
-type MemberStateTab = 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
-type ActiveTab = MemberStateTab | 'POLICIES';
-
-const MEMBER_STATE_TABS: { id: MemberStateTab; label: string }[] = [
-  { id: 'PENDING', label: 'Pending Members (L0)' },
-  { id: 'VERIFIED', label: 'Verified Members (L1)' },
-  { id: 'APPROVED', label: 'Approved Members' },
-];
-
-const REJECTED_TAB: { id: MemberStateTab; label: string } = { id: 'REJECTED', label: 'Rejected Members' };
 
 type SelectOption = { label: string; value: string };
 
@@ -102,7 +91,7 @@ const MembersPageV2 = () => {
 
   const { data, isLoading, isError } = useMembersList({
     authToken: authToken ?? undefined,
-    memberState: ALL_MEMBER_STATES,
+    memberState: [...ALL_MEMBER_STATES],
   });
 
   const { data: policiesData } = usePoliciesList({ authToken: authToken ?? undefined });

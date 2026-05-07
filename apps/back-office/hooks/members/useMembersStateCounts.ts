@@ -1,12 +1,11 @@
 import { useMemo } from 'react';
 import { useMembersList } from './useMembersList';
-
-const ALL_MEMBER_STATES = ['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED'];
+import { ALL_MEMBER_STATES } from '../../pages/members-v2/constants';
 
 export function useMembersStateCounts({ authToken }: { authToken: string | null | undefined }) {
   const { data } = useMembersList({
     authToken: authToken ?? undefined,
-    memberState: ALL_MEMBER_STATES,
+    memberState: [...ALL_MEMBER_STATES],
   });
 
   return useMemo(() => {

@@ -1,4 +1,5 @@
 import React from 'react';
+import type { MemberStateTab } from '../../../../pages/members-v2/types';
 
 export const PendingIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -48,9 +49,7 @@ export const PoliciesIcon = () => (
   </svg>
 );
 
-type MemberStateTabId = 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
-
-export const MEMBERS_V2_STATE_TAB_ICONS: Record<MemberStateTabId, React.FC> = {
+export const MEMBERS_V2_STATE_TAB_ICONS: Record<MemberStateTab, React.FC> = {
   PENDING: PendingIcon,
   VERIFIED: VerifiedIcon,
   APPROVED: ApprovedIcon,
