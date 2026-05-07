@@ -3,6 +3,7 @@ import { generateText } from 'ai';
 import { AiProviderService } from '../shared/ai-provider.service';
 import {
   AIJudgeResponse,
+  AIUsageEntry,
   FieldConfidence,
   FieldJudgment,
   FieldMetaKey,
@@ -12,6 +13,7 @@ import {
   TEAM_JUDGMENT_ASSESSMENT_MAX_LENGTH,
   TeamJudgment,
 } from './team-enrichment.types';
+import { buildUsageEntry, formatUsageLog } from './team-enrichment-cost';
 
 const TEAM_ENRICHMENT_JUDGE_SYSTEM_PROMPT = `
 You are an independent quality-verification judge for AI-enriched venture fund / crypto team data.
@@ -106,18 +108,21 @@ export class TeamEnrichmentJudgeAiService {
     overallAssessment: string;
     ok: boolean;
     errorMessage?: string;
+    usage: AIUsageEntry | null;
   }> {
     if (fields.length === 0) {
-      return { verdicts: {}, overallAssessment: 'No fields to judge.', ok: true };
+      return { verdicts: {}, overallAssessment: 'No fields to judge.', ok: true, usage: null };
     }
 
     const providerEnvVar = TeamEnrichmentJudgeAiService.PROVIDER_ENV_VAR;
+    const model = this.aiProvider.getModelName(providerEnvVar);
+    const startedAt = Date.now();
 
     try {
       const userPrompt = this.buildUserPrompt(context, fields);
       const tools = this.aiProvider.getWebSearchTool(providerEnvVar, { searchContextSize: 'medium' });
 
-      const { text } = await generateText({
+      const { text, usage, experimental_providerMetadata: providerMetadata } = await generateText({
         model: this.aiProvider.getResponsesModel(providerEnvVar, { useSearchGrounding: true }),
         system: TEAM_ENRICHMENT_JUDGE_SYSTEM_PROMPT,
         ...(Object.keys(tools).length > 0 && { tools }),
@@ -125,6 +130,17 @@ export class TeamEnrichmentJudgeAiService {
         temperature: 0.1,
         maxSteps: 3,
       });
+
+      const durationMs = Date.now() - startedAt;
+      const usageEntry = buildUsageEntry({ model, usage, providerMetadata, durationMs });
+
+      if (usageEntry) {
+        this.logger.log(`AI judge call team="${context.teamName}" stage=judge ok=true ${formatUsageLog(usageEntry)}`);
+      } else {
+        this.logger.warn(
+          `AI judge call team="${context.teamName}" stage=judge ok=true model=${model} durationMs=${durationMs} usage=unavailable`
+        );
+      }
 
       if (process.env.DEBUG_ENRICHMENT === 'true') {
         this.logger.debug(`Judge AI response (len=${text?.length ?? 0}): ${text?.substring(0, 500)}`);
@@ -137,6 +153,7 @@ export class TeamEnrichmentJudgeAiService {
           overallAssessment: '',
           ok: false,
           errorMessage: 'Judge AI response could not be parsed as JSON',
+          usage: usageEntry,
         };
       }
 
@@ -145,14 +162,20 @@ export class TeamEnrichmentJudgeAiService {
         verdicts,
         overallAssessment: this.truncate(parsed.overallAssessment || '', TEAM_JUDGMENT_ASSESSMENT_MAX_LENGTH),
         ok: true,
+        usage: usageEntry,
       };
     } catch (error) {
-      this.logger.error(`Judge AI failed for "${context.teamName}": ${error.message}`, error.stack);
+      const durationMs = Date.now() - startedAt;
+      this.logger.error(
+        `AI judge call team="${context.teamName}" stage=judge ok=false model=${model} durationMs=${durationMs} error="${error.message}"`,
+        error.stack
+      );
       return {
         verdicts: {},
         overallAssessment: '',
         ok: false,
         errorMessage: error.message,
+        usage: null,
       };
     }
   }

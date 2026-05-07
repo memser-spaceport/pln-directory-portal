@@ -4,8 +4,15 @@ import * as cheerio from 'cheerio';
 import ogs from 'open-graph-scraper';
 import { Readable } from 'stream';
 import sizeOf from 'image-size';
-import { AITeamEnrichmentResponse } from './team-enrichment.types';
+import { AITeamEnrichmentResponse, AIUsageEntry } from './team-enrichment.types';
 import { AiProviderService } from '../shared/ai-provider.service';
+import { buildUsageEntry, formatUsageLog } from './team-enrichment-cost';
+
+export interface TeamEnrichmentAIResult {
+  response: AITeamEnrichmentResponse;
+  /** AI token usage + cost estimate. Null when the SDK didn't surface a usage object. */
+  usage: AIUsageEntry | null;
+}
 
 export interface WebsiteSocialSignals {
   twitterHandler?: string;
@@ -157,14 +164,15 @@ export class TeamEnrichmentAiService {
         moreDetails?: string | null;
       };
     }
-  ): Promise<AITeamEnrichmentResponse> {
+  ): Promise<TeamEnrichmentAIResult> {
+    const providerEnvVar = TeamEnrichmentAiService.PROVIDER_ENV_VAR;
+    const model = this.aiProvider.getModelName(providerEnvVar);
+    const startedAt = Date.now();
     try {
       const userPrompt = this.buildUserPrompt(teamName, existingData);
-
-      const providerEnvVar = TeamEnrichmentAiService.PROVIDER_ENV_VAR;
       const tools = this.aiProvider.getWebSearchTool(providerEnvVar, { searchContextSize: 'high' });
 
-      const { text } = await generateText({
+      const { text, usage, experimental_providerMetadata: providerMetadata } = await generateText({
         model: this.aiProvider.getResponsesModel(providerEnvVar, {
           useSearchGrounding: true,
         }),
@@ -175,14 +183,29 @@ export class TeamEnrichmentAiService {
         maxSteps: 3,
       });
 
+      const durationMs = Date.now() - startedAt;
+      const usageEntry = buildUsageEntry({ model, usage, providerMetadata, durationMs });
+
+      if (usageEntry) {
+        this.logger.log(`AI enrichment call team="${teamName}" stage=enrichment ok=true ${formatUsageLog(usageEntry)}`);
+      } else {
+        this.logger.warn(
+          `AI enrichment call team="${teamName}" stage=enrichment ok=true model=${model} durationMs=${durationMs} usage=unavailable`
+        );
+      }
+
       if (process.env.DEBUG_ENRICHMENT === 'true') {
         this.logger.debug(`AI response (len=${text?.length ?? 0}): ${text?.substring(0, 500)}`);
       }
 
-      return this.parseAIResponse(text, teamName);
+      return { response: this.parseAIResponse(text, teamName), usage: usageEntry };
     } catch (error) {
-      this.logger.error(`AI enrichment failed for "${teamName}": ${error.message}`, error.stack);
-      return this.getEmptyResponse();
+      const durationMs = Date.now() - startedAt;
+      this.logger.error(
+        `AI enrichment call team="${teamName}" stage=enrichment ok=false model=${model} durationMs=${durationMs} error="${error.message}"`,
+        error.stack
+      );
+      return { response: this.getEmptyResponse(), usage: null };
     }
   }
 

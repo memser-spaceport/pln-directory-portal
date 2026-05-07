@@ -353,6 +353,41 @@ Guard: AdminAuthGuard
 Runs the single-team refetch for every team matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY`) with a non-empty `website` or `linkedinHandler`, regardless of current enrichment status. Teams whose logo is `ChangedByUser`, whose enrichment is `InProgress`, or which have no fetchable source are skipped with per-bucket counters.
 Returns `{ success, total, started, skippedInProgress, skippedUserOwned, noSource, notFound, message }`.
 
+### AI Cost Report
+
+```
+GET /v1/admin/teams/ai-report?since=<ISO8601>&page=<int>&pageSize=<int>
+Guard: AdminAuthGuard
+```
+
+Aggregated AI token usage + USD cost across all teams that have a `dataEnrichment.usage` block. Teams are sorted by combined cost desc and paginated.
+
+- `since` (optional) — filter per-stage by `lastRunAt >= since`. Each stage is filtered independently, so a team's enrichment run can be in-window while its judge run is out-of-window.
+- `page` (optional, default `1`) — 1-based page index for the `teams` list. Out-of-range pages clamp to the last available page.
+- `pageSize` (optional, default `10`, capped at `100`) — items per page for the `teams` list.
+
+> **Important:** `totals` and `byModel` are always computed over the full filtered result set, **not** the current page. Pagination only narrows the `teams` array.
+
+Response shape:
+
+```ts
+{
+  generatedAt: string,
+  filter: { since: string | null },
+  pagination: { page, pageSize, totalTeams, totalPages },
+  totals: {
+    teamsWithUsage: number,                                        // == pagination.totalTeams
+    enrichment: { teams, runs, inputTokens, outputTokens, cachedInputTokens, totalTokens, costUsd },
+    judge:      { teams, runs, inputTokens, outputTokens, cachedInputTokens, totalTokens, costUsd },
+    grandTotal: { totalTokens, costUsd }
+  },
+  byModel: Array<{ aiModel, stage: 'enrichment' | 'judge', teams, runs, totalTokens, costUsd }>,
+  teams:   Array<{ uid, name, enrichment: AIUsageEntry | null, judge: AIUsageEntry | null, grandTotalCostUsd }>
+}
+```
+
+Implementation reads `dataEnrichment.usage` in-memory across all teams with a non-null `dataEnrichment`, sorts and paginates in the service. Pagination is presentation-only — the underlying scan is always the full set, so `since` is the right knob when you want to narrow the actual computation. No cron/scheduler — call the endpoint when you want a fresh report.
+
 ### Team Lead Review
 
 ```
@@ -426,12 +461,80 @@ Web search behaviour differs by provider:
 - **Gemini** — uses model-level search grounding (no tool object).
 - **Anthropic** — Claude receives a provider-defined `web_search` tool in the shape the AI SDK accepts. Note that `@ai-sdk/anthropic@1.x` does not yet forward this tool to the Anthropic API, so the SDK emits an `unsupported-tool` warning and Claude answers from training knowledge. The call shape is kept forward-compatible so that a future SDK upgrade enables server-side web search without code changes.
 
+## AI Token Usage & Cost Tracking
+
+Each AI call (enrichment + judge) captures `usage` and `experimental_providerMetadata` from the Vercel AI SDK and converts them to a USD estimate via the per-model price table in `team-enrichment-cost.ts`. Token counts are persisted on the team; cost is logged and persisted alongside.
+
+### Persisted shape
+
+`Team.dataEnrichment.usage` carries one entry per stage. Both keys are optional — pre-tracking teams will not have them.
+
+```ts
+dataEnrichment.usage?: {
+  enrichment?: {
+    inputTokens, outputTokens, cachedInputTokens?, totalTokens,
+    costUsd,            // estimate from PRICING_TABLE; raw counts are the source of truth
+    aiModel,
+    durationMs,         // generateText wall-clock, summed across runs
+    runs,               // accumulates on force-enrichment / retries
+    lastRunAt           // ISO timestamp of most recent call
+  },
+  judge?: { …same shape… }
+}
+```
+
+`runs` and `durationMs` accumulate; `costUsd` is summed from the per-call estimate. A force-re-enrichment of a team produces `runs: 2`, summed tokens, summed cost, and the latest `lastRunAt`.
+
+### Pricing table
+
+`team-enrichment-cost.ts` keeps published per-1M-token rates for the models we run (Gemini 2.5 Flash/Pro, GPT-4o family, Claude Sonnet/Opus/Haiku 4.x). Lookup is exact id first, then prefix match (so `claude-sonnet-4-5-20250929` resolves to the `claude-sonnet-4` row). Unknown models log a `warn` and produce `costUsd: 0` — that's the signal to add a row.
+
+Cost numbers are estimates: provider pricing changes, web-search-grounding fees aren't reflected in `usage`, and cached-token discount tiers vary by provider. Treat `costUsd` as a budget signal; the persisted token counts let you re-derive cost later if rates change.
+
+**Maintenance cadence.** The table needs updating only a few times per year — token counts are exact and persisted, so stale rates affect `costUsd` estimates only, never historical accuracy.
+
+| Provider  | Typical change frequency               | Triggers                                                                                  |
+| --------- | -------------------------------------- | ----------------------------------------------------------------------------------------- |
+| OpenAI    | Every 6–18 months                      | Major model launches (4o → 4.1) and occasional re-pricings of existing models.            |
+| Anthropic | Stable across a generation             | New model rows when a tier ships (Sonnet 4.6, Opus 4.7); rarely re-prices existing rows.  |
+| Gemini    | Most volatile — adjusted in 2025       | Watch the [pricing page](https://ai.google.dev/pricing) when bumping `GEMINI_MODEL`.      |
+
+Recommended workflow: when a `WARN` log appears with `No pricing entry for model "<id>"`, that's the action item — add a row to `PRICING_TABLE`. No need to monitor proactively. If a provider repricies an existing model, edit the corresponding row; historical `costUsd` won't be backfilled (it's an estimate, and the underlying token counts remain accurate for re-derivation).
+
+### Logging
+
+Three structured log granularities, all keyword-style for grep / Loki / Datadog ingestion:
+
+1. **Per-AI-call** (one line per `generateText` invocation, in both AI services):
+   ```
+   AI enrichment call team="<name>" stage=enrichment ok=true model=gemini-2.5-flash
+     inputTokens=… outputTokens=… cachedInputTokens=… totalTokens=… costUsd=…
+     durationMs=… runs=1
+   ```
+   On failure, the line is logged at `error` with `ok=false error="…"`. If the SDK doesn't return a usage object (rare; cached/streamed paths), the line is logged at `warn` with `usage=unavailable`.
+
+2. **Per-team rollup** (one line at the end of each `doEnrichTeam` / `runJudgmentPipeline` after the persisted usage block has been written):
+   ```
+   Enrichment usage rollup team=<uid> name="<name>" stage=enrichment <…same fields…>
+   Judge usage rollup     team=<uid> name="<name>" stage=judge      <…same fields…>
+   ```
+   `runs` here reflects the cumulative count, so it answers "what has this team cost in total" rather than "what did this single call cost".
+
+3. **Per-cron summary** — the existing "job completed: N enriched / failed" line now ends with a pointer to the per-team rollup lines. Cron-level totals are intentionally **not** computed inline because both `enrichTeam` and `judgeTeam` fire background pipelines and return immediately; aggregating in-process would change that contract. For session-level spend, query the persisted `dataEnrichment.usage` (sum across teams enriched in a window) or aggregate the per-team rollup logs by timestamp.
+
+### Caveats
+
+- `costUsd` excludes search-grounding fees (Gemini grounding, OpenAI Responses web-search-preview, Anthropic provider-defined web_search).
+- ScrapingDog calls are not in this telemetry — those have a separate vendor billing channel.
+- The `usage` block is cumulative across re-runs; if you want per-run detail, the per-AI-call log lines are the source.
+
 ## Module Structure
 
 ```
 apps/web-api/src/team-enrichment/
   team-enrichment.types.ts          # Enums, interfaces, enrichable fields
   team-enrichment-eligibility-filter.ts # Shared isFund/priority WHERE filter for cron + admin queries
+  team-enrichment-cost.ts           # AI usage → USD estimator + pricing table + log formatter
   team-enrichment-ai.service.ts     # Enrichment LLM wrapper + logo scraping
   team-enrichment-scrapingdog.service.ts # LinkedIn fallback + classifyNameMatch/compareProfileToTeam helpers
   team-enrichment.service.ts        # Core enrichment business logic
@@ -439,6 +542,7 @@ apps/web-api/src/team-enrichment/
   team-enrichment-judge-ai.service.ts # Judge LLM wrapper (independent model)
   team-enrichment-judge.service.ts  # Two-stage judgment pipeline orchestration
   team-enrichment-judge.job.ts      # Judge cron job
+  team-enrichment-report.service.ts # Aggregator behind GET /v1/admin/teams/ai-report
   team-enrichment.module.ts         # NestJS module
 ```
 

@@ -6,6 +6,7 @@ import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.
 import { TeamEnrichmentJudgeAiService } from './team-enrichment-judge-ai.service';
 import { TeamEnrichmentJudgeService } from './team-enrichment-judge.service';
 import { TeamEnrichmentJudgeJob } from './team-enrichment-judge.job';
+import { TeamEnrichmentReportService } from './team-enrichment-report.service';
 import { LogoVerificationService } from './logo-verification.service';
 import { LogoVerificationController } from './logo-verification.controller';
 import { LogoVerificationPersistenceService } from './logo-verification-persistence.service';
@@ -21,6 +22,7 @@ import { LogoVerificationJobService } from './logo-verification-job.service';
     TeamEnrichmentJudgeAiService,
     TeamEnrichmentJudgeService,
     TeamEnrichmentJudgeJob,
+    TeamEnrichmentReportService,
     LogoVerificationService,
     LogoVerificationPersistenceService,
     LogoVerificationJobService,
@@ -28,6 +30,7 @@ import { LogoVerificationJobService } from './logo-verification-job.service';
   exports: [
     TeamEnrichmentService,
     TeamEnrichmentJudgeService,
+    TeamEnrichmentReportService,
     LogoVerificationService,
     LogoVerificationPersistenceService,
   ],
