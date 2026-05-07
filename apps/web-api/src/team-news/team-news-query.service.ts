@@ -21,7 +21,10 @@ const TOP_LEVEL_FOCUS_AREAS = [
 export class TeamNewsQueryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private buildWhere(query: TeamNewsListQuery, overrides: { dropFocus?: boolean; dropEventType?: boolean } = {}): Prisma.TeamNewsItemWhereInput {
+  private buildWhere(
+    query: TeamNewsListQuery,
+    overrides: { dropFocus?: boolean; dropEventType?: boolean } = {}
+  ): Prisma.TeamNewsItemWhereInput {
     const and: Prisma.TeamNewsItemWhereInput[] = [];
 
     const since = this.resolveSinceCutoff(query);
@@ -53,10 +56,7 @@ export class TeamNewsQueryService {
         team: {
           teamFocusAreas: {
             some: {
-              OR: [
-                { ancestorArea: { title: { in: query.focus } } },
-                { focusArea: { title: { in: query.focus } } },
-              ],
+              OR: [{ ancestorArea: { title: { in: query.focus } } }, { focusArea: { title: { in: query.focus } } }],
             },
           },
         },
@@ -184,9 +184,7 @@ export class TeamNewsQueryService {
     };
   }
 
-  private async countFocusFacets(
-    where: Prisma.TeamNewsItemWhereInput
-  ): Promise<TeamNewsFiltersResponse['focus']> {
+  private async countFocusFacets(where: Prisma.TeamNewsItemWhereInput): Promise<TeamNewsFiltersResponse['focus']> {
     const teamRows = await this.prisma.teamNewsItem.groupBy({
       by: ['teamUid'],
       where,
@@ -245,10 +243,9 @@ export class TeamNewsQueryService {
     const focusAreas: string[] = [];
     const subFocusAreas: string[] = [];
     for (const tfa of row.team.teamFocusAreas) {
+      focusAreas.push(tfa.ancestorArea.title);
       if (tfa.focusArea.parentUid) {
         subFocusAreas.push(tfa.focusArea.title);
-      } else {
-        focusAreas.push(tfa.ancestorArea.title);
       }
     }
 
