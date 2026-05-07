@@ -82,14 +82,7 @@ export class PLEventsController {
   }
 
   @Api(server.route.getPLEventGuestsByLocation)
-  @UseGuards(UserAuthValidateGuard, RbacGuard)
-  @RequirePermissions({
-    anyOf: [
-      IRL_GATHERINGS_PERMISSIONS.GOING_READ,
-      RBAC_PERMISSION_CODES.IRLG_GOING_WRITE,
-      ADMIN_PERMISSIONS.DIRECTORY_FULL,
-    ],
-  })
+  @UseGuards(UserAuthValidateGuard)
   @NoCache()
   async findPLEventGuestsByLocation(@Req() request: Request, @Param('uid') locationUid: string) {
     const member = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;

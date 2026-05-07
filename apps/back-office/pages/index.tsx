@@ -26,9 +26,20 @@ function getDefaultRedirect(user: AdminUser | null): string {
     return '/members?filter=level1';
   }
 
-  const isDemoDayAdmin = permissions.includes('demoday.admin.all') || permissions.some((permission) => permission.startsWith('demoday.admin.'));
+  const isDemoDayAdmin =
+    permissions.includes('demoday.admin.all') ||
+    permissions.includes('demoday.stats.read') ||
+    permissions.some((permission) => permission.startsWith('demoday.admin.'));
   if (isDemoDayAdmin) {
     return '/demo-days';
+  }
+
+  if (permissions.includes('member.contacts.read')) {
+    return '/members-v2';
+  }
+
+  if (permissions.includes('team.membership_source.read') || permissions.includes('membership.source.read')) {
+    return '/teams';
   }
 
   // admin.tools.access means the user may enter Back Office,

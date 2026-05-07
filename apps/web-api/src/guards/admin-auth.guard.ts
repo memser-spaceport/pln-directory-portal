@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '../utils/jwt/jwt.service';
-import { ADMIN_PERMISSIONS, DEMODAY_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { ADMIN_PERMISSIONS, DEMODAY_PERMISSIONS, MEMBER_PERMISSIONS, TEAM_MEMBERSHIP_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { MemberRole } from '../utils/constants';
 
 /**
@@ -40,7 +40,7 @@ abstract class BaseAdminAuthGuard implements CanActivate {
 
       // Verify user has at least one of the allowed roles
       const roles: string[] = payload.roles || [];
-      const permissions: string[] = payload.permissions || payload.effectivePermissionCodes || [];
+      const permissions: string[] = payload.effectivePermissionCodes ?? payload.permissions ?? [];
       const allowedRoles = this.getAllowedRoles();
       const allowedPermissions = this.getAllowedPermissions();
       const hasValidRole = roles.some((role) => allowedRoles.includes(role as MemberRole));
@@ -105,5 +105,85 @@ export class DemoDayAdminAuthGuard extends BaseAdminAuthGuard {
 
   protected allowsPermissionPrefix(permissionCode: string): boolean {
     return permissionCode.startsWith('demoday.admin.');
+  }
+}
+
+
+/**
+ * Guard for read-only Demo Day admin pages.
+ * Allows stats/report-link readers without granting write access.
+ */
+@Injectable()
+export class DemoDayReadAuthGuard extends BaseAdminAuthGuard {
+  constructor(jwtService: JwtService) {
+    super(jwtService);
+  }
+
+  protected getAllowedRoles(): MemberRole[] {
+    return [];
+  }
+
+  protected getAllowedPermissions(): string[] {
+    return [
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+      DEMODAY_PERMISSIONS.ADMIN_ALL,
+      DEMODAY_PERMISSIONS.STATS_READ,
+      DEMODAY_PERMISSIONS.REPORT_LINK_READ,
+    ];
+  }
+
+  protected allowsPermissionPrefix(permissionCode: string): boolean {
+    return permissionCode.startsWith('demoday.admin.');
+  }
+}
+
+
+/**
+ * Guard for Back Office member contacts read access.
+ * Allows read-only member contacts without granting member write/admin actions.
+ */
+@Injectable()
+export class MemberContactsReadAuthGuard extends BaseAdminAuthGuard {
+  constructor(jwtService: JwtService) {
+    super(jwtService);
+  }
+
+  protected getAllowedRoles(): MemberRole[] {
+    return [MemberRole.DIRECTORY_ADMIN];
+  }
+
+  protected getAllowedPermissions(): string[] {
+    return [
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+      DEMODAY_PERMISSIONS.ADMIN_ALL,
+      MEMBER_PERMISSIONS.CONTACTS_READ,
+    ];
+  }
+
+  protected allowsPermissionPrefix(permissionCode: string): boolean {
+    return permissionCode.startsWith('demoday.admin.');
+  }
+}
+
+/**
+ * Guard for Back Office team membership source read access.
+ * Allows read-only team membership source without granting team write/admin actions.
+ */
+@Injectable()
+export class TeamMembershipSourceReadAuthGuard extends BaseAdminAuthGuard {
+  constructor(jwtService: JwtService) {
+    super(jwtService);
+  }
+
+  protected getAllowedRoles(): MemberRole[] {
+    return [MemberRole.DIRECTORY_ADMIN];
+  }
+
+  protected getAllowedPermissions(): string[] {
+    return [
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+      TEAM_MEMBERSHIP_PERMISSIONS.SOURCE_READ,
+      TEAM_MEMBERSHIP_PERMISSIONS.SOURCE_READ_LEGACY,
+    ];
   }
 }

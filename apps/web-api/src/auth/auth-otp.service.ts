@@ -109,7 +109,12 @@ export class AuthOtpService {
     const permissionCodes = await this.getEffectivePermissionCodes(member.uid);
     const hasBackofficeAccess =
       permissionCodes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) ||
+      permissionCodes.includes(ADMIN_PERMISSIONS.TOOLS_ACCESS) ||
       permissionCodes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
+      permissionCodes.includes(DEMODAY_PERMISSIONS.STATS_READ) ||
+      permissionCodes.includes('member.contacts.read') ||
+      permissionCodes.includes('team.membership_source.read') ||
+      permissionCodes.includes('membership.source.read') ||
       permissionCodes.some((code) => code.startsWith('demoday.admin.'));
 
     if (!hasBackofficeAccess) {
@@ -236,7 +241,12 @@ export class AuthOtpService {
     const permissionCodes = await this.getEffectivePermissionCodes(member.uid);
     const hasBackofficeAccess =
       permissionCodes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) ||
+      permissionCodes.includes(ADMIN_PERMISSIONS.TOOLS_ACCESS) ||
       permissionCodes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
+      permissionCodes.includes(DEMODAY_PERMISSIONS.STATS_READ) ||
+      permissionCodes.includes('member.contacts.read') ||
+      permissionCodes.includes('team.membership_source.read') ||
+      permissionCodes.includes('membership.source.read') ||
       permissionCodes.some((code) => code.startsWith('demoday.admin.'));
 
     if (!hasBackofficeAccess) {

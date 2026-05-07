@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
-import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
+import { AdminAuthGuard, DemoDayAdminAuthGuard, MemberContactsReadAuthGuard } from '../guards/admin-auth.guard';
 
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import {
@@ -19,7 +19,7 @@ export class MemberController {
   constructor(private readonly memberService: MemberService) {}
 
   @Get()
-  @UseGuards(DemoDayAdminAuthGuard)
+  @UseGuards(MemberContactsReadAuthGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async getMembers(@Query() query: RequestMembersDto) {
@@ -34,7 +34,7 @@ export class MemberController {
   }
 
   @Get(':uid')
-  @UseGuards(DemoDayAdminAuthGuard)
+  @UseGuards(MemberContactsReadAuthGuard)
   @NoCache()
   async getMemberByUid(@Param('uid') uid: string): Promise<any> {
     return await this.memberService.findMemberByUid(uid);

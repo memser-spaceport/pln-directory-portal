@@ -136,9 +136,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // RBAC v2: page access is driven by effective permissions, not legacy MemberRole rows.
   const isDirectoryAdmin = hasPermission(ADMIN_PERMISSIONS.DIRECTORY_FULL);
-  const isBackOfficeUser = isDirectoryAdmin || hasPermission(ADMIN_PERMISSIONS.TOOLS_ACCESS);
+  const hasDemoDayStatsRead = hasPermission(DEMODAY_PERMISSIONS.STATS_READ);
+  const hasMemberContactsRead = hasPermission('member.contacts.read');
+  const hasMembershipSourceRead =
+    hasPermission('team.membership_source.read') || hasPermission('membership.source.read');
+  const isBackOfficeUser =
+    isDirectoryAdmin ||
+    hasPermission(ADMIN_PERMISSIONS.TOOLS_ACCESS) ||
+    hasDemoDayStatsRead ||
+    hasMemberContactsRead ||
+    hasMembershipSourceRead;
   const isDemoDayAdmin =
     isDirectoryAdmin ||
+    hasDemoDayStatsRead ||
     hasPermission(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
     permissions.some((permission) => permission.startsWith('demoday.admin.'));
 

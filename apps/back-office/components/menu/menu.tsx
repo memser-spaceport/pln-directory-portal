@@ -8,12 +8,12 @@ import { DealsMenu } from './components/DealsMenu/DealsMenu';
 import { FounderGuidesMenu } from './components/FounderGuidesMenu/FounderGuidesMenu';
 
 export function Menu() {
-  const { isDirectoryAdmin, isDemoDayAdmin } = useAuth();
+  const { isDirectoryAdmin, isDemoDayAdmin, hasPermission } = useAuth();
 
   return (
     <ul className="flex space-x-4 text-sm text-gray-700">
-      {isDirectoryAdmin && <MembersV2Menu />}
-      {isDirectoryAdmin && <TeamsMenu />}
+      {(isDirectoryAdmin || hasPermission('member.contacts.read')) && <MembersV2Menu />}
+      {(isDirectoryAdmin || hasPermission('team.membership_source.read') || hasPermission('membership.source.read')) && <TeamsMenu />}
       {(isDirectoryAdmin || isDemoDayAdmin) && <DemoDaysMenu />}
       {isDirectoryAdmin && <IrlGatheringMenu />}
       {isDirectoryAdmin && <DealsMenu />}

@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
-import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
+import { AdminAuthGuard, DemoDayAdminAuthGuard, DemoDayReadAuthGuard } from '../guards/admin-auth.guard';
 import { DemoDaysService } from '../demo-days/demo-days.service';
 import { DemoDayParticipantsService } from '../demo-days/demo-day-participants.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
@@ -113,18 +113,18 @@ export class AdminDemoDaysController {
   }
 
   @Get()
-  @UseGuards(DemoDayAdminAuthGuard)
+  @UseGuards(DemoDayReadAuthGuard)
   @NoCache()
   async getAllDemoDays(@Req() req): Promise<ResponseDemoDayDto[]> {
     // req.user contains the JWT payload with roles and memberUid
-    const userRoles: string[] = req.user?.roles ?? [];
-    const memberUid: string | undefined = req.user?.memberUid;
-    return this.demoDaysService.getAllDemoDaysForAdmin(userRoles, memberUid);
+    const permissionCodes: string[] = req.user?.effectivePermissionCodes ?? req.user?.permissions ?? req.user?.roles ?? [];
+    const memberUid: string | undefined = req.user?.memberUid ?? req.user?.uid;
+    return this.demoDaysService.getAllDemoDaysForAdmin(permissionCodes, memberUid);
   }
 
   // This endpoint uses slugURL for browser-friendly URLs (e.g., /demo-days/crypto-day)
   @Get(':slugURL')
-  @UseGuards(DemoDayAdminAuthGuard)
+  @UseGuards(DemoDayReadAuthGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async getDemoDayDetails(@Param('slugURL') slugURL: string): Promise<ResponseDemoDayDto> {
@@ -240,7 +240,7 @@ export class AdminDemoDaysController {
   }
 
   @Get(':uid/participants')
-  @UseGuards(DemoDayAdminAuthGuard)
+  @UseGuards(DemoDayReadAuthGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async getParticipants(
