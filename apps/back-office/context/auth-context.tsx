@@ -17,7 +17,12 @@ export interface AdminUser {
 interface AuthContextValue {
   user: AdminUser | null;
   isDirectoryAdmin: boolean;
+  /** See demo-days list/menu (includes stats/report readers). */
+  canViewDemoDays: boolean;
+  /** Back-compat: same as canViewDemoDays. */
   isDemoDayAdmin: boolean;
+  /** Create/update demo days and participants (excludes stats-only readers). */
+  canMutateDemoDays: boolean;
   isBackOfficeUser: boolean;
   permissions: string[];
   hasPermission: (permission: string) => boolean;
@@ -28,7 +33,9 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   isDirectoryAdmin: false,
+  canViewDemoDays: false,
   isDemoDayAdmin: false,
+  canMutateDemoDays: false,
   isBackOfficeUser: false,
   permissions: [],
   hasPermission: () => false,
@@ -81,8 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Backend returns memberRoles: [{ uid, name, ... }]
         const mappedRoles: string[] = Array.isArray(apiUser.memberRoles)
           ? apiUser.memberRoles
-            .map((role: any) => role?.name)
-            .filter((name: unknown): name is string => typeof name === 'string')
+              .map((role: any) => role?.name)
+              .filter((name: unknown): name is string => typeof name === 'string')
           : [];
 
         const apiPermissionCodes = apiUser.effectivePermissionCodes ?? apiUser.permissionCodes ?? [];
@@ -122,7 +129,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return userFromApi || user;
   }, [userFromApi, user]);
 
-
   const hasRole = useMemo(
     () =>
       (role: string): boolean => {
@@ -136,34 +142,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // RBAC v2: page access is driven by effective permissions, not legacy MemberRole rows.
   const isDirectoryAdmin = hasPermission(ADMIN_PERMISSIONS.DIRECTORY_FULL);
-  const hasDemoDayStatsRead = hasPermission(DEMODAY_PERMISSIONS.STATS_READ);
-  const hasMemberContactsRead = hasPermission('member.contacts.read');
-  const hasMembershipSourceRead =
-    hasPermission('team.membership_source.read') || hasPermission('membership.source.read');
+
+  const hasDemoDayAdminPermissionCode = permissions.some((p) => p.startsWith('demoday.admin.'));
+
+  const canMutateDemoDays =
+    isDirectoryAdmin || hasPermission(DEMODAY_PERMISSIONS.ADMIN_ALL) || hasDemoDayAdminPermissionCode;
+
+  const canViewDemoDays =
+    isDirectoryAdmin || hasPermission(DEMODAY_PERMISSIONS.ADMIN_ALL) || hasDemoDayAdminPermissionCode;
+
+  const isDemoDayAdmin = canViewDemoDays;
+
   const isBackOfficeUser =
-    isDirectoryAdmin ||
-    hasPermission(ADMIN_PERMISSIONS.TOOLS_ACCESS) ||
-    hasDemoDayStatsRead ||
-    hasMemberContactsRead ||
-    hasMembershipSourceRead;
-  const isDemoDayAdmin =
-    isDirectoryAdmin ||
-    hasDemoDayStatsRead ||
-    hasPermission(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
-    permissions.some((permission) => permission.startsWith('demoday.admin.'));
+    isDirectoryAdmin || hasPermission(ADMIN_PERMISSIONS.TOOLS_ACCESS) || hasDemoDayAdminPermissionCode;
 
   const value = useMemo(
     () => ({
       user: resolvedUser,
       isDirectoryAdmin,
+      canViewDemoDays,
       isDemoDayAdmin,
-      isBackOfficeUser: isBackOfficeUser || isDemoDayAdmin,
+      canMutateDemoDays,
+      isBackOfficeUser: isBackOfficeUser || canViewDemoDays,
       isLoading,
       permissions,
       hasPermission,
       hasRole,
     }),
-    [resolvedUser, isDirectoryAdmin, isDemoDayAdmin, isBackOfficeUser, isLoading, hasRole, permissions]
+    [
+      resolvedUser,
+      isDirectoryAdmin,
+      canViewDemoDays,
+      isDemoDayAdmin,
+      canMutateDemoDays,
+      isBackOfficeUser,
+      isLoading,
+      hasRole,
+      permissions,
+      hasPermission,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

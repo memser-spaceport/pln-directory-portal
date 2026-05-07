@@ -1,12 +1,11 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '../utils/jwt/jwt.service';
-import { ADMIN_PERMISSIONS, DEMODAY_PERMISSIONS, MEMBER_PERMISSIONS, TEAM_MEMBERSHIP_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import {
+  ADMIN_PERMISSIONS,
+  DEMODAY_PERMISSIONS,
+  MEMBER_PERMISSIONS,
+  TEAM_MEMBERSHIP_PERMISSIONS,
+} from '../access-control-v2/access-control-v2.constants';
 import { MemberRole } from '../utils/constants';
 
 /**
@@ -15,8 +14,6 @@ import { MemberRole } from '../utils/constants';
  */
 abstract class BaseAdminAuthGuard implements CanActivate {
   constructor(protected jwtService: JwtService) {}
-
-  protected abstract getAllowedRoles(): MemberRole[];
 
   protected getAllowedPermissions(): string[] {
     return [];
@@ -38,17 +35,14 @@ abstract class BaseAdminAuthGuard implements CanActivate {
       // so that we can access it in our route handlers
       request['user'] = payload;
 
-      // Verify user has at least one of the allowed roles
-      const roles: string[] = payload.roles || [];
+      // Verify user has at least one of the allowed permissions
       const permissions: string[] = payload.effectivePermissionCodes ?? payload.permissions ?? [];
-      const allowedRoles = this.getAllowedRoles();
       const allowedPermissions = this.getAllowedPermissions();
-      const hasValidRole = roles.some((role) => allowedRoles.includes(role as MemberRole));
       const hasValidPermission = permissions.some(
         (permission) => allowedPermissions.includes(permission) || this.allowsPermissionPrefix(permission)
       );
 
-      if (!hasValidRole && !hasValidPermission) {
+      if (!hasValidPermission) {
         throw new ForbiddenException('User does not have the required admin permission');
       }
     } catch (e) {
@@ -74,10 +68,6 @@ abstract class BaseAdminAuthGuard implements CanActivate {
 export class AdminAuthGuard extends BaseAdminAuthGuard {
   constructor(jwtService: JwtService) {
     super(jwtService);
-  }
-
-  protected getAllowedRoles(): MemberRole[] {
-    return [MemberRole.DIRECTORY_ADMIN];
   }
 
   protected getAllowedPermissions(): string[] {
@@ -108,7 +98,6 @@ export class DemoDayAdminAuthGuard extends BaseAdminAuthGuard {
   }
 }
 
-
 /**
  * Guard for read-only Demo Day admin pages.
  * Allows stats/report-link readers without granting write access.
@@ -137,34 +126,6 @@ export class DemoDayReadAuthGuard extends BaseAdminAuthGuard {
   }
 }
 
-
-/**
- * Guard for Back Office member contacts read access.
- * Allows read-only member contacts without granting member write/admin actions.
- */
-@Injectable()
-export class MemberContactsReadAuthGuard extends BaseAdminAuthGuard {
-  constructor(jwtService: JwtService) {
-    super(jwtService);
-  }
-
-  protected getAllowedRoles(): MemberRole[] {
-    return [MemberRole.DIRECTORY_ADMIN];
-  }
-
-  protected getAllowedPermissions(): string[] {
-    return [
-      ADMIN_PERMISSIONS.DIRECTORY_FULL,
-      DEMODAY_PERMISSIONS.ADMIN_ALL,
-      MEMBER_PERMISSIONS.CONTACTS_READ,
-    ];
-  }
-
-  protected allowsPermissionPrefix(permissionCode: string): boolean {
-    return permissionCode.startsWith('demoday.admin.');
-  }
-}
-
 /**
  * Guard for Back Office team membership source read access.
  * Allows read-only team membership source without granting team write/admin actions.
@@ -173,10 +134,6 @@ export class MemberContactsReadAuthGuard extends BaseAdminAuthGuard {
 export class TeamMembershipSourceReadAuthGuard extends BaseAdminAuthGuard {
   constructor(jwtService: JwtService) {
     super(jwtService);
-  }
-
-  protected getAllowedRoles(): MemberRole[] {
-    return [MemberRole.DIRECTORY_ADMIN];
   }
 
   protected getAllowedPermissions(): string[] {

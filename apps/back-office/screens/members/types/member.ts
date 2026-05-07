@@ -10,8 +10,16 @@ export type Member = {
   teamOrProjectURL: string;
   uid: string;
   signUpSource: string | null;
+  updatedAt?: string;
   roles?: { uid: string; code: string; name: string; description?: string | null }[];
-  policies?: { uid: string; code: string; name: string; description?: string | null }[];
+  policies?: {
+    uid: string;
+    code: string;
+    name: string;
+    description?: string | null;
+    role?: string | null;
+    group?: string | null;
+  }[];
   permissions?: { uid: string; code: string; module: string; description?: string | null }[];
   memberRoles?: { name: string }[];
   demoDayHosts?: string[];

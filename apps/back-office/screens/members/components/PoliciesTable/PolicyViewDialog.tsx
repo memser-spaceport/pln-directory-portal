@@ -3,7 +3,7 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
+  PaginationState,
   useReactTable,
 } from '@tanstack/react-table';
 import clsx from 'clsx';
@@ -11,11 +11,15 @@ import clsx from 'clsx';
 import Modal from '../../../../components/modal/modal';
 import { Policy } from '../../../../hooks/access-control/usePoliciesList';
 import { Member } from '../../types/member';
+import { useMembersList } from '../../../../hooks/members/useMembersList';
+import PaginationControls from '../PaginationControls/PaginationControls';
 import s from './PolicyViewDialog.module.scss';
+
+const MEMBER_SEARCH_DEBOUNCE_MS = 300;
 
 interface Props {
   policy: Policy | null;
-  members: Member[];
+  authToken: string | undefined;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -241,16 +245,43 @@ const columns = [
 
 const MODULES_INITIAL_COUNT = 6;
 
-export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
-  const [memberSearch, setMemberSearch] = useState('');
+export function PolicyViewDialog({ policy, authToken, isOpen, onClose }: Props) {
+  const [memberSearchRaw, setMemberSearchRaw] = useState('');
+  const [debouncedMemberSearch, setDebouncedMemberSearch] = useState('');
   const [showAllModules, setShowAllModules] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const [dialogPagination, setDialogPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 12 });
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMemberSearch(memberSearchRaw.trim()), MEMBER_SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [memberSearchRaw]);
+
+  useEffect(() => {
+    setDialogPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [debouncedMemberSearch]);
 
   useEffect(() => {
     setShowAllModules(false);
     setExpandedModules(new Set());
-    setMemberSearch('');
+    setMemberSearchRaw('');
+    setDebouncedMemberSearch('');
+    setDialogPagination({ pageIndex: 0, pageSize: 12 });
   }, [policy?.uid]);
+
+  const { data: assigneesData } = useMembersList(
+    {
+      authToken,
+      memberState: ['APPROVED'],
+      policyCodes: policy ? [policy.code] : undefined,
+      page: dialogPagination.pageIndex + 1,
+      limit: dialogPagination.pageSize,
+      search: debouncedMemberSearch || undefined,
+      sortBy: 'updatedAt',
+      sortOrder: 'desc',
+    },
+    { enabled: !!authToken && !!policy?.code && isOpen, keepPrevious: false }
+  );
 
   const modulesWithPermissions = useMemo(() => {
     if (!policy) return [];
@@ -274,21 +305,18 @@ export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
       .sort((a, b) => a.module.localeCompare(b.module));
   }, [policy]);
 
-  const policyMembers = members.filter((m) => m.policies?.some((p) => p.code === policy?.code));
+  const policyMembers = assigneesData?.data ?? [];
+  const totalAssigned = assigneesData?.pagination.total ?? 0;
+  const dialogPageCount = assigneesData?.pagination.pages ?? 1;
 
   const table = useReactTable({
     data: policyMembers,
     columns,
-    state: { globalFilter: memberSearch },
+    state: { pagination: dialogPagination },
+    onPaginationChange: setDialogPagination,
+    manualPagination: true,
+    pageCount: dialogPageCount,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    globalFilterFn: (row, _colId, value: string) => {
-      const q = value.toLowerCase();
-      return (
-        row.original.name.toLowerCase().includes(q) ||
-        row.original.email.toLowerCase().includes(q)
-      );
-    },
     getRowId: (row) => row.uid,
   });
 
@@ -395,7 +423,7 @@ export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
 
         {/* Members */}
         <section className={s.section}>
-          <h4 className={s.sectionHeading}>Members ({policyMembers.length})</h4>
+          <h4 className={s.sectionHeading}>Members ({totalAssigned.toLocaleString()})</h4>
 
           <div className={s.memberSearchWrapper}>
             <span className={s.memberSearchIcon}>
@@ -404,8 +432,8 @@ export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
             <input
               className={s.memberSearch}
               placeholder="Search members"
-              value={memberSearch}
-              onChange={(e) => setMemberSearch(e.target.value)}
+              value={memberSearchRaw}
+              onChange={(e) => setMemberSearchRaw(e.target.value)}
             />
           </div>
 
@@ -458,6 +486,7 @@ export function PolicyViewDialog({ policy, members, isOpen, onClose }: Props) {
               )}
             </div>
           </div>
+          {dialogPageCount > 0 ? <PaginationControls table={table} /> : null}
         </section>
       </div>
     </Modal>
