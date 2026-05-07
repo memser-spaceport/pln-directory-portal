@@ -502,16 +502,13 @@ export class TeamEnrichmentService {
       // (we don't make the team worse off), but record CannotEnrich for provenance.
       if (!newLogoMeta) {
         newLogoMeta = { status: FieldEnrichmentStatus.CannotEnrich };
-        this.logger.log(
-          `Logo refetch: no new logo found for team ${teamUid} (${team.name}); preserving existing logo`
-        );
+        this.logger.log(`Logo refetch: no new logo found for team ${teamUid} (${team.name}); preserving existing logo`);
       }
 
       // Restore the prior overall status (we clobbered it with InProgress earlier).
       // If the team had no prior enrichment, default to Enriched only when we actually set a logo.
-      const restoredStatus = priorStatus && priorStatus !== EnrichmentStatus.InProgress
-        ? priorStatus
-        : EnrichmentStatus.Enriched;
+      const restoredStatus =
+        priorStatus && priorStatus !== EnrichmentStatus.InProgress ? priorStatus : EnrichmentStatus.Enriched;
 
       const mergedFieldsMeta: FieldsMetaMap = {
         ...existingFieldsMeta,
@@ -550,20 +547,10 @@ export class TeamEnrichmentService {
         },
       });
 
-      this.logger.log(
-        `Logo refetch completed for team ${teamUid} (${team.name}): source=${sourceUsed ?? 'none'}`
-      );
+      this.logger.log(`Logo refetch completed for team ${teamUid} (${team.name}): source=${sourceUsed ?? 'none'}`);
     } catch (error) {
-      this.logger.error(
-        `Logo refetch failed for team ${teamUid} (${team.name}): ${error.message}`,
-        error.stack
-      );
-      await this.updateEnrichmentStatus(
-        teamUid,
-        team.dataEnrichment,
-        EnrichmentStatus.FailedToEnrich,
-        error.message
-      );
+      this.logger.error(`Logo refetch failed for team ${teamUid} (${team.name}): ${error.message}`, error.stack);
+      await this.updateEnrichmentStatus(teamUid, team.dataEnrichment, EnrichmentStatus.FailedToEnrich, error.message);
     }
   }
 
@@ -1142,8 +1129,7 @@ export class TeamEnrichmentService {
     const logoIsUserOwned =
       existingFieldsMeta.logo?.status === FieldEnrichmentStatus.ChangedByUser ||
       (!!team.logoUid && !existingFieldsMeta.logo);
-    const hasLogoGap =
-      !logoIsUserOwned && (!team.logoUid || !!forceOverwrite) && !(updateData as any).logo;
+    const hasLogoGap = !logoIsUserOwned && (!team.logoUid || !!forceOverwrite) && !(updateData as any).logo;
     const hasWebsiteGap = !team.website && !(updateData as any).website;
     const hasShortDescGap = !team.shortDescription && !(updateData as any).shortDescription;
     const hasLongDescGap = !team.longDescription && !(updateData as any).longDescription;
@@ -1278,7 +1264,9 @@ export class TeamEnrichmentService {
           (updateData as any).logo = { connect: { uid: persisted.imageUid } };
           markSdField('logo');
           filledFields.push('logo');
-          this.logger.log(`Team ${teamUid} (${team.name}): logo set from ScrapingDog, image uid: ${persisted.imageUid}`);
+          this.logger.log(
+            `Team ${teamUid} (${team.name}): logo set from ScrapingDog, image uid: ${persisted.imageUid}`
+          );
         }
       } catch (error) {
         this.logger.warn(`Team ${teamUid} (${team.name}): ScrapingDog logo download/upload failed: ${error.message}`);
@@ -1293,10 +1281,8 @@ export class TeamEnrichmentService {
       name: team.name,
       website: ((updateData as any).website as string | null | undefined) ?? team.website,
       linkedinHandler: team.linkedinHandler,
-      shortDescription:
-        ((updateData as any).shortDescription as string | null | undefined) ?? team.shortDescription,
-      longDescription:
-        ((updateData as any).longDescription as string | null | undefined) ?? team.longDescription,
+      shortDescription: ((updateData as any).shortDescription as string | null | undefined) ?? team.shortDescription,
+      longDescription: ((updateData as any).longDescription as string | null | undefined) ?? team.longDescription,
       moreDetails: ((updateData as any).moreDetails as string | null | undefined) ?? team.moreDetails,
       industryTags: team.industryTags.map((t) => ({ title: t.title })),
     };
@@ -1329,9 +1315,7 @@ export class TeamEnrichmentService {
       };
     }
 
-    this.logger.log(
-      `Team ${teamUid} (${team.name}): ScrapingDog filled [${filledFields.join(', ')}]`
-    );
+    this.logger.log(`Team ${teamUid} (${team.name}): ScrapingDog filled [${filledFields.join(', ')}]`);
 
     return {
       used: true,

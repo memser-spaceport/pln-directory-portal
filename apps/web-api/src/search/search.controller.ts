@@ -6,14 +6,14 @@ import { ApiTags } from '@nestjs/swagger';
 import { SearchService } from './search.service';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { ResponseSearchResultDto, SearchQueryDto } from 'libs/contracts/src/schema/global-search';
-import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { FORUM_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { Request } from 'express';
 
 @ApiTags('Search')
 @Controller()
-@UseGuards(UserTokenCheckGuard)
+@UseGuards(OptionalUserTokenCheckGuard)
 export class SearchController {
   constructor(
     private readonly searchService: SearchService,
