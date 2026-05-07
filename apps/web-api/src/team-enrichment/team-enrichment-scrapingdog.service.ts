@@ -162,18 +162,9 @@ export class TeamEnrichmentScrapingDogService {
       judgedVia: JudgmentSource.ScrapingDog,
     });
 
-    // website — URL host match (strip www.)
-    if (team.website && profile.website) {
-      const teamHost = this.extractHost(team.website);
-      const profileHost = this.extractHost(profile.website);
-      if (teamHost && profileHost) {
-        if (teamHost === profileHost) {
-          result.website = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'host-match');
-        } else {
-          result.website = mkJudgment(FieldConfidence.Low, JudgmentVerdict.Disagrees, 20, 'host-mismatch');
-        }
-      }
-    }
+    // website — intentionally not judged here. A LinkedIn-vs-team URL host comparison is too
+    // noisy: LinkedIn often lists an outdated, aliased, or product-subdomain URL even when the
+    // team's website is correct. The AI judge (Stage 2) can verify the website with web search instead.
 
     // linkedinHandler — corroborated by company_name match (and optionally website host).
     // The actual identity signal is that ScrapingDog returned a profile whose `company_name` matches the team.
