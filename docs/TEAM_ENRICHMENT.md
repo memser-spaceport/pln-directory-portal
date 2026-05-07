@@ -123,7 +123,7 @@ After enrichment completes, a separate **AI Judge** cron independently verifies 
 
 ### Two stages
 
-1. **Stage 1 — ScrapingDog LinkedIn match (deterministic).** Runs when `SCRAPINGDOG_API_KEY` is set and the team has a `linkedinHandler`. The judge fetches the canonical LinkedIn profile, classifies the name match as `exact` / `partial` / `none`, then performs direct field-to-field comparisons (URL host match for website, **`company_name` match + optional website-host corroboration for the LinkedIn handle itself**, tagline/about overlap for descriptions, set intersection for industries). Fields the comparison can resolve authoritatively (`agrees` at `high`, or `disagrees` at `low`) skip Stage 2. `partial` tier downshifts `high` verdicts to `medium`.
+1. **Stage 1 — ScrapingDog LinkedIn match (deterministic).** Runs when `SCRAPINGDOG_API_KEY` is set and the team has a `linkedinHandler`. The judge fetches the canonical LinkedIn profile, classifies the name match as `exact` / `partial` / `none`, then performs direct field-to-field comparisons (**`company_name` match + optional website-host corroboration for the LinkedIn handle itself**, tagline/about overlap for descriptions, set intersection for industries). Fields the comparison can resolve authoritatively (`agrees` at `high`, or `disagrees` at `low`) skip Stage 2. `partial` tier downshifts `high` verdicts to `medium`.
 
    **`linkedinHandler` verification — name match, not slug match.** The handle verdict is **not** produced by comparing the team's stored slug to ScrapingDog's `universal_name_id`. LinkedIn 301-redirects renamed companies to their canonical slug, so a stored `company/oldco` resolving to a profile whose `universal_name_id` is `newco-rebrand` would falsely look like a mismatch even though it points at the correct entity. Instead, Stage 1 trusts the precondition that produced this comparator run: ScrapingDog returned a profile whose `company_name` matched the team (per `classifyNameMatch`), so the handle pointed at the right company. Optionally, a website-host equality between `team.website` and `profile.website` corroborates the match and bumps confidence/score. Verdict matrix:
 
@@ -137,14 +137,7 @@ After enrichment completes, a separate **AI Judge** cron independently verifies 
 
    ¹ via the existing `partial → medium` downshift in `mkJudgment`. A partial-only name match with no corroborating website (e.g. "Acme Inc" vs "Acme BV") is intentionally surfaced as `uncertain` rather than silently agreed, so it lands in `fieldsForReview`. `nameMatch === 'none'` continues to skip the comparator entirely; the AI judge handles those.
 
-   **Website reachability gate.** A `host-mismatch` verdict from the host comparator is purely a string check — it can't tell whether the team's own website is real. To avoid condemning a reachable website on host-mismatch alone (a frequent false negative when the LinkedIn handle is the wrong one), Stage 1 probes `team.website` once with a lightweight `HEAD` request (5s timeout, follows redirects, falls back to a `Range`-limited `GET` on `405` / `501` / `403`). The probe runs **only** when the team has a website AND the comparator emitted `host-mismatch`; it is otherwise skipped. Verdict adjustments:
-
-   - **Reachable + final host equals the ScrapingDog-listed host** → website verdict flipped to `agrees-medium / redirects-to-scrapingdog-host` (the team's website redirects to the LinkedIn-canonical domain — same entity, alias domain).
-   - **Reachable + final host still differs** → website verdict downshifted to `uncertain-medium / host-mismatch-but-reachable`. Surfaces in `fieldsForReview` for manual check, but is no longer persisted as `disagrees`. The `linkedinHandler` verdict is intentionally **not** modified — the user picked the conservative path of flagging the website for review rather than auto-condemning the LinkedIn handle.
-   - **Definitive 4xx/5xx (unreachable)** → existing `disagrees-low / host-mismatch` verdict is kept (the host-mismatch is now backed by an additional negative signal).
-   - **Transient probe failure (timeout / DNS / network)** → returns `null`; existing verdict is left untouched. Flaky networks never penalise the team.
-
-   Probe outcome (and the post-redirect host) is persisted to `dataEnrichment.judgment.scrapingDog.websiteReachable` / `websiteFinalHost` for observability, and forwarded into the Stage 2 `JudgeTeamContext` as a `Website reachability:` line so the AI judge can factor it in (system prompt instructs: when the website is reachable but LinkedIn lists a different host, prefer to disagree with `linkedinHandler` over `website`).
+   **`website` (and other URL fields) — not judged by Stage 1.** Earlier revisions emitted a `host-match` / `host-mismatch` verdict by comparing the team's stored URL to the URL listed on the LinkedIn profile. This produced too many false negatives — companies routinely use alias domains, product subdomains, or rebrand without updating LinkedIn (e.g. team `Mercle` with website `mercle.ai` whose LinkedIn profile lists a different host) — so the comparator was condemning correct websites. The deterministic comparator is therefore intentionally silent on URL fields; the AI judge (Stage 2) verifies them via web search instead, and is explicitly instructed not to disagree on a URL solely because it differs from another URL we already have on file. Same reasoning as the `linkedinHandler` slug-equality removal.
 
 2. **Stage 2 — AI judge.** For remaining fields (or all fields when Stage 1 is unavailable), the second AI model returns a per-field `{ confidence, score, verdict, note }` plus an `overallAssessment`. Temperature is conservative so the judge prefers `uncertain` over guessing.
 
@@ -161,7 +154,7 @@ fieldsMeta[field]: {
     confidence: 'high' | 'medium' | 'low',   // judge's independent assessment
     score: 0..100,
     verdict: 'agrees' | 'disagrees' | 'uncertain',
-    note?: string,                 // max 60 chars, hyphenated-keyword style (e.g. 'host-match')
+    note?: string,                 // max 60 chars, hyphenated-keyword style (e.g. 'name-match')
     judgedVia: 'scrapingdog' | 'ai',
   }
 }
@@ -180,9 +173,7 @@ dataEnrichment.judgment: {
                                    // — includes every field whose judge verdict is disagrees,
                                    //   uncertain, or agrees-at-low-confidence
   scrapingDog?: {
-    used, fetchedAt, nameMatch, companyNameFromLinkedIn, verifiedFields, linkedinInternalId,
-    websiteReachable?: boolean | null,   // true = 2xx final, false = 4xx/5xx, null = not probed / transient
-    websiteFinalHost?: string | null     // post-redirect normalized host when reachable
+    used, fetchedAt, nameMatch, companyNameFromLinkedIn, verifiedFields, linkedinInternalId
   }
 }
 ```
