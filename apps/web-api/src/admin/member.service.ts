@@ -1464,7 +1464,7 @@ export class MemberService {
   }
 
   async findMembers(params: RequestMembersDto) {
-    const { page, limit, memberState, policyCodes, policyGroups, policyRoles } = params;
+    const { page, limit, memberState, policyCodes, policyGroups, policyRoles, search, sortBy, sortOrder } = params;
     const where: Prisma.MemberWhereInput = {};
 
     if (memberState?.length) {
@@ -1475,20 +1475,54 @@ export class MemberService {
       };
     }
 
-    if (policyCodes?.length || policyGroups?.length || policyRoles?.length) {
-      where.policyAssignmentsV2 = {
-        some: {
-          policy: {
-            ...(policyCodes?.length ? { code: { in: policyCodes } } : {}),
-            ...(policyGroups?.length ? { group: { in: policyGroups } } : {}),
-            ...(policyRoles?.length ? { role: { in: policyRoles } } : {}),
-          },
-        },
-      };
+    const policyBranches: Prisma.MemberWhereInput[] = [];
+    if (policyCodes?.length) {
+      policyBranches.push({
+        policyAssignmentsV2: { some: { policy: { code: { in: policyCodes } } } },
+      });
+    }
+    if (policyGroups?.length) {
+      policyBranches.push({
+        policyAssignmentsV2: { some: { policy: { group: { in: policyGroups } } } },
+      });
+    }
+    if (policyRoles?.length) {
+      policyBranches.push({
+        policyAssignmentsV2: { some: { policy: { role: { in: policyRoles } } } },
+      });
     }
 
+    const q = (search ?? '').trim();
+    const searchClause: Prisma.MemberWhereInput | null =
+      q.length > 0
+        ? {
+            OR: [
+              { name: { contains: q, mode: 'insensitive' as const } },
+              { email: { contains: q, mode: 'insensitive' as const } },
+              { uid: { contains: q, mode: 'insensitive' as const } },
+              {
+                projectContributions: {
+                  some: { project: { name: { contains: q, mode: 'insensitive' as const } } },
+                },
+              },
+            ],
+          }
+        : null;
+
+    const andParts: Prisma.MemberWhereInput[] = [...policyBranches];
+    if (searchClause) {
+      andParts.unshift(searchClause);
+    }
+    if (andParts.length) {
+      where.AND = andParts;
+    }
+
+    const resolvedSortField = sortBy ?? 'updatedAt';
+    const resolvedDir: Prisma.SortOrder = sortOrder ?? (resolvedSortField === 'updatedAt' ? 'desc' : 'asc');
+    const orderBy: Prisma.MemberOrderByWithRelationInput =
+      resolvedSortField === 'name' ? { name: resolvedDir } : { updatedAt: resolvedDir };
+
     const members = await this.prisma.member.findMany({
-      // When no pagination params provided, fetch all members
       ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
       where,
       select: {
@@ -1496,6 +1530,7 @@ export class MemberService {
         name: true,
         imageUid: true,
         memberRoles: true,
+        updatedAt: true,
         image: {
           select: {
             uid: true,
@@ -1579,6 +1614,8 @@ export class MemberService {
                 code: true,
                 name: true,
                 description: true,
+                role: true,
+                group: true,
                 policyPermissions: {
                   select: {
                     permission: {
@@ -1628,7 +1665,7 @@ export class MemberService {
           },
         },
       },
-      orderBy: { name: 'asc' },
+      orderBy,
     });
 
     const membersWithHosts = members.map((m) => ({
@@ -1644,7 +1681,7 @@ export class MemberService {
         total,
         page: page ?? 1,
         limit: limit ?? total,
-        pages: limit ? Math.ceil(total / limit) : 1,
+        pages: limit ? Math.max(1, Math.ceil(total / limit)) : 1,
       },
     };
   }

@@ -27,6 +27,24 @@ export function getDemoDayAdminPermissionForHost(host?: string | null): string |
   return key ? DEMO_DAY_HOST_TO_PERMISSION[key] ?? `${DEMO_DAY_ADMIN_PERMISSION_PREFIX}${key}` : null;
 }
 
+/** Prisma member slice with V2 permissions (as loaded by getMemberWithDemoDayParticipants). */
+export type MemberPermissionRelations = {
+  memberPermissionsV2?: { permission: { code: string } }[];
+  policyAssignmentsV2?: {
+    policy: { policyPermissions: { permission: { code: string } }[] };
+  }[];
+};
+
+/** Flatten assigned permission codes from DB relations (JWT may not be available in this code path). */
+export function flattenPermissionCodesFromMemberRelations(member: MemberPermissionRelations): string[] {
+  return Array.from(
+    new Set([
+      ...(member.memberPermissionsV2 ?? []).map((p) => p.permission.code),
+      ...(member.policyAssignmentsV2 ?? []).flatMap((a) => a.policy.policyPermissions.map((p) => p.permission.code)),
+    ])
+  );
+}
+
 export function getPermissionCodes(member: MemberWithRoles): string[] {
   const directCodes = member.effectivePermissionCodes ?? [];
   const permissionLikeItems = [...(member.effectivePermissions ?? []), ...(member.permissions ?? [])];
@@ -54,4 +72,22 @@ export function hasDemoDayAdminPermissionForHost(member: MemberWithRoles, host?:
     codes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
     (!!hostPermission && codes.includes(hostPermission))
   );
+}
+
+/** Host-scoped demoday.admin.* (excludes demoday.admin.all which is universal). */
+export function hasHostScopedDemoDayAdminCode(codes: string[]): boolean {
+  return codes.some(
+    (c) =>
+      c.startsWith(DEMO_DAY_ADMIN_PERMISSION_PREFIX) &&
+      c !== DEMODAY_PERMISSIONS.ADMIN_ALL &&
+      c.length > DEMO_DAY_ADMIN_PERMISSION_PREFIX.length
+  );
+}
+
+export function canReassignDemoDayHost(codes: string[]): boolean {
+  return codes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) || codes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL);
+}
+
+export function hasDirectoryFullOrDemoDayAll(codes: string[]): boolean {
+  return codes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) || codes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL);
 }

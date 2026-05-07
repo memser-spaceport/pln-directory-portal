@@ -9,13 +9,12 @@ import { ApprovalLayout } from '../../layout/approval-layout';
 import { AddMember } from '../../screens/members/components/AddMember/AddMember';
 import { MembersTableV2 } from '../../screens/members/components/MembersTableV2';
 import { PoliciesTable } from '../../screens/members/components/PoliciesTable/PoliciesTable';
-import { useMembersList } from '../../hooks/members/useMembersList';
+import { MembersListQueryParams, useMembersList } from '../../hooks/members/useMembersList';
 import { usePoliciesList } from '../../hooks/access-control/usePoliciesList';
 import { useAuth } from '../../context/auth-context';
 import { MEMBERS_V2_STATE_TAB_ICONS, PoliciesIcon } from '../../components/menu/components/MembersV2Menu/memberStateTabIcons';
+import { useMemberStateCounts } from '../../hooks/members/useAccessLevelCounts';
 import s from './styles.module.scss';
-
-const ALL_MEMBER_STATES = ['PENDING', 'VERIFIED', 'APPROVED', 'REJECTED'];
 
 type MemberStateTab = 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
 type ActiveTab = MemberStateTab | 'POLICIES';
@@ -53,6 +52,8 @@ const selectStyles: StylesConfig<SelectOption> = {
   menu: (base) => ({ ...base, zIndex: 3 }),
 };
 
+const DEBOUNCE_MS = 300;
+
 const SearchIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path
@@ -67,7 +68,7 @@ const SearchIcon = () => (
 
 const MembersPageV2 = () => {
   const router = useRouter();
-  const { isDirectoryAdmin, isLoading: authLoading, user, hasPermission } = useAuth();
+  const { isDirectoryAdmin, isLoading: authLoading, user } = useAuth();
   const [authToken] = useCookie('plnadmin');
 
   const initialTab = (
@@ -84,10 +85,12 @@ const MembersPageV2 = () => {
     }
   }, [router.query.tab]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 });
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
+  /** Empty = server default sort (updatedAt desc, newest first). Member column toggles name sort only. */
+  const [sorting, setSorting] = useState<SortingState>([]);
 
   const [policySearch, setPolicySearch] = useState('');
   const [policyRoleFilter, setPolicyRoleFilter] = useState('');
@@ -95,69 +98,76 @@ const MembersPageV2 = () => {
   const [policyPagination, setPolicyPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
 
   useEffect(() => {
-    if (!authLoading && user && !isDirectoryAdmin && !hasPermission('member.contacts.read')) {
+    const t = setTimeout(() => setDebouncedSearch(globalFilter.trim()), DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [globalFilter]);
+
+  useEffect(() => {
+    if (!authLoading && user && !isDirectoryAdmin) {
       router.replace('/access-denied');
     }
-  }, [authLoading, user, isDirectoryAdmin, hasPermission, router]);
+  }, [authLoading, user, isDirectoryAdmin, router]);
 
-  const { data, isLoading, isError } = useMembersList({
-    authToken: authToken ?? undefined,
-    memberState: ALL_MEMBER_STATES,
+  const { data: countsData } = useMemberStateCounts({ authToken: authToken ?? '' });
+
+  const tabCounts = useMemo<Record<MemberStateTab, number>>(
+    () => ({
+      PENDING: countsData?.PENDING ?? 0,
+      VERIFIED: countsData?.VERIFIED ?? 0,
+      APPROVED: countsData?.APPROVED ?? 0,
+      REJECTED: countsData?.REJECTED ?? 0,
+    }),
+    [countsData]
+  );
+
+  const apiSort = useMemo(() => {
+    const s = sorting[0];
+    if (s?.id === 'name') {
+      return { sortBy: 'name' as const, sortOrder: s.desc ? ('desc' as const) : ('asc' as const) };
+    }
+    return { sortBy: 'updatedAt' as const, sortOrder: 'desc' as const };
+  }, [sorting]);
+
+  const membersListArgs: MembersListQueryParams = useMemo(
+    () => ({
+      authToken: authToken ?? undefined,
+      memberState: activeTab !== 'POLICIES' ? [activeTab] : ['PENDING'],
+      page: pagination.pageIndex + 1,
+      limit: pagination.pageSize,
+      search: debouncedSearch || undefined,
+      policyGroups: activeTab === 'APPROVED' && groupFilter ? [groupFilter] : undefined,
+      policyRoles: activeTab === 'APPROVED' && roleFilter ? [roleFilter] : undefined,
+      sortBy: apiSort.sortBy,
+      sortOrder: apiSort.sortOrder,
+    }),
+    [authToken, activeTab, pagination.pageIndex, pagination.pageSize, debouncedSearch, groupFilter, roleFilter, apiSort]
+  );
+
+  const { data: listResponse, isLoading, isError } = useMembersList(membersListArgs, {
+    enabled: !!authToken && activeTab !== 'POLICIES',
   });
+
+  const members = listResponse?.data ?? [];
+  const pageCount = listResponse?.pagination.pages ?? 1;
+  const totalMembers = listResponse?.pagination.total ?? 0;
 
   const { data: policiesData } = usePoliciesList({ authToken: authToken ?? undefined });
 
-  const members = useMemo(() => data?.data ?? [], [data?.data]);
+  const groupOptions = useMemo<SelectOption[]>(
+    () => [
+      { label: 'All groups', value: '' },
+      ...[...new Set((policiesData ?? []).map((p) => p.group))].sort().map((n) => ({ label: n, value: n })),
+    ],
+    [policiesData]
+  );
 
-  const tabCounts = useMemo<Record<MemberStateTab, number>>(() => {
-    const base: Record<MemberStateTab, number> = { PENDING: 0, VERIFIED: 0, APPROVED: 0, REJECTED: 0 };
-    for (const m of members) {
-      if (m.memberState && m.memberState in base) {
-        base[m.memberState as MemberStateTab]++;
-      }
-    }
-    return base;
-  }, [members]);
-
-  const policyMap = useMemo(() => new Map((policiesData ?? []).map((p) => [p.uid, p])), [policiesData]);
-
-  const approvedMembers = useMemo(() => members.filter((m) => m.memberState === 'APPROVED'), [members]);
-
-  const filteredMembers = useMemo(() => {
-    if (activeTab === 'POLICIES') return [];
-    let list = members.filter((m) => m.memberState === activeTab);
-    if (activeTab === 'APPROVED') {
-      if (groupFilter) {
-        list = list.filter((m) => m.policies?.some((mp) => policyMap.get(mp.uid)?.group === groupFilter));
-      }
-      if (roleFilter) {
-        list = list.filter((m) => m.policies?.some((mp) => policyMap.get(mp.uid)?.role === roleFilter));
-      }
-    }
-    return list;
-  }, [members, activeTab, groupFilter, roleFilter, policyMap]);
-
-  const groupOptions = useMemo<SelectOption[]>(() => {
-    const names = new Set<string>();
-    for (const m of approvedMembers) {
-      for (const mp of m.policies ?? []) {
-        const group = policyMap.get(mp.uid)?.group;
-        if (group) names.add(group);
-      }
-    }
-    return [{ label: 'All groups', value: '' }, ...[...names].sort().map((n) => ({ label: n, value: n }))];
-  }, [approvedMembers, policyMap]);
-
-  const roleOptions = useMemo<SelectOption[]>(() => {
-    const names = new Set<string>();
-    for (const m of approvedMembers) {
-      for (const mp of m.policies ?? []) {
-        const role = policyMap.get(mp.uid)?.role;
-        if (role) names.add(role);
-      }
-    }
-    return [{ label: 'All roles', value: '' }, ...[...names].sort().map((n) => ({ label: n, value: n }))];
-  }, [approvedMembers, policyMap]);
+  const roleOptions = useMemo<SelectOption[]>(
+    () => [
+      { label: 'All roles', value: '' },
+      ...[...new Set((policiesData ?? []).map((p) => p.role))].sort().map((n) => ({ label: n, value: n })),
+    ],
+    [policiesData]
+  );
 
   const policyRoleOptions = useMemo<SelectOption[]>(
     () => [
@@ -193,6 +203,7 @@ const MembersPageV2 = () => {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
     setGroupFilter('');
     setRoleFilter('');
+    setSorting([]);
     setPolicySearch('');
     setPolicyRoleFilter('');
     setPolicyGroupFilter('');
@@ -219,7 +230,6 @@ const MembersPageV2 = () => {
           <p className={s.subtitle}>Manage members and roles for LabOS.</p>
         </header>
 
-        {/* Underline tab bar */}
         <nav className={s.tabBar}>
           {MEMBER_STATE_TABS.map((tab) => {
             const TabIcon = MEMBERS_V2_STATE_TAB_ICONS[tab.id];
@@ -267,7 +277,6 @@ const MembersPageV2 = () => {
           </button>
         </nav>
 
-        {/* Search + filters + Add Member row */}
         <div className={s.toolbar}>
           {activeTab !== 'POLICIES' && (
             <div className={s.searchWrapper}>
@@ -359,9 +368,7 @@ const MembersPageV2 = () => {
             </>
           )}
 
-          {activeTab !== 'POLICIES' && (
-            <AddMember authToken={authToken} className={s.addBtn} showRbacSection />
-          )}
+          {activeTab !== 'POLICIES' && <AddMember authToken={authToken} className={s.addBtn} showRbacSection />}
         </div>
 
         {activeTab !== 'POLICIES' && (
@@ -370,16 +377,16 @@ const MembersPageV2 = () => {
             {isError && <div className={s.status}>Failed to load members.</div>}
             {!isLoading && !isError && (
               <MembersTableV2
-                members={filteredMembers}
-                authToken={authToken}
+                members={members}
+                authToken={authToken ?? ''}
                 activeTab={activeTab}
                 pagination={pagination}
                 setPagination={setPagination}
-                globalFilter={globalFilter}
                 sorting={sorting}
                 setSorting={setSorting}
+                pageCount={pageCount}
+                totalRowCount={totalMembers}
                 showRbacSection
-                allPolicies={policiesData ?? []}
               />
             )}
           </>
@@ -388,7 +395,7 @@ const MembersPageV2 = () => {
         {activeTab === 'POLICIES' && (
           <PoliciesTable
             policies={filteredPolicies}
-            members={members}
+            authToken={authToken ?? undefined}
             pagination={policyPagination}
             setPagination={setPolicyPagination}
             globalFilter={policySearch}

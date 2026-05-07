@@ -9,7 +9,7 @@ import { useAuth } from '../../context/auth-context';
 const DemoDaysPage = () => {
   const router = useRouter();
   const [authToken] = useCookie('plnadmin');
-  const { user, isDirectoryAdmin, isDemoDayAdmin, isLoading } = useAuth();
+  const { user, canViewDemoDays, canMutateDemoDays, isLoading } = useAuth();
   const { data: demoDays, isLoading: isDemoDaysLoading } = useDemoDaysList({ authToken });
 
   // Redirect to login if not authenticated
@@ -21,16 +21,16 @@ const DemoDaysPage = () => {
 
   // Block access to Demo Days if user has no required permission
   useEffect(() => {
-    if (!isLoading && authToken && user && !isDirectoryAdmin && !isDemoDayAdmin) {
+    if (!isLoading && authToken && user && !canViewDemoDays) {
       router.replace('/');
     }
-  }, [authToken, user, isLoading, isDirectoryAdmin, isDemoDayAdmin, router]);
+  }, [authToken, user, isLoading, canViewDemoDays, router]);
 
   if (!authToken || isLoading) {
     return null;
   }
 
-  if (!isDirectoryAdmin && !isDemoDayAdmin) {
+  if (!canViewDemoDays) {
     return null;
   }
 
@@ -63,7 +63,7 @@ const DemoDaysPage = () => {
       <div className="mx-auto max-w-6xl p-6">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-semibold text-gray-900">Demo Days</h1>
-          {isDirectoryAdmin && (
+          {canMutateDemoDays && (
             <button
               onClick={() => router.push('/demo-days/create')}
               className="rounded-lg bg-blue-600 px-4 py-2 text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"

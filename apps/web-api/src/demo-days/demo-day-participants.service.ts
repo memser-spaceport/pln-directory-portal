@@ -25,9 +25,12 @@ export class DemoDayParticipantsService {
       name?: string;
       type: 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
     },
-    actorEmail?: string
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
   ): Promise<DemoDayParticipant> {
     const demoDayRecord = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
+
+    await this.demoDaysService.assertActorCanManageDemoDayOrThrow(actorEmail, adminJwt, demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
@@ -277,7 +280,8 @@ export class DemoDayParticipantsService {
         makeTeamLead?: boolean;
       }>;
     },
-    actorEmail?: string
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
   ): Promise<{
     summary: {
       total: number;
@@ -310,6 +314,8 @@ export class DemoDayParticipantsService {
     }>;
   }> {
     const demoDayRecord = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
+
+    await this.demoDaysService.assertActorCanManageDemoDayOrThrow(actorEmail, adminJwt, demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
@@ -990,9 +996,12 @@ export class DemoDayParticipantsService {
       isDemoDayAdmin?: boolean;
       isDemoDayReadOnlyAdmin?: boolean;
     },
-    actorEmail?: string
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
   ): Promise<DemoDayParticipant> {
     await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
+
+    await this.demoDaysService.assertActorCanManageDemoDayOrThrow(actorEmail, adminJwt, demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;

@@ -73,12 +73,6 @@ export async function applyDemoDayParticipantPolicyAssignments(
   options?: { teamMemberRoles?: Array<{ investmentTeam: boolean | null }> }
 ): Promise<void> {
   switch (participantType) {
-    case 'SUPPORT':
-      await upsertPolicyAssignmentByCode(db, memberUid, DEMO_DAY_POLICY_L2);
-      return;
-    case 'FOUNDER':
-      await upsertPolicyAssignmentByCode(db, memberUid, DEMO_DAY_POLICY_L4);
-      return;
     case 'INVESTOR':
       await upsertInvestorPolicyAssignmentForDemoDayHost(db, memberUid, demoDayHost);
       let roles = options?.teamMemberRoles;
