@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { z } from 'zod';
 import { PrismaService } from '../shared/prisma.service';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
@@ -7,12 +8,10 @@ import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.
 import {
   AIUsageEntry,
   EnrichmentStatus,
-  FieldConfidence,
   FieldEnrichmentMeta,
   FieldEnrichmentStatus,
   FieldJudgment,
   FieldMetaKey,
-  JudgmentSource,
   JudgmentStatus,
   JudgmentVerdict,
   TeamDataEnrichment,
@@ -70,6 +69,24 @@ const USER_JUDGABLE_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey
   'telegramHandler',
 ]);
 
+/**
+ * Fields whose stored value MUST parse as a URL to be judgable. Anything that doesn't pass
+ * the URL-format check (e.g. `'n/a'`, `'coming soon'`, `'tba'`, `'mercle.ai'` without scheme)
+ * is skipped from judgment entirely — there's nothing meaningful for the judge to verify, and
+ * we don't want it to fabricate a verdict against junk input. We don't maintain a placeholder
+ * blocklist; the URL-format check (zod's `z.string().url()`, backed by WHATWG `new URL()`)
+ * already rejects every common placeholder. Other URL-ish fields (`contactMethod` can be an
+ * email or invite link; `linkedinHandler` / `twitterHandler` / `telegramHandler` are often
+ * bare handles) are intentionally not gated here — the AI judge handles them.
+ */
+const URL_REQUIRED_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey>(['website', 'blog']);
+
+const urlSchema = z.string().url();
+
+function isValidUrl(value: string): boolean {
+  return urlSchema.safeParse(value.trim()).success;
+}
+
 @Injectable()
 export class TeamEnrichmentJudgeService {
   private readonly logger = new Logger(TeamEnrichmentJudgeService.name);
@@ -117,7 +134,7 @@ export class TeamEnrichmentJudgeService {
       const judgmentStatus = meta?.judgment?.status;
       if (judgmentStatus === JudgmentStatus.Judged) return false;
       if (judgmentStatus === JudgmentStatus.InProgress) return false;
-      return this.collectJudgableFieldKeys(meta?.fieldsMeta ?? {}).length > 0;
+      return this.collectJudgableFieldKeys(t as TeamRecord, meta?.fieldsMeta ?? {}).length > 0;
     });
   }
 
@@ -141,7 +158,7 @@ export class TeamEnrichmentJudgeService {
       return { status: 'not_eligible' };
     }
 
-    const judgableKeys = this.collectJudgableFieldKeys(meta.fieldsMeta ?? {});
+    const judgableKeys = this.collectJudgableFieldKeys(team, meta.fieldsMeta ?? {});
     if (judgableKeys.length === 0) {
       this.logger.log(`Judge: team ${teamUid} has no judgable fields, skipping`);
       return { status: 'not_eligible' };
@@ -169,7 +186,7 @@ export class TeamEnrichmentJudgeService {
       return { status: 'in_progress' };
     }
 
-    const judgableKeys = this.collectJudgableFieldKeys(meta.fieldsMeta ?? {});
+    const judgableKeys = this.collectJudgableFieldKeys(team, meta.fieldsMeta ?? {});
     if (judgableKeys.length === 0) {
       this.logger.log(`Force-judge: team ${teamUid} has no judgable fields, skipping`);
       return { status: 'not_eligible' };
@@ -255,41 +272,18 @@ export class TeamEnrichmentJudgeService {
             }
           }
 
-          // Reachability gate: a 'host-mismatch' verdict from compareProfileToTeam is purely a
-          // string comparison — it can't tell whether the team's website is real. If the website
-          // is reachable, host-mismatch is no longer evidence the website is wrong (more likely
-          // the LinkedIn profile is mismatched). Probe once, and adjust ONLY the website verdict
-          // per the team's direction (linkedinHandler verdict is left untouched).
+          // Reachability probe — pure observability + AI-judge context. Runs only when the team
+          // has a non-placeholder, parseable http(s) website (the same gate `collectJudgableFieldKeys`
+          // applies, so we never probe `'n/a'`/`'coming soon'`/etc. and never call `fetch` on a string
+          // that isn't a real URL). Result is forwarded into Stage 2 so the AI judge can factor a
+          // definitive 4xx/5xx into its website verdict.
           let websiteReachable: boolean | null = null;
           let websiteFinalHost: string | null = null;
-          if (team.website && stage1Verdicts.website?.note === 'host-mismatch') {
+          if (team.website && this.hasJudgableValue(team, 'website')) {
             const probe = await this.probeWebsiteReachable(team.website);
             if (probe) {
               websiteReachable = probe.reachable;
               websiteFinalHost = probe.finalHost;
-              if (probe.reachable) {
-                const profileHost = this.scrapingDogService.extractHost(profile.website ?? '');
-                if (profileHost && probe.finalHost && probe.finalHost === profileHost) {
-                  // Team's website redirects to the ScrapingDog-listed host — they're the same entity.
-                  stage1Verdicts.website = {
-                    confidence: FieldConfidence.Medium,
-                    verdict: JudgmentVerdict.Agrees,
-                    score: 75,
-                    note: 'redirects-to-scrapingdog-host',
-                    judgedVia: JudgmentSource.ScrapingDog,
-                  };
-                } else {
-                  // Reachable but host-mismatch persists: downshift to uncertain so the website
-                  // isn't condemned. Surfaces in fieldsForReview via needsManualReview.
-                  stage1Verdicts.website = {
-                    confidence: FieldConfidence.Medium,
-                    verdict: JudgmentVerdict.Uncertain,
-                    score: 50,
-                    note: 'host-mismatch-but-reachable',
-                    judgedVia: JudgmentSource.ScrapingDog,
-                  };
-                }
-              }
             }
           }
 
@@ -460,21 +454,41 @@ export class TeamEnrichmentJudgeService {
    *  - status === Enriched (any judgable key), OR
    *  - status === ChangedByUser AND key is in USER_JUDGABLE_FIELD_KEYS (website + contact links)
    *  - excludes logo and CannotEnrich
+   *
+   * Additionally, URL-required fields (`website`, `blog`) whose stored value doesn't parse as a
+   * URL (`'n/a'`, `'coming soon'`, `'tbd'`, etc. all fail the URL check) are skipped. This
+   * prevents the judge from wasting an AI call — and producing a misleading verdict — on fields
+   * that have no real data.
    */
-  private collectJudgableFieldKeys(fieldsMeta: FieldsMetaMap): FieldMetaKey[] {
+  private collectJudgableFieldKeys(team: TeamRecord, fieldsMeta: FieldsMetaMap): FieldMetaKey[] {
     const out: FieldMetaKey[] = [];
     for (const key of JUDGABLE_FIELD_KEYS) {
       const meta = fieldsMeta[key];
       if (!meta) continue;
-      if (meta.status === FieldEnrichmentStatus.Enriched) {
-        out.push(key);
-        continue;
-      }
-      if (meta.status === FieldEnrichmentStatus.ChangedByUser && USER_JUDGABLE_FIELD_KEYS.has(key)) {
-        out.push(key);
-      }
+      const statusOk =
+        meta.status === FieldEnrichmentStatus.Enriched ||
+        (meta.status === FieldEnrichmentStatus.ChangedByUser && USER_JUDGABLE_FIELD_KEYS.has(key));
+      if (!statusOk) continue;
+      if (!this.hasJudgableValue(team, key)) continue;
+      out.push(key);
     }
     return out;
+  }
+
+  /**
+   * True when the field's stored value is non-empty and (for URL-required fields) parses as a
+   * URL. Used both for the candidate filter and for gating the reachability probe. The URL
+   * check transparently rejects placeholders like `'n/a'` / `'coming soon'` / `'tba'` — they
+   * don't parse as URLs — so no separate placeholder blocklist is needed.
+   */
+  private hasJudgableValue(team: TeamRecord, key: FieldMetaKey): boolean {
+    const value = this.readFieldValue(team, key);
+    if (value === null || value === undefined) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    if (URL_REQUIRED_FIELD_KEYS.has(key) && !isValidUrl(trimmed)) return false;
+    return true;
   }
 
   private buildFieldInput(team: TeamRecord, fieldsMeta: FieldsMetaMap, key: FieldMetaKey): JudgeFieldInput | null {
@@ -649,8 +663,11 @@ export class TeamEnrichmentJudgeService {
    *   - { reachable: true,  finalHost } when the final response is 2xx.
    *   - { reachable: false, finalHost: null } when the final response is non-2xx.
    *   - null on network errors (timeout, DNS, abort) — don't penalise flaky networks.
-   * Used by the Stage 1 verdict gate to avoid condemning a reachable website on host-mismatch
-   * alone (a frequent false negative when the team's LinkedIn profile is the wrong one).
+   *
+   * Output is forwarded into the AI judge as observability: a definitive 4xx/5xx is a
+   * meaningful negative signal for the website verdict; a 2xx confirms the URL is live but
+   * not that it belongs to the team. Callers must pre-validate that `url` is a parseable
+   * http(s) URL (not a placeholder like `'n/a'`); this method does not re-validate.
    */
   private async probeWebsiteReachable(url: string): Promise<{ reachable: boolean; finalHost: string | null } | null> {
     const controller = new AbortController();

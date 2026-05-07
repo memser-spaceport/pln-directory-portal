@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Modal from '../modal/modal';
 import { useMembersList } from '../../hooks/members/useMembersList';
 import { useCookie } from 'react-use';
@@ -20,27 +20,36 @@ export const AddDealWhitelistModal: React.FC<AddDealWhitelistModalProps> = ({
   const [authToken] = useCookie('plnadmin');
   const [selectedMemberUid, setSelectedMemberUid] = useState<string>('');
   const [memberSearch, setMemberSearch] = useState('');
+  const [debouncedMemberSearch, setDebouncedMemberSearch] = useState('');
 
-  const { data: members } = useMembersList({
-    authToken,
-    memberState: ['APPROVED'],
-  });
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedMemberSearch(memberSearch.trim()), 300);
+    return () => window.clearTimeout(t);
+  }, [memberSearch]);
+
+  const { data: members } = useMembersList(
+    {
+      authToken,
+      memberState: ['APPROVED'],
+      page: 1,
+      limit: 120,
+      search: debouncedMemberSearch || undefined,
+      sortBy: 'name',
+      sortOrder: 'asc',
+    },
+    { enabled: !!authToken && isOpen }
+  );
 
   const addMutation = useAddDealWhitelistMember();
 
-  const filteredMembers =
-    members?.data?.filter(
-      (member) =>
-        !existingMemberUids.includes(member.uid) &&
-        (member.name?.toLowerCase().includes(memberSearch?.toLowerCase()) ||
-          member.email?.toLowerCase().includes(memberSearch?.toLowerCase()))
-    ) || [];
+  const filteredMembers = (members?.data ?? []).filter((member) => !existingMemberUids.includes(member.uid));
 
   const submitDisabled = addMutation.isPending || !selectedMemberUid;
 
   const resetAll = () => {
     setSelectedMemberUid('');
     setMemberSearch('');
+    setDebouncedMemberSearch('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

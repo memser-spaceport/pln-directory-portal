@@ -38,6 +38,11 @@ export const RequestMembersSchema = z.object({
     .optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
+  /** Server-side filter: name, email, uid (substring), project name */
+  search: z.string().optional(),
+  /** Default when omitted + sortOrder omitted: updatedAt desc (newest first) */
+  sortBy: z.enum(['updatedAt', 'name']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 
 export const CreateMemberSchema = z.object({

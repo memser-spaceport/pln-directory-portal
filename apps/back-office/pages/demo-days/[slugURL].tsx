@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Fragment } from 'react';
+import React, { useState, useEffect, Fragment, useMemo } from 'react';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
@@ -22,6 +22,7 @@ import { toast } from 'react-toastify';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../../context/auth-context';
 import api from '../../utils/api';
+import { hasDemoDayAdminPermissionForHost } from '../../utils/demoDayAdminPermissions';
 
 import s from './styles.module.scss';
 
@@ -47,7 +48,7 @@ const DemoDayDetailPage = () => {
   const router = useRouter();
   const { slugURL } = router.query;
   const [authToken] = useCookie('plnadmin');
-  const { isDirectoryAdmin, user, permissions, hasPermission } = useAuth();
+  const { isDirectoryAdmin, permissions, canMutateDemoDays } = useAuth();
 
   // Redirect to log-in if not authenticated
   useEffect(() => {
@@ -91,20 +92,15 @@ const DemoDayDetailPage = () => {
   const updateBrandingMutation = useUpdateBranding();
   const updateParticipantMutation = useUpdateParticipant();
 
-  const canManageDemoDay =
-    isDirectoryAdmin ||
-    hasPermission('demoday.admin.all') ||
-    permissions.some((permission) => permission.startsWith('demoday.admin.'));
-
-  const canReadDemoDay =
-    canManageDemoDay ||
-    hasPermission('demoday.stats.read') ||
-    hasPermission('demoday.report_link.read');
-
   const { data: demoDay, isLoading: demoDayLoading } = useDemoDayDetails({
     authToken,
     slugURL: slugURL as string,
   });
+
+  const canManageDemoDay = useMemo(() => {
+    if (!demoDay) return false;
+    return canMutateDemoDays && hasDemoDayAdminPermissionForHost(permissions, demoDay.host);
+  }, [demoDay, canMutateDemoDays, permissions]);
 
   const { data: participants, isLoading: participantsLoading } = useDemoDayParticipants({
     authToken,

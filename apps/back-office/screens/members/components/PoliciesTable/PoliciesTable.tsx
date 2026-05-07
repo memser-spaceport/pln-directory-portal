@@ -11,7 +11,6 @@ import {
 import clsx from 'clsx';
 
 import { Policy } from '../../../../hooks/access-control/usePoliciesList';
-import { Member } from '../../types/member';
 import PaginationControls from '../PaginationControls/PaginationControls';
 import { PolicyViewDialog } from './PolicyViewDialog';
 import { iconForRole } from '../MemberForm/RbacSection/PolicyMultiSelect/roleIconMap';
@@ -19,7 +18,7 @@ import s from './PoliciesTable.module.scss';
 
 interface Props {
   policies: Policy[];
-  members: Member[];
+  authToken: string | undefined;
   pagination: PaginationState;
   setPagination: Dispatch<SetStateAction<PaginationState>>;
   globalFilter: string;
@@ -54,7 +53,7 @@ const ModulesCell = ({ permissionItems }: { permissionItems: Policy['permissionI
 
 const columnHelper = createColumnHelper<Policy>();
 
-export function PoliciesTable({ policies, members, pagination, setPagination, globalFilter }: Props) {
+export function PoliciesTable({ policies, authToken, pagination, setPagination, globalFilter }: Props) {
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
 
   const columns = [
@@ -181,7 +180,7 @@ export function PoliciesTable({ policies, members, pagination, setPagination, gl
 
       <PolicyViewDialog
         policy={selectedPolicy}
-        members={members}
+        authToken={authToken}
         isOpen={!!selectedPolicy}
         onClose={() => setSelectedPolicy(null)}
       />

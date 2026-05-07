@@ -12,8 +12,21 @@ import { AnalyticsService } from '../analytics/service/analytics.service';
 import { MembersService } from '../members/members.service';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { CreateDemoDayInvestorApplicationDto } from '@protocol-labs-network/contracts';
-import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
-import { hasDemoDayAdminPermissionForHost, getDemoDayAdminPermissionForHost } from './utils/demo-day-admin-permissions.util';
+import {
+  ADMIN_PERMISSIONS,
+  DEMODAY_PERMISSIONS,
+  MEMBER_PERMISSIONS,
+} from '../access-control-v2/access-control-v2.constants';
+import {
+  hasDemoDayAdminPermissionForHost,
+  getDemoDayAdminPermissionForHost,
+  flattenPermissionCodesFromMemberRelations,
+  MemberPermissionRelations,
+  canReassignDemoDayHost,
+  hasHostScopedDemoDayAdminCode,
+  hasDirectoryFullOrDemoDayAll,
+  getPermissionCodes,
+} from './utils/demo-day-admin-permissions.util';
 import { MemberWithRoles } from '../utils/constants';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { MemberApprovalsService } from '../member-approvals/member-approvals.service';
@@ -86,6 +99,68 @@ export class DemoDaysService {
     private readonly notificationServiceClient: NotificationServiceClient,
     private readonly memberApprovalsService: MemberApprovalsService
   ) {}
+
+  /** Resolve member with effectivePermissionCodes from admin JWT (email or memberUid on token). */
+  private async findEnrichedAdminActor(
+    actorEmail: string | undefined,
+    adminJwt?: { memberUid?: string; uid?: string }
+  ): Promise<MemberWithRoles | null> {
+    if (actorEmail) {
+      const m = await this.membersService.findMemberByEmail(actorEmail);
+      return m ? (m as MemberWithRoles) : null;
+    }
+    const uid = adminJwt?.memberUid ?? adminJwt?.uid;
+    if (!uid || typeof uid !== 'string') return null;
+    const row = await this.prisma.member.findUnique({ where: { uid }, select: { email: true } });
+    if (!row?.email) return null;
+    const m = await this.membersService.findMemberByEmail(row.email);
+    return m ? (m as MemberWithRoles) : null;
+  }
+
+  /** Host-scoped demo-day admin JWT must match this demo day's host (stats/report-only bypass). */
+  async getDemoDayBySlugURLForAdminRead(
+    slugURL: string,
+    jwtCodes: string[],
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
+  ) {
+    const demoDayRow = await this.getDemoDayBySlugURL(slugURL);
+    const codes = jwtCodes ?? [];
+    if (hasDirectoryFullOrDemoDayAll(codes)) {
+      return demoDayRow;
+    }
+    if (!hasHostScopedDemoDayAdminCode(codes)) {
+      return demoDayRow;
+    }
+    const actor = await this.findEnrichedAdminActor(actorEmail, adminJwt);
+    if (!actor || !hasDemoDayAdminPermissionForHost(actor, demoDayRow.host)) {
+      throw new ForbiddenException('No demo day admin access');
+    }
+    return demoDayRow;
+  }
+
+  async assertActorCanManageDemoDayOrThrow(
+    actorEmail: string | undefined,
+    adminJwt: { memberUid?: string; uid?: string } | undefined,
+    demoDayUidOrSlug: string
+  ): Promise<void> {
+    const actor = await this.findEnrichedAdminActor(actorEmail, adminJwt);
+    const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+    if (!actor || !hasDemoDayAdminPermissionForHost(actor, demoDay.host)) {
+      throw new ForbiddenException('No demo day admin access');
+    }
+  }
+
+  async assertActorCanManageDemoDayHostOrThrow(
+    actorEmail: string | undefined,
+    adminJwt: { memberUid?: string; uid?: string } | undefined,
+    host: string
+  ): Promise<void> {
+    const actor = await this.findEnrichedAdminActor(actorEmail, adminJwt);
+    if (!actor || !hasDemoDayAdminPermissionForHost(actor, host)) {
+      throw new ForbiddenException('No demo day admin access');
+    }
+  }
 
   async getDemoDayReportLink(): Promise<{ url: string }> {
     const url = process.env.DEMO_DAY_REPORT_LINK;
@@ -194,12 +269,52 @@ export class DemoDaysService {
       };
     }
 
-    // Check if member has demo day admin access (super admin or DEMO_DAY_ADMIN role with matching host scope)
-    const hasMemberLevelAdminAccess = this.hasDemoDayAdminAccess(member, demoDay.host);
+    let participant = member.demoDayParticipants[0];
 
-    // Check demo day participant
-    const participant = member.demoDayParticipants[0];
-    if (participant && participant.status !== 'ENABLED') {
+    const rbacCodes = flattenPermissionCodesFromMemberRelations(member);
+    const rbacMemberStub = { effectivePermissionCodes: rbacCodes } as MemberWithRoles;
+    const hasMemberLevelAdminAccess = hasDemoDayAdminPermissionForHost(rbacMemberStub, demoDay.host);
+
+    if (participant?.status === DemoDayParticipantStatus.INVITED) {
+      await this.prisma.demoDayParticipant.update({
+        where: { uid: participant.uid },
+        data: { status: 'ENABLED' },
+      });
+      participant = { ...participant, status: 'ENABLED' as const };
+    }
+
+    if (!participant || participant.status !== DemoDayParticipantStatus.ENABLED) {
+      if (hasMemberLevelAdminAccess) {
+        const p = participant;
+        return {
+          access: 'SUPPORT',
+          uid: demoDay.uid,
+          slugURL: demoDay.slugURL,
+          host: demoDay.host,
+          date: demoDay.startDate.toISOString(),
+          title: demoDay.title,
+          description: demoDay.description,
+          shortDescription: demoDay.shortDescription,
+          approximateStartDate: demoDay.approximateStartDate,
+          supportEmail: demoDay.supportEmail,
+          status: this.getExternalDemoDayStatus(demoDay.status),
+          isEarlyAccess: demoDay.status === DemoDayStatus.EARLY_ACCESS,
+          isDemoDayAdmin: true,
+          isDemoDayReadOnlyAdmin: false,
+          confidentialityAccepted: p?.confidentialityAccepted ?? false,
+          isPending: p?.status === DemoDayParticipantStatus.PENDING,
+          teamsCount,
+          investorsCount,
+          logoUrl: demoDay.logoUrl ?? null,
+          primaryColor: demoDay.primaryColor ?? '#1a45e6',
+          landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
+          headerImageUrl: demoDay.headerImageUrl ?? null,
+          programFieldEnabled: demoDay.programFieldEnabled ?? null,
+          programFieldOptions: demoDay.programFieldOptions ?? null,
+          stageTagEnabled: demoDay.stageTagEnabled ?? null,
+        };
+      }
+
       return {
         access: 'none',
         uid: demoDay.uid,
@@ -214,8 +329,8 @@ export class DemoDaysService {
         supportEmail: demoDay.supportEmail,
         teamsCount,
         investorsCount,
-        confidentialityAccepted: participant.confidentialityAccepted,
-        isPending: participant.status === DemoDayParticipantStatus.PENDING,
+        confidentialityAccepted: participant?.confidentialityAccepted ?? false,
+        isPending: participant?.status === DemoDayParticipantStatus.PENDING,
         logoUrl: demoDay.logoUrl ?? null,
         primaryColor: demoDay.primaryColor ?? '#1a45e6',
         landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
@@ -226,54 +341,12 @@ export class DemoDaysService {
       };
     }
 
-    if (participant && participant.status === 'INVITED') {
-      participant.status = 'ENABLED';
-      await this.prisma.demoDayParticipant.update({
-        where: { uid: participant.uid },
-        data: { status: 'ENABLED' },
-      });
-    }
-
-    if (participant && participant.status === 'ENABLED') {
-      // Member is an enabled participant
-      const access = participant.type;
-
-      return {
-        access,
-        uid: demoDay.uid,
-        slugURL: demoDay.slugURL,
-        host: demoDay.host,
-        date: demoDay.startDate.toISOString(),
-        title: demoDay.title,
-        description: demoDay.description,
-        shortDescription: demoDay.shortDescription,
-        approximateStartDate: demoDay.approximateStartDate,
-        supportEmail: demoDay.supportEmail,
-        status: this.getExternalDemoDayStatus(
-          demoDay.status,
-          participant.type === 'FOUNDER' || participant.hasEarlyAccess
-        ),
-        isEarlyAccess: demoDay.status === DemoDayStatus.EARLY_ACCESS,
-        isDemoDayAdmin: participant.isDemoDayAdmin || hasMemberLevelAdminAccess,
-        isDemoDayReadOnlyAdmin: participant.isDemoDayReadOnlyAdmin || false,
-        confidentialityAccepted: participant.confidentialityAccepted,
-        teamsCount,
-        investorsCount,
-        isPending: false,
-        logoUrl: demoDay.logoUrl ?? null,
-        primaryColor: demoDay.primaryColor ?? '#1a45e6',
-        landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
-        headerImageUrl: demoDay.headerImageUrl ?? null,
-        programFieldEnabled: demoDay.programFieldEnabled ?? null,
-        programFieldOptions: demoDay.programFieldOptions ?? null,
-        stageTagEnabled: demoDay.stageTagEnabled ?? null,
-      };
-    }
+    const access = participant.type;
 
     return {
-      access: 'none',
+      access,
+      uid: demoDay.uid,
       slugURL: demoDay.slugURL,
-      status: this.getExternalDemoDayStatus(demoDay.status),
       host: demoDay.host,
       date: demoDay.startDate.toISOString(),
       title: demoDay.title,
@@ -281,9 +354,16 @@ export class DemoDaysService {
       shortDescription: demoDay.shortDescription,
       approximateStartDate: demoDay.approximateStartDate,
       supportEmail: demoDay.supportEmail,
+      status: this.getExternalDemoDayStatus(
+        demoDay.status,
+        participant.type === 'FOUNDER' || participant.hasEarlyAccess
+      ),
+      isEarlyAccess: demoDay.status === DemoDayStatus.EARLY_ACCESS,
+      isDemoDayAdmin: participant.isDemoDayAdmin || hasMemberLevelAdminAccess,
+      isDemoDayReadOnlyAdmin: participant.isDemoDayReadOnlyAdmin || false,
+      confidentialityAccepted: participant.confidentialityAccepted,
       teamsCount,
       investorsCount,
-      confidentialityAccepted: false,
       isPending: false,
       logoUrl: demoDay.logoUrl ?? null,
       primaryColor: demoDay.primaryColor ?? '#1a45e6',
@@ -310,14 +390,13 @@ export class DemoDaysService {
       host: string;
       status: DemoDayStatus;
     },
-    actorEmail?: string
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
   ): Promise<DemoDay> {
-    // resolve actor (optional)
-    let actorUid: string | undefined;
-    if (actorEmail) {
-      const actor = await this.prisma.member.findUnique({ where: { email: actorEmail }, select: { uid: true } });
-      actorUid = actor?.uid;
-    }
+    await this.assertActorCanManageDemoDayHostOrThrow(actorEmail, adminJwt, data.host);
+
+    const actor = await this.findEnrichedAdminActor(actorEmail, adminJwt);
+    const actorUid = actor && 'uid' in actor ? (actor as { uid?: string }).uid : undefined;
 
     // Check if slug already exists
     const slugURL = data.slugURL;
@@ -403,49 +482,43 @@ export class DemoDaysService {
 
   /**
    * Get all demo days for admin back-office.
-   * Access is resolved from RBAC v2.1 permissions only:
    * - directory.admin.full / demoday.admin.all: all demo days
-   * - demoday.admin.<host>: only matching host demo days
+   * - demoday.stats.read / demoday.report_link.read alone (no host-scoped demoday.admin.*): all demo days (global browse)
+   * - Otherwise host-scoped demoday.admin.<host>: only demo days whose host maps to an assigned permission code
+   * JWT union DB permissions when memberUid is present.
    */
   async getAllDemoDaysForAdmin(userRoles: string[], memberUid?: string): Promise<DemoDay[]> {
-    const tokenPermissionCodes = new Set(userRoles);
+    const permissionCodes = new Set<string>(userRoles ?? []);
 
-    if (
-      tokenPermissionCodes.has('directory.admin.full') ||
-      tokenPermissionCodes.has('demoday.admin.all') ||
-      tokenPermissionCodes.has('demoday.stats.read') ||
-      tokenPermissionCodes.has('demoday.report_link.read')
-    ) {
+    if (memberUid) {
+      const member = await this.prisma.member.findUnique({
+        where: { uid: memberUid },
+        select: {
+          memberPermissionsV2: { select: { permission: { select: { code: true } } } },
+          policyAssignmentsV2: {
+            select: {
+              policy: { select: { policyPermissions: { select: { permission: { select: { code: true } } } } } },
+            },
+          },
+        },
+      });
+
+      if (member) {
+        for (const code of flattenPermissionCodesFromMemberRelations(member)) {
+          permissionCodes.add(code);
+        }
+      }
+    }
+
+    const codesArr = [...permissionCodes];
+
+    if (permissionCodes.has(ADMIN_PERMISSIONS.DIRECTORY_FULL) || permissionCodes.has(DEMODAY_PERMISSIONS.ADMIN_ALL)) {
       return this.getAllDemoDays();
     }
 
-    if (!memberUid) {
-      return [];
-    }
-
-    const member = await this.prisma.member.findUnique({
-      where: { uid: memberUid },
-      select: {
-        memberPermissionsV2: { select: { permission: { select: { code: true } } } },
-        policyAssignmentsV2: {
-          select: {
-            policy: { select: { policyPermissions: { select: { permission: { select: { code: true } } } } } },
-          },
-        },
-      },
-    });
-
-    const permissionCodes = new Set([
-      ...tokenPermissionCodes,
-      ...(member?.memberPermissionsV2 ?? []).map((p) => p.permission.code),
-      ...(member?.policyAssignmentsV2 ?? []).flatMap((a) => a.policy.policyPermissions.map((p) => p.permission.code)),
-    ]);
-
     if (
-      permissionCodes.has('directory.admin.full') ||
-      permissionCodes.has('demoday.admin.all') ||
-      permissionCodes.has('demoday.stats.read') ||
-      permissionCodes.has('demoday.report_link.read')
+      !hasHostScopedDemoDayAdminCode(codesArr) &&
+      (permissionCodes.has(DEMODAY_PERMISSIONS.STATS_READ) || permissionCodes.has(DEMODAY_PERMISSIONS.REPORT_LINK_READ))
     ) {
       return this.getAllDemoDays();
     }
@@ -719,7 +792,8 @@ export class DemoDaysService {
       landingLogosEnabled?: boolean;
       headerImageUid?: string | null;
     },
-    actorEmail?: string
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
   ): Promise<
     DemoDay & {
       logoUid?: string | null;
@@ -733,12 +807,18 @@ export class DemoDaysService {
     // First check if demo day exists
     const before = await this.getDemoDayByUidOrSlug(uid);
 
-    // resolve actor (optional)
-    let actorUid: string | undefined;
-    if (actorEmail) {
-      const actor = await this.prisma.member.findUnique({ where: { email: actorEmail }, select: { uid: true } });
-      actorUid = actor?.uid;
+    await this.assertActorCanManageDemoDayOrThrow(actorEmail, adminJwt, uid);
+
+    if (data.host !== undefined && data.host !== before.host) {
+      const actorResolved = await this.findEnrichedAdminActor(actorEmail, adminJwt);
+      if (!actorResolved || !canReassignDemoDayHost(getPermissionCodes(actorResolved))) {
+        throw new ForbiddenException('Cannot change demo day host');
+      }
     }
+
+    const actorResolvedForUid = await this.findEnrichedAdminActor(actorEmail, adminJwt);
+    const actorUid =
+      actorResolvedForUid && 'uid' in actorResolvedForUid ? (actorResolvedForUid as { uid?: string }).uid : undefined;
 
     // Check if slugURL is being updated and if it conflicts with existing demo day
     if (data.slugURL !== undefined && data.slugURL !== before.slugURL) {
@@ -1920,10 +2000,16 @@ export class DemoDaysService {
    * @param demoDayHost - The host of the demo day to check access for
    */
   private hasDemoDayAdminAccess(
-    member: MemberWithRoles & { demoDayAdminScopes?: { scopeValue: string }[] },
+    member: MemberWithRoles &
+      MemberPermissionRelations & {
+        demoDayAdminScopes?: { scopeValue: string }[];
+      },
     demoDayHost?: string | null
   ): boolean {
-    return hasDemoDayAdminPermissionForHost(member, demoDayHost);
+    const merged = Array.from(
+      new Set([...(member.effectivePermissionCodes ?? []), ...flattenPermissionCodesFromMemberRelations(member)])
+    );
+    return hasDemoDayAdminPermissionForHost({ effectivePermissionCodes: merged } as MemberWithRoles, demoDayHost);
   }
 
   /**
@@ -1972,8 +2058,12 @@ export class DemoDaysService {
   async previewStatusNotification(
     demoDayUidOrSlug: string,
     newStatus: DemoDayStatus,
-    newNotificationsEnabled: boolean
+    newNotificationsEnabled: boolean,
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
   ): Promise<{ willSend: boolean; title?: string; description?: string; reason?: string }> {
+    await this.assertActorCanManageDemoDayOrThrow(actorEmail, adminJwt, demoDayUidOrSlug);
+
     const demoDay = await this.prisma.demoDay.findFirst({
       where: {
         OR: [{ uid: demoDayUidOrSlug }, { slugURL: demoDayUidOrSlug }],
@@ -2189,7 +2279,13 @@ export class DemoDaysService {
   /**
    * Get all whitelisted members for a demo day's founder dashboard
    */
-  async getDashboardWhitelist(demoDayUid: string) {
+  async getDashboardWhitelist(
+    demoDayUid: string,
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
+  ) {
+    await this.assertActorCanManageDemoDayOrThrow(actorEmail, adminJwt, demoDayUid);
+
     // Get demo day to retrieve host
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUid);
 
@@ -2267,7 +2363,14 @@ export class DemoDaysService {
   /**
    * Add a member to the dashboard whitelist for a demo day
    */
-  async addToDashboardWhitelist(demoDayUid: string, memberUid: string) {
+  async addToDashboardWhitelist(
+    demoDayUid: string,
+    memberUid: string,
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
+  ) {
+    await this.assertActorCanManageDemoDayOrThrow(actorEmail, adminJwt, demoDayUid);
+
     // Get demo day to retrieve host
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUid);
 
@@ -2309,7 +2412,14 @@ export class DemoDaysService {
   /**
    * Remove a member from the dashboard whitelist for a demo day
    */
-  async removeFromDashboardWhitelist(demoDayUid: string, memberUid: string) {
+  async removeFromDashboardWhitelist(
+    demoDayUid: string,
+    memberUid: string,
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
+  ) {
+    await this.assertActorCanManageDemoDayOrThrow(actorEmail, adminJwt, demoDayUid);
+
     // Get demo day to retrieve host
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUid);
 

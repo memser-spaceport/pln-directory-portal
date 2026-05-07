@@ -26,11 +26,11 @@ import { AskService } from '../asks/asks.service';
 import { TeamsHooksService } from './teams.hooks.service';
 import { ParticipantsRequest } from './dto/members.dto';
 import { SelfUpdatePayload } from './dto/teams.dto';
-import { MemberRole, isDirectoryAdmin } from '../utils/constants';
+import { isDirectoryAdmin, memberHasPermissionCode } from '../utils/constants';
 import { OpenSearchService } from '../opensearch/opensearch.service';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { ENRICHABLE_TEAM_FIELDS } from '../team-enrichment/team-enrichment.types';
-import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { MEMBER_PERMISSIONS, TEAM_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 /**
  * Interface for team search match result (used by entity association)
@@ -2001,7 +2001,9 @@ export class TeamsService {
       ? isDirectoryAdmin(member as { memberRoles: Array<{ name: string }> })
       : false;
 
-    return !!member.isTierViewer || memberIsDirectoryAdmin;
+    return (
+      !!member.isTierViewer || memberIsDirectoryAdmin || memberHasPermissionCode(member, TEAM_PERMISSIONS.PRIORITY_READ)
+    );
   }
 
   /**
