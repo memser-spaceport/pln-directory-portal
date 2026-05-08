@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { LogoVerificationResult } from './logo-verification.types';
 
@@ -8,34 +9,73 @@ export class LogoVerificationPersistenceService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getTeamsForVerification(limit = 20): Promise<Array<{
+  async getTeamsForVerification(params: {
+    limit?: number;
+    provider: string;
+    model: string | null;
+    force?: boolean;
+  }): Promise<Array<{
     uid: string;
     name: string;
     website: string | null;
     logoUid: string | null;
     logo: { uid: string; url: string } | null;
   }>> {
-    return this.prisma.team.findMany({
-      where: {
-        logoUid: { not: null },
+    const limit = params.limit ?? 20;
+
+    // Important: do not select the newest N teams first and then skip already-verified
+    // records in memory. That starves older teams forever once the newest page has
+    // already been processed. Instead, select only teams that still need verification.
+    const needsVerificationFilter = params.force
+      ? Prisma.empty
+      : Prisma.sql`
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "TeamLogoVerificationResult" tlvr
+          WHERE tlvr."teamUid" = t."uid"
+            AND tlvr."provider" = ${params.provider}
+            AND tlvr."logoUid" = t."logoUid"
+            AND tlvr."model" IS NOT DISTINCT FROM ${params.model}
+        )
+      `;
+
+    const rows = await this.prisma.$queryRaw<Array<{
+      uid: string;
+      name: string;
+      website: string | null;
+      logoUid: string | null;
+      logoUrl: string;
+      logoImageUid: string;
+    }>>(Prisma.sql`
+      SELECT
+        t."uid",
+        t."name",
+        t."website",
+        t."logoUid",
+        i."uid" AS "logoImageUid",
+        i."url" AS "logoUrl"
+      FROM "Team" t
+      INNER JOIN "Image" i ON i."uid" = t."logoUid"
+      WHERE t."logoUid" IS NOT NULL
+        AND i."url" IS NOT NULL
+        AND t."isFund" = false
+        AND t."priority" IN (1, 2, 3)
+        AND t."dataEnrichment" IS NOT NULL
+        ${needsVerificationFilter}
+      ORDER BY t."priority" ASC, t."updatedAt" DESC
+      LIMIT ${limit}
+    `);
+
+    return rows.map((row) => ({
+      uid: row.uid,
+      name: row.name,
+      website: row.website,
+      logoUid: row.logoUid,
+      logo: {
+        uid: row.logoImageUid,
+        url: row.logoUrl,
       },
-      select: {
-        uid: true,
-        name: true,
-        website: true,
-        logoUid: true,
-        logo: {
-          select: {
-            uid: true,
-            url: true,
-          },
-        },
-      },
-      orderBy: {
-        updatedAt: 'desc',
-      },
-      take: limit,
-    });
+    }));
   }
 
   async shouldVerifyTeam(params: {

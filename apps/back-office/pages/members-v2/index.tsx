@@ -89,8 +89,8 @@ const MembersPageV2 = () => {
   const [groupFilter, setGroupFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 });
-  /** Empty = server default sort (updatedAt desc, newest first). Member column toggles name sort only. */
-  const [sorting, setSorting] = useState<SortingState>([]);
+  /** Default: joined (createdAt) desc. Member / Joined headers toggle sort. */
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'joined', desc: true }]);
 
   const [policySearch, setPolicySearch] = useState('');
   const [policyRoleFilter, setPolicyRoleFilter] = useState('');
@@ -125,7 +125,10 @@ const MembersPageV2 = () => {
     if (s?.id === 'name') {
       return { sortBy: 'name' as const, sortOrder: s.desc ? ('desc' as const) : ('asc' as const) };
     }
-    return { sortBy: 'updatedAt' as const, sortOrder: 'desc' as const };
+    if (s?.id === 'joined') {
+      return { sortBy: 'createdAt' as const, sortOrder: s.desc ? ('desc' as const) : ('asc' as const) };
+    }
+    return { sortBy: 'createdAt' as const, sortOrder: 'desc' as const };
   }, [sorting]);
 
   const membersListArgs: MembersListQueryParams = useMemo(
@@ -203,7 +206,7 @@ const MembersPageV2 = () => {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
     setGroupFilter('');
     setRoleFilter('');
-    setSorting([]);
+    setSorting([{ id: 'joined', desc: true }]);
     setPolicySearch('');
     setPolicyRoleFilter('');
     setPolicyGroupFilter('');

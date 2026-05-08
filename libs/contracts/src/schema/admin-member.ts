@@ -40,8 +40,8 @@ export const RequestMembersSchema = z.object({
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
   /** Server-side filter: name, email, uid (substring), project name */
   search: z.string().optional(),
-  /** Default when omitted + sortOrder omitted: updatedAt desc (newest first) */
-  sortBy: z.enum(['updatedAt', 'name']).optional(),
+  /** Default when omitted + sortOrder omitted: createdAt desc (newest first) */
+  sortBy: z.enum(['createdAt', 'updatedAt', 'name']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 
