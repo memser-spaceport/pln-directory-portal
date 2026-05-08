@@ -137,7 +137,11 @@ interface RbacSectionProps {
 }
 
 export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions }: RbacSectionProps) => {
-  const { watch, setValue, formState: { errors } } = useFormContext<TMemberForm>();
+  const {
+    watch,
+    setValue,
+    formState: { errors },
+  } = useFormContext<TMemberForm>();
   const rbacPolicies = (watch('rbacPolicies') ?? []) as PolicySelection[];
   const rbacExceptions = (watch('rbacExceptions') ?? []) as SelectOption[];
   const memberStateStatus = watch('memberStateStatus');
@@ -177,9 +181,7 @@ export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions
             );
           }}
         />
-        {errors.memberStateStatus && (
-          <p className={s.errorMsg}>{errors.memberStateStatus.message}</p>
-        )}
+        {errors.memberStateStatus && <p className={s.errorMsg}>{errors.memberStateStatus.message}</p>}
         <p className={s.hint}>Policies can only be assigned to Approved members.</p>
       </div>
 
@@ -196,17 +198,15 @@ export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions
           placeholder="Select policies"
           ariaLabelledBy="policy-field-label"
         />
-        {errors.rbacPolicies && (
-          <p className={s.errorMsg}>{errors.rbacPolicies.message}</p>
-        )}
+        {errors.rbacPolicies && <p className={s.errorMsg}>{errors.rbacPolicies.message}</p>}
         <p className={s.hint}>Search and select one or more policies. Policies are grouped by role.</p>
       </div>
 
       <div className={s.exceptionsBlock}>
         <div className={s.exceptionsSelectWrap}>
           <ExceptionsMultiSelect
-            label="Permissions exceptions (Optional)"
-            placeholder="Select exceptions"
+            label="Permission Extension (Optional)"
+            placeholder="Select permission extensions"
             options={exceptionsOptions}
             isDisabled={isLoadingOptions || !isApproved}
           />
@@ -221,7 +221,7 @@ export const RbacSection = ({ policyOptions, exceptionsOptions, isLoadingOptions
               />
             </svg>
             <span>
-              Exceptions grant permissions outside of assigned policies.
+              Permission extensions grant access beyond assigned policies.
               <br />
               Use only for temporary or one-off cases.
             </span>

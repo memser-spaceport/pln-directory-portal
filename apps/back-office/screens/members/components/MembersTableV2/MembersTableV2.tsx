@@ -31,12 +31,21 @@ interface Props {
 
 const columnHelper = createColumnHelper<Member>();
 
+function formatJoinedDate(iso: string | undefined) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }).format(d);
+}
+
 function columnLayoutClass(columnId: string) {
   switch (columnId) {
     case 'name':
       return s.colMember;
     case 'teamProject':
       return s.colTeam;
+    case 'joined':
+      return s.colJoined;
     case 'role':
       return s.colRole;
     case 'group':
@@ -78,6 +87,24 @@ export function MembersTableV2({
         size: 280,
       }),
     ];
+
+    const joinedColumn = columnHelper.display({
+      id: 'joined',
+      header: 'Joined',
+      enableSorting: true,
+      cell: (info) => {
+        const raw = info.row.original.createdAt;
+        return (
+          <span
+            className={s.joinedText}
+            title={raw ? new Date(raw).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : undefined}
+          >
+            {formatJoinedDate(raw)}
+          </span>
+        );
+      },
+      size: 76,
+    });
 
     const approvedExtras =
       activeTab === 'APPROVED'
@@ -124,7 +151,7 @@ export function MembersTableV2({
             }),
             columnHelper.display({
               id: 'exceptions',
-              header: 'Exceptions',
+              header: 'Permission Extension',
               enableSorting: false,
               cell: (info) => {
                 const perms = info.row.original.permissions ?? [];
@@ -147,6 +174,7 @@ export function MembersTableV2({
     return [
       ...base,
       ...approvedExtras,
+      joinedColumn,
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
