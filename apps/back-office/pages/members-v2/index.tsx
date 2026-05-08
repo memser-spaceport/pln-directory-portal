@@ -13,7 +13,10 @@ import { useMembersList } from '../../hooks/members/useMembersList';
 import { useMembersStateCounts } from '../../hooks/members/useMembersStateCounts';
 import { usePoliciesList } from '../../hooks/access-control/usePoliciesList';
 import { useAuth } from '../../context/auth-context';
-import { MEMBERS_V2_STATE_TAB_ICONS, PoliciesIcon } from '../../components/menu/components/MembersV2Menu/memberStateTabIcons';
+import {
+  MEMBERS_V2_STATE_TAB_ICONS,
+  PoliciesIcon,
+} from '../../components/menu/components/MembersV2Menu/memberStateTabIcons';
 import { ALL_MEMBER_STATES, MEMBER_STATE_TABS, REJECTED_TAB } from './constants';
 import type { MemberStateTab, ActiveTab } from './types';
 import s from './styles.module.scss';
@@ -78,7 +81,7 @@ const MembersPageV2 = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
-  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 });
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
 
   const [policySearch, setPolicySearch] = useState('');
@@ -334,16 +337,13 @@ const MembersPageV2 = () => {
             </>
           )}
 
-          {activeTab !== 'POLICIES' && (
-            <AddMember authToken={authToken} className={s.addBtn} showRbacSection />
-          )}
+          {activeTab !== 'POLICIES' && <AddMember authToken={authToken} className={s.addBtn} showRbacSection />}
         </div>
 
         {activeTab !== 'POLICIES' && (
           <>
-            {isLoading && <div className={s.status}>Loading members…</div>}
             {isError && <div className={s.status}>Failed to load members.</div>}
-            {!isLoading && !isError && (
+            {!isError && (
               <MembersTableV2
                 members={data?.data ?? []}
                 authToken={authToken}
@@ -356,6 +356,7 @@ const MembersPageV2 = () => {
                 showRbacSection
                 allPolicies={policiesData ?? []}
                 pageCount={data?.pagination.pages}
+                isLoading={isLoading}
               />
             )}
           </>

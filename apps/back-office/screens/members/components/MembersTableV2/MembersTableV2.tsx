@@ -32,9 +32,12 @@ interface Props {
   showRbacSection?: boolean;
   allPolicies?: Policy[];
   pageCount?: number;
+  isLoading?: boolean;
 }
 
 const columnHelper = createColumnHelper<Member>();
+
+const SKELETON_ROWS = 10;
 
 export function MembersTableV2({
   members,
@@ -48,6 +51,7 @@ export function MembersTableV2({
   showRbacSection = false,
   allPolicies = [],
   pageCount,
+  isLoading = false,
 }: Props) {
   const policyMap = useMemo(() => new Map(allPolicies.map((p) => [p.uid, p])), [allPolicies]);
 
@@ -149,7 +153,9 @@ export function MembersTableV2({
     ];
   }, [authToken, activeTab, policyMap, showRbacSection]);
 
-  const isServerSide = pageCount !== undefined;
+  // Keep manualPagination true while loading so TanStack Table's autoResetPageIndex
+  // doesn't fire when data temporarily becomes [] between page navigations.
+  const isServerSide = isLoading || pageCount !== undefined;
 
   const table = useReactTable({
     data: members,
@@ -202,7 +208,34 @@ export function MembersTableV2({
           )}
         </div>
 
-        {rows.length === 0 ? (
+        {isLoading ? (
+          Array.from({ length: SKELETON_ROWS }).map((_, rowIdx) => (
+            <div key={rowIdx} className={s.bodyRow}>
+              {table.getHeaderGroups()[0].headers.map((header, colIdx) => (
+                <div
+                  key={header.id}
+                  className={clsx(s.bodyCell, {
+                    [s.fixed]: !!header.column.columnDef.size,
+                    [s.flexible]: !header.column.columnDef.size,
+                  })}
+                  style={{
+                    width: header.column.getSize(),
+                    flexBasis: header.column.getSize(),
+                  }}
+                >
+                  {colIdx === 0 ? (
+                    <div className={s.skeletonMember}>
+                      <div className={s.skeletonAvatar} />
+                      <div className={s.skeletonLine} style={{ width: `${55 + ((rowIdx * 3 + colIdx) % 4) * 10}%` }} />
+                    </div>
+                  ) : (
+                    <div className={s.skeletonLine} style={{ width: `${40 + ((rowIdx + colIdx * 2) % 4) * 10}%` }} />
+                  )}
+                </div>
+              ))}
+            </div>
+          ))
+        ) : rows.length === 0 ? (
           <div className={s.emptyState}>No members</div>
         ) : (
           rows.map((row) => (
@@ -229,7 +262,7 @@ export function MembersTableV2({
         )}
       </div>
 
-      <PaginationControls table={table} />
+      {<PaginationControls table={table} />}
     </div>
   );
 }

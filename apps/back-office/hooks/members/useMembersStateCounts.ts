@@ -2,7 +2,15 @@ import { useQuery } from '@tanstack/react-query';
 import { MembersQueryKeys } from './constants/queryKeys';
 import api from '../../utils/api';
 import { API_ROUTE } from '../../utils/constants';
-import { MemberState, MemberStateCounts } from 'libs/contracts/src/schema/admin-member';
+
+type MemberStateCounts = {
+  PENDING: number;
+  VERIFIED: number;
+  APPROVED: number;
+  REJECTED: number;
+};
+
+const EMPTY: MemberStateCounts = { PENDING: 0, VERIFIED: 0, APPROVED: 0, REJECTED: 0 };
 
 async function fetcher(authToken: string) {
   const { data } = await api.get<MemberStateCounts>(API_ROUTE.ADMIN_MEMBERS_COUNTS, {
@@ -18,12 +26,5 @@ export function useMembersStateCounts({ authToken }: { authToken: string | null 
     enabled: !!authToken,
   });
 
-  return (
-    data ?? {
-      [MemberState.PENDING]: 0,
-      [MemberState.VERIFIED]: 0,
-      [MemberState.APPROVED]: 0,
-      [MemberState.REJECTED]: 0,
-    }
-  );
+  return data ?? EMPTY;
 }

@@ -73,5 +73,6 @@ export function useMembersList(params: QueryParams) {
     ],
     queryFn: () => fetcher(params),
     enabled: !!params.authToken && enabled,
+    keepPreviousData: true,
   });
 }
