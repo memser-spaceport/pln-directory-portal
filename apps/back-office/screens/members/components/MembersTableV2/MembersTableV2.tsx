@@ -113,7 +113,7 @@ export function MembersTableV2({
                 return (
                   <div className={s.badgeRow}>
                     {groups.map((g) => (
-                      <span key={g} className={s.groupBadge}>
+                      <span key={g} className={s.groupBadge} title={g}>
                         {g}
                       </span>
                     ))}
@@ -189,12 +189,16 @@ export function MembersTableV2({
             hg.headers.map((header) => (
               <div
                 key={header.id}
-                className={clsx(s.headerCell, columnLayoutClass(header.column.id), !header.column.getCanSort() && s.headerStatic)}
+                className={clsx(
+                  s.headerCell,
+                  columnLayoutClass(header.column.id),
+                  !header.column.getCanSort() && s.headerStatic
+                )}
                 onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
               >
                 {flexRender(header.column.columnDef.header, header.getContext())}
               </div>
-            )),
+            ))
           )}
         </div>
 
@@ -205,10 +209,7 @@ export function MembersTableV2({
             <div key={row.id} className={s.bodyRow}>
               {row.getVisibleCells().map((cell) => {
                 return (
-                  <div
-                    key={cell.id}
-                    className={clsx(s.bodyCell, columnLayoutClass(cell.column.id))}
-                  >
+                  <div key={cell.id} className={clsx(s.bodyCell, columnLayoutClass(cell.column.id))}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </div>
                 );
