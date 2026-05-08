@@ -30,6 +30,8 @@ import {
 import { MembersService } from '../members/members.service';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
+import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 
 @ApiTags('NotificationSettings')
 @UseGuards(UserTokenValidation)
@@ -38,7 +40,8 @@ export class NotificationSettingsController {
   constructor(
     private notificationSettingsService: NotificationSettingsService,
     private memberService: MembersService,
-    private notificationServiceClient: NotificationServiceClient
+    private notificationServiceClient: NotificationServiceClient,
+    private accessControlV2Service: AccessControlV2Service
   ) {}
 
   @Get(':memberUid')
@@ -187,9 +190,11 @@ export class NotificationSettingsController {
 
     const isSelf = authenticatedUser.uid === memberUid;
     const isAdmin = this.memberService.checkIfAdminUser(authenticatedUser);
-    const isInvestor =
-      authenticatedUser?.accessLevel &&
-      (authenticatedUser.accessLevel === 'L5' || authenticatedUser.accessLevel === 'L6');
+    const investorPermission = await this.accessControlV2Service.hasPermission(
+      authenticatedUser.uid,
+      MEMBER_PERMISSIONS.INVESTOR_MANAGE
+    );
+    const isInvestor = investorPermission.allowed;
 
     if (!((isSelf && isInvestor) || isAdmin)) {
       throw new ForbiddenException(`User isn't authorized to update the investor settings`);

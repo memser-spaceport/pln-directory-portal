@@ -3,9 +3,6 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
   PaginationState,
   SortingState,
   useReactTable,
@@ -13,7 +10,6 @@ import {
 import clsx from 'clsx';
 
 import { Member } from '../../types/member';
-import { Policy } from '../../../../hooks/access-control/usePoliciesList';
 import { MemberCell } from '../MemberCell/MemberCell';
 import { ProjectsCell } from '../ProjectsCell/ProjectsCell';
 import { EditCell } from '../EditCell/EditCell';
@@ -26,14 +22,33 @@ interface Props {
   activeTab: string;
   pagination: PaginationState;
   setPagination: Dispatch<SetStateAction<PaginationState>>;
-  globalFilter: string;
   sorting: SortingState;
   setSorting: Dispatch<SetStateAction<SortingState>>;
+  pageCount: number;
+  totalRowCount?: number;
   showRbacSection?: boolean;
-  allPolicies?: Policy[];
 }
 
 const columnHelper = createColumnHelper<Member>();
+
+function columnLayoutClass(columnId: string) {
+  switch (columnId) {
+    case 'name':
+      return s.colMember;
+    case 'teamProject':
+      return s.colTeam;
+    case 'role':
+      return s.colRole;
+    case 'group':
+      return s.colGroup;
+    case 'exceptions':
+      return s.colExceptions;
+    case 'actions':
+      return s.colActions;
+    default:
+      return '';
+  }
+}
 
 export function MembersTableV2({
   members,
@@ -41,27 +56,26 @@ export function MembersTableV2({
   activeTab,
   pagination,
   setPagination,
-  globalFilter,
   sorting,
   setSorting,
+  pageCount,
+  totalRowCount,
   showRbacSection = false,
-  allPolicies = [],
 }: Props) {
-  const policyMap = useMemo(() => new Map(allPolicies.map((p) => [p.uid, p])), [allPolicies]);
-
   const columns = useMemo(() => {
     const base = [
       columnHelper.accessor('name', {
         header: 'Member',
         cell: (info) => <MemberCell member={info.row.original} />,
-        size: 350,
+        size: 340,
         sortingFn: 'alphanumeric',
       }),
       columnHelper.display({
         id: 'teamProject',
         header: 'Team/Project',
+        enableSorting: false,
         cell: (info) => <ProjectsCell member={info.row.original} />,
-        size: 0,
+        size: 280,
       }),
     ];
 
@@ -71,13 +85,10 @@ export function MembersTableV2({
             columnHelper.display({
               id: 'role',
               header: 'Role',
+              enableSorting: false,
               cell: (info) => {
                 const roles = [
-                  ...new Set(
-                    (info.row.original.policies ?? [])
-                      .map((mp) => policyMap.get(mp.uid)?.role)
-                      .filter(Boolean) as string[]
-                  ),
+                  ...new Set((info.row.original.policies ?? []).map((p) => p.role).filter(Boolean) as string[]),
                 ];
                 if (!roles.length) return <span>—</span>;
                 return (
@@ -93,13 +104,10 @@ export function MembersTableV2({
             columnHelper.display({
               id: 'group',
               header: 'Group',
+              enableSorting: false,
               cell: (info) => {
                 const groups = [
-                  ...new Set(
-                    (info.row.original.policies ?? [])
-                      .map((mp) => policyMap.get(mp.uid)?.group)
-                      .filter(Boolean) as string[]
-                  ),
+                  ...new Set((info.row.original.policies ?? []).map((p) => p.group).filter(Boolean) as string[]),
                 ];
                 if (!groups.length) return <span>—</span>;
                 return (
@@ -112,11 +120,12 @@ export function MembersTableV2({
                   </div>
                 );
               },
-              size: 180,
+              size: 148,
             }),
             columnHelper.display({
               id: 'exceptions',
               header: 'Exceptions',
+              enableSorting: false,
               cell: (info) => {
                 const perms = info.row.original.permissions ?? [];
                 if (!perms.length) return <span>—</span>;
@@ -130,7 +139,7 @@ export function MembersTableV2({
                   </div>
                 );
               },
-              size: 200,
+              size: 168,
             }),
           ]
         : [];
@@ -141,35 +150,36 @@ export function MembersTableV2({
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
+        enableSorting: false,
         cell: (info) => <EditCell member={info.row.original} authToken={authToken} showRbacSection={showRbacSection} />,
-        size: 100,
+        size: 108,
       }),
     ];
-  }, [authToken, activeTab, policyMap, showRbacSection]);
+  }, [authToken, activeTab, showRbacSection]);
 
   const table = useReactTable({
     data: members,
     columns,
-    state: { pagination, globalFilter, sorting },
+    state: { pagination, sorting },
     onPaginationChange: setPagination,
     onSortingChange: setSorting,
+    manualPagination: true,
+    manualSorting: true,
+    pageCount,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    globalFilterFn: (row, _, value) => {
-      const m = row.original;
-      const q = (value as string).toLowerCase();
-      return (
-        (m.name?.toLowerCase().includes(q) ?? false) ||
-        (m.email?.toLowerCase().includes(q) ?? false) ||
-        (m.projectContributions?.some((p) => p.project.name.toLowerCase().includes(q)) ?? false)
-      );
-    },
     getRowId: (row) => row.uid,
+    autoResetPageIndex: false,
   });
 
   const rows = table.getRowModel().rows;
+  const showingFrom =
+    typeof totalRowCount === 'number' && totalRowCount > 0 && rows.length > 0
+      ? pagination.pageIndex * pagination.pageSize + 1
+      : 0;
+  const showingTo =
+    typeof totalRowCount === 'number' && totalRowCount > 0 && rows.length > 0
+      ? pagination.pageIndex * pagination.pageSize + rows.length
+      : 0;
 
   return (
     <div className={s.wrapper}>
@@ -179,19 +189,12 @@ export function MembersTableV2({
             hg.headers.map((header) => (
               <div
                 key={header.id}
-                className={clsx(s.headerCell, {
-                  [s.fixed]: !!header.column.columnDef.size,
-                  [s.flexible]: !header.column.columnDef.size,
-                })}
-                style={{
-                  width: header.column.getSize(),
-                  flexBasis: header.column.getSize(),
-                }}
-                onClick={header.column.getToggleSortingHandler()}
+                className={clsx(s.headerCell, columnLayoutClass(header.column.id), !header.column.getCanSort() && s.headerStatic)}
+                onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
               >
                 {flexRender(header.column.columnDef.header, header.getContext())}
               </div>
-            ))
+            )),
           )}
         </div>
 
@@ -204,14 +207,7 @@ export function MembersTableV2({
                 return (
                   <div
                     key={cell.id}
-                    className={clsx(s.bodyCell, {
-                      [s.fixed]: !!cell.column.columnDef.size,
-                      [s.flexible]: !cell.column.columnDef.size,
-                    })}
-                    style={{
-                      width: cell.column.getSize(),
-                      flexBasis: cell.column.getSize(),
-                    }}
+                    className={clsx(s.bodyCell, columnLayoutClass(cell.column.id))}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </div>
@@ -222,7 +218,13 @@ export function MembersTableV2({
         )}
       </div>
 
-      <PaginationControls table={table} />
+      {typeof totalRowCount === 'number' && rows.length > 0 && (
+        <p className={s.rangeFooter}>
+          Showing {showingFrom.toLocaleString()}–{showingTo.toLocaleString()} of {totalRowCount.toLocaleString()}
+        </p>
+      )}
+
+      {pageCount > 0 ? <PaginationControls table={table} /> : null}
     </div>
   );
 }

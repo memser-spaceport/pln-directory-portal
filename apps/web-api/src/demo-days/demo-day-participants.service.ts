@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DemoDayParticipant, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
-import { MemberApprovalsService } from '../member-approvals/member-approvals.service';
 import { DemoDaysService } from './demo-days.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { TeamsService } from '../teams/teams.service';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
+import { applyDemoDayParticipantPolicyAssignments } from './demo-day-investor-policy.util';
 
 @Injectable()
 export class DemoDayParticipantsService {
@@ -25,9 +25,12 @@ export class DemoDayParticipantsService {
       name?: string;
       type: 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
     },
-    actorEmail?: string
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
   ): Promise<DemoDayParticipant> {
-    await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
+    const demoDayRecord = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
+
+    await this.demoDaysService.assertActorCanManageDemoDayOrThrow(actorEmail, adminJwt, demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
@@ -97,7 +100,6 @@ export class DemoDayParticipantsService {
           data: {
             name: data.name || data.email,
             email: data.email,
-            accessLevel: 'L0',
             memberApproval: {
               create: {
                 state: 'PENDING',
@@ -142,11 +144,21 @@ export class DemoDayParticipantsService {
       }
     }
 
-    if (data.type === 'INVESTOR' && !isNewMember && ['L2', 'L3', 'L4'].includes(member.accessLevel || '')) {
-      await this.prisma.member.update({
-        where: { uid: member.uid },
-        data: { accessLevel: 'L6' },
-      });
+    if (!isNewMember) {
+      await applyDemoDayParticipantPolicyAssignments(
+        this.prisma,
+        member.uid,
+        data.type,
+        demoDayRecord.host,
+        data.type === 'INVESTOR'
+          ? {
+              teamMemberRoles:
+                member.teamMemberRoles?.map((r: { investmentTeam?: boolean | null }) => ({
+                  investmentTeam: r.investmentTeam,
+                })) ?? undefined,
+            }
+          : undefined
+      );
     }
 
     // Determine status based on whether member was newly created or existing
@@ -268,7 +280,8 @@ export class DemoDayParticipantsService {
         makeTeamLead?: boolean;
       }>;
     },
-    actorEmail?: string
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
   ): Promise<{
     summary: {
       total: number;
@@ -300,7 +313,9 @@ export class DemoDayParticipantsService {
       teamId?: string;
     }>;
   }> {
-    await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
+    const demoDayRecord = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
+
+    await this.demoDaysService.assertActorCanManageDemoDayOrThrow(actorEmail, adminJwt, demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
@@ -462,9 +477,6 @@ export class DemoDayParticipantsService {
               name: participantData.name,
               twitterHandler: normalizedTwitter,
               linkedinHandler: normalizedLinkedin,
-              accessLevel: ['L2', 'L3', 'L4'].includes(String(existingMember.accessLevel))
-                ? 'L6'
-                : existingMember.accessLevel,
             };
 
             // Only set telegramHandler if it's not used by a different member
@@ -522,7 +534,6 @@ export class DemoDayParticipantsService {
               email: participantData.email,
               twitterHandler: normalizedTwitter,
               linkedinHandler: normalizedLinkedin,
-              accessLevel: 'L0',
               memberApproval: {
                 create: {
                   state: 'PENDING',
@@ -729,6 +740,16 @@ export class DemoDayParticipantsService {
             },
           });
 
+          if (!isNewUser) {
+            const rolesAfter = await tx.teamMemberRole.findMany({
+              where: { memberUid },
+              select: { investmentTeam: true },
+            });
+            await applyDemoDayParticipantPolicyAssignments(tx, memberUid, 'INVESTOR', demoDayRecord.host, {
+              teamMemberRoles: rolesAfter,
+            });
+          }
+
           // If it did not exist before, track "participant added" after commit
           if (!existedBefore) {
             pendingEvents.push({
@@ -890,8 +911,11 @@ export class DemoDayParticipantsService {
                 },
               },
               email: true,
-              accessLevel: true,
-              accessLevelUpdatedAt: true,
+              memberApproval: {
+                select: {
+                  state: true,
+                },
+              },
               linkedinHandler: true,
               teamMemberRoles: {
                 select: {
@@ -972,9 +996,12 @@ export class DemoDayParticipantsService {
       isDemoDayAdmin?: boolean;
       isDemoDayReadOnlyAdmin?: boolean;
     },
-    actorEmail?: string
+    actorEmail?: string,
+    adminJwt?: { memberUid?: string; uid?: string }
   ): Promise<DemoDayParticipant> {
     await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
+
+    await this.demoDaysService.assertActorCanManageDemoDayOrThrow(actorEmail, adminJwt, demoDayUid);
 
     // resolve actor (optional)
     let actorUid: string | undefined;
@@ -986,6 +1013,7 @@ export class DemoDayParticipantsService {
     const participant = await this.prisma.demoDayParticipant.findUnique({
       where: { uid: participantUid },
       include: {
+        demoDay: { select: { host: true } },
         member: {
           include: {
             teamMemberRoles: {
@@ -1020,41 +1048,45 @@ export class DemoDayParticipantsService {
       updateData.status = data.status;
       updateData.statusUpdatedAt = new Date();
 
-      // Update member access level when approving (status changes to ENABLED)
       if (data.status === 'ENABLED' && participant.status !== 'ENABLED') {
-        const memberAccessLevel = participant.member?.accessLevel;
         const participantType = data.type || participant.type;
-        const isNewMember = ['L0', 'L1'].includes(memberAccessLevel || '');
-        let newAccessLevel: string | null = null;
-
-        if (participantType === 'INVESTOR') {
-          // Investor: L0 -> L5, L2-L4 -> L6
-          if (isNewMember) {
-            newAccessLevel = 'L5';
-          } else if (['L2', 'L3', 'L4'].includes(memberAccessLevel || '')) {
-            newAccessLevel = 'L6';
-          }
-        } else if (participantType === 'FOUNDER') {
-          // Founder: L0 -> L4
-          if (isNewMember) {
-            newAccessLevel = 'L4';
-          }
-        } else if (participantType === 'SUPPORT') {
-          // Support: L0 -> L2
-          if (isNewMember) {
-            newAccessLevel = 'L2';
-          }
-        }
-
-        if (newAccessLevel && participant.memberUid) {
-          await this.prisma.member.update({
-            where: { uid: participant.memberUid },
-            data: {
-              accessLevel: newAccessLevel,
-              accessLevelUpdatedAt: new Date(),
-              isVerified: true,
+        if (participant.memberUid) {
+          await this.prisma.memberApproval.upsert({
+            where: { memberUid: participant.memberUid },
+            update: {
+              state: 'APPROVED',
+              reason: 'Demo day participant enabled',
+              reviewedAt: new Date(),
+            },
+            create: {
+              memberUid: participant.memberUid,
+              state: 'APPROVED',
+              requestedByUid: participant.memberUid,
+              reviewedByUid: null,
+              reason: 'Demo day participant enabled',
+              reviewedAt: new Date(),
             },
           });
+
+          await this.prisma.member.update({
+            where: { uid: participant.memberUid },
+            data: { isVerified: true },
+          });
+
+          await applyDemoDayParticipantPolicyAssignments(
+            this.prisma,
+            participant.memberUid,
+            participantType,
+            participant.demoDay?.host,
+            participantType === 'INVESTOR'
+              ? {
+                  teamMemberRoles:
+                    participant.member?.teamMemberRoles?.map((r) => ({
+                      investmentTeam: r.investmentTeam,
+                    })) ?? undefined,
+                }
+              : undefined
+          );
         }
 
         // Identify fund teams at L0 before promotion (for enrichment)

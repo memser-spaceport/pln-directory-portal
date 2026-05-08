@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useState } from 'react';
 import { InputField } from '@protocol-labs-network/ui';
 import { useRouter } from 'next/router';
 import { ReactComponent as Building } from '/public/assets/icons/building.svg';
-import APP_CONSTANTS, { MemberRole } from '../utils/constants';
+import APP_CONSTANTS, { ADMIN_PERMISSIONS } from '../utils/constants';
 import { parseCookies } from 'nookies';
 import Loader from '../components/common/loader';
 import { ReactComponent as LogoImage } from '/public/assets/images/Back_office_Logo.svg';
@@ -13,18 +13,34 @@ interface AdminUser {
   email: string;
   name: string;
   roles: string[];
+  permissions?: string[];
+  effectivePermissionCodes?: string[];
 }
 
 function getDefaultRedirect(user: AdminUser | null): string {
   if (!user) return '/members?filter=level1';
 
-  const isDirectoryAdmin = user.roles?.includes(MemberRole.DIRECTORY_ADMIN);
+  const permissions = user.effectivePermissionCodes ?? user.permissions ?? [];
+  const isDirectoryAdmin = permissions.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL);
   if (isDirectoryAdmin) {
-    return '/members?filter=level1';
+    return '/members-v2';
   }
 
-  // DEMO_DAY_ADMIN users go directly to demo-days
-  return '/demo-days';
+  const isDemoDayAdmin =
+    permissions.includes('demoday.admin.all') ||
+    permissions.includes('demoday.stats.read') ||
+    permissions.some((permission) => permission.startsWith('demoday.admin.'));
+  if (isDemoDayAdmin) {
+    return '/demo-days';
+  }
+
+  // admin.tools.access means the user may enter Back Office,
+  // but feature pages still require their own permissions.
+  if (permissions.includes(ADMIN_PERMISSIONS.TOOLS_ACCESS)) {
+    return '/access-denied';
+  }
+
+  return '/access-denied';
 }
 
 export function Index() {
@@ -40,9 +56,7 @@ export function Index() {
 
   const router = useRouter();
 
-  function onChange(
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) {
+  function onChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = event.target;
 
     if (name === 'email') {
@@ -92,8 +106,7 @@ export function Index() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => null);
-        const errorMessage =
-          errorData?.message || 'Failed to send OTP. Please try again.';
+        const errorMessage = errorData?.message || 'Failed to send OTP. Please try again.';
         setError(errorMessage);
         return;
       }
@@ -163,20 +176,10 @@ export function Index() {
       <div className="absolute left-[50%] top-[50%] w-[75%] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-8 md:w-[30%]">
         <div className="inline-block">
           <div className="inline-block">
-            <LogoImage
-              className="pl-3"
-              height={95}
-              width={195}
-              alt="Protocol Labs Logo"
-            />
+            <LogoImage className="pl-3" height={95} width={195} alt="Protocol Labs Logo" />
           </div>
           <div className="fixed right-[30px] top-[66px] inline-block h-[29px] w-[113px] rounded-[4px] bg-[#9D3DE8] bg-opacity-10">
-            <Building
-              className="relative left-[7px] inline-block"
-              title="building"
-              width="14"
-              height="20"
-            />
+            <Building className="relative left-[7px] inline-block" title="building" width="14" height="20" />
             <span className="relative left-[10px] text-[14px] font-semibold text-[#9C3DE8]">
               {APP_CONSTANTS.BACK_OFFICE_LABEL}
             </span>

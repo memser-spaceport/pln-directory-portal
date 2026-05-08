@@ -106,6 +106,8 @@ When a user later edits an enriched field, its `fieldsMeta[field].status` is fli
 - **`enrichedBy`**: set to `'system-cron'` for cron jobs, `'manually'` for admin-triggered enrichment
 - **Website signal backfill**: when the team has (or AI just discovered) a website, the pipeline fetches the page once and extracts self-declared `twitterHandler` / `linkedinHandler` / `telegramHandler` / `contactMethod` from multiple structured-data channels: (a) `<script type="application/ld+json">` Organization-like nodes (`sameAs`, `contactPoint.email`), (b) Twitter Card meta tags (`<meta name="twitter:site">`, `twitter:creator`), (c) HTML microdata (`itemprop="sameAs"`, `itemprop="email"`), with (d) `<a href>` and `mailto:` anchors as a final fallback. The single pre-fetched HTML is also reused by the logo path via ogs's `html` option, so one enrichment run hits the website at most once. Backfill runs **only** for fields the AI returned `null` for — never overwrites AI-supplied values, never touches user-owned data. Source is recorded as `open-graph`; confidence is `high` when the website is `ChangedByUser`, otherwise `medium`. No `Organization.name` ↔ team-name gate is applied because an existing `team.website` is already upstream-trusted (rebrand cases like "Invent Money" declared on `theinventionnetwork.com` flow through). Backfilled `linkedinHandler` is still passed through ScrapingDog for free verification.
 
+- **User-confirmed identity hints**: before each enrichment AI call, the pipeline collects the user-confirmed subset of `shortDescription` / `longDescription` / `moreDetails` (each included only when its `fieldsMeta[field].status === ChangedByUser`, or when the field is non-empty and has no prior `fieldsMeta` entry, i.e. pre-enrichment user data). The collected hints are emitted in a dedicated `USER-CONFIRMED IDENTITY HINTS` block of the user prompt, and the prompt's `IMPORTANT` line is rephrased to instruct the AI: when hints are present, the target entity is the one matching BOTH the team name AND the hints. This disambiguates ambiguous bare names (e.g. team named `"Neiro"` whose user-supplied description begins `"NeiroCoin is a community-driven cryptocurrency..."` — without the hint, the AI was matching against the unrelated "Studio Neiro" on LinkedIn). When no field is user-confirmed, the existing fallback line (`Existing Description: ...` / `Description: Not available`) is kept. Non-user-confirmed (`Enriched`) descriptions are intentionally not echoed back to the AI to avoid biasing it with its own prior output.
+
 ## AI Judge (Second-Pass Verification)
 
 After enrichment completes, a separate **AI Judge** cron independently verifies each enriched field. The judge uses a **different AI model** from the enricher (configurable via `TEAM_ENRICHMENT_JUDGE_AI_PROVIDER`) and can leverage ScrapingDog's LinkedIn profile for a deterministic first stage where applicable. Results are written back to `dataEnrichment.judgment` and `fieldsMeta[field].judgment` so admins reviewing a team see an independent confidence + rationale per field.
@@ -121,8 +123,34 @@ After enrichment completes, a separate **AI Judge** cron independently verifies 
 
 ### Two stages
 
-1. **Stage 1 — ScrapingDog LinkedIn match (deterministic).** Runs when `SCRAPINGDOG_API_KEY` is set and the team has a `linkedinHandler`. The judge fetches the canonical LinkedIn profile, classifies the name match as `exact` / `partial` / `none`, then performs direct field-to-field comparisons (URL host match for website, normalized equality for handle, tagline/about overlap for descriptions, set intersection for industries). Fields the comparison can resolve authoritatively (`agrees` at `high`, or `disagrees` at `low`) skip Stage 2. `partial` tier downshifts `high` verdicts to `medium`.
+1. **Stage 1 — ScrapingDog LinkedIn match (deterministic).** Runs when `SCRAPINGDOG_API_KEY` is set and the team has a `linkedinHandler`. The judge fetches the canonical LinkedIn profile, classifies the name match as `exact` / `partial` / `none`, then performs direct field-to-field comparisons (**`company_name` match + optional website-host corroboration for the LinkedIn handle itself**, tagline/about overlap for descriptions, set intersection for industries). Fields the comparison can resolve authoritatively (`agrees` at `high`, or `disagrees` at `low`) skip Stage 2. `partial` tier downshifts `high` verdicts to `medium`.
+
+   **`linkedinHandler` verification — name match, not slug match.** The handle verdict is **not** produced by comparing the team's stored slug to ScrapingDog's `universal_name_id`. LinkedIn 301-redirects renamed companies to their canonical slug, so a stored `company/oldco` resolving to a profile whose `universal_name_id` is `newco-rebrand` would falsely look like a mismatch even though it points at the correct entity. Instead, Stage 1 trusts the precondition that produced this comparator run: ScrapingDog returned a profile whose `company_name` matched the team (per `classifyNameMatch`), so the handle pointed at the right company. Optionally, a website-host equality between `team.website` and `profile.website` corroborates the match and bumps confidence/score. Verdict matrix:
+
+   | `nameMatch` | website host equal | verdict     | confidence | score | note                          |
+   | ----------- | ------------------ | ----------- | ---------- | ----- | ----------------------------- |
+   | `exact`     | yes                | `agrees`    | `high`     | 100   | `name-match+website`          |
+   | `exact`     | no / unknown       | `agrees`    | `high`     | 95    | `name-match`                  |
+   | `partial`   | yes                | `agrees`    | `medium`¹  | 90    | `name-match-partial+website`  |
+   | `partial`   | no / unknown       | `uncertain` | `medium`   | 55    | `name-match-partial-only`     |
+   | `none`      | —                  | —           | —          | —     | _no Stage 1 verdict — falls through to Stage 2 AI judge_ |
+
+   ¹ via the existing `partial → medium` downshift in `mkJudgment`. A partial-only name match with no corroborating website (e.g. "Acme Inc" vs "Acme BV") is intentionally surfaced as `uncertain` rather than silently agreed, so it lands in `fieldsForReview`. `nameMatch === 'none'` continues to skip the comparator entirely; the AI judge handles those.
+
+   **`website` (and other URL fields) — not judged by Stage 1.** Earlier revisions emitted a `host-match` / `host-mismatch` verdict by comparing the team's stored URL to the URL listed on the LinkedIn profile. This produced too many false negatives — companies routinely use alias domains, product subdomains, or rebrand without updating LinkedIn (e.g. team `Mercle` with website `mercle.ai` whose LinkedIn profile lists a different host) — so the comparator was condemning correct websites. The deterministic comparator is therefore intentionally silent on URL fields; the AI judge (Stage 2) verifies them via web search instead, and is explicitly instructed not to disagree on a URL solely because it differs from another URL we already have on file. Same reasoning as the `linkedinHandler` slug-equality removal.
+
+   **Website reachability probe.** Stage 1 still runs a lightweight reachability probe on `team.website` (single GET, follows redirects, 5s timeout). The result is **purely observability** — no Stage 1 verdict is produced from it, since the host comparator is gone. It's persisted to `dataEnrichment.judgment.scrapingDog.websiteReachable` / `websiteFinalHost` and forwarded to Stage 2 as a `Website reachability:` line so the AI judge can factor a definitive `4xx`/`5xx` (real negative signal) into its website verdict. The probe runs only when the team has a website that passes the value-validity gate below, so we never `fetch()` a placeholder string.
+
 2. **Stage 2 — AI judge.** For remaining fields (or all fields when Stage 1 is unavailable), the second AI model returns a per-field `{ confidence, score, verdict, note }` plus an `overallAssessment`. Temperature is conservative so the judge prefers `uncertain` over guessing.
+
+### Value-validity gate (URL-format skip)
+
+Before a field is judged at all, its stored value is checked. Fields that fail this check are **skipped entirely** — no Stage 1 verdict, no Stage 2 AI call, no entry in `fieldsForReview` (there is nothing meaningful to verify, and we don't want the AI to hallucinate a verdict against junk input):
+
+- **Empty / null** values are skipped. Empty arrays for `industryTags` / `investmentFocus` are skipped.
+- **URL-required fields (`website`, `blog`)** must pass `z.string().url()` (zod, backed by WHATWG `new URL()`). This rejects every common placeholder (`'n/a'`, `'na'`, `'tbd'`, `'tba'`, `'coming soon'`, `'pending'`, `'-'`, etc.) without maintaining an explicit blocklist, because none of them parse as URLs. It also rejects schemeless values like `mercle.ai` or `discord.gg/xxx` typed directly into `website` — the user still sees the value, but the judge won't fabricate a verdict for it.
+
+Other URL-ish fields (`contactMethod`, social handles) are not URL-gated, because they legitimately accept bare handles, `mailto:` addresses, or invite-style links. The AI judge handles those with its standard "prefer `uncertain` over guessing" rule.
 
 ### fieldsMeta after judgment
 
@@ -137,7 +165,7 @@ fieldsMeta[field]: {
     confidence: 'high' | 'medium' | 'low',   // judge's independent assessment
     score: 0..100,
     verdict: 'agrees' | 'disagrees' | 'uncertain',
-    note?: string,                 // max 60 chars, hyphenated-keyword style (e.g. 'host-match')
+    note?: string,                 // max 60 chars, hyphenated-keyword style (e.g. 'name-match')
     judgedVia: 'scrapingdog' | 'ai',
   }
 }
@@ -155,7 +183,11 @@ dataEnrichment.judgment: {
   fieldsForReview: string[],       // DB column names needing manual check: ['website','contactMethod',...]
                                    // — includes every field whose judge verdict is disagrees,
                                    //   uncertain, or agrees-at-low-confidence
-  scrapingDog?: { used, fetchedAt, nameMatch, companyNameFromLinkedIn, verifiedFields, linkedinInternalId }
+  scrapingDog?: {
+    used, fetchedAt, nameMatch, companyNameFromLinkedIn, verifiedFields, linkedinInternalId,
+    websiteReachable?: boolean | null,   // true = 2xx final, false = 4xx/5xx, null = not probed / transient / invalid URL
+    websiteFinalHost?: string | null     // post-redirect normalized host when reachable
+  }
 }
 ```
 
@@ -178,6 +210,66 @@ POST /v1/admin/teams/:uid/trigger-force-judgment     # Re-run judge even if alre
 ```
 
 All require `AdminAuthGuard`. They do NOT require `IS_TEAM_ENRICHMENT_ENABLED` — manual overrides.
+
+## Logo Verification (Vision-Model Pass)
+
+A separate, **logo-only** verification pipeline. It runs independently of the enrichment / judge crons and writes its results to the `TeamLogoVerificationResult` Postgres table — it never mutates `Team.logo`, `Team.logoUid`, or `dataEnrichment`. Output is an append-only audit log that admins (or downstream review tooling) can query to spot wrong-brand logos uploaded or auto-fetched onto a team.
+
+### What it does
+
+For each candidate team, the job downloads the current logo image (SVG is rasterized to PNG via `sharp`) and sends it to a vision-language model (VLM) along with the team name + website. The VLM returns a JSON verdict:
+
+```ts
+{
+  predictedCompanyName: string | null,
+  verdict: 'verified' | 'weak_match' | 'mismatch' | 'unverifiable',
+  confidence: 'high' | 'medium' | 'low',
+  quality: 'good' | 'poor' | 'unusable',
+  hasReadableText: boolean,
+  reason: string,
+  brandSignals: string[]
+}
+```
+
+A new row is inserted into `TeamLogoVerificationResult` per run — history is preserved across re-runs (logo swaps, model bumps, force re-verifies). The row carries `teamUid`, `logoUid`, `provider`, `model`, the snapshotted `website` / `logoUrl` / `source`, the parsed verdict fields, and the `rawResponse` for debugging.
+
+### Cron
+
+- **Schedule**: `LOGO_VERIFICATION_CRON` env var (default `0 */6 * * *` — every 6 hours UTC). Runs separately from the enrichment / marking / judge crons and on its own toggle.
+- **Guard**: `IS_LOGO_VERIFICATION_ENABLED` must be `'true'` (default `false`). Independent of `IS_TEAM_ENRICHMENT_ENABLED`.
+- **In-process re-entry guard**: an `isRunning` flag prevents two ticks from overlapping if a batch outlives its interval.
+- **Batch size**: `LOGO_VERIFICATION_BATCH_SIZE` (default `20`) — number of teams pulled per tick. Sequential per-team processing keeps VLM rate-limits manageable.
+
+### How teams are picked
+
+Two filters run in order:
+
+1. **DB-level candidates** — `team-logo-verification` selects teams where `logoUid IS NOT NULL`, ordered by `updatedAt DESC`, limited to `LOGO_VERIFICATION_BATCH_SIZE`. Recently-changed teams surface first so a freshly-uploaded or freshly-enriched logo gets verified on the next tick. There is no `isFund` / priority filter — every team that has a logo is eligible.
+2. **Per-team `shouldVerifyTeam` gate** — for each candidate, the persistence layer looks up the latest `TeamLogoVerificationResult` for the same `(teamUid, provider)` pair and skips if all of the following hold:
+   - a prior result exists,
+   - its `logoUid` matches the team's current `logoUid` (i.e. the logo wasn't replaced),
+   - its `model` matches the currently-resolved model name.
+
+   If the logo was swapped, or the VLM model was upgraded (e.g. `gemini-2.5-flash` → a newer Gemini), the team re-verifies. Teams with no `logoUid` are also skipped at this stage (defensive — the DB filter already excludes them).
+
+3. **Force re-verify** — set `LOGO_VERIFICATION_FORCE_UPDATE=true` to bypass the per-team gate and re-verify every batched team regardless of prior results. Useful when calibrating against a new VLM or after a prompt change.
+
+### Provider selection
+
+Resolved per run from `LOGO_VLM_PROVIDER` (default `gemini`). Each provider has its own model env var: `GEMINI_LOGO_VERIFICATION_MODEL` (default `gemini-2.5-flash`), `OPENAI_LOGO_VERIFICATION_MODEL` (default `gpt-4.1-mini`), `ANTHROPIC_LOGO_VERIFICATION_MODEL` (default `claude-3-5-sonnet-latest`). The chosen `provider` and `model` are persisted on every row, so the table remains queryable when defaults change.
+
+### On-demand admin endpoints
+
+The same VLM service is also exposed via on-demand HTTP endpoints (no auth guard wired here — intended for internal tooling). These do **not** write to `TeamLogoVerificationResult`; only the cron persists.
+
+```
+POST /team-enrichment/verify-logo                       # single image, default provider
+POST /team-enrichment/verify-logo/all                   # runs gemini + openai + anthropic in parallel + composite decision
+POST /team-enrichment/verify-logo/provider/:provider    # single image, specific provider
+POST /team-enrichment/verify-logo/batch                 # batch of images, mode: all | gemini | openai | anthropic
+```
+
+The `/all` variant returns a composite `decision: 'accept' | 'reject' | 'review'` derived from cross-provider agreement (e.g. both Gemini and OpenAI saying `verified` → `accept`; Gemini saying `mismatch` at high confidence → `reject`; otherwise → `review`).
 
 ## ScrapingDog Fallback (LinkedIn)
 
@@ -325,6 +417,41 @@ Guard: AdminAuthGuard
 Runs the single-team refetch for every team matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY`) with a non-empty `website` or `linkedinHandler`, regardless of current enrichment status. Teams whose logo is `ChangedByUser`, whose enrichment is `InProgress`, or which have no fetchable source are skipped with per-bucket counters.
 Returns `{ success, total, started, skippedInProgress, skippedUserOwned, noSource, notFound, message }`.
 
+### AI Cost Report
+
+```
+GET /v1/admin/teams/ai-report?since=<ISO8601>&page=<int>&pageSize=<int>
+Guard: AdminAuthGuard
+```
+
+Aggregated AI token usage + USD cost across all teams that have a `dataEnrichment.usage` block. Teams are sorted by combined cost desc and paginated.
+
+- `since` (optional) — filter per-stage by `lastRunAt >= since`. Each stage is filtered independently, so a team's enrichment run can be in-window while its judge run is out-of-window.
+- `page` (optional, default `1`) — 1-based page index for the `teams` list. Out-of-range pages clamp to the last available page.
+- `pageSize` (optional, default `10`, capped at `100`) — items per page for the `teams` list.
+
+> **Important:** `totals` and `byModel` are always computed over the full filtered result set, **not** the current page. Pagination only narrows the `teams` array.
+
+Response shape:
+
+```ts
+{
+  generatedAt: string,
+  filter: { since: string | null },
+  pagination: { page, pageSize, totalTeams, totalPages },
+  totals: {
+    teamsWithUsage: number,                                        // == pagination.totalTeams
+    enrichment: { teams, runs, inputTokens, outputTokens, cachedInputTokens, totalTokens, costUsd },
+    judge:      { teams, runs, inputTokens, outputTokens, cachedInputTokens, totalTokens, costUsd },
+    grandTotal: { totalTokens, costUsd }
+  },
+  byModel: Array<{ aiModel, stage: 'enrichment' | 'judge', teams, runs, totalTokens, costUsd }>,
+  teams:   Array<{ uid, name, enrichment: AIUsageEntry | null, judge: AIUsageEntry | null, grandTotalCostUsd }>
+}
+```
+
+Implementation reads `dataEnrichment.usage` in-memory across all teams with a non-null `dataEnrichment`, sorts and paginates in the service. Pagination is presentation-only — the underlying scan is always the full set, so `since` is the right knob when you want to narrow the actual computation. No cron/scheduler — call the endpoint when you want a fresh report.
+
 ### Team Lead Review
 
 ```
@@ -375,6 +502,14 @@ The shared `isFieldUserOwned(fieldsMeta, field, slotHasValue)` helper at the top
 | `TEAM_ENRICHMENT_MARKING_CRON`      | `0 2 * * *`         | Cron schedule for auto-marking eligible teams                                                                                                                                                              |
 | `TEAM_ENRICHMENT_JUDGE_CRON`        | `0 4 * * *`         | Cron schedule for the AI Judge second-pass verification job                                                                                                                                                |
 | `SCRAPINGDOG_API_KEY`               | —                   | ScrapingDog LinkedIn API key. When set, enables the ScrapingDog fallback for teams with a known `linkedinHandler`.                                                                                         |
+| `IS_LOGO_VERIFICATION_ENABLED`      | `false`             | Enable/disable the Logo Verification cron. Independent of `IS_TEAM_ENRICHMENT_ENABLED`.                                                                                                                    |
+| `LOGO_VERIFICATION_CRON`            | `0 */6 * * *`       | Cron schedule for the Logo Verification job (every 6 hours UTC by default).                                                                                                                                |
+| `LOGO_VERIFICATION_BATCH_SIZE`      | `20`                | Max teams pulled per Logo Verification tick. Sequential per-team to keep VLM rate-limits manageable.                                                                                                       |
+| `LOGO_VERIFICATION_FORCE_UPDATE`    | `false`             | When `true`, bypasses the per-team `shouldVerifyTeam` gate and re-verifies every batched team regardless of prior results.                                                                                 |
+| `LOGO_VLM_PROVIDER`                 | `gemini`            | Vision-language model provider for Logo Verification. Accepts `gemini`, `openai`, or `anthropic`. Independent of `AI_PROVIDER`.                                                                            |
+| `GEMINI_LOGO_VERIFICATION_MODEL`    | `gemini-2.5-flash`  | Gemini model used by the Logo Verification job when `LOGO_VLM_PROVIDER=gemini`.                                                                                                                            |
+| `OPENAI_LOGO_VERIFICATION_MODEL`    | `gpt-4.1-mini`      | OpenAI model used by the Logo Verification job when `LOGO_VLM_PROVIDER=openai`.                                                                                                                            |
+| `ANTHROPIC_LOGO_VERIFICATION_MODEL` | `claude-3-5-sonnet-latest` | Anthropic model used by the Logo Verification job when `LOGO_VLM_PROVIDER=anthropic`.                                                                                                              |
 
 ### Eligibility filter
 
@@ -398,12 +533,80 @@ Web search behaviour differs by provider:
 - **Gemini** — uses model-level search grounding (no tool object).
 - **Anthropic** — Claude receives a provider-defined `web_search` tool in the shape the AI SDK accepts. Note that `@ai-sdk/anthropic@1.x` does not yet forward this tool to the Anthropic API, so the SDK emits an `unsupported-tool` warning and Claude answers from training knowledge. The call shape is kept forward-compatible so that a future SDK upgrade enables server-side web search without code changes.
 
+## AI Token Usage & Cost Tracking
+
+Each AI call (enrichment + judge) captures `usage` and `experimental_providerMetadata` from the Vercel AI SDK and converts them to a USD estimate via the per-model price table in `team-enrichment-cost.ts`. Token counts are persisted on the team; cost is logged and persisted alongside.
+
+### Persisted shape
+
+`Team.dataEnrichment.usage` carries one entry per stage. Both keys are optional — pre-tracking teams will not have them.
+
+```ts
+dataEnrichment.usage?: {
+  enrichment?: {
+    inputTokens, outputTokens, cachedInputTokens?, totalTokens,
+    costUsd,            // estimate from PRICING_TABLE; raw counts are the source of truth
+    aiModel,
+    durationMs,         // generateText wall-clock, summed across runs
+    runs,               // accumulates on force-enrichment / retries
+    lastRunAt           // ISO timestamp of most recent call
+  },
+  judge?: { …same shape… }
+}
+```
+
+`runs` and `durationMs` accumulate; `costUsd` is summed from the per-call estimate. A force-re-enrichment of a team produces `runs: 2`, summed tokens, summed cost, and the latest `lastRunAt`.
+
+### Pricing table
+
+`team-enrichment-cost.ts` keeps published per-1M-token rates for the models we run (Gemini 2.5 Flash/Pro, GPT-4o family, Claude Sonnet/Opus/Haiku 4.x). Lookup is exact id first, then prefix match (so `claude-sonnet-4-5-20250929` resolves to the `claude-sonnet-4` row). Unknown models log a `warn` and produce `costUsd: 0` — that's the signal to add a row.
+
+Cost numbers are estimates: provider pricing changes, web-search-grounding fees aren't reflected in `usage`, and cached-token discount tiers vary by provider. Treat `costUsd` as a budget signal; the persisted token counts let you re-derive cost later if rates change.
+
+**Maintenance cadence.** The table needs updating only a few times per year — token counts are exact and persisted, so stale rates affect `costUsd` estimates only, never historical accuracy.
+
+| Provider  | Typical change frequency               | Triggers                                                                                  |
+| --------- | -------------------------------------- | ----------------------------------------------------------------------------------------- |
+| OpenAI    | Every 6–18 months                      | Major model launches (4o → 4.1) and occasional re-pricings of existing models.            |
+| Anthropic | Stable across a generation             | New model rows when a tier ships (Sonnet 4.6, Opus 4.7); rarely re-prices existing rows.  |
+| Gemini    | Most volatile — adjusted in 2025       | Watch the [pricing page](https://ai.google.dev/pricing) when bumping `GEMINI_MODEL`.      |
+
+Recommended workflow: when a `WARN` log appears with `No pricing entry for model "<id>"`, that's the action item — add a row to `PRICING_TABLE`. No need to monitor proactively. If a provider repricies an existing model, edit the corresponding row; historical `costUsd` won't be backfilled (it's an estimate, and the underlying token counts remain accurate for re-derivation).
+
+### Logging
+
+Three structured log granularities, all keyword-style for grep / Loki / Datadog ingestion:
+
+1. **Per-AI-call** (one line per `generateText` invocation, in both AI services):
+   ```
+   AI enrichment call team="<name>" stage=enrichment ok=true model=gemini-2.5-flash
+     inputTokens=… outputTokens=… cachedInputTokens=… totalTokens=… costUsd=…
+     durationMs=… runs=1
+   ```
+   On failure, the line is logged at `error` with `ok=false error="…"`. If the SDK doesn't return a usage object (rare; cached/streamed paths), the line is logged at `warn` with `usage=unavailable`.
+
+2. **Per-team rollup** (one line at the end of each `doEnrichTeam` / `runJudgmentPipeline` after the persisted usage block has been written):
+   ```
+   Enrichment usage rollup team=<uid> name="<name>" stage=enrichment <…same fields…>
+   Judge usage rollup     team=<uid> name="<name>" stage=judge      <…same fields…>
+   ```
+   `runs` here reflects the cumulative count, so it answers "what has this team cost in total" rather than "what did this single call cost".
+
+3. **Per-cron summary** — the existing "job completed: N enriched / failed" line now ends with a pointer to the per-team rollup lines. Cron-level totals are intentionally **not** computed inline because both `enrichTeam` and `judgeTeam` fire background pipelines and return immediately; aggregating in-process would change that contract. For session-level spend, query the persisted `dataEnrichment.usage` (sum across teams enriched in a window) or aggregate the per-team rollup logs by timestamp.
+
+### Caveats
+
+- `costUsd` excludes search-grounding fees (Gemini grounding, OpenAI Responses web-search-preview, Anthropic provider-defined web_search).
+- ScrapingDog calls are not in this telemetry — those have a separate vendor billing channel.
+- The `usage` block is cumulative across re-runs; if you want per-run detail, the per-AI-call log lines are the source.
+
 ## Module Structure
 
 ```
 apps/web-api/src/team-enrichment/
   team-enrichment.types.ts          # Enums, interfaces, enrichable fields
   team-enrichment-eligibility-filter.ts # Shared isFund/priority WHERE filter for cron + admin queries
+  team-enrichment-cost.ts           # AI usage → USD estimator + pricing table + log formatter
   team-enrichment-ai.service.ts     # Enrichment LLM wrapper + logo scraping
   team-enrichment-scrapingdog.service.ts # LinkedIn fallback + classifyNameMatch/compareProfileToTeam helpers
   team-enrichment.service.ts        # Core enrichment business logic
@@ -411,6 +614,12 @@ apps/web-api/src/team-enrichment/
   team-enrichment-judge-ai.service.ts # Judge LLM wrapper (independent model)
   team-enrichment-judge.service.ts  # Two-stage judgment pipeline orchestration
   team-enrichment-judge.job.ts      # Judge cron job
+  team-enrichment-report.service.ts # Aggregator behind GET /v1/admin/teams/ai-report
+  logo-verification.types.ts        # Verdict / confidence / quality types for the VLM pass
+  logo-verification.service.ts      # VLM wrapper (gemini / openai / anthropic) + image prep
+  logo-verification-persistence.service.ts # Candidate selection + shouldVerify gate + TeamLogoVerificationResult writes
+  logo-verification-job.service.ts  # Logo Verification cron job
+  logo-verification.controller.ts   # On-demand /team-enrichment/verify-logo* endpoints
   team-enrichment.module.ts         # NestJS module
 ```
 

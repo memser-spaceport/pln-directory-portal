@@ -11,7 +11,6 @@ import {
 import clsx from 'clsx';
 
 import { Policy } from '../../../../hooks/access-control/usePoliciesList';
-import { Member } from '../../types/member';
 import PaginationControls from '../PaginationControls/PaginationControls';
 import { PolicyViewDialog } from './PolicyViewDialog';
 import { iconForRole } from '../MemberForm/RbacSection/PolicyMultiSelect/roleIconMap';
@@ -19,7 +18,7 @@ import s from './PoliciesTable.module.scss';
 
 interface Props {
   policies: Policy[];
-  members: Member[];
+  authToken: string | undefined;
   pagination: PaginationState;
   setPagination: Dispatch<SetStateAction<PaginationState>>;
   globalFilter: string;
@@ -41,23 +40,20 @@ const EyeIcon = () => (
 const ModulesCell = ({ permissionItems }: { permissionItems: Policy['permissionItems'] }) => {
   const modules = [...new Set(permissionItems.map((permission) => permission.module))];
   if (!modules.length) return <span className={s.muted}>—</span>;
-  const visible = modules.slice(0, 2);
-  const overflow = modules.length - 2;
   return (
     <div className={s.badgeRow}>
-      {visible.map((module) => (
+      {modules.map((module) => (
         <span key={module} className={s.moduleBadge}>
           {module}
         </span>
       ))}
-      {overflow > 0 && <span className={s.overflowBadge}>+{overflow}</span>}
     </div>
   );
 };
 
 const columnHelper = createColumnHelper<Policy>();
 
-export function PoliciesTable({ policies, members, pagination, setPagination, globalFilter }: Props) {
+export function PoliciesTable({ policies, authToken, pagination, setPagination, globalFilter }: Props) {
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
 
   const columns = [
@@ -83,18 +79,18 @@ export function PoliciesTable({ policies, members, pagination, setPagination, gl
     }),
     columnHelper.display({
       id: 'group',
-      size: 160,
+      size: 200,
       header: () => 'Group',
       cell: (info) => <span className={s.groupBadge}>{info.row.original.group}</span>,
     }),
-    columnHelper.accessor('description', {
-      size: 0,
-      header: 'Description',
-      cell: (info) => info.getValue() ?? <span className={s.muted}>—</span>,
-    }),
+    // columnHelper.accessor('description', {
+    //   size: 0,
+    //   header: 'Description',
+    //   cell: (info) => info.getValue() ?? <span className={s.muted}>—</span>,
+    // }),
     columnHelper.display({
       id: 'modules',
-      size: 200,
+      size: 0,
       header: () => 'Modules',
       cell: (info) => <ModulesCell permissionItems={info.row.original.permissionItems} />,
     }),
@@ -184,7 +180,7 @@ export function PoliciesTable({ policies, members, pagination, setPagination, gl
 
       <PolicyViewDialog
         policy={selectedPolicy}
-        members={members}
+        authToken={authToken}
         isOpen={!!selectedPolicy}
         onClose={() => setSelectedPolicy(null)}
       />

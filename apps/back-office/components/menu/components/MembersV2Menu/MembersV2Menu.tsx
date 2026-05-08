@@ -4,7 +4,7 @@ import { clsx } from 'clsx';
 import { useCookie } from 'react-use';
 
 import { useOnClickOutside } from '../../../../hooks/useOnClickOutside';
-import { useMembersStateCounts } from '../../../../hooks/members/useMembersStateCounts';
+import { useMemberStateCounts } from '../../../../hooks/members/useAccessLevelCounts';
 import { usePoliciesList } from '../../../../hooks/access-control/usePoliciesList';
 import { AddMember } from '../../../../screens/members/components/AddMember/AddMember';
 import {
@@ -59,7 +59,8 @@ export const MembersV2Menu = () => {
   const [open, setOpen] = useState(false);
   const [cookieValue] = useCookie('plnadmin');
 
-  const counts = useMembersStateCounts({ authToken: cookieValue });
+  const countsQuery = useMemberStateCounts({ authToken: cookieValue ?? '' });
+  const counts = countsQuery.data;
   const { data: policiesData } = usePoliciesList({ authToken: cookieValue ?? undefined });
 
   useOnClickOutside([menuRef], () => setOpen(false));
@@ -80,7 +81,7 @@ export const MembersV2Menu = () => {
               <a className={s.menuItem} onClick={() => setOpen(false)}>
                 <TabIcon />
                 <span className={s.menuItemLabel}>{tab.label}</span>
-                <span className={s.menuItemCount}>{counts[tab.id]}</span>
+                <span className={s.menuItemCount}>{counts?.[tab.id] ?? 0}</span>
                 <CaretIcon />
               </a>
             </Link>

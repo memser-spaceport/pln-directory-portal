@@ -14,9 +14,9 @@ export const AdditionalDetails = () => {
   const { data } = useMemberFormOptions();
   const { control } = useFormContext<TMemberForm>();
 
-  const accessLevel = useWatch({
+  const memberStateStatus = useWatch({
     control,
-    name: 'accessLevel',
+    name: 'memberStateStatus',
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -29,7 +29,7 @@ export const AdditionalDetails = () => {
     name: 'investorProfile.type',
   });
 
-  const isInvestor = accessLevel?.value === 'L5' || accessLevel?.value === 'L6';
+  const isInvestor = memberStateStatus?.value === 'Approved';
 
   return (
     <div className="flex flex-col gap-4">

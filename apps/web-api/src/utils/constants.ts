@@ -1,3 +1,5 @@
+import { ADMIN_PERMISSIONS, DEMODAY_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+
 export enum APP_ENV {
   DEV = 'development',
   STAGING = 'staging',
@@ -24,7 +26,7 @@ export const ALLOWED_CORS_ORIGINS = {
     /dev-auth-app.plnetwork.io/,
     /dev-analytics.plnetwork.io/,
     /staging-admin.plnetwork.io/,
-    /protocol-ai-git-fix-home-page-polaris-01.vercel.app/
+    /protocol-ai-git-fix-home-page-polaris-01.vercel.app/,
   ],
   [APP_ENV.STAGING]: [
     /.-protocol-labs-spaceport.vercel.app/,
@@ -44,7 +46,13 @@ export const ALLOWED_CORS_ORIGINS = {
     /dev-analytics.plnetwork.io/,
     /uat-admin.plnetwork.io/,
   ],
-  [APP_ENV.PRODUCTION]: ['https://www.plnetwork.io', /app.forestadmin.com/, /admin.plnetwork.io/, /plnetwork.io/,/protocol.ai/],
+  [APP_ENV.PRODUCTION]: [
+    'https://www.plnetwork.io',
+    /app.forestadmin.com/,
+    /admin.plnetwork.io/,
+    /plnetwork.io/,
+    /protocol.ai/,
+  ],
 };
 
 export const IS_DEV_ENVIRONMENT = process.env.ENVIRONMENT == APP_ENV.DEV;
@@ -91,33 +99,53 @@ export enum MemberRole {
   DEMO_DAY_ADMIN = 'DEMO_DAY_ADMIN',
 }
 
+export const DIRECTORY_ADMIN_FULL_PERMISSION_CODE = ADMIN_PERMISSIONS.DIRECTORY_FULL;
+
 /**
  * Type for member with roles, used in role checking utilities
  */
 export type MemberWithRoles = {
-  memberRoles: Array<{ name: string }>;
+  memberRoles?: Array<{ name: string }>;
+  effectivePermissionCodes?: string[];
+  effectivePermissions?: Array<string | { code?: string | null }>;
+  permissions?: Array<string | { code?: string | null }>;
 };
 
 /**
  * Check if a member has a specific admin role
  */
 export function hasAdminRole(member: MemberWithRoles, role: MemberRole): boolean {
-  return member.memberRoles.some((r) => r.name === role);
+  return Boolean(member?.memberRoles?.some((r) => r.name === role));
 }
 
 /**
  * Check if a member has any of the specified admin roles
  */
 export function hasAnyAdminRole(member: MemberWithRoles, roles: MemberRole[]): boolean {
-  const memberRoleNames = member.memberRoles.map((r) => r.name);
+  const memberRoleNames = member?.memberRoles?.map((r) => r.name) ?? [];
   return roles.some((role) => memberRoleNames.includes(role));
+}
+
+export function memberHasPermissionCode(member: MemberWithRoles, permissionCode: string): boolean {
+  const effectivePermissionCodes = member?.effectivePermissionCodes ?? [];
+  const permissionLikeItems = [...(member?.effectivePermissions ?? []), ...(member?.permissions ?? [])];
+
+  return (
+    effectivePermissionCodes.includes(permissionCode) ||
+    permissionLikeItems.some((permission) =>
+      typeof permission === 'string' ? permission === permissionCode : permission?.code === permissionCode
+    )
+  );
 }
 
 /**
  * Check if a member is a directory admin (super role)
  */
 export function isDirectoryAdmin(member: MemberWithRoles): boolean {
-  return hasAdminRole(member, MemberRole.DIRECTORY_ADMIN);
+  return (
+    hasAdminRole(member, MemberRole.DIRECTORY_ADMIN) ||
+    memberHasPermissionCode(member, DIRECTORY_ADMIN_FULL_PERMISSION_CODE)
+  );
 }
 
 /**
@@ -125,6 +153,20 @@ export function isDirectoryAdmin(member: MemberWithRoles): boolean {
  */
 export function hasDemoDayAdminRole(member: MemberWithRoles): boolean {
   return hasAdminRole(member, MemberRole.DEMO_DAY_ADMIN);
+}
+
+export function hasAnyDemoDayAdminPermissionCode(member: MemberWithRoles): boolean {
+  const permissionCodes = [
+    ...(member?.effectivePermissionCodes ?? []),
+    ...(member?.effectivePermissions ?? []).map((p) => (typeof p === 'string' ? p : p?.code)).filter(Boolean) as string[],
+    ...(member?.permissions ?? []).map((p) => (typeof p === 'string' ? p : p?.code)).filter(Boolean) as string[],
+  ];
+
+  return (
+    permissionCodes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) ||
+    permissionCodes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
+    permissionCodes.some((code) => code.startsWith('demoday.admin.'))
+  );
 }
 
 export const JOIN_NOW_SUBJECT = 'A request to be a part of network';
@@ -175,7 +217,7 @@ export const InteractionFailureReasons: { [key: string]: string } = {
   'Preferred slot is not available': 'IFR0003',
   'Got rescheduled': 'IFR0005',
   'Got cancelled': 'IFR0006',
-  'Member didn\'t show up': 'IFR0007',
+  "Member didn't show up": 'IFR0007',
   'I could not make it': 'IFR0008',
   'Call quality issues': 'IFR0009',
   "Meeting link didn't work": 'IFR00010',
@@ -183,7 +225,14 @@ export const InteractionFailureReasons: { [key: string]: string } = {
 
 /********* HUSKY CONSTANTS ********/
 
-export const IGNORED_URLS_FOR_CONCEALID = ['/v1/husky/chat/assistant', '/v1/husky/chat/feedback', '/v1/husky/chat/contextual', '/v1/husky/chat/analytical', '/v1/husky/chat/additional-info', '/husky/threads'];
+export const IGNORED_URLS_FOR_CONCEALID = [
+  '/v1/husky/chat/assistant',
+  '/v1/husky/chat/feedback',
+  '/v1/husky/chat/contextual',
+  '/v1/husky/chat/analytical',
+  '/v1/husky/chat/additional-info',
+  '/husky/threads',
+];
 
 export const HUSKY_SOURCES = {
   TWITTER: 'twitter',
@@ -201,7 +250,6 @@ export const HUSKY_ACTION_TYPES = {
 
 export const HUSKY_MAX_CONTEXT_LENGTH = 500;
 
-
 export const HUSKY_POSTGRRES_POOL_CONSTANTS = {
   max: 3, // maximum number of clients in the pool
   idleTimeoutMillis: 60000, // increased to 1 minute
@@ -214,7 +262,7 @@ export const HUSKY_POSTGRRES_POOL_CONSTANTS = {
   application_name: 'pln-directory-portal', // For better identification in pg_stat_activity
   maxRetries: 3, // Maximum number of retries
   retryDelay: 1000, // Delay between retries in milliseconds
-}
+};
 
 export const HUSKY_POSTGRES_ERROR_CODES = {
   ECONNRESET: 'ECONNRESET',
@@ -226,10 +274,7 @@ export const HUSKY_POSTGRES_ERROR_CODES = {
   CANNOT_CONNECT_NOW: '57P03',
   MESSAGE: 'Connection terminated',
   CONNECTION_TIMEOUT_MESSAGE: 'connection timeout',
-
-}
-
-
+};
 
 /*
 - Add a note like "I've shown the first 10 results". And request user to specifically prompt/ask questions or add context to narrow down to show more specific results."
@@ -238,46 +283,46 @@ export const HUSKY_POSTGRES_ERROR_CODES = {
 */
 /********* HUSKY CONSTANTS END ********/
 
-export const EMAIL_TEMPLATES :  { [key: string]: string } = {
-  "EVENT_ADDED": "EVENT_ADDED",
-  "HOST_SPEAKER_ADDED": "HOST_SPEAKER_ADDED",
-  "IRL_UPDATES":"IRL_UPDATE",
-  "BROKEN_OH_BOOKING_ATTEMPT": "BROKEN_OH_BOOKING_ATTEMPT",
-  "BROKEN_OH_LINK_FIXED": "BROKEN_OH_LINK_FIXED"
+export const EMAIL_TEMPLATES: { [key: string]: string } = {
+  EVENT_ADDED: 'EVENT_ADDED',
+  HOST_SPEAKER_ADDED: 'HOST_SPEAKER_ADDED',
+  IRL_UPDATES: 'IRL_UPDATE',
+  BROKEN_OH_BOOKING_ATTEMPT: 'BROKEN_OH_BOOKING_ATTEMPT',
+  BROKEN_OH_LINK_FIXED: 'BROKEN_OH_LINK_FIXED',
 };
 
 export const NOTIFICATION_CHANNEL: { [key: string]: string } = {
-  "EMAIL": "EMAIL",
-  "TELEGRAM": "TELEGRAM"
-}
+  EMAIL: 'EMAIL',
+  TELEGRAM: 'TELEGRAM',
+};
 
-export const CREATE = "CREATE";
-export const UPDATE = "UPDATE";
-export const DELETE = "DELETE";
-export const UPSERT = "UPSERT";
+export const CREATE = 'CREATE';
+export const UPDATE = 'UPDATE';
+export const DELETE = 'DELETE';
+export const UPSERT = 'UPSERT';
 
-export const  EventInvitationToMember ="EventInvitationToMember";
-export const  EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME = "EventGuestPresenceRequest";
+export const EventInvitationToMember = 'EventInvitationToMember';
+export const EVENT_GUEST_PRESENCE_REQUEST_TEMPLATE_NAME = 'EventGuestPresenceRequest';
 
 // Office hours notification entity/action constants
 export const NOTIFICATION_ENTITY_TYPES = {
-  OFFICE_HOURS: 'OFFICE_HOURS'
+  OFFICE_HOURS: 'OFFICE_HOURS',
 };
 
 export const OFFICE_HOURS_ACTIONS = {
   BROKEN_LINK_ATTEMPT: 'BROKEN_LINK_ATTEMPT',
-  BROKEN_LINK_FIXED: 'BROKEN_LINK_FIXED'
+  BROKEN_LINK_FIXED: 'BROKEN_LINK_FIXED',
 };
 
 // Analytics Events
 export const ANALYTICS_EVENTS = {
   AUTH: {
     USER_FIRST_LOGIN: 'auth_user_first_login',
-    USER_LOGIN: 'auth_user_login'
+    USER_LOGIN: 'auth_user_login',
   },
   MEMBER: {
     MEMBER_CREATE: 'member_create',
-    MEMBER_UPDATE: 'member_update'
+    MEMBER_UPDATE: 'member_update',
   },
   TEAM: {
     TEAM_CREATE: 'team_create',
@@ -307,9 +352,8 @@ export const ANALYTICS_PROVIDER = {
   POSTHOG: 'posthog',
   CONSOLE: 'console',
   HYBRID: 'hybrid',
-  DB: 'db'
-}
-
+  DB: 'db',
+};
 
 /**
  * Max score threshold for OpenSearch score normalization.

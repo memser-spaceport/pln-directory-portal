@@ -46,11 +46,10 @@ import { isEmpty } from 'lodash';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { InternalAuthGuard } from '../guards/auth.guard';
 import { TeamsService } from '../teams/teams.service';
-import { AccessLevelsGuard } from '../guards/access-levels.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
-import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { ADMIN_PERMISSIONS, IRL_GATHERINGS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 const server = initNestServer(apiEvents);
 type RouteShape = typeof server.routeShapes;
@@ -83,7 +82,7 @@ export class PLEventsController {
   }
 
   @Api(server.route.getPLEventGuestsByLocation)
-  @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
+  @UseGuards(UserAuthValidateGuard)
   @NoCache()
   async findPLEventGuestsByLocation(@Req() request: Request, @Param('uid') locationUid: string) {
     const member = request['userEmail'] ? await this.memberService.findMemberByEmail(request['userEmail']) : null;
@@ -93,7 +92,14 @@ export class PLEventsController {
   @Api(server.route.getPLEventBySlug)
   @ApiParam({ name: 'slug', type: 'string' })
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema)
-  @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
+  @UseGuards(UserAuthValidateGuard, RbacGuard)
+  @RequirePermissions({
+    anyOf: [
+      IRL_GATHERINGS_PERMISSIONS.GOING_READ,
+      RBAC_PERMISSION_CODES.IRLG_GOING_WRITE,
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+    ],
+  })
   @NoCache()
   async findOne(@ApiDecorator() { params: { slug } }: RouteShape['getPLEventBySlug'], @Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(PLEventGuestQuerySchema);
@@ -206,7 +212,14 @@ export class PLEventsController {
   @Api(server.route.getPLEventsByLoggedInMember)
   @ApiQueryFromZod(PLEventQueryParams)
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema.array())
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions({
+    anyOf: [
+      IRL_GATHERINGS_PERMISSIONS.GOING_READ,
+      RBAC_PERMISSION_CODES.IRLG_GOING_WRITE,
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+    ],
+  })
   @NoCache()
   async getPLEventsByLoggedInMember(@Param('uid') locationUid, @Req() request) {
     const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
@@ -232,7 +245,14 @@ export class PLEventsController {
   }
 
   @Api(server.route.getPLEventGuestByUidAndLocation)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions({
+    anyOf: [
+      IRL_GATHERINGS_PERMISSIONS.GOING_READ,
+      RBAC_PERMISSION_CODES.IRLG_GOING_WRITE,
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+    ],
+  })
   async getPLEventGuestByUidAndLocation(
     @Req() request,
     @Param('uid') locationUid: string,
@@ -258,7 +278,14 @@ export class PLEventsController {
   }
 
   @Api(server.route.getPLEventGuestTopics)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
+  @UseGuards(UserTokenValidation, RbacGuard)
+  @RequirePermissions({
+    anyOf: [
+      IRL_GATHERINGS_PERMISSIONS.GOING_READ,
+      RBAC_PERMISSION_CODES.IRLG_GOING_WRITE,
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+    ],
+  })
   @NoCache()
   async getPLEventGuestTopics(@Param('uid') locationUid: string, @Param('guestUid') guestUid: string, @Req() request) {
     const userEmail = request['userEmail'];
@@ -278,7 +305,14 @@ export class PLEventsController {
 
   @Api(server.route.getAllAggregatedData)
   @ApiQueryFromZod(PLEventAggregatedDataQueryParams)
-  @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
+  @UseGuards(UserAuthValidateGuard, RbacGuard)
+  @RequirePermissions({
+    anyOf: [
+      IRL_GATHERINGS_PERMISSIONS.GOING_READ,
+      RBAC_PERMISSION_CODES.IRLG_GOING_WRITE,
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+    ],
+  })
   @NoCache()
   async getAllAggregatedData(@Req() request: Request) {
     const loggedInMember = request['userEmail']

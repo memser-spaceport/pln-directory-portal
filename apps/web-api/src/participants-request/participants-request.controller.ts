@@ -1,29 +1,20 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Query,
-  Req,
-  UseGuards,
-  UsePipes,
-} from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common';
 import { ParticipantsRequestService } from './participants-request.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 import { FindUniqueIdentiferDto } from '@protocol-labs-network/contracts';
 import { MembersService } from '../members/members.service';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
-import { AccessLevelsGuard } from '../guards/access-levels.guard';
-import { AccessLevels } from '../decorators/access-levels.decorator';
-import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
+import { RbacGuard } from '../rbac/rbac.guard';
+import { RequirePermissions } from '../rbac/rbac.decorator';
+import { ADMIN_PERMISSIONS, MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 @Controller('v1/participants-request')
 @NoCache()
 export class ParticipantsRequestController {
   constructor(
     private readonly participantsRequestService: ParticipantsRequestService,
-    private readonly membersService: MembersService,
+    private readonly membersService: MembersService
   ) {}
 
   /**
@@ -40,41 +31,23 @@ export class ParticipantsRequestController {
    */
   @Post('/')
   @UsePipes(new ParticipantsReqValidationPipe())
-  @UseGuards(UserAuthValidateGuard, AccessLevelsGuard)
-  @AccessLevels(
-    AccessLevel.L0,
-    AccessLevel.L1,
-    AccessLevel.L2,
-    AccessLevel.L3,
-    AccessLevel.L4,
-    AccessLevel.L5,
-    AccessLevel.L6,
-  )
+  @UseGuards(UserAuthValidateGuard)
   async addRequest(@Body() body: any, @Req() request: Request) {
     // Derive unique identifier (team name or member email) from the payload
-    const uniqueIdentifier =
-      this.participantsRequestService.getUniqueIdentifier(body);
+    const uniqueIdentifier = this.participantsRequestService.getUniqueIdentifier(body);
 
     // Ensure there is no existing entity with the same identifier
-    await this.participantsRequestService.validateUniqueIdentifier(
-      body.participantType,
-      uniqueIdentifier,
-    );
+    await this.participantsRequestService.validateUniqueIdentifier(body.participantType, uniqueIdentifier);
 
     // Perform additional semantic validation (location, requester email, etc.)
     await this.participantsRequestService.validateParticipantRequest(body);
 
     // Load the requester Member based on the authenticated user email
-    const requesterUser = await this.membersService.findMemberByEmail(
-      (request as any)['userEmail'],
-    );
+    const requesterUser = await this.membersService.findMemberByEmail((request as any)['userEmail']);
 
     // New flow: immediately create the underlying Member / Team
     // without storing anything in participants_request
-    return this.participantsRequestService.processImmediateRequest(
-      body,
-      requesterUser,
-    );
+    return this.participantsRequestService.processImmediateRequest(body, requesterUser);
   }
 
   /**
@@ -94,9 +67,6 @@ export class ParticipantsRequestController {
    */
   @Get('/unique-identifier')
   async findMatchingIdentifier(@Query() queryParams: FindUniqueIdentiferDto) {
-    return this.participantsRequestService.checkIfIdentifierAlreadyExist(
-      queryParams.type,
-      queryParams.identifier,
-    );
+    return this.participantsRequestService.checkIfIdentifierAlreadyExist(queryParams.type, queryParams.identifier);
   }
 }

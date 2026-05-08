@@ -21,7 +21,7 @@ import { useMembersList } from '../../hooks/members/useMembersList';
 import { Level0Icon, Level1Icon, Level2Icon, RejectedIcon, SortIcon } from '../../screens/members/components/icons';
 import clsx from 'clsx';
 import { MultieditControls } from '../../screens/members/components/MultieditControls';
-import { useAccessLevelCounts } from '../../hooks/members/useAccessLevelCounts';
+import { useMemberStateCounts } from '../../hooks/members/useAccessLevelCounts';
 import PaginationControls from '../../screens/members/components/PaginationControls/PaginationControls';
 import { AddMember } from '../../screens/members/components/AddMember/AddMember';
 import { useCookie } from 'react-use';
@@ -34,13 +34,13 @@ const MembersPage = () => {
   const query = router.query;
   const { filter, search } = query;
   const [authToken] = useCookie('plnadmin');
-  const { data: counts } = useAccessLevelCounts({ authToken });
+  const { data: counts } = useMemberStateCounts({ authToken });
 
   // Redirect non-directory admins to demo-days
   useEffect(() => {
     // Wait for auth to load, then check if user has directory admin role
     if (!isLoading && user && !isDirectoryAdmin) {
-      router.replace('/demo-days');
+      router.replace('/access-denied');
     }
   }, [isLoading, user, isDirectoryAdmin, router]);
 
@@ -50,42 +50,42 @@ const MembersPage = () => {
         id: 'level1',
         icon: <Level1Icon />,
         label: 'L1',
-        count: counts?.L1 ?? 0,
+        count: counts?.VERIFIED ?? 0,
         activeColor: '#4174FF',
       },
       {
         id: 'level2',
         icon: <Level2Icon />,
         label: 'L2-L4',
-        count: (counts?.L2 ?? 0) + (counts?.L3 ?? 0) + (counts?.L4 ?? 0),
+        count: counts?.APPROVED ?? 0,
         activeColor: '#0A9952',
       },
       {
         id: 'level56',
         icon: <Level2Icon />,
         label: 'L5-L6 (Investors)',
-        count: (counts?.L5 ?? 0) + (counts?.L6 ?? 0),
+        count: 0,
         activeColor: '#7C3AED',
       },
       {
         id: 'level0',
         icon: <Level0Icon />,
         label: 'L0',
-        count: counts?.L0 ?? 0,
+        count: counts?.PENDING ?? 0,
         activeColor: '#D97706',
       },
       {
         id: 'rejected',
         icon: <RejectedIcon />,
         label: 'Rejected',
-        count: counts?.Rejected ?? 0,
+        count: counts?.REJECTED ?? 0,
         activeColor: '#D21A0E',
       },
     ];
   }, [counts]);
   const [sorting, setSorting] = useState<SortingState>([
     {
-      id: 'accessLevel',
+      id: 'memberState',
       desc: true,
     },
   ]);
@@ -96,7 +96,7 @@ const MembersPage = () => {
   });
   const [globalFilter, setGlobalFilter] = useState<string>((search as string | undefined) ?? '');
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const { data } = useMembersList({ authToken, accessLevel: getAccessLevel(filter as string) });
+  const { data } = useMembersList({ authToken, memberState: getMemberState(filter as string) });
   const { table } = useMembersTable({
     members: data?.data,
     sorting,
@@ -200,7 +200,7 @@ const MembersPage = () => {
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {header.column.getCanSort() && <SortIcon />}
 
-                      {header.column.id === 'accessLevel' && filter === 'level2' && (
+                      {header.column.id === 'memberState' && filter === 'level2' && (
                         <div
                           className="ml-auto"
                           onClick={(e) => {
@@ -268,18 +268,18 @@ const MembersPage = () => {
 
 export default MembersPage;
 
-function getAccessLevel(filter: string | undefined) {
+function getMemberState(filter: string | undefined) {
   switch (filter) {
     case 'level1':
-      return ['L1'];
+      return ['VERIFIED'];
     case 'level2':
-      return ['L2', 'L3', 'L4'];
+      return ['APPROVED'];
     case 'level56':
-      return ['L5', 'L6'];
+      return ['APPROVED'];
     case 'level0':
-      return ['L0'];
+      return ['PENDING'];
     case 'rejected':
     default:
-      return ['Rejected'];
+      return ['REJECTED'];
   }
 }

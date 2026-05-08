@@ -50,7 +50,8 @@ export class TeamEnrichmentJob {
       }
 
       this.logger.log(
-        `Team enrichment job completed: ${enriched} enriched, ${failed} failed out of ${teams.length} total`
+        `Team enrichment job completed: ${enriched} enriched, ${failed} failed out of ${teams.length} total. ` +
+          `Per-team token usage + USD cost is logged separately as "Enrichment usage rollup" lines and persisted on dataEnrichment.usage.`
       );
     } finally {
       this.isEnrichmentRunning = false;

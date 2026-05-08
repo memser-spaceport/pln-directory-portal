@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
@@ -8,14 +8,15 @@ import { CreateDemoDayDto } from '../../screens/demo-days/types/demo-day';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../../context/auth-context';
 import { DEMO_DAY_HOSTS } from '@protocol-labs-network/contracts/constants';
-import { removeToken } from '../../utils/auth'; // ⬅️ NEW: used for logout on role = none / 403
+import { allowedHostValuesForUser } from '../../utils/demoDayAdminPermissions';
 
 const RichTextEditor = dynamic(() => import('../../components/common/rich-text-editor'), { ssr: false });
 
 const CreateDemoDayPage = () => {
   const router = useRouter();
   const [authToken] = useCookie('plnadmin');
-  const { isDirectoryAdmin, isLoading, user } = useAuth();
+  const { canMutateDemoDays, isLoading, user, permissions } = useAuth();
+  const allowedHosts = useMemo(() => allowedHostValuesForUser(permissions, DEMO_DAY_HOSTS), [permissions]);
 
   // Redirect to log-in if not authenticated
   useEffect(() => {
@@ -24,34 +25,12 @@ const CreateDemoDayPage = () => {
     }
   }, [authToken, router]);
 
-  // Helper: logout when user has no roles (NONE) or forbidden
-  const forceLogout = () => {
-    console.log('[CreateDemoDayPage] Force logout (no roles / forbidden)');
-    removeToken();
-    // clear snapshot cookie with user info
-    document.cookie = 'plnadmin_user=; Max-Age=0; path=/;';
-    router.replace('/');
-  };
-
-  // Redirect non-directory admins:
-  // - if user has NO roles (none) -> full logout
-  // - if user has some roles but not directory admin -> back to demo-days list
+  // Redirect users who cannot create / manage demo days
   useEffect(() => {
-    if (!isLoading && user) {
-      const hasAnyRoles = Array.isArray((user as any).roles) && (user as any).roles.length > 0;
-
-      if (!hasAnyRoles) {
-        // User without roles (NONE) should be logged out from back-office
-        forceLogout();
-        return;
-      }
-
-      if (!isDirectoryAdmin) {
-        // Demo day admins (and any non-directory admins) should not see "Create" page
-        router.replace('/demo-days');
-      }
+    if (!isLoading && user && !canMutateDemoDays) {
+      router.replace('/access-denied');
     }
-  }, [isLoading, user, isDirectoryAdmin, router]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoading, user, canMutateDemoDays, router]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [slugError, setSlugError] = useState<string>('');
@@ -65,6 +44,12 @@ const CreateDemoDayPage = () => {
     host: '',
     status: 'UPCOMING',
   });
+
+  useEffect(() => {
+    if (allowedHosts.length === 1 && !formData.host) {
+      setFormData((prev) => ({ ...prev, host: allowedHosts[0] }));
+    }
+  }, [allowedHosts, formData.host]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,9 +76,8 @@ const CreateDemoDayPage = () => {
     } catch (error: any) {
       console.error('Error creating demo day:', error);
 
-      // NEW: if backend says "forbidden", we treat it as "roles = none" and log out
       if (error?.response?.status === 403) {
-        forceLogout();
+        router.replace('/access-denied');
         return;
       }
 
@@ -150,9 +134,8 @@ const CreateDemoDayPage = () => {
     }));
   };
 
-  // Don't render if not authenticated or not a directory admin.
-  // NOTE: actual redirects / logout are handled in effects above.
-  if (!authToken || (!isLoading && user && !isDirectoryAdmin)) {
+  // Don't render if not authenticated or user cannot mutate demo days
+  if (!authToken || (!isLoading && user && !canMutateDemoDays)) {
     return null;
   }
 
@@ -294,7 +277,7 @@ const CreateDemoDayPage = () => {
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select a host</option>
-                {DEMO_DAY_HOSTS.map((host) => (
+                {allowedHosts.map((host) => (
                   <option key={host} value={host}>
                     {host}
                   </option>

@@ -1,12 +1,6 @@
 import * as yup from 'yup';
 
 export const memberFormSchema = yup.object({
-  accessLevel: yup
-    .object({
-      label: yup.string(),
-      value: yup.string().required(),
-    })
-    .required('Access level is required'),
   image: yup.mixed<File>().nullable(),
   name: yup.string().required('Name is required'),
   email: yup.string().email('Must be a valid email').required('Email is required'),
@@ -47,10 +41,17 @@ export const memberFormSchema = yup.object({
   memberStateStatus: yup
     .object({ label: yup.string().required(), value: yup.string().required() })
     .nullable()
-    .optional(),
+    .required('Member state is required'),
   rbacPolicies: yup
     .array()
     .of(yup.object({ label: yup.string().required(), value: yup.string().required() }))
+    .required()
+    .when('memberStateStatus', {
+      is: (status: { value: string } | null) => status?.value === 'Approved',
+      then: (schema) => schema.min(1, 'At least one policy is required'),
+    }),
+  rbacExceptions: yup
+    .array()
+    .of(yup.object({ label: yup.string(), value: yup.string() }))
     .optional(),
-  rbacExceptions: yup.array().of(yup.object({ label: yup.string(), value: yup.string() })).optional(),
 });

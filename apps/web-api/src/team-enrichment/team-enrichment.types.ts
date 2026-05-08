@@ -107,7 +107,37 @@ export interface TeamJudgment {
     companyNameFromLinkedIn: string | null;
     verifiedFields: string[];
     linkedinInternalId: string | null;
+    websiteReachable?: boolean | null;
+    websiteFinalHost?: string | null;
   };
+}
+
+/**
+ * Aggregated AI token usage + estimated cost for one stage (enrichment or judge)
+ * of a team's pipeline. Accumulates across re-runs (force-enrichment, force-judge)
+ * via `runs`. Cost is an estimate from the in-app pricing table — see
+ * `team-enrichment-cost.ts` for the caveats.
+ */
+export interface AIUsageEntry {
+  inputTokens: number;
+  outputTokens: number;
+  /** Only populated when the provider exposes a cached-prompt token count (Gemini, Anthropic, OpenAI Responses). */
+  cachedInputTokens?: number;
+  totalTokens: number;
+  /** Estimated USD cost for the tokens, using the provider's published per-token rates. */
+  costUsd: number;
+  aiModel: string;
+  /** Wall-clock time spent inside generateText for this stage, summed across runs. */
+  durationMs: number;
+  /** Number of AI calls accumulated into this entry. >1 means re-runs (force mode, retries). */
+  runs: number;
+  /** ISO timestamp of the most recent AI call contributing to this entry. */
+  lastRunAt: string;
+}
+
+export interface TeamEnrichmentUsage {
+  enrichment?: AIUsageEntry;
+  judge?: AIUsageEntry;
 }
 
 export interface TeamDataEnrichment {
@@ -128,15 +158,20 @@ export interface TeamDataEnrichment {
     linkedinInternalId?: string | null;
   };
   judgment?: TeamJudgment;
+  /** AI token usage + cost estimate per stage. Optional — pre-tracking teams won't have it. */
+  usage?: TeamEnrichmentUsage;
 }
 
 export interface AIJudgeResponse {
-  fields: Record<string, {
-    confidence: 'high' | 'medium' | 'low';
-    score: number;
-    verdict: 'agrees' | 'disagrees' | 'uncertain';
-    note: string;
-  }>;
+  fields: Record<
+    string,
+    {
+      confidence: 'high' | 'medium' | 'low';
+      score: number;
+      verdict: 'agrees' | 'disagrees' | 'uncertain';
+      note: string;
+    }
+  >;
   overallAssessment: string;
 }
 

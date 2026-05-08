@@ -4,7 +4,6 @@ import { useCookie } from 'react-use';
 
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
-import { removeToken } from '../../utils/auth';
 import {
   fetchIrlGatheringLocations,
   IrlGatheringLocationDto,
@@ -251,27 +250,11 @@ const IrlGatheringPushSendPage = () => {
     }
   }, [authToken, router]);
 
-  const forceLogout = () => {
-    console.log('[IrlGatheringPushSendPage] Force logout (no roles / forbidden)');
-    removeToken();
-    document.cookie = 'plnadmin_user=; Max-Age=0; path=/;';
-    router.replace('/');
-  };
-
   useEffect(() => {
-    if (!isLoading && user) {
-      const hasAnyRoles = Array.isArray((user as any).roles) && (user as any).roles.length > 0;
-
-      if (!hasAnyRoles) {
-        forceLogout();
-        return;
-      }
-
-      if (!isDirectoryAdmin) {
-        router.replace('/demo-days');
-      }
+    if (!isLoading && user && !isDirectoryAdmin) {
+      router.replace('/access-denied');
     }
-  }, [isLoading, user, isDirectoryAdmin, router]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoading, user, isDirectoryAdmin, router]);
 
   useEffect(() => {
     const load = async () => {
@@ -290,7 +273,7 @@ const IrlGatheringPushSendPage = () => {
         console.error('[IrlGatheringPushSendPage] Failed to load locations:', e);
 
         if (e?.response?.status === 403) {
-          forceLogout();
+          router.replace('/access-denied');
           return;
         }
 
@@ -325,7 +308,7 @@ const IrlGatheringPushSendPage = () => {
       console.error('[IrlGatheringPushSendPage] Trigger failed:', e);
 
       if (e?.response?.status === 403) {
-        forceLogout();
+        router.replace('/access-denied');
         return;
       }
 

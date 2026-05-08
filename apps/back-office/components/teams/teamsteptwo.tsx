@@ -17,6 +17,7 @@ export default function TeamStepTwo(props) {
   const handleInputChange = props?.handleInputChange;
   const [isFocusAreaModalOpen, setIsFocusAreaModalOpen] = useState(false);
   const from = props?.from;
+  const canViewMembershipSource = props?.canViewMembershipSource ?? true;
 
   const onOpenFocusAreaModal = () => {
     setIsFocusAreaModalOpen(true);
@@ -63,17 +64,19 @@ export default function TeamStepTwo(props) {
         />
       </div>
 
-      <div className="pt-5">
-        <MultiSelect
-          options={dropDownValues?.membershipSources}
-          name="membershipSources"
-          selectedValues={values.membershipSources}
-          placeholder="Select the Membership Sources"
-          onChange={handleDropDownChange}
-          disabled={!props.isEditEnabled}
-          label="Membership Source"
-        />
-      </div>
+      {canViewMembershipSource && (
+        <div className="pt-5">
+          <MultiSelect
+            options={dropDownValues?.membershipSources}
+            name="membershipSources"
+            selectedValues={values.membershipSources}
+            placeholder="Select the Membership Sources"
+            onChange={handleDropDownChange}
+            disabled={!props.isEditEnabled}
+            label="Membership Source"
+          />
+        </div>
+      )}
 
       <div className="pt-5">
         <MultiSelect

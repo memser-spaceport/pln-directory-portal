@@ -3,6 +3,7 @@ import {
   Body,
   CacheTTL,
   Controller,
+  Get,
   Param,
   Patch,
   Post,
@@ -22,6 +23,7 @@ import { AdminTeamsService } from './admin-teams.service';
 import { TriggerForceEnrichmentQueryDto, UploadTeamTiersQueryDto } from './schema/admin-teams';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { TeamEnrichmentJudgeService } from '../team-enrichment/team-enrichment-judge.service';
+import { TeamEnrichmentReportService } from '../team-enrichment/team-enrichment-report.service';
 
 @ApiTags('Admin Teams')
 @Controller('v1/admin/teams')
@@ -30,7 +32,8 @@ export class AdminTeamsController {
   constructor(
     private readonly adminTeamsService: AdminTeamsService,
     private readonly teamEnrichmentService: TeamEnrichmentService,
-    private readonly teamEnrichmentJudgeService: TeamEnrichmentJudgeService
+    private readonly teamEnrichmentJudgeService: TeamEnrichmentJudgeService,
+    private readonly teamEnrichmentReportService: TeamEnrichmentReportService
   ) {}
 
   @Post('tiers/upload')
@@ -223,5 +226,34 @@ export class AdminTeamsController {
     }
 
     return { success: true, message: `Force-judgment triggered for team ${uid}` };
+  }
+
+  /**
+   * Aggregated AI token usage + USD cost report for the enrichment + judge pipelines.
+   * Reads `dataEnrichment.usage` persisted on each team and rolls up totals, per-model
+   * breakdowns, and per-team usage. Teams are sorted by combined cost desc and paginated.
+   *
+   * Query params:
+   *  - since=<ISO8601> — filter per-stage usage by `lastRunAt >= since` (each stage filtered independently).
+   *  - page=<int>     — 1-based page index for the `teams` list (default 1).
+   *  - pageSize=<int> — items per page for the `teams` list (default 10, capped at 100).
+   *
+   * `totals` and `byModel` are always computed over the full result set, regardless of pagination.
+   *
+   * Costs are estimates from the in-app pricing table (`team-enrichment-cost.ts`).
+   * Token counts are exact and are the source of truth.
+   */
+  @Get('ai-report')
+  @NoCache()
+  async aiReport(
+    @Query('since') since?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string
+  ) {
+    return this.teamEnrichmentReportService.generateReport({
+      since,
+      page: page ? parseInt(page, 10) : undefined,
+      pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
+    });
   }
 }

@@ -1,6 +1,5 @@
 export type Member = {
-  accessLevel: string;
-  accessLevelUpdatedAt: string;
+  accessLevelUpdatedAt?: string;
   email: string;
   image: { url: string };
   isSubscribedToNewsletter: boolean;
@@ -11,8 +10,16 @@ export type Member = {
   teamOrProjectURL: string;
   uid: string;
   signUpSource: string | null;
+  updatedAt?: string;
   roles?: { uid: string; code: string; name: string; description?: string | null }[];
-  policies?: { uid: string; code: string; name: string; description?: string | null }[];
+  policies?: {
+    uid: string;
+    code: string;
+    name: string;
+    description?: string | null;
+    role?: string | null;
+    group?: string | null;
+  }[];
   permissions?: { uid: string; code: string; module: string; description?: string | null }[];
   memberRoles?: { name: string }[];
   demoDayHosts?: string[];
@@ -29,7 +36,6 @@ export type TMemberForm = {
   memberStateStatus?: { label: string; value: 'Pending' | 'Verified' | 'Approved' | 'Rejected' } | null;
   rbacPolicies?: { label: string; value: string }[];
   rbacExceptions?: { label: string; value: string; module?: string; description?: string | null }[];
-  accessLevel: { label?: string; value?: string } | null;
   image: File | null;
   name: string;
   email: string;

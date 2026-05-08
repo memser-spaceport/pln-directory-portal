@@ -302,7 +302,6 @@ export class PushNotificationsService {
    * Get push notifications for a user.
    * - Private notifications: use isRead field directly
    * - Public notifications: check PushNotificationReadStatus table
-   * - Access level notifications: check if user's access level is in the accessLevels array
    * - Permission-based notifications: check if user has ANY of the requiredPermissions
    *   (notifications with requiredPermissions set, but no accessLevels and no specific recipient)
    */
@@ -316,13 +315,12 @@ export class PushNotificationsService {
   ) {
     const { limit = 50, offset = 0, unreadOnly = false } = options || {};
 
-    // Get user's access level and creation date
+    // Get member creation date for notification visibility window
     const member = await this.prisma.member.findFirst({
       where: { uid: memberUid },
-      select: { accessLevel: true, createdAt: true },
+      select: { createdAt: true },
     });
 
-    const userAccessLevel = member?.accessLevel;
     const memberCreatedAt = member?.createdAt;
 
     // Get private notifications for this user
@@ -558,17 +556,15 @@ export class PushNotificationsService {
    * Get unread count for a user.
    * - Private: count where isRead = false
    * - Public: count where no read status exists for this user
-   * - Access level: count where user's access level is in accessLevels array and no read status exists
    * - Permission-based: filter by requiredPermissions (user must have ANY of the required permissions)
    */
   async getUnreadCount(memberUid: string): Promise<number> {
-    // Get user's access level and creation date
+    // Get member creation date for notification visibility window
     const member = await this.prisma.member.findFirst({
       where: { uid: memberUid },
-      select: { accessLevel: true, createdAt: true },
+      select: { createdAt: true },
     });
 
-    const userAccessLevel = member?.accessLevel;
     const memberCreatedAt = member?.createdAt;
 
     // Count unread private notifications (filter by requiredPermissions)
@@ -659,10 +655,9 @@ export class PushNotificationsService {
   async getUnreadLinksForUser(memberUid: string): Promise<Array<{ uid: string; link: string }>> {
     const member = await this.prisma.member.findFirst({
       where: { uid: memberUid },
-      select: { accessLevel: true, createdAt: true },
+      select: { createdAt: true },
     });
 
-    const userAccessLevel = member?.accessLevel;
     const memberCreatedAt = member?.createdAt;
 
     // Unread private notifications with links
@@ -759,14 +754,6 @@ export class PushNotificationsService {
    * - Permission-based notifications: insert into PushNotificationReadStatus
    */
   async markAsRead(uid: string, memberUid: string) {
-    // Get user's access level
-    const member = await this.prisma.member.findFirst({
-      where: { uid: memberUid },
-      select: { accessLevel: true },
-    });
-
-    const userAccessLevel = member?.accessLevel;
-
     // Build OR conditions for finding the notification
     const orConditions: Prisma.PushNotificationWhereInput[] = [{ recipientUid: memberUid }, { isPublic: true }];
 

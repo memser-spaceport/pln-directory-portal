@@ -1,12 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards, UsePipes } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
 import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
 
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import {
-  AccessLevelCounts,
   CreateMemberDto,
+  MemberStateCounts,
   RequestMembersDto,
-  UpdateAccessLevelDto,
   UpdateMemberDto,
 } from 'libs/contracts/src/schema/admin-member';
 import { NoCache } from '../decorators/no-cache.decorator';
@@ -24,20 +23,16 @@ export class MemberController {
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async getMembers(@Query() query: RequestMembersDto) {
-    return await this.memberService.findMemberByAccessLevels(query);
+    return await this.memberService.findMembers(query);
   }
 
-  @Get('access-level-counts')
-  @UseGuards(AdminAuthGuard)
+  @Get('member-state-counts')
+  @UseGuards(DemoDayAdminAuthGuard)
   @NoCache()
-  async getAccessLevelCounts(): Promise<AccessLevelCounts> {
-    return this.memberService.getAccessLevelCounts();
+  async getMemberStateCounts(): Promise<MemberStateCounts> {
+    return this.memberService.getMemberStateCounts();
   }
 
-  /**
-   * Returns a single member by uid.
-   * Used by Back Office to refresh roles and member data.
-   */
   @Get(':uid')
   @UseGuards(DemoDayAdminAuthGuard)
   @NoCache()
@@ -45,15 +40,8 @@ export class MemberController {
     return await this.memberService.findMemberByUid(uid);
   }
 
-  @Put('access-level')
-  @UseGuards(AdminAuthGuard)
-  @UsePipes(ZodValidationPipe)
-  async updateAccessLevel(@Body() body: UpdateAccessLevelDto) {
-    return this.memberService.updateAccessLevel(body);
-  }
-
   @Post('/create')
-  @UseGuards(AdminAuthGuard)
+  @UseGuards(DemoDayAdminAuthGuard)
   async addNewMember(@Body() body: any): Promise<Member> {
     return this.memberService.createMemberByAdmin(
       body as CreateMemberDto & {
@@ -65,7 +53,7 @@ export class MemberController {
   }
 
   @Patch('/edit/:uid')
-  @UseGuards(AdminAuthGuard)
+  @UseGuards(DemoDayAdminAuthGuard)
   @UsePipes(ZodValidationPipe)
   async editMember(@Param('uid') uid: string, @Body() body: UpdateMemberDto): Promise<string> {
     return this.memberService.updateMemberByAdmin(uid, body);
@@ -78,7 +66,7 @@ export class MemberController {
    * @returns Array of updation status of the provided memberIds.
    */
   @Post('/')
-  @UseGuards(AdminAuthGuard)
+  @UseGuards(DemoDayAdminAuthGuard)
   async verifyMembers(@Body() body) {
     const requestor = await this.memberService.findMemberByRole();
     const { memberIds } = body;
@@ -92,7 +80,7 @@ export class MemberController {
    * @returns updated member object
    */
   @Patch('/:uid')
-  @UseGuards(AdminAuthGuard)
+  @UseGuards(DemoDayAdminAuthGuard)
   async updateMemberAndVerify(@Param('uid') uid, @Body() participantsRequest) {
     const requestor = await this.memberService.findMemberByRole();
     const requestorEmail = requestor?.email ?? '';
@@ -106,7 +94,7 @@ export class MemberController {
    * Expects an array of hosts (e.g. ["plnetwork.io", "founders.plnetwork.io"]).
    */
   @Patch(':uid/demo-day-hosts')
-  @UseGuards(AdminAuthGuard)
+  @UseGuards(DemoDayAdminAuthGuard)
   async updateDemoDayAdminHosts(@Param('uid') uid: string, @Body() body: { hosts: string[] }): Promise<Member> {
     return await this.memberService.updateDemoDayAdminHosts(uid, body.hosts || []);
   }
@@ -116,7 +104,7 @@ export class MemberController {
    * Only directory/super admins are allowed to call this endpoint.
    */
   @Patch(':uid/roles')
-  @UseGuards(AdminAuthGuard)
+  @UseGuards(DemoDayAdminAuthGuard)
   async updateMemberRoles(@Param('uid') uid: string, @Body() body: UpdateMemberRolesDto) {
     return await this.memberService.updateMemberRolesByUid(uid, body.roles);
   }
@@ -127,7 +115,7 @@ export class MemberController {
    * Only directory/super admins are allowed to call this endpoint.
    */
   @Patch(':uid/roles-and-hosts')
-  @UseGuards(AdminAuthGuard)
+  @UseGuards(DemoDayAdminAuthGuard)
   async updateMemberRolesAndHosts(
     @Param('uid') uid: string,
     @Body() body: UpdateMemberRolesAndHostsDto
