@@ -40,8 +40,13 @@ export class LogoVerificationJobService {
       const batchSize = Number(process.env.LOGO_VERIFICATION_BATCH_SIZE || '20');
       const force = (process.env.LOGO_VERIFICATION_FORCE_UPDATE?.toLowerCase() ?? 'false') === 'true';
 
-      const teams = await this.persistenceService.getTeamsForVerification(batchSize);
-      this.logger.log(`Found ${teams.length} teams with logos`);
+      const teams = await this.persistenceService.getTeamsForVerification({
+        limit: batchSize,
+        provider,
+        model,
+        force,
+      });
+      this.logger.log(`Found ${teams.length} teams pending logo verification`);
 
       let processed = 0;
       let skipped = 0;
