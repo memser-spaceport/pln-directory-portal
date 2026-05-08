@@ -24,9 +24,18 @@ export class AuthOtpService {
   ) {}
 
   private async getEffectivePermissionCodes(memberUid: string): Promise<string[]> {
-    const [direct, policyBased] = await Promise.all([
+    const [directV2, directLegacy, policyBased, roleBased] = await Promise.all([
       this.prisma.memberPermissionV2.findMany({
         where: { memberUid },
+        select: { permission: { select: { code: true } } },
+      }),
+      // Keep login compatible with legacy permission exceptions while BO is moving to RBAC v2.
+      this.prisma.memberPermission.findMany({
+        where: {
+          memberUid,
+          status: 'ACTIVE',
+          revokedAt: null,
+        },
         select: { permission: { select: { code: true } } },
       }),
       this.prisma.policyAssignment.findMany({
@@ -41,13 +50,44 @@ export class AuthOtpService {
           },
         },
       }),
+      this.prisma.roleAssignment.findMany({
+        where: {
+          memberUid,
+          status: 'ACTIVE',
+          revokedAt: null,
+        },
+        select: {
+          role: {
+            select: {
+              rolePermissions: {
+                select: { permission: { select: { code: true } } },
+              },
+            },
+          },
+        },
+      }),
     ]);
 
     return Array.from(
       new Set([
-        ...direct.map((p) => p.permission.code),
+        ...directV2.map((p) => p.permission.code),
+        ...directLegacy.map((p) => p.permission.code),
         ...policyBased.flatMap((a) => a.policy.policyPermissions.map((p) => p.permission.code)),
-      ])
+        ...roleBased.flatMap((a) => a.role.rolePermissions.map((p) => p.permission.code)),
+      ].filter(Boolean))
+    );
+  }
+
+  private hasBackOfficeAccess(permissionCodes: string[]): boolean {
+    return (
+      permissionCodes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) ||
+      permissionCodes.includes(ADMIN_PERMISSIONS.TOOLS_ACCESS) ||
+      permissionCodes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
+      permissionCodes.includes(DEMODAY_PERMISSIONS.STATS_READ) ||
+      permissionCodes.includes('member.contacts.read') ||
+      permissionCodes.includes('team.membership_source.read') ||
+      permissionCodes.includes('membership.source.read') ||
+      permissionCodes.some((code) => code.startsWith('demoday.admin.'))
     );
   }
 
@@ -107,15 +147,7 @@ export class AuthOtpService {
 
     // Check that Member has back-office access via RBAC v2.1 permissions only.
     const permissionCodes = await this.getEffectivePermissionCodes(member.uid);
-    const hasBackofficeAccess =
-      permissionCodes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) ||
-      permissionCodes.includes(ADMIN_PERMISSIONS.TOOLS_ACCESS) ||
-      permissionCodes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
-      permissionCodes.includes(DEMODAY_PERMISSIONS.STATS_READ) ||
-      permissionCodes.includes('member.contacts.read') ||
-      permissionCodes.includes('team.membership_source.read') ||
-      permissionCodes.includes('membership.source.read') ||
-      permissionCodes.some((code) => code.startsWith('demoday.admin.'));
+    const hasBackofficeAccess = this.hasBackOfficeAccess(permissionCodes);
 
     if (!hasBackofficeAccess) {
       this.logger.warn(`Member ${member.uid} (${normalizedEmail}) does not have back-office admin role`);
@@ -239,15 +271,7 @@ export class AuthOtpService {
 
     // 3) Check that Member has back-office access via RBAC v2.1 permissions only.
     const permissionCodes = await this.getEffectivePermissionCodes(member.uid);
-    const hasBackofficeAccess =
-      permissionCodes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) ||
-      permissionCodes.includes(ADMIN_PERMISSIONS.TOOLS_ACCESS) ||
-      permissionCodes.includes(DEMODAY_PERMISSIONS.ADMIN_ALL) ||
-      permissionCodes.includes(DEMODAY_PERMISSIONS.STATS_READ) ||
-      permissionCodes.includes('member.contacts.read') ||
-      permissionCodes.includes('team.membership_source.read') ||
-      permissionCodes.includes('membership.source.read') ||
-      permissionCodes.some((code) => code.startsWith('demoday.admin.'));
+    const hasBackofficeAccess = this.hasBackOfficeAccess(permissionCodes);
 
     if (!hasBackofficeAccess) {
       this.logger.warn(`Member ${member.uid} (${email}) does not have back-office admin role`);
