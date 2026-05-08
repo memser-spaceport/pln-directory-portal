@@ -1517,10 +1517,14 @@ export class MemberService {
       where.AND = andParts;
     }
 
-    const resolvedSortField = sortBy ?? 'updatedAt';
-    const resolvedDir: Prisma.SortOrder = sortOrder ?? (resolvedSortField === 'updatedAt' ? 'desc' : 'asc');
+    const resolvedSortField = sortBy ?? 'createdAt';
+    const resolvedDir: Prisma.SortOrder = sortOrder ?? (resolvedSortField === 'name' ? 'asc' : 'desc');
     const orderBy: Prisma.MemberOrderByWithRelationInput =
-      resolvedSortField === 'name' ? { name: resolvedDir } : { updatedAt: resolvedDir };
+      resolvedSortField === 'name'
+        ? { name: resolvedDir }
+        : resolvedSortField === 'updatedAt'
+        ? { updatedAt: resolvedDir }
+        : { createdAt: resolvedDir };
 
     const members = await this.prisma.member.findMany({
       ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
@@ -1530,6 +1534,7 @@ export class MemberService {
         name: true,
         imageUid: true,
         memberRoles: true,
+        createdAt: true,
         updatedAt: true,
         image: {
           select: {

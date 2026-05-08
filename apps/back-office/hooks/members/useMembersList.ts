@@ -14,7 +14,7 @@ export interface MembersListQueryParams {
   limit?: number;
   /** Sent as search= (server filters name/email/uid/project name) */
   search?: string;
-  sortBy?: 'updatedAt' | 'name';
+  sortBy?: 'createdAt' | 'updatedAt' | 'name';
   sortOrder?: 'asc' | 'desc';
 }
 
