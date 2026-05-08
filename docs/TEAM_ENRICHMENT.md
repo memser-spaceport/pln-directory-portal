@@ -92,7 +92,7 @@ When a user later edits an enriched field, its `fieldsMeta[field].status` is fli
 
 ### Path C — Automatic marking of eligible existing teams
 
-1. A cron job (`TEAM_ENRICHMENT_MARKING_CRON`) periodically scans for **eligible** teams that have never been enriched (`dataEnrichment` is null). Eligibility is governed by `TEAM_ENRICHMENT_FILTER_PRIORITY` (see Environment Variables) — when set, teams are filtered by `priority IN (...)`; when empty/unset, teams are filtered by `isFund=true`.
+1. A cron job (`TEAM_ENRICHMENT_MARKING_CRON`) periodically scans for **eligible** teams that have never been enriched (`dataEnrichment` is null). Eligibility is governed by `TEAM_ENRICHMENT_FILTER_PRIORITY` and `TEAM_ENRICHMENT_FILTER_IS_FUND` (see Environment Variables) — active filters compose with OR. For example `PRIORITY=1,2,3` + `IS_FUND=true` selects fund teams OR priority 1/2/3 teams. With both unset/empty, eligibility falls back to `isFund=true`.
 2. Teams must also have at least one empty enrichable scalar field (website, blog, contactMethod, twitterHandler, linkedinHandler, telegramHandler, shortDescription, longDescription, moreDetails)
 3. Matching teams are marked for enrichment: `dataEnrichment = { shouldEnrich: true, status: 'PendingEnrichment', ... }`
 4. The existing enrichment cron picks them up on its next run
@@ -114,7 +114,7 @@ After enrichment completes, a separate **AI Judge** cron independently verifies 
 
 ### What the judge evaluates
 
-- Only teams matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY` set → `priority IN (...)`; otherwise `isFund=true`) and `dataEnrichment.status = Enriched`.
+- Only teams matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY` and/or `TEAM_ENRICHMENT_FILTER_IS_FUND`, OR-composed; see [Eligibility filter](#eligibility-filter)) and `dataEnrichment.status = Enriched`.
 - Per-field, the judge runs on either:
   - any field whose `fieldsMeta[field].status === Enriched`, OR
   - a **user-supplied** website / contact link (`fieldsMeta[field].status === ChangedByUser`) — restricted to: `website`, `blog`, `contactMethod`, `linkedinHandler`, `twitterHandler`, `telegramHandler`. These are the high-signal identity fields a team lead can fill in directly, and we want an independent check that the value really belongs to the team.
@@ -381,7 +381,7 @@ POST /v1/admin/teams/trigger-force-enrichment?mode=all|cannotEnrich
 Guard: AdminAuthGuard
 ```
 
-Finds all teams matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY`) with `status ∈ { Enriched, Reviewed, Approved, FailedToEnrich }` and re-queues them using the same `mode` semantics as the single-team variant.
+Finds all teams matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY` and/or `TEAM_ENRICHMENT_FILTER_IS_FUND`) with `status ∈ { Enriched, Reviewed, Approved, FailedToEnrich }` and re-queues them using the same `mode` semantics as the single-team variant.
 Teams currently `InProgress` or `PendingEnrichment` are skipped.
 Returns `{ success, total, started, skipped, message }`.
 
@@ -414,7 +414,7 @@ POST /v1/admin/teams/trigger-force-logo-refetch
 Guard: AdminAuthGuard
 ```
 
-Runs the single-team refetch for every team matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY`) with a non-empty `website` or `linkedinHandler`, regardless of current enrichment status. Teams whose logo is `ChangedByUser`, whose enrichment is `InProgress`, or which have no fetchable source are skipped with per-bucket counters.
+Runs the single-team refetch for every team matching the shared eligibility filter (`TEAM_ENRICHMENT_FILTER_PRIORITY` and/or `TEAM_ENRICHMENT_FILTER_IS_FUND`) with a non-empty `website` or `linkedinHandler`, regardless of current enrichment status. Teams whose logo is `ChangedByUser`, whose enrichment is `InProgress`, or which have no fetchable source are skipped with per-bucket counters.
 Returns `{ success, total, started, skippedInProgress, skippedUserOwned, noSource, notFound, message }`.
 
 ### AI Cost Report
@@ -490,7 +490,8 @@ The shared `isFieldUserOwned(fieldsMeta, field, slotHasValue)` helper at the top
 | Variable                            | Default             | Description                                                                                                                                                                                                |
 | ----------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `IS_TEAM_ENRICHMENT_ENABLED`        | `false`             | Enable/disable all enrichment-related cron jobs (enrichment, marking, judge)                                                                                                                               |
-| `TEAM_ENRICHMENT_FILTER_PRIORITY`   | _(unset)_           | Comma-separated list of `Team.priority` values (e.g. `1,2,3`). When set, eligibility is `priority IN (...)`. When empty or unset, eligibility is `isFund = true`.                                          |
+| `TEAM_ENRICHMENT_FILTER_PRIORITY`   | _(unset)_           | Comma-separated list of `Team.priority` values (e.g. `1,2,3`). When set, contributes a `priority IN (...)` clause to the eligibility filter. See [Eligibility filter](#eligibility-filter).                |
+| `TEAM_ENRICHMENT_FILTER_IS_FUND`    | _(unset)_           | `'true'` / `'false'` (case-insensitive). When `'true'`, contributes an `isFund = true` clause to the eligibility filter. See [Eligibility filter](#eligibility-filter).                                    |
 | `AI_PROVIDER`                       | `gemini`            | Global default AI provider. Accepts `openai`, `gemini`, or `anthropic`.                                                                                                                                    |
 | `TEAM_ENRICHMENT_AI_PROVIDER`       | —                   | Overrides `AI_PROVIDER` for team enrichment only. Accepts `openai`, `gemini`, or `anthropic`.                                                                                                              |
 | `TEAM_ENRICHMENT_JUDGE_AI_PROVIDER` | —                   | Overrides `AI_PROVIDER` for the AI Judge only. Set to a **different** value from `TEAM_ENRICHMENT_AI_PROVIDER` for a meaningful second-opinion verification (e.g. enrichment=`gemini`, judge=`anthropic`). |
@@ -513,15 +514,22 @@ The shared `isFieldUserOwned(fieldsMeta, field, slotHasValue)` helper at the top
 
 ### Eligibility filter
 
-`TEAM_ENRICHMENT_FILTER_PRIORITY` gates which teams the marking cron, force-enrich-all, force-logo-refetch-all, and the judge cron operate on:
+Two env vars gate which teams the marking cron, force-enrich-all, force-logo-refetch-all, and the judge cron operate on. Each is independently optional, and active filters compose with **OR** — i.e. a team qualifies if it matches any active clause.
 
-| Use case                  | `TEAM_ENRICHMENT_FILTER_PRIORITY` | Resulting WHERE clause  |
-| ------------------------- | --------------------------------- | ----------------------- |
-| Default — fund teams only | _(unset / empty)_                 | `isFund = true`         |
-| P1/P2/P3 teams            | `1,2,3`                           | `priority IN (1, 2, 3)` |
-| Only P1 teams             | `1`                               | `priority IN (1)`       |
+- `TEAM_ENRICHMENT_FILTER_PRIORITY` — comma-separated list of `Team.priority` values (e.g. `1,2,3`). Active when set to a non-empty list of integers. Adds `priority IN (...)`.
+- `TEAM_ENRICHMENT_FILTER_IS_FUND` — `'true'` / `'false'` (case-insensitive). Active when set to `'true'`. Adds `isFund = true`.
 
-This filter does **not** affect single-team admin endpoints (`POST /v1/admin/teams/:uid/trigger-enrichment` etc.) — those are explicit overrides and run on whatever uid is provided. Path A (Demo Day approval) and Path B (participants-request team creation) are also unaffected; they continue to mark fund / new-L1 teams regardless of this env var.
+If neither filter is active, eligibility falls back to `isFund = true` (preserves behavior of deployments predating `TEAM_ENRICHMENT_FILTER_IS_FUND`).
+
+| Use case                                | `TEAM_ENRICHMENT_FILTER_PRIORITY` | `TEAM_ENRICHMENT_FILTER_IS_FUND` | Resulting WHERE clause                     |
+| --------------------------------------- | --------------------------------- | -------------------------------- | ------------------------------------------ |
+| Default — fund teams only (back-compat) | _(unset / empty)_                 | _(unset)_                        | `isFund = true`                            |
+| Fund teams only (explicit)              | _(unset / empty)_                 | `true`                           | `isFund = true`                            |
+| P1/P2/P3 teams only                     | `1,2,3`                           | _(unset or `false`)_             | `priority IN (1, 2, 3)`                    |
+| Only P1 teams                           | `1`                               | _(unset or `false`)_             | `priority IN (1)`                          |
+| Fund teams **plus** P1/P2/P3 teams      | `1,2,3`                           | `true`                           | `priority IN (1, 2, 3) OR isFund = true`   |
+
+This filter does **not** affect single-team admin endpoints (`POST /v1/admin/teams/:uid/trigger-enrichment` etc.) — those are explicit overrides and run on whatever uid is provided. Path A (Demo Day approval) and Path B (participants-request team creation) are also unaffected; they continue to mark fund / new-L1 teams regardless of these env vars.
 
 ### AI provider selection
 
