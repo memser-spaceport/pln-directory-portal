@@ -44,14 +44,14 @@ export class TeamEnrichmentJob {
           await this.teamEnrichmentService.enrichTeam(team.uid);
           enriched++;
         } catch (error) {
-          this.logger.error(`Failed to enrich team ${team.uid} (${team.name}): ${error.message}`, error.stack);
+          this.logger.error(`Failed to enrich team ${team.uid}: ${error.message}`, error.stack);
           failed++;
         }
       }
 
       this.logger.log(
         `Team enrichment job completed: ${enriched} enriched, ${failed} failed out of ${teams.length} total. ` +
-          `Per-team token usage + USD cost is logged separately as "Enrichment usage rollup" lines and persisted on dataEnrichment.usage.`
+          `Per-team token usage + USD cost is logged separately as "Enrichment usage rollup" lines and persisted on TeamEnrichment.dataEnrichment.usage.`
       );
     } finally {
       this.isEnrichmentRunning = false;
