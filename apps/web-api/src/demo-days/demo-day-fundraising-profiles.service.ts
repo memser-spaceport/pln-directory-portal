@@ -6,6 +6,7 @@ import { AnalyticsService } from '../analytics/service/analytics.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { DEMODAY_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 
 @Injectable()
 export class DemoDayFundraisingProfilesService {
@@ -14,7 +15,8 @@ export class DemoDayFundraisingProfilesService {
     private readonly demoDaysService: DemoDaysService,
     private readonly analyticsService: AnalyticsService,
     private readonly uploadsService: UploadsService,
-    private readonly awsService: AwsService
+    private readonly awsService: AwsService,
+    private readonly teamEnrichmentService: TeamEnrichmentService
   ) {}
 
   async getCurrentDemoDayFundraisingProfileByTeamUid(
@@ -699,6 +701,9 @@ export class DemoDayFundraisingProfilesService {
     }
 
     const updateData: any = {};
+    // Subset of the changes that map to enrichable fields — used to flip fieldsMeta to
+    // ChangedByUser on TeamEnrichment in the same transaction as the Team update.
+    const enrichableChanges: Record<string, unknown> = {};
 
     if (data.name) {
       updateData.name = data.name;
@@ -706,14 +711,17 @@ export class DemoDayFundraisingProfilesService {
 
     if (data.shortDescription) {
       updateData.shortDescription = data.shortDescription;
+      enrichableChanges.shortDescription = data.shortDescription;
     }
 
     if (data.website) {
       updateData.website = data.website;
+      enrichableChanges.website = data.website;
     }
 
     if (data.logo) {
       updateData.logoUid = data.logo;
+      enrichableChanges.logo = data.logo;
     }
 
     if (data.fundingStage) {
@@ -724,12 +732,19 @@ export class DemoDayFundraisingProfilesService {
       updateData.industryTags = {
         set: data.industryTags.map((uid) => ({ uid })),
       };
+      enrichableChanges.industryTags = data.industryTags;
     }
 
-    // Update team
-    await this.prisma.team.update({
-      where: { uid: teamUid },
-      data: updateData,
+    // Update team + flip enrichment fieldsMeta atomically so the user's edits are tracked
+    // and future enrichment runs won't overwrite them.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.team.update({
+        where: { uid: teamUid },
+        data: updateData,
+      });
+      if (Object.keys(enrichableChanges).length > 0) {
+        await this.teamEnrichmentService.handleUserFieldChange(teamUid, enrichableChanges, tx);
+      }
     });
 
     // Update program on team fundraising profile if provided

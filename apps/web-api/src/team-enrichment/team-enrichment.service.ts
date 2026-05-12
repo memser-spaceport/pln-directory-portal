@@ -1000,9 +1000,19 @@ export class TeamEnrichmentService {
   }
 
   /**
-   * Called from the team-update flow (participants-request) when a user edits team fields.
-   * The fieldsMeta lives on TeamEnrichment.dataEnrichment, so we read/write the
-   * TeamEnrichment row here — never Team.
+   * Called from any team-update flow (participants-request, profile-update, demo-day
+   * fundraising profile) when a user edits enrichable team fields. The fieldsMeta lives
+   * on TeamEnrichment.dataEnrichment, so we read/write the TeamEnrichment row here —
+   * never Team.
+   *
+   * Supported fields: every key in `FieldMetaKey` — scalars (website, blog, contactMethod,
+   * social handles, descriptions, moreDetails), relational arrays (`industryTags`,
+   * `investmentFocus`), and `logo`. Each is flipped to `ChangedByUser` when:
+   *   - the prior status was `Enriched` (regardless of the new value), OR
+   *   - the prior status was `CannotEnrich` AND the user supplied a non-empty value.
+   *
+   * "Non-empty" depends on the field's value shape: trimmed string for scalars / logo,
+   * `length > 0` for arrays. Anything else (numbers, null, undefined) is treated as empty.
    */
   async handleUserFieldChange(
     teamUid: string,
@@ -1020,27 +1030,32 @@ export class TeamEnrichmentService {
     if (!meta || !meta.isAIGenerated) return;
     if (!meta.fieldsMeta) meta.fieldsMeta = {};
 
+    const trackedFields = new Set<FieldMetaKey>([...ENRICHABLE_TEAM_FIELDS, 'industryTags', 'investmentFocus', 'logo']);
+
+    const isNonEmpty = (value: unknown): boolean => {
+      if (Array.isArray(value)) return value.length > 0;
+      if (typeof value === 'string') return value.trim() !== '';
+      return false;
+    };
+
     const flipped: string[] = [];
     for (const [field, newValue] of Object.entries(changedFieldValues)) {
-      if (!ENRICHABLE_TEAM_FIELDS.includes(field as EnrichableTeamField)) continue;
-      const currentStatus = meta.fieldsMeta[field as EnrichableTeamField]?.status;
+      if (!trackedFields.has(field as FieldMetaKey)) continue;
+      const key = field as FieldMetaKey;
+      const currentStatus = meta.fieldsMeta[key]?.status;
 
       if (currentStatus === FieldEnrichmentStatus.Enriched) {
-        meta.fieldsMeta[field as EnrichableTeamField] = {
-          ...meta.fieldsMeta[field as EnrichableTeamField],
+        meta.fieldsMeta[key] = {
+          ...meta.fieldsMeta[key],
           status: FieldEnrichmentStatus.ChangedByUser,
         };
         flipped.push(field);
         continue;
       }
 
-      if (
-        currentStatus === FieldEnrichmentStatus.CannotEnrich &&
-        typeof newValue === 'string' &&
-        newValue.trim() !== ''
-      ) {
-        meta.fieldsMeta[field as EnrichableTeamField] = {
-          ...meta.fieldsMeta[field as EnrichableTeamField],
+      if (currentStatus === FieldEnrichmentStatus.CannotEnrich && isNonEmpty(newValue)) {
+        meta.fieldsMeta[key] = {
+          ...meta.fieldsMeta[key],
           status: FieldEnrichmentStatus.ChangedByUser,
         };
         flipped.push(field);
