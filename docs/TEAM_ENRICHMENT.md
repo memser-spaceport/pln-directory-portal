@@ -72,11 +72,35 @@ interface TeamDataEnrichment {
         confidence?: 'high' | 'medium' | 'low';
         source?: 'ai' | 'open-graph' | 'scrapingdog';
         judgment?: FieldJudgment;
+        lastModifiedAt?: string;       // ISO timestamp of the most recent VALUE write
       }
     >
   >;
 }
 ```
+
+### Per-field last-modified tracking
+
+Each `fieldsMeta[<field>]` carries a `lastModifiedAt` ISO timestamp updated whenever the field's **value** is touched. Who wrote the value is derivable from `status` — there is no separate "modified by" field:
+
+| `status`        | Implied modifier                                                |
+| --------------- | --------------------------------------------------------------- |
+| `Enriched`      | AI wrote the value (`source` carries the sub-channel)           |
+| `ChangedByUser` | user wrote the value                                            |
+| `CannotEnrich`  | AI declared the field unsalvageable                             |
+
+`lastModifiedAt` is stamped from these paths:
+
+- Enrichment pipeline `doEnrichTeam`: every Enriched / CannotEnrich write (scalars, industryTags, investmentFocus, logo).
+- ScrapingDog fallback (`maybeEnrichViaScrapingDog`): every field it fills, plus the bad-LinkedIn-handle nulling path.
+- Logo refetch (`doRefetchLogo`).
+- `handleUserFieldChange`: when a user edit flips an Enriched / CannotEnrich field to ChangedByUser. Called from participants-request team updates, `PATCH /v1/teams/:uid/profile-update`, and `PATCH /demo-days/:slug/teams/:teamUid/fundraising-profile/team`.
+
+**The judge never touches `lastModifiedAt`** — even on its `nullBadLinkedinHandle` path. The judge owns `judgment` and the promotion-to-Team step; `lastModifiedAt` belongs to the enrichment + user-edit paths. When the judge invalidates a bad LinkedIn handle, it flips the status to `CannotEnrich` but leaves the prior `lastModifiedAt` in place; the next enrichment run will refresh it when retrying the field.
+
+The **pre-existing user-data discovery** branches in `doEnrichTeam` (where the enrichment loop notices a non-empty Team column with no prior `Enriched` meta and flips to `ChangedByUser`) preserve any prior timestamp rather than fabricating a "now" stamp — the user's actual edit happened earlier and we honestly don't know when. Use the absence of `lastModifiedAt` as a "pre-tracking / very old" signal.
+
+Use case: query `fieldsMeta[<field>].lastModifiedAt < (now - threshold)` to surface stale enrichment for re-run. Combine with `status` to distinguish stale-AI from stale-user data (e.g. `status = 'Enriched' AND lastModifiedAt < 60d ago` → AI hasn't refreshed in 60 days).
 
 > **Note:** The legacy `fields` property (a simple `field → status` map) may still exist in older records but is superseded by `fieldsMeta`, which includes the same `status` along with `confidence` and `source`. New code should use `fieldsMeta` exclusively.
 

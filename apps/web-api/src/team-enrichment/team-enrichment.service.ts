@@ -53,6 +53,15 @@ function isFieldUserOwned(
   return false;
 }
 
+/**
+ * Stamp a fresh `lastModifiedAt` on a fieldsMeta entry. Call this at every site that
+ * writes a value (enrichment, ScrapingDog fill, AI giving up on a field, user edit, logo
+ * refetch, bad-LinkedIn-handle nulling).
+ */
+function stampModified<T extends FieldEnrichmentMeta>(meta: T, at: string): T {
+  return { ...meta, lastModifiedAt: at };
+}
+
 function toConfidence(raw: unknown): FieldConfidence | undefined {
   if (typeof raw !== 'string') return undefined;
   const v = raw.toLowerCase();
@@ -533,12 +542,16 @@ export class TeamEnrichmentService {
       const restoredStatus =
         priorStatus && priorStatus !== EnrichmentStatus.InProgress ? priorStatus : EnrichmentStatus.Enriched;
 
+      const now = new Date().toISOString();
       const mergedFieldsMeta: FieldsMetaMap = {
         ...existingFieldsMeta,
-        logo: {
-          ...(existingFieldsMeta.logo ?? {}),
-          ...newLogoMeta,
-        } as FieldEnrichmentMeta,
+        logo: stampModified(
+          {
+            ...(existingFieldsMeta.logo ?? {}),
+            ...newLogoMeta,
+          } as FieldEnrichmentMeta,
+          now
+        ),
       };
 
       const enrichment: TeamDataEnrichment = {
@@ -899,6 +912,9 @@ export class TeamEnrichmentService {
       } else if (logoIsUserOwned) {
         this.logger.log(`Team ${teamUid} (${team.name}) logo is user-owned, skipping logo fetch`);
         if (!existingFieldsMeta.logo) {
+          // Pre-existing user logo discovered — set status=ChangedByUser only. The merge step
+          // skips stamping for ChangedByUser writes (the user's upload happened earlier, we
+          // honestly don't know when).
           newFieldsMeta.logo = { status: FieldEnrichmentStatus.ChangedByUser };
         }
       } else if (team.logoUid) {
@@ -920,6 +936,7 @@ export class TeamEnrichmentService {
         forceOverwrite,
       });
 
+      const now = new Date().toISOString();
       const mergedFieldsMeta: FieldsMetaMap = { ...existingFieldsMeta };
       for (const [field, fresh] of Object.entries(newFieldsMeta) as Array<
         [FieldMetaKey, FieldEnrichmentMeta | undefined]
@@ -929,10 +946,15 @@ export class TeamEnrichmentService {
         const freshDefined = Object.fromEntries(
           Object.entries(fresh).filter(([, v]) => v !== undefined)
         ) as Partial<FieldEnrichmentMeta>;
-        mergedFieldsMeta[field] = {
+        let merged: FieldEnrichmentMeta = {
           ...(prior ?? {}),
           ...freshDefined,
         } as FieldEnrichmentMeta;
+        // Stamp `lastModifiedAt` only when the value actually changed this run.
+        if (merged.status !== FieldEnrichmentStatus.ChangedByUser) {
+          merged = stampModified(merged, now);
+        }
+        mergedFieldsMeta[field] = merged;
       }
 
       const mergedEnrichmentUsage = mergeUsageEntries(existingMeta?.usage?.enrichment, enrichmentUsage);
@@ -1038,6 +1060,7 @@ export class TeamEnrichmentService {
       return false;
     };
 
+    const now = new Date().toISOString();
     const flipped: string[] = [];
     for (const [field, newValue] of Object.entries(changedFieldValues)) {
       if (!trackedFields.has(field as FieldMetaKey)) continue;
@@ -1045,19 +1068,25 @@ export class TeamEnrichmentService {
       const currentStatus = meta.fieldsMeta[key]?.status;
 
       if (currentStatus === FieldEnrichmentStatus.Enriched) {
-        meta.fieldsMeta[key] = {
-          ...meta.fieldsMeta[key],
-          status: FieldEnrichmentStatus.ChangedByUser,
-        };
+        meta.fieldsMeta[key] = stampModified(
+          {
+            ...meta.fieldsMeta[key],
+            status: FieldEnrichmentStatus.ChangedByUser,
+          },
+          now
+        );
         flipped.push(field);
         continue;
       }
 
       if (currentStatus === FieldEnrichmentStatus.CannotEnrich && isNonEmpty(newValue)) {
-        meta.fieldsMeta[key] = {
-          ...meta.fieldsMeta[key],
-          status: FieldEnrichmentStatus.ChangedByUser,
-        };
+        meta.fieldsMeta[key] = stampModified(
+          {
+            ...meta.fieldsMeta[key],
+            status: FieldEnrichmentStatus.ChangedByUser,
+          },
+          now
+        );
         flipped.push(field);
       }
     }
