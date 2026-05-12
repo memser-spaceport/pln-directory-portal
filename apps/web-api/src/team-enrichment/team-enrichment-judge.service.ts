@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../shared/prisma.service';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
 import { JudgeFieldInput, JudgeTeamContext, TeamEnrichmentJudgeAiService } from './team-enrichment-judge-ai.service';
+import { buildPromotionPayload, executePromotion } from './team-enrichment-promotion';
 import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import {
   AIUsageEntry,
@@ -87,22 +87,6 @@ const USER_JUDGABLE_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey
   'twitterHandler',
   'linkedinHandler',
   'telegramHandler',
-]);
-
-/**
- * Scalars on Team the judge can promote directly. `industryTags` (needs title→IndustryTag
- * resolution) and `investmentFocus` (lives on InvestorProfile, not Team) are handled separately.
- */
-const PROMOTABLE_SCALAR_FIELDS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey>([
-  'website',
-  'blog',
-  'contactMethod',
-  'twitterHandler',
-  'linkedinHandler',
-  'telegramHandler',
-  'shortDescription',
-  'longDescription',
-  'moreDetails',
 ]);
 
 const URL_REQUIRED_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey>(['website', 'blog']);
@@ -461,7 +445,10 @@ export class TeamEnrichmentJudgeService {
 
       // Promote high-confidence values from TeamEnrichment → Team in a single transaction with
       // the dataEnrichment write so the promotion is atomic with the verdict.
-      const promotion = await this.buildPromotionPayload(team, allVerdicts, mergedFieldsMeta);
+      const promotableKeys = (Object.entries(allVerdicts) as Array<[FieldMetaKey, FieldJudgment | undefined]>)
+        .filter(([, v]) => v?.verdict === JudgmentVerdict.Agrees && v?.confidence === 'high')
+        .map(([k]) => k);
+      const promotion = await buildPromotionPayload(this.prisma, team.teamEnrichment, promotableKeys, mergedFieldsMeta);
 
       await this.prisma.$transaction(async (tx) => {
         await tx.teamEnrichment.update({
@@ -470,28 +457,7 @@ export class TeamEnrichmentJudgeService {
         });
 
         if (promotion.teamUpdate || promotion.investmentFocus !== null) {
-          if (promotion.teamUpdate) {
-            await tx.team.update({
-              where: { uid: teamUid },
-              data: promotion.teamUpdate,
-            });
-          }
-          if (promotion.investmentFocus !== null) {
-            // Promote enriched investmentFocus onto InvestorProfile (or create if absent).
-            if (team.investorProfile) {
-              await tx.investorProfile.update({
-                where: { uid: team.investorProfile.uid },
-                data: { investmentFocus: promotion.investmentFocus },
-              });
-            } else {
-              await tx.investorProfile.create({
-                data: {
-                  investmentFocus: promotion.investmentFocus,
-                  team: { connect: { uid: teamUid } },
-                },
-              });
-            }
-          }
+          await executePromotion(tx, teamUid, team, promotion);
         }
       });
 
@@ -512,77 +478,6 @@ export class TeamEnrichmentJudgeService {
         errorMessage: error.message,
       });
     }
-  }
-
-  /**
-   * Promote AI candidates from TeamEnrichment to Team whenever the judge agreed at high
-   * confidence on an Enriched field. ChangedByUser fields are never promoted — the user's
-   * value already lives on Team and the candidate (if any) on TeamEnrichment is informational.
-   * Logo is excluded by design (not judged; binary presence not a semantic value).
-   */
-  private async buildPromotionPayload(
-    team: TeamRecord,
-    verdicts: Partial<Record<FieldMetaKey, FieldJudgment>>,
-    mergedFieldsMeta: FieldsMetaMap
-  ): Promise<{
-    teamUpdate: Prisma.TeamUpdateInput | null;
-    investmentFocus: string[] | null;
-    promotedFields: string[];
-  }> {
-    const enrichmentRow = team.teamEnrichment;
-    if (!enrichmentRow) {
-      return { teamUpdate: null, investmentFocus: null, promotedFields: [] };
-    }
-
-    const teamUpdate: Prisma.TeamUpdateInput = {};
-    let investmentFocus: string[] | null = null;
-    const promotedFields: string[] = [];
-
-    for (const [key, verdict] of Object.entries(verdicts) as Array<[FieldMetaKey, FieldJudgment | undefined]>) {
-      if (!verdict) continue;
-      if (verdict.verdict !== JudgmentVerdict.Agrees) continue;
-      if (verdict.confidence !== 'high') continue;
-      const fieldMeta = mergedFieldsMeta[key];
-      if (fieldMeta?.status !== FieldEnrichmentStatus.Enriched) continue;
-
-      if (PROMOTABLE_SCALAR_FIELDS.has(key)) {
-        const candidate = (enrichmentRow as any)[key] as string | null;
-        if (!candidate || candidate.trim() === '') continue;
-        (teamUpdate as any)[key] = candidate;
-        promotedFields.push(key);
-        continue;
-      }
-
-      if (key === 'industryTags') {
-        const candidateTitles = enrichmentRow.industryTags ?? [];
-        if (candidateTitles.length === 0) continue;
-        // Resolve titles → IndustryTag rows at promotion-time. Any title that no longer
-        // matches an IndustryTag is silently dropped (the row may have been renamed/deleted
-        // between enrichment and judge).
-        const resolved = await this.prisma.industryTag.findMany({
-          where: { title: { in: candidateTitles, mode: 'insensitive' } },
-          select: { uid: true },
-        });
-        if (resolved.length === 0) continue;
-        teamUpdate.industryTags = { set: resolved.map((t) => ({ uid: t.uid })) };
-        promotedFields.push('industryTags');
-        continue;
-      }
-
-      if (key === 'investmentFocus') {
-        const candidate = enrichmentRow.investmentFocus ?? [];
-        if (candidate.length === 0) continue;
-        investmentFocus = candidate;
-        promotedFields.push('investmentFocus');
-        continue;
-      }
-    }
-
-    return {
-      teamUpdate: Object.keys(teamUpdate).length > 0 ? teamUpdate : null,
-      investmentFocus,
-      promotedFields,
-    };
   }
 
   /**

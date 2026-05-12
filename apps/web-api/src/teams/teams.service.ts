@@ -1594,6 +1594,8 @@ export class TeamsService {
 
           if (website !== undefined) {
             await tx.team.update({ where: { uid: teamUid }, data: { website } });
+            // Notify enrichment that the user owns this value now so future runs don't overwrite it.
+            await this.teamEnrichmentService.handleUserFieldChange(teamUid, { website }, tx);
           }
         }
       }
