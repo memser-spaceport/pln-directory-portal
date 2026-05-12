@@ -20,7 +20,12 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 
 import { AdminTeamsService } from './admin-teams.service';
-import { TriggerForceEnrichmentQueryDto, UploadTeamTiersQueryDto } from './schema/admin-teams';
+import {
+  ApproveEnrichmentFieldsBodyDto,
+  EnrichmentReviewQueryDto,
+  TriggerForceEnrichmentQueryDto,
+  UploadTeamTiersQueryDto,
+} from './schema/admin-teams';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { TeamEnrichmentJudgeService } from '../team-enrichment/team-enrichment-judge.service';
 import { TeamEnrichmentReportService } from '../team-enrichment/team-enrichment-report.service';
@@ -94,6 +99,37 @@ export class AdminTeamsController {
     }
     await this.teamEnrichmentService.reviewEnrichment(uid, body.status, req?.userEmail ?? 'admin');
     return { success: true };
+  }
+
+  /**
+   * Paginated list of teams whose enrichment has at least one reviewable field —
+   * any `fieldsMeta[k].judgment.confidence !== 'high'`, or a latest logo verification
+   * whose `confidence !== 'high'`. Only teams in `EnrichmentStatus.Enriched` are included.
+   */
+  @Get('enrichment-review')
+  @NoCache()
+  async listEnrichmentsForReview(@Query(new ZodValidationPipe()) query: EnrichmentReviewQueryDto) {
+    return this.teamEnrichmentService.listEnrichmentsForReview({
+      page: query.page,
+      pageSize: query.pageSize,
+    });
+  }
+
+  /**
+   * Approve a list of enrichment fields for a team. Promotes the candidate values from
+   * TeamEnrichment to Team (scalars + industryTags M2M + InvestorProfile.investmentFocus +
+   * Team.logoUid), normalizes per-field judgment metadata (verdict=agrees, confidence=high,
+   * score=90), flips `dataEnrichment.status` to `Reviewed`, and on logo approval also marks
+   * the latest TeamLogoVerificationResult row `verified` at high confidence.
+   */
+  @Patch('/:uid/enrichment-review/fields')
+  @NoCache()
+  async approveEnrichmentFields(
+    @Param('uid') uid: string,
+    @Body(new ZodValidationPipe()) body: ApproveEnrichmentFieldsBodyDto,
+    @Req() req: any
+  ) {
+    return this.teamEnrichmentService.approveEnrichmentFields(uid, body.fields, req?.userEmail ?? 'admin');
   }
 
   @Post('/:uid/trigger-enrichment')

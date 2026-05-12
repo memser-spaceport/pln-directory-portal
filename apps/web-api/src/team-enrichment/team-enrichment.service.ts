@@ -5,6 +5,7 @@ import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
+import { buildPromotionPayload, executePromotion } from './team-enrichment-promotion';
 import { ScrapingDogCompanyProfile, TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import {
   ENRICHABLE_TEAM_FIELDS,
@@ -17,9 +18,44 @@ import {
   FieldJudgment,
   FieldMetaKey,
   ForceEnrichmentMode,
+  JudgmentSource,
   JudgmentVerdict,
   TeamDataEnrichment,
 } from './team-enrichment.types';
+
+export type EnrichmentReviewFieldEntry = {
+  content: string | string[];
+  metadata: { source?: EnrichmentSource; lastModifiedAt?: string };
+  judgment: { note?: string; score?: number };
+  promotable: boolean;
+};
+
+export type EnrichmentReviewLogo = {
+  content: { uid: string; url: string } | null;
+  metadata: { source?: EnrichmentSource; lastModifiedAt?: string };
+  verification: {
+    verdict: string;
+    confidence: string;
+    reason: string | null;
+    verifiedAt: string;
+  } | null;
+  promotable: boolean;
+};
+
+export type EnrichmentReviewItem = {
+  uid: string;
+  name: string;
+  enrichmentStatus: EnrichmentStatus;
+  fields: Partial<Record<FieldMetaKey, EnrichmentReviewFieldEntry>>;
+  logo?: EnrichmentReviewLogo;
+};
+
+export type ApproveEnrichmentFieldsResult = {
+  success: boolean;
+  promoted: string[];
+  skipped: Array<{ field: string; reason: string }>;
+  message?: string;
+};
 
 const CONFIDENCE_RANK: Record<string, number> = {
   low: 1,
@@ -1117,6 +1153,315 @@ export class TeamEnrichmentService {
     });
 
     this.logger.log(`Enrichment for team ${teamUid} marked as ${action} by ${reviewerEmail}`);
+  }
+
+  /**
+   * Paginated list of teams whose enrichment has at least one reviewable item:
+   *  - any `fieldsMeta[k].judgment.confidence` is medium/low (k ∈ scalars + industryTags + investmentFocus), OR
+   *  - latest `TeamLogoVerificationResult` row has `confidence !== 'high'`.
+   *
+   * Only teams whose top-level `dataEnrichment.status === 'Enriched'` are considered — Reviewed /
+   * Approved / PendingEnrichment / InProgress / FailedToEnrich are out of scope.
+   *
+   * Per-field rules:
+   *  - high-confidence fields are hidden (already promoted by judge)
+   *  - empty candidates are excluded
+   *  - ChangedByUser fields are surfaced with `promotable: false`
+   */
+  async listEnrichmentsForReview(params: { page?: number; pageSize?: number }): Promise<{
+    pagination: { page: number; pageSize: number; totalTeams: number; totalPages: number };
+    teams: EnrichmentReviewItem[];
+  }> {
+    const pageSize = Math.min(Math.max(params.pageSize ?? 20, 1), 100);
+    const requestedPage = Math.max(params.page ?? 1, 1);
+
+    const rows = await this.prisma.teamEnrichment.findMany({
+      where: { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched } },
+      select: {
+        teamUid: true,
+        team: { select: { uid: true, name: true } },
+        website: true,
+        blog: true,
+        contactMethod: true,
+        twitterHandler: true,
+        linkedinHandler: true,
+        telegramHandler: true,
+        shortDescription: true,
+        longDescription: true,
+        moreDetails: true,
+        logoUid: true,
+        logo: { select: { uid: true, url: true } },
+        investmentFocus: true,
+        industryTags: true,
+        dataEnrichment: true,
+      },
+      orderBy: { team: { name: 'asc' } },
+    });
+
+    if (rows.length === 0) {
+      return {
+        pagination: { page: 1, pageSize, totalTeams: 0, totalPages: 0 },
+        teams: [],
+      };
+    }
+
+    const teamUids = rows.map((r) => r.teamUid);
+    const grouped = await this.prisma.teamLogoVerificationResult.groupBy({
+      by: ['teamUid'],
+      where: { teamUid: { in: teamUids } },
+      _max: { createdAt: true },
+    });
+    const latestPairs = grouped
+      .filter((g): g is typeof g & { _max: { createdAt: Date } } => g._max.createdAt !== null)
+      .map((g) => ({ teamUid: g.teamUid, createdAt: g._max.createdAt }));
+    const latestRows =
+      latestPairs.length === 0
+        ? []
+        : await this.prisma.teamLogoVerificationResult.findMany({
+            where: { OR: latestPairs.map((p) => ({ teamUid: p.teamUid, createdAt: p.createdAt })) },
+            select: {
+              teamUid: true,
+              verdict: true,
+              confidence: true,
+              reason: true,
+              createdAt: true,
+            },
+          });
+    const latestByTeam = new Map<string, typeof latestRows[number]>();
+    for (const lv of latestRows) latestByTeam.set(lv.teamUid, lv);
+
+    const items: EnrichmentReviewItem[] = [];
+    for (const row of rows) {
+      const meta = this.parseEnrichmentMeta(row.dataEnrichment);
+      if (!meta?.fieldsMeta) continue;
+
+      const fields: EnrichmentReviewItem['fields'] = {};
+      for (const [keyStr, fieldMeta] of Object.entries(meta.fieldsMeta) as Array<
+        [FieldMetaKey, FieldEnrichmentMeta | undefined]
+      >) {
+        if (!fieldMeta?.judgment) continue;
+        if (keyStr === 'logo') continue;
+        if (fieldMeta.judgment.confidence === FieldConfidence.High) continue;
+
+        const candidate = (row as any)[keyStr];
+        if (candidate === null || candidate === undefined) continue;
+        if (typeof candidate === 'string' && candidate.trim() === '') continue;
+        if (Array.isArray(candidate) && candidate.length === 0) continue;
+
+        fields[keyStr] = {
+          content: candidate,
+          metadata: { source: fieldMeta.source, lastModifiedAt: fieldMeta.lastModifiedAt },
+          judgment: { note: fieldMeta.judgment.note, score: fieldMeta.judgment.score },
+          promotable: fieldMeta.status !== FieldEnrichmentStatus.ChangedByUser,
+        };
+      }
+
+      let logo: EnrichmentReviewLogo | undefined;
+      const logoMeta = meta.fieldsMeta.logo;
+      const latestLogoVerif = latestByTeam.get(row.teamUid);
+      const logoConfidenceLow = !!latestLogoVerif && latestLogoVerif.confidence !== 'high';
+      if (row.logoUid && logoConfidenceLow) {
+        logo = {
+          content: row.logo ? { uid: row.logo.uid, url: row.logo.url } : null,
+          metadata: { source: logoMeta?.source, lastModifiedAt: logoMeta?.lastModifiedAt },
+          verification: latestLogoVerif
+            ? {
+                verdict: latestLogoVerif.verdict,
+                confidence: latestLogoVerif.confidence,
+                reason: latestLogoVerif.reason,
+                verifiedAt: latestLogoVerif.createdAt.toISOString(),
+              }
+            : null,
+          promotable: logoMeta?.status !== FieldEnrichmentStatus.ChangedByUser,
+        };
+      }
+
+      if (Object.keys(fields).length === 0 && !logo) continue;
+
+      items.push({
+        uid: row.team.uid,
+        name: row.team.name,
+        enrichmentStatus: meta.status,
+        fields,
+        ...(logo ? { logo } : {}),
+      });
+    }
+
+    const totalTeams = items.length;
+    const totalPages = totalTeams === 0 ? 0 : Math.ceil(totalTeams / pageSize);
+    const page = totalPages === 0 ? 1 : Math.min(requestedPage, totalPages);
+    const start = (page - 1) * pageSize;
+    return {
+      pagination: { page, pageSize, totalTeams, totalPages },
+      teams: items.slice(start, start + pageSize),
+    };
+  }
+
+  /**
+   * Approve a specific set of enrichment fields (and optionally `logo`) for one team.
+   *
+   * For each approved field:
+   *  - copy the candidate value from TeamEnrichment to Team (scalars), or set the M2M
+   *    (industryTags), or upsert InvestorProfile.investmentFocus, or set Team.logoUid (logo) —
+   *    via the shared promotion helpers, so the write path matches the AI judge's.
+   *  - normalize `fieldsMeta[field].judgment` to `{ verdict: 'agrees', confidence: 'high', score: 90 }`
+   *    while preserving `note` and `judgedVia` (audit signal).
+   *  - drop the field from team-level `dataEnrichment.judgment.fieldsForReview`.
+   *
+   * Team-level: flip `dataEnrichment.status` to `Reviewed`, write `reviewedAt` / `reviewedBy`.
+   *
+   * Logo approval also mutates the latest `TeamLogoVerificationResult` row for the team
+   * (any provider, newest by createdAt) → `verdict='verified'`, `confidence='high'`. Other columns
+   * (reason, brandSignals, rawResponse, predictedCompanyName, quality, hasReadableText, model,
+   * provider) are left verbatim as the model's snapshot.
+   *
+   * Skipped fields are returned with a `reason` (`user_owned`, `not_enriched`, `no_field_meta`,
+   * `empty_candidate`) so the caller can surface partial outcomes.
+   */
+  async approveEnrichmentFields(
+    teamUid: string,
+    fields: string[],
+    reviewerEmail: string
+  ): Promise<ApproveEnrichmentFieldsResult> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: TEAM_WITH_ENRICHMENT_SELECT,
+    });
+    if (!team) {
+      return { success: false, promoted: [], skipped: [], message: `Team ${teamUid} not found` };
+    }
+    if (!team.teamEnrichment) {
+      return {
+        success: false,
+        promoted: [],
+        skipped: [],
+        message: `Team ${teamUid} has no enrichment row`,
+      };
+    }
+    const meta = this.parseEnrichmentMeta(team.teamEnrichment.dataEnrichment);
+    if (!meta) {
+      return {
+        success: false,
+        promoted: [],
+        skipped: [],
+        message: `Team ${teamUid} has no enrichment data`,
+      };
+    }
+    if (meta.status === EnrichmentStatus.InProgress) {
+      return {
+        success: false,
+        promoted: [],
+        skipped: [],
+        message: `Enrichment already in progress for team ${teamUid}`,
+      };
+    }
+
+    const fieldsMeta = meta.fieldsMeta ?? {};
+    const skipped: Array<{ field: string; reason: string }> = [];
+    const promotableKeys: FieldMetaKey[] = [];
+
+    for (const f of fields) {
+      const key = f as FieldMetaKey;
+      const fm = fieldsMeta[key];
+      if (!fm) {
+        skipped.push({ field: f, reason: 'no_field_meta' });
+        continue;
+      }
+      if (fm.status === FieldEnrichmentStatus.ChangedByUser) {
+        skipped.push({ field: f, reason: 'user_owned' });
+        continue;
+      }
+      if (fm.status !== FieldEnrichmentStatus.Enriched) {
+        skipped.push({ field: f, reason: 'not_enriched' });
+        continue;
+      }
+      promotableKeys.push(key);
+    }
+
+    if (promotableKeys.length === 0) {
+      return { success: true, promoted: [], skipped, message: 'No promotable fields' };
+    }
+
+    const promotion = await buildPromotionPayload(this.prisma, team.teamEnrichment, promotableKeys, fieldsMeta);
+    const promotedSet = new Set<string>(promotion.promotedFields);
+    for (const requested of promotableKeys) {
+      if (!promotedSet.has(requested)) {
+        skipped.push({ field: requested, reason: 'empty_candidate' });
+      }
+    }
+
+    if (promotion.promotedFields.length === 0) {
+      return { success: true, promoted: [], skipped, message: 'No values to promote' };
+    }
+
+    const newFieldsMeta: FieldsMetaMap = { ...fieldsMeta };
+    for (const k of promotion.promotedFields) {
+      const existing = newFieldsMeta[k];
+      if (!existing) continue;
+      newFieldsMeta[k] = {
+        ...existing,
+        judgment: {
+          note: existing.judgment?.note,
+          judgedVia: existing.judgment?.judgedVia ?? JudgmentSource.AI,
+          verdict: JudgmentVerdict.Agrees,
+          confidence: FieldConfidence.High,
+          score: 90,
+        },
+      };
+    }
+
+    const updatedTeamJudgment = meta.judgment
+      ? {
+          ...meta.judgment,
+          fieldsForReview: (meta.judgment.fieldsForReview ?? []).filter((f) => !promotedSet.has(f)),
+        }
+      : meta.judgment;
+
+    const updated: TeamDataEnrichment = {
+      ...meta,
+      fieldsMeta: newFieldsMeta,
+      judgment: updatedTeamJudgment,
+      status: EnrichmentStatus.Reviewed,
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: reviewerEmail,
+    };
+
+    let latestLogoVerificationUid: string | null = null;
+    if (promotedSet.has('logo')) {
+      const latest = await this.prisma.teamLogoVerificationResult.findFirst({
+        where: { teamUid },
+        orderBy: { createdAt: 'desc' },
+        select: { uid: true },
+      });
+      latestLogoVerificationUid = latest?.uid ?? null;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.teamEnrichment.update({
+        where: { teamUid },
+        data: { dataEnrichment: updated as any },
+      });
+      await executePromotion(tx, teamUid, team, promotion);
+      if (latestLogoVerificationUid) {
+        await tx.teamLogoVerificationResult.update({
+          where: { uid: latestLogoVerificationUid },
+          data: { verdict: 'verified', confidence: 'high' },
+        });
+      }
+    });
+
+    this.logger.log(
+      `Admin enrichment approve: team ${teamUid} promoted=[${promotion.promotedFields.join(
+        ','
+      )}] reviewer=${reviewerEmail}`
+    );
+
+    return {
+      success: true,
+      promoted: promotion.promotedFields,
+      skipped,
+      message: `Approved ${promotion.promotedFields.length} field(s) for team ${teamUid}`,
+    };
   }
 
   private async maybeEnrichViaScrapingDog(ctx: {
