@@ -70,7 +70,9 @@ model Team {
   accessLevel                  String?                       @default("L1")
   accessLevelUpdatedAt         DateTime                      @default(now())
   eventAssociations            PLEventAssociation[]
-  dataEnrichment               Json? /// AI enrichment metadata
+  /// AI enrichment lives on TeamEnrichment; only judge-confirmed high-confidence
+  /// values flow back to this table.
+  teamEnrichment               TeamEnrichment?
   logoVerificationResults      TeamLogoVerificationResult[]
 
   vendorDeals             Deal[]           @relation("DealVendorTeam")
@@ -498,6 +500,7 @@ model Image {
   dealSubmissionLogos     DealSubmission[]             @relation("DealSubmissionLogo")
   articleCoverImages      Article[]                    @relation("ArticleCoverImage")
   logoVerificationResults TeamLogoVerificationResult[]
+  teamEnrichmentLogos     TeamEnrichment[]
 }
 
 model Faq {
@@ -1909,6 +1912,50 @@ model TeamLogoVerificationResult {
   @@index([teamUid, createdAt])
   @@index([teamUid, provider])
   @@index([logoUid])
+}
+
+/// Holds AI-enriched values for a team. The Team row only receives a value once
+/// the AI judge confirms it at high confidence; everything else (including
+/// enrichment state, fieldsMeta, judgment, scrapingDog metadata, and AI cost
+/// usage) lives here.
+model TeamEnrichment {
+  id      Int    @id @default(autoincrement())
+  uid     String @unique @default(cuid())
+  teamUid String @unique
+  team    Team   @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+
+  // Enriched scalar candidates — mirror Team's enrichable columns.
+  website          String?
+  blog             String?
+  contactMethod    String?
+  twitterHandler   String?
+  linkedinHandler  String?
+  telegramHandler  String?
+  shortDescription String?
+  longDescription  String?
+  moreDetails      String?
+
+  // Enriched logo candidate (promoted to Team.logoUid on high-confidence judgment).
+  logo    Image?  @relation(fields: [logoUid], references: [uid])
+  logoUid String?
+
+  // Enriched relational candidates. Stored as plain string arrays (matches investmentFocus's
+  // shape and avoids an extra join table for ~1K teams). The judge looks up the matching
+  // IndustryTag rows by title at promotion-time.
+  industryTags    String[] @default([])
+  investmentFocus String[] @default([])
+
+  /// Full enrichment metadata: shouldEnrich, status, fieldsMeta, scrapingDog,
+  /// judgment, usage, etc. (was previously Team.dataEnrichment).
+  ///
+  /// We DO NOT add GIN indexes on the `dataEnrichment` paths (`status`, `shouldEnrich`).
+  /// The portal carries ~1K teams; a full-table JSONB scan completes in <1ms, and the
+  /// write overhead of a GIN index would outweigh the read savings. Revisit if team count
+  /// grows by ~10x.
+  dataEnrichment Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Policy {

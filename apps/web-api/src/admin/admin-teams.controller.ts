@@ -230,7 +230,7 @@ export class AdminTeamsController {
 
   /**
    * Aggregated AI token usage + USD cost report for the enrichment + judge pipelines.
-   * Reads `dataEnrichment.usage` persisted on each team and rolls up totals, per-model
+   * Reads `TeamEnrichment.dataEnrichment.usage` persisted on each team and rolls up totals, per-model
    * breakdowns, and per-team usage. Teams are sorted by combined cost desc and paginated.
    *
    * Query params:
