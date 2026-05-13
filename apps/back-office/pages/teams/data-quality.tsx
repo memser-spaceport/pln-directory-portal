@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { GetServerSideProps } from 'next';
 import { parseCookies } from 'nookies';
-import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
@@ -10,39 +9,12 @@ import { clsx } from 'clsx';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
-import { useTeamsEnrichmentReview, FieldKey, FieldEntry, LogoEntry, EnrichmentTeam } from '../../hooks/teams/useTeamsEnrichmentReview';
+import { useTeamsEnrichmentReview, EnrichmentTeam, FieldKey } from '../../hooks/teams/useTeamsEnrichmentReview';
 import { useApproveEnrichmentFields } from '../../hooks/teams/useApproveEnrichmentFields';
+import { FIELD_KEYS, FIELD_LABELS } from './data-quality/constants';
+import { TeamLogoCell } from './data-quality/TeamLogoCell';
+import { ReviewModal } from './data-quality/ReviewModal';
 import s from './data-quality.module.scss';
-
-const FIELD_KEYS: FieldKey[] = [
-  'website',
-  'logo',
-  'shortDescription',
-  'longDescription',
-  'contactMethod',
-  'twitterHandler',
-  'linkedinHandler',
-  'blog',
-];
-
-const FIELD_LABELS: Record<FieldKey, string> = {
-  website: 'Website',
-  logo: 'Logo',
-  shortDescription: 'Short Description',
-  longDescription: 'Long Description',
-  contactMethod: 'Contact Method',
-  twitterHandler: 'Twitter',
-  linkedinHandler: 'LinkedIn',
-  blog: 'Blog',
-};
-
-function formatFieldContent(content: FieldEntry['content']): string {
-  if (content === null || content === undefined) return '';
-  if (Array.isArray(content)) return content.join(', ');
-  if (typeof content === 'object' && 'url' in content) return content.url ?? '';
-  const str = String(content);
-  return str.length > 100 ? str.slice(0, 100) + '…' : str;
-}
 
 const DataQualityPage: React.FC = () => {
   const router = useRouter();
@@ -57,9 +29,7 @@ const DataQualityPage: React.FC = () => {
   const approveMutation = useApproveEnrichmentFields();
 
   useEffect(() => {
-    if (!isLoading && user && !isDirectoryAdmin) {
-      router.replace('/access-denied');
-    }
+    if (!isLoading && user && !isDirectoryAdmin) router.replace('/access-denied');
   }, [isLoading, user, isDirectoryAdmin, router]);
 
   useEffect(() => {
@@ -110,9 +80,7 @@ const DataQualityPage: React.FC = () => {
               <tr>
                 <th className={clsx(s.th, s.stickyCol)}>Team</th>
                 {FIELD_KEYS.map((key) => (
-                  <th key={key} className={s.th}>
-                    {FIELD_LABELS[key]}
-                  </th>
+                  <th key={key} className={s.th}>{FIELD_LABELS[key]}</th>
                 ))}
                 <th className={s.th}>Actions</th>
               </tr>
@@ -120,9 +88,7 @@ const DataQualityPage: React.FC = () => {
             <tbody>
               {teamsLoading && (
                 <tr>
-                  <td colSpan={FIELD_KEYS.length + 2} className={s.stateCell}>
-                    Loading…
-                  </td>
+                  <td colSpan={FIELD_KEYS.length + 2} className={s.stateCell}>Loading…</td>
                 </tr>
               )}
               {!teamsLoading && filteredTeams.length === 0 && (
@@ -132,154 +98,65 @@ const DataQualityPage: React.FC = () => {
                   </td>
                 </tr>
               )}
-              {!teamsLoading &&
-                filteredTeams.map((team) => (
-                  <tr key={team.uid} className={s.tr}>
-                    <td className={clsx(s.td, s.stickyCol, s.teamNameCell)}>
-                      <a
-                        href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={s.teamLink}
-                      >
-                        <TeamLogoCell logo={team.logo} name={team.name} />
-                        <span className={s.teamName}>{team.name}</span>
-                      </a>
-                    </td>
-                    {FIELD_KEYS.map((key) => {
-                      const entry = key === 'logo' ? team.logo : team.fields[key];
-                      return (
-                        <td key={key} className={s.td}>
-                          {entry ? (
-                            <div className={s.fieldCell}>
-                              <span className={s.dataSource}>
-                                {entry.promotable ? 'Enriched' : 'Provided by user'}
-                              </span>
-                              <span
-                                className={clsx(
-                                  s.evalBadge,
-                                  (entry.judgment?.score ?? 0) >= 50 ? s.evalHigh : s.evalLow
-                                )}
-                              >
-                                {(entry.judgment?.score ?? 0) >= 50 ? 'High' : 'Low'}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className={s.emptyField}>—</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className={s.td}>
-                      <button className={s.reviewButton} onClick={() => setSelectedTeam(team)}>
-                        Review
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+              {!teamsLoading && filteredTeams.map((team) => (
+                <tr key={team.uid} className={s.tr}>
+                  <td className={clsx(s.td, s.stickyCol, s.teamNameCell)}>
+                    <a
+                      href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={s.teamLink}
+                    >
+                      <TeamLogoCell logo={team.logo} name={team.name} />
+                      <span className={s.teamName}>{team.name}</span>
+                    </a>
+                  </td>
+                  {FIELD_KEYS.map((key) => {
+                    const entry = key === 'logo' ? team.logo : team.fields[key];
+                    return (
+                      <td key={key} className={s.td}>
+                        {entry ? (
+                          <div className={s.fieldCell}>
+                            <span className={s.dataSource}>
+                              {entry.promotable ? 'Enriched' : 'Provided by user'}
+                            </span>
+                            <span className={clsx(
+                              s.evalBadge,
+                              (entry.judgment?.score ?? 0) >= 50 ? s.evalHigh : s.evalLow
+                            )}>
+                              {(entry.judgment?.score ?? 0) >= 50 ? 'High' : 'Low'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className={s.emptyField}>—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className={s.td}>
+                    <button className={s.reviewButton} onClick={() => setSelectedTeam(team)}>
+                      Review
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
 
-        <AnimatePresence>
-          {selectedTeam && (
-            <motion.div
-              className={s.overlay}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedTeam(null)}
-            >
-              <motion.div
-                className={s.modal}
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className={s.modalHeader}>
-                  <h2 className={s.modalTitle}>{selectedTeam.name} — Enrichment Review</h2>
-                  <button className={s.closeButton} onClick={() => setSelectedTeam(null)}>
-                    ✕
-                  </button>
-                </div>
-
-                <div className={s.modalBody}>
-                  {FIELD_KEYS.map((key) => {
-                    const entry = key === 'logo' ? selectedTeam.logo : selectedTeam.fields[key];
-                    if (!entry) return null;
-                    const stateKey = `${selectedTeam.uid}:${key}`;
-                    const isApproved = !!approved[stateKey];
-                    const isSaving = approveMutation.isPending;
-                    const isUserOwned = !entry.promotable;
-
-                    return (
-                      <div key={key} className={clsx(s.fieldRow, { [s.fieldRowApproved]: isApproved })}>
-                        <div className={s.fieldInfo}>
-                          <div className={s.fieldMeta}>
-                            <span className={s.fieldLabel}>{FIELD_LABELS[key]}</span>
-                            <span className={clsx(s.badge, entry.promotable ? s.badgeAI : s.badgeUser)}>
-                              {entry.promotable ? 'AI' : 'User'}
-                            </span>
-                          </div>
-                          <span className={s.fieldValue}>{formatFieldContent(entry.content)}</span>
-                          {entry.judgment?.note && (
-                            <span className={s.judgmentNote}>
-                              AI note: {entry.judgment.note}
-                              {entry.judgment.score !== undefined && ` (score: ${entry.judgment.score})`}
-                            </span>
-                          )}
-                        </div>
-                        <div className={s.toggleWrapper}>
-                          <button
-                            className={clsx(s.toggle, {
-                              [s.toggleOn]: isApproved,
-                              [s.toggleDisabled]: isApproved || isSaving || isUserOwned,
-                            })}
-                            disabled={isApproved || isSaving || isUserOwned}
-                            onClick={() => handleApproveField(selectedTeam.uid, key)}
-                            title={isUserOwned ? 'User-owned field — cannot be overridden' : undefined}
-                          >
-                            <span className={s.toggleThumb} />
-                          </button>
-                          <span className={s.toggleStatus}>
-                            {isApproved ? 'Approved' : isSaving ? 'Saving…' : isUserOwned ? 'User-owned' : 'Approve'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <ReviewModal
+          team={selectedTeam}
+          approved={approved}
+          isSaving={approveMutation.isPending}
+          onClose={() => setSelectedTeam(null)}
+          onApproveField={handleApproveField}
+        />
       </div>
     </ApprovalLayout>
   );
 };
 
 export default DataQualityPage;
-
-function TeamLogoCell({ logo, name }: { logo?: LogoEntry; name: string }) {
-  const url =
-    logo?.content && typeof logo.content === 'object' && 'url' in logo.content ? logo.content.url : null;
-
-  if (url) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={url}
-        alt={name}
-        className={s.teamLogo}
-        onError={(e) => {
-          (e.target as HTMLImageElement).style.display = 'none';
-        }}
-      />
-    );
-  }
-  return <span className={s.teamLogoPlaceholder}>{name.charAt(0).toUpperCase()}</span>;
-}
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const { plnadmin } = parseCookies(ctx);
