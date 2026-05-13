@@ -56,6 +56,28 @@
   }
 }
 
+.filterSelect {
+  height: 48px;
+  padding: 10px 32px 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(203, 213, 225, 0.5);
+  background: #fff;
+  font-size: 14px;
+  font-weight: 400;
+  color: #374151;
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%23374151' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+
+  &:focus {
+    border-color: #5e718d;
+    box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12);
+  }
+}
+
 .triggerBtn {
   display: flex;
   height: 48px;

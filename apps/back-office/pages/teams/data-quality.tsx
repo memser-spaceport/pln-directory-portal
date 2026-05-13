@@ -22,6 +22,8 @@ const DataQualityPage: React.FC = () => {
   const [authToken] = useCookie('plnadmin');
 
   const [search, setSearch] = useState('');
+  const [evalFilter, setEvalFilter] = useState<'all' | 'low' | 'high'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'enriched' | 'user'>('all');
   const [selectedTeam, setSelectedTeam] = useState<EnrichmentTeam | null>(null);
 
   const { data: teams = [], isLoading: teamsLoading, isError } = useTeamsEnrichmentReview(authToken);
@@ -37,7 +39,18 @@ const DataQualityPage: React.FC = () => {
 
   const filteredTeams = teams.filter((t) => {
     const q = search.trim().toLowerCase();
-    return !q || t.name.toLowerCase().includes(q);
+    if (q && !t.name.toLowerCase().includes(q)) return false;
+    if (evalFilter === 'all' && sourceFilter === 'all') return true;
+
+    return FIELD_KEYS.some((key) => {
+      const entry = key === 'logo' ? t.logo : t.fields[key];
+      if (!entry) return false;
+      const isHigh = (entry.judgment?.score ?? 0) >= 50;
+      const isEnriched = entry.promotable;
+      const evalMatch = evalFilter === 'all' || (evalFilter === 'high' ? isHigh : !isHigh);
+      const sourceMatch = sourceFilter === 'all' || (sourceFilter === 'enriched' ? isEnriched : !isEnriched);
+      return evalMatch && sourceMatch;
+    });
   });
 
   if (!isLoading && user && !isDirectoryAdmin) return null;
@@ -54,6 +67,24 @@ const DataQualityPage: React.FC = () => {
               placeholder="Search by team name…"
               className={s.input}
             />
+            <select
+              className={s.filterSelect}
+              value={evalFilter}
+              onChange={(e) => setEvalFilter(e.target.value as typeof evalFilter)}
+            >
+              <option value="all">All scores</option>
+              <option value="low">Low</option>
+              <option value="high">High</option>
+            </select>
+            <select
+              className={s.filterSelect}
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value as typeof sourceFilter)}
+            >
+              <option value="all">All sources</option>
+              <option value="enriched">Enriched</option>
+              <option value="user">Provided by user</option>
+            </select>
             <button
               className={s.triggerBtn}
               disabled={triggerMutation.isPending}
