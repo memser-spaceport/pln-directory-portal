@@ -437,10 +437,13 @@ Full list of teams whose top-level `dataEnrichment.status === 'Enriched'`. Revie
 
 Per-field rules:
 - Every field that has a `fieldsMeta[k].judgment` entry is surfaced, including those the judge already promoted at `agrees + high`. Admins use this view to spot-check promotion decisions.
-- Empty candidate values (null / empty string / empty array) are excluded.
+- `content` source is decided by `fieldsMeta[k].status`:
+  - `ChangedByUser` → reads from `Team.<field>` (user's value is the source of truth; the `TeamEnrichment.<field>` candidate, if any, is informational provenance).
+  - `Enriched` / `CannotEnrich` → reads from `TeamEnrichment.<field>` (AI candidate not yet promoted).
+  The other side is used as a fallback if the primary side is empty. Fields that are empty in **both** places are skipped — there's nothing to review.
 - `ChangedByUser` fields are surfaced with `promotable: false` (visibility only — admin can't promote the user's own value).
 - Logo is included whenever `TeamEnrichment.logoUid` is set, regardless of the latest verification's confidence. The latest `TeamLogoVerificationResult` row (any provider, newest by `createdAt`) populates `verification`; `verification` is `null` when no row exists.
-- `teamLogo` carries the live `Team.logo` (joined from `Image`) so admins can compare the user-visible logo against the candidate `logo` (which holds the `TeamEnrichment.logo` row).
+- The logo URL also appears in `fields.logo.content` (mirrors the scalar-field shape so the UI can iterate uniformly). The richer VLM verdict stays on the top-level `logo` block.
 
 Response shape:
 
@@ -450,7 +453,6 @@ Response shape:
     uid: string;
     name: string;
     enrichmentStatus: EnrichmentStatus;          // always 'Enriched' in this list
-    teamLogo: { uid: string; url: string } | null;  // live Team.logo (left-join Image)
     fields: Partial<Record<FieldMetaKey, {
       content: string | string[];                // candidate value from TeamEnrichment
       metadata: { source?: EnrichmentSource; lastModifiedAt?: string };

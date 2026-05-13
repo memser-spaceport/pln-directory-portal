@@ -26,14 +26,14 @@ import {
 
 export type EnrichmentReviewFieldEntry = {
   content: string | string[];
-  metadata: { source?: EnrichmentSource; lastModifiedAt?: string };
+  metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
   judgment: { note?: string; score?: number };
   promotable: boolean;
 };
 
 export type EnrichmentReviewLogo = {
   content: { uid: string; url: string } | null;
-  metadata: { source?: EnrichmentSource; lastModifiedAt?: string };
+  metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
   verification: {
     verdict: string;
     confidence: string;
@@ -47,7 +47,6 @@ export type EnrichmentReviewItem = {
   uid: string;
   name: string;
   enrichmentStatus: EnrichmentStatus;
-  teamLogo: { uid: string; url: string } | null;
   fields: Partial<Record<FieldMetaKey, EnrichmentReviewFieldEntry>>;
   logo?: EnrichmentReviewLogo;
 };
@@ -1214,7 +1213,21 @@ export class TeamEnrichmentService {
       where: { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched } },
       select: {
         teamUid: true,
-        team: { select: { uid: true, name: true, logo: { select: { uid: true, url: true } } } },
+        team: {
+          select: {
+            uid: true,
+            name: true,
+            logo: { select: { uid: true, url: true } },
+            website: true,
+            blog: true,
+            contactMethod: true,
+            twitterHandler: true,
+            linkedinHandler: true,
+            telegramHandler: true,
+            shortDescription: true,
+            longDescription: true,
+          },
+        },
         website: true,
         blog: true,
         contactMethod: true,
@@ -1223,7 +1236,6 @@ export class TeamEnrichmentService {
         telegramHandler: true,
         shortDescription: true,
         longDescription: true,
-        moreDetails: true,
         logoUid: true,
         logo: { select: { uid: true, url: true } },
         investmentFocus: true,
@@ -1271,17 +1283,55 @@ export class TeamEnrichmentService {
       for (const [keyStr, fieldMeta] of Object.entries(meta.fieldsMeta) as Array<
         [FieldMetaKey, FieldEnrichmentMeta | undefined]
       >) {
-        if (!fieldMeta?.judgment) continue;
-        if (keyStr === 'logo') continue;
+        if (keyStr === 'moreDetails') continue;
 
-        const candidate = (row as any)[keyStr];
-        if (candidate === null || candidate === undefined) continue;
-        if (typeof candidate === 'string' && candidate.trim() === '') continue;
-        if (Array.isArray(candidate) && candidate.length === 0) continue;
+        // Logo: no AI judgment exists (logo isn't judged — binary presence, not semantic).
+        // Emit it as a regular field with `content = Image.url` so the UI can iterate
+        // uniformly. The richer VLM verification still lives on the top-level `logo` block.
+        if (keyStr === 'logo') {
+          const logoUrl = row.logo?.url ?? row.team.logo?.url;
+          if (!logoUrl) continue;
+          fields.logo = {
+            content: logoUrl,
+            metadata: {
+              status: fieldMeta?.status,
+              source: fieldMeta?.source,
+              lastModifiedAt: fieldMeta?.lastModifiedAt,
+            },
+            judgment: {},
+            promotable: fieldMeta?.status !== FieldEnrichmentStatus.ChangedByUser,
+          };
+          continue;
+        }
+
+        if (!fieldMeta?.judgment) continue;
+
+        // Status decides the source of truth:
+        //   - ChangedByUser → Team.<field> (user-owned value lives on Team; the TeamEnrichment
+        //     candidate, if any, is informational provenance)
+        //   - Enriched / CannotEnrich → TeamEnrichment.<field> (AI candidate not yet promoted)
+        // Fallback to the other side covers rows where one side is empty (e.g. AI candidate
+        // promoted-then-cleared, or pre-tracking user data with stale meta).
+        const isUserOwned = fieldMeta.status === FieldEnrichmentStatus.ChangedByUser;
+        const teamValue = (row.team as any)[keyStr];
+        const enrichmentValue = (row as any)[keyStr];
+        const isEmpty = (v: any) =>
+          v === null ||
+          v === undefined ||
+          (typeof v === 'string' && v.trim() === '') ||
+          (Array.isArray(v) && v.length === 0);
+        const primary = isUserOwned ? teamValue : enrichmentValue;
+        const fallback = isUserOwned ? enrichmentValue : teamValue;
+        const candidate = !isEmpty(primary) ? primary : fallback;
+        if (isEmpty(candidate)) continue;
 
         fields[keyStr] = {
           content: candidate,
-          metadata: { source: fieldMeta.source, lastModifiedAt: fieldMeta.lastModifiedAt },
+          metadata: {
+            status: fieldMeta.status,
+            source: fieldMeta.source,
+            lastModifiedAt: fieldMeta.lastModifiedAt,
+          },
           judgment: { note: fieldMeta.judgment.note, score: fieldMeta.judgment.score },
           promotable: fieldMeta.status !== FieldEnrichmentStatus.ChangedByUser,
         };
@@ -1293,7 +1343,11 @@ export class TeamEnrichmentService {
       if (row.logoUid) {
         logo = {
           content: row.logo ? { uid: row.logo.uid, url: row.logo.url } : null,
-          metadata: { source: logoMeta?.source, lastModifiedAt: logoMeta?.lastModifiedAt },
+          metadata: {
+            status: logoMeta?.status,
+            source: logoMeta?.source,
+            lastModifiedAt: logoMeta?.lastModifiedAt,
+          },
           verification: latestLogoVerif
             ? {
                 verdict: latestLogoVerif.verdict,
@@ -1310,7 +1364,6 @@ export class TeamEnrichmentService {
         uid: row.team.uid,
         name: row.team.name,
         enrichmentStatus: meta.status,
-        teamLogo: row.team.logo ? { uid: row.team.logo.uid, url: row.team.logo.url } : null,
         fields,
         ...(logo ? { logo } : {}),
       });
