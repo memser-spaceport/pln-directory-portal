@@ -9,6 +9,11 @@ export class TeamEnrichmentJudgeJob {
 
   constructor(private readonly judgeService: TeamEnrichmentJudgeService) {}
 
+  /** Per-pod in-memory flag — `true` while this pod's judge cron tick is mid-flight. */
+  get judgmentRunning(): boolean {
+    return this.isJudgmentRunning;
+  }
+
   // Default: daily at 4 AM UTC (one hour after the default 3 AM enrichment cron).
   @Cron(process.env.TEAM_ENRICHMENT_JUDGE_CRON || '0 4 * * *', {
     name: 'team-enrichment-judge',

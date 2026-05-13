@@ -31,6 +31,8 @@ import { LogoVerificationJobService } from './logo-verification-job.service';
     TeamEnrichmentService,
     TeamEnrichmentJudgeService,
     TeamEnrichmentReportService,
+    TeamEnrichmentJob,
+    TeamEnrichmentJudgeJob,
     LogoVerificationService,
     LogoVerificationPersistenceService,
   ],
