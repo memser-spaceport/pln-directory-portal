@@ -25,7 +25,10 @@ const DataQualityPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [evalFilter, setEvalFilter] = useState<'all' | 'low' | 'high'>('all');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'enriched' | 'user'>('all');
+  const [page, setPage] = useState(1);
   const [selectedTeam, setSelectedTeam] = useState<EnrichmentTeam | null>(null);
+
+  const PAGE_SIZE = 20;
 
   const { data: teams = [], isLoading: teamsLoading, isError } = useTeamsEnrichmentReview(authToken);
   const triggerMutation = useTriggerEnrichment();
@@ -55,6 +58,14 @@ const DataQualityPage: React.FC = () => {
     });
   });
 
+  const totalPages = Math.max(1, Math.ceil(filteredTeams.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedTeams = filteredTeams.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const handleSearchChange = (value: string) => { setSearch(value); setPage(1); };
+  const handleEvalChange = (value: typeof evalFilter) => { setEvalFilter(value); setPage(1); };
+  const handleSourceChange = (value: typeof sourceFilter) => { setSourceFilter(value); setPage(1); };
+
   if (!isLoading && user && !isDirectoryAdmin) return null;
 
   return (
@@ -65,14 +76,14 @@ const DataQualityPage: React.FC = () => {
           <div className={s.headerActions}>
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search by team name…"
               className={s.input}
             />
             <select
               className={s.filterSelect}
               value={evalFilter}
-              onChange={(e) => setEvalFilter(e.target.value as typeof evalFilter)}
+              onChange={(e) => handleEvalChange(e.target.value as typeof evalFilter)}
             >
               <option value="all">All scores</option>
               <option value="low">Low</option>
@@ -81,7 +92,7 @@ const DataQualityPage: React.FC = () => {
             <select
               className={s.filterSelect}
               value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value as typeof sourceFilter)}
+              onChange={(e) => handleSourceChange(e.target.value as typeof sourceFilter)}
             >
               <option value="all">All sources</option>
               <option value="enriched">Enriched</option>
@@ -136,11 +147,13 @@ const DataQualityPage: React.FC = () => {
               {!teamsLoading && filteredTeams.length === 0 && (
                 <tr>
                   <td colSpan={FIELD_KEYS.length + 2} className={s.stateCell}>
-                    {search ? 'No teams match your search.' : 'No teams with reviewable fields found.'}
+                    {search || evalFilter !== 'all' || sourceFilter !== 'all'
+                      ? 'No teams match your filters.'
+                      : 'No teams with reviewable fields found.'}
                   </td>
                 </tr>
               )}
-              {!teamsLoading && filteredTeams.map((team) => (
+              {!teamsLoading && pagedTeams.map((team) => (
                 <tr key={team.uid} className={s.tr}>
                   <td className={clsx(s.td, s.stickyCol, s.teamNameCell)}>
                     <a
@@ -185,6 +198,31 @@ const DataQualityPage: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {!teamsLoading && filteredTeams.length > 0 && (
+          <div className={s.pagination}>
+            <span className={s.paginationInfo}>
+              {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredTeams.length)} of {filteredTeams.length} teams
+            </span>
+            <div className={s.paginationControls}>
+              <button
+                className={s.pageBtn}
+                disabled={safePage === 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                ←
+              </button>
+              <span className={s.pageIndicator}>{safePage} / {totalPages}</span>
+              <button
+                className={s.pageBtn}
+                disabled={safePage === totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                →
+              </button>
+            </div>
+          </div>
+        )}
 
         <EditModal
           team={selectedTeam}

@@ -39,7 +39,7 @@ type EnrichmentReviewResponse = {
 async function fetchEnrichmentReview(authToken: string): Promise<EnrichmentTeam[]> {
   const config = { headers: { authorization: `Bearer ${authToken}` } };
   const { data } = await api.get<EnrichmentReviewResponse>(
-    '/v1/admin/teams/enrichment-review?pageSize=200',
+    '/v1/admin/teams/enrichment-review?pageSize=1000',
     config
   );
   return data.teams ?? [];
