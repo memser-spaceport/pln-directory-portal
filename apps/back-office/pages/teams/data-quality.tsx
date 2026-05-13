@@ -11,6 +11,7 @@ import { useAuth } from '../../context/auth-context';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
 import { useTeamsEnrichmentReview, EnrichmentTeam } from '../../hooks/teams/useTeamsEnrichmentReview';
 import { useTriggerEnrichment } from '../../hooks/teams/useTriggerEnrichment';
+import { useTriggerJudgment } from '../../hooks/teams/useTriggerJudgment';
 import { FIELD_KEYS, FIELD_LABELS } from './data-quality/constants';
 import { TeamLogoCell } from './data-quality/TeamLogoCell';
 import { EditModal } from './data-quality/EditModal';
@@ -28,6 +29,7 @@ const DataQualityPage: React.FC = () => {
 
   const { data: teams = [], isLoading: teamsLoading, isError } = useTeamsEnrichmentReview(authToken);
   const triggerMutation = useTriggerEnrichment();
+  const judgmentMutation = useTriggerJudgment();
 
   useEffect(() => {
     if (!isLoading && user && !isDirectoryAdmin) router.replace('/access-denied');
@@ -97,6 +99,19 @@ const DataQualityPage: React.FC = () => {
               }
             >
               {triggerMutation.isPending ? 'Triggering…' : 'Trigger Enrichment'}
+            </button>
+            <button
+              className={s.triggerBtn}
+              disabled={judgmentMutation.isPending}
+              onClick={() =>
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                judgmentMutation.mutate(authToken!, {
+                  onSuccess: (res) => toast.success(res.message ?? 'Judgment triggered.'),
+                  onError: () => toast.error('Failed to trigger judgment.'),
+                })
+              }
+            >
+              {judgmentMutation.isPending ? 'Triggering…' : 'Trigger Judgment'}
             </button>
           </div>
         </div>
