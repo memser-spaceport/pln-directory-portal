@@ -30,6 +30,12 @@
   letter-spacing: -0.75px;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .input {
   display: flex;
   height: 48px;
@@ -47,6 +53,33 @@
     border: 1px solid #5e718d;
     background: #fff;
     box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12) !important;
+  }
+}
+
+.triggerBtn {
+  display: flex;
+  height: 48px;
+  padding: 10px 16px;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(14, 15, 17, 0.12);
+  background: #1b4dff;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0px 1px 3px 0px rgba(255, 255, 255, 0.32) inset,
+    0px 1px 5px 0px rgba(27, 77, 255, 0.16);
+
+  &:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 }
 

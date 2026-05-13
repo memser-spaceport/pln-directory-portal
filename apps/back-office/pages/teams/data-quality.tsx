@@ -10,6 +10,7 @@ import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
 import { useTeamsEnrichmentReview, EnrichmentTeam } from '../../hooks/teams/useTeamsEnrichmentReview';
+import { useTriggerEnrichment } from '../../hooks/teams/useTriggerEnrichment';
 import { FIELD_KEYS, FIELD_LABELS } from './data-quality/constants';
 import { TeamLogoCell } from './data-quality/TeamLogoCell';
 import { EditModal } from './data-quality/EditModal';
@@ -24,6 +25,7 @@ const DataQualityPage: React.FC = () => {
   const [selectedTeam, setSelectedTeam] = useState<EnrichmentTeam | null>(null);
 
   const { data: teams = [], isLoading: teamsLoading, isError } = useTeamsEnrichmentReview(authToken);
+  const triggerMutation = useTriggerEnrichment();
 
   useEffect(() => {
     if (!isLoading && user && !isDirectoryAdmin) router.replace('/access-denied');
@@ -45,12 +47,27 @@ const DataQualityPage: React.FC = () => {
       <div className={s.root}>
         <div className={s.header}>
           <span className={s.title}>Teams — Data Quality</span>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by team name…"
-            className={s.input}
-          />
+          <div className={s.headerActions}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by team name…"
+              className={s.input}
+            />
+            <button
+              className={s.triggerBtn}
+              disabled={triggerMutation.isPending}
+              onClick={() =>
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                triggerMutation.mutate(authToken!, {
+                  onSuccess: (res) => toast.success(res.message ?? 'Enrichment triggered.'),
+                  onError: () => toast.error('Failed to trigger enrichment.'),
+                })
+              }
+            >
+              {triggerMutation.isPending ? 'Triggering…' : 'Trigger Enrichment'}
+            </button>
+          </div>
         </div>
 
         <div className={s.tableWrapper}>
