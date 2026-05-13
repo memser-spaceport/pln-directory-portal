@@ -1,6 +1,7 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../utils/api';
 import { FieldKey } from './useTeamsEnrichmentReview';
+import { TeamsQueryKeys } from './constants/queryKeys';
 
 type MutationParams = {
   authToken: string;
@@ -18,5 +19,12 @@ async function approveEnrichmentFields(params: MutationParams): Promise<void> {
 }
 
 export function useApproveEnrichmentFields() {
-  return useMutation({ mutationFn: approveEnrichmentFields });
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: approveEnrichmentFields,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TeamsQueryKeys.ENRICHMENT_REVIEW] });
+    },
+  });
 }
