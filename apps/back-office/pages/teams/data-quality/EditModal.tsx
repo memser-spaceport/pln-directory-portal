@@ -77,24 +77,46 @@ export function EditModal({ team, authToken, onClose }: Props) {
   };
 
   const handleSave = () => {
-    if (!team || !form || !authToken) return;
+    if (!team || !form || !authToken || !teamDetail) return;
+
+    // Only send fields whose value actually changed — sending unchanged fields
+    // triggers trackUserEdits on the backend which marks them as ChangedByUser.
+    const changedData: TeamUpdatePayload = {};
+    (Object.keys(form) as (keyof TeamUpdatePayload)[]).forEach((key) => {
+      const original = String(teamDetail[key as keyof TeamDetail] ?? '');
+      const current = form[key] ?? '';
+      if (current !== original) changedData[key] = current;
+    });
+
+    if (Object.keys(changedData).length === 0 && confirmedFields.size === 0) {
+      onClose();
+      return;
+    }
+
+    const doApprove = (onDone: () => void) => {
+      const fieldsToApprove = [...confirmedFields];
+      if (fieldsToApprove.length === 0) { onDone(); return; }
+      approveMutation.mutate(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        { authToken: authToken!, teamUid: team.uid, fields: fieldsToApprove },
+        {
+          onSuccess: onDone,
+          onError: () => { toast.error('Saved, but failed to confirm some fields.'); onDone(); },
+        }
+      );
+    };
+
+    if (Object.keys(changedData).length === 0) {
+      // Nothing to save — only approvals
+      doApprove(() => { toast.success('Fields confirmed.'); onClose(); });
+      return;
+    }
 
     updateMutation.mutate(
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      { authToken: authToken!, uid: team.uid, data: form },
+      { authToken: authToken!, uid: team.uid, data: changedData },
       {
-        onSuccess: () => {
-          const fieldsToApprove = [...confirmedFields];
-          if (fieldsToApprove.length > 0) {
-            approveMutation.mutate(
-              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-              { authToken: authToken!, teamUid: team.uid, fields: fieldsToApprove },
-              { onError: () => toast.error('Saved, but failed to confirm some fields.') }
-            );
-          }
-          toast.success('Team updated successfully.');
-          onClose();
-        },
+        onSuccess: () => doApprove(() => { toast.success('Team updated successfully.'); onClose(); }),
         onError: () => toast.error('Failed to save changes. Please try again.'),
       }
     );
@@ -214,7 +236,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
               </button>
               <button
                 className={s.saveButton}
-                disabled={!form || updateMutation.isPending || detailLoading}
+                disabled={!form || !teamDetail || updateMutation.isPending || approveMutation.isPending || detailLoading}
                 onClick={handleSave}
               >
                 {updateMutation.isPending ? 'Saving…' : 'Save changes'}
