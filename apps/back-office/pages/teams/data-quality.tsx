@@ -9,11 +9,10 @@ import { clsx } from 'clsx';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
-import { useTeamsEnrichmentReview, EnrichmentTeam, FieldKey } from '../../hooks/teams/useTeamsEnrichmentReview';
-import { useApproveEnrichmentFields } from '../../hooks/teams/useApproveEnrichmentFields';
+import { useTeamsEnrichmentReview, EnrichmentTeam } from '../../hooks/teams/useTeamsEnrichmentReview';
 import { FIELD_KEYS, FIELD_LABELS } from './data-quality/constants';
 import { TeamLogoCell } from './data-quality/TeamLogoCell';
-import { ReviewModal } from './data-quality/ReviewModal';
+import { EditModal } from './data-quality/EditModal';
 import s from './data-quality.module.scss';
 
 const DataQualityPage: React.FC = () => {
@@ -23,36 +22,16 @@ const DataQualityPage: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [selectedTeam, setSelectedTeam] = useState<EnrichmentTeam | null>(null);
-  const [approved, setApproved] = useState<Record<string, boolean>>({});
 
   const { data: teams = [], isLoading: teamsLoading, isError } = useTeamsEnrichmentReview(authToken);
-  const approveMutation = useApproveEnrichmentFields();
 
   useEffect(() => {
     if (!isLoading && user && !isDirectoryAdmin) router.replace('/access-denied');
   }, [isLoading, user, isDirectoryAdmin, router]);
 
   useEffect(() => {
-    setApproved({});
-  }, [selectedTeam?.uid]);
-
-  useEffect(() => {
     if (isError) toast.error('Failed to load teams. Please try again.');
   }, [isError]);
-
-  const handleApproveField = (teamUid: string, fieldKey: FieldKey) => {
-    const stateKey = `${teamUid}:${fieldKey}`;
-    if (approved[stateKey] || approveMutation.isPending) return;
-
-    approveMutation.mutate(
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      { authToken: authToken!, teamUid, fields: [fieldKey] },
-      {
-        onSuccess: () => setApproved((prev) => ({ ...prev, [stateKey]: true })),
-        onError: () => toast.error(`Failed to approve ${FIELD_LABELS[fieldKey]}. Please try again.`),
-      }
-    );
-  };
 
   const filteredTeams = teams.filter((t) => {
     const q = search.trim().toLowerCase();
@@ -135,7 +114,7 @@ const DataQualityPage: React.FC = () => {
                   })}
                   <td className={s.td}>
                     <button className={s.reviewButton} onClick={() => setSelectedTeam(team)}>
-                      Review
+                      Edit
                     </button>
                   </td>
                 </tr>
@@ -144,12 +123,10 @@ const DataQualityPage: React.FC = () => {
           </table>
         </div>
 
-        <ReviewModal
+        <EditModal
           team={selectedTeam}
-          approved={approved}
-          isSaving={approveMutation.isPending}
+          authToken={authToken}
           onClose={() => setSelectedTeam(null)}
-          onApproveField={handleApproveField}
         />
       </div>
     </ApprovalLayout>
