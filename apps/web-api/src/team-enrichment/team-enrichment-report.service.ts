@@ -66,11 +66,12 @@ export class TeamEnrichmentReportService {
     const sinceTs = filter.since ? Date.parse(filter.since) : NaN;
     const sinceValid = Number.isFinite(sinceTs);
 
-    // dataEnrichment is JSONB; in-app filtering is fine here — team counts are bounded
-    // (hundreds, not millions). If this ever changes, switch to a SQL aggregator.
-    const candidates = await this.prisma.team.findMany({
+    // dataEnrichment is JSONB on TeamEnrichment; in-app filtering is fine here — team counts
+    // are bounded (hundreds, not millions). Joining via the relation keeps the team's name +
+    // uid alongside the enrichment metadata.
+    const candidates = await this.prisma.teamEnrichment.findMany({
       where: { dataEnrichment: { not: { equals: null as any } } },
-      select: { uid: true, name: true, dataEnrichment: true },
+      select: { team: { select: { uid: true, name: true } }, dataEnrichment: true },
     });
 
     const enrichment = emptyTotals();
@@ -82,8 +83,9 @@ export class TeamEnrichmentReportService {
     type TeamRow = AiReportResponse['teams'][number];
     const teamRows: TeamRow[] = [];
 
-    for (const t of candidates) {
-      const meta = parseEnrichment(t.dataEnrichment);
+    for (const row of candidates) {
+      const t = row.team;
+      const meta = parseEnrichment(row.dataEnrichment);
       const usage = meta?.usage;
       if (!usage) continue;
 

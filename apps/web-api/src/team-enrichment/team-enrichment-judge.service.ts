@@ -4,6 +4,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
 import { JudgeFieldInput, JudgeTeamContext, TeamEnrichmentJudgeAiService } from './team-enrichment-judge-ai.service';
+import { buildPromotionPayload, executePromotion } from './team-enrichment-promotion';
 import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import {
   AIUsageEntry,
@@ -18,6 +19,14 @@ import {
   TeamJudgment,
 } from './team-enrichment.types';
 
+/**
+ * The judge needs two parallel views of every team:
+ *   - Team scalars (current authoritative values — what the user/admin sees).
+ *   - TeamEnrichment scalars (AI candidates not yet promoted).
+ *
+ * For ChangedByUser fields, the judge reads from Team (the user's value). For Enriched fields
+ * (still candidate), the judge reads from TeamEnrichment.
+ */
 type TeamRecord = {
   uid: string;
   name: string;
@@ -30,9 +39,26 @@ type TeamRecord = {
   shortDescription: string | null;
   longDescription: string | null;
   moreDetails: string | null;
-  dataEnrichment: unknown;
   industryTags: Array<{ title: string }>;
-  investorProfile: { investmentFocus: string[] } | null;
+  investorProfile: { uid: string; investmentFocus: string[] } | null;
+  teamEnrichment: TeamEnrichmentSnapshot | null;
+};
+
+type TeamEnrichmentSnapshot = {
+  website: string | null;
+  blog: string | null;
+  contactMethod: string | null;
+  twitterHandler: string | null;
+  linkedinHandler: string | null;
+  telegramHandler: string | null;
+  shortDescription: string | null;
+  longDescription: string | null;
+  moreDetails: string | null;
+  logoUid: string | null;
+  investmentFocus: string[];
+  /** Plain titles (matches investmentFocus's shape). The judge re-resolves to IndustryTag rows at promotion. */
+  industryTags: string[];
+  dataEnrichment: unknown;
 };
 
 type FieldsMetaMap = Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
@@ -54,12 +80,6 @@ const JUDGABLE_FIELD_KEYS: FieldMetaKey[] = [
   'investmentFocus',
 ];
 
-/**
- * Subset of fields the judge will evaluate when their status is `ChangedByUser`.
- * Limited to website + contact links
- * The judge stays non-destructive: it only attaches `fieldsMeta[field].judgment`;
- * the field's value, status, confidence, and source are preserved.
- */
 const USER_JUDGABLE_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey>([
   'website',
   'blog',
@@ -69,16 +89,6 @@ const USER_JUDGABLE_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey
   'telegramHandler',
 ]);
 
-/**
- * Fields whose stored value MUST parse as a URL to be judgable. Anything that doesn't pass
- * the URL-format check (e.g. `'n/a'`, `'coming soon'`, `'tba'`, `'mercle.ai'` without scheme)
- * is skipped from judgment entirely — there's nothing meaningful for the judge to verify, and
- * we don't want it to fabricate a verdict against junk input. We don't maintain a placeholder
- * blocklist; the URL-format check (zod's `z.string().url()`, backed by WHATWG `new URL()`)
- * already rejects every common placeholder. Other URL-ish fields (`contactMethod` can be an
- * email or invite link; `linkedinHandler` / `twitterHandler` / `telegramHandler` are often
- * bare handles) are intentionally not gated here — the AI judge handles them.
- */
 const URL_REQUIRED_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey>(['website', 'blog']);
 
 const urlSchema = z.string().url();
@@ -86,6 +96,39 @@ const urlSchema = z.string().url();
 function isValidUrl(value: string): boolean {
   return urlSchema.safeParse(value.trim()).success;
 }
+
+const TEAM_RECORD_SELECT = {
+  uid: true,
+  name: true,
+  website: true,
+  blog: true,
+  contactMethod: true,
+  twitterHandler: true,
+  linkedinHandler: true,
+  telegramHandler: true,
+  shortDescription: true,
+  longDescription: true,
+  moreDetails: true,
+  industryTags: { select: { title: true } },
+  investorProfile: { select: { uid: true, investmentFocus: true } },
+  teamEnrichment: {
+    select: {
+      website: true,
+      blog: true,
+      contactMethod: true,
+      twitterHandler: true,
+      linkedinHandler: true,
+      telegramHandler: true,
+      shortDescription: true,
+      longDescription: true,
+      moreDetails: true,
+      logoUid: true,
+      investmentFocus: true,
+      industryTags: true,
+      dataEnrichment: true,
+    },
+  },
+} as const;
 
 @Injectable()
 export class TeamEnrichmentJudgeService {
@@ -98,43 +141,31 @@ export class TeamEnrichmentJudgeService {
   ) {}
 
   /**
-   * Finds eligible teams whose enrichment is complete but have not been judged yet.
-   * DB-level filter: shared eligibility filter (isFund / priority, see
-   * `buildTeamEnrichmentEligibilityFilter`) AND dataEnrichment.status=Enriched.
-   * In-memory filter: judgment.status not Judged/InProgress AND at least one judgable field.
+   * Finds eligible teams whose TeamEnrichment is Enriched but unjudged. Filters via the
+   * TeamEnrichment.dataEnrichment JSON path. An additional in-memory pass drops teams whose
+   * judgment is already Judged/InProgress and teams with no judgable fields.
    */
   async findTeamsPendingJudgment(): Promise<TeamRecord[]> {
-    const candidates = await this.prisma.team.findMany({
+    const candidates = (await this.prisma.team.findMany({
       where: {
         AND: [
           buildTeamEnrichmentEligibilityFilter(),
-          { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched } },
+          {
+            teamEnrichment: {
+              dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched },
+            },
+          },
         ],
       },
-      select: {
-        uid: true,
-        name: true,
-        website: true,
-        blog: true,
-        contactMethod: true,
-        twitterHandler: true,
-        linkedinHandler: true,
-        telegramHandler: true,
-        shortDescription: true,
-        longDescription: true,
-        moreDetails: true,
-        dataEnrichment: true,
-        industryTags: { select: { title: true } },
-        investorProfile: { select: { investmentFocus: true } },
-      },
-    });
+      select: TEAM_RECORD_SELECT,
+    })) as unknown as TeamRecord[];
 
     return candidates.filter((t) => {
-      const meta = this.parseEnrichmentMeta(t.dataEnrichment);
+      const meta = this.parseEnrichmentMeta(t.teamEnrichment?.dataEnrichment);
       const judgmentStatus = meta?.judgment?.status;
       if (judgmentStatus === JudgmentStatus.Judged) return false;
       if (judgmentStatus === JudgmentStatus.InProgress) return false;
-      return this.collectJudgableFieldKeys(t as TeamRecord, meta?.fieldsMeta ?? {}).length > 0;
+      return this.collectJudgableFieldKeys(t, meta?.fieldsMeta ?? {}).length > 0;
     });
   }
 
@@ -142,7 +173,7 @@ export class TeamEnrichmentJudgeService {
     const team = await this.loadTeamRecord(teamUid);
     if (!team) return { status: 'not_found' };
 
-    const meta = this.parseEnrichmentMeta(team.dataEnrichment);
+    const meta = this.parseEnrichmentMeta(team.teamEnrichment?.dataEnrichment);
     if (!meta) return { status: 'not_eligible' };
 
     if (meta.judgment?.status === JudgmentStatus.InProgress) {
@@ -166,7 +197,6 @@ export class TeamEnrichmentJudgeService {
 
     await this.writeJudgmentStatus(teamUid, meta, { status: JudgmentStatus.InProgress });
 
-    // Run the full pipeline in the background so callers (cron, admin) don't block on the AI call.
     this.runJudgmentPipeline(team, meta, judgableKeys, judgedBy).catch((err) => {
       this.logger.error(`Background judgment failed for team ${teamUid}: ${err.message}`, err.stack);
     });
@@ -178,7 +208,7 @@ export class TeamEnrichmentJudgeService {
     const team = await this.loadTeamRecord(teamUid);
     if (!team) return { status: 'not_found' };
 
-    const meta = this.parseEnrichmentMeta(team.dataEnrichment);
+    const meta = this.parseEnrichmentMeta(team.teamEnrichment?.dataEnrichment);
     if (!meta) return { status: 'not_eligible' };
 
     if (meta.judgment?.status === JudgmentStatus.InProgress) {
@@ -192,7 +222,6 @@ export class TeamEnrichmentJudgeService {
       return { status: 'not_eligible' };
     }
 
-    // Re-queue by clearing any prior terminal judgment state.
     await this.writeJudgmentStatus(teamUid, meta, { status: JudgmentStatus.InProgress });
 
     this.runJudgmentPipeline(team, meta, judgableKeys, judgedBy).catch((err) => {
@@ -221,6 +250,7 @@ export class TeamEnrichmentJudgeService {
    * Two-stage pipeline:
    * Stage 1 — ScrapingDog LinkedIn verification (deterministic, no LLM).
    * Stage 2 — AI judge for fields Stage 1 couldn't resolve.
+   * After judgment, fields with high-confidence verdict are promoted to Team.
    */
   private async runJudgmentPipeline(
     team: TeamRecord,
@@ -231,7 +261,6 @@ export class TeamEnrichmentJudgeService {
     const teamUid = team.uid;
 
     try {
-      // --- Stage 1: ScrapingDog ---
       let stage1Verdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = {};
       let scrapingDogMeta: TeamJudgment['scrapingDog'] | undefined;
 
@@ -253,18 +282,20 @@ export class TeamEnrichmentJudgeService {
         } else {
           const profile = result.profile;
           const nameMatch = this.scrapingDogService.classifyNameMatch(team.name, profile);
+          // Snapshot what the judge is about to verify: Team for user-supplied values, TeamEnrichment
+          // for AI candidates. compareProfileToTeam is fed the right value per field via the
+          // readFieldValue / judgeable-value path.
           const teamSnapshot = {
             name: team.name,
-            website: team.website,
+            website: this.preferEnrichmentValue(team, 'website'),
             linkedinHandler: team.linkedinHandler,
-            shortDescription: team.shortDescription,
-            longDescription: team.longDescription,
-            moreDetails: team.moreDetails,
-            industryTags: team.industryTags,
+            shortDescription: this.preferEnrichmentValue(team, 'shortDescription'),
+            longDescription: this.preferEnrichmentValue(team, 'longDescription'),
+            moreDetails: this.preferEnrichmentValue(team, 'moreDetails'),
+            industryTags: this.preferEnrichmentIndustryTags(team).map((title) => ({ title })),
           };
           if (nameMatch !== 'none') {
             stage1Verdicts = this.scrapingDogService.compareProfileToTeam(teamSnapshot, profile, nameMatch);
-            // Keep verdicts only for fields we were asked to judge.
             for (const k of Object.keys(stage1Verdicts)) {
               if (!judgableKeys.includes(k as FieldMetaKey)) {
                 delete stage1Verdicts[k as FieldMetaKey];
@@ -272,15 +303,11 @@ export class TeamEnrichmentJudgeService {
             }
           }
 
-          // Reachability probe — pure observability + AI-judge context. Runs only when the team
-          // has a non-placeholder, parseable http(s) website (the same gate `collectJudgableFieldKeys`
-          // applies, so we never probe `'n/a'`/`'coming soon'`/etc. and never call `fetch` on a string
-          // that isn't a real URL). Result is forwarded into Stage 2 so the AI judge can factor a
-          // definitive 4xx/5xx into its website verdict.
           let websiteReachable: boolean | null = null;
           let websiteFinalHost: string | null = null;
-          if (team.website && this.hasJudgableValue(team, 'website')) {
-            const probe = await this.probeWebsiteReachable(team.website);
+          const websiteToProbe = this.preferEnrichmentValue(team, 'website');
+          if (websiteToProbe && this.hasJudgableValue(team, 'website')) {
+            const probe = await this.probeWebsiteReachable(websiteToProbe);
             if (probe) {
               websiteReachable = probe.reachable;
               websiteFinalHost = probe.finalHost;
@@ -304,8 +331,6 @@ export class TeamEnrichmentJudgeService {
         }
       }
 
-      // --- Stage 2: AI judge ---
-      // Skip any field Stage 1 resolved authoritatively (agrees-high or disagrees-low).
       const stage1Resolved = new Set<FieldMetaKey>();
       for (const [k, v] of Object.entries(stage1Verdicts)) {
         if (!v) continue;
@@ -328,7 +353,7 @@ export class TeamEnrichmentJudgeService {
 
         const judgeContext: JudgeTeamContext = {
           teamName: team.name,
-          website: team.website,
+          website: this.preferEnrichmentValue(team, 'website'),
           linkedinHandler: team.linkedinHandler,
           twitterHandler: team.twitterHandler,
           telegramHandler: team.telegramHandler,
@@ -354,7 +379,6 @@ export class TeamEnrichmentJudgeService {
           errorMessage: judgeErrorMessage,
           scrapingDog: scrapingDogMeta,
         });
-        // Persist judge token usage even on failure — we still paid for the AI call.
         if (judgeUsage) {
           await this.appendJudgeUsage(teamUid, judgeUsage);
           this.logger.log(
@@ -367,19 +391,15 @@ export class TeamEnrichmentJudgeService {
         return;
       }
 
-      // Merge Stage 1 verdicts on top of Stage 2 — Stage 1 (LinkedIn) is authoritative where it spoke.
       const allVerdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = { ...stage2Verdicts, ...stage1Verdicts };
 
-      // Refresh team dataEnrichment snapshot since Stage 1 may have mutated linkedinHandler meta.
       const refreshedMeta = await this.readEnrichmentMeta(teamUid);
       const baseFieldsMeta = refreshedMeta?.fieldsMeta ?? existingMeta.fieldsMeta ?? {};
       const mergedFieldsMeta: FieldsMetaMap = { ...baseFieldsMeta };
 
-      // The judge is non-destructive: it annotates with a `judgment` sub-object but never
-      // overrides enrichment-time values like `confidence` or `source`, and never touches the
-      // field's `status` — including for ChangedByUser fields (the user's data is preserved
-      // verbatim). Readers who want the judge's verdict should read
-      // `fieldsMeta[field].judgment.confidence`.
+      // Non-destructive: only writes a judgment sub-object; never touches status/value/source on
+      // Team or TeamEnrichment. ChangedByUser fields are evaluated for review but the user's
+      // value is preserved verbatim.
       const fieldsForReview: string[] = [];
       for (const [key, verdict] of Object.entries(allVerdicts) as Array<[FieldMetaKey, FieldJudgment | undefined]>) {
         if (!verdict) continue;
@@ -406,8 +426,6 @@ export class TeamEnrichmentJudgeService {
         ...(scrapingDogMeta ? { scrapingDog: scrapingDogMeta } : {}),
       };
 
-      // Accumulate judge token usage on top of any prior judge runs (force-judge bumps the
-      // counters rather than overwriting). Enrichment usage on the existing record is preserved.
       const baseUsage = (refreshedMeta ?? existingMeta).usage;
       const mergedJudgeUsage = mergeUsageEntries(baseUsage?.judge, judgeUsage);
       const usageBlock: TeamDataEnrichment['usage'] | undefined =
@@ -425,15 +443,28 @@ export class TeamEnrichmentJudgeService {
         ...(usageBlock ? { usage: usageBlock } : {}),
       };
 
-      await this.prisma.team.update({
-        where: { uid: teamUid },
-        data: { dataEnrichment: updated as any },
+      // Promote high-confidence values from TeamEnrichment → Team in a single transaction with
+      // the dataEnrichment write so the promotion is atomic with the verdict.
+      const promotableKeys = (Object.entries(allVerdicts) as Array<[FieldMetaKey, FieldJudgment | undefined]>)
+        .filter(([, v]) => v?.verdict === JudgmentVerdict.Agrees && v?.confidence === 'high')
+        .map(([k]) => k);
+      const promotion = await buildPromotionPayload(this.prisma, team.teamEnrichment, promotableKeys, mergedFieldsMeta);
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.teamEnrichment.update({
+          where: { teamUid },
+          data: { dataEnrichment: updated as any },
+        });
+
+        if (promotion.teamUpdate || promotion.investmentFocus !== null) {
+          await executePromotion(tx, teamUid, team, promotion);
+        }
       });
 
       this.logger.log(
         `Judge: team ${teamUid} (${team.name}) judged — stage1=${Object.keys(stage1Verdicts).length} stage2=${
           Object.keys(stage2Verdicts).length
-        } fieldsForReview=[${fieldsForReview.join(',')}]`
+        } promoted=[${promotion.promotedFields.join(',')}] fieldsForReview=[${fieldsForReview.join(',')}]`
       );
       if (mergedJudgeUsage) {
         this.logger.log(
@@ -453,12 +484,9 @@ export class TeamEnrichmentJudgeService {
    * Returns the list of fieldsMeta keys that are candidates for judgment:
    *  - status === Enriched (any judgable key), OR
    *  - status === ChangedByUser AND key is in USER_JUDGABLE_FIELD_KEYS (website + contact links)
-   *  - excludes logo and CannotEnrich
    *
-   * Additionally, URL-required fields (`website`, `blog`) whose stored value doesn't parse as a
-   * URL (`'n/a'`, `'coming soon'`, `'tbd'`, etc. all fail the URL check) are skipped. This
-   * prevents the judge from wasting an AI call — and producing a misleading verdict — on fields
-   * that have no real data.
+   * URL-required fields (`website`, `blog`) whose stored value doesn't parse as a URL are
+   * skipped to prevent the judge from fabricating verdicts against junk input.
    */
   private collectJudgableFieldKeys(team: TeamRecord, fieldsMeta: FieldsMetaMap): FieldMetaKey[] {
     const out: FieldMetaKey[] = [];
@@ -475,12 +503,6 @@ export class TeamEnrichmentJudgeService {
     return out;
   }
 
-  /**
-   * True when the field's stored value is non-empty and (for URL-required fields) parses as a
-   * URL. Used both for the candidate filter and for gating the reachability probe. The URL
-   * check transparently rejects placeholders like `'n/a'` / `'coming soon'` / `'tba'` — they
-   * don't parse as URLs — so no separate placeholder blocklist is needed.
-   */
   private hasJudgableValue(team: TeamRecord, key: FieldMetaKey): boolean {
     const value = this.readFieldValue(team, key);
     if (value === null || value === undefined) return false;
@@ -503,66 +525,88 @@ export class TeamEnrichmentJudgeService {
     };
   }
 
+  /**
+   * The judge reads the candidate that needs verification:
+   *   - For Enriched fields, that's the value AI wrote to TeamEnrichment.
+   *   - For ChangedByUser fields (only the user-judgable subset), that's the user-supplied
+   *     value on Team.
+   */
   private readFieldValue(team: TeamRecord, key: FieldMetaKey): string | string[] | null {
+    const meta = this.parseEnrichmentMeta(team.teamEnrichment?.dataEnrichment);
+    const fieldStatus = meta?.fieldsMeta?.[key]?.status;
+    const preferEnrichmentSide = fieldStatus !== FieldEnrichmentStatus.ChangedByUser;
+
     switch (key) {
       case 'website':
-        return team.website;
+        return preferEnrichmentSide ? team.teamEnrichment?.website ?? team.website : team.website;
       case 'blog':
-        return team.blog;
+        return preferEnrichmentSide ? team.teamEnrichment?.blog ?? team.blog : team.blog;
       case 'contactMethod':
-        return team.contactMethod;
+        return preferEnrichmentSide ? team.teamEnrichment?.contactMethod ?? team.contactMethod : team.contactMethod;
       case 'twitterHandler':
-        return team.twitterHandler;
+        return preferEnrichmentSide ? team.teamEnrichment?.twitterHandler ?? team.twitterHandler : team.twitterHandler;
       case 'linkedinHandler':
-        return team.linkedinHandler;
+        return preferEnrichmentSide
+          ? team.teamEnrichment?.linkedinHandler ?? team.linkedinHandler
+          : team.linkedinHandler;
       case 'telegramHandler':
-        return team.telegramHandler;
+        return preferEnrichmentSide
+          ? team.teamEnrichment?.telegramHandler ?? team.telegramHandler
+          : team.telegramHandler;
       case 'shortDescription':
-        return team.shortDescription;
+        return preferEnrichmentSide
+          ? team.teamEnrichment?.shortDescription ?? team.shortDescription
+          : team.shortDescription;
       case 'longDescription':
-        return team.longDescription;
+        return preferEnrichmentSide
+          ? team.teamEnrichment?.longDescription ?? team.longDescription
+          : team.longDescription;
       case 'moreDetails':
-        return team.moreDetails;
+        return preferEnrichmentSide ? team.teamEnrichment?.moreDetails ?? team.moreDetails : team.moreDetails;
       case 'industryTags':
-        return team.industryTags.map((t) => t.title);
+        return this.preferEnrichmentIndustryTags(team);
       case 'investmentFocus':
-        return team.investorProfile?.investmentFocus ?? [];
+        return team.teamEnrichment?.investmentFocus?.length
+          ? team.teamEnrichment.investmentFocus
+          : team.investorProfile?.investmentFocus ?? [];
       case 'logo':
-        return null; // never judged
+        return null;
       default:
         return null;
     }
   }
 
+  private preferEnrichmentValue<K extends keyof TeamEnrichmentSnapshot & keyof TeamRecord>(
+    team: TeamRecord,
+    key: K
+  ): string | null {
+    const enrichmentVal = team.teamEnrichment?.[key];
+    if (typeof enrichmentVal === 'string' && enrichmentVal.trim() !== '') return enrichmentVal;
+    const teamVal = team[key];
+    return typeof teamVal === 'string' ? teamVal : null;
+  }
+
+  private preferEnrichmentIndustryTags(team: TeamRecord): string[] {
+    if (team.teamEnrichment?.industryTags?.length) {
+      return team.teamEnrichment.industryTags;
+    }
+    return team.industryTags.map((t) => t.title);
+  }
+
   private async loadTeamRecord(teamUid: string): Promise<TeamRecord | null> {
-    const team = await this.prisma.team.findUnique({
+    const team = (await this.prisma.team.findUnique({
       where: { uid: teamUid },
-      select: {
-        uid: true,
-        name: true,
-        website: true,
-        blog: true,
-        contactMethod: true,
-        twitterHandler: true,
-        linkedinHandler: true,
-        telegramHandler: true,
-        shortDescription: true,
-        longDescription: true,
-        moreDetails: true,
-        dataEnrichment: true,
-        industryTags: { select: { title: true } },
-        investorProfile: { select: { investmentFocus: true } },
-      },
-    });
-    return team as TeamRecord | null;
+      select: TEAM_RECORD_SELECT,
+    })) as unknown as TeamRecord | null;
+    return team;
   }
 
   private async readEnrichmentMeta(teamUid: string): Promise<TeamDataEnrichment | null> {
-    const team = await this.prisma.team.findUnique({
-      where: { uid: teamUid },
+    const row = await this.prisma.teamEnrichment.findUnique({
+      where: { teamUid },
       select: { dataEnrichment: true },
     });
-    return this.parseEnrichmentMeta(team?.dataEnrichment);
+    return this.parseEnrichmentMeta(row?.dataEnrichment);
   }
 
   private parseEnrichmentMeta(raw: unknown): TeamDataEnrichment | null {
@@ -592,20 +636,19 @@ export class TeamEnrichmentJudgeService {
       } as FieldEnrichmentMeta,
     };
     const updated: TeamDataEnrichment = { ...meta, fieldsMeta: updatedFieldsMeta };
-    await this.prisma.team.update({
-      where: { uid: teamUid },
-      data: {
-        linkedinHandler: null,
-        dataEnrichment: updated as any,
-      },
-    });
+    await this.prisma.$transaction([
+      this.prisma.team.update({
+        where: { uid: teamUid },
+        data: { linkedinHandler: null },
+      }),
+      this.prisma.teamEnrichment.update({
+        where: { teamUid },
+        data: { linkedinHandler: null, dataEnrichment: updated as any },
+      }),
+    ]);
     this.logger.warn(`Judge: nulled invalid AI-supplied LinkedIn handle on team ${teamUid}`);
   }
 
-  /**
-   * Appends judge token usage to the team without touching anything else on `dataEnrichment`.
-   * Used on the FailedToJudge path so we still record what the failed AI call cost.
-   */
   private async appendJudgeUsage(teamUid: string, fresh: AIUsageEntry): Promise<void> {
     const latest = await this.readEnrichmentMeta(teamUid);
     if (!latest) return;
@@ -618,8 +661,8 @@ export class TeamEnrichmentJudgeService {
         judge: merged,
       },
     };
-    await this.prisma.team.update({
-      where: { uid: teamUid },
+    await this.prisma.teamEnrichment.update({
+      where: { teamUid },
       data: { dataEnrichment: updated as any },
     });
   }
@@ -629,7 +672,6 @@ export class TeamEnrichmentJudgeService {
     currentMeta: TeamDataEnrichment,
     patch: Partial<TeamJudgment> & { status: JudgmentStatus }
   ): Promise<void> {
-    // Always merge with the freshest DB state to avoid clobbering concurrent writes (e.g. user edits).
     const latest = (await this.readEnrichmentMeta(teamUid)) ?? currentMeta;
     const existingJudgment = latest.judgment;
     const nextJudgment: TeamJudgment = {
@@ -640,16 +682,12 @@ export class TeamEnrichmentJudgeService {
       ...latest,
       judgment: nextJudgment,
     };
-    await this.prisma.team.update({
-      where: { uid: teamUid },
+    await this.prisma.teamEnrichment.update({
+      where: { teamUid },
       data: { dataEnrichment: updated as any },
     });
   }
 
-  /**
-   * A judged field needs manual review when the judge disagrees, is uncertain, or agrees
-   * only at low confidence. Agrees + high/medium is considered trusted — no manual check.
-   */
   private needsManualReview(verdict: FieldJudgment): boolean {
     if (verdict.verdict === JudgmentVerdict.Disagrees) return true;
     if (verdict.verdict === JudgmentVerdict.Uncertain) return true;
@@ -657,18 +695,6 @@ export class TeamEnrichmentJudgeService {
     return false;
   }
 
-  /**
-   * Lightweight reachability probe: a single GET that follows redirects, with a 5s timeout.
-   * Returns:
-   *   - { reachable: true,  finalHost } when the final response is 2xx.
-   *   - { reachable: false, finalHost: null } when the final response is non-2xx.
-   *   - null on network errors (timeout, DNS, abort) — don't penalise flaky networks.
-   *
-   * Output is forwarded into the AI judge as observability: a definitive 4xx/5xx is a
-   * meaningful negative signal for the website verdict; a 2xx confirms the URL is live but
-   * not that it belongs to the team. Callers must pre-validate that `url` is a parseable
-   * http(s) URL (not a placeholder like `'n/a'`); this method does not re-validate.
-   */
   private async probeWebsiteReachable(url: string): Promise<{ reachable: boolean; finalHost: string | null } | null> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);

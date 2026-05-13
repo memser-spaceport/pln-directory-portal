@@ -137,12 +137,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  overflow: hidden;
   max-width: 100%;
   width: 100%;
 }
 
 .groupBadge {
-  display: inline-flex;
+  display: block;
   align-items: center;
   padding: 2px 8px;
   border-radius: 12px;
@@ -150,6 +151,9 @@
   color: #374151;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   overflow-wrap: anywhere;
   word-break: break-word;
   max-width: 100%;

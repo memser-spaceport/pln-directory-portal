@@ -61,6 +61,9 @@ export interface FieldEnrichmentMeta {
   confidence?: FieldConfidence;
   source?: EnrichmentSource;
   judgment?: FieldJudgment;
+
+  // ISO timestamp of the most recent write to this field's value
+  lastModifiedAt?: string;
 }
 
 /** Scalar fields on the Team model that can be enriched directly. */
