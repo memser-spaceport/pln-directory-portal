@@ -6,6 +6,7 @@ import { clsx } from 'clsx';
 import { EnrichmentTeam, FieldKey, FieldEntry } from '../../../hooks/teams/useTeamsEnrichmentReview';
 import { useGetTeam, TeamDetail } from '../../../hooks/teams/useGetTeam';
 import { useUpdateAdminTeam, TeamUpdatePayload } from '../../../hooks/teams/useUpdateAdminTeam';
+import { useApproveEnrichmentFields } from '../../../hooks/teams/useApproveEnrichmentFields';
 import { FIELD_KEYS, FIELD_LABELS } from './constants';
 import s from '../data-quality.module.scss';
 
@@ -50,6 +51,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
 
   const { data: teamDetail, isLoading: detailLoading } = useGetTeam(team?.uid ?? null, !!team);
   const updateMutation = useUpdateAdminTeam();
+  const approveMutation = useApproveEnrichmentFields();
 
   useEffect(() => {
     if (teamDetail) setForm(teamToForm(teamDetail));
@@ -62,11 +64,23 @@ export function EditModal({ team, authToken, onClose }: Props) {
   const handleSave = () => {
     if (!team || !form || !authToken) return;
 
+    // Collect all enriched field keys that are reviewable (promotable = AI-enriched)
+    const fieldsToApprove = FIELD_KEYS.filter((key) => {
+      const entry = key === 'logo' ? team.logo : team.fields[key];
+      return entry?.promotable;
+    });
+
     updateMutation.mutate(
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       { authToken: authToken!, uid: team.uid, data: form },
       {
         onSuccess: () => {
+          // Mark all AI-enriched fields as confirmed (high confidence) so they
+          // no longer appear as Low in the table
+          if (fieldsToApprove.length > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            approveMutation.mutate({ authToken: authToken!, teamUid: team.uid, fields: fieldsToApprove });
+          }
           toast.success('Team updated successfully.');
           onClose();
         },
