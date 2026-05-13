@@ -336,54 +336,9 @@
   font-weight: 400;
 }
 
-/* ── Pagination ─────────────────────────────────────────── */
-
-.pagination {
+.tableSection {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 4px;
-}
-
-.paginationInfo {
-  font-size: 13px;
-  color: #6b7280;
-}
-
-.paginationControls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pageBtn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  border: 1px solid rgba(203, 213, 225, 0.5);
-  background: #fff;
-  color: #374151;
-  font-size: 14px;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background: #f9fafb;
-  }
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-}
-
-.pageIndicator {
-  font-size: 13px;
-  color: #374151;
-  min-width: 56px;
-  text-align: center;
+  flex-direction: column;
 }
 
 /* ── Modal ─────────────────────────────────────────────── */
