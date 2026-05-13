@@ -191,16 +191,7 @@ const DataQualityPage: React.FC = () => {
                         rel="noreferrer"
                         className={s.teamLink}
                       >
-                        {team.logo?.content && typeof team.logo.content === 'object' && 'url' in team.logo.content ? (
-                          <img
-                            src={team.logo.content.url}
-                            alt={team.name}
-                            className={s.teamLogo}
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        ) : (
-                          <span className={s.teamLogoPlaceholder}>{team.name.charAt(0).toUpperCase()}</span>
-                        )}
+                        <TeamLogoCell logo={team.logo} name={team.name} />
                         <span className={s.teamName}>{team.name}</span>
                       </a>
                     </td>
@@ -210,9 +201,11 @@ const DataQualityPage: React.FC = () => {
                         <td key={key} className={s.td}>
                           {entry ? (
                             <div className={s.fieldCell}>
-                              <WarningIcon />
-                              <span className={clsx(s.badge, entry.promotable ? s.badgeAI : s.badgeUser)}>
-                                {entry.promotable ? 'AI' : 'User'}
+                              <span className={s.dataSource}>
+                                {entry.promotable ? 'Enriched' : 'Provided by user'}
+                              </span>
+                              <span className={clsx(s.evalBadge, (entry.judgment?.score ?? 0) >= 50 ? s.evalHigh : s.evalLow)}>
+                                {(entry.judgment?.score ?? 0) >= 50 ? 'High' : 'Low'}
                               </span>
                             </div>
                           ) : (
@@ -312,6 +305,26 @@ const DataQualityPage: React.FC = () => {
 
 export default DataQualityPage;
 
+function TeamLogoCell({ logo, name }: { logo?: LogoEntry; name: string }) {
+  const url =
+    logo?.content && typeof logo.content === 'object' && 'url' in logo.content ? logo.content.url : null;
+
+  if (url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={url}
+        alt={name}
+        className={s.teamLogo}
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
+    );
+  }
+  return <span className={s.teamLogoPlaceholder}>{name.charAt(0).toUpperCase()}</span>;
+}
+
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const { plnadmin } = parseCookies(ctx);
   if (!plnadmin) {
@@ -325,11 +338,3 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   return { props: {} };
 };
 
-const WarningIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M10 2a8 8 0 100 16A8 8 0 0010 2zm0 9a1 1 0 01-1-1V7a1 1 0 012 0v3a1 1 0 01-1 1zm0 3a1 1 0 110-2 1 1 0 010 2z"
-      fill="#F59E0B"
-    />
-  </svg>
-);
