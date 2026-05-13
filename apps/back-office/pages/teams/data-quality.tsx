@@ -1,45 +1,18 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { GetServerSideProps } from 'next';
 import { parseCookies } from 'nookies';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { useRouter } from 'next/router';
+import { useCookie } from 'react-use';
 import { clsx } from 'clsx';
 
 import { ApprovalLayout } from '../../layout/approval-layout';
-import api from '../../utils/api';
 import { useAuth } from '../../context/auth-context';
 import { WEB_UI_BASE_URL } from '../../utils/constants';
+import { useTeamsEnrichmentReview, FieldKey, FieldEntry, LogoEntry, EnrichmentTeam } from '../../hooks/teams/useTeamsEnrichmentReview';
+import { useApproveEnrichmentFields } from '../../hooks/teams/useApproveEnrichmentFields';
 import s from './data-quality.module.scss';
-
-type FieldKey =
-  | 'website'
-  | 'logo'
-  | 'shortDescription'
-  | 'longDescription'
-  | 'contactMethod'
-  | 'twitterHandler'
-  | 'linkedinHandler'
-  | 'blog';
-
-type FieldEntry = {
-  content: string | string[] | { uid: string; url: string } | null;
-  metadata: { source?: string; lastModifiedAt?: string };
-  judgment?: { note?: string; score?: number };
-  promotable: boolean;
-};
-
-type LogoEntry = FieldEntry & {
-  verification: { verdict: string; confidence: string; reason: string } | null;
-};
-
-type EnrichmentTeam = {
-  uid: string;
-  name: string;
-  enrichmentStatus: string;
-  fields: Partial<Record<FieldKey, FieldEntry>>;
-  logo?: LogoEntry;
-};
 
 const FIELD_KEYS: FieldKey[] = [
   'website',
@@ -74,13 +47,14 @@ function formatFieldContent(content: FieldEntry['content']): string {
 const DataQualityPage: React.FC = () => {
   const router = useRouter();
   const { isDirectoryAdmin, isLoading, user } = useAuth();
+  const [authToken] = useCookie('plnadmin');
 
-  const [teams, setTeams] = useState<EnrichmentTeam[]>([]);
-  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedTeam, setSelectedTeam] = useState<EnrichmentTeam | null>(null);
   const [approved, setApproved] = useState<Record<string, boolean>>({});
-  const [approving, setApproving] = useState<Record<string, boolean>>({});
+
+  const { data: teams = [], isLoading: teamsLoading, isError } = useTeamsEnrichmentReview(authToken);
+  const approveMutation = useApproveEnrichmentFields();
 
   useEffect(() => {
     if (!isLoading && user && !isDirectoryAdmin) {
@@ -89,49 +63,26 @@ const DataQualityPage: React.FC = () => {
   }, [isLoading, user, isDirectoryAdmin, router]);
 
   useEffect(() => {
-    loadTeams();
-  }, []);
-
-  useEffect(() => {
     setApproved({});
-    setApproving({});
   }, [selectedTeam?.uid]);
 
-  async function loadTeams() {
-    try {
-      setLoading(true);
-      const cookies = parseCookies();
-      const config = { headers: { authorization: `Bearer ${cookies.plnadmin}` } };
-      const res = await api.get('/v1/admin/teams/enrichment-review?pageSize=200', config);
-      setTeams(res.data?.teams ?? []);
-    } catch (e) {
-      console.error('Failed to load enrichment data', e);
-      toast.error('Failed to load teams. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    if (isError) toast.error('Failed to load teams. Please try again.');
+  }, [isError]);
 
-  const handleApproveField = useCallback(
-    async (teamUid: string, fieldKey: FieldKey) => {
-      const stateKey = `${teamUid}:${fieldKey}`;
-      if (approved[stateKey] || approving[stateKey]) return;
+  const handleApproveField = (teamUid: string, fieldKey: FieldKey) => {
+    const stateKey = `${teamUid}:${fieldKey}`;
+    if (approved[stateKey] || approveMutation.isPending) return;
 
-      try {
-        setApproving((prev) => ({ ...prev, [stateKey]: true }));
-        const cookies = parseCookies();
-        const config = { headers: { authorization: `Bearer ${cookies.plnadmin}` } };
-        await api.patch(`/v1/admin/teams/${teamUid}/enrichment-review/fields`, { fields: [fieldKey] }, config);
-        setApproved((prev) => ({ ...prev, [stateKey]: true }));
-      } catch (e) {
-        console.error('Failed to approve field', e);
-        toast.error(`Failed to approve ${FIELD_LABELS[fieldKey]}. Please try again.`);
-      } finally {
-        setApproving((prev) => ({ ...prev, [stateKey]: false }));
+    approveMutation.mutate(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      { authToken: authToken!, teamUid, fields: [fieldKey] },
+      {
+        onSuccess: () => setApproved((prev) => ({ ...prev, [stateKey]: true })),
+        onError: () => toast.error(`Failed to approve ${FIELD_LABELS[fieldKey]}. Please try again.`),
       }
-    },
-    [approved, approving]
-  );
+    );
+  };
 
   const filteredTeams = teams.filter((t) => {
     const q = search.trim().toLowerCase();
@@ -167,21 +118,21 @@ const DataQualityPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {loading && (
+              {teamsLoading && (
                 <tr>
                   <td colSpan={FIELD_KEYS.length + 2} className={s.stateCell}>
                     Loading…
                   </td>
                 </tr>
               )}
-              {!loading && filteredTeams.length === 0 && (
+              {!teamsLoading && filteredTeams.length === 0 && (
                 <tr>
                   <td colSpan={FIELD_KEYS.length + 2} className={s.stateCell}>
                     {search ? 'No teams match your search.' : 'No teams with reviewable fields found.'}
                   </td>
                 </tr>
               )}
-              {!loading &&
+              {!teamsLoading &&
                 filteredTeams.map((team) => (
                   <tr key={team.uid} className={s.tr}>
                     <td className={clsx(s.td, s.stickyCol, s.teamNameCell)}>
@@ -204,7 +155,12 @@ const DataQualityPage: React.FC = () => {
                               <span className={s.dataSource}>
                                 {entry.promotable ? 'Enriched' : 'Provided by user'}
                               </span>
-                              <span className={clsx(s.evalBadge, (entry.judgment?.score ?? 0) >= 50 ? s.evalHigh : s.evalLow)}>
+                              <span
+                                className={clsx(
+                                  s.evalBadge,
+                                  (entry.judgment?.score ?? 0) >= 50 ? s.evalHigh : s.evalLow
+                                )}
+                              >
                                 {(entry.judgment?.score ?? 0) >= 50 ? 'High' : 'Low'}
                               </span>
                             </div>
@@ -254,7 +210,7 @@ const DataQualityPage: React.FC = () => {
                     if (!entry) return null;
                     const stateKey = `${selectedTeam.uid}:${key}`;
                     const isApproved = !!approved[stateKey];
-                    const isApproving = !!approving[stateKey];
+                    const isSaving = approveMutation.isPending;
                     const isUserOwned = !entry.promotable;
 
                     return (
@@ -278,16 +234,16 @@ const DataQualityPage: React.FC = () => {
                           <button
                             className={clsx(s.toggle, {
                               [s.toggleOn]: isApproved,
-                              [s.toggleDisabled]: isApproved || isApproving || isUserOwned,
+                              [s.toggleDisabled]: isApproved || isSaving || isUserOwned,
                             })}
-                            disabled={isApproved || isApproving || isUserOwned}
+                            disabled={isApproved || isSaving || isUserOwned}
                             onClick={() => handleApproveField(selectedTeam.uid, key)}
                             title={isUserOwned ? 'User-owned field — cannot be overridden' : undefined}
                           >
                             <span className={s.toggleThumb} />
                           </button>
                           <span className={s.toggleStatus}>
-                            {isApproved ? 'Approved' : isApproving ? 'Saving…' : isUserOwned ? 'User-owned' : 'Approve'}
+                            {isApproved ? 'Approved' : isSaving ? 'Saving…' : isUserOwned ? 'User-owned' : 'Approve'}
                           </span>
                         </div>
                       </div>
@@ -337,4 +293,3 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   }
   return { props: {} };
 };
-
