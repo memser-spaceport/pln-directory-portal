@@ -9,21 +9,18 @@ import { clsx } from 'clsx';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import api from '../../utils/api';
 import { useAuth } from '../../context/auth-context';
+import { WEB_UI_BASE_URL } from '../../utils/constants';
 import s from './data-quality.module.scss';
 
 type FieldKey =
   | 'website'
-  | 'blog'
+  | 'logo'
+  | 'shortDescription'
+  | 'longDescription'
   | 'contactMethod'
   | 'twitterHandler'
   | 'linkedinHandler'
-  | 'telegramHandler'
-  | 'shortDescription'
-  | 'longDescription'
-  | 'moreDetails'
-  | 'industryTags'
-  | 'investmentFocus'
-  | 'logo';
+  | 'blog';
 
 type FieldEntry = {
   content: string | string[] | { uid: string; url: string } | null;
@@ -46,32 +43,24 @@ type EnrichmentTeam = {
 
 const FIELD_KEYS: FieldKey[] = [
   'website',
-  'blog',
+  'logo',
+  'shortDescription',
+  'longDescription',
   'contactMethod',
   'twitterHandler',
   'linkedinHandler',
-  'telegramHandler',
-  'shortDescription',
-  'longDescription',
-  'moreDetails',
-  'industryTags',
-  'investmentFocus',
-  'logo',
+  'blog',
 ];
 
 const FIELD_LABELS: Record<FieldKey, string> = {
   website: 'Website',
-  blog: 'Blog',
-  contactMethod: 'Contact',
+  logo: 'Logo',
+  shortDescription: 'Short Description',
+  longDescription: 'Long Description',
+  contactMethod: 'Contact Method',
   twitterHandler: 'Twitter',
   linkedinHandler: 'LinkedIn',
-  telegramHandler: 'Telegram',
-  shortDescription: 'Short Desc',
-  longDescription: 'Long Desc',
-  moreDetails: 'More Details',
-  industryTags: 'Industry Tags',
-  investmentFocus: 'Inv. Focus',
-  logo: 'Logo',
+  blog: 'Blog',
 };
 
 function formatFieldContent(content: FieldEntry['content']): string {
@@ -196,7 +185,24 @@ const DataQualityPage: React.FC = () => {
                 filteredTeams.map((team) => (
                   <tr key={team.uid} className={s.tr}>
                     <td className={clsx(s.td, s.stickyCol, s.teamNameCell)}>
-                      <span className={s.teamName}>{team.name}</span>
+                      <a
+                        href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={s.teamLink}
+                      >
+                        {team.logo?.content && typeof team.logo.content === 'object' && 'url' in team.logo.content ? (
+                          <img
+                            src={team.logo.content.url}
+                            alt={team.name}
+                            className={s.teamLogo}
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <span className={s.teamLogoPlaceholder}>{team.name.charAt(0).toUpperCase()}</span>
+                        )}
+                        <span className={s.teamName}>{team.name}</span>
+                      </a>
                     </td>
                     {FIELD_KEYS.map((key) => {
                       const entry = key === 'logo' ? team.logo : team.fields[key];
