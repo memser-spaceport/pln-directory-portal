@@ -429,30 +429,28 @@ Team-level status flip only — sets `dataEnrichment.status` to `Reviewed` or `A
 ### Admin Field-Level Review — List
 
 ```
-GET /v1/admin/teams/enrichment-review?page=<int>&pageSize=<int>
+GET /v1/admin/teams/enrichment-review
 Guard: AdminAuthGuard
 ```
 
-Paginated list of teams that have at least one reviewable item — non-`high` judgment on any `fieldsMeta[k]`, or a latest `TeamLogoVerificationResult` whose `confidence !== 'high'`. Only teams whose top-level `dataEnrichment.status === 'Enriched'` are included (Reviewed / Approved / PendingEnrichment / InProgress / FailedToEnrich are out of scope). Sorted by `team.name` ASC.
-
-- `page` (default `1`) — 1-based page index. Out-of-range pages clamp to the last available page.
-- `pageSize` (default `20`, capped at `100`) — items per page.
+Full list of teams whose top-level `dataEnrichment.status === 'Enriched'`. Reviewed / Approved / PendingEnrichment / InProgress / FailedToEnrich are out of scope. Sorted by `team.name` ASC. No pagination — the portal carries ~1K teams and the back-office UI consumes the full set at once.
 
 Per-field rules:
-- High-confidence fields are hidden (already promoted by the judge).
+- Every field that has a `fieldsMeta[k].judgment` entry is surfaced, including those the judge already promoted at `agrees + high`. Admins use this view to spot-check promotion decisions.
 - Empty candidate values (null / empty string / empty array) are excluded.
-- `ChangedByUser` fields with low/medium judgment are surfaced with `promotable: false` (visibility only — admin can't promote the user's own value).
-- Logo is included when the team has a `TeamEnrichment.logoUid` and the latest verification's `confidence !== 'high'`. The latest row is selected across all providers, newest by `createdAt`.
+- `ChangedByUser` fields are surfaced with `promotable: false` (visibility only — admin can't promote the user's own value).
+- Logo is included whenever `TeamEnrichment.logoUid` is set, regardless of the latest verification's confidence. The latest `TeamLogoVerificationResult` row (any provider, newest by `createdAt`) populates `verification`; `verification` is `null` when no row exists.
+- `teamLogo` carries the live `Team.logo` (joined from `Image`) so admins can compare the user-visible logo against the candidate `logo` (which holds the `TeamEnrichment.logo` row).
 
 Response shape:
 
 ```ts
 {
-  pagination: { page, pageSize, totalTeams, totalPages },
   teams: Array<{
     uid: string;
     name: string;
     enrichmentStatus: EnrichmentStatus;          // always 'Enriched' in this list
+    teamLogo: { uid: string; url: string } | null;  // live Team.logo (left-join Image)
     fields: Partial<Record<FieldMetaKey, {
       content: string | string[];                // candidate value from TeamEnrichment
       metadata: { source?: EnrichmentSource; lastModifiedAt?: string };
@@ -460,7 +458,7 @@ Response shape:
       promotable: boolean;                        // false when fieldsMeta[k].status === ChangedByUser
     }>>;
     logo?: {
-      content: { uid: string; url: string } | null;
+      content: { uid: string; url: string } | null;   // candidate logo from TeamEnrichment
       metadata: { source?: EnrichmentSource; lastModifiedAt?: string };
       verification: {
         verdict: string;
@@ -473,6 +471,81 @@ Response shape:
   }>
 }
 ```
+
+### Admin Enrichment Status — Single Team
+
+```
+GET /v1/admin/teams/:uid/enrichment-status
+Guard: AdminAuthGuard
+```
+
+Per-team enrich + judge status snapshot. Useful for back-office to ask "what's the current state of team X?" without parsing the full enrichment-review list.
+
+- Returns 404 if the team uid doesn't exist.
+- Returns `enrichment: null` and `judgment: null` when the team has no `TeamEnrichment` row.
+- Returns `judgment: null` when the team has been enriched but the judge has not run yet.
+
+Response shape:
+
+```ts
+{
+  uid: string;
+  name: string;
+  enrichment: {
+    status: EnrichmentStatus;             // PendingEnrichment | InProgress | Enriched | FailedToEnrich | Reviewed | Approved
+    shouldEnrich: boolean;
+    enrichedAt: string | null;            // ISO timestamp of last successful enrichment
+    enrichedBy: string | null;            // 'system-cron' | 'manually' | <email>
+    reviewedAt: string | null;
+    reviewedBy: string | null;
+    errorMessage: string | null;
+    aiModel: string | null;
+  } | null;
+  judgment: {
+    status: JudgmentStatus;               // PendingJudgment | InProgress | Judged | FailedToJudge
+    judgedAt: string | null;
+    judgedBy: string | null;
+    aiModel: string | null;
+    errorMessage: string | null;
+    overallAssessment: string | null;
+    fieldsForReview: string[];            // DB column names the judge flagged for manual review
+  } | null;
+}
+```
+
+### Admin Enrichment Status — Cron Jobs
+
+```
+GET /v1/admin/teams/enrichment-status
+Guard: AdminAuthGuard
+```
+
+Cron progress snapshot — `isRunning` flags for the three cron jobs (enrichment, marking, judge), plus pending / in-progress team counts. Admins use this to confirm whether a manual `trigger-enrichment` is still mid-batch, or to know whether the daily cron has anything queued.
+
+Response shape:
+
+```ts
+{
+  enrichment: {
+    isRunning: boolean;        // per-pod in-memory flag
+    pending: number;           // TeamEnrichment rows with shouldEnrich=true AND status=PendingEnrichment
+    inProgress: number;        // TeamEnrichment rows with status=InProgress
+  };
+  marking: {
+    isRunning: boolean;        // per-pod in-memory flag (separate marking cron)
+  };
+  judge: {
+    isRunning: boolean;        // per-pod in-memory flag
+    pending: number;           // status=Enriched AND judgment.status NOT IN (Judged, InProgress) — SQL pre-filter only
+    inProgress: number;        // judgment.status=InProgress
+  };
+}
+```
+
+Caveats:
+
+- **`isRunning` is per-pod**. The flag is an in-memory boolean on the cron-job class — accurate within this pod, but if the API runs as multiple replicas, only the pod actually executing the cron will report `true`. Counts come from the DB and are authoritative across pods.
+- **Judge `pending` is the SQL pre-filter only**, before `collectJudgableFieldKeys` weeds out rows with nothing to judge. The true cron-eligible count is `≤ pending` — same shape as the cron's own log line.
 
 ### Admin Field-Level Review — Approve
 
