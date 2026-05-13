@@ -292,4 +292,10 @@ export class AdminTeamsController {
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
     });
   }
+
+  @Get(':uid')
+  @NoCache()
+  async getTeam(@Param('uid') uid: string) {
+    return this.adminTeamsService.findOneForAdmin(uid);
+  }
 }

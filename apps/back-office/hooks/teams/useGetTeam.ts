@@ -16,7 +16,7 @@ export type TeamDetail = {
 
 async function fetchTeam(uid: string, authToken: string): Promise<TeamDetail> {
   const config = { headers: { authorization: `Bearer ${authToken}` } };
-  const { data } = await api.get<TeamDetail>(`/v1/teams/${uid}`, config);
+  const { data } = await api.get<TeamDetail>(`/v1/admin/teams/${uid}`, config);
   return data;
 }
 
