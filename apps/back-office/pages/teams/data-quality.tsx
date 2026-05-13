@@ -15,6 +15,7 @@ import { useTriggerJudgment } from '../../hooks/teams/useTriggerJudgment';
 import { FIELD_KEYS, FIELD_LABELS } from './data-quality/constants';
 import { TeamLogoCell } from './data-quality/TeamLogoCell';
 import { EditModal } from './data-quality/EditModal';
+import { FieldStatusCell } from './data-quality/FieldStatusCell';
 import s from './data-quality.module.scss';
 
 const DataQualityPage: React.FC = () => {
@@ -170,21 +171,7 @@ const DataQualityPage: React.FC = () => {
                     const entry = key === 'logo' ? team.logo : team.fields[key];
                     return (
                       <td key={key} className={s.td}>
-                        {entry ? (
-                          <div className={s.fieldCell}>
-                            <span className={s.dataSource}>
-                              {entry.promotable ? 'Enriched' : 'Provided by user'}
-                            </span>
-                            <span className={clsx(
-                              s.evalBadge,
-                              (entry.judgment?.score ?? 0) >= 50 ? s.evalHigh : s.evalLow
-                            )}>
-                              {(entry.judgment?.score ?? 0) >= 50 ? 'High' : 'Low'}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className={s.emptyField}>—</span>
-                        )}
+                        {entry ? <FieldStatusCell entry={entry} /> : <span className={s.emptyField}>—</span>}
                       </td>
                     );
                   })}
