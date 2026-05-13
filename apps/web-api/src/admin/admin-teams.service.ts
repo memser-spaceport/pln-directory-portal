@@ -210,26 +210,6 @@ export class AdminTeamsService {
     };
   }
 
-  async findOneForAdmin(uid: string) {
-    const team = await this.prisma.team.findUnique({
-      where: { uid },
-      select: {
-        uid: true,
-        name: true,
-        website: true,
-        blog: true,
-        contactMethod: true,
-        twitterHandler: true,
-        linkedinHandler: true,
-        shortDescription: true,
-        longDescription: true,
-        logo: { select: { url: true } },
-      },
-    });
-    if (!team) throw new NotFoundException('Team not found');
-    return team;
-  }
-
   async updateTeam(uid: string, data: Prisma.TeamUpdateInput) {
     await this.prisma.$transaction(async (tx) => {
       const team = await tx.team.findUnique({ where: { uid } });

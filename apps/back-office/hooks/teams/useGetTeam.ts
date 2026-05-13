@@ -14,18 +14,16 @@ export type TeamDetail = {
   logo?: { url: string } | null;
 };
 
-async function fetchTeam(uid: string, authToken: string): Promise<TeamDetail> {
-  const config = { headers: { authorization: `Bearer ${authToken}` } };
-  const { data } = await api.get<TeamDetail>(`/v1/admin/teams/${uid}`, config);
+async function fetchTeam(uid: string): Promise<TeamDetail> {
+  const { data } = await api.get<TeamDetail>(`/v1/teams/${uid}`);
   return data;
 }
 
-export function useGetTeam(uid: string | null, authToken: string | null | undefined) {
+export function useGetTeam(uid: string | null, enabled = true) {
   return useQuery({
     queryKey: ['TEAM_DETAIL', uid],
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    queryFn: () => fetchTeam(uid!, authToken!),
-    enabled: !!uid && !!authToken,
+    queryFn: () => fetchTeam(uid!),
+    enabled: enabled && !!uid,
     staleTime: 30_000,
   });
 }

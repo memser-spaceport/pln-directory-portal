@@ -293,9 +293,4 @@ export class AdminTeamsController {
     });
   }
 
-  @Get(':uid')
-  @NoCache()
-  async getTeam(@Param('uid') uid: string) {
-    return this.adminTeamsService.findOneForAdmin(uid);
-  }
 }

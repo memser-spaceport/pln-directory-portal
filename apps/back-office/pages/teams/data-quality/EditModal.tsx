@@ -11,7 +11,7 @@ import s from '../data-quality.module.scss';
 
 interface Props {
   team: EnrichmentTeam | null;
-  authToken: string | null | undefined;
+  authToken: string | null | undefined; // needed for save only
   onClose: () => void;
 }
 
@@ -48,7 +48,7 @@ function teamToForm(team: TeamDetail): TeamUpdatePayload {
 export function EditModal({ team, authToken, onClose }: Props) {
   const [form, setForm] = useState<TeamUpdatePayload | null>(null);
 
-  const { data: teamDetail, isLoading: detailLoading } = useGetTeam(team?.uid ?? null, authToken);
+  const { data: teamDetail, isLoading: detailLoading } = useGetTeam(team?.uid ?? null, !!team);
   const updateMutation = useUpdateAdminTeam();
 
   useEffect(() => {
