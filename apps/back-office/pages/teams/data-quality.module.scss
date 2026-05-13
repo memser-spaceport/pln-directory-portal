@@ -66,21 +66,19 @@
 
 .th {
   height: 52px;
-  padding: 4px 8px;
+  padding: 0 16px;
   text-align: left;
-  color: var(--foreground-neutral-secondary, #455468);
+  color: #374151;
   font-size: 14px;
-  font-style: normal;
   font-weight: 500;
-  line-height: 20px;
-  letter-spacing: -0.2px;
-  background: var(--background-neutral-soft-surface, #f9fafb);
+  background: #f9fafb;
   border-bottom: 1px solid #eee;
   white-space: nowrap;
   user-select: none;
+  box-sizing: border-box;
 
   &:first-child {
-    padding-left: 12px;
+    padding-left: 20px;
   }
 }
 
@@ -88,37 +86,36 @@
   position: sticky;
   left: 0;
   z-index: 2;
-  background: var(--background-neutral-soft-surface, #f9fafb);
+  background: #f9fafb;
   box-shadow: 2px 0 4px rgba(0, 0, 0, 0.04);
 }
 
 .tr {
   border-bottom: 1px solid #eee;
+  background: #fff;
 
   &:last-child {
     border-bottom: none;
   }
 
   &:hover .td {
-    background: var(--background-neutral-soft-surface, #f9fafb);
+    background: #f9fafb;
   }
 }
 
 .td {
-  background: var(--background-base-white, #fff);
-  padding: 12px 8px;
+  background: #fff;
+  padding: 12px 16px;
   vertical-align: middle;
-  color: var(--foreground-neutral-secondary, #455468);
+  color: #374151;
   font-size: 14px;
-  font-style: normal;
   font-weight: 500;
-  line-height: 20px;
-  letter-spacing: -0.2px;
-  white-space: nowrap;
+  min-height: 52px;
   min-width: 100px;
+  box-sizing: border-box;
 
   &:first-child {
-    padding-left: 12px;
+    padding-left: 20px;
   }
 }
 
@@ -138,12 +135,12 @@
   align-items: center;
   gap: 8px;
   text-decoration: none;
-  color: inherit;
+  color: #374151;
   min-width: 0;
 
   &:hover .teamName {
     text-decoration: underline;
-    color: var(--action-background-brand-normal, #1b4dff);
+    color: #1b4dff;
   }
 }
 
@@ -173,7 +170,7 @@
 
 .teamName {
   font-weight: 500;
-  color: var(--foreground-neutral-primary, #0a0c11);
+  color: #374151;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -191,7 +188,7 @@
 .dataSource {
   font-size: 12px;
   font-weight: 400;
-  color: var(--foreground-neutral-secondary, #455468);
+  color: #6b7280;
   white-space: nowrap;
 }
 
@@ -229,29 +226,27 @@
   gap: 4px;
   padding: 4px 12px;
   border-radius: 9999px;
-  background: var(--background-neutral-soft-surface, #f9fafb);
-  color: var(--foreground-neutral-secondary, #455468);
+  background: #f9fafb;
+  color: #374151;
   font-size: 12px;
-  font-style: normal;
   font-weight: 500;
   line-height: 16px;
   border: none;
   cursor: pointer;
 
   &:hover {
-    background: rgba(203, 213, 225, 0.3);
+    background: #f1f5f9;
   }
 }
 
 /* ── State rows ─────────────────────────────────────────── */
 
 .stateCell {
-  padding: 32px 24px;
+  padding: 48px;
   text-align: center;
-  color: var(--foreground-neutral-secondary, #455468);
+  color: #5e718d;
   font-size: 14px;
   font-weight: 400;
-  line-height: 20px;
 }
 
 /* ── Modal ─────────────────────────────────────────────── */
