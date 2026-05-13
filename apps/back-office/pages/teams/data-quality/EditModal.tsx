@@ -49,6 +49,7 @@ function teamToForm(team: TeamDetail): TeamUpdatePayload {
 export function EditModal({ team, authToken, onClose }: Props) {
   const [form, setForm] = useState<TeamUpdatePayload | null>(null);
   const [confirmedFields, setConfirmedFields] = useState<Set<FieldKey>>(new Set());
+  const [appliedFields, setAppliedFields] = useState<Set<FieldKey>>(new Set());
 
   const { data: teamDetail, isLoading: detailLoading } = useGetTeam(team?.uid ?? null, !!team);
   const updateMutation = useUpdateAdminTeam();
@@ -62,6 +63,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
     if (!team) {
       setForm(null);
       setConfirmedFields(new Set());
+      setAppliedFields(new Set());
     }
   }, [team]);
 
@@ -184,13 +186,16 @@ export function EditModal({ team, authToken, onClose }: Props) {
                           />
                         )}
 
-                        {enrichmentEntry?.promotable && typeof enrichmentEntry.content === 'string' && enrichmentEntry.content && (
+                        {enrichmentEntry?.promotable && typeof enrichmentEntry.content === 'string' && enrichmentEntry.content && !appliedFields.has(key) && (
                           <div className={s.editSuggestion}>
                             <span className={s.editSuggestionLabel}>AI suggestion:</span>
                             <span className={s.editSuggestionValue}>{enrichmentEntry.content}</span>
                             <button
                               className={s.editApplyBtn}
-                              onClick={() => setForm((prev) => prev ? { ...prev, [key]: enrichmentEntry.content as string } : prev)}
+                              onClick={() => {
+                                setForm((prev) => prev ? { ...prev, [key]: enrichmentEntry.content as string } : prev);
+                                setAppliedFields((prev) => new Set(prev).add(key));
+                              }}
                             >
                               Apply
                             </button>
