@@ -12,7 +12,7 @@ import s from '../data-quality.module.scss';
 
 interface Props {
   team: EnrichmentTeam | null;
-  authToken: string | null | undefined; // needed for save only
+  authToken: string | null | undefined;
   onClose: () => void;
 }
 
@@ -48,6 +48,7 @@ function teamToForm(team: TeamDetail): TeamUpdatePayload {
 
 export function EditModal({ team, authToken, onClose }: Props) {
   const [form, setForm] = useState<TeamUpdatePayload | null>(null);
+  const [confirmedFields, setConfirmedFields] = useState<Set<FieldKey>>(new Set());
 
   const { data: teamDetail, isLoading: detailLoading } = useGetTeam(team?.uid ?? null, !!team);
   const updateMutation = useUpdateAdminTeam();
@@ -58,28 +59,36 @@ export function EditModal({ team, authToken, onClose }: Props) {
   }, [teamDetail]);
 
   useEffect(() => {
-    if (!team) setForm(null);
+    if (!team) {
+      setForm(null);
+      setConfirmedFields(new Set());
+    }
   }, [team]);
+
+  const toggleConfirm = (key: FieldKey) => {
+    setConfirmedFields((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const handleSave = () => {
     if (!team || !form || !authToken) return;
-
-    // Collect all enriched field keys that are reviewable (promotable = AI-enriched)
-    const fieldsToApprove = FIELD_KEYS.filter((key) => {
-      const entry = key === 'logo' ? team.logo : team.fields[key];
-      return entry?.promotable;
-    });
 
     updateMutation.mutate(
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       { authToken: authToken!, uid: team.uid, data: form },
       {
         onSuccess: () => {
-          // Mark all AI-enriched fields as confirmed (high confidence) so they
-          // no longer appear as Low in the table
+          const fieldsToApprove = [...confirmedFields];
           if (fieldsToApprove.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            approveMutation.mutate({ authToken: authToken!, teamUid: team.uid, fields: fieldsToApprove });
+            approveMutation.mutate(
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+              { authToken: authToken!, teamUid: team.uid, fields: fieldsToApprove },
+              { onError: () => toast.error('Saved, but failed to confirm some fields.') }
+            );
           }
           toast.success('Team updated successfully.');
           onClose();
@@ -116,13 +125,17 @@ export function EditModal({ team, authToken, onClose }: Props) {
 
               {!detailLoading && form && (
                 <>
-                  {/* Logo — read-only */}
-                  <LogoRow team={team} teamDetail={teamDetail} />
+                  <LogoRow
+                    team={team}
+                    teamDetail={teamDetail}
+                    confirmed={confirmedFields.has('logo')}
+                    onToggleConfirm={() => toggleConfirm('logo')}
+                  />
 
-                  {/* Editable text fields */}
                   {EDITABLE_KEYS.map((key) => {
                     const enrichmentEntry = team.fields[key];
                     const score = getScore(enrichmentEntry);
+                    const isConfirmed = confirmedFields.has(key);
 
                     return (
                       <div key={key} className={s.editFieldRow}>
@@ -140,6 +153,14 @@ export function EditModal({ team, authToken, onClose }: Props) {
                                 <span className={s.editJudgmentNote} title={enrichmentEntry.judgment.note}>
                                   {enrichmentEntry.judgment.note}
                                 </span>
+                              )}
+                              {enrichmentEntry.promotable && (
+                                <button
+                                  className={clsx(s.confirmBtn, { [s.confirmBtnActive]: isConfirmed })}
+                                  onClick={() => toggleConfirm(key)}
+                                >
+                                  {isConfirmed ? '✓ Confirmed' : 'Confirm'}
+                                </button>
                               )}
                             </div>
                           ) : (
@@ -201,7 +222,17 @@ export function EditModal({ team, authToken, onClose }: Props) {
   );
 }
 
-function LogoRow({ team, teamDetail }: { team: EnrichmentTeam; teamDetail?: TeamDetail }) {
+function LogoRow({
+  team,
+  teamDetail,
+  confirmed,
+  onToggleConfirm,
+}: {
+  team: EnrichmentTeam;
+  teamDetail?: TeamDetail;
+  confirmed: boolean;
+  onToggleConfirm: () => void;
+}) {
   const currentLogoUrl = teamDetail?.logo?.url ?? null;
   const candidateLogoUrl =
     team.logo?.content && typeof team.logo.content === 'object' && 'url' in team.logo.content
@@ -221,6 +252,14 @@ function LogoRow({ team, teamDetail }: { team: EnrichmentTeam; teamDetail?: Team
             <span className={clsx(s.evalBadge, logoScore !== undefined && logoScore >= 50 ? s.evalHigh : s.evalLow)}>
               {scoreLabel(logoScore)}
             </span>
+            {team.logo.promotable && (
+              <button
+                className={clsx(s.confirmBtn, { [s.confirmBtnActive]: confirmed })}
+                onClick={onToggleConfirm}
+              >
+                {confirmed ? '✓ Confirmed' : 'Confirm'}
+              </button>
+            )}
           </div>
         ) : (
           <span className={s.editNoEnrichment}>No enrichment data</span>
