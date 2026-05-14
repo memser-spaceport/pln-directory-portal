@@ -3,11 +3,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { clsx } from 'clsx';
 
-import { EnrichmentTeam, FieldKey, FieldEntry } from '../../../hooks/teams/useTeamsEnrichmentReview';
+import { EnrichmentTeam, FieldKey } from '../../../hooks/teams/useTeamsEnrichmentReview';
 import { useGetTeam, TeamDetail } from '../../../hooks/teams/useGetTeam';
 import { useUpdateAdminTeam, TeamUpdatePayload } from '../../../hooks/teams/useUpdateAdminTeam';
 import { useApproveEnrichmentFields } from '../../../hooks/teams/useApproveEnrichmentFields';
 import { FIELD_KEYS, FIELD_LABELS } from './constants';
+import { FieldStatusCell } from './FieldStatusCell';
 import s from '../data-quality.module.scss';
 
 interface Props {
@@ -24,15 +25,6 @@ const MULTILINE: Partial<Record<EditableFieldKey, boolean>> = {
   shortDescription: true,
   longDescription: true,
 };
-
-function getScore(entry: FieldEntry | undefined): number | undefined {
-  return entry?.judgment?.score;
-}
-
-function scoreLabel(score: number | undefined): string {
-  if (score === undefined) return '—';
-  return score >= 50 ? 'High' : 'Low';
-}
 
 function teamToForm(team: TeamDetail): TeamUpdatePayload {
   return {
@@ -156,7 +148,6 @@ export function EditModal({ team, authToken, onClose }: Props) {
 
                   {EDITABLE_KEYS.map((key) => {
                     const enrichmentEntry = team.fields[key];
-                    const score = getScore(enrichmentEntry);
                     const isConfirmed = confirmedFields.has(key);
 
                     return (
@@ -165,14 +156,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                           <span className={s.fieldLabel}>{FIELD_LABELS[key]}</span>
                           {enrichmentEntry ? (
                             <div className={s.editEnrichmentStatus}>
-                              <span className={clsx(s.badge, enrichmentEntry.promotable ? s.badgeAI : s.badgeUser)}>
-                                {enrichmentEntry.promotable ? 'AI' : 'User'}
-                              </span>
-                              {score !== undefined && (
-                                <span className={clsx(s.evalBadge, score >= 50 ? s.evalHigh : s.evalLow)}>
-                                  {scoreLabel(score)}
-                                </span>
-                              )}
+                              <FieldStatusCell entry={enrichmentEntry} />
                               {enrichmentEntry.judgment?.note && (
                                 <span className={s.editJudgmentNote} title={enrichmentEntry.judgment.note}>
                                   {enrichmentEntry.judgment.note}
@@ -265,7 +249,6 @@ function LogoRow({
     team.logo?.content && typeof team.logo.content === 'object' && 'url' in team.logo.content
       ? team.logo.content.url
       : null;
-  const logoScore = team.logo?.judgment?.score;
 
   return (
     <div className={s.editFieldRow}>
@@ -273,14 +256,7 @@ function LogoRow({
         <span className={s.fieldLabel}>{FIELD_LABELS['logo']}</span>
         {team.logo ? (
           <div className={s.editEnrichmentStatus}>
-            <span className={clsx(s.badge, team.logo.promotable ? s.badgeAI : s.badgeUser)}>
-              {team.logo.promotable ? 'AI' : 'User'}
-            </span>
-            {logoScore !== undefined && (
-              <span className={clsx(s.evalBadge, logoScore >= 50 ? s.evalHigh : s.evalLow)}>
-                {scoreLabel(logoScore)}
-              </span>
-            )}
+            <FieldStatusCell entry={team.logo} />
             {team.logo.promotable && (
               <button
                 className={clsx(s.confirmBtn, { [s.confirmBtnActive]: confirmed })}

@@ -121,7 +121,7 @@
 
 .th {
   height: 52px;
-  padding: 0 16px;
+  padding: 0 8px;
   text-align: left;
   color: #374151;
   font-size: 14px;
@@ -257,7 +257,6 @@
 
 .fieldCell {
   display: flex;
-  flex-direction: column;
   gap: 4px;
 }
 
@@ -475,25 +474,6 @@
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 5px;
-  border-radius: 4px;
-  white-space: nowrap;
-  line-height: 1.4;
-}
-
-.badgeAI {
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-
-.badgeUser {
-  background: #f0fdf4;
-  color: #15803d;
 }
 
 .fieldLabel {
