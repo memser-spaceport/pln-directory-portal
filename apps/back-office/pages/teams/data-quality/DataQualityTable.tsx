@@ -67,12 +67,11 @@ export function DataQualityTable({ teams, isLoading, search, evalFilter, sourceF
         },
       }),
       ...FIELD_KEYS.map((key) =>
-        columnHelper.display({
+        // Use accessor (not display) so getCanSort() sees an accessorFn and allows sorting
+        columnHelper.accessor((row) => fieldSortValue(row, key), {
           id: key,
           header: FIELD_LABELS[key],
-          enableSorting: true,
-          sortingFn: (rowA, rowB) =>
-            fieldSortValue(rowA.original, key) - fieldSortValue(rowB.original, key),
+          sortingFn: 'basic',
           cell: (info) => {
             const team = info.row.original;
             const entry = key === 'logo' ? team.logo : team.fields[key];
