@@ -30,7 +30,7 @@ export function FieldStatusCell({ entry }: Props) {
   );
 }
 
-const AIIcon = () => (
+export const AIIcon = () => (
   <svg width="11" height="11" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M8 1l1.5 3.5L13 6l-3.5 1.5L8 11l-1.5-3.5L3 6l3.5-1.5L8 1z" fill="currentColor" />
     <path
@@ -41,7 +41,7 @@ const AIIcon = () => (
   </svg>
 );
 
-const UserIcon = () => (
+export const UserIcon = () => (
   <svg width="11" height="11" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path
       d="M8 8a3 3 0 100-6 3 3 0 000 6zM2 14c0-3.314 2.686-5 6-5s6 1.686 6 5"
