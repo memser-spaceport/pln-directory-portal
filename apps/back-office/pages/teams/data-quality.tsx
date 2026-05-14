@@ -5,7 +5,6 @@ import { toast } from 'react-toastify';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
 import Select, { StylesConfig } from 'react-select';
-import { clsx } from 'clsx';
 
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
@@ -13,7 +12,6 @@ import { useTeamsEnrichmentReview, EnrichmentTeam } from '../../hooks/teams/useT
 import { FIELD_KEYS } from './data-quality/constants';
 import { DataQualityTable } from './data-quality/DataQualityTable';
 import { EditModal } from './data-quality/EditModal';
-import { AIIcon, UserIcon } from './data-quality/FieldStatusCell';
 import s from './data-quality.module.scss';
 
 type SelectOption = { label: string; value: string };
@@ -53,31 +51,6 @@ const SOURCE_OPTIONS: SelectOption[] = [
   { value: 'user', label: 'Provided by user' },
 ];
 
-function formatEvalOption(opt: SelectOption) {
-  if (opt.value === 'all') return <span>{opt.label}</span>;
-  const isHigh = opt.value === 'high';
-  return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span className={clsx(s.evalBadge, isHigh ? s.evalHigh : s.evalLow)}>
-        <span className={s.evalDot} />
-        {opt.label}
-      </span>
-    </span>
-  );
-}
-
-function formatSourceOption(opt: SelectOption) {
-  if (opt.value === 'all') return <span>{opt.label}</span>;
-  const isAI = opt.value === 'enriched';
-  return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span className={clsx(s.sourceBadge, isAI ? s.sourceBadgeAI : s.sourceBadgeUser)}>
-        {isAI ? <AIIcon /> : <UserIcon />}
-      </span>
-      {opt.label}
-    </span>
-  );
-}
 
 const DataQualityPage: React.FC = () => {
   const router = useRouter();
@@ -134,7 +107,6 @@ const DataQualityPage: React.FC = () => {
               options={EVAL_OPTIONS}
               value={EVAL_OPTIONS.find((o) => o.value === evalFilter)}
               onChange={(opt: SelectOption | null) => setEvalFilter((opt?.value ?? 'all') as typeof evalFilter)}
-              formatOptionLabel={formatEvalOption}
               isClearable={false}
               styles={selectStyles}
             />
@@ -143,7 +115,6 @@ const DataQualityPage: React.FC = () => {
               options={SOURCE_OPTIONS}
               value={SOURCE_OPTIONS.find((o) => o.value === sourceFilter)}
               onChange={(opt: SelectOption | null) => setSourceFilter((opt?.value ?? 'all') as typeof sourceFilter)}
-              formatOptionLabel={formatSourceOption}
               isClearable={false}
               styles={selectStyles}
             />
