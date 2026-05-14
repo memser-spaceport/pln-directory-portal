@@ -16,12 +16,10 @@ export function FieldStatusCell({ entry }: Props) {
       {isEnriched ? (
         <span className={clsx(s.sourceBadge, s.sourceBadgeAI)}>
           <AIIcon />
-          AI Enriched
         </span>
       ) : (
         <span className={clsx(s.sourceBadge, s.sourceBadgeUser)}>
           <UserIcon />
-          provided by user
         </span>
       )}
       <span className={clsx(s.evalBadge, isHigh ? s.evalHigh : s.evalLow)}>

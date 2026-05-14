@@ -41,15 +41,12 @@ export function DataQualityTable({ teams, isLoading, search, evalFilter, sourceF
       columnHelper.display({
         id: 'name',
         header: 'Team',
+        size: 180,
+        maxSize: 180,
         cell: (info) => {
           const team = info.row.original;
           return (
-            <a
-              href={`${WEB_UI_BASE_URL}/teams/${team.uid}`}
-              target="_blank"
-              rel="noreferrer"
-              className={s.teamLink}
-            >
+            <a href={`${WEB_UI_BASE_URL}/teams/${team.uid}`} target="_blank" rel="noreferrer" className={s.teamLink}>
               <TeamLogoCell logo={team.logo} name={team.name} />
               <span className={s.teamName}>{team.name}</span>
             </a>
@@ -101,10 +98,7 @@ export function DataQualityTable({ teams, isLoading, search, evalFilter, sourceF
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header, i) => (
-                  <th
-                    key={header.id}
-                    className={clsx(s.th, i === 0 && s.stickyCol, i === 0 && s.teamNameCell)}
-                  >
+                  <th key={header.id} className={clsx(s.th, i === 0 && s.stickyCol, i === 0 && s.teamNameCell)}>
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
                 ))}
@@ -114,7 +108,9 @@ export function DataQualityTable({ teams, isLoading, search, evalFilter, sourceF
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={colCount} className={s.stateCell}>Loading…</td>
+                <td colSpan={colCount} className={s.stateCell}>
+                  Loading…
+                </td>
               </tr>
             )}
             {!isLoading && teams.length === 0 && (
@@ -126,25 +122,21 @@ export function DataQualityTable({ teams, isLoading, search, evalFilter, sourceF
                 </td>
               </tr>
             )}
-            {!isLoading && table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className={s.tr}>
-                {row.getVisibleCells().map((cell, i) => (
-                  <td
-                    key={cell.id}
-                    className={clsx(s.td, i === 0 && s.stickyCol, i === 0 && s.teamNameCell)}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {!isLoading &&
+              table.getRowModel().rows.map((row) => (
+                <tr key={row.id} className={s.tr}>
+                  {row.getVisibleCells().map((cell, i) => (
+                    <td key={cell.id} className={clsx(s.td, i === 0 && s.stickyCol, i === 0 && s.teamNameCell)}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
 
-      {!isLoading && teams.length > 0 && (
-        <PaginationControls table={table} />
-      )}
+      {!isLoading && teams.length > 0 && <PaginationControls table={table} />}
     </div>
   );
 }

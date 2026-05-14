@@ -160,7 +160,7 @@
 
 .td {
   background: #fff;
-  padding: 12px 16px;
+  padding: 12px 8px;
   vertical-align: middle;
   color: #374151;
   font-size: 14px;
@@ -182,7 +182,7 @@
 
 .teamNameCell {
   min-width: 220px;
-  max-width: 280px;
+  max-width: 220px;
 }
 
 .teamLink {
@@ -236,7 +236,7 @@
 
 .fieldCell {
   display: flex;
-  flex-direction: column;
+  //flex-direction: column;
   gap: 4px;
 }
 
