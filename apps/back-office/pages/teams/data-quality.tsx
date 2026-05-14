@@ -4,6 +4,7 @@ import { parseCookies } from 'nookies';
 import { toast } from 'react-toastify';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
+import Select, { StylesConfig } from 'react-select';
 
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
@@ -12,6 +13,43 @@ import { FIELD_KEYS } from './data-quality/constants';
 import { DataQualityTable } from './data-quality/DataQualityTable';
 import { EditModal } from './data-quality/EditModal';
 import s from './data-quality.module.scss';
+
+type SelectOption = { label: string; value: string };
+
+const selectStyles: StylesConfig<SelectOption> = {
+  container: (base) => ({ ...base, minWidth: 160 }),
+  control: (base) => ({
+    ...base,
+    height: 48,
+    borderRadius: '8px',
+    border: '1px solid rgba(203, 213, 225, 0.50)',
+    background: '#fff',
+    fontSize: '14px',
+    boxShadow: 'none',
+    borderColor: 'rgba(203, 213, 225, 0.50)',
+    '&:hover': { borderColor: '#5E718D', boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12)' },
+  }),
+  indicatorSeparator: () => ({ display: 'none' }),
+  option: (base) => ({
+    ...base,
+    fontSize: '14px',
+    color: '#455468',
+    '&:hover': { background: 'rgba(27, 56, 96, 0.12)' },
+  }),
+  menu: (base) => ({ ...base, zIndex: 3 }),
+};
+
+const EVAL_OPTIONS: SelectOption[] = [
+  { value: 'all', label: 'All scores' },
+  { value: 'low', label: 'Low' },
+  { value: 'high', label: 'High' },
+];
+
+const SOURCE_OPTIONS: SelectOption[] = [
+  { value: 'all', label: 'All sources' },
+  { value: 'enriched', label: 'Enriched' },
+  { value: 'user', label: 'Provided by user' },
+];
 
 const DataQualityPage: React.FC = () => {
   const router = useRouter();
@@ -63,24 +101,22 @@ const DataQualityPage: React.FC = () => {
               placeholder="Search by team name…"
               className={s.input}
             />
-            <select
-              className={s.filterSelect}
-              value={evalFilter}
-              onChange={(e) => setEvalFilter(e.target.value as typeof evalFilter)}
-            >
-              <option value="all">All scores</option>
-              <option value="low">Low</option>
-              <option value="high">High</option>
-            </select>
-            <select
-              className={s.filterSelect}
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value as typeof sourceFilter)}
-            >
-              <option value="all">All sources</option>
-              <option value="enriched">Enriched</option>
-              <option value="user">Provided by user</option>
-            </select>
+            <Select<SelectOption>
+              menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+              options={EVAL_OPTIONS}
+              value={EVAL_OPTIONS.find((o) => o.value === evalFilter)}
+              onChange={(opt: SelectOption | null) => setEvalFilter((opt?.value ?? 'all') as typeof evalFilter)}
+              isClearable={false}
+              styles={selectStyles}
+            />
+            <Select<SelectOption>
+              menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+              options={SOURCE_OPTIONS}
+              value={SOURCE_OPTIONS.find((o) => o.value === sourceFilter)}
+              onChange={(opt: SelectOption | null) => setSourceFilter((opt?.value ?? 'all') as typeof sourceFilter)}
+              isClearable={false}
+              styles={selectStyles}
+            />
           </div>
         </div>
 
