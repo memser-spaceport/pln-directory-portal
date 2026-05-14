@@ -1172,7 +1172,7 @@ export class TeamEnrichmentService {
     pagination: { page: number; pageSize: number; totalTeams: number; totalPages: number };
     teams: EnrichmentReviewItem[];
   }> {
-    const pageSize = Math.min(Math.max(params.pageSize ?? 20, 1), 100);
+    const pageSize = Math.min(Math.max(params.pageSize ?? 20, 1), 2000);
     const requestedPage = Math.max(params.page ?? 1, 1);
 
     const rows = await this.prisma.teamEnrichment.findMany({
