@@ -10,6 +10,16 @@ export class TeamEnrichmentJob {
 
   constructor(private readonly teamEnrichmentService: TeamEnrichmentService) { }
 
+  /** Per-pod in-memory flag — `true` while this pod's enrichment cron tick is mid-flight. */
+  get enrichmentRunning(): boolean {
+    return this.isEnrichmentRunning;
+  }
+
+  /** Per-pod in-memory flag — `true` while this pod's marking cron tick is mid-flight. */
+  get markingRunning(): boolean {
+    return this.isMarkingRunning;
+  }
+
   // Default: every 5 minutes
   @Cron(process.env.TEAM_ENRICHMENT_CRON || '*/5 * * * *', {
     name: 'team-enrichment',
