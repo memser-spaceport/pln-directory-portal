@@ -1,7 +1,7 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import { FieldEntry } from '../../../hooks/teams/useTeamsEnrichmentReview';
-import s from '../data-quality.module.scss';
+import s from '../../../pages/teams/data-quality.module.scss';
 
 interface Props {
   entry: FieldEntry;

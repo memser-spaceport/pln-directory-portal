@@ -1,6 +1,6 @@
 import React from 'react';
 import { LogoEntry } from '../../../hooks/teams/useTeamsEnrichmentReview';
-import s from '../data-quality.module.scss';
+import s from '../../../pages/teams/data-quality.module.scss';
 
 interface Props {
   logo?: LogoEntry;

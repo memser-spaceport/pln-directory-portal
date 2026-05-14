@@ -17,7 +17,7 @@ import PaginationControls from '../../../screens/members/components/PaginationCo
 import { FieldStatusCell } from './FieldStatusCell';
 import { TeamLogoCell } from './TeamLogoCell';
 import { FIELD_KEYS, FIELD_LABELS } from './constants';
-import s from '../data-quality.module.scss';
+import s from '../../../pages/teams/data-quality.module.scss';
 
 interface Props {
   teams: EnrichmentTeam[];
