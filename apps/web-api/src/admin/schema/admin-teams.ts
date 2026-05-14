@@ -71,24 +71,6 @@ export const TriggerForceEnrichmentQuerySchema = z.object({
 export class TriggerForceEnrichmentQueryDto extends createZodDto(TriggerForceEnrichmentQuerySchema) {}
 
 /**
- * Query parameters for GET /v1/admin/teams/enrichment-review (paginated list of teams
- * with at least one low/medium-confidence reviewable field or logo verification).
- *
- * Service-side clamps bounds — the DTO only converts string → number.
- */
-const toOptionalInt = (v: unknown): number | undefined => {
-  if (v === undefined || v === null || v === '') return undefined;
-  const num = typeof v === 'string' ? parseInt(v, 10) : typeof v === 'number' ? v : NaN;
-  return Number.isFinite(num) ? num : undefined;
-};
-
-export const EnrichmentReviewQuerySchema = z.object({
-  page: z.union([z.string(), z.number()]).optional().transform(toOptionalInt),
-  pageSize: z.union([z.string(), z.number()]).optional().transform(toOptionalInt),
-});
-export class EnrichmentReviewQueryDto extends createZodDto(EnrichmentReviewQuerySchema) {}
-
-/**
  * Reviewable field keys for the field-level approve endpoint. Mirrors FieldMetaKey from
  * team-enrichment.types.ts — duplicated here so the Zod layer can validate without dragging
  * an enum import into the schema module. Keep in sync if FieldMetaKey changes.

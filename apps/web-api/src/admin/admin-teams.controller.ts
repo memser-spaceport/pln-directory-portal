@@ -22,13 +22,14 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { AdminTeamsService } from './admin-teams.service';
 import {
   ApproveEnrichmentFieldsBodyDto,
-  EnrichmentReviewQueryDto,
   TriggerForceEnrichmentQueryDto,
   UploadTeamTiersQueryDto,
 } from './schema/admin-teams';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { TeamEnrichmentJudgeService } from '../team-enrichment/team-enrichment-judge.service';
 import { TeamEnrichmentReportService } from '../team-enrichment/team-enrichment-report.service';
+import { TeamEnrichmentJob } from '../team-enrichment/team-enrichment.job';
+import { TeamEnrichmentJudgeJob } from '../team-enrichment/team-enrichment-judge.job';
 
 @ApiTags('Admin Teams')
 @Controller('v1/admin/teams')
@@ -38,7 +39,9 @@ export class AdminTeamsController {
     private readonly adminTeamsService: AdminTeamsService,
     private readonly teamEnrichmentService: TeamEnrichmentService,
     private readonly teamEnrichmentJudgeService: TeamEnrichmentJudgeService,
-    private readonly teamEnrichmentReportService: TeamEnrichmentReportService
+    private readonly teamEnrichmentReportService: TeamEnrichmentReportService,
+    private readonly teamEnrichmentJob: TeamEnrichmentJob,
+    private readonly teamEnrichmentJudgeJob: TeamEnrichmentJudgeJob
   ) {}
 
   @Post('tiers/upload')
@@ -102,17 +105,54 @@ export class AdminTeamsController {
   }
 
   /**
-   * Paginated list of teams whose enrichment has at least one reviewable field —
-   * any `fieldsMeta[k].judgment.confidence !== 'high'`, or a latest logo verification
-   * whose `confidence !== 'high'`. Only teams in `EnrichmentStatus.Enriched` are included.
+   * Full list of teams whose enrichment is in `EnrichmentStatus.Enriched`, including every
+   * judged field regardless of confidence. The response carries both the live `teamLogo`
+   * (`Team.logo`) and the candidate `logo` (`TeamEnrichment.logo`) so admins can compare.
    */
   @Get('enrichment-review')
   @NoCache()
-  async listEnrichmentsForReview(@Query(new ZodValidationPipe()) query: EnrichmentReviewQueryDto) {
-    return this.teamEnrichmentService.listEnrichmentsForReview({
-      page: query.page,
-      pageSize: query.pageSize,
-    });
+  async listEnrichmentsForReview() {
+    return this.teamEnrichmentService.listEnrichmentsForReview();
+  }
+
+  /**
+   * Enrich + judge status snapshot for the enrichment + judge cron jobs.
+   *
+   * `isRunning` is a per-pod in-memory flag — accurate within this process, but if the API
+   * runs as multiple replicas only one pod will see `true`. Pending / in-progress counts come
+   * from the DB and are authoritative across pods.
+   *
+   * Declared before `/:uid/enrichment-status` so Nest routes the static segment first.
+   */
+  @Get('enrichment-status')
+  @NoCache()
+  async getEnrichmentCronStatus() {
+    const counts = await this.teamEnrichmentService.getCronCounts();
+    return {
+      enrichment: {
+        isRunning: this.teamEnrichmentJob.enrichmentRunning,
+        pending: counts.enrichment.pending,
+        inProgress: counts.enrichment.inProgress,
+      },
+      marking: { isRunning: this.teamEnrichmentJob.markingRunning },
+      judge: {
+        isRunning: this.teamEnrichmentJudgeJob.judgmentRunning,
+        pending: counts.judge.pending,
+        inProgress: counts.judge.inProgress,
+      },
+    };
+  }
+
+  /**
+   * Per-team enrich + judge status snapshot — enrichment status (e.g. PendingEnrichment /
+   * Enriched / Reviewed), `enrichedAt` / `judgedAt` timestamps, and judge `fieldsForReview`.
+   * Returns 404 if the team uid doesn't exist; returns `enrichment: null` if the team has no
+   * `TeamEnrichment` row yet.
+   */
+  @Get('/:uid/enrichment-status')
+  @NoCache()
+  async getEnrichmentStatus(@Param('uid') uid: string) {
+    return this.teamEnrichmentService.getEnrichmentStatus(uid);
   }
 
   /**

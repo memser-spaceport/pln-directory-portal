@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
@@ -19,20 +19,21 @@ import {
   FieldMetaKey,
   ForceEnrichmentMode,
   JudgmentSource,
+  JudgmentStatus,
   JudgmentVerdict,
   TeamDataEnrichment,
 } from './team-enrichment.types';
 
 export type EnrichmentReviewFieldEntry = {
   content: string | string[];
-  metadata: { source?: EnrichmentSource; lastModifiedAt?: string };
+  metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
   judgment: { note?: string; score?: number };
   promotable: boolean;
 };
 
 export type EnrichmentReviewLogo = {
   content: { uid: string; url: string } | null;
-  metadata: { source?: EnrichmentSource; lastModifiedAt?: string };
+  metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
   verification: {
     verdict: string;
     confidence: string;
@@ -55,6 +56,45 @@ export type ApproveEnrichmentFieldsResult = {
   promoted: string[];
   skipped: Array<{ field: string; reason: string }>;
   message?: string;
+};
+
+export type TeamEnrichmentStatusEntry = {
+  status: EnrichmentStatus;
+  shouldEnrich: boolean;
+  enrichedAt: string | null;
+  enrichedBy: string | null;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  errorMessage: string | null;
+  aiModel: string | null;
+};
+
+export type TeamJudgmentStatusEntry = {
+  status: JudgmentStatus;
+  judgedAt: string | null;
+  judgedBy: string | null;
+  aiModel: string | null;
+  errorMessage: string | null;
+  overallAssessment: string | null;
+  fieldsForReview: string[];
+};
+
+export type TeamEnrichmentStatusResult = {
+  uid: string;
+  name: string;
+  enrichment: TeamEnrichmentStatusEntry | null;
+  judgment: TeamJudgmentStatusEntry | null;
+};
+
+export type EnrichmentCronCounts = {
+  enrichment: { pending: number; inProgress: number };
+  judge: { pending: number; inProgress: number };
+};
+
+export type EnrichmentCronStatusResult = {
+  enrichment: { isRunning: boolean; pending: number; inProgress: number };
+  marking: { isRunning: boolean };
+  judge: { isRunning: boolean; pending: number; inProgress: number };
 };
 
 const CONFIDENCE_RANK: Record<string, number> = {
@@ -1156,30 +1196,38 @@ export class TeamEnrichmentService {
   }
 
   /**
-   * Paginated list of teams whose enrichment has at least one reviewable item:
-   *  - any `fieldsMeta[k].judgment.confidence` is medium/low (k ∈ scalars + industryTags + investmentFocus), OR
-   *  - latest `TeamLogoVerificationResult` row has `confidence !== 'high'`.
-   *
-   * Only teams whose top-level `dataEnrichment.status === 'Enriched'` are considered — Reviewed /
-   * Approved / PendingEnrichment / InProgress / FailedToEnrich are out of scope.
+   * Full list of teams whose enrichment is in `EnrichmentStatus.Enriched`. Includes every
+   * judged field regardless of confidence so admins can spot-check what the judge promoted.
    *
    * Per-field rules:
-   *  - high-confidence fields are hidden (already promoted by judge)
-   *  - empty candidates are excluded
+   *  - fields without a `fieldsMeta[k].judgment` entry are skipped (not review-ready)
+   *  - empty candidate values (null / empty string / empty array) are excluded
    *  - ChangedByUser fields are surfaced with `promotable: false`
+   *
+   * Logos: emitted whenever `TeamEnrichment.logoUid` is set; the latest
+   * `TeamLogoVerificationResult` (any confidence) populates `verification`. The live
+   * `Team.logo` is exposed separately as `teamLogo` for current-vs-candidate comparison.
    */
-  async listEnrichmentsForReview(params: { page?: number; pageSize?: number }): Promise<{
-    pagination: { page: number; pageSize: number; totalTeams: number; totalPages: number };
-    teams: EnrichmentReviewItem[];
-  }> {
-    const pageSize = Math.min(Math.max(params.pageSize ?? 20, 1), 2000);
-    const requestedPage = Math.max(params.page ?? 1, 1);
-
+  async listEnrichmentsForReview(): Promise<{ teams: EnrichmentReviewItem[] }> {
     const rows = await this.prisma.teamEnrichment.findMany({
       where: { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched } },
       select: {
         teamUid: true,
-        team: { select: { uid: true, name: true } },
+        team: {
+          select: {
+            uid: true,
+            name: true,
+            logo: { select: { uid: true, url: true } },
+            website: true,
+            blog: true,
+            contactMethod: true,
+            twitterHandler: true,
+            linkedinHandler: true,
+            telegramHandler: true,
+            shortDescription: true,
+            longDescription: true,
+          },
+        },
         website: true,
         blog: true,
         contactMethod: true,
@@ -1188,7 +1236,6 @@ export class TeamEnrichmentService {
         telegramHandler: true,
         shortDescription: true,
         longDescription: true,
-        moreDetails: true,
         logoUid: true,
         logo: { select: { uid: true, url: true } },
         investmentFocus: true,
@@ -1199,10 +1246,7 @@ export class TeamEnrichmentService {
     });
 
     if (rows.length === 0) {
-      return {
-        pagination: { page: 1, pageSize, totalTeams: 0, totalPages: 0 },
-        teams: [],
-      };
+      return { teams: [] };
     }
 
     const teamUids = rows.map((r) => r.teamUid);
@@ -1239,18 +1283,55 @@ export class TeamEnrichmentService {
       for (const [keyStr, fieldMeta] of Object.entries(meta.fieldsMeta) as Array<
         [FieldMetaKey, FieldEnrichmentMeta | undefined]
       >) {
-        if (!fieldMeta?.judgment) continue;
-        if (keyStr === 'logo') continue;
-        if (fieldMeta.judgment.confidence === FieldConfidence.High) continue;
+        if (keyStr === 'moreDetails') continue;
 
-        const candidate = (row as any)[keyStr];
-        if (candidate === null || candidate === undefined) continue;
-        if (typeof candidate === 'string' && candidate.trim() === '') continue;
-        if (Array.isArray(candidate) && candidate.length === 0) continue;
+        // Logo: no AI judgment exists (logo isn't judged — binary presence, not semantic).
+        // Emit it as a regular field with `content = Image.url` so the UI can iterate
+        // uniformly. The richer VLM verification still lives on the top-level `logo` block.
+        if (keyStr === 'logo') {
+          const logoUrl = row.logo?.url ?? row.team.logo?.url;
+          if (!logoUrl) continue;
+          fields.logo = {
+            content: logoUrl,
+            metadata: {
+              status: fieldMeta?.status,
+              source: fieldMeta?.source,
+              lastModifiedAt: fieldMeta?.lastModifiedAt,
+            },
+            judgment: {},
+            promotable: fieldMeta?.status !== FieldEnrichmentStatus.ChangedByUser,
+          };
+          continue;
+        }
+
+        if (!fieldMeta?.judgment) continue;
+
+        // Status decides the source of truth:
+        //   - ChangedByUser → Team.<field> (user-owned value lives on Team; the TeamEnrichment
+        //     candidate, if any, is informational provenance)
+        //   - Enriched / CannotEnrich → TeamEnrichment.<field> (AI candidate not yet promoted)
+        // Fallback to the other side covers rows where one side is empty (e.g. AI candidate
+        // promoted-then-cleared, or pre-tracking user data with stale meta).
+        const isUserOwned = fieldMeta.status === FieldEnrichmentStatus.ChangedByUser;
+        const teamValue = (row.team as any)[keyStr];
+        const enrichmentValue = (row as any)[keyStr];
+        const isEmpty = (v: any) =>
+          v === null ||
+          v === undefined ||
+          (typeof v === 'string' && v.trim() === '') ||
+          (Array.isArray(v) && v.length === 0);
+        const primary = isUserOwned ? teamValue : enrichmentValue;
+        const fallback = isUserOwned ? enrichmentValue : teamValue;
+        const candidate = !isEmpty(primary) ? primary : fallback;
+        if (isEmpty(candidate)) continue;
 
         fields[keyStr] = {
           content: candidate,
-          metadata: { source: fieldMeta.source, lastModifiedAt: fieldMeta.lastModifiedAt },
+          metadata: {
+            status: fieldMeta.status,
+            source: fieldMeta.source,
+            lastModifiedAt: fieldMeta.lastModifiedAt,
+          },
           judgment: { note: fieldMeta.judgment.note, score: fieldMeta.judgment.score },
           promotable: fieldMeta.status !== FieldEnrichmentStatus.ChangedByUser,
         };
@@ -1259,11 +1340,14 @@ export class TeamEnrichmentService {
       let logo: EnrichmentReviewLogo | undefined;
       const logoMeta = meta.fieldsMeta.logo;
       const latestLogoVerif = latestByTeam.get(row.teamUid);
-      const logoConfidenceLow = !!latestLogoVerif && latestLogoVerif.confidence !== 'high';
-      if (row.logoUid && logoConfidenceLow) {
+      if (row.logoUid) {
         logo = {
           content: row.logo ? { uid: row.logo.uid, url: row.logo.url } : null,
-          metadata: { source: logoMeta?.source, lastModifiedAt: logoMeta?.lastModifiedAt },
+          metadata: {
+            status: logoMeta?.status,
+            source: logoMeta?.source,
+            lastModifiedAt: logoMeta?.lastModifiedAt,
+          },
           verification: latestLogoVerif
             ? {
                 verdict: latestLogoVerif.verdict,
@@ -1276,8 +1360,6 @@ export class TeamEnrichmentService {
         };
       }
 
-      if (Object.keys(fields).length === 0 && !logo) continue;
-
       items.push({
         uid: row.team.uid,
         name: row.team.name,
@@ -1287,13 +1369,101 @@ export class TeamEnrichmentService {
       });
     }
 
-    const totalTeams = items.length;
-    const totalPages = totalTeams === 0 ? 0 : Math.ceil(totalTeams / pageSize);
-    const page = totalPages === 0 ? 1 : Math.min(requestedPage, totalPages);
-    const start = (page - 1) * pageSize;
+    return { teams: items };
+  }
+
+  /**
+   * Per-team enrich + judge status snapshot. Returns `enrichment: null` if the team has no
+   * `TeamEnrichment` row yet. Throws `NotFoundException` if the team uid doesn't exist.
+   */
+  async getEnrichmentStatus(teamUid: string): Promise<TeamEnrichmentStatusResult> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: {
+        uid: true,
+        name: true,
+        teamEnrichment: { select: { dataEnrichment: true } },
+      },
+    });
+
+    if (!team) {
+      throw new NotFoundException(`Team ${teamUid} not found`);
+    }
+
+    const meta = this.parseEnrichmentMeta(team.teamEnrichment?.dataEnrichment);
+    if (!meta) {
+      return { uid: team.uid, name: team.name, enrichment: null, judgment: null };
+    }
+
+    const enrichment: TeamEnrichmentStatusEntry = {
+      status: meta.status,
+      shouldEnrich: !!meta.shouldEnrich,
+      enrichedAt: meta.enrichedAt ?? null,
+      enrichedBy: meta.enrichedBy ?? null,
+      reviewedAt: meta.reviewedAt ?? null,
+      reviewedBy: meta.reviewedBy ?? null,
+      errorMessage: meta.errorMessage ?? null,
+      aiModel: meta.aiModel ?? null,
+    };
+
+    const judgment: TeamJudgmentStatusEntry | null = meta.judgment
+      ? {
+          status: meta.judgment.status,
+          judgedAt: meta.judgment.judgedAt ?? null,
+          judgedBy: meta.judgment.judgedBy ?? null,
+          aiModel: meta.judgment.aiModel ?? null,
+          errorMessage: meta.judgment.errorMessage ?? null,
+          overallAssessment: meta.judgment.overallAssessment ?? null,
+          fieldsForReview: meta.judgment.fieldsForReview ?? [],
+        }
+      : null;
+
+    return { uid: team.uid, name: team.name, enrichment, judgment };
+  }
+
+  /**
+   * Pending / in-progress counts for the enrichment + judge crons. Pending judge count uses the
+   * same SQL pre-filter as the cron itself (`status=Enriched`, excluding rows already Judged or
+   * InProgress); the cron's post-filter (`collectJudgableFieldKeys`) is not applied here because
+   * it requires materializing every row, and the SQL-pre-filter count is the same shape the cron
+   * logs report.
+   */
+  async getCronCounts(): Promise<EnrichmentCronCounts> {
+    const [enrichPending, enrichInProgress, judgePending, judgeInProgress] = await Promise.all([
+      this.prisma.teamEnrichment.count({
+        where: {
+          AND: [
+            { dataEnrichment: { path: ['shouldEnrich'], equals: true } },
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.PendingEnrichment } },
+          ],
+        },
+      }),
+      this.prisma.teamEnrichment.count({
+        where: { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.InProgress } },
+      }),
+      this.prisma.teamEnrichment.count({
+        where: {
+          AND: [
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched } },
+            {
+              NOT: {
+                OR: [
+                  { dataEnrichment: { path: ['judgment', 'status'], equals: JudgmentStatus.Judged } },
+                  { dataEnrichment: { path: ['judgment', 'status'], equals: JudgmentStatus.InProgress } },
+                ],
+              },
+            },
+          ],
+        },
+      }),
+      this.prisma.teamEnrichment.count({
+        where: { dataEnrichment: { path: ['judgment', 'status'], equals: JudgmentStatus.InProgress } },
+      }),
+    ]);
+
     return {
-      pagination: { page, pageSize, totalTeams, totalPages },
-      teams: items.slice(start, start + pageSize),
+      enrichment: { pending: enrichPending, inProgress: enrichInProgress },
+      judge: { pending: judgePending, inProgress: judgeInProgress },
     };
   }
 
