@@ -8,8 +8,6 @@ import { useCookie } from 'react-use';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
 import { useTeamsEnrichmentReview, EnrichmentTeam } from '../../hooks/teams/useTeamsEnrichmentReview';
-import { useTriggerEnrichment } from '../../hooks/teams/useTriggerEnrichment';
-import { useTriggerJudgment } from '../../hooks/teams/useTriggerJudgment';
 import { FIELD_KEYS } from './data-quality/constants';
 import { DataQualityTable } from './data-quality/DataQualityTable';
 import { EditModal } from './data-quality/EditModal';
@@ -26,8 +24,6 @@ const DataQualityPage: React.FC = () => {
   const [selectedTeam, setSelectedTeam] = useState<EnrichmentTeam | null>(null);
 
   const { data: teams = [], isLoading: teamsLoading, isError } = useTeamsEnrichmentReview(authToken);
-  const triggerMutation = useTriggerEnrichment();
-  const judgmentMutation = useTriggerJudgment();
 
   useEffect(() => {
     if (!isLoading && user && !isDirectoryAdmin) router.replace('/access-denied');
@@ -85,32 +81,6 @@ const DataQualityPage: React.FC = () => {
               <option value="enriched">Enriched</option>
               <option value="user">Provided by user</option>
             </select>
-            <button
-              className={s.triggerBtn}
-              disabled={triggerMutation.isPending}
-              onClick={() =>
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                triggerMutation.mutate(authToken!, {
-                  onSuccess: (res) => toast.success(res.message ?? 'Enrichment triggered.'),
-                  onError: () => toast.error('Failed to trigger enrichment.'),
-                })
-              }
-            >
-              {triggerMutation.isPending ? 'Triggering…' : 'Trigger Enrichment'}
-            </button>
-            <button
-              className={s.triggerBtn}
-              disabled={judgmentMutation.isPending}
-              onClick={() =>
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                judgmentMutation.mutate(authToken!, {
-                  onSuccess: (res) => toast.success(res.message ?? 'Judgment triggered.'),
-                  onError: () => toast.error('Failed to trigger judgment.'),
-                })
-              }
-            >
-              {judgmentMutation.isPending ? 'Triggering…' : 'Trigger Judgment'}
-            </button>
           </div>
         </div>
 
@@ -123,11 +93,7 @@ const DataQualityPage: React.FC = () => {
           onEdit={setSelectedTeam}
         />
 
-        <EditModal
-          team={selectedTeam}
-          authToken={authToken}
-          onClose={() => setSelectedTeam(null)}
-        />
+        <EditModal team={selectedTeam} authToken={authToken} onClose={() => setSelectedTeam(null)} />
       </div>
     </ApprovalLayout>
   );
