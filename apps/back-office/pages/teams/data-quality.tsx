@@ -30,11 +30,11 @@ const selectStyles: StylesConfig<SelectOption> = {
     '&:hover': { borderColor: '#5E718D', boxShadow: '0 0 0 4px rgba(27, 56, 96, 0.12)' },
   }),
   indicatorSeparator: () => ({ display: 'none' }),
-  option: (base) => ({
+  option: (base, state) => ({
     ...base,
     fontSize: '14px',
-    color: '#455468',
-    '&:hover': { background: 'rgba(27, 56, 96, 0.12)' },
+    color: state.isSelected ? '#fff' : '#455468',
+    '&:hover': { background: 'rgba(27, 56, 96, 0.12)', color: '#455468' },
   }),
   menu: (base) => ({ ...base, zIndex: 3 }),
 };
