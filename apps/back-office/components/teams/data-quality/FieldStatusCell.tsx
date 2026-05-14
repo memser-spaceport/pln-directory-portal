@@ -1,5 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
+import { Tooltip } from '@protocol-labs-network/ui';
 import { FieldEntry } from '../../../hooks/teams/useTeamsEnrichmentReview';
 import s from '../../../pages/teams/data-quality.module.scss';
 
@@ -14,13 +15,9 @@ export function FieldStatusCell({ entry }: Props) {
   return (
     <div className={s.fieldCell}>
       {isEnriched ? (
-        <span className={clsx(s.sourceBadge, s.sourceBadgeAI)}>
-          <AIIcon />
-        </span>
+        <Tooltip asChild trigger={<span className={clsx(s.sourceBadge, s.sourceBadgeAI)}><AIIcon /></span>} content="Enriched" />
       ) : (
-        <span className={clsx(s.sourceBadge, s.sourceBadgeUser)}>
-          <UserIcon />
-        </span>
+        <Tooltip asChild trigger={<span className={clsx(s.sourceBadge, s.sourceBadgeUser)}><UserIcon /></span>} content="Provided by user" />
       )}
       <span className={clsx(s.evalBadge, isHigh ? s.evalHigh : s.evalLow)}>
         <span className={s.evalDot} />
