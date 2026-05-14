@@ -2195,3 +2195,59 @@ model JobAlertSendRun {
   @@unique([alertUid, ingestRunId])
   @@index([ingestRunId])
 }
+
+model InvestorOutreachRecord {
+  id Int @id @default(autoincrement())
+
+  investorId  String @unique
+  canonicalId String?
+  dedupeKey   String @unique
+  source      String
+
+  firstName String?
+  lastName  String?
+  email     String
+
+  emailStatus String
+  linkedinUrl String?
+  firm        String?
+  firmDomain  String?
+  title       String? @db.VarChar(120)
+
+  investorType   String
+  fundThesis     String?
+  aumRange       String?
+  checkSizeRange String?
+
+  stageFocus   String
+  sectorTags   String?
+  geoFocus     String? @db.VarChar(120)
+  recentDeals  String? @db.VarChar(200)
+
+  outreachTouches   Int @default(0)
+  outreachCampaigns String?
+  opened            Int @default(0)
+  clicked           Int @default(0)
+  registered        Int @default(0)
+
+  firstSentDate  DateTime? @db.Date
+  lastSentDate   DateTime? @db.Date
+  engagementTier String
+
+  enrichmentStatus      String
+  enrichmentDate        DateTime? @db.Date
+  lastEnrichmentAttempt DateTime?
+
+  enrichmentNotes String? @db.VarChar(500)
+  rawPayload      Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([canonicalId])
+  @@index([source])
+  @@index([emailStatus])
+  @@index([engagementTier])
+  @@index([enrichmentStatus])
+  @@index([enrichmentDate])
+}

@@ -70,6 +70,7 @@ import { ArticleRequestsModule } from './article-requests/article-requests.modul
 import { JobOpeningsModule } from './job-openings/job-openings.module';
 import { JobAlertsModule } from './job-alerts/job-alerts.module';
 import { TeamNewsModule } from './team-news/team-news.module';
+import { InvestorOutreachModule } from './investor-outreach/investor-outreach.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -160,6 +161,7 @@ import { TeamNewsModule } from './team-news/team-news.module';
     JobOpeningsModule,
     JobAlertsModule,
     TeamNewsModule,
+    InvestorOutreachModule,
   ],
   providers: [
     {
