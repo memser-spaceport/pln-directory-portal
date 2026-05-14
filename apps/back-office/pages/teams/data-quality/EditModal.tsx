@@ -100,17 +100,24 @@ export function EditModal({ team, authToken, onClose }: Props) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         await updateMutation.mutateAsync({ authToken: authToken!, uid: team.uid, data: changedData });
       }
+    } catch {
+      toast.error('Failed to save changes. Please try again.');
+      return;
+    }
 
+    try {
       if (fieldsToApprove.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         await approveMutation.mutateAsync({ authToken: authToken!, teamUid: team.uid, fields: fieldsToApprove });
       }
-
-      toast.success('Team updated successfully.');
-      onClose();
     } catch {
-      toast.error('Failed to save changes. Please try again.');
+      toast.error('Changes saved, but failed to confirm fields. Please try again.');
+      onClose();
+      return;
     }
+
+    toast.success('Team updated successfully.');
+    onClose();
   };
 
   return (
@@ -161,9 +168,11 @@ export function EditModal({ team, authToken, onClose }: Props) {
                               <span className={clsx(s.badge, enrichmentEntry.promotable ? s.badgeAI : s.badgeUser)}>
                                 {enrichmentEntry.promotable ? 'AI' : 'User'}
                               </span>
-                              <span className={clsx(s.evalBadge, score !== undefined && score >= 50 ? s.evalHigh : s.evalLow)}>
-                                {scoreLabel(score)}
-                              </span>
+                              {score !== undefined && (
+                                <span className={clsx(s.evalBadge, score >= 50 ? s.evalHigh : s.evalLow)}>
+                                  {scoreLabel(score)}
+                                </span>
+                              )}
                               {enrichmentEntry.judgment?.note && (
                                 <span className={s.editJudgmentNote} title={enrichmentEntry.judgment.note}>
                                   {enrichmentEntry.judgment.note}
@@ -230,7 +239,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                 disabled={!form || !teamDetail || updateMutation.isPending || approveMutation.isPending || detailLoading}
                 onClick={handleSave}
               >
-                {updateMutation.isPending ? 'Saving…' : 'Save changes'}
+                {updateMutation.isPending || approveMutation.isPending ? 'Saving…' : 'Save changes'}
               </button>
             </div>
           </motion.div>
@@ -267,9 +276,11 @@ function LogoRow({
             <span className={clsx(s.badge, team.logo.promotable ? s.badgeAI : s.badgeUser)}>
               {team.logo.promotable ? 'AI' : 'User'}
             </span>
-            <span className={clsx(s.evalBadge, logoScore !== undefined && logoScore >= 50 ? s.evalHigh : s.evalLow)}>
-              {scoreLabel(logoScore)}
-            </span>
+            {logoScore !== undefined && (
+              <span className={clsx(s.evalBadge, logoScore >= 50 ? s.evalHigh : s.evalLow)}>
+                {scoreLabel(logoScore)}
+              </span>
+            )}
             {team.logo.promotable && (
               <button
                 className={clsx(s.confirmBtn, { [s.confirmBtnActive]: confirmed })}
