@@ -137,6 +137,27 @@
   }
 }
 
+.thSortable {
+  cursor: pointer;
+
+  &:hover {
+    background: #f1f5f9;
+  }
+}
+
+.thContent {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sortIcon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: #9ca3af;
+}
+
 .stickyCol {
   position: sticky;
   left: 0;
