@@ -9,7 +9,7 @@ import { useUpdateAdminTeam, TeamUpdatePayload } from '../../../hooks/teams/useU
 import { useApproveEnrichmentFields } from '../../../hooks/teams/useApproveEnrichmentFields';
 import { FIELD_KEYS, FIELD_LABELS } from './constants';
 import { FieldStatusCell } from './FieldStatusCell';
-import s from '../data-quality.module.scss';
+import s from '../../../pages/teams/data-quality.module.scss';
 
 interface Props {
   team: EnrichmentTeam | null;

@@ -9,9 +9,9 @@ import Select, { StylesConfig } from 'react-select';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
 import { useTeamsEnrichmentReview, EnrichmentTeam } from '../../hooks/teams/useTeamsEnrichmentReview';
-import { FIELD_KEYS } from './data-quality/constants';
-import { DataQualityTable } from './data-quality/DataQualityTable';
-import { EditModal } from './data-quality/EditModal';
+import { FIELD_KEYS } from '../../components/teams/data-quality/constants';
+import { DataQualityTable } from '../../components/teams/data-quality/DataQualityTable';
+import { EditModal } from '../../components/teams/data-quality/EditModal';
 import s from './data-quality.module.scss';
 
 type SelectOption = { label: string; value: string };
