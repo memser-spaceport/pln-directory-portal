@@ -8,6 +8,7 @@ import type {
   TeamNewsListQuery,
   TeamNewsListResponse,
 } from 'libs/contracts/src/schema/team-news';
+import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 
 const TOP_LEVEL_FOCUS_AREAS = [
   'Digital Human Rights',
@@ -59,6 +60,16 @@ export class TeamNewsQueryService {
               OR: [{ ancestorArea: { title: { in: query.focus } } }, { focusArea: { title: { in: query.focus } } }],
             },
           },
+        },
+      });
+    }
+
+    if (TEAM_NEWS_EXCLUDED_TEAM_NAMES.length > 0) {
+      and.push({
+        NOT: {
+          OR: TEAM_NEWS_EXCLUDED_TEAM_NAMES.map((name) => ({
+            team: { name: { equals: name, mode: 'insensitive' } },
+          })),
         },
       });
     }
