@@ -61,4 +61,67 @@ describe('InvestorOutreachServiceController', () => {
     expect(ingest).toHaveBeenCalledWith(body);
     expect(out.created).toBe(1);
   });
+
+  it('rejects portfolio_overlaps without team_uid', async () => {
+    await expect(
+      controller.ingest({
+        items: [
+          {
+            investor_id: 'INV-1',
+            dedupe_key: 'a@b.com',
+            source: 'Manual',
+            email: 'a@b.com',
+            email_status: 'verified',
+            investor_type: 'fund',
+            stage_focus: 'seed',
+            engagement_tier: 'T4_cold',
+            enrichment_status: 'pending',
+            portfolio_overlaps: [{} as never],
+          },
+        ],
+      })
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects portfolio_overlaps deal_date that is not YYYY-MM-DD', async () => {
+    await expect(
+      controller.ingest({
+        items: [
+          {
+            investor_id: 'INV-1',
+            dedupe_key: 'a@b.com',
+            source: 'Manual',
+            email: 'a@b.com',
+            email_status: 'verified',
+            investor_type: 'fund',
+            stage_focus: 'seed',
+            engagement_tier: 'T4_cold',
+            enrichment_status: 'pending',
+            portfolio_overlaps: [{ team_uid: 'team-a', deal_date: '2025/06/01' }],
+          },
+        ],
+      })
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects top-level portfolio_teams entries without team_uid', async () => {
+    await expect(
+      controller.ingest({
+        items: [
+          {
+            investor_id: 'INV-1',
+            dedupe_key: 'a@b.com',
+            source: 'Manual',
+            email: 'a@b.com',
+            email_status: 'verified',
+            investor_type: 'fund',
+            stage_focus: 'seed',
+            engagement_tier: 'T4_cold',
+            enrichment_status: 'pending',
+          },
+        ],
+        portfolio_teams: [{ pl_invested_at: '2024-12-01' } as never],
+      })
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });

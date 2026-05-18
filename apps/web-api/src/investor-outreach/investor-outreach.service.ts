@@ -3,10 +3,13 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import {
   InvestorOutreachIngestItem,
+  InvestorOutreachPortfolioOverlapInput,
+  InvestorOutreachPortfolioTeamInput,
   IngestInvestorOutreachDto,
   IngestInvestorOutreachResponse,
 } from './dto/ingest-investor-outreach.dto';
 import {
+  isAllowedAttributionFund,
   isAllowedAumRange,
   isAllowedCheckSizeRange,
   isAllowedEmailStatus,
@@ -58,6 +61,8 @@ export class InvestorOutreachService {
       created: 0,
       updated: 0,
       failed: 0,
+      overlaps_synced: 0,
+      portfolio_teams_upserted: 0,
       errors: [],
     };
 
@@ -88,7 +93,7 @@ export class InvestorOutreachService {
 
         const wasCreate = !byDedupe;
 
-        await this.prisma.investorOutreachRecord.upsert({
+        const upserted = await this.prisma.investorOutreachRecord.upsert({
           where: { dedupeKey: data.dedupeKey },
           create: data,
           update: this.stripKeysForUpdate(data),
@@ -97,6 +102,17 @@ export class InvestorOutreachService {
         result.ingested++;
         if (wasCreate) result.created++;
         else result.updated++;
+
+        if (item.portfolio_overlaps !== undefined) {
+          const recordId = upserted?.id ?? byDedupe?.id ?? byInvestor?.id;
+          if (recordId === undefined) {
+            result.errors?.push(`Item ${i}: could not resolve record id for overlap sync`);
+          } else {
+            const sync = await this.syncOverlapsForRecord(recordId, item.portfolio_overlaps, i);
+            for (const err of sync.errors) result.errors?.push(err);
+            result.overlaps_synced = (result.overlaps_synced ?? 0) + sync.synced;
+          }
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         result.failed++;
@@ -105,9 +121,30 @@ export class InvestorOutreachService {
       }
     }
 
+    if (dto.portfolio_teams && dto.portfolio_teams.length) {
+      let upserted = 0;
+      for (let i = 0; i < dto.portfolio_teams.length; i++) {
+        const entry = dto.portfolio_teams[i];
+        try {
+          const ok = await this.upsertPortfolioTeam(entry);
+          if (ok) {
+            upserted++;
+          } else {
+            result.errors?.push(`portfolio_teams[${i}] team_uid=${entry.team_uid}: team not found`);
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          result.errors?.push(`portfolio_teams[${i}] team_uid=${entry.team_uid}: ${msg}`);
+        }
+      }
+      result.portfolio_teams_upserted = upserted;
+    }
+
     this.logger.log(
       `Investor outreach ingest done (runId=${dto.runId ?? 'none'}, batchSource=${dto.source ?? 'none'}): ` +
-        `received=${result.received} ingested=${result.ingested} created=${result.created} updated=${result.updated} failed=${result.failed}`
+        `received=${result.received} ingested=${result.ingested} created=${result.created} updated=${result.updated} ` +
+        `failed=${result.failed} overlaps_synced=${result.overlaps_synced ?? 0} ` +
+        `portfolio_teams_upserted=${result.portfolio_teams_upserted ?? 0}`
     );
 
     return result;
@@ -118,7 +155,170 @@ export class InvestorOutreachService {
     return rest;
   }
 
-  /** Build prisma input; validates vocab + lengths; throws on invalid row. */
+  /**
+   * Sync overlap rows for a single investor. Semantics:
+   *  - Each provided entry is upserted on the (investorOutreachRecordId, teamUid) unique key.
+   *  - Rows whose teamUid is NOT in the provided set are deleted (so an empty array wipes the investor's overlaps).
+   *  - Entries with unknown team_uid or invalid attribution_fund go into errors[] and are skipped (the rest still sync).
+   */
+  private async syncOverlapsForRecord(
+    recordId: number,
+    overlaps: InvestorOutreachPortfolioOverlapInput[],
+    itemIndex: number
+  ): Promise<{ synced: number; errors: string[] }> {
+    const errors: string[] = [];
+    let synced = 0;
+
+    const providedTeamUids = Array.from(new Set(overlaps.map((o) => o.team_uid.trim()).filter(Boolean)));
+
+    const knownTeamUids = providedTeamUids.length
+      ? new Set(
+          (
+            await this.prisma.team.findMany({
+              where: { uid: { in: providedTeamUids } },
+              select: { uid: true },
+            })
+          ).map((t) => t.uid)
+        )
+      : new Set<string>();
+
+    for (let j = 0; j < overlaps.length; j++) {
+      const o = overlaps[j];
+      const teamUid = o.team_uid.trim();
+      if (!knownTeamUids.has(teamUid)) {
+        errors.push(`Item ${itemIndex}: portfolio_overlaps[${j}] team_uid=${teamUid} not found`);
+        continue;
+      }
+
+      const attributionFund =
+        o.attribution_fund == null || o.attribution_fund.trim() === '' ? null : o.attribution_fund.trim();
+      if (attributionFund !== null && !isAllowedAttributionFund(attributionFund)) {
+        errors.push(
+          `Item ${itemIndex}: portfolio_overlaps[${j}].attribution_fund invalid: ${attributionFund}`
+        );
+        continue;
+      }
+
+      let dealDate: Date | undefined;
+      try {
+        dealDate = parseIsoDateOnly(o.deal_date, `portfolio_overlaps[${j}].deal_date`);
+      } catch (e) {
+        errors.push(`Item ${itemIndex}: ${(e as Error).message}`);
+        continue;
+      }
+
+      const dealStage = o.deal_stage == null || o.deal_stage.trim() === '' ? null : o.deal_stage.trim();
+      const dealAmount = o.deal_amount;
+      if (dealAmount !== undefined && dealAmount !== null) {
+        if (typeof dealAmount !== 'number' || !Number.isFinite(dealAmount) || dealAmount < 0) {
+          errors.push(`Item ${itemIndex}: portfolio_overlaps[${j}].deal_amount must be a non-negative number`);
+          continue;
+        }
+      }
+
+      await this.prisma.investorPortfolioOverlap.upsert({
+        where: { investorOutreachRecordId_teamUid: { investorOutreachRecordId: recordId, teamUid } },
+        create: {
+          investorOutreachRecordId: recordId,
+          teamUid,
+          dealAmount: dealAmount ?? null,
+          dealDate: dealDate ?? null,
+          dealStage,
+          isLeadInvestor: o.is_lead_investor ?? false,
+          attributionFund,
+        },
+        update: {
+          dealAmount: dealAmount ?? null,
+          dealDate: dealDate ?? null,
+          dealStage,
+          isLeadInvestor: o.is_lead_investor ?? false,
+          attributionFund,
+        },
+      });
+      synced++;
+    }
+
+    // Empty array → wipe all overlaps for this investor. Otherwise delete only rows outside the provided set.
+    if (providedTeamUids.length === 0) {
+      const deleted = await this.prisma.investorPortfolioOverlap.deleteMany({
+        where: { investorOutreachRecordId: recordId },
+      });
+      synced += deleted.count;
+    } else {
+      const deleted = await this.prisma.investorPortfolioOverlap.deleteMany({
+        where: {
+          investorOutreachRecordId: recordId,
+          teamUid: { notIn: providedTeamUids },
+        },
+      });
+      synced += deleted.count;
+    }
+
+    return { synced, errors };
+  }
+
+  /** Returns true if the team was found and the meta row was upserted; false if team_uid is unknown. */
+  private async upsertPortfolioTeam(entry: InvestorOutreachPortfolioTeamInput): Promise<boolean> {
+    const teamUid = entry.team_uid.trim();
+    const team = await this.prisma.team.findUnique({ where: { uid: teamUid }, select: { uid: true } });
+    if (!team) return false;
+
+    const plInvestedAt = parseIsoDateOnly(entry.pl_invested_at, 'pl_invested_at');
+
+    const stage = entry.pl_invested_stage == null || entry.pl_invested_stage.trim() === ''
+      ? null
+      : entry.pl_invested_stage.trim();
+    if (stage !== null && !isAllowedStageFocus(stage)) {
+      throw new Error(`pl_invested_stage invalid: ${stage}`);
+    }
+
+    const raisingNow = entry.raising_now == null || entry.raising_now.trim() === ''
+      ? null
+      : entry.raising_now.trim();
+    if (raisingNow !== null && !isAllowedStageFocus(raisingNow)) {
+      throw new Error(`raising_now invalid: ${raisingNow}`);
+    }
+
+    let sectors: string | null = null;
+    if (entry.sectors != null && entry.sectors.trim() !== '') {
+      const parsed = parseSectorTagsList(entry.sectors);
+      if (!parsed.ok) throw new Error(parsed.reason);
+      sectors = parsed.value || null;
+    }
+
+    const geo = entry.geo == null || entry.geo.trim() === '' ? null : entry.geo.trim();
+    if (geo !== null && geo.length > 120) {
+      throw new Error('geo exceeds 120 characters');
+    }
+
+    await this.prisma.plPortfolioTeamMeta.upsert({
+      where: { teamUid },
+      create: {
+        teamUid,
+        plInvestedAt: plInvestedAt ?? null,
+        plInvestedStage: stage,
+        raisingNow,
+        sectors,
+        geo,
+      },
+      update: {
+        plInvestedAt: plInvestedAt ?? null,
+        plInvestedStage: stage,
+        raisingNow,
+        sectors,
+        geo,
+      },
+    });
+    return true;
+  }
+
+  /**
+   * Build prisma input; validates vocab + lengths; throws on invalid row.
+   *
+   * Tag-skip rule: if `item.tags` is undefined, omit `tags` from the input so the existing column
+   * value is preserved on update (and the schema default `[]` is used on create). Supplying an
+   * empty array `[]` explicitly overwrites the column to empty.
+   */
   buildRecordInput(item: InvestorOutreachIngestItem): Prisma.InvestorOutreachRecordUncheckedCreateInput {
     const investorId = item.investor_id.trim();
     const dedupeKey = item.dedupe_key.trim().toLowerCase();
@@ -175,7 +375,7 @@ export class InvestorOutreachService {
     const firmDomain =
       item.firm_domain == null || item.firm_domain.trim() === '' ? undefined : item.firm_domain.trim().toLowerCase();
 
-    return {
+    const input: Prisma.InvestorOutreachRecordUncheckedCreateInput = {
       investorId,
       canonicalId: emptyToUndefined(item.canonical_id?.trim()),
       dedupeKey,
@@ -210,6 +410,15 @@ export class InvestorOutreachService {
       enrichmentNotes,
       rawPayload: item as unknown as Prisma.InputJsonValue,
     };
+
+    if (item.tags !== undefined) {
+      if (!Array.isArray(item.tags)) {
+        throw new Error('tags must be an array of strings');
+      }
+      input.tags = item.tags.map((t) => String(t));
+    }
+
+    return input;
   }
 }
 

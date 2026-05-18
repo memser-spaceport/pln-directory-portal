@@ -87,6 +87,9 @@ model Team {
   jobEnrichment  TeamJobEnrichment?
   newsItems      TeamNewsItem[]
   newsEnrichment TeamNewsEnrichment?
+
+  portfolioOverlaps InvestorPortfolioOverlap[]
+  portfolioMeta     PlPortfolioTeamMeta?
 }
 
 enum AskStatus {
@@ -2199,9 +2202,9 @@ model JobAlertSendRun {
 model InvestorOutreachRecord {
   id Int @id @default(autoincrement())
 
-  investorId  String @unique
+  investorId  String  @unique
   canonicalId String?
-  dedupeKey   String @unique
+  dedupeKey   String  @unique
   source      String
 
   firstName String?
@@ -2219,16 +2222,16 @@ model InvestorOutreachRecord {
   aumRange       String?
   checkSizeRange String?
 
-  stageFocus   String
-  sectorTags   String?
-  geoFocus     String? @db.VarChar(120)
-  recentDeals  String? @db.VarChar(200)
+  stageFocus  String
+  sectorTags  String?
+  geoFocus    String? @db.VarChar(120)
+  recentDeals String? @db.VarChar(200)
 
-  outreachTouches   Int @default(0)
+  outreachTouches   Int     @default(0)
   outreachCampaigns String?
-  opened            Int @default(0)
-  clicked           Int @default(0)
-  registered        Int @default(0)
+  opened            Int     @default(0)
+  clicked           Int     @default(0)
+  registered        Int     @default(0)
 
   firstSentDate  DateTime? @db.Date
   lastSentDate   DateTime? @db.Date
@@ -2241,6 +2244,12 @@ model InvestorOutreachRecord {
   enrichmentNotes String? @db.VarChar(500)
   rawPayload      Json?
 
+  /// User-applied tags. Reserved for the future PATCH /investors/:id/tags endpoint;
+  /// the ingest pipeline will only populate this once the script starts emitting it (Phase 2+).
+  tags String[] @default([])
+
+  portfolioOverlaps InvestorPortfolioOverlap[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2250,4 +2259,49 @@ model InvestorOutreachRecord {
   @@index([engagementTier])
   @@index([enrichmentStatus])
   @@index([enrichmentDate])
+}
+
+/// Cap-table overlap between an external investor (InvestorOutreachRecord) and a PL portfolio Team.
+/// Populated by the Apps-Script ingest pipeline in Phase 2; empty until then.
+model InvestorPortfolioOverlap {
+  id Int @id @default(autoincrement())
+
+  investorOutreachRecordId Int
+  investorOutreachRecord   InvestorOutreachRecord @relation(fields: [investorOutreachRecordId], references: [id], onDelete: Cascade)
+
+  teamUid String
+  team    Team   @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+
+  dealAmount      Decimal?  @db.Decimal(18, 2)
+  dealDate        DateTime? @db.Date
+  dealStage       String?
+  isLeadInvestor  Boolean   @default(false)
+  attributionFund String?
+
+  sourceDataset String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([investorOutreachRecordId, teamUid])
+  @@index([investorOutreachRecordId])
+  @@index([teamUid])
+}
+
+/// PL portfolio team metadata used by the Investor DB warm-intros flow.
+/// Sidecar to Team so the core model stays untouched. Populated by the ingest pipeline in Phase 2.
+model PlPortfolioTeamMeta {
+  id Int @id @default(autoincrement())
+
+  teamUid String @unique
+  team    Team   @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+
+  plInvestedAt    DateTime? @db.Date
+  plInvestedStage String?
+  raisingNow      String?
+  /// Comma-separated sector tags, matching the ingest `sector_tags` convention.
+  sectors         String?
+  geo             String?   @db.VarChar(120)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
