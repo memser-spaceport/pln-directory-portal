@@ -13,6 +13,8 @@ export const RBAC_PERMISSION_CODES = {
   DIRECTORY_ADMIN: 'directory.admin.full',
   ADMIN_TOOLS_ACCESS: 'admin.tools.access',
   TEAM_MEMBERSHIP_SOURCE_READ: 'team.membership_source.read',
+  INVESTOR_DB_VIEW: 'investor_db.view',
+  INVESTOR_DB_EDIT: 'investor_db.edit',
 } as const;
 
 export const RBAC_SCOPES = {
