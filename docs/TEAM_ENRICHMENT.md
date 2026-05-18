@@ -416,16 +416,6 @@ scrapingDog?: {
 
 ## Endpoints
 
-### Admin Review
-
-```
-PATCH /v1/admin/teams/:uid/enrichment-review
-Guard: AdminAuthGuard
-Body: { status: 'Reviewed' | 'Approved' }
-```
-
-Team-level status flip only — sets `dataEnrichment.status` to `Reviewed` or `Approved` and stamps `reviewedAt` / `reviewedBy`. Does not touch field values; for field-level approval + Team promotion use the two endpoints below.
-
 ### Admin Field-Level Review — List
 
 ```
@@ -436,12 +426,11 @@ Guard: AdminAuthGuard
 Full list of teams whose top-level `dataEnrichment.status === 'Enriched'`. Reviewed / Approved / PendingEnrichment / InProgress / FailedToEnrich are out of scope. Sorted by `team.name` ASC. No pagination — the portal carries ~1K teams and the back-office UI consumes the full set at once.
 
 Per-field rules:
-- Every field that has a `fieldsMeta[k].judgment` entry is surfaced, including those the judge already promoted at `agrees + high`. Admins use this view to spot-check promotion decisions.
+- Every field that has a `fieldsMeta[k].judgment` entry is surfaced, including those at `agrees + high`. Admins use this view to spot-check the AI's output before approving.
 - `content` source is decided by `fieldsMeta[k].status`:
   - `ChangedByUser` → reads from `Team.<field>` (user's value is the source of truth; the `TeamEnrichment.<field>` candidate, if any, is informational provenance).
   - `Enriched` / `CannotEnrich` → reads from `TeamEnrichment.<field>` (AI candidate not yet promoted).
   The other side is used as a fallback if the primary side is empty. Fields that are empty in **both** places are skipped — there's nothing to review.
-- `ChangedByUser` fields are surfaced with `promotable: false` (visibility only — admin can't promote the user's own value).
 - Logo is included whenever `TeamEnrichment.logoUid` is set, regardless of the latest verification's confidence. The latest `TeamLogoVerificationResult` row (any provider, newest by `createdAt`) populates `verification`; `verification` is `null` when no row exists.
 - The logo URL also appears in `fields.logo.content` (mirrors the scalar-field shape so the UI can iterate uniformly). The richer VLM verdict stays on the top-level `logo` block.
 
@@ -452,27 +441,69 @@ Response shape:
   teams: Array<{
     uid: string;
     name: string;
+    priority: number;                            // Team.priority (1 = highest, 5 = lowest, 99 = NA)
     enrichmentStatus: EnrichmentStatus;          // always 'Enriched' in this list
+    enrichmentAt: string | null;                 // dataEnrichment.usage.enrichment.lastRunAt (ISO)
+    judgedAt: string | null;                     // dataEnrichment.judgment.judgedAt (ISO)
     fields: Partial<Record<FieldMetaKey, {
       content: string | string[];                // candidate value from TeamEnrichment
-      metadata: { source?: EnrichmentSource; lastModifiedAt?: string };
+      metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
       judgment: { note?: string; score?: number };
-      promotable: boolean;                        // false when fieldsMeta[k].status === ChangedByUser
     }>>;
     logo?: {
       content: { uid: string; url: string } | null;   // candidate logo from TeamEnrichment
-      metadata: { source?: EnrichmentSource; lastModifiedAt?: string };
+      metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
       verification: {
         verdict: string;
         confidence: string;
         reason: string | null;
         verifiedAt: string;                       // TeamLogoVerificationResult.createdAt (ISO)
       } | null;
-      promotable: boolean;                         // false when fieldsMeta.logo.status === ChangedByUser
     };
   }>
 }
 ```
+
+### Admin Team Approval
+
+```
+PATCH /v1/admin/teams/:uid/enrichment-review
+Guard: AdminAuthGuard
+Body: { fields: Array<{ key: FieldMetaKey, content?: string | string[] }> }
+```
+
+Admin reviews a team and approves its enrichment. Body lists per-field decisions (at least one):
+
+- `content` provided → admin edited the value. Final value goes to `Team.<column>` and `fieldsMeta[key].status` flips to `ChangedByUser`.
+- `content` omitted ("Confirm") → admin accepted the current value as-is. The canonical source is read (`Team.<field>` when status is `ChangedByUser`, otherwise the `TeamEnrichment.<field>` candidate) and promoted to Team. `status` is unchanged.
+
+In both cases the per-field judgment is normalized to `{ verdict: 'agrees', confidence: 'high', score: 100, note: '' }` (with `judgedVia` preserved). `note` is cleared because admin approval supersedes the AI's prior justification — keeping stale notes like `"matches-known-..."` would misrepresent why the field is now high-confidence. `lastModifiedAt` is restamped per the value-write invariant.
+
+Value shape per field:
+- Scalars (`website`, `blog`, `contactMethod`, social handles, descriptions, `moreDetails`): `string`.
+- `logo`: `string` (a logo `Image.uid` — `Team.logoUid` is connected to it).
+- `industryTags`: `string[]` of tag titles. Resolved case-insensitively against existing `IndustryTag` records; unmatched titles are silently dropped (same rule as the judge).
+- `investmentFocus`: `string[]`. Written to `InvestorProfile.investmentFocus` (the profile is created if missing).
+
+What happens in one `prisma.$transaction`:
+
+1. **Team writes** per the per-field resolution above. For `ChangedByUser` + confirm-only entries, no Team write is issued (the value is already there); only `fieldsMeta` is normalized.
+2. **`fieldsMeta` normalization** for every approved key — `status` + `judgment` updated per the rules above, `lastModifiedAt` restamped.
+3. **Team-level metadata**:
+   - `dataEnrichment.status` → `Approved`.
+   - `reviewedAt` → now (ISO).
+   - `reviewedBy` → requestor email from the JWT (`req.userEmail`).
+   - Approved keys removed from `dataEnrichment.judgment.fieldsForReview`.
+4. **Logo verification audit** — when `logo` is approved, the latest `TeamLogoVerificationResult` row for the team (any provider, newest by `createdAt`) is updated to `{ verdict: 'verified', confidence: 'high' }`. Other snapshot columns are preserved.
+
+Guards & skip reasons:
+
+- **Concurrency**: if `dataEnrichment.status === 'InProgress'`, returns `{ success: false, ... }` and writes nothing.
+- **Per-field skips** are returned in `skipped: { key, reason }[]` (the call still succeeds for the other fields):
+  - `empty_value` — admin sent an empty `content` (empty string / empty array).
+  - `no_candidate` — no `content` was provided and the canonical source (Team or TeamEnrichment) is empty.
+
+Returns `{ success, approved: FieldMetaKey[], skipped: { key, reason }[], message }`. Does NOT require `IS_TEAM_ENRICHMENT_ENABLED`.
 
 ### Admin Enrichment Status — Single Team
 
@@ -548,46 +579,6 @@ Caveats:
 
 - **`isRunning` is per-pod**. The flag is an in-memory boolean on the cron-job class — accurate within this pod, but if the API runs as multiple replicas, only the pod actually executing the cron will report `true`. Counts come from the DB and are authoritative across pods.
 - **Judge `pending` is the SQL pre-filter only**, before `collectJudgableFieldKeys` weeds out rows with nothing to judge. The true cron-eligible count is `≤ pending` — same shape as the cron's own log line.
-
-### Admin Field-Level Review — Approve
-
-```
-PATCH /v1/admin/teams/:uid/enrichment-review/fields
-Guard: AdminAuthGuard
-Body: { fields: string[] }    // each value ∈ FieldMetaKey ∪ ['logo']
-```
-
-Approve a list of enrichment fields for a single team. Reuses the shared promotion helpers (`team-enrichment-promotion.ts`) so the write path matches the AI judge's `agrees + high` promotion — no logic duplication.
-
-What happens in one `prisma.$transaction`:
-
-1. **Promotion to `Team`** — for each approved field:
-   - **Scalars** (`website`, `blog`, `contactMethod`, `twitterHandler`, `linkedinHandler`, `telegramHandler`, `shortDescription`, `longDescription`, `moreDetails`): `Team.<field>` = `TeamEnrichment.<field>`.
-   - **`industryTags`**: candidate titles → `IndustryTag` rows (case-insensitive, unmatched titles silently dropped) → `Team.industryTags` M2M set.
-   - **`investmentFocus`**: `InvestorProfile.investmentFocus` upsert (creates the profile if absent).
-   - **`logo`**: `Team.logoUid` = `TeamEnrichment.logoUid`.
-2. **Per-field metadata normalization** — for each approved field:
-   - `fieldsMeta[field].judgment` → `{ verdict: 'agrees', confidence: 'high', score: 90, note: <preserved>, judgedVia: <preserved or 'ai' default> }`.
-   - Removed from team-level `dataEnrichment.judgment.fieldsForReview`.
-   - `fieldsMeta[field].lastModifiedAt` is **not** stamped (mirrors judge — `lastModifiedAt` tracks value writes; promotion just moves the value from `TeamEnrichment` to `Team`).
-3. **Team-level metadata** — every successful call:
-   - `dataEnrichment.status` → `Reviewed`.
-   - `reviewedAt` → now (ISO).
-   - `reviewedBy` → requestor email from the JWT (`req.userEmail`).
-4. **Logo verification audit** — when `logo` is approved, the **latest** `TeamLogoVerificationResult` row for the team (any provider, newest by `createdAt`) is updated to `verdict: 'verified'`, `confidence: 'high'`. All snapshot columns (`reason`, `brandSignals`, `rawResponse`, `predictedCompanyName`, `quality`, `hasReadableText`, `model`, `provider`) are preserved verbatim as the model's audit record. `updatedAt` is auto-bumped by Prisma. This is the first (and currently only) `.update()` against `TeamLogoVerificationResult` — every other write is append-only.
-
-Guards & skip reasons:
-
-- **Concurrency**: if `dataEnrichment.status === 'InProgress'`, returns `{ success: false, message: '...already in progress' }` and writes nothing.
-- **Per-field skips** are returned in `skipped: { field, reason }[]` (the call still succeeds for the other fields):
-  - `no_field_meta` — field has no entry in `fieldsMeta` on this team.
-  - `user_owned` — `fieldsMeta[field].status === ChangedByUser`. The user's value on `Team` is preserved; promotion is bypassed.
-  - `not_enriched` — `fieldsMeta[field].status` is neither `Enriched` nor `ChangedByUser` (e.g. `CannotEnrich`).
-  - `empty_candidate` — the candidate value on `TeamEnrichment` is null / empty string / empty array.
-
-Idempotency: re-approving a field that is already at `agrees + high + 90` writes the same value/metadata again — safe.
-
-Returns `{ success, promoted: string[], skipped: { field, reason }[], message }`. Does NOT require `IS_TEAM_ENRICHMENT_ENABLED`.
 
 ### Trigger Enrichment for a Single Team
 

@@ -20,11 +20,7 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 
 import { AdminTeamsService } from './admin-teams.service';
-import {
-  ApproveEnrichmentFieldsBodyDto,
-  TriggerForceEnrichmentQueryDto,
-  UploadTeamTiersQueryDto,
-} from './schema/admin-teams';
+import { ReviewEnrichmentBodyDto, TriggerForceEnrichmentQueryDto, UploadTeamTiersQueryDto } from './schema/admin-teams';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { TeamEnrichmentJudgeService } from '../team-enrichment/team-enrichment-judge.service';
 import { TeamEnrichmentReportService } from '../team-enrichment/team-enrichment-report.service';
@@ -90,18 +86,28 @@ export class AdminTeamsController {
     return this.adminTeamsService.updateTeam(teamUid, body);
   }
 
+  /**
+   * Admin team approval. Body lists per-field decisions:
+   *   { fields: [{ key: 'website', content: 'https://...' }, { key: 'blog' }, ...] }
+   *
+   * For each entry:
+   *  - `content` provided → admin edited the field. Value goes to Team; FieldEnrichmentStatus
+   *    flips to ChangedByUser; judgment.score bumps to 100.
+   *  - `content` omitted → admin confirmed the value as-is. The current Team / candidate value
+   *    is preserved; judgment.score bumps to 100; status is unchanged.
+   *
+   * Team-level: dataEnrichment.status → Approved, reviewedAt / reviewedBy stamped, approved
+   * keys dropped from judgment.fieldsForReview. Logo approval also marks the latest
+   * TeamLogoVerificationResult row `verified` at high confidence.
+   */
   @Patch('/:uid/enrichment-review')
   @NoCache()
   async reviewEnrichment(
     @Param('uid') uid: string,
-    @Body() body: { status: 'Reviewed' | 'Approved' },
+    @Body(new ZodValidationPipe()) body: ReviewEnrichmentBodyDto,
     @Req() req: any
   ) {
-    if (!body.status || !['Reviewed', 'Approved'].includes(body.status)) {
-      throw new BadRequestException('status must be "Reviewed" or "Approved"');
-    }
-    await this.teamEnrichmentService.reviewEnrichment(uid, body.status, req?.userEmail ?? 'admin');
-    return { success: true };
+    return this.teamEnrichmentService.approveEnrichmentForTeam(uid, body.fields, req?.userEmail ?? 'admin');
   }
 
   /**
@@ -153,23 +159,6 @@ export class AdminTeamsController {
   @NoCache()
   async getEnrichmentStatus(@Param('uid') uid: string) {
     return this.teamEnrichmentService.getEnrichmentStatus(uid);
-  }
-
-  /**
-   * Approve a list of enrichment fields for a team. Promotes the candidate values from
-   * TeamEnrichment to Team (scalars + industryTags M2M + InvestorProfile.investmentFocus +
-   * Team.logoUid), normalizes per-field judgment metadata (verdict=agrees, confidence=high,
-   * score=90), flips `dataEnrichment.status` to `Reviewed`, and on logo approval also marks
-   * the latest TeamLogoVerificationResult row `verified` at high confidence.
-   */
-  @Patch('/:uid/enrichment-review/fields')
-  @NoCache()
-  async approveEnrichmentFields(
-    @Param('uid') uid: string,
-    @Body(new ZodValidationPipe()) body: ApproveEnrichmentFieldsBodyDto,
-    @Req() req: any
-  ) {
-    return this.teamEnrichmentService.approveEnrichmentFields(uid, body.fields, req?.userEmail ?? 'admin');
   }
 
   @Post('/:uid/trigger-enrichment')
@@ -321,16 +310,11 @@ export class AdminTeamsController {
    */
   @Get('ai-report')
   @NoCache()
-  async aiReport(
-    @Query('since') since?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string
-  ) {
+  async aiReport(@Query('since') since?: string, @Query('page') page?: string, @Query('pageSize') pageSize?: string) {
     return this.teamEnrichmentReportService.generateReport({
       since,
       page: page ? parseInt(page, 10) : undefined,
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
     });
   }
-
 }

@@ -5,7 +5,6 @@ import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
-import { buildPromotionPayload, executePromotion } from './team-enrichment-promotion';
 import { ScrapingDogCompanyProfile, TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import {
   ENRICHABLE_TEAM_FIELDS,
@@ -28,7 +27,6 @@ export type EnrichmentReviewFieldEntry = {
   content: string | string[];
   metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
   judgment: { note?: string; score?: number };
-  promotable: boolean;
 };
 
 export type EnrichmentReviewLogo = {
@@ -40,22 +38,34 @@ export type EnrichmentReviewLogo = {
     reason: string | null;
     verifiedAt: string;
   } | null;
-  promotable: boolean;
 };
 
 export type EnrichmentReviewItem = {
   uid: string;
   name: string;
+  priority: number;
   enrichmentStatus: EnrichmentStatus;
+  enrichmentAt: string | null;
+  judgedAt: string | null;
   fields: Partial<Record<FieldMetaKey, EnrichmentReviewFieldEntry>>;
   logo?: EnrichmentReviewLogo;
 };
 
-export type ApproveEnrichmentFieldsResult = {
+export type ApproveEnrichmentTeamSkip = {
+  key: FieldMetaKey;
+  reason: 'empty_value' | 'no_candidate';
+};
+
+export type ApproveEnrichmentTeamResult = {
   success: boolean;
-  promoted: string[];
-  skipped: Array<{ field: string; reason: string }>;
+  approved: FieldMetaKey[];
+  skipped: ApproveEnrichmentTeamSkip[];
   message?: string;
+};
+
+export type ApproveEnrichmentFieldInput = {
+  key: FieldMetaKey;
+  content?: string | string[];
 };
 
 export type TeamEnrichmentStatusEntry = {
@@ -1197,16 +1207,14 @@ export class TeamEnrichmentService {
 
   /**
    * Full list of teams whose enrichment is in `EnrichmentStatus.Enriched`. Includes every
-   * judged field regardless of confidence so admins can spot-check what the judge promoted.
+   * judged field regardless of confidence so admins can spot-check what the judge produced.
    *
    * Per-field rules:
    *  - fields without a `fieldsMeta[k].judgment` entry are skipped (not review-ready)
    *  - empty candidate values (null / empty string / empty array) are excluded
-   *  - ChangedByUser fields are surfaced with `promotable: false`
    *
    * Logos: emitted whenever `TeamEnrichment.logoUid` is set; the latest
-   * `TeamLogoVerificationResult` (any confidence) populates `verification`. The live
-   * `Team.logo` is exposed separately as `teamLogo` for current-vs-candidate comparison.
+   * `TeamLogoVerificationResult` (any confidence) populates `verification`.
    */
   async listEnrichmentsForReview(): Promise<{ teams: EnrichmentReviewItem[] }> {
     const rows = await this.prisma.teamEnrichment.findMany({
@@ -1217,6 +1225,7 @@ export class TeamEnrichmentService {
           select: {
             uid: true,
             name: true,
+            priority: true,
             logo: { select: { uid: true, url: true } },
             website: true,
             blog: true,
@@ -1299,7 +1308,6 @@ export class TeamEnrichmentService {
               lastModifiedAt: fieldMeta?.lastModifiedAt,
             },
             judgment: {},
-            promotable: fieldMeta?.status !== FieldEnrichmentStatus.ChangedByUser,
           };
           continue;
         }
@@ -1333,7 +1341,6 @@ export class TeamEnrichmentService {
             lastModifiedAt: fieldMeta.lastModifiedAt,
           },
           judgment: { note: fieldMeta.judgment.note, score: fieldMeta.judgment.score },
-          promotable: fieldMeta.status !== FieldEnrichmentStatus.ChangedByUser,
         };
       }
 
@@ -1356,14 +1363,16 @@ export class TeamEnrichmentService {
                 verifiedAt: latestLogoVerif.createdAt.toISOString(),
               }
             : null,
-          promotable: logoMeta?.status !== FieldEnrichmentStatus.ChangedByUser,
         };
       }
 
       items.push({
         uid: row.team.uid,
         name: row.team.name,
+        priority: row.team.priority,
         enrichmentStatus: meta.status,
+        enrichmentAt: meta.usage?.enrichment?.lastRunAt ?? null,
+        judgedAt: meta.judgment?.judgedAt ?? null,
         fields,
         ...(logo ? { logo } : {}),
       });
@@ -1468,42 +1477,38 @@ export class TeamEnrichmentService {
   }
 
   /**
-   * Approve a specific set of enrichment fields (and optionally `logo`) for one team.
+   * Admin team approval. For each requested field, writes the value to Team and normalizes
+   * the per-field judgment to `{ verdict: agrees, confidence: high, score: 100 }`.
    *
-   * For each approved field:
-   *  - copy the candidate value from TeamEnrichment to Team (scalars), or set the M2M
-   *    (industryTags), or upsert InvestorProfile.investmentFocus, or set Team.logoUid (logo) —
-   *    via the shared promotion helpers, so the write path matches the AI judge's.
-   *  - normalize `fieldsMeta[field].judgment` to `{ verdict: 'agrees', confidence: 'high', score: 90 }`
-   *    while preserving `note` and `judgedVia` (audit signal).
-   *  - drop the field from team-level `dataEnrichment.judgment.fieldsForReview`.
+   * Per-field rule:
+   *  - `content` provided → admin edited the value. Final value is the admin input;
+   *    `fieldsMeta[key].status` flips to `ChangedByUser`.
+   *  - `content` omitted ("Confirm") → admin accepted the existing value. Final value is
+   *    read from the canonical source: `Team.<field>` when current status is `ChangedByUser`
+   *    (the user's value is already there), otherwise the AI candidate on `TeamEnrichment.<field>`.
+   *    `status` is left unchanged.
    *
-   * Team-level: flip `dataEnrichment.status` to `Reviewed`, write `reviewedAt` / `reviewedBy`.
-   *
-   * Logo approval also mutates the latest `TeamLogoVerificationResult` row for the team
-   * (any provider, newest by createdAt) → `verdict='verified'`, `confidence='high'`. Other columns
-   * (reason, brandSignals, rawResponse, predictedCompanyName, quality, hasReadableText, model,
-   * provider) are left verbatim as the model's snapshot.
-   *
-   * Skipped fields are returned with a `reason` (`user_owned`, `not_enriched`, `no_field_meta`,
-   * `empty_candidate`) so the caller can surface partial outcomes.
+   * Empty resolved values are pushed into `skipped` (`empty_value` / `no_candidate`) and not
+   * promoted. Team-level `dataEnrichment.status` flips to `Approved`; approved keys are dropped
+   * from `judgment.fieldsForReview`. Logo approval also marks the latest
+   * `TeamLogoVerificationResult` row `verified` at high confidence.
    */
-  async approveEnrichmentFields(
+  async approveEnrichmentForTeam(
     teamUid: string,
-    fields: string[],
+    inputs: ApproveEnrichmentFieldInput[],
     reviewerEmail: string
-  ): Promise<ApproveEnrichmentFieldsResult> {
+  ): Promise<ApproveEnrichmentTeamResult> {
     const team = await this.prisma.team.findUnique({
       where: { uid: teamUid },
       select: TEAM_WITH_ENRICHMENT_SELECT,
     });
     if (!team) {
-      return { success: false, promoted: [], skipped: [], message: `Team ${teamUid} not found` };
+      return { success: false, approved: [], skipped: [], message: `Team ${teamUid} not found` };
     }
     if (!team.teamEnrichment) {
       return {
         success: false,
-        promoted: [],
+        approved: [],
         skipped: [],
         message: `Team ${teamUid} has no enrichment row`,
       };
@@ -1512,7 +1517,7 @@ export class TeamEnrichmentService {
     if (!meta) {
       return {
         success: false,
-        promoted: [],
+        approved: [],
         skipped: [],
         message: `Team ${teamUid} has no enrichment data`,
       };
@@ -1520,70 +1525,130 @@ export class TeamEnrichmentService {
     if (meta.status === EnrichmentStatus.InProgress) {
       return {
         success: false,
-        promoted: [],
+        approved: [],
         skipped: [],
         message: `Enrichment already in progress for team ${teamUid}`,
       };
     }
 
     const fieldsMeta = meta.fieldsMeta ?? {};
-    const skipped: Array<{ field: string; reason: string }> = [];
-    const promotableKeys: FieldMetaKey[] = [];
+    const skipped: ApproveEnrichmentTeamSkip[] = [];
 
-    for (const f of fields) {
-      const key = f as FieldMetaKey;
-      const fm = fieldsMeta[key];
-      if (!fm) {
-        skipped.push({ field: f, reason: 'no_field_meta' });
+    const isEmpty = (v: unknown): boolean =>
+      v === null ||
+      v === undefined ||
+      (typeof v === 'string' && v.trim() === '') ||
+      (Array.isArray(v) && v.length === 0);
+
+    // `write` is the value to send to Team; null means "no Team write needed" (already there
+    // for ChangedByUser + confirm). We still normalize fieldsMeta regardless.
+    type Resolved = { key: FieldMetaKey; flip: boolean; write: string | string[] | null };
+    const resolved: Resolved[] = [];
+    const seen = new Set<FieldMetaKey>();
+
+    for (const { key, content } of inputs) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const adminProvided = content !== undefined;
+      if (adminProvided) {
+        if (isEmpty(content)) {
+          skipped.push({ key, reason: 'empty_value' });
+          continue;
+        }
+        resolved.push({ key, flip: true, write: content as string | string[] });
         continue;
       }
-      if (fm.status === FieldEnrichmentStatus.ChangedByUser) {
-        skipped.push({ field: f, reason: 'user_owned' });
+
+      const currentStatus = fieldsMeta[key]?.status;
+      // For ChangedByUser + confirm: value is already on Team / InvestorProfile. Bump score
+      // only — no Team write needed (and reading team.<field> isn't well-typed for relations).
+      if (currentStatus === FieldEnrichmentStatus.ChangedByUser) {
+        resolved.push({ key, flip: false, write: null });
         continue;
       }
-      if (fm.status !== FieldEnrichmentStatus.Enriched) {
-        skipped.push({ field: f, reason: 'not_enriched' });
+
+      const candidate =
+        key === 'logo'
+          ? team.teamEnrichment.logoUid
+          : key === 'investmentFocus'
+          ? team.teamEnrichment.investmentFocus
+          : key === 'industryTags'
+          ? team.teamEnrichment.industryTags
+          : (team.teamEnrichment as any)[key];
+      if (isEmpty(candidate)) {
+        skipped.push({ key, reason: 'no_candidate' });
         continue;
       }
-      promotableKeys.push(key);
+      resolved.push({ key, flip: false, write: candidate as string | string[] });
     }
 
-    if (promotableKeys.length === 0) {
-      return { success: true, promoted: [], skipped, message: 'No promotable fields' };
+    if (resolved.length === 0) {
+      return { success: true, approved: [], skipped, message: 'No fields to approve' };
     }
 
-    const promotion = await buildPromotionPayload(this.prisma, team.teamEnrichment, promotableKeys, fieldsMeta);
-    const promotedSet = new Set<string>(promotion.promotedFields);
-    for (const requested of promotableKeys) {
-      if (!promotedSet.has(requested)) {
-        skipped.push({ field: requested, reason: 'empty_candidate' });
+    const teamUpdate: Prisma.TeamUpdateInput = {};
+    let investmentFocus: string[] | null = null;
+
+    for (const r of resolved) {
+      if (r.write === null) continue;
+      if (r.key === 'industryTags') {
+        const titles = (r.write as string[]).filter((s) => typeof s === 'string' && s.trim() !== '');
+        const matched =
+          titles.length === 0
+            ? []
+            : await this.prisma.industryTag.findMany({
+                where: { title: { in: titles, mode: 'insensitive' } },
+                select: { uid: true },
+              });
+        teamUpdate.industryTags = { set: matched.map((t) => ({ uid: t.uid })) };
+        continue;
       }
+      if (r.key === 'investmentFocus') {
+        investmentFocus = r.write as string[];
+        continue;
+      }
+      if (r.key === 'logo') {
+        const logoUid = Array.isArray(r.write) ? r.write[0] : r.write;
+        teamUpdate.logo = { connect: { uid: logoUid } };
+        continue;
+      }
+      // scalar
+      (teamUpdate as any)[r.key] = Array.isArray(r.write) ? r.write[0] : r.write;
     }
 
-    if (promotion.promotedFields.length === 0) {
-      return { success: true, promoted: [], skipped, message: 'No values to promote' };
-    }
+    const now = new Date().toISOString();
+    const approvedKeys = resolved.map((r) => r.key);
+    const approvedSet = new Set<FieldMetaKey>(approvedKeys);
 
     const newFieldsMeta: FieldsMetaMap = { ...fieldsMeta };
-    for (const k of promotion.promotedFields) {
-      const existing = newFieldsMeta[k];
-      if (!existing) continue;
-      newFieldsMeta[k] = {
-        ...existing,
-        judgment: {
-          note: existing.judgment?.note,
-          judgedVia: existing.judgment?.judgedVia ?? JudgmentSource.AI,
-          verdict: JudgmentVerdict.Agrees,
-          confidence: FieldConfidence.High,
-          score: 90,
+    for (const r of resolved) {
+      const existing = newFieldsMeta[r.key];
+      const nextStatus = r.flip
+        ? FieldEnrichmentStatus.ChangedByUser
+        : existing?.status ?? FieldEnrichmentStatus.Enriched;
+      newFieldsMeta[r.key] = stampModified(
+        {
+          ...(existing ?? {}),
+          status: nextStatus,
+          judgment: {
+            // Admin approval supersedes the AI's note — clear it so stale judgment
+            // text ("matches-known-...") doesn't outlive the value it described.
+            note: '',
+            judgedVia: existing?.judgment?.judgedVia ?? JudgmentSource.AI,
+            verdict: JudgmentVerdict.Agrees,
+            confidence: FieldConfidence.High,
+            score: 100,
+          },
         },
-      };
+        now
+      );
     }
 
     const updatedTeamJudgment = meta.judgment
       ? {
           ...meta.judgment,
-          fieldsForReview: (meta.judgment.fieldsForReview ?? []).filter((f) => !promotedSet.has(f)),
+          fieldsForReview: (meta.judgment.fieldsForReview ?? []).filter((f) => !approvedSet.has(f as FieldMetaKey)),
         }
       : meta.judgment;
 
@@ -1591,13 +1656,13 @@ export class TeamEnrichmentService {
       ...meta,
       fieldsMeta: newFieldsMeta,
       judgment: updatedTeamJudgment,
-      status: EnrichmentStatus.Reviewed,
-      reviewedAt: new Date().toISOString(),
+      status: EnrichmentStatus.Approved,
+      reviewedAt: now,
       reviewedBy: reviewerEmail,
     };
 
     let latestLogoVerificationUid: string | null = null;
-    if (promotedSet.has('logo')) {
+    if (approvedSet.has('logo')) {
       const latest = await this.prisma.teamLogoVerificationResult.findFirst({
         where: { teamUid },
         orderBy: { createdAt: 'desc' },
@@ -1611,7 +1676,24 @@ export class TeamEnrichmentService {
         where: { teamUid },
         data: { dataEnrichment: updated as any },
       });
-      await executePromotion(tx, teamUid, team, promotion);
+      if (Object.keys(teamUpdate).length > 0) {
+        await tx.team.update({ where: { uid: teamUid }, data: teamUpdate });
+      }
+      if (investmentFocus !== null) {
+        if (team.investorProfile) {
+          await tx.investorProfile.update({
+            where: { uid: team.investorProfile.uid },
+            data: { investmentFocus },
+          });
+        } else {
+          await tx.investorProfile.create({
+            data: {
+              investmentFocus,
+              team: { connect: { uid: teamUid } },
+            },
+          });
+        }
+      }
       if (latestLogoVerificationUid) {
         await tx.teamLogoVerificationResult.update({
           where: { uid: latestLogoVerificationUid },
@@ -1621,16 +1703,14 @@ export class TeamEnrichmentService {
     });
 
     this.logger.log(
-      `Admin enrichment approve: team ${teamUid} promoted=[${promotion.promotedFields.join(
-        ','
-      )}] reviewer=${reviewerEmail}`
+      `Admin enrichment approve: team ${teamUid} approved=[${approvedKeys.join(',')}] reviewer=${reviewerEmail}`
     );
 
     return {
       success: true,
-      promoted: promotion.promotedFields,
+      approved: approvedKeys,
       skipped,
-      message: `Approved ${promotion.promotedFields.length} field(s) for team ${teamUid}`,
+      message: `Approved ${approvedKeys.length} field(s) for team ${teamUid}`,
     };
   }
 
