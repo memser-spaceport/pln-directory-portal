@@ -47,6 +47,8 @@ export const INVESTOR_OUTREACH_ENRICHMENT_STATUS = [
   'skipped',
 ] as const;
 
+export const INVESTOR_OUTREACH_ATTRIBUTION_FUNDS = ['PL Capital', 'PLVS'] as const;
+
 export const INVESTOR_OUTREACH_SECTOR_TAGS = [
   'ai',
   'crypto',
@@ -78,6 +80,7 @@ const STAGE_SET = toStringSet(INVESTOR_OUTREACH_STAGE_FOCUS);
 const ENGAGEMENT_SET = toStringSet(INVESTOR_OUTREACH_ENGAGEMENT_TIER);
 const ENRICHMENT_SET = toStringSet(INVESTOR_OUTREACH_ENRICHMENT_STATUS);
 const SECTOR_TAG_SET = toStringSet(INVESTOR_OUTREACH_SECTOR_TAGS);
+const ATTRIBUTION_FUND_SET = toStringSet(INVESTOR_OUTREACH_ATTRIBUTION_FUNDS);
 
 export function isAllowedInvestorSource(v: string): boolean {
   return SOURCE_SET.has(v);
@@ -109,6 +112,10 @@ export function isAllowedEngagementTier(v: string): boolean {
 
 export function isAllowedEnrichmentStatus(v: string): boolean {
   return ENRICHMENT_SET.has(v);
+}
+
+export function isAllowedAttributionFund(v: string): boolean {
+  return ATTRIBUTION_FUND_SET.has(v);
 }
 
 export function parseSectorTagsList(
