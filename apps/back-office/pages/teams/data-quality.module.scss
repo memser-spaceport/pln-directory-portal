@@ -96,6 +96,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .th {
@@ -310,13 +311,13 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 12px;
+  padding: 6px 16px;
   border-radius: 9999px;
   background: #f9fafb;
   color: #374151;
   font-size: 12px;
   font-weight: 500;
-  line-height: 16px;
+  line-height: 15px;
   border: none;
   cursor: pointer;
 
@@ -618,8 +619,16 @@
 .editFieldHeader {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  flex-wrap: wrap;
+}
+
+.editFieldMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
 }
 
 .editEnrichmentStatus {
@@ -729,28 +738,36 @@
 }
 
 .confirmBtn {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid rgba(203, 213, 225, 0.8);
-  background: #fff;
-  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border: 1px solid #1f8a4c;
+  background: transparent;
+  color: #1f8a4c;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: all 0.15s ease;
+  transition: background 0.12s;
+  font-family: inherit;
 
   &:hover {
-    border-color: #22c55e;
-    color: #16a34a;
+    background: #e7f7ee;
   }
 }
 
 .confirmBtnActive {
-  background: #f0fdf4;
-  border-color: #22c55e;
-  color: #16a34a;
+  background: #1f8a4c;
+  color: #fff;
+  border-color: #1f8a4c;
+
+  &:hover {
+    background: #1a7a43;
+  }
 }
 
 /* ── Logo preview row ───────────────────────────────────── */
@@ -781,4 +798,146 @@
   object-fit: contain;
   border: 1px solid rgba(203, 213, 225, 0.4);
   background: #f8fafc;
+}
+
+/* ── Modal title link + subtitle ────────────────────────── */
+
+.modalTitleLink {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  color: #0a0c11;
+  text-decoration: none;
+  display: block;
+
+  &:hover {
+    color: #1b4dff;
+    text-decoration: underline;
+  }
+}
+
+.modalSubtitle {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 400;
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+/* ── Info banner ────────────────────────────────────────── */
+
+.modalInfoBanner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  margin: 12px 0 4px;
+  background: #e8f0fe;
+  border: 1px solid #dbe5fa;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0a0c11;
+}
+
+.modalInfoIcon {
+  color: #1a56db;
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.modalInfoText {
+  flex: 1;
+}
+
+.modalInfoTitle {
+  font-weight: 600;
+  color: #1a56db;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+/* ── Modal empty state ──────────────────────────────────── */
+
+.modalEmptyState {
+  padding: 40px 0;
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 400;
+  margin: 0;
+}
+
+/* ── Priority pill ──────────────────────────────────────── */
+
+.priorityPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  min-width: 28px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+/* ── Needs-review chips ─────────────────────────────────── */
+
+.reviewChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.reviewChip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.reviewChipAI {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.reviewChipUser {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+/* ── Last-judged date stack ─────────────────────────────── */
+
+.dateStack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dateMain {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  line-height: 18px;
+}
+
+.dateTime {
+  font-size: 11px;
+  font-weight: 400;
+  color: #94a3b8;
+  line-height: 16px;
 }

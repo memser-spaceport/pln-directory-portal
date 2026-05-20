@@ -2,6 +2,7 @@ import React from 'react';
 import { clsx } from 'clsx';
 import { Tooltip } from '@protocol-labs-network/ui';
 import { FieldEntry } from '../../../hooks/teams/useTeamsEnrichmentReview';
+import { isAIEnriched } from './constants';
 import s from '../../../pages/teams/data-quality.module.scss';
 
 interface Props {
@@ -10,7 +11,7 @@ interface Props {
 
 export function FieldStatusCell({ entry }: Props) {
   const isHigh = (entry.judgment?.score ?? 0) >= 50;
-  const isEnriched = entry.promotable;
+  const isEnriched = isAIEnriched(entry);
 
   return (
     <div className={s.fieldCell}>
