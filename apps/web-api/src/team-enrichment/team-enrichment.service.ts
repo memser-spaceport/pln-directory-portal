@@ -1209,16 +1209,17 @@ export class TeamEnrichmentService {
    * Full list of teams that still have at least one thing needing admin review.
    *
    * Inclusion criteria — a team is included if EITHER of the following holds:
-   *  - at least one non-logo `fieldsMeta[k].judgment` is not fully approved
-   *    (NOT (`confidence === 'high'` AND `score === 100`)). Admin-approved fields are
-   *    normalized to `{ confidence: high, score: 100 }` and stop triggering inclusion.
+   *  - at least one non-logo `fieldsMeta[k].judgment.score` is below 90. Anything `>= 90`
+   *    is treated as high-confidence (the judge auto-promotes at 90 and admin-approved
+   *    fields land at 100), so it doesn't need review.
    *  - the team has a logo (`row.logoUid` set) whose latest `TeamLogoVerificationResult`
-   *    is not at (`verdict === 'verified'` AND `confidence === 'high'`). Logo has no AI
-   *    judgment on `fieldsMeta` — its verdict lives in the VLM verification table.
+   *    is NOT at (`verdict === 'verified'` AND `confidence === 'high'`). Logo verification
+   *    has no `score` column — the equivalent "high-confidence approved" check uses the
+   *    verdict + confidence pair the VLM writes (and admin approval updates to verified+high).
    *
-   * Note: we deliberately do NOT filter on `dataEnrichment.status`. The judgment + logo
-   * verification state already determines whether anything needs review; a status filter
-   * would silently hide teams if a new status is introduced or one is set by mistake.
+   * Statuses excluded at the query level: `PendingEnrichment`, `InProgress`, `FailedToEnrich`.
+   * The remaining statuses (`Enriched`, `Reviewed`, `Approved`, and any future addition) all
+   * surface here as long as the inclusion check above flags something.
    *
    * Per-field rules in the response:
    *  - fields without a `fieldsMeta[k].judgment` entry are skipped (not review-ready)
@@ -1229,6 +1230,15 @@ export class TeamEnrichmentService {
    */
   async listEnrichmentsForReview(): Promise<{ teams: EnrichmentReviewItem[] }> {
     const rows = await this.prisma.teamEnrichment.findMany({
+      where: {
+        NOT: {
+          OR: [
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.PendingEnrichment } },
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.InProgress } },
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.FailedToEnrich } },
+          ],
+        },
+      },
       select: {
         teamUid: true,
         team: {
@@ -1298,12 +1308,12 @@ export class TeamEnrichmentService {
       const meta = this.parseEnrichmentMeta(row.dataEnrichment);
       if (!meta?.fieldsMeta) continue;
 
-      // A team needs review if any non-logo field isn't fully approved (confidence=high
-      // AND score=100), OR its logo verification isn't (verified, high). The logo doesn't
-      // carry an AI judgment — its verdict comes from TeamLogoVerificationResult.
+      // Score >= 90 is treated as high-confidence and doesn't need review.
+      // Logo has no `score` column on its verification row — the equivalent check is
+      // verdict='verified' AND confidence='high' (what admin-approve writes).
       const hasUnapprovedField = Object.entries(meta.fieldsMeta).some(([k, fm]) => {
         if (k === 'logo' || !fm?.judgment) return false;
-        return !(fm.judgment.confidence === FieldConfidence.High && fm.judgment.score === 100);
+        return (fm.judgment.score ?? 0) < 90;
       });
       const latestLogoVerif = latestByTeam.get(row.teamUid);
       const hasUnapprovedLogo =

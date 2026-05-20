@@ -426,10 +426,10 @@ Guard: AdminAuthGuard
 Full list of teams that still have **at least one thing needing admin review**. Sorted by `team.name` ASC. No pagination — the portal carries ~1K teams and the back-office UI consumes the full set at once.
 
 Inclusion criteria — a team is included if EITHER:
-- At least one non-logo `fieldsMeta[k].judgment` is NOT fully approved — i.e. NOT (`confidence === 'high'` AND `score === 100`). Admin-approved fields are normalized to `{ confidence: high, score: 100 }` and stop triggering inclusion.
-- The team has a logo (`TeamEnrichment.logoUid` set) whose latest `TeamLogoVerificationResult` is NOT at (`verdict === 'verified'` AND `confidence === 'high'`). Logo carries no AI judgment on `fieldsMeta`; its verdict lives in the VLM verification table. Admin-approving a logo updates the latest row to `{ verdict: 'verified', confidence: 'high' }`, which drops it from this filter.
+- At least one non-logo `fieldsMeta[k].judgment.score` is below 90. Anything `>= 90` is treated as high-confidence and is excluded — the judge auto-promotes at score 90 and admin approval normalizes to score 100, so this threshold covers both. Fields without a judgment entry yet are ignored (they're not review-ready).
+- The team has a logo (`TeamEnrichment.logoUid` set) whose latest `TeamLogoVerificationResult` is NOT at (`verdict === 'verified'` AND `confidence === 'high'`). Logo verification has no `score` column, so the high-confidence check uses the verdict + confidence pair (which admin approval updates to verified+high).
 
-The endpoint deliberately does **not** filter on `dataEnrichment.status`. The judgment + logo verification state already determines whether anything needs review, and a status filter would silently hide teams if a new status is introduced or one is set by mistake.
+The endpoint excludes `PendingEnrichment`, `InProgress`, and `FailedToEnrich` at the query level — those teams have nothing review-ready. Remaining statuses (`Enriched`, `Reviewed`, `Approved`, and any future addition) all surface as long as the inclusion check flags something.
 
 Per-field rules in the response:
 - Every field that has a `fieldsMeta[k].judgment` entry is surfaced, including those at `agrees + high + 100` (so admins can see the full picture of what already passed).
