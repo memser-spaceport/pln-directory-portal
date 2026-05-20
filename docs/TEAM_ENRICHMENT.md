@@ -423,10 +423,16 @@ GET /v1/admin/teams/enrichment-review
 Guard: AdminAuthGuard
 ```
 
-Full list of teams whose top-level `dataEnrichment.status === 'Enriched'`. Reviewed / Approved / PendingEnrichment / InProgress / FailedToEnrich are out of scope. Sorted by `team.name` ASC. No pagination — the portal carries ~1K teams and the back-office UI consumes the full set at once.
+Full list of teams that still have **at least one thing needing admin review**. Sorted by `team.name` ASC. No pagination — the portal carries ~1K teams and the back-office UI consumes the full set at once.
 
-Per-field rules:
-- Every field that has a `fieldsMeta[k].judgment` entry is surfaced, including those at `agrees + high`. Admins use this view to spot-check the AI's output before approving.
+Inclusion criteria — a team is included if EITHER:
+- At least one non-logo `fieldsMeta[k].judgment.score` is below 90. Anything `>= 90` is treated as high-confidence and is excluded — the judge auto-promotes at score 90 and admin approval normalizes to score 100, so this threshold covers both. Fields without a judgment entry yet are ignored (they're not review-ready).
+- The team has a logo (`TeamEnrichment.logoUid` set) whose latest `TeamLogoVerificationResult` is NOT at (`verdict === 'verified'` AND `confidence === 'high'`). Logo verification has no `score` column, so the high-confidence check uses the verdict + confidence pair (which admin approval updates to verified+high).
+
+The endpoint excludes `PendingEnrichment`, `InProgress`, and `FailedToEnrich` at the query level — those teams have nothing review-ready. Remaining statuses (`Enriched`, `Reviewed`, `Approved`, and any future addition) all surface as long as the inclusion check flags something.
+
+Per-field rules in the response:
+- Every field that has a `fieldsMeta[k].judgment` entry is surfaced, including those at `agrees + high + 100` (so admins can see the full picture of what already passed).
 - `content` source is decided by `fieldsMeta[k].status`:
   - `ChangedByUser` → reads from `Team.<field>` (user's value is the source of truth; the `TeamEnrichment.<field>` candidate, if any, is informational provenance).
   - `Enriched` / `CannotEnrich` → reads from `TeamEnrichment.<field>` (AI candidate not yet promoted).
@@ -490,7 +496,7 @@ What happens in one `prisma.$transaction`:
 1. **Team writes** per the per-field resolution above. For `ChangedByUser` + confirm-only entries, no Team write is issued (the value is already there); only `fieldsMeta` is normalized.
 2. **`fieldsMeta` normalization** for every approved key — `status` + `judgment` updated per the rules above, `lastModifiedAt` restamped.
 3. **Team-level metadata**:
-   - `dataEnrichment.status` → `Approved`.
+   - `dataEnrichment.status` → `Reviewed`. The flip happens whether the admin approved every flagged field or only a subset — partial reviews stay in `Reviewed` and the team remains in the list endpoint until all flagged fields land at `score=100, confidence=high`. `Approved` is reserved for an explicit team-level finalization (not exposed through this endpoint).
    - `reviewedAt` → now (ISO).
    - `reviewedBy` → requestor email from the JWT (`req.userEmail`).
    - Approved keys removed from `dataEnrichment.judgment.fieldsForReview`.

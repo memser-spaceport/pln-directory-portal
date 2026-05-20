@@ -1206,10 +1206,22 @@ export class TeamEnrichmentService {
   }
 
   /**
-   * Full list of teams whose enrichment is in `EnrichmentStatus.Enriched`. Includes every
-   * judged field regardless of confidence so admins can spot-check what the judge produced.
+   * Full list of teams that still have at least one thing needing admin review.
    *
-   * Per-field rules:
+   * Inclusion criteria — a team is included if EITHER of the following holds:
+   *  - at least one non-logo `fieldsMeta[k].judgment.score` is below 90. Anything `>= 90`
+   *    is treated as high-confidence (the judge auto-promotes at 90 and admin-approved
+   *    fields land at 100), so it doesn't need review.
+   *  - the team has a logo (`row.logoUid` set) whose latest `TeamLogoVerificationResult`
+   *    is NOT at (`verdict === 'verified'` AND `confidence === 'high'`). Logo verification
+   *    has no `score` column — the equivalent "high-confidence approved" check uses the
+   *    verdict + confidence pair the VLM writes (and admin approval updates to verified+high).
+   *
+   * Statuses excluded at the query level: `PendingEnrichment`, `InProgress`, `FailedToEnrich`.
+   * The remaining statuses (`Enriched`, `Reviewed`, `Approved`, and any future addition) all
+   * surface here as long as the inclusion check above flags something.
+   *
+   * Per-field rules in the response:
    *  - fields without a `fieldsMeta[k].judgment` entry are skipped (not review-ready)
    *  - empty candidate values (null / empty string / empty array) are excluded
    *
@@ -1218,7 +1230,15 @@ export class TeamEnrichmentService {
    */
   async listEnrichmentsForReview(): Promise<{ teams: EnrichmentReviewItem[] }> {
     const rows = await this.prisma.teamEnrichment.findMany({
-      where: { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched } },
+      where: {
+        NOT: {
+          OR: [
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.PendingEnrichment } },
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.InProgress } },
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.FailedToEnrich } },
+          ],
+        },
+      },
       select: {
         teamUid: true,
         team: {
@@ -1288,6 +1308,18 @@ export class TeamEnrichmentService {
       const meta = this.parseEnrichmentMeta(row.dataEnrichment);
       if (!meta?.fieldsMeta) continue;
 
+      // Score >= 90 is treated as high-confidence and doesn't need review.
+      // Logo has no `score` column on its verification row — the equivalent check is
+      // verdict='verified' AND confidence='high' (what admin-approve writes).
+      const hasUnapprovedField = Object.entries(meta.fieldsMeta).some(([k, fm]) => {
+        if (k === 'logo' || !fm?.judgment) return false;
+        return (fm.judgment.score ?? 0) < 90;
+      });
+      const latestLogoVerif = latestByTeam.get(row.teamUid);
+      const hasUnapprovedLogo =
+        !!row.logoUid && !(latestLogoVerif?.verdict === 'verified' && latestLogoVerif?.confidence === 'high');
+      if (!hasUnapprovedField && !hasUnapprovedLogo) continue;
+
       const fields: EnrichmentReviewItem['fields'] = {};
       for (const [keyStr, fieldMeta] of Object.entries(meta.fieldsMeta) as Array<
         [FieldMetaKey, FieldEnrichmentMeta | undefined]
@@ -1346,7 +1378,6 @@ export class TeamEnrichmentService {
 
       let logo: EnrichmentReviewLogo | undefined;
       const logoMeta = meta.fieldsMeta.logo;
-      const latestLogoVerif = latestByTeam.get(row.teamUid);
       if (row.logoUid) {
         logo = {
           content: row.logo ? { uid: row.logo.uid, url: row.logo.url } : null,
@@ -1656,7 +1687,7 @@ export class TeamEnrichmentService {
       ...meta,
       fieldsMeta: newFieldsMeta,
       judgment: updatedTeamJudgment,
-      status: EnrichmentStatus.Approved,
+      status: EnrichmentStatus.Reviewed,
       reviewedAt: now,
       reviewedBy: reviewerEmail,
     };
