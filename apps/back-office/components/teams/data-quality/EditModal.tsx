@@ -7,7 +7,7 @@ import { EnrichmentTeam, FieldKey } from '../../../hooks/teams/useTeamsEnrichmen
 import { useGetTeam, TeamDetail } from '../../../hooks/teams/useGetTeam';
 import { useUpdateAdminTeam, TeamUpdatePayload } from '../../../hooks/teams/useUpdateAdminTeam';
 import { useApproveEnrichmentFields } from '../../../hooks/teams/useApproveEnrichmentFields';
-import { FIELD_KEYS, FIELD_LABELS } from './constants';
+import { FIELD_KEYS, FIELD_LABELS, isAIEnriched } from './constants';
 import { FieldStatusCell } from './FieldStatusCell';
 import s from '../../../pages/teams/data-quality.module.scss';
 
@@ -100,7 +100,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
     try {
       if (fieldsToApprove.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        await approveMutation.mutateAsync({ authToken: authToken!, teamUid: team.uid, fields: fieldsToApprove });
+        await approveMutation.mutateAsync({ authToken: authToken!, teamUid: team.uid, fields: fieldsToApprove.map((key) => ({ key })) });
       }
     } catch {
       toast.error('Changes saved, but failed to confirm fields. Please try again.');
@@ -162,7 +162,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                                   {enrichmentEntry.judgment.note}
                                 </span>
                               )}
-                              {enrichmentEntry.promotable && (
+                              {isAIEnriched(enrichmentEntry) && (
                                 <button
                                   className={clsx(s.confirmBtn, { [s.confirmBtnActive]: isConfirmed })}
                                   onClick={() => toggleConfirm(key)}
@@ -192,7 +192,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                           />
                         )}
 
-                        {enrichmentEntry?.promotable && typeof enrichmentEntry.content === 'string' && enrichmentEntry.content && !appliedFields.has(key) && (
+                        {enrichmentEntry && isAIEnriched(enrichmentEntry) && typeof enrichmentEntry.content === 'string' && enrichmentEntry.content && !appliedFields.has(key) && (
                           <div className={s.editSuggestion}>
                             <span className={s.editSuggestionLabel}>AI suggestion:</span>
                             <span className={s.editSuggestionValue}>{enrichmentEntry.content}</span>
@@ -257,7 +257,7 @@ function LogoRow({
         {team.logo ? (
           <div className={s.editEnrichmentStatus}>
             <FieldStatusCell entry={team.logo} />
-            {team.logo.promotable && (
+            {isAIEnriched(team.logo) && (
               <button
                 className={clsx(s.confirmBtn, { [s.confirmBtnActive]: confirmed })}
                 onClick={onToggleConfirm}

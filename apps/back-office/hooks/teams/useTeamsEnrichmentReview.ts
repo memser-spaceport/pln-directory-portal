@@ -12,11 +12,18 @@ export type FieldKey =
   | 'linkedinHandler'
   | 'blog';
 
+// Mirrors EnrichmentSource and FieldEnrichmentStatus enums from backend
+export type FieldMetadataSource = 'ai' | 'open-graph' | 'scrapingdog';
+export type FieldMetadataStatus = 'Enriched' | 'ChangedByUser' | 'CannotEnrich';
+
 export type FieldEntry = {
   content: string | string[] | { uid: string; url: string } | null;
-  metadata: { source?: string; lastModifiedAt?: string };
+  metadata: {
+    source?: FieldMetadataSource;
+    status?: FieldMetadataStatus;
+    lastModifiedAt?: string;
+  };
   judgment?: { note?: string; score?: number };
-  promotable: boolean;
 };
 
 export type LogoEntry = FieldEntry & {
@@ -26,7 +33,10 @@ export type LogoEntry = FieldEntry & {
 export type EnrichmentTeam = {
   uid: string;
   name: string;
+  priority: number;
   enrichmentStatus: string;
+  enrichmentAt: string | null;
+  judgedAt: string | null;
   fields: Partial<Record<FieldKey, FieldEntry>>;
   logo?: LogoEntry;
 };

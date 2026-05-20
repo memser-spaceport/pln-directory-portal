@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { GetServerSideProps } from 'next';
 import { parseCookies } from 'nookies';
 import { toast } from 'react-toastify';
@@ -9,7 +9,7 @@ import Select, { StylesConfig } from 'react-select';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
 import { useTeamsEnrichmentReview, EnrichmentTeam } from '../../hooks/teams/useTeamsEnrichmentReview';
-import { FIELD_KEYS } from '../../components/teams/data-quality/constants';
+import { FIELD_KEYS, getEntry, isAIEnriched, UNJUDGED_SCORE } from '../../components/teams/data-quality/constants';
 import { DataQualityTable } from '../../components/teams/data-quality/DataQualityTable';
 import { EditModal } from '../../components/teams/data-quality/EditModal';
 import s from './data-quality.module.scss';
@@ -39,18 +39,20 @@ const selectStyles: StylesConfig<SelectOption> = {
   menu: (base) => ({ ...base, zIndex: 3 }),
 };
 
-const EVAL_OPTIONS: SelectOption[] = [
-  { value: 'all', label: 'All scores' },
-  { value: 'low', label: 'Low' },
-  { value: 'high', label: 'High' },
+const PRIORITY_OPTIONS: SelectOption[] = [
+  { value: 'all', label: 'All priorities' },
+  { value: '1',   label: 'P1' },
+  { value: '2',   label: 'P2' },
+  { value: '3',   label: 'P3' },
+  { value: '4',   label: 'P4' },
+  { value: '5',   label: 'P5' },
 ];
 
 const SOURCE_OPTIONS: SelectOption[] = [
-  { value: 'all', label: 'All sources' },
-  { value: 'enriched', label: 'Enriched' },
-  { value: 'user', label: 'Provided by user' },
+  { value: 'all',  label: 'Any source' },
+  { value: 'ai',   label: 'Has AI-enriched fields' },
+  { value: 'user', label: 'Has user-provided fields' },
 ];
-
 
 const DataQualityPage: React.FC = () => {
   const router = useRouter();
@@ -58,8 +60,8 @@ const DataQualityPage: React.FC = () => {
   const [authToken] = useCookie('plnadmin');
 
   const [search, setSearch] = useState('');
-  const [evalFilter, setEvalFilter] = useState<'all' | 'low' | 'high'>('all');
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'enriched' | 'user'>('all');
+  const [priorityFilter, setPriorityFilter] = useState<number | 'all'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'ai' | 'user'>('all');
   const [selectedTeam, setSelectedTeam] = useState<EnrichmentTeam | null>(null);
 
   const { data: teams = [], isLoading: teamsLoading, isError } = useTeamsEnrichmentReview(authToken);
@@ -72,21 +74,37 @@ const DataQualityPage: React.FC = () => {
     if (isError) toast.error('Failed to load teams. Please try again.');
   }, [isError]);
 
-  const filteredTeams = teams.filter((t) => {
+  const filteredTeams = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (q && !t.name.toLowerCase().includes(q)) return false;
-    if (evalFilter === 'all' && sourceFilter === 'all') return true;
 
-    return FIELD_KEYS.some((key) => {
-      const entry = key === 'logo' ? t.logo : t.fields[key];
-      if (!entry) return false;
-      const isHigh = (entry.judgment?.score ?? 0) >= 50;
-      const isEnriched = entry.promotable;
-      const evalMatch = evalFilter === 'all' || (evalFilter === 'high' ? isHigh : !isHigh);
-      const sourceMatch = sourceFilter === 'all' || (sourceFilter === 'enriched' ? isEnriched : !isEnriched);
-      return evalMatch && sourceMatch;
+    return teams.filter((t) => {
+      if (q && !t.name.toLowerCase().includes(q)) return false;
+
+      // Only show teams with at least one low-score field
+      const hasLowField = FIELD_KEYS.some((key) => {
+        const entry = getEntry(t, key);
+        return entry && (entry.judgment?.score ?? UNJUDGED_SCORE) < 50;
+      });
+      if (!hasLowField) return false;
+
+      // Priority
+      if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
+
+      // Source
+      if (sourceFilter !== 'all') {
+        const hasSource = FIELD_KEYS.some((key) => {
+          const entry = getEntry(t, key);
+          if (!entry) return false;
+          return sourceFilter === 'ai' ? isAIEnriched(entry) : entry.metadata.status === 'ChangedByUser';
+        });
+        if (!hasSource) return false;
+      }
+
+      return true;
     });
-  });
+  }, [teams, search, priorityFilter, sourceFilter]);
+
+  const hasActiveFilters = search.trim() !== '' || priorityFilter !== 'all' || sourceFilter !== 'all';
 
   if (!isLoading && user && !isDirectoryAdmin) return null;
 
@@ -104,9 +122,9 @@ const DataQualityPage: React.FC = () => {
             />
             <Select<SelectOption>
               menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
-              options={EVAL_OPTIONS}
-              value={EVAL_OPTIONS.find((o) => o.value === evalFilter)}
-              onChange={(opt: SelectOption | null) => setEvalFilter((opt?.value ?? 'all') as typeof evalFilter)}
+              options={PRIORITY_OPTIONS}
+              value={PRIORITY_OPTIONS.find((o) => o.value === (priorityFilter === 'all' ? 'all' : String(priorityFilter)))}
+              onChange={(opt) => setPriorityFilter(opt?.value === 'all' ? 'all' : Number(opt?.value))}
               isClearable={false}
               styles={selectStyles}
             />
@@ -114,7 +132,7 @@ const DataQualityPage: React.FC = () => {
               menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
               options={SOURCE_OPTIONS}
               value={SOURCE_OPTIONS.find((o) => o.value === sourceFilter)}
-              onChange={(opt: SelectOption | null) => setSourceFilter((opt?.value ?? 'all') as typeof sourceFilter)}
+              onChange={(opt) => setSourceFilter((opt?.value ?? 'all') as typeof sourceFilter)}
               isClearable={false}
               styles={selectStyles}
             />
@@ -124,9 +142,7 @@ const DataQualityPage: React.FC = () => {
         <DataQualityTable
           teams={filteredTeams}
           isLoading={teamsLoading}
-          search={search}
-          evalFilter={evalFilter}
-          sourceFilter={sourceFilter}
+          hasActiveFilters={hasActiveFilters}
           onEdit={setSelectedTeam}
         />
 
@@ -139,14 +155,9 @@ const DataQualityPage: React.FC = () => {
 export default DataQualityPage;
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const { plnadmin } = parseCookies(ctx);
-  if (!plnadmin) {
-    return {
-      redirect: {
-        destination: `/?backlink=${ctx.resolvedUrl}`,
-        permanent: false,
-      },
-    };
+  const cookies = parseCookies(ctx);
+  if (!cookies['plnadmin']) {
+    return { redirect: { destination: '/login', permanent: false } };
   }
   return { props: {} };
 };

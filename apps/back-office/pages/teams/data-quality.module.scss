@@ -782,3 +782,75 @@
   border: 1px solid rgba(203, 213, 225, 0.4);
   background: #f8fafc;
 }
+
+/* ── Priority pill ──────────────────────────────────────── */
+
+.priorityPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  min-width: 28px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+/* ── Needs-review chips ─────────────────────────────────── */
+
+.reviewChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.reviewChip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.reviewChipAI {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.reviewChipUser {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+/* ── Last-judged date stack ─────────────────────────────── */
+
+.dateStack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dateMain {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  line-height: 18px;
+}
+
+.dateTime {
+  font-size: 11px;
+  font-weight: 400;
+  color: #94a3b8;
+  line-height: 16px;
+}
