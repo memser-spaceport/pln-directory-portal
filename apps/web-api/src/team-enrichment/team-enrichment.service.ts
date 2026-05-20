@@ -1206,10 +1206,21 @@ export class TeamEnrichmentService {
   }
 
   /**
-   * Full list of teams whose enrichment is in `EnrichmentStatus.Enriched`. Includes every
-   * judged field regardless of confidence so admins can spot-check what the judge produced.
+   * Full list of teams that still have at least one thing needing admin review.
    *
-   * Per-field rules:
+   * Inclusion criteria — a team is included if EITHER of the following holds:
+   *  - at least one non-logo `fieldsMeta[k].judgment` is not fully approved
+   *    (NOT (`confidence === 'high'` AND `score === 100`)). Admin-approved fields are
+   *    normalized to `{ confidence: high, score: 100 }` and stop triggering inclusion.
+   *  - the team has a logo (`row.logoUid` set) whose latest `TeamLogoVerificationResult`
+   *    is not at (`verdict === 'verified'` AND `confidence === 'high'`). Logo has no AI
+   *    judgment on `fieldsMeta` — its verdict lives in the VLM verification table.
+   *
+   * Note: we deliberately do NOT filter on `dataEnrichment.status`. The judgment + logo
+   * verification state already determines whether anything needs review; a status filter
+   * would silently hide teams if a new status is introduced or one is set by mistake.
+   *
+   * Per-field rules in the response:
    *  - fields without a `fieldsMeta[k].judgment` entry are skipped (not review-ready)
    *  - empty candidate values (null / empty string / empty array) are excluded
    *
@@ -1218,7 +1229,6 @@ export class TeamEnrichmentService {
    */
   async listEnrichmentsForReview(): Promise<{ teams: EnrichmentReviewItem[] }> {
     const rows = await this.prisma.teamEnrichment.findMany({
-      where: { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched } },
       select: {
         teamUid: true,
         team: {
@@ -1288,6 +1298,18 @@ export class TeamEnrichmentService {
       const meta = this.parseEnrichmentMeta(row.dataEnrichment);
       if (!meta?.fieldsMeta) continue;
 
+      // A team needs review if any non-logo field isn't fully approved (confidence=high
+      // AND score=100), OR its logo verification isn't (verified, high). The logo doesn't
+      // carry an AI judgment — its verdict comes from TeamLogoVerificationResult.
+      const hasUnapprovedField = Object.entries(meta.fieldsMeta).some(([k, fm]) => {
+        if (k === 'logo' || !fm?.judgment) return false;
+        return !(fm.judgment.confidence === FieldConfidence.High && fm.judgment.score === 100);
+      });
+      const latestLogoVerif = latestByTeam.get(row.teamUid);
+      const hasUnapprovedLogo =
+        !!row.logoUid && !(latestLogoVerif?.verdict === 'verified' && latestLogoVerif?.confidence === 'high');
+      if (!hasUnapprovedField && !hasUnapprovedLogo) continue;
+
       const fields: EnrichmentReviewItem['fields'] = {};
       for (const [keyStr, fieldMeta] of Object.entries(meta.fieldsMeta) as Array<
         [FieldMetaKey, FieldEnrichmentMeta | undefined]
@@ -1346,7 +1368,6 @@ export class TeamEnrichmentService {
 
       let logo: EnrichmentReviewLogo | undefined;
       const logoMeta = meta.fieldsMeta.logo;
-      const latestLogoVerif = latestByTeam.get(row.teamUid);
       if (row.logoUid) {
         logo = {
           content: row.logo ? { uid: row.logo.uid, url: row.logo.url } : null,
@@ -1656,7 +1677,7 @@ export class TeamEnrichmentService {
       ...meta,
       fieldsMeta: newFieldsMeta,
       judgment: updatedTeamJudgment,
-      status: EnrichmentStatus.Approved,
+      status: EnrichmentStatus.Reviewed,
       reviewedAt: now,
       reviewedBy: reviewerEmail,
     };
