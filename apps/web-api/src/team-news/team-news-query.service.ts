@@ -9,7 +9,6 @@ import type {
   TeamNewsListResponse,
 } from 'libs/contracts/src/schema/team-news';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
-import { computeRunSeedFromCreatedAt, seededShuffle } from './utils/seeded-shuffle';
 
 const TOP_LEVEL_FOCUS_AREAS = [
   'Digital Human Rights',
@@ -91,14 +90,6 @@ export class TeamNewsQueryService {
 
   async listTeamNews(query: TeamNewsListQuery): Promise<TeamNewsListResponse> {
     const where = this.buildWhere(query);
-
-    // "All" tab = no focus filter and no search query. Shuffle the matching set
-    // with a per-run seed so it doesn't look like the top focus area's tab; the
-    // seed only changes when a new ingest run lands, so refreshes stay stable.
-    if (this.shouldRandomizeAllFeed(query)) {
-      return this.listTeamNewsRandomized(query, where);
-    }
-
     const skip = (query.page - 1) * query.limit;
 
     const [rows, total] = await Promise.all([
@@ -126,46 +117,6 @@ export class TeamNewsQueryService {
       limit: query.limit,
       total,
       items: rows.map((row) => this.toDto(row)),
-    };
-  }
-
-  private shouldRandomizeAllFeed(query: TeamNewsListQuery): boolean {
-    return query.focus.length === 0 && !query.q;
-  }
-
-  private async listTeamNewsRandomized(
-    query: TeamNewsListQuery,
-    where: Prisma.TeamNewsItemWhereInput
-  ): Promise<TeamNewsListResponse> {
-    const rows = await this.prisma.teamNewsItem.findMany({
-      where,
-      // Stable secondary sort by uid keeps the input to the shuffle
-      // deterministic regardless of DB-side tie-breaking.
-      orderBy: [{ createdAt: 'desc' }, { uid: 'asc' }],
-      include: {
-        team: {
-          select: {
-            uid: true,
-            name: true,
-            logo: { select: { url: true } },
-            teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
-          },
-        },
-      },
-    });
-
-    const seed = computeRunSeedFromCreatedAt(rows.map((r) => r.createdAt));
-    const shuffled = seed === 0 ? rows : seededShuffle(rows, seed);
-
-    const total = shuffled.length;
-    const skip = (query.page - 1) * query.limit;
-    const pageRows = shuffled.slice(skip, skip + query.limit);
-
-    return {
-      page: query.page,
-      limit: query.limit,
-      total,
-      items: pageRows.map((row) => this.toDto(row)),
     };
   }
 
