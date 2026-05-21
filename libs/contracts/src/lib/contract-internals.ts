@@ -18,7 +18,8 @@ import {
   MemberSearchQueryParams,
   ResponseMemberSearchResultSchema,
   TeamSearchQueryParams,
-  ResponseTeamSearchResultSchema
+  ResponseTeamSearchResultSchema,
+  PLEventAggregatedDataQueryParams
 } from '../schema';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -178,5 +179,14 @@ export const apiInternals = contract.router({
       200: ResponsePLEventLocationSchema,
     },
     summary: 'Delete a PL event location by UID',
+  },
+  getAllAggregatedData: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/internals/irl/aggregated-data`,
+    query: PLEventAggregatedDataQueryParams,
+    responses: {
+      200: contract.response<unknown>(),
+    },
+    summary: 'Get all aggregated data (internal)',
   }
 });
