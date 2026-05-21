@@ -26,15 +26,21 @@ const MULTILINE: Partial<Record<EditableFieldKey, boolean>> = {
   longDescription: true,
 };
 
-function teamToForm(team: TeamDetail): TeamUpdatePayload {
+function teamToForm(teamDetail: TeamDetail, enrichmentTeam: EnrichmentTeam): TeamUpdatePayload {
+  const getContent = (key: EditableFieldKey): string => {
+    const entry = enrichmentTeam.fields[key];
+    if (entry?.content && typeof entry.content === 'string') return entry.content;
+    return (teamDetail[key as keyof TeamDetail] as string | null | undefined) ?? '';
+  };
+
   return {
-    website: team.website ?? '',
-    blog: team.blog ?? '',
-    contactMethod: team.contactMethod ?? '',
-    twitterHandler: team.twitterHandler ?? '',
-    linkedinHandler: team.linkedinHandler ?? '',
-    shortDescription: team.shortDescription ?? '',
-    longDescription: team.longDescription ?? '',
+    website: getContent('website'),
+    blog: getContent('blog'),
+    contactMethod: getContent('contactMethod'),
+    twitterHandler: getContent('twitterHandler'),
+    linkedinHandler: getContent('linkedinHandler'),
+    shortDescription: getContent('shortDescription'),
+    longDescription: getContent('longDescription'),
   };
 }
 
@@ -46,9 +52,11 @@ export function EditModal({ team, authToken, onClose }: Props) {
   const updateMutation = useUpdateAdminTeam();
   const approveMutation = useApproveEnrichmentFields();
 
+  console.log({ team, teamDetail });
+
   useEffect(() => {
-    if (teamDetail) setForm(teamToForm(teamDetail));
-  }, [teamDetail]);
+    if (teamDetail && team) setForm(teamToForm(teamDetail, team));
+  }, [teamDetail, team]);
 
   useEffect(() => {
     if (!team) {
@@ -64,23 +72,13 @@ export function EditModal({ team, authToken, onClose }: Props) {
     };
   }, [team]);
 
-  const toggleConfirm = (key: FieldKey) => {
+  // One-directional: Set.add is idempotent, so calling on an already-confirmed field is a no-op.
+  const addConfirm = (key: FieldKey) => {
     setConfirmedFields((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      next.add(key);
       return next;
     });
-  };
-
-  const autoConfirm = (key: FieldKey) => {
-    if (!confirmedFields.has(key)) {
-      setConfirmedFields((prev) => {
-        const next = new Set(prev);
-        next.add(key);
-        return next;
-      });
-    }
   };
 
   const handleSave = async () => {
@@ -128,7 +126,6 @@ export function EditModal({ team, authToken, onClose }: Props) {
     onClose();
   };
 
-  // Derive which editable keys have low scores — only those are shown
   const lowScoreEditableKeys: EditableFieldKey[] = team
     ? EDITABLE_KEYS.filter((key) => {
         const entry = getEntry(team, key);
@@ -165,7 +162,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  {team.name}
+                  {team.name} <ExternalLinkIcon />
                 </a>
                 <p className={s.modalSubtitle}>Review enrichment data and confirm or edit fields.</p>
               </div>
@@ -185,10 +182,10 @@ export function EditModal({ team, authToken, onClose }: Props) {
                     </span>
                     <div className={s.modalInfoText}>
                       <div className={s.modalInfoTitle}>How to review</div>
-                      Below are fields the AI Judge scored as <strong>Low quality</strong>. The value may have been
-                      provided by a user or by AI enrichment — either way it needs your review. Edit the value if
-                      needed, then click <strong>Confirm</strong>. Fields stay editable until you press{' '}
-                      <strong>Save changes</strong>.
+                      Below are the fields the AI Judge scored as <strong>Low quality</strong>. The value may have been
+                      provided by a user or by AI enrichment — either way it needs your review. Read the Judge&apos;s
+                      reason next to each field, edit the value if needed, then click <strong>Confirm</strong>. Fields
+                      stay editable until you press <strong>Save changes</strong>.
                     </div>
                   </div>
 
@@ -197,7 +194,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                       team={team}
                       teamDetail={teamDetail}
                       confirmed={confirmedFields.has('logo')}
-                      onToggleConfirm={() => toggleConfirm('logo')}
+                      onConfirm={() => addConfirm('logo')}
                     />
                   )}
 
@@ -209,6 +206,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                     return (
                       <div key={key} className={s.editFieldRow}>
                         <div className={s.editFieldHeader}>
+                          {/* Left: label + source badge */}
                           <div className={s.editFieldMeta}>
                             <span className={s.fieldLabel}>{FIELD_LABELS[key]}</span>
                             {enrichmentEntry && (
@@ -217,19 +215,22 @@ export function EditModal({ team, authToken, onClose }: Props) {
                                 {isAI ? 'AI Suggestion' : 'Provided by user'}
                               </span>
                             )}
+                          </div>
+                          {/* Right: judge note + Confirm button */}
+                          <div className={s.editFieldActions}>
                             {enrichmentEntry?.judgment?.note && (
                               <span className={s.editJudgmentNote} title={enrichmentEntry.judgment.note}>
                                 {enrichmentEntry.judgment.note}
                               </span>
                             )}
+                            <button
+                              className={clsx(s.confirmBtn, { [s.confirmBtnActive]: isConfirmed })}
+                              onClick={() => addConfirm(key)}
+                            >
+                              <CheckIcon />
+                              {isConfirmed ? 'Confirmed' : 'Confirm'}
+                            </button>
                           </div>
-                          <button
-                            className={clsx(s.confirmBtn, { [s.confirmBtnActive]: isConfirmed })}
-                            onClick={() => toggleConfirm(key)}
-                          >
-                            <CheckIcon />
-                            {isConfirmed ? 'Confirmed' : 'Confirm'}
-                          </button>
                         </div>
 
                         {MULTILINE[key] ? (
@@ -238,7 +239,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                             value={form[key] ?? ''}
                             onChange={(e) => {
                               setForm((prev) => (prev ? { ...prev, [key]: e.target.value } : prev));
-                              autoConfirm(key);
+                              addConfirm(key);
                             }}
                             rows={3}
                           />
@@ -249,7 +250,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                             value={form[key] ?? ''}
                             onChange={(e) => {
                               setForm((prev) => (prev ? { ...prev, [key]: e.target.value } : prev));
-                              autoConfirm(key);
+                              addConfirm(key);
                             }}
                           />
                         )}
@@ -289,51 +290,107 @@ function LogoRow({
   team,
   teamDetail,
   confirmed,
-  onToggleConfirm,
+  onConfirm,
 }: {
   team: EnrichmentTeam;
   teamDetail?: TeamDetail;
   confirmed: boolean;
-  onToggleConfirm: () => void;
+  onConfirm: () => void;
 }) {
+  const [selectedSlot, setSelectedSlot] = useState<'current' | 'suggested' | 'upload' | null>(null);
+
   const currentLogoUrl = teamDetail?.logo?.url ?? null;
   const candidateLogoUrl =
     team.logo?.content && typeof team.logo.content === 'object' && 'url' in team.logo.content
-      ? team.logo.content.url
+      ? (team.logo.content as { url: string }).url
       : null;
+
+  const handleSlotClick = (slot: 'current' | 'suggested' | 'upload') => {
+    setSelectedSlot(slot);
+    onConfirm();
+  };
+
+  const judgeNote = team.logo?.judgment?.note;
 
   return (
     <div className={s.editFieldRow}>
       <div className={s.editFieldHeader}>
         <div className={s.editFieldMeta}>
           <span className={s.fieldLabel}>{FIELD_LABELS['logo']}</span>
-          {team.logo && (
-            <span className={clsx(s.sourceBadge, isAIEnriched(team.logo) ? s.sourceBadgeAI : s.sourceBadgeUser)}>
-              {isAIEnriched(team.logo) ? <SparkleIcon /> : <UserIcon />}
-              {isAIEnriched(team.logo) ? 'AI Suggestion' : 'Provided by user'}
+        </div>
+        <div className={s.editFieldActions}>
+          {judgeNote && (
+            <span className={s.editJudgmentNote} title={judgeNote}>
+              {judgeNote}
             </span>
           )}
+          <button className={clsx(s.confirmBtn, { [s.confirmBtnActive]: confirmed })} onClick={onConfirm}>
+            <CheckIcon />
+            {confirmed ? 'Confirmed' : 'Confirm'}
+          </button>
         </div>
-        <button className={clsx(s.confirmBtn, { [s.confirmBtnActive]: confirmed })} onClick={onToggleConfirm}>
-          <CheckIcon />
-          {confirmed ? 'Confirmed' : 'Confirm'}
-        </button>
       </div>
-      <div className={s.logoPreviewRow}>
-        {currentLogoUrl && (
-          <div className={s.logoPreview}>
-            <span className={s.logoPreviewLabel}>Current</span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={currentLogoUrl} alt="Current logo" className={s.logoPreviewImg} />
+
+      <div className={s.logoCompare}>
+        {/* Current */}
+        <div
+          className={clsx(s.logoSlot, { [s.logoSlotSelected]: selectedSlot === 'current' })}
+          onClick={() => handleSlotClick('current')}
+        >
+          {selectedSlot === 'current' && (
+            <span className={s.logoSlotCheck}>
+              <CheckIcon />
+            </span>
+          )}
+          <div className={s.logoSlotLabel}>Current</div>
+          <div className={s.logoSlotPreview}>
+            {currentLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={currentLogoUrl} alt="Current logo" className={s.logoSlotImg} />
+            ) : (
+              <ImageIcon />
+            )}
           </div>
-        )}
-        {candidateLogoUrl && candidateLogoUrl !== currentLogoUrl && (
-          <div className={s.logoPreview}>
-            <span className={s.logoPreviewLabel}>AI candidate</span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={candidateLogoUrl} alt="AI candidate logo" className={s.logoPreviewImg} />
+        </div>
+
+        {/* AI suggestion */}
+        <div
+          className={clsx(s.logoSlot, s.logoSlotSuggested, { [s.logoSlotSelected]: selectedSlot === 'suggested' })}
+          onClick={() => handleSlotClick('suggested')}
+        >
+          {selectedSlot === 'suggested' && (
+            <span className={s.logoSlotCheck}>
+              <CheckIcon />
+            </span>
+          )}
+          <div className={s.logoSlotLabel}>
+            <SparkleIcon /> AI suggestion
           </div>
-        )}
+          <div className={s.logoSlotPreview}>
+            {candidateLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={candidateLogoUrl} alt="AI suggestion logo" className={s.logoSlotImg} />
+            ) : (
+              <ImageIcon />
+            )}
+          </div>
+        </div>
+
+        {/* Upload (visual placeholder) */}
+        <div
+          className={clsx(s.logoSlot, s.logoSlotUpload, { [s.logoSlotSelected]: selectedSlot === 'upload' })}
+          onClick={() => handleSlotClick('upload')}
+        >
+          {selectedSlot === 'upload' && (
+            <span className={s.logoSlotCheck}>
+              <CheckIcon />
+            </span>
+          )}
+          <div className={s.logoSlotLabel}>Upload</div>
+          <div className={s.logoSlotPreview}>
+            <UploadIcon />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -392,5 +449,30 @@ const InfoIcon = () => (
     <circle cx="12" cy="12" r="10" />
     <line x1="12" y1="16" x2="12" y2="12" />
     <line x1="12" y1="8" x2="12.01" y2="8" />
+  </svg>
+);
+
+const ExternalLinkIcon = () => (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 256 256"
+    fill="currentColor"
+    aria-hidden="true"
+    style={{ verticalAlign: 'middle', marginLeft: 4, color: '#94a3b8' }}
+  >
+    <path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z" />
+  </svg>
+);
+
+const ImageIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" style={{ color: '#cbd5e1' }}>
+    <path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V158.75l-26.07-26.06a16,16,0,0,0-22.63,0l-20,20-44-44a16,16,0,0,0-22.62,0L40,149.37V56ZM40,172l52-52,80,80H40Zm176,28H194.63l-36-36,20-20L216,181.38V200ZM144,100a12,12,0,1,1,12,12A12,12,0,0,1,144,100Z" />
+  </svg>
+);
+
+const UploadIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" style={{ color: '#94a3b8' }}>
+    <path d="M240,136v64a16,16,0,0,1-16,16H32a16,16,0,0,1-16-16V136a16,16,0,0,1,16-16H80a8,8,0,0,1,0,16H32v64H224V136H176a8,8,0,0,1,0-16h48A16,16,0,0,1,240,136ZM85.66,77.66,120,43.31V144a8,8,0,0,0,16,0V43.31l34.34,34.35a8,8,0,0,0,11.32-11.32l-48-48a8,8,0,0,0-11.32,0l-48,48A8,8,0,0,0,85.66,77.66Z" />
   </svg>
 );
