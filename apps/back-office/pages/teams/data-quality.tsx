@@ -41,16 +41,16 @@ const selectStyles: StylesConfig<SelectOption> = {
 
 const PRIORITY_OPTIONS: SelectOption[] = [
   { value: 'all', label: 'All priorities' },
-  { value: '1',   label: 'P1' },
-  { value: '2',   label: 'P2' },
-  { value: '3',   label: 'P3' },
-  { value: '4',   label: 'P4' },
-  { value: '5',   label: 'P5' },
+  { value: '1', label: 'P1' },
+  { value: '2', label: 'P2' },
+  { value: '3', label: 'P3' },
+  { value: '4', label: 'P4' },
+  { value: '5', label: 'P5' },
 ];
 
 const SOURCE_OPTIONS: SelectOption[] = [
-  { value: 'all',  label: 'Any source' },
-  { value: 'ai',   label: 'Has AI-enriched fields' },
+  { value: 'all', label: 'Any source' },
+  { value: 'ai', label: 'Has AI-enriched fields' },
   { value: 'user', label: 'Has user-provided fields' },
 ];
 
@@ -83,7 +83,7 @@ const DataQualityPage: React.FC = () => {
       // Only show teams with at least one low-score field
       const hasLowField = FIELD_KEYS.some((key) => {
         const entry = getEntry(t, key);
-        return entry && (entry.judgment?.score ?? UNJUDGED_SCORE) < 50;
+        return entry && (entry.judgment?.score ?? UNJUDGED_SCORE) <= 90;
       });
       if (!hasLowField) return false;
 
@@ -123,7 +123,9 @@ const DataQualityPage: React.FC = () => {
             <Select<SelectOption>
               menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
               options={PRIORITY_OPTIONS}
-              value={PRIORITY_OPTIONS.find((o) => o.value === (priorityFilter === 'all' ? 'all' : String(priorityFilter)))}
+              value={PRIORITY_OPTIONS.find(
+                (o) => o.value === (priorityFilter === 'all' ? 'all' : String(priorityFilter))
+              )}
               onChange={(opt) => setPriorityFilter(opt?.value === 'all' ? 'all' : Number(opt?.value))}
               isClearable={false}
               styles={selectStyles}
