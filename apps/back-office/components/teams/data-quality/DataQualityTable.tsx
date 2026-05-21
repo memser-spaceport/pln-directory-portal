@@ -73,7 +73,7 @@ export function DataQualityTable({ teams, isLoading, hasActiveFilters, onEdit }:
           const chips = FIELD_KEYS.flatMap((key) => {
             const entry = getEntry(team, key);
             if (!entry) return [];
-            if ((entry.judgment?.score ?? UNJUDGED_SCORE) >= 50) return [];
+            if ((entry.judgment?.score ?? UNJUDGED_SCORE) > 90) return [];
             return [
               <span key={key} className={clsx(s.reviewChip, isAIEnriched(entry) ? s.reviewChipAI : s.reviewChipUser)}>
                 {FIELD_LABELS[key]}

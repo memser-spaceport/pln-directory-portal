@@ -59,7 +59,9 @@ export function EditModal({ team, authToken, onClose }: Props) {
 
   useEffect(() => {
     document.body.style.overflow = team ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [team]);
 
   const toggleConfirm = (key: FieldKey) => {
@@ -110,7 +112,11 @@ export function EditModal({ team, authToken, onClose }: Props) {
     try {
       if (fieldsToApprove.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        await approveMutation.mutateAsync({ authToken: authToken!, teamUid: team.uid, fields: fieldsToApprove.map((key) => ({ key })) });
+        await approveMutation.mutateAsync({
+          authToken: authToken!,
+          teamUid: team.uid,
+          fields: fieldsToApprove.map((key) => ({ key })),
+        });
       }
     } catch {
       toast.error('Changes saved, but failed to confirm fields. Please try again.');
@@ -126,13 +132,11 @@ export function EditModal({ team, authToken, onClose }: Props) {
   const lowScoreEditableKeys: EditableFieldKey[] = team
     ? EDITABLE_KEYS.filter((key) => {
         const entry = getEntry(team, key);
-        return entry && (entry.judgment?.score ?? UNJUDGED_SCORE) < 50;
+        return !!entry && (entry.judgment?.score ?? UNJUDGED_SCORE) <= 90;
       })
     : [];
 
-  const showLogoRow = Boolean(
-    team?.logo && (team.logo.judgment?.score ?? UNJUDGED_SCORE) < 50
-  );
+  const showLogoRow = Boolean(team?.logo && (team.logo.judgment?.score ?? UNJUDGED_SCORE) <= 90);
 
   const hasNoLowFields = !detailLoading && form && lowScoreEditableKeys.length === 0 && !showLogoRow;
 
@@ -165,7 +169,9 @@ export function EditModal({ team, authToken, onClose }: Props) {
                 </a>
                 <p className={s.modalSubtitle}>Review enrichment data and confirm or edit fields.</p>
               </div>
-              <button className={s.closeButton} onClick={onClose}>✕</button>
+              <button className={s.closeButton} onClick={onClose}>
+                ✕
+              </button>
             </div>
 
             <div className={s.modalBody}>
@@ -179,10 +185,10 @@ export function EditModal({ team, authToken, onClose }: Props) {
                     </span>
                     <div className={s.modalInfoText}>
                       <div className={s.modalInfoTitle}>How to review</div>
-                      Below are fields the AI Judge scored as <strong>Low quality</strong>. The value
-                      may have been provided by a user or by AI enrichment — either way it needs your
-                      review. Edit the value if needed, then click <strong>Confirm</strong>. Fields
-                      stay editable until you press <strong>Save changes</strong>.
+                      Below are fields the AI Judge scored as <strong>Low quality</strong>. The value may have been
+                      provided by a user or by AI enrichment — either way it needs your review. Edit the value if
+                      needed, then click <strong>Confirm</strong>. Fields stay editable until you press{' '}
+                      <strong>Save changes</strong>.
                     </div>
                   </div>
 
@@ -231,7 +237,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                             className={s.editTextarea}
                             value={form[key] ?? ''}
                             onChange={(e) => {
-                              setForm((prev) => prev ? { ...prev, [key]: e.target.value } : prev);
+                              setForm((prev) => (prev ? { ...prev, [key]: e.target.value } : prev));
                               autoConfirm(key);
                             }}
                             rows={3}
@@ -242,7 +248,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                             className={s.editInput}
                             value={form[key] ?? ''}
                             onChange={(e) => {
-                              setForm((prev) => prev ? { ...prev, [key]: e.target.value } : prev);
+                              setForm((prev) => (prev ? { ...prev, [key]: e.target.value } : prev));
                               autoConfirm(key);
                             }}
                           />
@@ -252,9 +258,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                   })}
 
                   {hasNoLowFields && (
-                    <p className={s.modalEmptyState}>
-                      Nothing to confirm — all low-quality fields have been resolved.
-                    </p>
+                    <p className={s.modalEmptyState}>Nothing to confirm — all low-quality fields have been resolved.</p>
                   )}
                 </>
               )}
@@ -266,7 +270,9 @@ export function EditModal({ team, authToken, onClose }: Props) {
               </button>
               <button
                 className={s.saveButton}
-                disabled={!form || !teamDetail || updateMutation.isPending || approveMutation.isPending || detailLoading}
+                disabled={
+                  !form || !teamDetail || updateMutation.isPending || approveMutation.isPending || detailLoading
+                }
                 onClick={handleSave}
               >
                 {updateMutation.isPending || approveMutation.isPending ? 'Saving…' : 'Save changes'}
@@ -308,10 +314,7 @@ function LogoRow({
             </span>
           )}
         </div>
-        <button
-          className={clsx(s.confirmBtn, { [s.confirmBtnActive]: confirmed })}
-          onClick={onToggleConfirm}
-        >
+        <button className={clsx(s.confirmBtn, { [s.confirmBtnActive]: confirmed })} onClick={onToggleConfirm}>
           <CheckIcon />
           {confirmed ? 'Confirmed' : 'Confirm'}
         </button>
@@ -344,19 +347,48 @@ const SparkleIcon = () => (
 );
 
 const UserIcon = () => (
-  <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+  <svg
+    width="11"
+    height="11"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
     <path d="M8 8a3 3 0 100-6 3 3 0 000 6zM2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" />
   </svg>
 );
 
 const CheckIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <polyline points="20 6 9 17 4 12" />
   </svg>
 );
 
 const InfoIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <circle cx="12" cy="12" r="10" />
     <line x1="12" y1="16" x2="12" y2="12" />
     <line x1="12" y1="8" x2="12.01" y2="8" />
