@@ -3,16 +3,18 @@ import api from '../../utils/api';
 import { FieldKey } from './useTeamsEnrichmentReview';
 import { TeamsQueryKeys } from './constants/queryKeys';
 
+export type ApproveFieldInput = { key: FieldKey; content?: string };
+
 type MutationParams = {
   authToken: string;
   teamUid: string;
-  fields: FieldKey[];
+  fields: ApproveFieldInput[];
 };
 
 async function approveEnrichmentFields(params: MutationParams): Promise<void> {
   const config = { headers: { authorization: `Bearer ${params.authToken}` } };
   await api.patch(
-    `/v1/admin/teams/${params.teamUid}/enrichment-review/fields`,
+    `/v1/admin/teams/${params.teamUid}/enrichment-review`,
     { fields: params.fields },
     config
   );

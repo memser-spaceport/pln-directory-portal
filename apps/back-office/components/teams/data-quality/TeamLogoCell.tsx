@@ -11,6 +11,8 @@ export function TeamLogoCell({ logo, name }: Props) {
   const url =
     logo?.content && typeof logo.content === 'object' && 'url' in logo.content
       ? logo.content.url
+      : logo?.content && typeof logo.content === 'string'
+      ? logo.content
       : null;
 
   if (url) {

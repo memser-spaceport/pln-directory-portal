@@ -92,14 +92,7 @@ export class PLEventsController {
   @Api(server.route.getPLEventBySlug)
   @ApiParam({ name: 'slug', type: 'string' })
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema)
-  @UseGuards(UserAuthValidateGuard, RbacGuard)
-  @RequirePermissions({
-    anyOf: [
-      IRL_GATHERINGS_PERMISSIONS.GOING_READ,
-      RBAC_PERMISSION_CODES.IRLG_GOING_WRITE,
-      ADMIN_PERMISSIONS.DIRECTORY_FULL,
-    ],
-  })
+  @UseGuards(UserAuthValidateGuard)
   @NoCache()
   async findOne(@ApiDecorator() { params: { slug } }: RouteShape['getPLEventBySlug'], @Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(PLEventGuestQuerySchema);
@@ -212,14 +205,7 @@ export class PLEventsController {
   @Api(server.route.getPLEventsByLoggedInMember)
   @ApiQueryFromZod(PLEventQueryParams)
   @ApiOkResponseFromZod(ResponsePLEventSchemaWithRelationsSchema.array())
-  @UseGuards(UserTokenValidation, RbacGuard)
-  @RequirePermissions({
-    anyOf: [
-      IRL_GATHERINGS_PERMISSIONS.GOING_READ,
-      RBAC_PERMISSION_CODES.IRLG_GOING_WRITE,
-      ADMIN_PERMISSIONS.DIRECTORY_FULL,
-    ],
-  })
+  @UseGuards(UserTokenValidation)
   @NoCache()
   async getPLEventsByLoggedInMember(@Param('uid') locationUid, @Req() request) {
     const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
@@ -245,14 +231,7 @@ export class PLEventsController {
   }
 
   @Api(server.route.getPLEventGuestByUidAndLocation)
-  @UseGuards(UserTokenValidation, RbacGuard)
-  @RequirePermissions({
-    anyOf: [
-      IRL_GATHERINGS_PERMISSIONS.GOING_READ,
-      RBAC_PERMISSION_CODES.IRLG_GOING_WRITE,
-      ADMIN_PERMISSIONS.DIRECTORY_FULL,
-    ],
-  })
+  @UseGuards(UserTokenValidation)
   async getPLEventGuestByUidAndLocation(
     @Req() request,
     @Param('uid') locationUid: string,
@@ -278,14 +257,7 @@ export class PLEventsController {
   }
 
   @Api(server.route.getPLEventGuestTopics)
-  @UseGuards(UserTokenValidation, RbacGuard)
-  @RequirePermissions({
-    anyOf: [
-      IRL_GATHERINGS_PERMISSIONS.GOING_READ,
-      RBAC_PERMISSION_CODES.IRLG_GOING_WRITE,
-      ADMIN_PERMISSIONS.DIRECTORY_FULL,
-    ],
-  })
+  @UseGuards(UserTokenValidation)
   @NoCache()
   async getPLEventGuestTopics(@Param('uid') locationUid: string, @Param('guestUid') guestUid: string, @Req() request) {
     const userEmail = request['userEmail'];
@@ -305,14 +277,7 @@ export class PLEventsController {
 
   @Api(server.route.getAllAggregatedData)
   @ApiQueryFromZod(PLEventAggregatedDataQueryParams)
-  @UseGuards(UserAuthValidateGuard, RbacGuard)
-  @RequirePermissions({
-    anyOf: [
-      IRL_GATHERINGS_PERMISSIONS.GOING_READ,
-      RBAC_PERMISSION_CODES.IRLG_GOING_WRITE,
-      ADMIN_PERMISSIONS.DIRECTORY_FULL,
-    ],
-  })
+  @UseGuards(UserAuthValidateGuard)
   @NoCache()
   async getAllAggregatedData(@Req() request: Request) {
     const loggedInMember = request['userEmail']

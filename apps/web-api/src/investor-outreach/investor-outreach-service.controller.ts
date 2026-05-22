@@ -20,6 +20,8 @@ const REQUIRED_SCALAR: Array<keyof InvestorOutreachIngestItem> = [
   'enrichment_status',
 ];
 
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
 @ApiTags('Investor Outreach - Service')
 @Controller('v1/service')
 @UseGuards(ServiceAuthGuard)
@@ -53,7 +55,7 @@ export class InvestorOutreachServiceController {
       ] as const;
       for (const [name, val] of dateFields) {
         if (val !== undefined && val !== null && String(val).trim() !== '') {
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(String(val).trim())) {
+          if (!YMD.test(String(val).trim())) {
             throw new BadRequestException(`Item ${i}: ${name} must be YYYY-MM-DD when provided`);
           }
         }
@@ -64,12 +66,63 @@ export class InvestorOutreachServiceController {
           throw new BadRequestException(`Item ${i}: last_enrichment_attempt must be valid ISO datetime when provided`);
         }
       }
+
+      if (item.tags !== undefined && item.tags !== null) {
+        if (!Array.isArray(item.tags)) {
+          throw new BadRequestException(`Item ${i}: tags must be an array of strings when provided`);
+        }
+        for (const t of item.tags) {
+          if (typeof t !== 'string') {
+            throw new BadRequestException(`Item ${i}: tags entries must be strings`);
+          }
+        }
+      }
+
+      if (item.portfolio_overlaps !== undefined && item.portfolio_overlaps !== null) {
+        if (!Array.isArray(item.portfolio_overlaps)) {
+          throw new BadRequestException(`Item ${i}: portfolio_overlaps must be an array when provided`);
+        }
+        for (let j = 0; j < item.portfolio_overlaps.length; j++) {
+          const o = item.portfolio_overlaps[j];
+          if (!o || typeof o !== 'object') {
+            throw new BadRequestException(`Item ${i}: portfolio_overlaps[${j}] must be an object`);
+          }
+          if (typeof o.team_uid !== 'string' || o.team_uid.trim() === '') {
+            throw new BadRequestException(`Item ${i}: portfolio_overlaps[${j}].team_uid is required`);
+          }
+          if (o.deal_date != null && String(o.deal_date).trim() !== '' && !YMD.test(String(o.deal_date).trim())) {
+            throw new BadRequestException(`Item ${i}: portfolio_overlaps[${j}].deal_date must be YYYY-MM-DD`);
+          }
+        }
+      }
+    }
+
+    if (dto.portfolio_teams !== undefined && dto.portfolio_teams !== null) {
+      if (!Array.isArray(dto.portfolio_teams)) {
+        throw new BadRequestException('portfolio_teams must be an array when provided');
+      }
+      for (let i = 0; i < dto.portfolio_teams.length; i++) {
+        const t = dto.portfolio_teams[i];
+        if (!t || typeof t !== 'object') {
+          throw new BadRequestException(`portfolio_teams[${i}] must be an object`);
+        }
+        if (typeof t.team_uid !== 'string' || t.team_uid.trim() === '') {
+          throw new BadRequestException(`portfolio_teams[${i}].team_uid is required`);
+        }
+        if (
+          t.pl_invested_at != null &&
+          String(t.pl_invested_at).trim() !== '' &&
+          !YMD.test(String(t.pl_invested_at).trim())
+        ) {
+          throw new BadRequestException(`portfolio_teams[${i}].pl_invested_at must be YYYY-MM-DD when provided`);
+        }
+      }
     }
 
     this.logger.log(
       `Received investor-outreach ingest: items=${dto.items.length} runId=${dto.runId ?? 'none'} source=${
         dto.source ?? 'none'
-      }`
+      } portfolio_teams=${dto.portfolio_teams?.length ?? 0}`
     );
     return this.investorOutreachService.ingest(dto);
   }
