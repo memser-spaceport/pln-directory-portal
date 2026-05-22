@@ -813,6 +813,12 @@
   }
 }
 
+.logoSlotDisabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
 .logoSlotUpload {
   border-style: dashed;
   border-color: rgba(27, 56, 96, 0.24);

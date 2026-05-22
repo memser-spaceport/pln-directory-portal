@@ -11,7 +11,7 @@ import {
 } from '@tanstack/react-table';
 import { clsx } from 'clsx';
 
-import { EnrichmentTeam } from '../../../hooks/teams/useTeamsEnrichmentReview';
+import { EnrichmentTeam, LogoEntry } from '../../../hooks/teams/useTeamsEnrichmentReview';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
 import PaginationControls from '../../../screens/members/components/PaginationControls/PaginationControls';
 import { TeamLogoCell } from './TeamLogoCell';
@@ -60,7 +60,7 @@ export function DataQualityTable({ teams, isLoading, hasActiveFilters, onEdit }:
           const team = info.row.original;
           return (
             <a href={`${WEB_UI_BASE_URL}/teams/${team.uid}`} target="_blank" rel="noreferrer" className={s.teamLink}>
-              <TeamLogoCell logo={team.logo} name={team.name} />
+              <TeamLogoCell logo={team.logo ?? (team.fields?.logo as LogoEntry)} name={team.name} />
               <span className={s.teamName}>{team.name}</span>
             </a>
           );

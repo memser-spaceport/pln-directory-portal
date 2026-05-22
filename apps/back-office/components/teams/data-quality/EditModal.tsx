@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { clsx } from 'clsx';
@@ -9,6 +9,7 @@ import { useUpdateAdminTeam, TeamUpdatePayload } from '../../../hooks/teams/useU
 import { useApproveEnrichmentFields } from '../../../hooks/teams/useApproveEnrichmentFields';
 import { FIELD_KEYS, FIELD_LABELS, UNJUDGED_SCORE, getEntry, isAIEnriched } from './constants';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
+import api from '../../../utils/api';
 import s from '../../../pages/teams/data-quality.module.scss';
 
 interface Props {
@@ -47,6 +48,7 @@ function teamToForm(teamDetail: TeamDetail, enrichmentTeam: EnrichmentTeam): Tea
 export function EditModal({ team, authToken, onClose }: Props) {
   const [form, setForm] = useState<TeamUpdatePayload | null>(null);
   const [confirmedFields, setConfirmedFields] = useState<Set<FieldKey>>(new Set());
+  const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
 
   const { data: teamDetail, isLoading: detailLoading } = useGetTeam(team?.uid ?? null, !!team);
   const updateMutation = useUpdateAdminTeam();
@@ -62,6 +64,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
     if (!team) {
       setForm(null);
       setConfirmedFields(new Set());
+      setSelectedLogoFile(null);
     }
   }, [team]);
 
@@ -97,6 +100,22 @@ export function EditModal({ team, authToken, onClose }: Props) {
       return;
     }
 
+    // Upload logo file at save time (follows the same pattern as EditTeamDetailsForm)
+    let uploadedLogoUid: string | null = null;
+    if (selectedLogoFile) {
+      try {
+        const formData = new FormData();
+        formData.append('file', selectedLogoFile);
+        const response = await api.post('/v1/images', formData, {
+          headers: { 'content-type': 'multipart/form-data' },
+        });
+        uploadedLogoUid = response.data.image.uid;
+      } catch {
+        toast.error('Failed to upload logo. Please try again.');
+        return;
+      }
+    }
+
     try {
       if (Object.keys(changedData).length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -113,7 +132,9 @@ export function EditModal({ team, authToken, onClose }: Props) {
         await approveMutation.mutateAsync({
           authToken: authToken!,
           teamUid: team.uid,
-          fields: fieldsToApprove.map((key) => ({ key })),
+          fields: fieldsToApprove.map((key) =>
+            key === 'logo' && uploadedLogoUid ? { key, content: uploadedLogoUid } : { key }
+          ),
         });
       }
     } catch {
@@ -133,7 +154,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
       })
     : [];
 
-  const showLogoRow = Boolean(team?.logo && (team.logo.judgment?.score ?? UNJUDGED_SCORE) <= 90);
+  const showLogoRow = true;
 
   const hasNoLowFields = !detailLoading && form && lowScoreEditableKeys.length === 0 && !showLogoRow;
 
@@ -195,6 +216,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                       teamDetail={teamDetail}
                       confirmed={confirmedFields.has('logo')}
                       onConfirm={() => addConfirm('logo')}
+                      onFileSelected={setSelectedLogoFile}
                     />
                   )}
 
@@ -291,13 +313,23 @@ function LogoRow({
   teamDetail,
   confirmed,
   onConfirm,
+  onFileSelected,
 }: {
   team: EnrichmentTeam;
   teamDetail?: TeamDetail;
   confirmed: boolean;
   onConfirm: () => void;
+  onFileSelected: (file: File) => void;
 }) {
   const [selectedSlot, setSelectedSlot] = useState<'current' | 'suggested' | 'upload' | null>(null);
+  const [uploadedPreviewUrl, setUploadedPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (uploadedPreviewUrl) URL.revokeObjectURL(uploadedPreviewUrl);
+    };
+  }, [uploadedPreviewUrl]);
 
   const currentLogoUrl = teamDetail?.logo?.url ?? null;
   const candidateLogoUrl =
@@ -305,8 +337,25 @@ function LogoRow({
       ? (team.logo.content as { url: string }).url
       : null;
 
-  const handleSlotClick = (slot: 'current' | 'suggested' | 'upload') => {
+  const handleSlotClick = (slot: 'current' | 'suggested') => {
     setSelectedSlot(slot);
+    onConfirm();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      toast.error('Only JPG and PNG images are allowed.');
+      return;
+    }
+
+    if (uploadedPreviewUrl) URL.revokeObjectURL(uploadedPreviewUrl);
+    setUploadedPreviewUrl(URL.createObjectURL(file));
+    setSelectedSlot('upload');
+    onFileSelected(file);
     onConfirm();
   };
 
@@ -331,6 +380,14 @@ function LogoRow({
         </div>
       </div>
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
       <div className={s.logoCompare}>
         {/* Current */}
         <div
@@ -353,10 +410,13 @@ function LogoRow({
           </div>
         </div>
 
-        {/* AI suggestion */}
+        {/* AI suggestion — disabled when no candidate */}
         <div
-          className={clsx(s.logoSlot, s.logoSlotSuggested, { [s.logoSlotSelected]: selectedSlot === 'suggested' })}
-          onClick={() => handleSlotClick('suggested')}
+          className={clsx(s.logoSlot, s.logoSlotSuggested, {
+            [s.logoSlotSelected]: selectedSlot === 'suggested',
+            [s.logoSlotDisabled]: !candidateLogoUrl,
+          })}
+          onClick={candidateLogoUrl ? () => handleSlotClick('suggested') : undefined}
         >
           {selectedSlot === 'suggested' && (
             <span className={s.logoSlotCheck}>
@@ -376,10 +436,10 @@ function LogoRow({
           </div>
         </div>
 
-        {/* Upload (visual placeholder) */}
+        {/* Upload */}
         <div
           className={clsx(s.logoSlot, s.logoSlotUpload, { [s.logoSlotSelected]: selectedSlot === 'upload' })}
-          onClick={() => handleSlotClick('upload')}
+          onClick={() => fileInputRef.current?.click()}
         >
           {selectedSlot === 'upload' && (
             <span className={s.logoSlotCheck}>
@@ -388,7 +448,12 @@ function LogoRow({
           )}
           <div className={s.logoSlotLabel}>Upload</div>
           <div className={s.logoSlotPreview}>
-            <UploadIcon />
+            {uploadedPreviewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={uploadedPreviewUrl} alt="Uploaded logo" className={s.logoSlotImg} />
+            ) : (
+              <UploadIcon />
+            )}
           </div>
         </div>
       </div>
