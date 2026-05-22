@@ -217,4 +217,11 @@ export class PLEventsInternalController {
   async getIrlEventDetails(@Param('uid') uid: string) {
     return await this.internalsService.getIrlEventDetails(uid);
   }
+
+  @Api(server.route.getAllAggregatedData)
+  async getAllAggregatedData(
+    @Req() request: Request
+  ) {
+    return await this.eventGuestsService.getAllAggregatedData(null, request.query);
+  }
 }
