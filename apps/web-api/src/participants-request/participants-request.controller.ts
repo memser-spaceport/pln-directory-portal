@@ -5,9 +5,6 @@ import { ParticipantsReqValidationPipe } from '../pipes/participant-request-vali
 import { FindUniqueIdentiferDto } from '@protocol-labs-network/contracts';
 import { MembersService } from '../members/members.service';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
-import { RbacGuard } from '../rbac/rbac.guard';
-import { RequirePermissions } from '../rbac/rbac.decorator';
-import { ADMIN_PERMISSIONS, MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 @Controller('v1/participants-request')
 @NoCache()
