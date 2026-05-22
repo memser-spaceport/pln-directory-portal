@@ -56,11 +56,11 @@ export class LogoVerificationPersistenceService {
         i."url" AS "logoUrl"
       FROM "Team" t
       INNER JOIN "Image" i ON i."uid" = t."logoUid"
+      INNER JOIN "TeamEnrichment" te ON te."teamUid" = t."uid"
       WHERE t."logoUid" IS NOT NULL
         AND i."url" IS NOT NULL
         AND t."isFund" = false
         AND t."priority" IN (1, 2, 3)
-        AND t."dataEnrichment" IS NOT NULL
         ${needsVerificationFilter}
       ORDER BY t."priority" ASC, t."updatedAt" DESC
       LIMIT ${limit}
