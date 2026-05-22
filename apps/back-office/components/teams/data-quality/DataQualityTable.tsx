@@ -47,7 +47,9 @@ export function DataQualityTable({ teams, isLoading, hasActiveFilters, onEdit }:
         header: 'Priority',
         size: 90,
         sortingFn: 'basic',
-        cell: (info) => <span className={s.priorityPill}>P{info.getValue()}</span>,
+        cell: (info) => (
+          <span className={s.priorityPill}>{info.getValue() === 99 ? `N/A` : `P${info.getValue()}`}</span>
+        ),
       }),
       columnHelper.accessor('name', {
         id: 'name',

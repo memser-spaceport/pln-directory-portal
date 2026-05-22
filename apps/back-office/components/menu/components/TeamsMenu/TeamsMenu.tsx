@@ -4,10 +4,12 @@ import { clsx } from 'clsx';
 
 import { useOnClickOutside } from '../../../../hooks/useOnClickOutside';
 import s from './TeamsMenu.module.scss';
+import { useAuth } from '../../../../context/auth-context';
 
 export const TeamsMenu = () => {
   const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const { isDirectoryAdmin } = useAuth();
 
   useOnClickOutside([menuRef], () => setOpen(false));
 
@@ -30,7 +32,6 @@ export const TeamsMenu = () => {
           </a>
         </Link>
 
-        {/* Hidden until Team Data Quality is ready
         {isDirectoryAdmin && (
           <Link href="/teams/data-quality" passHref>
             <a className={s.menuItem}>
@@ -40,7 +41,6 @@ export const TeamsMenu = () => {
             </a>
           </Link>
         )}
-        */}
       </div>
     </div>
   );
@@ -55,14 +55,14 @@ const TeamsIcon = () => (
   </svg>
 );
 
-// const DataQualityIcon = () => (
-//   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-//     <path
-//       d="M10 2a8 8 0 100 16A8 8 0 0010 2zm-1.5 10.94L5.56 10l1.06-1.06 1.88 1.87 4.44-4.43 1.06 1.06-5.5 5.5z"
-//       fill="#3D4A5C"
-//     />
-//   </svg>
-// );
+const DataQualityIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M10 2a8 8 0 100 16A8 8 0 0010 2zm-1.5 10.94L5.56 10l1.06-1.06 1.88 1.87 4.44-4.43 1.06 1.06-5.5 5.5z"
+      fill="#3D4A5C"
+    />
+  </svg>
+);
 
 const ChevronDownIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
