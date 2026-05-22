@@ -764,10 +764,130 @@
   background: #1f8a4c;
   color: #fff;
   border-color: #1f8a4c;
+  cursor: default;
 
   &:hover {
-    background: #1a7a43;
+    background: #1f8a4c;
   }
+}
+
+/* ── Field header right cluster ─────────────────────────── */
+
+.editFieldActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Logo three-slot picker ─────────────────────────────── */
+
+.logoCompare {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.logoSlot {
+  position: relative;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px 12px;
+  background: #fff;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:hover {
+    border-color: rgba(27, 56, 96, 0.24);
+  }
+}
+
+.logoSlotSuggested {
+  background: #f2f5ff;
+  border-color: #dbe5fa;
+
+  &:hover {
+    border-color: #dbe5fa;
+  }
+}
+
+.logoSlotDisabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.logoSlotUpload {
+  border-style: dashed;
+  border-color: rgba(27, 56, 96, 0.24);
+
+  &:hover {
+    border-color: #1b4dff;
+    background: #fafbfd;
+  }
+}
+
+.logoSlotSelected {
+  border-color: #1b4dff !important;
+  border-width: 1.5px;
+  padding: 15.5px 11.5px;
+
+  &.logoSlotUpload {
+    border-style: solid;
+  }
+}
+
+.logoSlotCheck {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1b4dff;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.logoSlotLabel {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+
+  .logoSlotSuggested & {
+    color: #1b4dff;
+    font-weight: 600;
+  }
+}
+
+.logoSlotPreview {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto;
+  border-radius: 12px;
+  background: #f0f1f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #94a3b8;
+}
+
+.logoSlotImg {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  border-radius: 12px;
 }
 
 /* ── Logo preview row ───────────────────────────────────── */
