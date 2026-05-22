@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, NewsEventType } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import type {
+  TeamNewsDiscussion,
   TeamNewsFiltersResponse,
   TeamNewsGroupedResponse,
   TeamNewsItemDto,
@@ -9,6 +10,8 @@ import type {
   TeamNewsListResponse,
 } from 'libs/contracts/src/schema/team-news';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
+
+const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 
 const TOP_LEVEL_FOCUS_AREAS = [
   'Digital Human Rights',
@@ -112,11 +115,13 @@ export class TeamNewsQueryService {
       this.prisma.teamNewsItem.count({ where }),
     ]);
 
+    const discussions = await this.loadDiscussions(rows.map((r) => r.uid));
+
     return {
       page: query.page,
       limit: query.limit,
       total,
-      items: rows.map((row) => this.toDto(row)),
+      items: rows.map((row) => this.toDto(row, discussions.get(row.uid))),
     };
   }
 
@@ -137,15 +142,18 @@ export class TeamNewsQueryService {
       },
     });
 
-    const focusAreas = await this.prisma.focusArea.findMany({
-      where: { parentUid: null },
-      select: { uid: true, title: true },
-    });
+    const [focusAreas, discussions] = await Promise.all([
+      this.prisma.focusArea.findMany({
+        where: { parentUid: null },
+        select: { uid: true, title: true },
+      }),
+      this.loadDiscussions(rows.map((r) => r.uid)),
+    ]);
     const focusByTitle = new Map(focusAreas.map((fa) => [fa.title, fa]));
 
     const groups = new Map<string, TeamNewsItemDto[]>();
     for (const row of rows) {
-      const dto = this.toDto(row);
+      const dto = this.toDto(row, discussions.get(row.uid));
       if (dto.focusAreas.length === 0) continue;
       for (const title of dto.focusAreas) {
         if (!focusByTitle.has(title)) continue;
@@ -230,27 +238,55 @@ export class TeamNewsQueryService {
       .sort((a, b) => a.value.localeCompare(b.value));
   }
 
-  private toDto(row: {
-    uid: string;
-    teamUid: string;
-    eventType: NewsEventType;
-    eventDate: Date;
-    title: string;
-    summary: string | null;
-    sourceUrl: string;
-    sourceDomain: string | null;
-    tags: string[];
-    createdAt: Date;
-    team: {
+  /**
+   * Batch-load forum discussion summaries for a set of news items.
+   * Returns a map keyed by news-item UID. Items absent from the map have
+   * zero linked discussions.
+   */
+  private async loadDiscussions(itemUids: string[]): Promise<Map<string, TeamNewsDiscussion>> {
+    if (itemUids.length === 0) return new Map();
+    const links = await this.prisma.teamNewsForumLink.findMany({
+      where: { newsItemUid: { in: itemUids } },
+      orderBy: { createdAt: 'desc' },
+      select: { newsItemUid: true, forumTopicUrl: true },
+    });
+
+    const out = new Map<string, TeamNewsDiscussion>();
+    for (const link of links) {
+      const current = out.get(link.newsItemUid);
+      if (current) {
+        current.count += 1;
+      } else {
+        out.set(link.newsItemUid, { count: 1, latestTopicUrl: link.forumTopicUrl });
+      }
+    }
+    return out;
+  }
+
+  private toDto(
+    row: {
       uid: string;
-      name: string;
-      logo: { url: string } | null;
-      teamFocusAreas: Array<{
-        focusArea: { title: string; parentUid: string | null };
-        ancestorArea: { title: string };
-      }>;
-    };
-  }): TeamNewsItemDto {
+      teamUid: string;
+      eventType: NewsEventType;
+      eventDate: Date;
+      title: string;
+      summary: string | null;
+      sourceUrl: string;
+      sourceDomain: string | null;
+      tags: string[];
+      createdAt: Date;
+      team: {
+        uid: string;
+        name: string;
+        logo: { url: string } | null;
+        teamFocusAreas: Array<{
+          focusArea: { title: string; parentUid: string | null };
+          ancestorArea: { title: string };
+        }>;
+      };
+    },
+    discussion: TeamNewsDiscussion | undefined
+  ): TeamNewsItemDto {
     const focusAreas: string[] = [];
     const subFocusAreas: string[] = [];
     for (const tfa of row.team.teamFocusAreas) {
@@ -275,6 +311,7 @@ export class TeamNewsQueryService {
       focusAreas: [...new Set(focusAreas)],
       subFocusAreas: [...new Set(subFocusAreas)],
       createdAt: row.createdAt.toISOString(),
+      discussion: discussion ?? EMPTY_DISCUSSION,
     };
   }
 }
