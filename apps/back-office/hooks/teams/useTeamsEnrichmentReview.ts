@@ -15,6 +15,7 @@ export type FieldKey =
 // Mirrors EnrichmentSource and FieldEnrichmentStatus enums from backend
 export type FieldMetadataSource = 'ai' | 'open-graph' | 'scrapingdog';
 export type FieldMetadataStatus = 'Enriched' | 'ChangedByUser' | 'CannotEnrich';
+export type JudgmentVerdict = 'agrees' | 'disagrees' | 'uncertain';
 
 export type FieldEntry = {
   content: string | string[] | { uid: string; url: string } | null;
@@ -23,7 +24,7 @@ export type FieldEntry = {
     status?: FieldMetadataStatus;
     lastModifiedAt?: string;
   };
-  judgment?: { note?: string; score?: number };
+  judgment?: { note?: string; score?: number; verdict?: JudgmentVerdict };
 };
 
 export type LogoEntry = FieldEntry & {

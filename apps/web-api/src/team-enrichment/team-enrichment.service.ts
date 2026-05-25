@@ -26,7 +26,7 @@ import {
 export type EnrichmentReviewFieldEntry = {
   content: string | string[];
   metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
-  judgment: { note?: string; score?: number };
+  judgment: { note?: string; score?: number; verdict?: JudgmentVerdict };
 };
 
 export type EnrichmentReviewLogo = {
@@ -1412,7 +1412,11 @@ export class TeamEnrichmentService {
             source: fieldMeta.source,
             lastModifiedAt: fieldMeta.lastModifiedAt,
           },
-          judgment: { note: fieldMeta.judgment.note, score: fieldMeta.judgment.score },
+          judgment: {
+            note: fieldMeta.judgment.note,
+            score: fieldMeta.judgment.score,
+            verdict: fieldMeta.judgment.verdict,
+          },
         };
       }
 

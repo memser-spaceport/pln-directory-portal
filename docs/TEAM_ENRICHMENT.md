@@ -476,7 +476,7 @@ Response shape:
     fields: Partial<Record<FieldMetaKey, {
       content: string | string[];                // candidate value from TeamEnrichment
       metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
-      judgment: { note?: string; score?: number };
+      judgment: { note?: string; score?: number; verdict?: 'agrees' | 'disagrees' | 'uncertain' };
     }>>;
     logo?: {
       content: { uid: string; url: string } | null;   // candidate logo from TeamEnrichment
