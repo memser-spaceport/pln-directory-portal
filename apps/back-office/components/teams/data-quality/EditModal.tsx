@@ -154,7 +154,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
       })
     : [];
 
-  const showLogoRow = true;
+  const showLogoRow = Boolean(team?.logo && (team.logo.judgment?.score ?? UNJUDGED_SCORE) <= 90);
 
   const hasNoLowFields = !detailLoading && form && lowScoreEditableKeys.length === 0 && !showLogoRow;
 
