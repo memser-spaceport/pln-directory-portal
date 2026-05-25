@@ -49,15 +49,14 @@ export function EditModal({ team, authToken, onClose }: Props) {
   const [form, setForm] = useState<TeamUpdatePayload | null>(null);
   const [confirmedFields, setConfirmedFields] = useState<Set<FieldKey>>(new Set());
   const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
+  const isSavingRef = useRef(false);
 
   const { data: teamDetail, isLoading: detailLoading } = useGetTeam(team?.uid ?? null, !!team);
   const updateMutation = useUpdateAdminTeam();
   const approveMutation = useApproveEnrichmentFields();
 
-  console.log({ team, teamDetail });
-
   useEffect(() => {
-    if (teamDetail && team) setForm(teamToForm(teamDetail, team));
+    if (teamDetail && team && !isSavingRef.current) setForm(teamToForm(teamDetail, team));
   }, [teamDetail, team]);
 
   useEffect(() => {
@@ -86,6 +85,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
 
   const handleSave = async () => {
     if (!team || !form || !authToken || !teamDetail) return;
+    isSavingRef.current = true;
 
     const fieldsToApprove = [...confirmedFields];
 
