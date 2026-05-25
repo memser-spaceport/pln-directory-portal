@@ -303,8 +303,13 @@ export class TeamEnrichmentService {
   /**
    * Teams whose TeamEnrichment.dataEnrichment is PendingEnrichment + shouldEnrich=true.
    * Filtered via JSONB path expressions on the TeamEnrichment row.
+   *
+   * Also self-heals rows stuck in InProgress beyond the stuck-TTL (pod was killed mid-flight)
+   * by flipping them back to PendingEnrichment + shouldEnrich=true so the same call picks
+   * them up.
    */
   async findTeamsPendingEnrichment(): Promise<Array<{ uid: string }>> {
+    await this.resetStaleInProgressEnrichment();
     return this.prisma.team.findMany({
       where: {
         teamEnrichment: {
@@ -316,6 +321,41 @@ export class TeamEnrichmentService {
       },
       select: { uid: true },
     });
+  }
+
+  /**
+   * Flips rows whose `dataEnrichment.status = 'InProgress'` and `updatedAt` is older than
+   * the stuck-TTL back to `PendingEnrichment + shouldEnrich=true`. The only way a row stays
+   * `InProgress` past the TTL is a pod that died mid-run — every healthy enrichment writes
+   * a terminal status in well under the TTL window.
+   *
+   * TTL is `TEAM_ENRICHMENT_STUCK_TTL_MINUTES` (default 180). A generous default avoids
+   * racing a slow-but-live run.
+   */
+  private async resetStaleInProgressEnrichment(): Promise<void> {
+    const ttlMinutes = this.getStuckTtlMinutes();
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "TeamEnrichment"
+      SET "dataEnrichment" =
+            jsonb_set(
+              jsonb_set("dataEnrichment", '{status}',       '"PendingEnrichment"'),
+                                          '{shouldEnrich}', 'true'
+            ),
+          "updatedAt" = NOW()
+      WHERE "dataEnrichment"->>'status' = 'InProgress'
+        AND "updatedAt" < NOW() - make_interval(mins => ${ttlMinutes})
+    `;
+    if (updated > 0) {
+      this.logger.warn(
+        `Stale enrichment recovery: reset ${updated} row(s) from InProgress → PendingEnrichment (ttl=${ttlMinutes}m)`
+      );
+    }
+  }
+
+  private getStuckTtlMinutes(): number {
+    const raw = process.env.TEAM_ENRICHMENT_STUCK_TTL_MINUTES?.trim();
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 180;
   }
 
   async enrichTeam(teamUid: string, enrichedBy = 'system-cron'): Promise<{ status: 'started' | 'in_progress' }> {

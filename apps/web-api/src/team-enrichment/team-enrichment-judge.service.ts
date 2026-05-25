@@ -146,6 +146,8 @@ export class TeamEnrichmentJudgeService {
    * judgment is already Judged/InProgress and teams with no judgable fields.
    */
   async findTeamsPendingJudgment(): Promise<TeamRecord[]> {
+    await this.resetStaleInProgressJudgment();
+
     const candidates = (await this.prisma.team.findMany({
       where: {
         AND: [
@@ -167,6 +169,36 @@ export class TeamEnrichmentJudgeService {
       if (judgmentStatus === JudgmentStatus.InProgress) return false;
       return this.collectJudgableFieldKeys(t, meta?.fieldsMeta ?? {}).length > 0;
     });
+  }
+
+  /**
+   * Self-heals rows whose `dataEnrichment.judgment.status = 'InProgress'` and `updatedAt`
+   * is older than the stuck-TTL — the pod was killed mid-judge. Drops the `judgment` block
+   * so the team is judgable again on this same call.
+   *
+   * TTL is `TEAM_ENRICHMENT_STUCK_TTL_MINUTES` (default 180), shared with the enrichment
+   * recovery in TeamEnrichmentService.
+   */
+  private async resetStaleInProgressJudgment(): Promise<void> {
+    const ttlMinutes = this.getStuckTtlMinutes();
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "TeamEnrichment"
+      SET "dataEnrichment" = "dataEnrichment" - 'judgment',
+          "updatedAt"      = NOW()
+      WHERE "dataEnrichment"->'judgment'->>'status' = 'InProgress'
+        AND "updatedAt" < NOW() - make_interval(mins => ${ttlMinutes})
+    `;
+    if (updated > 0) {
+      this.logger.warn(
+        `Stale judge recovery: cleared judgment block on ${updated} row(s) stuck InProgress (ttl=${ttlMinutes}m)`
+      );
+    }
+  }
+
+  private getStuckTtlMinutes(): number {
+    const raw = process.env.TEAM_ENRICHMENT_STUCK_TTL_MINUTES?.trim();
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 180;
   }
 
   async judgeTeam(teamUid: string, judgedBy = 'system-cron'): Promise<JudgeTeamResult> {
