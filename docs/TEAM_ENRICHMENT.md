@@ -330,7 +330,7 @@ A new row is inserted into `TeamLogoVerificationResult` per run — history is p
 
 Two filters run in order:
 
-1. **DB-level candidates** — `team-logo-verification` selects teams where `logoUid IS NOT NULL`, ordered by `updatedAt DESC`, limited to `LOGO_VERIFICATION_BATCH_SIZE`. Recently-changed teams surface first so a freshly-uploaded or freshly-enriched logo gets verified on the next tick. There is no `isFund` / priority filter — every team that has a logo is eligible.
+1. **DB-level candidates** — `team-logo-verification` selects teams where `logoUid IS NOT NULL`, joined to a `TeamEnrichment` row (i.e. enrichment has at least been _marked_ for the team), with `isFund = false` AND `priority IN (1, 2, 3)`. The joined `Image.url` must also be non-null. Ordered by `priority ASC` then `updatedAt DESC` and limited to `LOGO_VERIFICATION_BATCH_SIZE` — higher-priority, recently-changed teams surface first so a freshly-uploaded or freshly-enriched logo gets verified on the next tick.
 2. **Per-team `shouldVerifyTeam` gate** — for each candidate, the persistence layer looks up the latest `TeamLogoVerificationResult` for the same `(teamUid, provider)` pair and skips if all of the following hold:
    - a prior result exists,
    - its `logoUid` matches the team's current `logoUid` (i.e. the logo wasn't replaced),
@@ -413,6 +413,28 @@ scrapingDog?: {
 - **Guard**: `IS_TEAM_ENRICHMENT_ENABLED` must be `'true'`
 - Finds all teams whose `TeamEnrichment.dataEnrichment.shouldEnrich=true` AND `status=PendingEnrichment` (the eligibility filter is applied at the _marking_ step, so this cron processes everything that's been marked, regardless of current `isFund`/`priority`)
 - Processes sequentially to avoid rate limits
+
+## Stale `InProgress` recovery
+
+A pod killed mid-run (SIGKILL, OOM, container restart, hung pipeline) can leave a row stuck with `dataEnrichment.status = InProgress` (or `judgment.status = InProgress`) forever — every entry point (`enrichTeam`, `forceEnrichTeam`, `judgeTeam`, `forceJudgeTeam`, plus all `trigger-*-all` variants and the crons) treats `InProgress` as an "already running" guard and skips. To prevent permanent stuck rows, a TTL-based self-heal runs on every `findTeamsPendingEnrichment` / `findTeamsPendingJudgment` call:
+
+- **Enrichment recovery** — any row with `dataEnrichment.status = 'InProgress'` AND `updatedAt < NOW() - TEAM_ENRICHMENT_STUCK_TTL_MINUTES` is flipped back to `PendingEnrichment + shouldEnrich = true` in a single `UPDATE`. The next pass of the same call picks it up.
+- **Judge recovery** — any row with `dataEnrichment.judgment.status = 'InProgress'` AND `updatedAt < NOW() - TTL` has its `judgment` block dropped (via JSONB `-` operator). Since the judge only excludes `Judged` and `InProgress` from its candidate set, removing the block re-qualifies the team on the same call.
+
+Both writes also bump `updatedAt` so a successful recovery is itself protected from being re-fired on the next tick.
+
+**TTL choice.** Default `60` minutes. A single team's enrichment is ~2 minutes worst-case (one AI call + a couple of HTTP fetches), and a judge run is a few seconds — so 60 minutes is comfortably outside the longest possible live run. Lower it if you want faster recovery; raise it if you ever see actually-running teams flagged.
+
+**Observability.** When the self-heal fires, it logs at `warn` level with the affected row count:
+
+```
+Stale enrichment recovery: reset N row(s) from InProgress → PendingEnrichment (ttl=60m)
+Stale judge recovery: cleared judgment block on N row(s) stuck InProgress (ttl=60m)
+```
+
+Treat repeated firings against the same team as a real bug signal (a deterministic crash inside the pipeline), not a normal pod restart.
+
+**Why TTL-only, no extra error handling.** Both pipelines already wrap the entire body in `try/catch` blocks that write `FailedToEnrich` / `FailedToJudge` on error. The cases where `InProgress` still escapes are (a) the process being killed before any catch can run, or (b) the catch's own DB write failing (typically because the DB is what threw in the first place). Adding more catch-the-catch layers helps only the second case — and only marginally, since the same DB call is being retried — so the TTL is the right defense for both.
 
 ## Endpoints
 
@@ -735,29 +757,30 @@ The shared `isFieldUserOwned(fieldsMeta, field, teamSlotHasValue)` helper at the
 
 ## Environment Variables
 
-| Variable                            | Default             | Description                                                                                                                                                                                                |
-| ----------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IS_TEAM_ENRICHMENT_ENABLED`        | `false`             | Enable/disable all enrichment-related cron jobs (enrichment, marking, judge)                                                                                                                               |
-| `TEAM_ENRICHMENT_FILTER_PRIORITY`   | _(unset)_           | Comma-separated list of `Team.priority` values (e.g. `1,2,3`). When set, contributes a `priority IN (...)` clause to the eligibility filter. See [Eligibility filter](#eligibility-filter).                |
-| `TEAM_ENRICHMENT_FILTER_IS_FUND`    | _(unset)_           | `'true'` / `'false'` (case-insensitive). When `'true'`, contributes an `isFund = true` clause to the eligibility filter. See [Eligibility filter](#eligibility-filter).                                    |
-| `AI_PROVIDER`                       | `gemini`            | Global default AI provider. Accepts `openai`, `gemini`, or `anthropic`.                                                                                                                                    |
-| `TEAM_ENRICHMENT_AI_PROVIDER`       | —                   | Overrides `AI_PROVIDER` for team enrichment only. Accepts `openai`, `gemini`, or `anthropic`.                                                                                                              |
-| `TEAM_ENRICHMENT_JUDGE_AI_PROVIDER` | —                   | Overrides `AI_PROVIDER` for the AI Judge only. Set to a **different** value from `TEAM_ENRICHMENT_AI_PROVIDER` for a meaningful second-opinion verification (e.g. enrichment=`gemini`, judge=`anthropic`). |
-| `OPENAI_LLM_MODEL`                  | `gpt-4o`            | OpenAI model                                                                                                                                                                                               |
-| `GEMINI_MODEL`                      | `gemini-2.5-flash`  | Gemini model                                                                                                                                                                                               |
-| `CLAUDE_API_KEY`                    | —                   | Anthropic API key. Required when the resolved provider is `anthropic`. Falls back to `ANTHROPIC_API_KEY` for SDK-default compatibility.                                                                    |
-| `CLAUDE_MODEL`                      | `claude-sonnet-4-6` | Claude model. Also accepts `ANTHROPIC_MODEL`.                                                                                                                                                              |
-| `TEAM_ENRICHMENT_CRON`              | `*/5 * * * *`       | Cron schedule for the enrichment job                                                                                                                                                                       |
-| `TEAM_ENRICHMENT_MARKING_CRON`      | `0 2 * * *`         | Cron schedule for auto-marking eligible teams                                                                                                                                                              |
-| `TEAM_ENRICHMENT_JUDGE_CRON`        | `0 4 * * *`         | Cron schedule for the AI Judge second-pass verification job                                                                                                                                                |
-| `SCRAPINGDOG_API_KEY`               | —                   | ScrapingDog LinkedIn API key. When set, enables the ScrapingDog fallback for teams with a known `linkedinHandler`.                                                                                         |
-| `IS_LOGO_VERIFICATION_ENABLED`      | `false`             | Enable/disable the Logo Verification cron. Independent of `IS_TEAM_ENRICHMENT_ENABLED`.                                                                                                                    |
-| `LOGO_VERIFICATION_CRON`            | `0 */6 * * *`       | Cron schedule for the Logo Verification job (every 6 hours UTC by default).                                                                                                                                |
-| `LOGO_VERIFICATION_BATCH_SIZE`      | `20`                | Max teams pulled per Logo Verification tick. Sequential per-team to keep VLM rate-limits manageable.                                                                                                       |
-| `LOGO_VERIFICATION_FORCE_UPDATE`    | `false`             | When `true`, bypasses the per-team `shouldVerifyTeam` gate and re-verifies every batched team regardless of prior results.                                                                                 |
-| `LOGO_VLM_PROVIDER`                 | `gemini`            | Vision-language model provider for Logo Verification. Accepts `gemini`, `openai`, or `anthropic`. Independent of `AI_PROVIDER`.                                                                            |
-| `GEMINI_LOGO_VERIFICATION_MODEL`    | `gemini-2.5-flash`  | Gemini model used by the Logo Verification job when `LOGO_VLM_PROVIDER=gemini`.                                                                                                                            |
-| `OPENAI_LOGO_VERIFICATION_MODEL`    | `gpt-4.1-mini`      | OpenAI model used by the Logo Verification job when `LOGO_VLM_PROVIDER=openai`.                                                                                                                            |
+| Variable                            | Default                    | Description                                                                                                                                                                                                |
+| ----------------------------------- |----------------------------| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IS_TEAM_ENRICHMENT_ENABLED`        | `false`                    | Enable/disable all enrichment-related cron jobs (enrichment, marking, judge)                                                                                                                               |
+| `TEAM_ENRICHMENT_FILTER_PRIORITY`   | _(unset)_                  | Comma-separated list of `Team.priority` values (e.g. `1,2,3`). When set, contributes a `priority IN (...)` clause to the eligibility filter. See [Eligibility filter](#eligibility-filter).                |
+| `TEAM_ENRICHMENT_FILTER_IS_FUND`    | _(unset)_                  | `'true'` / `'false'` (case-insensitive). When `'true'`, contributes an `isFund = true` clause to the eligibility filter. See [Eligibility filter](#eligibility-filter).                                    |
+| `AI_PROVIDER`                       | `gemini`                   | Global default AI provider. Accepts `openai`, `gemini`, or `anthropic`.                                                                                                                                    |
+| `TEAM_ENRICHMENT_AI_PROVIDER`       | —                          | Overrides `AI_PROVIDER` for team enrichment only. Accepts `openai`, `gemini`, or `anthropic`.                                                                                                              |
+| `TEAM_ENRICHMENT_JUDGE_AI_PROVIDER` | —                          | Overrides `AI_PROVIDER` for the AI Judge only. Set to a **different** value from `TEAM_ENRICHMENT_AI_PROVIDER` for a meaningful second-opinion verification (e.g. enrichment=`gemini`, judge=`anthropic`). |
+| `OPENAI_LLM_MODEL`                  | `gpt-4o`                   | OpenAI model                                                                                                                                                                                               |
+| `GEMINI_MODEL`                      | `gemini-2.5-flash`         | Gemini model                                                                                                                                                                                               |
+| `CLAUDE_API_KEY`                    | —                          | Anthropic API key. Required when the resolved provider is `anthropic`. Falls back to `ANTHROPIC_API_KEY` for SDK-default compatibility.                                                                    |
+| `CLAUDE_MODEL`                      | `claude-sonnet-4-6`        | Claude model. Also accepts `ANTHROPIC_MODEL`.                                                                                                                                                              |
+| `TEAM_ENRICHMENT_CRON`              | `*/5 * * * *`              | Cron schedule for the enrichment job                                                                                                                                                                       |
+| `TEAM_ENRICHMENT_MARKING_CRON`      | `0 2 * * *`                | Cron schedule for auto-marking eligible teams                                                                                                                                                              |
+| `TEAM_ENRICHMENT_JUDGE_CRON`        | `0 4 * * *`                | Cron schedule for the AI Judge second-pass verification job                                                                                                                                                |
+| `TEAM_ENRICHMENT_STUCK_TTL_MINUTES` | `180`                      | Stale-`InProgress` TTL in minutes. Rows whose enrichment or judgment status has been `InProgress` longer than this are auto-reset on the next `findTeamsPending*` call (cron tick or `trigger-*-all`). See [Stale `InProgress` recovery](#stale-inprogress-recovery). |
+| `SCRAPINGDOG_API_KEY`               | —                          | ScrapingDog LinkedIn API key. When set, enables the ScrapingDog fallback for teams with a known `linkedinHandler`.                                                                                         |
+| `IS_LOGO_VERIFICATION_ENABLED`      | `false`                    | Enable/disable the Logo Verification cron. Independent of `IS_TEAM_ENRICHMENT_ENABLED`.                                                                                                                    |
+| `LOGO_VERIFICATION_CRON`            | `0 */6 * * *`              | Cron schedule for the Logo Verification job (every 6 hours UTC by default).                                                                                                                                |
+| `LOGO_VERIFICATION_BATCH_SIZE`      | `20`                       | Max teams pulled per Logo Verification tick. Sequential per-team to keep VLM rate-limits manageable.                                                                                                       |
+| `LOGO_VERIFICATION_FORCE_UPDATE`    | `false`                    | When `true`, bypasses the per-team `shouldVerifyTeam` gate and re-verifies every batched team regardless of prior results.                                                                                 |
+| `LOGO_VLM_PROVIDER`                 | `gemini`                   | Vision-language model provider for Logo Verification. Accepts `gemini`, `openai`, or `anthropic`. Independent of `AI_PROVIDER`.                                                                            |
+| `GEMINI_LOGO_VERIFICATION_MODEL`    | `gemini-2.5-flash`         | Gemini model used by the Logo Verification job when `LOGO_VLM_PROVIDER=gemini`.                                                                                                                            |
+| `OPENAI_LOGO_VERIFICATION_MODEL`    | `gpt-4.1-mini`             | OpenAI model used by the Logo Verification job when `LOGO_VLM_PROVIDER=openai`.                                                                                                                            |
 | `ANTHROPIC_LOGO_VERIFICATION_MODEL` | `claude-3-5-sonnet-latest` | Anthropic model used by the Logo Verification job when `LOGO_VLM_PROVIDER=anthropic`.                                                                                                              |
 
 ### Eligibility filter
