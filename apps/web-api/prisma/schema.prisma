@@ -2143,11 +2143,31 @@ model TeamNewsItem {
   rawPayload   Json?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  forumLinks   TeamNewsForumLink[]
 
   @@index([teamUid])
   @@index([eventDate])
   @@index([eventType])
   @@index([teamUid, eventDate(sort: Desc)])
+}
+
+/// Authoritative link between a TeamNewsItem and a forum (NodeBB) topic
+/// that was created via the "Start a conversation" / "Discuss" affordance
+/// on the home-page news feed. Idempotent on (newsItemUid, forumTopicId)
+/// so the frontend can safely retry the write.
+model TeamNewsForumLink {
+  id             Int          @id @default(autoincrement())
+  uid            String       @unique @default(cuid())
+  newsItemUid    String
+  newsItem       TeamNewsItem @relation(fields: [newsItemUid], references: [uid], onDelete: Cascade)
+  forumTopicId   Int
+  forumTopicSlug String
+  forumTopicUrl  String
+  createdByUid   String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([newsItemUid, forumTopicId])
+  @@index([newsItemUid])
 }
 
 model TeamNewsEnrichment {

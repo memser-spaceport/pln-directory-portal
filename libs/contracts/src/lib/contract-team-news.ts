@@ -1,5 +1,8 @@
 import { initContract } from '@ts-rest/core';
+import { z } from 'zod';
 import {
+  CreateTeamNewsDiscussionRequestSchema,
+  CreateTeamNewsDiscussionResponseSchema,
   TeamNewsFiltersResponseSchema,
   TeamNewsGroupedResponseSchema,
   TeamNewsListQueryParams,
@@ -36,5 +39,15 @@ export const apiTeamNews = contract.router({
       200: TeamNewsFiltersResponseSchema,
     },
     summary: 'Facet counts for the Team News list',
+  },
+  createTeamNewsDiscussion: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/team-news/:newsItemUid/discussions`,
+    pathParams: z.object({ newsItemUid: z.string() }),
+    body: CreateTeamNewsDiscussionRequestSchema,
+    responses: {
+      201: CreateTeamNewsDiscussionResponseSchema,
+    },
+    summary: 'Record that a forum topic was created in response to a news item',
   },
 });
