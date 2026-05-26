@@ -32,6 +32,10 @@ export type EnrichmentReviewFieldEntry = {
 export type EnrichmentReviewLogo = {
   content: { uid: string; url: string } | null;
   metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
+  // Admin-approval judgment lives on fieldsMeta.logo.judgment (PATCH /enrichment-review writes
+  // {verdict: agrees, confidence: high, score: 100} here). The VLM cron never writes here —
+  // it writes to verification below.
+  judgment?: { note?: string; score?: number; verdict?: JudgmentVerdict; confidence?: FieldConfidence };
   verification: {
     verdict: string;
     confidence: string;
@@ -1360,8 +1364,13 @@ export class TeamEnrichmentService {
         return !(fm.judgment.verdict === JudgmentVerdict.Agrees && fm.judgment.confidence === FieldConfidence.High);
       });
       const latestLogoVerif = latestByTeam.get(row.teamUid);
-      const hasUnapprovedLogo =
-        !!row.logoUid && !(latestLogoVerif?.verdict === 'verified' && latestLogoVerif?.confidence === 'high');
+      const logoFieldMeta = meta.fieldsMeta.logo;
+      const logoApprovedByAdmin =
+        logoFieldMeta?.judgment?.verdict === JudgmentVerdict.Agrees &&
+        logoFieldMeta?.judgment?.confidence === FieldConfidence.High;
+      const logoApprovedByVLM =
+        latestLogoVerif?.verdict === 'verified' && latestLogoVerif?.confidence === 'high';
+      const hasUnapprovedLogo = !!row.logoUid && !logoApprovedByAdmin && !logoApprovedByVLM;
       if (!hasUnapprovedField && !hasUnapprovedLogo) continue;
 
       const fields: EnrichmentReviewItem['fields'] = {};
@@ -1435,6 +1444,16 @@ export class TeamEnrichmentService {
             source: logoMeta?.source,
             lastModifiedAt: logoMeta?.lastModifiedAt,
           },
+          ...(logoMeta?.judgment
+            ? {
+                judgment: {
+                  note: logoMeta.judgment.note,
+                  score: logoMeta.judgment.score,
+                  verdict: logoMeta.judgment.verdict,
+                  confidence: logoMeta.judgment.confidence,
+                },
+              }
+            : {}),
           verification: latestLogoVerif
             ? {
                 verdict: latestLogoVerif.verdict,

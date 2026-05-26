@@ -449,7 +449,7 @@ Full list of teams that still have **at least one thing needing admin review**. 
 
 Inclusion criteria — a team is included if EITHER:
 - At least one non-logo `fieldsMeta[k].judgment` is NOT (`verdict === 'agrees'` AND `confidence === 'high'`). That pair is the exact criterion the judge uses to auto-promote a field from `TeamEnrichment` to `Team`, and admin approval normalizes to the same pair — so anything else (`disagrees`, `uncertain`, or `medium`/`low` confidence) is still pending review and surfaces here. Fields without a `judgment` entry yet are ignored (they're not review-ready). Score is **not** the gate: ScrapingDog can legitimately emit `score=90` at `medium` confidence (e.g. partial nameMatch + website corroboration — not promoted) and `score=85` at `high` (e.g. tagline-overlap with exact name match — promoted), so score-thresholding produces both false negatives and false positives relative to what the judge actually did.
-- The team has a logo (`TeamEnrichment.logoUid` set) whose latest `TeamLogoVerificationResult` is NOT at (`verdict === 'verified'` AND `confidence === 'high'`). Logo uses the same verdict + confidence pair (no score column).
+- The team has a logo (`TeamEnrichment.logoUid` set) and NEITHER of the two approval sources is at high confidence. Logo has two independent approval sources, EITHER is sufficient: (a) admin approval via PATCH `/enrichment-review` writes `agrees + high` to `fieldsMeta.logo.judgment`; (b) the VLM cron writes `verified + high` to the latest `TeamLogoVerificationResult` row. The union is required because admin approval only **updates** an existing VLM row — it does not **create** one — so a logo approved by an admin before the VLM cron ever ran would otherwise keep surfacing in the review list forever.
 
 The endpoint excludes `PendingEnrichment`, `InProgress`, and `FailedToEnrich` at the query level — those teams have nothing review-ready. Remaining statuses (`Enriched`, `Reviewed`, `Approved`, and any future addition) all surface as long as the inclusion check flags something.
 
@@ -481,6 +481,7 @@ Response shape:
     logo?: {
       content: { uid: string; url: string } | null;   // candidate logo from TeamEnrichment
       metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
+      judgment?: { note?: string; score?: number; verdict?: 'agrees' | 'disagrees' | 'uncertain'; confidence?: 'high' | 'medium' | 'low' };  // admin-approval judgment from fieldsMeta.logo.judgment; absent until admin approves
       verification: {
         verdict: string;
         confidence: string;

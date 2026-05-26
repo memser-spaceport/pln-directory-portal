@@ -50,8 +50,11 @@ export function needsReview(team: EnrichmentTeam, key: FieldKey): boolean {
   if (key === 'logo') {
     const logo = team.logo;
     if (!logo?.content) return false;
+    const j = logo.judgment;
+    if (j?.verdict === 'agrees' && j?.confidence === 'high') return false;
     const v = logo.verification;
-    return !(v?.verdict === 'verified' && v?.confidence === 'high');
+    if (v?.verdict === 'verified' && v?.confidence === 'high') return false;
+    return true;
   }
   const entry = team.fields[key];
   if (!entry?.judgment) return false;
