@@ -448,8 +448,8 @@ Guard: AdminAuthGuard
 Full list of teams that still have **at least one thing needing admin review**. Sorted by `team.name` ASC. No pagination — the portal carries ~1K teams and the back-office UI consumes the full set at once.
 
 Inclusion criteria — a team is included if EITHER:
-- At least one non-logo `fieldsMeta[k].judgment.score` is below 90. Anything `>= 90` is treated as high-confidence and is excluded — the judge auto-promotes at score 90 and admin approval normalizes to score 100, so this threshold covers both. Fields without a judgment entry yet are ignored (they're not review-ready).
-- The team has a logo (`TeamEnrichment.logoUid` set) whose latest `TeamLogoVerificationResult` is NOT at (`verdict === 'verified'` AND `confidence === 'high'`). Logo verification has no `score` column, so the high-confidence check uses the verdict + confidence pair (which admin approval updates to verified+high).
+- At least one non-logo `fieldsMeta[k].judgment` is NOT (`verdict === 'agrees'` AND `confidence === 'high'`). That pair is the exact criterion the judge uses to auto-promote a field from `TeamEnrichment` to `Team`, and admin approval normalizes to the same pair — so anything else (`disagrees`, `uncertain`, or `medium`/`low` confidence) is still pending review and surfaces here. Fields without a `judgment` entry yet are ignored (they're not review-ready). Score is **not** the gate: ScrapingDog can legitimately emit `score=90` at `medium` confidence (e.g. partial nameMatch + website corroboration — not promoted) and `score=85` at `high` (e.g. tagline-overlap with exact name match — promoted), so score-thresholding produces both false negatives and false positives relative to what the judge actually did.
+- The team has a logo (`TeamEnrichment.logoUid` set) and NEITHER of the two approval sources is at high confidence. Logo has two independent approval sources, EITHER is sufficient: (a) admin approval via PATCH `/enrichment-review` writes `agrees + high` to `fieldsMeta.logo.judgment`; (b) the VLM cron writes `verified + high` to the latest `TeamLogoVerificationResult` row. The union is required because admin approval only **updates** an existing VLM row — it does not **create** one — so a logo approved by an admin before the VLM cron ever ran would otherwise keep surfacing in the review list forever.
 
 The endpoint excludes `PendingEnrichment`, `InProgress`, and `FailedToEnrich` at the query level — those teams have nothing review-ready. Remaining statuses (`Enriched`, `Reviewed`, `Approved`, and any future addition) all surface as long as the inclusion check flags something.
 
@@ -476,11 +476,12 @@ Response shape:
     fields: Partial<Record<FieldMetaKey, {
       content: string | string[];                // candidate value from TeamEnrichment
       metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
-      judgment: { note?: string; score?: number };
+      judgment: { note?: string; score?: number; verdict?: 'agrees' | 'disagrees' | 'uncertain'; confidence?: 'high' | 'medium' | 'low' };
     }>>;
     logo?: {
       content: { uid: string; url: string } | null;   // candidate logo from TeamEnrichment
       metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
+      judgment?: { note?: string; score?: number; verdict?: 'agrees' | 'disagrees' | 'uncertain'; confidence?: 'high' | 'medium' | 'low' };  // admin-approval judgment from fieldsMeta.logo.judgment; absent until admin approves
       verification: {
         verdict: string;
         confidence: string;
@@ -518,7 +519,7 @@ What happens in one `prisma.$transaction`:
 1. **Team writes** per the per-field resolution above. For `ChangedByUser` + confirm-only entries, no Team write is issued (the value is already there); only `fieldsMeta` is normalized.
 2. **`fieldsMeta` normalization** for every approved key — `status` + `judgment` updated per the rules above, `lastModifiedAt` restamped.
 3. **Team-level metadata**:
-   - `dataEnrichment.status` → `Reviewed`. The flip happens whether the admin approved every flagged field or only a subset — partial reviews stay in `Reviewed` and the team remains in the list endpoint until all flagged fields land at `score=100, confidence=high`. `Approved` is reserved for an explicit team-level finalization (not exposed through this endpoint).
+   - `dataEnrichment.status` → `Reviewed`. The flip happens whether the admin approved every flagged field or only a subset — partial reviews stay in `Reviewed` and the team remains in the list endpoint until all flagged fields land at `verdict=agrees, confidence=high` (the same pair the judge uses to auto-promote; admin approval normalizes to this with `score=100`). `Approved` is reserved for an explicit team-level finalization (not exposed through this endpoint).
    - `reviewedAt` → now (ISO).
    - `reviewedBy` → requestor email from the JWT (`req.userEmail`).
    - Approved keys removed from `dataEnrichment.judgment.fieldsForReview`.

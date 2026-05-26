@@ -15,7 +15,7 @@ import { EnrichmentTeam, LogoEntry } from '../../../hooks/teams/useTeamsEnrichme
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
 import PaginationControls from '../../../screens/members/components/PaginationControls/PaginationControls';
 import { TeamLogoCell } from './TeamLogoCell';
-import { FIELD_KEYS, FIELD_LABELS, UNJUDGED_SCORE, getEntry, isAIEnriched } from './constants';
+import { FIELD_KEYS, FIELD_LABELS, getEntry, isAIEnriched, needsReview } from './constants';
 import s from '../../../pages/teams/data-quality.module.scss';
 
 interface Props {
@@ -74,8 +74,7 @@ export function DataQualityTable({ teams, isLoading, hasActiveFilters, onEdit }:
           const team = info.row.original;
           const chips = FIELD_KEYS.flatMap((key) => {
             const entry = getEntry(team, key);
-            if (!entry) return [];
-            if ((entry.judgment?.score ?? UNJUDGED_SCORE) > 90) return [];
+            if (!entry || !needsReview(team, key)) return [];
             return [
               <span key={key} className={clsx(s.reviewChip, isAIEnriched(entry) ? s.reviewChipAI : s.reviewChipUser)}>
                 {FIELD_LABELS[key]}
