@@ -26,7 +26,7 @@ import {
 export type EnrichmentReviewFieldEntry = {
   content: string | string[];
   metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
-  judgment: { note?: string; score?: number; verdict?: JudgmentVerdict };
+  judgment: { note?: string; score?: number; verdict?: JudgmentVerdict; confidence?: FieldConfidence };
 };
 
 export type EnrichmentReviewLogo = {
@@ -1249,13 +1249,13 @@ export class TeamEnrichmentService {
    * Full list of teams that still have at least one thing needing admin review.
    *
    * Inclusion criteria — a team is included if EITHER of the following holds:
-   *  - at least one non-logo `fieldsMeta[k].judgment.score` is below 90. Anything `>= 90`
-   *    is treated as high-confidence (the judge auto-promotes at 90 and admin-approved
-   *    fields land at 100), so it doesn't need review.
+   *  - at least one non-logo `fieldsMeta[k].judgment` is NOT (`verdict='agrees'` AND
+   *    `confidence='high'`). That pair is the exact criterion the judge uses to auto-promote
+   *    a field to `Team`, and admin approval normalizes to the same pair — so anything else
+   *    (disagrees, uncertain, or medium/low confidence) is still pending review.
    *  - the team has a logo (`row.logoUid` set) whose latest `TeamLogoVerificationResult`
    *    is NOT at (`verdict === 'verified'` AND `confidence === 'high'`). Logo verification
-   *    has no `score` column — the equivalent "high-confidence approved" check uses the
-   *    verdict + confidence pair the VLM writes (and admin approval updates to verified+high).
+   *    uses verdict+confidence directly (no score column), mirroring the field-level check.
    *
    * Statuses excluded at the query level: `PendingEnrichment`, `InProgress`, `FailedToEnrich`.
    * The remaining statuses (`Enriched`, `Reviewed`, `Approved`, and any future addition) all
@@ -1348,12 +1348,16 @@ export class TeamEnrichmentService {
       const meta = this.parseEnrichmentMeta(row.dataEnrichment);
       if (!meta?.fieldsMeta) continue;
 
-      // Score >= 90 is treated as high-confidence and doesn't need review.
-      // Logo has no `score` column on its verification row — the equivalent check is
+      // A field is "auto-approved" iff the judge would have promoted it, i.e.
+      // verdict=agrees AND confidence=high (admin approval also normalizes to this).
+      // Score is intentionally NOT the gate — ScrapingDog/AI can emit score=90
+      // at medium confidence (not promoted) or score=85 at high (promoted),
+      // so score-thresholding produces both false negatives and false positives.
+      // Logo has no judgment.score on its verification row — the equivalent check is
       // verdict='verified' AND confidence='high' (what admin-approve writes).
       const hasUnapprovedField = Object.entries(meta.fieldsMeta).some(([k, fm]) => {
         if (k === 'logo' || !fm?.judgment) return false;
-        return (fm.judgment.score ?? 0) < 90;
+        return !(fm.judgment.verdict === JudgmentVerdict.Agrees && fm.judgment.confidence === FieldConfidence.High);
       });
       const latestLogoVerif = latestByTeam.get(row.teamUid);
       const hasUnapprovedLogo =
@@ -1416,6 +1420,7 @@ export class TeamEnrichmentService {
             note: fieldMeta.judgment.note,
             score: fieldMeta.judgment.score,
             verdict: fieldMeta.judgment.verdict,
+            confidence: fieldMeta.judgment.confidence,
           },
         };
       }

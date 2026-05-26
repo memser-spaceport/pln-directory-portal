@@ -7,7 +7,7 @@ import { EnrichmentTeam, FieldKey } from '../../../hooks/teams/useTeamsEnrichmen
 import { useGetTeam, TeamDetail } from '../../../hooks/teams/useGetTeam';
 import { useUpdateAdminTeam, TeamUpdatePayload } from '../../../hooks/teams/useUpdateAdminTeam';
 import { useApproveEnrichmentFields } from '../../../hooks/teams/useApproveEnrichmentFields';
-import { FIELD_KEYS, FIELD_LABELS, UNJUDGED_SCORE, getEntry, isAIEnriched } from './constants';
+import { FIELD_KEYS, FIELD_LABELS, getEntry, isAIEnriched, needsReview } from './constants';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
 import api from '../../../utils/api';
 import s from '../../../pages/teams/data-quality.module.scss';
@@ -152,16 +152,13 @@ export function EditModal({ team, authToken, onClose }: Props) {
     onClose();
   };
 
-  const lowScoreEditableKeys: EditableFieldKey[] = team
-    ? EDITABLE_KEYS.filter((key) => {
-        const entry = getEntry(team, key);
-        return !!entry && (entry.judgment?.score ?? UNJUDGED_SCORE) <= 90;
-      })
+  const reviewableEditableKeys: EditableFieldKey[] = team
+    ? EDITABLE_KEYS.filter((key) => !!getEntry(team, key) && needsReview(team, key))
     : [];
 
-  const showLogoRow = Boolean(team?.logo && (team.logo.judgment?.score ?? UNJUDGED_SCORE) <= 90);
+  const showLogoRow = Boolean(team && needsReview(team, 'logo'));
 
-  const hasNoLowFields = !detailLoading && form && lowScoreEditableKeys.length === 0 && !showLogoRow;
+  const hasNoLowFields = !detailLoading && form && reviewableEditableKeys.length === 0 && !showLogoRow;
 
   return (
     <AnimatePresence>
@@ -225,7 +222,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
                     />
                   )}
 
-                  {lowScoreEditableKeys.map((key) => {
+                  {reviewableEditableKeys.map((key) => {
                     const enrichmentEntry = team.fields[key];
                     const isConfirmed = confirmedFields.has(key);
                     const isAI = enrichmentEntry ? isAIEnriched(enrichmentEntry) : false;
