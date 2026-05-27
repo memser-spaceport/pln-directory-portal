@@ -317,4 +317,15 @@ export class AdminTeamsController {
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
     });
   }
+
+  /**
+   * Admin single-team detail for the data-quality review modal. Unlike the public
+   * GET /v1/teams/:uid, this returns inactive (L0) teams too. Declared last so the
+   * static GET routes above (enrichment-review, enrichment-status, ai-report) match first.
+   */
+  @Get('/:uid')
+  @NoCache()
+  async getTeamForReview(@Param('uid') uid: string) {
+    return this.adminTeamsService.getTeamForReview(uid);
+  }
 }
