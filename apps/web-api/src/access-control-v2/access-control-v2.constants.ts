@@ -122,6 +122,17 @@ export const PL_ADVISORS_PERMISSIONS = {
   ACCESS: 'pl.advisors.access',
 } as const;
 
+// ── Roadmap (Gantry) ──────────────────────────────────────────────────────
+
+export const ROADMAP_PERMISSIONS = {
+  VIEW: 'roadmap.view',
+  IDEA_CREATE: 'roadmap.idea.create',
+  ITEM_UPVOTE: 'roadmap.item.upvote',
+  ITEM_EDIT_OWN: 'roadmap.item.edit_own',
+  ITEM_CURATE: 'roadmap.item.curate',
+  ITEM_TRANSITION: 'roadmap.item.transition',
+} as const;
+
 // ── Legacy Permission Aliases ───────────────────────────────────────────
 
 /**
@@ -196,6 +207,14 @@ export const ALL_PERMISSION_CODES = [
 
   // PL Advisors
   PL_ADVISORS_PERMISSIONS.ACCESS,
+
+  // Roadmap
+  ROADMAP_PERMISSIONS.VIEW,
+  ROADMAP_PERMISSIONS.IDEA_CREATE,
+  ROADMAP_PERMISSIONS.ITEM_UPVOTE,
+  ROADMAP_PERMISSIONS.ITEM_EDIT_OWN,
+  ROADMAP_PERMISSIONS.ITEM_CURATE,
+  ROADMAP_PERMISSIONS.ITEM_TRANSITION,
 ] as const;
 
 // ── Type Exports ─────────────────────────────────────────────────────────
