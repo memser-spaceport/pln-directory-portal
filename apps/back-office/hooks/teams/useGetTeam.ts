@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import publicApi from '../../utils/public-api';
+import api from '../../utils/api';
 
 export type TeamDetail = {
   uid: string;
@@ -15,7 +15,7 @@ export type TeamDetail = {
 };
 
 async function fetchTeam(uid: string): Promise<TeamDetail> {
-  const { data } = await publicApi.get<TeamDetail>(`/v1/teams/${uid}`);
+  const { data } = await api.get<TeamDetail>(`/v1/admin/teams/${uid}`);
   return data;
 }
 

@@ -66,6 +66,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
 
   useEffect(() => {
     if (!team) {
+      isSavingRef.current = false;
       setForm(null);
       setInitialForm(null);
       setConfirmedFields(new Set());
