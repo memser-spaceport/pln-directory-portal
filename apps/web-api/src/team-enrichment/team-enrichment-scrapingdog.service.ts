@@ -178,7 +178,7 @@ export class TeamEnrichmentScrapingDogService {
           FieldConfidence.High,
           JudgmentVerdict.Agrees,
           websiteCorroborates ? 100 : 95,
-          websiteCorroborates ? 'name-match+website' : 'name-match'
+          websiteCorroborates ? 'name match and website' : 'name match'
         );
       } else {
         // nameMatch === 'partial'. A partial-only match (e.g. "Acme Inc" vs "Acme BV")
@@ -188,14 +188,14 @@ export class TeamEnrichmentScrapingDogService {
             FieldConfidence.High,
             JudgmentVerdict.Agrees,
             90,
-            'name-match-partial+website'
+            'name match partial and website'
           );
         } else {
           result.linkedinHandler = mkJudgment(
             FieldConfidence.Medium,
             JudgmentVerdict.Uncertain,
             55,
-            'name-match-partial-only'
+            'name match partial only'
           );
         }
       }
@@ -204,18 +204,18 @@ export class TeamEnrichmentScrapingDogService {
     // shortDescription — tagline overlap
     if (team.shortDescription && profile.tagline) {
       if (this.textsOverlap(team.shortDescription, profile.tagline, 0.2)) {
-        result.shortDescription = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'tagline-overlap');
+        result.shortDescription = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'tagline overlap');
       } else {
-        result.shortDescription = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'tagline-differs');
+        result.shortDescription = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'tagline differs');
       }
     }
 
     // longDescription — about sentence overlap
     if (team.longDescription && profile.about) {
       if (this.sentenceOverlap(team.longDescription, profile.about, 0.4)) {
-        result.longDescription = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'about-overlap');
+        result.longDescription = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'about overlap');
       } else {
-        result.longDescription = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'about-low-overlap');
+        result.longDescription = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'about low overlap');
       }
     }
 
@@ -228,9 +228,9 @@ export class TeamEnrichmentScrapingDogService {
         const teamTagsLower = team.industryTags.map((t) => t.title.toLowerCase());
         const overlap = teamTagsLower.some((t) => linkedinTags.some((l) => l.includes(t) || t.includes(l)));
         if (overlap) {
-          result.industryTags = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 80, 'tags-overlap');
+          result.industryTags = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 80, 'tags overlap');
         } else {
-          result.industryTags = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 45, 'tags-no-overlap');
+          result.industryTags = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 45, 'tags no overlap');
         }
       }
     }
@@ -241,9 +241,9 @@ export class TeamEnrichmentScrapingDogService {
       const foundedHit = !!profile.founded && text.includes(profile.founded.toLowerCase());
       const hqHit = !!profile.headquarters && this.extractCity(profile.headquarters).some((c) => text.includes(c));
       if (foundedHit || hqHit) {
-        result.moreDetails = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Agrees, 70, 'details-match');
+        result.moreDetails = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Agrees, 70, 'details match');
       } else {
-        result.moreDetails = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'details-no-match');
+        result.moreDetails = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'details no match');
       }
     }
 

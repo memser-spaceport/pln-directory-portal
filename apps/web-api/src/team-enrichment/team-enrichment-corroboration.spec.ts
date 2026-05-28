@@ -21,7 +21,7 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict).not.toBeNull();
       expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
       expect(verdict?.confidence).toBe(FieldConfidence.High);
-      expect(verdict?.note).toBe('email-domain==website');
+      expect(verdict?.note).toBe('email domain matches website');
       expect(verdict?.judgedVia).toBe(JudgmentSource.Corroboration);
     });
 
@@ -30,7 +30,7 @@ describe('team-enrichment-corroboration', () => {
         teamName: 'Acme',
         website: 'https://www.acme.com',
       });
-      expect(verdict?.note).toBe('email-domain==website');
+      expect(verdict?.note).toBe('email domain matches website');
     });
 
     it('schemeless website is normalized and still matches', () => {
@@ -52,7 +52,7 @@ describe('team-enrichment-corroboration', () => {
         website: 'https://acme.io',
         websiteSignals: { extractedAt: 'x', contactEmail: 'team@acme.com' },
       });
-      expect(verdict?.note).toBe('email-domain==jsonld');
+      expect(verdict?.note).toBe('email domain matches jsonld');
     });
 
     it('email with mismatching website and no JSON-LD → no verdict (falls through to AI)', () => {
@@ -83,7 +83,7 @@ describe('team-enrichment-corroboration', () => {
         teamName: 'Acme',
         websiteSignals: { extractedAt: 'x', twitterHandler: 'acmehq' },
       });
-      expect(verdict?.note).toBe('website-self-declared');
+      expect(verdict?.note).toBe('website self declared');
       expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
     });
 
@@ -115,7 +115,7 @@ describe('team-enrichment-corroboration', () => {
         websiteSignals: { extractedAt: 'x', linkedinHandler: 'company/acme-labs' },
       });
       expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
-      expect(verdict?.note).toBe('website-self-declared');
+      expect(verdict?.note).toBe('website self declared');
     });
 
     it('full URL vs slug-only is normalized', () => {
@@ -143,7 +143,7 @@ describe('team-enrichment-corroboration', () => {
         teamName: 'Acme',
         website: 'https://acme.com',
       });
-      expect(verdict?.note).toBe('host-corroborated');
+      expect(verdict?.note).toBe('host corroborated');
       expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
     });
 
@@ -173,7 +173,7 @@ describe('team-enrichment-corroboration', () => {
         websiteReachable: true,
         websiteSignals: { extractedAt: 'x', ogSiteName: 'Acme Robotics — Industrial Robotics' },
       });
-      expect(verdict?.note).toContain('og-name-match');
+      expect(verdict?.note).toContain('og name match');
       expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
     });
 
@@ -183,7 +183,7 @@ describe('team-enrichment-corroboration', () => {
         websiteReachable: true,
         websiteSignals: { extractedAt: 'x', jsonLdOrgName: 'Acme Robotics, Inc' },
       });
-      expect(verdict?.note).toContain('jsonld-name-match');
+      expect(verdict?.note).toContain('jsonld name match');
     });
 
     it('multiple anchors firing → concatenated note', () => {
@@ -196,7 +196,7 @@ describe('team-enrichment-corroboration', () => {
           jsonLdOrgName: 'Acme Robotics Inc',
         },
       });
-      expect(verdict?.note).toBe('og-name-match+jsonld-name-match');
+      expect(verdict?.note).toBe('og name match + jsonld name match');
     });
 
     it('not reachable → no verdict regardless of anchors', () => {
@@ -232,7 +232,7 @@ describe('team-enrichment-corroboration', () => {
           linkedinInternalId: null,
         },
       });
-      expect(verdict?.note).toContain('sd-website-host-match');
+      expect(verdict?.note).toContain('sd website host match');
     });
   });
 
@@ -254,7 +254,7 @@ describe('team-enrichment-corroboration', () => {
         { teamName: 'Best Team', website: 'https://bestTeam.xyz', websiteReachable: true }
       );
       expect(out.contactMethod?.verdict).toBe(JudgmentVerdict.Agrees);
-      expect(out.contactMethod?.note).toBe('email-domain==website');
+      expect(out.contactMethod?.note).toBe('email domain matches website');
       // website needs name corroboration to fire — none here, so falls through:
       expect(out.website).toBeUndefined();
     });

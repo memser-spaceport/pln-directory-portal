@@ -176,14 +176,14 @@ export function corroborateContactMethod(
 
   const websiteHost = normalizeHost(ctx.website);
   if (websiteHost && hostsMatch(domain.toLowerCase(), websiteHost)) {
-    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'email-domain==website');
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'email domain matches website');
   }
 
   const jsonLdEmail = ctx.websiteSignals?.contactEmail ?? null;
   if (jsonLdEmail) {
     const jdom = emailDomain(jsonLdEmail);
     if (jdom && jdom.toLowerCase() === domain.toLowerCase()) {
-      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'email-domain==jsonld');
+      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'email domain matches jsonld');
     }
   }
   return null;
@@ -203,7 +203,7 @@ export function corroborateTwitterHandler(
   if (!candidate) return null;
   const ws = ctx.websiteSignals?.twitterHandler?.replace(/^@/, '').trim().toLowerCase();
   if (ws && ws === candidate) {
-    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'website-self-declared');
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'website self declared');
   }
   return null;
 }
@@ -223,7 +223,7 @@ export function corroborateLinkedinHandler(
   if (!candidate) return null;
   const ws = ctx.websiteSignals?.linkedinHandler ? norm(ctx.websiteSignals.linkedinHandler) : null;
   if (ws && ws === candidate) {
-    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'website-self-declared');
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'website self declared');
   }
   return null;
 }
@@ -237,7 +237,7 @@ export function corroborateTelegramHandler(
   if (!candidate) return null;
   const ws = ctx.websiteSignals?.telegramHandler?.replace(/^@/, '').trim().toLowerCase();
   if (ws && ws === candidate) {
-    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'website-self-declared');
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'website self declared');
   }
   return null;
 }
@@ -254,7 +254,7 @@ export function corroborateBlog(value: string | null, ctx: CorroborationContext)
   const siteHost = normalizeHost(ctx.website);
   if (!blogHost || !siteHost) return null;
   if (hostsMatch(blogHost, siteHost)) {
-    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'host-corroborated');
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'host corroborated');
   }
   return null;
 }
@@ -276,13 +276,13 @@ export function corroborateWebsite(value: string | null, ctx: CorroborationConte
   const anchorsFired: string[] = [];
 
   if (ctx.websiteSignals?.ogSiteName && namesShareSubstantiveToken(ctx.teamName, ctx.websiteSignals.ogSiteName)) {
-    anchorsFired.push('og-name-match');
+    anchorsFired.push('og name match');
   }
   if (
     ctx.websiteSignals?.jsonLdOrgName &&
     namesShareSubstantiveToken(ctx.teamName, ctx.websiteSignals.jsonLdOrgName)
   ) {
-    anchorsFired.push('jsonld-name-match');
+    anchorsFired.push('jsonld name match');
   }
   if (
     ctx.scrapingDogProfile?.website &&
@@ -290,14 +290,14 @@ export function corroborateWebsite(value: string | null, ctx: CorroborationConte
     ctx.scrapingDogNameMatch !== 'none' &&
     hostsMatch(normalizeHost(ctx.scrapingDogProfile.website), siteHost)
   ) {
-    anchorsFired.push('sd-website-host-match');
+    anchorsFired.push('sd website host match');
   }
 
   if (anchorsFired.length === 0) return null;
   // First anchor establishes high-confidence agreement; additional anchors are
   // appended for explainability but don't change the verdict — the note stays
   // under FIELD_JUDGMENT_NOTE_MAX_LENGTH (60).
-  const note = anchorsFired.join('+');
+  const note = anchorsFired.join(' + ');
   return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, note);
 }
 

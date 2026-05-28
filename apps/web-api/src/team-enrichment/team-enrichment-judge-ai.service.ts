@@ -25,7 +25,7 @@ For each field listed in the user prompt, decide:
 - confidence: "high" | "medium" | "low" — how confident you are in the enriched value
 - score: 0–100 — fine-grained score matching the confidence
 - verdict: "agrees" (value looks correct), "disagrees" (value looks wrong), or "uncertain" (you cannot verify)
-- note: VERY SHORT tag-style mark explaining the verdict. Max 60 characters. Prefer hyphenated keywords like "domain-matches", "name-not-found-on-web", "url-404". NOT a sentence.
+- note: VERY SHORT tag-style mark explaining the verdict. Max 60 characters. Prefer space-separated keywords like "domain matches", "name not found on web", "url 404". NOT a sentence. No hyphens — use spaces between words.
 
 If a "ScrapingDog pre-verification" block confirms the team's LinkedIn identity, treat that as strong evidence the entity reference is correct — but still verify each individual field value on its own merits.
 
@@ -43,7 +43,7 @@ If a "Website reachability" line is present, treat it as a signal — never the 
 RULES:
 - Use "uncertain" rather than guessing when you cannot verify a value.
 - Do NOT propose new values. You are judging, not enriching.
-- Keep "note" strictly under 60 chars. Hyphenated keyword style, not prose. No sentences, no "the value ...", no punctuation except hyphens.
+- Keep "note" strictly under 60 chars. Space-separated keyword style, not prose. No sentences, no "the value ...", no hyphens — use spaces between words.
 - Pay close attention to the EXACT team name. If similarly-named entities exist, verify values are about the provided team, not a lookalike.
 
 Also return:
