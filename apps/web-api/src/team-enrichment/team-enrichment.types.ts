@@ -41,6 +41,8 @@ export enum JudgmentVerdict {
 export enum JudgmentSource {
   ScrapingDog = 'scrapingdog',
   AI = 'ai',
+  /** Stage 1.5 — deterministic cross-field corroboration (no LLM, no network). */
+  Corroboration = 'corroboration',
 }
 
 export type NameMatchTier = 'exact' | 'partial' | 'none';
@@ -95,6 +97,28 @@ export type FieldMetaKey = EnrichableField | 'logo';
 
 export type ForceEnrichmentMode = 'all' | 'cannotEnrich';
 
+/**
+ * Per-team quality block computed at judge time. Mirrors the 6-dimension
+ * scoring doctrine from pln-data-enrichment/apps/signal-sourcing/src/quality.
+ * `thinEvidence` is the surfaced flag — true when the team has too few
+ * independent sources or core fields to be considered well-attested, even
+ * if individual field judgments look high-confidence.
+ */
+export interface TeamQuality {
+  /** Populated enrichable fields / total enrichable fields. */
+  completeness: number;
+  /** Fraction of populated URL/email-shaped fields that pass URL/email validation. */
+  validity: number;
+  /** 1 - days_since_enriched/365 (clamped [0,1]). */
+  freshness: number;
+  /** Count of distinct sources contributing any field (ai, open-graph, scrapingdog, website-signals). */
+  distinctSources: number;
+  /** distinctSources < 2 OR fewer than 3 core fields populated. */
+  thinEvidence: boolean;
+  /** Dedup'd list of every Stage 1.5 anchor note from this run (explainability). */
+  anchorsFired: string[];
+}
+
 export interface TeamJudgment {
   status: JudgmentStatus;
   judgedAt?: string;
@@ -113,6 +137,7 @@ export interface TeamJudgment {
     websiteReachable?: boolean | null;
     websiteFinalHost?: string | null;
   };
+  quality?: TeamQuality;
 }
 
 /**
@@ -143,6 +168,27 @@ export interface TeamEnrichmentUsage {
   judge?: AIUsageEntry;
 }
 
+/**
+ * Self-declared signals extracted from the team's website HTML during enrichment
+ * (JSON-LD, Twitter Cards, microdata, anchors, OG tags). Persisted as a
+ * second independent source so the judge's Stage 1.5 corroboration layer can
+ * verify AI-filled fields without consulting an LLM. Optional: only populated
+ * when the website was reachable AND at least one signal was extracted.
+ */
+export interface WebsiteSignals {
+  /** ISO timestamp of the extraction run. */
+  extractedAt: string;
+  /** Normalized host (no www., lowercase) the signals came from. */
+  host?: string | null;
+  twitterHandler?: string | null;
+  linkedinHandler?: string | null;
+  telegramHandler?: string | null;
+  contactEmail?: string | null;
+  jsonLdOrgName?: string | null;
+  ogSiteName?: string | null;
+  metaDescription?: string | null;
+}
+
 export interface TeamDataEnrichment {
   shouldEnrich: boolean;
   status: EnrichmentStatus;
@@ -160,6 +206,8 @@ export interface TeamDataEnrichment {
     fields: string[];
     linkedinInternalId?: string | null;
   };
+  /** Second-source signals scraped from the team's website (independent of AI / ScrapingDog). */
+  websiteSignals?: WebsiteSignals;
   judgment?: TeamJudgment;
   /** AI token usage + cost estimate per stage. Optional — pre-tracking teams won't have it. */
   usage?: TeamEnrichmentUsage;

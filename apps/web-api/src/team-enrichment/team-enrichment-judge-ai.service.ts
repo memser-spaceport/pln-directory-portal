@@ -12,6 +12,7 @@ import {
   JudgmentVerdict,
   TEAM_JUDGMENT_ASSESSMENT_MAX_LENGTH,
   TeamJudgment,
+  WebsiteSignals,
 } from './team-enrichment.types';
 import { buildUsageEntry, formatUsageLog } from './team-enrichment-cost';
 
@@ -24,11 +25,15 @@ For each field listed in the user prompt, decide:
 - confidence: "high" | "medium" | "low" — how confident you are in the enriched value
 - score: 0–100 — fine-grained score matching the confidence
 - verdict: "agrees" (value looks correct), "disagrees" (value looks wrong), or "uncertain" (you cannot verify)
-- note: VERY SHORT tag-style mark explaining the verdict. Max 60 characters. Prefer hyphenated keywords like "domain-matches", "name-not-found-on-web", "url-404". NOT a sentence.
+- note: VERY SHORT tag-style mark explaining the verdict. Max 60 characters. Prefer space-separated keywords like "domain matches", "name not found on web", "url 404". NOT a sentence. No hyphens — use spaces between words.
 
 If a "ScrapingDog pre-verification" block confirms the team's LinkedIn identity, treat that as strong evidence the entity reference is correct — but still verify each individual field value on its own merits.
 
 URL fields (website, blog, contactMethod, social handles): do NOT mark a value as "disagrees" merely because it differs from another URL we already have on file (e.g. the LinkedIn-listed website). Companies routinely use alias domains, product subdomains, or rebrand without updating LinkedIn. Verify each URL on its own merits via web search; prefer "uncertain" when you cannot independently confirm or refute it.
+
+CONTACT EMAIL RULE: when contactMethod is an email like "user@DOMAIN" and the team's known website host equals DOMAIN (or the website is on a subdomain of DOMAIN), the email's domain corroborates the website host — both are self-declared signals from the team's own assets. The verdict is "agrees", NOT "disagrees" against a different LinkedIn-listed email. Apply the same logic when a "Cross-source signals from website extraction" block declares a contact email whose domain matches.
+
+When a "Corroboration already established by deterministic stage" block is present, the listed fields have ALREADY been verified by a deterministic cross-source check before reaching you. Do not second-guess them; if you must judge one, return "agrees" + "high" unless you find a hard contradiction.
 
 If a "Website reachability" line is present, treat it as a signal — never the only signal:
 - "yes" (reachable, 2xx) — the URL is live, but liveness alone does not prove brand identity. Continue to verify the URL belongs to the team via web search.
@@ -38,7 +43,7 @@ If a "Website reachability" line is present, treat it as a signal — never the 
 RULES:
 - Use "uncertain" rather than guessing when you cannot verify a value.
 - Do NOT propose new values. You are judging, not enriching.
-- Keep "note" strictly under 60 chars. Hyphenated keyword style, not prose. No sentences, no "the value ...", no punctuation except hyphens.
+- Keep "note" strictly under 60 chars. Space-separated keyword style, not prose. No sentences, no "the value ...", no hyphens — use spaces between words.
 - Pay close attention to the EXACT team name. If similarly-named entities exist, verify values are about the provided team, not a lookalike.
 
 Also return:
@@ -85,6 +90,10 @@ export interface JudgeTeamContext {
   /** Post-redirect host (normalized) when reachable; null otherwise. */
   websiteFinalHost?: string | null;
   scrapingDog?: TeamJudgment['scrapingDog'];
+  /** Second-source signals scraped from the team's own website (Stage 1.5 input). */
+  websiteSignals?: WebsiteSignals | null;
+  /** Field keys that Stage 1.5 (or Stage 1) already resolved at agrees+high. Listed for prompt context. */
+  corroboratedFields?: string[];
 }
 
 @Injectable()
@@ -187,6 +196,8 @@ export class TeamEnrichmentJudgeAiService {
 
   private buildUserPrompt(context: JudgeTeamContext, fields: JudgeFieldInput[]): string {
     const sdBlock = this.renderScrapingDogBlock(context.scrapingDog);
+    const wsBlock = this.renderWebsiteSignalsBlock(context.websiteSignals);
+    const corroborationBlock = this.renderCorroborationBlock(context.corroboratedFields);
 
     const identityLines: string[] = [];
     if (context.website) identityLines.push(`Known Website: ${context.website}`);
@@ -211,10 +222,12 @@ export class TeamEnrichmentJudgeAiService {
       })
       .join('\n');
 
+    const optionalBlocks = [sdBlock, wsBlock, corroborationBlock].filter(Boolean).join('\n');
+
     return `
 Team to verify: ${context.teamName}
 
-${identityLines.length > 0 ? identityLines.join('\n') + '\n' : ''}${sdBlock ? sdBlock + '\n' : ''}
+${identityLines.length > 0 ? identityLines.join('\n') + '\n' : ''}${optionalBlocks ? optionalBlocks + '\n' : ''}
 Fields to judge (verify each value belongs to the real "${context.teamName}" team):
 ${fieldsBlock}
 
@@ -222,6 +235,40 @@ For each field above, return your verdict in the schema specified by the system 
 
 Current Date: ${new Date().toISOString().split('T')[0]}
 `;
+  }
+
+  /**
+   * Renders the second-source signals scraped from the team's own website. The AI judge
+   * uses these as an independent cross-source confirmation for any field it's about to
+   * verify (especially contactMethod email-domain ↔ website-host).
+   */
+  private renderWebsiteSignalsBlock(ws: WebsiteSignals | null | undefined): string {
+    if (!ws) return '';
+    const lines: string[] = [];
+    if (ws.host) lines.push(`  host: ${ws.host}`);
+    if (ws.ogSiteName) lines.push(`  og:site_name: ${ws.ogSiteName}`);
+    if (ws.jsonLdOrgName) lines.push(`  jsonld Organization.name: ${ws.jsonLdOrgName}`);
+    if (ws.twitterHandler) lines.push(`  declared twitter: ${ws.twitterHandler}`);
+    if (ws.linkedinHandler) lines.push(`  declared linkedin: ${ws.linkedinHandler}`);
+    if (ws.telegramHandler) lines.push(`  declared telegram: ${ws.telegramHandler}`);
+    if (ws.contactEmail) lines.push(`  declared contact email: ${ws.contactEmail}`);
+    if (ws.metaDescription) lines.push(`  meta description: ${ws.metaDescription.substring(0, 240)}`);
+    if (lines.length === 0) return '';
+    return [
+      'Cross-source signals from website extraction (second independent source; use to corroborate the fields below):',
+      ...lines,
+    ].join('\n');
+  }
+
+  /**
+   * Renders the deterministic-stage corroboration block — telling the AI which fields
+   * have already been verified before this call. In normal operation those fields are
+   * pulled OUT of the input list before they reach this prompt; this block exists as
+   * defense-in-depth for any future change that re-routes them through Stage 2.
+   */
+  private renderCorroborationBlock(corroborated: string[] | undefined): string {
+    if (!corroborated || corroborated.length === 0) return '';
+    return `Corroboration already established by deterministic stage: [${corroborated.join(', ')}]`;
   }
 
   private renderScrapingDogBlock(meta: TeamJudgment['scrapingDog'] | undefined): string {
