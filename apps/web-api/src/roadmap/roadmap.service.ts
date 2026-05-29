@@ -31,7 +31,6 @@ type MemberAccess = {
 };
 
 const itemInclude: Prisma.RoadmapItemInclude = {
-  focusArea: { select: { uid: true, title: true } },
   createdBy: { select: { uid: true, name: true, image: { select: { url: true } } } },
   promotedBy: { select: { uid: true, name: true } },
   _count: { select: { upvotes: true } },
@@ -43,8 +42,7 @@ interface RoadmapItemRow {
   description: string;
   acceptanceCriteria: string | null;
   stage: RoadmapStage;
-  focusAreaUid: string | null;
-  focusArea: { uid: string; title: string } | null;
+  focusArea: string | null;
   createdByUid: string;
   createdBy: { uid: string; name: string; image: { url: string } | null };
   promotedAt: Date | null;
@@ -140,16 +138,12 @@ export class RoadmapService {
       stage = body.stage as RoadmapStage;
     }
 
-    if (body.focusAreaUid) {
-      await this.assertFocusAreaExists(body.focusAreaUid);
-    }
-
     const row = await this.prisma.roadmapItem.create({
       data: {
         title: body.title,
         description: body.description,
         acceptanceCriteria: body.acceptanceCriteria ?? null,
-        focusAreaUid: body.focusAreaUid ?? null,
+        focusArea: body.focusArea ?? null,
         externalTrackerUrl: body.externalTrackerUrl ?? null,
         stage,
         createdByUid: actorUid,
@@ -174,17 +168,13 @@ export class RoadmapService {
       throw new ForbiddenException('You cannot edit this item');
     }
 
-    if (body.focusAreaUid) {
-      await this.assertFocusAreaExists(body.focusAreaUid);
-    }
-
     const row = await this.prisma.roadmapItem.update({
       where: { uid },
       data: {
         ...(body.title !== undefined ? { title: body.title } : {}),
         ...(body.description !== undefined ? { description: body.description } : {}),
         ...(body.acceptanceCriteria !== undefined ? { acceptanceCriteria: body.acceptanceCriteria } : {}),
-        ...(body.focusAreaUid !== undefined ? { focusAreaUid: body.focusAreaUid } : {}),
+        ...(body.focusArea !== undefined ? { focusArea: body.focusArea } : {}),
         ...(body.externalTrackerUrl !== undefined ? { externalTrackerUrl: body.externalTrackerUrl } : {}),
       },
       include: itemInclude,
@@ -341,11 +331,8 @@ export class RoadmapService {
       where.createdByUid = viewerUid;
     }
 
-    const focusAreaUids = query.focusAreaUid;
-    if (focusAreaUids?.length === 1) {
-      where.focusAreaUid = focusAreaUids[0];
-    } else if (focusAreaUids && focusAreaUids.length > 1) {
-      where.focusAreaUid = { in: focusAreaUids };
+    if (query.focusArea) {
+      where.focusArea = query.focusArea;
     }
 
     const stages = query.stage as RoadmapStage[] | undefined;
@@ -369,16 +356,6 @@ export class RoadmapService {
     return row as unknown as RoadmapItemRow;
   }
 
-  private async assertFocusAreaExists(focusAreaUid: string) {
-    const fa = await this.prisma.focusArea.findUnique({
-      where: { uid: focusAreaUid },
-      select: { uid: true },
-    });
-    if (!fa) {
-      throw new BadRequestException(`Focus area ${focusAreaUid} not found`);
-    }
-  }
-
   private async hasViewerUpvoted(itemUid: string, memberUid: string) {
     const row = await this.prisma.roadmapItemUpvote.findUnique({
       where: { itemUid_memberUid: { itemUid, memberUid } },
@@ -394,8 +371,7 @@ export class RoadmapService {
       description: row.description,
       acceptanceCriteria: row.acceptanceCriteria,
       stage: row.stage,
-      focusAreaUid: row.focusAreaUid,
-      focusArea: row.focusArea ? { uid: row.focusArea.uid, title: row.focusArea.title } : null,
+      focusArea: row.focusArea,
       createdByUid: row.createdByUid,
       createdBy: {
         uid: row.createdBy.uid,

@@ -1,25 +1,17 @@
-import { BadRequestException } from '@nestjs/common';
 import { RoadmapStage } from '@prisma/client';
 import { IDEA_STAGES } from './roadmap.constants';
-
-const ALLOWED_TRANSITIONS: Record<RoadmapStage, RoadmapStage[]> = {
-  [RoadmapStage.IDEA]: [RoadmapStage.UNDER_REVIEW, RoadmapStage.PLANNED, RoadmapStage.DECLINED],
-  [RoadmapStage.UNDER_REVIEW]: [RoadmapStage.IDEA, RoadmapStage.PLANNED, RoadmapStage.DECLINED],
-  [RoadmapStage.PLANNED]: [RoadmapStage.IN_PROGRESS, RoadmapStage.DECLINED],
-  [RoadmapStage.IN_PROGRESS]: [RoadmapStage.SHIPPED, RoadmapStage.PLANNED, RoadmapStage.DECLINED],
-  [RoadmapStage.SHIPPED]: [RoadmapStage.IN_PROGRESS],
-  [RoadmapStage.DECLINED]: [RoadmapStage.IDEA],
-};
 
 export function isIdeaStage(stage: RoadmapStage): boolean {
   return IDEA_STAGES.includes(stage);
 }
 
-export function assertTransitionAllowed(from: RoadmapStage, to: RoadmapStage): void {
-  const allowed = ALLOWED_TRANSITIONS[from] ?? [];
-  if (!allowed.includes(to)) {
-    throw new BadRequestException(`Transition from ${from} to ${to} is not allowed`);
-  }
+/**
+ * Stage transitions are unrestricted: a member with the transition permission may
+ * move an item between any two stages (e.g. SHIPPED → PLANNED, PLANNED → IDEA).
+ * Retained as a function so callers and the promote/decline side-effects stay centralized.
+ */
+export function assertTransitionAllowed(_from: RoadmapStage, _to: RoadmapStage): void {
+  // No-op: all stage transitions are permitted for members with the transition permission.
 }
 
 export function isPromoteTransition(from: RoadmapStage, to: RoadmapStage): boolean {

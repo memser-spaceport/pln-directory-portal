@@ -25,9 +25,20 @@ const commaSeparatedListParam = () =>
 
 const StageListParam = commaSeparatedListParam();
 
+export const DESCRIPTION_MAX_LENGTH = 1000;
+
+const stripHtml = (html: string) =>
+  html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+
+const withinDescriptionLimit = (value: string) => stripHtml(value).length <= DESCRIPTION_MAX_LENGTH;
+const descriptionLimitMessage = `Description must be ${DESCRIPTION_MAX_LENGTH} characters or fewer`;
+
 export const RoadmapItemListQueryParams = z.object({
   stage: StageListParam,
-  focusAreaUid: commaSeparatedListParam(),
+  focusArea: z.string().optional(),
   mine: z
     .preprocess((v) => v === 'true' || v === true, z.boolean())
     .optional(),
@@ -45,19 +56,13 @@ export const RoadmapMemberSummarySchema = z.object({
   imageUrl: z.string().nullable(),
 });
 
-export const RoadmapFocusAreaSummarySchema = z.object({
-  uid: z.string(),
-  title: z.string(),
-});
-
 export const RoadmapItemSchema = z.object({
   uid: z.string(),
   title: z.string(),
   description: z.string(),
   acceptanceCriteria: z.string().nullable(),
   stage: RoadmapStageSchema,
-  focusAreaUid: z.string().nullable(),
-  focusArea: RoadmapFocusAreaSummarySchema.nullable(),
+  focusArea: z.string().nullable(),
   createdByUid: z.string(),
   createdBy: RoadmapMemberSummarySchema,
   promotedAt: z.string().nullable(),
@@ -78,18 +83,18 @@ export const RoadmapItemListResponseSchema = z.object({
 
 export const CreateRoadmapItemSchema = z.object({
   title: z.string().min(1).max(500),
-  description: z.string().min(1),
+  description: z.string().refine(withinDescriptionLimit, descriptionLimitMessage).optional().default(''),
   acceptanceCriteria: z.string().optional().nullable(),
-  focusAreaUid: z.string().optional().nullable(),
+  focusArea: z.string().max(500).optional().nullable(),
   externalTrackerUrl: z.string().max(2000).optional().nullable(),
   stage: RoadmapStageSchema.optional(),
 });
 
 export const UpdateRoadmapItemSchema = z.object({
   title: z.string().min(1).max(500).optional(),
-  description: z.string().min(1).optional(),
+  description: z.string().refine(withinDescriptionLimit, descriptionLimitMessage).optional(),
   acceptanceCriteria: z.string().optional().nullable(),
-  focusAreaUid: z.string().optional().nullable(),
+  focusArea: z.string().max(500).optional().nullable(),
   externalTrackerUrl: z.string().max(2000).optional().nullable(),
 });
 

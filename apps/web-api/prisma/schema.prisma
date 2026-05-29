@@ -727,7 +727,6 @@ model FocusArea {
   focusAreas                  FocusAreaHierarchy[]          @relation("focusAreas")
   subFocusAreas               FocusAreaHierarchy[]          @relation("subfocusAreas")
   TeamFocusAreaVersionHistory TeamFocusAreaVersionHistory[]
-  roadmapItems                RoadmapItem[]               @relation("roadmapItemFocusArea")
 }
 
 model TeamFocusArea {
@@ -2347,8 +2346,7 @@ model RoadmapItem {
   acceptanceCriteria String?
   stage              RoadmapStage  @default(IDEA)
 
-  focusAreaUid       String?
-  focusArea          FocusArea?    @relation("roadmapItemFocusArea", fields: [focusAreaUid], references: [uid])
+  focusArea          String?
 
   createdByUid       String
   createdBy          Member        @relation("roadmapItemCreatedBy", fields: [createdByUid], references: [uid])

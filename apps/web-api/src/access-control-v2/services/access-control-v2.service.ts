@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma.service';
 import { MemberApprovalsService } from '../../member-approvals/member-approvals.service';
+import { expandEffectivePermissions } from '../access-control-v2.constants';
 
 @Injectable()
 export class AccessControlV2Service {
@@ -392,9 +393,10 @@ export class AccessControlV2Service {
       module: row.permission.module,
     }));
 
-    const effectivePermissions = Array.from(
-      new Set([...policies.flatMap((policy) => policy.permissions), ...directPermissions])
-    ).sort();
+    const effectivePermissions = expandEffectivePermissions([
+      ...policies.flatMap((policy) => policy.permissions),
+      ...directPermissions,
+    ]).sort();
 
     const effectivePermissionItems = Array.from(
       new Map(
