@@ -137,6 +137,9 @@ export class TeamNewsEnrichmentService {
           focusAreas: [...new Set(focusAreas)],
           subFocusAreas: [...new Set(subFocusAreas)],
           createdAt: item.createdAt.toISOString(),
+          // The service-side per-team endpoint does not surface forum-link
+          // counts; consumers that need them should use the public list APIs.
+          discussion: { count: 0, latestTopicUrl: null },
         };
       }),
     };

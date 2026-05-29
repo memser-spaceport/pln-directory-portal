@@ -230,6 +230,9 @@ model Member {
   memberApprovalEvents      MemberApprovalEvent[] @relation("MemberApprovalEventMember")
   actedMemberApprovalEvents MemberApprovalEvent[] @relation("MemberApprovalEventActor")
   jobAlerts                 JobAlert[]            @relation("MemberJobAlerts")
+  roadmapItemsCreated       RoadmapItem[]         @relation("roadmapItemCreatedBy")
+  roadmapItemsPromoted      RoadmapItem[]         @relation("roadmapItemPromotedBy")
+  roadmapItemUpvotes        RoadmapItemUpvote[]   @relation("roadmapItemUpvoter")
 }
 
 model MemberApproval {
@@ -2143,11 +2146,31 @@ model TeamNewsItem {
   rawPayload   Json?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  forumLinks   TeamNewsForumLink[]
 
   @@index([teamUid])
   @@index([eventDate])
   @@index([eventType])
   @@index([teamUid, eventDate(sort: Desc)])
+}
+
+/// Authoritative link between a TeamNewsItem and a forum (NodeBB) topic
+/// that was created via the "Start a conversation" / "Discuss" affordance
+/// on the home-page news feed. Idempotent on (newsItemUid, forumTopicId)
+/// so the frontend can safely retry the write.
+model TeamNewsForumLink {
+  id             Int          @id @default(autoincrement())
+  uid            String       @unique @default(cuid())
+  newsItemUid    String
+  newsItem       TeamNewsItem @relation(fields: [newsItemUid], references: [uid], onDelete: Cascade)
+  forumTopicId   Int
+  forumTopicSlug String
+  forumTopicUrl  String
+  createdByUid   String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([newsItemUid, forumTopicId])
+  @@index([newsItemUid])
 }
 
 model TeamNewsEnrichment {
@@ -2304,4 +2327,58 @@ model PlPortfolioTeamMeta {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum RoadmapStage {
+  IDEA
+  UNDER_REVIEW
+  PLANNED
+  IN_PROGRESS
+  SHIPPED
+  DECLINED
+}
+
+model RoadmapItem {
+  id                 Int           @id @default(autoincrement())
+  uid                String        @unique @default(cuid())
+  title              String
+  description        String
+  acceptanceCriteria String?
+  stage              RoadmapStage  @default(IDEA)
+
+  focusArea          String?
+
+  createdByUid       String
+  createdBy          Member        @relation("roadmapItemCreatedBy", fields: [createdByUid], references: [uid])
+
+  promotedAt         DateTime?
+  promotedByUid      String?
+  promotedBy         Member?       @relation("roadmapItemPromotedBy", fields: [promotedByUid], references: [uid])
+  declinedReason     String?
+
+  externalTrackerUrl String?
+
+  upvotes            RoadmapItemUpvote[]
+
+  deletedAt          DateTime?
+  deletionReason     String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([stage, deletedAt])
+  @@index([createdByUid])
+}
+
+model RoadmapItemUpvote {
+  id        Int         @id @default(autoincrement())
+  uid       String      @unique @default(cuid())
+  itemUid   String
+  item      RoadmapItem @relation(fields: [itemUid], references: [uid], onDelete: Cascade)
+  memberUid String
+  member    Member      @relation("roadmapItemUpvoter", fields: [memberUid], references: [uid])
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@unique([itemUid, memberUid])
+  @@index([memberUid])
 }

@@ -210,6 +210,34 @@ export class AdminTeamsService {
     };
   }
 
+  /**
+   * Single-team detail for the data-quality review modal. Unlike the public
+   * teams.service.findTeamByUid, this does NOT gate on accessLevel, so inactive
+   * (L0) teams — which still surface in the enrichment-review list — can be opened
+   * by admins instead of 403-ing ("Team is inactive").
+   */
+  async getTeamForReview(uid: string) {
+    const team = await this.prisma.team.findUnique({
+      where: { uid },
+      select: {
+        uid: true,
+        name: true,
+        website: true,
+        blog: true,
+        contactMethod: true,
+        twitterHandler: true,
+        linkedinHandler: true,
+        shortDescription: true,
+        longDescription: true,
+        logo: { select: { url: true } },
+      },
+    });
+    if (!team) {
+      throw new NotFoundException('Team not found');
+    }
+    return team;
+  }
+
   async updateTeam(uid: string, data: Prisma.TeamUpdateInput) {
     await this.prisma.$transaction(async (tx) => {
       const team = await tx.team.findUnique({ where: { uid } });

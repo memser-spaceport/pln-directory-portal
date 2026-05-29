@@ -9,7 +9,7 @@ import Select, { StylesConfig } from 'react-select';
 import { ApprovalLayout } from '../../layout/approval-layout';
 import { useAuth } from '../../context/auth-context';
 import { useTeamsEnrichmentReview, EnrichmentTeam } from '../../hooks/teams/useTeamsEnrichmentReview';
-import { FIELD_KEYS, getEntry, isAIEnriched, UNJUDGED_SCORE } from '../../components/teams/data-quality/constants';
+import { FIELD_KEYS, getEntry, isAIEnriched, needsReview } from '../../components/teams/data-quality/constants';
 import { DataQualityTable } from '../../components/teams/data-quality/DataQualityTable';
 import { EditModal } from '../../components/teams/data-quality/EditModal';
 import s from './data-quality.module.scss';
@@ -80,12 +80,9 @@ const DataQualityPage: React.FC = () => {
     return teams.filter((t) => {
       if (q && !t.name.toLowerCase().includes(q)) return false;
 
-      // Only show teams with at least one low-score field
-      const hasLowField = FIELD_KEYS.some((key) => {
-        const entry = getEntry(t, key);
-        return entry && (entry.judgment?.score ?? UNJUDGED_SCORE) <= 90;
-      });
-      if (!hasLowField) return false;
+      // Only show teams with at least one field still pending admin review
+      // (not auto-approved at verdict=agrees + confidence=high — same rule the API applies).
+      if (!FIELD_KEYS.some((key) => needsReview(t, key))) return false;
 
       // Priority
       if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;

@@ -122,6 +122,50 @@ export const PL_ADVISORS_PERMISSIONS = {
   ACCESS: 'pl.advisors.access',
 } as const;
 
+// ── Roadmap (Gantry) ──────────────────────────────────────────────────────
+
+export const ROADMAP_PERMISSIONS = {
+  /** Aggregate grant: implies every other roadmap permission */
+  ADMIN: 'roadmap.admin',
+  VIEW: 'roadmap.view',
+  IDEA_CREATE: 'roadmap.idea.create',
+  ITEM_UPVOTE: 'roadmap.item.upvote',
+  ITEM_EDIT_OWN: 'roadmap.item.edit_own',
+  ITEM_CURATE: 'roadmap.item.curate',
+  ITEM_TRANSITION: 'roadmap.item.transition',
+} as const;
+
+/** Every fine-grained roadmap permission that `roadmap.admin` expands into. */
+export const ROADMAP_ADMIN_GRANTS = [
+  ROADMAP_PERMISSIONS.VIEW,
+  ROADMAP_PERMISSIONS.IDEA_CREATE,
+  ROADMAP_PERMISSIONS.ITEM_UPVOTE,
+  ROADMAP_PERMISSIONS.ITEM_EDIT_OWN,
+  ROADMAP_PERMISSIONS.ITEM_CURATE,
+  ROADMAP_PERMISSIONS.ITEM_TRANSITION,
+] as const;
+
+/**
+ * Aggregate permissions that, when granted (via policy or direct assignment),
+ * expand into a set of finer-grained permissions in a member's effective permissions.
+ */
+export const PERMISSION_GRANT_EXPANSIONS: Record<string, readonly string[]> = {
+  [ROADMAP_PERMISSIONS.ADMIN]: ROADMAP_ADMIN_GRANTS,
+};
+
+/** Expand a set of permission codes, resolving any aggregate grants. */
+export function expandEffectivePermissions(codes: Iterable<string>): string[] {
+  const result = new Set<string>();
+  for (const code of codes) {
+    result.add(code);
+    const grants = PERMISSION_GRANT_EXPANSIONS[code];
+    if (grants) {
+      grants.forEach((granted) => result.add(granted));
+    }
+  }
+  return Array.from(result);
+}
+
 // ── Legacy Permission Aliases ───────────────────────────────────────────
 
 /**
@@ -196,6 +240,15 @@ export const ALL_PERMISSION_CODES = [
 
   // PL Advisors
   PL_ADVISORS_PERMISSIONS.ACCESS,
+
+  // Roadmap
+  ROADMAP_PERMISSIONS.ADMIN,
+  ROADMAP_PERMISSIONS.VIEW,
+  ROADMAP_PERMISSIONS.IDEA_CREATE,
+  ROADMAP_PERMISSIONS.ITEM_UPVOTE,
+  ROADMAP_PERMISSIONS.ITEM_EDIT_OWN,
+  ROADMAP_PERMISSIONS.ITEM_CURATE,
+  ROADMAP_PERMISSIONS.ITEM_TRANSITION,
 ] as const;
 
 // ── Type Exports ─────────────────────────────────────────────────────────

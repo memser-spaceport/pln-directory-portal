@@ -1,7 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { IngestTeamNewsDto, IngestTeamNewsResponse, TeamNewsIngestItem } from './dto/ingest-team-news.dto';
+import type {
+  CreateTeamNewsDiscussionRequest,
+  CreateTeamNewsDiscussionResponse,
+  TeamNewsForumLinkDto,
+} from 'libs/contracts/src/schema/team-news';
 import { computeCanonicalKey } from './utils/canonical-key';
 import { extractDomain } from './utils/url-normalize';
 
@@ -179,5 +184,71 @@ export class TeamNewsService {
         update: { recentNewsCount },
       });
     }
+  }
+
+  /**
+   * Record that a forum topic was created in response to a news item.
+   * Idempotent on (newsItemUid, forumTopicId) — replaying the same call
+   * returns the existing link with `created: false`. Used by the home-page
+   * "Discuss" flow, called by the frontend after a successful topic create.
+   *
+   * Throws NotFound when the news item does not exist (e.g. stale link
+   * attempt against a deleted item).
+   */
+  async createForumLink(
+    newsItemUid: string,
+    body: CreateTeamNewsDiscussionRequest,
+    actorUid: string | null,
+  ): Promise<CreateTeamNewsDiscussionResponse> {
+    const item = await this.prisma.teamNewsItem.findUnique({
+      where: { uid: newsItemUid },
+      select: { uid: true },
+    });
+    if (!item) {
+      throw new NotFoundException(`TeamNewsItem ${newsItemUid} not found`);
+    }
+
+    // Upsert keeps the call idempotent under concurrent submits (two clients
+    // racing to link the same news item to the same topic would otherwise
+    // produce a 500 from the unique-constraint violation on the second
+    // caller). `created` is inferred from whether the existing row's
+    // createdAt was just stamped — we treat any pre-existing link as "not
+    // created by this call".
+    const before = await this.prisma.teamNewsForumLink.findUnique({
+      where: { newsItemUid_forumTopicId: { newsItemUid, forumTopicId: body.forumTopicId } },
+      select: { id: true },
+    });
+    const row = await this.prisma.teamNewsForumLink.upsert({
+      where: { newsItemUid_forumTopicId: { newsItemUid, forumTopicId: body.forumTopicId } },
+      create: {
+        newsItemUid,
+        forumTopicId: body.forumTopicId,
+        forumTopicSlug: body.forumTopicSlug,
+        forumTopicUrl: body.forumTopicUrl,
+        createdByUid: actorUid,
+      },
+      update: {},
+    });
+    return { link: this.toForumLinkDto(row), created: !before };
+  }
+
+  private toForumLinkDto(row: {
+    uid: string;
+    newsItemUid: string;
+    forumTopicId: number;
+    forumTopicSlug: string;
+    forumTopicUrl: string;
+    createdByUid: string | null;
+    createdAt: Date;
+  }): TeamNewsForumLinkDto {
+    return {
+      uid: row.uid,
+      newsItemUid: row.newsItemUid,
+      forumTopicId: row.forumTopicId,
+      forumTopicSlug: row.forumTopicSlug,
+      forumTopicUrl: row.forumTopicUrl,
+      createdByUid: row.createdByUid,
+      createdAt: row.createdAt.toISOString(),
+    };
   }
 }

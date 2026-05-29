@@ -49,6 +49,15 @@ export const TeamNewsListQueryParams = z.object({
 
 export type TeamNewsListQuery = z.infer<typeof TeamNewsListQueryParams>;
 
+// Per-item summary of forum discussions linked to this news item.
+// `count` is the number of TeamNewsForumLink rows; `latestTopicUrl` is the
+// most recently-linked topic's URL (used by the frontend to render
+// "Join discussion ›" linking straight to that thread when count === 1).
+export const TeamNewsDiscussionSchema = z.object({
+  count: z.number().int().min(0),
+  latestTopicUrl: z.string().nullable(),
+});
+
 export const TeamNewsItemSchema = z.object({
   uid: z.string(),
   teamUid: z.string(),
@@ -64,6 +73,31 @@ export const TeamNewsItemSchema = z.object({
   focusAreas: z.array(z.string()),
   subFocusAreas: z.array(z.string()),
   createdAt: z.string(),
+  discussion: TeamNewsDiscussionSchema,
+});
+
+// POST /v1/team-news/{newsItemUid}/discussions — links a TeamNewsItem to a
+// forum topic that was just created via the home-page "Discuss" flow.
+// Idempotent on (newsItemUid, forumTopicId).
+export const CreateTeamNewsDiscussionRequestSchema = z.object({
+  forumTopicId: z.number().int().positive(),
+  forumTopicSlug: z.string().min(1),
+  forumTopicUrl: z.string().min(1),
+});
+
+export const TeamNewsForumLinkSchema = z.object({
+  uid: z.string(),
+  newsItemUid: z.string(),
+  forumTopicId: z.number().int(),
+  forumTopicSlug: z.string(),
+  forumTopicUrl: z.string(),
+  createdByUid: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export const CreateTeamNewsDiscussionResponseSchema = z.object({
+  link: TeamNewsForumLinkSchema,
+  created: z.boolean(),
 });
 
 export const TeamNewsListResponseSchema = z.object({
@@ -203,3 +237,7 @@ export type TeamNewsEnrichmentResponseItem = z.infer<typeof TeamNewsEnrichmentSc
 export type TeamWithNewsEnrichment = z.infer<typeof TeamWithNewsEnrichmentSchema>;
 export type TeamsWithNewsEnrichmentResponse = z.infer<typeof TeamsWithNewsEnrichmentResponseSchema>;
 export type TeamNewsPerTeamResponse = z.infer<typeof TeamNewsPerTeamResponseSchema>;
+export type TeamNewsDiscussion = z.infer<typeof TeamNewsDiscussionSchema>;
+export type CreateTeamNewsDiscussionRequest = z.infer<typeof CreateTeamNewsDiscussionRequestSchema>;
+export type CreateTeamNewsDiscussionResponse = z.infer<typeof CreateTeamNewsDiscussionResponseSchema>;
+export type TeamNewsForumLinkDto = z.infer<typeof TeamNewsForumLinkSchema>;

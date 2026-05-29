@@ -928,7 +928,8 @@
   line-height: 28px;
   color: #0a0c11;
   text-decoration: none;
-  display: block;
+  display: flex;
+  align-items: center;
 
   &:hover {
     color: #1b4dff;

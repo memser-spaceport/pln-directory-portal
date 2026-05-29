@@ -71,6 +71,7 @@ import { JobOpeningsModule } from './job-openings/job-openings.module';
 import { JobAlertsModule } from './job-alerts/job-alerts.module';
 import { TeamNewsModule } from './team-news/team-news.module';
 import { InvestorOutreachModule } from './investor-outreach/investor-outreach.module';
+import { RoadmapModule } from './roadmap/roadmap.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -162,6 +163,7 @@ import { InvestorOutreachModule } from './investor-outreach/investor-outreach.mo
     JobAlertsModule,
     TeamNewsModule,
     InvestorOutreachModule,
+    RoadmapModule,
   ],
   providers: [
     {
