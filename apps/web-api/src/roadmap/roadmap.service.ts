@@ -105,7 +105,7 @@ export class RoadmapService {
     const sorted = (rows as unknown as (RoadmapItemRow & { upvotes: { uid: string }[] })[]).sort((a, b) => {
       const countDiff = b._count.upvotes - a._count.upvotes;
       if (countDiff !== 0) return countDiff;
-      return b.createdAt.getTime() - a.createdAt.getTime();
+      return b.updatedAt.getTime() - a.updatedAt.getTime();
     });
 
     return {

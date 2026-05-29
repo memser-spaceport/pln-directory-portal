@@ -2331,7 +2331,7 @@ model PlPortfolioTeamMeta {
 
 enum RoadmapStage {
   IDEA
-  UNDER_REVIEW
+  BACKLOG
   PLANNED
   IN_PROGRESS
   SHIPPED

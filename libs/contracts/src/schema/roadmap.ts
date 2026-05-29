@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const RoadmapStageSchema = z.enum(['IDEA', 'UNDER_REVIEW', 'PLANNED', 'IN_PROGRESS', 'SHIPPED', 'DECLINED']);
+export const RoadmapStageSchema = z.enum(['IDEA', 'BACKLOG', 'PLANNED', 'IN_PROGRESS', 'SHIPPED', 'DECLINED']);
 
 const commaSeparatedListParam = () =>
   z
