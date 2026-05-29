@@ -1,13 +1,6 @@
 import { z } from 'zod';
 
-export const RoadmapStageSchema = z.enum([
-  'IDEA',
-  'UNDER_REVIEW',
-  'PLANNED',
-  'IN_PROGRESS',
-  'SHIPPED',
-  'DECLINED',
-]);
+export const RoadmapStageSchema = z.enum(['IDEA', 'UNDER_REVIEW', 'PLANNED', 'IN_PROGRESS', 'SHIPPED', 'DECLINED']);
 
 const commaSeparatedListParam = () =>
   z
@@ -25,29 +18,12 @@ const commaSeparatedListParam = () =>
 
 const StageListParam = commaSeparatedListParam();
 
-export const DESCRIPTION_MAX_LENGTH = 1000;
-
-const stripHtml = (html: string) =>
-  html
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .trim();
-
-const withinDescriptionLimit = (value: string) => stripHtml(value).length <= DESCRIPTION_MAX_LENGTH;
-const descriptionLimitMessage = `Description must be ${DESCRIPTION_MAX_LENGTH} characters or fewer`;
-
 export const RoadmapItemListQueryParams = z.object({
   stage: StageListParam,
   focusArea: z.string().optional(),
-  mine: z
-    .preprocess((v) => v === 'true' || v === true, z.boolean())
-    .optional(),
-  includeDeclined: z
-    .preprocess((v) => v === 'true' || v === true, z.boolean())
-    .optional(),
-  includeArchived: z
-    .preprocess((v) => v === 'true' || v === true, z.boolean())
-    .optional(),
+  mine: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
+  includeDeclined: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
+  includeArchived: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
 });
 
 export const RoadmapMemberSummarySchema = z.object({
@@ -83,7 +59,7 @@ export const RoadmapItemListResponseSchema = z.object({
 
 export const CreateRoadmapItemSchema = z.object({
   title: z.string().min(1).max(500),
-  description: z.string().refine(withinDescriptionLimit, descriptionLimitMessage).optional().default(''),
+  description: z.string().optional().default(''),
   acceptanceCriteria: z.string().optional().nullable(),
   focusArea: z.string().max(500).optional().nullable(),
   externalTrackerUrl: z.string().max(2000).optional().nullable(),
@@ -92,7 +68,7 @@ export const CreateRoadmapItemSchema = z.object({
 
 export const UpdateRoadmapItemSchema = z.object({
   title: z.string().min(1).max(500).optional(),
-  description: z.string().refine(withinDescriptionLimit, descriptionLimitMessage).optional(),
+  description: z.string().optional(),
   acceptanceCriteria: z.string().optional().nullable(),
   focusArea: z.string().max(500).optional().nullable(),
   externalTrackerUrl: z.string().max(2000).optional().nullable(),
