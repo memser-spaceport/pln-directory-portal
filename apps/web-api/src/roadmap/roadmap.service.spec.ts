@@ -23,7 +23,7 @@ const baseItem = {
   description: 'Desc',
   acceptanceCriteria: null,
   stage: RoadmapStage.IDEA,
-  focusAreaUid: null,
+  focusArea: null,
   createdByUid: 'creator-1',
   promotedAt: null,
   promotedByUid: null,
@@ -46,7 +46,6 @@ const buildPrismaMock = () => ({
     upsert: jest.fn(),
     deleteMany: jest.fn(),
   },
-  focusArea: { findUnique: jest.fn() },
 });
 
 describe('RoadmapService', () => {

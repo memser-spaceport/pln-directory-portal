@@ -124,7 +124,7 @@ export function DataQualityTable({ teams, isLoading, hasActiveFilters, onEdit }:
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    autoResetPageIndex: false,
+
     getRowId: (row) => row.uid,
   });
 
