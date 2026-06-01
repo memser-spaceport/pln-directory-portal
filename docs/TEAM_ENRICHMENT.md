@@ -215,38 +215,83 @@ Anything less than `agrees + high` stays on `TeamEnrichment` only — the user-f
 
    **`linkedinHandler` verification — name match, not slug match.** The handle verdict is **not** produced by comparing the team's stored slug to ScrapingDog's `universal_name_id`. LinkedIn 301-redirects renamed companies to their canonical slug, so a stored `company/oldco` resolving to a profile whose `universal_name_id` is `newco-rebrand` would falsely look like a mismatch even though it points at the correct entity. Instead, Stage 1 trusts the precondition that produced this comparator run: ScrapingDog returned a profile whose `company_name` matched the team (per `classifyNameMatch`), so the handle pointed at the right company. Optionally, a website-host equality between `team.website` and `profile.website` corroborates the match and bumps confidence/score. Verdict matrix:
 
-   | `nameMatch` | website host equal | verdict     | confidence | score | note                          |
-   | ----------- | ------------------ | ----------- | ---------- | ----- | ----------------------------- |
-   | `exact`     | yes                | `agrees`    | `high`     | 100   | `name-match+website`          |
-   | `exact`     | no / unknown       | `agrees`    | `high`     | 95    | `name-match`                  |
-   | `partial`   | yes                | `agrees`    | `medium`¹  | 90    | `name-match-partial+website`  |
-   | `partial`   | no / unknown       | `uncertain` | `medium`   | 55    | `name-match-partial-only`     |
+   | `nameMatch` | website host equal | verdict     | confidence | score | note                              |
+   | ----------- | ------------------ | ----------- | ---------- | ----- | --------------------------------- |
+   | `exact`     | yes                | `agrees`    | `high`     | 100   | `name match and website`          |
+   | `exact`     | no / unknown       | `agrees`    | `high`     | 95    | `name match`                      |
+   | `partial`   | yes                | `agrees`    | `medium`¹  | 90    | `name match partial and website`  |
+   | `partial`   | no / unknown       | `uncertain` | `medium`   | 55    | `name match partial only`         |
    | `none`      | —                  | —           | —          | —     | _no Stage 1 verdict — falls through to Stage 2 AI judge_ |
 
    ¹ via the existing `partial → medium` downshift in `mkJudgment`. A partial-only name match with no corroborating website (e.g. "Acme Inc" vs "Acme BV") is intentionally surfaced as `uncertain` rather than silently agreed, so it lands in `fieldsForReview`. `nameMatch === 'none'` continues to skip the comparator entirely; the AI judge handles those.
 
    **`website` (and other URL fields) — not judged by Stage 1.** Earlier revisions emitted a `host-match` / `host-mismatch` verdict by comparing the team's stored URL to the URL listed on the LinkedIn profile. This produced too many false negatives — companies routinely use alias domains, product subdomains, or rebrand without updating LinkedIn (e.g. team `Mercle` with website `mercle.ai` whose LinkedIn profile lists a different host) — so the comparator was condemning correct websites. The deterministic comparator is therefore intentionally silent on URL fields; the AI judge (Stage 2) verifies them via web search instead, and is explicitly instructed not to disagree on a URL solely because it differs from another URL we already have on file. Same reasoning as the `linkedinHandler` slug-equality removal.
 
-   **Website reachability probe.** Stage 1 still runs a lightweight reachability probe on the website value being judged (single GET, follows redirects, 5s timeout). The result is **purely observability** — no Stage 1 verdict is produced from it, since the host comparator is gone. It's persisted to `TeamEnrichment.dataEnrichment.judgment.scrapingDog.websiteReachable` / `websiteFinalHost` and forwarded to Stage 2 as a `Website reachability:` line so the AI judge can factor a definitive `4xx`/`5xx` (real negative signal) into its website verdict. The probe runs only when the value passes the value-validity gate below, so we never `fetch()` a placeholder string.
+   **Website reachability probe.** The judge runs a lightweight reachability probe on the website value being judged (single GET, follows redirects, 8s timeout, **uses the same `BROWSER_REQUEST_HEADERS` bouquet as `fetchWebsiteHtml`** so it doesn't get Cloudflare-blocked on real-but-bot-protected sites). The probe runs **unconditionally** when the team has a judgable website — it was previously nested inside the ScrapingDog success branch, which meant that any team without a `linkedinHandler` (or any ScrapingDog 403) silently skipped the probe and left the AI judge to guess at reachability. Result is forwarded to Stage 2 as a `Website reachability:` line so the AI can factor a definitive `4xx`/`5xx` (real negative signal) into its website verdict, and is also consumed by the `corroborateWebsite` Stage 1.5 rule (which requires `websiteReachable === true`). When ScrapingDog Stage 1 ran, the result is also persisted to `TeamEnrichment.dataEnrichment.judgment.scrapingDog.websiteReachable` / `websiteFinalHost`. The probe runs only when the value passes the value-validity gate below, so we never `fetch()` a placeholder string.
 
-2. **Stage 2 — AI judge.** For remaining fields (or all fields when Stage 1 is unavailable), the second AI model returns a per-field `{ confidence, score, verdict, note }` plus an `overallAssessment`. Temperature is conservative so the judge prefers `uncertain` over guessing.
+2. **Stage 2 — AI judge.** For remaining fields (those Stage 1 and Stage 1.5 didn't resolve), the second AI model returns a per-field `{ confidence, score, verdict, note }` plus an `overallAssessment`. Temperature is conservative (`0.1`) so the judge prefers `uncertain` over guessing. The prompt asks for **space-separated** keyword notes (no hyphens, no prose).
+
+   **Prompt context blocks** the user prompt now includes when applicable:
+
+   - **ScrapingDog pre-verification** — when ScrapingDog Stage 1 ran, tells the AI whether LinkedIn identity is `exact` / `partial` / `none` match.
+   - **Website reachability** — `yes` / `no` / `unknown` from the unconditional reachability probe.
+   - **Cross-source signals from website extraction** — when `dataEnrichment.websiteSignals` is populated, lists `og:site_name`, `jsonld Organization.name`, declared socials, declared contact email, and the website's meta description. The AI uses these as a second independent source when judging any field.
+   - **Corroboration already established by deterministic stage** — defense-in-depth listing of fields Stage 1 / Stage 1.5 already auto-promoted. In practice those fields are pulled OUT of the input list before reaching Stage 2, but the block exists in case a future change ever re-routes them.
+
+   **Field-specific prompt rules:**
+
+   - **URL fields (website, blog, contactMethod, social handles):** Do NOT mark `disagrees` merely because the value differs from another URL on file (e.g. LinkedIn's listed website). Companies use alias domains, product subdomains, or rebrand without updating LinkedIn. Verify each URL independently via web search; prefer `uncertain` when unverifiable.
+   - **Contact email rule:** When `contactMethod` is an email like `x@DOMAIN` and the team's website host is `DOMAIN`, the email's domain corroborates the website host — verdict `agrees`, NOT `disagrees` against a different LinkedIn-listed email. (Same logic when a website-extraction declares a matching contact email.)
+   - **Description fields (`shortDescription`, `longDescription`, `moreDetails`):** Paraphrasing, summarization, and reworded versions of the team's own LinkedIn / website description are expected and acceptable. The source is typically the team's own LinkedIn About text or website meta description — exact wording will not match other web-search sources. Verdict `agrees + high` as long as the **core facts** (mission, products, founding, team identity) align. Do NOT downgrade to `medium` solely because phrasing differs — paraphrasing is not a defect. (This rule was added because the AI was systematically punishing LinkedIn-paraphrased descriptions; combined with the source-trust rule that auto-promotes scrapingdog/open-graph high-confidence values, descriptions rarely reach Stage 2 anymore.)
+   - **Website reachability:** `yes` is positive but not sufficient (liveness ≠ identity). `no` (definitive 4xx/5xx) is a real negative signal — lean toward `disagrees` for the website verdict if web search also can't confirm. `unknown` — do not infer either way.
 
 ### Stage 1.5 — Deterministic Cross-Field Corroboration
 
-A pure-function pass inserted between Stage 1 (ScrapingDog) and Stage 2 (AI judge). No LLM, no network. For each judgable field, runs a small ruleset using anchors already on hand (`team.*`, `dataEnrichment.websiteSignals`, the Stage 1 ScrapingDog meta). Rules emit a `FieldJudgment` with `judgedVia: 'corroboration'` whose `note` lists which anchors fired (e.g. `"email-domain==website"`, `"website-self-declared"`, `"og-name-match+jsonld-name-match"`).
+A pure-function pass inserted between Stage 1 (ScrapingDog) and Stage 2 (AI judge). No LLM, no network. For each judgable field, runs a ruleset using anchors already on hand (`team.*`, `fieldsMeta[<field>].{source,confidence}`, `dataEnrichment.websiteSignals`, Stage 1 ScrapingDog meta, and the unconditional website reachability probe). Rules emit a `FieldJudgment` with `judgedVia: 'corroboration'` whose `note` is a short space-separated phrase listing which anchor(s) fired (e.g. `"email domain matches website"`, `"name in twitter handle"`, `"og name match + jsonld name match"`).
 
 `agrees + high` verdicts from Stage 1.5 are merged into the Stage-1 verdict map BEFORE the `stage1Resolved` set is computed — so any corroborated field skips the AI judge entirely and is promoted to `Team.<field>` on the same promotion gate as before. This is the primary mechanism by which the admin review queue shrinks.
 
-| Field | Rule | Anchors that must converge |
-| --- | --- | --- |
-| `contactMethod` | email-domain equals website-host (or JSON-LD-declared email's domain) | `team.website` host OR `websiteSignals.contactEmail` |
-| `twitterHandler` / `linkedinHandler` / `telegramHandler` | AI value equals the value the team's own website self-declared | `websiteSignals.<field>` (JSON-LD `sameAs`, `twitter:site`, microdata) |
-| `blog` | host equals website host, or is a subdomain of it | `team.website` host |
-| `website` | reachable (2xx) AND name-anchored by ≥1 second source | `websiteSignals.ogSiteName`, `websiteSignals.jsonLdOrgName`, or `scrapingDog.profile.website` (token-overlap on substantive ≥3-char tokens, company-stopword-aware) |
+#### Rule index
 
-Rules are **conservative** — they only fire when ≥2 distinct anchors converge. Fields with no rule match (or no anchors firing) fall through to Stage 2.
+The dispatcher always runs **source-trust** first; if it fires, the field-specific rules are skipped. All field-specific rules below produce `agrees + high` verdicts and require ≥2 independent signals to converge.
 
-> **The canonical failure case this fixes:** team has `contactMethod = "test@bestTeam.xyz"` and `website = "bestTeam.xyz"`. Stage 1.5's `email-domain==website` rule produces `agrees + high` for `contactMethod`, so the AI judge never sees this field and it auto-promotes. Previously, the AI was finding a different email listed on the team's LinkedIn page and marking the field `disagrees`.
+| Rule | Applies to | Fires when | Note string | Score |
+| --- | --- | --- | --- | --- |
+| **source-trust** | every field | `fieldsMeta[<field>].source ∈ {scrapingdog, open-graph}` AND `confidence === 'high'` | `sourced from linkedin` / `sourced from website` | 95 / 90 |
+| `email domain matches website` | `contactMethod` (email form) | email-domain host-equal to `team.website` host (or subdomain-of) | `email domain matches website` | 100 |
+| `email domain matches jsonld` | `contactMethod` (email form) | email-domain equal to the JSON-LD `Organization.email` domain found on the team's website | `email domain matches jsonld` | 95 |
+| `url host matches website` | `contactMethod` (URL form) | URL host equal to `team.website` host (or subdomain-of) — catches "team's own /contact page", anchor-link self-references, etc. | `url host matches website` | 95 |
+| `website self declared` | `twitterHandler` / `linkedinHandler` / `telegramHandler` | value exact-equal to what `websiteSignals.<field>` extracted from the team's own website HTML (JSON-LD `sameAs`, `twitter:site`, microdata, anchor) | `website self declared` | 100 |
+| `name in twitter handle` | `twitterHandler` | handle starts with a substantive team-name token (prefix-only — `eonsys` for "Eon", `Surus_io` for "Surus") | `name in twitter handle` | 90 |
+| `name in linkedin slug` | `linkedinHandler` | slug after `company/`/`school/`/`in/` starts with a substantive team-name token (`company/eon-systems-pbc` for "Eon") | `name in linkedin slug` | 90 |
+| `name in telegram handle` | `telegramHandler` | handle starts with a substantive team-name token (`fileverse`, `hextrustannouncements`, `vitadao`) | `name in telegram handle` | 90 |
+| `host corroborated` | `blog` | blog host equals `team.website` host (or subdomain-of: `blog.acme.com` ↔ `acme.com`, `acme.com/blog` ↔ `acme.com`) | `host corroborated` | 95 |
+| `name in blog handle` | `blog` (third-party platforms) | blog is on Substack / Medium / Ghost / paragraph.xyz / Mirror / dev.to / Hashnode / Beehiiv / Posthaven AND the URL's identity slug (subdomain or path) contains every substantive team-name token (`asterainstitute.substack.com` for "Astera Institute", `manifestnetwork.medium.com` for "Manifest Network") | `name in blog handle` | 95 |
+| `name in website host` | `website` | reachable (`websiteReachable === true`) AND host's first dot-separated label STARTS WITH a substantive team-name token (`eon.systems` ↔ "Eon", `devonian.ai` ↔ "Devonian Systems"). Prefix-only — `beontop.com` is NOT a match for "Eon". | `name in website host` | 95 |
+| `og name match` / `jsonld name match` / `sd website host match` | `website` | reachable AND a second-source name anchor fires from one of: `websiteSignals.ogSiteName`, `websiteSignals.jsonLdOrgName`, or ScrapingDog `profile.website` host. Multiple anchors concatenate with ` + ` in the note. | `og name match` / `jsonld name match` / `sd website host match` (or `+`-joined) | 95 |
+
+#### Prefix-only guard
+
+The `name in <handle>` family checks intentionally use **prefix matching** (`startsWith`), not substring-anywhere. Substring would false-positive on coincidental matches — a team named "Eon" with website `beontop.com` would falsely match because "eon" appears inside "beontop". Prefix-of-first-label keeps the safe cases (`eon.systems`, `astera.org`, `devonian.ai`, `computelabs.ai`, `manifestai.org`) while rejecting unrelated domains.
+
+The `name in blog handle` rule is stricter — it requires **every** substantive team-name token to appear as a substring of the handle (handle is concatenated, so `asterainstitute` matches "Astera Institute" but `essentialtechnology` does NOT match "Convergent Research").
+
+Both checks use the same stopword filter as `namesShareSubstantiveToken` (drops "labs", "inc", "team", "network", "protocol", "foundation", etc.) so two-letter codes and stopword-only team names won't match anything.
+
+#### Source-trust (no second source needed)
+
+When the enrichment pipeline already filled a field from a trusted deterministic source at high confidence, accept it without re-verifying via the AI judge. The pipeline records `source` per field on `fieldsMeta`:
+
+- `scrapingdog` → pulled from the team's LinkedIn company profile. Verdict `agrees + high`, note `sourced from linkedin`, score 95.
+- `open-graph` → pulled from the team's own website HTML (JSON-LD, twitter cards, microdata, anchors). Verdict `agrees + high`, note `sourced from website`, score 90.
+- `ai` → filled by the LLM. NOT trusted by this rule, because LLM self-assessed confidence is exactly what the judge exists to verify.
+
+The enrichment-time `confidence` must be `high` — `medium`/`low` indicates the source didn't fully corroborate the value (e.g. open-graph extraction from a website whose ownership wasn't verified). Only `high` clears the bar. This rule was added because the AI judge was systematically downgrading high-confidence LinkedIn-paraphrased descriptions (`shortDescription`, `longDescription`, `moreDetails`) to `medium` based on web-search wording differences — the source IS the verification.
+
+> **The canonical failure cases this fixes:**
+>
+> - Team has `contactMethod = "test@bestTeam.xyz"` and `website = "bestTeam.xyz"`. The `email domain matches website` rule produces `agrees + high` for `contactMethod`, so the AI judge never sees this field and it auto-promotes. Previously, the AI was finding a different email listed on the team's LinkedIn page and marking the field `disagrees`.
+> - Team's `longDescription` was pulled from LinkedIn's About text by ScrapingDog at high confidence. The AI judge would web-search, find paraphrased wording, and downgrade to `medium`. The source-trust rule now auto-promotes — LinkedIn IS the source, paraphrasing is expected.
 
 The full rule implementations + an eval bench live in `team-enrichment-corroboration.ts` and `team-enrichment-corroboration.spec.ts`. The bench pins precision/recall: any rule change that regresses fixtures fails CI.
 
@@ -289,14 +334,27 @@ quality?: {
 
 `thinEvidence: true` flags teams whose verdicts look high-confidence but are built on sparse data (the failure mode the `pln-data-enrichment` `isLowData` flag was designed to catch). Reviewers can de-prioritize those teams independently of the per-field verdict.
 
-### Value-validity gate (URL-format skip)
+### Value-validity gate (per-field shape check)
 
-Before a field is judged at all, its stored value is checked. Fields that fail this check are **skipped entirely** — no Stage 1 verdict, no Stage 2 AI call, no entry in `fieldsForReview` (there is nothing meaningful to verify, and we don't want the AI to hallucinate a verdict against junk input):
+Before a field is judged at all, its stored value is checked against a per-field shape validator (`team-enrichment-field-shape.util.ts`, function `isLikelyValueForField`). Fields that fail are **skipped entirely** — no Stage 1 verdict, no Stage 2 AI call, no entry in `fieldsForReview` (there is nothing meaningful to verify, and we don't want the AI to hallucinate a verdict against junk input).
 
-- **Empty / null** values are skipped. Empty arrays for `industryTags` / `investmentFocus` are skipped.
-- **URL-required fields (`website`, `blog`)** must pass `z.string().url()` (zod, backed by WHATWG `new URL()`). This rejects every common placeholder (`'n/a'`, `'na'`, `'tbd'`, `'tba'`, `'coming soon'`, `'pending'`, `'-'`, etc.) without maintaining an explicit blocklist, because none of them parse as URLs. It also rejects schemeless values like `mercle.ai` or `discord.gg/xxx` typed directly into `website` — the user still sees the value, but the judge won't fabricate a verdict for it.
+The validator rejects values **by structure**, not by enumerating placeholder strings. "Coming soon!", "TBD", "n/a", "pending", "email", "Twitter", "Telegram" all fail because none of them match the field's expected shape — no blocklist needed.
 
-Other URL-ish fields (`contactMethod`, social handles) are not URL-gated, because they legitimately accept bare handles, `mailto:` addresses, or invite-style links. The AI judge handles those with its standard "prefer `uncertain` over guessing" rule.
+| Field | Accepted shapes | Examples of rejected values |
+| --- | --- | --- |
+| `website` / `blog` | `http(s)://host.tld/...` (full URL with scheme + host containing a dot) | `Coming soon!`, `t54.ai` (schemeless), `n/a`, `TBD` |
+| `contactMethod` | email (`x@host.tld`), URL-with-scheme, `mailto:`, or `@handle` (≥2 alphanumeric/underscore chars) | `email`, `Twitter`, `Telegram`, `phone`, `Coming soon!`, `TBD` |
+| `twitterHandler` | 1-15 alphanumeric / underscore (with optional `@` prefix or full `twitter.com` / `x.com` URL) | `acme team` (space), `acme-team` (hyphen), `n/a`, anything >15 chars |
+| `linkedinHandler` | `company/<slug>`, `school/<slug>`, `in/<slug>`, bare slug (2-100 alphanumeric / `_` / `-` / `.`), or full `linkedin.com/...` URL | `Coming soon!`, `n/a` |
+| `telegramHandler` | 3-32 alphanumeric / underscore (with optional `@` prefix or full `t.me` / `telegram.me` URL) | `@ab` (too short), `n/a`, `Coming soon!` |
+| descriptions, `moreDetails`, array fields (`industryTags` / `investmentFocus`) | any non-empty value | empty / whitespace-only / empty array |
+
+Two design choices worth noting:
+
+- **Conditional URL-prefix stripping.** For platforms with URL form (Twitter `twitter.com/...`, LinkedIn `linkedin.com/...`, Telegram `t.me/...`), the validator only strips path / query / fragment when the value actually starts with the platform's URL prefix. An earlier draft stripped after any `/`, which made `n/a` falsely pass `twitterHandler` validation (stripped to `n`, a valid 1-char handle).
+- **Short legit handles still pass.** `@EFF` (3 chars), `@safe` (4 chars), `@bluesky` (7 chars) all pass `twitterHandler`. The shape is the gate, not the length, so the validator doesn't accidentally reject real short brands.
+
+This replaces the earlier URL-only gate (`URL_REQUIRED_FIELD_KEYS` + `z.string().url()`) that only covered `website` and `blog` — placeholder values typed into `contactMethod` (`"email"`, `"Twitter"`) used to get judged and clutter the review queue.
 
 ### fieldsMeta after judgment
 
@@ -944,17 +1002,26 @@ Three structured log granularities, all keyword-style for grep / Loki / Datadog 
 
 ```
 apps/web-api/src/team-enrichment/
-  team-enrichment.types.ts          # Enums, interfaces, enrichable fields
+  team-enrichment.types.ts          # Enums, interfaces, enrichable fields (incl. JudgmentSource.Corroboration, WebsiteSignals, TeamQuality)
   team-enrichment-eligibility-filter.ts # Shared isFund/priority WHERE filter for cron + admin queries
   team-enrichment-cost.ts           # AI usage → USD estimator + pricing table + log formatter
-  team-enrichment-ai.service.ts     # Enrichment LLM wrapper + logo scraping
+  team-enrichment-http.util.ts      # BROWSER_USER_AGENT + BROWSER_REQUEST_HEADERS (Cloudflare-safe bouquet)
+  team-enrichment-field-shape.util.ts # Per-field shape validator — rejects placeholders by structure
+  team-enrichment-corroboration.ts  # Stage 1.5 pure-function rules (source-trust + per-field anchors)
+  team-enrichment-quality.ts        # 6-dimension team quality + thin-evidence flag
+  team-enrichment-ai.service.ts     # Enrichment LLM wrapper + logo scraping + website signal extractor
   team-enrichment-scrapingdog.service.ts # LinkedIn fallback + classifyNameMatch/compareProfileToTeam helpers
-  team-enrichment.service.ts        # Core enrichment business logic
+  team-enrichment.service.ts        # Core enrichment business logic (persists websiteSignals)
   team-enrichment.job.ts            # Enrichment + marking cron jobs
-  team-enrichment-judge-ai.service.ts # Judge LLM wrapper (independent model)
-  team-enrichment-judge.service.ts  # Two-stage judgment pipeline orchestration
+  team-enrichment-judge-ai.service.ts # Judge LLM wrapper (independent model) — also renders Cross-source signals + Corroboration blocks into the prompt
+  team-enrichment-judge.service.ts  # Two/three-stage judgment pipeline orchestration (Stage 1 ScrapingDog + Stage 1.5 corroboration + Stage 2 AI)
   team-enrichment-judge.job.ts      # Judge cron job
+  team-enrichment-promotion.ts      # Promotion payload builder + executor (TeamEnrichment → Team)
   team-enrichment-report.service.ts # Aggregator behind GET /v1/admin/teams/ai-report
+  bench-judge.ts                    # Standalone Nest bootstrap that re-judges every team in `bench_team_uid` (prod-data bench runner)
+  prod_data/                        # Imported prod data + compare.sql for the review-queue reduction bench
+  team-enrichment-corroboration.spec.ts # Eval bench — pinned precision/recall on labelled corroboration fixtures
+  team-enrichment-field-shape.util.spec.ts # Shape-validator coverage (placeholders + short legit handles)
   logo-verification.types.ts        # Verdict / confidence / quality types for the VLM pass
   logo-verification.service.ts      # VLM wrapper (gemini / openai / anthropic) + image prep
   logo-verification-persistence.service.ts # Candidate selection + shouldVerify gate + TeamLogoVerificationResult writes
