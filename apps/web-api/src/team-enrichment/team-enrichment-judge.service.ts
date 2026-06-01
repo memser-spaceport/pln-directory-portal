@@ -8,6 +8,7 @@ import { buildPromotionPayload, executePromotion } from './team-enrichment-promo
 import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import { CorroborationFieldInput, runCorroboration } from './team-enrichment-corroboration';
 import { computeTeamQuality } from './team-enrichment-quality';
+import { BROWSER_REQUEST_HEADERS } from './team-enrichment-http.util';
 import {
   AIUsageEntry,
   EnrichmentStatus,
@@ -298,6 +299,22 @@ export class TeamEnrichmentJudgeService {
       let stage1Verdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = {};
       let scrapingDogMeta: TeamJudgment['scrapingDog'] | undefined;
 
+      // Website reachability probe — runs UNCONDITIONALLY when the team has a
+      // judgable website, independent of whether ScrapingDog runs. Previously
+      // this lived inside the ScrapingDog success branch, which meant a single
+      // ScrapingDog 403 (or a team with no linkedinHandler) silently dropped
+      // the probe and forced the AI judge to guess at reachability.
+      let websiteReachable: boolean | null = null;
+      let websiteFinalHost: string | null = null;
+      const websiteToProbe = this.preferEnrichmentValue(team, 'website');
+      if (websiteToProbe && this.hasJudgableValue(team, 'website')) {
+        const probe = await this.probeWebsiteReachable(websiteToProbe);
+        if (probe) {
+          websiteReachable = probe.reachable;
+          websiteFinalHost = probe.finalHost;
+        }
+      }
+
       if (this.scrapingDogService.isConfigured() && team.linkedinHandler) {
         const result = await this.scrapingDogService.fetchCompanyProfile(team.linkedinHandler);
 
@@ -337,17 +354,6 @@ export class TeamEnrichmentJudgeService {
             }
           }
 
-          let websiteReachable: boolean | null = null;
-          let websiteFinalHost: string | null = null;
-          const websiteToProbe = this.preferEnrichmentValue(team, 'website');
-          if (websiteToProbe && this.hasJudgableValue(team, 'website')) {
-            const probe = await this.probeWebsiteReachable(websiteToProbe);
-            if (probe) {
-              websiteReachable = probe.reachable;
-              websiteFinalHost = probe.finalHost;
-            }
-          }
-
           const verifiedFields = Object.entries(stage1Verdicts)
             .filter(([, v]) => v?.verdict === JudgmentVerdict.Agrees && v.confidence === 'high')
             .map(([k]) => k);
@@ -370,7 +376,13 @@ export class TeamEnrichmentJudgeService {
       // we extracted from the team's own website during enrichment + the ScrapingDog
       // profile from Stage 1. Verdicts that fire at `agrees + high` short-circuit the
       // AI judge and promote the value, exactly like Stage 1 already does.
-      const stage15Verdicts = this.runStage15(team, existingMeta, judgableKeys, scrapingDogMeta);
+      const stage15Verdicts = this.runStage15(
+        team,
+        existingMeta,
+        judgableKeys,
+        scrapingDogMeta,
+        websiteReachable
+      );
 
       // Stage 1.5 verdicts merge into stage1 before the resolved set is computed, so any
       // corroborated field skips Stage 2. Stage 1 takes precedence on overlap (e.g. it
@@ -406,8 +418,8 @@ export class TeamEnrichmentJudgeService {
           linkedinHandler: team.linkedinHandler,
           twitterHandler: team.twitterHandler,
           telegramHandler: team.telegramHandler,
-          websiteReachable: scrapingDogMeta?.websiteReachable ?? null,
-          websiteFinalHost: scrapingDogMeta?.websiteFinalHost ?? null,
+          websiteReachable,
+          websiteFinalHost,
           scrapingDog: scrapingDogMeta,
           websiteSignals: existingMeta.websiteSignals ?? null,
           corroboratedFields: Object.keys(mergedStage1Verdicts).filter(
@@ -578,7 +590,8 @@ export class TeamEnrichmentJudgeService {
     team: TeamRecord,
     existingMeta: TeamDataEnrichment,
     judgableKeys: FieldMetaKey[],
-    scrapingDogMeta: TeamJudgment['scrapingDog'] | undefined
+    scrapingDogMeta: TeamJudgment['scrapingDog'] | undefined,
+    websiteReachable: boolean | null
   ): Partial<Record<FieldMetaKey, FieldJudgment>> {
     const inputs: CorroborationFieldInput[] = [];
     for (const key of judgableKeys) {
@@ -592,10 +605,12 @@ export class TeamEnrichmentJudgeService {
     // host-match anchor relies only on profile.website (which the meta doesn't carry) so
     // we leave that anchor inactive in Stage 1.5 — it's already covered by Stage 1's
     // compareProfileToTeam (websiteCorroborates) for linkedinHandler.
+    // websiteReachable now comes from the unconditional probe (not scrapingDogMeta),
+    // so corroborateWebsite gets a real signal even when ScrapingDog Stage 1 was skipped.
     return runCorroboration(inputs, {
       teamName: team.name,
       website: this.preferEnrichmentValue(team, 'website'),
-      websiteReachable: scrapingDogMeta?.websiteReachable ?? null,
+      websiteReachable,
       websiteSignals: existingMeta.websiteSignals ?? null,
       scrapingDogProfile: null,
       scrapingDogNameMatch: scrapingDogMeta?.nameMatch ?? null,
@@ -803,13 +818,25 @@ export class TeamEnrichmentJudgeService {
     return false;
   }
 
+  /**
+   * Reachability probe for the team's website. Uses the same
+   * browser-like header bouquet as the website-signal extractor (`fetchWebsiteHtml`)
+   * so Cloudflare / Akamai bot rules don't return 403 on what's actually a live
+   * site. A bare-fetch probe got false `unreachable` verdicts on perfectly
+   * browsable sites — fixed by parity with the extractor's header set.
+   *
+   * Returns `null` only on hard transient failure (network error, timeout).
+   * A 4xx/5xx response returns `{reachable: false, ...}` — that's a real
+   * negative signal worth propagating to the AI judge.
+   */
   private async probeWebsiteReachable(url: string): Promise<{ reachable: boolean; finalHost: string | null } | null> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 8000);
     try {
       const response = await fetch(url, {
         signal: controller.signal,
         redirect: 'follow' as RequestRedirect,
+        headers: { ...BROWSER_REQUEST_HEADERS },
       });
       const finalHost = (() => {
         try {

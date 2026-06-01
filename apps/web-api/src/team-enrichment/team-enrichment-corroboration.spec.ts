@@ -155,12 +155,104 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
     });
 
-    it('blog on a completely different host → no verdict', () => {
-      const verdict = corroborateBlog('https://medium.com/@acme', {
+    it('blog on a completely different host with unrelated handle → no verdict', () => {
+      const verdict = corroborateBlog('https://medium.com/@unrelated-author', {
         teamName: 'Acme',
         website: 'https://acme.com',
       });
       expect(verdict).toBeNull();
+    });
+
+    // Bench case (Astera Institute): asterainstitute.substack.com — handle is
+    // the concatenated team name. host-corroborated can't fire (different host),
+    // so the new rule must catch it.
+    it('substack subdomain encoding the team name → name in blog handle', () => {
+      const verdict = corroborateBlog('https://asterainstitute.substack.com/', {
+        teamName: 'Astera Institute',
+        website: 'https://astera.org/',
+      });
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+      expect(verdict?.note).toBe('name in blog handle');
+    });
+
+    it('substack subdomain encoding multi-word team name → name in blog handle', () => {
+      // "Compute Labs" → "labs" is a stopword, "compute" is the only substantive token.
+      const verdict = corroborateBlog('https://computelabs.substack.com/', {
+        teamName: 'Compute Labs',
+        website: 'https://www.computelabs.ai',
+      });
+      expect(verdict?.note).toBe('name in blog handle');
+    });
+
+    it('medium subdomain → name in blog handle', () => {
+      const verdict = corroborateBlog('https://labdao.medium.com/', {
+        teamName: 'LabDAO',
+        website: 'https://www.labdao.xyz',
+      });
+      expect(verdict?.note).toBe('name in blog handle');
+    });
+
+    it('medium path with @handle → name in blog handle', () => {
+      const verdict = corroborateBlog('https://medium.com/@manifestnetwork', {
+        teamName: 'Manifest Network',
+        website: 'https://manifestai.org/',
+      });
+      expect(verdict?.note).toBe('name in blog handle');
+    });
+
+    it('paragraph.xyz with @handle → name in blog handle', () => {
+      const verdict = corroborateBlog('https://paragraph.xyz/@cabin', {
+        teamName: 'Cabin',
+        website: 'https://cabin.city',
+      });
+      expect(verdict?.note).toBe('name in blog handle');
+    });
+
+    // Bench case (Crecimiento): substack.com/@<handle> user-profile URL,
+    // distinct from the <handle>.substack.com publication URL pattern.
+    it('substack user-profile path (substack.com/@handle) → name in blog handle', () => {
+      const verdict = corroborateBlog('https://substack.com/@crecimientoar/posts', {
+        teamName: 'Crecimiento',
+        website: 'https://bringargentinaonchain.org',
+      });
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.note).toBe('name in blog handle');
+    });
+
+    it('substack user-profile path with unrelated handle → no verdict', () => {
+      const verdict = corroborateBlog('https://substack.com/@unrelated-author/posts', {
+        teamName: 'Crecimiento',
+        website: 'https://bringargentinaonchain.org',
+      });
+      expect(verdict).toBeNull();
+    });
+
+    // Bench negative case (Convergent Research FROs): "essentialtechnology"
+    // subdomain has no substantive-token overlap with the team name. Correctly
+    // stays in review — admin should verify whether this is really their blog.
+    it('substack subdomain unrelated to team name → no verdict', () => {
+      const verdict = corroborateBlog('https://essentialtechnology.substack.com/', {
+        teamName: 'Convergent Research FROs',
+        website: 'https://convergentresearch.org',
+      });
+      expect(verdict).toBeNull();
+    });
+
+    it('mirror.xyz with .eth suffix → name in blog handle', () => {
+      const verdict = corroborateBlog('https://mirror.xyz/acme.eth', {
+        teamName: 'Acme',
+        website: 'https://acme.com',
+      });
+      expect(verdict?.note).toBe('name in blog handle');
+    });
+
+    it('ghost.io subdomain → name in blog handle', () => {
+      const verdict = corroborateBlog('https://acmehq.ghost.io/', {
+        teamName: 'Acme HQ',
+        website: 'https://acme.com',
+      });
+      expect(verdict?.note).toBe('name in blog handle');
     });
   });
 
@@ -196,7 +288,9 @@ describe('team-enrichment-corroboration', () => {
           jsonLdOrgName: 'Acme Robotics Inc',
         },
       });
-      expect(verdict?.note).toBe('og name match + jsonld name match');
+      // Host first-label "acme" starts with team token "acme" too, so three anchors
+      // fire and concatenate in this order: name in website host + og + jsonld.
+      expect(verdict?.note).toBe('name in website host + og name match + jsonld name match');
     });
 
     it('not reachable → no verdict regardless of anchors', () => {
@@ -208,8 +302,54 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict).toBeNull();
     });
 
-    it('reachable but no name anchors → no verdict (single-source insufficient)', () => {
-      const verdict = corroborateWebsite('https://acme.com', { ...base, websiteReachable: true });
+    it('reachable but no name anchors AND host unrelated to team name → no verdict', () => {
+      // "Acme Robotics" team but website is `unrelated.com` — first label "unrelated"
+      // doesn't start with "acme" or "robotics", and no second-source signals exist.
+      const verdict = corroborateWebsite('https://unrelated.com', { ...base, websiteReachable: true });
+      expect(verdict).toBeNull();
+    });
+
+    // Bench case (Eon): `eon.systems` for team "Eon". No websiteSignals or
+    // ScrapingDog profile (Stage 1 didn't run), but the host first-label IS
+    // the team name. Combined with reachability that's enough for high confidence.
+    it('reachable + host first-label starts with team token → name in website host', () => {
+      const verdict = corroborateWebsite('https://eon.systems/', {
+        teamName: 'Eon',
+        websiteReachable: true,
+      });
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+      expect(verdict?.note).toBe('name in website host');
+    });
+
+    // Bench case (Devonian Systems): host `devonian.ai` starts with the team's
+    // primary token. Same rule, multi-word team name with stopword filtering.
+    it('reachable + host matches first substantive team token (multi-word team) → match', () => {
+      const verdict = corroborateWebsite('https://devonian.ai/', {
+        teamName: 'Devonian Systems (Operad)',
+        websiteReachable: true,
+      });
+      expect(verdict?.note).toBe('name in website host');
+    });
+
+    // False-positive guard: team "Eon" with a domain that has "eon" buried
+    // mid-word (`beontop.com`). The substring exists but isn't a prefix of the
+    // first label, so the rule correctly rejects it.
+    it('reachable but host has team token mid-word (not prefix) → no verdict', () => {
+      const verdict = corroborateWebsite('https://beontop.com/', {
+        teamName: 'Eon',
+        websiteReachable: true,
+      });
+      expect(verdict).toBeNull();
+    });
+
+    // Abbreviated brand case: `fil.org` for "Filecoin Foundation". The host
+    // first-label is too short to contain the team token — falls through to AI.
+    it('reachable but host is an abbreviation of team name → no verdict (AI handles)', () => {
+      const verdict = corroborateWebsite('https://fil.org/', {
+        teamName: 'Filecoin Foundation',
+        websiteReachable: true,
+      });
       expect(verdict).toBeNull();
     });
 
@@ -255,8 +395,10 @@ describe('team-enrichment-corroboration', () => {
       );
       expect(out.contactMethod?.verdict).toBe(JudgmentVerdict.Agrees);
       expect(out.contactMethod?.note).toBe('email domain matches website');
-      // website needs name corroboration to fire — none here, so falls through:
-      expect(out.website).toBeUndefined();
+      // website also auto-promotes: reachable + host first-label "bestteam"
+      // starts with team token "best".
+      expect(out.website?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(out.website?.note).toBe('name in website host');
     });
 
     it('skips array-valued fields entirely (industryTags / investmentFocus)', () => {

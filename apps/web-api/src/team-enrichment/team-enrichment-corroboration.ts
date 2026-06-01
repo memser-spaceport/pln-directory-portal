@@ -138,6 +138,50 @@ export function namesShareSubstantiveToken(a: string, b: string): boolean {
   return false;
 }
 
+/**
+ * Looser sibling of `namesShareSubstantiveToken`, designed for handles found
+ * in URLs (subdomains, path slugs) that have no whitespace delimiters: e.g.
+ * `asterainstitute` for the team "Astera Institute", `manifestnetwork` for
+ * "Manifest Network".
+ *
+ * Tokenizes the team name as usual (stopword-aware), then checks whether
+ * EVERY substantive team token appears as a substring of the normalized
+ * handle. Both "asterainstitute" (concatenated) and "astera-institute"
+ * (hyphenated) match. `essentialtechnology` for "Convergent Research" does
+ * not, because neither `convergent` nor `research` appears.
+ */
+export function handleMatchesTeamName(teamName: string, rawHandle: string): boolean {
+  const teamTokens = tokenize(teamName);
+  if (teamTokens.length === 0) return false;
+  const handle = rawHandle.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (handle.length < 3) return false;
+  return teamTokens.every((t) => handle.includes(t));
+}
+
+/**
+ * Variant for website hosts, where the team name is typically abbreviated to
+ * its leading distinctive token: `eon.systems` for "Eon", `astera.org` for
+ * "Astera Institute" (drops "Institute"), `fil.org` for "Filecoin Foundation"
+ * (loses the team name entirely — falls through).
+ *
+ * Strict on placement: requires the first dot-separated label of the host to
+ * START WITH a substantive team token (or equal it). Substring-anywhere would
+ * false-positive on coincidental matches — a team named "Eon" with website
+ * `beontop.com` would falsely match if we just checked for "eon" anywhere.
+ * Prefix-of-first-label keeps Astera/Eon/Devonian/etc. matching while
+ * rejecting `beontop.com` (first label "beontop" doesn't start with "eon").
+ *
+ * Stopword filter + 3-char minimum on tokens still apply (so two-letter team
+ * names and stopword-only names won't match anything).
+ */
+export function hostFirstLabelMatchesTeamName(teamName: string, host: string): boolean {
+  const teamTokens = tokenize(teamName);
+  if (teamTokens.length === 0) return false;
+  const firstLabel = host.toLowerCase().replace(/^www\./, '').split('.')[0];
+  if (!firstLabel || firstLabel.length < 3) return false;
+  return teamTokens.some((t) => firstLabel.startsWith(t));
+}
+
 function mkJudgment(
   confidence: FieldConfidence,
   verdict: JudgmentVerdict,
@@ -243,19 +287,104 @@ export function corroborateTelegramHandler(
 }
 
 /**
- * Blog URL on the same host (or subdomain of) the team's website. Two paths
- * matter equally here: `blog.acme.com` ↔ `acme.com`, and `acme.com/blog`
- * ↔ `acme.com`. We don't require the blog host to be reachable — the host
- * relationship to the website is the corroboration signal.
+ * Extracts the team-identity "handle" from a blog URL hosted on a third-party
+ * publishing platform (Substack, Medium, Ghost, paragraph.xyz, etc.). Returns
+ * null when the URL isn't on a recognized platform or no handle could be
+ * extracted. The handle is the part of the URL that identifies WHO owns the
+ * blog — typically the subdomain (`<handle>.substack.com`) or a path segment
+ * (`medium.com/@<handle>`). Used by the blog corroboration rule below to
+ * check whether the team name appears in the URL itself.
+ */
+export function extractBlogHandle(blogUrl: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(/^https?:\/\//i.test(blogUrl.trim()) ? blogUrl.trim() : `https://${blogUrl.trim()}`);
+  } catch {
+    return null;
+  }
+  const host = u.host.replace(/^www\./, '').toLowerCase();
+  const segments = u.pathname.split('/').filter(Boolean);
+
+  // Subdomain-based platforms: <handle>.<platform-host>
+  const subdomainPlatforms = [
+    'substack.com',
+    'medium.com',
+    'ghost.io',
+    'hashnode.dev',
+    'beehiiv.com',
+    'posthaven.com',
+    'mirror.xyz',
+  ];
+  for (const platform of subdomainPlatforms) {
+    if (host !== platform && host.endsWith('.' + platform)) {
+      const handle = host.slice(0, -(platform.length + 1));
+      // Reject empty / reserved-prefix-only handles (e.g. "www" already stripped).
+      if (handle && handle !== 'blog') return handle;
+    }
+  }
+
+  // Path-based platforms: <platform-host>/@<handle> or <platform-host>/<handle>
+  // Note: substack.com appears in BOTH subdomainPlatforms (publication URLs like
+  // acme.substack.com) AND here (user-profile URLs like substack.com/@acme/posts).
+  // The subdomain branch above only fires when host !== platform, so the two
+  // patterns don't collide.
+  const pathPlatforms: Record<string, 'at-handle' | 'plain'> = {
+    'medium.com': 'at-handle',
+    'substack.com': 'at-handle',
+    'paragraph.xyz': 'at-handle',
+    'mirror.xyz': 'plain',
+    'dev.to': 'plain',
+    'hashnode.com': 'at-handle',
+  };
+  const style = pathPlatforms[host];
+  if (style && segments.length > 0) {
+    const first = decodeURIComponent(segments[0]);
+    if (style === 'at-handle' && first.startsWith('@')) {
+      return first.slice(1).toLowerCase();
+    }
+    if (style === 'plain') {
+      // Strip ENS-style suffix common on mirror.xyz handles ("acme.eth" -> "acme").
+      return first.replace(/\.eth$/i, '').toLowerCase();
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Blog URL corroboration. Two patterns auto-approve at high confidence:
+ *
+ *   1. **Same-host / subdomain-of website**: `blog.acme.com` ↔ `acme.com`,
+ *      `acme.com/blog` ↔ `acme.com`. Note `"host corroborated"`.
+ *
+ *   2. **Third-party platform with team name in the handle**: e.g. team
+ *      `Astera Institute` with blog `asterainstitute.substack.com`. The
+ *      handle in the URL (subdomain or path slug, depending on platform)
+ *      shares a substantive token with the team name. Note `"name in blog handle"`.
+ *
+ * The second rule catches blogs hosted on Substack/Medium/Ghost/paragraph/etc.
+ * where the team-owned identity lives in the URL slug rather than the host.
+ * Token-match is stopword-aware (drops "labs", "the", "network", "ai", etc.)
+ * so it correctly does NOT fire on `essentialtechnology.substack.com` for a
+ * team named "Convergent Research" — those handles share no substantive token.
  */
 export function corroborateBlog(value: string | null, ctx: CorroborationContext): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   const blogHost = normalizeHost(value);
   const siteHost = normalizeHost(ctx.website);
-  if (!blogHost || !siteHost) return null;
-  if (hostsMatch(blogHost, siteHost)) {
+  if (!blogHost) return null;
+
+  // Rule 1: same-host / subdomain-of website.
+  if (siteHost && hostsMatch(blogHost, siteHost)) {
     return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'host corroborated');
   }
+
+  // Rule 2: third-party platform, team name in the URL handle.
+  const handle = extractBlogHandle(value);
+  if (handle && handleMatchesTeamName(ctx.teamName, handle)) {
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'name in blog handle');
+  }
+
   return null;
 }
 
@@ -274,6 +403,16 @@ export function corroborateWebsite(value: string | null, ctx: CorroborationConte
   if (!siteHost) return null;
 
   const anchorsFired: string[] = [];
+
+  // Strongest anchor: the host itself starts with a substantive team token.
+  // `eon.systems` ↔ "Eon", `astera.org` ↔ "Astera Institute", `devonian.ai`
+  // ↔ "Devonian Systems". Combined with reachability, this is a deterministic
+  // identity match — the team owns a domain that's named after them and the
+  // domain is live. (Reachability is required by the `websiteReachable !== true`
+  // gate above, so adding this anchor here means both signals are in hand.)
+  if (hostFirstLabelMatchesTeamName(ctx.teamName, siteHost)) {
+    anchorsFired.push('name in website host');
+  }
 
   if (ctx.websiteSignals?.ogSiteName && namesShareSubstantiveToken(ctx.teamName, ctx.websiteSignals.ogSiteName)) {
     anchorsFired.push('og name match');
