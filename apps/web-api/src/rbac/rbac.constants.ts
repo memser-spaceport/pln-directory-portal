@@ -15,6 +15,8 @@ export const RBAC_PERMISSION_CODES = {
   TEAM_MEMBERSHIP_SOURCE_READ: 'team.membership_source.read',
   INVESTOR_DB_VIEW: 'investor_db.view',
   INVESTOR_DB_EDIT: 'investor_db.edit',
+  FOUNDER_DB_VIEW: 'founder_db.view',
+  FOUNDER_DB_EDIT: 'founder_db.edit',
 } as const;
 
 export const RBAC_SCOPES = {

@@ -2329,6 +2329,108 @@ model PlPortfolioTeamMeta {
   updatedAt DateTime @updatedAt
 }
 
+enum FounderReviewStatus {
+  NEW
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  HOLD
+}
+
+enum FounderReviewFeedback {
+  GOOD
+  BAD
+  WRONG_FUND
+  NEEDS_CONTEXT
+}
+
+model FounderSourcingRecord {
+  id Int @id @default(autoincrement())
+
+  founderId String @unique
+  dedupeKey String @unique
+  source    String
+  sources   String[] @default([])
+
+  name        String?
+  firstName   String?
+  lastName    String?
+  emails      String[] @default([])
+  primaryEmail String?
+  github      String?
+  twitter     String?
+  linkedin    String?
+  telegram    String?
+  farcaster   String?
+  website     String?
+  org         String?
+  team        String?
+  teamPriority Int?
+  bio         String?
+  topics      String[] @default([])
+  externalIds Json?
+  directoryMemberId String?
+  directoryTeamId   String?
+  identityCompleteness Decimal? @db.Decimal(5, 4)
+
+  fundTags           Json?
+  fundCodes          String[] @default([])
+  plvsScore          Int?
+  plvsRecommendation String?
+  plvsFeatures       Json?
+  plvsWeightsVersion String?
+  alignmentMax       Decimal? @db.Decimal(5, 4)
+
+  quality Json?
+
+  plnProximity    Decimal? @db.Decimal(5, 4)
+  plAlignment     Decimal? @db.Decimal(5, 4)
+  reputationFlags Json?
+  warmIntroPaths  Json?
+  intentSignals   Json?
+
+  provenance   Json?
+  lastSignalAt DateTime?
+  whyNow       String? @db.VarChar(500)
+  thinEvidence Boolean?
+
+  runId                  String?
+  signalSourcingVersion  String?
+  isKnown                Boolean?
+  lastIngestRunId        String?
+  lastIngestSource       String?
+
+  reviewStatus        FounderReviewStatus   @default(NEW)
+  reviewFeedback      FounderReviewFeedback?
+  reviewDecidedAt     DateTime?
+  reviewNote          String?               @db.VarChar(500)
+  reviewedByMemberUid String?
+
+  rawPayload Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([source])
+  @@index([primaryEmail])
+  @@index([reviewStatus])
+  @@index([alignmentMax])
+  @@index([lastSignalAt])
+  @@index([runId])
+  @@index([plvsScore])
+}
+
+model FounderSourcingIngestRun {
+  id Int @id @default(autoincrement())
+
+  runId     String @unique
+  source    String?
+  itemCount Int
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 enum RoadmapStage {
   IDEA
   BACKLOG
