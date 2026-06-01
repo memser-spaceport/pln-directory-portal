@@ -6,12 +6,7 @@ import { ListInvestorsQueryDto } from './dto/list-investors.query.dto';
 import { PlPortfolioTeamDto } from './dto/pl-portfolio-team.dto';
 import { WarmIntrosQueryDto } from './dto/warm-intros.query.dto';
 import { WarmIntroCandidateDto, WarmIntrosResponseDto } from './dto/warm-intros.dto';
-import {
-  MemberByEmail,
-  OverlapsByInvestorId,
-  toInvestorDto,
-  toPlPortfolioTeamDto,
-} from './investor-outreach.mapper';
+import { MemberByEmail, OverlapsByInvestorId, toInvestorDto, toPlPortfolioTeamDto } from './investor-outreach.mapper';
 import { scoreCandidate } from './warm-intros.scorer';
 import {
   isAllowedEmailStatus,
@@ -249,12 +244,15 @@ export class InvestorOutreachQueryService {
   }
 
   /**
-   * Resolves "investor email is a LabOS Member" via a Member-email lookup. Done as an explicit
-   * email IN (...) clause because InvestorOutreachRecord has no relation to Member.
+   * Resolves outreach email against approved LabOS members (visible profiles only).
+   * Done as an explicit email IN (...) clause because InvestorOutreachRecord has no Member relation.
    */
   private async buildInLabOsCondition(inLabOs: boolean): Promise<Prisma.InvestorOutreachRecordWhereInput | null> {
     const members = await this.prisma.member.findMany({
-      where: { email: { not: null } },
+      where: {
+        email: { not: null },
+        memberApproval: { state: 'APPROVED' },
+      },
       select: { email: true },
     });
     const emails = members.map((m) => m.email).filter((e): e is string => !!e);
@@ -297,7 +295,10 @@ export class InvestorOutreachQueryService {
     const [members, overlaps] = await Promise.all([
       emails.length
         ? this.prisma.member.findMany({
-            where: { email: { in: emails, mode: 'insensitive' } },
+            where: {
+              email: { in: emails, mode: 'insensitive' },
+              memberApproval: { state: 'APPROVED' },
+            },
             include: { image: true },
           })
         : Promise.resolve([]),
