@@ -7,11 +7,13 @@ export class JwtService {
    * <p> Returns a signed jwt token for given roles valid for 30 days </p>
    * @returns the signed jwt token as string
    */
-  async getSignedToken(roles: string[], memberUid?: string) {
+  async getSignedToken(roles: string[], memberUid?: string, permissions: string[] = []) {
     return jwt.sign(
       {
         roles,
         memberUid,
+        permissions,
+        effectivePermissionCodes: permissions,
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30,
       },
       process.env.ADMIN_TOKEN_SECRET

@@ -34,12 +34,11 @@ import { TeamsService } from './teams.service';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
-import { AccessLevelsGuard } from '../guards/access-levels.guard';
-import { AccessLevels } from '../decorators/access-levels.decorator';
-import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import { MembersService } from '../members/members.service';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { TeamMembershipSourceReadAuthGuard } from '../guards/admin-auth.guard';
 import { QueryCache } from '../decorators/query-cache.decorator';
 import { UpdateTeamAccessLevelDto } from './dto/teams.dto';
 import { ParticipantsRequest } from './dto/members.dto';
@@ -51,7 +50,7 @@ export class TeamsController {
   constructor(
     private readonly teamsService: TeamsService,
     private readonly membersService: MembersService,
-    private readonly teamEnrichmentService: TeamEnrichmentService,
+    private readonly teamEnrichmentService: TeamEnrichmentService
   ) {}
 
   @Api(server.route.teamFilters)
@@ -168,8 +167,7 @@ export class TeamsController {
   }
 
   @Api(server.route.modifyTeam)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @UseGuards(UserTokenValidation)
   @UsePipes(new ParticipantsReqValidationPipe())
   async updateOne(@Param('uid') teamUid, @Body() body, @Req() req) {
     await this.teamsService.validateRequestor(req.userEmail, teamUid);
@@ -178,8 +176,7 @@ export class TeamsController {
 
   // TODO: Remove this endpoint after frontend integration with new ask api
   @Api(server.route.patchTeam)
-  @UseGuards(UserTokenValidation, AccessLevelsGuard)
-  @AccessLevels(AccessLevel.L2, AccessLevel.L3, AccessLevel.L4, AccessLevel.L5, AccessLevel.L6)
+  @UseGuards(UserTokenValidation)
   async addAsk(@Param('uid') teamUid, @Body() body, @Req() req) {
     await this.teamsService.isTeamMemberOrAdmin(req.userEmail, teamUid);
     const res = await this.teamsService.addEditTeamAsk(teamUid, body.teamName, req.userEmail, body.ask);
@@ -243,6 +240,7 @@ export class TeamsController {
    * body: { accessLevel: "L0" | "L1" | ... }
    */
   @Patch('v1/teams/:uid/access-level')
+  @UseGuards(AdminAuthGuard)
   @NoCache()
   async updateTeamAccessLevel(@Param('uid') uid: string, @Body() body: UpdateTeamAccessLevelDto) {
     return await this.teamsService.updateAccessLevel(uid, body.accessLevel);
@@ -253,6 +251,7 @@ export class TeamsController {
    * GET /teams?includeL0=true|false
    */
   @Get('v1/admin/teams')
+  @UseGuards(TeamMembershipSourceReadAuthGuard)
   @NoCache()
   async getTeams() {
     const teams = await this.teamsService.findAllForAdmin();
@@ -265,7 +264,7 @@ export class TeamsController {
   async reviewEnrichment(
     @Param('uid') uid: string,
     @Body() body: { status: 'Reviewed' | 'Approved' },
-    @Req() req: Request,
+    @Req() req: Request
   ) {
     if (!body.status || !['Reviewed', 'Approved'].includes(body.status)) {
       throw new BadRequestException('status must be "Reviewed" or "Approved"');

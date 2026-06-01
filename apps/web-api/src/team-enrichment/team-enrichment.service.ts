@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
+import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { ScrapingDogCompanyProfile, TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import {
   ENRICHABLE_TEAM_FIELDS,
@@ -16,9 +17,99 @@ import {
   FieldJudgment,
   FieldMetaKey,
   ForceEnrichmentMode,
+  JudgmentSource,
+  JudgmentStatus,
   JudgmentVerdict,
   TeamDataEnrichment,
 } from './team-enrichment.types';
+
+export type EnrichmentReviewFieldEntry = {
+  content: string | string[];
+  metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
+  judgment: { note?: string; score?: number; verdict?: JudgmentVerdict; confidence?: FieldConfidence };
+};
+
+export type EnrichmentReviewLogo = {
+  content: { uid: string; url: string } | null;
+  metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
+  // Admin-approval judgment lives on fieldsMeta.logo.judgment (PATCH /enrichment-review writes
+  // {verdict: agrees, confidence: high, score: 100} here). The VLM cron never writes here —
+  // it writes to verification below.
+  judgment?: { note?: string; score?: number; verdict?: JudgmentVerdict; confidence?: FieldConfidence };
+  verification: {
+    verdict: string;
+    confidence: string;
+    reason: string | null;
+    verifiedAt: string;
+  } | null;
+};
+
+export type EnrichmentReviewItem = {
+  uid: string;
+  name: string;
+  priority: number;
+  enrichmentStatus: EnrichmentStatus;
+  enrichmentAt: string | null;
+  judgedAt: string | null;
+  fields: Partial<Record<FieldMetaKey, EnrichmentReviewFieldEntry>>;
+  logo?: EnrichmentReviewLogo;
+};
+
+export type ApproveEnrichmentTeamSkip = {
+  key: FieldMetaKey;
+  reason: 'empty_value' | 'no_candidate';
+};
+
+export type ApproveEnrichmentTeamResult = {
+  success: boolean;
+  approved: FieldMetaKey[];
+  skipped: ApproveEnrichmentTeamSkip[];
+  message?: string;
+};
+
+export type ApproveEnrichmentFieldInput = {
+  key: FieldMetaKey;
+  content?: string | string[];
+};
+
+export type TeamEnrichmentStatusEntry = {
+  status: EnrichmentStatus;
+  shouldEnrich: boolean;
+  enrichedAt: string | null;
+  enrichedBy: string | null;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  errorMessage: string | null;
+  aiModel: string | null;
+};
+
+export type TeamJudgmentStatusEntry = {
+  status: JudgmentStatus;
+  judgedAt: string | null;
+  judgedBy: string | null;
+  aiModel: string | null;
+  errorMessage: string | null;
+  overallAssessment: string | null;
+  fieldsForReview: string[];
+};
+
+export type TeamEnrichmentStatusResult = {
+  uid: string;
+  name: string;
+  enrichment: TeamEnrichmentStatusEntry | null;
+  judgment: TeamJudgmentStatusEntry | null;
+};
+
+export type EnrichmentCronCounts = {
+  enrichment: { pending: number; inProgress: number };
+  judge: { pending: number; inProgress: number };
+};
+
+export type EnrichmentCronStatusResult = {
+  enrichment: { isRunning: boolean; pending: number; inProgress: number };
+  marking: { isRunning: boolean };
+  judge: { isRunning: boolean; pending: number; inProgress: number };
+};
 
 const CONFIDENCE_RANK: Record<string, number> = {
   low: 1,
@@ -33,21 +124,32 @@ function rankConfidence(value: FieldConfidence | undefined): number {
 type FieldsMetaMap = Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
 
 /**
- * User-owned = user explicitly asserted this value.
- * True when the field is flagged ChangedByUser, OR has a non-empty value with no prior Enriched meta
- * (pre-enrichment user data). User-owned values are highest-trust and should bypass downstream
- * verification / fuzzy-matching checks.
+ * User-owned = user explicitly asserted this value on the Team record.
+ * True when fieldsMeta says ChangedByUser, OR Team[field] is non-empty with no prior Enriched
+ * meta entry (pre-enrichment data or post-CannotEnrich user fill-in). User-owned values are
+ * highest-trust and should bypass downstream verification / fuzzy-matching checks.
+ *
+ * Note: "non-empty" is evaluated against the Team row (what the user/judge sees), NOT the
+ * TeamEnrichment row (which holds AI candidates not yet promoted).
  */
 function isFieldUserOwned(
   fieldsMeta: Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>,
   field: FieldMetaKey,
-  slotHasValue: boolean
+  teamSlotHasValue: boolean
 ): boolean {
   const status = fieldsMeta[field]?.status;
   if (status === FieldEnrichmentStatus.ChangedByUser) return true;
-  // Pre-enrichment user value: has a value but no meta entry at all.
-  if (slotHasValue && !fieldsMeta[field]) return true;
+  if (teamSlotHasValue && !fieldsMeta[field]) return true;
   return false;
+}
+
+/**
+ * Stamp a fresh `lastModifiedAt` on a fieldsMeta entry. Call this at every site that
+ * writes a value (enrichment, ScrapingDog fill, AI giving up on a field, user edit, logo
+ * refetch, bad-LinkedIn-handle nulling).
+ */
+function stampModified<T extends FieldEnrichmentMeta>(meta: T, at: string): T {
+  return { ...meta, lastModifiedAt: at };
 }
 
 function toConfidence(raw: unknown): FieldConfidence | undefined {
@@ -58,6 +160,76 @@ function toConfidence(raw: unknown): FieldConfidence | undefined {
   if (v === 'low') return FieldConfidence.Low;
   return undefined;
 }
+
+type TeamWithEnrichment = {
+  uid: string;
+  name: string;
+  website: string | null;
+  blog: string | null;
+  contactMethod: string | null;
+  twitterHandler: string | null;
+  linkedinHandler: string | null;
+  telegramHandler: string | null;
+  shortDescription: string | null;
+  longDescription: string | null;
+  moreDetails: string | null;
+  logoUid: string | null;
+  industryTags: Array<{ uid: string; title: string }>;
+  investorProfile: { uid: string; investmentFocus: string[] } | null;
+  teamEnrichment: TeamEnrichmentRow | null;
+};
+
+type TeamEnrichmentRow = {
+  uid: string;
+  website: string | null;
+  blog: string | null;
+  contactMethod: string | null;
+  twitterHandler: string | null;
+  linkedinHandler: string | null;
+  telegramHandler: string | null;
+  shortDescription: string | null;
+  longDescription: string | null;
+  moreDetails: string | null;
+  logoUid: string | null;
+  investmentFocus: string[];
+  industryTags: string[];
+  dataEnrichment: any;
+};
+
+const TEAM_WITH_ENRICHMENT_SELECT = {
+  uid: true,
+  name: true,
+  website: true,
+  blog: true,
+  contactMethod: true,
+  twitterHandler: true,
+  linkedinHandler: true,
+  telegramHandler: true,
+  shortDescription: true,
+  longDescription: true,
+  moreDetails: true,
+  logoUid: true,
+  industryTags: { select: { uid: true, title: true } },
+  investorProfile: { select: { uid: true, investmentFocus: true } },
+  teamEnrichment: {
+    select: {
+      uid: true,
+      website: true,
+      blog: true,
+      contactMethod: true,
+      twitterHandler: true,
+      linkedinHandler: true,
+      telegramHandler: true,
+      shortDescription: true,
+      longDescription: true,
+      moreDetails: true,
+      logoUid: true,
+      investmentFocus: true,
+      industryTags: true,
+      dataEnrichment: true,
+    },
+  },
+} as const;
 
 @Injectable()
 export class TeamEnrichmentService {
@@ -70,35 +242,31 @@ export class TeamEnrichmentService {
   ) {}
 
   async markTeamForEnrichment(teamUid: string): Promise<void> {
-    const team = await this.prisma.team.findUnique({
-      where: { uid: teamUid },
-      select: { dataEnrichment: true },
-    });
-
-    const existing = this.parseEnrichmentMeta(team?.dataEnrichment);
+    const existing = await this.readEnrichmentMeta(teamUid);
 
     const enrichment: TeamDataEnrichment = {
-      ...existing,
+      ...(existing ?? { isAIGenerated: false }),
       shouldEnrich: true,
       status: EnrichmentStatus.PendingEnrichment,
       isAIGenerated: existing?.isAIGenerated ?? false,
       fieldsMeta: existing?.fieldsMeta ?? {},
     };
 
-    await this.prisma.team.update({
-      where: { uid: teamUid },
-      data: { dataEnrichment: enrichment as any },
-    });
-
+    await this.upsertEnrichmentRow(teamUid, enrichment);
     this.logger.log(`Marked team ${teamUid} for enrichment`);
   }
 
+  /**
+   * Eligibility: team has no TeamEnrichment row yet, AND at least one enrichable scalar slot is empty.
+   * The marking job reads only the Team table — the per-team upsert into TeamEnrichment happens
+   * inside `markTeamForEnrichment`, so the find query stays a single read against Team.
+   */
   async findTeamsEligibleForEnrichment(): Promise<Array<{ uid: string }>> {
     return this.prisma.team.findMany({
       where: {
         AND: [
           buildTeamEnrichmentEligibilityFilter(),
-          { dataEnrichment: { equals: Prisma.DbNull } },
+          { teamEnrichment: { is: null } },
           {
             OR: [
               { website: null },
@@ -136,67 +304,71 @@ export class TeamEnrichmentService {
     return teams.length;
   }
 
-  async findTeamsPendingEnrichment(): Promise<
-    Array<{
-      uid: string;
-      name: string;
-      website: string | null;
-      blog: string | null;
-      contactMethod: string | null;
-      twitterHandler: string | null;
-      linkedinHandler: string | null;
-      telegramHandler: string | null;
-      shortDescription: string | null;
-      longDescription: string | null;
-      moreDetails: string | null;
-      logoUid: string | null;
-      dataEnrichment: any;
-    }>
-  > {
+  /**
+   * Teams whose TeamEnrichment.dataEnrichment is PendingEnrichment + shouldEnrich=true.
+   * Filtered via JSONB path expressions on the TeamEnrichment row.
+   *
+   * Also self-heals rows stuck in InProgress beyond the stuck-TTL (pod was killed mid-flight)
+   * by flipping them back to PendingEnrichment + shouldEnrich=true so the same call picks
+   * them up.
+   */
+  async findTeamsPendingEnrichment(): Promise<Array<{ uid: string }>> {
+    await this.resetStaleInProgressEnrichment();
     return this.prisma.team.findMany({
       where: {
-        dataEnrichment: {
-          path: ['shouldEnrich'],
-          equals: true,
-        },
-        AND: {
-          dataEnrichment: {
-            path: ['status'],
-            equals: EnrichmentStatus.PendingEnrichment,
-          },
+        teamEnrichment: {
+          AND: [
+            { dataEnrichment: { path: ['shouldEnrich'], equals: true } },
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.PendingEnrichment } },
+          ],
         },
       },
-      select: {
-        uid: true,
-        name: true,
-        website: true,
-        blog: true,
-        contactMethod: true,
-        twitterHandler: true,
-        linkedinHandler: true,
-        telegramHandler: true,
-        shortDescription: true,
-        longDescription: true,
-        moreDetails: true,
-        logoUid: true,
-        dataEnrichment: true,
-      },
+      select: { uid: true },
     });
   }
 
-  async enrichTeam(teamUid: string, enrichedBy = 'system-cron'): Promise<{ status: 'started' | 'in_progress' }> {
-    const team = await this.prisma.team.findUnique({
-      where: { uid: teamUid },
-      select: { dataEnrichment: true },
-    });
+  /**
+   * Flips rows whose `dataEnrichment.status = 'InProgress'` and `updatedAt` is older than
+   * the stuck-TTL back to `PendingEnrichment + shouldEnrich=true`. The only way a row stays
+   * `InProgress` past the TTL is a pod that died mid-run — every healthy enrichment writes
+   * a terminal status in well under the TTL window.
+   *
+   * TTL is `TEAM_ENRICHMENT_STUCK_TTL_MINUTES` (default 180). A generous default avoids
+   * racing a slow-but-live run.
+   */
+  private async resetStaleInProgressEnrichment(): Promise<void> {
+    const ttlMinutes = this.getStuckTtlMinutes();
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "TeamEnrichment"
+      SET "dataEnrichment" =
+            jsonb_set(
+              jsonb_set("dataEnrichment", '{status}',       '"PendingEnrichment"'),
+                                          '{shouldEnrich}', 'true'
+            ),
+          "updatedAt" = NOW()
+      WHERE "dataEnrichment"->>'status' = 'InProgress'
+        AND "updatedAt" < NOW() - make_interval(mins => ${ttlMinutes})
+    `;
+    if (updated > 0) {
+      this.logger.warn(
+        `Stale enrichment recovery: reset ${updated} row(s) from InProgress → PendingEnrichment (ttl=${ttlMinutes}m)`
+      );
+    }
+  }
 
-    const meta = this.parseEnrichmentMeta(team?.dataEnrichment);
+  private getStuckTtlMinutes(): number {
+    const raw = process.env.TEAM_ENRICHMENT_STUCK_TTL_MINUTES?.trim();
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 180;
+  }
+
+  async enrichTeam(teamUid: string, enrichedBy = 'system-cron'): Promise<{ status: 'started' | 'in_progress' }> {
+    const meta = await this.readEnrichmentMeta(teamUid);
     if (meta?.status === EnrichmentStatus.InProgress) {
       this.logger.warn(`Enrichment already in progress for team ${teamUid}, skipping`);
       return { status: 'in_progress' };
     }
 
-    // Mark as pending before kicking off background work
     await this.markTeamForEnrichment(teamUid);
 
     this.doEnrichTeam(teamUid, enrichedBy).catch((err) => {
@@ -213,19 +385,18 @@ export class TeamEnrichmentService {
   ): Promise<{ status: 'started' | 'in_progress' | 'not_found' }> {
     const team = await this.prisma.team.findUnique({
       where: { uid: teamUid },
-      select: { dataEnrichment: true },
+      select: { uid: true },
     });
     if (!team) return { status: 'not_found' };
 
-    const existing = this.parseEnrichmentMeta(team.dataEnrichment);
+    const existing = await this.readEnrichmentMeta(teamUid);
     if (existing?.status === EnrichmentStatus.InProgress) {
       this.logger.warn(`Force-enrichment: already in progress for team ${teamUid}, skipping`);
       return { status: 'in_progress' };
     }
 
-    // Preserve all existing fieldsMeta entries (including Enriched, CannotEnrich, ChangedByUser)
-    // so provenance (confidence, source, prior status) is retained as history.
-    // doEnrichTeam decides per-field whether to skip or overwrite based on forceOverwrite + status.
+    // Preserve all existing fieldsMeta entries (Enriched, CannotEnrich, ChangedByUser) so
+    // provenance is retained across the re-run.
     const enrichment: TeamDataEnrichment = {
       ...(existing ?? { isAIGenerated: false }),
       shouldEnrich: true,
@@ -234,11 +405,7 @@ export class TeamEnrichmentService {
       fieldsMeta: existing?.fieldsMeta ?? {},
     };
 
-    await this.prisma.team.update({
-      where: { uid: teamUid },
-      data: { dataEnrichment: enrichment as any },
-    });
-
+    await this.upsertEnrichmentRow(teamUid, enrichment);
     this.logger.log(`Force-enrichment queued for team ${teamUid} (mode=${mode})`);
 
     this.doEnrichTeam(teamUid, enrichedBy, { forceOverwrite: mode === 'all' }).catch((err) => {
@@ -248,6 +415,10 @@ export class TeamEnrichmentService {
     return { status: 'started' };
   }
 
+  /**
+   * Teams whose enrichment is in a terminal state (Enriched / Reviewed / Approved / FailedToEnrich).
+   * Used by the force-enrich-all endpoint.
+   */
   async findCompletedTeams(): Promise<Array<{ uid: string }>> {
     const completedStatuses = [
       EnrichmentStatus.Enriched,
@@ -260,9 +431,11 @@ export class TeamEnrichmentService {
         AND: [
           buildTeamEnrichmentEligibilityFilter(),
           {
-            OR: completedStatuses.map((status) => ({
-              dataEnrichment: { path: ['status'], equals: status },
-            })),
+            teamEnrichment: {
+              OR: completedStatuses.map((status) => ({
+                dataEnrichment: { path: ['status'], equals: status },
+              })),
+            },
           },
         ],
       },
@@ -282,11 +455,8 @@ export class TeamEnrichmentService {
 
     for (const team of teams) {
       const { status } = await this.forceEnrichTeam(team.uid, mode, enrichedBy);
-      if (status === 'started') {
-        started++;
-      } else {
-        skipped++;
-      }
+      if (status === 'started') started++;
+      else skipped++;
     }
 
     return { total: teams.length, started, skipped };
@@ -303,12 +473,12 @@ export class TeamEnrichmentService {
       select: {
         website: true,
         linkedinHandler: true,
-        dataEnrichment: true,
+        teamEnrichment: { select: { dataEnrichment: true } },
       },
     });
     if (!team) return { status: 'not_found' };
 
-    const existing = this.parseEnrichmentMeta(team.dataEnrichment);
+    const existing = this.parseEnrichmentMeta(team.teamEnrichment?.dataEnrichment);
     if (existing?.status === EnrichmentStatus.InProgress) {
       this.logger.warn(`Logo refetch: enrichment already in progress for team ${teamUid}, skipping`);
       return { status: 'in_progress' };
@@ -328,7 +498,7 @@ export class TeamEnrichmentService {
     }
 
     const priorStatus = existing?.status ?? null;
-    await this.updateEnrichmentStatus(teamUid, team.dataEnrichment, EnrichmentStatus.InProgress);
+    await this.updateEnrichmentStatus(teamUid, existing, EnrichmentStatus.InProgress);
 
     this.logger.log(`Logo refetch queued for team ${teamUid}`);
 
@@ -392,8 +562,8 @@ export class TeamEnrichmentService {
 
   /**
    * Refetch the logo for a single team using ScrapingDog (high confidence)
-   * with OG/website as a fallback. Runs in the background and restores the
-   * prior enrichment status when done.
+   * with OG/website as a fallback. Writes the enriched logo to TeamEnrichment.logoUid;
+   * Team.logoUid is only updated by the judge when confidence is high.
    */
   private async doRefetchLogo(
     teamUid: string,
@@ -408,7 +578,7 @@ export class TeamEnrichmentService {
         website: true,
         linkedinHandler: true,
         logoUid: true,
-        dataEnrichment: true,
+        teamEnrichment: { select: { dataEnrichment: true, logoUid: true } },
       },
     });
 
@@ -418,18 +588,15 @@ export class TeamEnrichmentService {
     }
 
     try {
-      const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
+      const existingMeta = this.parseEnrichmentMeta(team.teamEnrichment?.dataEnrichment);
       const existingFieldsMeta = (existingMeta?.fieldsMeta ?? {}) as FieldsMetaMap;
 
-      const updateData: Prisma.TeamUpdateInput = {};
+      const enrichmentUpdate: Prisma.TeamEnrichmentUpdateInput = {};
       let newLogoMeta: FieldEnrichmentMeta | null = null;
       let sourceUsed: EnrichmentSource | null = null;
       let scrapingDogInternalId: string | null | undefined;
 
-      // 1. Prefer ScrapingDog (high confidence) when LinkedIn handle is available.
       if (this.scrapingDogService.isConfigured() && team.linkedinHandler) {
-        // User-asserted LinkedIn handle is ground truth — skip the fuzzy team-name entity check
-        // (it can falsely reject correct profiles when the LinkedIn company name differs from team.name).
         const linkedinIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
         this.logger.log(
           `Logo refetch: trying ScrapingDog for team ${teamUid} (${team.name}) handle "${team.linkedinHandler}"${
@@ -444,7 +611,7 @@ export class TeamEnrichmentService {
             try {
               const persisted = await this.persistLogoImage(teamUid, profile.profilePhoto, 'scrapingdog');
               if (persisted) {
-                updateData.logo = { connect: { uid: persisted.imageUid } };
+                enrichmentUpdate.logo = { connect: { uid: persisted.imageUid } };
                 newLogoMeta = {
                   status: FieldEnrichmentStatus.Enriched,
                   confidence: FieldConfidence.High,
@@ -469,7 +636,6 @@ export class TeamEnrichmentService {
         }
       }
 
-      // 2. Fallback to OG / website favicon when ScrapingDog did not produce a logo.
       if (!newLogoMeta && team.website && team.website.trim() !== '') {
         this.logger.log(`Logo refetch: trying website/OG for team ${teamUid} (${team.name}) at ${team.website}`);
         const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, team.website);
@@ -477,7 +643,7 @@ export class TeamEnrichmentService {
           try {
             const persisted = await this.persistLogoImage(teamUid, logoResult.logoUrl);
             if (persisted) {
-              updateData.logo = { connect: { uid: persisted.imageUid } };
+              enrichmentUpdate.logo = { connect: { uid: persisted.imageUid } };
               newLogoMeta = {
                 status: FieldEnrichmentStatus.Enriched,
                 confidence: FieldConfidence.Medium,
@@ -498,27 +664,24 @@ export class TeamEnrichmentService {
         }
       }
 
-      // 3. Neither source produced a logo — keep the existing logoUid untouched
-      // (we don't make the team worse off), but record CannotEnrich for provenance.
       if (!newLogoMeta) {
         newLogoMeta = { status: FieldEnrichmentStatus.CannotEnrich };
-        this.logger.log(
-          `Logo refetch: no new logo found for team ${teamUid} (${team.name}); preserving existing logo`
-        );
+        this.logger.log(`Logo refetch: no new logo found for team ${teamUid} (${team.name}); preserving existing logo`);
       }
 
-      // Restore the prior overall status (we clobbered it with InProgress earlier).
-      // If the team had no prior enrichment, default to Enriched only when we actually set a logo.
-      const restoredStatus = priorStatus && priorStatus !== EnrichmentStatus.InProgress
-        ? priorStatus
-        : EnrichmentStatus.Enriched;
+      const restoredStatus =
+        priorStatus && priorStatus !== EnrichmentStatus.InProgress ? priorStatus : EnrichmentStatus.Enriched;
 
+      const now = new Date().toISOString();
       const mergedFieldsMeta: FieldsMetaMap = {
         ...existingFieldsMeta,
-        logo: {
-          ...(existingFieldsMeta.logo ?? {}),
-          ...newLogoMeta,
-        } as FieldEnrichmentMeta,
+        logo: stampModified(
+          {
+            ...(existingFieldsMeta.logo ?? {}),
+            ...newLogoMeta,
+          } as FieldEnrichmentMeta,
+          now
+        ),
       };
 
       const enrichment: TeamDataEnrichment = {
@@ -538,32 +701,25 @@ export class TeamEnrichmentService {
         };
       }
 
-      // Track that a manual refetch touched the team without overwriting the original enrichment timestamp.
       enrichment.enrichedBy = existingMeta?.enrichedBy ?? enrichedBy;
       enrichment.enrichedAt = existingMeta?.enrichedAt;
 
-      await this.prisma.team.update({
-        where: { uid: teamUid },
-        data: {
-          ...updateData,
-          dataEnrichment: enrichment as any,
+      enrichmentUpdate.dataEnrichment = enrichment as any;
+
+      await this.prisma.teamEnrichment.upsert({
+        where: { teamUid },
+        create: {
+          team: { connect: { uid: teamUid } },
+          ...this.updateInputToCreate(enrichmentUpdate),
         },
+        update: enrichmentUpdate,
       });
 
-      this.logger.log(
-        `Logo refetch completed for team ${teamUid} (${team.name}): source=${sourceUsed ?? 'none'}`
-      );
+      this.logger.log(`Logo refetch completed for team ${teamUid} (${team.name}): source=${sourceUsed ?? 'none'}`);
     } catch (error) {
-      this.logger.error(
-        `Logo refetch failed for team ${teamUid} (${team.name}): ${error.message}`,
-        error.stack
-      );
-      await this.updateEnrichmentStatus(
-        teamUid,
-        team.dataEnrichment,
-        EnrichmentStatus.FailedToEnrich,
-        error.message
-      );
+      this.logger.error(`Logo refetch failed for team ${teamUid} (${team.name}): ${error.message}`, error.stack);
+      const meta = this.parseEnrichmentMeta(team.teamEnrichment?.dataEnrichment);
+      await this.updateEnrichmentStatus(teamUid, meta, EnrichmentStatus.FailedToEnrich, error.message);
     }
   }
 
@@ -603,38 +759,36 @@ export class TeamEnrichmentService {
     opts: { forceOverwrite?: boolean } = {}
   ): Promise<void> {
     const forceOverwrite = opts.forceOverwrite === true;
-    const team = await this.prisma.team.findUnique({
+    const team = (await this.prisma.team.findUnique({
       where: { uid: teamUid },
-      select: {
-        uid: true,
-        name: true,
-        website: true,
-        blog: true,
-        contactMethod: true,
-        twitterHandler: true,
-        linkedinHandler: true,
-        telegramHandler: true,
-        shortDescription: true,
-        longDescription: true,
-        moreDetails: true,
-        logoUid: true,
-        dataEnrichment: true,
-        industryTags: { select: { uid: true, title: true } },
-        investorProfile: { select: { uid: true, investmentFocus: true } },
-      },
-    });
+      select: TEAM_WITH_ENRICHMENT_SELECT,
+    })) as TeamWithEnrichment | null;
 
     if (!team) {
       this.logger.warn(`Team ${teamUid} not found`);
       return;
     }
 
-    // Mark as in-progress
-    await this.updateEnrichmentStatus(teamUid, team.dataEnrichment, EnrichmentStatus.InProgress);
+    const existingMeta = this.parseEnrichmentMeta(team.teamEnrichment?.dataEnrichment);
+    await this.updateEnrichmentStatus(teamUid, existingMeta, EnrichmentStatus.InProgress);
 
     try {
-      // Call AI for enrichment
-      const aiResponse = await this.aiService.enrichTeamViaAI(team.name, {
+      const existingFieldsMeta = (existingMeta?.fieldsMeta ?? {}) as FieldsMetaMap;
+
+      // Pass user-confirmed shortDescription/longDescription/moreDetails to the AI as
+      // high-trust identity hints — disambiguates ambiguous team names so the AI searches for
+      // the entity described by the hint, not the bare name.
+      const userConfirmedIdentityHints = {
+        shortDescription: isFieldUserOwned(existingFieldsMeta, 'shortDescription', !!team.shortDescription)
+          ? team.shortDescription
+          : null,
+        longDescription: isFieldUserOwned(existingFieldsMeta, 'longDescription', !!team.longDescription)
+          ? team.longDescription
+          : null,
+        moreDetails: isFieldUserOwned(existingFieldsMeta, 'moreDetails', !!team.moreDetails) ? team.moreDetails : null,
+      };
+
+      const aiResult = await this.aiService.enrichTeamViaAI(team.name, {
         website: team.website,
         contactMethod: team.contactMethod,
         linkedinHandler: team.linkedinHandler,
@@ -642,29 +796,62 @@ export class TeamEnrichmentService {
         telegramHandler: team.telegramHandler,
         shortDescription: team.shortDescription,
         longDescription: team.longDescription,
+        userConfirmedIdentityHints,
       });
+      const aiResponse = aiResult.response;
+      const enrichmentUsage = aiResult.usage;
 
-      // Preserve existing field statuses from previous enrichment runs
-      const existingMeta = this.parseEnrichmentMeta(team.dataEnrichment);
-      const existingFieldsMeta = (existingMeta?.fieldsMeta ?? {}) as FieldsMetaMap;
-
-      // Verify entity identity to decide which fields are safe to enrich.
-      // Website and logo require high confidence (verified entity).
-      // Other fields (descriptions, socials, tags) are enriched regardless — the AI
-      // was asked about the exact name, and these fields are usually correct even when the website match fails.
+      // Verify entity identity to decide which fields are safe to enrich. Same gating as before:
+      // descriptions / socials / tags are enriched regardless; website + logo require verified
+      // entity when the team had no website to anchor on.
       const hadNoWebsite = !team.website || team.website.trim() === '';
       const isEntityVerified = hadNoWebsite ? this.verifyEntityIdentity(team.name, aiResponse) : true;
       if (!isEntityVerified) {
         this.logger.warn(
           `Team ${teamUid} (${team.name}): entity identity not verified — will skip website and logo, but still enrich other fields`
         );
-        // Clear website from AI response so it won't be used for enrichment or logo
         aiResponse.website = null;
         aiResponse.websiteCandidates = [];
       }
 
-      // Determine which fields need enrichment (skip already Enriched ones)
-      const updateData: Prisma.TeamUpdateInput = {};
+      // Website-signal extraction: parse the team's website for self-declared socials.
+      const websiteToScan = team.website?.trim() || aiResponse.website?.trim() || null;
+      const websiteIsUserOwned = !!team.website && isFieldUserOwned(existingFieldsMeta, 'website', !!team.website);
+      const websiteBackfilledFields = new Set<EnrichableTeamField>();
+      const websiteHtml = websiteToScan ? await this.aiService.fetchWebsiteHtml(websiteToScan) : null;
+
+      if (websiteToScan) {
+        const signals = await this.aiService.fetchSocialSignalsFromWebsite(websiteToScan, websiteHtml ?? undefined);
+        if (signals) {
+          aiResponse.confidence ||= {};
+          const backfillMap: Array<[EnrichableTeamField, string | undefined]> = [
+            ['twitterHandler', signals.twitterHandler],
+            ['linkedinHandler', signals.linkedinHandler],
+            ['telegramHandler', signals.telegramHandler],
+            ['contactMethod', signals.contactEmail],
+          ];
+          for (const [field, value] of backfillMap) {
+            if (!value) continue;
+            if (aiResponse[field]) continue;
+            aiResponse[field] = value;
+            aiResponse.confidence[field] = websiteIsUserOwned ? 'high' : 'medium';
+            websiteBackfilledFields.add(field);
+          }
+          if (websiteBackfilledFields.size > 0) {
+            this.logger.log(
+              `Team ${teamUid} (${team.name}): website signal backfill from ${websiteToScan} → [${[
+                ...websiteBackfilledFields,
+              ].join(', ')}]${websiteIsUserOwned ? ' (website user-owned)' : ''}${
+                signals.jsonLdOrgName ? ` jsonLdOrg="${signals.jsonLdOrgName}"` : ''
+              }`
+            );
+          }
+        }
+      }
+
+      // Determine which fields need enrichment. Writes go to TeamEnrichment, not Team —
+      // the judge later promotes high-confidence values to Team.
+      const enrichmentUpdate: Prisma.TeamEnrichmentUpdateInput = {};
       const newFieldsMeta: FieldsMetaMap = {};
       let fieldsUpdatedCount = 0;
       const skipReasons: Record<string, string[]> = {
@@ -678,19 +865,17 @@ export class TeamEnrichmentService {
       for (const field of ENRICHABLE_TEAM_FIELDS) {
         const fieldStatus = existingFieldsMeta[field]?.status;
 
-        // Never overwrite user-edited fields.
         if (fieldStatus === FieldEnrichmentStatus.ChangedByUser) {
           skipReasons.userEdited.push(field);
           continue;
         }
 
-        const currentValue = team[field];
-        const slotIsEmpty = !currentValue || currentValue.trim() === '';
+        // user-owned check is against the Team row (what the user/judge see),
+        // not the TeamEnrichment candidate row.
+        const teamValue = team[field];
+        const teamSlotIsEmpty = !teamValue || teamValue.trim() === '';
 
-        // User-owned: non-empty value with no prior AI enrichment. Applies in BOTH
-        // standard and force modes — force mode must NEVER overwrite user data whose
-        // only "crime" is that dataEnrichment was null on a team's first enrichment.
-        if (!slotIsEmpty && fieldStatus !== FieldEnrichmentStatus.Enriched) {
+        if (!teamSlotIsEmpty && fieldStatus !== FieldEnrichmentStatus.Enriched) {
           newFieldsMeta[field] = {
             ...existingFieldsMeta[field],
             status: FieldEnrichmentStatus.ChangedByUser,
@@ -699,27 +884,24 @@ export class TeamEnrichmentService {
           continue;
         }
 
-        // Standard mode skips already-enriched fields; force mode re-queries them.
         if (!forceOverwrite && fieldStatus === FieldEnrichmentStatus.Enriched) {
           skipReasons.alreadyEnriched.push(field);
           continue;
         }
 
-        // Remaining shapes: slot empty, OR (slot non-empty && Enriched && forceOverwrite).
         const newValue = aiResponse[field];
         if (newValue) {
-          (updateData as any)[field] = newValue;
+          (enrichmentUpdate as any)[field] = newValue;
           newFieldsMeta[field] = {
             status: FieldEnrichmentStatus.Enriched,
             confidence: toConfidence(aiResponse.confidence?.[field]),
             source: EnrichmentSource.AI,
           };
           fieldsUpdatedCount++;
-        } else if (slotIsEmpty) {
+        } else if (teamSlotIsEmpty) {
           newFieldsMeta[field] = { status: FieldEnrichmentStatus.CannotEnrich };
           skipReasons.aiCannotEnrich.push(field);
         } else {
-          // Force mode + non-empty slot + AI returned null: preserve existing value + meta.
           skipReasons.aiReturnedNull.push(field);
         }
       }
@@ -734,21 +916,30 @@ export class TeamEnrichmentService {
         }`
       );
 
-      // Handle industryTags — same four-layer check as the scalar loop.
+      for (const field of websiteBackfilledFields) {
+        const meta = newFieldsMeta[field];
+        if (meta?.status === FieldEnrichmentStatus.Enriched && meta.source === EnrichmentSource.AI) {
+          newFieldsMeta[field] = { ...meta, source: EnrichmentSource.OpenGraph };
+        }
+      }
+
+      // industryTags — same four-layer check as scalars. User-ownership reads Team (what's
+      // approved); the enriched titles go onto TeamEnrichment.industryTags (String[]).
+      // We still resolve the titles against IndustryTag here to keep the persisted list to
+      // recognized tags only — the judge re-resolves at promotion-time to set the M2M on Team.
       const tagsStatus = existingFieldsMeta.industryTags?.status;
+      const teamHasIndustryTags = team.industryTags.length > 0;
 
       if (tagsStatus === FieldEnrichmentStatus.ChangedByUser) {
-        // User-controlled — skip entirely.
-      } else if (team.industryTags.length > 0 && tagsStatus !== FieldEnrichmentStatus.Enriched) {
-        // User-owned: team has tags with no prior AI enrichment. Protect in both modes.
+        // user-controlled — skip
+      } else if (teamHasIndustryTags && tagsStatus !== FieldEnrichmentStatus.Enriched) {
         newFieldsMeta.industryTags = {
           ...existingFieldsMeta.industryTags,
           status: FieldEnrichmentStatus.ChangedByUser,
         };
       } else if (!forceOverwrite && tagsStatus === FieldEnrichmentStatus.Enriched) {
-        // Standard mode, already enriched — skip.
+        // standard mode, already enriched — skip
       } else {
-        // Either team has no tags, or force mode + Enriched — run AI matching.
         this.logger.debug(`Team ${teamUid}: AI returned industryTags = [${aiResponse.industryTags.join(', ')}]`);
         if (aiResponse.industryTags.length > 0) {
           const matchedTags = await this.prisma.industryTag.findMany({
@@ -761,75 +952,56 @@ export class TeamEnrichmentService {
             } industryTags: [${matchedTags.map((t) => t.title).join(', ')}]`
           );
           if (matchedTags.length > 0) {
-            // Force mode: replace existing tag set; fresh-field mode: team had none, connect is equivalent.
-            updateData.industryTags = forceOverwrite
-              ? { set: matchedTags.map((t) => ({ uid: t.uid })) }
-              : { connect: matchedTags.map((t) => ({ uid: t.uid })) };
+            enrichmentUpdate.industryTags = matchedTags.map((t) => t.title);
             newFieldsMeta.industryTags = {
               status: FieldEnrichmentStatus.Enriched,
               confidence: toConfidence(aiResponse.confidence?.industryTags),
               source: EnrichmentSource.AI,
             };
             fieldsUpdatedCount++;
-          } else if (team.industryTags.length === 0) {
+          } else if (!teamHasIndustryTags) {
             newFieldsMeta.industryTags = { status: FieldEnrichmentStatus.CannotEnrich };
           }
-        } else if (team.industryTags.length === 0) {
+        } else if (!teamHasIndustryTags) {
           newFieldsMeta.industryTags = { status: FieldEnrichmentStatus.CannotEnrich };
         }
       }
 
-      // Handle investmentFocus — same four-layer check.
+      // investmentFocus — stored as String[] on TeamEnrichment. The judge promotes high-confidence
+      // values onto InvestorProfile.investmentFocus.
       const currentFocus = team.investorProfile?.investmentFocus || [];
       const focusStatus = existingFieldsMeta.investmentFocus?.status;
+      const teamHasFocus = currentFocus.length > 0;
 
       if (focusStatus === FieldEnrichmentStatus.ChangedByUser) {
-        // User-controlled — skip entirely.
-      } else if (currentFocus.length > 0 && focusStatus !== FieldEnrichmentStatus.Enriched) {
-        // User-owned: team has focus tags with no prior AI enrichment. Protect in both modes.
+        // user-controlled — skip
+      } else if (teamHasFocus && focusStatus !== FieldEnrichmentStatus.Enriched) {
         newFieldsMeta.investmentFocus = {
           ...existingFieldsMeta.investmentFocus,
           status: FieldEnrichmentStatus.ChangedByUser,
         };
       } else if (!forceOverwrite && focusStatus === FieldEnrichmentStatus.Enriched) {
-        // Standard mode, already enriched — skip.
+        // standard mode, already enriched — skip
       } else {
-        // Either team has no focus, or force mode + Enriched — run AI matching.
         this.logger.debug(`Team ${teamUid}: AI returned investmentFocus = [${aiResponse.investmentFocus.join(', ')}]`);
         if (aiResponse.investmentFocus.length > 0) {
-          if (team.investorProfile) {
-            await this.prisma.investorProfile.update({
-              where: { uid: team.investorProfile.uid },
-              data: { investmentFocus: aiResponse.investmentFocus },
-            });
-          } else {
-            await this.prisma.investorProfile.create({
-              data: {
-                investmentFocus: aiResponse.investmentFocus,
-                team: { connect: { uid: teamUid } },
-              },
-            });
-          }
+          enrichmentUpdate.investmentFocus = aiResponse.investmentFocus;
           newFieldsMeta.investmentFocus = {
             status: FieldEnrichmentStatus.Enriched,
             confidence: toConfidence(aiResponse.confidence?.investmentFocus),
             source: EnrichmentSource.AI,
           };
           fieldsUpdatedCount++;
-        } else if (currentFocus.length === 0) {
+        } else if (!teamHasFocus) {
           newFieldsMeta.investmentFocus = { status: FieldEnrichmentStatus.CannotEnrich };
         }
       }
 
-      // Handle logo via OG tag scraping — only from a verified website
-      // Do NOT use websiteCandidates for logo since they are unverified and may belong to a different entity
+      // Logo via OG tag scraping — written to TeamEnrichment.logoUid, never directly to Team.
       const effectiveWebsite = team.website || aiResponse.website || null;
-      // User-owned: either explicitly flagged by a prior run, or a logo that predates enrichment
-      // (has logoUid but no fieldsMeta.logo entry). Protect in both standard and force modes.
       const logoIsUserOwned =
         existingFieldsMeta.logo?.status === FieldEnrichmentStatus.ChangedByUser ||
         (!!team.logoUid && !existingFieldsMeta.logo);
-      // Re-fetch when: no existing logo, OR force mode and the logo isn't user-owned.
       const shouldRefetchLogo = !logoIsUserOwned && (!team.logoUid || forceOverwrite);
 
       if (shouldRefetchLogo && effectiveWebsite) {
@@ -838,20 +1010,23 @@ export class TeamEnrichmentService {
             team.logoUid ? ' (force overwrite)' : ''
           }`
         );
-        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite);
+        const logoHtml = websiteToScan === effectiveWebsite ? websiteHtml ?? undefined : undefined;
+        const logoResult = await this.aiService.fetchLogoFromWebsite(team.name, effectiveWebsite, logoHtml);
 
         if (logoResult) {
           this.logger.log(`Logo metadata found for team ${teamUid} (${team.name}): ${logoResult.logoUrl}`);
           try {
             const persisted = await this.persistLogoImage(teamUid, logoResult.logoUrl);
             if (persisted) {
-              updateData.logo = { connect: { uid: persisted.imageUid } };
+              enrichmentUpdate.logo = { connect: { uid: persisted.imageUid } };
               newFieldsMeta.logo = {
                 status: FieldEnrichmentStatus.Enriched,
                 confidence: FieldConfidence.Medium,
                 source: EnrichmentSource.OpenGraph,
               };
-              this.logger.log(`Logo uploaded successfully for team ${teamUid} (${team.name}), image uid: ${persisted.imageUid}`);
+              this.logger.log(
+                `Logo uploaded successfully for team ${teamUid} (${team.name}), image uid: ${persisted.imageUid}`
+              );
             } else {
               this.logger.warn(`Logo upload returned no URL for team ${teamUid} (${team.name})`);
               newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
@@ -866,32 +1041,32 @@ export class TeamEnrichmentService {
         }
       } else if (logoIsUserOwned) {
         this.logger.log(`Team ${teamUid} (${team.name}) logo is user-owned, skipping logo fetch`);
-        // Lock in ChangedByUser for pre-enrichment logos that had no meta entry.
         if (!existingFieldsMeta.logo) {
+          // Pre-existing user logo discovered — set status=ChangedByUser only. The merge step
+          // skips stamping for ChangedByUser writes (the user's upload happened earlier, we
+          // honestly don't know when).
           newFieldsMeta.logo = { status: FieldEnrichmentStatus.ChangedByUser };
         }
       } else if (team.logoUid) {
-        // Standard mode (not force) + has logo + not user-owned — preserve existing behavior: skip.
         this.logger.log(`Team ${teamUid} (${team.name}) already has a logo, skipping logo fetch`);
       } else {
         this.logger.log(`Team ${teamUid} (${team.name}): no verified website available, skipping logo fetch`);
         newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
       }
 
-      // ScrapingDog fallback — only when primary enrichment left high-value gaps AND we have a LinkedIn handle
+      // ScrapingDog fallback — writes its enriched fields to TeamEnrichment via the same
+      // enrichmentUpdate object.
       const scrapingDogMeta = await this.maybeEnrichViaScrapingDog({
         teamUid,
         team,
         existingFieldsMeta,
         aiLinkedinHandler: aiResponse.linkedinHandler,
-        updateData,
+        enrichmentUpdate,
         newFieldsMeta,
         forceOverwrite,
       });
 
-      // Merge field metadata per-field. Undefined keys on the fresh entry don't clobber
-      // prior provenance (confidence, source), so history is preserved when the new AI
-      // run doesn't re-supply them. Entries not touched this run remain as-is.
+      const now = new Date().toISOString();
       const mergedFieldsMeta: FieldsMetaMap = { ...existingFieldsMeta };
       for (const [field, fresh] of Object.entries(newFieldsMeta) as Array<
         [FieldMetaKey, FieldEnrichmentMeta | undefined]
@@ -901,13 +1076,26 @@ export class TeamEnrichmentService {
         const freshDefined = Object.fromEntries(
           Object.entries(fresh).filter(([, v]) => v !== undefined)
         ) as Partial<FieldEnrichmentMeta>;
-        mergedFieldsMeta[field] = {
+        let merged: FieldEnrichmentMeta = {
           ...(prior ?? {}),
           ...freshDefined,
         } as FieldEnrichmentMeta;
+        // Stamp `lastModifiedAt` only when the value actually changed this run.
+        if (merged.status !== FieldEnrichmentStatus.ChangedByUser) {
+          merged = stampModified(merged, now);
+        }
+        mergedFieldsMeta[field] = merged;
       }
 
-      // Build enrichment metadata
+      const mergedEnrichmentUsage = mergeUsageEntries(existingMeta?.usage?.enrichment, enrichmentUsage);
+      const usageBlock: TeamDataEnrichment['usage'] | undefined =
+        mergedEnrichmentUsage || existingMeta?.usage?.judge
+          ? {
+              ...(mergedEnrichmentUsage ? { enrichment: mergedEnrichmentUsage } : {}),
+              ...(existingMeta?.usage?.judge ? { judge: existingMeta.usage.judge } : {}),
+            }
+          : undefined;
+
       const enrichment: TeamDataEnrichment = {
         shouldEnrich: false,
         status: EnrichmentStatus.Enriched,
@@ -917,21 +1105,31 @@ export class TeamEnrichmentService {
         aiModel: this.aiService.getModelName(),
         fieldsMeta: mergedFieldsMeta,
         ...(scrapingDogMeta ? { scrapingDog: scrapingDogMeta } : {}),
+        ...(usageBlock ? { usage: usageBlock } : {}),
       };
 
-      // Update team with enriched data + metadata
-      await this.prisma.team.update({
-        where: { uid: teamUid },
-        data: {
-          ...updateData,
-          dataEnrichment: enrichment as any,
+      enrichmentUpdate.dataEnrichment = enrichment as any;
+
+      await this.prisma.teamEnrichment.upsert({
+        where: { teamUid },
+        create: {
+          team: { connect: { uid: teamUid } },
+          ...this.updateInputToCreate(enrichmentUpdate),
         },
+        update: enrichmentUpdate,
       });
 
       this.logger.log(`Enriched team ${teamUid} (${team.name}): ${fieldsUpdatedCount} new fields updated`);
+      if (mergedEnrichmentUsage) {
+        this.logger.log(
+          `Enrichment usage rollup team=${teamUid} name="${team.name}" stage=enrichment ${formatUsageLog(
+            mergedEnrichmentUsage
+          )}`
+        );
+      }
     } catch (error) {
       this.logger.error(`Failed to enrich team ${teamUid} (${team.name}): ${error.message}`, error.stack);
-      await this.updateEnrichmentStatus(teamUid, team.dataEnrichment, EnrichmentStatus.FailedToEnrich, error.message);
+      await this.updateEnrichmentStatus(teamUid, existingMeta, EnrichmentStatus.FailedToEnrich, error.message);
     }
   }
 
@@ -946,16 +1144,28 @@ export class TeamEnrichmentService {
 
     for (const team of teams) {
       const { status } = await this.enrichTeam(team.uid, enrichedBy);
-      if (status === 'started') {
-        started++;
-      } else {
-        skipped++;
-      }
+      if (status === 'started') started++;
+      else skipped++;
     }
 
     return { total: teams.length, started, skipped };
   }
 
+  /**
+   * Called from any team-update flow (participants-request, profile-update, demo-day
+   * fundraising profile) when a user edits enrichable team fields. The fieldsMeta lives
+   * on TeamEnrichment.dataEnrichment, so we read/write the TeamEnrichment row here —
+   * never Team.
+   *
+   * Supported fields: every key in `FieldMetaKey` — scalars (website, blog, contactMethod,
+   * social handles, descriptions, moreDetails), relational arrays (`industryTags`,
+   * `investmentFocus`), and `logo`. Each is flipped to `ChangedByUser` when:
+   *   - the prior status was `Enriched` (regardless of the new value), OR
+   *   - the prior status was `CannotEnrich` AND the user supplied a non-empty value.
+   *
+   * "Non-empty" depends on the field's value shape: trimmed string for scalars / logo,
+   * `length > 0` for arrays. Anything else (numbers, null, undefined) is treated as empty.
+   */
   async handleUserFieldChange(
     teamUid: string,
     changedFieldValues: Record<string, unknown>,
@@ -963,48 +1173,57 @@ export class TeamEnrichmentService {
   ): Promise<void> {
     const db = tx || this.prisma;
 
-    const team = await db.team.findUnique({
-      where: { uid: teamUid },
+    const row = await db.teamEnrichment.findUnique({
+      where: { teamUid },
       select: { dataEnrichment: true },
     });
 
-    const meta = this.parseEnrichmentMeta(team?.dataEnrichment);
+    const meta = this.parseEnrichmentMeta(row?.dataEnrichment);
     if (!meta || !meta.isAIGenerated) return;
     if (!meta.fieldsMeta) meta.fieldsMeta = {};
 
+    const trackedFields = new Set<FieldMetaKey>([...ENRICHABLE_TEAM_FIELDS, 'industryTags', 'investmentFocus', 'logo']);
+
+    const isNonEmpty = (value: unknown): boolean => {
+      if (Array.isArray(value)) return value.length > 0;
+      if (typeof value === 'string') return value.trim() !== '';
+      return false;
+    };
+
+    const now = new Date().toISOString();
     const flipped: string[] = [];
     for (const [field, newValue] of Object.entries(changedFieldValues)) {
-      if (!ENRICHABLE_TEAM_FIELDS.includes(field as EnrichableTeamField)) continue;
-      const currentStatus = meta.fieldsMeta[field as EnrichableTeamField]?.status;
+      if (!trackedFields.has(field as FieldMetaKey)) continue;
+      const key = field as FieldMetaKey;
+      const currentStatus = meta.fieldsMeta[key]?.status;
 
-      // AI previously filled this field; user just edited it → flip to ChangedByUser.
       if (currentStatus === FieldEnrichmentStatus.Enriched) {
-        meta.fieldsMeta[field as EnrichableTeamField] = {
-          ...meta.fieldsMeta[field as EnrichableTeamField],
-          status: FieldEnrichmentStatus.ChangedByUser,
-        };
+        meta.fieldsMeta[key] = stampModified(
+          {
+            ...meta.fieldsMeta[key],
+            status: FieldEnrichmentStatus.ChangedByUser,
+          },
+          now
+        );
         flipped.push(field);
         continue;
       }
 
-      // AI couldn't enrich; user is supplying a non-empty value → flip to ChangedByUser
-      // so a later force-enrich run won't overwrite it.
-      if (
-        currentStatus === FieldEnrichmentStatus.CannotEnrich &&
-        typeof newValue === 'string' &&
-        newValue.trim() !== ''
-      ) {
-        meta.fieldsMeta[field as EnrichableTeamField] = {
-          ...meta.fieldsMeta[field as EnrichableTeamField],
-          status: FieldEnrichmentStatus.ChangedByUser,
-        };
+      if (currentStatus === FieldEnrichmentStatus.CannotEnrich && isNonEmpty(newValue)) {
+        meta.fieldsMeta[key] = stampModified(
+          {
+            ...meta.fieldsMeta[key],
+            status: FieldEnrichmentStatus.ChangedByUser,
+          },
+          now
+        );
         flipped.push(field);
       }
     }
 
     if (flipped.length > 0) {
-      await db.team.update({
-        where: { uid: teamUid },
+      await db.teamEnrichment.update({
+        where: { teamUid },
         data: { dataEnrichment: meta as any },
       });
       this.logger.log(`Marked fields as ChangedByUser for team ${teamUid}: ${flipped.join(', ')}`);
@@ -1012,12 +1231,7 @@ export class TeamEnrichmentService {
   }
 
   async reviewEnrichment(teamUid: string, action: 'Reviewed' | 'Approved', reviewerEmail: string): Promise<void> {
-    const team = await this.prisma.team.findUnique({
-      where: { uid: teamUid },
-      select: { dataEnrichment: true },
-    });
-
-    const meta = this.parseEnrichmentMeta(team?.dataEnrichment);
+    const meta = await this.readEnrichmentMeta(teamUid);
     if (!meta) {
       this.logger.warn(`No enrichment data found for team ${teamUid}`);
       return;
@@ -1027,33 +1241,589 @@ export class TeamEnrichmentService {
     meta.reviewedAt = new Date().toISOString();
     meta.reviewedBy = reviewerEmail;
 
-    await this.prisma.team.update({
-      where: { uid: teamUid },
+    await this.prisma.teamEnrichment.update({
+      where: { teamUid },
       data: { dataEnrichment: meta as any },
     });
 
     this.logger.log(`Enrichment for team ${teamUid} marked as ${action} by ${reviewerEmail}`);
   }
 
+  /**
+   * Full list of teams that still have at least one thing needing admin review.
+   *
+   * Inclusion criteria — a team is included if EITHER of the following holds:
+   *  - at least one non-logo `fieldsMeta[k].judgment` is NOT (`verdict='agrees'` AND
+   *    `confidence='high'`). That pair is the exact criterion the judge uses to auto-promote
+   *    a field to `Team`, and admin approval normalizes to the same pair — so anything else
+   *    (disagrees, uncertain, or medium/low confidence) is still pending review.
+   *  - the team has a logo (`row.logoUid` set) whose latest `TeamLogoVerificationResult`
+   *    is NOT at (`verdict === 'verified'` AND `confidence === 'high'`). Logo verification
+   *    uses verdict+confidence directly (no score column), mirroring the field-level check.
+   *
+   * Statuses excluded at the query level: `PendingEnrichment`, `InProgress`, `FailedToEnrich`.
+   * The remaining statuses (`Enriched`, `Reviewed`, `Approved`, and any future addition) all
+   * surface here as long as the inclusion check above flags something.
+   *
+   * Per-field rules in the response:
+   *  - fields without a `fieldsMeta[k].judgment` entry are skipped (not review-ready)
+   *  - empty candidate values (null / empty string / empty array) are excluded
+   *
+   * Logos: emitted whenever `TeamEnrichment.logoUid` is set; the latest
+   * `TeamLogoVerificationResult` (any confidence) populates `verification`.
+   */
+  async listEnrichmentsForReview(): Promise<{ teams: EnrichmentReviewItem[] }> {
+    const rows = await this.prisma.teamEnrichment.findMany({
+      where: {
+        NOT: {
+          OR: [
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.PendingEnrichment } },
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.InProgress } },
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.FailedToEnrich } },
+          ],
+        },
+      },
+      select: {
+        teamUid: true,
+        team: {
+          select: {
+            uid: true,
+            name: true,
+            priority: true,
+            logo: { select: { uid: true, url: true } },
+            website: true,
+            blog: true,
+            contactMethod: true,
+            twitterHandler: true,
+            linkedinHandler: true,
+            telegramHandler: true,
+            shortDescription: true,
+            longDescription: true,
+          },
+        },
+        website: true,
+        blog: true,
+        contactMethod: true,
+        twitterHandler: true,
+        linkedinHandler: true,
+        telegramHandler: true,
+        shortDescription: true,
+        longDescription: true,
+        logoUid: true,
+        logo: { select: { uid: true, url: true } },
+        investmentFocus: true,
+        industryTags: true,
+        dataEnrichment: true,
+      },
+      orderBy: { team: { name: 'asc' } },
+    });
+
+    if (rows.length === 0) {
+      return { teams: [] };
+    }
+
+    const teamUids = rows.map((r) => r.teamUid);
+    const grouped = await this.prisma.teamLogoVerificationResult.groupBy({
+      by: ['teamUid'],
+      where: { teamUid: { in: teamUids } },
+      _max: { createdAt: true },
+    });
+    const latestPairs = grouped
+      .filter((g): g is typeof g & { _max: { createdAt: Date } } => g._max.createdAt !== null)
+      .map((g) => ({ teamUid: g.teamUid, createdAt: g._max.createdAt }));
+    const latestRows =
+      latestPairs.length === 0
+        ? []
+        : await this.prisma.teamLogoVerificationResult.findMany({
+            where: { OR: latestPairs.map((p) => ({ teamUid: p.teamUid, createdAt: p.createdAt })) },
+            select: {
+              teamUid: true,
+              verdict: true,
+              confidence: true,
+              reason: true,
+              createdAt: true,
+            },
+          });
+    const latestByTeam = new Map<string, typeof latestRows[number]>();
+    for (const lv of latestRows) latestByTeam.set(lv.teamUid, lv);
+
+    const items: EnrichmentReviewItem[] = [];
+    for (const row of rows) {
+      const meta = this.parseEnrichmentMeta(row.dataEnrichment);
+      if (!meta?.fieldsMeta) continue;
+
+      // A field is "auto-approved" iff the judge would have promoted it, i.e.
+      // verdict=agrees AND confidence=high (admin approval also normalizes to this).
+      // Score is intentionally NOT the gate — ScrapingDog/AI can emit score=90
+      // at medium confidence (not promoted) or score=85 at high (promoted),
+      // so score-thresholding produces both false negatives and false positives.
+      // Logo has no judgment.score on its verification row — the equivalent check is
+      // verdict='verified' AND confidence='high' (what admin-approve writes).
+      const hasUnapprovedField = Object.entries(meta.fieldsMeta).some(([k, fm]) => {
+        if (k === 'logo' || !fm?.judgment) return false;
+        return !(fm.judgment.verdict === JudgmentVerdict.Agrees && fm.judgment.confidence === FieldConfidence.High);
+      });
+      const latestLogoVerif = latestByTeam.get(row.teamUid);
+      const logoFieldMeta = meta.fieldsMeta.logo;
+      const logoApprovedByAdmin =
+        logoFieldMeta?.judgment?.verdict === JudgmentVerdict.Agrees &&
+        logoFieldMeta?.judgment?.confidence === FieldConfidence.High;
+      const logoApprovedByVLM =
+        latestLogoVerif?.verdict === 'verified' && latestLogoVerif?.confidence === 'high';
+      const hasUnapprovedLogo = !!row.logoUid && !logoApprovedByAdmin && !logoApprovedByVLM;
+      if (!hasUnapprovedField && !hasUnapprovedLogo) continue;
+
+      const fields: EnrichmentReviewItem['fields'] = {};
+      for (const [keyStr, fieldMeta] of Object.entries(meta.fieldsMeta) as Array<
+        [FieldMetaKey, FieldEnrichmentMeta | undefined]
+      >) {
+        if (keyStr === 'moreDetails') continue;
+
+        // Logo: no AI judgment exists (logo isn't judged — binary presence, not semantic).
+        // Emit it as a regular field with `content = Image.url` so the UI can iterate
+        // uniformly. The richer VLM verification still lives on the top-level `logo` block.
+        if (keyStr === 'logo') {
+          const logoUrl = row.logo?.url ?? row.team.logo?.url;
+          if (!logoUrl) continue;
+          fields.logo = {
+            content: logoUrl,
+            metadata: {
+              status: fieldMeta?.status,
+              source: fieldMeta?.source,
+              lastModifiedAt: fieldMeta?.lastModifiedAt,
+            },
+            judgment: {},
+          };
+          continue;
+        }
+
+        if (!fieldMeta?.judgment) continue;
+
+        // Status decides the source of truth:
+        //   - ChangedByUser → Team.<field> (user-owned value lives on Team; the TeamEnrichment
+        //     candidate, if any, is informational provenance)
+        //   - Enriched / CannotEnrich → TeamEnrichment.<field> (AI candidate not yet promoted)
+        // Fallback to the other side covers rows where one side is empty (e.g. AI candidate
+        // promoted-then-cleared, or pre-tracking user data with stale meta).
+        const isUserOwned = fieldMeta.status === FieldEnrichmentStatus.ChangedByUser;
+        const teamValue = (row.team as any)[keyStr];
+        const enrichmentValue = (row as any)[keyStr];
+        const isEmpty = (v: any) =>
+          v === null ||
+          v === undefined ||
+          (typeof v === 'string' && v.trim() === '') ||
+          (Array.isArray(v) && v.length === 0);
+        const primary = isUserOwned ? teamValue : enrichmentValue;
+        const fallback = isUserOwned ? enrichmentValue : teamValue;
+        const candidate = !isEmpty(primary) ? primary : fallback;
+        if (isEmpty(candidate)) continue;
+
+        fields[keyStr] = {
+          content: candidate,
+          metadata: {
+            status: fieldMeta.status,
+            source: fieldMeta.source,
+            lastModifiedAt: fieldMeta.lastModifiedAt,
+          },
+          judgment: {
+            note: fieldMeta.judgment.note,
+            score: fieldMeta.judgment.score,
+            verdict: fieldMeta.judgment.verdict,
+            confidence: fieldMeta.judgment.confidence,
+          },
+        };
+      }
+
+      let logo: EnrichmentReviewLogo | undefined;
+      const logoMeta = meta.fieldsMeta.logo;
+      if (row.logoUid) {
+        logo = {
+          content: row.logo ? { uid: row.logo.uid, url: row.logo.url } : null,
+          metadata: {
+            status: logoMeta?.status,
+            source: logoMeta?.source,
+            lastModifiedAt: logoMeta?.lastModifiedAt,
+          },
+          ...(logoMeta?.judgment
+            ? {
+                judgment: {
+                  note: logoMeta.judgment.note,
+                  score: logoMeta.judgment.score,
+                  verdict: logoMeta.judgment.verdict,
+                  confidence: logoMeta.judgment.confidence,
+                },
+              }
+            : {}),
+          verification: latestLogoVerif
+            ? {
+                verdict: latestLogoVerif.verdict,
+                confidence: latestLogoVerif.confidence,
+                reason: latestLogoVerif.reason,
+                verifiedAt: latestLogoVerif.createdAt.toISOString(),
+              }
+            : null,
+        };
+      }
+
+      items.push({
+        uid: row.team.uid,
+        name: row.team.name,
+        priority: row.team.priority,
+        enrichmentStatus: meta.status,
+        enrichmentAt: meta.usage?.enrichment?.lastRunAt ?? null,
+        judgedAt: meta.judgment?.judgedAt ?? null,
+        fields,
+        ...(logo ? { logo } : {}),
+      });
+    }
+
+    return { teams: items };
+  }
+
+  /**
+   * Per-team enrich + judge status snapshot. Returns `enrichment: null` if the team has no
+   * `TeamEnrichment` row yet. Throws `NotFoundException` if the team uid doesn't exist.
+   */
+  async getEnrichmentStatus(teamUid: string): Promise<TeamEnrichmentStatusResult> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: {
+        uid: true,
+        name: true,
+        teamEnrichment: { select: { dataEnrichment: true } },
+      },
+    });
+
+    if (!team) {
+      throw new NotFoundException(`Team ${teamUid} not found`);
+    }
+
+    const meta = this.parseEnrichmentMeta(team.teamEnrichment?.dataEnrichment);
+    if (!meta) {
+      return { uid: team.uid, name: team.name, enrichment: null, judgment: null };
+    }
+
+    const enrichment: TeamEnrichmentStatusEntry = {
+      status: meta.status,
+      shouldEnrich: !!meta.shouldEnrich,
+      enrichedAt: meta.enrichedAt ?? null,
+      enrichedBy: meta.enrichedBy ?? null,
+      reviewedAt: meta.reviewedAt ?? null,
+      reviewedBy: meta.reviewedBy ?? null,
+      errorMessage: meta.errorMessage ?? null,
+      aiModel: meta.aiModel ?? null,
+    };
+
+    const judgment: TeamJudgmentStatusEntry | null = meta.judgment
+      ? {
+          status: meta.judgment.status,
+          judgedAt: meta.judgment.judgedAt ?? null,
+          judgedBy: meta.judgment.judgedBy ?? null,
+          aiModel: meta.judgment.aiModel ?? null,
+          errorMessage: meta.judgment.errorMessage ?? null,
+          overallAssessment: meta.judgment.overallAssessment ?? null,
+          fieldsForReview: meta.judgment.fieldsForReview ?? [],
+        }
+      : null;
+
+    return { uid: team.uid, name: team.name, enrichment, judgment };
+  }
+
+  /**
+   * Pending / in-progress counts for the enrichment + judge crons. Pending judge count uses the
+   * same SQL pre-filter as the cron itself (`status=Enriched`, excluding rows already Judged or
+   * InProgress); the cron's post-filter (`collectJudgableFieldKeys`) is not applied here because
+   * it requires materializing every row, and the SQL-pre-filter count is the same shape the cron
+   * logs report.
+   */
+  async getCronCounts(): Promise<EnrichmentCronCounts> {
+    const [enrichPending, enrichInProgress, judgePending, judgeInProgress] = await Promise.all([
+      this.prisma.teamEnrichment.count({
+        where: {
+          AND: [
+            { dataEnrichment: { path: ['shouldEnrich'], equals: true } },
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.PendingEnrichment } },
+          ],
+        },
+      }),
+      this.prisma.teamEnrichment.count({
+        where: { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.InProgress } },
+      }),
+      this.prisma.teamEnrichment.count({
+        where: {
+          AND: [
+            { dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched } },
+            {
+              NOT: {
+                OR: [
+                  { dataEnrichment: { path: ['judgment', 'status'], equals: JudgmentStatus.Judged } },
+                  { dataEnrichment: { path: ['judgment', 'status'], equals: JudgmentStatus.InProgress } },
+                ],
+              },
+            },
+          ],
+        },
+      }),
+      this.prisma.teamEnrichment.count({
+        where: { dataEnrichment: { path: ['judgment', 'status'], equals: JudgmentStatus.InProgress } },
+      }),
+    ]);
+
+    return {
+      enrichment: { pending: enrichPending, inProgress: enrichInProgress },
+      judge: { pending: judgePending, inProgress: judgeInProgress },
+    };
+  }
+
+  /**
+   * Admin team approval. For each requested field, writes the value to Team and normalizes
+   * the per-field judgment to `{ verdict: agrees, confidence: high, score: 100 }`.
+   *
+   * Per-field rule:
+   *  - `content` provided → admin edited the value. Final value is the admin input;
+   *    `fieldsMeta[key].status` flips to `ChangedByUser`.
+   *  - `content` omitted ("Confirm") → admin accepted the existing value. Final value is
+   *    read from the canonical source: `Team.<field>` when current status is `ChangedByUser`
+   *    (the user's value is already there), otherwise the AI candidate on `TeamEnrichment.<field>`.
+   *    `status` is left unchanged.
+   *
+   * Empty resolved values are pushed into `skipped` (`empty_value` / `no_candidate`) and not
+   * promoted. Team-level `dataEnrichment.status` flips to `Approved`; approved keys are dropped
+   * from `judgment.fieldsForReview`. Logo approval also marks the latest
+   * `TeamLogoVerificationResult` row `verified` at high confidence.
+   */
+  async approveEnrichmentForTeam(
+    teamUid: string,
+    inputs: ApproveEnrichmentFieldInput[],
+    reviewerEmail: string
+  ): Promise<ApproveEnrichmentTeamResult> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: TEAM_WITH_ENRICHMENT_SELECT,
+    });
+    if (!team) {
+      return { success: false, approved: [], skipped: [], message: `Team ${teamUid} not found` };
+    }
+    if (!team.teamEnrichment) {
+      return {
+        success: false,
+        approved: [],
+        skipped: [],
+        message: `Team ${teamUid} has no enrichment row`,
+      };
+    }
+    const meta = this.parseEnrichmentMeta(team.teamEnrichment.dataEnrichment);
+    if (!meta) {
+      return {
+        success: false,
+        approved: [],
+        skipped: [],
+        message: `Team ${teamUid} has no enrichment data`,
+      };
+    }
+    if (meta.status === EnrichmentStatus.InProgress) {
+      return {
+        success: false,
+        approved: [],
+        skipped: [],
+        message: `Enrichment already in progress for team ${teamUid}`,
+      };
+    }
+
+    const fieldsMeta = meta.fieldsMeta ?? {};
+    const skipped: ApproveEnrichmentTeamSkip[] = [];
+
+    const isEmpty = (v: unknown): boolean =>
+      v === null ||
+      v === undefined ||
+      (typeof v === 'string' && v.trim() === '') ||
+      (Array.isArray(v) && v.length === 0);
+
+    // `write` is the value to send to Team; null means "no Team write needed" (already there
+    // for ChangedByUser + confirm). We still normalize fieldsMeta regardless.
+    type Resolved = { key: FieldMetaKey; flip: boolean; write: string | string[] | null };
+    const resolved: Resolved[] = [];
+    const seen = new Set<FieldMetaKey>();
+
+    for (const { key, content } of inputs) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const adminProvided = content !== undefined;
+      if (adminProvided) {
+        if (isEmpty(content)) {
+          skipped.push({ key, reason: 'empty_value' });
+          continue;
+        }
+        resolved.push({ key, flip: true, write: content as string | string[] });
+        continue;
+      }
+
+      const currentStatus = fieldsMeta[key]?.status;
+      // For ChangedByUser + confirm: value is already on Team / InvestorProfile. Bump score
+      // only — no Team write needed (and reading team.<field> isn't well-typed for relations).
+      if (currentStatus === FieldEnrichmentStatus.ChangedByUser) {
+        resolved.push({ key, flip: false, write: null });
+        continue;
+      }
+
+      const candidate =
+        key === 'logo'
+          ? team.teamEnrichment.logoUid
+          : key === 'investmentFocus'
+          ? team.teamEnrichment.investmentFocus
+          : key === 'industryTags'
+          ? team.teamEnrichment.industryTags
+          : (team.teamEnrichment as any)[key];
+      if (isEmpty(candidate)) {
+        skipped.push({ key, reason: 'no_candidate' });
+        continue;
+      }
+      resolved.push({ key, flip: false, write: candidate as string | string[] });
+    }
+
+    if (resolved.length === 0) {
+      return { success: true, approved: [], skipped, message: 'No fields to approve' };
+    }
+
+    const teamUpdate: Prisma.TeamUpdateInput = {};
+    let investmentFocus: string[] | null = null;
+
+    for (const r of resolved) {
+      if (r.write === null) continue;
+      if (r.key === 'industryTags') {
+        const titles = (r.write as string[]).filter((s) => typeof s === 'string' && s.trim() !== '');
+        const matched =
+          titles.length === 0
+            ? []
+            : await this.prisma.industryTag.findMany({
+                where: { title: { in: titles, mode: 'insensitive' } },
+                select: { uid: true },
+              });
+        teamUpdate.industryTags = { set: matched.map((t) => ({ uid: t.uid })) };
+        continue;
+      }
+      if (r.key === 'investmentFocus') {
+        investmentFocus = r.write as string[];
+        continue;
+      }
+      if (r.key === 'logo') {
+        const logoUid = Array.isArray(r.write) ? r.write[0] : r.write;
+        teamUpdate.logo = { connect: { uid: logoUid } };
+        continue;
+      }
+      // scalar
+      (teamUpdate as any)[r.key] = Array.isArray(r.write) ? r.write[0] : r.write;
+    }
+
+    const now = new Date().toISOString();
+    const approvedKeys = resolved.map((r) => r.key);
+    const approvedSet = new Set<FieldMetaKey>(approvedKeys);
+
+    const newFieldsMeta: FieldsMetaMap = { ...fieldsMeta };
+    for (const r of resolved) {
+      const existing = newFieldsMeta[r.key];
+      const nextStatus = r.flip
+        ? FieldEnrichmentStatus.ChangedByUser
+        : existing?.status ?? FieldEnrichmentStatus.Enriched;
+      newFieldsMeta[r.key] = stampModified(
+        {
+          ...(existing ?? {}),
+          status: nextStatus,
+          judgment: {
+            // Admin approval supersedes the AI's note — clear it so stale judgment
+            // text ("matches-known-...") doesn't outlive the value it described.
+            note: '',
+            judgedVia: existing?.judgment?.judgedVia ?? JudgmentSource.AI,
+            verdict: JudgmentVerdict.Agrees,
+            confidence: FieldConfidence.High,
+            score: 100,
+          },
+        },
+        now
+      );
+    }
+
+    const updatedTeamJudgment = meta.judgment
+      ? {
+          ...meta.judgment,
+          fieldsForReview: (meta.judgment.fieldsForReview ?? []).filter((f) => !approvedSet.has(f as FieldMetaKey)),
+        }
+      : meta.judgment;
+
+    const updated: TeamDataEnrichment = {
+      ...meta,
+      fieldsMeta: newFieldsMeta,
+      judgment: updatedTeamJudgment,
+      status: EnrichmentStatus.Reviewed,
+      reviewedAt: now,
+      reviewedBy: reviewerEmail,
+    };
+
+    let latestLogoVerificationUid: string | null = null;
+    if (approvedSet.has('logo')) {
+      const latest = await this.prisma.teamLogoVerificationResult.findFirst({
+        where: { teamUid },
+        orderBy: { createdAt: 'desc' },
+        select: { uid: true },
+      });
+      latestLogoVerificationUid = latest?.uid ?? null;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.teamEnrichment.update({
+        where: { teamUid },
+        data: { dataEnrichment: updated as any },
+      });
+      if (Object.keys(teamUpdate).length > 0) {
+        await tx.team.update({ where: { uid: teamUid }, data: teamUpdate });
+      }
+      if (investmentFocus !== null) {
+        if (team.investorProfile) {
+          await tx.investorProfile.update({
+            where: { uid: team.investorProfile.uid },
+            data: { investmentFocus },
+          });
+        } else {
+          await tx.investorProfile.create({
+            data: {
+              investmentFocus,
+              team: { connect: { uid: teamUid } },
+            },
+          });
+        }
+      }
+      if (latestLogoVerificationUid) {
+        await tx.teamLogoVerificationResult.update({
+          where: { uid: latestLogoVerificationUid },
+          data: { verdict: 'verified', confidence: 'high' },
+        });
+      }
+    });
+
+    this.logger.log(
+      `Admin enrichment approve: team ${teamUid} approved=[${approvedKeys.join(',')}] reviewer=${reviewerEmail}`
+    );
+
+    return {
+      success: true,
+      approved: approvedKeys,
+      skipped,
+      message: `Approved ${approvedKeys.length} field(s) for team ${teamUid}`,
+    };
+  }
+
   private async maybeEnrichViaScrapingDog(ctx: {
     teamUid: string;
-    team: {
-      name: string;
-      website: string | null;
-      shortDescription: string | null;
-      longDescription: string | null;
-      moreDetails: string | null;
-      logoUid: string | null;
-      linkedinHandler: string | null;
-      industryTags: Array<{ uid: string; title: string }>;
-    };
+    team: TeamWithEnrichment;
     existingFieldsMeta: FieldsMetaMap;
     aiLinkedinHandler: string | null;
-    updateData: Prisma.TeamUpdateInput;
+    enrichmentUpdate: Prisma.TeamEnrichmentUpdateInput;
     newFieldsMeta: FieldsMetaMap;
     forceOverwrite?: boolean;
   }): Promise<TeamDataEnrichment['scrapingDog'] | null> {
-    const { teamUid, team, existingFieldsMeta, aiLinkedinHandler, updateData, newFieldsMeta, forceOverwrite } = ctx;
+    const { teamUid, team, existingFieldsMeta, aiLinkedinHandler, enrichmentUpdate, newFieldsMeta, forceOverwrite } =
+      ctx;
 
     const markSdField = (field: FieldMetaKey) => {
       newFieldsMeta[field] = {
@@ -1071,23 +1841,20 @@ export class TeamEnrichmentService {
       return null;
     }
 
-    // In force mode we treat an existing AI-set logo as a gap so ScrapingDog can upgrade
-    // it to high-confidence; user-owned logos (ChangedByUser or predating enrichment) stay locked.
     const logoIsUserOwned =
       existingFieldsMeta.logo?.status === FieldEnrichmentStatus.ChangedByUser ||
       (!!team.logoUid && !existingFieldsMeta.logo);
-    const hasLogoGap =
-      !logoIsUserOwned && (!team.logoUid || !!forceOverwrite) && !(updateData as any).logo;
-    const hasWebsiteGap = !team.website && !(updateData as any).website;
-    const hasShortDescGap = !team.shortDescription && !(updateData as any).shortDescription;
-    const hasLongDescGap = !team.longDescription && !(updateData as any).longDescription;
-    const hasMoreDetailsGap = !team.moreDetails && !(updateData as any).moreDetails;
+    const hasLogoGap = !logoIsUserOwned && (!team.logoUid || !!forceOverwrite) && !(enrichmentUpdate as any).logo;
+    const hasWebsiteGap = !team.website && !(enrichmentUpdate as any).website;
+    const hasShortDescGap = !team.shortDescription && !(enrichmentUpdate as any).shortDescription;
+    const hasLongDescGap = !team.longDescription && !(enrichmentUpdate as any).longDescription;
+    const hasMoreDetailsGap = !team.moreDetails && !(enrichmentUpdate as any).moreDetails;
     const tagsStatus = existingFieldsMeta.industryTags?.status;
     const hasIndustryTagsGap =
       tagsStatus !== FieldEnrichmentStatus.Enriched &&
       tagsStatus !== FieldEnrichmentStatus.ChangedByUser &&
       team.industryTags.length === 0 &&
-      !(updateData as any).industryTags;
+      !(enrichmentUpdate as any).industryTags;
 
     if (
       !hasLogoGap &&
@@ -1101,9 +1868,6 @@ export class TeamEnrichmentService {
       return null;
     }
 
-    // Trust user-asserted LinkedIn handles: if the team's linkedinHandler is user-owned, the user
-    // has already vouched that this handle belongs to them — don't reject the response over a fuzzy
-    // team-name mismatch. AI-discovered handles still need to pass verifyScrapingDogEntity.
     const usingUserOwnedHandle =
       handle === team.linkedinHandler &&
       isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
@@ -1123,8 +1887,6 @@ export class TeamEnrichmentService {
     }
 
     if (fetchResult.kind === 'not-found') {
-      // Only null an AI-supplied handle. User-asserted handles stay on the team record so the
-      // user can correct them manually — we don't silently discard user data.
       const handleIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
       if (handleIsUserOwned) {
         this.logger.warn(
@@ -1135,10 +1897,13 @@ export class TeamEnrichmentService {
       this.logger.warn(
         `Team ${teamUid} (${team.name}): LinkedIn handle "${handle}" is invalid per ScrapingDog, nulling`
       );
-      // Null the stored handle if it was persisted; if only aiLinkedinHandler supplied the handle,
-      // it was never written to Team so nothing to clear there.
+      // Null the stored handle if it was persisted on Team; otherwise it only existed on the AI
+      // response and was never written.
       if (team.linkedinHandler === handle) {
-        (updateData as any).linkedinHandler = null;
+        await this.prisma.team.update({
+          where: { uid: teamUid },
+          data: { linkedinHandler: null },
+        });
       }
       newFieldsMeta.linkedinHandler = {
         status: FieldEnrichmentStatus.CannotEnrich,
@@ -1160,19 +1925,19 @@ export class TeamEnrichmentService {
     const filledFields: string[] = [];
 
     if (hasWebsiteGap && profile.website) {
-      (updateData as any).website = profile.website;
+      (enrichmentUpdate as any).website = profile.website;
       markSdField('website');
       filledFields.push('website');
     }
 
     if (hasShortDescGap && profile.tagline) {
-      (updateData as any).shortDescription = this.aiService.truncateString(profile.tagline, 200);
+      (enrichmentUpdate as any).shortDescription = this.aiService.truncateString(profile.tagline, 200);
       markSdField('shortDescription');
       filledFields.push('shortDescription');
     }
 
     if (hasLongDescGap && profile.about) {
-      (updateData as any).longDescription = this.aiService.truncateString(profile.about, 1000);
+      (enrichmentUpdate as any).longDescription = this.aiService.truncateString(profile.about, 1000);
       markSdField('longDescription');
       filledFields.push('longDescription');
     }
@@ -1184,7 +1949,7 @@ export class TeamEnrichmentService {
       if (profile.industries.length) parts.push(`Industries: ${profile.industries.join(', ')}`);
       if (profile.specialties.length) parts.push(`Specialties: ${profile.specialties.join(', ')}`);
       if (parts.length > 0) {
-        (updateData as any).moreDetails = parts.join('\n');
+        (enrichmentUpdate as any).moreDetails = parts.join('\n');
         markSdField('moreDetails');
         filledFields.push('moreDetails');
       }
@@ -1198,7 +1963,7 @@ export class TeamEnrichmentService {
           select: { uid: true, title: true },
         });
         if (matchedTags.length > 0) {
-          (updateData as any).industryTags = { connect: matchedTags.map((t) => ({ uid: t.uid })) };
+          enrichmentUpdate.industryTags = matchedTags.map((t) => t.title);
           markSdField('industryTags');
           filledFields.push('industryTags');
         }
@@ -1209,29 +1974,29 @@ export class TeamEnrichmentService {
       try {
         const persisted = await this.persistLogoImage(teamUid, profile.profilePhoto, 'scrapingdog');
         if (persisted) {
-          (updateData as any).logo = { connect: { uid: persisted.imageUid } };
+          enrichmentUpdate.logo = { connect: { uid: persisted.imageUid } };
           markSdField('logo');
           filledFields.push('logo');
-          this.logger.log(`Team ${teamUid} (${team.name}): logo set from ScrapingDog, image uid: ${persisted.imageUid}`);
+          this.logger.log(
+            `Team ${teamUid} (${team.name}): logo set from ScrapingDog, image uid: ${persisted.imageUid}`
+          );
         }
       } catch (error) {
         this.logger.warn(`Team ${teamUid} (${team.name}): ScrapingDog logo download/upload failed: ${error.message}`);
       }
     }
 
-    // Confidence upgrade: on a valid ScrapingDog profile with a matching name, corroborate the
-    // AI-filled fields. Only upgrades — never downgrades — and never touches user-owned fields
-    // or fields ScrapingDog just filled (already at high). The judge's `fieldsMeta[field].judgment`
-    // sub-object is never written here — that stays judge-owned.
+    // Confidence upgrade: on a valid ScrapingDog profile with a matching name, corroborate
+    // AI-filled fields. Snapshot is taken against the in-progress TeamEnrichment update so we
+    // verify the candidate values, not the current Team values.
     const postRunTeam = {
       name: team.name,
-      website: ((updateData as any).website as string | null | undefined) ?? team.website,
+      website: ((enrichmentUpdate as any).website as string | null | undefined) ?? team.website,
       linkedinHandler: team.linkedinHandler,
       shortDescription:
-        ((updateData as any).shortDescription as string | null | undefined) ?? team.shortDescription,
-      longDescription:
-        ((updateData as any).longDescription as string | null | undefined) ?? team.longDescription,
-      moreDetails: ((updateData as any).moreDetails as string | null | undefined) ?? team.moreDetails,
+        ((enrichmentUpdate as any).shortDescription as string | null | undefined) ?? team.shortDescription,
+      longDescription: ((enrichmentUpdate as any).longDescription as string | null | undefined) ?? team.longDescription,
+      moreDetails: ((enrichmentUpdate as any).moreDetails as string | null | undefined) ?? team.moreDetails,
       industryTags: team.industryTags.map((t) => ({ title: t.title })),
     };
     const verdicts = this.scrapingDogService.compareProfileToTeam(postRunTeam, profile, nameMatch);
@@ -1239,7 +2004,7 @@ export class TeamEnrichmentService {
       if (!verdict || verdict.verdict !== JudgmentVerdict.Agrees) continue;
       const currentMeta = (newFieldsMeta[field] ?? existingFieldsMeta[field]) as FieldEnrichmentMeta | undefined;
       if (!currentMeta || currentMeta.status !== FieldEnrichmentStatus.Enriched) continue;
-      if (currentMeta.source === EnrichmentSource.ScrapingDog) continue; // don't overwrite freshly-set SD values
+      if (currentMeta.source === EnrichmentSource.ScrapingDog) continue;
       const currentRank = rankConfidence(currentMeta.confidence);
       const newRank = rankConfidence(verdict.confidence);
       if (newRank > currentRank) {
@@ -1263,9 +2028,7 @@ export class TeamEnrichmentService {
       };
     }
 
-    this.logger.log(
-      `Team ${teamUid} (${team.name}): ScrapingDog filled [${filledFields.join(', ')}]`
-    );
+    this.logger.log(`Team ${teamUid} (${team.name}): ScrapingDog filled [${filledFields.join(', ')}]`);
 
     return {
       used: true,
@@ -1287,6 +2050,50 @@ export class TeamEnrichmentService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Reads the latest TeamEnrichment.dataEnrichment for a given team. Returns null when
+   * the team has never been enriched (no TeamEnrichment row yet).
+   */
+  private async readEnrichmentMeta(teamUid: string): Promise<TeamDataEnrichment | null> {
+    const row = await this.prisma.teamEnrichment.findUnique({
+      where: { teamUid },
+      select: { dataEnrichment: true },
+    });
+    return this.parseEnrichmentMeta(row?.dataEnrichment);
+  }
+
+  /**
+   * Upserts a TeamEnrichment row carrying just the dataEnrichment JSON. Used for marking,
+   * status transitions, and any other metadata-only writes that don't touch candidate values.
+   */
+  private async upsertEnrichmentRow(teamUid: string, enrichment: TeamDataEnrichment): Promise<void> {
+    await this.prisma.teamEnrichment.upsert({
+      where: { teamUid },
+      create: {
+        team: { connect: { uid: teamUid } },
+        dataEnrichment: enrichment as any,
+      },
+      update: { dataEnrichment: enrichment as any },
+    });
+  }
+
+  /**
+   * Translates a `TeamEnrichmentUpdateInput` into the equivalent `TeamEnrichmentCreateInput`
+   * shape for the upsert `create` branch. The only divergence is `logo`, which uses a relation
+   * verb on both sides; scalars and String[] arrays pass through as-is.
+   */
+  private updateInputToCreate(
+    update: Prisma.TeamEnrichmentUpdateInput
+  ): Omit<Prisma.TeamEnrichmentCreateInput, 'team'> {
+    const { logo, industryTags, investmentFocus, dataEnrichment, ...scalars } = update as any;
+    const out: Omit<Prisma.TeamEnrichmentCreateInput, 'team'> = { ...scalars };
+    if (logo?.connect) out.logo = logo;
+    if (industryTags?.set) out.industryTags = industryTags.set;
+    if (investmentFocus?.set) out.investmentFocus = investmentFocus.set;
+    if (dataEnrichment !== undefined) out.dataEnrichment = dataEnrichment;
+    return out;
   }
 
   /**
@@ -1313,19 +2120,12 @@ export class TeamEnrichmentService {
     const normalizedTeamName = normalize(teamName);
     const teamWords = normalizedTeamName.split(/\s+/);
 
-    // Signal 1: Website owner name matches the team name
-    // Must be a substring match (contiguous words), NOT just individual word presence.
-    // e.g., "Arbitrum Ventures Program" matches "Arbitrum Ventures" (contiguous substring)
-    // but "Arbitrum Gaming Ventures" does NOT match "Arbitrum Ventures" (different entity)
     let websiteNameMatch = false;
     if (aiResponse.websiteOwnerName) {
       const normalizedOwner = normalize(aiResponse.websiteOwnerName);
       websiteNameMatch = normalizedOwner.includes(normalizedTeamName) || normalizedTeamName.includes(normalizedOwner);
     }
 
-    // Signal 2: Descriptions mention the exact team name as a standalone phrase
-    // We check that the team name appears in the description and is NOT part of a longer entity name
-    // e.g., "Arbitrum Ventures" in "Arbitrum Gaming Ventures focuses on..." is NOT a match
     let descriptionMatch = false;
     const descriptionsToCheck = [aiResponse.shortDescription, aiResponse.longDescription].filter(
       (d): d is string => !!d
@@ -1337,7 +2137,6 @@ export class TeamEnrichmentService {
       }
     }
 
-    // Signal 3: Sources contain URLs that reference the team name
     let sourceMatch = false;
     const urlSlug = teamWords.join('-');
     const urlSlugAlt = teamWords.join('');
@@ -1355,35 +2154,21 @@ export class TeamEnrichmentService {
       `Entity verification for "${teamName}": website=${websiteNameMatch}, description=${descriptionMatch}, sources=${sourceMatch} (${matchCount}/3 signals)`
     );
 
-    // If website owner name matches, we trust it (strongest signal)
     if (websiteNameMatch) return true;
-
-    // Otherwise need at least 2 of 3 signals to confirm identity
     if (matchCount >= 2) return true;
-
-    // If description matches with exact entity name, it's a decent signal on its own
     if (descriptionMatch) return true;
-
     return false;
   }
 
-  /**
-   * Checks if a text contains the entity name as a standalone phrase,
-   * NOT as part of a longer entity name.
-   * e.g., "arbitrum ventures is a fund" → true for "arbitrum ventures"
-   *        "arbitrum gaming ventures is a fund" → false for "arbitrum ventures"
-   */
   private containsExactEntityName(text: string, entityName: string): boolean {
     let startIndex = 0;
     while (true) {
       const idx = text.indexOf(entityName, startIndex);
       if (idx === -1) return false;
 
-      // Check what comes before and after the match
       const charBefore = idx > 0 ? text[idx - 1] : ' ';
       const charAfter = idx + entityName.length < text.length ? text[idx + entityName.length] : ' ';
 
-      // Must be at a word boundary
       const isWordBoundaryBefore = charBefore === ' ' || idx === 0;
       const isWordBoundaryAfter =
         charAfter === ' ' ||
@@ -1395,26 +2180,15 @@ export class TeamEnrichmentService {
         idx + entityName.length === text.length;
 
       if (isWordBoundaryBefore && isWordBoundaryAfter) {
-        // It's at a word boundary, but we also need to check the surrounding context
-        // isn't forming a longer entity name. Check if the word before or after is a capitalized
-        // word that could be part of a compound entity name.
-        // Since text is already normalized (lowercase), we check for adjacent name-like words
-
-        // Get the word right before the entity name
         const textBefore = text.substring(0, idx).trim();
         const wordBefore = textBefore.split(/\s+/).pop() || '';
 
-        // Get the word right after the entity name
         const textAfter = text.substring(idx + entityName.length).trim();
         const wordAfter = textAfter.split(/\s+/)[0] || '';
 
-        // Words that suggest a different entity when prepended/appended
-        // e.g., "gaming" before "ventures" in "arbitrum gaming ventures"
         const entityExtendingWords = ['gaming', 'capital', 'labs', 'studio', 'studios', 'digital', 'global', 'network'];
 
-        // Check if the word before is NOT an entity-extending word
         const beforeSafe = !entityExtendingWords.includes(wordBefore);
-        // Check if the word after is NOT an entity-extending word (but allow common suffixes)
         const safeSuffixes = [
           'is',
           'was',
@@ -1461,11 +2235,11 @@ export class TeamEnrichmentService {
 
   private async updateEnrichmentStatus(
     teamUid: string,
-    currentMeta: any,
+    currentMeta: TeamDataEnrichment | null,
     status: EnrichmentStatus,
     errorMessage?: string
   ): Promise<void> {
-    const meta = this.parseEnrichmentMeta(currentMeta) || {
+    const meta = currentMeta || {
       shouldEnrich: false,
       status,
       isAIGenerated: false,
@@ -1480,9 +2254,6 @@ export class TeamEnrichmentService {
       meta.errorMessage = errorMessage;
     }
 
-    await this.prisma.team.update({
-      where: { uid: teamUid },
-      data: { dataEnrichment: meta as any },
-    });
+    await this.upsertEnrichmentRow(teamUid, meta);
   }
 }

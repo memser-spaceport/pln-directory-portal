@@ -3,8 +3,10 @@ import { ArticlesModule } from './articles/articles.module';
 import { BullModule } from '@nestjs/bull';
 import { CacheModule, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { InternalServiceThrottlerGuard } from './guards/internal-service-throttler.guard';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import * as redisStore from 'cache-manager-redis-store';
 import { AppController } from './app.controller';
 import { FundingStagesModule } from './funding-stages/funding-stages.module';
@@ -66,6 +68,10 @@ import { DealsModule } from './deals/deals.module';
 import { DealRequestsModule } from './deal-requests/deal-requests.module';
 import { ArticleRequestsModule } from './article-requests/article-requests.module';
 import { JobOpeningsModule } from './job-openings/job-openings.module';
+import { JobAlertsModule } from './job-alerts/job-alerts.module';
+import { TeamNewsModule } from './team-news/team-news.module';
+import { InvestorOutreachModule } from './investor-outreach/investor-outreach.module';
+import { RoadmapModule } from './roadmap/roadmap.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -103,6 +109,7 @@ import { JobOpeningsModule } from './job-openings/job-openings.module';
       },
     }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     MembersModule,
     HealthModule,
     TeamsModule,
@@ -153,11 +160,15 @@ import { JobOpeningsModule } from './job-openings/job-openings.module';
     DealRequestsModule,
     ArticleRequestsModule,
     JobOpeningsModule,
+    JobAlertsModule,
+    TeamNewsModule,
+    InvestorOutreachModule,
+    RoadmapModule,
   ],
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: InternalServiceThrottlerGuard,
     },
     {
       provide: APP_INTERCEPTOR,

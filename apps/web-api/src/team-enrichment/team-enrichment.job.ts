@@ -10,6 +10,16 @@ export class TeamEnrichmentJob {
 
   constructor(private readonly teamEnrichmentService: TeamEnrichmentService) { }
 
+  /** Per-pod in-memory flag — `true` while this pod's enrichment cron tick is mid-flight. */
+  get enrichmentRunning(): boolean {
+    return this.isEnrichmentRunning;
+  }
+
+  /** Per-pod in-memory flag — `true` while this pod's marking cron tick is mid-flight. */
+  get markingRunning(): boolean {
+    return this.isMarkingRunning;
+  }
+
   // Default: every 5 minutes
   @Cron(process.env.TEAM_ENRICHMENT_CRON || '*/5 * * * *', {
     name: 'team-enrichment',
@@ -44,13 +54,14 @@ export class TeamEnrichmentJob {
           await this.teamEnrichmentService.enrichTeam(team.uid);
           enriched++;
         } catch (error) {
-          this.logger.error(`Failed to enrich team ${team.uid} (${team.name}): ${error.message}`, error.stack);
+          this.logger.error(`Failed to enrich team ${team.uid}: ${error.message}`, error.stack);
           failed++;
         }
       }
 
       this.logger.log(
-        `Team enrichment job completed: ${enriched} enriched, ${failed} failed out of ${teams.length} total`
+        `Team enrichment job completed: ${enriched} enriched, ${failed} failed out of ${teams.length} total. ` +
+          `Per-team token usage + USD cost is logged separately as "Enrichment usage rollup" lines and persisted on TeamEnrichment.dataEnrichment.usage.`
       );
     } finally {
       this.isEnrichmentRunning = false;

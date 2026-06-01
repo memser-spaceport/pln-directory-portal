@@ -1,44 +1,53 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
 
-export enum AccessLevel {
-  L0 = 'L0',
-  L1 = 'L1',
-  L2 = 'L2',
-  L3 = 'L3',
-  L4 = 'L4',
-  L5 = 'L5',
-  L6 = 'L6',
-  REJECTED = 'Rejected',
+export enum MemberState {
+  PENDING = 'PENDING',
+  VERIFIED = 'VERIFIED',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
 }
 
-export const AccessLevelDescriptions: Record<AccessLevel, string> = {
-  [AccessLevel.L0]:
-    'Account created but KYC pending = former unverified = user can only access their profile, all other feature access similar to logged out view',
-  [AccessLevel.L1]:
-    'KYC complete = former unverified = user sees a message with verification success with prompt to fill out their profile & still no access to features. At this point system generates an email to admin and she approves/rejects the user',
-  [AccessLevel.L2]:
-    'Access Approved = former unverified = user gets a notification that they are approved/welcome to explore the product. They have access to all features at this point',
-  [AccessLevel.L3]: 'Mission Aligned = former verified + friends of PL',
-  [AccessLevel.L4]:
-    'Portfolio Investment or Core Contributors = former verified + Member = All users La Christa adds via the Back Office "Add Member" flow go here',
-  [AccessLevel.L5]: 'Investor Level 5 = Advanced investor access with team investor profile capabilities',
-  [AccessLevel.L6]: 'Investor Level 6 = Premium investor access with team and personal investor profile capabilities',
-  [AccessLevel.REJECTED]: 'User has been rejected by admin = former rejected',
+export const MemberStateDescriptions: Record<MemberState, string> = {
+  [MemberState.PENDING]: 'Account created and pending review',
+  [MemberState.VERIFIED]: 'Linkedin verification complete and pending final approval',
+  [MemberState.APPROVED]: 'Approved member with product access',
+  [MemberState.REJECTED]: 'Member request was rejected',
 };
 
 export const RequestMembersSchema = z.object({
-  accessLevel: z
+  memberState: z
     .string()
     .transform((val) => val.split(',').map((v) => v.trim()))
-    .refine((arr) => arr.length > 0, { message: 'accessLevel must contain at least one value' }),
+    .refine((arr) => arr.length > 0, { message: 'memberState must contain at least one value' })
+    .optional(),
+  policyCodes: z
+    .string()
+    .transform((val) => val.split(',').map((v) => v.trim()))
+    .refine((arr) => arr.length > 0, { message: 'policyCodes must contain at least one value' })
+    .optional(),
+  policyGroups: z
+    .string()
+    .transform((val) => val.split(',').map((v) => v.trim()))
+    .refine((arr) => arr.length > 0, { message: 'policyGroups must contain at least one value' })
+    .optional(),
+  policyRoles: z
+    .string()
+    .transform((val) => val.split(',').map((v) => v.trim()))
+    .refine((arr) => arr.length > 0, { message: 'policyRoles must contain at least one value' })
+    .optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
+  /** Server-side filter: name, email, uid (substring), project name */
+  search: z.string().optional(),
+  /** Default when omitted + sortOrder omitted: createdAt desc (newest first) */
+  sortBy: z.enum(['createdAt', 'updatedAt', 'name']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 
 export const CreateMemberSchema = z.object({
   name: z.string(),
-  accessLevel: z.string(),
+  memberState: z.nativeEnum(MemberState).optional(),
   email: z.string().email(),
   imageUid: z.string().nullable(),
   joinDate: z.string().nullable(),
@@ -85,7 +94,7 @@ export const UpdateMemberSchema = z.object({
   name: z.string().optional(),
   email: z.string().email().optional(),
   imageUid: z.string().optional().nullable(),
-  accessLevel: z.string().optional(),
+  memberState: z.nativeEnum(MemberState).optional(),
   joinDate: z.string().optional().nullable(),
   bio: z.string().optional().nullable(),
   aboutYou: z.string().optional().nullable(),
@@ -128,15 +137,8 @@ export const UpdateMemberSchema = z.object({
     .optional(),
 });
 
-export const UpdateAccessLevelSchema = z.object({
-  memberUids: z.string().array().nonempty({ message: 'memberUids cannot be empty' }),
-  accessLevel: z.string().min(1, { message: 'accessLevel must not be empty' }),
-  sendRejectEmail: z.boolean().optional(),
-});
-
-export type AccessLevelCounts = Record<AccessLevel, number>;
+export type MemberStateCounts = Record<MemberState, number>;
 
 export class RequestMembersDto extends createZodDto(RequestMembersSchema) {}
 export class CreateMemberDto extends createZodDto(CreateMemberSchema) {}
 export class UpdateMemberDto extends createZodDto(UpdateMemberSchema) {}
-export class UpdateAccessLevelDto extends createZodDto(UpdateAccessLevelSchema) {}

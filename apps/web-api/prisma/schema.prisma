@@ -70,7 +70,9 @@ model Team {
   accessLevel                  String?                       @default("L1")
   accessLevelUpdatedAt         DateTime                      @default(now())
   eventAssociations            PLEventAssociation[]
-  dataEnrichment               Json? /// AI enrichment metadata
+  /// AI enrichment lives on TeamEnrichment; only judge-confirmed high-confidence
+  /// values flow back to this table.
+  teamEnrichment               TeamEnrichment?
   logoVerificationResults      TeamLogoVerificationResult[]
 
   vendorDeals             Deal[]           @relation("DealVendorTeam")
@@ -80,9 +82,14 @@ model Team {
   dealRedemptions         DealRedemption[] @relation("TeamDealRedemptions")
   dealUsages              DealUsage[]      @relation("TeamDealUsages")
 
-  articles      Article[]          @relation("TeamArticles")
-  jobOpenings   JobOpening[]
-  jobEnrichment TeamJobEnrichment?
+  articles       Article[]           @relation("TeamArticles")
+  jobOpenings    JobOpening[]
+  jobEnrichment  TeamJobEnrichment?
+  newsItems      TeamNewsItem[]
+  newsEnrichment TeamNewsEnrichment?
+
+  portfolioOverlaps InvestorPortfolioOverlap[]
+  portfolioMeta     PlPortfolioTeamMeta?
 }
 
 enum AskStatus {
@@ -222,6 +229,10 @@ model Member {
   reviewedMemberApprovals   MemberApproval[]      @relation("MemberApprovalReviewedBy")
   memberApprovalEvents      MemberApprovalEvent[] @relation("MemberApprovalEventMember")
   actedMemberApprovalEvents MemberApprovalEvent[] @relation("MemberApprovalEventActor")
+  jobAlerts                 JobAlert[]            @relation("MemberJobAlerts")
+  roadmapItemsCreated       RoadmapItem[]         @relation("roadmapItemCreatedBy")
+  roadmapItemsPromoted      RoadmapItem[]         @relation("roadmapItemPromotedBy")
+  roadmapItemUpvotes        RoadmapItemUpvote[]   @relation("roadmapItemUpvoter")
 }
 
 model MemberApproval {
@@ -495,6 +506,7 @@ model Image {
   dealSubmissionLogos     DealSubmission[]             @relation("DealSubmissionLogo")
   articleCoverImages      Article[]                    @relation("ArticleCoverImage")
   logoVerificationResults TeamLogoVerificationResult[]
+  teamEnrichmentLogos     TeamEnrichment[]
 }
 
 model Faq {
@@ -1817,6 +1829,7 @@ model Role {
 model Permission {
   uid         String   @id
   code        String   @unique
+  module      String
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1907,6 +1920,50 @@ model TeamLogoVerificationResult {
   @@index([logoUid])
 }
 
+/// Holds AI-enriched values for a team. The Team row only receives a value once
+/// the AI judge confirms it at high confidence; everything else (including
+/// enrichment state, fieldsMeta, judgment, scrapingDog metadata, and AI cost
+/// usage) lives here.
+model TeamEnrichment {
+  id      Int    @id @default(autoincrement())
+  uid     String @unique @default(cuid())
+  teamUid String @unique
+  team    Team   @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+
+  // Enriched scalar candidates — mirror Team's enrichable columns.
+  website          String?
+  blog             String?
+  contactMethod    String?
+  twitterHandler   String?
+  linkedinHandler  String?
+  telegramHandler  String?
+  shortDescription String?
+  longDescription  String?
+  moreDetails      String?
+
+  // Enriched logo candidate (promoted to Team.logoUid on high-confidence judgment).
+  logo    Image?  @relation(fields: [logoUid], references: [uid])
+  logoUid String?
+
+  // Enriched relational candidates. Stored as plain string arrays (matches investmentFocus's
+  // shape and avoids an extra join table for ~1K teams). The judge looks up the matching
+  // IndustryTag rows by title at promotion-time.
+  industryTags    String[] @default([])
+  investmentFocus String[] @default([])
+
+  /// Full enrichment metadata: shouldEnrich, status, fieldsMeta, scrapingDog,
+  /// judgment, usage, etc. (was previously Team.dataEnrichment).
+  ///
+  /// We DO NOT add GIN indexes on the `dataEnrichment` paths (`status`, `shouldEnrich`).
+  /// The portal carries ~1K teams; a full-table JSONB scan completes in <1ms, and the
+  /// write overhead of a GIN index would outweigh the read savings. Revisit if team count
+  /// grows by ~10x.
+  dataEnrichment Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Policy {
   uid               String             @id @default(cuid())
   code              String             @unique
@@ -1915,6 +1972,7 @@ model Policy {
   role              String
   group             String
   isSystem          Boolean            @default(true)
+  hidden            Boolean            @default(false)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   policyPermissions PolicyPermission[]
@@ -1998,7 +2056,8 @@ model JobOpening {
   seniority       String?
   urgency         String?
   summary         String?
-  location        String?
+  location        String[]         @default([])
+  workMode        String?
   ws4AskId        String?
   detectionDate   DateTime
   sourceType      String?
@@ -2012,7 +2071,8 @@ model JobOpening {
   postedDate      DateTime?
   lastSeenLive    DateTime?
   signalId        String?
-  canonicalKey    String           @unique
+  canonicalKey    String
+  dedupKey        String           @unique
   teamUid         String?
   team            Team?            @relation(fields: [teamUid], references: [uid])
   needsReview     String?
@@ -2030,7 +2090,8 @@ model JobOpening {
   @@index([teamUid])
   @@index([roleCategory])
   @@index([seniority])
-  @@index([location])
+  @@index([location], map: "job_opening_location_idx", type: Gin)
+  @@index([workMode])
   @@index([updatedAt])
 }
 
@@ -2052,4 +2113,272 @@ model TeamJobEnrichment {
   @@index([teamUid])
   @@index([needsReview])
   @@index([dataDiscrepancyFlag])
+}
+
+enum NewsEventType {
+  FUNDING
+  LAUNCH
+  PARTNERSHIP
+  ANNOUNCEMENT
+  MILESTONE
+  OTHER
+}
+
+enum NewsDiscoveryOutcome {
+  OK
+  NO_WEBSITE
+  AGENT_FAILED
+}
+
+model TeamNewsItem {
+  id           Int           @id @default(autoincrement())
+  uid          String        @unique @default(cuid())
+  teamUid      String
+  team         Team          @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  canonicalKey String        @unique
+  eventType    NewsEventType @default(OTHER)
+  eventDate    DateTime
+  title        String
+  summary      String?
+  sourceUrl    String
+  sourceDomain String?
+  tags         String[]      @default([])
+  rawPayload   Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  forumLinks   TeamNewsForumLink[]
+
+  @@index([teamUid])
+  @@index([eventDate])
+  @@index([eventType])
+  @@index([teamUid, eventDate(sort: Desc)])
+}
+
+/// Authoritative link between a TeamNewsItem and a forum (NodeBB) topic
+/// that was created via the "Start a conversation" / "Discuss" affordance
+/// on the home-page news feed. Idempotent on (newsItemUid, forumTopicId)
+/// so the frontend can safely retry the write.
+model TeamNewsForumLink {
+  id             Int          @id @default(autoincrement())
+  uid            String       @unique @default(cuid())
+  newsItemUid    String
+  newsItem       TeamNewsItem @relation(fields: [newsItemUid], references: [uid], onDelete: Cascade)
+  forumTopicId   Int
+  forumTopicSlug String
+  forumTopicUrl  String
+  createdByUid   String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([newsItemUid, forumTopicId])
+  @@index([newsItemUid])
+}
+
+model TeamNewsEnrichment {
+  id                   Int                   @id @default(autoincrement())
+  uid                  String                @unique @default(cuid())
+  teamUid              String                @unique
+  team                 Team                  @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  lastDiscoveryAt      DateTime?
+  lastDiscoveryOutcome NewsDiscoveryOutcome?
+  recentNewsCount      Int                   @default(0)
+  enrichmentSource     String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([teamUid])
+  @@index([lastDiscoveryOutcome])
+}
+
+model JobAlert {
+  id              Int               @id @default(autoincrement())
+  uid             String            @unique @default(cuid())
+  memberUid       String
+  member          Member            @relation("MemberJobAlerts", fields: [memberUid], references: [uid], onDelete: Cascade)
+  name            String            @db.VarChar(120)
+  filterState     Json
+  filterStateHash String
+  lastSentAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+  sendRuns        JobAlertSendRun[] @relation("JobAlertSendRuns")
+
+  @@unique([memberUid, filterStateHash])
+  @@index([memberUid, createdAt(sort: Desc)])
+  @@index([deletedAt])
+}
+
+model JobAlertSendRun {
+  id          Int      @id @default(autoincrement())
+  uid         String   @unique @default(cuid())
+  alertUid    String
+  alert       JobAlert @relation("JobAlertSendRuns", fields: [alertUid], references: [uid], onDelete: Cascade)
+  ingestRunId String
+  matchCount  Int
+  emailType   String
+  sentAt      DateTime @default(now())
+
+  @@unique([alertUid, ingestRunId])
+  @@index([ingestRunId])
+}
+
+model InvestorOutreachRecord {
+  id Int @id @default(autoincrement())
+
+  investorId  String  @unique
+  canonicalId String?
+  dedupeKey   String  @unique
+  source      String
+
+  firstName String?
+  lastName  String?
+  email     String
+
+  emailStatus String
+  linkedinUrl String?
+  firm        String?
+  firmDomain  String?
+  title       String? @db.VarChar(120)
+
+  investorType   String
+  fundThesis     String?
+  aumRange       String?
+  checkSizeRange String?
+
+  stageFocus  String
+  sectorTags  String?
+  geoFocus    String? @db.VarChar(120)
+  recentDeals String? @db.VarChar(200)
+
+  outreachTouches   Int     @default(0)
+  outreachCampaigns String?
+  opened            Int     @default(0)
+  clicked           Int     @default(0)
+  registered        Int     @default(0)
+
+  firstSentDate  DateTime? @db.Date
+  lastSentDate   DateTime? @db.Date
+  engagementTier String
+
+  enrichmentStatus      String
+  enrichmentDate        DateTime? @db.Date
+  lastEnrichmentAttempt DateTime?
+
+  enrichmentNotes String? @db.VarChar(500)
+  rawPayload      Json?
+
+  /// User-applied tags. Reserved for the future PATCH /investors/:id/tags endpoint;
+  /// the ingest pipeline will only populate this once the script starts emitting it (Phase 2+).
+  tags String[] @default([])
+
+  portfolioOverlaps InvestorPortfolioOverlap[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([canonicalId])
+  @@index([source])
+  @@index([emailStatus])
+  @@index([engagementTier])
+  @@index([enrichmentStatus])
+  @@index([enrichmentDate])
+}
+
+/// Cap-table overlap between an external investor (InvestorOutreachRecord) and a PL portfolio Team.
+/// Populated by the Apps-Script ingest pipeline in Phase 2; empty until then.
+model InvestorPortfolioOverlap {
+  id Int @id @default(autoincrement())
+
+  investorOutreachRecordId Int
+  investorOutreachRecord   InvestorOutreachRecord @relation(fields: [investorOutreachRecordId], references: [id], onDelete: Cascade)
+
+  teamUid String
+  team    Team   @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+
+  dealAmount      Decimal?  @db.Decimal(18, 2)
+  dealDate        DateTime? @db.Date
+  dealStage       String?
+  isLeadInvestor  Boolean   @default(false)
+  attributionFund String?
+
+  sourceDataset String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([investorOutreachRecordId, teamUid])
+  @@index([investorOutreachRecordId])
+  @@index([teamUid])
+}
+
+/// PL portfolio team metadata used by the Investor DB warm-intros flow.
+/// Sidecar to Team so the core model stays untouched. Populated by the ingest pipeline in Phase 2.
+model PlPortfolioTeamMeta {
+  id Int @id @default(autoincrement())
+
+  teamUid String @unique
+  team    Team   @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+
+  plInvestedAt    DateTime? @db.Date
+  plInvestedStage String?
+  raisingNow      String?
+  /// Comma-separated sector tags, matching the ingest `sector_tags` convention.
+  sectors         String?
+  geo             String?   @db.VarChar(120)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum RoadmapStage {
+  IDEA
+  UNDER_REVIEW
+  PLANNED
+  IN_PROGRESS
+  SHIPPED
+  DECLINED
+}
+
+model RoadmapItem {
+  id                 Int           @id @default(autoincrement())
+  uid                String        @unique @default(cuid())
+  title              String
+  description        String
+  acceptanceCriteria String?
+  stage              RoadmapStage  @default(IDEA)
+
+  focusArea          String?
+
+  createdByUid       String
+  createdBy          Member        @relation("roadmapItemCreatedBy", fields: [createdByUid], references: [uid])
+
+  promotedAt         DateTime?
+  promotedByUid      String?
+  promotedBy         Member?       @relation("roadmapItemPromotedBy", fields: [promotedByUid], references: [uid])
+  declinedReason     String?
+
+  externalTrackerUrl String?
+
+  upvotes            RoadmapItemUpvote[]
+
+  deletedAt          DateTime?
+  deletionReason     String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([stage, deletedAt])
+  @@index([createdByUid])
+}
+
+model RoadmapItemUpvote {
+  id        Int         @id @default(autoincrement())
+  uid       String      @unique @default(cuid())
+  itemUid   String
+  item      RoadmapItem @relation(fields: [itemUid], references: [uid], onDelete: Cascade)
+  memberUid String
+  member    Member      @relation("roadmapItemUpvoter", fields: [memberUid], references: [uid])
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@unique([itemUid, memberUid])
+  @@index([memberUid])
 }

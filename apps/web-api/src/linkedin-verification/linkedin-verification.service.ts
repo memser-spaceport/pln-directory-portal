@@ -9,10 +9,9 @@ import {
   LinkedInVerificationResponseDto,
   LinkedInVerificationStatusDto,
 } from 'libs/contracts/src/schema/linkedin-verification';
-import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import path from 'path';
 import { AwsService } from '../utils/aws/aws.service';
-import { Member } from '@prisma/client';
+import { Member, MemberApprovalState } from '@prisma/client';
 import { MemberService } from '../admin/member.service';
 
 @Injectable()
@@ -141,6 +140,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         where: { uid: memberUid },
         include: {
           linkedinProfile: true,
+          memberApproval: true,
         },
       });
 
@@ -189,14 +189,9 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         });
       }
 
-      let accessLevel = member.accessLevel;
-      if (member.accessLevel === AccessLevel.L0) {
-        const result = await this.memberService.updateAccessLevel({
-          memberUids: [member.uid],
-          accessLevel: AccessLevel.L1,
-        });
-        if (result.updatedCount > 0) {
-          accessLevel = AccessLevel.L1;
+      if (member.memberApproval?.state === MemberApprovalState.PENDING) {
+        const result = await this.memberService.updateMemberApprovalState(member.uid, MemberApprovalState.VERIFIED);
+        if (result.updated) {
           const emailData = await this.prepareEmailTemplateData(member);
           await this.sendLinkedinVerifiedEmailToAdmin(emailData, `New Member LinkedIn Verified : ${member.name}`);
         }
@@ -210,8 +205,8 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         linkedinProfileId: linkedinProfile.linkedinProfileId,
         linkedinHandler: linkedinProfile.linkedinHandler || undefined,
         profileData: linkedinProfile.profileData as any,
-        redirectUrl: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}status=success&accesslevel=${accessLevel}`,
-        newAccessLevel: accessLevel,
+        redirectUrl: `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}status=success&memberState=VERIFIED`,
+        newMemberApprovalState: member.memberApproval?.state ?? null,
       };
     } catch (error) {
       this.logger.error('LinkedIn verification failed', error, 'LinkedInVerification');
@@ -227,7 +222,7 @@ export class LinkedInVerificationService implements OnModuleDestroy {
         redirectUrl: `${redirectUrl}${
           redirectUrl.includes('?') ? '&' : '?'
         }status=error&error_message=${encodeURIComponent(errorMessage)}`,
-        newAccessLevel: null,
+        newMemberApprovalState: null,
       };
     }
   }
@@ -295,7 +290,9 @@ export class LinkedInVerificationService implements OnModuleDestroy {
   }> {
     const pendingMembers = await this.prisma.member.findMany({
       where: {
-        accessLevel: 'L1',
+        memberApproval: {
+          state: 'VERIFIED',
+        },
         uid: {
           not: member.uid,
         },

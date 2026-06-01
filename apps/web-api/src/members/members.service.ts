@@ -6,7 +6,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  InternalServerErrorException
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { z } from 'zod';
 import axios from 'axios';
@@ -27,11 +27,11 @@ import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
 import { CacheService } from '../utils/cache/cache.service';
 import { MembersHooksService } from './members.hooks.service';
 import { NotificationSettingsService } from '../notification-settings/notification-settings.service';
-import { AccessLevel } from '../../../../libs/contracts/src/schema/admin-member';
 import { OfficeHoursService } from '../office-hours/office-hours.service';
 import { TeamsService } from '../teams/teams.service';
 import { ParticipantsRequest } from './members.dto';
 import { OpenSearchService } from '../opensearch/opensearch.service';
+import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 /**
  * Interface for member search match result (used by entity association)
@@ -83,7 +83,7 @@ export class MembersService {
         data: member,
       });
 
-      await this.memberApprovalsService.ensureApprovalExists(createdMember.uid, null, tx);
+      await this.memberApprovalsService.ensureApprovalExists(createdMember.uid, tx);
 
       return createdMember;
     } catch (error) {
@@ -103,11 +103,9 @@ export class MembersService {
    */
   async findAll(queryOptions: Prisma.MemberFindManyArgs): Promise<{ count: number; members: Member[] }> {
     try {
-      const where = {
+      const where: Prisma.MemberWhereInput = {
         ...queryOptions.where,
-        accessLevel: {
-          notIn: ['L0', 'L1', 'Rejected'],
-        },
+        memberApproval: { state: { in: ['APPROVED'] } },
       };
 
       const [members, membersCount] = await this.prisma.$transaction([
@@ -147,11 +145,11 @@ export class MembersService {
     loginEmail: string | null
   ): Promise<{ count: number; members: Member[] }> {
     try {
-      const accessLevelFilter: Prisma.MemberWhereInput = {
-        accessLevel: { notIn: ['L0', 'L1', 'Rejected'] },
+      const approvalFilter: Prisma.MemberWhereInput = {
+        memberApproval: { state: { in: ['APPROVED'] } },
       };
 
-      const filters: Prisma.MemberWhereInput[] = [accessLevelFilter];
+      const filters: Prisma.MemberWhereInput[] = [approvalFilter];
 
       if (loginEmail) {
         filters.push({ email: loginEmail });
@@ -184,42 +182,74 @@ export class MembersService {
    * @param memberIds - Array of member UIDs to retrieve
    * @returns A promise that resolves to an array of simplified member records
    */
-  async findMembersByIds(
-    memberIds: string[]
-  ): Promise<Array<{ uid: string; name: string; email: string; accessLevel: string }>> {
+  async findMembersByIds(memberIds: string[]): Promise<
+    Array<{
+      uid: string;
+      name: string;
+      email: string;
+      policies: any[];
+      effectivePermissions: any[];
+    }>
+  > {
     try {
       const members = await this.prisma.member.findMany({
         where: {
           uid: {
             in: memberIds,
           },
-          accessLevel: {
-            notIn: ['L0', 'L1', 'Rejected'],
-          },
+          OR: [{ memberApproval: null }, { memberApproval: { state: { in: ['APPROVED'] } } }],
           email: {
             not: null,
           },
         },
-        select: {
-          uid: true,
-          name: true,
-          email: true,
-          accessLevel: true,
+        include: {
+          roleAssignments: {
+            include: {
+              role: {
+                include: {
+                  rolePermissions: {
+                    include: {
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          policyAssignmentsV2: {
+            include: {
+              policy: {
+                include: {
+                  policyPermissions: {
+                    include: {
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          memberPermissionsV2: {
+            include: {
+              permission: true,
+            },
+          },
         },
       });
 
-      // Filter out any members with null emails (type safety)
-      return members.filter(
-        (
-          member
-        ): member is {
-          uid: string;
-          name: string;
-          email: string;
-          accessLevel: string;
-          memberRoles: { name: string }[];
-        } => member.email !== null
-      );
+      // Build authorization for each member and map response
+      return members
+        .filter((member) => member.email !== null)
+        .map((member) => {
+          const authorization = this.buildMemberAuthorization(member as any);
+          return {
+            uid: member.uid,
+            name: member.name,
+            email: member.email!,
+            policies: authorization.policies,
+            effectivePermissions: authorization.effectivePermissions,
+          };
+        });
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -404,6 +434,46 @@ export class MembersService {
           location: true,
           skills: true,
           memberRoles: true,
+          memberApproval: {
+            select: {
+              state: true,
+            },
+          },
+          roleAssignments: {
+            where: {
+              status: 'ACTIVE',
+              revokedAt: null,
+            },
+            include: {
+              role: {
+                include: {
+                  rolePermissions: {
+                    include: {
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          policyAssignmentsV2: {
+            include: {
+              policy: {
+                include: {
+                  policyPermissions: {
+                    include: {
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          memberPermissionsV2: {
+            include: {
+              permission: true,
+            },
+          },
           linkedinProfile: true,
           investorProfile: true,
           teamMemberRoles: {
@@ -470,10 +540,110 @@ export class MembersService {
         },
       });
 
-      return { ...(member as any) };
+      const responseMember = { ...(member as any) };
+
+      responseMember.memberState = this.resolveMemberState(responseMember.memberApproval?.state);
+
+      const authorization = this.buildMemberAuthorization(responseMember);
+
+      responseMember.roles = authorization.roles;
+      responseMember.policies = authorization.policies;
+      responseMember.permissions = authorization.permissions;
+      responseMember.effectivePermissions = authorization.effectivePermissions;
+
+      delete responseMember.memberApproval;
+      delete responseMember.roleAssignments;
+      delete responseMember.policyAssignmentsV2;
+      delete responseMember.memberPermissionsV2;
+      delete responseMember.accessLevel;
+
+      return responseMember;
     } catch (error) {
       return this.handleErrors(error);
     }
+  }
+
+  private resolveMemberState(approvalState?: string | null) {
+    return approvalState ?? 'PENDING';
+  }
+
+  private buildMemberAuthorization(member: any) {
+    const uniqByCode = (items: any[]) => {
+      const seen = new Set<string>();
+      return items.filter((item) => {
+        if (!item?.code || seen.has(item.code)) return false;
+        seen.add(item.code);
+        return true;
+      });
+    };
+
+    const mapPermission = (permission: any) =>
+      permission
+        ? {
+            uid: permission.uid,
+            code: permission.code,
+            description: permission.description ?? null,
+          }
+        : null;
+
+    const mapRole = (role: any) =>
+      role
+        ? {
+            uid: role.uid,
+            code: role.code,
+            name: role.name,
+            description: role.description ?? null,
+          }
+        : null;
+
+    const mapPolicy = (policy: any) =>
+      policy
+        ? {
+            uid: policy.uid,
+            code: policy.code,
+            name: policy.name,
+            description: policy.description ?? null,
+            role: policy.role ?? null,
+            group: policy.group ?? null,
+          }
+        : null;
+
+    const directPermissions = uniqByCode(
+      (member.memberPermissionsV2 ?? []).map((item: any) => mapPermission(item.permission)).filter(Boolean)
+    );
+
+    const policies = uniqByCode(
+      (member.policyAssignmentsV2 ?? []).map((item: any) => mapPolicy(item.policy)).filter(Boolean)
+    );
+
+    const policyPermissions = uniqByCode(
+      (member.policyAssignmentsV2 ?? [])
+        .flatMap((assignment: any) => assignment.policy?.policyPermissions ?? [])
+        .map((item: any) => mapPermission(item.permission))
+        .filter(Boolean)
+    );
+
+    const roles = uniqByCode((member.roleAssignments ?? []).map((item: any) => mapRole(item.role)).filter(Boolean));
+
+    const rolePermissions = uniqByCode(
+      (member.roleAssignments ?? [])
+        .flatMap((assignment: any) => assignment.role?.rolePermissions ?? [])
+        .map((item: any) => mapPermission(item.permission))
+        .filter(Boolean)
+    );
+
+    const effectivePermissions = uniqByCode([...directPermissions, ...policyPermissions, ...rolePermissions]);
+
+    return {
+      roles,
+      roleCodes: roles.map((r: any) => r.code),
+      policies,
+      policyCodes: policies.map((p: any) => p.code),
+      permissions: directPermissions,
+      permissionCodes: directPermissions.map((p: any) => p.code),
+      effectivePermissions,
+      effectivePermissionCodes: effectivePermissions.map((p: any) => p.code),
+    };
   }
 
   /**
@@ -530,10 +700,7 @@ export class MembersService {
    * Gets member's main team UID.
    * Returns the team with mainTeam=true, or the first team if none is marked as main.
    */
-  async getMemberMainTeamByUid(
-    memberUid: string,
-    tx: Prisma.TransactionClient = this.prisma
-  ): Promise<string | null> {
+  async getMemberMainTeamByUid(memberUid: string, tx: Prisma.TransactionClient = this.prisma): Promise<string | null> {
     const teamRoles = await tx.teamMemberRole.findMany({
       where: { memberUid },
       select: { teamUid: true, mainTeam: true },
@@ -550,12 +717,33 @@ export class MembersService {
    */
   async findMemberFromEmail(email: string): Promise<Member> {
     try {
-      return await this.prisma.member.findUniqueOrThrow({
+      const member = await this.prisma.member.findUniqueOrThrow({
         where: { email: email.toLowerCase().trim() },
         include: {
           memberRoles: true,
+          roleAssignments: {
+            where: { status: 'ACTIVE', revokedAt: null },
+            include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+          },
+          policyAssignmentsV2: {
+            include: { policy: { include: { policyPermissions: { include: { permission: true } } } } },
+          },
+          memberPermissionsV2: {
+            include: { permission: true },
+          },
         },
       });
+
+      const authorization = this.buildMemberAuthorization(member as any);
+
+      return {
+        ...(member as any),
+        roles: authorization.roles,
+        policies: authorization.policies,
+        permissions: authorization.permissions,
+        effectivePermissions: authorization.effectivePermissions,
+        effectivePermissionCodes: authorization.effectivePermissionCodes,
+      } as any;
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -578,7 +766,18 @@ export class MembersService {
         },
         include: {
           image: true,
+          memberApproval: true,
           memberRoles: true,
+          roleAssignments: {
+            where: { status: 'ACTIVE', revokedAt: null },
+            include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+          },
+          policyAssignmentsV2: {
+            include: { policy: { include: { policyPermissions: { include: { permission: true } } } } },
+          },
+          memberPermissionsV2: {
+            include: { permission: true },
+          },
           teamMemberRoles: {
             include: {
               team: true,
@@ -590,10 +789,19 @@ export class MembersService {
       if (!foundMember) {
         return null;
       }
+      const authorization = this.buildMemberAuthorization(foundMember as any);
+      const enrichedMember = {
+        ...(foundMember as any),
+        roles: authorization.roles,
+        policies: authorization.policies,
+        permissions: authorization.permissions,
+        effectivePermissions: authorization.effectivePermissions,
+        effectivePermissionCodes: authorization.effectivePermissionCodes,
+      };
       const roleNames = foundMember.memberRoles.map((m) => m.name);
-      const memberIsDirectoryAdmin = isDirectoryAdmin(foundMember);
+      const memberIsDirectoryAdmin = isDirectoryAdmin(enrichedMember);
       return {
-        ...foundMember,
+        ...enrichedMember,
         isDirectoryAdmin: memberIsDirectoryAdmin,
         roleNames,
         leadingTeams: foundMember.teamMemberRoles.filter((role) => role.teamLead).map((role) => role.teamUid),
@@ -690,7 +898,7 @@ export class MembersService {
       uid: memberInfo.uid,
       roles: memberInfo.memberRoles?.map((r) => r.name) ?? [],
       leadingTeams: memberInfo.teamMemberRoles?.filter((role) => role.teamLead).map((role) => role.teamUid) ?? [],
-      accessLevel: memberInfo.accessLevel,
+      memberState: memberInfo.memberApproval?.state ?? 'PENDING',
     };
   }
 
@@ -859,7 +1067,6 @@ export class MembersService {
     let createdMember: any;
     await this.prisma.$transaction(async (tx) => {
       const { member } = await this.prepareMemberFromParticipantRequest(null, memberData, null, tx);
-      member.accessLevel = AccessLevel.L0;
       await this.mapLocationToMember(memberData, null, member, tx);
       createdMember = await this.createMember(member, tx);
       await this.membersHooksService.postCreateActions(createdMember, memberData.email);
@@ -902,7 +1109,10 @@ export class MembersService {
 
       // Handle investor profile updates
       if (investorProfileData) {
-        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, existingMember.accessLevel);
+        const canManageInvestorProfile =
+          existingMember?.isDirectoryAdmin === true ||
+          existingMember?.effectivePermissionCodes?.includes(MEMBER_PERMISSIONS.INVESTOR_MANAGE);
+        await this.updateMemberInvestorProfile(memberUid, investorProfileData, tx, canManageInvestorProfile);
       }
 
       if (isEmailChanged && isDirectoryAdmin) {
@@ -987,8 +1197,14 @@ export class MembersService {
     member['image'] = memberData.imageUid
       ? { connect: { uid: memberData.imageUid } }
       : type === 'Update'
-        ? { disconnect: true }
-        : undefined;
+      ? { disconnect: true }
+      : undefined;
+    if (Array.isArray(memberData.skills)) {
+      memberData.skills = memberData.skills
+        .map((skill: any) => (typeof skill === 'string' ? { uid: skill } : skill))
+        .filter((skill: any) => skill?.uid);
+    }
+
     member['skills'] = buildMultiRelationMapping('skills', memberData, type);
     if (type === 'Create') {
       if (Array.isArray(memberData.teamAndRoles)) {
@@ -1038,10 +1254,9 @@ export class MembersService {
     memberUid: string,
     investorProfileData: any,
     tx: Prisma.TransactionClient,
-    memberAccessLevel?: string
+    canManageInvestorProfile = false
   ) {
-    // Check if member has permission to update investor profile (L5 or L6)
-    if (memberAccessLevel && !['L5', 'L6'].includes(memberAccessLevel)) {
+    if (!canManageInvestorProfile) {
       throw new ForbiddenException('Insufficient permissions to update investor profile');
     }
 
@@ -1056,7 +1271,7 @@ export class MembersService {
 
     const secRulesAcceptedAt =
       investorProfileData.secRulesAccepted &&
-        existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
+      existingMember.investorProfile?.secRulesAccepted !== investorProfileData.secRulesAccepted
         ? new Date()
         : existingMember.investorProfile?.secRulesAcceptedAt;
 
@@ -1171,8 +1386,8 @@ export class MembersService {
           memberData.teamAndRoles[index].roleTags = foundDefaultRoleTag
             ? foundValue.roleTags
             : t.role
-              ? t.role.split(',').map((item: string) => item.trim())
-              : [];
+            ? t.role.split(',').map((item: string) => item.trim())
+            : [];
           return true;
         }
       }
@@ -1229,9 +1444,7 @@ export class MembersService {
         teamLead: false, // Set your default values here if needed
         teamUid: t.teamUid,
         memberUid,
-        roleTags: t.role
-          ? t.role.split(',').map((item: string) => item.trim())
-          : [], // Properly format roleTags
+        roleTags: t.role ? t.role.split(',').map((item: string) => item.trim()) : [], // Properly format roleTags
       }));
 
       await tx.teamMemberRole.createMany({
@@ -1301,9 +1514,7 @@ export class MembersService {
           mainTeam: t.mainTeam || false,
           teamLead: false,
           teamUid: t.teamUid,
-          roleTags: t.role
-            ? t.role.split(',').map((item) => item.trim())
-            : [],
+          roleTags: t.role ? t.role.split(',').map((item) => item.trim()) : [],
         })),
       },
     };
@@ -1798,11 +2009,9 @@ export class MembersService {
     const limit = Math.min(filters.limit || 20, 100);
     const skip = (page - 1) * limit;
 
-    // Base where clause excluding rejected access levels
+    // Base where clause including only approved members
     const baseWhere: Prisma.MemberWhereInput = {
-      accessLevel: {
-        notIn: ['L0', 'L1', 'Rejected'],
-      },
+      memberApproval: { state: { in: ['APPROVED'] } },
     };
 
     const whereConditions: Prisma.MemberWhereInput[] = [baseWhere];
@@ -1861,32 +2070,32 @@ export class MembersService {
           this.prisma.$queryRaw<{ id: number }[]>`
             SELECT DISTINCT id FROM "Member"
             WHERE ${Prisma.raw(
-            topicsArray
-              .map(
-                (topic) => `
+              topicsArray
+                .map(
+                  (topic) => `
                   EXISTS (
                     SELECT 1 FROM unnest("ohInterest") AS interest_item
                     WHERE LOWER(interest_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
                   )
                 `
-              )
-              .join(' OR ')
-          )}
+                )
+                .join(' OR ')
+            )}
           `,
           this.prisma.$queryRaw<{ id: number }[]>`
             SELECT DISTINCT id FROM "Member"
             WHERE ${Prisma.raw(
-            topicsArray
-              .map(
-                (topic) => `
+              topicsArray
+                .map(
+                  (topic) => `
                   EXISTS (
                     SELECT 1 FROM unnest("ohHelpWith") AS help_item
                     WHERE LOWER(help_item) LIKE LOWER('%${topic.replace(/'/g, "''")}%')
                   )
                 `
-              )
-              .join(' OR ')
-          )}
+                )
+                .join(' OR ')
+            )}
           `,
         ]);
 
@@ -1986,31 +2195,34 @@ export class MembersService {
 
     // Investor filters
     if (filters.isInvestor) {
+      const investorPolicyRoleCondition: Prisma.MemberWhereInput = {
+        policyAssignmentsV2: {
+          some: {
+            policy: {
+              role: {
+                equals: 'investor',
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      };
+
       whereConditions.push({
         AND: [
           {
             OR: [
-              // Members explicitly marked as investors with L5/L6 access level
               {
                 AND: [
                   {
                     isInvestor: true,
                   },
-                  {
-                    accessLevel: {
-                      in: ['L5', 'L6'],
-                    },
-                  },
+                  investorPolicyRoleCondition,
                 ],
               },
-              // Members with L5/L6 access level when isInvestor is null (legacy support)
               {
                 AND: [
-                  {
-                    accessLevel: {
-                      in: ['L5', 'L6'],
-                    },
-                  },
+                  investorPolicyRoleCondition,
                   {
                     isInvestor: null,
                   },
@@ -2199,17 +2411,17 @@ export class MembersService {
         SELECT DISTINCT m.id FROM "Member" m
         INNER JOIN "InvestorProfile" ip ON m."investorProfileId" = ip.uid
         WHERE ${Prisma.raw(
-        focusArray
-          .map(
-            (focus) => `
+          focusArray
+            .map(
+              (focus) => `
               EXISTS (
                 SELECT 1 FROM unnest(ip."investmentFocus") AS focus_item
                 WHERE LOWER(focus_item) LIKE LOWER('%${focus.replace(/'/g, "''")}%')
               )
             `
-          )
-          .join(' OR ')
-      )}
+            )
+            .join(' OR ')
+        )}
       `;
 
       if (matchingMemberIds.length > 0) {
@@ -2245,7 +2457,6 @@ export class MembersService {
       uid: true,
       externalId: true,
       name: true,
-      accessLevel: true,
       officeHours: true,
       ohStatus: true,
       ohInterest: true,
@@ -2288,6 +2499,15 @@ export class MembersService {
       skills: {
         select: {
           title: true,
+        },
+      },
+      policyAssignmentsV2: {
+        select: {
+          policy: {
+            select: {
+              role: true,
+            },
+          },
         },
       },
       investorProfile: {
@@ -2338,10 +2558,10 @@ export class MembersService {
         // Apply pagination manually
         const paginatedMembers = scoredMembers.slice(skip, skip + limit);
 
-        // Remove internal score and filter investorProfile based on access level
+        // Remove internal score and filter investorProfile unless member has Investor policy role
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const filteredMembers = paginatedMembers.map(({ _relevanceScore, ...member }) => {
-          if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+          if (!this.memberHasInvestorPolicyRole(member)) {
             return { ...member, investorProfile: null };
           }
           return member;
@@ -2368,9 +2588,8 @@ export class MembersService {
         this.prisma.member.count({ where }),
       ]);
 
-      // Filter investorProfile based on access level (only show for L5 and L6 members)
       const filteredMembers = members.map((member) => {
-        if (member.accessLevel !== 'L5' && member.accessLevel !== 'L6') {
+        if (!this.memberHasInvestorPolicyRole(member)) {
           return { ...member, investorProfile: null };
         }
         return member;
@@ -2404,16 +2623,14 @@ export class MembersService {
       // Build where clause - if no query, get all topics; if query, filter by it
       const titleFilter = query.trim()
         ? {
-          contains: searchQuery,
-          mode: 'insensitive' as const,
-        }
+            contains: searchQuery,
+            mode: 'insensitive' as const,
+          }
         : undefined;
 
       // Build member filter for office hours
       const memberFilter: any = {
-        accessLevel: {
-          notIn: ['L0', 'L1', 'Rejected'],
-        },
+        memberApproval: { state: { in: ['APPROVED'] } },
         ...(hasOfficeHours && {
           AND: [
             {
@@ -2490,10 +2707,10 @@ export class MembersService {
           ...memberFilter,
           ...(query.trim() &&
             ohMemberIds.length > 0 && {
-            id: {
-              in: ohMemberIds,
-            },
-          }),
+              id: {
+                in: ohMemberIds,
+              },
+            }),
           // If no query, get members with any ohInterest or ohHelpWith
           ...(!query.trim() && {
             OR: [
@@ -2619,9 +2836,7 @@ export class MembersService {
     try {
       // Build member filter for office hours
       const memberFilter: any = {
-        accessLevel: {
-          notIn: ['L0', 'L1', 'Rejected'],
-        },
+        memberApproval: { state: { in: ['APPROVED'] } },
         ...(hasOfficeHours && {
           AND: [
             {
@@ -2814,11 +3029,42 @@ export class MembersService {
     try {
       // Base conditions array - same logic as searchMembers isInvestor filter
       const baseConditions: Prisma.MemberWhereInput[] = [
-        // Must be L5/L6 with isInvestor true or null
         {
           OR: [
-            { AND: [{ isInvestor: true }, { accessLevel: { in: ['L5', 'L6'] } }] },
-            { AND: [{ accessLevel: { in: ['L5', 'L6'] } }, { isInvestor: null }] },
+            {
+              AND: [
+                { isInvestor: true },
+                {
+                  policyAssignmentsV2: {
+                    some: {
+                      policy: {
+                        role: {
+                          equals: 'investor',
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+            {
+              AND: [
+                {
+                  policyAssignmentsV2: {
+                    some: {
+                      policy: {
+                        role: {
+                          equals: 'investor',
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
+                },
+                { isInvestor: null },
+              ],
+            },
           ],
         },
         // Must have accepted SEC rules
@@ -2955,6 +3201,12 @@ export class MembersService {
     }
   }
 
+  private memberHasInvestorPolicyRole(member: {
+    policyAssignmentsV2?: Array<{ policy: { role: string } | null }> | null;
+  }): boolean {
+    return member.policyAssignmentsV2?.some((a) => a.policy?.role?.toLowerCase() === 'investor') ?? false;
+  }
+
   /**
    * Calculates a relevance score for a member based on how well they match the search term.
    * Used for ranking search results to prioritize better matches.
@@ -3006,14 +3258,23 @@ export class MembersService {
     this.logger.error(error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error?.code) {
-        case 'P2002':
-          const target = error.meta?.target as string[] | undefined;
-          if (target && target.some((t) => t.includes('telegram'))) {
+        case 'P2002': {
+          const target = error.meta?.target as string[] | string | undefined;
+          const fields = Array.isArray(target) ? target.map(String) : target != null ? [String(target)] : [];
+          if (fields.some((t) => t.includes('telegram'))) {
             throw new ConflictException(
               'This Telegram is already in use by another member. Please use a different Telegram ID.'
             );
           }
-          throw new ConflictException('Unique key constraint error on Member:', error.message);
+          if (fields.includes('email')) {
+            throw new ConflictException(
+              'An account with this email already exists. Sign in or use a different email address.'
+            );
+          }
+          throw new ConflictException(
+            'A member with this information already exists. Please check your details and try again.'
+          );
+        }
         case 'P2003':
           throw new BadRequestException('Foreign key constraint error on Member', error.message);
         case 'P2025':
@@ -3214,7 +3475,6 @@ export class MembersService {
           name: true,
           externalId: true,
           email: true,
-          accessLevel: true,
           officeHours: true,
           ohStatus: true,
           image: {
@@ -3269,7 +3529,52 @@ export class MembersService {
         },
       });
 
-      return members;
+      const memberUids = members.map((member) => member.uid);
+
+      if (!memberUids.length) {
+        return members;
+      }
+
+      const [policyAssignments, directPermissionRows] = await Promise.all([
+        this.prisma.policyAssignment.findMany({
+          where: { memberUid: { in: memberUids } },
+          include: {
+            policy: {
+              include: {
+                policyPermissions: {
+                  include: { permission: true },
+                },
+              },
+            },
+          },
+        }),
+        this.prisma.memberPermissionV2.findMany({
+          where: { memberUid: { in: memberUids } },
+          include: { permission: true },
+        }),
+      ]);
+
+      const permissionsByMemberUid = new Map<string, Set<string>>();
+
+      for (const memberUid of memberUids) {
+        permissionsByMemberUid.set(memberUid, new Set<string>());
+      }
+
+      for (const assignment of policyAssignments) {
+        const permissions = permissionsByMemberUid.get(assignment.memberUid);
+        for (const policyPermission of assignment.policy.policyPermissions) {
+          permissions?.add(policyPermission.permission.code);
+        }
+      }
+
+      for (const directPermission of directPermissionRows) {
+        permissionsByMemberUid.get(directPermission.memberUid)?.add(directPermission.permission.code);
+      }
+
+      return members.map((member) => ({
+        ...member,
+        permissions: Array.from(permissionsByMemberUid.get(member.uid) ?? []).sort(),
+      }));
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -3300,7 +3605,8 @@ export class MembersService {
       select: { uid: true, teamUid: true },
     });
     this.logger.info(
-      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${newTeamUid ?? 'null'
+      `[FounderSync] resolved team memberUid=${memberUid} preferredMain=${Boolean(preferred)} newTeamUid=${
+        newTeamUid ?? 'null'
       }`
     );
     // If there are no FOUNDER participants, nothing to do
@@ -3713,7 +4019,6 @@ export class MembersService {
         email: normalizedEmail,
         externalId: externalId ?? null,
         name: displayName,
-        accessLevel: 'L0', // default access level for newly created SSO users
       },
     });
 
@@ -3742,7 +4047,11 @@ export class MembersService {
    * @param params - Search parameters including optional searchTerm and email
    * @returns Array of matching members with confidence scores (0-100), sorted by score desc
    */
-  async searchMemberMatches(params: { searchTerm?: string; email?: string; limit: number }): Promise<{ matches: MemberSearchMatch[] }> {
+  async searchMemberMatches(params: {
+    searchTerm?: string;
+    email?: string;
+    limit: number;
+  }): Promise<{ matches: MemberSearchMatch[] }> {
     try {
       const { searchTerm, email, limit } = params;
       const trimmedName = searchTerm?.trim();
@@ -3821,8 +4130,8 @@ export class MembersService {
             // Exact name match with highest boost
             {
               match_phrase: {
-                name: { query: safeName, boost: 5.0 }
-              }
+                name: { query: safeName, boost: 5.0 },
+              },
             },
             // Fuzzy name match
             {
@@ -3831,8 +4140,8 @@ export class MembersService {
                   query: safeName,
                   fuzziness: 'AUTO',
                   boost: 2.0,
-                }
-              }
+                },
+              },
             },
             // Bio match for additional context
             {
@@ -3841,12 +4150,12 @@ export class MembersService {
                   query: safeName,
                   fuzziness: 'AUTO',
                   boost: 0.5,
-                }
-              }
-            }
+                },
+              },
+            },
           ],
           minimum_should_match: 1,
-        }
+        },
       },
       _source: ['uid', 'name', 'image'],
       sort: [{ _score: 'desc' }],

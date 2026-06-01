@@ -12,6 +12,7 @@ import { TeamsService } from '../teams/teams.service';
 import { Prisma } from '@prisma/client';
 import { LocationTransferService } from '../utils/location-transfer/location-transfer.service';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
+import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 type ParticipantTypeString = 'MEMBER' | 'TEAM';
 
@@ -25,7 +26,7 @@ export class ParticipantsRequestService {
     @Inject(forwardRef(() => TeamEnrichmentService))
     private readonly teamEnrichmentService: TeamEnrichmentService,
     private readonly logger: LogService,
-    private readonly locationTransferService: LocationTransferService,
+    private readonly locationTransferService: LocationTransferService
   ) {}
 
   /**
@@ -40,9 +41,7 @@ export class ParticipantsRequestService {
     const email = newData.email || body.email || null;
 
     if (!email) {
-      throw new BadRequestException(
-        'newData.email (or email) is required for member request',
-      );
+      throw new BadRequestException('newData.email (or email) is required for member request');
     }
 
     if (body.isTeamNew) {
@@ -50,9 +49,7 @@ export class ParticipantsRequestService {
       const teamName = team.name || newData.teamTitle || null;
 
       if (!teamName) {
-        throw new BadRequestException(
-          'team.name (or newData.teamTitle) is required when isTeamNew = true',
-        );
+        throw new BadRequestException('team.name (or newData.teamTitle) is required when isTeamNew = true');
       }
     }
   }
@@ -65,10 +62,7 @@ export class ParticipantsRequestService {
    *  - attach member to team
    */
   async handleMemberRequest(body: any): Promise<any> {
-    this.logger.info(
-      '[ParticipantsRequestService.handleMemberRequest] Incoming body=' +
-      JSON.stringify(body),
-    );
+    this.logger.info('[ParticipantsRequestService.handleMemberRequest] Incoming body=' + JSON.stringify(body));
 
     this.validateMemberRequestBody(body);
 
@@ -95,10 +89,7 @@ export class ParticipantsRequestService {
 
     const result = await this.membersService.createMemberAndAttach(newData, opts);
 
-    this.logger.info(
-      '[ParticipantsRequestService.handleMemberRequest] Created/updated member uid=' +
-      result.uid,
-    );
+    this.logger.info('[ParticipantsRequestService.handleMemberRequest] Created/updated member uid=' + result.uid);
 
     return result;
   }
@@ -122,12 +113,11 @@ export class ParticipantsRequestService {
    * Validate that the unique identifier does not already exist in Member / Team tables.
    * The participants_request table is no longer used here.
    */
-  async validateUniqueIdentifier(
-    participantType: ParticipantTypeString,
-    uniqueIdentifier: string,
-  ): Promise<void> {
-    const { isRequestPending, isUniqueIdentifierExist } =
-      await this.checkIfIdentifierAlreadyExist(participantType, uniqueIdentifier);
+  async validateUniqueIdentifier(participantType: ParticipantTypeString, uniqueIdentifier: string): Promise<void> {
+    const { isRequestPending, isUniqueIdentifierExist } = await this.checkIfIdentifierAlreadyExist(
+      participantType,
+      uniqueIdentifier
+    );
 
     // isRequestPending is always false in the new model,
     // because we do not store pending requests anymore.
@@ -147,7 +137,7 @@ export class ParticipantsRequestService {
 
     if (requestData.participantType === 'TEAM' && !requestData.requesterEmailId) {
       throw new BadRequestException(
-        'Requester email is required for team participation requests. Please provide a valid email address.',
+        'Requester email is required for team participation requests. Please provide a valid email address.'
       );
     }
   }
@@ -158,13 +148,7 @@ export class ParticipantsRequestService {
   async validateLocation(data: any): Promise<void> {
     const { city, country, region } = data;
     if (city || country || region) {
-      const result: any = await this.locationTransferService.fetchLocation(
-        city,
-        country,
-        null,
-        region,
-        null,
-      );
+      const result: any = await this.locationTransferService.fetchLocation(city, country, null, region, null);
       if (!result || !result?.location) {
         throw new BadRequestException('Invalid location information');
       }
@@ -176,19 +160,13 @@ export class ParticipantsRequestService {
    *  - we do NOT create a row in participants_request
    *  - if status = PENDING → we directly create Member/Team with accessLevel = L0
    */
-  async processImmediateRequest(
-    requestData: any,
-    requesterUser?: any,
-  ): Promise<any> {
+  async processImmediateRequest(requestData: any, requesterUser?: any): Promise<any> {
     this.logger.info(
-      '[ParticipantsRequestService.processImmediateRequest] Incoming body=' +
-      JSON.stringify(requestData),
+      '[ParticipantsRequestService.processImmediateRequest] Incoming body=' + JSON.stringify(requestData)
     );
 
     if (requestData.status && requestData.status !== 'PENDING') {
-      throw new BadRequestException(
-        'Only PENDING status is supported in the new model',
-      );
+      throw new BadRequestException('Only PENDING status is supported in the new model');
     }
 
     const participantType = requestData.participantType as ParticipantTypeString;
@@ -196,12 +174,10 @@ export class ParticipantsRequestService {
     if (participantType === 'MEMBER') {
       // This mirrors the old /member flow:
       // create a Member with L0 access level from sign-up data.
-      const member = await this.membersService.createMemberFromSignUpData(
-        requestData.newData,
-      );
+      const member = await this.membersService.createMemberFromSignUpData(requestData.newData);
 
       this.logger.info(
-        `[ParticipantsRequestService.processImmediateRequest] Created member uid=${member.uid} from legacy request`,
+        `[ParticipantsRequestService.processImmediateRequest] Created member uid=${member.uid} from legacy request`
       );
 
       return {
@@ -218,17 +194,17 @@ export class ParticipantsRequestService {
           newData: requestData.newData,
           requesterEmailId: requestData.requesterEmailId,
         },
-        requesterUser,
+        requesterUser
       );
 
       this.logger.info(
-        `[ParticipantsRequestService.processImmediateRequest] Created team uid=${createdTeam.uid} from legacy request`,
+        `[ParticipantsRequestService.processImmediateRequest] Created team uid=${createdTeam.uid} from legacy request`
       );
 
-      if (['L5', 'L6'].includes(requesterUser?.accessLevel)) {
+      if (requesterUser?.effectivePermissionCodes?.includes(MEMBER_PERMISSIONS.INVESTOR_MANAGE)) {
         await this.teamEnrichmentService.markTeamForEnrichment(createdTeam.uid);
         this.logger.info(
-          `[ParticipantsRequestService.processImmediateRequest] Marked team uid=${createdTeam.uid} for enrichment (requester accessLevel=${requesterUser.accessLevel})`,
+          `[ParticipantsRequestService.processImmediateRequest] Marked team uid=${createdTeam.uid} for enrichment (requester has investor manage permission)`
         );
       }
 
@@ -238,9 +214,7 @@ export class ParticipantsRequestService {
       };
     }
 
-    throw new BadRequestException(
-      `Unsupported participantType: ${participantType}`,
-    );
+    throw new BadRequestException(`Unsupported participantType: ${participantType}`);
   }
 
   /**
@@ -248,7 +222,7 @@ export class ParticipantsRequestService {
    * In the new model we do NOT look at participants_request anymore.
    */
   async checkIfIdentifierAlreadyExist(
-    type:   "MEMBER" | "TEAM",
+    type: 'MEMBER' | 'TEAM',
     identifier: string
   ): Promise<{
     isRequestPending: boolean;
@@ -260,12 +234,12 @@ export class ParticipantsRequestService {
           ? await this.teamsService.findTeamByName(identifier)
           : await this.membersService.findMemberByEmail(identifier);
       if (existingEntry) {
-        return {isRequestPending: false, isUniqueIdentifierExist: true};
+        return { isRequestPending: false, isUniqueIdentifierExist: true };
       }
-      return {isRequestPending: false, isUniqueIdentifierExist: false};
+      return { isRequestPending: false, isUniqueIdentifierExist: false };
     } catch (err) {
       if (err instanceof Prisma.NotFoundError) {
-        return {isRequestPending: false, isUniqueIdentifierExist: false};
+        return { isRequestPending: false, isUniqueIdentifierExist: false };
       }
       return this.handleErrors(err);
     }

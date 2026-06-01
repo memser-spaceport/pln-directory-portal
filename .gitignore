@@ -66,3 +66,5 @@ Thumbs.db
 /img-tmp
 AWSCLIV2.pkg
 env copy
+
+tsconfig.*

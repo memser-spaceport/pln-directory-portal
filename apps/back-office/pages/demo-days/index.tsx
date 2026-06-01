@@ -5,12 +5,11 @@ import { useDemoDaysList } from '../../hooks/demo-days/useDemoDaysList';
 import { useCookie } from 'react-use';
 import Link from 'next/link';
 import { useAuth } from '../../context/auth-context';
-import { removeToken } from '../../utils/auth';
 
 const DemoDaysPage = () => {
   const router = useRouter();
   const [authToken] = useCookie('plnadmin');
-  const { user, isDirectoryAdmin, isDemoDayAdmin, isLoading } = useAuth();
+  const { user, canViewDemoDays, canMutateDemoDays, isLoading } = useAuth();
   const { data: demoDays, isLoading: isDemoDaysLoading } = useDemoDaysList({ authToken });
 
   // Redirect to login if not authenticated
@@ -20,32 +19,18 @@ const DemoDaysPage = () => {
     }
   }, [authToken, router]);
 
-  // Logout completely if user has NO roles (NONE case)
+  // Block access to Demo Days if user has no required permission
   useEffect(() => {
-    if (!isLoading && authToken && user && (!user.roles || user.roles.length === 0)) {
-      removeToken();
+    if (!isLoading && authToken && user && !canViewDemoDays) {
       router.replace('/');
     }
-  }, [authToken, user, isLoading, router]);
-
-  // Block access to Demo Days if user has no required role
-  useEffect(() => {
-    if (!isLoading && authToken && user && user.roles && user.roles.length > 0) {
-      if (!isDirectoryAdmin && !isDemoDayAdmin) {
-        router.replace('/');
-      }
-    }
-  }, [authToken, user, isLoading, isDirectoryAdmin, isDemoDayAdmin, router]);
+  }, [authToken, user, isLoading, canViewDemoDays, router]);
 
   if (!authToken || isLoading) {
     return null;
   }
 
-  if (user && (!user.roles || user.roles.length === 0)) {
-    return null;
-  }
-
-  if (!isDirectoryAdmin && !isDemoDayAdmin) {
+  if (!canViewDemoDays) {
     return null;
   }
 
@@ -78,7 +63,7 @@ const DemoDaysPage = () => {
       <div className="mx-auto max-w-6xl p-6">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-semibold text-gray-900">Demo Days</h1>
-          {isDirectoryAdmin && (
+          {canMutateDemoDays && (
             <button
               onClick={() => router.push('/demo-days/create')}
               className="rounded-lg bg-blue-600 px-4 py-2 text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"

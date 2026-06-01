@@ -20,7 +20,7 @@ export const MembersMenu = () => {
   return (
     <div className={s.root} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button className={s.trigger}>
-        <MembersIcon /> Members{' '}
+        <MembersIcon /> M{' '}
         <span
           className={clsx(s.chevron, {
             [s.open]: open,
@@ -30,11 +30,17 @@ export const MembersMenu = () => {
         </span>
       </button>
       <div ref={menuRef} className={`${s.menu} ${open ? s.open : ''}`}>
+        <Link href="/members-v2" passHref>
+          <a className={s.menuItem}>
+            <span className={s.menuItemLabel}>Members V2</span>
+            <CaretIcon />
+          </a>
+        </Link>
         <Link href="/members?filter=level1" passHref>
           <a className={s.menuItem}>
             <Level1Icon />
             <span className={s.menuItemLabel}>1 level</span>
-            <span className={s.menuItemCount}>{counts?.L1}</span>
+            <span className={s.menuItemCount}>{counts?.VERIFIED}</span>
             <CaretIcon />
           </a>
         </Link>
@@ -42,7 +48,7 @@ export const MembersMenu = () => {
           <div className={s.menuItem}>
             <Level0Icon />
             <span className={s.menuItemLabel}>0 Level</span>
-            <span className={s.menuItemCount}>{counts?.L0}</span>
+            <span className={s.menuItemCount}>{counts?.PENDING}</span>
             <CaretIcon />
           </div>
         </Link>
@@ -50,7 +56,7 @@ export const MembersMenu = () => {
           <div className={s.menuItem}>
             <Level2Icon />
             <span className={s.menuItemLabel}>2-4 Level</span>
-            <span className={s.menuItemCount}>{(counts?.L2 ?? 0) + (counts?.L3 ?? 0) + (counts?.L4 ?? 0)}</span>
+            <span className={s.menuItemCount}>{counts?.APPROVED ?? 0}</span>
             <CaretIcon />
           </div>
         </Link>
@@ -58,7 +64,7 @@ export const MembersMenu = () => {
           <div className={s.menuItem}>
             <Level2Icon />
             <span className={s.menuItemLabel}>5-6 Level</span>
-            <span className={s.menuItemCount}>{(counts?.L5 ?? 0) + (counts?.L6 ?? 0)}</span>
+            <span className={s.menuItemCount}>{0}</span>
             <CaretIcon />
           </div>
         </Link>
@@ -66,7 +72,7 @@ export const MembersMenu = () => {
           <div className={s.menuItem}>
             <RejectedIcon />
             <span className={s.menuItemLabel}>Rejected</span>
-            <span className={s.menuItemCount}>{counts?.Rejected}</span>
+            <span className={s.menuItemCount}>{counts?.REJECTED}</span>
             <CaretIcon />
           </div>
         </Link>

@@ -36,7 +36,7 @@ export class PLEventGuestsService {
     private eventService: PLEventsService,
     @Inject(forwardRef(() => IrlGatheringPushCandidatesService))
     private readonly irlGatheringPushCandidatesService: IrlGatheringPushCandidatesService
-  ) { }
+  ) {}
 
   /**
    * This method creates multiple event guests for a specific location.
@@ -104,8 +104,8 @@ export class PLEventGuestsService {
       if (type === CREATE) {
         await this.eventLocationsService.subscribeLocationByUid(locationUid, data.memberUid);
         this.memberService.checkIfAdminUser(member) &&
-        !plEvents.length &&
-        (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
+          !plEvents.length &&
+          (await this.sendEventInvitationIfAdminAddsMember(eventMember, location));
       }
 
       await this.updateGuestTopicsAndReason(data, locationUid, member, eventType, tx);
@@ -191,7 +191,7 @@ export class PLEventGuestsService {
   ) {
     try {
       const events = type === 'upcoming' ? location.upcomingEvents : location.pastEvents;
-      const windowEventUids = events.map(e => e.uid);
+      const windowEventUids = events.map((e) => e.uid);
 
       const isAdmin = this.memberService.checkIfAdminUser(member);
       const targetMemberUid = isAdmin ? data.memberUid : member.uid;
@@ -274,8 +274,6 @@ export class PLEventGuestsService {
       this.handleErrors(err);
     }
   }
-
-
 
   /**
    * Deletes PLEventGuest records for a SPECIFIC location only.
@@ -384,21 +382,23 @@ export class PLEventGuestsService {
       const affectedEventUids = Array.from(affectedEventUidsSet).filter((x): x is string => x.length > 0);
 
       if (affectedEventUids.length > 0) {
-        await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(affectedEventUids);
+        await this.irlGatheringPushCandidatesService.refreshCandidatesForEventsAndUpdateNotifications(
+          affectedEventUids
+        );
       }
 
       await this.irlGatheringPushCandidatesService.refreshNotificationsForLocation(locationUid);
 
       this.logger.info(
         `[PLEventGuestsService] deletePLEventGuests ` +
-        JSON.stringify({
-          locationUid,
-          eventDeletePairs: uniqueEventDeleteConditions.length,
-          fullDeleteMembers: uniqueFullDeleteMemberUids.length,
-          affectedEventUids: affectedEventUids.length,
-          deletedEventCount: result?.events?.count ?? 0,
-          deletedFullCount: result?.full?.count ?? 0,
-        })
+          JSON.stringify({
+            locationUid,
+            eventDeletePairs: uniqueEventDeleteConditions.length,
+            fullDeleteMembers: uniqueFullDeleteMemberUids.length,
+            affectedEventUids: affectedEventUids.length,
+            deletedEventCount: result?.events?.count ?? 0,
+            deletedFullCount: result?.full?.count ?? 0,
+          })
       );
 
       return result;
@@ -438,21 +438,21 @@ export class PLEventGuestsService {
       // Detailed request log
       this.logger.info(
         `[PLEventGuestsService] getPLEventGuestsByLocationAndType request ` +
-        JSON.stringify({
-          locationUid,
-          type: type ?? null,
-          loggedInMemberUid: member?.uid ?? null,
-          filteredEventsCount: Array.isArray(filteredEvents) ? filteredEvents.length : 0,
-          eventsCountAfterFilter: Array.isArray(events) ? events.length : 0,
-          page: query?.page ?? 1,
-          limit: query?.limit ?? 10,
-          sortBy: query?.sortBy ?? null,
-          sortDirection: query?.sortDirection ?? null,
-          search: query?.search ?? null,
-          includeLocationOnlyGuests: true,
-          windowStart: window?.start ?? null,
-          windowEnd: window?.end ?? null,
-        })
+          JSON.stringify({
+            locationUid,
+            type: type ?? null,
+            loggedInMemberUid: member?.uid ?? null,
+            filteredEventsCount: Array.isArray(filteredEvents) ? filteredEvents.length : 0,
+            eventsCountAfterFilter: Array.isArray(events) ? events.length : 0,
+            page: query?.page ?? 1,
+            limit: query?.limit ?? 10,
+            sortBy: query?.sortBy ?? null,
+            sortDirection: query?.sortDirection ?? null,
+            search: query?.search ?? null,
+            includeLocationOnlyGuests: true,
+            windowStart: window?.start ?? null,
+            windowEnd: window?.end ?? null,
+          })
       );
 
       const result = await this.fetchAttendees({
@@ -480,13 +480,13 @@ export class PLEventGuestsService {
       // Response log (page-level)
       this.logger.info(
         `[PLEventGuestsService] getPLEventGuestsByLocationAndType response ` +
-        JSON.stringify({
-          locationUid,
-          type: type ?? null,
-          loggedInMemberUid: member?.uid ?? null,
-          returnedCount: Array.isArray(result) ? result.length : 0,
-          firstMemberUid: Array.isArray(result) && result[0] ? result[0]?.memberUid ?? null : null,
-        })
+          JSON.stringify({
+            locationUid,
+            type: type ?? null,
+            loggedInMemberUid: member?.uid ?? null,
+            returnedCount: Array.isArray(result) ? result.length : 0,
+            firstMemberUid: Array.isArray(result) && result[0] ? result[0]?.memberUid ?? null : null,
+          })
       );
 
       return result;
@@ -530,9 +530,7 @@ export class PLEventGuestsService {
             in: events.map((event) => event.uid),
           },
           member: {
-            accessLevel: {
-              notIn: ['L0', 'L1', 'Rejected'],
-            },
+            memberApproval: { state: { in: ['APPROVED'] } },
           },
           ...query.where,
         },
@@ -561,7 +559,6 @@ export class PLEventGuestsService {
           member: {
             select: {
               name: true,
-              accessLevel: true,
               image: {
                 select: {
                   url: true,
@@ -727,7 +724,9 @@ export class PLEventGuestsService {
    */
   async filterEventsByAttendanceAndAdminStatus(filteredEventsUid, events: PLEvent[], member): Promise<PLEvent[]> {
     if (filteredEventsUid?.length > 0 && !member) {
-      return events.filter((event) => filteredEventsUid?.includes(event.uid)).filter((event) => event.type !== 'INVITE_ONLY');
+      return events
+        .filter((event) => filteredEventsUid?.includes(event.uid))
+        .filter((event) => event.type !== 'INVITE_ONLY');
     }
     // If the user is logged out, remove all invite-only events
     if (!member) {
@@ -791,26 +790,26 @@ export class PLEventGuestsService {
 
     this.logger.info(
       `[PLEventGuestsService] fetchAttendees input ` +
-      JSON.stringify({
-        locationUid: locationUid ?? null,
-        loggedInMemberUid: loggedInMemberUid ?? null,
-        includeLocationOnlyGuests: !!includeLocationOnlyGuests,
-        eventUidsCount: Array.isArray(eventUids) ? eventUids.length : 0,
-        topicsCount: Array.isArray(topics) ? topics.length : 0,
-        isHost: isHost ?? null,
-        isSpeaker: isSpeaker ?? null,
-        isSponsor: isSponsor ?? null,
-        sortBy: sortBy ?? null,
-        sortDirection: sortDirection ?? null,
-        search: search ?? null,
-        limit: limit ?? 10,
-        page: page ?? 1,
-        includeLocations: !!includeLocations,
-      })
+        JSON.stringify({
+          locationUid: locationUid ?? null,
+          loggedInMemberUid: loggedInMemberUid ?? null,
+          includeLocationOnlyGuests: !!includeLocationOnlyGuests,
+          eventUidsCount: Array.isArray(eventUids) ? eventUids.length : 0,
+          topicsCount: Array.isArray(topics) ? topics.length : 0,
+          isHost: isHost ?? null,
+          isSpeaker: isSpeaker ?? null,
+          isSponsor: isSponsor ?? null,
+          sortBy: sortBy ?? null,
+          sortDirection: sortDirection ?? null,
+          search: search ?? null,
+          limit: limit ?? 10,
+          page: page ?? 1,
+          includeLocations: !!includeLocations,
+        })
     );
 
     // Build dynamic query conditions for filtering by eventUids and topics
-    let { conditions, values } = this.buildConditions(eventUids, topics);
+    const { conditions, values } = this.buildConditions(eventUids, topics);
 
     // location filter (always)
     values.push(locationUid);
@@ -959,8 +958,9 @@ export class PLEventGuestsService {
         ),
 
         location_only AS (
-        ${includeLocationOnlyGuests
-      ? `
+        ${
+          includeLocationOnlyGuests
+            ? `
                   SELECT
                     pg."memberUid",
                     'none' AS guest_type,
@@ -1023,7 +1023,12 @@ export class PLEventGuestsService {
                   WHERE
                     ($${locationUidPos}::text IS NULL OR pg."locationUid" = $${locationUidPos})
                     AND pg."eventUid" IS NULL
-                    AND m."accessLevel" NOT IN ('L0','L1','Rejected')
+                    AND NOT EXISTS (
+                      SELECT 1
+                      FROM "MemberApproval" ma
+                      WHERE ma."memberUid" = m.uid
+                        AND ma.state = 'REJECTED'
+                    )
 
                     -- prevent duplicates: if member already attends at least one of the requested events,
                     -- don't include their location-only row
@@ -1043,8 +1048,8 @@ export class PLEventGuestsService {
                     m.name,
                     tm.name
                 `
-      : `SELECT NULL::text AS "memberUid", 'none'::text AS guest_type, '{}'::json AS guest, '[]'::json AS events, '{}'::json AS member, '[]'::jsonb AS teamMemberRoles, '{}'::json AS team, 0::bigint AS count WHERE FALSE`
-    }
+            : `SELECT NULL::text AS "memberUid", 'none'::text AS guest_type, '{}'::json AS guest, '[]'::json AS events, '{}'::json AS member, '[]'::jsonb AS teamMemberRoles, '{}'::json AS team, 0::bigint AS count WHERE FALSE`
+        }
         ),
 
         combined AS (
@@ -1065,33 +1070,32 @@ export class PLEventGuestsService {
 
     this.logger.info(
       `[PLEventGuestsService] fetchAttendees sqlMeta ` +
-      JSON.stringify({
-        valuesCountBeforePagination: values.length,
-        locationUidPos,
-        loggedInUidPos,
-        eventUidsPos,
-        paginationLimit,
-        offset,
-      })
+        JSON.stringify({
+          valuesCountBeforePagination: values.length,
+          locationUidPos,
+          loggedInUidPos,
+          eventUidsPos,
+          paginationLimit,
+          offset,
+        })
     );
 
     values.push(paginationLimit, offset);
 
     this.logger.info(
       `[PLEventGuestsService] fetchAttendees sqlParams ` +
-      JSON.stringify({
-        valuesCountFinal: values.length,
-        eventUidsCount: Array.isArray(eventUids) ? eventUids.length : 0,
-        hasSearch: !!search,
-        hasLoggedInUid: !!loggedInMemberUid,
-      })
+        JSON.stringify({
+          valuesCountFinal: values.length,
+          eventUidsCount: Array.isArray(eventUids) ? eventUids.length : 0,
+          hasSearch: !!search,
+          hasLoggedInUid: !!loggedInMemberUid,
+        })
     );
 
     // Execute the raw query with the built query string and values
     const result = await this.prisma.$queryRawUnsafe(query, ...values);
     return this.formatAttendees(result);
   }
-
 
   private buildOuterOrderBy(sortBy: string, sortDirection: any, loggedInUidPos: number): string {
     const normalizeString = (v: any): string => {
@@ -1148,7 +1152,6 @@ export class PLEventGuestsService {
   `;
   }
 
-
   /**
    *
    * @param includeLocation query param to specify whether to include location or not
@@ -1171,7 +1174,7 @@ export class PLEventGuestsService {
    */
   private formatAttendees(result) {
     return result.map((attendee) => {
-      let guestInfo = { ...attendee?.guest?.info };
+      const guestInfo = { ...attendee?.guest?.info };
       guestInfo.teamUid = this.getGuestsActiveTeam(attendee?.teammemberroles, guestInfo?.teamUid)
         ? guestInfo?.teamUid
         : null;
@@ -1261,13 +1264,17 @@ export class PLEventGuestsService {
     if (search) {
       values.push(`%${search}%`);
       return ` WHERE
-        (m."accessLevel" NOT IN ('L0', 'L1', 'Rejected') AND (m."name" ILIKE $${values.length}) OR
+        (NOT EXISTS (
+          SELECT 1 FROM "MemberApproval" ma WHERE ma."memberUid" = m.uid AND ma.state = 'REJECTED'
+        ) AND (m."name" ILIKE $${values.length}) OR
         tm."name" ILIKE $${values.length} OR
         pc_project."name" ILIKE $${values.length} OR
         cp."name" ILIKE $${values.length}) `;
       // Append search term to the query values with wildcard matching
     }
-    return ` WHERE m."accessLevel" NOT IN ('L0', 'L1', 'Rejected')`;
+    return ` WHERE NOT EXISTS (
+      SELECT 1 FROM "MemberApproval" ma WHERE ma."memberUid" = m.uid AND ma.state = 'REJECTED'
+    )`;
   }
 
   /**
@@ -1317,7 +1324,7 @@ export class PLEventGuestsService {
       } else {
         events = (await this.eventLocationsService.getPLEventLocationByUid(locationUid)).events;
       }
-      let uniqueTopics = await this.prisma.pLEventGuest.findMany({
+      const uniqueTopics = await this.prisma.pLEventGuest.findMany({
         where: {
           eventUid: {
             in: events.map((event) => event.uid),
@@ -1546,10 +1553,7 @@ export class PLEventGuestsService {
     return await this.attachRoleFlags(rows, { locationUid: null, eventUids: [] });
   }
 
-  private async attachRoleFlags(
-    attendees: any[],
-    scope: { locationUid?: string | null; eventUids?: string[] }
-  ) {
+  private async attachRoleFlags(attendees: any[], scope: { locationUid?: string | null; eventUids?: string[] }) {
     const memberUids = Array.from(new Set((attendees ?? []).map((x) => x?.memberUid).filter(Boolean)));
     if (memberUids.length === 0) return attendees ?? [];
 
@@ -1599,14 +1603,13 @@ export class PLEventGuestsService {
     });
   }
 
-
   /**
    * Determines the active team for a guest.
    * @param teamMemberRoles - List of roles the guest has in different teams.
    * @param team - The current team associated with the guest.
    * @returns The team object if the guest is part of the team, otherwise an empty object.
    */
-  private getGuestsActiveTeam(teamMemberRoles, team: Partial<Team> | string | null): Boolean {
+  private getGuestsActiveTeam(teamMemberRoles, team: Partial<Team> | string | null): boolean {
     // check whether the given team is a members active team
     return teamMemberRoles?.some((role) => role?.team?.uid === (typeof team === 'string' ? team : team?.uid));
   }
@@ -1628,7 +1631,7 @@ export class PLEventGuestsService {
     data: UpdatePLEventGuestSchemaDto,
     locationUid: string,
     member: Member,
-    type: string = 'upcoming',
+    type = 'upcoming',
     tx?: Prisma.TransactionClient
   ) {
     const location = await this.eventLocationsService.getPLEventLocationByUid(locationUid);
@@ -1700,20 +1703,20 @@ export class PLEventGuestsService {
       // Build search conditions for events and locations
       const eventSearchCondition = queryParams?.name
         ? {
-          name: {
-            contains: queryParams.name,
-            mode: 'insensitive' as const,
-          },
-        }
+            name: {
+              contains: queryParams.name,
+              mode: 'insensitive' as const,
+            },
+          }
         : {};
 
       const locationSearchCondition = queryParams?.name
         ? {
-          location: {
-            contains: queryParams.name,
-            mode: 'insensitive' as const,
-          },
-        }
+            location: {
+              contains: queryParams.name,
+              mode: 'insensitive' as const,
+            },
+          }
         : {};
 
       // Build orderBy conditions based on queryParams.orderBy
@@ -1780,7 +1783,7 @@ export class PLEventGuestsService {
    */
   async sendEventGuestPresenceRequest(userEmail: string, body) {
     try {
-      let emailData = {
+      const emailData = {
         locationName: body.locationName,
         memberName: body.memberName,
         events: this.enrichEvents(body.events) ?? [],

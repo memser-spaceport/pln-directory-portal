@@ -9,6 +9,11 @@ export class TeamEnrichmentJudgeJob {
 
   constructor(private readonly judgeService: TeamEnrichmentJudgeService) {}
 
+  /** Per-pod in-memory flag — `true` while this pod's judge cron tick is mid-flight. */
+  get judgmentRunning(): boolean {
+    return this.isJudgmentRunning;
+  }
+
   // Default: daily at 4 AM UTC (one hour after the default 3 AM enrichment cron).
   @Cron(process.env.TEAM_ENRICHMENT_JUDGE_CRON || '0 4 * * *', {
     name: 'team-enrichment-judge',
@@ -45,16 +50,14 @@ export class TeamEnrichmentJudgeJob {
           if (status === 'started') started++;
           else skipped++;
         } catch (error) {
-          this.logger.error(
-            `Failed to judge team ${team.uid} (${team.name}): ${error.message}`,
-            error.stack
-          );
+          this.logger.error(`Failed to judge team ${team.uid} (${team.name}): ${error.message}`, error.stack);
           failed++;
         }
       }
 
       this.logger.log(
-        `Team enrichment judge job completed: ${started} started, ${skipped} skipped, ${failed} errored out of ${teams.length} total`
+        `Team enrichment judge job completed: ${started} started, ${skipped} skipped, ${failed} errored out of ${teams.length} total. ` +
+          `Per-team token usage + USD cost is logged separately as "Judge usage rollup" lines and persisted on TeamEnrichment.dataEnrichment.usage.`
       );
     } finally {
       this.isJudgmentRunning = false;

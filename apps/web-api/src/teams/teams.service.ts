@@ -26,10 +26,11 @@ import { AskService } from '../asks/asks.service';
 import { TeamsHooksService } from './teams.hooks.service';
 import { ParticipantsRequest } from './dto/members.dto';
 import { SelfUpdatePayload } from './dto/teams.dto';
-import { MemberRole, isDirectoryAdmin } from '../utils/constants';
+import { isDirectoryAdmin, memberHasPermissionCode } from '../utils/constants';
 import { OpenSearchService } from '../opensearch/opensearch.service';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { ENRICHABLE_TEAM_FIELDS } from '../team-enrichment/team-enrichment.types';
+import { MEMBER_PERMISSIONS, TEAM_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 /**
  * Interface for team search match result (used by entity association)
@@ -433,7 +434,10 @@ export class TeamsService {
 
       // Handle investor profile updates
       if (investorProfileData) {
-        await this.updateTeamInvestorProfile(teamUid, investorProfileData, tx, requestor.accessLevel);
+        const canManageInvestorProfile =
+          requestor?.isDirectoryAdmin === true ||
+          requestor?.effectivePermissionCodes?.includes(MEMBER_PERMISSIONS.INVESTOR_MANAGE);
+        await this.updateTeamInvestorProfile(teamUid, investorProfileData, tx, canManageInvestorProfile);
       }
     });
     await this.notificationService.notifyForTeamEditApproval(updatedTeam.name, teamUid, requestorEmail);
@@ -610,20 +614,13 @@ export class TeamsService {
     teamUid: string,
     investorProfileData: any,
     tx: Prisma.TransactionClient,
-    requestorAccessLevel?: string
+    canManageInvestorProfile = false
   ) {
     this.logger.info(
       `updateTeamInvestorProfile called for team ${teamUid} with data: ${JSON.stringify(investorProfileData)}`
     );
-    // Check if requestor has permission to update investor profile (L5, L6, or directory admin)
-    if (requestorAccessLevel && !['L5', 'L6'].includes(requestorAccessLevel)) {
-      // Check if they're a directory admin
-      const requestor = await tx.member.findFirst({
-        where: { memberRoles: { some: { name: MemberRole.DIRECTORY_ADMIN } } },
-      });
-      if (!requestor) {
-        throw new ForbiddenException('Insufficient permissions to update investor profile');
-      }
+    if (!canManageInvestorProfile) {
+      throw new ForbiddenException('Insufficient permissions to update investor profile');
     }
 
     const team = await tx.team.findUnique({
@@ -1597,6 +1594,8 @@ export class TeamsService {
 
           if (website !== undefined) {
             await tx.team.update({ where: { uid: teamUid }, data: { website } });
+            // Notify enrichment that the user owns this value now so future runs don't overwrite it.
+            await this.teamEnrichmentService.handleUserFieldChange(teamUid, { website }, tx);
           }
         }
       }
@@ -1781,7 +1780,7 @@ export class TeamsService {
         industryTags: {
           some: {
             title: {
-              in: filters.tags.split('searchTeams|'),
+              in: filters.tags.split('|'),
               mode: 'insensitive',
             },
           },
@@ -2004,7 +2003,9 @@ export class TeamsService {
       ? isDirectoryAdmin(member as { memberRoles: Array<{ name: string }> })
       : false;
 
-    return !!member.isTierViewer || memberIsDirectoryAdmin;
+    return (
+      !!member.isTierViewer || memberIsDirectoryAdmin || memberHasPermissionCode(member, TEAM_PERMISSIONS.PRIORITY_READ)
+    );
   }
 
   /**
@@ -2091,7 +2092,7 @@ export class TeamsService {
    * This is used by the new ParticipantsRequestService.processImmediateRequest()
    * to support the old /v1/participants-request endpoint while:
    *  - directly creating a Team entity
-   *  - setting accessLevel = 'L0' (inactive / soft-created)
+   *  - setting accessLevel = 'L1' when the requester is directory admin or memberApproval.state is APPROVED, otherwise 'L0'
    *  - optionally attaching the requester as a team member (team lead)
    *
    * @param payload.newData - Raw team data from the request
@@ -2117,10 +2118,14 @@ export class TeamsService {
         'Create' // keep the semantics consistent with existing code
       );
 
-      // Force L0 access level for newly created teams in this flow
-      formattedTeam.accessLevel =
-        !requesterUser?.accessLevel || ['L0', 'L1'].includes(requesterUser?.accessLevel) ? 'L0' : 'L1';
+      const requesterEligibleForActiveTeamAccess =
+        requesterUser?.isDirectoryAdmin === true || requesterUser?.memberApproval?.state === 'APPROVED';
+      formattedTeam.accessLevel = requesterEligibleForActiveTeamAccess ? 'L1' : 'L0';
       formattedTeam.accessLevelUpdatedAt = new Date();
+
+      const canUpdateInvestorProfile =
+        requesterUser?.isDirectoryAdmin === true ||
+        requesterUser?.effectivePermissionCodes?.includes(MEMBER_PERMISSIONS.INVESTOR_MANAGE);
 
       const createdTeam = await this.createTeam(formattedTeam, tx, requesterEmailId || newData?.requestorEmail || '');
 
@@ -2129,7 +2134,7 @@ export class TeamsService {
         this.logger.info(
           `[TeamsService.createTeamFromLegacyRequest] Updating investor profile for team ${createdTeam.uid}`
         );
-        await this.updateTeamInvestorProfile(createdTeam.uid, investorProfileData, tx, requesterUser?.accessLevel);
+        await this.updateTeamInvestorProfile(createdTeam.uid, investorProfileData, tx, canUpdateInvestorProfile);
       }
 
       // Optionally add requester as a team member (team lead, investment team flag, etc.)

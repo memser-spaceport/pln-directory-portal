@@ -1,5 +1,6 @@
 import { Controller, Post, Body, UseGuards, BadRequestException, Logger, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { NoCache } from '../decorators/no-cache.decorator';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
 import { JobOpeningsService } from './job-openings.service';
 import { JobOpeningsEnrichmentService } from './job-openings-enrichment.service';
@@ -44,14 +45,21 @@ export class JobOpeningsServiceController {
       if (!job.canonicalKey) {
         throw new BadRequestException(`Job at index ${i}: canonicalKey is required`);
       }
+      if (!job.dedupKey) {
+        throw new BadRequestException(`Job at index ${i}: dedupKey is required`);
+      }
       if (!job.detectionDate) {
         throw new BadRequestException(`Job at index ${i}: detectionDate is required`);
       }
     }
 
     this.logger.log(`Received ingest request with ${dto.jobs.length} jobs (runId: ${dto.runId ?? 'none'})`);
+    this.logger.log(`Job openings ingest payload: ${JSON.stringify(dto)}`);
 
-    const result = await this.jobOpeningsService.ingestJobOpenings(dto.jobs);
+    const result = await this.jobOpeningsService.ingestJobOpenings(dto.jobs, {
+      runId: dto.runId ?? null,
+      source: dto.source ?? null,
+    });
 
     this.logger.log(`Ingest complete: ${result.created} created, ${result.updated} updated, ${result.failed} failed`);
 
@@ -59,6 +67,7 @@ export class JobOpeningsServiceController {
   }
 
   @Get('teams-with-enrichment')
+  @NoCache()
   async getTeamsWithEnrichment(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -77,6 +86,7 @@ export class JobOpeningsServiceController {
   }
 
   @Get('teams/:uid/job-openings')
+  @NoCache()
   async getJobOpeningsByTeam(@Param('uid') uid: string): Promise<JobOpeningsPerTeamResponse> {
     return this.enrichmentService.getJobOpeningsByTeam(uid);
   }

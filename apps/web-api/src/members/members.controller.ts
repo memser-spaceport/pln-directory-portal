@@ -557,8 +557,7 @@ export class MemberController {
       throw new ForbiddenException('You can only update your own investor setting');
     }
 
-    // Check if a member is not rejected
-    if (member.accessLevel === 'Rejected') {
+    if (member.memberApproval?.state === 'REJECTED') {
       throw new ForbiddenException('Your application to join the Protocol Labs network was not approved');
     }
 

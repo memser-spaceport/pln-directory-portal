@@ -3,6 +3,7 @@ import {
   Body,
   CacheTTL,
   Controller,
+  Get,
   Param,
   Patch,
   Post,
@@ -19,9 +20,12 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 
 import { AdminTeamsService } from './admin-teams.service';
-import { TriggerForceEnrichmentQueryDto, UploadTeamTiersQueryDto } from './schema/admin-teams';
+import { ReviewEnrichmentBodyDto, TriggerForceEnrichmentQueryDto, UploadTeamTiersQueryDto } from './schema/admin-teams';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { TeamEnrichmentJudgeService } from '../team-enrichment/team-enrichment-judge.service';
+import { TeamEnrichmentReportService } from '../team-enrichment/team-enrichment-report.service';
+import { TeamEnrichmentJob } from '../team-enrichment/team-enrichment.job';
+import { TeamEnrichmentJudgeJob } from '../team-enrichment/team-enrichment-judge.job';
 
 @ApiTags('Admin Teams')
 @Controller('v1/admin/teams')
@@ -30,7 +34,10 @@ export class AdminTeamsController {
   constructor(
     private readonly adminTeamsService: AdminTeamsService,
     private readonly teamEnrichmentService: TeamEnrichmentService,
-    private readonly teamEnrichmentJudgeService: TeamEnrichmentJudgeService
+    private readonly teamEnrichmentJudgeService: TeamEnrichmentJudgeService,
+    private readonly teamEnrichmentReportService: TeamEnrichmentReportService,
+    private readonly teamEnrichmentJob: TeamEnrichmentJob,
+    private readonly teamEnrichmentJudgeJob: TeamEnrichmentJudgeJob
   ) {}
 
   @Post('tiers/upload')
@@ -79,18 +86,79 @@ export class AdminTeamsController {
     return this.adminTeamsService.updateTeam(teamUid, body);
   }
 
+  /**
+   * Admin team approval. Body lists per-field decisions:
+   *   { fields: [{ key: 'website', content: 'https://...' }, { key: 'blog' }, ...] }
+   *
+   * For each entry:
+   *  - `content` provided → admin edited the field. Value goes to Team; FieldEnrichmentStatus
+   *    flips to ChangedByUser; judgment.score bumps to 100.
+   *  - `content` omitted → admin confirmed the value as-is. The current Team / candidate value
+   *    is preserved; judgment.score bumps to 100; status is unchanged.
+   *
+   * Team-level: dataEnrichment.status → Approved, reviewedAt / reviewedBy stamped, approved
+   * keys dropped from judgment.fieldsForReview. Logo approval also marks the latest
+   * TeamLogoVerificationResult row `verified` at high confidence.
+   */
   @Patch('/:uid/enrichment-review')
   @NoCache()
   async reviewEnrichment(
     @Param('uid') uid: string,
-    @Body() body: { status: 'Reviewed' | 'Approved' },
+    @Body(new ZodValidationPipe()) body: ReviewEnrichmentBodyDto,
     @Req() req: any
   ) {
-    if (!body.status || !['Reviewed', 'Approved'].includes(body.status)) {
-      throw new BadRequestException('status must be "Reviewed" or "Approved"');
-    }
-    await this.teamEnrichmentService.reviewEnrichment(uid, body.status, req?.userEmail ?? 'admin');
-    return { success: true };
+    return this.teamEnrichmentService.approveEnrichmentForTeam(uid, body.fields, req?.userEmail ?? 'admin');
+  }
+
+  /**
+   * Full list of teams whose enrichment is in `EnrichmentStatus.Enriched`, including every
+   * judged field regardless of confidence. The response carries both the live `teamLogo`
+   * (`Team.logo`) and the candidate `logo` (`TeamEnrichment.logo`) so admins can compare.
+   */
+  @Get('enrichment-review')
+  @NoCache()
+  async listEnrichmentsForReview() {
+    return this.teamEnrichmentService.listEnrichmentsForReview();
+  }
+
+  /**
+   * Enrich + judge status snapshot for the enrichment + judge cron jobs.
+   *
+   * `isRunning` is a per-pod in-memory flag — accurate within this process, but if the API
+   * runs as multiple replicas only one pod will see `true`. Pending / in-progress counts come
+   * from the DB and are authoritative across pods.
+   *
+   * Declared before `/:uid/enrichment-status` so Nest routes the static segment first.
+   */
+  @Get('enrichment-status')
+  @NoCache()
+  async getEnrichmentCronStatus() {
+    const counts = await this.teamEnrichmentService.getCronCounts();
+    return {
+      enrichment: {
+        isRunning: this.teamEnrichmentJob.enrichmentRunning,
+        pending: counts.enrichment.pending,
+        inProgress: counts.enrichment.inProgress,
+      },
+      marking: { isRunning: this.teamEnrichmentJob.markingRunning },
+      judge: {
+        isRunning: this.teamEnrichmentJudgeJob.judgmentRunning,
+        pending: counts.judge.pending,
+        inProgress: counts.judge.inProgress,
+      },
+    };
+  }
+
+  /**
+   * Per-team enrich + judge status snapshot — enrichment status (e.g. PendingEnrichment /
+   * Enriched / Reviewed), `enrichedAt` / `judgedAt` timestamps, and judge `fieldsForReview`.
+   * Returns 404 if the team uid doesn't exist; returns `enrichment: null` if the team has no
+   * `TeamEnrichment` row yet.
+   */
+  @Get('/:uid/enrichment-status')
+  @NoCache()
+  async getEnrichmentStatus(@Param('uid') uid: string) {
+    return this.teamEnrichmentService.getEnrichmentStatus(uid);
   }
 
   @Post('/:uid/trigger-enrichment')
@@ -223,5 +291,41 @@ export class AdminTeamsController {
     }
 
     return { success: true, message: `Force-judgment triggered for team ${uid}` };
+  }
+
+  /**
+   * Aggregated AI token usage + USD cost report for the enrichment + judge pipelines.
+   * Reads `TeamEnrichment.dataEnrichment.usage` persisted on each team and rolls up totals, per-model
+   * breakdowns, and per-team usage. Teams are sorted by combined cost desc and paginated.
+   *
+   * Query params:
+   *  - since=<ISO8601> — filter per-stage usage by `lastRunAt >= since` (each stage filtered independently).
+   *  - page=<int>     — 1-based page index for the `teams` list (default 1).
+   *  - pageSize=<int> — items per page for the `teams` list (default 10, capped at 100).
+   *
+   * `totals` and `byModel` are always computed over the full result set, regardless of pagination.
+   *
+   * Costs are estimates from the in-app pricing table (`team-enrichment-cost.ts`).
+   * Token counts are exact and are the source of truth.
+   */
+  @Get('ai-report')
+  @NoCache()
+  async aiReport(@Query('since') since?: string, @Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+    return this.teamEnrichmentReportService.generateReport({
+      since,
+      page: page ? parseInt(page, 10) : undefined,
+      pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
+    });
+  }
+
+  /**
+   * Admin single-team detail for the data-quality review modal. Unlike the public
+   * GET /v1/teams/:uid, this returns inactive (L0) teams too. Declared last so the
+   * static GET routes above (enrichment-review, enrichment-status, ai-report) match first.
+   */
+  @Get('/:uid')
+  @NoCache()
+  async getTeamForReview(@Param('uid') uid: string) {
+    return this.adminTeamsService.getTeamForReview(uid);
   }
 }

@@ -73,7 +73,7 @@ const fade = {
 
 const TeamsPage: React.FC = () => {
   const router = useRouter();
-  const { isDirectoryAdmin } = useAuth();
+  const { isDirectoryAdmin, hasPermission } = useAuth();
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -87,6 +87,7 @@ const TeamsPage: React.FC = () => {
   const [search, setSearch] = useState('');
 
   // Right-side editor state
+  const canManageTeams = isDirectoryAdmin;
   const [selectedTeamUid, setSelectedTeamUid] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<TeamRow>>({});
   const [savingTeam, setSavingTeam] = useState(false);
@@ -95,10 +96,10 @@ const TeamsPage: React.FC = () => {
 
   // Redirect non-directory admins to demo-days
   useEffect(() => {
-    if (!isLoading && user && !isDirectoryAdmin) {
-      router.replace('/demo-days');
+    if (!isLoading && user && !isDirectoryAdmin && !hasPermission('team.membership_source.read') && !hasPermission('membership.source.read')) {
+      router.replace('/access-denied');
     }
-  }, [isLoading, user, isDirectoryAdmin, router]);
+  }, [isLoading, user, isDirectoryAdmin, hasPermission, router]);
 
   // Load teams on mount
   useEffect(() => {
@@ -139,6 +140,9 @@ const TeamsPage: React.FC = () => {
    */
   const handleAccessLevelChange = useCallback(
     (teamUid: string, accessLevel: AccessLevel) => {
+      if (!canManageTeams) {
+        return;
+      }
       const team = teams.find((t) => t.uid === teamUid);
 
       if (!team) {
@@ -158,13 +162,17 @@ const TeamsPage: React.FC = () => {
         return next;
       });
     },
-    [teams]
+    [teams, canManageTeams]
   );
 
   /**
    * Saves all pending access level changes
    */
   const handleSaveBatch = useCallback(async () => {
+    if (!canManageTeams) {
+      return;
+    }
+
     if (pendingAccessLevelChanges.size === 0) {
       return;
     }
@@ -202,7 +210,7 @@ const TeamsPage: React.FC = () => {
     } finally {
       setIsSavingBatch(false);
     }
-  }, [pendingAccessLevelChanges]);
+  }, [pendingAccessLevelChanges, canManageTeams]);
 
   /**
    * Resets all pending access level changes
@@ -228,6 +236,10 @@ const TeamsPage: React.FC = () => {
    * Opens the right-hand editor panel for the given team.
    */
   function openEditor(team: TeamRow) {
+    if (!canManageTeams) {
+      return;
+    }
+
     setSelectedTeamUid(team.uid);
     setEditForm({
       uid: team.uid,
@@ -272,6 +284,7 @@ const TeamsPage: React.FC = () => {
    * Backend reuses updateTeamFromParticipantsRequest under the hood.
    */
   async function saveTeam() {
+    if (!canManageTeams) return;
     if (!selectedTeamUid) return;
 
     try {
@@ -350,7 +363,7 @@ const TeamsPage: React.FC = () => {
   const selectedTeam = teams.find((t) => t.uid === selectedTeamUid) || null;
 
   // Don't render page content if user doesn't have access
-  if (!isLoading && user && !isDirectoryAdmin) {
+  if (!isLoading && user && !isDirectoryAdmin && !hasPermission('team.membership_source.read') && !hasPermission('membership.source.read')) {
     return null;
   }
 
@@ -392,8 +405,8 @@ const TeamsPage: React.FC = () => {
                 <div
                   key={team.uid}
                   className={s.tableRow}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => openEditor(team)}
+                  style={{ cursor: canManageTeams ? 'pointer' : 'default' }}
+                  onClick={() => canManageTeams && openEditor(team)}
                 >
                   <div className={clsx(s.bodyCell, s.first, s.teamNameColumn)}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -412,7 +425,7 @@ const TeamsPage: React.FC = () => {
                     <TeamAccessLevelSelect
                       value={getDisplayAccessLevel(team.uid, team.accessLevel ?? 'L0')}
                       onChange={(val) => handleAccessLevelChange(team.uid, val)}
-                      disabled={isSavingBatch}
+                      disabled={isSavingBatch || !canManageTeams}
                     />
                   </div>
 
@@ -422,6 +435,7 @@ const TeamsPage: React.FC = () => {
                   <div className={clsx(s.bodyCell, s.dateColumn)}>{new Date(team.updatedAt).toLocaleDateString()}</div>
 
                   <div className={clsx(s.bodyCell, s.infoColumn)} onClick={(e) => e.stopPropagation()}>
+                    {canManageTeams && (
                     <button className={s.editButton} onClick={() => openEditor(team)}>
                       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path
@@ -441,6 +455,7 @@ const TeamsPage: React.FC = () => {
                       </svg>
                       Edit
                     </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -548,7 +563,7 @@ const TeamsPage: React.FC = () => {
                     <button className={s.cancelButton} onClick={closeEditor}>
                       Cancel
                     </button>
-                    <button className={s.saveButton} disabled={savingTeam} onClick={saveTeam}>
+                    <button className={s.saveButton} disabled={savingTeam || !canManageTeams} onClick={saveTeam}>
                       {savingTeam ? 'Saving…' : 'Save'}
                     </button>
                   </div>

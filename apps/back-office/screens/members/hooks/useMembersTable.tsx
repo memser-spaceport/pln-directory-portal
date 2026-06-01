@@ -136,20 +136,10 @@ export function useMembersTable({
         enableSorting: true,
       }),
 
-      // Status (access level) column
-      columnHelper.accessor('accessLevel', {
-        header: 'Access level',
-        sortingFn: (rowA: Row<Member>, rowB: Row<Member>) => {
-          if (rowA.original.accessLevelUpdatedAt > rowB.original.accessLevelUpdatedAt) {
-            return 1;
-          }
-
-          if (rowA.original.accessLevelUpdatedAt < rowB.original.accessLevelUpdatedAt) {
-            return -1;
-          }
-
-          return 0;
-        },
+      columnHelper.accessor('memberState', {
+        header: 'Member state',
+        sortingFn: (rowA: Row<Member>, rowB: Row<Member>) =>
+          (rowA.original.memberState ?? '').localeCompare(rowB.original.memberState ?? ''),
         cell: (props) => <StatusCell member={props.row.original} authToken={authToken} />,
         size: 0,
       }),

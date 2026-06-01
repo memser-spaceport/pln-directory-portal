@@ -3,6 +3,7 @@ import { generateText } from 'ai';
 import { AiProviderService } from '../shared/ai-provider.service';
 import {
   AIJudgeResponse,
+  AIUsageEntry,
   FieldConfidence,
   FieldJudgment,
   FieldMetaKey,
@@ -12,6 +13,7 @@ import {
   TEAM_JUDGMENT_ASSESSMENT_MAX_LENGTH,
   TeamJudgment,
 } from './team-enrichment.types';
+import { buildUsageEntry, formatUsageLog } from './team-enrichment-cost';
 
 const TEAM_ENRICHMENT_JUDGE_SYSTEM_PROMPT = `
 You are an independent quality-verification judge for AI-enriched venture fund / crypto team data.
@@ -25,6 +27,13 @@ For each field listed in the user prompt, decide:
 - note: VERY SHORT tag-style mark explaining the verdict. Max 60 characters. Prefer hyphenated keywords like "domain-matches", "name-not-found-on-web", "url-404". NOT a sentence.
 
 If a "ScrapingDog pre-verification" block confirms the team's LinkedIn identity, treat that as strong evidence the entity reference is correct — but still verify each individual field value on its own merits.
+
+URL fields (website, blog, contactMethod, social handles): do NOT mark a value as "disagrees" merely because it differs from another URL we already have on file (e.g. the LinkedIn-listed website). Companies routinely use alias domains, product subdomains, or rebrand without updating LinkedIn. Verify each URL on its own merits via web search; prefer "uncertain" when you cannot independently confirm or refute it.
+
+If a "Website reachability" line is present, treat it as a signal — never the only signal:
+- "yes" (reachable, 2xx) — the URL is live, but liveness alone does not prove brand identity. Continue to verify the URL belongs to the team via web search.
+- "no" (definitive 4xx/5xx) — meaningful negative signal that the URL is stale or wrong. Lean toward "disagrees" for the website verdict if you also can't confirm it via web search.
+- "unknown" (not probed or transient network failure) — do not infer either way.
 
 RULES:
 - Use "uncertain" rather than guessing when you cannot verify a value.
@@ -71,6 +80,10 @@ export interface JudgeTeamContext {
   linkedinHandler?: string | null;
   twitterHandler?: string | null;
   telegramHandler?: string | null;
+  /** Website reachability probe result. true=2xx, false=definitive 4xx/5xx, null=not probed/transient/invalid URL. */
+  websiteReachable?: boolean | null;
+  /** Post-redirect host (normalized) when reachable; null otherwise. */
+  websiteFinalHost?: string | null;
   scrapingDog?: TeamJudgment['scrapingDog'];
 }
 
@@ -100,18 +113,21 @@ export class TeamEnrichmentJudgeAiService {
     overallAssessment: string;
     ok: boolean;
     errorMessage?: string;
+    usage: AIUsageEntry | null;
   }> {
     if (fields.length === 0) {
-      return { verdicts: {}, overallAssessment: 'No fields to judge.', ok: true };
+      return { verdicts: {}, overallAssessment: 'No fields to judge.', ok: true, usage: null };
     }
 
     const providerEnvVar = TeamEnrichmentJudgeAiService.PROVIDER_ENV_VAR;
+    const model = this.aiProvider.getModelName(providerEnvVar);
+    const startedAt = Date.now();
 
     try {
       const userPrompt = this.buildUserPrompt(context, fields);
       const tools = this.aiProvider.getWebSearchTool(providerEnvVar, { searchContextSize: 'medium' });
 
-      const { text } = await generateText({
+      const { text, usage, experimental_providerMetadata: providerMetadata } = await generateText({
         model: this.aiProvider.getResponsesModel(providerEnvVar, { useSearchGrounding: true }),
         system: TEAM_ENRICHMENT_JUDGE_SYSTEM_PROMPT,
         ...(Object.keys(tools).length > 0 && { tools }),
@@ -119,6 +135,17 @@ export class TeamEnrichmentJudgeAiService {
         temperature: 0.1,
         maxSteps: 3,
       });
+
+      const durationMs = Date.now() - startedAt;
+      const usageEntry = buildUsageEntry({ model, usage, providerMetadata, durationMs });
+
+      if (usageEntry) {
+        this.logger.log(`AI judge call team="${context.teamName}" stage=judge ok=true ${formatUsageLog(usageEntry)}`);
+      } else {
+        this.logger.warn(
+          `AI judge call team="${context.teamName}" stage=judge ok=true model=${model} durationMs=${durationMs} usage=unavailable`
+        );
+      }
 
       if (process.env.DEBUG_ENRICHMENT === 'true') {
         this.logger.debug(`Judge AI response (len=${text?.length ?? 0}): ${text?.substring(0, 500)}`);
@@ -131,6 +158,7 @@ export class TeamEnrichmentJudgeAiService {
           overallAssessment: '',
           ok: false,
           errorMessage: 'Judge AI response could not be parsed as JSON',
+          usage: usageEntry,
         };
       }
 
@@ -139,14 +167,20 @@ export class TeamEnrichmentJudgeAiService {
         verdicts,
         overallAssessment: this.truncate(parsed.overallAssessment || '', TEAM_JUDGMENT_ASSESSMENT_MAX_LENGTH),
         ok: true,
+        usage: usageEntry,
       };
     } catch (error) {
-      this.logger.error(`Judge AI failed for "${context.teamName}": ${error.message}`, error.stack);
+      const durationMs = Date.now() - startedAt;
+      this.logger.error(
+        `AI judge call team="${context.teamName}" stage=judge ok=false model=${model} durationMs=${durationMs} error="${error.message}"`,
+        error.stack
+      );
       return {
         verdicts: {},
         overallAssessment: '',
         ok: false,
         errorMessage: error.message,
+        usage: null,
       };
     }
   }
@@ -159,6 +193,15 @@ export class TeamEnrichmentJudgeAiService {
     if (context.linkedinHandler) identityLines.push(`Known LinkedIn: ${context.linkedinHandler}`);
     if (context.twitterHandler) identityLines.push(`Known Twitter/X: ${context.twitterHandler}`);
     if (context.telegramHandler) identityLines.push(`Known Telegram: ${context.telegramHandler}`);
+    if (context.website && context.websiteReachable !== undefined) {
+      const reachabilityWord =
+        context.websiteReachable === true ? 'yes' : context.websiteReachable === false ? 'no' : 'unknown';
+      const finalHostNote =
+        context.websiteFinalHost && context.websiteReachable === true
+          ? `; final host after redirects: ${context.websiteFinalHost}`
+          : '';
+      identityLines.push(`Website reachability: ${reachabilityWord}${finalHostNote}`);
+    }
 
     const fieldsBlock = fields
       .map((f) => {

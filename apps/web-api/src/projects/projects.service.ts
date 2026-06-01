@@ -99,9 +99,7 @@ export class ProjectsService {
       const whereWithFilter: Prisma.ProjectWhereInput = {
         ...queryOptions.where,
         creator: {
-          accessLevel: {
-            notIn: ['L0', 'L1', 'Rejected'],
-          },
+          memberApproval: { state: { in: ['APPROVED'] } },
         },
       };
 
@@ -113,7 +111,6 @@ export class ProjectsService {
             ? {
                 select: {
                   ...queryOptions.select,
-                  creator: { select: { accessLevel: true } },
                   logo: true,
                 },
               }

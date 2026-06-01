@@ -6,7 +6,6 @@ import { ApprovalLayout } from '../../layout/approval-layout';
 import api from '../../utils/api';
 import { API_ROUTE } from '../../utils/constants';
 import { useAuth } from '../../context/auth-context';
-import { removeToken } from '../../utils/auth';
 
 type IrlGatheringPushConfigDto = {
   uid: string;
@@ -68,29 +67,13 @@ const IrlGatheringPushConfigPage = () => {
     }
   }, [authToken, router]);
 
-  // Helper: logout when user has no roles (NONE) or forbidden
-  const forceLogout = () => {
-    console.log('[IrlGatheringPushConfigPage] Force logout (no roles / forbidden)');
-    removeToken();
-    document.cookie = 'plnadmin_user=; Max-Age=0; path=/;';
-    router.replace('/');
-  };
-
-  // Redirect non-directory admins
+  // Redirect non-directory admins. Authorization is permission-based now;
+  // an empty roles array is valid for admins with RBAC v2 permissions.
   useEffect(() => {
-    if (!isLoading && user) {
-      const hasAnyRoles = Array.isArray((user as any).roles) && (user as any).roles.length > 0;
-
-      if (!hasAnyRoles) {
-        forceLogout();
-        return;
-      }
-
-      if (!isDirectoryAdmin) {
-        router.replace('/demo-days');
-      }
+    if (!isLoading && user && !isDirectoryAdmin) {
+      router.replace('/access-denied');
     }
-  }, [isLoading, user, isDirectoryAdmin, router]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoading, user, isDirectoryAdmin, router]);
 
   // Load active config
   useEffect(() => {
@@ -124,7 +107,7 @@ const IrlGatheringPushConfigPage = () => {
         console.error('[IrlGatheringPushConfigPage] Failed to load config:', e);
 
         if (e?.response?.status === 403) {
-          forceLogout();
+          router.replace('/access-denied');
           return;
         }
 
@@ -193,7 +176,7 @@ const IrlGatheringPushConfigPage = () => {
       console.error('[IrlGatheringPushConfigPage] Save failed:', e);
 
       if (e?.response?.status === 403) {
-        forceLogout();
+        router.replace('/access-denied');
         return;
       }
 

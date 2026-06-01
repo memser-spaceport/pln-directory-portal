@@ -15,12 +15,14 @@ import { TeamsModule } from '../teams/teams.module';
 import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
 import { DemoDayNotificationsJob } from './demo-day-notifications.job';
 import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
+import { MemberApprovalsModule } from '../member-approvals/member-approvals.module';
 
 @Module({
   imports: [
     SharedModule,
     UploadsModule,
     AnalyticsModule,
+    MemberApprovalsModule,
     forwardRef(() => MembersModule),
     forwardRef(() => TeamsModule),
     NotificationsModule,

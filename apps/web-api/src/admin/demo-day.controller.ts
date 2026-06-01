@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
-import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
+import { DemoDayAdminAuthGuard, DemoDayReadAuthGuard } from '../guards/admin-auth.guard';
 import { DemoDaysService } from '../demo-days/demo-days.service';
 import { DemoDayParticipantsService } from '../demo-days/demo-day-participants.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
@@ -40,6 +40,7 @@ import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 @ApiTags('Admin Demo Days')
 @Controller('v1/admin/demo-days')
@@ -50,12 +51,26 @@ export class AdminDemoDaysController {
     private readonly notificationServiceClient: NotificationServiceClient
   ) {}
 
+  private adminJwt(req: Record<string, any>): { memberUid?: string; uid?: string } | undefined {
+    return req?.user ? { memberUid: req.user.memberUid, uid: req.user.uid } : undefined;
+  }
+
+  private jwtPermissionCodes(req: Record<string, any>): string[] {
+    return req.user?.effectivePermissionCodes ?? req.user?.permissions ?? req.user?.roles ?? [];
+  }
+
   @Get('report-link')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
-  @RequirePermissions(RBAC_PERMISSION_CODES.DEMO_DAY_REPORT_LINK_VIEW)
+  @RequirePermissions({
+    anyOf: [
+      RBAC_PERMISSION_CODES.DEMO_DAY_REPORT_LINK_READ,
+      RBAC_PERMISSION_CODES.DEMO_DAY_STATS_READ,
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+    ],
+  })
   @NoCache()
   async getDemoDayReportLink(@Req() req): Promise<{ url: string }> {
-    return this.demoDaysService.getDemoDayReportLink(req.userEmail);
+    return this.demoDaysService.getDemoDayReportLink();
   }
 
   @Get('subscribers')
@@ -83,7 +98,7 @@ export class AdminDemoDaysController {
   }
 
   @Post()
-  @UseGuards(AdminAuthGuard)
+  @UseGuards(DemoDayAdminAuthGuard)
   @UsePipes(ZodValidationPipe)
   @QueryCache()
   @CacheTTL(120) // 2 minutes
@@ -101,40 +116,51 @@ export class AdminDemoDaysController {
         host: body.host,
         status: body.status.toUpperCase() as DemoDayStatus,
       },
-      req.userEmail
+      req.userEmail,
+      this.adminJwt(req)
     );
   }
 
   @Get()
-  @UseGuards(DemoDayAdminAuthGuard)
+  @UseGuards(DemoDayReadAuthGuard)
   @NoCache()
   async getAllDemoDays(@Req() req): Promise<ResponseDemoDayDto[]> {
     // req.user contains the JWT payload with roles and memberUid
-    const userRoles: string[] = req.user?.roles ?? [];
-    const memberUid: string | undefined = req.user?.memberUid;
-    return this.demoDaysService.getAllDemoDaysForAdmin(userRoles, memberUid);
+    const permissionCodes: string[] =
+      req.user?.effectivePermissionCodes ?? req.user?.permissions ?? req.user?.roles ?? [];
+    const memberUid: string | undefined = req.user?.memberUid ?? req.user?.uid;
+    return this.demoDaysService.getAllDemoDaysForAdmin(permissionCodes, memberUid);
   }
 
   // This endpoint uses slugURL for browser-friendly URLs (e.g., /demo-days/crypto-day)
   @Get(':slugURL')
-  @UseGuards(DemoDayAdminAuthGuard)
+  @UseGuards(DemoDayReadAuthGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
-  async getDemoDayDetails(@Param('slugURL') slugURL: string): Promise<ResponseDemoDayDto> {
-    return this.demoDaysService.getDemoDayBySlugURL(slugURL);
+  async getDemoDayDetails(@Req() req, @Param('slugURL') slugURL: string): Promise<ResponseDemoDayDto> {
+    const permissionCodes = this.jwtPermissionCodes(req);
+    return this.demoDaysService.getDemoDayBySlugURLForAdminRead(
+      slugURL,
+      permissionCodes,
+      req.userEmail,
+      this.adminJwt(req)
+    );
   }
 
   @Post(':slugURL/preview-notification')
   @UseGuards(DemoDayAdminAuthGuard)
   @NoCache()
   async previewNotification(
+    @Req() req,
     @Param('slugURL') slugURL: string,
     @Body() body: { status: string; notificationsEnabled: boolean }
   ): Promise<{ willSend: boolean; title?: string; description?: string; reason?: string }> {
     return this.demoDaysService.previewStatusNotification(
       slugURL,
       body.status?.toUpperCase() as DemoDayStatus,
-      body.notificationsEnabled
+      body.notificationsEnabled,
+      req.userEmail,
+      this.adminJwt(req)
     );
   }
 
@@ -169,7 +195,8 @@ export class AdminDemoDaysController {
         programFieldOptions: body.programFieldOptions,
         stageTagEnabled: body.stageTagEnabled,
       },
-      req.userEmail
+      req.userEmail,
+      this.adminJwt(req)
     );
   }
 
@@ -190,7 +217,8 @@ export class AdminDemoDaysController {
         primaryColor: body.primaryColor,
         landingLogosEnabled: body.landingLogosEnabled,
       },
-      req.userEmail
+      req.userEmail,
+      this.adminJwt(req)
     );
   }
 
@@ -211,7 +239,8 @@ export class AdminDemoDaysController {
         name: body.name,
         type: body.type.toUpperCase() as 'INVESTOR' | 'FOUNDER',
       },
-      req.userEmail
+      req.userEmail,
+      this.adminJwt(req)
     );
   }
 
@@ -228,12 +257,13 @@ export class AdminDemoDaysController {
       {
         participants: body.participants,
       },
-      req.userEmail
+      req.userEmail,
+      this.adminJwt(req)
     );
   }
 
   @Get(':uid/participants')
-  @UseGuards(DemoDayAdminAuthGuard)
+  @UseGuards(DemoDayReadAuthGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async getParticipants(
@@ -272,7 +302,8 @@ export class AdminDemoDaysController {
         isDemoDayAdmin: body.isDemoDayAdmin,
         isDemoDayReadOnlyAdmin: body.isDemoDayReadOnlyAdmin,
       },
-      req.userEmail
+      req.userEmail,
+      this.adminJwt(req)
     );
   }
 
@@ -281,8 +312,8 @@ export class AdminDemoDaysController {
   @Get(':uid/dashboard-whitelist')
   @UseGuards(DemoDayAdminAuthGuard)
   @NoCache()
-  async getDashboardWhitelist(@Param('uid') uid: string): Promise<DashboardWhitelistMemberDto[]> {
-    return this.demoDaysService.getDashboardWhitelist(uid);
+  async getDashboardWhitelist(@Req() req, @Param('uid') uid: string): Promise<DashboardWhitelistMemberDto[]> {
+    return this.demoDaysService.getDashboardWhitelist(uid, req.userEmail, this.adminJwt(req));
   }
 
   @Post(':uid/dashboard-whitelist')
@@ -290,19 +321,21 @@ export class AdminDemoDaysController {
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async addToDashboardWhitelist(
+    @Req() req,
     @Param('uid') uid: string,
     @Body() body: AddDashboardWhitelistMemberDto
   ): Promise<{ success: boolean }> {
-    return this.demoDaysService.addToDashboardWhitelist(uid, body.memberUid);
+    return this.demoDaysService.addToDashboardWhitelist(uid, body.memberUid, req.userEmail, this.adminJwt(req));
   }
 
   @Delete(':uid/dashboard-whitelist/:memberUid')
   @UseGuards(DemoDayAdminAuthGuard)
   @NoCache()
   async removeFromDashboardWhitelist(
+    @Req() req,
     @Param('uid') uid: string,
     @Param('memberUid') memberUid: string
   ): Promise<{ success: boolean }> {
-    return this.demoDaysService.removeFromDashboardWhitelist(uid, memberUid);
+    return this.demoDaysService.removeFromDashboardWhitelist(uid, memberUid, req.userEmail, this.adminJwt(req));
   }
 }

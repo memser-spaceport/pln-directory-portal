@@ -1,0 +1,1064 @@
+@use '../../styles/mixins.scss';
+
+/* ── Page shell ─────────────────────────────────────────── */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1343px;
+  margin: 0 auto;
+  padding: 0 32px;
+  min-height: calc(100dvh - 80px);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 0;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.title {
+  color: var(--foreground-neutral-primary, #0a0c11);
+  font-size: 32px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 42px;
+  letter-spacing: -0.75px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input {
+  display: flex;
+  height: 48px;
+  padding: 10px 16px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(203, 213, 225, 0.5);
+  background: #fff;
+  outline: none;
+  min-width: 320px;
+  font-size: 14px;
+
+  &:focus {
+    border: 1px solid #5e718d;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12) !important;
+  }
+}
+
+
+.triggerBtn {
+  display: flex;
+  height: 48px;
+  padding: 10px 16px;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(14, 15, 17, 0.12);
+  background: #1b4dff;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0px 1px 3px 0px rgba(255, 255, 255, 0.32) inset,
+    0px 1px 5px 0px rgba(27, 77, 255, 0.16);
+
+  &:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+/* ── Table ─────────────────────────────────────────────── */
+
+.tableWrapper {
+  overflow-x: auto;
+  border: 1px solid #ddd;
+  border-radius: 10px 10px 0 0;
+  flex: 1;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.th {
+  height: 52px;
+  padding: 0 8px;
+  text-align: left;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  background: #f9fafb;
+  border-bottom: 1px solid #eee;
+  white-space: nowrap;
+  user-select: none;
+  box-sizing: border-box;
+
+  &:first-child {
+    padding-left: 20px;
+  }
+}
+
+.thSortable {
+  cursor: pointer;
+
+  &:hover {
+    background: #f1f5f9;
+  }
+}
+
+.thContent {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sortIcon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: #9ca3af;
+}
+
+.stickyCol {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #f9fafb;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.04);
+}
+
+.tr {
+  border-bottom: 1px solid #eee;
+  background: #fff;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover .td {
+    background: #f9fafb;
+  }
+}
+
+.td {
+  background: #fff;
+  padding: 12px 8px;
+  vertical-align: middle;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 52px;
+  min-width: 100px;
+  box-sizing: border-box;
+
+  &:first-child {
+    padding-left: 20px;
+  }
+}
+
+.td.stickyCol {
+  z-index: 1;
+}
+
+/* ── Team name column ───────────────────────────────────── */
+
+.teamNameCell {
+  min-width: 220px;
+  max-width: 220px;
+}
+
+.teamLink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: #374151;
+  min-width: 0;
+
+  &:hover .teamName {
+    text-decoration: underline;
+    color: #1b4dff;
+  }
+}
+
+.teamLogo {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border: 1px solid rgba(203, 213, 225, 0.4);
+  background: #f9fafb;
+}
+
+.teamLogoPlaceholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(203, 213, 225, 0.3);
+  color: var(--foreground-neutral-secondary, #455468);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.teamName {
+  font-weight: 500;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* ── Field cells ────────────────────────────────────────── */
+
+.fieldCell {
+  display: flex;
+  gap: 4px;
+}
+
+/* Source badge — AI or User */
+.sourceBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  width: fit-content;
+  line-height: 1;
+}
+
+.sourceBadgeAI {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.sourceBadgeUser {
+  background: #f8fafc;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+/* Eval badge — Low or High */
+.evalBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  width: fit-content;
+  line-height: 1;
+}
+
+.evalDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.evalLow {
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.evalHigh {
+  background: rgba(34, 197, 94, 0.08);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.emptyField {
+  color: rgba(203, 213, 225, 0.8);
+  font-size: 14px;
+}
+
+/* ── Actions column ─────────────────────────────────────── */
+
+.reviewButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 15px;
+  border: none;
+  cursor: pointer;
+
+  &:hover {
+    background: #f1f5f9;
+  }
+}
+
+/* ── State rows ─────────────────────────────────────────── */
+
+.stateCell {
+  padding: 48px;
+  text-align: center;
+  color: #5e718d;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.tableSection {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Modal ─────────────────────────────────────────────── */
+
+.overlay {
+  @include mixins.hide-scrollbar;
+  position: fixed;
+  inset: 0;
+  background: #00000066;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: auto;
+  padding: 32px;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  height: fit-content;
+  color: var(--foreground-neutral-secondary, #455468);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: -0.2px;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: fit-content;
+  border-bottom: 1px solid var(--border-neutral-muted, #e2e8f0);
+  padding: 20px;
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  color: var(--foreground-neutral-primary, #0a0c11);
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 28px;
+  margin: 0;
+}
+
+.closeButton {
+  position: absolute;
+  border: none;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  user-select: none;
+  outline: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 16px;
+  color: var(--foreground-neutral-secondary, #455468);
+
+  &:hover {
+    background: var(--background-neutral-soft-surface, #f9fafb);
+  }
+}
+
+.modalBody {
+  overflow-y: auto;
+  padding: 8px 20px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Field rows in modal ────────────────────────────────── */
+
+.fieldRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-neutral-muted, #e2e8f0);
+  transition: opacity 0.2s;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.fieldRowApproved {
+  opacity: 0.55;
+}
+
+.fieldInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fieldMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fieldLabel {
+  color: var(--foreground-neutral-secondary, #455468);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: -0.2px;
+}
+
+.fieldValue {
+  color: var(--foreground-neutral-primary, #0a0c11);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  word-break: break-all;
+}
+
+.judgmentNote {
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* ── Toggle ─────────────────────────────────────────────── */
+
+.toggleWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: rgba(203, 213, 225, 0.5);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s;
+  flex-shrink: 0;
+
+  &:focus-visible {
+    outline: 2px solid var(--action-background-brand-normal, #1b4dff);
+    outline-offset: 2px;
+  }
+}
+
+.toggleOn {
+  background: #22c55e;
+
+  .toggleThumb {
+    transform: translateX(16px);
+  }
+}
+
+.toggleDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggleThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.toggleStatus {
+  font-size: 12px;
+  color: var(--foreground-neutral-secondary, #455468);
+  white-space: nowrap;
+  min-width: 72px;
+}
+
+/* ── Modal footer ───────────────────────────────────────── */
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-neutral-muted, #e2e8f0);
+  flex-shrink: 0;
+}
+
+.cancelButton {
+  display: flex;
+  padding: 10px 16px;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(14, 15, 17, 0.16);
+  background: #fff;
+  color: #455468;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  box-shadow: 0px -2px 8px 0px rgba(14, 15, 17, 0.02) inset, 0px 1px 2px 0px rgba(14, 15, 17, 0.08);
+
+  &:hover {
+    background: #f9fafb;
+  }
+}
+
+.saveButton {
+  display: flex;
+  padding: 10px 16px;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(14, 15, 17, 0.12);
+  background: #1b4dff;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  box-shadow: 0px 1px 3px 0px rgba(255, 255, 255, 0.32) inset, 0px 4px 6px 0px rgba(255, 255, 255, 0.06) inset,
+    0px 1px 5px 0px rgba(27, 77, 255, 0.16);
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+}
+
+.modalLoading {
+  padding: 32px;
+  text-align: center;
+  color: #5e718d;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* ── Edit modal field rows ──────────────────────────────── */
+
+.editFieldRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 0;
+  border-bottom: 1px solid #e2e8f0;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.editFieldHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.editFieldMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.editEnrichmentStatus {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.editJudgmentNote {
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editNoEnrichment {
+  margin-left: auto;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.editInput {
+  width: 100%;
+  height: 40px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(203, 213, 225, 0.5);
+  background: #fff;
+  outline: none;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  color: #0a0c11;
+  box-sizing: border-box;
+
+  &:focus {
+    border-color: #5e718d;
+    box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12);
+  }
+}
+
+.editTextarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(203, 213, 225, 0.5);
+  background: #fff;
+  outline: none;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  color: #0a0c11;
+  resize: vertical;
+  box-sizing: border-box;
+
+  &:focus {
+    border-color: #5e718d;
+    box-shadow: 0 0 0 4px rgba(27, 56, 96, 0.12);
+  }
+}
+
+.editSuggestion {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+
+.editSuggestionLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1d4ed8;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.editSuggestionValue {
+  font-size: 12px;
+  color: #475569;
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
+
+.editApplyBtn {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1d4ed8;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.confirmBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border: 1px solid #1f8a4c;
+  background: transparent;
+  color: #1f8a4c;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.12s;
+  font-family: inherit;
+
+  &:hover {
+    background: #e7f7ee;
+  }
+}
+
+.confirmBtnActive {
+  background: #1f8a4c;
+  color: #fff;
+  border-color: #1f8a4c;
+  cursor: default;
+
+  &:hover {
+    background: #1f8a4c;
+  }
+}
+
+/* ── Field header right cluster ─────────────────────────── */
+
+.editFieldActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Logo three-slot picker ─────────────────────────────── */
+
+.logoCompare {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.logoSlot {
+  position: relative;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px 12px;
+  background: #fff;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:hover {
+    border-color: rgba(27, 56, 96, 0.24);
+  }
+}
+
+.logoSlotSuggested {
+  background: #f2f5ff;
+  border-color: #dbe5fa;
+
+  &:hover {
+    border-color: #dbe5fa;
+  }
+}
+
+.logoSlotDisabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.logoSlotUpload {
+  border-style: dashed;
+  border-color: rgba(27, 56, 96, 0.24);
+
+  &:hover {
+    border-color: #1b4dff;
+    background: #fafbfd;
+  }
+}
+
+.logoSlotSelected {
+  border-color: #1b4dff !important;
+  border-width: 1.5px;
+  padding: 15.5px 11.5px;
+
+  &.logoSlotUpload {
+    border-style: solid;
+  }
+}
+
+.logoSlotCheck {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1b4dff;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.logoSlotLabel {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+
+  .logoSlotSuggested & {
+    color: #1b4dff;
+    font-weight: 600;
+  }
+}
+
+.logoSlotPreview {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto;
+  border-radius: 12px;
+  background: #f0f1f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #94a3b8;
+}
+
+.logoSlotImg {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+/* ── Logo preview row ───────────────────────────────────── */
+
+.logoPreviewRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.logoPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.logoPreviewLabel {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.logoPreviewImg {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: contain;
+  border: 1px solid rgba(203, 213, 225, 0.4);
+  background: #f8fafc;
+}
+
+/* ── Modal title link + subtitle ────────────────────────── */
+
+.modalTitleLink {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  color: #0a0c11;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+
+  &:hover {
+    color: #1b4dff;
+    text-decoration: underline;
+  }
+}
+
+.modalSubtitle {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 400;
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+/* ── Info banner ────────────────────────────────────────── */
+
+.modalInfoBanner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  margin: 12px 0 4px;
+  background: #e8f0fe;
+  border: 1px solid #dbe5fa;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0a0c11;
+}
+
+.modalInfoIcon {
+  color: #1a56db;
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.modalInfoText {
+  flex: 1;
+}
+
+.modalInfoTitle {
+  font-weight: 600;
+  color: #1a56db;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+/* ── Modal empty state ──────────────────────────────────── */
+
+.modalEmptyState {
+  padding: 40px 0;
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 400;
+  margin: 0;
+}
+
+/* ── Priority pill ──────────────────────────────────────── */
+
+.priorityPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  min-width: 28px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+/* ── Needs-review chips ─────────────────────────────────── */
+
+.reviewChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.reviewChip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.reviewChipAI {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.reviewChipUser {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+/* ── Last-judged date stack ─────────────────────────────── */
+
+.dateStack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dateMain {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  line-height: 18px;
+}
+
+.dateTime {
+  font-size: 11px;
+  font-weight: 400;
+  color: #94a3b8;
+  line-height: 16px;
+}

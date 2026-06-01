@@ -11,16 +11,14 @@ import { CreateArticleDto, ListArticlesQueryDto, UpdateArticleDto } from './arti
 import type { ArticleCategory } from './articles.constants';
 import { ARTICLE_CATEGORY_DESCRIPTIONS, WORDS_PER_MINUTE } from './articles.constants';
 import { MemberRole } from '../utils/constants';
+import { FOUNDER_GUIDES_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
-import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
-import { RbacService } from '../rbac/rbac.service';
 
 @Injectable()
 export class ArticlesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly accessControlV2Service: AccessControlV2Service,
-    private readonly rbacService: RbacService
+    private readonly accessControlV2Service: AccessControlV2Service
   ) {}
 
   // ── Helpers ────────────────────────────────────────────────────────────
@@ -84,29 +82,10 @@ export class ArticlesService {
   }
 
   private readonly ARTICLE_PERMISSION_CODES = [
-    'founder_guides.view.plvs',
-    'founder_guides.view.plcc',
-    'founder_guides.view.all',
+    FOUNDER_GUIDES_PERMISSIONS.VIEW_PLVS,
+    FOUNDER_GUIDES_PERMISSIONS.VIEW_PLCC,
+    FOUNDER_GUIDES_PERMISSIONS.VIEW_ALL,
   ] as const;
-
-  // TODO: Remove after RBAC V2 migration
-  private async resolveUserScopes(userEmail?: string): Promise<string[]> {
-    if (!userEmail) return [];
-    try {
-      const member = await this.rbacService.findMemberByEmail(userEmail);
-      if (!member) return [];
-      return this.rbacService.getScopesForPermission(member.uid, RBAC_PERMISSION_CODES.FOUNDER_GUIDES_VIEW);
-    } catch {
-      return [];
-    }
-  }
-
-  // TODO: Remove after RBAC V2 migration
-  private buildScopeFilter(userScopes: string[]): Prisma.ArticleWhereInput {
-    return {
-      OR: [{ scope: null }, ...(userScopes.length > 0 ? [{ scope: { in: userScopes } }] : [])],
-    };
-  }
 
   private validateRequiredPermissionCode(permissionCode: string | null | undefined): void {
     if (!permissionCode) return;
@@ -128,8 +107,9 @@ export class ArticlesService {
     if (permissionSet.has(permissionCode)) return true;
 
     if (
-      (permissionCode === 'founder_guides.view.plvs' || permissionCode === 'founder_guides.view.plcc') &&
-      permissionSet.has('founder_guides.view.all')
+      (permissionCode === FOUNDER_GUIDES_PERMISSIONS.VIEW_PLVS ||
+        permissionCode === FOUNDER_GUIDES_PERMISSIONS.VIEW_PLCC) &&
+      permissionSet.has(FOUNDER_GUIDES_PERMISSIONS.VIEW_ALL)
     ) {
       return true;
     }
@@ -251,10 +231,8 @@ export class ArticlesService {
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const userScopes = await this.resolveUserScopes(userEmail);
     const baseWhere: Prisma.ArticleWhereInput = {
       ...this.buildArticleWhere(query, ArticleStatus.PUBLISHED),
-      ...this.buildScopeFilter(userScopes),
     };
 
     let orderBy: Prisma.ArticleOrderByWithRelationInput;
@@ -374,14 +352,6 @@ export class ArticlesService {
         isAuthor = article.authorMemberUid === memberUid || (!!teamUid && article.authorTeamUid === teamUid);
       } catch {
         // Not logged in or member not found -- treat as non-author
-      }
-    }
-
-    // TODO: Remove after RBAC V2 migration
-    if (article.scope && !isAuthor) {
-      const userScopes = await this.resolveUserScopes(userEmail);
-      if (!userScopes.includes(article.scope)) {
-        throw new ForbiddenException('You do not have access to this article');
       }
     }
 
@@ -1026,10 +996,6 @@ export class ArticlesService {
       return { members: [], teams: [] };
     }
 
-    const memberAccessOk: Prisma.MemberWhereInput = {
-      OR: [{ accessLevel: null }, { accessLevel: { notIn: ['L0', 'L1'] } }],
-    };
-
     const teamAccessOk: Prisma.TeamWhereInput = {
       OR: [{ accessLevel: null }, { accessLevel: { not: 'L0' } }],
     };
@@ -1039,7 +1005,7 @@ export class ArticlesService {
         where: {
           deletedAt: null,
           AND: [
-            memberAccessOk,
+            { memberApproval: { state: { in: ['APPROVED'] } } },
             {
               OR: [{ name: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }],
             },

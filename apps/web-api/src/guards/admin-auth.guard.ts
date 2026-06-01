@@ -1,11 +1,11 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '../utils/jwt/jwt.service';
+import {
+  ADMIN_PERMISSIONS,
+  DEMODAY_PERMISSIONS,
+  MEMBER_PERMISSIONS,
+  TEAM_MEMBERSHIP_PERMISSIONS,
+} from '../access-control-v2/access-control-v2.constants';
 import { MemberRole } from '../utils/constants';
 
 /**
@@ -15,7 +15,13 @@ import { MemberRole } from '../utils/constants';
 abstract class BaseAdminAuthGuard implements CanActivate {
   constructor(protected jwtService: JwtService) {}
 
-  protected abstract getAllowedRoles(): MemberRole[];
+  protected getAllowedPermissions(): string[] {
+    return [];
+  }
+
+  protected allowsPermissionPrefix(_permissionCode: string): boolean {
+    return false;
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -29,13 +35,15 @@ abstract class BaseAdminAuthGuard implements CanActivate {
       // so that we can access it in our route handlers
       request['user'] = payload;
 
-      // Verify user has at least one of the allowed roles
-      const roles: string[] = payload.roles || [];
-      const allowedRoles = this.getAllowedRoles();
-      const hasValidRole = roles.some((role) => allowedRoles.includes(role as MemberRole));
+      // Verify user has at least one of the allowed permissions
+      const permissions: string[] = payload.effectivePermissionCodes ?? payload.permissions ?? [];
+      const allowedPermissions = this.getAllowedPermissions();
+      const hasValidPermission = permissions.some(
+        (permission) => allowedPermissions.includes(permission) || this.allowsPermissionPrefix(permission)
+      );
 
-      if (!hasValidRole) {
-        throw new ForbiddenException('User does not have the required admin role');
+      if (!hasValidPermission) {
+        throw new ForbiddenException('User does not have the required admin permission');
       }
     } catch (e) {
       if (e instanceof ForbiddenException) {
@@ -62,8 +70,8 @@ export class AdminAuthGuard extends BaseAdminAuthGuard {
     super(jwtService);
   }
 
-  protected getAllowedRoles(): MemberRole[] {
-    return [MemberRole.DIRECTORY_ADMIN];
+  protected getAllowedPermissions(): string[] {
+    return [ADMIN_PERMISSIONS.DIRECTORY_FULL];
   }
 }
 
@@ -78,6 +86,61 @@ export class DemoDayAdminAuthGuard extends BaseAdminAuthGuard {
   }
 
   protected getAllowedRoles(): MemberRole[] {
-    return [MemberRole.DIRECTORY_ADMIN, MemberRole.DEMO_DAY_ADMIN];
+    return [];
+  }
+
+  protected getAllowedPermissions(): string[] {
+    return [ADMIN_PERMISSIONS.DIRECTORY_FULL, DEMODAY_PERMISSIONS.ADMIN_ALL];
+  }
+
+  protected allowsPermissionPrefix(permissionCode: string): boolean {
+    return permissionCode.startsWith('demoday.admin.');
+  }
+}
+
+/**
+ * Guard for read-only Demo Day admin pages.
+ * Allows stats/report-link readers without granting write access.
+ */
+@Injectable()
+export class DemoDayReadAuthGuard extends BaseAdminAuthGuard {
+  constructor(jwtService: JwtService) {
+    super(jwtService);
+  }
+
+  protected getAllowedRoles(): MemberRole[] {
+    return [];
+  }
+
+  protected getAllowedPermissions(): string[] {
+    return [
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+      DEMODAY_PERMISSIONS.ADMIN_ALL,
+      DEMODAY_PERMISSIONS.STATS_READ,
+      DEMODAY_PERMISSIONS.REPORT_LINK_READ,
+    ];
+  }
+
+  protected allowsPermissionPrefix(permissionCode: string): boolean {
+    return permissionCode.startsWith('demoday.admin.');
+  }
+}
+
+/**
+ * Guard for Back Office team membership source read access.
+ * Allows read-only team membership source without granting team write/admin actions.
+ */
+@Injectable()
+export class TeamMembershipSourceReadAuthGuard extends BaseAdminAuthGuard {
+  constructor(jwtService: JwtService) {
+    super(jwtService);
+  }
+
+  protected getAllowedPermissions(): string[] {
+    return [
+      ADMIN_PERMISSIONS.DIRECTORY_FULL,
+      TEAM_MEMBERSHIP_PERMISSIONS.SOURCE_READ,
+      TEAM_MEMBERSHIP_PERMISSIONS.SOURCE_READ_LEGACY,
+    ];
   }
 }

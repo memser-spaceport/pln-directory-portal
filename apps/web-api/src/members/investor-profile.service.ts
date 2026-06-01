@@ -1,23 +1,16 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { InvestorProfileType } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InvestorProfileType, MemberApprovalState } from '@prisma/client';
+import { upsertPolicyAssignmentByCode } from '../demo-days/demo-day-investor-policy.util';
 import { PrismaService } from '../shared/prisma.service';
 import { LogService } from '../shared/log.service';
 import { CacheService } from '../utils/cache/cache.service';
+
+const PL_INVESTOR_POLICY_CODE = 'investor_pl';
 
 @Injectable()
 export class InvestorProfileService {
   constructor(private prisma: PrismaService, private logger: LogService, private cacheService: CacheService) {}
 
-  /**
-   * Creates or updates an investor profile for a member
-   * Only L5 and L6 members can create/update their own investor profile
-   * Automatically upgrades L2-L4 members to L6 when they provide an investor type
-   *
-   * @param memberUid - The UID of the member
-   * @param memberAccessLevel - The access level of the member
-   * @param investorProfileData - The investor profile data
-   * @returns The created/updated investor profile
-   */
   async createOrUpdateInvestorProfile(
     memberUid: string,
     investorProfileData: {
@@ -34,39 +27,34 @@ export class InvestorProfileService {
     try {
       const member = await this.prisma.member.findUnique({
         where: { uid: memberUid },
-        select: { investorProfileId: true, investorProfile: true, accessLevel: true },
+        select: {
+          investorProfileId: true,
+          investorProfile: true,
+          isInvestor: true,
+          memberApproval: { select: { state: true } },
+        },
       });
 
       if (!member) {
         throw new NotFoundException('Member not found');
       }
 
-      // Auto-upgrade L2-L4 members to L6 and set isInvestor if they provide an investor type
       const investorTypes: InvestorProfileType[] = ['ANGEL', 'FUND', 'ANGEL_AND_FUND'];
-      const shouldUpgradeToL6 =
-        investorProfileData.type &&
-        investorTypes.includes(investorProfileData.type) &&
-        member.accessLevel &&
-        ['L2', 'L3', 'L4'].includes(member.accessLevel);
 
-      if (shouldUpgradeToL6) {
-        await this.prisma.member.update({
-          where: { uid: memberUid },
-          data: {
-            accessLevel: 'L6',
-            isInvestor: true,
-          },
-        });
-        this.logger.info(
-          `Member upgraded to investor: memberUid=${memberUid}, oldLevel=${member.accessLevel}, investorType=${investorProfileData.type}`
-        );
-      } else if (investorProfileData.type && investorTypes.includes(investorProfileData.type)) {
-        // For L5 and L6 members, just set isInvestor flag
+      // Auto-upgrade L2-L4 members to L6 and set isInvestor if they provide an investor type
+      if (investorProfileData.type && investorTypes.includes(investorProfileData.type)) {
         await this.prisma.member.update({
           where: { uid: memberUid },
           data: { isInvestor: true },
         });
-        this.logger.info(`Member isInvestor flag set: memberUid=${memberUid}, investorType=${investorProfileData.type}`);
+
+        if (member.memberApproval?.state === MemberApprovalState.APPROVED) {
+          await upsertPolicyAssignmentByCode(this.prisma, memberUid, PL_INVESTOR_POLICY_CODE);
+        }
+
+        this.logger.info(
+          `Member isInvestor flag set: memberUid=${memberUid}, investorType=${investorProfileData.type}`
+        );
       }
 
       let result;
@@ -134,7 +122,7 @@ export class InvestorProfileService {
     try {
       const member = await this.prisma.member.findUnique({
         where: { uid: memberUid },
-        select: { investorProfileId: true, accessLevel: true },
+        select: { investorProfileId: true },
       });
 
       if (!member?.investorProfileId) {

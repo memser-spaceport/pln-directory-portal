@@ -9,10 +9,20 @@ import { NotificationSettingsModule } from '../notification-settings/notificatio
 import {AdminModule} from "../admin/admin.module";
 import {MembersModule} from "../members/members.module";
 import {TeamEnrichmentModule} from "../team-enrichment/team-enrichment.module";
+import { RbacModule } from '../rbac/rbac.module';
+import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
+
 @Module({
-  imports: [forwardRef(() => AdminModule),
+  imports: [
+    forwardRef(() => AdminModule),
     forwardRef(() => MembersModule),
-    forwardRef(() => TeamsModule), forwardRef(() => TeamEnrichmentModule), SharedModule, NotificationSettingsModule],
+    forwardRef(() => TeamsModule),
+    forwardRef(() => TeamEnrichmentModule),
+    SharedModule,
+    NotificationSettingsModule,
+    RbacModule,
+    AccessControlV2Module,
+  ],
   controllers: [ParticipantsRequestController],
   providers: [
     ParticipantsRequestService,

@@ -9,6 +9,7 @@ const AUTOMCOMPLETE_MAX_LENGTH = 50;
 
 type FetchAllOptions = {
   strict?: boolean;
+  canReadForum?: boolean;
   perIndexSize?: number; // default: MAX_SEARCH_RESULTS_PER_INDEX
   topN?: number; // default: 50 (controls result.top when no pagination)
   page?: number; // 1-based; optional combined pagination
@@ -21,6 +22,14 @@ const strictLabel = (v?: boolean) => String(!!v); // "true" | "false"
 @Injectable()
 export class SearchService {
   constructor(private readonly openSearchService: OpenSearchService) {}
+
+  private removeForumResults(result: SearchResult): SearchResult {
+    return {
+      ...result,
+      forumThreads: [],
+      top: (result.top ?? []).filter((item) => item.index !== 'forumThreads'),
+    };
+  }
 
   /**
    * Loose query (current default behavior): multi_match best_fields.
@@ -239,7 +248,7 @@ export class SearchService {
           }));
 
           // Default shape for the UI
-          let item: SearchResultItem = {
+          const item: SearchResultItem = {
             uid: String(hit._id),
             name: src?.name ?? '',
             image: src?.image ?? '',
@@ -391,7 +400,7 @@ export class SearchService {
         ...result.forumThreads.slice(0, 5),
       ];
 
-      return result;
+      return options?.canReadForum ? result : this.removeForumResults(result);
     } catch (e) {
       // Bubble up but record an overall error with a normalized type
       SearchMetrics.errors.inc({ source, section: 'all', strict, error_type: classifyError(e) });
@@ -405,7 +414,7 @@ export class SearchService {
    * Autocomplete using completion suggesters.
    * Forum: `forum_thread.name_suggest` is used to suggest thread titles/summaries.
    */
-  async autocompleteSearch(text: string, size = 5): Promise<SearchResult> {
+  async autocompleteSearch(text: string, size = 5, canReadForum = true): Promise<SearchResult> {
     const indices: Record<string, [string, string[]]> = {
       events: ['event', ['name_suggest', 'shortDescription_suggest', 'location_suggest']],
       projects: ['project', ['name_suggest', 'tagline_suggest', 'tags_suggest']],
@@ -556,7 +565,7 @@ export class SearchService {
         SearchMetrics.empty.inc({ source, section: 'all', strict });
       }
 
-      return results;
+      return canReadForum ? results : this.removeForumResults(results);
     } catch (e) {
       SearchMetrics.errors.inc({ source, section: 'all', strict, error_type: classifyError(e) });
       throw e;

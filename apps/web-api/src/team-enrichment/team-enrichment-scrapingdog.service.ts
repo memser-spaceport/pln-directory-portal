@@ -105,7 +105,9 @@ export class TeamEnrichmentScrapingDogService {
       // treat as not-found rather than ok. Preserves the original callers' ability to trust
       // classifyNameMatch on an 'ok' response.
       if (!profile.companyName && !profile.universalNameId) {
-        this.logger.warn(`ScrapingDog returned profile with no company_name/universal_name_id for id "${id}", treating as not-found`);
+        this.logger.warn(
+          `ScrapingDog returned profile with no company_name/universal_name_id for id "${id}", treating as not-found`
+        );
         return { kind: 'not-found' };
       }
 
@@ -160,27 +162,42 @@ export class TeamEnrichmentScrapingDogService {
       judgedVia: JudgmentSource.ScrapingDog,
     });
 
-    // website — URL host match (strip www.)
-    if (team.website && profile.website) {
-      const teamHost = this.extractHost(team.website);
-      const profileHost = this.extractHost(profile.website);
-      if (teamHost && profileHost) {
-        if (teamHost === profileHost) {
-          result.website = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'host-match');
-        } else {
-          result.website = mkJudgment(FieldConfidence.Low, JudgmentVerdict.Disagrees, 20, 'host-mismatch');
-        }
-      }
-    }
+    // website — intentionally not judged here. A LinkedIn-vs-team URL host comparison is too
+    // noisy: LinkedIn often lists an outdated, aliased, or product-subdomain URL even when the
+    // team's website is correct. The AI judge (Stage 2) can verify the website with web search instead.
 
-    // linkedinHandler — normalized equality with universal_name_id
-    if (team.linkedinHandler && profile.universalNameId) {
-      const teamHandle = this.normalizeHandleForCompare(team.linkedinHandler);
-      const profileHandle = this.normalizeHandleForCompare(profile.universalNameId);
-      if (teamHandle === profileHandle) {
-        result.linkedinHandler = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'handle-match');
+    // linkedinHandler — corroborated by company_name match (and optionally website host).
+    // The actual identity signal is that ScrapingDog returned a profile whose `company_name` matches the team.
+    // Website host equality is a strong corroborating signal when both sides declare a website.
+    if (team.linkedinHandler && profile.companyName) {
+      const websiteCorroborates =
+        !!team.website && !!profile.website && this.extractHost(team.website) === this.extractHost(profile.website);
+
+      if (nameMatch === 'exact') {
+        result.linkedinHandler = mkJudgment(
+          FieldConfidence.High,
+          JudgmentVerdict.Agrees,
+          websiteCorroborates ? 100 : 95,
+          websiteCorroborates ? 'name-match+website' : 'name-match'
+        );
       } else {
-        result.linkedinHandler = mkJudgment(FieldConfidence.Low, JudgmentVerdict.Disagrees, 15, 'handle-mismatch');
+        // nameMatch === 'partial'. A partial-only match (e.g. "Acme Inc" vs "Acme BV")
+        // is too risky to mark as Agrees on its own — surface it for review.
+        if (websiteCorroborates) {
+          result.linkedinHandler = mkJudgment(
+            FieldConfidence.High,
+            JudgmentVerdict.Agrees,
+            90,
+            'name-match-partial+website'
+          );
+        } else {
+          result.linkedinHandler = mkJudgment(
+            FieldConfidence.Medium,
+            JudgmentVerdict.Uncertain,
+            55,
+            'name-match-partial-only'
+          );
+        }
       }
     }
 
@@ -235,8 +252,19 @@ export class TeamEnrichmentScrapingDogService {
 
   private extractHandleId(handler: string): string | null {
     if (!handler) return null;
-    const match = handler.match(/(?:linkedin\.com\/)?(?:company\/)?([a-zA-Z0-9_-]+)/);
-    return match ? match[1] : null;
+    const trimmed = handler.trim();
+    if (!trimmed) return null;
+    // Full or partial LinkedIn URL — only accept company paths.
+    if (/linkedin\.com\//i.test(trimmed)) {
+      const m = trimmed.match(/linkedin\.com\/company\/([a-zA-Z0-9_.-]+)/i);
+      return m ? m[1].replace(/\/+$/, '') : null;
+    }
+    // Otherwise treat as a bare handle (optionally prefixed with `company/`), stripping query/path.
+    const cleaned = trimmed
+      .replace(/^company\//i, '')
+      .replace(/[\/?#].*$/, '')
+      .trim();
+    return /^[a-zA-Z0-9_.-]+$/.test(cleaned) ? cleaned : null;
   }
 
   private isNotFoundBody(raw: unknown): boolean {
@@ -257,16 +285,12 @@ export class TeamEnrichmentScrapingDogService {
       .trim();
   }
 
-  private normalizeHandleForCompare(s: string): string {
-    return s
-      .toLowerCase()
-      .replace(/^https?:\/\/(www\.)?linkedin\.com\//, '')
-      .replace(/^company\//, '')
-      .replace(/[\/\s]+$/, '')
-      .trim();
-  }
-
-  private extractHost(url: string): string | null {
+  /**
+   * Normalizes a URL to a comparable host string (strips `www.`, lowercases).
+   * Public so the judge can match a probe's redirect-final host against the same
+   * normalization the deterministic comparator uses.
+   */
+  extractHost(url: string): string | null {
     try {
       const parsed = new URL(url);
       return parsed.host.replace(/^www\./, '').toLowerCase();

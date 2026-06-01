@@ -17,14 +17,16 @@ import { TeamsModule } from '../teams/teams.module';
   providers: [EventsService, EventsToolingService, EventsConsumer, EventConsumerHelper, EventGuestSyncHelper],
   imports: [
     SqsModule.register({
-      consumers: [
-        {
-          name: 'events',
-          queueUrl: process.env.EVENTS_QUEUE_URL || '',
-          region: process.env.AWS_REGION,
-          pollingWaitTimeMs: (process.env.POLLING_INTERVAL as unknown as number) || 5000
-        },
-      ],
+      consumers: process.env.EVENTS_QUEUE_URL
+        ? [
+            {
+              name: 'events',
+              queueUrl: process.env.EVENTS_QUEUE_URL,
+              region: process.env.AWS_REGION,
+              pollingWaitTimeMs: (process.env.POLLING_INTERVAL as unknown as number) || 5000,
+            },
+          ]
+        : [],
       producers: [],
     }),
     forwardRef(() => PLEventsModule),

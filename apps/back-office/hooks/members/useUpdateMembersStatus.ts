@@ -6,7 +6,7 @@ import { API_ROUTE } from '../../utils/constants';
 interface MutationParams {
   authToken: string;
   memberUids: string[];
-  accessLevel: string;
+  memberState: string;
   sendRejectEmail?: boolean;
 }
 
@@ -17,7 +17,7 @@ async function mutation(params: MutationParams) {
     },
   };
 
-  return api.put(`${API_ROUTE.ADMIN_MEMBERS}/access-level`, params, config);
+  return api.put(`${API_ROUTE.ADMIN_MEMBERS}/member-state`, params, config);
 }
 
 export function useUpdateMembersStatus() {

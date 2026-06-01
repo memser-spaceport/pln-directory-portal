@@ -4,7 +4,7 @@ import TeamStepTwo from '../components/teams/teamsteptwo';
 import TeamStepThree from '../components/teams/teamstepthree';
 import { IFormValues } from '../utils/teams.types';
 import api from '../utils/api';
-import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE, FILTER_API_ROUTES, ROUTE_CONSTANTS } from '../utils/constants';
+import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE, FILTER_API_ROUTES, ROUTE_CONSTANTS, ADMIN_PERMISSIONS, TEAM_PERMISSIONS } from '../utils/constants';
 import { ApprovalLayout } from '../layout/approval-layout';
 import { FooterButtons } from '../components/footer-buttons/footer-buttons';
 import router from 'next/router';
@@ -12,6 +12,7 @@ import Loader from '../components/common/loader';
 import { useNavbarContext } from '../context/navbar-context';
 import { toast } from 'react-toastify';
 import { parseCookies } from 'nookies';
+import jwt_decode from 'jwt-decode';
 
 function validateBasicForm(formValues, imageUrl) {
   const errors = [];
@@ -356,6 +357,19 @@ export const getServerSideProps = async (context) => {
 
   const { plnadmin } = parseCookies(context);
 
+  let tokenPermissionCodes: string[] = [];
+  try {
+    const decoded = jwt_decode<{ permissions?: string[]; effectivePermissionCodes?: string[] }>(plnadmin);
+    tokenPermissionCodes = decoded?.effectivePermissionCodes ?? decoded?.permissions ?? [];
+  } catch {
+    tokenPermissionCodes = [];
+  }
+
+  const canViewMembershipSource =
+    tokenPermissionCodes.includes(ADMIN_PERMISSIONS.DIRECTORY_FULL) ||
+    tokenPermissionCodes.includes(TEAM_PERMISSIONS.MEMBERSHIP_SOURCE_READ) ||
+    tokenPermissionCodes.includes(TEAM_PERMISSIONS.MEMBERSHIP_SOURCE_READ_LEGACY);
+
   if (!plnadmin) {
     const currentUrl = context.resolvedUrl;
     const loginUrl = `/?backlink=${currentUrl}`;
@@ -520,7 +534,8 @@ export const getServerSideProps = async (context) => {
   return {
     props: {
       formValues,
-      membershipSources,
+      membershipSources: canViewMembershipSource ? membershipSources : [],
+      canViewMembershipSource,
       fundingStages,
       industryTags,
       technologies,

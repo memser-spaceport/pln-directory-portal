@@ -38,7 +38,7 @@ export const UploadTeamTiersDryRunSchema = z.object({
         uid: z.string().optional(),
         name: z.string().optional(),
         tier: z.number().min(1).max(4),
-      }),
+      })
     )
     .max(5),
   note: z.string(),
@@ -69,3 +69,46 @@ export const TriggerForceEnrichmentQuerySchema = z.object({
   mode: z.enum(['all', 'cannotEnrich']).optional().default('all'),
 });
 export class TriggerForceEnrichmentQueryDto extends createZodDto(TriggerForceEnrichmentQuerySchema) {}
+
+/**
+ * Reviewable field keys for the admin enrichment review endpoint. Mirrors FieldMetaKey from
+ * team-enrichment.types.ts — duplicated here so the Zod layer can validate without dragging
+ * an enum import into the schema module. Keep in sync if FieldMetaKey changes.
+ */
+export const REVIEWABLE_FIELD_KEYS = [
+  'website',
+  'blog',
+  'contactMethod',
+  'twitterHandler',
+  'linkedinHandler',
+  'telegramHandler',
+  'shortDescription',
+  'longDescription',
+  'moreDetails',
+  'industryTags',
+  'investmentFocus',
+  'logo',
+] as const;
+
+/**
+ * Body schema for PATCH /v1/admin/teams/:uid/enrichment-review.
+ *
+ * `content` is optional per-field. When present, the admin edited the field — the value is
+ * written to Team and `FieldEnrichmentStatus` flips to `ChangedByUser`. When absent, the admin
+ * confirmed the existing candidate / user value as-is and the status is unchanged. In both
+ * cases, `judgment.score` is bumped to 100 and the team-level `EnrichmentStatus` flips to
+ * `Approved`. Scalars and `logo` accept a `string`; `industryTags` and `investmentFocus`
+ * accept `string[]` (titles for industry tags; the resolver matches them case-insensitively
+ * against existing IndustryTag rows).
+ */
+export const ReviewEnrichmentBodySchema = z.object({
+  fields: z
+    .array(
+      z.object({
+        key: z.enum(REVIEWABLE_FIELD_KEYS),
+        content: z.union([z.string(), z.array(z.string())]).optional(),
+      })
+    )
+    .min(1),
+});
+export class ReviewEnrichmentBodyDto extends createZodDto(ReviewEnrichmentBodySchema) {}

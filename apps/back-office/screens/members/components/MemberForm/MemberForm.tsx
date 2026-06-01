@@ -1,16 +1,20 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 
 import s from './MemberForm.module.scss';
 import { CloseIcon } from '../icons';
-import { FormProvider, useForm } from 'react-hook-form';
-import { options, StatusSelector } from './StatusSelector';
+import { FormProvider, useForm, Resolver } from 'react-hook-form';
+import { StatusSelector } from './StatusSelector';
 import { TMemberForm } from '../../types/member';
 import { ProfileDetails } from './ProfileDetails/ProfileDetails';
 import { ProfileLocationInput } from './ProfileLocationInput';
 import { AdditionalDetails } from './AdditionalDetails/AdditionalDetails';
 import { ContactDetails } from './ContactDetails/ContactDetails';
+import { RbacSection } from './RbacSection/RbacSection';
+import { PolicyOption } from './RbacSection/PolicyMultiSelect/PolicyMultiSelect';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { memberFormSchema } from './helpers';
+import { useRbacPermissions } from '../../../../hooks/access-control/useRbacPermissions';
+import { usePoliciesList } from '../../../../hooks/access-control/usePoliciesList';
 
 interface Props {
   onClose: () => void;
@@ -19,39 +23,57 @@ interface Props {
   onSubmit: (data: TMemberForm) => Promise<void>;
   initialData?: TMemberForm;
   existingImageUrl?: string;
+  authToken?: string;
+  showRbacSection?: boolean;
 }
 
-export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existingImageUrl }: Props) => {
-  const methods = useForm<TMemberForm>({
-    defaultValues: {
-      accessLevel: options.find((option) => option.value === 'L4') ?? null,
-      image: null,
-      name: '',
-      email: '',
-      joinDate: null,
-      bio: '',
-      aboutYou: '',
-      country: '',
-      state: '',
-      city: '',
-      skills: [],
-      discord: '',
-      github: '',
-      linkedin: '',
-      officeHours: '',
-      telegram: '',
-      twitter: '',
-      investorProfile: {
-        investmentFocus: [],
-        typicalCheckSize: null,
-        secRulesAccepted: false,
-        type: null,
-        investInStartupStages: [],
-        investInFundTypes: [],
-      },
-      teamsAndRoles: [],
+export const MemberForm = ({
+  onClose,
+  title,
+  desc,
+  onSubmit,
+  initialData,
+  existingImageUrl,
+  authToken,
+  showRbacSection = false,
+}: Props) => {
+  const isAddNew = !initialData;
+
+  const emptyDefaults: TMemberForm = {
+    memberStateStatus: null,
+    rbacPolicies: [],
+    rbacExceptions: [],
+    image: null,
+    name: '',
+    email: '',
+    joinDate: null,
+    bio: '',
+    aboutYou: '',
+    country: '',
+    state: '',
+    city: '',
+    skills: [],
+    discord: '',
+    github: '',
+    linkedin: '',
+    officeHours: '',
+    telegram: '',
+    twitter: '',
+    investorProfile: {
+      investmentFocus: [],
+      typicalCheckSize: null,
+      secRulesAccepted: false,
+      type: null,
+      investInStartupStages: [],
+      investInFundTypes: [],
     },
-    resolver: yupResolver(memberFormSchema),
+    teamsAndRoles: [],
+    teamOrProjectURL: '',
+  };
+
+  const methods = useForm<TMemberForm>({
+    defaultValues: initialData ?? emptyDefaults,
+    resolver: yupResolver(memberFormSchema) as Resolver<TMemberForm>,
   });
   const {
     handleSubmit,
@@ -64,6 +86,47 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
       reset(initialData);
     }
   }, [initialData, reset]);
+
+  const { data: policiesData, isLoading: policiesLoading } = usePoliciesList({ authToken });
+  const { data: rbacPermissionsData, isLoading: permsLoading } = useRbacPermissions({ authToken });
+  const isLoadingOptions = policiesLoading || permsLoading;
+
+  const policyOptions = useMemo<PolicyOption[]>(
+    () =>
+      (policiesData ?? [])
+        .filter((p) => p.role && p.group)
+        .map((p) => ({ label: p.name, value: p.code, role: p.role, group: p.group })),
+    [policiesData]
+  );
+
+  const exceptionsOptions = useMemo(() => {
+    const grouped = new Map<
+      string,
+      Array<{ label: string; value: string; module: string; description?: string | null }>
+    >();
+    for (const permission of rbacPermissionsData ?? []) {
+      const module = permission.module || 'Other';
+      const option = {
+        label: permission.code,
+        value: permission.code,
+        module,
+        description: permission.description ?? null,
+      };
+      const current = grouped.get(module);
+      if (current) {
+        current.push(option);
+      } else {
+        grouped.set(module, [option]);
+      }
+    }
+
+    return Array.from(grouped.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([module, options]) => ({
+        label: module,
+        options: options.sort((a, b) => a.label.localeCompare(b.label)),
+      }));
+  }, [rbacPermissionsData]);
 
   return (
     <div className={s.modal}>
@@ -87,7 +150,15 @@ export const MemberForm = ({ onClose, title, desc, onSubmit, initialData, existi
               }
             }}
           >
-            <StatusSelector isAddNew={!initialData} />
+            {showRbacSection ? (
+              <RbacSection
+                policyOptions={policyOptions}
+                exceptionsOptions={exceptionsOptions}
+                isLoadingOptions={isLoadingOptions}
+              />
+            ) : (
+              <StatusSelector isAddNew={isAddNew} />
+            )}
             <ProfileDetails existingImageUrl={existingImageUrl} />
             <hr className="border-gray-200 dark:border-gray-200" />
             <ProfileLocationInput />

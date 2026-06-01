@@ -128,6 +128,10 @@ async function main() {
         throw new Error('Missing canonicalKey');
       }
 
+      const sourceLink = row['Source Link'] || null;
+      // dedupKey: prefer sourceLink when present, fallback to canonicalKey
+      const dedupKey = sourceLink || canonicalKey;
+
       const detectionDate = formatDate(row['Detection Date']) || new Date();
       const sourceDate = formatDate(row['Source Date']);
       const postedDate = formatDate(row['Posted Date']);
@@ -143,21 +147,23 @@ async function main() {
         department: row.Department || null,
         seniority: mapSeniority(row.Seniority),
         summary: row.Summary || null,
-        location: row.Location || null,
+        location: row.Location ? [row.Location] : [],
+        workMode: null,
         detectionDate,
         sourceType: row['Source Type'] || null,
-        sourceLink: row['Source Link'] || null,
+        sourceLink,
         sourceDate,
         postedDate,
         lastSeenLive,
         updatedAt,
         canonicalKey,
+        dedupKey,
         teamUid: isValidTeam ? teamUid : null,
         notes: row.Notes || null,
       };
 
       const existing = await prisma.jobOpening.findUnique({
-        where: { canonicalKey: data.canonicalKey },
+        where: { dedupKey: data.dedupKey },
       });
 
       if (existing) {
@@ -174,9 +180,11 @@ async function main() {
             seniority: data.seniority,
             summary: data.summary,
             location: data.location,
+            workMode: data.workMode,
             detectionDate: data.detectionDate,
             sourceType: data.sourceType,
             sourceLink: data.sourceLink,
+            canonicalKey: data.canonicalKey,
             sourceDate: data.sourceDate,
             postedDate: data.postedDate,
             lastSeenLive: data.lastSeenLive,
@@ -192,7 +200,6 @@ async function main() {
           data: {
             ...data,
             uid: cuid(),
-            updatedAt: data.updatedAt,
           },
         });
         created++;

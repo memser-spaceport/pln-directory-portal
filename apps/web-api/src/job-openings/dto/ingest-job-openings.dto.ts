@@ -8,7 +8,9 @@ export interface JobOpeningIngestItem {
   seniority?: string;
   urgency?: string;
   summary?: string;
-  location?: string;
+  locations?: string[];
+  location?: string | string[];
+  workMode?: string;
   ws4AskId?: string;
   detectionDate: string;
   sourceType?: string;
@@ -23,6 +25,7 @@ export interface JobOpeningIngestItem {
   lastSeenLive?: string;
   signalId?: string;
   canonicalKey: string;
+  dedupKey: string;
   teamUid?: string;
   needsReview?: string;
   notes?: string;
