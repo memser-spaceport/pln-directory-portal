@@ -113,6 +113,87 @@ describe('team-enrichment-corroboration', () => {
       expect(corroborateContactMethod(null, { teamName: 'Acme' })).toBeNull();
       expect(corroborateContactMethod('', { teamName: 'Acme' })).toBeNull();
     });
+
+    describe('founder-contact cross-reference', () => {
+      const leadCtx = {
+        teamName: 'Acme',
+        website: 'https://acme.com',
+        teamLeadContacts: {
+          emails: ['jane@gmail.com', 'founder@acmefounders.io'],
+          twitter: ['janedoe'],
+          telegram: ['jane_chat'],
+          linkedin: ['in/jane-doe', 'jane-doe'],
+        },
+      };
+
+      // Bench pattern (pre-seed teams): founder's personal gmail used as team
+      // contact. Host-match can't fire because gmail.com isn't the team domain.
+      it('email matches a lead member → founder contact match', () => {
+        const v = corroborateContactMethod('jane@gmail.com', leadCtx);
+        expect(v?.verdict).toBe(JudgmentVerdict.Agrees);
+        expect(v?.confidence).toBe(FieldConfidence.High);
+        expect(v?.note).toBe('founder contact match');
+      });
+
+      it('email on founder personal domain (no website host match) → founder contact match', () => {
+        const v = corroborateContactMethod('founder@acmefounders.io', leadCtx);
+        expect(v?.note).toBe('founder contact match');
+      });
+
+      it('email matches BOTH website-host rule AND a lead → website-host rule wins (stronger)', () => {
+        // hostsMatch fires first and returns 'email domain matches website' (score 100).
+        // founder match (score 95) is never reached. That's intentional ordering.
+        const v = corroborateContactMethod('jane@acme.com', {
+          ...leadCtx,
+          teamLeadContacts: { ...leadCtx.teamLeadContacts, emails: ['jane@acme.com'] },
+        });
+        expect(v?.note).toBe('email domain matches website');
+      });
+
+      it('email of someone NOT a lead → no verdict', () => {
+        const v = corroborateContactMethod('stranger@unrelated.org', leadCtx);
+        expect(v).toBeNull();
+      });
+
+      it('@handle matching a lead twitter → founder contact match', () => {
+        const v = corroborateContactMethod('@janedoe', leadCtx);
+        expect(v?.note).toBe('founder contact match');
+      });
+
+      it('twitter URL matching a lead twitter → founder contact match', () => {
+        const v = corroborateContactMethod('https://twitter.com/janedoe', leadCtx);
+        expect(v?.note).toBe('founder contact match');
+      });
+
+      it('x.com URL matching a lead twitter → founder contact match', () => {
+        const v = corroborateContactMethod('https://x.com/janedoe', leadCtx);
+        expect(v?.note).toBe('founder contact match');
+      });
+
+      it('t.me URL matching a lead telegram → founder contact match', () => {
+        const v = corroborateContactMethod('https://t.me/jane_chat', leadCtx);
+        expect(v?.note).toBe('founder contact match');
+      });
+
+      it('linkedin URL matching a lead → founder contact match', () => {
+        const v = corroborateContactMethod('https://www.linkedin.com/in/jane-doe/', leadCtx);
+        expect(v?.note).toBe('founder contact match');
+      });
+
+      it('handle that does not match any lead → no verdict', () => {
+        const v = corroborateContactMethod('@strangerhandle', leadCtx);
+        expect(v).toBeNull();
+      });
+
+      it('empty teamLeadContacts → falls through normally', () => {
+        const v = corroborateContactMethod('jane@gmail.com', {
+          teamName: 'Acme',
+          website: 'https://acme.com',
+          teamLeadContacts: { emails: [], twitter: [], telegram: [], linkedin: [] },
+        });
+        expect(v).toBeNull();
+      });
+    });
   });
 
   describe('twitterHandler', () => {

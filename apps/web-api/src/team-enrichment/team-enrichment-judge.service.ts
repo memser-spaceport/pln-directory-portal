@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
@@ -44,6 +45,21 @@ type TeamRecord = {
   moreDetails: string | null;
   industryTags: Array<{ title: string }>;
   investorProfile: { uid: string; investmentFocus: string[] } | null;
+  /**
+   * Team leads + role-tagged founders, used by the founder-contact cross-reference
+   * rule (Stage 1.5) to validate `contactMethod` against a known founder's email /
+   * social handle. Filtered at query time so we don't pull every team member.
+   */
+  teamMemberRoles: Array<{
+    teamLead: boolean;
+    role: string | null;
+    member: {
+      email: string | null;
+      twitterHandler: string | null;
+      linkedinHandler: string | null;
+      telegramHandler: string | null;
+    };
+  }>;
   teamEnrichment: TeamEnrichmentSnapshot | null;
 };
 
@@ -110,6 +126,31 @@ const TEAM_RECORD_SELECT = {
   moreDetails: true,
   industryTags: { select: { title: true } },
   investorProfile: { select: { uid: true, investmentFocus: true } },
+  // Filter at the DB layer: only team leads or members whose role string
+  // mentions "founder". Avoids pulling every member for teams with large rosters.
+  teamMemberRoles: {
+    // `as Prisma.TeamMemberRoleWhereInput[]` so the surrounding `as const` on
+    // TEAM_RECORD_SELECT doesn't make this tuple readonly (Prisma rejects
+    // readonly arrays for `OR`).
+    where: {
+      OR: [
+        { teamLead: true },
+        { role: { contains: 'founder', mode: 'insensitive' } },
+      ] as Prisma.TeamMemberRoleWhereInput[],
+    },
+    select: {
+      teamLead: true,
+      role: true,
+      member: {
+        select: {
+          email: true,
+          twitterHandler: true,
+          linkedinHandler: true,
+          telegramHandler: true,
+        },
+      },
+    },
+  },
   teamEnrichment: {
     select: {
       website: true,
@@ -620,7 +661,69 @@ export class TeamEnrichmentJudgeService {
       websiteSignals: existingMeta.websiteSignals ?? null,
       scrapingDogProfile: null,
       scrapingDogNameMatch: scrapingDogMeta?.nameMatch ?? null,
+      teamLeadContacts: this.collectLeadContacts(team),
     });
+  }
+
+  /**
+   * Extracts and normalizes contact info for the team's leads / founders
+   * (already filtered by the Prisma query to teamLead OR role-mentions-founder).
+   * Result is consumed by the founder-contact cross-reference rule on
+   * `contactMethod`. All values lowercased, no leading `@`, no URL prefix.
+   */
+  private collectLeadContacts(team: TeamRecord): {
+    emails: string[];
+    twitter: string[];
+    telegram: string[];
+    linkedin: string[];
+  } {
+    const emails = new Set<string>();
+    const twitter = new Set<string>();
+    const telegram = new Set<string>();
+    const linkedin = new Set<string>();
+
+    for (const role of team.teamMemberRoles ?? []) {
+      const m = role.member;
+      if (m.email) emails.add(m.email.trim().toLowerCase());
+      if (m.twitterHandler) {
+        twitter.add(
+          m.twitterHandler
+            .trim()
+            .replace(/^@/, '')
+            .replace(/^https?:\/\/(?:www\.)?(?:twitter|x)\.com\//i, '')
+            .replace(/[/?#].*$/, '')
+            .toLowerCase()
+        );
+      }
+      if (m.telegramHandler) {
+        telegram.add(
+          m.telegramHandler
+            .trim()
+            .replace(/^@/, '')
+            .replace(/^https?:\/\/(?:www\.)?(?:t\.me|telegram\.me)\//i, '')
+            .replace(/[/?#].*$/, '')
+            .toLowerCase()
+        );
+      }
+      if (m.linkedinHandler) {
+        const norm = m.linkedinHandler
+          .trim()
+          .replace(/^https?:\/\/(?:www\.)?linkedin\.com\//i, '')
+          .replace(/\/+$/, '')
+          .toLowerCase();
+        linkedin.add(norm);
+        // Also store the bare slug after company/school/in for looser matching.
+        const slugMatch = norm.match(/^(?:company|school|in)\/(.+)$/);
+        if (slugMatch) linkedin.add(slugMatch[1]);
+      }
+    }
+
+    return {
+      emails: [...emails].filter(Boolean),
+      twitter: [...twitter].filter(Boolean),
+      telegram: [...telegram].filter(Boolean),
+      linkedin: [...linkedin].filter(Boolean),
+    };
   }
 
   /** Snapshot of every judgable field value for the quality scorer. */

@@ -47,6 +47,21 @@ export interface CorroborationContext {
   scrapingDogProfile?: ScrapingDogCompanyProfile | null;
   /** ScrapingDog name-match tier — gates whether sd-profile signals are trusted. */
   scrapingDogNameMatch?: NameMatchTier | null;
+  /**
+   * Contact info for the team's leads / founders (TeamMemberRole rows where
+   * `teamLead = true` OR `role ILIKE '%founder%'`). Used by the founder-contact
+   * cross-reference rule on `contactMethod` — pre-seed teams routinely enter a
+   * founder's personal email as the team contact, and the host-match rule
+   * misses those (founder's email lives on `@gmail.com` or their personal
+   * domain, not the team's website host). All values are normalized:
+   * lowercased, no leading `@`, no URL prefix.
+   */
+  teamLeadContacts?: {
+    emails: string[];
+    twitter: string[];
+    telegram: string[];
+    linkedin: string[];
+  };
 }
 
 /** Stopword list used for substantive-token name overlap (mirrors pln-data-enrichment). */
@@ -220,6 +235,7 @@ export function corroborateContactMethod(
   if (isEmail(trimmed)) {
     const domain = emailDomain(trimmed);
     if (!domain) return null;
+    const normEmail = trimmed.toLowerCase();
 
     if (websiteHost && hostsMatch(domain.toLowerCase(), websiteHost)) {
       return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'email domain matches website');
@@ -231,6 +247,14 @@ export function corroborateContactMethod(
       if (jdom && jdom.toLowerCase() === domain.toLowerCase()) {
         return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'email domain matches jsonld');
       }
+    }
+
+    // Founder-contact cross-reference: pre-seed teams often enter a founder's
+    // personal email (gmail / outlook / their own domain) as the team contact.
+    // The host-match rules above can't help — gmail.com isn't the team's host —
+    // but a direct email-vs-lead-email match is a strong identity signal.
+    if (ctx.teamLeadContacts?.emails.includes(normEmail)) {
+      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'founder contact match');
     }
     return null;
   }
@@ -246,8 +270,62 @@ export function corroborateContactMethod(
     if (contactHost && websiteHost && hostsMatch(contactHost, websiteHost)) {
       return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'url host matches website');
     }
+
+    // Founder-contact cross-reference for URL form: contactMethod is a link
+    // to a founder's twitter / telegram / linkedin profile.
+    const founderUrlMatch = matchFounderContactUrl(trimmed, ctx.teamLeadContacts);
+    if (founderUrlMatch) return founderUrlMatch;
   }
 
+  // ── @handle form ───────────────────────────────────────────────────────
+  // Bare `@handle` — match against any lead's twitter / telegram handle.
+  if (/^@[A-Za-z0-9_]{2,}$/.test(trimmed)) {
+    const h = trimmed.slice(1).toLowerCase();
+    if (
+      ctx.teamLeadContacts?.twitter.includes(h) ||
+      ctx.teamLeadContacts?.telegram.includes(h)
+    ) {
+      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'founder contact match');
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Helper: when contactMethod is a twitter / telegram / linkedin URL, check
+ * whether the embedded handle / slug matches any team lead's recorded social.
+ */
+function matchFounderContactUrl(
+  url: string,
+  leads: CorroborationContext['teamLeadContacts']
+): FieldJudgment | null {
+  if (!leads) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = parsed.host.replace(/^www\./, '').toLowerCase();
+  const segments = parsed.pathname.split('/').filter(Boolean);
+  if (segments.length === 0) return null;
+
+  if ((host === 'twitter.com' || host === 'x.com') && leads.twitter.includes(segments[0].toLowerCase())) {
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'founder contact match');
+  }
+  if ((host === 't.me' || host === 'telegram.me') && leads.telegram.includes(segments[0].toLowerCase())) {
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'founder contact match');
+  }
+  if (host === 'linkedin.com' || /^[a-z]{2}\.linkedin\.com$/.test(host)) {
+    const [kind, slug] = segments;
+    if (slug && (kind === 'in' || kind === 'company' || kind === 'school')) {
+      const candidate = (kind === 'in' ? slug : `${kind}/${slug}`).toLowerCase();
+      if (leads.linkedin.includes(candidate) || leads.linkedin.includes(slug.toLowerCase())) {
+        return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'founder contact match');
+      }
+    }
+  }
   return null;
 }
 

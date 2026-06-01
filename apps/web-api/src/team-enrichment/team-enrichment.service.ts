@@ -6,6 +6,7 @@ import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { ScrapingDogCompanyProfile, TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
+import { deriveTeamFieldsFromLeads } from './team-enrichment-lead-backfill';
 import {
   ENRICHABLE_TEAM_FIELDS,
   EnrichableTeamField,
@@ -176,6 +177,21 @@ type TeamWithEnrichment = {
   logoUid: string | null;
   industryTags: Array<{ uid: string; title: string }>;
   investorProfile: { uid: string; investmentFocus: string[] } | null;
+  /**
+   * Team leads + role-tagged founders — pre-filtered at the DB layer so we
+   * don't pull every member. Used by the lead-backfill step (an additional
+   * non-AI source of team-shaped contact/social fields).
+   */
+  teamMemberRoles: Array<{
+    teamLead: boolean;
+    role: string | null;
+    member: {
+      email: string | null;
+      twitterHandler: string | null;
+      linkedinHandler: string | null;
+      telegramHandler: string | null;
+    };
+  }>;
   teamEnrichment: TeamEnrichmentRow | null;
 };
 
@@ -211,6 +227,32 @@ const TEAM_WITH_ENRICHMENT_SELECT = {
   logoUid: true,
   industryTags: { select: { uid: true, title: true } },
   investorProfile: { select: { uid: true, investmentFocus: true } },
+  // Lead-backfill input. Filtered at the DB layer to teamLead OR role-mentions-founder
+  // so we don't pull every member for teams with large rosters. Member fields
+  // selected are the ones that could plausibly identity-match the team.
+  teamMemberRoles: {
+    // `as Prisma.TeamMemberRoleWhereInput[]` so the surrounding `as const` on
+    // TEAM_WITH_ENRICHMENT_SELECT doesn't make this tuple readonly (Prisma
+    // rejects readonly arrays for `OR`).
+    where: {
+      OR: [
+        { teamLead: true },
+        { role: { contains: 'founder', mode: 'insensitive' } },
+      ] as Prisma.TeamMemberRoleWhereInput[],
+    },
+    select: {
+      teamLead: true,
+      role: true,
+      member: {
+        select: {
+          email: true,
+          twitterHandler: true,
+          linkedinHandler: true,
+          telegramHandler: true,
+        },
+      },
+    },
+  },
   teamEnrichment: {
     select: {
       uid: true,
@@ -871,6 +913,37 @@ export class TeamEnrichmentService {
         }
       }
 
+      // Lead-backfill: before deciding per-field outcomes, fill any aiResponse
+      // nulls from team-lead Member rows whose value structurally matches the
+      // team's identity (`info@<website-host>`, `@<team-name-prefixed>` etc.).
+      // Same backfill pattern as the website-signal pass above. Lead-derived
+      // values get their source re-stamped to `team-lead` after the field
+      // loop (mirroring how website backfill re-stamps to `open-graph`).
+      const leadBackfilledFields = new Set<EnrichableTeamField>();
+      const leadBackfill = deriveTeamFieldsFromLeads(
+        team.name,
+        team.website ?? aiResponse.website ?? null,
+        (team.teamMemberRoles ?? []).map((r) => r.member)
+      );
+      const leadBackfillMap: Array<[EnrichableTeamField, string | undefined]> = [
+        ['contactMethod', leadBackfill.contactMethod],
+        ['twitterHandler', leadBackfill.twitterHandler],
+        ['telegramHandler', leadBackfill.telegramHandler],
+      ];
+      for (const [field, value] of leadBackfillMap) {
+        if (!value) continue;
+        if (aiResponse[field]) continue; // AI already filled it — don't override
+        aiResponse[field] = value;
+        aiResponse.confidence ||= {};
+        aiResponse.confidence[field] = 'high';
+        leadBackfilledFields.add(field);
+      }
+      if (leadBackfilledFields.size > 0) {
+        this.logger.log(
+          `Team ${teamUid} (${team.name}): team-lead backfill → [${[...leadBackfilledFields].join(', ')}]`
+        );
+      }
+
       // Determine which fields need enrichment. Writes go to TeamEnrichment, not Team —
       // the judge later promotes high-confidence values to Team.
       const enrichmentUpdate: Prisma.TeamEnrichmentUpdateInput = {};
@@ -942,6 +1015,16 @@ export class TeamEnrichmentService {
         const meta = newFieldsMeta[field];
         if (meta?.status === FieldEnrichmentStatus.Enriched && meta.source === EnrichmentSource.AI) {
           newFieldsMeta[field] = { ...meta, source: EnrichmentSource.OpenGraph };
+        }
+      }
+
+      // Lead-backfill re-stamp: any field the lead-backfill filled (and the
+      // AI didn't override) should be sourced as `team-lead` so the judge's
+      // source-trust rule (Stage 1.5) auto-promotes it.
+      for (const field of leadBackfilledFields) {
+        const meta = newFieldsMeta[field];
+        if (meta?.status === FieldEnrichmentStatus.Enriched && meta.source === EnrichmentSource.AI) {
+          newFieldsMeta[field] = { ...meta, source: EnrichmentSource.TeamLead };
         }
       }
 

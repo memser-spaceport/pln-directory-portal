@@ -135,11 +135,12 @@ Each enrichable field is tracked in `TeamEnrichment.dataEnrichment.fieldsMeta[<f
 
 `TeamEnrichment.dataEnrichment.fieldsMeta[<field>]` also records per-field `confidence` and `source`:
 
-| Source                                        | Confidence                                                             |
-| --------------------------------------------- | ---------------------------------------------------------------------- |
-| `ai` (OpenAI / Gemini / Anthropic web search) | `high` / `medium` / `low` — taken from the model's `confidence` object |
-| `open-graph` (website favicon / OG scraping)  | `medium`                                                               |
-| `scrapingdog` (LinkedIn first-party)          | `high`                                                                 |
+| Source                                                | Confidence                                                             |
+| ----------------------------------------------------- | ---------------------------------------------------------------------- |
+| `ai` (OpenAI / Gemini / Anthropic web search)         | `high` / `medium` / `low` — taken from the model's `confidence` object |
+| `open-graph` (website favicon / OG scraping)          | `medium`                                                               |
+| `scrapingdog` (LinkedIn first-party)                  | `high`                                                                 |
+| `team-lead` (lead Member backfill, identity-matched)  | `high`                                                                 |
 
 When a user later edits an enriched field on `Team`, the corresponding `TeamEnrichment.dataEnrichment.fieldsMeta[field].status` flips to `ChangedByUser` but `confidence` and `source` are preserved as provenance.
 
@@ -178,6 +179,19 @@ All enrichment writes target `TeamEnrichment` (candidate values + `dataEnrichmen
 - **Concurrency guard**: if enrichment is already `InProgress` for a team, duplicate requests are rejected immediately
 - **`enrichedBy`**: set to `'system-cron'` for cron jobs, `'manually'` for admin-triggered enrichment
 - **Website signal backfill**: when the team has (or AI just discovered) a website, the pipeline fetches the page once and extracts self-declared `twitterHandler` / `linkedinHandler` / `telegramHandler` / `contactMethod` from multiple structured-data channels: (a) `<script type="application/ld+json">` Organization-like nodes (`sameAs`, `contactPoint.email`), (b) Twitter Card meta tags (`<meta name="twitter:site">`, `twitter:creator`), (c) HTML microdata (`itemprop="sameAs"`, `itemprop="email"`), with (d) `<a href>` and `mailto:` anchors as a final fallback. The single pre-fetched HTML is also reused by the logo path via ogs's `html` option, so one enrichment run hits the website at most once. Backfill runs **only** for fields the AI returned `null` for — never overwrites AI-supplied values, never touches user-owned data. Source is recorded as `open-graph`; confidence is `high` when the website is `ChangedByUser`, otherwise `medium`. No `Organization.name` ↔ team-name gate is applied because an existing `team.website` is already upstream-trusted (rebrand cases like "Invent Money" declared on `theinventionnetwork.com` flow through). Backfilled `linkedinHandler` is still passed through ScrapingDog for free verification.
+
+- **Team-lead backfill**: an additional non-AI backfill source that pulls candidate contact/social values from the team's lead Members (`TeamMemberRole` rows filtered to `teamLead = true` OR `role ILIKE '%founder%'` at the DB layer). For each candidate value, the same identity-match guards used by the judge's Stage 1.5 corroboration are applied — only values whose **structure matches the team's identity** are accepted:
+
+  | Field | Accepted from a lead when… | Example |
+  | --- | --- | --- |
+  | `contactMethod` (email) | email's domain equals the team's website host (or subdomain-of) | Jane's `jane@acme.com` for team Acme with website `acme.com` ✓; her `jane@gmail.com` ✗ |
+  | `twitterHandler` | handle's first label starts with a substantive team-name token (`hostFirstLabelMatchesTeamName`, prefix-only, stopword-aware) | `@acmehq` for team Acme ✓; `@janedoe` ✗; `@beontop` for team Eon ✗ (mid-word, not prefix) |
+  | `telegramHandler` | same prefix-only guard as twitter | `acme_chat` for team Acme ✓; `janepersonal` ✗ |
+  | `linkedinHandler` | **never** backfilled from a lead | `Member.linkedinHandler` is always the lead's personal `in/<name>` profile — wrong shape for the team's `company/<slug>` field |
+
+  Runs alongside the website-signal backfill — both fill `aiResponse` nulls **only** (never overwrites AI-supplied or user-owned values), keyed by independent sources. Lead-derived fields are recorded with `source: team-lead` and `confidence: high`, so the judge's source-trust rule auto-promotes them at Stage 1.5 without an AI call. The lead members are pulled in the same Prisma query as the team row (no extra round-trip).
+
+  Catches the pre-seed pattern where the team-shaped contact info already lives on a founder's Member row — no AI / ScrapingDog / website fetch needed to populate `contactMethod` / `twitterHandler` / `telegramHandler`. Personal contacts (handles that don't structurally match the team) are intentionally rejected.
 
 - **User-confirmed identity hints**: before each enrichment AI call, the pipeline collects the user-confirmed subset of `shortDescription` / `longDescription` / `moreDetails` (each included only when its `fieldsMeta[field].status === ChangedByUser`, or when the field is non-empty and has no prior `fieldsMeta` entry, i.e. pre-enrichment user data). The collected hints are emitted in a dedicated `USER-CONFIRMED IDENTITY HINTS` block of the user prompt, and the prompt's `IMPORTANT` line is rephrased to instruct the AI: when hints are present, the target entity is the one matching BOTH the team name AND the hints. This disambiguates ambiguous bare names (e.g. team named `"Neiro"` whose user-supplied description begins `"NeiroCoin is a community-driven cryptocurrency..."` — without the hint, the AI was matching against the unrelated "Studio Neiro" on LinkedIn). When no field is user-confirmed, the existing fallback line (`Existing Description: ...` / `Description: Not available`) is kept. Non-user-confirmed (`Enriched`) descriptions are intentionally not echoed back to the AI to avoid biasing it with its own prior output.
 
@@ -260,6 +274,7 @@ The dispatcher always runs **source-trust** first; if it fires, the field-specif
 | **source-trust** | every field | `fieldsMeta[<field>].source ∈ {scrapingdog, open-graph}` AND `confidence === 'high'` | `sourced from linkedin` / `sourced from website` | 95 / 90 |
 | `email domain matches website` | `contactMethod` (email form) | email-domain host-equal to `team.website` host (or subdomain-of) | `email domain matches website` | 100 |
 | `email domain matches jsonld` | `contactMethod` (email form) | email-domain equal to the JSON-LD `Organization.email` domain found on the team's website | `email domain matches jsonld` | 95 |
+| `founder contact match` | `contactMethod` (email, `@handle`, or twitter / telegram / linkedin URL) | value matches any team lead's recorded `Member.email` / `twitterHandler` / `telegramHandler` / `linkedinHandler`. Catches the pre-seed pattern where a founder's personal email or social is entered as the team contact (so the host-match rules can't help). | `founder contact match` | 95 |
 | `url host matches website` | `contactMethod` (URL form) | URL host equal to `team.website` host (or subdomain-of) — catches "team's own /contact page", anchor-link self-references, etc. | `url host matches website` | 95 |
 | `website self declared` | `twitterHandler` / `linkedinHandler` / `telegramHandler` | value exact-equal to what `websiteSignals.<field>` extracted from the team's own website HTML (JSON-LD `sameAs`, `twitter:site`, microdata, anchor) | `website self declared` | 100 |
 | `name in twitter handle` | `twitterHandler` | handle starts with a substantive team-name token (prefix-only — `eonsys` for "Eon", `Surus_io` for "Surus") | `name in twitter handle` | 90 |
@@ -278,6 +293,30 @@ The `name in blog handle` rule is stricter — it requires **every** substantive
 
 Both checks use the same stopword filter as `namesShareSubstantiveToken` (drops "labs", "inc", "team", "network", "protocol", "foundation", etc.) so two-letter codes and stopword-only team names won't match anything.
 
+#### Founder-contact cross-reference (data source for `contactMethod`)
+
+When the judge runs, the team query also pulls `TeamMemberRole` rows for the team — filtered at the DB layer to `teamLead = true` OR `role ILIKE '%founder%'`, so it doesn't load every member for teams with large rosters. The selected members' `email`, `twitterHandler`, `linkedinHandler`, and `telegramHandler` are normalized (lowercased, `@` stripped, URL prefixes stripped, LinkedIn slug expanded to both `in/<slug>` and bare `<slug>` form) and passed into `CorroborationContext.teamLeadContacts`.
+
+The `founder contact match` rule then matches the team's `contactMethod` against this set, in the following shapes:
+
+| Input `contactMethod` shape | Matched against |
+| --- | --- |
+| `someone@gmail.com` (or any email) | `teamLeadContacts.emails` |
+| `@handle` | `teamLeadContacts.twitter` ∪ `teamLeadContacts.telegram` |
+| `https://twitter.com/<x>` or `https://x.com/<x>` | `teamLeadContacts.twitter` |
+| `https://t.me/<x>` or `https://telegram.me/<x>` | `teamLeadContacts.telegram` |
+| `https://www.linkedin.com/in/<x>/` (or `/company/<x>`, `/school/<x>`) | `teamLeadContacts.linkedin` |
+
+Rule ordering inside `corroborateContactMethod` is strongest-first — each falls through to the next when it doesn't fire:
+
+1. `email domain matches website` (score 100) — both signals self-declared by the team
+2. `email domain matches jsonld` (score 95) — team's website JSON-LD declared the same email domain
+3. `founder contact match` for emails (score 95) — founder cross-reference
+4. `url host matches website` (score 95) — team's own /contact page, anchor-link self-reference, etc.
+5. `founder contact match` for URLs / `@handle` (score 95)
+
+The website-host rules outrank the founder-match rule when both apply — `jane@acme.com` for a team with website `acme.com` and a founder `jane@acme.com` resolves via the host-match (score 100), not via the founder match (score 95). The verdict is the same; the note tells the reviewer which signal fired.
+
 #### Source-trust (no second source needed)
 
 When the enrichment pipeline already filled a field from a trusted deterministic source at high confidence, accept it without re-verifying via the AI judge. The pipeline records `source` per field on `fieldsMeta`:
@@ -292,6 +331,7 @@ The enrichment-time `confidence` must be `high` — `medium`/`low` indicates the
 >
 > - Team has `contactMethod = "test@bestTeam.xyz"` and `website = "bestTeam.xyz"`. The `email domain matches website` rule produces `agrees + high` for `contactMethod`, so the AI judge never sees this field and it auto-promotes. Previously, the AI was finding a different email listed on the team's LinkedIn page and marking the field `disagrees`.
 > - Team's `longDescription` was pulled from LinkedIn's About text by ScrapingDog at high confidence. The AI judge would web-search, find paraphrased wording, and downgrade to `medium`. The source-trust rule now auto-promotes — LinkedIn IS the source, paraphrasing is expected.
+> - Pre-seed team enters the solo founder's personal `jane@gmail.com` as the team contact. Host-match can't help (gmail.com isn't the team's website host). The `founder contact match` rule cross-references against the `TeamMemberRole` lead members' emails and auto-promotes when Jane is registered as a team lead.
 
 The full rule implementations + an eval bench live in `team-enrichment-corroboration.ts` and `team-enrichment-corroboration.spec.ts`. The bench pins precision/recall: any rule change that regresses fixtures fails CI.
 
@@ -1009,9 +1049,10 @@ apps/web-api/src/team-enrichment/
   team-enrichment-field-shape.util.ts # Per-field shape validator — rejects placeholders by structure
   team-enrichment-corroboration.ts  # Stage 1.5 pure-function rules (source-trust + per-field anchors)
   team-enrichment-quality.ts        # 6-dimension team quality + thin-evidence flag
+  team-enrichment-lead-backfill.ts  # Enrichment-stage backfill from team-lead Members (identity-matched, no AI)
   team-enrichment-ai.service.ts     # Enrichment LLM wrapper + logo scraping + website signal extractor
   team-enrichment-scrapingdog.service.ts # LinkedIn fallback + classifyNameMatch/compareProfileToTeam helpers
-  team-enrichment.service.ts        # Core enrichment business logic (persists websiteSignals)
+  team-enrichment.service.ts        # Core enrichment business logic (persists websiteSignals, applies lead backfill)
   team-enrichment.job.ts            # Enrichment + marking cron jobs
   team-enrichment-judge-ai.service.ts # Judge LLM wrapper (independent model) — also renders Cross-source signals + Corroboration blocks into the prompt
   team-enrichment-judge.service.ts  # Two/three-stage judgment pipeline orchestration (Stage 1 ScrapingDog + Stage 1.5 corroboration + Stage 2 AI)
@@ -1022,6 +1063,7 @@ apps/web-api/src/team-enrichment/
   prod_data/                        # Imported prod data + compare.sql for the review-queue reduction bench
   team-enrichment-corroboration.spec.ts # Eval bench — pinned precision/recall on labelled corroboration fixtures
   team-enrichment-field-shape.util.spec.ts # Shape-validator coverage (placeholders + short legit handles)
+  team-enrichment-lead-backfill.spec.ts # Lead-backfill coverage (identity-matched accepts, personal-info rejects)
   logo-verification.types.ts        # Verdict / confidence / quality types for the VLM pass
   logo-verification.service.ts      # VLM wrapper (gemini / openai / anthropic) + image prep
   logo-verification-persistence.service.ts # Candidate selection + shouldVerify gate + TeamLogoVerificationResult writes
