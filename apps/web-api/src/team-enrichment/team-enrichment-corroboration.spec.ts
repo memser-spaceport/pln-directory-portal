@@ -63,8 +63,45 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict).toBeNull();
     });
 
-    it('non-email contactMethod (Discord invite) → no verdict (falls through)', () => {
+    it('non-email contactMethod with unrelated host (Discord invite) → no verdict (falls through)', () => {
       const verdict = corroborateContactMethod('https://discord.gg/xxxyyy', {
+        teamName: 'Acme',
+        website: 'https://acme.com',
+      });
+      expect(verdict).toBeNull();
+    });
+
+    // Bench case (FrodoBots): user-supplied contactMethod is just an anchor
+    // link back to the homepage — host matches the verified website, so it
+    // identity-verifies even though it's not a useful "contact method" per se.
+    it('URL contactMethod whose host matches website → url host matches website', () => {
+      const verdict = corroborateContactMethod('https://www.frodobots.ai/#', {
+        teamName: 'FrodoBots',
+        website: 'https://www.frodobots.ai/',
+      });
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+      expect(verdict?.note).toBe('url host matches website');
+    });
+
+    it('URL contactMethod on a /contact subpage of website host → url host matches website', () => {
+      const verdict = corroborateContactMethod('https://acme.com/contact', {
+        teamName: 'Acme',
+        website: 'https://www.acme.com',
+      });
+      expect(verdict?.note).toBe('url host matches website');
+    });
+
+    it('URL contactMethod on subdomain of website host → url host matches website', () => {
+      const verdict = corroborateContactMethod('https://support.acme.com/', {
+        teamName: 'Acme',
+        website: 'https://acme.com',
+      });
+      expect(verdict?.note).toBe('url host matches website');
+    });
+
+    it('URL contactMethod on an unrelated host (Calendly) → no verdict', () => {
+      const verdict = corroborateContactMethod('https://calendly.com/acme-team', {
         teamName: 'Acme',
         website: 'https://acme.com',
       });
@@ -103,8 +140,31 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict).toBeNull();
     });
 
-    it('no website signals → no verdict', () => {
-      expect(corroborateTwitterHandler('acmehq', { teamName: 'Acme' })).toBeNull();
+    it('no website signals but handle starts with team token → name in twitter handle', () => {
+      // Bench case (Eon): twitter `eonsys` for team "Eon". No website signals
+      // but the handle starts with the team token.
+      const verdict = corroborateTwitterHandler('eonsys', { teamName: 'Eon' });
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+      expect(verdict?.note).toBe('name in twitter handle');
+    });
+
+    it('handle with underscore + suffix → name in twitter handle', () => {
+      // Bench case (Surus): twitter `Surus_io` for team "Surus".
+      const verdict = corroborateTwitterHandler('Surus_io', { teamName: 'Surus' });
+      expect(verdict?.note).toBe('name in twitter handle');
+    });
+
+    it('handle that does not start with team token → no verdict', () => {
+      // Bench case (Near Foundation / cryptonear) — `cryptonear` doesn't START
+      // with "near", even though "near" is in there mid-word. Correctly stays
+      // in review.
+      const verdict = corroborateTwitterHandler('cryptonear', { teamName: 'Near Foundation' });
+      expect(verdict).toBeNull();
+    });
+
+    it('no website signals AND handle unrelated → no verdict', () => {
+      expect(corroborateTwitterHandler('unrelated_account', { teamName: 'Acme' })).toBeNull();
     });
   });
 
@@ -125,6 +185,25 @@ describe('team-enrichment-corroboration', () => {
       });
       expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
     });
+
+    it('slug starts with team token → name in linkedin slug', () => {
+      // Bench case (Eon): `company/eon-systems-pbc` — slug starts with "eon".
+      const verdict = corroborateLinkedinHandler('company/eon-systems-pbc', { teamName: 'Eon' });
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.note).toBe('name in linkedin slug');
+    });
+
+    it('slug from full URL starts with team token → name in linkedin slug', () => {
+      const verdict = corroborateLinkedinHandler('https://www.linkedin.com/company/mosaia-ai', {
+        teamName: 'Mosaia',
+      });
+      expect(verdict?.note).toBe('name in linkedin slug');
+    });
+
+    it('slug unrelated to team name → no verdict', () => {
+      const verdict = corroborateLinkedinHandler('company/totally-different', { teamName: 'Eon' });
+      expect(verdict).toBeNull();
+    });
   });
 
   describe('telegramHandler', () => {
@@ -134,6 +213,24 @@ describe('team-enrichment-corroboration', () => {
         websiteSignals: { extractedAt: 'x', telegramHandler: 'acmechat' },
       });
       expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+    });
+
+    it('handle starts with team token → name in telegram handle', () => {
+      // Bench cases: `fileverse`, `vitadao`, `talentprotocol`.
+      const verdict = corroborateTelegramHandler('fileverse', { teamName: 'Fileverse' });
+      expect(verdict?.note).toBe('name in telegram handle');
+    });
+
+    it('handle with suffix starts with team token → name in telegram handle', () => {
+      // Bench case (Hex Trust): `hextrustannouncements` for "Hex Trust".
+      const verdict = corroborateTelegramHandler('hextrustannouncements', { teamName: 'Hex Trust' });
+      expect(verdict?.note).toBe('name in telegram handle');
+    });
+
+    it('handle that does not start with team token → no verdict', () => {
+      // Bench case (Near Foundation / cryptonear) — same shape as Twitter case.
+      const verdict = corroborateTelegramHandler('cryptonear', { teamName: 'Near Foundation' });
+      expect(verdict).toBeNull();
     });
   });
 

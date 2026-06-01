@@ -213,23 +213,40 @@ export function corroborateContactMethod(
 ): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   const trimmed = value.trim();
-  if (!isEmail(trimmed)) return null;
-
-  const domain = emailDomain(trimmed);
-  if (!domain) return null;
-
   const websiteHost = normalizeHost(ctx.website);
-  if (websiteHost && hostsMatch(domain.toLowerCase(), websiteHost)) {
-    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'email domain matches website');
+
+  // ── Email form ─────────────────────────────────────────────────────────
+  if (isEmail(trimmed)) {
+    const domain = emailDomain(trimmed);
+    if (!domain) return null;
+
+    if (websiteHost && hostsMatch(domain.toLowerCase(), websiteHost)) {
+      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'email domain matches website');
+    }
+
+    const jsonLdEmail = ctx.websiteSignals?.contactEmail ?? null;
+    if (jsonLdEmail) {
+      const jdom = emailDomain(jsonLdEmail);
+      if (jdom && jdom.toLowerCase() === domain.toLowerCase()) {
+        return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'email domain matches jsonld');
+      }
+    }
+    return null;
   }
 
-  const jsonLdEmail = ctx.websiteSignals?.contactEmail ?? null;
-  if (jsonLdEmail) {
-    const jdom = emailDomain(jsonLdEmail);
-    if (jdom && jdom.toLowerCase() === domain.toLowerCase()) {
-      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'email domain matches jsonld');
+  // ── URL form ───────────────────────────────────────────────────────────
+  // Teams commonly enter a link to their /contact page, a Calendly URL, or
+  // even just the homepage itself (often with a `#contact` fragment) as their
+  // contactMethod. When the URL's host matches the verified website host,
+  // it's the team's own asset — same identity strength as the email rule.
+  // Same matcher (`hostsMatch`) handles `www.` prefix and subdomain-of cases.
+  if (/^https?:\/\//i.test(trimmed)) {
+    const contactHost = normalizeHost(trimmed);
+    if (contactHost && websiteHost && hostsMatch(contactHost, websiteHost)) {
+      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'url host matches website');
     }
   }
+
   return null;
 }
 
@@ -245,9 +262,19 @@ export function corroborateTwitterHandler(
   if (!value || typeof value !== 'string') return null;
   const candidate = value.replace(/^@/, '').trim().toLowerCase();
   if (!candidate) return null;
+
+  // Rule 1: exact match with what the website self-declares (strongest).
   const ws = ctx.websiteSignals?.twitterHandler?.replace(/^@/, '').trim().toLowerCase();
   if (ws && ws === candidate) {
     return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'website self declared');
+  }
+
+  // Rule 2: handle starts with a substantive team token. Twitter handles are
+  // capped at 15 chars, so abbreviations + suffixes ("eonsys", "asterainst")
+  // are common. Same prefix-only guard as the website host rule prevents
+  // substring-anywhere false positives.
+  if (hostFirstLabelMatchesTeamName(ctx.teamName, candidate)) {
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'name in twitter handle');
   }
   return null;
 }
@@ -265,9 +292,20 @@ export function corroborateLinkedinHandler(
       .replace(/\/+$/, '');
   const candidate = norm(value);
   if (!candidate) return null;
+
+  // Rule 1: exact match with website-self-declared LinkedIn URL/slug.
   const ws = ctx.websiteSignals?.linkedinHandler ? norm(ctx.websiteSignals.linkedinHandler) : null;
   if (ws && ws === candidate) {
     return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'website self declared');
+  }
+
+  // Rule 2: extract the slug after company/school/in/ and check if it starts
+  // with a substantive team token. `company/eon-systems-pbc` for team "Eon" →
+  // slug `eon-systems-pbc` → starts with "eon" → match.
+  const slugMatch = candidate.match(/^(?:company|school|in)\/([^/?#]+)/);
+  const slug = slugMatch ? slugMatch[1] : candidate;
+  if (hostFirstLabelMatchesTeamName(ctx.teamName, slug)) {
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'name in linkedin slug');
   }
   return null;
 }
@@ -279,9 +317,18 @@ export function corroborateTelegramHandler(
   if (!value || typeof value !== 'string') return null;
   const candidate = value.replace(/^@/, '').trim().toLowerCase();
   if (!candidate) return null;
+
+  // Rule 1: exact match with website-self-declared Telegram handle.
   const ws = ctx.websiteSignals?.telegramHandler?.replace(/^@/, '').trim().toLowerCase();
   if (ws && ws === candidate) {
     return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 100, 'website self declared');
+  }
+
+  // Rule 2: handle starts with a substantive team token. Catches "fileverse",
+  // "vitadao", "talentprotocol" etc. — Telegram handle conventions are similar
+  // to Twitter's so same prefix-match guard applies.
+  if (hostFirstLabelMatchesTeamName(ctx.teamName, candidate)) {
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'name in telegram handle');
   }
   return null;
 }
