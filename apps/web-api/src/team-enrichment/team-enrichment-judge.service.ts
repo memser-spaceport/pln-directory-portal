@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { z } from 'zod';
 import { PrismaService } from '../shared/prisma.service';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
@@ -9,6 +8,7 @@ import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.
 import { CorroborationFieldInput, runCorroboration } from './team-enrichment-corroboration';
 import { computeTeamQuality } from './team-enrichment-quality';
 import { BROWSER_REQUEST_HEADERS } from './team-enrichment-http.util';
+import { isLikelyValueForField } from './team-enrichment-field-shape.util';
 import {
   AIUsageEntry,
   EnrichmentStatus,
@@ -92,13 +92,9 @@ const USER_JUDGABLE_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey
   'telegramHandler',
 ]);
 
-const URL_REQUIRED_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey>(['website', 'blog']);
-
-const urlSchema = z.string().url();
-
-function isValidUrl(value: string): boolean {
-  return urlSchema.safeParse(value.trim()).success;
-}
+// Shape validation is now centralized in `team-enrichment-field-shape.util.ts`
+// — it covers every typed field, not just URL fields. The old URL_REQUIRED_FIELD_KEYS
+// gate is subsumed by the per-field validator dispatch in `hasJudgableValue`.
 
 const TEAM_RECORD_SELECT = {
   uid: true,
@@ -594,10 +590,20 @@ export class TeamEnrichmentJudgeService {
     websiteReachable: boolean | null
   ): Partial<Record<FieldMetaKey, FieldJudgment>> {
     const inputs: CorroborationFieldInput[] = [];
+    const fieldsMeta = existingMeta.fieldsMeta ?? {};
     for (const key of judgableKeys) {
       const value = this.readFieldValue(team, key);
       if (value === null || (Array.isArray(value) && value.length === 0)) continue;
-      inputs.push({ field: key, value });
+      // Pass per-field provenance so the source-trust rule can fire on values
+      // that were filled at enrichment-time by ScrapingDog or the website
+      // signal extractor at high confidence.
+      const meta = fieldsMeta[key];
+      inputs.push({
+        field: key,
+        value,
+        source: meta?.source,
+        enrichmentConfidence: meta?.confidence,
+      });
     }
 
     // ScrapingDog profile is rebuilt from the meta block for the corroboration rule that
@@ -632,8 +638,10 @@ export class TeamEnrichmentJudgeService {
     if (Array.isArray(value)) return value.length > 0;
     const trimmed = value.trim();
     if (!trimmed) return false;
-    if (URL_REQUIRED_FIELD_KEYS.has(key) && !isValidUrl(trimmed)) return false;
-    return true;
+    // Per-field shape gate: rejects placeholders like "Coming soon!" on URL
+    // fields and "email" / "Twitter" / "Telegram" on contactMethod, plus
+    // structurally-impossible values on social handles.
+    return isLikelyValueForField(key, trimmed);
   }
 
   private buildFieldInput(team: TeamRecord, fieldsMeta: FieldsMetaMap, key: FieldMetaKey): JudgeFieldInput | null {

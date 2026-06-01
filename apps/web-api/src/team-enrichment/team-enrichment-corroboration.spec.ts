@@ -1,6 +1,7 @@
 import {
   CorroborationContext,
   corroborateBlog,
+  corroborateBySource,
   corroborateContactMethod,
   corroborateLinkedinHandler,
   corroborateTelegramHandler,
@@ -9,7 +10,7 @@ import {
   namesShareSubstantiveToken,
   runCorroboration,
 } from './team-enrichment-corroboration';
-import { FieldConfidence, JudgmentSource, JudgmentVerdict } from './team-enrichment.types';
+import { EnrichmentSource, FieldConfidence, JudgmentSource, JudgmentVerdict } from './team-enrichment.types';
 
 describe('team-enrichment-corroboration', () => {
   describe('contactMethod', () => {
@@ -501,6 +502,101 @@ describe('team-enrichment-corroboration', () => {
     it('skips array-valued fields entirely (industryTags / investmentFocus)', () => {
       const out = runCorroboration([{ field: 'industryTags', value: ['AI', 'DeFi'] }], { teamName: 'X' });
       expect(out.industryTags).toBeUndefined();
+    });
+
+    // Bench case (Astera Institute longDescription): value sourced from
+    // ScrapingDog at high enrichment confidence. The AI judge was downgrading
+    // to medium because LinkedIn-paraphrased text doesn't match other sources
+    // verbatim. Source-trust rule short-circuits the AI for trusted sources.
+    it('source-trust: scrapingdog + high → auto-approve regardless of field-specific rules', () => {
+      const out = runCorroboration(
+        [
+          {
+            field: 'longDescription',
+            value: 'Astera advances breakthrough science and tech for the public benefit.',
+            source: EnrichmentSource.ScrapingDog,
+            enrichmentConfidence: 'high',
+          },
+        ],
+        { teamName: 'Astera Institute' }
+      );
+      expect(out.longDescription?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(out.longDescription?.confidence).toBe(FieldConfidence.High);
+      expect(out.longDescription?.note).toBe('sourced from linkedin');
+    });
+
+    it('source-trust: open-graph + high → auto-approve (website-extracted signal)', () => {
+      const out = runCorroboration(
+        [
+          {
+            field: 'twitterHandler',
+            value: 'somehandle',
+            source: EnrichmentSource.OpenGraph,
+            enrichmentConfidence: 'high',
+          },
+        ],
+        { teamName: 'Some Team' }
+      );
+      expect(out.twitterHandler?.note).toBe('sourced from website');
+    });
+
+    it('source-trust: medium enrichment confidence does NOT auto-approve', () => {
+      const out = runCorroboration(
+        [
+          {
+            field: 'longDescription',
+            value: 'Some description.',
+            source: EnrichmentSource.ScrapingDog,
+            enrichmentConfidence: 'medium',
+          },
+        ],
+        { teamName: 'Some Team' }
+      );
+      // Description has no field-specific corroboration rule, so falls through to AI.
+      expect(out.longDescription).toBeUndefined();
+    });
+
+    it('source-trust: ai source does NOT auto-approve (LLM self-confidence not trusted)', () => {
+      const out = runCorroboration(
+        [
+          {
+            field: 'longDescription',
+            value: 'Some description from AI.',
+            source: EnrichmentSource.AI,
+            enrichmentConfidence: 'high',
+          },
+        ],
+        { teamName: 'Some Team' }
+      );
+      expect(out.longDescription).toBeUndefined();
+    });
+  });
+
+  describe('corroborateBySource', () => {
+    it('scrapingdog + high → agrees+high (sourced from linkedin)', () => {
+      const v = corroborateBySource(EnrichmentSource.ScrapingDog, 'high');
+      expect(v?.note).toBe('sourced from linkedin');
+      expect(v?.judgedVia).toBe(JudgmentSource.Corroboration);
+    });
+
+    it('open-graph + high → agrees+high (sourced from website)', () => {
+      const v = corroborateBySource(EnrichmentSource.OpenGraph, 'high');
+      expect(v?.note).toBe('sourced from website');
+    });
+
+    it('ai source → null (LLM-self-confidence is what the judge exists to verify)', () => {
+      expect(corroborateBySource(EnrichmentSource.AI, 'high')).toBeNull();
+    });
+
+    it('non-high enrichment confidence → null', () => {
+      expect(corroborateBySource(EnrichmentSource.ScrapingDog, 'medium')).toBeNull();
+      expect(corroborateBySource(EnrichmentSource.ScrapingDog, 'low')).toBeNull();
+      expect(corroborateBySource(EnrichmentSource.ScrapingDog, undefined)).toBeNull();
+    });
+
+    it('unknown source → null', () => {
+      expect(corroborateBySource('something-else', 'high')).toBeNull();
+      expect(corroborateBySource(undefined, 'high')).toBeNull();
     });
   });
 });

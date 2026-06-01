@@ -23,6 +23,7 @@
  */
 
 import {
+  EnrichmentSource,
   FieldConfidence,
   FieldJudgment,
   FieldMetaKey,
@@ -487,16 +488,56 @@ export function corroborateWebsite(value: string | null, ctx: CorroborationConte
   return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, note);
 }
 
+/**
+ * Source-trust rule: when the enrichment pipeline already populated this
+ * field from a trusted deterministic source at high confidence, accept it
+ * without re-verifying via the AI judge.
+ *
+ * The pipeline records `source` per field on `fieldsMeta`:
+ *   - `scrapingdog` — pulled from the team's LinkedIn company profile.
+ *   - `open-graph`  — pulled from the team's own website HTML (JSON-LD,
+ *                     twitter cards, microdata, anchors).
+ *   - `ai`          — filled by the LLM. NOT trusted by this rule, because
+ *                     LLM self-assessed confidence is exactly what the
+ *                     judge exists to verify in the first place.
+ *
+ * The enrichment-time `confidence` must be `high` — `medium`/`low` indicates
+ * the source didn't fully corroborate the value (e.g. open-graph extraction
+ * from a website whose ownership wasn't verified). Only `high` clears the bar.
+ *
+ * This rule turns "source provenance" into the second source, the same way
+ * the website-self-declared / email-domain-matches-website rules do — except
+ * the corroboration happened at enrichment-time, not at judge-time.
+ */
+export function corroborateBySource(
+  source: string | undefined,
+  enrichmentConfidence: string | undefined
+): FieldJudgment | null {
+  if (enrichmentConfidence !== 'high') return null;
+  if (source === EnrichmentSource.ScrapingDog) {
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'sourced from linkedin');
+  }
+  if (source === EnrichmentSource.OpenGraph) {
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'sourced from website');
+  }
+  return null;
+}
+
 // ─── Dispatcher ────────────────────────────────────────────────────────────
 
 /**
  * Per-field input passed to the dispatcher. Mirrors the shape the judge already
- * builds when collecting judgable fields — just the field key and the value
- * being judged.
+ * builds when collecting judgable fields — field key, the value being judged,
+ * and (optionally) the field's provenance from `fieldsMeta` so the source-trust
+ * rule can fire when the value came from a deterministic source.
  */
 export interface CorroborationFieldInput {
   field: FieldMetaKey;
   value: string | string[] | null;
+  /** Enrichment-time provenance: `ai` / `scrapingdog` / `open-graph`. */
+  source?: string;
+  /** Enrichment-time self-assessed confidence: `high` / `medium` / `low`. */
+  enrichmentConfidence?: string;
 }
 
 /**
@@ -512,6 +553,16 @@ export function runCorroboration(
   for (const f of fields) {
     if (Array.isArray(f.value)) continue; // array fields (industryTags, investmentFocus) are not Stage-1.5 candidates
     const v = f.value;
+
+    // Source-trust rule runs FIRST for every field — if the value came from a
+    // trusted deterministic source at high confidence, that's the verification
+    // and we skip the per-field rules + AI judge. Symmetric for all field types.
+    const sourceVerdict = corroborateBySource(f.source, f.enrichmentConfidence);
+    if (sourceVerdict) {
+      out[f.field] = sourceVerdict;
+      continue;
+    }
+
     let verdict: FieldJudgment | null = null;
     switch (f.field) {
       case 'contactMethod':
