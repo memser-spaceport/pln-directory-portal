@@ -376,7 +376,10 @@ quality?: {
 
 ### Value-validity gate (per-field shape check)
 
-Before a field is judged at all, its stored value is checked against a per-field shape validator (`team-enrichment-field-shape.util.ts`, function `isLikelyValueForField`). Fields that fail are **skipped entirely** — no Stage 1 verdict, no Stage 2 AI call, no entry in `fieldsForReview` (there is nothing meaningful to verify, and we don't want the AI to hallucinate a verdict against junk input).
+The same per-field shape validator (`team-enrichment-field-shape.util.ts`, function `isLikelyValueForField`) is used on **both** sides of the pipeline:
+
+- **At enrichment time** (`team-enrichment.service.ts`): a `Team.<field>` value that fails the shape gate is treated as effectively empty. The field falls through to AI / website-signal / lead / ScrapingDog enrichment as if the user had left it blank, the AI's candidate is written with `status: Enriched`, and the judge can then promote it — overwriting the junk placeholder on `Team.<field>`. See [Governing invariant](#governing-invariant).
+- **At judge time** (`team-enrichment-judge.service.ts`): a candidate value that fails the shape gate is skipped entirely — no Stage 1 verdict, no Stage 2 AI call, no entry in `fieldsForReview` (there is nothing meaningful to verify, and we don't want the AI to hallucinate a verdict against junk input).
 
 The validator rejects values **by structure**, not by enumerating placeholder strings. "Coming soon!", "TBD", "n/a", "pending", "email", "Twitter", "Telegram" all fail because none of them match the field's expected shape — no blocklist needed.
 
@@ -894,9 +897,15 @@ Validates requestor is team lead of the team
 
 ### Governing invariant
 
-**If a field has a value on `Team` and its prior `fieldsMeta[field].status` is not `Enriched`, it is user-owned. Enrichment never overwrites it (on either `Team` or `TeamEnrichment`) and marks it `ChangedByUser`.**
+**If a field has a *structurally valid* value on `Team` and its prior `fieldsMeta[field].status` is not `Enriched`, it is user-owned. Enrichment never overwrites it (on either `Team` or `TeamEnrichment`) and marks it `ChangedByUser`.**
 
-This rule applies in both standard and force modes. Force mode can re-query fields marked `Enriched` (AI-owned, candidate value lives on `TeamEnrichment`), but it will not touch anything the user has populated on `Team` — including on a team's very first enrichment where no `TeamEnrichment` row exists yet.
+The "structurally valid" qualifier is enforced by [`isLikelyValueForField`](#value-validity-gate-per-field-shape-check) — the same per-field shape validator the judge uses. A `Team` value that doesn't pass its field's shape (`"Coming soon!"` on `website`, `"n/a"` on `contactMethod`, `"email"` typed into `contactMethod`, etc.) is treated as **effectively empty** by both the user-owned guard and the `ChangedByUser` short-circuit. This means:
+
+- A user value of `"Coming soon!"` on `website` does NOT block enrichment. The AI pipeline runs, fills `TeamEnrichment.website` with a real URL, status flips to `Enriched`, and the judge promotes the AI value to `Team.website` on the next run — overwriting the junk placeholder. The enrichment log records this under `userJunkOverridden=[website,...]` for audit.
+- If the user typed junk by mistake AND the AI's replacement isn't high-confidence, the field surfaces in `/v1/admin/teams/enrichment-review` like any other AI-supplied `Enriched` field — admin can confirm or edit.
+- A user value that *does* pass shape validation (e.g. an actual URL on `website`, an actual email on `contactMethod`) keeps the existing protection: enrichment never overwrites it.
+
+This rule applies in both standard and force modes. Force mode can re-query fields marked `Enriched` (AI-owned, candidate value lives on `TeamEnrichment`), but it will not touch any *structurally valid* user value on `Team` — including on a team's very first enrichment where no `TeamEnrichment` row exists yet.
 
 **User-owned = highest-confidence truth.** Beyond write-protection, user-owned fields also bypass downstream verification when used as seeds:
 
@@ -904,11 +913,13 @@ This rule applies in both standard and force modes. Force mode can re-query fiel
 - `industryTags` (ChangedByUser, including user-cleared sets) is never treated as a ScrapingDog gap.
 - `website` existence on `Team` already causes `verifyEntityIdentity` to be skipped for the AI-enrichment pass, so user-owned websites are implicitly trusted.
 
-The shared `isFieldUserOwned(fieldsMeta, field, teamSlotHasValue)` helper at the top of `team-enrichment.service.ts` encodes the "ChangedByUser OR non-empty-on-Team-with-no-meta" check used throughout. Note that "non-empty" is evaluated against `Team`, not `TeamEnrichment` — what matters is what the user/judge actually sees.
+All three of these bypasses require the user value to pass the shape gate. Junk-shaped values don't get the seed-trust treatment — they're treated as if the field were empty, so verification still happens.
+
+The shared `isFieldUserOwned(fieldsMeta, field, teamValue)` helper at the top of `team-enrichment.service.ts` encodes the "ChangedByUser OR non-empty-on-Team-with-no-meta, AND value passes shape gate" check used throughout. The helper takes the actual value (not just a boolean) so it can run the shape validator. Note that "non-empty" is evaluated against `Team`, not `TeamEnrichment` — what matters is what the user/judge actually sees.
 
 ### Where `ChangedByUser` is written
 
-1. **During any enrichment run** — when the loop encounters a scalar field / `industryTags` / `investmentFocus` / `logo` that is non-empty on `Team` and has no prior `Enriched` status, it writes `fieldsMeta[field] = { ..., status: ChangedByUser }` on `TeamEnrichment.dataEnrichment`. Covers pre-existing user data on a first-ever run (whether triggered by cron or by force-enrichment) and any orphan user-supplied values that bypassed the team-update flow.
+1. **During any enrichment run** — when the loop encounters a scalar field / `industryTags` / `investmentFocus` / `logo` that is non-empty on `Team`, **passes the per-field shape gate**, and has no prior `Enriched` status, it writes `fieldsMeta[field] = { ..., status: ChangedByUser }` on `TeamEnrichment.dataEnrichment`. Covers pre-existing user data on a first-ever run (whether triggered by cron or by force-enrichment) and any orphan user-supplied values that bypassed the team-update flow. Junk-shaped values (failing the shape gate) are treated as effectively empty here too — they don't get the `ChangedByUser` stamp and they DO get re-enriched.
 2. **When a user edits an AI-filled field on `Team`** — `handleUserFieldChange()` flips `Enriched → ChangedByUser` for modified fields in `TeamEnrichment.dataEnrichment.fieldsMeta` (called from `updateTeamFromParticipantsRequest()` when the team has `isAIGenerated=true`).
 3. **When a user fills in a `CannotEnrich` field** — `handleUserFieldChange()` also flips `CannotEnrich → ChangedByUser` when the user supplies a non-empty value for a field AI had previously given up on.
 

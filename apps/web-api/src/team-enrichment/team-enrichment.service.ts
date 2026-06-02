@@ -7,6 +7,7 @@ import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibil
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { ScrapingDogCompanyProfile, TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import { deriveTeamFieldsFromLeads } from './team-enrichment-lead-backfill';
+import { isLikelyValueForField } from './team-enrichment-field-shape.util';
 import {
   ENRICHABLE_TEAM_FIELDS,
   EnrichableTeamField,
@@ -136,11 +137,20 @@ type FieldsMetaMap = Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
 function isFieldUserOwned(
   fieldsMeta: Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>,
   field: FieldMetaKey,
-  teamSlotHasValue: boolean
+  teamValue: string | null | undefined
 ): boolean {
+  // A value is "user-owned" only if the user provided meaningful data.
+  // Junk-shaped placeholders ("Coming soon!", "n/a", field-name typos like
+  // "email" / "Twitter") are treated as effectively-empty, so they don't
+  // block enrichment and don't get promoted as if they were real user data.
+  // The shape validator is the same one the judge uses (`isLikelyValueForField`),
+  // so enrichment and judging agree on what counts as a real value.
+  if (!teamValue || teamValue.trim() === '' || !isLikelyValueForField(field, teamValue)) {
+    return false;
+  }
   const status = fieldsMeta[field]?.status;
   if (status === FieldEnrichmentStatus.ChangedByUser) return true;
-  if (teamSlotHasValue && !fieldsMeta[field]) return true;
+  if (!fieldsMeta[field]) return true; // pre-enrichment user data
   return false;
 }
 
@@ -639,7 +649,7 @@ export class TeamEnrichmentService {
       let scrapingDogInternalId: string | null | undefined;
 
       if (this.scrapingDogService.isConfigured() && team.linkedinHandler) {
-        const linkedinIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
+        const linkedinIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', team.linkedinHandler);
         this.logger.log(
           `Logo refetch: trying ScrapingDog for team ${teamUid} (${team.name}) handle "${team.linkedinHandler}"${
             linkedinIsUserOwned ? ' (user-owned handle, entity check bypassed)' : ''
@@ -821,13 +831,13 @@ export class TeamEnrichmentService {
       // high-trust identity hints — disambiguates ambiguous team names so the AI searches for
       // the entity described by the hint, not the bare name.
       const userConfirmedIdentityHints = {
-        shortDescription: isFieldUserOwned(existingFieldsMeta, 'shortDescription', !!team.shortDescription)
+        shortDescription: isFieldUserOwned(existingFieldsMeta, 'shortDescription', team.shortDescription)
           ? team.shortDescription
           : null,
-        longDescription: isFieldUserOwned(existingFieldsMeta, 'longDescription', !!team.longDescription)
+        longDescription: isFieldUserOwned(existingFieldsMeta, 'longDescription', team.longDescription)
           ? team.longDescription
           : null,
-        moreDetails: isFieldUserOwned(existingFieldsMeta, 'moreDetails', !!team.moreDetails) ? team.moreDetails : null,
+        moreDetails: isFieldUserOwned(existingFieldsMeta, 'moreDetails', team.moreDetails) ? team.moreDetails : null,
       };
 
       const aiResult = await this.aiService.enrichTeamViaAI(team.name, {
@@ -858,7 +868,7 @@ export class TeamEnrichmentService {
 
       // Website-signal extraction: parse the team's website for self-declared socials.
       const websiteToScan = team.website?.trim() || aiResponse.website?.trim() || null;
-      const websiteIsUserOwned = !!team.website && isFieldUserOwned(existingFieldsMeta, 'website', !!team.website);
+      const websiteIsUserOwned = !!team.website && isFieldUserOwned(existingFieldsMeta, 'website', team.website);
       const websiteBackfilledFields = new Set<EnrichableTeamField>();
       const websiteHtml = websiteToScan ? await this.aiService.fetchWebsiteHtml(websiteToScan) : null;
 
@@ -955,20 +965,36 @@ export class TeamEnrichmentService {
         alreadyEnriched: [],
         aiReturnedNull: [],
         aiCannotEnrich: [],
+        userJunkOverridden: [],
       };
 
       for (const field of ENRICHABLE_TEAM_FIELDS) {
         const fieldStatus = existingFieldsMeta[field]?.status;
 
-        if (fieldStatus === FieldEnrichmentStatus.ChangedByUser) {
+        // Junk-aware empty check. A `Team` value of "Coming soon!", "n/a",
+        // "email" (as contactMethod), "TBD" — anything that fails the per-field
+        // shape validator — is treated as effectively empty. The ChangedByUser
+        // short-circuit AND the user-owned guard below both honor this, so the
+        // field falls through to AI enrichment and the AI's new value is
+        // written with status `Enriched` (overriding the prior junk
+        // ChangedByUser status). Lets the judge then promote it normally,
+        // which overwrites the junk Team.<field> value.
+        const teamValue = team[field];
+        const teamValueHasContent = !!teamValue && teamValue.trim() !== '';
+        const teamValueIsJunk = teamValueHasContent && !isLikelyValueForField(field, teamValue as string);
+        const teamSlotIsEmpty = !teamValueHasContent || teamValueIsJunk;
+
+        if (teamValueIsJunk) {
+          skipReasons.userJunkOverridden.push(field);
+        }
+
+        // ChangedByUser short-circuit: skip ONLY when the user value is real.
+        // Junk ChangedByUser values fall through to enrichment and get
+        // overwritten by the AI candidate when the judge agrees at high.
+        if (fieldStatus === FieldEnrichmentStatus.ChangedByUser && !teamValueIsJunk) {
           skipReasons.userEdited.push(field);
           continue;
         }
-
-        // user-owned check is against the Team row (what the user/judge see),
-        // not the TeamEnrichment candidate row.
-        const teamValue = team[field];
-        const teamSlotIsEmpty = !teamValue || teamValue.trim() === '';
 
         if (!teamSlotIsEmpty && fieldStatus !== FieldEnrichmentStatus.Enriched) {
           newFieldsMeta[field] = {
@@ -1981,7 +2007,7 @@ export class TeamEnrichmentService {
 
     const usingUserOwnedHandle =
       handle === team.linkedinHandler &&
-      isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
+      isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', team.linkedinHandler);
 
     this.logger.log(
       `Team ${teamUid} (${team.name}): invoking ScrapingDog for handle "${handle}"${
@@ -1998,7 +2024,7 @@ export class TeamEnrichmentService {
     }
 
     if (fetchResult.kind === 'not-found') {
-      const handleIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
+      const handleIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', team.linkedinHandler);
       if (handleIsUserOwned) {
         this.logger.warn(
           `Team ${teamUid} (${team.name}): ScrapingDog reports "${handle}" not found, but handle is user-owned — leaving as-is`
