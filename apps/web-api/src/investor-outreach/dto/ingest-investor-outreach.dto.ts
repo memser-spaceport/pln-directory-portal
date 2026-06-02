@@ -25,6 +25,13 @@ export interface InvestorOutreachPortfolioTeamInput {
   pl_invested_at?: string;
   pl_invested_stage?: string;
   raising_now?: string;
+  raising_stage?: string;
+  last_round_stage?: string;
+  /** YYYY-MM-DD */
+  last_round_date?: string;
+  /** YYYY-MM-DD */
+  raising_as_of?: string;
+  raising_source?: string;
   /** Comma-separated sector tags, matching the row-level sector_tags convention. */
   sectors?: string;
   geo?: string;

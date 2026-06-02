@@ -2131,21 +2131,21 @@ enum NewsDiscoveryOutcome {
 }
 
 model TeamNewsItem {
-  id           Int           @id @default(autoincrement())
-  uid          String        @unique @default(cuid())
+  id           Int                 @id @default(autoincrement())
+  uid          String              @unique @default(cuid())
   teamUid      String
-  team         Team          @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
-  canonicalKey String        @unique
-  eventType    NewsEventType @default(OTHER)
+  team         Team                @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  canonicalKey String              @unique
+  eventType    NewsEventType       @default(OTHER)
   eventDate    DateTime
   title        String
   summary      String?
   sourceUrl    String
   sourceDomain String?
-  tags         String[]      @default([])
+  tags         String[]            @default([])
   rawPayload   Json?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
   forumLinks   TeamNewsForumLink[]
 
   @@index([teamUid])
@@ -2321,6 +2321,11 @@ model PlPortfolioTeamMeta {
   plInvestedAt    DateTime? @db.Date
   plInvestedStage String?
   raisingNow      String?
+  lastRoundStage  String?
+  lastRoundDate   DateTime? @db.Date
+  raisingStage    String?
+  raisingAsOf     DateTime? @db.Date
+  raisingSource   String?   @db.VarChar(120)
   /// Comma-separated sector tags, matching the ingest `sector_tags` convention.
   sectors         String?
   geo             String?   @db.VarChar(120)
@@ -2347,30 +2352,30 @@ enum FounderReviewFeedback {
 model FounderSourcingRecord {
   id Int @id @default(autoincrement())
 
-  founderId String @unique
-  dedupeKey String @unique
+  founderId String   @unique
+  dedupeKey String   @unique
   source    String
   sources   String[] @default([])
 
-  name        String?
-  firstName   String?
-  lastName    String?
-  emails      String[] @default([])
-  primaryEmail String?
-  github      String?
-  twitter     String?
-  linkedin    String?
-  telegram    String?
-  farcaster   String?
-  website     String?
-  org         String?
-  team        String?
-  teamPriority Int?
-  bio         String?
-  topics      String[] @default([])
-  externalIds Json?
-  directoryMemberId String?
-  directoryTeamId   String?
+  name                 String?
+  firstName            String?
+  lastName             String?
+  emails               String[] @default([])
+  primaryEmail         String?
+  github               String?
+  twitter              String?
+  linkedin             String?
+  telegram             String?
+  farcaster            String?
+  website              String?
+  org                  String?
+  team                 String?
+  teamPriority         Int?
+  bio                  String?
+  topics               String[] @default([])
+  externalIds          Json?
+  directoryMemberId    String?
+  directoryTeamId      String?
   identityCompleteness Decimal? @db.Decimal(5, 4)
 
   fundTags           Json?
@@ -2391,19 +2396,19 @@ model FounderSourcingRecord {
 
   provenance   Json?
   lastSignalAt DateTime?
-  whyNow       String? @db.VarChar(500)
+  whyNow       String?   @db.VarChar(500)
   thinEvidence Boolean?
 
-  runId                  String?
-  signalSourcingVersion  String?
-  isKnown                Boolean?
-  lastIngestRunId        String?
-  lastIngestSource       String?
+  runId                 String?
+  signalSourcingVersion String?
+  isKnown               Boolean?
+  lastIngestRunId       String?
+  lastIngestSource      String?
 
-  reviewStatus        FounderReviewStatus   @default(NEW)
+  reviewStatus        FounderReviewStatus    @default(NEW)
   reviewFeedback      FounderReviewFeedback?
   reviewDecidedAt     DateTime?
-  reviewNote          String?               @db.VarChar(500)
+  reviewNote          String?                @db.VarChar(500)
   reviewedByMemberUid String?
 
   rawPayload Json
@@ -2423,7 +2428,7 @@ model FounderSourcingRecord {
 model FounderSourcingIngestRun {
   id Int @id @default(autoincrement())
 
-  runId     String @unique
+  runId     String   @unique
   source    String?
   itemCount Int
   createdAt DateTime @default(now())
@@ -2441,31 +2446,31 @@ enum RoadmapStage {
 }
 
 model RoadmapItem {
-  id                 Int           @id @default(autoincrement())
-  uid                String        @unique @default(cuid())
+  id                 Int          @id @default(autoincrement())
+  uid                String       @unique @default(cuid())
   title              String
   description        String
   acceptanceCriteria String?
-  stage              RoadmapStage  @default(IDEA)
+  stage              RoadmapStage @default(IDEA)
 
-  focusArea          String?
+  focusArea String?
 
-  createdByUid       String
-  createdBy          Member        @relation("roadmapItemCreatedBy", fields: [createdByUid], references: [uid])
+  createdByUid String
+  createdBy    Member @relation("roadmapItemCreatedBy", fields: [createdByUid], references: [uid])
 
-  promotedAt         DateTime?
-  promotedByUid      String?
-  promotedBy         Member?       @relation("roadmapItemPromotedBy", fields: [promotedByUid], references: [uid])
-  declinedReason     String?
+  promotedAt     DateTime?
+  promotedByUid  String?
+  promotedBy     Member?   @relation("roadmapItemPromotedBy", fields: [promotedByUid], references: [uid])
+  declinedReason String?
 
   externalTrackerUrl String?
 
-  upvotes            RoadmapItemUpvote[]
+  upvotes RoadmapItemUpvote[]
 
-  deletedAt          DateTime?
-  deletionReason     String?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  deletedAt      DateTime?
+  deletionReason String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([stage, deletedAt])
   @@index([createdByUid])
