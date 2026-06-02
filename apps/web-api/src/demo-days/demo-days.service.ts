@@ -1077,13 +1077,25 @@ export class DemoDaysService {
   ): Promise<{ success: boolean }> {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
 
-    const member = await this.prisma.member.findUnique({
-      where: { email: memberEmail },
-      select: { uid: true },
-    });
-
+    const member = await this.membersService.findMemberByEmail(memberEmail);
     if (!member) {
       throw new NotFoundException('Member not found');
+    }
+
+    const activeParticipant = await this.prisma.demoDayParticipant.findFirst({
+      where: {
+        demoDayUid: demoDay.uid,
+        memberUid: member.uid,
+        isDeleted: false,
+      },
+    });
+
+    if (activeParticipant) {
+      await this.prisma.demoDayParticipant.update({
+        where: { uid: activeParticipant.uid },
+        data: { confidentialityAccepted: accepted },
+      });
+      return { success: true };
     }
 
     const existingParticipant = await this.prisma.demoDayParticipant.findUnique({
@@ -1098,11 +1110,30 @@ export class DemoDaysService {
     if (existingParticipant) {
       await this.prisma.demoDayParticipant.update({
         where: { uid: existingParticipant.uid },
-        data: { confidentialityAccepted: accepted },
+        data: {
+          confidentialityAccepted: accepted,
+          isDeleted: false,
+          deletedAt: null,
+        },
       });
+      return { success: true };
     }
 
-    return { success: true };
+    if (hasDemoDayAdminPermissionForHost(member, demoDay.host)) {
+      await this.prisma.demoDayParticipant.create({
+        data: {
+          demoDayUid: demoDay.uid,
+          memberUid: member.uid,
+          type: 'SUPPORT',
+          status: DemoDayParticipantStatus.ENABLED,
+          isDemoDayAdmin: true,
+          confidentialityAccepted: accepted,
+        },
+      });
+      return { success: true };
+    }
+
+    throw new NotFoundException('Demo day participant not found');
   }
 
   async getTeamAnalytics(teamUid: string, demoDayUidOrSlug: string) {
@@ -1940,7 +1971,7 @@ export class DemoDaysService {
 
   private async getMemberWithDemoDayParticipants(memberEmail: string, demoDayUid?: string) {
     return this.prisma.member.findUnique({
-      where: { email: memberEmail },
+      where: { email: memberEmail.toLowerCase().trim() },
       select: {
         uid: true,
         memberApproval: {
