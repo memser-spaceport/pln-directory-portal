@@ -95,8 +95,7 @@ jobs:
           aws sts get-caller-identity
           aws eks update-kubeconfig \
             --region us-west-1 \
-            --name ${{ env.CLUSTER_NAME }} \
-            --role-arn arn:aws:iam::013228333448:role/github-actions-pln-dev
+            --name ${{ env.CLUSTER_NAME }}
 
       - name: Verify Kubernetes access
         run: |
