@@ -36,10 +36,6 @@ export class SetupService {
       logStreamName: `${ip.address()}`,
       awsRegion: process.env.CLOUDWATCH_REGION,
       awsOptions: {
-        credentials: {
-          accessKeyId: process.env.CLOUDWATCH_ACCESS_KEY as string,
-          secretAccessKey: process.env.CLOUDWATCH_SECRET_KEY as string,
-        },
         region: process.env.CLOUDWATCH_REGION,
       },
       messageFormatter: (item: any) =>
