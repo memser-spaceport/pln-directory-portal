@@ -1,34 +1,40 @@
-# syntax=docker/dockerfile:1.7
+# ============================
+# Stage 1: Builder
+# ============================
+FROM node:20.19-bookworm AS builder
 
-FROM node:20.19-bullseye AS deps
 WORKDIR /app
+
+# Enable corepack (for Yarn support)
 RUN corepack enable
 
+# Copy dependency files
 COPY package.json yarn.lock ./
+COPY .forestadmin-schema.json ./
 COPY patches ./patches
+RUN yarn install --frozen-lockfile
 
-RUN --mount=type=cache,target=/root/.cache/yarn \
-    yarn install --frozen-lockfile
-
-FROM node:20.19-bullseye AS builder
-WORKDIR /app
-RUN corepack enable
-
-COPY --from=deps /app/node_modules ./node_modules
+# Copy source code
 COPY . .
 
-RUN npx prisma generate --schema=./apps/web-api/prisma/schema.prisma
-RUN npx prisma generate --schema=./apps/web-api/prisma/oso-schema.prisma
+# Generate Prisma clients
+RUN npx prisma generate --schema=apps/web-api/prisma/schema.prisma
+RUN npx prisma generate --schema=apps/web-api/prisma/oso-schema.prisma
 
-RUN yarn nx build web-api --configuration=production
+# Build the app
+RUN yarn build
 
-FROM node:20.19-bullseye-slim AS runtime
-WORKDIR /app
+# ============================
+# Stage 2: Production
+# ============================
+FROM node:20.19-bookworm
 
-ENV NODE_ENV=production
-
+# Create a non-root user for security
 RUN groupadd -r app && useradd -r -g app app
 
+WORKDIR /app
+
+# Copy built artifacts and only required files
 COPY --from=builder /app/package.json /app/yarn.lock ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
@@ -36,9 +42,13 @@ COPY --from=builder /app/apps/web-api/prisma ./apps/web-api/prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/.forestadmin-schema.json ./
 
-RUN chown -R app:app /app
+# Ensure /app is owned by the 'app' user and is writable (for Forest Admin schema file)
+# Security note: This grants write access to the app directory for the app user only, not globally
+RUN chown -R app:app /app && chmod -R u+w /app
 
 USER app
+
 EXPOSE 3000
 
+# Start command with better error handling
 CMD ["sh", "-c", "npx prisma migrate deploy --schema=./apps/web-api/prisma/schema.prisma && npm run start:prod"]
