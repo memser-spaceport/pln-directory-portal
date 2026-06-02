@@ -134,5 +134,8 @@ jobs:
             --set ingress.host=dev-directory.plnetwork.io \
             --set service.port=3000 \
             --set ingress.acm_arn=$CERT_ARN \
+            --set serviceAccount.create=true \
+            --set serviceAccount.name=directory-service-sa \
+            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=arn:aws:iam::013228333448:role/directory-service-dev-irsa \
             -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml \
             -n pln-dev
