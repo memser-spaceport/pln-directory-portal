@@ -11,6 +11,11 @@ export interface PlPortfolioTeamDto {
   plInvestedAt: string | null;
   plInvestedStage: string | null;
   raisingNow: string | null;
+  raisingStage: string | null;
+  lastRoundStage: string | null;
+  lastRoundDate: string | null;
+  raisingAsOf: string | null;
+  raisingSource: string | null;
   sectors: string[];
   geo: string | null;
   coInvestors: PlPortfolioTeamCoInvestorDto[];

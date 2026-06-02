@@ -116,6 +116,20 @@ export class InvestorOutreachServiceController {
         ) {
           throw new BadRequestException(`portfolio_teams[${i}].pl_invested_at must be YYYY-MM-DD when provided`);
         }
+        if (
+          t.last_round_date != null &&
+          String(t.last_round_date).trim() !== '' &&
+          !YMD.test(String(t.last_round_date).trim())
+        ) {
+          throw new BadRequestException(`portfolio_teams[${i}].last_round_date must be YYYY-MM-DD when provided`);
+        }
+        if (
+          t.raising_as_of != null &&
+          String(t.raising_as_of).trim() !== '' &&
+          !YMD.test(String(t.raising_as_of).trim())
+        ) {
+          throw new BadRequestException(`portfolio_teams[${i}].raising_as_of must be YYYY-MM-DD when provided`);
+        }
       }
     }
 
