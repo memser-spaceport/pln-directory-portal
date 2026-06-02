@@ -3,9 +3,9 @@ import { assertTransitionAllowed, isIdeaStage, isPromoteTransition } from './roa
 
 describe('roadmap-stage.util', () => {
   describe('isIdeaStage', () => {
-    it('returns true for IDEA and UNDER_REVIEW', () => {
+    it('returns true for IDEA and BACKLOG', () => {
       expect(isIdeaStage(RoadmapStage.IDEA)).toBe(true);
-      expect(isIdeaStage(RoadmapStage.UNDER_REVIEW)).toBe(true);
+      expect(isIdeaStage(RoadmapStage.BACKLOG)).toBe(true);
     });
 
     it('returns false for roadmap stages', () => {
@@ -26,7 +26,7 @@ describe('roadmap-stage.util', () => {
 
   describe('isPromoteTransition', () => {
     it('detects promote from idea stage to PLANNED', () => {
-      expect(isPromoteTransition(RoadmapStage.UNDER_REVIEW, RoadmapStage.PLANNED)).toBe(true);
+      expect(isPromoteTransition(RoadmapStage.BACKLOG, RoadmapStage.PLANNED)).toBe(true);
       expect(isPromoteTransition(RoadmapStage.PLANNED, RoadmapStage.IN_PROGRESS)).toBe(false);
     });
   });

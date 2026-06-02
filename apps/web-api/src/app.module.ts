@@ -71,6 +71,7 @@ import { JobOpeningsModule } from './job-openings/job-openings.module';
 import { JobAlertsModule } from './job-alerts/job-alerts.module';
 import { TeamNewsModule } from './team-news/team-news.module';
 import { InvestorOutreachModule } from './investor-outreach/investor-outreach.module';
+import { FounderSourcingModule } from './founder-sourcing/founder-sourcing.module';
 import { RoadmapModule } from './roadmap/roadmap.module';
 
 @Module({
@@ -163,6 +164,7 @@ import { RoadmapModule } from './roadmap/roadmap.module';
     JobAlertsModule,
     TeamNewsModule,
     InvestorOutreachModule,
+    FounderSourcingModule,
     RoadmapModule,
   ],
   providers: [

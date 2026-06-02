@@ -209,6 +209,8 @@ Anything less than `agrees + high` stays on `TeamEnrichment` only — the user-f
 
 ### Two stages
 
+> **Stage 1.5 — Deterministic Cross-Field Corroboration** runs between Stage 1 and Stage 2. See [Stage 1.5 below](#stage-15--deterministic-cross-field-corroboration).
+
 1. **Stage 1 — ScrapingDog LinkedIn match (deterministic).** Runs when `SCRAPINGDOG_API_KEY` is set and the team has a `linkedinHandler`. The judge fetches the canonical LinkedIn profile, classifies the name match as `exact` / `partial` / `none`, then performs direct field-to-field comparisons (**`company_name` match + optional website-host corroboration for the LinkedIn handle itself**, tagline/about overlap for descriptions, set intersection for industries). Fields the comparison can resolve authoritatively (`agrees` at `high`, or `disagrees` at `low`) skip Stage 2. `partial` tier downshifts `high` verdicts to `medium`.
 
    **`linkedinHandler` verification — name match, not slug match.** The handle verdict is **not** produced by comparing the team's stored slug to ScrapingDog's `universal_name_id`. LinkedIn 301-redirects renamed companies to their canonical slug, so a stored `company/oldco` resolving to a profile whose `universal_name_id` is `newco-rebrand` would falsely look like a mismatch even though it points at the correct entity. Instead, Stage 1 trusts the precondition that produced this comparator run: ScrapingDog returned a profile whose `company_name` matched the team (per `classifyNameMatch`), so the handle pointed at the right company. Optionally, a website-host equality between `team.website` and `profile.website` corroborates the match and bumps confidence/score. Verdict matrix:
@@ -228,6 +230,64 @@ Anything less than `agrees + high` stays on `TeamEnrichment` only — the user-f
    **Website reachability probe.** Stage 1 still runs a lightweight reachability probe on the website value being judged (single GET, follows redirects, 5s timeout). The result is **purely observability** — no Stage 1 verdict is produced from it, since the host comparator is gone. It's persisted to `TeamEnrichment.dataEnrichment.judgment.scrapingDog.websiteReachable` / `websiteFinalHost` and forwarded to Stage 2 as a `Website reachability:` line so the AI judge can factor a definitive `4xx`/`5xx` (real negative signal) into its website verdict. The probe runs only when the value passes the value-validity gate below, so we never `fetch()` a placeholder string.
 
 2. **Stage 2 — AI judge.** For remaining fields (or all fields when Stage 1 is unavailable), the second AI model returns a per-field `{ confidence, score, verdict, note }` plus an `overallAssessment`. Temperature is conservative so the judge prefers `uncertain` over guessing.
+
+### Stage 1.5 — Deterministic Cross-Field Corroboration
+
+A pure-function pass inserted between Stage 1 (ScrapingDog) and Stage 2 (AI judge). No LLM, no network. For each judgable field, runs a small ruleset using anchors already on hand (`team.*`, `dataEnrichment.websiteSignals`, the Stage 1 ScrapingDog meta). Rules emit a `FieldJudgment` with `judgedVia: 'corroboration'` whose `note` lists which anchors fired (e.g. `"email-domain==website"`, `"website-self-declared"`, `"og-name-match+jsonld-name-match"`).
+
+`agrees + high` verdicts from Stage 1.5 are merged into the Stage-1 verdict map BEFORE the `stage1Resolved` set is computed — so any corroborated field skips the AI judge entirely and is promoted to `Team.<field>` on the same promotion gate as before. This is the primary mechanism by which the admin review queue shrinks.
+
+| Field | Rule | Anchors that must converge |
+| --- | --- | --- |
+| `contactMethod` | email-domain equals website-host (or JSON-LD-declared email's domain) | `team.website` host OR `websiteSignals.contactEmail` |
+| `twitterHandler` / `linkedinHandler` / `telegramHandler` | AI value equals the value the team's own website self-declared | `websiteSignals.<field>` (JSON-LD `sameAs`, `twitter:site`, microdata) |
+| `blog` | host equals website host, or is a subdomain of it | `team.website` host |
+| `website` | reachable (2xx) AND name-anchored by ≥1 second source | `websiteSignals.ogSiteName`, `websiteSignals.jsonLdOrgName`, or `scrapingDog.profile.website` (token-overlap on substantive ≥3-char tokens, company-stopword-aware) |
+
+Rules are **conservative** — they only fire when ≥2 distinct anchors converge. Fields with no rule match (or no anchors firing) fall through to Stage 2.
+
+> **The canonical failure case this fixes:** team has `contactMethod = "test@bestTeam.xyz"` and `website = "bestTeam.xyz"`. Stage 1.5's `email-domain==website` rule produces `agrees + high` for `contactMethod`, so the AI judge never sees this field and it auto-promotes. Previously, the AI was finding a different email listed on the team's LinkedIn page and marking the field `disagrees`.
+
+The full rule implementations + an eval bench live in `team-enrichment-corroboration.ts` and `team-enrichment-corroboration.spec.ts`. The bench pins precision/recall: any rule change that regresses fixtures fails CI.
+
+### Website signal persistence (`dataEnrichment.websiteSignals`)
+
+`fetchSocialSignalsFromWebsite` already extracts self-declared signals from the team's website HTML during enrichment (JSON-LD `Organization` nodes, Twitter cards, microdata, anchors, `og:site_name`, `meta description`). The extracted block is now also **persisted** to `TeamEnrichment.dataEnrichment.websiteSignals` so Stage 1.5 can read it as a second independent source:
+
+```ts
+websiteSignals?: {
+  extractedAt: string;          // ISO timestamp
+  host?: string;                // normalized website host (no www., lowercase)
+  twitterHandler?: string;
+  linkedinHandler?: string;
+  telegramHandler?: string;
+  contactEmail?: string;
+  jsonLdOrgName?: string;
+  ogSiteName?: string;
+  metaDescription?: string;
+}
+```
+
+The block is preserved across runs if a subsequent fetch fails — a transient website outage doesn't wipe a recent extraction.
+
+**Browser-like header bouquet for HTML fetches.** `fetchWebsiteHtml` now uses the full `BROWSER_REQUEST_HEADERS` set from `team-enrichment-http.util.ts` (User-Agent + Accept-Language + Accept-Encoding + Sec-Ch-Ua-* + Sec-Fetch-* + Priority + Upgrade-Insecure-Requests). The bouquet was ported from `pln-data-enrichment/apps/data-enrichment/src/common/utils/user-agent.util.ts`, where it documented a 66% recovery rate on `homepage-unreachable` outcomes once the absent-headers bot-signal class was eliminated. More successful HTML fetches → more `websiteSignals` populated → more Stage 1.5 corroboration → fewer fields reaching the AI judge.
+
+### Quality block + thin-evidence flag (`dataEnrichment.judgment.quality`)
+
+Computed at judge time and persisted alongside the verdict. Mirrors the 6-dimension scoring doctrine from `pln-data-enrichment/apps/signal-sourcing/src/quality/quality.util.ts`. Surfaced through the review-list endpoint so admins can sort/filter the queue.
+
+```ts
+quality?: {
+  completeness: number;        // populated / total enrichable fields
+  validity: number;            // URL/email zod pass-rate over populated fields
+  freshness: number;           // 1 - days_since_enriched/365 (clamped [0,1])
+  distinctSources: number;     // distinct sources contributing any field (ai|open-graph|scrapingdog|website-signals|user)
+  thinEvidence: boolean;       // distinctSources < 2 OR fewer than 3 core fields populated
+  anchorsFired: string[];      // dedup'd Stage 1.5 anchor notes from this run (explainability)
+}
+```
+
+`thinEvidence: true` flags teams whose verdicts look high-confidence but are built on sparse data (the failure mode the `pln-data-enrichment` `isLowData` flag was designed to catch). Reviewers can de-prioritize those teams independently of the per-field verdict.
 
 ### Value-validity gate (URL-format skip)
 

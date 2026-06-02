@@ -6,6 +6,8 @@ import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibil
 import { JudgeFieldInput, JudgeTeamContext, TeamEnrichmentJudgeAiService } from './team-enrichment-judge-ai.service';
 import { buildPromotionPayload, executePromotion } from './team-enrichment-promotion';
 import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
+import { CorroborationFieldInput, runCorroboration } from './team-enrichment-corroboration';
+import { computeTeamQuality } from './team-enrichment-quality';
 import {
   AIUsageEntry,
   EnrichmentStatus,
@@ -363,8 +365,23 @@ export class TeamEnrichmentJudgeService {
         }
       }
 
+      // Stage 1.5 — deterministic cross-field corroboration (no LLM, no network).
+      // Runs against the same set of judgable keys, using the second-source signals
+      // we extracted from the team's own website during enrichment + the ScrapingDog
+      // profile from Stage 1. Verdicts that fire at `agrees + high` short-circuit the
+      // AI judge and promote the value, exactly like Stage 1 already does.
+      const stage15Verdicts = this.runStage15(team, existingMeta, judgableKeys, scrapingDogMeta);
+
+      // Stage 1.5 verdicts merge into stage1 before the resolved set is computed, so any
+      // corroborated field skips Stage 2. Stage 1 takes precedence on overlap (e.g. it
+      // already produces a linkedinHandler verdict from the ScrapingDog comparator).
+      const mergedStage1Verdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = {
+        ...stage15Verdicts,
+        ...stage1Verdicts,
+      };
+
       const stage1Resolved = new Set<FieldMetaKey>();
-      for (const [k, v] of Object.entries(stage1Verdicts)) {
+      for (const [k, v] of Object.entries(mergedStage1Verdicts)) {
         if (!v) continue;
         const resolvedAgrees = v.verdict === JudgmentVerdict.Agrees && v.confidence === 'high';
         const resolvedDisagrees = v.verdict === JudgmentVerdict.Disagrees && v.confidence === 'low';
@@ -392,6 +409,11 @@ export class TeamEnrichmentJudgeService {
           websiteReachable: scrapingDogMeta?.websiteReachable ?? null,
           websiteFinalHost: scrapingDogMeta?.websiteFinalHost ?? null,
           scrapingDog: scrapingDogMeta,
+          websiteSignals: existingMeta.websiteSignals ?? null,
+          corroboratedFields: Object.keys(mergedStage1Verdicts).filter(
+            (k) => mergedStage1Verdicts[k as FieldMetaKey]?.verdict === JudgmentVerdict.Agrees &&
+              mergedStage1Verdicts[k as FieldMetaKey]?.confidence === 'high'
+          ),
         };
 
         const aiOut = await this.judgeAi.judgeTeamFields(judgeContext, fieldsForAi);
@@ -423,7 +445,7 @@ export class TeamEnrichmentJudgeService {
         return;
       }
 
-      const allVerdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = { ...stage2Verdicts, ...stage1Verdicts };
+      const allVerdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = { ...stage2Verdicts, ...mergedStage1Verdicts };
 
       const refreshedMeta = await this.readEnrichmentMeta(teamUid);
       const baseFieldsMeta = refreshedMeta?.fieldsMeta ?? existingMeta.fieldsMeta ?? {};
@@ -448,6 +470,14 @@ export class TeamEnrichmentJudgeService {
         if (this.needsManualReview(verdict)) fieldsForReview.push(key);
       }
 
+      const quality = computeTeamQuality({
+        fieldsMeta: mergedFieldsMeta,
+        fieldValues: this.collectFieldValuesForQuality(team),
+        enrichedAt: existingMeta.enrichedAt,
+        hasWebsiteSignals: !!existingMeta.websiteSignals,
+        stage15Verdicts,
+      });
+
       const judgment: TeamJudgment = {
         status: JudgmentStatus.Judged,
         judgedAt: new Date().toISOString(),
@@ -456,6 +486,7 @@ export class TeamEnrichmentJudgeService {
         overallAssessment,
         fieldsForReview,
         ...(scrapingDogMeta ? { scrapingDog: scrapingDogMeta } : {}),
+        quality,
       };
 
       const baseUsage = (refreshedMeta ?? existingMeta).usage;
@@ -494,9 +525,11 @@ export class TeamEnrichmentJudgeService {
       });
 
       this.logger.log(
-        `Judge: team ${teamUid} (${team.name}) judged — stage1=${Object.keys(stage1Verdicts).length} stage2=${
-          Object.keys(stage2Verdicts).length
-        } promoted=[${promotion.promotedFields.join(',')}] fieldsForReview=[${fieldsForReview.join(',')}]`
+        `Judge: team ${teamUid} (${team.name}) judged — stage1=${Object.keys(stage1Verdicts).length} stage1.5=${
+          Object.keys(stage15Verdicts).length
+        } stage2=${Object.keys(stage2Verdicts).length} promoted=[${promotion.promotedFields.join(
+          ','
+        )}] fieldsForReview=[${fieldsForReview.join(',')}] thinEvidence=${quality.thinEvidence}`
       );
       if (mergedJudgeUsage) {
         this.logger.log(
@@ -531,6 +564,49 @@ export class TeamEnrichmentJudgeService {
       if (!statusOk) continue;
       if (!this.hasJudgableValue(team, key)) continue;
       out.push(key);
+    }
+    return out;
+  }
+
+  /**
+   * Stage 1.5 — runs the deterministic corroboration rules against every judgable field.
+   * Pulls anchors from the team record, the persisted websiteSignals (second source), and
+   * the ScrapingDog meta from Stage 1. Returns a verdict map; missing keys mean no rule
+   * fired (falls through to AI judge).
+   */
+  private runStage15(
+    team: TeamRecord,
+    existingMeta: TeamDataEnrichment,
+    judgableKeys: FieldMetaKey[],
+    scrapingDogMeta: TeamJudgment['scrapingDog'] | undefined
+  ): Partial<Record<FieldMetaKey, FieldJudgment>> {
+    const inputs: CorroborationFieldInput[] = [];
+    for (const key of judgableKeys) {
+      const value = this.readFieldValue(team, key);
+      if (value === null || (Array.isArray(value) && value.length === 0)) continue;
+      inputs.push({ field: key, value });
+    }
+
+    // ScrapingDog profile is rebuilt from the meta block for the corroboration rule that
+    // checks profile.website host. We don't have the full profile in scope here, but the
+    // host-match anchor relies only on profile.website (which the meta doesn't carry) so
+    // we leave that anchor inactive in Stage 1.5 — it's already covered by Stage 1's
+    // compareProfileToTeam (websiteCorroborates) for linkedinHandler.
+    return runCorroboration(inputs, {
+      teamName: team.name,
+      website: this.preferEnrichmentValue(team, 'website'),
+      websiteReachable: scrapingDogMeta?.websiteReachable ?? null,
+      websiteSignals: existingMeta.websiteSignals ?? null,
+      scrapingDogProfile: null,
+      scrapingDogNameMatch: scrapingDogMeta?.nameMatch ?? null,
+    });
+  }
+
+  /** Snapshot of every judgable field value for the quality scorer. */
+  private collectFieldValuesForQuality(team: TeamRecord): Partial<Record<FieldMetaKey, string | string[] | null>> {
+    const out: Partial<Record<FieldMetaKey, string | string[] | null>> = {};
+    for (const key of JUDGABLE_FIELD_KEYS) {
+      out[key] = this.readFieldValue(team, key);
     }
     return out;
   }

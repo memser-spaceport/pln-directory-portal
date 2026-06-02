@@ -7,6 +7,7 @@ import sizeOf from 'image-size';
 import { AITeamEnrichmentResponse, AIUsageEntry } from './team-enrichment.types';
 import { AiProviderService } from '../shared/ai-provider.service';
 import { buildUsageEntry, formatUsageLog } from './team-enrichment-cost';
+import { BROWSER_REQUEST_HEADERS, BROWSER_USER_AGENT } from './team-enrichment-http.util';
 
 export interface TeamEnrichmentAIResult {
   response: AITeamEnrichmentResponse;
@@ -20,11 +21,11 @@ export interface WebsiteSocialSignals {
   telegramHandler?: string;
   contactEmail?: string;
   jsonLdOrgName?: string;
+  /** `<meta property="og:site_name">` value, lightly trimmed. */
+  ogSiteName?: string;
+  /** `<meta name="description">` (or `og:description` fallback), trimmed + length-capped. */
+  metaDescription?: string;
 }
-
-// Browser-like User-Agent for HTML page fetches
-const BROWSER_USER_AGENT =
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 const TEAM_ENRICHMENT_SYSTEM_PROMPT = `
 You are a professional research assistant specializing in company/fund data enrichment.
@@ -400,10 +401,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       const response = await fetch(websiteUrl, {
         signal: controller.signal,
         redirect: 'follow' as RequestRedirect,
-        headers: {
-          'User-Agent': BROWSER_USER_AGENT,
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9',
-        },
+        headers: { ...BROWSER_REQUEST_HEADERS },
       });
       clearTimeout(timeout);
       if (!response.ok) {
@@ -445,7 +443,29 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       }
     });
 
-    // 2. Twitter Card meta — `twitter:site` is the brand's own canonical X-handle
+    // 2a. Open Graph identity tags. `og:site_name` is the brand's canonical
+    // display name as declared on its own site — a strong corroboration anchor
+    // for the `website` field (matched against team.name token-overlap in the
+    // Stage 1.5 corroboration layer). `meta name="description"` (with `og:description`
+    // fallback) gives us a second-source description summary the judge can use
+    // to corroborate AI-supplied shortDescription/longDescription values.
+    if (!result.ogSiteName) {
+      const siteName = $('meta[property="og:site_name" i]').attr('content');
+      if (siteName) {
+        const trimmed = siteName.trim();
+        if (trimmed.length > 0 && trimmed.length <= 200) result.ogSiteName = trimmed;
+      }
+    }
+    if (!result.metaDescription) {
+      const desc =
+        $('meta[name="description" i]').attr('content') || $('meta[property="og:description" i]').attr('content');
+      if (desc) {
+        const trimmed = desc.replace(/\s+/g, ' ').trim();
+        if (trimmed.length > 0) result.metaDescription = trimmed.substring(0, 1000);
+      }
+    }
+
+    // 2b. Twitter Card meta — `twitter:site` is the brand's own canonical X-handle
     // declaration. Falls back to `twitter:creator` (author rather than brand, but
     // for many one-person companies it's the same handle and still useful).
     if (!result.twitterHandler) {
@@ -506,7 +526,15 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       this.assignSocialFromUrl(url, result);
     }
 
-    if (!result.twitterHandler && !result.linkedinHandler && !result.telegramHandler && !result.contactEmail) {
+    if (
+      !result.twitterHandler &&
+      !result.linkedinHandler &&
+      !result.telegramHandler &&
+      !result.contactEmail &&
+      !result.ogSiteName &&
+      !result.metaDescription &&
+      !result.jsonLdOrgName
+    ) {
       return null;
     }
     return result;

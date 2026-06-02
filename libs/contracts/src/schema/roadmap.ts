@@ -1,6 +1,19 @@
 import { z } from 'zod';
 
-export const RoadmapStageSchema = z.enum(['IDEA', 'UNDER_REVIEW', 'PLANNED', 'IN_PROGRESS', 'SHIPPED', 'DECLINED']);
+export const RoadmapStageSchema = z.enum(['IDEA', 'BACKLOG', 'PLANNED', 'IN_PROGRESS', 'SHIPPED', 'DECLINED']);
+
+/** API converts empty strings to null before validation; store as empty string in DB. */
+const roadmapDescriptionCreate = () =>
+  z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => v ?? '');
+
+const roadmapDescriptionUpdate = () =>
+  z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v ?? ''));
 
 const commaSeparatedListParam = () =>
   z
@@ -59,7 +72,7 @@ export const RoadmapItemListResponseSchema = z.object({
 
 export const CreateRoadmapItemSchema = z.object({
   title: z.string().min(1).max(500),
-  description: z.string().optional().default(''),
+  description: roadmapDescriptionCreate(),
   acceptanceCriteria: z.string().optional().nullable(),
   focusArea: z.string().max(500).optional().nullable(),
   externalTrackerUrl: z.string().max(2000).optional().nullable(),
@@ -68,7 +81,7 @@ export const CreateRoadmapItemSchema = z.object({
 
 export const UpdateRoadmapItemSchema = z.object({
   title: z.string().min(1).max(500).optional(),
-  description: z.string().optional(),
+  description: roadmapDescriptionUpdate(),
   acceptanceCriteria: z.string().optional().nullable(),
   focusArea: z.string().max(500).optional().nullable(),
   externalTrackerUrl: z.string().max(2000).optional().nullable(),

@@ -820,6 +820,10 @@ export class TeamEnrichmentService {
       const websiteBackfilledFields = new Set<EnrichableTeamField>();
       const websiteHtml = websiteToScan ? await this.aiService.fetchWebsiteHtml(websiteToScan) : null;
 
+      // Captured for persistence to dataEnrichment.websiteSignals — Stage 1.5 corroboration
+      // (in the judge pipeline) reads this as a second independent source.
+      let extractedWebsiteSignals: TeamDataEnrichment['websiteSignals'] | undefined;
+
       if (websiteToScan) {
         const signals = await this.aiService.fetchSocialSignalsFromWebsite(websiteToScan, websiteHtml ?? undefined);
         if (signals) {
@@ -846,6 +850,24 @@ export class TeamEnrichmentService {
               }`
             );
           }
+
+          let host: string | null = null;
+          try {
+            host = new URL(websiteToScan).host.replace(/^www\./, '').toLowerCase();
+          } catch {
+            host = null;
+          }
+          extractedWebsiteSignals = {
+            extractedAt: new Date().toISOString(),
+            host,
+            ...(signals.twitterHandler ? { twitterHandler: signals.twitterHandler } : {}),
+            ...(signals.linkedinHandler ? { linkedinHandler: signals.linkedinHandler } : {}),
+            ...(signals.telegramHandler ? { telegramHandler: signals.telegramHandler } : {}),
+            ...(signals.contactEmail ? { contactEmail: signals.contactEmail } : {}),
+            ...(signals.jsonLdOrgName ? { jsonLdOrgName: signals.jsonLdOrgName } : {}),
+            ...(signals.ogSiteName ? { ogSiteName: signals.ogSiteName } : {}),
+            ...(signals.metaDescription ? { metaDescription: signals.metaDescription } : {}),
+          };
         }
       }
 
@@ -1096,6 +1118,11 @@ export class TeamEnrichmentService {
             }
           : undefined;
 
+      // Carry forward prior websiteSignals when the current run didn't extract any
+      // (e.g. website fetch failed transiently). This keeps a recent second-source
+      // available for the judge even if a single enrichment retry whiffs on the fetch.
+      const websiteSignalsToPersist = extractedWebsiteSignals ?? existingMeta?.websiteSignals;
+
       const enrichment: TeamDataEnrichment = {
         shouldEnrich: false,
         status: EnrichmentStatus.Enriched,
@@ -1105,6 +1132,7 @@ export class TeamEnrichmentService {
         aiModel: this.aiService.getModelName(),
         fieldsMeta: mergedFieldsMeta,
         ...(scrapingDogMeta ? { scrapingDog: scrapingDogMeta } : {}),
+        ...(websiteSignalsToPersist ? { websiteSignals: websiteSignalsToPersist } : {}),
         ...(usageBlock ? { usage: usageBlock } : {}),
       };
 

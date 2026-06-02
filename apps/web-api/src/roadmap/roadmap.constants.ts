@@ -12,7 +12,7 @@ export const ROADMAP_ANALYTICS_EVENTS = {
   BUILD_BUTTON_CLICKED: 'gantry_build_button_clicked',
 } as const;
 
-export const IDEA_STAGES: RoadmapStage[] = [RoadmapStage.IDEA, RoadmapStage.UNDER_REVIEW];
+export const IDEA_STAGES: RoadmapStage[] = [RoadmapStage.IDEA, RoadmapStage.BACKLOG];
 
 export const ROADMAP_KANBAN_STAGES: RoadmapStage[] = [
   RoadmapStage.PLANNED,
