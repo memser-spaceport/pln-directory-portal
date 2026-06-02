@@ -22,7 +22,7 @@ RUN npx prisma generate --schema=./apps/web-api/prisma/oso-schema.prisma
 
 RUN yarn nx build web-api --configuration=production
 
-FROM node:20.19-bullseye-slim AS runtime
+FROM node:20.19-bullseye AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production
