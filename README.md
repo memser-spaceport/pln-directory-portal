@@ -399,8 +399,6 @@ Once this is done, you will have your Postgres(for both PL Network and OSO) and 
 
 - Make sure it has permission to read and write from the provided S3 bucket (If you do not have aws keys, leave it assuming you will not be uploading any profile images):
   ```sh
-  AWS_ACCESS_KEY=
-  AWS_SECRET_KEY=
   ```
 
 - Must be a public bucket: (Leave it if you do not have any)
