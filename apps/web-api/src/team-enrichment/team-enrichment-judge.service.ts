@@ -212,7 +212,7 @@ export class TeamEnrichmentJudgeService {
       SET "dataEnrichment" = "dataEnrichment" - 'judgment',
           "updatedAt"      = NOW()
       WHERE "dataEnrichment"->'judgment'->>'status' = 'InProgress'
-        AND "updatedAt" < NOW() - make_interval(mins => ${ttlMinutes})
+        AND "updatedAt" < NOW() - make_interval(mins => ${ttlMinutes}::int)
     `;
     if (updated > 0) {
       this.logger.warn(
