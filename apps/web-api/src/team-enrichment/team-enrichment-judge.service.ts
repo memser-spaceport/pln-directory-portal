@@ -11,6 +11,19 @@ import { computeTeamQuality } from './team-enrichment-quality';
 import { BROWSER_REQUEST_HEADERS } from './team-enrichment-http.util';
 import { isLikelyValueForField } from './team-enrichment-field-shape.util';
 import {
+  BOT_BLOCK_STATUS_CODES,
+  expandLinkedinHandleVariants,
+  isAgreesHigh,
+  JUDGABLE_FIELD_KEYS,
+  needsManualReview,
+  normalizeHost,
+  normalizeTelegramHandle,
+  normalizeTwitterHandle,
+  TEAM_ENRICHMENT_STUCK_TTL_MINUTES_DEFAULT,
+  USER_JUDGABLE_FIELD_KEYS,
+  WEBSITE_PROBE_TIMEOUT_MS,
+} from './shared';
+import {
   AIUsageEntry,
   EnrichmentStatus,
   FieldEnrichmentMeta,
@@ -84,33 +97,6 @@ type FieldsMetaMap = Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
 
 export type JudgeTeamResult =
   | { status: 'started' | 'already_judged' | 'in_progress' | 'not_found' | 'not_eligible' };
-
-const JUDGABLE_FIELD_KEYS: FieldMetaKey[] = [
-  'website',
-  'blog',
-  'contactMethod',
-  'twitterHandler',
-  'linkedinHandler',
-  'telegramHandler',
-  'shortDescription',
-  'longDescription',
-  'moreDetails',
-  'industryTags',
-  'investmentFocus',
-];
-
-const USER_JUDGABLE_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey>([
-  'website',
-  'blog',
-  'contactMethod',
-  'twitterHandler',
-  'linkedinHandler',
-  'telegramHandler',
-]);
-
-// Shape validation is now centralized in `team-enrichment-field-shape.util.ts`
-// — it covers every typed field, not just URL fields. The old URL_REQUIRED_FIELD_KEYS
-// gate is subsumed by the per-field validator dispatch in `hasJudgableValue`.
 
 const TEAM_RECORD_SELECT = {
   uid: true,
@@ -238,7 +224,7 @@ export class TeamEnrichmentJudgeService {
   private getStuckTtlMinutes(): number {
     const raw = process.env.TEAM_ENRICHMENT_STUCK_TTL_MINUTES?.trim();
     const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : 180;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : TEAM_ENRICHMENT_STUCK_TTL_MINUTES_DEFAULT;
   }
 
   async judgeTeam(teamUid: string, judgedBy = 'system-cron'): Promise<JudgeTeamResult> {
@@ -319,10 +305,12 @@ export class TeamEnrichmentJudgeService {
   }
 
   /**
-   * Two-stage pipeline:
-   * Stage 1 — ScrapingDog LinkedIn verification (deterministic, no LLM).
-   * Stage 2 — AI judge for fields Stage 1 couldn't resolve.
-   * After judgment, fields with high-confidence verdict are promoted to Team.
+   * Three-stage pipeline driven by the verification ladder (cheap → expensive):
+   *   Stage 1   — ScrapingDog LinkedIn match (deterministic API, no LLM).
+   *   Stage 1.5 — Deterministic cross-source corroboration (pure functions).
+   *   Stage 2   — AI judge for fields the cheaper stages couldn't resolve.
+   * Fields verified at agrees+high are promoted to Team in a single tx.
+   * See team-enrichment-judge-pipeline.ts for the typed rule-registry view.
    */
   private async runJudgmentPipeline(
     team: TeamRecord,
@@ -336,11 +324,8 @@ export class TeamEnrichmentJudgeService {
       let stage1Verdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = {};
       let scrapingDogMeta: TeamJudgment['scrapingDog'] | undefined;
 
-      // Website reachability probe — runs UNCONDITIONALLY when the team has a
-      // judgable website, independent of whether ScrapingDog runs. Previously
-      // this lived inside the ScrapingDog success branch, which meant a single
-      // ScrapingDog 403 (or a team with no linkedinHandler) silently dropped
-      // the probe and forced the AI judge to guess at reachability.
+      // Probe runs unconditionally so the AI judge doesn't have to guess at
+      // reachability when ScrapingDog 403s or the team has no LinkedIn handle.
       let websiteReachable: boolean | null = null;
       let websiteFinalHost: string | null = null;
       const websiteToProbe = this.preferEnrichmentValue(team, 'website');
@@ -370,9 +355,8 @@ export class TeamEnrichmentJudgeService {
         } else {
           const profile = result.profile;
           const nameMatch = this.scrapingDogService.classifyNameMatch(team.name, profile);
-          // Snapshot what the judge is about to verify: Team for user-supplied values, TeamEnrichment
-          // for AI candidates. compareProfileToTeam is fed the right value per field via the
-          // readFieldValue / judgeable-value path.
+          // Snapshot the candidate side per field: Team for ChangedByUser,
+          // TeamEnrichment for Enriched. Same selection rule as readFieldValue.
           const teamSnapshot = {
             name: team.name,
             website: this.preferEnrichmentValue(team, 'website'),
@@ -408,11 +392,6 @@ export class TeamEnrichmentJudgeService {
         }
       }
 
-      // Stage 1.5 — deterministic cross-field corroboration (no LLM, no network).
-      // Runs against the same set of judgable keys, using the second-source signals
-      // we extracted from the team's own website during enrichment + the ScrapingDog
-      // profile from Stage 1. Verdicts that fire at `agrees + high` short-circuit the
-      // AI judge and promote the value, exactly like Stage 1 already does.
       const stage15Verdicts = this.runStage15(
         team,
         existingMeta,
@@ -439,8 +418,6 @@ export class TeamEnrichmentJudgeService {
       // flooded the review queue (bench v2 vs v1 regression: moreDetails
       // auto-rate dropped from 47% → 16%, linkedinHandler 97% → 73%).
       const mergedStage1Verdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = { ...stage15Verdicts };
-      const isAgreesHigh = (v: FieldJudgment | undefined): boolean =>
-        !!v && v.verdict === JudgmentVerdict.Agrees && v.confidence === 'high';
       for (const [key, stage1Verdict] of Object.entries(stage1Verdicts) as Array<
         [FieldMetaKey, FieldJudgment | undefined]
       >) {
@@ -538,7 +515,7 @@ export class TeamEnrichmentJudgeService {
           ...current,
           judgment: verdict,
         };
-        if (this.needsManualReview(verdict)) fieldsForReview.push(key);
+        if (needsManualReview(verdict)) fieldsForReview.push(key);
       }
 
       const quality = computeTeamQuality({
@@ -701,10 +678,9 @@ export class TeamEnrichmentJudgeService {
   }
 
   /**
-   * Extracts and normalizes contact info for the team's leads / founders
-   * (already filtered by the Prisma query to teamLead OR role-mentions-founder).
+   * Extracts and normalizes contact info for the team's leads / founders.
    * Result is consumed by the founder-contact cross-reference rule on
-   * `contactMethod`. All values lowercased, no leading `@`, no URL prefix.
+   * `contactMethod`. All values lowercased, no `@`, no URL prefix.
    */
   private collectLeadContacts(team: TeamRecord): {
     emails: string[];
@@ -720,36 +696,12 @@ export class TeamEnrichmentJudgeService {
     for (const role of team.teamMemberRoles ?? []) {
       const m = role.member;
       if (m.email) emails.add(m.email.trim().toLowerCase());
-      if (m.twitterHandler) {
-        twitter.add(
-          m.twitterHandler
-            .trim()
-            .replace(/^@/, '')
-            .replace(/^https?:\/\/(?:www\.)?(?:twitter|x)\.com\//i, '')
-            .replace(/[/?#].*$/, '')
-            .toLowerCase()
-        );
-      }
-      if (m.telegramHandler) {
-        telegram.add(
-          m.telegramHandler
-            .trim()
-            .replace(/^@/, '')
-            .replace(/^https?:\/\/(?:www\.)?(?:t\.me|telegram\.me)\//i, '')
-            .replace(/[/?#].*$/, '')
-            .toLowerCase()
-        );
-      }
+      if (m.twitterHandler) twitter.add(normalizeTwitterHandle(m.twitterHandler));
+      if (m.telegramHandler) telegram.add(normalizeTelegramHandle(m.telegramHandler));
       if (m.linkedinHandler) {
-        const norm = m.linkedinHandler
-          .trim()
-          .replace(/^https?:\/\/(?:www\.)?linkedin\.com\//i, '')
-          .replace(/\/+$/, '')
-          .toLowerCase();
-        linkedin.add(norm);
-        // Also store the bare slug after company/school/in for looser matching.
-        const slugMatch = norm.match(/^(?:company|school|in)\/(.+)$/);
-        if (slugMatch) linkedin.add(slugMatch[1]);
+        for (const variant of expandLinkedinHandleVariants(m.linkedinHandler)) {
+          linkedin.add(variant);
+        }
       }
     }
 
@@ -957,39 +909,22 @@ export class TeamEnrichmentJudgeService {
     });
   }
 
-  private needsManualReview(verdict: FieldJudgment): boolean {
-    if (verdict.verdict === JudgmentVerdict.Disagrees) return true;
-    if (verdict.verdict === JudgmentVerdict.Uncertain) return true;
-    if (verdict.confidence === 'low') return true;
-    return false;
-  }
-
   /**
-   * Reachability probe for the team's website. Uses the same
-   * browser-like header bouquet as the website-signal extractor
-   * (`fetchWebsiteHtml`) so Cloudflare / Akamai bot rules don't return 403
-   * on what's actually a live site.
+   * Reachability probe for the team's website. Uses the same browser-mimic
+   * headers as the website-signal extractor — Cloudflare / Akamai bot rules
+   * routinely 403 on bare User-Agent fetches.
    *
    * Three-state return:
-   *   - `reachable: true`  — 2xx response. Definitively up.
-   *   - `reachable: false` — definitive negative (404 / 410 / 500 / 502 / 504
-   *     etc.) Real "URL is dead" signal.
-   *   - `reachable: null`  — inconclusive. Either the probe couldn't reach
-   *     the server (network error / timeout) OR the server returned a bot-
-   *     blocking status code that real browsers see fine (401, 403, 429,
-   *     451, 503). 403 in particular is the dominant "Cloudflare doesn't
-   *     like our headers" response — the site is up for humans, just
-   *     uncontactable by automated probes. Stage 1.5's `corroborateWebsite`
-   *     rule allows null-reachability when a strong deterministic name
-   *     anchor matches; the AI judge sees `Website reachability: unknown`
-   *     and is told not to infer either way.
-   *
-   * `finalHost` is set on 2xx (the post-redirect host, normalized) and null
-   * otherwise.
+   *   - `reachable: true`  — 2xx. Definitively up; `finalHost` is post-redirect.
+   *   - `reachable: false` — definitive negative (404 / 410 / 500 / 502 / 504).
+   *   - `reachable: null`  — inconclusive. Either a network error / timeout
+   *     OR a bot-block status (401, 403, 429, 451, 503). Stage 1.5's
+   *     `corroborateWebsite` rule allows null-reachability when a strong
+   *     deterministic name anchor matches; the AI judge is told not to infer.
    */
   private async probeWebsiteReachable(url: string): Promise<{ reachable: boolean | null; finalHost: string | null } | null> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), WEBSITE_PROBE_TIMEOUT_MS);
     try {
       const response = await fetch(url, {
         signal: controller.signal,
@@ -997,19 +932,9 @@ export class TeamEnrichmentJudgeService {
         headers: { ...BROWSER_REQUEST_HEADERS },
       });
       if (response.ok) {
-        const finalHost = (() => {
-          try {
-            return new URL(response.url || url).host.replace(/^www\./, '').toLowerCase();
-          } catch {
-            return null;
-          }
-        })();
-        return { reachable: true, finalHost };
+        return { reachable: true, finalHost: normalizeHost(response.url || url) };
       }
-      // Bot-block status codes: site is almost certainly alive for humans,
-      // we just look like a bot. Treat as inconclusive, not as a real negative.
-      const BOT_BLOCK_CODES = new Set([401, 403, 429, 451, 503]);
-      if (BOT_BLOCK_CODES.has(response.status)) {
+      if (BOT_BLOCK_STATUS_CODES.has(response.status)) {
         return { reachable: null, finalHost: null };
       }
       return { reachable: false, finalHost: null };

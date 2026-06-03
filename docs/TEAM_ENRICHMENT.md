@@ -314,6 +314,26 @@ The dispatcher always runs **source-trust** first; if it fires, the field-specif
 | `name in website host` | `website` | host's first dot-separated label STARTS WITH a substantive team-name token (`eon.systems` ↔ "Eon", `devonian.ai` ↔ "Devonian Systems") AND probe didn't report a definitive 4xx/5xx (`websiteReachable !== false`). Bot-blocked (403) sites with a strong name match still auto-promote. Prefix-only — `beontop.com` is NOT a match for "Eon". | `name in website host` | 95 |
 | `og name match` / `jsonld name match` / `sd website host match` | `website` | a second-source name anchor fires from one of: `websiteSignals.ogSiteName`, `websiteSignals.jsonLdOrgName`, or ScrapingDog `profile.website` host. Multiple anchors concatenate with ` + ` in the note. (These anchors implicitly require successful HTML fetch, since they come from extracted page content — so they only fire on truly-reachable sites.) | `og name match` / `jsonld name match` / `sd website host match` (or `+`-joined) | 95 |
 
+#### Rule registry (extension model)
+
+All Stage 1.5 rules are registered in **`team-enrichment-judge-pipeline.ts`** as typed `JudgeRule` objects with explicit `costTier`, `appliesTo`, and `description` fields. This is the canonical extension point — adding a new corroboration rule means writing a `(value, ctx) => FieldJudgment | null` function in `team-enrichment-corroboration.ts` and registering it in `STAGE_1_5_RULES`. The dispatcher (`runStage15Rules`, aliased as `runCorroboration` for back-compat) walks the registry in array order and stops on the first non-null verdict per field.
+
+The full **`JudgeCostTier`** ladder:
+
+| Tier | Name | Lives in | Cost |
+| --- | --- | --- | --- |
+| 0 | `SOURCE_TRUST` | `corroboration.ts → corroborateBySource` | ~0 (metadata read) |
+| 1 | `DETERMINISTIC` | `corroboration.ts → corroborate{ContactMethod,Twitter,Linkedin,Telegram,Blog,Website}` | ~0 (pure functions over loaded signals) |
+| 2 | `NETWORK_PROBE` | `judge.service.ts → probeWebsiteReachable` | 1 HTTP fetch (browser-mimic headers) |
+| 3 | `SCRAPING_API` | `scrapingdog.service.ts → compareProfileToTeam` + `verifyTwitterProfileMatchesTeam` | 1 paid API call |
+| 4 | `AI` | `judge-ai.service.ts → judgeTeamFields` | LLM call with web-search grounding |
+
+`JUDGE_TIER_REGISTRY` exports the full ordered listing (Stage 1, probe, Stage 1.5 rules, Stage 2) for admin tooling and telemetry — treat it as the canonical "what rules exist and in what order" source, not greppable switch statements.
+
+**Why the registry**: the existing pipeline was already tier-ordered, but the ordering was implicit in the orchestrator code. Promoting it to a typed registry (a) makes adding a rule a 2-line change (write function + register), (b) lets admin UIs and bench tooling read rule metadata directly, and (c) decouples rule documentation from rule implementation. See the `team-enrichment-rules` Claude Skill at `.claude/skills/team-enrichment-rules/` for a step-by-step guide on adding rules.
+
+Shared utilities used by every rule live under **`team-enrichment/shared/`**: `normalizeHost`, `hostsMatch`, `validateHttpUrl` (`url.util.ts`); `tokenize`, `namesShareSubstantiveToken`, `hostFirstLabelMatchesTeamName`, `levenshtein`, `textsOverlap`, `sentenceOverlap` (`text.util.ts`); `normalizeHandleValue`, `expandLinkedinHandleVariants`, `normalizeTwitterHandle`, `normalizeTelegramHandle`, `extractHandleFromUrlOrPassthrough` (`handle.util.ts`); `makeJudgment`, `isAgreesHigh`, `needsManualReview` (`judgment.util.ts`); `isEmail`, `looksLikeEmail`, `emailDomain` (`validators.util.ts`); and the magic-number constants — timeouts, thresholds, `BOT_BLOCK_STATUS_CODES`, `COMPANY_STOPWORDS`, `CORE_FIELDS`, `USER_JUDGABLE_FIELD_KEYS`, `JUDGABLE_FIELD_KEYS` — in `constants.ts`.
+
 #### Prefix-and-segment guard
 
 The `name in <handle>` family checks use a two-rule placement guard, never substring-anywhere. Both rules apply via the shared `hostFirstLabelMatchesTeamName` helper:
