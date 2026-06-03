@@ -331,19 +331,63 @@ export class TeamEnrichmentScrapingDogService {
   ): Partial<Record<FieldMetaKey, FieldJudgment>> {
     if (nameMatch === 'none') return {};
 
+    // Website-host equality is a deterministic second identity anchor: when the
+    // team's website host equals the LinkedIn profile's listed website host,
+    // both ends declare each other (the team claims this domain, the LinkedIn
+    // company profile lists this domain). With that anchor in hand the entity
+    // identity is double-corroborated and downstream field comparisons are
+    // looking at data from the verified team — so the per-field comparison
+    // method becomes the verification, not the identity proof.
+    const websiteCorroborates =
+      !!team.website &&
+      !!profile.website &&
+      this.extractHost(team.website) === this.extractHost(profile.website);
+
     const result: Partial<Record<FieldMetaKey, FieldJudgment>> = {};
     const mkJudgment = (
       confidence: FieldConfidence,
       verdict: JudgmentVerdict,
       score: number,
       note: string
-    ): FieldJudgment => ({
-      confidence: nameMatch === 'partial' && confidence === FieldConfidence.High ? FieldConfidence.Medium : confidence,
-      score,
-      verdict,
-      note,
-      judgedVia: JudgmentSource.ScrapingDog,
-    });
+    ): FieldJudgment => {
+      let finalConfidence = confidence;
+      // Partial-name-match downshift: a partial-only match (e.g. team "Acme"
+      // vs profile "Acme Beauty Salon") doesn't establish identity by itself —
+      // demote High to Medium. The downshift is skipped when the website host
+      // corroborates: that's the second anchor that lifts partial to a real
+      // identity match (bench case ARIA: team `ARIA` ↔ profile
+      // `Advanced Research + Invention Agency (ARIA)` with shared website
+      // `aria.org.uk` — partial in normalize-then-compare, but the website
+      // host match nails it).
+      if (
+        nameMatch === 'partial' &&
+        finalConfidence === FieldConfidence.High &&
+        !websiteCorroborates
+      ) {
+        finalConfidence = FieldConfidence.Medium;
+      }
+      // Website-corroborated upshift: when the website anchor is in hand AND
+      // the comparator emitted `agrees + medium` (text overlap on tagline /
+      // about / details / industry tags is intrinsically a fuzzy method, so
+      // the comparator starts at Medium even on a clean match), lift to High.
+      // The text-overlap quality drives whether we say `agrees` vs `uncertain`;
+      // the WEBSITE ANCHOR drives the identity confidence — and an `agrees`
+      // verdict on identity-verified data is high-confidence by construction.
+      if (
+        websiteCorroborates &&
+        verdict === JudgmentVerdict.Agrees &&
+        finalConfidence === FieldConfidence.Medium
+      ) {
+        finalConfidence = FieldConfidence.High;
+      }
+      return {
+        confidence: finalConfidence,
+        score,
+        verdict,
+        note,
+        judgedVia: JudgmentSource.ScrapingDog,
+      };
+    };
 
     // website — intentionally not judged here. A LinkedIn-vs-team URL host comparison is too
     // noisy: LinkedIn often lists an outdated, aliased, or product-subdomain URL even when the
@@ -353,9 +397,6 @@ export class TeamEnrichmentScrapingDogService {
     // The actual identity signal is that ScrapingDog returned a profile whose `company_name` matches the team.
     // Website host equality is a strong corroborating signal when both sides declare a website.
     if (team.linkedinHandler && profile.companyName) {
-      const websiteCorroborates =
-        !!team.website && !!profile.website && this.extractHost(team.website) === this.extractHost(profile.website);
-
       if (nameMatch === 'exact') {
         result.linkedinHandler = mkJudgment(
           FieldConfidence.High,

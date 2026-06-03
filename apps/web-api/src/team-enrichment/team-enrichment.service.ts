@@ -30,9 +30,37 @@ import {
 } from './team-enrichment.types';
 
 export type EnrichmentReviewFieldEntry = {
+  /**
+   * Primary value. ChangedByUser → reads from `Team.<field>` (user's value
+   * is the source of truth). Enriched / CannotEnrich → reads from
+   * `TeamEnrichment.<field>` (AI candidate, possibly junk-overridden into
+   * Enriched on this team). Empty side falls back to the other.
+   */
   content: string | string[];
   metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
   judgment: { note?: string; score?: number; verdict?: JudgmentVerdict; confidence?: FieldConfidence };
+  /**
+   * The opposite-side candidate when it exists, differs from `content`, and
+   * is shape-valid. Lets the back-office show "user typed X, AI suggests Y"
+   * side-by-side so admins can pick the AI candidate when the user typed a
+   * placeholder (`"Coming soon!"`, `"n/a"`) or got it wrong. `fromSide`
+   * tells the UI which side this came from:
+   *
+   *   - `'enrichment'`: primary is the user's value (status=ChangedByUser),
+   *     this is the AI candidate. Show as "AI suggestion".
+   *   - `'team'`: primary is the AI candidate (status=Enriched after the
+   *     junk-override path), this is the literal value on the Team row.
+   *     Show as "Current user value (likely junk)" so admins can confirm
+   *     the AI candidate replaces it.
+   *
+   * Omitted when the two sides are equal, when the opposite side is empty,
+   * or when the opposite side fails the per-field shape gate (no point
+   * surfacing a second junk value).
+   */
+  alternative?: {
+    content: string | string[];
+    fromSide: 'team' | 'enrichment';
+  };
 };
 
 export type EnrichmentReviewLogo = {
@@ -967,6 +995,7 @@ export class TeamEnrichmentService {
         userEdited: [],
         userOwned: [],
         alreadyEnriched: [],
+        alreadyPromoted: [],
         aiReturnedNull: [],
         aiCannotEnrich: [],
         userJunkOverridden: [],
@@ -1006,6 +1035,31 @@ export class TeamEnrichmentService {
             status: FieldEnrichmentStatus.ChangedByUser,
           };
           skipReasons.userOwned.push(field);
+          continue;
+        }
+
+        // Previously-promoted guard: when `Team.<field>` is non-empty AND
+        // shape-valid AND `fieldsMeta.status === Enriched`, the value got
+        // onto Team via the only path that lets AI values cross that
+        // boundary — the judge's promotion at `agrees + high`. So the
+        // field is already judge-verified at high confidence. Re-querying
+        // it (even in force mode) only risks producing a worse candidate
+        // on `TeamEnrichment.<field>` that drags the team back into the
+        // review queue for a question we already answered. ChangedByUser
+        // is handled above; this guard is the symmetric "judge-promoted
+        // is also settled" case. Bench symptom: Akave's
+        // `Team.blog = "https://akave.ai/blog"` (promoted at agrees+high
+        // in an earlier run) got replaced on TE by an unreachable
+        // `blog.akave.cloud` from a later `mode=all` re-query, and the
+        // judge marked the new candidate `uncertain + medium` → team back
+        // in review. Admins who actually want to refresh a stale promoted
+        // value should edit `Team.<field>` directly (which flips status
+        // to ChangedByUser and lets enrichment re-evaluate naturally).
+        if (
+          fieldStatus === FieldEnrichmentStatus.Enriched &&
+          !teamSlotIsEmpty
+        ) {
+          skipReasons.alreadyPromoted.push(field);
           continue;
         }
 
@@ -1530,6 +1584,25 @@ export class TeamEnrichmentService {
         if (k === 'logo' || !fm?.judgment) return false;
         return !(fm.judgment.verdict === JudgmentVerdict.Agrees && fm.judgment.confidence === FieldConfidence.High);
       });
+      // A team also needs review when a ChangedByUser field's *user value*
+      // is junk-shaped (fails `isLikelyValueForField`) AND TeamEnrichment
+      // has a shape-valid AI candidate to suggest. The judge might have
+      // already marked the field `agrees + high` via the `user trusted`
+      // fallback (because the user supplied it), but with junk + AI
+      // alternative the admin should still confirm. Bench case: ANDÉN
+      // with `Team.website = "Coming soon!"` and AI candidate
+      // `https://andendigital.com/`.
+      const hasJunkUserValueWithAiAlt = (Object.keys(meta.fieldsMeta) as FieldMetaKey[]).some((k) => {
+        if (k === 'logo') return false;
+        const fm = meta.fieldsMeta[k];
+        if (fm?.status !== FieldEnrichmentStatus.ChangedByUser) return false;
+        const teamValue = (row.team as any)[k];
+        const enrichmentValue = (row as any)[k];
+        if (typeof teamValue !== 'string' || teamValue.trim() === '') return false;
+        if (typeof enrichmentValue !== 'string' || enrichmentValue.trim() === '') return false;
+        // Junk on the user side AND shape-valid on the AI side.
+        return !isLikelyValueForField(k, teamValue) && isLikelyValueForField(k, enrichmentValue);
+      });
       const latestLogoVerif = latestByTeam.get(row.teamUid);
       const logoFieldMeta = meta.fieldsMeta.logo;
       const logoApprovedByAdmin =
@@ -1538,7 +1611,7 @@ export class TeamEnrichmentService {
       const logoApprovedByVLM =
         latestLogoVerif?.verdict === 'verified' && latestLogoVerif?.confidence === 'high';
       const hasUnapprovedLogo = !!row.logoUid && !logoApprovedByAdmin && !logoApprovedByVLM;
-      if (!hasUnapprovedField && !hasUnapprovedLogo) continue;
+      if (!hasUnapprovedField && !hasUnapprovedLogo && !hasJunkUserValueWithAiAlt) continue;
 
       const fields: EnrichmentReviewItem['fields'] = {};
       for (const [keyStr, fieldMeta] of Object.entries(meta.fieldsMeta) as Array<
@@ -1564,15 +1637,13 @@ export class TeamEnrichmentService {
           continue;
         }
 
-        if (!fieldMeta?.judgment) continue;
-
-        // Status decides the source of truth:
-        //   - ChangedByUser → Team.<field> (user-owned value lives on Team; the TeamEnrichment
-        //     candidate, if any, is informational provenance)
-        //   - Enriched / CannotEnrich → TeamEnrichment.<field> (AI candidate not yet promoted)
-        // Fallback to the other side covers rows where one side is empty (e.g. AI candidate
-        // promoted-then-cleared, or pre-tracking user data with stale meta).
-        const isUserOwned = fieldMeta.status === FieldEnrichmentStatus.ChangedByUser;
+        if (!fieldMeta) continue;
+        const fieldStatus = fieldMeta.status;
+        // Most fields require a judgment to surface. The exception is the
+        // ChangedByUser-with-junk-Team-value case: the judge accepts the
+        // user's value (often via the `user trusted` fallback), but the AI
+        // has a better alternative we want to put in front of the admin.
+        // Emit the field so the back-office can render the AI suggestion.
         const teamValue = (row.team as any)[keyStr];
         const enrichmentValue = (row as any)[keyStr];
         const isEmpty = (v: any) =>
@@ -1580,10 +1651,53 @@ export class TeamEnrichmentService {
           v === undefined ||
           (typeof v === 'string' && v.trim() === '') ||
           (Array.isArray(v) && v.length === 0);
+        const userValIsJunk =
+          fieldStatus === FieldEnrichmentStatus.ChangedByUser &&
+          typeof teamValue === 'string' &&
+          teamValue.trim() !== '' &&
+          !isLikelyValueForField(keyStr, teamValue);
+        const teValIsShapeValid =
+          typeof enrichmentValue === 'string' &&
+          enrichmentValue.trim() !== '' &&
+          isLikelyValueForField(keyStr, enrichmentValue);
+
+        // Skip fields with no judgment UNLESS this is the junk-user + AI-alt case.
+        if (!fieldMeta.judgment && !(userValIsJunk && teValIsShapeValid)) continue;
+
+        // Status decides the source of truth:
+        //   - ChangedByUser → Team.<field> (user-owned value lives on Team; the TeamEnrichment
+        //     candidate, if any, is informational provenance)
+        //   - Enriched / CannotEnrich → TeamEnrichment.<field> (AI candidate not yet promoted)
+        // Fallback to the other side covers rows where one side is empty (e.g. AI candidate
+        // promoted-then-cleared, or pre-tracking user data with stale meta).
+        const isUserOwned = fieldStatus === FieldEnrichmentStatus.ChangedByUser;
         const primary = isUserOwned ? teamValue : enrichmentValue;
         const fallback = isUserOwned ? enrichmentValue : teamValue;
         const candidate = !isEmpty(primary) ? primary : fallback;
         if (isEmpty(candidate)) continue;
+
+        // Compute the opposite-side alternative — surface it when:
+        //   - both sides are non-empty,
+        //   - they differ (case-insensitive trimmed compare, to avoid
+        //     "https://acme.com" vs "https://acme.com/" looking distinct),
+        //   - and at least ONE of the two sides is shape-valid. This lets
+        //     us show the literal user-typed `"Coming soon!"` as the
+        //     alternative when the primary is the AI's shape-valid URL —
+        //     admins benefit from seeing what the user typed even when
+        //     it's junk. We only suppress when BOTH sides are junk; then
+        //     there's nothing actionable to surface.
+        let alternative: EnrichmentReviewFieldEntry['alternative'] | undefined;
+        const otherSide = isUserOwned ? enrichmentValue : teamValue;
+        const otherSideSide: 'team' | 'enrichment' = isUserOwned ? 'enrichment' : 'team';
+        if (
+          typeof otherSide === 'string' &&
+          otherSide.trim() !== '' &&
+          typeof candidate === 'string' &&
+          otherSide.trim().toLowerCase() !== candidate.trim().toLowerCase() &&
+          (isLikelyValueForField(keyStr, otherSide) || isLikelyValueForField(keyStr, candidate))
+        ) {
+          alternative = { content: otherSide, fromSide: otherSideSide };
+        }
 
         fields[keyStr] = {
           content: candidate,
@@ -1592,12 +1706,15 @@ export class TeamEnrichmentService {
             source: fieldMeta.source,
             lastModifiedAt: fieldMeta.lastModifiedAt,
           },
-          judgment: {
-            note: fieldMeta.judgment.note,
-            score: fieldMeta.judgment.score,
-            verdict: fieldMeta.judgment.verdict,
-            confidence: fieldMeta.judgment.confidence,
-          },
+          judgment: fieldMeta.judgment
+            ? {
+                note: fieldMeta.judgment.note,
+                score: fieldMeta.judgment.score,
+                verdict: fieldMeta.judgment.verdict,
+                confidence: fieldMeta.judgment.confidence,
+              }
+            : {},
+          ...(alternative ? { alternative } : {}),
         };
       }
 

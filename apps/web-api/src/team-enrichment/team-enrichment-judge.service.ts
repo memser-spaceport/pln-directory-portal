@@ -666,6 +666,7 @@ export class TeamEnrichmentJudgeService {
         value,
         source: meta?.source,
         enrichmentConfidence: meta?.confidence,
+        isUserOwned: meta?.status === FieldEnrichmentStatus.ChangedByUser,
       });
     }
 

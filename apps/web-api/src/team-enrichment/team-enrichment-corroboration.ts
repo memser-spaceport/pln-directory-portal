@@ -241,7 +241,8 @@ function hostsMatch(a: string | null, b: string | null): boolean {
  */
 export function corroborateContactMethod(
   value: string | null,
-  ctx: CorroborationContext
+  ctx: CorroborationContext,
+  opts: { isUserOwned?: boolean } = {}
 ): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -283,7 +284,11 @@ export function corroborateContactMethod(
     if (hostFirstLabelMatchesTeamName(ctx.teamName, domain)) {
       return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'email domain matches team name');
     }
-    return null;
+    // No deterministic anchor fired. Fall through to the user-trusted
+    // fallback at the bottom of the function (rather than returning null
+    // here) so a ChangedByUser email on an unrelated host still auto-
+    // promotes — the lead has authority over their own contact email even
+    // when it's a personal / freemail / off-domain address.
   }
 
   // ── URL form ───────────────────────────────────────────────────────────
@@ -349,6 +354,23 @@ export function corroborateContactMethod(
     if ((ownTwitter && ownTwitter === h) || (ownTelegram && ownTelegram === h)) {
       return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'matches team social');
     }
+  }
+
+  // ── User-trusted fallback ──────────────────────────────────────────────
+  // The team lead supplied this value directly (status === ChangedByUser).
+  // None of the deterministic anchors above matched — typically because the
+  // value is a community / chat link we can't independently validate:
+  // a `discord.gg/<opaque-invite-token>`, a `t.me/+<one-time-token>`, an
+  // off-host path like `https://getlit.dev/chat`, a Calendly URL, etc.
+  // The value already passed `isLikelyValueForField` (so it's a real email
+  // / URL / handle shape, not junk like "Coming soon!"). The lead's
+  // authority over their own contact channel is the verification — re-
+  // queueing it for admin review forever provides no information the lead
+  // doesn't already have. Score 85 so a deterministic anchor would still
+  // outrank this in any future merge, but it's high-confidence enough to
+  // auto-promote and clear the review queue.
+  if (opts.isUserOwned) {
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
   }
 
   return null;
@@ -813,6 +835,17 @@ export interface CorroborationFieldInput {
   source?: string;
   /** Enrichment-time self-assessed confidence: `high` / `medium` / `low`. */
   enrichmentConfidence?: string;
+  /**
+   * True when `fieldsMeta[<field>].status === ChangedByUser` — the value
+   * was set by a team lead, not produced by AI / scrapingdog / website
+   * scraping. Consumed by per-field "user trusted" fallbacks (e.g.
+   * `contactMethod` URL forms that no deterministic anchor can verify — a
+   * `discord.gg/<opaque-token>` invite or a `https://getlit.dev/chat`
+   * off-host path. The team lead put it there, we can't independently
+   * verify it, but we trust the user's authority over their own contact
+   * channel rather than queueing it for admin review forever).
+   */
+  isUserOwned?: boolean;
 }
 
 /**
@@ -841,7 +874,7 @@ export function runCorroboration(
     let verdict: FieldJudgment | null = null;
     switch (f.field) {
       case 'contactMethod':
-        verdict = corroborateContactMethod(v, ctx);
+        verdict = corroborateContactMethod(v, ctx, { isUserOwned: f.isUserOwned });
         break;
       case 'twitterHandler':
         verdict = corroborateTwitterHandler(v, ctx);

@@ -237,6 +237,102 @@ describe('team-enrichment-corroboration', () => {
       expect(corroborateContactMethod('', { teamName: 'Acme' })).toBeNull();
     });
 
+    describe('user-trusted fallback (ChangedByUser)', () => {
+      // A team lead set `contactMethod` to a community chat URL that no
+      // deterministic anchor can verify. The lead has authority over their
+      // own contact channel; without the fallback the AI judge will mark
+      // these uncertain forever and the team will live in the review queue.
+      it('off-host chat path (Lit Protocol case): user-owned → user trusted', () => {
+        const v = corroborateContactMethod(
+          'https://getlit.dev/chat',
+          { teamName: 'Lit Protocol', website: 'https://litprotocol.com' },
+          { isUserOwned: true }
+        );
+        expect(v?.verdict).toBe(JudgmentVerdict.Agrees);
+        expect(v?.confidence).toBe(FieldConfidence.High);
+        expect(v?.note).toBe('user trusted');
+      });
+
+      it('discord.gg/<opaque-token>: user-owned → user trusted', () => {
+        const v = corroborateContactMethod(
+          'https://discord.gg/BakDKKDpHF',
+          { teamName: 'Drips', website: 'https://www.drips.network' },
+          { isUserOwned: true }
+        );
+        expect(v?.note).toBe('user trusted');
+      });
+
+      it('discord.com/invite/<opaque-token>: user-owned → user trusted', () => {
+        const v = corroborateContactMethod(
+          'https://discord.com/invite/5VcqgwMmkA',
+          { teamName: 'Lava Network', website: 'https://www.lavanet.xyz' },
+          { isUserOwned: true }
+        );
+        expect(v?.note).toBe('user trusted');
+      });
+
+      it('Calendly URL: user-owned → user trusted', () => {
+        const v = corroborateContactMethod(
+          'https://calendly.com/acme-team',
+          { teamName: 'Acme', website: 'https://acme.com' },
+          { isUserOwned: true }
+        );
+        expect(v?.note).toBe('user trusted');
+      });
+
+      it('arbitrary off-host email: user-owned → user trusted', () => {
+        // Team lead supplied a personal email that's not on the website
+        // domain and doesn't match any other anchor. We trust them anyway.
+        const v = corroborateContactMethod(
+          'jane@personaldomain.io',
+          { teamName: 'Acme', website: 'https://acme.com' },
+          { isUserOwned: true }
+        );
+        expect(v?.note).toBe('user trusted');
+      });
+
+      it('deterministic anchor wins when both fire (host-match before fallback)', () => {
+        // ChangedByUser email matches website host — the email-domain rule
+        // outranks the user-trusted fallback (note shows the actual proof,
+        // not a generic "user trusted"). Score 100 > 85.
+        const v = corroborateContactMethod(
+          'hello@acme.com',
+          { teamName: 'Acme', website: 'https://acme.com' },
+          { isUserOwned: true }
+        );
+        expect(v?.note).toBe('email domain matches website');
+      });
+
+      it('Enriched (not user-owned) value with no anchor → no verdict', () => {
+        // AI-supplied contactMethod URL that doesn't match any anchor.
+        // Falls through to the AI judge (no user authority claim).
+        const v = corroborateContactMethod(
+          'https://getlit.dev/chat',
+          { teamName: 'Lit Protocol', website: 'https://litprotocol.com' },
+          { isUserOwned: false }
+        );
+        expect(v).toBeNull();
+      });
+
+      it('omitted isUserOwned (defaults to false) → no fallback', () => {
+        const v = corroborateContactMethod('https://getlit.dev/chat', {
+          teamName: 'Lit Protocol',
+          website: 'https://litprotocol.com',
+        });
+        expect(v).toBeNull();
+      });
+
+      it('via dispatcher: ChangedByUser contactMethod → user trusted', () => {
+        const out = runCorroboration(
+          [{ field: 'contactMethod', value: 'https://getlit.dev/chat', isUserOwned: true }],
+          { teamName: 'Lit Protocol', website: 'https://litprotocol.com' }
+        );
+        expect(out.contactMethod?.verdict).toBe(JudgmentVerdict.Agrees);
+        expect(out.contactMethod?.confidence).toBe(FieldConfidence.High);
+        expect(out.contactMethod?.note).toBe('user trusted');
+      });
+    });
+
     describe('team-owned-channel cross-reference', () => {
       // Bench case (Hypercerts, clnez5ttg00021h02he9ljx5m): user set both
       // `contactMethod` and `telegramHandler` to the SAME `t.me/+opaque-token`
