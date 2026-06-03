@@ -431,7 +431,7 @@ export class TeamEnrichmentService {
             ),
           "updatedAt" = NOW()
       WHERE "dataEnrichment"->>'status' = 'InProgress'
-        AND "updatedAt" < NOW() - make_interval(mins => ${ttlMinutes})
+        AND "updatedAt" < NOW() - make_interval(mins => ${ttlMinutes}::int)
     `;
     if (updated > 0) {
       this.logger.warn(
