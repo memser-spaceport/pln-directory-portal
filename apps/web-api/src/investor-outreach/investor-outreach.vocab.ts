@@ -62,6 +62,11 @@ export const INVESTOR_OUTREACH_SECTOR_TAGS = [
   'neurotech',
   'fintech',
   'biotech',
+  'biopharma',
+  'biotechnology',
+  'medical-device',
+  'diagnostics',
+  'healthcare-services',
   'climate',
   'gaming',
   'saas',
@@ -81,7 +86,6 @@ const STAGE_SET = toStringSet(INVESTOR_OUTREACH_STAGE_FOCUS);
 const RAISING_NOW_SET = toStringSet(INVESTOR_OUTREACH_RAISING_NOW);
 const ENGAGEMENT_SET = toStringSet(INVESTOR_OUTREACH_ENGAGEMENT_TIER);
 const ENRICHMENT_SET = toStringSet(INVESTOR_OUTREACH_ENRICHMENT_STATUS);
-const SECTOR_TAG_SET = toStringSet(INVESTOR_OUTREACH_SECTOR_TAGS);
 const ATTRIBUTION_FUND_SET = toStringSet(INVESTOR_OUTREACH_ATTRIBUTION_FUNDS);
 
 export function isAllowedInvestorSource(v: string): boolean {
@@ -144,6 +148,14 @@ export function isAllowedAttributionFund(v: string): boolean {
   return ATTRIBUTION_FUND_SET.has(v);
 }
 
+/**
+ * Permissive normalization. Accepts free-form `sector_tags` from the enrichment pipeline:
+ * splits on comma OR semicolon, lowercases and trims each token, joins back with comma for
+ * storage. Unknown tokens are NOT rejected — `INVESTOR_OUTREACH_SECTOR_TAGS` only governs the
+ * filter UI's closed vocab, not what's stored on a row.
+ *
+ * Always returns ok=true; the result-shape stays the same so callers don't need to change.
+ */
 export function parseSectorTagsList(
   raw: string | undefined
 ): { ok: true; value: string } | { ok: false; reason: string } {
@@ -151,12 +163,8 @@ export function parseSectorTagsList(
     return { ok: true, value: '' };
   }
   const parts = raw
-    .split(',')
+    .split(/[,;]/)
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  const bad = parts.filter((p) => !SECTOR_TAG_SET.has(p));
-  if (bad.length) {
-    return { ok: false, reason: `Invalid sector_tags: ${bad.join(', ')}` };
-  }
   return { ok: true, value: parts.join(',') };
 }

@@ -1,5 +1,5 @@
 import { INestApplication, VersioningType } from '@nestjs/common';
-import { json } from 'body-parser';
+import { json, urlencoded } from 'body-parser';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { CsrfFilter, nestCsrf } from 'ncsrf';
@@ -31,8 +31,13 @@ export function mainConfig(app: INestApplication) {
     origin: ALLOWED_CORS_ORIGINS[process.env.ENVIRONMENT || APP_ENV.DEV],
     credentials: true,
   });
-  /* Limiting the size of the body of the request to 100kb. */
-  app.use(json({ limit: '100kb', type: 'text/plain' }));
+  /* Default JSON parser. Raised from the body-parser default 100kb so the investor-outreach
+   * ingest endpoint can accept batches with the script's per-row `evidence` objects (a single
+   * batch of 25 enriched investors is ~150kb; 5mb leaves comfortable headroom for future growth). */
+  app.use(json({ limit: '5mb' }));
+  app.use(urlencoded({ extended: true, limit: '5mb' }));
+  /* Some clients post raw JSON with text/plain content type. */
+  app.use(json({ limit: '5mb', type: 'text/plain' }));
   /* Apply helmet to the entire app
   // Default configuration documented here: https://github.com/helmetjs/helmet
   */
