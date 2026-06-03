@@ -5,7 +5,11 @@ import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
-import { ScrapingDogCompanyProfile, TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
+import {
+  ScrapingDogCompanyProfile,
+  TeamEnrichmentScrapingDogService,
+  verifyTwitterProfileMatchesTeam,
+} from './team-enrichment-scrapingdog.service';
 import { deriveTeamFieldsFromLeads } from './team-enrichment-lead-backfill';
 import { isLikelyValueForField } from './team-enrichment-field-shape.util';
 import {
@@ -1197,6 +1201,20 @@ export class TeamEnrichmentService {
         forceOverwrite,
       });
 
+      // ScrapingDog X verification — runs independently of the LinkedIn fallback.
+      // Verifies a candidate twitterHandler (from AI, website-signal backfill,
+      // lead-backfill, or an orphan value carried over from a prior enrichment
+      // run) against the X profile's website / display name. When verified,
+      // promotes the handle's `source` to `scrapingdog + high` so the judge's
+      // Stage 1.5 source-trust rule auto-promotes it without an AI call.
+      await this.maybeVerifyTwitterHandleViaScrapingDog({
+        teamUid,
+        team,
+        existingFieldsMeta,
+        enrichmentUpdate,
+        newFieldsMeta,
+      });
+
       const now = new Date().toISOString();
       const mergedFieldsMeta: FieldsMetaMap = { ...existingFieldsMeta };
       for (const [field, fresh] of Object.entries(newFieldsMeta) as Array<
@@ -1211,6 +1229,18 @@ export class TeamEnrichmentService {
           ...(prior ?? {}),
           ...freshDefined,
         } as FieldEnrichmentMeta;
+        // Drop any stale `judgment` block on every fresh enrichment write.
+        // The judgment is owned by the judge stage — it is rendered against
+        // a specific (status, value) tuple, so any time enrichment rewrites
+        // the field's meta the prior verdict no longer applies. Without
+        // this, a value that flipped from `Enriched` → `CannotEnrich`
+        // (AI lost its previous answer) or was re-enriched with a different
+        // candidate keeps surfacing the team in admin review because the
+        // legacy verdict (likely `uncertain` / `medium`) is still attached.
+        // The next judge run will write a fresh verdict if warranted.
+        if (fresh.status) {
+          delete (merged as any).judgment;
+        }
         // Stamp `lastModifiedAt` only when the value actually changed this run.
         if (merged.status !== FieldEnrichmentStatus.ChangedByUser) {
           merged = stampModified(merged, now);
@@ -2178,6 +2208,100 @@ export class TeamEnrichmentService {
   private verifyScrapingDogEntity(teamName: string, profile: ScrapingDogCompanyProfile): boolean {
     return this.scrapingDogService.classifyNameMatch(teamName, profile) !== 'none';
   }
+
+  /**
+   * Verifies a candidate `twitterHandler` against ScrapingDog's X profile.
+   * Mirrors the LinkedIn fallback's intent — turn an AI guess into a
+   * deterministically-corroborated value — but with three differences:
+   *
+   *   1. It runs even when the field has no "gap" (since the goal is to
+   *      upgrade an already-filled candidate, not to discover a new one).
+   *   2. It picks up orphan values left behind by a prior run (a candidate
+   *      stored on `te.twitterHandler` whose `fieldsMeta` status got flipped to
+   *      `CannotEnrich` on a later force-enrich where the AI returned null).
+   *   3. On a verified profile it writes `source = scrapingdog` /
+   *      `confidence = high`, which the judge's Stage 1.5 source-trust rule
+   *      auto-promotes — no AI call, no admin review.
+   *
+   * Verification accepts the handle when ANY of:
+   *   - profile website host equals team website host (strongest single signal),
+   *   - profile name shares a substantive token with the team name AND the
+   *     account is X-verified as a Business/Government org,
+   *   - profile name shares a substantive token with the team name AND the
+   *     handle's first label prefix-matches a team-name token (two converging
+   *     identity anchors, same doctrine as the existing `name in twitter handle`
+   *     corroboration rule).
+   *
+   * Non-verifying outcomes (profile fetched but no anchor fires, or
+   * not-found / error) are non-destructive on first occurrence — the prior
+   * state stands and the AI judge gets a normal turn at the field. We
+   * intentionally do NOT null an orphan handle here because the same handle
+   * can be correct even when X's parsed payload misses an anchor (an org
+   * account with no listed website and a brand-different display name is
+   * plausible); the LinkedIn `nullBadLinkedinHandle` path has the much
+   * stronger signal of a hard "not found" response, which the X endpoint
+   * provides equivalently.
+   */
+  private async maybeVerifyTwitterHandleViaScrapingDog(ctx: {
+    teamUid: string;
+    team: TeamWithEnrichment;
+    existingFieldsMeta: FieldsMetaMap;
+    enrichmentUpdate: Prisma.TeamEnrichmentUpdateInput;
+    newFieldsMeta: FieldsMetaMap;
+  }): Promise<void> {
+    if (!this.scrapingDogService.isConfigured()) return;
+
+    const { teamUid, team, existingFieldsMeta, enrichmentUpdate, newFieldsMeta } = ctx;
+
+    if (isFieldUserOwned(existingFieldsMeta, 'twitterHandler', team.twitterHandler)) return;
+
+    // Candidate priority:
+    //   1. Value being written this run (AI / website-signal / lead-backfill).
+    //   2. Existing TeamEnrichment.twitterHandler (orphan from a prior run, or
+    //      from the previous Enriched state that this force-run is re-evaluating).
+    // The newFieldsMeta status is the in-flight write; the existing fieldsMeta
+    // status is what's about to be overwritten.
+    const candidateFromUpdate =
+      typeof (enrichmentUpdate as any).twitterHandler === 'string'
+        ? ((enrichmentUpdate as any).twitterHandler as string)
+        : null;
+    const candidate = candidateFromUpdate ?? team.teamEnrichment?.twitterHandler ?? null;
+    if (!candidate || !isLikelyValueForField('twitterHandler', candidate)) return;
+
+    const result = await this.scrapingDogService.fetchTwitterProfile(candidate);
+    if (result.kind !== 'ok') {
+      this.logger.log(
+        `Team ${teamUid} (${team.name}): X profile for "${candidate}" returned ${result.kind}` +
+          (result.kind === 'error' ? ` (${result.reason})` : '') +
+          ' — leaving twitterHandler state untouched'
+      );
+      return;
+    }
+
+    const verification = verifyTwitterProfileMatchesTeam(team, result.profile);
+    if (!verification.verified) {
+      this.logger.log(
+        `Team ${teamUid} (${team.name}): X profile fetched for "${candidate}" but no identity anchor fired ` +
+          `(profile.name="${result.profile.name ?? ''}" website="${result.profile.website ?? ''}" verifiedType="${result.profile.verifiedType ?? ''}")`
+      );
+      return;
+    }
+
+    // Canonical handle from the verified profile (X's preferred casing,
+    // stripped of `@`). Fall back to the candidate when the profile omits
+    // its own username (shouldn't happen for a parsed payload, but defensive).
+    const canonicalHandle = result.profile.username ?? candidate.replace(/^@/, '');
+    (enrichmentUpdate as any).twitterHandler = canonicalHandle;
+    newFieldsMeta.twitterHandler = {
+      status: FieldEnrichmentStatus.Enriched,
+      confidence: FieldConfidence.High,
+      source: EnrichmentSource.ScrapingDog,
+    };
+    this.logger.log(
+      `Team ${teamUid} (${team.name}): X profile verified twitterHandler="${canonicalHandle}" via [${verification.anchors.join(', ')}]`
+    );
+  }
+
 
   parseEnrichmentMeta(raw: any): TeamDataEnrichment | null {
     if (!raw) return null;

@@ -151,6 +151,87 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict).toBeNull();
     });
 
+    // Bench case (LabDAO): Discord invite URL with team-named slug.
+    it('discord.com/invite/<slug> matching team name → name in invite slug', () => {
+      const verdict = corroborateContactMethod('https://discord.com/invite/labdao', {
+        teamName: 'LabDAO',
+        website: 'https://www.labdao.xyz',
+      });
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.note).toBe('name in invite slug');
+    });
+
+    // Bench case (ConsenSys): single-token team, slug equals team name.
+    it('discord.com/invite/<slug> equal to team token → name in invite slug', () => {
+      const verdict = corroborateContactMethod('https://discord.com/invite/consensys', {
+        teamName: 'ConsenSys',
+        website: 'https://consensys.net',
+      });
+      expect(verdict?.note).toBe('name in invite slug');
+    });
+
+    // Bench case (Manifest Network): multi-word team, stopword "network" dropped,
+    // slug "manifestnetwork" still starts with team token "manifest".
+    it('discord.com/invite/<slug> starts with team token (stopword-aware) → name in invite slug', () => {
+      const verdict = corroborateContactMethod('https://discord.com/invite/manifestnetwork', {
+        teamName: 'Manifest Network',
+        website: 'https://manifestai.org/',
+      });
+      expect(verdict?.note).toBe('name in invite slug');
+    });
+
+    it('discord.gg/<slug> short link with team-named slug → name in invite slug', () => {
+      const verdict = corroborateContactMethod('https://discord.gg/labdao', {
+        teamName: 'LabDAO',
+        website: 'https://www.labdao.xyz',
+      });
+      expect(verdict?.note).toBe('name in invite slug');
+    });
+
+    // Bench negatives (Lava Network / Drips / NFT.Storage / DeSci Labs): random
+    // opaque invite IDs that don't start with any team token. Correctly stay in review.
+    it('discord.gg/<opaque-id> does NOT match team name → no verdict', () => {
+      const verdict = corroborateContactMethod('https://discord.gg/BakDKKDpHF', {
+        teamName: 'Drips',
+        website: 'https://www.drips.network',
+      });
+      expect(verdict).toBeNull();
+    });
+
+    it('discord.com/invite/<opaque-id> for Lava Network → no verdict', () => {
+      const verdict = corroborateContactMethod('https://discord.com/invite/5VcqgwMmkA', {
+        teamName: 'Lava Network',
+        website: 'https://www.lavanet.xyz',
+      });
+      expect(verdict).toBeNull();
+    });
+
+    it('t.me/<slug> with team-named slug → name in invite slug', () => {
+      const verdict = corroborateContactMethod('https://t.me/acmechat', {
+        teamName: 'Acme',
+        website: 'https://acme.com',
+      });
+      expect(verdict?.note).toBe('name in invite slug');
+    });
+
+    it('t.me/+<token> (one-time join token, not a team handle) → no verdict', () => {
+      // Bench case (Hypercerts): `https://t.me/+YF9AYb6zCv1mNDJi`. The +<token>
+      // form is an opaque single-use invite, not a team-identifying slug.
+      const verdict = corroborateContactMethod('https://t.me/+YF9AYb6zCv1mNDJi', {
+        teamName: 'Hypercerts',
+        website: 'https://hypercerts.org',
+      });
+      expect(verdict).toBeNull();
+    });
+
+    it('linktr.ee/<slug> matching team name → name in invite slug', () => {
+      const verdict = corroborateContactMethod('https://linktr.ee/acmehq', {
+        teamName: 'Acme HQ',
+        website: 'https://acme.com',
+      });
+      expect(verdict?.note).toBe('name in invite slug');
+    });
+
     it('null or empty value → no verdict', () => {
       expect(corroborateContactMethod(null, { teamName: 'Acme' })).toBeNull();
       expect(corroborateContactMethod('', { teamName: 'Acme' })).toBeNull();
@@ -326,6 +407,30 @@ describe('team-enrichment-corroboration', () => {
 
     it('slug unrelated to team name → no verdict', () => {
       const verdict = corroborateLinkedinHandler('company/totally-different', { teamName: 'Eon' });
+      expect(verdict).toBeNull();
+    });
+
+    // Bench case (Manifest Network): slug `company/the-manifest-network` —
+    // common LinkedIn pattern that puts a leading `the-` before the team
+    // name. Prefix-only check fails ('the-manifest-network'.startsWith('manifest') = false).
+    // Hyphen-segment equality catches it ('manifest' equals team token).
+    it('slug with leading `the-` before team name → name in linkedin slug', () => {
+      const verdict = corroborateLinkedinHandler('company/the-manifest-network', { teamName: 'Manifest Network' });
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.note).toBe('name in linkedin slug');
+    });
+
+    it('slug with leading `the-` for multi-word team → matches via segment equality', () => {
+      const verdict = corroborateLinkedinHandler('company/the-acme-foundation', { teamName: 'Acme Foundation' });
+      expect(verdict?.note).toBe('name in linkedin slug');
+    });
+
+    // Safety guard: a segment that's a SUPERSET of a team token (not equal)
+    // does NOT match. `something-eonical-corp` for team "Eon" — segment
+    // 'eonical' is NOT equal to team token 'eon', so the equality check
+    // correctly rejects. (Prefix on segment would have false-positived here.)
+    it('slug segment that contains team token mid-segment → no verdict (segment equality required)', () => {
+      const verdict = corroborateLinkedinHandler('company/something-eonical-corp', { teamName: 'Eon' });
       expect(verdict).toBeNull();
     });
   });
@@ -730,10 +835,24 @@ describe('team-enrichment-corroboration', () => {
   });
 
   describe('corroborateBySource', () => {
-    it('scrapingdog + high → agrees+high (sourced from linkedin)', () => {
-      const v = corroborateBySource(EnrichmentSource.ScrapingDog, 'high');
+    it('scrapingdog + high (default / linkedin field) → agrees+high (sourced from linkedin)', () => {
+      const v = corroborateBySource(EnrichmentSource.ScrapingDog, 'high', 'linkedinHandler');
       expect(v?.note).toBe('sourced from linkedin');
       expect(v?.judgedVia).toBe(JudgmentSource.Corroboration);
+    });
+
+    // `twitterHandler` with source=scrapingdog can only come from the X
+    // profile endpoint (LinkedIn's company-profile fetcher never writes
+    // twitterHandler). Note reflects the actual upstream so admin reviewers
+    // can trust the provenance string.
+    it('scrapingdog + high on twitterHandler → sourced from x', () => {
+      const v = corroborateBySource(EnrichmentSource.ScrapingDog, 'high', 'twitterHandler');
+      expect(v?.note).toBe('sourced from x');
+    });
+
+    it('scrapingdog + high on telegramHandler → sourced from telegram', () => {
+      const v = corroborateBySource(EnrichmentSource.ScrapingDog, 'high', 'telegramHandler');
+      expect(v?.note).toBe('sourced from telegram');
     });
 
     it('open-graph + high → agrees+high (sourced from website)', () => {

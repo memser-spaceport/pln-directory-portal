@@ -7,6 +7,7 @@ import {
   JudgmentVerdict,
   NameMatchTier,
 } from './team-enrichment.types';
+import { hostFirstLabelMatchesTeamName, namesShareSubstantiveToken } from './team-enrichment-corroboration';
 
 export interface ScrapingDogCompanyProfile {
   universalNameId: string | null;
@@ -22,10 +23,98 @@ export interface ScrapingDogCompanyProfile {
   linkedinInternalId: string | null;
 }
 
+/**
+ * Normalized X/Twitter profile data from ScrapingDog's `/x/profile?parsed=true`
+ * endpoint. Used by the team-enrichment pipeline to verify whether an
+ * AI-supplied or previously-stored `twitterHandler` actually belongs to the
+ * team — by comparing the profile's listed `website` to `team.website` and
+ * the profile's `name` to `team.name`. X's own org-verification flag
+ * (`verified_type === "Business"`) is captured as a corroborating signal.
+ */
+export interface ScrapingDogTwitterProfile {
+  /** Lowercased username, no leading `@`. */
+  username: string | null;
+  /** Display name (e.g. "Science Corporation"). */
+  name: string | null;
+  /** Profile bio. */
+  description: string | null;
+  /** Listed website URL. Validated as http(s) before being returned. */
+  website: string | null;
+  /** Internal user id from X. */
+  userId: string | null;
+  /** True when X marks the account as a verified organization / business. */
+  isVerifiedOrg: boolean;
+  /** Raw `verified_type` value (e.g. "Business", "Government"). */
+  verifiedType: string | null;
+}
+
 export type FetchCompanyProfileResult =
   | { kind: 'ok'; profile: ScrapingDogCompanyProfile }
   | { kind: 'not-found' }
   | { kind: 'error'; reason: string };
+
+export type FetchTwitterProfileResult =
+  | { kind: 'ok'; profile: ScrapingDogTwitterProfile }
+  | { kind: 'not-found' }
+  | { kind: 'error'; reason: string };
+
+/**
+ * Three-anchor identity check on an X/Twitter profile. Pure: takes the team's
+ * name + website and the normalized profile, returns the set of anchors that
+ * fired. The caller treats `verified === true` as the auto-promotion gate.
+ *
+ * Doctrine: a single strong anchor (website host match) suffices because both
+ * sides — the listed website on the X profile and the team's stored website —
+ * are independent team-controlled assets. The two weaker anchors (X
+ * Business/Government verification AND name overlap, or handle prefix-match
+ * AND name overlap) require two converging signals, mirroring how the
+ * Stage 1.5 corroboration rules establish high-confidence verdicts.
+ */
+export function verifyTwitterProfileMatchesTeam(
+  team: { name: string; website: string | null | undefined },
+  profile: ScrapingDogTwitterProfile
+): { verified: boolean; anchors: string[] } {
+  const anchors: string[] = [];
+
+  const normalizeHost = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    try {
+      return new URL(url).host.replace(/^www\./, '').toLowerCase();
+    } catch {
+      return null;
+    }
+  };
+
+  // Anchor 1 (sufficient alone): listed website host equals team website host.
+  // Both sides are independently-controlled team assets — a match is decisive.
+  const teamHost = normalizeHost(team.website ?? null);
+  const profileHost = normalizeHost(profile.website);
+  if (teamHost && profileHost && teamHost === profileHost) {
+    anchors.push('website host match');
+    return { verified: true, anchors };
+  }
+
+  const nameMatches = !!profile.name && namesShareSubstantiveToken(team.name, profile.name);
+  if (nameMatches) anchors.push('name match');
+
+  // Anchor 2: X-verified org (Business / Government) AND substantive-token
+  // name overlap. X manually verifies these accounts, so the verification
+  // tier is a high-quality second signal.
+  if (nameMatches && profile.isVerifiedOrg) {
+    anchors.push('x verified org');
+    return { verified: true, anchors };
+  }
+
+  // Anchor 3: handle prefix-matches a team token AND substantive-token name
+  // overlap. Mirrors Stage 1.5's existing `name in twitter handle` rule, but
+  // anchored against the second-source profile name to keep the safety guard.
+  if (nameMatches && profile.username && hostFirstLabelMatchesTeamName(team.name, profile.username)) {
+    anchors.push('handle prefix match');
+    return { verified: true, anchors };
+  }
+
+  return { verified: false, anchors };
+}
 
 export interface TeamSnapshotForCompare {
   name: string;
@@ -41,6 +130,7 @@ export interface TeamSnapshotForCompare {
 export class TeamEnrichmentScrapingDogService {
   private readonly logger = new Logger(TeamEnrichmentScrapingDogService.name);
   private static readonly API_URL = 'https://api.scrapingdog.com/profile';
+  private static readonly X_API_URL = 'https://api.scrapingdog.com/x/profile';
   private static readonly TIMEOUT_MS = 15000;
 
   isConfigured(): boolean {
@@ -115,6 +205,99 @@ export class TeamEnrichmentScrapingDogService {
     } catch (error) {
       const reason = error?.name === 'AbortError' ? 'timeout' : error?.message || 'unknown error';
       this.logger.warn(`ScrapingDog fetch failed for id "${id}": ${reason}`);
+      return { kind: 'error', reason };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  /**
+   * Fetches and normalizes an X/Twitter profile via ScrapingDog's
+   * `/x/profile?parsed=true` endpoint. Used to verify a candidate
+   * `twitterHandler` belongs to the team by comparing the profile's listed
+   * `website` against the team's website and the profile's `name` against the
+   * team name. The tagged-union result mirrors `fetchCompanyProfile` so callers
+   * can switch on `kind`.
+   *
+   * Tagged outcomes:
+   *   - `ok`         — usable profile returned.
+   *   - `not-found`  — ScrapingDog returned `success: false` (typically with
+   *                    "not found" / "doesn't exist") or a payload with no
+   *                    username + no user_id. Treated as an invalid handle.
+   *   - `error`      — HTTP non-200, timeout, malformed JSON, missing API key,
+   *                    or an empty/invalid payload. State is left untouched.
+   */
+  async fetchTwitterProfile(handle: string): Promise<FetchTwitterProfileResult> {
+    const apiKey = process.env.SCRAPINGDOG_API_KEY;
+    if (!apiKey) {
+      this.logger.debug('SCRAPINGDOG_API_KEY not set, skipping ScrapingDog X profile fetch');
+      return { kind: 'error', reason: 'api key not configured' };
+    }
+
+    const id = this.extractTwitterHandle(handle);
+    if (!id) {
+      this.logger.warn(`Could not extract Twitter/X handle from: "${handle}"`);
+      return { kind: 'error', reason: 'could not extract handle id' };
+    }
+
+    const url = new URL(TeamEnrichmentScrapingDogService.X_API_URL);
+    url.searchParams.set('api_key', apiKey);
+    url.searchParams.set('profileId', id);
+    url.searchParams.set('parsed', 'true');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TeamEnrichmentScrapingDogService.TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        signal: controller.signal,
+        headers: { 'User-Agent': 'PLNEnrichment/1.0' },
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`ScrapingDog X returned HTTP ${response.status} for handle "${id}"`);
+        return { kind: 'error', reason: `HTTP ${response.status}` };
+      }
+
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch (parseError) {
+        this.logger.warn(`ScrapingDog X returned malformed JSON for handle "${id}": ${parseError.message}`);
+        return { kind: 'error', reason: 'malformed json' };
+      }
+
+      const raw = Array.isArray(body) ? (body[0] as unknown) : body;
+      if (!raw || typeof raw !== 'object') {
+        this.logger.warn(`ScrapingDog X returned empty/invalid payload for handle "${id}"`);
+        return { kind: 'error', reason: 'empty or invalid payload' };
+      }
+
+      if (this.isNotFoundBody(raw)) {
+        this.logger.warn(`ScrapingDog X reports profile not found for handle "${id}"`);
+        return { kind: 'not-found' };
+      }
+
+      // X endpoint nests the data under `profile`. Defensive: also accept the
+      // top-level shape in case the API ever flattens it.
+      const r = raw as Record<string, unknown>;
+      const profileBlock =
+        r.profile && typeof r.profile === 'object' ? (r.profile as Record<string, unknown>) : r;
+
+      const profile = this.normalizeTwitterProfile(profileBlock);
+
+      if (!profile.username && !profile.userId) {
+        this.logger.warn(
+          `ScrapingDog X returned profile with no username/user_id for handle "${id}", treating as not-found`
+        );
+        return { kind: 'not-found' };
+      }
+
+      return { kind: 'ok', profile };
+    } catch (error) {
+      const reason = error?.name === 'AbortError' ? 'timeout' : error?.message || 'unknown error';
+      this.logger.warn(`ScrapingDog X fetch failed for handle "${id}": ${reason}`);
       return { kind: 'error', reason };
     } finally {
       clearTimeout(timeout);
@@ -267,6 +450,29 @@ export class TeamEnrichmentScrapingDogService {
     return /^[a-zA-Z0-9_.-]+$/.test(cleaned) ? cleaned : null;
   }
 
+  /**
+   * Normalizes a raw `twitterHandler` value (which may be a bare handle, an
+   * `@`-prefixed handle, or a full twitter.com / x.com URL) into the bare
+   * username form expected by ScrapingDog's X profile endpoint. Returns null
+   * when the input doesn't pass X's username shape rules (1-15 alphanumeric
+   * + underscore characters).
+   */
+  private extractTwitterHandle(handler: string): string | null {
+    if (!handler) return null;
+    const trimmed = handler.trim();
+    if (!trimmed) return null;
+    // Full / partial twitter.com or x.com URL — pull the first path segment.
+    if (/(?:twitter|x)\.com\//i.test(trimmed)) {
+      const m = trimmed.match(/(?:twitter|x)\.com\/([A-Za-z0-9_]+)/i);
+      return m && /^[A-Za-z0-9_]{1,15}$/.test(m[1]) ? m[1] : null;
+    }
+    const cleaned = trimmed
+      .replace(/^@/, '')
+      .replace(/[\/?#].*$/, '')
+      .trim();
+    return /^[A-Za-z0-9_]{1,15}$/.test(cleaned) ? cleaned : null;
+  }
+
   private isNotFoundBody(raw: unknown): boolean {
     if (!raw || typeof raw !== 'object') return false;
     const r = raw as Record<string, unknown>;
@@ -378,6 +584,38 @@ export class TeamEnrichmentScrapingDogService {
       founded: nonEmpty(raw.founded),
       headquarters: nonEmpty(raw.headquarters),
       linkedinInternalId: nonEmpty(raw.linkedin_internal_id),
+    };
+  }
+
+  /**
+   * Normalizes ScrapingDog's parsed X profile body. Defensive against missing
+   * keys — the parsed-true endpoint usually returns all of them but we never
+   * trust that. `verified_type` of `"Business"` flips `isVerifiedOrg` true,
+   * which the team-enrichment pipeline uses as a corroborating identity signal
+   * (X manually verifies official org accounts).
+   */
+  private normalizeTwitterProfile(raw: Record<string, unknown>): ScrapingDogTwitterProfile {
+    const nonEmpty = (value: unknown): string | null => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const rawUsername = nonEmpty(raw.username);
+    const cleanedUsername = rawUsername ? rawUsername.replace(/^@/, '').toLowerCase() : null;
+    const verifiedType = nonEmpty(raw.verified_type);
+
+    return {
+      username: cleanedUsername,
+      name: nonEmpty(raw.name),
+      description: nonEmpty(raw.description),
+      website: this.validateUrl(raw.website),
+      userId: nonEmpty(raw.user_id),
+      verifiedType,
+      // X uses verified_type to mark business / government / news org accounts.
+      // The boolean `verified` field is meaningful only on legacy blue-check
+      // accounts; the org class is what we actually trust as an identity signal.
+      isVerifiedOrg: verifiedType?.toLowerCase() === 'business' || verifiedType?.toLowerCase() === 'government',
     };
   }
 

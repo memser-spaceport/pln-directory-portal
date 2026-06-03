@@ -155,19 +155,28 @@ export function namesShareSubstantiveToken(a: string, b: string): boolean {
 }
 
 /**
- * Variant for website hosts, where the team name is typically abbreviated to
- * its leading distinctive token: `eon.systems` for "Eon", `astera.org` for
- * "Astera Institute" (drops "Institute"), `fil.org` for "Filecoin Foundation"
- * (loses the team name entirely — falls through).
+ * Variant for website hosts (and other host-like single-label strings such as
+ * LinkedIn slugs, Twitter/Telegram handles, Discord invite slugs).
  *
- * Strict on placement: requires the first dot-separated label of the host to
- * START WITH a substantive team token (or equal it). Substring-anywhere would
- * false-positive on coincidental matches — a team named "Eon" with website
- * `beontop.com` would falsely match if we just checked for "eon" anywhere.
- * Prefix-of-first-label keeps Astera/Eon/Devonian/etc. matching while
- * rejecting `beontop.com` (first label "beontop" doesn't start with "eon").
+ * Two acceptance paths, both strict on placement:
  *
- * Stopword filter + 3-char minimum on tokens still apply (so two-letter team
+ *   1. **Whole-string prefix**: the first dot-separated label STARTS WITH a
+ *      substantive team token. Catches concatenated / abbreviated forms:
+ *      `eon.systems` for "Eon", `eonsys` for "Eon", `astera.org` for
+ *      "Astera Institute", `manifestnetwork` for "Manifest Network".
+ *
+ *   2. **Exact hyphen-segment equality**: any hyphen-separated segment
+ *      EQUALS a substantive team token. Catches LinkedIn-style slugs that
+ *      put a prefix word in front of the team name: `the-manifest-network`
+ *      → segment `manifest` equals team token `manifest`. Equality (not
+ *      prefix) keeps the false-positive safety — segment `eonical` is NOT
+ *      equal to team token `eon`, so `something-eonical-corp` for team
+ *      "Eon" is correctly rejected even though `eon` is a substring.
+ *
+ * Substring-anywhere matching is intentionally never used — it would
+ * false-positive on coincidental matches like `beontop.com` for team "Eon".
+ *
+ * Stopword filter + 3-char minimum on tokens still apply (two-letter team
  * names and stopword-only names won't match anything).
  */
 export function hostFirstLabelMatchesTeamName(teamName: string, host: string): boolean {
@@ -175,7 +184,12 @@ export function hostFirstLabelMatchesTeamName(teamName: string, host: string): b
   if (teamTokens.length === 0) return false;
   const firstLabel = host.toLowerCase().replace(/^www\./, '').split('.')[0];
   if (!firstLabel || firstLabel.length < 3) return false;
-  return teamTokens.some((t) => firstLabel.startsWith(t));
+  // 1) Whole-string prefix match (concatenated / abbreviated forms).
+  if (teamTokens.some((t) => firstLabel.startsWith(t))) return true;
+  // 2) Exact match against any hyphen-separated segment (hyphenated forms
+  //    common in LinkedIn slugs: `the-manifest-network`, `the-acme-foundation`).
+  const segments = firstLabel.split('-').filter(Boolean);
+  return segments.some((seg) => teamTokens.includes(seg));
 }
 
 function mkJudgment(
@@ -273,6 +287,17 @@ export function corroborateContactMethod(
     // is `spacetimedb.com`). Symmetric with the email branch above.
     if (contactHost && hostFirstLabelMatchesTeamName(ctx.teamName, contactHost)) {
       return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'url host matches team name');
+    }
+
+    // Community / invite link: contactMethod is a Discord / Slack / Linktree /
+    // Telegram URL whose path slug starts with a team token. The host matches
+    // the platform (not the team), but the SLUG carries the team identifier:
+    // `discord.com/invite/labdao` for "LabDAO", `discord.gg/consensys` for
+    // ConsenSys, etc. Random opaque invite IDs (`discord.gg/BakDKKDpHF`)
+    // correctly fail the prefix check.
+    const inviteSlug = extractInviteSlug(trimmed);
+    if (inviteSlug && hostFirstLabelMatchesTeamName(ctx.teamName, inviteSlug)) {
+      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'name in invite slug');
     }
   }
 
@@ -477,6 +502,54 @@ export function extractBlogHandle(blogUrl: string): string | null {
 }
 
 /**
+ * Extracts the team-identifying slug from a community / invite URL hosted on
+ * a recognized platform (Discord, Telegram, Linktree, etc.). Returns null
+ * when the URL isn't on a recognized platform or the path doesn't carry an
+ * identifiable slug.
+ *
+ * Recognized patterns:
+ *   - `discord.com/invite/<slug>`
+ *   - `discord.gg/<slug>`
+ *   - `t.me/<slug>` (but NOT `t.me/+<token>` which is a single-use join
+ *     token, opaque and not team-identifying)
+ *   - `telegram.me/<slug>`
+ *   - `linktr.ee/<slug>`
+ *
+ * Used by `corroborateContactMethod` to fire `name in invite slug` when the
+ * slug starts with a substantive team-name token (e.g. `discord.com/invite/labdao`
+ * for "LabDAO" → slug `labdao` → starts with team token `labdao` ✓).
+ * Random opaque invite IDs (`discord.gg/BakDKKDpHF`) won't pass the prefix
+ * check and correctly stay in review.
+ */
+export function extractInviteSlug(rawUrl: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(rawUrl.trim());
+  } catch {
+    return null;
+  }
+  const host = u.host.replace(/^www\./, '').toLowerCase();
+  const segments = u.pathname.split('/').filter(Boolean);
+  if (segments.length === 0) return null;
+
+  if (host === 'discord.com' && segments[0] === 'invite' && segments[1]) {
+    return segments[1];
+  }
+  if (host === 'discord.gg' && segments[0]) {
+    return segments[0];
+  }
+  if ((host === 't.me' || host === 'telegram.me') && segments[0]) {
+    // `+ABC123` style is a one-time join token, not a team-identifying slug.
+    if (segments[0].startsWith('+')) return null;
+    return segments[0];
+  }
+  if (host === 'linktr.ee' && segments[0]) {
+    return segments[0];
+  }
+  return null;
+}
+
+/**
  * Blog URL corroboration. Two patterns auto-approve at high confidence:
  *
  *   1. **Same-host / subdomain-of website**: `blog.acme.com` ↔ `acme.com`,
@@ -601,11 +674,22 @@ export function corroborateWebsite(value: string | null, ctx: CorroborationConte
  */
 export function corroborateBySource(
   source: string | undefined,
-  enrichmentConfidence: string | undefined
+  enrichmentConfidence: string | undefined,
+  field?: FieldMetaKey
 ): FieldJudgment | null {
   if (enrichmentConfidence !== 'high') return null;
   if (source === EnrichmentSource.ScrapingDog) {
-    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'sourced from linkedin');
+    // LinkedIn ScrapingDog never fills `twitterHandler` / `telegramHandler` —
+    // those are X / Telegram profile verifications written from a separate
+    // ScrapingDog endpoint. Surface the actual source so admin reviewers can
+    // trust the note. Same enum value (`scrapingdog`), different upstream.
+    const note =
+      field === 'twitterHandler'
+        ? 'sourced from x'
+        : field === 'telegramHandler'
+        ? 'sourced from telegram'
+        : 'sourced from linkedin';
+    return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, note);
   }
   if (source === EnrichmentSource.OpenGraph) {
     return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'sourced from website');
@@ -647,7 +731,7 @@ export function runCorroboration(
     // Source-trust rule runs FIRST for every field — if the value came from a
     // trusted deterministic source at high confidence, that's the verification
     // and we skip the per-field rules + AI judge. Symmetric for all field types.
-    const sourceVerdict = corroborateBySource(f.source, f.enrichmentConfidence);
+    const sourceVerdict = corroborateBySource(f.source, f.enrichmentConfidence, f.field);
     if (sourceVerdict) {
       out[f.field] = sourceVerdict;
       continue;

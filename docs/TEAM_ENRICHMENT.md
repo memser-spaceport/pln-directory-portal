@@ -291,22 +291,26 @@ The dispatcher always runs **source-trust** first; if it fires, the field-specif
 | `email domain matches team name` | `contactMethod` (email form) | email-domain's first label starts with a substantive team-name token (prefix-only). Catches brand-alias domains — team "Clockwork Labs" with website `spacetimedb.com` and contact `contact@clockworklabs.io`. | `email domain matches team name` | 90 |
 | `url host matches website` | `contactMethod` (URL form) | URL host equal to `team.website` host (or subdomain-of) — catches "team's own /contact page", anchor-link self-references, etc. | `url host matches website` | 95 |
 | `url host matches team name` | `contactMethod` (URL form) | URL host's first label starts with a substantive team-name token (prefix-only). Symmetric with `email domain matches team name` for URL-form contact methods on a brand-alias domain. | `url host matches team name` | 90 |
+| `name in invite slug` | `contactMethod` (URL form) | URL is a Discord / Telegram / Linktree community/invite link on a recognized platform (`discord.com/invite/<slug>`, `discord.gg/<slug>`, `t.me/<slug>`, `linktr.ee/<slug>`) AND the path slug starts with a substantive team-name token. The host matches the platform (not the team), but the SLUG carries the team identifier. Random opaque invite IDs (`discord.gg/BakDKKDpHF`, `t.me/+YF9AYb6zCv1mNDJi`) correctly fail the prefix check. | `name in invite slug` | 90 |
 | `website self declared` | `twitterHandler` / `linkedinHandler` / `telegramHandler` | value exact-equal to what `websiteSignals.<field>` extracted from the team's own website HTML (JSON-LD `sameAs`, `twitter:site`, microdata, anchor) | `website self declared` | 100 |
 | `name in twitter handle` | `twitterHandler` | handle starts with a substantive team-name token (prefix-only — `eonsys` for "Eon", `Surus_io` for "Surus") | `name in twitter handle` | 90 |
-| `name in linkedin slug` | `linkedinHandler` | slug after `company/`/`school/`/`in/` starts with a substantive team-name token (`company/eon-systems-pbc` for "Eon") | `name in linkedin slug` | 90 |
+| `name in linkedin slug` | `linkedinHandler` | slug after `company/`/`school/`/`in/` starts with a substantive team-name token, OR any hyphen-separated segment equals a team token (`company/eon-systems-pbc` for "Eon", `company/the-manifest-network` for "Manifest Network"). | `name in linkedin slug` | 90 |
 | `name in telegram handle` | `telegramHandler` | handle starts with a substantive team-name token (`fileverse`, `hextrustannouncements`, `vitadao`) | `name in telegram handle` | 90 |
 | `host corroborated` | `blog` | blog host equals `team.website` host (or subdomain-of: `blog.acme.com` ↔ `acme.com`, `acme.com/blog` ↔ `acme.com`) | `host corroborated` | 95 |
 | `name in blog handle` | `blog` (third-party platforms) | blog is on Substack / Medium / Ghost / paragraph.xyz / Mirror / dev.to / Hashnode / Beehiiv / Posthaven AND the URL's identity slug (subdomain or path) contains every substantive team-name token (`asterainstitute.substack.com` for "Astera Institute", `manifestnetwork.medium.com` for "Manifest Network") | `name in blog handle` | 95 |
 | `name in website host` | `website` | host's first dot-separated label STARTS WITH a substantive team-name token (`eon.systems` ↔ "Eon", `devonian.ai` ↔ "Devonian Systems") AND probe didn't report a definitive 4xx/5xx (`websiteReachable !== false`). Bot-blocked (403) sites with a strong name match still auto-promote. Prefix-only — `beontop.com` is NOT a match for "Eon". | `name in website host` | 95 |
 | `og name match` / `jsonld name match` / `sd website host match` | `website` | a second-source name anchor fires from one of: `websiteSignals.ogSiteName`, `websiteSignals.jsonLdOrgName`, or ScrapingDog `profile.website` host. Multiple anchors concatenate with ` + ` in the note. (These anchors implicitly require successful HTML fetch, since they come from extracted page content — so they only fire on truly-reachable sites.) | `og name match` / `jsonld name match` / `sd website host match` (or `+`-joined) | 95 |
 
-#### Prefix-only guard
+#### Prefix-and-segment guard
 
-The `name in <handle>` family checks intentionally use **prefix matching** (`startsWith`), not substring-anywhere. Substring would false-positive on coincidental matches — a team named "Eon" with website `beontop.com` would falsely match because "eon" appears inside "beontop". Prefix-of-first-label keeps the safe cases (`eon.systems`, `astera.org`, `devonian.ai`, `computelabs.ai`, `manifestai.org`) while rejecting unrelated domains.
+The `name in <handle>` family checks use a two-rule placement guard, never substring-anywhere. Both rules apply via the shared `hostFirstLabelMatchesTeamName` helper:
 
-The `name in blog handle` rule is stricter — it requires **every** substantive team-name token to appear as a substring of the handle (handle is concatenated, so `asterainstitute` matches "Astera Institute" but `essentialtechnology` does NOT match "Convergent Research").
+1. **Whole-string prefix** — handle/host first label STARTS WITH a substantive team token. Catches concatenated / abbreviated forms: `eonsys`, `astera.org`, `manifestnetwork`, `clockworklabs`.
+2. **Exact hyphen-segment equality** — any hyphen-separated segment EQUALS a substantive team token. Catches LinkedIn-style slugs that prefix the team name with a word: `the-manifest-network` (segment `manifest` equals team token), `the-acme-foundation` (segment `acme` equals team token).
 
-Both checks use the same stopword filter as `namesShareSubstantiveToken` (drops "labs", "inc", "team", "network", "protocol", "foundation", etc.) so two-letter codes and stopword-only team names won't match anything.
+Equality on segments (not prefix) preserves the false-positive guard: `something-eonical-corp` for team "Eon" → segment `eonical` is NOT equal to team token `eon`, so safely rejected even though `eon` is a substring. Same for `beontop` (mid-segment substring also safely rejected via rule 1).
+
+Stopword filter + 3-char minimum on tokens still apply (drops "labs", "inc", "team", "network", "protocol", "foundation", etc.). Two-letter team names and stopword-only names match nothing.
 
 #### Founder-contact cross-reference (data source for `contactMethod`)
 
@@ -336,7 +340,10 @@ The website-host rules outrank the founder-match rule when both apply — `jane@
 
 When the enrichment pipeline already filled a field from a trusted deterministic source at high confidence, accept it without re-verifying via the AI judge. The pipeline records `source` per field on `fieldsMeta`:
 
-- `scrapingdog` → pulled from the team's LinkedIn company profile. Verdict `agrees + high`, note `sourced from linkedin`, score 95.
+- `scrapingdog` → pulled from the team's LinkedIn company profile, OR (for `twitterHandler`) verified against the team's X / Twitter profile. Verdict `agrees + high`, score 95. The note is **field-aware** to surface the actual upstream:
+  - `twitterHandler` → `sourced from x` (only X verification writes scrapingdog into this field; LinkedIn's company-profile fetcher never sets twitterHandler)
+  - `telegramHandler` → `sourced from telegram` (reserved for the future Telegram verification source — same enum, distinct note)
+  - everything else → `sourced from linkedin`
 - `open-graph` → pulled from the team's own website HTML (JSON-LD, twitter cards, microdata, anchors). Verdict `agrees + high`, note `sourced from website`, score 90.
 - `ai` → filled by the LLM. NOT trusted by this rule, because LLM self-assessed confidence is exactly what the judge exists to verify.
 
@@ -348,6 +355,7 @@ The enrichment-time `confidence` must be `high` — `medium`/`low` indicates the
 > - Team's `longDescription` was pulled from LinkedIn's About text by ScrapingDog at high confidence. The AI judge would web-search, find paraphrased wording, and downgrade to `medium`. The source-trust rule now auto-promotes — LinkedIn IS the source, paraphrasing is expected.
 > - Pre-seed team enters the solo founder's personal `jane@gmail.com` as the team contact. Host-match can't help (gmail.com isn't the team's website host). The `founder contact match` rule cross-references against the `TeamMemberRole` lead members' emails and auto-promotes when Jane is registered as a team lead.
 > - Brand-alias case: team "Clockwork Labs" with website `spacetimedb.com` (their product) and contact `contact@clockworklabs.io` (their corporate domain). Website-host match can't fire — the two domains differ — but the email domain's first label (`clockworklabs`) starts with the team token (`clockwork`). The `email domain matches team name` rule auto-promotes.
+> - Community invite link: team "LabDAO" with `contactMethod = https://discord.com/invite/labdao`. Host `discord.com` doesn't match the team, but the path slug after `/invite/` literally IS the team's name. The `name in invite slug` rule extracts the slug and prefix-matches it against substantive team tokens — auto-promotes. Random opaque invite IDs (`discord.gg/BakDKKDpHF`) don't match and correctly stay in review.
 
 The full rule implementations + an eval bench live in `team-enrichment-corroboration.ts` and `team-enrichment-corroboration.spec.ts`. The bench pins precision/recall: any rule change that regresses fixtures fails CI.
 
@@ -583,6 +591,62 @@ scrapingDog?: {
   linkedinInternalId?: string;   // LinkedIn internal company id
 }
 ```
+
+## ScrapingDog X / Twitter Verification
+
+A secondary deterministic verification source that targets the `twitterHandler` field specifically. Runs at **enrichment time** (not judge time) via `TeamEnrichmentScrapingDogService.fetchTwitterProfile`, which calls ScrapingDog's `/x/profile?parsed=true` endpoint. Same paid API as the LinkedIn fallback, gated by the same `SCRAPINGDOG_API_KEY` env var.
+
+The LinkedIn fallback's job is to **discover** missing values from the company profile. The X verification's job is to **upgrade** an already-filled `twitterHandler` candidate from `source: ai` (LLM self-assessed) to `source: scrapingdog + confidence: high` (deterministic identity proof). The judge's Stage 1.5 source-trust rule then auto-promotes the value with `note: "sourced from x"` — no AI judge call, no admin review.
+
+### When it runs
+
+After the AI pass, website-signal backfill, lead-backfill, and the LinkedIn ScrapingDog fallback all complete. Gated by ALL of:
+
+- `SCRAPINGDOG_API_KEY` is set.
+- `twitterHandler` is NOT user-owned (`ChangedByUser` with a structurally-valid value).
+- A candidate handle exists from EITHER:
+  - `enrichmentUpdate.twitterHandler` — written this run by AI / website-signal / lead-backfill, OR
+  - `TeamEnrichment.twitterHandler` — orphan value from a prior enrichment cycle (the common case when a re-enrichment marked the field `CannotEnrich` but left the prior candidate in place; see [Stale judgment handling](#stale-judgment-cleared-on-re-enrichment)).
+- The candidate passes the `twitterHandler` shape gate (`isLikelyValueForField`) — placeholder text like `"Twitter"` is rejected before we burn a ScrapingDog call.
+
+### Identity check
+
+`verifyTwitterProfileMatchesTeam` (exported from `team-enrichment-scrapingdog.service.ts` so it's unit-testable in isolation) emits an anchor list. Verification succeeds when ANY anchor fires:
+
+| Anchor | Fires when | Sufficient alone? |
+| --- | --- | --- |
+| `website host match` | The X profile's listed `website` host equals the team's `website` host (normalized — `www.` stripped, lowercased). | **Yes.** Both ends are independently-controlled team assets — a host match is decisive. |
+| `name match` + `x verified org` | The X profile's display `name` shares a substantive token with `team.name` AND `verified_type` is `Business` or `Government` (X manually verifies these tiers, so the verification flag is a high-quality second source). | Yes, when combined. |
+| `name match` + `handle prefix match` | Display-name token overlap AND the handle's first label prefix-matches a substantive team token (same rule as Stage 1.5's `name in twitter handle` — mirrors the existing converging-anchors doctrine). | Yes, when combined. |
+
+`name match` alone is **not** sufficient — could be a brand-squatter or fan account. Same rationale as the rest of the Stage 1.5 rules: single-source overlap doesn't clear the bar, two converging anchors does.
+
+### What it writes
+
+On a verified profile:
+
+1. `enrichmentUpdate.twitterHandler` is set to the **canonical** handle from `profile.username` (X's preferred casing, lowercased, `@`-stripped). This may differ from the AI-supplied casing (e.g. `"ScienceCorp_"` → `"sciencecorp_"`).
+2. `newFieldsMeta.twitterHandler = { status: Enriched, confidence: High, source: ScrapingDog }`. The same enum value as the LinkedIn ScrapingDog upgrade — `corroborateBySource` distinguishes by field key when emitting the judge-time note (`sourced from x` for twitterHandler, `sourced from linkedin` for company fields).
+
+### Non-destructive on failure
+
+The X verification step is non-destructive on every non-`ok` outcome:
+
+- `error` (HTTP non-200, timeout, malformed JSON, missing API key) — logs and returns. The candidate's prior `source` / `confidence` / `status` stand. The AI judge will get a normal turn at the field via the Stage 2 path.
+- `not-found` (the documented `success: false, message: /not found/i` shape) — logs and returns. We intentionally do NOT mirror the LinkedIn `nullBadLinkedinHandle` path here. X profiles can legitimately move to a new handle without HTTP redirects, and the existing handle may still be the team's chosen identity even when X's parsed payload temporarily misses it. The handle stays as the AI / lead-backfill supplied it.
+- Profile fetched but no identity anchor fired — same treatment as `not-found`. We log the anchors we evaluated (`profile.name`, `profile.website`, `verified_type`) so admin reviewers can spot mis-tagged accounts at a glance.
+
+### Canonical failure case this fixes
+
+> Team `Science` (`cldvnx75t01czu21k77n84pg2`) with website `https://science.xyz`. The AI pipeline guessed `twitterHandler = "ScienceCorp_"`. Earlier, the AI judge couldn't independently verify this and emitted `verdict: uncertain, confidence: medium, note: "ScienceCorp_-handle-not-independently-confirmed"` — surfacing the team in admin review.
+>
+> With X verification: `fetchTwitterProfile("ScienceCorp_")` returns a profile whose `website` is `https://science.xyz/` (matching the team's website host). The `website host match` anchor fires → handle's source is upgraded to `scrapingdog + high` → Stage 1.5 source-trust rule auto-promotes with `note: "sourced from x"`. Auto-cleared from the review queue.
+
+### Stale judgment cleared on re-enrichment
+
+Independent of the X verification, the enrichment-time `fieldsMeta` merge now drops any prior `judgment` block whenever it writes fresh meta for a field. Rationale: the judgment is owned by the judge stage and is rendered against a specific `(status, value)` tuple — once enrichment rewrites the field, the prior verdict no longer applies.
+
+Before this change, a value that flipped `Enriched → CannotEnrich` (AI lost its previous answer on a force-rerun) kept surfacing the team in admin review because the legacy `uncertain / medium` verdict was still attached. The next judge run writes a fresh verdict only for fields whose status is `Enriched` or `ChangedByUser` (judgable) — `CannotEnrich` fields no longer carry a stale verdict at all.
 
 ## Cron Job
 
@@ -1078,7 +1142,8 @@ apps/web-api/src/team-enrichment/
   team-enrichment-quality.ts        # 6-dimension team quality + thin-evidence flag
   team-enrichment-lead-backfill.ts  # Enrichment-stage backfill from team-lead Members (identity-matched, no AI)
   team-enrichment-ai.service.ts     # Enrichment LLM wrapper + logo scraping + website signal extractor
-  team-enrichment-scrapingdog.service.ts # LinkedIn fallback + classifyNameMatch/compareProfileToTeam helpers
+  team-enrichment-scrapingdog.service.ts # LinkedIn fallback + X profile verification (fetchTwitterProfile + verifyTwitterProfileMatchesTeam)
+  team-enrichment-scrapingdog.service.spec.ts # X profile fetcher + verification anchors coverage
   team-enrichment.service.ts        # Core enrichment business logic (persists websiteSignals, applies lead backfill)
   team-enrichment.job.ts            # Enrichment + marking cron jobs
   team-enrichment-judge-ai.service.ts # Judge LLM wrapper (independent model) — also renders Cross-source signals + Corroboration blocks into the prompt
@@ -1087,6 +1152,7 @@ apps/web-api/src/team-enrichment/
   team-enrichment-promotion.ts      # Promotion payload builder + executor (TeamEnrichment → Team)
   team-enrichment-report.service.ts # Aggregator behind GET /v1/admin/teams/ai-report
   bench-judge.ts                    # Standalone Nest bootstrap that re-judges every team in `bench_team_uid` (prod-data bench runner)
+  bench-judge-single.ts             # Single-team variant of bench-judge.ts (pass `BENCH_TEAM_UID=<uid>` to validate one team without burning the full bench)
   prod_data/                        # Imported prod data + compare.sql for the review-queue reduction bench
   team-enrichment-corroboration.spec.ts # Eval bench — pinned precision/recall on labelled corroboration fixtures
   team-enrichment-field-shape.util.spec.ts # Shape-validator coverage (placeholders + short legit handles)
