@@ -23,6 +23,8 @@ export enum EnrichmentSource {
   AI = 'ai',
   OpenGraph = 'open-graph',
   ScrapingDog = 'scrapingdog',
+  /** Pulled from a team-lead Member row whose value matches the team's identity. */
+  TeamLead = 'team-lead',
 }
 
 export enum JudgmentStatus {

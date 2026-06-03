@@ -15,6 +15,7 @@ import {
   WebsiteSignals,
 } from './team-enrichment.types';
 import { buildUsageEntry, formatUsageLog } from './team-enrichment-cost';
+import { AI_JUDGE_MAX_STEPS, AI_JUDGE_TEMPERATURE, truncateString } from './shared';
 
 const TEAM_ENRICHMENT_JUDGE_SYSTEM_PROMPT = `
 You are an independent quality-verification judge for AI-enriched venture fund / crypto team data.
@@ -30,6 +31,8 @@ For each field listed in the user prompt, decide:
 If a "ScrapingDog pre-verification" block confirms the team's LinkedIn identity, treat that as strong evidence the entity reference is correct — but still verify each individual field value on its own merits.
 
 URL fields (website, blog, contactMethod, social handles): do NOT mark a value as "disagrees" merely because it differs from another URL we already have on file (e.g. the LinkedIn-listed website). Companies routinely use alias domains, product subdomains, or rebrand without updating LinkedIn. Verify each URL on its own merits via web search; prefer "uncertain" when you cannot independently confirm or refute it.
+
+DESCRIPTION FIELDS (shortDescription, longDescription, moreDetails): paraphrasing, summarization, and reworded versions of the team's own LinkedIn / website description are expected and acceptable. The source of these fields is typically the team's own LinkedIn About text or website meta description — exact wording will not match other sources you find via web search. Verdict is "agrees" + "high" as long as the CORE FACTS (mission, products, founding info, team identity) align with what you can verify. Do NOT downgrade to "medium" solely because phrasing differs from what your web search returns — paraphrasing is not a defect.
 
 CONTACT EMAIL RULE: when contactMethod is an email like "user@DOMAIN" and the team's known website host equals DOMAIN (or the website is on a subdomain of DOMAIN), the email's domain corroborates the website host — both are self-declared signals from the team's own assets. The verdict is "agrees", NOT "disagrees" against a different LinkedIn-listed email. Apply the same logic when a "Cross-source signals from website extraction" block declares a contact email whose domain matches.
 
@@ -141,8 +144,8 @@ export class TeamEnrichmentJudgeAiService {
         system: TEAM_ENRICHMENT_JUDGE_SYSTEM_PROMPT,
         ...(Object.keys(tools).length > 0 && { tools }),
         prompt: userPrompt,
-        temperature: 0.1,
-        maxSteps: 3,
+        temperature: AI_JUDGE_TEMPERATURE,
+        maxSteps: AI_JUDGE_MAX_STEPS,
       });
 
       const durationMs = Date.now() - startedAt;
@@ -174,7 +177,7 @@ export class TeamEnrichmentJudgeAiService {
       const verdicts = this.mapToVerdicts(parsed, fields);
       return {
         verdicts,
-        overallAssessment: this.truncate(parsed.overallAssessment || '', TEAM_JUDGMENT_ASSESSMENT_MAX_LENGTH),
+        overallAssessment: truncateString(parsed.overallAssessment || '', TEAM_JUDGMENT_ASSESSMENT_MAX_LENGTH),
         ok: true,
         usage: usageEntry,
       };
@@ -347,7 +350,7 @@ Current Date: ${new Date().toISOString().split('T')[0]}
 
       const score = typeof raw.score === 'number' ? Math.max(0, Math.min(100, Math.round(raw.score))) : undefined;
       const rawNote = typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim() : undefined;
-      const note = rawNote ? this.truncate(rawNote, FIELD_JUDGMENT_NOTE_MAX_LENGTH) : undefined;
+      const note = rawNote ? truncateString(rawNote, FIELD_JUDGMENT_NOTE_MAX_LENGTH) : undefined;
 
       out[rawKey as FieldMetaKey] = {
         confidence,
@@ -376,11 +379,5 @@ Current Date: ${new Date().toISOString().split('T')[0]}
     if (v === 'disagrees') return JudgmentVerdict.Disagrees;
     if (v === 'uncertain') return JudgmentVerdict.Uncertain;
     return null;
-  }
-
-  private truncate(s: string, max: number): string {
-    if (!s) return s;
-    if (s.length <= max) return s;
-    return max > 3 ? s.substring(0, max - 3) + '...' : s.substring(0, max);
   }
 }

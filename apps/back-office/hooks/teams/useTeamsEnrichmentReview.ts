@@ -26,6 +26,18 @@ export type FieldEntry = {
     lastModifiedAt?: string;
   };
   judgment?: { note?: string; score?: number; verdict?: JudgmentVerdict; confidence?: JudgmentConfidence };
+  /**
+   * Opposite-side suggestion when it exists, differs from `content`, and
+   * is shape-valid. `fromSide: 'enrichment'` means it's the AI candidate
+   * (`content` is the user's value, status=ChangedByUser); `fromSide:
+   * 'team'` means it's the literal user-typed value (`content` is the AI
+   * candidate, status=Enriched after junk-override). Lets the UI render
+   * both side-by-side so the admin can Apply the alternative.
+   */
+  alternative?: {
+    content: string | string[];
+    fromSide: 'team' | 'enrichment';
+  };
 };
 
 export type LogoEntry = FieldEntry & {

@@ -7,6 +7,18 @@ import {
   JudgmentVerdict,
   NameMatchTier,
 } from './team-enrichment.types';
+import {
+  ABOUT_SENTENCE_OVERLAP_RATIO,
+  hostFirstLabelMatchesTeamName,
+  makeJudgment,
+  namesShareSubstantiveToken,
+  normalizeHost,
+  SCRAPINGDOG_TIMEOUT_MS,
+  sentenceOverlap,
+  TAGLINE_LEVENSHTEIN_RATIO,
+  textsOverlap,
+  validateHttpUrl,
+} from './shared';
 
 export interface ScrapingDogCompanyProfile {
   universalNameId: string | null;
@@ -22,10 +34,66 @@ export interface ScrapingDogCompanyProfile {
   linkedinInternalId: string | null;
 }
 
+/**
+ * Normalized X/Twitter profile data from ScrapingDog's `/x/profile?parsed=true`.
+ * X's `verified_type === "Business" | "Government"` is captured as a
+ * corroborating identity signal (X manually verifies those tiers).
+ */
+export interface ScrapingDogTwitterProfile {
+  username: string | null;
+  name: string | null;
+  description: string | null;
+  website: string | null;
+  userId: string | null;
+  isVerifiedOrg: boolean;
+  verifiedType: string | null;
+}
+
 export type FetchCompanyProfileResult =
   | { kind: 'ok'; profile: ScrapingDogCompanyProfile }
   | { kind: 'not-found' }
   | { kind: 'error'; reason: string };
+
+export type FetchTwitterProfileResult =
+  | { kind: 'ok'; profile: ScrapingDogTwitterProfile }
+  | { kind: 'not-found' }
+  | { kind: 'error'; reason: string };
+
+/**
+ * Three-anchor identity check on an X/Twitter profile. Pure; returns the set
+ * of anchors that fired. A single strong anchor (website host match) suffices
+ * because both sides are independently-controlled team assets. The two weaker
+ * anchors (X verification + name overlap, or handle prefix-match + name
+ * overlap) require two converging signals.
+ */
+export function verifyTwitterProfileMatchesTeam(
+  team: { name: string; website: string | null | undefined },
+  profile: ScrapingDogTwitterProfile
+): { verified: boolean; anchors: string[] } {
+  const anchors: string[] = [];
+
+  const teamHost = normalizeHost(team.website ?? null);
+  const profileHost = normalizeHost(profile.website);
+  if (teamHost && profileHost && teamHost === profileHost) {
+    anchors.push('website host match');
+    return { verified: true, anchors };
+  }
+
+  const nameMatches = !!profile.name && namesShareSubstantiveToken(team.name, profile.name);
+  if (nameMatches) anchors.push('name match');
+
+  if (nameMatches && profile.isVerifiedOrg) {
+    anchors.push('x verified org');
+    return { verified: true, anchors };
+  }
+
+  if (nameMatches && profile.username && hostFirstLabelMatchesTeamName(team.name, profile.username)) {
+    anchors.push('handle prefix match');
+    return { verified: true, anchors };
+  }
+
+  return { verified: false, anchors };
+}
 
 export interface TeamSnapshotForCompare {
   name: string;
@@ -41,7 +109,7 @@ export interface TeamSnapshotForCompare {
 export class TeamEnrichmentScrapingDogService {
   private readonly logger = new Logger(TeamEnrichmentScrapingDogService.name);
   private static readonly API_URL = 'https://api.scrapingdog.com/profile';
-  private static readonly TIMEOUT_MS = 15000;
+  private static readonly X_API_URL = 'https://api.scrapingdog.com/x/profile';
 
   isConfigured(): boolean {
     return Boolean(process.env.SCRAPINGDOG_API_KEY);
@@ -66,7 +134,7 @@ export class TeamEnrichmentScrapingDogService {
     url.searchParams.set('type', 'company');
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TeamEnrichmentScrapingDogService.TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), SCRAPINGDOG_TIMEOUT_MS);
 
     try {
       const response = await fetch(url.toString(), {
@@ -101,9 +169,8 @@ export class TeamEnrichmentScrapingDogService {
 
       const profile = this.normalize(raw as Record<string, unknown>);
 
-      // Defensive: if ScrapingDog returned 200 with an empty company shell (no name or id),
-      // treat as not-found rather than ok. Preserves the original callers' ability to trust
-      // classifyNameMatch on an 'ok' response.
+      // Defensive: 200 with an empty company shell (no name/id) is "not found"
+      // for our purposes — preserves classifyNameMatch's ability to trust 'ok'.
       if (!profile.companyName && !profile.universalNameId) {
         this.logger.warn(
           `ScrapingDog returned profile with no company_name/universal_name_id for id "${id}", treating as not-found`
@@ -121,7 +188,83 @@ export class TeamEnrichmentScrapingDogService {
     }
   }
 
-  /** Classifies how well the ScrapingDog profile name matches the team name. */
+  async fetchTwitterProfile(handle: string): Promise<FetchTwitterProfileResult> {
+    const apiKey = process.env.SCRAPINGDOG_API_KEY;
+    if (!apiKey) {
+      this.logger.debug('SCRAPINGDOG_API_KEY not set, skipping ScrapingDog X profile fetch');
+      return { kind: 'error', reason: 'api key not configured' };
+    }
+
+    const id = this.extractTwitterHandle(handle);
+    if (!id) {
+      this.logger.warn(`Could not extract Twitter/X handle from: "${handle}"`);
+      return { kind: 'error', reason: 'could not extract handle id' };
+    }
+
+    const url = new URL(TeamEnrichmentScrapingDogService.X_API_URL);
+    url.searchParams.set('api_key', apiKey);
+    url.searchParams.set('profileId', id);
+    url.searchParams.set('parsed', 'true');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), SCRAPINGDOG_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        signal: controller.signal,
+        headers: { 'User-Agent': 'PLNEnrichment/1.0' },
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`ScrapingDog X returned HTTP ${response.status} for handle "${id}"`);
+        return { kind: 'error', reason: `HTTP ${response.status}` };
+      }
+
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch (parseError) {
+        this.logger.warn(`ScrapingDog X returned malformed JSON for handle "${id}": ${parseError.message}`);
+        return { kind: 'error', reason: 'malformed json' };
+      }
+
+      const raw = Array.isArray(body) ? (body[0] as unknown) : body;
+      if (!raw || typeof raw !== 'object') {
+        this.logger.warn(`ScrapingDog X returned empty/invalid payload for handle "${id}"`);
+        return { kind: 'error', reason: 'empty or invalid payload' };
+      }
+
+      if (this.isNotFoundBody(raw)) {
+        this.logger.warn(`ScrapingDog X reports profile not found for handle "${id}"`);
+        return { kind: 'not-found' };
+      }
+
+      // X endpoint nests data under `profile`. Defensive: also accept the
+      // top-level shape in case the API ever flattens it.
+      const r = raw as Record<string, unknown>;
+      const profileBlock =
+        r.profile && typeof r.profile === 'object' ? (r.profile as Record<string, unknown>) : r;
+
+      const profile = this.normalizeTwitterProfile(profileBlock);
+
+      if (!profile.username && !profile.userId) {
+        this.logger.warn(
+          `ScrapingDog X returned profile with no username/user_id for handle "${id}", treating as not-found`
+        );
+        return { kind: 'not-found' };
+      }
+
+      return { kind: 'ok', profile };
+    } catch (error) {
+      const reason = error?.name === 'AbortError' ? 'timeout' : error?.message || 'unknown error';
+      this.logger.warn(`ScrapingDog X fetch failed for handle "${id}": ${reason}`);
+      return { kind: 'error', reason };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   classifyNameMatch(teamName: string, profile: ScrapingDogCompanyProfile): NameMatchTier {
     const needle = this.normalizeName(teamName);
     const candidates = [profile.companyName, profile.universalNameId]
@@ -134,12 +277,15 @@ export class TeamEnrichmentScrapingDogService {
   }
 
   /**
-   * Deterministic field-by-field comparisons between a team's current enriched values and the
-   * ScrapingDog LinkedIn profile. Returns verdicts keyed by FieldMetaKey. Used by both the judge
-   * (Stage 1) and the enrichment-time confidence upgrade.
+   * Deterministic field comparisons between a team's current values and the
+   * ScrapingDog LinkedIn profile. When nameMatch === 'partial', a high verdict
+   * is downshifted to medium unless the website host also corroborates —
+   * partial-name-match alone doesn't establish identity.
    *
-   * When nameMatch === 'partial', any 'high' verdict is downshifted to 'medium' to reflect the
-   * reduced identity confidence.
+   * When the website host matches on both sides, `agrees + medium` verdicts
+   * from fuzzy text-overlap comparators are lifted to `agrees + high` (the
+   * identity is double-corroborated, so the comparator becomes the verification
+   * rather than the identity proof).
    */
   compareProfileToTeam(
     team: TeamSnapshotForCompare,
@@ -148,50 +294,63 @@ export class TeamEnrichmentScrapingDogService {
   ): Partial<Record<FieldMetaKey, FieldJudgment>> {
     if (nameMatch === 'none') return {};
 
+    const teamHost = team.website ? normalizeHost(team.website) : null;
+    const profileHost = profile.website ? normalizeHost(profile.website) : null;
+    const websiteCorroborates = !!teamHost && !!profileHost && teamHost === profileHost;
+
     const result: Partial<Record<FieldMetaKey, FieldJudgment>> = {};
-    const mkJudgment = (
+    const mkVerdict = (
       confidence: FieldConfidence,
       verdict: JudgmentVerdict,
       score: number,
       note: string
-    ): FieldJudgment => ({
-      confidence: nameMatch === 'partial' && confidence === FieldConfidence.High ? FieldConfidence.Medium : confidence,
-      score,
-      verdict,
-      note,
-      judgedVia: JudgmentSource.ScrapingDog,
-    });
+    ): FieldJudgment => {
+      let finalConfidence = confidence;
+      // Partial-name-match downshift: demote High to Medium unless the website
+      // host corroborates (ARIA case: team "ARIA" ↔ profile "Advanced Research
+      // + Invention Agency (ARIA)" with shared website `aria.org.uk`).
+      if (
+        nameMatch === 'partial' &&
+        finalConfidence === FieldConfidence.High &&
+        !websiteCorroborates
+      ) {
+        finalConfidence = FieldConfidence.Medium;
+      }
+      // Website-corroborated upshift: fuzzy text-overlap comparators start at
+      // Medium even on a clean match; the website anchor lifts identity-
+      // verified data to High.
+      if (
+        websiteCorroborates &&
+        verdict === JudgmentVerdict.Agrees &&
+        finalConfidence === FieldConfidence.Medium
+      ) {
+        finalConfidence = FieldConfidence.High;
+      }
+      return makeJudgment(finalConfidence, verdict, score, note, JudgmentSource.ScrapingDog);
+    };
 
-    // website — intentionally not judged here. A LinkedIn-vs-team URL host comparison is too
-    // noisy: LinkedIn often lists an outdated, aliased, or product-subdomain URL even when the
-    // team's website is correct. The AI judge (Stage 2) can verify the website with web search instead.
+    // website — NOT judged here. LinkedIn often lists an outdated, aliased,
+    // or product-subdomain URL even when the team's website is correct. The
+    // AI judge (Stage 2) verifies website with web search instead.
 
-    // linkedinHandler — corroborated by company_name match (and optionally website host).
-    // The actual identity signal is that ScrapingDog returned a profile whose `company_name` matches the team.
-    // Website host equality is a strong corroborating signal when both sides declare a website.
     if (team.linkedinHandler && profile.companyName) {
-      const websiteCorroborates =
-        !!team.website && !!profile.website && this.extractHost(team.website) === this.extractHost(profile.website);
-
       if (nameMatch === 'exact') {
-        result.linkedinHandler = mkJudgment(
+        result.linkedinHandler = mkVerdict(
           FieldConfidence.High,
           JudgmentVerdict.Agrees,
           websiteCorroborates ? 100 : 95,
           websiteCorroborates ? 'name match and website' : 'name match'
         );
       } else {
-        // nameMatch === 'partial'. A partial-only match (e.g. "Acme Inc" vs "Acme BV")
-        // is too risky to mark as Agrees on its own — surface it for review.
         if (websiteCorroborates) {
-          result.linkedinHandler = mkJudgment(
+          result.linkedinHandler = mkVerdict(
             FieldConfidence.High,
             JudgmentVerdict.Agrees,
             90,
             'name match partial and website'
           );
         } else {
-          result.linkedinHandler = mkJudgment(
+          result.linkedinHandler = mkVerdict(
             FieldConfidence.Medium,
             JudgmentVerdict.Uncertain,
             55,
@@ -201,25 +360,22 @@ export class TeamEnrichmentScrapingDogService {
       }
     }
 
-    // shortDescription — tagline overlap
     if (team.shortDescription && profile.tagline) {
-      if (this.textsOverlap(team.shortDescription, profile.tagline, 0.2)) {
-        result.shortDescription = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'tagline overlap');
+      if (textsOverlap(team.shortDescription, profile.tagline, TAGLINE_LEVENSHTEIN_RATIO)) {
+        result.shortDescription = mkVerdict(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'tagline overlap');
       } else {
-        result.shortDescription = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'tagline differs');
+        result.shortDescription = mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'tagline differs');
       }
     }
 
-    // longDescription — about sentence overlap
     if (team.longDescription && profile.about) {
-      if (this.sentenceOverlap(team.longDescription, profile.about, 0.4)) {
-        result.longDescription = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'about overlap');
+      if (sentenceOverlap(team.longDescription, profile.about, ABOUT_SENTENCE_OVERLAP_RATIO)) {
+        result.longDescription = mkVerdict(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'about overlap');
       } else {
-        result.longDescription = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'about low overlap');
+        result.longDescription = mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'about low overlap');
       }
     }
 
-    // industryTags — set intersection with industries + specialties
     if (team.industryTags && team.industryTags.length > 0) {
       const linkedinTags = [...profile.industries, ...profile.specialties]
         .map((t) => t.trim().toLowerCase())
@@ -228,22 +384,21 @@ export class TeamEnrichmentScrapingDogService {
         const teamTagsLower = team.industryTags.map((t) => t.title.toLowerCase());
         const overlap = teamTagsLower.some((t) => linkedinTags.some((l) => l.includes(t) || t.includes(l)));
         if (overlap) {
-          result.industryTags = mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 80, 'tags overlap');
+          result.industryTags = mkVerdict(FieldConfidence.High, JudgmentVerdict.Agrees, 80, 'tags overlap');
         } else {
-          result.industryTags = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 45, 'tags no overlap');
+          result.industryTags = mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 45, 'tags no overlap');
         }
       }
     }
 
-    // moreDetails — contains founded year or HQ city
     if (team.moreDetails && (profile.founded || profile.headquarters)) {
       const text = team.moreDetails.toLowerCase();
       const foundedHit = !!profile.founded && text.includes(profile.founded.toLowerCase());
       const hqHit = !!profile.headquarters && this.extractCity(profile.headquarters).some((c) => text.includes(c));
       if (foundedHit || hqHit) {
-        result.moreDetails = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Agrees, 70, 'details match');
+        result.moreDetails = mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Agrees, 70, 'details match');
       } else {
-        result.moreDetails = mkJudgment(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'details no match');
+        result.moreDetails = mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'details no match');
       }
     }
 
@@ -254,17 +409,35 @@ export class TeamEnrichmentScrapingDogService {
     if (!handler) return null;
     const trimmed = handler.trim();
     if (!trimmed) return null;
-    // Full or partial LinkedIn URL — only accept company paths.
     if (/linkedin\.com\//i.test(trimmed)) {
       const m = trimmed.match(/linkedin\.com\/company\/([a-zA-Z0-9_.-]+)/i);
       return m ? m[1].replace(/\/+$/, '') : null;
     }
-    // Otherwise treat as a bare handle (optionally prefixed with `company/`), stripping query/path.
     const cleaned = trimmed
       .replace(/^company\//i, '')
       .replace(/[\/?#].*$/, '')
       .trim();
     return /^[a-zA-Z0-9_.-]+$/.test(cleaned) ? cleaned : null;
+  }
+
+  /**
+   * Normalizes a `twitterHandler` value into the bare username form expected
+   * by ScrapingDog's X profile endpoint. Returns null when the input doesn't
+   * pass X's username shape (1-15 alphanumeric + underscore).
+   */
+  private extractTwitterHandle(handler: string): string | null {
+    if (!handler) return null;
+    const trimmed = handler.trim();
+    if (!trimmed) return null;
+    if (/(?:twitter|x)\.com\//i.test(trimmed)) {
+      const m = trimmed.match(/(?:twitter|x)\.com\/([A-Za-z0-9_]+)/i);
+      return m && /^[A-Za-z0-9_]{1,15}$/.test(m[1]) ? m[1] : null;
+    }
+    const cleaned = trimmed
+      .replace(/^@/, '')
+      .replace(/[\/?#].*$/, '')
+      .trim();
+    return /^[A-Za-z0-9_]{1,15}$/.test(cleaned) ? cleaned : null;
   }
 
   private isNotFoundBody(raw: unknown): boolean {
@@ -283,65 +456,6 @@ export class TeamEnrichmentScrapingDogService {
       .replace(/[^a-z0-9\s]/g, '')
       .replace(/\s+/g, ' ')
       .trim();
-  }
-
-  /**
-   * Normalizes a URL to a comparable host string (strips `www.`, lowercases).
-   * Public so the judge can match a probe's redirect-final host against the same
-   * normalization the deterministic comparator uses.
-   */
-  extractHost(url: string): string | null {
-    try {
-      const parsed = new URL(url);
-      return parsed.host.replace(/^www\./, '').toLowerCase();
-    } catch {
-      return null;
-    }
-  }
-
-  private textsOverlap(a: string, b: string, levenshteinRatio: number): boolean {
-    const an = a.toLowerCase().replace(/\s+/g, ' ').trim();
-    const bn = b.toLowerCase().replace(/\s+/g, ' ').trim();
-    if (!an || !bn) return false;
-    if (an.includes(bn) || bn.includes(an)) return true;
-    const longer = an.length >= bn.length ? an : bn;
-    const shorter = an.length >= bn.length ? bn : an;
-    const distance = this.levenshtein(longer, shorter);
-    const maxAllowed = Math.ceil(longer.length * levenshteinRatio);
-    return distance <= maxAllowed;
-  }
-
-  private sentenceOverlap(a: string, b: string, threshold: number): boolean {
-    const split = (s: string) =>
-      s
-        .split(/[.!?]\s+/)
-        .map((p) => p.replace(/\s+/g, ' ').trim().toLowerCase())
-        .filter((p) => p.length >= 12);
-    const aParts = split(a);
-    const bParts = split(b);
-    if (aParts.length === 0 || bParts.length === 0) return false;
-    const shorter = aParts.length <= bParts.length ? aParts : bParts;
-    const longer = aParts.length <= bParts.length ? bParts : aParts;
-    const longerText = longer.join(' ');
-    const hits = shorter.filter((s) => longerText.includes(s)).length;
-    return hits / shorter.length >= threshold;
-  }
-
-  private levenshtein(a: string, b: string): number {
-    if (a === b) return 0;
-    if (!a.length) return b.length;
-    if (!b.length) return a.length;
-    const prev = new Array(b.length + 1).fill(0).map((_, i) => i);
-    const curr = new Array(b.length + 1).fill(0);
-    for (let i = 1; i <= a.length; i++) {
-      curr[0] = i;
-      for (let j = 1; j <= b.length; j++) {
-        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-        curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
-      }
-      for (let j = 0; j <= b.length; j++) prev[j] = curr[j];
-    }
-    return prev[b.length];
   }
 
   private extractCity(headquarters: string): string[] {
@@ -369,8 +483,8 @@ export class TeamEnrichmentScrapingDogService {
     return {
       universalNameId: nonEmpty(raw.universal_name_id),
       companyName: nonEmpty(raw.company_name),
-      profilePhoto: this.validateUrl(raw.profile_photo),
-      website: this.validateUrl(raw.website),
+      profilePhoto: validateHttpUrl(raw.profile_photo),
+      website: validateHttpUrl(raw.website),
       tagline: nonEmpty(raw.tagline),
       about: nonEmpty(raw.about),
       industries: splitList(raw.industries ?? raw.industry),
@@ -381,14 +495,31 @@ export class TeamEnrichmentScrapingDogService {
     };
   }
 
-  private validateUrl(url: unknown): string | null {
-    if (typeof url !== 'string' || !url.trim()) return null;
-    try {
-      const parsed = new URL(url.trim());
-      if (!['http:', 'https:'].includes(parsed.protocol)) return null;
-      return parsed.toString();
-    } catch {
-      return null;
-    }
+  /**
+   * Normalizes ScrapingDog's parsed X profile body. `verified_type` of
+   * `"Business"` or `"Government"` flips `isVerifiedOrg` true — X manually
+   * verifies those tiers, so they're a usable corroborating identity signal
+   * (the boolean `verified` field is meaningful only on legacy blue-checks).
+   */
+  private normalizeTwitterProfile(raw: Record<string, unknown>): ScrapingDogTwitterProfile {
+    const nonEmpty = (value: unknown): string | null => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const rawUsername = nonEmpty(raw.username);
+    const cleanedUsername = rawUsername ? rawUsername.replace(/^@/, '').toLowerCase() : null;
+    const verifiedType = nonEmpty(raw.verified_type);
+
+    return {
+      username: cleanedUsername,
+      name: nonEmpty(raw.name),
+      description: nonEmpty(raw.description),
+      website: validateHttpUrl(raw.website),
+      userId: nonEmpty(raw.user_id),
+      verifiedType,
+      isVerifiedOrg: verifiedType?.toLowerCase() === 'business' || verifiedType?.toLowerCase() === 'government',
+    };
   }
 }

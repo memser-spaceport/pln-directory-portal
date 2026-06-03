@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
@@ -8,6 +8,21 @@ import { buildPromotionPayload, executePromotion } from './team-enrichment-promo
 import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
 import { CorroborationFieldInput, runCorroboration } from './team-enrichment-corroboration';
 import { computeTeamQuality } from './team-enrichment-quality';
+import { BROWSER_REQUEST_HEADERS } from './team-enrichment-http.util';
+import { isLikelyValueForField } from './team-enrichment-field-shape.util';
+import {
+  BOT_BLOCK_STATUS_CODES,
+  expandLinkedinHandleVariants,
+  isAgreesHigh,
+  JUDGABLE_FIELD_KEYS,
+  needsManualReview,
+  normalizeHost,
+  normalizeTelegramHandle,
+  normalizeTwitterHandle,
+  TEAM_ENRICHMENT_STUCK_TTL_MINUTES_DEFAULT,
+  USER_JUDGABLE_FIELD_KEYS,
+  WEBSITE_PROBE_TIMEOUT_MS,
+} from './shared';
 import {
   AIUsageEntry,
   EnrichmentStatus,
@@ -43,6 +58,21 @@ type TeamRecord = {
   moreDetails: string | null;
   industryTags: Array<{ title: string }>;
   investorProfile: { uid: string; investmentFocus: string[] } | null;
+  /**
+   * Team leads + role-tagged founders, used by the founder-contact cross-reference
+   * rule (Stage 1.5) to validate `contactMethod` against a known founder's email /
+   * social handle. Filtered at query time so we don't pull every team member.
+   */
+  teamMemberRoles: Array<{
+    teamLead: boolean;
+    role: string | null;
+    member: {
+      email: string | null;
+      twitterHandler: string | null;
+      linkedinHandler: string | null;
+      telegramHandler: string | null;
+    };
+  }>;
   teamEnrichment: TeamEnrichmentSnapshot | null;
 };
 
@@ -68,37 +98,6 @@ type FieldsMetaMap = Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
 export type JudgeTeamResult =
   | { status: 'started' | 'already_judged' | 'in_progress' | 'not_found' | 'not_eligible' };
 
-const JUDGABLE_FIELD_KEYS: FieldMetaKey[] = [
-  'website',
-  'blog',
-  'contactMethod',
-  'twitterHandler',
-  'linkedinHandler',
-  'telegramHandler',
-  'shortDescription',
-  'longDescription',
-  'moreDetails',
-  'industryTags',
-  'investmentFocus',
-];
-
-const USER_JUDGABLE_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey>([
-  'website',
-  'blog',
-  'contactMethod',
-  'twitterHandler',
-  'linkedinHandler',
-  'telegramHandler',
-]);
-
-const URL_REQUIRED_FIELD_KEYS: ReadonlySet<FieldMetaKey> = new Set<FieldMetaKey>(['website', 'blog']);
-
-const urlSchema = z.string().url();
-
-function isValidUrl(value: string): boolean {
-  return urlSchema.safeParse(value.trim()).success;
-}
-
 const TEAM_RECORD_SELECT = {
   uid: true,
   name: true,
@@ -113,6 +112,31 @@ const TEAM_RECORD_SELECT = {
   moreDetails: true,
   industryTags: { select: { title: true } },
   investorProfile: { select: { uid: true, investmentFocus: true } },
+  // Filter at the DB layer: only team leads or members whose role string
+  // mentions "founder". Avoids pulling every member for teams with large rosters.
+  teamMemberRoles: {
+    // `as Prisma.TeamMemberRoleWhereInput[]` so the surrounding `as const` on
+    // TEAM_RECORD_SELECT doesn't make this tuple readonly (Prisma rejects
+    // readonly arrays for `OR`).
+    where: {
+      OR: [
+        { teamLead: true },
+        { role: { contains: 'founder', mode: 'insensitive' } },
+      ] as Prisma.TeamMemberRoleWhereInput[],
+    },
+    select: {
+      teamLead: true,
+      role: true,
+      member: {
+        select: {
+          email: true,
+          twitterHandler: true,
+          linkedinHandler: true,
+          telegramHandler: true,
+        },
+      },
+    },
+  },
   teamEnrichment: {
     select: {
       website: true,
@@ -200,7 +224,7 @@ export class TeamEnrichmentJudgeService {
   private getStuckTtlMinutes(): number {
     const raw = process.env.TEAM_ENRICHMENT_STUCK_TTL_MINUTES?.trim();
     const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : 180;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : TEAM_ENRICHMENT_STUCK_TTL_MINUTES_DEFAULT;
   }
 
   async judgeTeam(teamUid: string, judgedBy = 'system-cron'): Promise<JudgeTeamResult> {
@@ -281,10 +305,12 @@ export class TeamEnrichmentJudgeService {
   }
 
   /**
-   * Two-stage pipeline:
-   * Stage 1 — ScrapingDog LinkedIn verification (deterministic, no LLM).
-   * Stage 2 — AI judge for fields Stage 1 couldn't resolve.
-   * After judgment, fields with high-confidence verdict are promoted to Team.
+   * Three-stage pipeline driven by the verification ladder (cheap → expensive):
+   *   Stage 1   — ScrapingDog LinkedIn match (deterministic API, no LLM).
+   *   Stage 1.5 — Deterministic cross-source corroboration (pure functions).
+   *   Stage 2   — AI judge for fields the cheaper stages couldn't resolve.
+   * Fields verified at agrees+high are promoted to Team in a single tx.
+   * See team-enrichment-judge-pipeline.ts for the typed rule-registry view.
    */
   private async runJudgmentPipeline(
     team: TeamRecord,
@@ -297,6 +323,19 @@ export class TeamEnrichmentJudgeService {
     try {
       let stage1Verdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = {};
       let scrapingDogMeta: TeamJudgment['scrapingDog'] | undefined;
+
+      // Probe runs unconditionally so the AI judge doesn't have to guess at
+      // reachability when ScrapingDog 403s or the team has no LinkedIn handle.
+      let websiteReachable: boolean | null = null;
+      let websiteFinalHost: string | null = null;
+      const websiteToProbe = this.preferEnrichmentValue(team, 'website');
+      if (websiteToProbe && this.hasJudgableValue(team, 'website')) {
+        const probe = await this.probeWebsiteReachable(websiteToProbe);
+        if (probe) {
+          websiteReachable = probe.reachable;
+          websiteFinalHost = probe.finalHost;
+        }
+      }
 
       if (this.scrapingDogService.isConfigured() && team.linkedinHandler) {
         const result = await this.scrapingDogService.fetchCompanyProfile(team.linkedinHandler);
@@ -316,9 +355,8 @@ export class TeamEnrichmentJudgeService {
         } else {
           const profile = result.profile;
           const nameMatch = this.scrapingDogService.classifyNameMatch(team.name, profile);
-          // Snapshot what the judge is about to verify: Team for user-supplied values, TeamEnrichment
-          // for AI candidates. compareProfileToTeam is fed the right value per field via the
-          // readFieldValue / judgeable-value path.
+          // Snapshot the candidate side per field: Team for ChangedByUser,
+          // TeamEnrichment for Enriched. Same selection rule as readFieldValue.
           const teamSnapshot = {
             name: team.name,
             website: this.preferEnrichmentValue(team, 'website'),
@@ -334,17 +372,6 @@ export class TeamEnrichmentJudgeService {
               if (!judgableKeys.includes(k as FieldMetaKey)) {
                 delete stage1Verdicts[k as FieldMetaKey];
               }
-            }
-          }
-
-          let websiteReachable: boolean | null = null;
-          let websiteFinalHost: string | null = null;
-          const websiteToProbe = this.preferEnrichmentValue(team, 'website');
-          if (websiteToProbe && this.hasJudgableValue(team, 'website')) {
-            const probe = await this.probeWebsiteReachable(websiteToProbe);
-            if (probe) {
-              websiteReachable = probe.reachable;
-              websiteFinalHost = probe.finalHost;
             }
           }
 
@@ -365,20 +392,41 @@ export class TeamEnrichmentJudgeService {
         }
       }
 
-      // Stage 1.5 — deterministic cross-field corroboration (no LLM, no network).
-      // Runs against the same set of judgable keys, using the second-source signals
-      // we extracted from the team's own website during enrichment + the ScrapingDog
-      // profile from Stage 1. Verdicts that fire at `agrees + high` short-circuit the
-      // AI judge and promote the value, exactly like Stage 1 already does.
-      const stage15Verdicts = this.runStage15(team, existingMeta, judgableKeys, scrapingDogMeta);
+      const stage15Verdicts = this.runStage15(
+        team,
+        existingMeta,
+        judgableKeys,
+        scrapingDogMeta,
+        websiteReachable
+      );
 
-      // Stage 1.5 verdicts merge into stage1 before the resolved set is computed, so any
-      // corroborated field skips Stage 2. Stage 1 takes precedence on overlap (e.g. it
-      // already produces a linkedinHandler verdict from the ScrapingDog comparator).
-      const mergedStage1Verdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = {
-        ...stage15Verdicts,
-        ...stage1Verdicts,
-      };
+      // Stage 1.5 and Stage 1 verdicts merge before the resolved set is computed.
+      // The merge is **confidence-aware** rather than positional:
+      //   - When BOTH stages produce a verdict for the same field, keep the
+      //     `agrees+high` one. If both are `agrees+high`, Stage 1 wins (its
+      //     comparator carries the LinkedIn-internal identity proof and a
+      //     more specific note like `name match and website`).
+      //   - When only one stage produced a verdict, that one is used.
+      //
+      // Why this matters: when Stage 1.5's `source-trust` rule has already
+      // accepted a field at `agrees+high` (e.g. ScrapingDog filled
+      // `moreDetails` at enrichment-time → high-confidence linkedin source),
+      // Stage 1's fuzzy `compareProfileToTeam` then re-derives the same
+      // verdict but often at a weaker tier (text-overlap heuristics produce
+      // `agrees+medium` or `uncertain+medium`). Letting Stage 1 unconditionally
+      // overwrite Stage 1.5 silently demoted those auto-promotable fields and
+      // flooded the review queue (bench v2 vs v1 regression: moreDetails
+      // auto-rate dropped from 47% → 16%, linkedinHandler 97% → 73%).
+      const mergedStage1Verdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = { ...stage15Verdicts };
+      for (const [key, stage1Verdict] of Object.entries(stage1Verdicts) as Array<
+        [FieldMetaKey, FieldJudgment | undefined]
+      >) {
+        if (!stage1Verdict) continue;
+        const existing = mergedStage1Verdicts[key];
+        // Preserve Stage 1.5's agrees+high when Stage 1 is anything weaker.
+        if (isAgreesHigh(existing) && !isAgreesHigh(stage1Verdict)) continue;
+        mergedStage1Verdicts[key] = stage1Verdict;
+      }
 
       const stage1Resolved = new Set<FieldMetaKey>();
       for (const [k, v] of Object.entries(mergedStage1Verdicts)) {
@@ -406,8 +454,8 @@ export class TeamEnrichmentJudgeService {
           linkedinHandler: team.linkedinHandler,
           twitterHandler: team.twitterHandler,
           telegramHandler: team.telegramHandler,
-          websiteReachable: scrapingDogMeta?.websiteReachable ?? null,
-          websiteFinalHost: scrapingDogMeta?.websiteFinalHost ?? null,
+          websiteReachable,
+          websiteFinalHost,
           scrapingDog: scrapingDogMeta,
           websiteSignals: existingMeta.websiteSignals ?? null,
           corroboratedFields: Object.keys(mergedStage1Verdicts).filter(
@@ -467,7 +515,7 @@ export class TeamEnrichmentJudgeService {
           ...current,
           judgment: verdict,
         };
-        if (this.needsManualReview(verdict)) fieldsForReview.push(key);
+        if (needsManualReview(verdict)) fieldsForReview.push(key);
       }
 
       const quality = computeTeamQuality({
@@ -578,13 +626,25 @@ export class TeamEnrichmentJudgeService {
     team: TeamRecord,
     existingMeta: TeamDataEnrichment,
     judgableKeys: FieldMetaKey[],
-    scrapingDogMeta: TeamJudgment['scrapingDog'] | undefined
+    scrapingDogMeta: TeamJudgment['scrapingDog'] | undefined,
+    websiteReachable: boolean | null
   ): Partial<Record<FieldMetaKey, FieldJudgment>> {
     const inputs: CorroborationFieldInput[] = [];
+    const fieldsMeta = existingMeta.fieldsMeta ?? {};
     for (const key of judgableKeys) {
       const value = this.readFieldValue(team, key);
       if (value === null || (Array.isArray(value) && value.length === 0)) continue;
-      inputs.push({ field: key, value });
+      // Pass per-field provenance so the source-trust rule can fire on values
+      // that were filled at enrichment-time by ScrapingDog or the website
+      // signal extractor at high confidence.
+      const meta = fieldsMeta[key];
+      inputs.push({
+        field: key,
+        value,
+        source: meta?.source,
+        enrichmentConfidence: meta?.confidence,
+        isUserOwned: meta?.status === FieldEnrichmentStatus.ChangedByUser,
+      });
     }
 
     // ScrapingDog profile is rebuilt from the meta block for the corroboration rule that
@@ -592,14 +652,65 @@ export class TeamEnrichmentJudgeService {
     // host-match anchor relies only on profile.website (which the meta doesn't carry) so
     // we leave that anchor inactive in Stage 1.5 — it's already covered by Stage 1's
     // compareProfileToTeam (websiteCorroborates) for linkedinHandler.
+    // websiteReachable now comes from the unconditional probe (not scrapingDogMeta),
+    // so corroborateWebsite gets a real signal even when ScrapingDog Stage 1 was skipped.
     return runCorroboration(inputs, {
       teamName: team.name,
       website: this.preferEnrichmentValue(team, 'website'),
-      websiteReachable: scrapingDogMeta?.websiteReachable ?? null,
+      websiteReachable,
       websiteSignals: existingMeta.websiteSignals ?? null,
       scrapingDogProfile: null,
       scrapingDogNameMatch: scrapingDogMeta?.nameMatch ?? null,
+      teamLeadContacts: this.collectLeadContacts(team),
+      // The team's other on-file channels. Used by the contactMethod rule to
+      // recognize self-declared duplicates (same URL set as both
+      // `contactMethod` and `telegramHandler` / `twitterHandler` / ...).
+      // Reads the candidate side per field — for a ChangedByUser field
+      // that's `Team`, for Enriched it's `TeamEnrichment`. Matches what the
+      // judge is currently considering as truth for the other fields.
+      teamOwnedChannels: {
+        twitterHandler: this.preferEnrichmentValue(team, 'twitterHandler'),
+        telegramHandler: this.preferEnrichmentValue(team, 'telegramHandler'),
+        linkedinHandler: this.preferEnrichmentValue(team, 'linkedinHandler'),
+        blog: this.preferEnrichmentValue(team, 'blog'),
+      },
     });
+  }
+
+  /**
+   * Extracts and normalizes contact info for the team's leads / founders.
+   * Result is consumed by the founder-contact cross-reference rule on
+   * `contactMethod`. All values lowercased, no `@`, no URL prefix.
+   */
+  private collectLeadContacts(team: TeamRecord): {
+    emails: string[];
+    twitter: string[];
+    telegram: string[];
+    linkedin: string[];
+  } {
+    const emails = new Set<string>();
+    const twitter = new Set<string>();
+    const telegram = new Set<string>();
+    const linkedin = new Set<string>();
+
+    for (const role of team.teamMemberRoles ?? []) {
+      const m = role.member;
+      if (m.email) emails.add(m.email.trim().toLowerCase());
+      if (m.twitterHandler) twitter.add(normalizeTwitterHandle(m.twitterHandler));
+      if (m.telegramHandler) telegram.add(normalizeTelegramHandle(m.telegramHandler));
+      if (m.linkedinHandler) {
+        for (const variant of expandLinkedinHandleVariants(m.linkedinHandler)) {
+          linkedin.add(variant);
+        }
+      }
+    }
+
+    return {
+      emails: [...emails].filter(Boolean),
+      twitter: [...twitter].filter(Boolean),
+      telegram: [...telegram].filter(Boolean),
+      linkedin: [...linkedin].filter(Boolean),
+    };
   }
 
   /** Snapshot of every judgable field value for the quality scorer. */
@@ -617,8 +728,10 @@ export class TeamEnrichmentJudgeService {
     if (Array.isArray(value)) return value.length > 0;
     const trimmed = value.trim();
     if (!trimmed) return false;
-    if (URL_REQUIRED_FIELD_KEYS.has(key) && !isValidUrl(trimmed)) return false;
-    return true;
+    // Per-field shape gate: rejects placeholders like "Coming soon!" on URL
+    // fields and "email" / "Twitter" / "Telegram" on contactMethod, plus
+    // structurally-impossible values on social handles.
+    return isLikelyValueForField(key, trimmed);
   }
 
   private buildFieldInput(team: TeamRecord, fieldsMeta: FieldsMetaMap, key: FieldMetaKey): JudgeFieldInput | null {
@@ -796,29 +909,35 @@ export class TeamEnrichmentJudgeService {
     });
   }
 
-  private needsManualReview(verdict: FieldJudgment): boolean {
-    if (verdict.verdict === JudgmentVerdict.Disagrees) return true;
-    if (verdict.verdict === JudgmentVerdict.Uncertain) return true;
-    if (verdict.confidence === 'low') return true;
-    return false;
-  }
-
-  private async probeWebsiteReachable(url: string): Promise<{ reachable: boolean; finalHost: string | null } | null> {
+  /**
+   * Reachability probe for the team's website. Uses the same browser-mimic
+   * headers as the website-signal extractor — Cloudflare / Akamai bot rules
+   * routinely 403 on bare User-Agent fetches.
+   *
+   * Three-state return:
+   *   - `reachable: true`  — 2xx. Definitively up; `finalHost` is post-redirect.
+   *   - `reachable: false` — definitive negative (404 / 410 / 500 / 502 / 504).
+   *   - `reachable: null`  — inconclusive. Either a network error / timeout
+   *     OR a bot-block status (401, 403, 429, 451, 503). Stage 1.5's
+   *     `corroborateWebsite` rule allows null-reachability when a strong
+   *     deterministic name anchor matches; the AI judge is told not to infer.
+   */
+  private async probeWebsiteReachable(url: string): Promise<{ reachable: boolean | null; finalHost: string | null } | null> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), WEBSITE_PROBE_TIMEOUT_MS);
     try {
       const response = await fetch(url, {
         signal: controller.signal,
         redirect: 'follow' as RequestRedirect,
+        headers: { ...BROWSER_REQUEST_HEADERS },
       });
-      const finalHost = (() => {
-        try {
-          return new URL(response.url || url).host.replace(/^www\./, '').toLowerCase();
-        } catch {
-          return null;
-        }
-      })();
-      return response.ok ? { reachable: true, finalHost } : { reachable: false, finalHost: null };
+      if (response.ok) {
+        return { reachable: true, finalHost: normalizeHost(response.url || url) };
+      }
+      if (BOT_BLOCK_STATUS_CODES.has(response.status)) {
+        return { reachable: null, finalHost: null };
+      }
+      return { reachable: false, finalHost: null };
     } catch {
       return null;
     } finally {
