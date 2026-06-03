@@ -662,6 +662,18 @@ export class TeamEnrichmentJudgeService {
       scrapingDogProfile: null,
       scrapingDogNameMatch: scrapingDogMeta?.nameMatch ?? null,
       teamLeadContacts: this.collectLeadContacts(team),
+      // The team's other on-file channels. Used by the contactMethod rule to
+      // recognize self-declared duplicates (same URL set as both
+      // `contactMethod` and `telegramHandler` / `twitterHandler` / ...).
+      // Reads the candidate side per field — for a ChangedByUser field
+      // that's `Team`, for Enriched it's `TeamEnrichment`. Matches what the
+      // judge is currently considering as truth for the other fields.
+      teamOwnedChannels: {
+        twitterHandler: this.preferEnrichmentValue(team, 'twitterHandler'),
+        telegramHandler: this.preferEnrichmentValue(team, 'telegramHandler'),
+        linkedinHandler: this.preferEnrichmentValue(team, 'linkedinHandler'),
+        blog: this.preferEnrichmentValue(team, 'blog'),
+      },
     });
   }
 

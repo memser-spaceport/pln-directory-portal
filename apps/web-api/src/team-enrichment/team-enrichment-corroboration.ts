@@ -62,6 +62,28 @@ export interface CorroborationContext {
     telegram: string[];
     linkedin: string[];
   };
+  /**
+   * The team's OWN on-file social/communication channels. Used by the
+   * `contactMethod` corroboration rule to recognize when the team set
+   * `contactMethod` to the same URL/handle it already uses as its
+   * `twitterHandler` / `telegramHandler` / `linkedinHandler` / `blog`.
+   *
+   * Catches the case where the only signal we have on a contactMethod is
+   * that the team itself declared it as another channel — common with
+   * Telegram one-time-invite links (`t.me/+<opaque>`), where the slug
+   * isn't team-identifying on its own but the team has set the *exact same
+   * URL* as both `contactMethod` and `telegramHandler`. That's self-
+   * corroboration: the team explicitly named this channel as a contact.
+   *
+   * Values pass in their raw stored form; the rule does its own
+   * normalization (strip `@`, strip URL prefix, lowercase, trim path).
+   */
+  teamOwnedChannels?: {
+    twitterHandler?: string | null;
+    telegramHandler?: string | null;
+    linkedinHandler?: string | null;
+    blog?: string | null;
+  };
 }
 
 /** Stopword list used for substantive-token name overlap (mirrors pln-data-enrichment). */
@@ -276,6 +298,16 @@ export function corroborateContactMethod(
       return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'url host matches website');
     }
 
+    // Team's own social channel: if contactMethod URL matches what the team
+    // already has on file as its twitter / telegram / linkedin / blog, the
+    // team has self-declared this channel for contact. Catches the
+    // Telegram `t.me/+<opaque-invite>` case (bench: Hypercerts) — the slug
+    // isn't team-identifying on its own (opaque join token), but the team
+    // set the SAME URL as both `contactMethod` and `telegramHandler`.
+    // Identical self-declaration on two fields is the identity proof.
+    const ownChannelMatch = matchContactToTeamOwnedChannel(trimmed, ctx.teamOwnedChannels);
+    if (ownChannelMatch) return ownChannelMatch;
+
     // Founder-contact cross-reference for URL form: contactMethod is a link
     // to a founder's twitter / telegram / linkedin profile.
     const founderUrlMatch = matchFounderContactUrl(trimmed, ctx.teamLeadContacts);
@@ -302,7 +334,8 @@ export function corroborateContactMethod(
   }
 
   // ── @handle form ───────────────────────────────────────────────────────
-  // Bare `@handle` — match against any lead's twitter / telegram handle.
+  // Bare `@handle` — match against any lead's twitter / telegram handle, OR
+  // against the team's own on-file twitter/telegram handle (self-declared).
   if (/^@[A-Za-z0-9_]{2,}$/.test(trimmed)) {
     const h = trimmed.slice(1).toLowerCase();
     if (
@@ -311,8 +344,76 @@ export function corroborateContactMethod(
     ) {
       return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'founder contact match');
     }
+    const ownTwitter = normalizeHandleValue(ctx.teamOwnedChannels?.twitterHandler);
+    const ownTelegram = normalizeHandleValue(ctx.teamOwnedChannels?.telegramHandler);
+    if ((ownTwitter && ownTwitter === h) || (ownTelegram && ownTelegram === h)) {
+      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'matches team social');
+    }
   }
 
+  return null;
+}
+
+/**
+ * Normalizes a stored handle / URL value to a bare-handle string for equality
+ * checks. Accepts the same shapes the shape validator accepts:
+ *   - `@handle` → `handle`
+ *   - `twitter.com/handle` / `x.com/handle` → `handle`
+ *   - `t.me/handle` / `telegram.me/handle` → `handle`
+ *   - `linkedin.com/company/<slug>` etc. → `company/<slug>`
+ *   - Bare slug → unchanged
+ * Returns the lowercased path-stripped form, or null when the input is empty.
+ */
+function normalizeHandleValue(raw: string | null | undefined): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  let v = raw.trim().toLowerCase();
+  if (!v) return null;
+  v = v.replace(/^https?:\/\/(?:www\.)?/i, '');
+  // Platform-prefix strip: only the host part is removed, the path (handle/slug) is preserved.
+  v = v.replace(/^(?:twitter|x)\.com\//, '');
+  v = v.replace(/^(?:t\.me|telegram\.me)\//, '');
+  v = v.replace(/^linkedin\.com\//, '');
+  v = v.replace(/^@/, '');
+  v = v.replace(/[?#].*$/, '');
+  v = v.replace(/\/+$/, '');
+  return v || null;
+}
+
+/**
+ * URL-form `contactMethod` self-declaration check. Fires when the
+ * contactMethod URL normalizes to the same canonical form as one of the
+ * team's other on-file channels (`telegramHandler`, `twitterHandler`,
+ * `linkedinHandler`, `blog`). Returns the highest-priority match with a
+ * channel-specific note for explainability.
+ *
+ * Why this rule exists: a team setting `contactMethod` to the literal same
+ * URL it already has on file as `telegramHandler` is self-declaring a
+ * two-field link. The URL slug doesn't need to be team-identifying on its
+ * own (e.g. opaque `t.me/+invite-token`) — the duplicate declaration IS the
+ * proof.
+ */
+function matchContactToTeamOwnedChannel(
+  contactUrl: string,
+  channels: CorroborationContext['teamOwnedChannels']
+): FieldJudgment | null {
+  if (!channels) return null;
+  const contactNorm = normalizeHandleValue(contactUrl);
+  if (!contactNorm) return null;
+
+  // Per-channel comparison. We use normalizeHandleValue on both sides so
+  // protocol/host/path-suffix differences don't defeat the equality check.
+  const candidates: Array<[string, string | null | undefined]> = [
+    ['matches team telegram', channels.telegramHandler],
+    ['matches team twitter', channels.twitterHandler],
+    ['matches team linkedin', channels.linkedinHandler],
+    ['matches team blog', channels.blog],
+  ];
+  for (const [note, channelValue] of candidates) {
+    const channelNorm = normalizeHandleValue(channelValue);
+    if (channelNorm && channelNorm === contactNorm) {
+      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, note);
+    }
+  }
   return null;
 }
 

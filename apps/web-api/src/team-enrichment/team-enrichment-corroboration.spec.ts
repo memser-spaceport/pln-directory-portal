@@ -237,6 +237,107 @@ describe('team-enrichment-corroboration', () => {
       expect(corroborateContactMethod('', { teamName: 'Acme' })).toBeNull();
     });
 
+    describe('team-owned-channel cross-reference', () => {
+      // Bench case (Hypercerts, clnez5ttg00021h02he9ljx5m): user set both
+      // `contactMethod` and `telegramHandler` to the SAME `t.me/+opaque-token`
+      // invite URL. The `+token` form correctly fails `name in invite slug`
+      // (opaque join token, not team-identifying), so previously the AI judge
+      // marked it `agrees + medium` → admin review. The duplicate self-
+      // declaration is the identity proof.
+      it('Hypercerts canonical case: contactMethod URL == team telegramHandler → matches team telegram', () => {
+        const v = corroborateContactMethod('https://t.me/+YF9AYb6zCv1mNDJi', {
+          teamName: 'Hypercerts',
+          website: 'https://hypercerts.org',
+          teamOwnedChannels: { telegramHandler: 'https://t.me/+YF9AYb6zCv1mNDJi' },
+        });
+        expect(v?.verdict).toBe(JudgmentVerdict.Agrees);
+        expect(v?.confidence).toBe(FieldConfidence.High);
+        expect(v?.note).toBe('matches team telegram');
+      });
+
+      it('contactMethod URL == team twitterHandler URL → matches team twitter', () => {
+        const v = corroborateContactMethod('https://twitter.com/acmehq', {
+          teamName: 'Acme',
+          website: 'https://acme.com',
+          teamOwnedChannels: { twitterHandler: 'https://twitter.com/acmehq' },
+        });
+        expect(v?.note).toBe('matches team twitter');
+      });
+
+      // Normalization: contactMethod is full twitter URL, team has bare handle.
+      // Both normalize to `acmehq`.
+      it('normalizes across URL vs bare-handle for twitter', () => {
+        const v = corroborateContactMethod('https://x.com/acmehq', {
+          teamName: 'Acme',
+          website: 'https://acme.com',
+          teamOwnedChannels: { twitterHandler: '@acmehq' },
+        });
+        expect(v?.note).toBe('matches team twitter');
+      });
+
+      it('contactMethod URL == team linkedinHandler → matches team linkedin', () => {
+        const v = corroborateContactMethod('https://www.linkedin.com/company/acme-labs', {
+          teamName: 'Acme',
+          website: 'https://acme.com',
+          teamOwnedChannels: { linkedinHandler: 'company/acme-labs' },
+        });
+        expect(v?.note).toBe('matches team linkedin');
+      });
+
+      it('contactMethod URL == team blog (off-site host) → matches team blog', () => {
+        // Substack blog on an off-site host — `url host matches website`
+        // can't fire because substack.com isn't a subdomain of acme.com.
+        // The team-owned-channel rule is the one that catches this.
+        const v = corroborateContactMethod('https://acmehq.substack.com/about', {
+          teamName: 'Acme',
+          website: 'https://acme.com',
+          teamOwnedChannels: { blog: 'https://acmehq.substack.com/about' },
+        });
+        expect(v?.note).toBe('matches team blog');
+      });
+
+      it('bare @handle == team twitter → matches team social', () => {
+        const v = corroborateContactMethod('@acmehq', {
+          teamName: 'Acme',
+          website: 'https://acme.com',
+          teamOwnedChannels: { twitterHandler: 'https://twitter.com/acmehq' },
+        });
+        expect(v?.note).toBe('matches team social');
+      });
+
+      it('bare @handle == team telegram → matches team social', () => {
+        const v = corroborateContactMethod('@acme_chat', {
+          teamName: 'Acme',
+          website: 'https://acme.com',
+          teamOwnedChannels: { telegramHandler: 'acme_chat' },
+        });
+        expect(v?.note).toBe('matches team social');
+      });
+
+      it('different telegram URL than team has on file → no verdict', () => {
+        // contact is on a DIFFERENT invite slug than what's on telegramHandler.
+        // We don't accept "any t.me URL" — only the exact same handle.
+        const v = corroborateContactMethod('https://t.me/+DIFFERENT123', {
+          teamName: 'Hypercerts',
+          website: 'https://hypercerts.org',
+          teamOwnedChannels: { telegramHandler: 'https://t.me/+YF9AYb6zCv1mNDJi' },
+        });
+        expect(v).toBeNull();
+      });
+
+      it('website-host rule still wins when both apply', () => {
+        // contactMethod URL is the team's blog AND its host matches the
+        // website host. The earlier `url host matches website` rule fires
+        // first (score 95, same as ours, but ordered above).
+        const v = corroborateContactMethod('https://acme.com/contact', {
+          teamName: 'Acme',
+          website: 'https://acme.com',
+          teamOwnedChannels: { blog: 'https://acme.com/contact' },
+        });
+        expect(v?.note).toBe('url host matches website');
+      });
+    });
+
     describe('founder-contact cross-reference', () => {
       const leadCtx = {
         teamName: 'Acme',
