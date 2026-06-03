@@ -8,6 +8,7 @@ import type {
 } from '@prisma/client';
 import { InvestorDto, LabOsProfileDto } from './dto/investor.dto';
 import { PlPortfolioTeamCoInvestorDto, PlPortfolioTeamDto } from './dto/pl-portfolio-team.dto';
+import { isAllowedStageFocus } from './investor-outreach.vocab';
 
 type MemberWithImage = Member & { image: Image | null };
 
@@ -17,10 +18,22 @@ export type MemberByEmail = Map<string, MemberWithImage>;
 /** Overlap rows grouped by investor record id → list of teamUids. */
 export type OverlapsByInvestorId = Map<number, string[]>;
 
-const dateToYmd = (d: Date | null | undefined): string | null =>
-  d == null ? null : d.toISOString().slice(0, 10);
+const dateToYmd = (d: Date | null | undefined): string | null => (d == null ? null : d.toISOString().slice(0, 10));
 
 const dateToIso = (d: Date | null | undefined): string | null => (d == null ? null : d.toISOString());
+
+export const effectiveRaisingStage = (
+  raisingNow: string | null | undefined,
+  raisingStage: string | null | undefined
+): string | null => {
+  if (raisingNow === 'yes' && raisingStage) {
+    return raisingStage;
+  }
+  if (raisingNow && isAllowedStageFocus(raisingNow)) {
+    return raisingNow;
+  }
+  return null;
+};
 
 export const splitCsv = (raw: string | null | undefined): string[] => {
   if (raw == null || raw.trim() === '') return [];
@@ -124,6 +137,11 @@ export function toPlPortfolioTeamDto(team: TeamWithMetaAndOverlaps): PlPortfolio
     plInvestedAt: dateToYmd(meta?.plInvestedAt ?? null),
     plInvestedStage: meta?.plInvestedStage ?? null,
     raisingNow: meta?.raisingNow ?? null,
+    raisingStage: meta?.raisingStage ?? null,
+    lastRoundStage: meta?.lastRoundStage ?? null,
+    lastRoundDate: dateToYmd(meta?.lastRoundDate ?? null),
+    raisingAsOf: dateToYmd(meta?.raisingAsOf ?? null),
+    raisingSource: meta?.raisingSource ?? null,
     sectors: splitCsv(meta?.sectors ?? null),
     geo: meta?.geo ?? null,
     coInvestors: team.portfolioOverlaps.map(toCoInvestor),

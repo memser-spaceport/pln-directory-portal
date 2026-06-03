@@ -10,9 +10,14 @@ describe('investor-outreach.vocab', () => {
     expect(parseSectorTagsList(' ai, Saas ')).toEqual({ ok: true, value: 'ai,saas' });
   });
 
-  it('rejects unknown tokens', () => {
-    const r = parseSectorTagsList('ai,not-a-tag');
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toContain('not-a-tag');
+  it('accepts unknown tokens (free-form storage)', () => {
+    expect(parseSectorTagsList('ai,not-a-tag')).toEqual({ ok: true, value: 'ai,not-a-tag' });
+  });
+
+  it('splits on comma OR semicolon and normalizes casing', () => {
+    expect(parseSectorTagsList('Artificial Intelligence; Blockchain / Web3; Manufacturing AI')).toEqual({
+      ok: true,
+      value: 'artificial intelligence,blockchain / web3,manufacturing ai',
+    });
   });
 });

@@ -248,19 +248,14 @@ describe('InvestorOutreachService', () => {
       const res = await service.ingest({
         items: [
           minimalItem({
-            portfolio_overlaps: [
-              { team_uid: 'team-real' },
-              { team_uid: 'team-missing' },
-            ],
+            portfolio_overlaps: [{ team_uid: 'team-real' }, { team_uid: 'team-missing' }],
           }),
         ],
       });
 
       expect(overlapUpsert).toHaveBeenCalledTimes(1);
       expect(overlapUpsert.mock.calls[0][0].create.teamUid).toBe('team-real');
-      expect(res.errors).toEqual(
-        expect.arrayContaining([expect.stringContaining('team-missing')])
-      );
+      expect(res.errors).toEqual(expect.arrayContaining([expect.stringContaining('team-missing')]));
       expect(res.failed).toBe(0); // overlap errors don't fail the row
     });
 
@@ -276,9 +271,7 @@ describe('InvestorOutreachService', () => {
       });
 
       expect(overlapUpsert).not.toHaveBeenCalled();
-      expect(res.errors).toEqual(
-        expect.arrayContaining([expect.stringContaining('attribution_fund invalid')])
-      );
+      expect(res.errors).toEqual(expect.arrayContaining([expect.stringContaining('attribution_fund invalid')]));
     });
   });
 
@@ -297,7 +290,12 @@ describe('InvestorOutreachService', () => {
             team_uid: 'team-a',
             pl_invested_at: '2024-12-01',
             pl_invested_stage: 'seed',
-            raising_now: 'series-a',
+            raising_now: 'yes',
+            raising_stage: 'series-a',
+            last_round_stage: 'seed',
+            last_round_date: '2024-06-01',
+            raising_as_of: '2025-01-15',
+            raising_source: 'demo_day_survey',
             sectors: 'ai,crypto',
             geo: 'US',
           },
@@ -308,8 +306,39 @@ describe('InvestorOutreachService', () => {
       const args = teamMetaUpsert.mock.calls[0][0];
       expect(args.where).toEqual({ teamUid: 'team-a' });
       expect(args.create.plInvestedStage).toBe('seed');
-      expect(args.create.raisingNow).toBe('series-a');
+      expect(args.create.raisingNow).toBe('yes');
+      expect(args.create.raisingStage).toBe('series-a');
+      expect(args.create.lastRoundStage).toBe('seed');
+      expect(args.create.raisingSource).toBe('demo_day_survey');
       expect(args.create.sectors).toBe('ai,crypto');
+      expect(res.portfolio_teams_upserted).toBe(1);
+    });
+
+    it('normalizes legacy stage-valued raising_now into yes + raisingStage', async () => {
+      teamFindUnique.mockResolvedValue({ uid: 'team-a' });
+
+      const res = await service.ingest({
+        items: [minimalItem()],
+        portfolio_teams: [{ team_uid: 'team-a', raising_now: 'series-a' }],
+      });
+
+      const args = teamMetaUpsert.mock.calls[0][0];
+      expect(args.create.raisingNow).toBe('yes');
+      expect(args.create.raisingStage).toBe('series-a');
+      expect(res.portfolio_teams_upserted).toBe(1);
+    });
+
+    it('allows raising_now=yes without raising_stage', async () => {
+      teamFindUnique.mockResolvedValue({ uid: 'team-a' });
+
+      const res = await service.ingest({
+        items: [minimalItem()],
+        portfolio_teams: [{ team_uid: 'team-a', raising_now: 'yes' }],
+      });
+
+      const args = teamMetaUpsert.mock.calls[0][0];
+      expect(args.create.raisingNow).toBe('yes');
+      expect(args.create.raisingStage).toBeNull();
       expect(res.portfolio_teams_upserted).toBe(1);
     });
 
@@ -335,9 +364,19 @@ describe('InvestorOutreachService', () => {
       });
 
       expect(teamMetaUpsert).not.toHaveBeenCalled();
-      expect(res.errors).toEqual(
-        expect.arrayContaining([expect.stringContaining('pl_invested_stage invalid')])
-      );
+      expect(res.errors).toEqual(expect.arrayContaining([expect.stringContaining('pl_invested_stage invalid')]));
+    });
+
+    it('rejects invalid raising_now value', async () => {
+      teamFindUnique.mockResolvedValue({ uid: 'team-a' });
+
+      const res = await service.ingest({
+        items: [minimalItem()],
+        portfolio_teams: [{ team_uid: 'team-a', raising_now: 'maybe' }],
+      });
+
+      expect(teamMetaUpsert).not.toHaveBeenCalled();
+      expect(res.errors).toEqual(expect.arrayContaining([expect.stringContaining('raising_now invalid')]));
     });
   });
 });

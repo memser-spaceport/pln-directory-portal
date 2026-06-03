@@ -6,7 +6,13 @@ import { ListInvestorsQueryDto } from './dto/list-investors.query.dto';
 import { PlPortfolioTeamDto } from './dto/pl-portfolio-team.dto';
 import { WarmIntrosQueryDto } from './dto/warm-intros.query.dto';
 import { WarmIntroCandidateDto, WarmIntrosResponseDto } from './dto/warm-intros.dto';
-import { MemberByEmail, OverlapsByInvestorId, toInvestorDto, toPlPortfolioTeamDto } from './investor-outreach.mapper';
+import {
+  effectiveRaisingStage,
+  MemberByEmail,
+  OverlapsByInvestorId,
+  toInvestorDto,
+  toPlPortfolioTeamDto,
+} from './investor-outreach.mapper';
 import { scoreCandidate } from './warm-intros.scorer';
 import {
   isAllowedEmailStatus,
@@ -100,7 +106,10 @@ export class InvestorOutreachQueryService {
         targetTeamName = team.name;
         targetTeamDto = toPlPortfolioTeamDto(team);
         teamSectors = targetTeamDto.sectors;
-        teamStage = targetTeamDto.raisingNow ?? targetTeamDto.plInvestedStage ?? undefined;
+        teamStage =
+          effectiveRaisingStage(targetTeamDto.raisingNow, targetTeamDto.raisingStage) ??
+          targetTeamDto.plInvestedStage ??
+          undefined;
       }
     }
 

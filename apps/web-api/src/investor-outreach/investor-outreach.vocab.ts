@@ -35,6 +35,7 @@ export const INVESTOR_OUTREACH_AUM_RANGES = ['<50M', '50-100M', '100-500M', '500
 export const INVESTOR_OUTREACH_CHECK_SIZE_RANGES = ['<100K', '100-500K', '500K-1M', '1M-5M', '5M+', 'unknown'] as const;
 
 export const INVESTOR_OUTREACH_STAGE_FOCUS = ['pre-seed', 'seed', 'series-a', 'series-b+', 'all', 'unknown'] as const;
+export const INVESTOR_OUTREACH_RAISING_NOW = ['yes', 'unknown'] as const;
 
 export const INVESTOR_OUTREACH_ENGAGEMENT_TIER = ['T1_registered', 'T2_clicked', 'T3_opened', 'T4_cold'] as const;
 
@@ -61,6 +62,11 @@ export const INVESTOR_OUTREACH_SECTOR_TAGS = [
   'neurotech',
   'fintech',
   'biotech',
+  'biopharma',
+  'biotechnology',
+  'medical-device',
+  'diagnostics',
+  'healthcare-services',
   'climate',
   'gaming',
   'saas',
@@ -77,9 +83,9 @@ const INVESTOR_TYPE_SET = toStringSet(INVESTOR_OUTREACH_INVESTOR_TYPES);
 const AUM_SET = toStringSet(INVESTOR_OUTREACH_AUM_RANGES);
 const CHECK_SET = toStringSet(INVESTOR_OUTREACH_CHECK_SIZE_RANGES);
 const STAGE_SET = toStringSet(INVESTOR_OUTREACH_STAGE_FOCUS);
+const RAISING_NOW_SET = toStringSet(INVESTOR_OUTREACH_RAISING_NOW);
 const ENGAGEMENT_SET = toStringSet(INVESTOR_OUTREACH_ENGAGEMENT_TIER);
 const ENRICHMENT_SET = toStringSet(INVESTOR_OUTREACH_ENRICHMENT_STATUS);
-const SECTOR_TAG_SET = toStringSet(INVESTOR_OUTREACH_SECTOR_TAGS);
 const ATTRIBUTION_FUND_SET = toStringSet(INVESTOR_OUTREACH_ATTRIBUTION_FUNDS);
 
 export function isAllowedInvestorSource(v: string): boolean {
@@ -106,6 +112,30 @@ export function isAllowedStageFocus(v: string): boolean {
   return STAGE_SET.has(v);
 }
 
+export function isAllowedRaisingNow(v: string): boolean {
+  return RAISING_NOW_SET.has(v);
+}
+
+export function normalizeRaisingNow(raw: string | undefined): {
+  raisingNow: string | null;
+  raisingStage: string | null;
+} {
+  if (raw == null || raw.trim() === '') {
+    return { raisingNow: null, raisingStage: null };
+  }
+
+  const value = raw.trim();
+  if (isAllowedRaisingNow(value)) {
+    return { raisingNow: value, raisingStage: null };
+  }
+
+  if (isAllowedStageFocus(value)) {
+    return { raisingNow: 'yes', raisingStage: value };
+  }
+
+  throw new Error(`raising_now invalid: ${value}`);
+}
+
 export function isAllowedEngagementTier(v: string): boolean {
   return ENGAGEMENT_SET.has(v);
 }
@@ -118,6 +148,14 @@ export function isAllowedAttributionFund(v: string): boolean {
   return ATTRIBUTION_FUND_SET.has(v);
 }
 
+/**
+ * Permissive normalization. Accepts free-form `sector_tags` from the enrichment pipeline:
+ * splits on comma OR semicolon, lowercases and trims each token, joins back with comma for
+ * storage. Unknown tokens are NOT rejected — `INVESTOR_OUTREACH_SECTOR_TAGS` only governs the
+ * filter UI's closed vocab, not what's stored on a row.
+ *
+ * Always returns ok=true; the result-shape stays the same so callers don't need to change.
+ */
 export function parseSectorTagsList(
   raw: string | undefined
 ): { ok: true; value: string } | { ok: false; reason: string } {
@@ -125,12 +163,8 @@ export function parseSectorTagsList(
     return { ok: true, value: '' };
   }
   const parts = raw
-    .split(',')
+    .split(/[,;]/)
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  const bad = parts.filter((p) => !SECTOR_TAG_SET.has(p));
-  if (bad.length) {
-    return { ok: false, reason: `Invalid sector_tags: ${bad.join(', ')}` };
-  }
   return { ok: true, value: parts.join(',') };
 }

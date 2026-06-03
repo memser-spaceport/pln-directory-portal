@@ -1,3 +1,16 @@
-# Dependencies
 node_modules
-npm-debug.log
+dist
+coverage
+.nx/cache
+tmp
+.git
+.github
+.idea
+.vscode
+.DS_Store
+__MACOSX
+*.log
+.env
+.env.*
+README.md
+docker-compose*
