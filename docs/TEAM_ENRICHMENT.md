@@ -278,6 +278,8 @@ A pure-function pass inserted between Stage 1 (ScrapingDog) and Stage 2 (AI judg
 
 `agrees + high` verdicts from Stage 1.5 are merged into the Stage-1 verdict map BEFORE the `stage1Resolved` set is computed — so any corroborated field skips the AI judge entirely and is promoted to `Team.<field>` on the same promotion gate as before. This is the primary mechanism by which the admin review queue shrinks.
 
+**Merge is confidence-aware, not positional.** When both Stage 1 (the ScrapingDog `compareProfileToTeam` comparator) AND Stage 1.5 produce a verdict for the same field, the `agrees + high` verdict is preserved — Stage 1 only overwrites Stage 1.5 when both are at the same tier (or when Stage 1 is `agrees + high`). This guards against Stage 1's fuzzy text-overlap heuristics silently demoting fields that Stage 1.5's source-trust rule already accepted. Bench evidence: an earlier version of this merge let Stage 1 unconditionally overwrite Stage 1.5, which dropped the `moreDetails` auto-promote rate from 47% → 16% and `linkedinHandler` from 97% → 73% once ScrapingDog Stage 1 came online (because `compareProfileToTeam` re-derives the same verdict at a weaker tier — `agrees+medium` from tagline / partial-name overlap — and was overwriting the high-confidence source-trust verdicts).
+
 #### Rule index
 
 The dispatcher always runs **source-trust** first; if it fires, the field-specific rules are skipped. All field-specific rules below produce `agrees + high` verdicts and require ≥2 independent signals to converge.

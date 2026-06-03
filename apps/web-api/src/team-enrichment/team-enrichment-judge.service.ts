@@ -421,13 +421,35 @@ export class TeamEnrichmentJudgeService {
         websiteReachable
       );
 
-      // Stage 1.5 verdicts merge into stage1 before the resolved set is computed, so any
-      // corroborated field skips Stage 2. Stage 1 takes precedence on overlap (e.g. it
-      // already produces a linkedinHandler verdict from the ScrapingDog comparator).
-      const mergedStage1Verdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = {
-        ...stage15Verdicts,
-        ...stage1Verdicts,
-      };
+      // Stage 1.5 and Stage 1 verdicts merge before the resolved set is computed.
+      // The merge is **confidence-aware** rather than positional:
+      //   - When BOTH stages produce a verdict for the same field, keep the
+      //     `agrees+high` one. If both are `agrees+high`, Stage 1 wins (its
+      //     comparator carries the LinkedIn-internal identity proof and a
+      //     more specific note like `name match and website`).
+      //   - When only one stage produced a verdict, that one is used.
+      //
+      // Why this matters: when Stage 1.5's `source-trust` rule has already
+      // accepted a field at `agrees+high` (e.g. ScrapingDog filled
+      // `moreDetails` at enrichment-time → high-confidence linkedin source),
+      // Stage 1's fuzzy `compareProfileToTeam` then re-derives the same
+      // verdict but often at a weaker tier (text-overlap heuristics produce
+      // `agrees+medium` or `uncertain+medium`). Letting Stage 1 unconditionally
+      // overwrite Stage 1.5 silently demoted those auto-promotable fields and
+      // flooded the review queue (bench v2 vs v1 regression: moreDetails
+      // auto-rate dropped from 47% → 16%, linkedinHandler 97% → 73%).
+      const mergedStage1Verdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = { ...stage15Verdicts };
+      const isAgreesHigh = (v: FieldJudgment | undefined): boolean =>
+        !!v && v.verdict === JudgmentVerdict.Agrees && v.confidence === 'high';
+      for (const [key, stage1Verdict] of Object.entries(stage1Verdicts) as Array<
+        [FieldMetaKey, FieldJudgment | undefined]
+      >) {
+        if (!stage1Verdict) continue;
+        const existing = mergedStage1Verdicts[key];
+        // Preserve Stage 1.5's agrees+high when Stage 1 is anything weaker.
+        if (isAgreesHigh(existing) && !isAgreesHigh(stage1Verdict)) continue;
+        mergedStage1Verdicts[key] = stage1Verdict;
+      }
 
       const stage1Resolved = new Set<FieldMetaKey>();
       for (const [k, v] of Object.entries(mergedStage1Verdicts)) {
