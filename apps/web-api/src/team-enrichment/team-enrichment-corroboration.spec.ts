@@ -109,6 +109,48 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict).toBeNull();
     });
 
+    // Bench case (Clockwork Labs): team owns a product domain (`spacetimedb.com`)
+    // as website and a corporate domain (`clockworklabs.io`) for email. Email
+    // domain first-label `clockworklabs` starts with team token `clockwork`
+    // (`labs` is a stopword and dropped).
+    it('brand-alias email: domain first-label starts with team token → email domain matches team name', () => {
+      const verdict = corroborateContactMethod('contact@clockworklabs.io', {
+        teamName: 'Clockwork Labs',
+        website: 'https://spacetimedb.com/home',
+      });
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+      expect(verdict?.note).toBe('email domain matches team name');
+    });
+
+    it('brand-alias URL: host first-label starts with team token → url host matches team name', () => {
+      const verdict = corroborateContactMethod('https://clockworklabs.io/contact', {
+        teamName: 'Clockwork Labs',
+        website: 'https://spacetimedb.com/home',
+      });
+      expect(verdict?.note).toBe('url host matches team name');
+    });
+
+    // False-positive guard: team "Eon" with email on `beontop.com`. The team
+    // token `eon` appears mid-word in `beontop`, but the prefix-only check
+    // correctly rejects (`beontop` doesn't START with `eon`).
+    it('email on a domain that contains team token mid-word (not prefix) → no verdict', () => {
+      const verdict = corroborateContactMethod('contact@beontop.com', {
+        teamName: 'Eon',
+        website: 'https://eon.systems',
+      });
+      expect(verdict).toBeNull();
+    });
+
+    it('email on a generic free-mail host (gmail) → no verdict', () => {
+      // `gmail.com` first-label `gmail` doesn't start with any team token.
+      const verdict = corroborateContactMethod('founder@gmail.com', {
+        teamName: 'Acme',
+        website: 'https://acme.com',
+      });
+      expect(verdict).toBeNull();
+    });
+
     it('null or empty value → no verdict', () => {
       expect(corroborateContactMethod(null, { teamName: 'Acme' })).toBeNull();
       expect(corroborateContactMethod('', { teamName: 'Acme' })).toBeNull();
@@ -355,6 +397,19 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict?.note).toBe('name in blog handle');
     });
 
+    // Bench case (Astera Institute, abbreviated): astera.substack.com — handle
+    // is just the leading distinctive team token, NOT the full concatenation.
+    // Prefix-only check accepts this; the old "every-token-as-substring" rule
+    // would have rejected it because "institute" isn't in "astera".
+    it('substack subdomain with only the leading team token → name in blog handle', () => {
+      const verdict = corroborateBlog('https://astera.substack.com/', {
+        teamName: 'Astera Institute',
+        website: 'https://astera.org/',
+      });
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.note).toBe('name in blog handle');
+    });
+
     it('substack subdomain encoding multi-word team name → name in blog handle', () => {
       // "Compute Labs" → "labs" is a stopword, "compute" is the only substantive token.
       const verdict = corroborateBlog('https://computelabs.substack.com/', {
@@ -472,11 +527,32 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict?.note).toBe('name in website host + og name match + jsonld name match');
     });
 
-    it('not reachable → no verdict regardless of anchors', () => {
+    it('definitive 4xx/5xx (reachable=false) → no verdict regardless of anchors', () => {
       const verdict = corroborateWebsite('https://acme.com', {
         ...base,
         websiteReachable: false,
         websiteSignals: { extractedAt: 'x', ogSiteName: 'Acme Robotics' },
+      });
+      expect(verdict).toBeNull();
+    });
+
+    // Bench case (Compute Labs / computelabs.ai): site is alive in a browser
+    // but returns HTTP 403 to non-browser fetches (full Cloudflare bot
+    // protection). Probe reports `reachable: null` (inconclusive, not false).
+    // The deterministic name anchor IS the identity proof here.
+    it('bot-blocked (reachable=null) + name anchor matches → still auto-promotes', () => {
+      const verdict = corroborateWebsite('https://www.computelabs.ai', {
+        teamName: 'Compute Labs',
+        websiteReachable: null, // bot-blocked, not definitively dead
+      });
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.note).toBe('name in website host');
+    });
+
+    it('bot-blocked (reachable=null) + NO name anchor → no verdict (single signal insufficient)', () => {
+      const verdict = corroborateWebsite('https://unrelated.com', {
+        teamName: 'Compute Labs',
+        websiteReachable: null,
       });
       expect(verdict).toBeNull();
     });

@@ -931,16 +931,28 @@ export class TeamEnrichmentJudgeService {
 
   /**
    * Reachability probe for the team's website. Uses the same
-   * browser-like header bouquet as the website-signal extractor (`fetchWebsiteHtml`)
-   * so Cloudflare / Akamai bot rules don't return 403 on what's actually a live
-   * site. A bare-fetch probe got false `unreachable` verdicts on perfectly
-   * browsable sites — fixed by parity with the extractor's header set.
+   * browser-like header bouquet as the website-signal extractor
+   * (`fetchWebsiteHtml`) so Cloudflare / Akamai bot rules don't return 403
+   * on what's actually a live site.
    *
-   * Returns `null` only on hard transient failure (network error, timeout).
-   * A 4xx/5xx response returns `{reachable: false, ...}` — that's a real
-   * negative signal worth propagating to the AI judge.
+   * Three-state return:
+   *   - `reachable: true`  — 2xx response. Definitively up.
+   *   - `reachable: false` — definitive negative (404 / 410 / 500 / 502 / 504
+   *     etc.) Real "URL is dead" signal.
+   *   - `reachable: null`  — inconclusive. Either the probe couldn't reach
+   *     the server (network error / timeout) OR the server returned a bot-
+   *     blocking status code that real browsers see fine (401, 403, 429,
+   *     451, 503). 403 in particular is the dominant "Cloudflare doesn't
+   *     like our headers" response — the site is up for humans, just
+   *     uncontactable by automated probes. Stage 1.5's `corroborateWebsite`
+   *     rule allows null-reachability when a strong deterministic name
+   *     anchor matches; the AI judge sees `Website reachability: unknown`
+   *     and is told not to infer either way.
+   *
+   * `finalHost` is set on 2xx (the post-redirect host, normalized) and null
+   * otherwise.
    */
-  private async probeWebsiteReachable(url: string): Promise<{ reachable: boolean; finalHost: string | null } | null> {
+  private async probeWebsiteReachable(url: string): Promise<{ reachable: boolean | null; finalHost: string | null } | null> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
@@ -949,14 +961,23 @@ export class TeamEnrichmentJudgeService {
         redirect: 'follow' as RequestRedirect,
         headers: { ...BROWSER_REQUEST_HEADERS },
       });
-      const finalHost = (() => {
-        try {
-          return new URL(response.url || url).host.replace(/^www\./, '').toLowerCase();
-        } catch {
-          return null;
-        }
-      })();
-      return response.ok ? { reachable: true, finalHost } : { reachable: false, finalHost: null };
+      if (response.ok) {
+        const finalHost = (() => {
+          try {
+            return new URL(response.url || url).host.replace(/^www\./, '').toLowerCase();
+          } catch {
+            return null;
+          }
+        })();
+        return { reachable: true, finalHost };
+      }
+      // Bot-block status codes: site is almost certainly alive for humans,
+      // we just look like a bot. Treat as inconclusive, not as a real negative.
+      const BOT_BLOCK_CODES = new Set([401, 403, 429, 451, 503]);
+      if (BOT_BLOCK_CODES.has(response.status)) {
+        return { reachable: null, finalHost: null };
+      }
+      return { reachable: false, finalHost: null };
     } catch {
       return null;
     } finally {

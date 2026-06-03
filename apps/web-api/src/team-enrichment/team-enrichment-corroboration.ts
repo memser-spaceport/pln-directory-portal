@@ -155,26 +155,6 @@ export function namesShareSubstantiveToken(a: string, b: string): boolean {
 }
 
 /**
- * Looser sibling of `namesShareSubstantiveToken`, designed for handles found
- * in URLs (subdomains, path slugs) that have no whitespace delimiters: e.g.
- * `asterainstitute` for the team "Astera Institute", `manifestnetwork` for
- * "Manifest Network".
- *
- * Tokenizes the team name as usual (stopword-aware), then checks whether
- * EVERY substantive team token appears as a substring of the normalized
- * handle. Both "asterainstitute" (concatenated) and "astera-institute"
- * (hyphenated) match. `essentialtechnology` for "Convergent Research" does
- * not, because neither `convergent` nor `research` appears.
- */
-export function handleMatchesTeamName(teamName: string, rawHandle: string): boolean {
-  const teamTokens = tokenize(teamName);
-  if (teamTokens.length === 0) return false;
-  const handle = rawHandle.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (handle.length < 3) return false;
-  return teamTokens.every((t) => handle.includes(t));
-}
-
-/**
  * Variant for website hosts, where the team name is typically abbreviated to
  * its leading distinctive token: `eon.systems` for "Eon", `astera.org` for
  * "Astera Institute" (drops "Institute"), `fil.org` for "Filecoin Foundation"
@@ -256,6 +236,17 @@ export function corroborateContactMethod(
     if (ctx.teamLeadContacts?.emails.includes(normEmail)) {
       return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'founder contact match');
     }
+
+    // Brand-alias case: the team owns multiple domains (a product domain as
+    // website, a corporate domain for email). Example: team "Clockwork Labs"
+    // with website `spacetimedb.com` and contact `contact@clockworklabs.io` —
+    // the email-domain first-label `clockworklabs` starts with the team token
+    // `clockwork`. Same prefix-only safety guard as the website-host rule
+    // prevents substring-anywhere false positives (`beontop.com` for "Eon"
+    // would correctly fail because `beontop` doesn't start with `eon`).
+    if (hostFirstLabelMatchesTeamName(ctx.teamName, domain)) {
+      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'email domain matches team name');
+    }
     return null;
   }
 
@@ -275,6 +266,14 @@ export function corroborateContactMethod(
     // to a founder's twitter / telegram / linkedin profile.
     const founderUrlMatch = matchFounderContactUrl(trimmed, ctx.teamLeadContacts);
     if (founderUrlMatch) return founderUrlMatch;
+
+    // Brand-alias URL: contactMethod URL is on a different host than the
+    // website but that host's first label starts with a team token (e.g.
+    // `https://clockworklabs.io/contact` for "Clockwork Labs" while website
+    // is `spacetimedb.com`). Symmetric with the email branch above.
+    if (contactHost && hostFirstLabelMatchesTeamName(ctx.teamName, contactHost)) {
+      return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'url host matches team name');
+    }
   }
 
   // ── @handle form ───────────────────────────────────────────────────────
@@ -505,9 +504,15 @@ export function corroborateBlog(value: string | null, ctx: CorroborationContext)
     return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'host corroborated');
   }
 
-  // Rule 2: third-party platform, team name in the URL handle.
+  // Rule 2: third-party platform, team name in the URL handle. Uses the same
+  // prefix-only check the social handle rules use (`hostFirstLabelMatchesTeamName`).
+  // Catches abbreviated forms too — `astera.substack.com` for "Astera Institute"
+  // works because the handle starts with the substantive token "astera", even
+  // though the second team token ("institute") isn't in the handle. Earlier
+  // draft required EVERY token to appear as a substring, which rejected those
+  // abbreviated handles and forced unnecessary admin review.
   const handle = extractBlogHandle(value);
-  if (handle && handleMatchesTeamName(ctx.teamName, handle)) {
+  if (handle && hostFirstLabelMatchesTeamName(ctx.teamName, handle)) {
     return mkJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'name in blog handle');
   }
 
@@ -515,16 +520,23 @@ export function corroborateBlog(value: string | null, ctx: CorroborationContext)
 }
 
 /**
- * Website corroboration. Requires the website to be reachable AND a name
- * anchor to fire from at least one second source: og:site_name token-match,
- * JSON-LD Organization.name token-match, or ScrapingDog profile.website
- * host-match (when the ScrapingDog name-match is exact/partial). Single-source
- * "looks reachable" is intentionally insufficient — reachability alone is
- * not identity, per the AI-judge system prompt.
+ * Website corroboration. Requires a name anchor to fire from at least one
+ * second source: og:site_name token-match, JSON-LD Organization.name
+ * token-match, ScrapingDog profile.website host-match (when nameMatch is
+ * exact/partial), OR a host first-label name match. Single-source "looks
+ * reachable" alone is intentionally insufficient.
+ *
+ * Reachability gate: blocks only on `websiteReachable === false` (definitive
+ * 4xx/5xx like 404/500). `true` (2xx) and `null` (inconclusive — bot-blocked
+ * 403, transient network error) BOTH allow the rule to fire when a name
+ * anchor matches. Many real team websites are alive in a browser but return
+ * 403 to non-browser fetches with full Cloudflare bot protection (e.g.
+ * `computelabs.ai`) — the deterministic name anchor IS the identity proof in
+ * those cases; the inability to probe is not a reason to fall back to the AI.
  */
 export function corroborateWebsite(value: string | null, ctx: CorroborationContext): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
-  if (ctx.websiteReachable !== true) return null;
+  if (ctx.websiteReachable === false) return null; // only definitive 4xx/5xx blocks
   const siteHost = normalizeHost(value);
   if (!siteHost) return null;
 
