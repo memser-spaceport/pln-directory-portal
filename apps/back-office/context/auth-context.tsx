@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState, useEffect, ReactNode } from 'react';
 import { useCookie } from 'react-use';
-import { API_ROUTE, ADMIN_PERMISSIONS, DEMODAY_PERMISSIONS } from '../utils/constants';
+import { API_ROUTE, ADMIN_PERMISSIONS, DEMODAY_PERMISSIONS, TEAM_PITCH_PERMISSIONS } from '../utils/constants';
 import api from '../utils/api';
 import { useRouter } from 'next/router';
 import { removeToken } from '../utils/auth';
@@ -23,6 +23,8 @@ interface AuthContextValue {
   isDemoDayAdmin: boolean;
   /** Create/update demo days and participants (excludes stats-only readers). */
   canMutateDemoDays: boolean;
+  canViewTeamPitches: boolean;
+  canMutateTeamPitches: boolean;
   isBackOfficeUser: boolean;
   permissions: string[];
   hasPermission: (permission: string) => boolean;
@@ -36,6 +38,8 @@ const AuthContext = createContext<AuthContextValue>({
   canViewDemoDays: false,
   isDemoDayAdmin: false,
   canMutateDemoDays: false,
+  canViewTeamPitches: false,
+  canMutateTeamPitches: false,
   isBackOfficeUser: false,
   permissions: [],
   hasPermission: () => false,
@@ -153,8 +157,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isDemoDayAdmin = canViewDemoDays;
 
+  const canViewTeamPitches = isDirectoryAdmin || hasPermission(TEAM_PITCH_PERMISSIONS.ADMIN);
+  const canMutateTeamPitches = canViewTeamPitches;
+
   const isBackOfficeUser =
-    isDirectoryAdmin || hasPermission(ADMIN_PERMISSIONS.TOOLS_ACCESS) || hasDemoDayAdminPermissionCode;
+    isDirectoryAdmin ||
+    hasPermission(ADMIN_PERMISSIONS.TOOLS_ACCESS) ||
+    hasDemoDayAdminPermissionCode ||
+    canViewTeamPitches;
 
   const value = useMemo(
     () => ({
@@ -163,6 +173,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canViewDemoDays,
       isDemoDayAdmin,
       canMutateDemoDays,
+      canViewTeamPitches,
+      canMutateTeamPitches,
       isBackOfficeUser: isBackOfficeUser || canViewDemoDays,
       isLoading,
       permissions,
@@ -175,6 +187,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canViewDemoDays,
       isDemoDayAdmin,
       canMutateDemoDays,
+      canViewTeamPitches,
+      canMutateTeamPitches,
       isBackOfficeUser,
       isLoading,
       hasRole,

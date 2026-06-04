@@ -60,6 +60,7 @@ import { MetricsMiddleware } from './metrics/metrics.interceptor';
 import { UploadsService } from './uploads/uploads.service';
 import { UploadsModule } from './uploads/uploads.module';
 import { DemoDaysModule } from './demo-days/demo-days.module';
+import { TeamPitchesModule } from './team-pitches/team-pitches.module';
 import { ContactSupportModule } from './contact-support/contact-support.module';
 import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 import { WebSocketModule } from './websocket/websocket.module';
@@ -153,6 +154,7 @@ import { RoadmapModule } from './roadmap/roadmap.module';
     ForumModule,
     UploadsModule,
     DemoDaysModule,
+    TeamPitchesModule,
     ContactSupportModule,
     PushNotificationsModule,
     WebSocketModule,
@@ -216,7 +218,9 @@ export class AppModule {
           path: 'v1/demo-days/:demoDayUidOrSlug/teams/:teamUid/fundraising-profile/one-pager/preview',
           method: RequestMethod.POST,
         },
-        { path: 'v1/admin/teams/tiers/upload', method: RequestMethod.POST }
+        { path: 'v1/admin/teams/tiers/upload', method: RequestMethod.POST },
+        { path: 'v1/team-pitches/:slugOrUid/profile/one-pager', method: RequestMethod.PUT },
+        { path: 'v1/team-pitches/:slugOrUid/profile/video', method: RequestMethod.PUT }
       )
       .forRoutes(
         { path: '*', method: RequestMethod.POST },

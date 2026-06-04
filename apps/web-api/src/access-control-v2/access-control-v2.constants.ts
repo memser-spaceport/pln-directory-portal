@@ -27,6 +27,10 @@ export const DEALS_PERMISSIONS = {
 
 // ── Demo Day ────────────────────────────────────────────────────────────
 
+export const TEAM_PITCH_PERMISSIONS = {
+  ADMIN: 'team_pitch.admin',
+} as const;
+
 export const DEMODAY_PERMISSIONS = {
   /** Read demo day fundraiser / analytics report link */
   REPORT_LINK_READ: 'demoday.report_link.read',
@@ -205,6 +209,8 @@ export const ALL_PERMISSION_CODES = [
   DEMODAY_PERMISSIONS.ADMIN_FOUNDER_SCHOOL,
   DEMODAY_PERMISSIONS.ADMIN_CRECIMIENTO_FOUNDER_SCHOOL,
   DEMODAY_PERMISSIONS.STATS_READ,
+
+  TEAM_PITCH_PERMISSIONS.ADMIN,
 
   // Members
   MEMBER_PERMISSIONS.SEARCH_READ,

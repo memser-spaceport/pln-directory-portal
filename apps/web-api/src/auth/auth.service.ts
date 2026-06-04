@@ -140,9 +140,9 @@ export class AuthService implements OnModuleInit {
         );
 
         // Run demo-day upgrade logic if necessary
-        const upgradedUser = await this.checkAndUpgradeDemoDayParticipant(foundUser);
+        const approvedUser = await this.checkApproveOnLoginMember(foundUser);
+        const upgradedUser = await this.checkAndUpgradeDemoDayParticipant(approvedUser);
 
-        // Track login event for analytics/auditing
         await this.trackLoginEvent(upgradedUser);
 
         return {
@@ -201,7 +201,8 @@ export class AuthService implements OnModuleInit {
           );
         }
 
-        const upgradedUser = await this.checkAndUpgradeDemoDayParticipant(foundUser);
+        const approvedUser = await this.checkApproveOnLoginMember(foundUser);
+        const upgradedUser = await this.checkAndUpgradeDemoDayParticipant(approvedUser);
         await this.trackLoginEvent(upgradedUser);
 
         return {
@@ -532,6 +533,39 @@ export class AuthService implements OnModuleInit {
     const newClientToken = await this.getClientToken();
     await this.cacheService.store.set('authserviceClientToken', newClientToken, { ttl: 3600 });
     return newClientToken;
+  }
+
+  private async checkApproveOnLoginMember(member: any): Promise<any> {
+    if (!member?.approveOnLogin) {
+      return member;
+    }
+
+    const approval = member.memberApproval;
+    if (!approval || approval.state !== 'PENDING') {
+      await this.prisma.member.update({
+        where: { uid: member.uid },
+        data: { approveOnLogin: false },
+      });
+      return member;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.memberApproval.update({
+        where: { memberUid: member.uid },
+        data: {
+          state: 'APPROVED',
+          reviewedAt: new Date(),
+          reason: 'Auto-approved on login for team pitch',
+        },
+      });
+      await tx.member.update({
+        where: { uid: member.uid },
+        data: { approveOnLogin: false, isVerified: true },
+      });
+    });
+
+    const refreshed = await this.membersService.findMemberByEmail(member.email);
+    return refreshed ?? { ...member, memberState: 'APPROVED', approveOnLogin: false };
   }
 
   private async checkAndUpgradeDemoDayParticipant(member: any): Promise<any> {
