@@ -6,8 +6,6 @@ import * as fs from 'fs';
 import Handlebars from 'handlebars';
 
 const CONFIG = {
-  accessKeyId: process.env.AWS_ACCESS_KEY,
-  secretAccessKey: process.env.AWS_SECRET_KEY,
   region: process.env.AWS_REGION,
 };
 
@@ -94,7 +92,7 @@ export class AwsService {
   async uploadFileToS3(file, bucketName, fileName: string) {
     if (
       process.env.ENVIRONMENT === 'development' &&
-      (!bucketName || !CONFIG.accessKeyId || !CONFIG.secretAccessKey || !CONFIG.region)
+      (!bucketName || !CONFIG.region)
     ) {
       return {
         Location: '',
