@@ -3,9 +3,14 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
+import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import { JudgeFieldInput, JudgeTeamContext, TeamEnrichmentJudgeAiService } from './team-enrichment-judge-ai.service';
 import { buildPromotionPayload, executePromotion } from './team-enrichment-promotion';
-import { TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
+import {
+  extractSupersedingTwitterHandle,
+  TeamEnrichmentScrapingDogService,
+  verifyTwitterProfileMatchesTeam,
+} from './team-enrichment-scrapingdog.service';
 import { CorroborationFieldInput, runCorroboration } from './team-enrichment-corroboration';
 import { computeTeamQuality } from './team-enrichment-quality';
 import { BROWSER_REQUEST_HEADERS } from './team-enrichment-http.util';
@@ -25,11 +30,14 @@ import {
 } from './shared';
 import {
   AIUsageEntry,
+  EnrichmentSource,
   EnrichmentStatus,
+  FieldConfidence,
   FieldEnrichmentMeta,
   FieldEnrichmentStatus,
   FieldJudgment,
   FieldMetaKey,
+  JudgmentSource,
   JudgmentStatus,
   JudgmentVerdict,
   TeamDataEnrichment,
@@ -163,7 +171,13 @@ export class TeamEnrichmentJudgeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scrapingDogService: TeamEnrichmentScrapingDogService,
-    private readonly judgeAi: TeamEnrichmentJudgeAiService
+    private readonly judgeAi: TeamEnrichmentJudgeAiService,
+    /**
+     * Used only by the stale-user-recovery sub-pipeline — when a
+     * ChangedByUser website returns 4xx, the judge calls back into the
+     * enrichment AI to discover a fresh URL and re-judges it in-place.
+     */
+    private readonly enrichmentAi: TeamEnrichmentAiService
   ) {}
 
   /**
@@ -518,9 +532,54 @@ export class TeamEnrichmentJudgeService {
         if (needsManualReview(verdict)) fieldsForReview.push(key);
       }
 
+      // Stage 3 — stale user-value recovery. After the first verdict pass,
+      // some ChangedByUser fields carry hard evidence that the user's value
+      // is no longer the team's canonical one (website 4xx, X bio
+      // explicitly naming a successor handle). The recovery sub-pipeline
+      // discovers a replacement and re-judges that field in-place, so we
+      // don't ship a known-stale value into the admin review queue or
+      // worse, leave it as-is.
+      const recovery = await this.attemptStaleUserRecovery({
+        team,
+        existingMeta,
+        fieldsMeta: mergedFieldsMeta,
+        websiteReachable,
+        scrapingDogMeta,
+      });
+      if (recovery.attempted) {
+        for (const [k, v] of Object.entries(recovery.candidateWrites) as Array<[FieldMetaKey, string]>) {
+          // Update the in-memory enrichment row so buildPromotionPayload
+          // picks up the new candidate value when promoting.
+          if (team.teamEnrichment) (team.teamEnrichment as any)[k] = v;
+        }
+        for (const [k, m] of Object.entries(recovery.newFieldsMeta) as Array<[FieldMetaKey, FieldEnrichmentMeta]>) {
+          mergedFieldsMeta[k] = m;
+        }
+        for (const [k, v] of Object.entries(recovery.newVerdicts) as Array<[FieldMetaKey, FieldJudgment]>) {
+          allVerdicts[k] = v;
+          // If the recovery upgraded the field to agrees+high, drop it from
+          // the review queue — there is nothing left for the admin to look
+          // at on this field this run.
+          if (v.verdict === JudgmentVerdict.Agrees && v.confidence === FieldConfidence.High) {
+            const idx = fieldsForReview.indexOf(k);
+            if (idx >= 0) fieldsForReview.splice(idx, 1);
+          } else if (needsManualReview(v) && !fieldsForReview.includes(k)) {
+            fieldsForReview.push(k);
+          }
+        }
+      }
+
+      // Recovery may have overwritten field values for the quality pass —
+      // reflect the new ones so completeness / validity reflect the post-
+      // recovery state.
+      const fieldValuesForQuality = this.collectFieldValuesForQuality(team);
+      for (const [k, v] of Object.entries(recovery.candidateWrites) as Array<[FieldMetaKey, string]>) {
+        fieldValuesForQuality[k] = v;
+      }
+
       const quality = computeTeamQuality({
         fieldsMeta: mergedFieldsMeta,
-        fieldValues: this.collectFieldValuesForQuality(team),
+        fieldValues: fieldValuesForQuality,
         enrichedAt: existingMeta.enrichedAt,
         hasWebsiteSignals: !!existingMeta.websiteSignals,
         stage15Verdicts,
@@ -535,14 +594,25 @@ export class TeamEnrichmentJudgeService {
         fieldsForReview,
         ...(scrapingDogMeta ? { scrapingDog: scrapingDogMeta } : {}),
         quality,
+        // Always stamp staleUserRecoveryAttempted once the pipeline reaches
+        // this point — both when we actively did recovery and when the
+        // prior run already attempted it. Prevents the next cron tick from
+        // re-firing the AI re-discovery against the same broken value.
+        staleUserRecoveryAttempted:
+          recovery.attempted || existingMeta.judgment?.staleUserRecoveryAttempted === true,
+        ...(recovery.events.length > 0 ? { staleUserRecovery: recovery.events } : {}),
       };
 
       const baseUsage = (refreshedMeta ?? existingMeta).usage;
+      // Recovery can issue an AI enrichment call (for website rediscovery);
+      // fold its token usage into the enrichment bucket (it IS an enrichment
+      // call by lineage, even though the judge initiated it).
       const mergedJudgeUsage = mergeUsageEntries(baseUsage?.judge, judgeUsage);
+      const mergedEnrichmentUsage = mergeUsageEntries(baseUsage?.enrichment, recovery.recoveryUsage);
       const usageBlock: TeamDataEnrichment['usage'] | undefined =
-        mergedJudgeUsage || baseUsage?.enrichment
+        mergedJudgeUsage || mergedEnrichmentUsage
           ? {
-              ...(baseUsage?.enrichment ? { enrichment: baseUsage.enrichment } : {}),
+              ...(mergedEnrichmentUsage ? { enrichment: mergedEnrichmentUsage } : {}),
               ...(mergedJudgeUsage ? { judge: mergedJudgeUsage } : {}),
             }
           : undefined;
@@ -564,7 +634,13 @@ export class TeamEnrichmentJudgeService {
       await this.prisma.$transaction(async (tx) => {
         await tx.teamEnrichment.update({
           where: { teamUid },
-          data: { dataEnrichment: updated as any },
+          data: {
+            dataEnrichment: updated as any,
+            // Persist any recovery-introduced scalar candidates onto the
+            // TeamEnrichment row's columns so the next stage / future
+            // judge / admin review reads the same values out of the DB.
+            ...(recovery.candidateWrites as Prisma.TeamEnrichmentUpdateInput),
+          },
         });
 
         if (promotion.teamUpdate || promotion.investmentFocus !== null) {
@@ -575,7 +651,10 @@ export class TeamEnrichmentJudgeService {
       this.logger.log(
         `Judge: team ${teamUid} (${team.name}) judged — stage1=${Object.keys(stage1Verdicts).length} stage1.5=${
           Object.keys(stage15Verdicts).length
-        } stage2=${Object.keys(stage2Verdicts).length} promoted=[${promotion.promotedFields.join(
+        } stage2=${Object.keys(stage2Verdicts).length} recovered=[${recovery.events
+          .filter((e) => e.outcome === 'recovered')
+          .map((e) => e.field)
+          .join(',')}] promoted=[${promotion.promotedFields.join(
           ','
         )}] fieldsForReview=[${fieldsForReview.join(',')}] thinEvidence=${quality.thinEvidence}`
       );
@@ -675,6 +754,297 @@ export class TeamEnrichmentJudgeService {
         blog: this.preferEnrichmentValue(team, 'blog'),
       },
     });
+  }
+
+  /**
+   * Stage 3 — stale user-value recovery.
+   *
+   * Runs once per team (idempotent via `judgment.staleUserRecoveryAttempted`).
+   * Looks for ChangedByUser fields whose hard-signal evidence says the user
+   * value is no longer the team's canonical one:
+   *
+   *   - **website 4xx** — the unconditional reachability probe returned a
+   *     definitive 4xx / 5xx (`websiteReachable === false`). Triggers a
+   *     focused AI re-discovery + re-probe + a single-field Stage 1.5
+   *     corroboration pass on the new URL. If the new URL is reachable AND
+   *     a deterministic anchor fires (`name in website host`, `og name
+   *     match`, etc.), the field is promotable to Team in this same run.
+   *
+   *   - **twitter superseded handle** — the X bio explicitly names a
+   *     successor account (`"old handle of @humntech"`, `"moved to @X"`,
+   *     etc. — see `SUPERSEDING_HANDLE_PATTERNS`). We re-fetch ScrapingDog
+   *     X for the named handle and run the existing
+   *     `verifyTwitterProfileMatchesTeam` against the team identity. On
+   *     verified, the new handle replaces the user's with
+   *     `source=scrapingdog + confidence=high` — Stage 1.5's source-trust
+   *     rule auto-promotes it.
+   *
+   * Both paths write candidate values to TeamEnrichment.<field> AND flip
+   * the field's status from ChangedByUser to Enriched. The caller's
+   * `buildPromotionPayload` then sees an Enriched field with agrees+high
+   * and promotes to Team.<field> in the same transaction as the verdict
+   * write. Behavior matches the regular enrichment → judge → promote
+   * lifecycle; the only difference is who initiated the AI/ScrapingDog
+   * call (judge instead of enrichment cron).
+   *
+   * Returns a delta — the caller is responsible for merging it into the
+   * pipeline's `mergedFieldsMeta`, `allVerdicts`, and the prisma update.
+   */
+  private async attemptStaleUserRecovery(args: {
+    team: TeamRecord;
+    existingMeta: TeamDataEnrichment;
+    fieldsMeta: FieldsMetaMap;
+    websiteReachable: boolean | null;
+    scrapingDogMeta: TeamJudgment['scrapingDog'] | undefined;
+  }): Promise<{
+    attempted: boolean;
+    events: NonNullable<TeamJudgment['staleUserRecovery']>;
+    candidateWrites: Partial<Record<FieldMetaKey, string>>;
+    newFieldsMeta: Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
+    newVerdicts: Partial<Record<FieldMetaKey, FieldJudgment>>;
+    recoveryUsage: AIUsageEntry | null;
+  }> {
+    const { team, existingMeta, fieldsMeta, websiteReachable } = args;
+    const events: NonNullable<TeamJudgment['staleUserRecovery']> = [];
+    const candidateWrites: Partial<Record<FieldMetaKey, string>> = {};
+    const newFieldsMeta: Partial<Record<FieldMetaKey, FieldEnrichmentMeta>> = {};
+    const newVerdicts: Partial<Record<FieldMetaKey, FieldJudgment>> = {};
+    let recoveryUsage: AIUsageEntry | null = null;
+
+    // Idempotency — a prior judge run already exhausted recovery for this team.
+    // The flag is only reset by the next enrichment write (which clears any
+    // stale meta on its way to writing fresh values).
+    if (existingMeta.judgment?.staleUserRecoveryAttempted) {
+      return {
+        attempted: false,
+        events,
+        candidateWrites,
+        newFieldsMeta,
+        newVerdicts,
+        recoveryUsage,
+      };
+    }
+
+    const now = new Date().toISOString();
+
+    // ----- Twitter: superseded-handle recovery -----
+    const twMeta = fieldsMeta.twitterHandler;
+    if (
+      twMeta?.status === FieldEnrichmentStatus.ChangedByUser &&
+      team.twitterHandler &&
+      this.scrapingDogService.isConfigured()
+    ) {
+      const userHandle = team.twitterHandler;
+      const profileResult = await this.scrapingDogService.fetchTwitterProfile(userHandle);
+      if (profileResult.kind === 'ok' && profileResult.profile.description) {
+        const sup = extractSupersedingTwitterHandle(profileResult.profile.description, userHandle);
+        if (sup) {
+          const newProfileResult = await this.scrapingDogService.fetchTwitterProfile(sup.newHandle);
+          if (newProfileResult.kind === 'ok') {
+            const teamForVerify = {
+              name: team.name,
+              website: this.preferEnrichmentValue(team, 'website'),
+            };
+            const verification = verifyTwitterProfileMatchesTeam(teamForVerify, newProfileResult.profile);
+            if (verification.verified) {
+              const canonical = newProfileResult.profile.username ?? sup.newHandle;
+              const verdict: FieldJudgment = {
+                verdict: JudgmentVerdict.Agrees,
+                confidence: FieldConfidence.High,
+                score: 95,
+                note: `superseded ${sup.pattern}`.slice(0, 60),
+                judgedVia: JudgmentSource.Corroboration,
+              };
+              candidateWrites.twitterHandler = canonical;
+              newFieldsMeta.twitterHandler = {
+                status: FieldEnrichmentStatus.Enriched,
+                source: EnrichmentSource.ScrapingDog,
+                confidence: FieldConfidence.High,
+                lastModifiedAt: now,
+                judgment: verdict,
+              };
+              newVerdicts.twitterHandler = verdict;
+              events.push({
+                field: 'twitterHandler',
+                trigger: 'twitter-superseded',
+                outcome: 'recovered',
+                priorValue: userHandle,
+                newValue: canonical,
+                note: `${sup.pattern} -> @${canonical}`.slice(0, 80),
+              });
+              this.logger.log(
+                `Recovery: team ${team.uid} (${team.name}) twitterHandler "${userHandle}" superseded by "@${canonical}" via "${sup.pattern}" + [${verification.anchors.join(', ')}]`
+              );
+            } else {
+              events.push({
+                field: 'twitterHandler',
+                trigger: 'twitter-superseded',
+                outcome: 'verify-failed',
+                priorValue: userHandle,
+                note: `@${sup.newHandle} did not verify`.slice(0, 80),
+              });
+              this.logger.log(
+                `Recovery: team ${team.uid} (${team.name}) twitterHandler "${userHandle}" claims successor "@${sup.newHandle}" but identity did not verify`
+              );
+            }
+          } else {
+            events.push({
+              field: 'twitterHandler',
+              trigger: 'twitter-superseded',
+              outcome: 'verify-failed',
+              priorValue: userHandle,
+              note: `@${sup.newHandle} not fetchable`.slice(0, 80),
+            });
+          }
+        }
+      }
+    }
+
+    // ----- Website: 4xx recovery -----
+    const webMeta = fieldsMeta.website;
+    if (
+      webMeta?.status === FieldEnrichmentStatus.ChangedByUser &&
+      team.website &&
+      websiteReachable === false
+    ) {
+      const aiOut = await this.enrichmentAi.enrichTeamViaAI(team.name, {
+        // Drop the broken URL so the AI rediscovers from scratch.
+        website: null,
+        contactMethod: team.contactMethod ?? undefined,
+        linkedinHandler: team.linkedinHandler ?? undefined,
+        twitterHandler: candidateWrites.twitterHandler ?? team.twitterHandler ?? undefined,
+        telegramHandler: team.telegramHandler ?? undefined,
+        shortDescription: team.shortDescription ?? undefined,
+        longDescription: team.longDescription ?? undefined,
+        userConfirmedIdentityHints: {
+          shortDescription:
+            fieldsMeta.shortDescription?.status === FieldEnrichmentStatus.ChangedByUser
+              ? team.shortDescription
+              : null,
+          longDescription:
+            fieldsMeta.longDescription?.status === FieldEnrichmentStatus.ChangedByUser
+              ? team.longDescription
+              : null,
+          moreDetails:
+            fieldsMeta.moreDetails?.status === FieldEnrichmentStatus.ChangedByUser
+              ? team.moreDetails
+              : null,
+        },
+      });
+      recoveryUsage = aiOut.usage;
+      const candidate = aiOut.response.website;
+      const normalizedCandidate = candidate?.trim() ?? '';
+      const isFresh =
+        normalizedCandidate &&
+        normalizedCandidate.toLowerCase() !== team.website.trim().toLowerCase() &&
+        isLikelyValueForField('website', normalizedCandidate);
+
+      if (isFresh) {
+        const probe = await this.probeWebsiteReachable(normalizedCandidate);
+        const newReachable = probe?.reachable ?? null;
+        if (newReachable !== false) {
+          const aiConfidence = ((): FieldConfidence => {
+            const c = aiOut.response.confidence?.website?.toLowerCase();
+            if (c === 'high') return FieldConfidence.High;
+            if (c === 'medium') return FieldConfidence.Medium;
+            if (c === 'low') return FieldConfidence.Low;
+            return FieldConfidence.Medium;
+          })();
+          // Single-field Stage 1.5 corroboration on the new URL. If a
+          // deterministic anchor fires AND probe didn't 4xx, the rule
+          // produces agrees+high — promotable in this same run.
+          const corroboration = runCorroboration(
+            [
+              {
+                field: 'website',
+                value: normalizedCandidate,
+                source: EnrichmentSource.AI,
+                enrichmentConfidence: aiConfidence,
+                isUserOwned: false,
+              },
+            ],
+            {
+              teamName: team.name,
+              website: normalizedCandidate,
+              websiteReachable: newReachable,
+              websiteSignals: existingMeta.websiteSignals ?? null,
+              scrapingDogProfile: null,
+              scrapingDogNameMatch: args.scrapingDogMeta?.nameMatch ?? null,
+              teamLeadContacts: this.collectLeadContacts(team),
+              teamOwnedChannels: {
+                twitterHandler:
+                  candidateWrites.twitterHandler ?? this.preferEnrichmentValue(team, 'twitterHandler'),
+                telegramHandler: this.preferEnrichmentValue(team, 'telegramHandler'),
+                linkedinHandler: this.preferEnrichmentValue(team, 'linkedinHandler'),
+                blog: this.preferEnrichmentValue(team, 'blog'),
+              },
+            }
+          );
+          const corroboratedVerdict = corroboration.website;
+          const finalVerdict: FieldJudgment =
+            corroboratedVerdict && corroboratedVerdict.verdict === JudgmentVerdict.Agrees
+              ? corroboratedVerdict
+              : {
+                  verdict: JudgmentVerdict.Uncertain,
+                  confidence: FieldConfidence.Medium,
+                  score: 55,
+                  note: 'recovered candidate, needs review',
+                  judgedVia: JudgmentSource.Corroboration,
+                };
+          candidateWrites.website = normalizedCandidate;
+          newFieldsMeta.website = {
+            status: FieldEnrichmentStatus.Enriched,
+            source: EnrichmentSource.AI,
+            confidence: aiConfidence,
+            lastModifiedAt: now,
+            judgment: finalVerdict,
+          };
+          newVerdicts.website = finalVerdict;
+          events.push({
+            field: 'website',
+            trigger: 'website-4xx',
+            outcome: 'recovered',
+            priorValue: team.website,
+            newValue: normalizedCandidate,
+            note: finalVerdict.note ?? '',
+          });
+          this.logger.log(
+            `Recovery: team ${team.uid} (${team.name}) website "${team.website}" 4xx → AI candidate "${normalizedCandidate}" verdict ${finalVerdict.verdict}/${finalVerdict.confidence} note "${finalVerdict.note}"`
+          );
+        } else {
+          events.push({
+            field: 'website',
+            trigger: 'website-4xx',
+            outcome: 'no-better-candidate',
+            priorValue: team.website,
+            note: `AI candidate ${normalizedCandidate} also 4xx`.slice(0, 80),
+          });
+          this.logger.log(
+            `Recovery: team ${team.uid} (${team.name}) AI suggested "${normalizedCandidate}" but it also 4xx — leaving user value in place`
+          );
+        }
+      } else {
+        events.push({
+          field: 'website',
+          trigger: 'website-4xx',
+          outcome: 'no-better-candidate',
+          priorValue: team.website,
+          note: normalizedCandidate ? 'AI returned same/invalid URL' : 'AI returned no candidate',
+        });
+        this.logger.log(
+          `Recovery: team ${team.uid} (${team.name}) website 4xx but AI did not suggest a usable replacement (got "${normalizedCandidate || '(null)'}")`
+        );
+      }
+    }
+
+    return {
+      attempted: events.length > 0,
+      events,
+      candidateWrites,
+      newFieldsMeta,
+      newVerdicts,
+      recoveryUsage,
+    };
   }
 
   /**

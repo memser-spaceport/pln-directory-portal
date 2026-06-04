@@ -229,7 +229,16 @@ flowchart TD
 
   AI[Stage 2 · AI judge<br/>LLM + web search · low temperature<br/>verify candidate on its own merits]
   AI -->|agrees+high| Promote
-  AI -->|disagrees / uncertain / low| Review
+  AI -->|disagrees / uncertain / low| SR
+
+  SR{Stage 3 · stale-user recovery<br/>ChangedByUser field with hard staleness signal?<br/>website 4xx · X bio names successor handle}
+  SR -->|website 4xx| AIRD[Focused AI re-discovery<br/>+ probe + Stage 1.5 corroboration<br/>on the new URL]
+  SR -->|twitter superseded| XV[Re-fetch ScrapingDog X<br/>for named successor handle<br/>+ verifyTwitterProfileMatchesTeam]
+  SR -->|no signal| Review
+  AIRD -->|verified| Promote
+  AIRD -->|verify-failed| Review
+  XV -->|verified| Promote
+  XV -->|verify-failed| Review
 
   Promote([Auto-promote to Team])
   Review([Admin review queue<br/>fieldsForReview])
@@ -252,7 +261,7 @@ For each Enriched field whose Stage 1 or Stage 2 verdict is `agrees` at `high` c
 | `investmentFocus`                              | `InvestorProfile.investmentFocus` (creating the profile if missing) |
 | `logo`                                         | **not promoted by the judge** — logo isn't judged. Stays on `TeamEnrichment.logoUid` until the logo-verification pipeline or an admin review handles it. |
 
-Anything less than `agrees + high` stays on `TeamEnrichment` only — the user-facing `Team` row does not receive it. Fields whose status is `ChangedByUser` are never promoted (the user's value is already on `Team`; the candidate, if any, is informational).
+Anything less than `agrees + high` stays on `TeamEnrichment` only — the user-facing `Team` row does not receive it. Fields whose status is `ChangedByUser` are never promoted (the user's value is already on `Team`; the candidate, if any, is informational) **with one narrow exception**: the [stale-user-value recovery](#stage-3--stale-user-value-recovery) sub-pipeline flips a ChangedByUser field to `Enriched` and promotes a fresh candidate when there is hard evidence the user's value is no longer canonical (4xx website, X bio that names a successor handle). Recovery never fires on ambiguous AI verdicts — only on deterministic staleness signals.
 
 ### What the judge evaluates
 
@@ -261,7 +270,7 @@ Anything less than `agrees + high` stays on `TeamEnrichment` only — the user-f
   - any field whose `fieldsMeta[field].status === Enriched` (reads the candidate from `TeamEnrichment.<field>`), OR
   - a **user-supplied** website / contact link (`fieldsMeta[field].status === ChangedByUser`, reads from `Team.<field>`) — restricted to: `website`, `blog`, `contactMethod`, `linkedinHandler`, `twitterHandler`, `telegramHandler`. These are the high-signal identity fields a team lead can fill in directly, and we want an independent check that the value really belongs to the team.
 - **Excluded**: `logo` (binary presence, not a semantic value), `CannotEnrich`, any `ChangedByUser` field outside the user-judgable subset above (descriptions, `industryTags`, `investmentFocus`).
-- **Non-destructive for user data**: when judging a `ChangedByUser` field, the judge writes only the `judgment` sub-object. The field's value on `Team`, its `status`, `confidence`, and `source` are preserved verbatim, and the promotion path is bypassed. A "disagrees" verdict surfaces the field in `fieldsForReview` for admin review but never overwrites the user's input. The bad-LinkedIn-handle nulling path also continues to skip user-supplied handles.
+- **Non-destructive for user data — by default**: when judging a `ChangedByUser` field, the judge writes only the `judgment` sub-object. The field's value on `Team`, its `status`, `confidence`, and `source` are preserved verbatim, and the promotion path is bypassed. A "disagrees" or "uncertain" verdict surfaces the field in `fieldsForReview` for admin review but never overwrites the user's input. The bad-LinkedIn-handle nulling path also continues to skip user-supplied handles. The single exception is the [Stage 3 stale-user-value recovery](#stage-3--stale-user-value-recovery) — fires only on deterministic staleness signals (4xx website, X bio naming a successor handle) and is idempotent per team via `judgment.staleUserRecoveryAttempted`.
 
 ### Two stages
 
@@ -430,6 +439,40 @@ The enrichment-time `confidence` must be `high` — `medium`/`low` indicates the
 > - Self-declared duplicate (bench case Hypercerts): team set `contactMethod = telegramHandler = "https://t.me/+YF9AYb6zCv1mNDJi"`. The `+token` form is an opaque join token, so `name in invite slug` correctly rejects — but the duplicate declaration across two fields IS the identity proof. The `matches team telegram` rule normalizes both values and equality-checks, then auto-promotes. Symmetric for `twitterHandler` / `linkedinHandler` / `blog`.
 
 The full rule implementations + an eval bench live in `team-enrichment-corroboration.ts` and `team-enrichment-corroboration.spec.ts`. The bench pins precision/recall: any rule change that regresses fixtures fails CI.
+
+### Stage 3 — Stale User-Value Recovery
+
+Runs after Stage 1.5 + Stage 2 finish, **only** on `ChangedByUser` fields that carry hard evidence the user's value is no longer the team's canonical one. Lives in `team-enrichment-judge.service.ts → attemptStaleUserRecovery`. Idempotent per team via `dataEnrichment.judgment.staleUserRecoveryAttempted` — the next enrichment write clears the flag (the judgment block is rebuilt fresh from each enrichment run), so the recovery can re-fire if a later edit produces a new stale value.
+
+Two hard signals trigger recovery — nothing else. The judge does **not** re-enrich a field just because its first verdict was `disagrees` or `uncertain`: those are too noisy a gate to justify rewriting user data without explicit staleness evidence.
+
+| Trigger | Signal | Field(s) | Recovery action | Cost |
+| --- | --- | --- | --- | --- |
+| `website-4xx` | Reachability probe returned a definitive 4xx / 5xx (`websiteReachable === false`). Bot-blocked (403, etc.) does NOT count — see [reachability probe](#two-stages). | `website` | Focused AI re-discovery (`enrichTeamViaAI` with the website slot blanked + user-confirmed description hints). Re-probe the new URL; if reachable, run a single-field Stage 1.5 corroboration pass on the new URL. On `agrees + high` the new URL replaces the user's. | 1 AI call + 1 HTTP probe |
+| `twitter-superseded` | Existing `team.twitterHandler` resolves to an X profile whose `description` matches one of `SUPERSEDING_HANDLE_PATTERNS` (`"old handle of @X"`, `"moved to @X"`, `"rebranded to @X"`, `"new account is @X"`, `"follow us at @X"`). | `twitterHandler` | Extract the named successor handle, re-fetch ScrapingDog X for it, run the existing `verifyTwitterProfileMatchesTeam` against the team identity. On verified, the new handle replaces the user's at `source=scrapingdog + confidence=high` — Stage 1.5's source-trust rule auto-promotes it (no AI judge call). | 2 ScrapingDog X calls |
+
+A recovered field is written to `TeamEnrichment.<field>` AND has its `fieldsMeta[field].status` flipped from `ChangedByUser` → `Enriched`. The caller's `buildPromotionPayload` then sees the field as `Enriched` + `agrees + high` and promotes it to `Team.<field>` in the same transaction as the verdict write. From here on out the field behaves like any other AI-enriched-then-judge-promoted field: a future user edit flips it back to `ChangedByUser`, the next force-enrichment skips it via the `alreadyPromoted` guard, etc.
+
+**Provenance is preserved on `TeamJudgment.staleUserRecovery`** — a per-event log on the team-level judgment block so admins can see exactly which user values the judge superseded and why:
+
+```ts
+staleUserRecovery?: Array<{
+  field: FieldMetaKey;
+  trigger: 'website-4xx' | 'twitter-superseded';
+  outcome: 'recovered' | 'no-better-candidate' | 'verify-failed';
+  priorValue?: string | null;    // original user value
+  newValue?: string | null;       // what we wrote (when recovered)
+  note?: string;                  // short explainability (e.g. "old handle of -> @humntech")
+}>
+```
+
+Token usage from the website AI re-discovery rolls up into `usage.enrichment` (it IS an enrichment call by lineage — discovery, not verification), not `usage.judge`. The judge cron logs include `recovered=[...]` alongside `promoted=[...]` so the recovery rate is visible without parsing the JSON block.
+
+> **Canonical failure cases this fixes:**
+>
+> - **`clpr2ryag0002vg02fmgdd6ay`** (`human.tech, by Holonym`) — user-supplied `twitterHandler = "@0xHolonym"` resolves to an X account whose bio is `"This is the old handle of @humntech"`. The first judge pass marked the field `uncertain + medium` (note `"website declares humntech not 0xHolonym possible rebrand"`) — accurate diagnosis but no action. Recovery: extracts `humntech`, re-fetches the X profile, `verifyTwitterProfileMatchesTeam` fires on the `website host match` anchor (X profile's website is `human.tech`), promotes `twitterHandler = "humntech"` with `source: scrapingdog + high`, note `"superseded old handle of"`.
+> - Team's user-supplied `website = "https://oldco.example"` returns HTTP 404. The reachability probe sets `websiteReachable = false`. Recovery: AI re-discovers `https://newco.example`, the new URL probes 200, Stage 1.5's `name in website host` rule fires on the team's substantive token, and the new URL promotes. The original `oldco.example` is recorded in `staleUserRecovery[0].priorValue` for admin auditing.
+> - Team's user-supplied website returns HTTP 403 (Cloudflare bot-block). `websiteReachable === null` (inconclusive), so recovery does NOT fire — the site is almost certainly fine for humans. The AI judge handles this via Stage 2 as usual.
 
 ### Website signal persistence (`dataEnrichment.websiteSignals`)
 

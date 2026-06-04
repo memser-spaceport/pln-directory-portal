@@ -60,6 +60,62 @@ export type FetchTwitterProfileResult =
   | { kind: 'error'; reason: string };
 
 /**
+ * Conservative patterns the X/Twitter description uses to declare that the
+ * current handle is no longer the team's canonical account. Each pattern names
+ * a successor handle so the recovery path can re-verify the team's identity
+ * against the new account without an AI call.
+ *
+ * The set is intentionally narrow — only phrases that self-identify the
+ * account as outdated and explicitly point at a replacement. Generic
+ * mentions ("follow @ourpartners", "now hiring @recruiter") would
+ * silently rebind a team's handle on a false positive, so we don't match
+ * them. The matcher is run by the judge's stale-user-recovery pass; see
+ * `attemptStaleUserRecovery` in `team-enrichment-judge.service.ts`.
+ */
+const SUPERSEDING_HANDLE_PATTERNS: Array<{ re: RegExp; label: string }> = [
+  // "This is the old handle of @humntech" — the canonical case (clpr2ryag0002vg02fmgdd6ay).
+  { re: /\bold\s+(?:handle|account|username)\s+(?:of|is|was)\s+@([A-Za-z0-9_]{1,15})\b/i, label: 'old handle of' },
+  // "We've moved to @newco" / "Migrated to @newco" / "Switched to @newco".
+  { re: /\b(?:moved|migrated|relocated|switched)\s+to\s+@([A-Za-z0-9_]{1,15})\b/i, label: 'moved to' },
+  // "Rebranded to @newco" / "Renamed to @newco" / "Renamed as @newco".
+  { re: /\b(?:rebranded|renamed)\s+(?:to|as)\s+@([A-Za-z0-9_]{1,15})\b/i, label: 'rebranded to' },
+  // "Our new account is @newco" / "New handle: @newco" / "Main account is @newco".
+  { re: /\b(?:new|current|main)\s+(?:account|handle)\s*(?:is|:)?\s*@([A-Za-z0-9_]{1,15})\b/i, label: 'new account is' },
+  // "Follow us at @newco" — moderately restrictive (requires explicit "us at"
+  // or "us on" pivot, not just "follow @X"). Catches retirement announcements
+  // that keep the bio short.
+  { re: /\bfollow\s+us\s+(?:at|on)\s+@([A-Za-z0-9_]{1,15})\b/i, label: 'follow us at' },
+];
+
+/**
+ * Detects whether an X profile's description self-declares as superseded by a
+ * different handle and returns the named successor. Pure; returns `null` when
+ * nothing matches OR when the matched handle equals `currentHandle` (a
+ * description that mentions its own handle isn't superseding itself).
+ *
+ * Result `pattern` is a short tag (matching the table in
+ * `SUPERSEDING_HANDLE_PATTERNS`) used in the judge note so reviewers see
+ * which phrase fired.
+ */
+export function extractSupersedingTwitterHandle(
+  description: string | null | undefined,
+  currentHandle: string | null | undefined
+): { newHandle: string; pattern: string } | null {
+  if (!description) return null;
+  const normalizedCurrent = currentHandle
+    ? currentHandle.trim().replace(/^@/, '').toLowerCase()
+    : '';
+  for (const { re, label } of SUPERSEDING_HANDLE_PATTERNS) {
+    const m = description.match(re);
+    if (!m) continue;
+    const candidate = m[1].toLowerCase();
+    if (!candidate || candidate === normalizedCurrent) continue;
+    return { newHandle: candidate, pattern: label };
+  }
+  return null;
+}
+
+/**
  * Three-anchor identity check on an X/Twitter profile. Pure; returns the set
  * of anchors that fired. A single strong anchor (website host match) suffices
  * because both sides are independently-controlled team assets. The two weaker

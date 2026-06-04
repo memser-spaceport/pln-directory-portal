@@ -140,6 +140,33 @@ export interface TeamJudgment {
     websiteFinalHost?: string | null;
   };
   quality?: TeamQuality;
+  /**
+   * Set true after the post-judge "stale user-value recovery" sub-pipeline
+   * runs for a team. Guards against re-doing the recovery on every judge cron
+   * tick — if the first pass couldn't find a better candidate, neither will
+   * the second. Cleared automatically on the next enrichment write (since
+   * the field's value or status will have changed by then).
+   */
+  staleUserRecoveryAttempted?: boolean;
+  /**
+   * Per-field event log from the recovery sub-pipeline. Stored for
+   * observability — admins can see which user values the judge actually
+   * superseded (and why) without parsing logs. Empty when no recovery
+   * action ran.
+   */
+  staleUserRecovery?: Array<{
+    field: FieldMetaKey;
+    /** What evidence flagged the prior user value as stale. */
+    trigger: 'website-4xx' | 'twitter-superseded' | string;
+    /** Whether the recovery actually produced a higher-confidence value. */
+    outcome: 'recovered' | 'no-better-candidate' | 'verify-failed';
+    /** Original user-supplied value, kept so admins can see what was replaced. */
+    priorValue?: string | null;
+    /** New value written to TeamEnrichment.<field> (when recovered). */
+    newValue?: string | null;
+    /** Free-text explainability (e.g. "old handle of @humntech"). Capped at 80 chars. */
+    note?: string;
+  }>;
 }
 
 /**
