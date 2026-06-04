@@ -66,6 +66,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
     isSubscribedToNewsletter: faker.datatype.boolean(),
     teamOrProjectURL: faker.internet.url(),
     openToWork: faker.datatype.boolean(),
+    approveOnLogin: faker.datatype.boolean(),
     preferences: {
       showEmail: true,
       showGithubHandle: true,

@@ -49,6 +49,7 @@ const permissionSeeds: PermissionSeed[] = [
   { code: 'demoday.admin.crecimiento_founder_school', module: 'PL Demo Day' },
   { code: 'demoday.stats.read', module: 'PL Demo Day' },
   { code: 'demoday.report_link.read', module: 'PL Demo Day' },
+  { code: 'team_pitch.admin', module: 'Team Pitch' },
   { code: 'pl.advisors.access', module: 'PL Advisors' },
 ];
 
@@ -70,6 +71,7 @@ const policies: PolicySeed[] = [
       'founder_guides.create',
       'demoday.report_link.read',
       'demoday.stats.read',
+      'team_pitch.admin',
       'deals.read',
       'forum.read',
       'forum.write',
@@ -106,12 +108,7 @@ const policies: PolicySeed[] = [
     name: 'Demo Day Admin / PL Internal',
     role: 'Demo Day Admin',
     group: 'PL Internal',
-    permissions: [
-      'member.contacts.read',
-      'demoday.admin.all',
-      'demoday.stats.read',
-      'demoday.report_link.read',
-    ],
+    permissions: ['member.contacts.read', 'demoday.admin.all', 'demoday.stats.read', 'demoday.report_link.read'],
   },
   {
     code: 'demo_day_admin_pl_crecimiento_founder_school',
