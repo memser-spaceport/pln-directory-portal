@@ -245,7 +245,8 @@ function matchFounderContactUrl(
 
 export function corroborateTwitterHandler(
   value: string | null,
-  ctx: CorroborationContext
+  ctx: CorroborationContext,
+  opts: { isUserOwned?: boolean } = {}
 ): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   const candidate = value.replace(/^@/, '').trim().toLowerCase();
@@ -262,12 +263,23 @@ export function corroborateTwitterHandler(
   if (hostFirstLabelMatchesTeamName(ctx.teamName, candidate)) {
     return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'name in twitter handle');
   }
+
+  // User-trusted fallback. Mirrors contactMethod's same rule: the team lead
+  // supplied this handle, none of the deterministic anchors matched, but the
+  // value already passed `isLikelyValueForField` (valid handle shape).
+  // Re-queueing it for admin review forever provides no information the lead
+  // doesn't already have. Score 85 < deterministic anchors so any future
+  // anchor match would outrank this fallback in a merge.
+  if (opts.isUserOwned) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
+  }
   return null;
 }
 
 export function corroborateLinkedinHandler(
   value: string | null,
-  ctx: CorroborationContext
+  ctx: CorroborationContext,
+  opts: { isUserOwned?: boolean } = {}
 ): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   const norm = (s: string) =>
@@ -289,12 +301,17 @@ export function corroborateLinkedinHandler(
   if (hostFirstLabelMatchesTeamName(ctx.teamName, slug)) {
     return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'name in linkedin slug');
   }
+
+  if (opts.isUserOwned) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
+  }
   return null;
 }
 
 export function corroborateTelegramHandler(
   value: string | null,
-  ctx: CorroborationContext
+  ctx: CorroborationContext,
+  opts: { isUserOwned?: boolean } = {}
 ): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   const candidate = value.replace(/^@/, '').trim().toLowerCase();
@@ -307,6 +324,10 @@ export function corroborateTelegramHandler(
 
   if (hostFirstLabelMatchesTeamName(ctx.teamName, candidate)) {
     return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'name in telegram handle');
+  }
+
+  if (opts.isUserOwned) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
   }
   return null;
 }
@@ -402,7 +423,11 @@ export function extractInviteSlug(rawUrl: string): string | null {
   return null;
 }
 
-export function corroborateBlog(value: string | null, ctx: CorroborationContext): FieldJudgment | null {
+export function corroborateBlog(
+  value: string | null,
+  ctx: CorroborationContext,
+  opts: { isUserOwned?: boolean } = {}
+): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   const blogHost = normalizeHost(value);
   const siteHost = normalizeHost(ctx.website);
@@ -412,14 +437,40 @@ export function corroborateBlog(value: string | null, ctx: CorroborationContext)
     return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'host corroborated');
   }
 
-  // Third-party platform, team name in the URL handle. Same prefix-only check
-  // the social handle rules use — catches abbreviated forms (`astera.substack.com`
-  // for "Astera Institute" works because the handle starts with "astera").
+  // 3rd-party platforms (Substack / Medium / Ghost / paragraph / Mirror /
+  // dev.to / Hashnode / Beehiiv / Posthaven) check the team-name match
+  // against the URL HANDLE, not the host — host is the platform, the slug
+  // is the team identifier. Returning null when the handle exists but
+  // doesn't match prevents the host-name fallback from leaking through
+  // (`asterainstitute.substack.com` first-label would otherwise match the
+  // team token even when this is a wrong-team substack).
   const handle = extractBlogHandle(value);
-  if (handle && hostFirstLabelMatchesTeamName(ctx.teamName, handle)) {
-    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'name in blog handle');
+  if (handle) {
+    if (hostFirstLabelMatchesTeamName(ctx.teamName, handle)) {
+      return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'name in blog handle');
+    }
+    // 3rd-party platform handle didn't match team — return null so the
+    // host-name fallback (which would match the platform host on its own
+    // first label) doesn't leak through. user-trusted fallback also
+    // disabled here: a lead pasting a wrong substack/medium link is a real
+    // failure mode worth surfacing to admin review.
+    return null;
   }
 
+  // Custom-domain blog (not on a recognized platform) whose host first-label
+  // matches a substantive team-name token. Mirrors `name in website host`.
+  // Catches team "Near" with website `near.foundation` and blog
+  // `near.org/blog/...` — different hosts so `host corroborated` can't fire,
+  // not a 3rd-party platform so `name in blog handle` can't fire, but the
+  // host first-label `near` matches the team token. Same prefix-only guard
+  // as the website rule (`beontop.com` is correctly NOT a match for "Eon").
+  if (hostFirstLabelMatchesTeamName(ctx.teamName, blogHost)) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'name in blog host');
+  }
+
+  if (opts.isUserOwned) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
+  }
   return null;
 }
 
@@ -434,7 +485,11 @@ export function corroborateBlog(value: string | null, ctx: CorroborationContext)
  * rule fire when a name anchor matches — many real sites are alive in a
  * browser but 403 to non-browser fetches.
  */
-export function corroborateWebsite(value: string | null, ctx: CorroborationContext): FieldJudgment | null {
+export function corroborateWebsite(
+  value: string | null,
+  ctx: CorroborationContext,
+  opts: { isUserOwned?: boolean } = {}
+): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   if (ctx.websiteReachable === false) return null;
   const siteHost = normalizeHost(value);
@@ -464,11 +519,20 @@ export function corroborateWebsite(value: string | null, ctx: CorroborationConte
     anchorsFired.push('sd website host match');
   }
 
-  if (anchorsFired.length === 0) return null;
-  // First anchor establishes high-confidence agreement; additional anchors
-  // are appended for explainability but don't change the verdict.
-  const note = anchorsFired.join(' + ');
-  return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, note);
+  if (anchorsFired.length > 0) {
+    // First anchor establishes high-confidence agreement; additional anchors
+    // are appended for explainability but don't change the verdict.
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, anchorsFired.join(' + '));
+  }
+
+  // User-trusted fallback: lead-supplied URL passing shape gate, no
+  // deterministic anchor matched, and reachability isn't definitively false
+  // (the early-return above blocked websiteReachable === false). Trust the
+  // lead's authority over their own website rather than queueing for review.
+  if (opts.isUserOwned) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
+  }
+  return null;
 }
 
 /**

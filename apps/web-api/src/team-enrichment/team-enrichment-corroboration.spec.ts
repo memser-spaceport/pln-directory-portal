@@ -568,6 +568,43 @@ describe('team-enrichment-corroboration', () => {
     it('no website signals AND handle unrelated → no verdict', () => {
       expect(corroborateTwitterHandler('unrelated_account', { teamName: 'Acme' })).toBeNull();
     });
+
+    // Bench case (ContributionDAO): handle `@contributedao` is the team's
+    // own X account. Doesn't prefix-match team token `contributiondao` (handle
+    // is shorter and slightly different spelling: `contribute` vs `contribution`).
+    // Without isUserOwned, falls to AI (which may wrongly disagree on the
+    // grounds that the website declares a different handle). With isUserOwned,
+    // user-trusted fallback fires.
+    it('user-supplied handle that no deterministic anchor matches → user trusted', () => {
+      const verdict = corroborateTwitterHandler(
+        'contributedao',
+        { teamName: 'ContributionDAO', websiteSignals: { extractedAt: 'x', twitterHandler: 'theplebth' } },
+        { isUserOwned: true }
+      );
+      expect(verdict).not.toBeNull();
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+      expect(verdict?.note).toBe('user trusted');
+    });
+
+    it('AI-supplied unrelated handle → no verdict (falls through to AI)', () => {
+      const verdict = corroborateTwitterHandler(
+        'contributedao',
+        { teamName: 'ContributionDAO', websiteSignals: { extractedAt: 'x', twitterHandler: 'theplebth' } },
+        { isUserOwned: false }
+      );
+      expect(verdict).toBeNull();
+    });
+
+    it('user-trusted does NOT override stronger deterministic anchor', () => {
+      // Website self-declared anchor still wins on score 100 vs 85.
+      const verdict = corroborateTwitterHandler(
+        'acme',
+        { teamName: 'Acme', websiteSignals: { extractedAt: 'x', twitterHandler: '@acme' } },
+        { isUserOwned: true }
+      );
+      expect(verdict?.note).toBe('website self declared');
+    });
   });
 
   describe('linkedinHandler', () => {
@@ -630,6 +667,17 @@ describe('team-enrichment-corroboration', () => {
       const verdict = corroborateLinkedinHandler('company/something-eonical-corp', { teamName: 'Eon' });
       expect(verdict).toBeNull();
     });
+
+    it('user-supplied linkedin slug that no deterministic anchor matches → user trusted', () => {
+      const verdict = corroborateLinkedinHandler(
+        'company/some-unrelated-slug',
+        { teamName: 'Acme' },
+        { isUserOwned: true }
+      );
+      expect(verdict?.note).toBe('user trusted');
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+    });
   });
 
   describe('telegramHandler', () => {
@@ -658,6 +706,16 @@ describe('team-enrichment-corroboration', () => {
       const verdict = corroborateTelegramHandler('cryptonear', { teamName: 'Near Foundation' });
       expect(verdict).toBeNull();
     });
+
+    it('user-supplied telegram handle that no deterministic anchor matches → user trusted', () => {
+      const verdict = corroborateTelegramHandler(
+        'somecommunity',
+        { teamName: 'Acme' },
+        { isUserOwned: true }
+      );
+      expect(verdict?.note).toBe('user trusted');
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+    });
   });
 
   describe('blog', () => {
@@ -682,6 +740,37 @@ describe('team-enrichment-corroboration', () => {
       const verdict = corroborateBlog('https://medium.com/@unrelated-author', {
         teamName: 'Acme',
         website: 'https://acme.com',
+      });
+      expect(verdict).toBeNull();
+    });
+
+    // Bench case (Near): blog `near.org/blog/...` with website `near.foundation`.
+    // Different hosts (host-corroborated can't fire), not a 3rd-party platform
+    // (name-in-blog-handle can't fire), but both blog host's first label and
+    // website host's first label are `near` — the team-token name match against
+    // the blog host IS the identity proof, same as `name in website host` for
+    // the website rule.
+    it('custom-domain blog whose host first-label matches team token → name in blog host', () => {
+      const verdict = corroborateBlog(
+        'https://near.org/blog/?_gl=1*4ltauw*_up*MQ..*_ga*MTg5MzA0MDM1OS4xNjY4NjMxOTE5',
+        {
+          teamName: 'Near',
+          website: 'https://near.foundation/',
+        }
+      );
+      expect(verdict).not.toBeNull();
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+      expect(verdict?.note).toBe('name in blog host');
+    });
+
+    // Safety guard: substring-anywhere shouldn't false-positive. Team "Eon"
+    // with blog on `beontop.com` — `beontop` first label does NOT start with
+    // `eon`, so the rule correctly rejects.
+    it('custom-domain blog whose host contains team token mid-string → no verdict', () => {
+      const verdict = corroborateBlog('https://beontop.com/blog', {
+        teamName: 'Eon',
+        website: 'https://eon.systems/',
       });
       expect(verdict).toBeNull();
     });
@@ -789,6 +878,28 @@ describe('team-enrichment-corroboration', () => {
         website: 'https://acme.com',
       });
       expect(verdict?.note).toBe('name in blog handle');
+    });
+
+    it('user-supplied custom-domain blog (not on platform) with no name match → user trusted', () => {
+      const verdict = corroborateBlog(
+        'https://random-team-blog.example.org/',
+        { teamName: 'Acme', website: 'https://acme.com' },
+        { isUserOwned: true }
+      );
+      expect(verdict?.note).toBe('user trusted');
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+    });
+
+    it('user-supplied 3rd-party platform blog with unrelated handle → no verdict (still review)', () => {
+      // 3rd-party platform branch returns null explicitly to keep wrong-team
+      // substack/medium pastes in the review queue — the user-trusted
+      // fallback intentionally does NOT cover this case.
+      const verdict = corroborateBlog(
+        'https://wrong-team-blog.substack.com/',
+        { teamName: 'Acme', website: 'https://acme.com' },
+        { isUserOwned: true }
+      );
+      expect(verdict).toBeNull();
     });
   });
 
@@ -930,6 +1041,25 @@ describe('team-enrichment-corroboration', () => {
         },
       });
       expect(verdict?.note).toContain('sd website host match');
+    });
+
+    it('user-supplied website with no deterministic anchor and reachable → user trusted', () => {
+      const verdict = corroborateWebsite(
+        'https://team-product.io',
+        { teamName: 'Acme Robotics', websiteReachable: true },
+        { isUserOwned: true }
+      );
+      expect(verdict?.note).toBe('user trusted');
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+    });
+
+    it('user-supplied website that is definitively unreachable → no verdict (hard disprove gate)', () => {
+      const verdict = corroborateWebsite(
+        'https://broken.example.com',
+        { teamName: 'Acme', websiteReachable: false },
+        { isUserOwned: true }
+      );
+      expect(verdict).toBeNull();
     });
   });
 
