@@ -931,16 +931,41 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict?.confidence).toBe(FieldConfidence.High);
     });
 
-    it('user-supplied 3rd-party platform blog with unrelated handle → no verdict (still review)', () => {
-      // 3rd-party platform branch returns null explicitly to keep wrong-team
-      // substack/medium pastes in the review queue — the user-trusted
-      // fallback intentionally does NOT cover this case.
+    // Bench case (Phas3): Mirror.xyz blog whose publication slug is the
+    // team's wallet address (`mirror.xyz/0x8b26…`) — by construction the
+    // slug is not name-matchable, but the team admin manually set it. Trust
+    // the user's authority over the team's own on-chain blog.
+    it('user-supplied Mirror.xyz with wallet-address slug → user trusted', () => {
+      const verdict = corroborateBlog(
+        'https://mirror.xyz/0x8b2622EEA6ca1cD84423a63DD551bAC913BAc932',
+        { teamName: 'Phas3', website: 'https://www.phas3.io/' },
+        { isUserOwned: true }
+      );
+      expect(verdict?.note).toBe('user trusted');
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+    });
+
+    it('AI-supplied 3rd-party platform blog with unrelated handle → no verdict (still review)', () => {
+      // Symmetric safety: AI-supplied substack/medium with a handle that
+      // doesn't match the team token is exactly the failure mode we want
+      // admin to catch. Only ChangedByUser values trigger user-trusted on
+      // 3rd-party platforms.
       const verdict = corroborateBlog(
         'https://wrong-team-blog.substack.com/',
         { teamName: 'Acme', website: 'https://acme.com' },
-        { isUserOwned: true }
+        { isUserOwned: false }
       );
       expect(verdict).toBeNull();
+    });
+
+    it('user-supplied 3rd-party platform blog with unrelated handle → user trusted', () => {
+      const verdict = corroborateBlog(
+        'https://archival-handle.substack.com/',
+        { teamName: 'Acme', website: 'https://acme.com' },
+        { isUserOwned: true }
+      );
+      expect(verdict?.note).toBe('user trusted');
     });
   });
 

@@ -455,20 +455,26 @@ export function corroborateBlog(
   // 3rd-party platforms (Substack / Medium / Ghost / paragraph / Mirror /
   // dev.to / Hashnode / Beehiiv / Posthaven) check the team-name match
   // against the URL HANDLE, not the host — host is the platform, the slug
-  // is the team identifier. Returning null when the handle exists but
-  // doesn't match prevents the host-name fallback from leaking through
-  // (`asterainstitute.substack.com` first-label would otherwise match the
-  // team token even when this is a wrong-team substack).
+  // is the team identifier.
   const handle = extractBlogHandle(value);
   if (handle) {
     if (hostFirstLabelMatchesTeamName(ctx.teamName, handle)) {
       return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'name in blog handle');
     }
-    // 3rd-party platform handle didn't match team — return null so the
-    // host-name fallback (which would match the platform host on its own
-    // first label) doesn't leak through. user-trusted fallback also
-    // disabled here: a lead pasting a wrong substack/medium link is a real
-    // failure mode worth surfacing to admin review.
+    // 3rd-party platform with a handle that doesn't match the team token —
+    // trust ChangedByUser values. Legitimate cases this catches:
+    //   - Mirror.xyz with a wallet-address publication slug (`mirror.xyz/0x…`)
+    //     — team's on-chain blog whose slug is by construction not name-matchable.
+    //   - Archival Medium/Substack URLs where the team has rebranded so the
+    //     handle no longer matches the current team name.
+    //   - Hashnode / dev.to handles that use a personal-handle convention
+    //     rather than the team name.
+    // AI-supplied values still fall through to the AI judge — return null
+    // so the host-name fallback below also doesn't leak through (would
+    // match the platform host's first-label on its own).
+    if (opts.isUserOwned) {
+      return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
+    }
     return null;
   }
 
