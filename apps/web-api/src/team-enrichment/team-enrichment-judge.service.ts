@@ -585,31 +585,36 @@ export class TeamEnrichmentJudgeService {
         }
       }
 
-      // Dead-/personal-user-value cleanup: generalization of the
-      // `hasJudgableValue` shape-junk skip. The shape gate silently drops
-      // "Coming soon!"-style values from the judge pipeline entirely — they
-      // never get a verdict and never enter the review queue, because there
-      // is no actionable signal a human reviewer could add beyond what the
-      // AI already searched.
+      // Build the review-suppression list. The AI's per-field `judgment`
+      // block is **never modified, stripped, or downgraded** — every verdict
+      // the judge produced stays intact on `fieldsMeta[field].judgment`
+      // (score, confidence, verdict, note, judgedVia preserved). What we
+      // adjust is the OPERATIONAL queue: fields are removed from
+      // `fieldsForReview` and accumulated into `reviewSuppressedFields`,
+      // which the admin review endpoint reads as a hide-list. Preserves
+      // the AI's audit trail while keeping the queue free of fields admin
+      // review can't usefully act on.
       //
-      // The same logic applies to ChangedByUser fields whose value passed
-      // the shape gate but failed our stronger staleness/personal signals
-      // (4xx website, 4xx blog, `in/<slug>` linkedinHandler, personal
-      // free-provider contactMethod email, twitter handle whose X bio names
-      // a successor we couldn't verify): recovery already tried discovery
-      // + verification and came up empty, so an admin looking at the field
-      // has no extra information. Strip the field's judgment + remove from
-      // `fieldsForReview`. `listEnrichmentsForReview`'s filter then drops
-      // the field from the admin review queue (no `judgment` block + a
-      // shape-valid Team value = nothing to surface).
+      // Two suppression sources, each persisting its own audit log:
       //
-      // Applies in two situations:
-      //   - recovery ran this turn and reported `no-better-candidate` /
-      //     `verify-failed` for the field, OR
-      //   - recovery was attempted in a prior run (`staleUserRecoveryAttempted`
-      //     is true) and the field is still ChangedByUser + still in the
-      //     same trigger state — the prior recovery must also have failed
-      //     (or the status would now be `Enriched`).
+      //   (A) Stale-user-value recovery exhaustion — generalization of
+      //       `hasJudgableValue`'s shape-junk skip. Fields where recovery
+      //       either ran and came up empty this turn, OR was already
+      //       attempted on a prior run with the field still in its trigger
+      //       state (so the prior recovery also failed). Logged on
+      //       `judgment.staleUserRecovery` (events list with outcome).
+      //
+      //   (B) Trust-transfer from a verified user-supplied website — when
+      //       `website` is ChangedByUser AND verified at agrees+high, the
+      //       team lead is treated as broadly trustworthy on this team, so
+      //       other ChangedByUser fields whose AI verdict was less than
+      //       agrees+high are suppressed too. Logged on
+      //       `judgment.userTrustTransfer.droppedFields`.
+      //
+      // `reviewSuppressedFields` is the flat union — what the review
+      // endpoint actually consults to decide visibility.
+      const reviewSuppressedFields = new Set<FieldMetaKey>();
+
       const recoveryWasAlreadyAttempted = existingMeta.judgment?.staleUserRecoveryAttempted === true;
       const triggerStillFires = (field: FieldMetaKey): boolean => {
         const meta = mergedFieldsMeta[field];
@@ -642,7 +647,7 @@ export class TeamEnrichmentJudgeService {
         'contactMethod',
         'twitterHandler',
       ];
-      const droppedFromReview: FieldMetaKey[] = [];
+      const recoverySuppressed: FieldMetaKey[] = [];
       for (const field of recoverableFields) {
         if (mergedFieldsMeta[field]?.status !== FieldEnrichmentStatus.ChangedByUser) continue;
         const thisRunEvent = recovery.events.find((e) => e.field === field);
@@ -650,20 +655,61 @@ export class TeamEnrichmentJudgeService {
           !!thisRunEvent && (thisRunEvent.outcome === 'no-better-candidate' || thisRunEvent.outcome === 'verify-failed');
         const stuckFromPrior = recoveryWasAlreadyAttempted && !thisRunEvent && triggerStillFires(field);
         if (!thisRunFailed && !stuckFromPrior) continue;
-        const fm = mergedFieldsMeta[field];
-        if (fm) {
-          const { judgment: _stripped, ...rest } = fm;
-          mergedFieldsMeta[field] = rest as FieldEnrichmentMeta;
-        }
-        delete allVerdicts[field];
+        reviewSuppressedFields.add(field);
+        recoverySuppressed.push(field);
         const idx = fieldsForReview.indexOf(field);
         if (idx >= 0) fieldsForReview.splice(idx, 1);
-        droppedFromReview.push(field);
       }
-      if (droppedFromReview.length > 0) {
+      if (recoverySuppressed.length > 0) {
         this.logger.log(
-          `Recovery: team ${team.uid} (${team.name}) dropping fields from review (no actionable signal for admin): [${droppedFromReview.join(',')}]`
+          `Recovery: team ${team.uid} (${team.name}) suppressing fields from review (no actionable signal for admin): [${recoverySuppressed.join(',')}] — AI verdicts preserved on fieldsMeta`
         );
+      }
+
+      // Trust-transfer from a user-supplied website. When a ChangedByUser
+      // `website` value verifies at agrees+high (deterministic anchors fired
+      // — `name in website host`, `og name match`, `jsonld name match`, or
+      // ScrapingDog `website host match`), we take it as a strong signal that
+      // the team lead is broadly trustworthy on this team and add OTHER
+      // ChangedByUser fields to `reviewSuppressedFields`. Reasoning: a user
+      // who correctly nailed the team's canonical website almost certainly
+      // nailed the other team-contact fields too, and an admin scrolling
+      // through borderline AI verdicts for those fields is wasted work.
+      // `Enriched` fields are NOT affected — they're AI candidates not yet
+      // promoted, still subject to the usual review gate. The AI's per-field
+      // judgment on `fieldsMeta[field].judgment` is preserved verbatim — we
+      // only hide the field from the review queue, never overwrite or strip
+      // the verdict.
+      //
+      // Trade-off: false negatives are possible. A user who typed the right
+      // URL but a personal `@john_doe` twitter handle would silently bypass
+      // admin review. Mitigation: this only applies to user-judgable URL /
+      // social fields where the deterministic anchors couldn't already
+      // confirm them; structurally-wrong values (personal LinkedIn `in/`,
+      // free-provider personal contact email) still trigger Stage 3 recovery
+      // BEFORE this rule runs, so the obvious "wrong-shape" cases are
+      // already promoted/dropped before trust-transfer even looks.
+      const websiteIsUserTrusted =
+        mergedFieldsMeta.website?.status === FieldEnrichmentStatus.ChangedByUser &&
+        isAgreesHigh(mergedFieldsMeta.website?.judgment);
+      const userTrustTransferDropped: FieldMetaKey[] = [];
+      if (websiteIsUserTrusted) {
+        for (const field of USER_JUDGABLE_FIELD_KEYS) {
+          if (field === 'website') continue;
+          const fm = mergedFieldsMeta[field];
+          if (fm?.status !== FieldEnrichmentStatus.ChangedByUser) continue;
+          if (!fm.judgment) continue; // already nothing to surface
+          if (isAgreesHigh(fm.judgment)) continue; // not in review anyway, skip
+          reviewSuppressedFields.add(field);
+          userTrustTransferDropped.push(field);
+          const idx = fieldsForReview.indexOf(field);
+          if (idx >= 0) fieldsForReview.splice(idx, 1);
+        }
+        if (userTrustTransferDropped.length > 0) {
+          this.logger.log(
+            `Trust-transfer: team ${team.uid} (${team.name}) user-supplied website verified agrees+high — suppressing other ChangedByUser fields from review: [${userTrustTransferDropped.join(',')}] — AI verdicts preserved on fieldsMeta`
+          );
+        }
       }
 
       // Recovery may have overwritten field values for the quality pass —
@@ -698,6 +744,12 @@ export class TeamEnrichmentJudgeService {
         staleUserRecoveryAttempted:
           recovery.attempted || existingMeta.judgment?.staleUserRecoveryAttempted === true,
         ...(recovery.events.length > 0 ? { staleUserRecovery: recovery.events } : {}),
+        ...(userTrustTransferDropped.length > 0
+          ? { userTrustTransfer: { basis: 'website', droppedFields: userTrustTransferDropped } }
+          : {}),
+        ...(reviewSuppressedFields.size > 0
+          ? { reviewSuppressedFields: Array.from(reviewSuppressedFields) }
+          : {}),
       };
 
       const baseUsage = (refreshedMeta ?? existingMeta).usage;

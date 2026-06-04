@@ -481,7 +481,7 @@ Token usage from the website AI re-discovery rolls up into `usage.enrichment` (i
 
 #### Dead-/personal-user-value cleanup — no actionable signal, no review entry
 
-A consequence of recovery's existence: when a ChangedByUser field is in its trigger state (4xx website, 4xx blog, `in/<slug>` linkedin, free-provider personal contact email, or — for Twitter only — an X bio that named a successor we couldn't verify) AND recovery returned `no-better-candidate` / `verify-failed`, the field is **stripped from the review queue**. The judgment block on `fieldsMeta.<field>` is dropped and the field is removed from `fieldsForReview`. This mirrors how `hasJudgableValue` silently excludes shape-junk values (`"Coming soon!"`, `"n/a"`, etc.) at the judge gate — same operator-burden reasoning:
+A consequence of recovery's existence: when a ChangedByUser field is in its trigger state (4xx website, 4xx blog, `in/<slug>` linkedin, free-provider personal contact email, or — for Twitter only — an X bio that named a successor we couldn't verify) AND recovery returned `no-better-candidate` / `verify-failed`, the field is **suppressed from the review queue**. The AI's per-field `judgment` on `fieldsMeta.<field>` is **preserved verbatim** (the verdict, score, confidence, note, judgedVia all stay) — only the operational "show this in admin review" decision changes. The field is removed from `fieldsForReview` and added to `judgment.reviewSuppressedFields`, which `listEnrichmentsForReview` consults as a hide-list. This mirrors how `hasJudgableValue` silently excludes shape-junk values (`"Coming soon!"`, `"n/a"`, etc.) at the judge gate — same operator-burden reasoning:
 
 - The user supplied something the AI couldn't verify or replace.
 - A human reviewer looking at the field has no extra signal beyond what the AI already searched.
@@ -496,6 +496,34 @@ Fires in two situations:
 **Bot-blocked websites do NOT trigger the drop.** `websiteReachable === null` (Cloudflare 403, transient timeouts, etc.) is inconclusive evidence; the site is almost certainly fine for humans, and the field continues to surface in review under its existing verdict.
 
 To re-surface a dropped field (e.g., the team came back online and updated their bio), clear `dataEnrichment.judgment.staleUserRecoveryAttempted` so the next force-judge re-attempts recovery. The simplest practical path is the user editing `Team.<field>` to a fresh value — the regular `handleUserFieldChange` flow records the new value, the next enrichment cycle clears the judgment block, and the next judge run gets a clean shot at it.
+
+#### User trust-transfer from a verified website
+
+A separate review-pruning heuristic with the same end effect: drop ChangedByUser fields from the admin queue when there is no actionable signal admin review could add.
+
+**Rule**: when `team.website` is `ChangedByUser` AND its judgment is `agrees + high` (deterministic anchors confirm it's the team's canonical site — `name in website host`, `og name match`, `jsonld name match`, or ScrapingDog `website host match` — see Stage 1.5), every OTHER `ChangedByUser` user-judgable field (`blog`, `contactMethod`, `linkedinHandler`, `twitterHandler`, `telegramHandler`) whose individual verdict was less than `agrees + high` is added to `judgment.reviewSuppressedFields` so the admin review endpoint hides it. The AI's per-field `judgment` block is **preserved verbatim** on `fieldsMeta[field].judgment` — never overwritten, stripped, or downgraded. The judge's score for the field stays exactly what the AI assigned; only the operational queue decision is changed. `Enriched` fields are not touched.
+
+**Reasoning**: a user who correctly supplied the team's canonical website almost certainly supplied correct values for the other team-contact fields too. Admin review on borderline `uncertain`/`disagrees` verdicts for those fields is wasted work — the user has demonstrated they know the team's identity, and the AI judge is just unable to independently verify (which is the gap Stage 1.5 corroboration is designed to bridge, but doesn't always succeed at on small or niche teams).
+
+**Constraints (mirror the dead-value cleanup section above)**:
+- Only `ChangedByUser` fields are touched. `Enriched` candidates (AI-discovered, not yet promoted) are unaffected — they still surface in review at low/medium confidence as before, so empty-slot enrichment still flows through the normal review path.
+- Personal-shape values that triggered Stage 3 recovery (`linkedin-personal`, `contact-personal-email`) are handled by the recovery sub-pipeline FIRST — successful recoveries promote to `Enriched`, failures get dropped via the dead-value cleanup. Trust-transfer only runs after both, so the obvious wrong-shape cases are already resolved when trust-transfer looks at them.
+- Idempotent: re-runs of the judge produce the same trust-transfer outcome given the same input state.
+
+**Trade-off (worth knowing)**: a user who typed the right website but a personal-shape value on another field (e.g., wrong `@john_doe` twitter handle) that *didn't* trigger Stage 3 recovery would silently bypass admin review under this rule. We accept this trade-off because (a) Stage 3 already catches the deterministically-detectable personal-shape cases (`in/<slug>` linkedin, free-provider personal email), (b) admin time is a scarcer resource than perfect correctness on every social handle, and (c) the persisted log on `dataEnrichment.judgment.userTrustTransfer` lets admins audit exactly what was dropped — combined with the preserved `fieldsMeta[field].judgment` block, you can always see the AI's original verdict on a suppressed field even after it's been hidden from the queue.
+
+**Persisted log** on `TeamJudgment.userTrustTransfer`:
+
+```ts
+userTrustTransfer?: {
+  basis: FieldMetaKey;            // always 'website' today
+  droppedFields: FieldMetaKey[];  // e.g. ['contactMethod', 'twitterHandler']
+}
+```
+
+Omitted when no fields were dropped.
+
+To force a dropped field back into review (e.g., spot-check), edit the corresponding `Team.<field>` value or clear `dataEnrichment.judgment` outright — both paths cause the next judge run to start fresh on the affected fields. The cleanest is for the user to actually correct the field they got wrong; if they do, `handleUserFieldChange` records a fresh `lastModifiedAt`, and the next judge run re-evaluates with that newer signal.
 
 > **Canonical failure cases this fixes:**
 >
@@ -599,7 +627,20 @@ TeamEnrichment.dataEnrichment.judgment: {
   overallAssessment: string,       // max 120 chars — compact one-liner
   fieldsForReview: string[],       // DB column names needing manual check: ['website','contactMethod',...]
                                    // — includes every field whose judge verdict is disagrees,
-                                   //   uncertain, or agrees-at-low-confidence
+                                   //   uncertain, or agrees-at-low-confidence (minus anything in
+                                   //   reviewSuppressedFields below)
+  reviewSuppressedFields?: FieldMetaKey[],
+                                   // — hide-list consulted by listEnrichmentsForReview.
+                                   //   Fields here have an AI judgment on `fieldsMeta.<field>.judgment`
+                                   //   (NEVER stripped), but the admin review endpoint hides them
+                                   //   because there's no actionable signal a human reviewer could
+                                   //   add (Stage 3 recovery exhaustion) or because the user is
+                                   //   trusted via a verified ChangedByUser website (trust-transfer).
+                                   //   Reason per field is queryable via `staleUserRecovery` events
+                                   //   + `userTrustTransfer.droppedFields` below.
+  staleUserRecoveryAttempted?: boolean,
+  staleUserRecovery?: Array<{ field, trigger, outcome, priorValue, newValue, note }>,
+  userTrustTransfer?: { basis: FieldMetaKey, droppedFields: FieldMetaKey[] },
   scrapingDog?: {
     used, fetchedAt, nameMatch, companyNameFromLinkedIn, verifiedFields, linkedinInternalId,
     websiteReachable?: boolean | null,   // true = 2xx final, false = 4xx/5xx, null = not probed / transient / invalid URL

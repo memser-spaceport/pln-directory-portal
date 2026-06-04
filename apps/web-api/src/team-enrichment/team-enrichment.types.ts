@@ -167,6 +167,51 @@ export interface TeamJudgment {
     /** Free-text explainability (e.g. "old handle of @humntech"). Capped at 80 chars. */
     note?: string;
   }>;
+  /**
+   * Trust-transfer event log. Set when a user-supplied (ChangedByUser)
+   * `website` verifies at agrees+high — taken as a strong signal that the
+   * team lead is broadly trustworthy on this team. Other ChangedByUser
+   * fields whose individual verdicts were less than agrees+high are added
+   * to [[reviewSuppressedFields]] so the admin review endpoint hides them
+   * (their per-field `judgment` block is preserved on `fieldsMeta` —
+   * the AI's verdict is part of the audit trail and we never overwrite
+   * it).
+   *
+   * Stored for observability so admins can see WHY a ChangedByUser field
+   * isn't surfacing in `enrichment-review`.
+   */
+  userTrustTransfer?: {
+    /** The field whose agrees+high verdict triggered the transfer (always `website` today). */
+    basis: FieldMetaKey;
+    /** Other ChangedByUser fields whose review entry was dropped. */
+    droppedFields: FieldMetaKey[];
+  };
+  /**
+   * Operational hide-list for the admin review endpoint
+   * (`listEnrichmentsForReview` / `GET /v1/admin/teams/enrichment-review`).
+   * Fields named here are EXCLUDED from the review queue regardless of
+   * their `fieldsMeta[field].judgment` verdict. Reasons a field lands here:
+   *
+   *   - Stale-user-value recovery failed (`staleUserRecovery[].outcome ∈
+   *     {no-better-candidate, verify-failed}`) — the AI re-discovery /
+   *     verification turn came up empty, so admin review has no actionable
+   *     signal beyond what the AI already searched.
+   *   - Recovery was attempted in a prior run (flag set) and the field is
+   *     still in its trigger state — same "exhausted, no signal" reasoning.
+   *   - Trust-transfer fired (`userTrustTransfer.droppedFields`) — a
+   *     verified ChangedByUser website implies the team lead is broadly
+   *     trustworthy, so other borderline ChangedByUser verdicts are not
+   *     worth admin time.
+   *
+   * **The AI's per-field judgment is never modified, stripped, or
+   * downgraded** — `fieldsMeta[field].judgment` continues to carry the
+   * verdict the judge produced, with full `score`, `confidence`, `verdict`,
+   * `note`, and `judgedVia`. This list is purely an operational toggle on
+   * the review queue, derivable from `staleUserRecovery` + `userTrustTransfer`
+   * but cached here as a flat array so the review endpoint doesn't have to
+   * re-derive it per request.
+   */
+  reviewSuppressedFields?: FieldMetaKey[];
 }
 
 /**

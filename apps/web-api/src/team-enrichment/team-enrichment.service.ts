@@ -1573,6 +1573,14 @@ export class TeamEnrichmentService {
       const meta = this.parseEnrichmentMeta(row.dataEnrichment);
       if (!meta?.fieldsMeta) continue;
 
+      // Fields the judge marked as suppressed (Stage 3 recovery exhaustion
+      // OR website trust-transfer). The AI's per-field judgment is still on
+      // `fieldsMeta[field].judgment` — we never overwrite it — but the
+      // review endpoint treats these fields as if they had no judgment for
+      // visibility purposes. See `dataEnrichment.judgment.reviewSuppressedFields`
+      // doc in `team-enrichment.types.ts` for the full rule.
+      const suppressed = new Set<FieldMetaKey>(meta.judgment?.reviewSuppressedFields ?? []);
+
       // A field is "auto-approved" iff the judge would have promoted it, i.e.
       // verdict=agrees AND confidence=high (admin approval also normalizes to this).
       // Score is intentionally NOT the gate — ScrapingDog/AI can emit score=90
@@ -1582,6 +1590,7 @@ export class TeamEnrichmentService {
       // verdict='verified' AND confidence='high' (what admin-approve writes).
       const hasUnapprovedField = Object.entries(meta.fieldsMeta).some(([k, fm]) => {
         if (k === 'logo' || !fm?.judgment) return false;
+        if (suppressed.has(k as FieldMetaKey)) return false;
         return !(fm.judgment.verdict === JudgmentVerdict.Agrees && fm.judgment.confidence === FieldConfidence.High);
       });
       // A team also needs review when a ChangedByUser field's *user value*
@@ -1594,6 +1603,7 @@ export class TeamEnrichmentService {
       // `https://andendigital.com/`.
       const hasJunkUserValueWithAiAlt = (Object.keys(meta.fieldsMeta) as FieldMetaKey[]).some((k) => {
         if (k === 'logo') return false;
+        if (suppressed.has(k)) return false;
         const fm = meta.fieldsMeta[k];
         if (fm?.status !== FieldEnrichmentStatus.ChangedByUser) return false;
         const teamValue = (row.team as any)[k];
@@ -1618,6 +1628,11 @@ export class TeamEnrichmentService {
         [FieldMetaKey, FieldEnrichmentMeta | undefined]
       >) {
         if (keyStr === 'moreDetails') continue;
+        // Suppressed by the judge's recovery-exhaustion or trust-transfer
+        // logic — the AI's verdict is still on `fieldMeta.judgment` for
+        // audit, but the operational decision is to hide this field from
+        // admin review.
+        if (suppressed.has(keyStr)) continue;
 
         // Logo: no AI judgment exists (logo isn't judged — binary presence, not semantic).
         // Emit it as a regular field with `content = Image.url` so the UI can iterate
