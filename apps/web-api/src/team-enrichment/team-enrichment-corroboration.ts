@@ -245,7 +245,8 @@ function matchFounderContactUrl(
 
 export function corroborateTwitterHandler(
   value: string | null,
-  ctx: CorroborationContext
+  ctx: CorroborationContext,
+  opts: { isUserOwned?: boolean } = {}
 ): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   const candidate = value.replace(/^@/, '').trim().toLowerCase();
@@ -262,12 +263,23 @@ export function corroborateTwitterHandler(
   if (hostFirstLabelMatchesTeamName(ctx.teamName, candidate)) {
     return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'name in twitter handle');
   }
+
+  // User-trusted fallback. Mirrors contactMethod's same rule: the team lead
+  // supplied this handle, none of the deterministic anchors matched, but the
+  // value already passed `isLikelyValueForField` (valid handle shape).
+  // Re-queueing it for admin review forever provides no information the lead
+  // doesn't already have. Score 85 < deterministic anchors so any future
+  // anchor match would outrank this fallback in a merge.
+  if (opts.isUserOwned) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
+  }
   return null;
 }
 
 export function corroborateLinkedinHandler(
   value: string | null,
-  ctx: CorroborationContext
+  ctx: CorroborationContext,
+  opts: { isUserOwned?: boolean } = {}
 ): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   const norm = (s: string) =>
@@ -289,12 +301,17 @@ export function corroborateLinkedinHandler(
   if (hostFirstLabelMatchesTeamName(ctx.teamName, slug)) {
     return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'name in linkedin slug');
   }
+
+  if (opts.isUserOwned) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
+  }
   return null;
 }
 
 export function corroborateTelegramHandler(
   value: string | null,
-  ctx: CorroborationContext
+  ctx: CorroborationContext,
+  opts: { isUserOwned?: boolean } = {}
 ): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   const candidate = value.replace(/^@/, '').trim().toLowerCase();
@@ -307,6 +324,10 @@ export function corroborateTelegramHandler(
 
   if (hostFirstLabelMatchesTeamName(ctx.teamName, candidate)) {
     return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'name in telegram handle');
+  }
+
+  if (opts.isUserOwned) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
   }
   return null;
 }
@@ -347,23 +368,38 @@ export function extractBlogHandle(blogUrl: string): string | null {
   // Note: substack.com appears in BOTH the subdomain branch (publication URLs)
   // and here (user-profile URLs). The subdomain branch only fires when host !==
   // platform, so the two patterns don't collide.
-  const pathPlatforms: Record<string, 'at-handle' | 'plain'> = {
-    'medium.com': 'at-handle',
+  //
+  // `'either'` style accepts both `@<handle>` and plain `<slug>` first
+  // segments — Medium uses both (`medium.com/@user` for profiles,
+  // `medium.com/<publication>` for team publications). Reserved routes
+  // (`tag`, `p`, `m`, etc.) are filtered below to avoid false-matching them
+  // as publication slugs.
+  const pathPlatforms: Record<string, 'at-handle' | 'plain' | 'either'> = {
+    'medium.com': 'either',
     'substack.com': 'at-handle',
     'paragraph.xyz': 'at-handle',
     'mirror.xyz': 'plain',
     'dev.to': 'plain',
     'hashnode.com': 'at-handle',
   };
+  // Reserved first-path segments that aren't team-identifying slugs on the
+  // platforms above. Apply only to `'plain'` and `'either'` styles (an
+  // `@<handle>` is always identity-bearing).
+  const PLATFORM_RESERVED_SEGMENTS = new Set([
+    'tag', 'tags', 'topic', 'topics',
+    'm', 'me', 'p', 's', '_',
+    'signin', 'signup', 'search', 'about',
+    'policy', 'terms', 'help', 'subscribe',
+  ]);
   const style = pathPlatforms[host];
   if (style && segments.length > 0) {
     const first = decodeURIComponent(segments[0]);
-    if (style === 'at-handle' && first.startsWith('@')) {
+    if ((style === 'at-handle' || style === 'either') && first.startsWith('@')) {
       return first.slice(1).toLowerCase();
     }
-    if (style === 'plain') {
-      // Strip ENS-style suffix common on mirror.xyz handles ("acme.eth" -> "acme").
-      return first.replace(/\.eth$/i, '').toLowerCase();
+    if (style === 'plain' || style === 'either') {
+      const slug = first.replace(/\.eth$/i, '').toLowerCase();
+      if (!PLATFORM_RESERVED_SEGMENTS.has(slug)) return slug;
     }
   }
 
@@ -402,7 +438,11 @@ export function extractInviteSlug(rawUrl: string): string | null {
   return null;
 }
 
-export function corroborateBlog(value: string | null, ctx: CorroborationContext): FieldJudgment | null {
+export function corroborateBlog(
+  value: string | null,
+  ctx: CorroborationContext,
+  opts: { isUserOwned?: boolean } = {}
+): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   const blogHost = normalizeHost(value);
   const siteHost = normalizeHost(ctx.website);
@@ -412,14 +452,46 @@ export function corroborateBlog(value: string | null, ctx: CorroborationContext)
     return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'host corroborated');
   }
 
-  // Third-party platform, team name in the URL handle. Same prefix-only check
-  // the social handle rules use — catches abbreviated forms (`astera.substack.com`
-  // for "Astera Institute" works because the handle starts with "astera").
+  // 3rd-party platforms (Substack / Medium / Ghost / paragraph / Mirror /
+  // dev.to / Hashnode / Beehiiv / Posthaven) check the team-name match
+  // against the URL HANDLE, not the host — host is the platform, the slug
+  // is the team identifier.
   const handle = extractBlogHandle(value);
-  if (handle && hostFirstLabelMatchesTeamName(ctx.teamName, handle)) {
-    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'name in blog handle');
+  if (handle) {
+    if (hostFirstLabelMatchesTeamName(ctx.teamName, handle)) {
+      return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'name in blog handle');
+    }
+    // 3rd-party platform with a handle that doesn't match the team token —
+    // trust ChangedByUser values. Legitimate cases this catches:
+    //   - Mirror.xyz with a wallet-address publication slug (`mirror.xyz/0x…`)
+    //     — team's on-chain blog whose slug is by construction not name-matchable.
+    //   - Archival Medium/Substack URLs where the team has rebranded so the
+    //     handle no longer matches the current team name.
+    //   - Hashnode / dev.to handles that use a personal-handle convention
+    //     rather than the team name.
+    // AI-supplied values still fall through to the AI judge — return null
+    // so the host-name fallback below also doesn't leak through (would
+    // match the platform host's first-label on its own).
+    if (opts.isUserOwned) {
+      return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
+    }
+    return null;
   }
 
+  // Custom-domain blog (not on a recognized platform) whose host first-label
+  // matches a substantive team-name token. Mirrors `name in website host`.
+  // Catches team "Near" with website `near.foundation` and blog
+  // `near.org/blog/...` — different hosts so `host corroborated` can't fire,
+  // not a 3rd-party platform so `name in blog handle` can't fire, but the
+  // host first-label `near` matches the team token. Same prefix-only guard
+  // as the website rule (`beontop.com` is correctly NOT a match for "Eon").
+  if (hostFirstLabelMatchesTeamName(ctx.teamName, blogHost)) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, 'name in blog host');
+  }
+
+  if (opts.isUserOwned) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
+  }
   return null;
 }
 
@@ -434,7 +506,11 @@ export function corroborateBlog(value: string | null, ctx: CorroborationContext)
  * rule fire when a name anchor matches — many real sites are alive in a
  * browser but 403 to non-browser fetches.
  */
-export function corroborateWebsite(value: string | null, ctx: CorroborationContext): FieldJudgment | null {
+export function corroborateWebsite(
+  value: string | null,
+  ctx: CorroborationContext,
+  opts: { isUserOwned?: boolean } = {}
+): FieldJudgment | null {
   if (!value || typeof value !== 'string') return null;
   if (ctx.websiteReachable === false) return null;
   const siteHost = normalizeHost(value);
@@ -464,11 +540,20 @@ export function corroborateWebsite(value: string | null, ctx: CorroborationConte
     anchorsFired.push('sd website host match');
   }
 
-  if (anchorsFired.length === 0) return null;
-  // First anchor establishes high-confidence agreement; additional anchors
-  // are appended for explainability but don't change the verdict.
-  const note = anchorsFired.join(' + ');
-  return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, note);
+  if (anchorsFired.length > 0) {
+    // First anchor establishes high-confidence agreement; additional anchors
+    // are appended for explainability but don't change the verdict.
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 95, anchorsFired.join(' + '));
+  }
+
+  // User-trusted fallback: lead-supplied URL passing shape gate, no
+  // deterministic anchor matched, and reachability isn't definitively false
+  // (the early-return above blocked websiteReachable === false). Trust the
+  // lead's authority over their own website rather than queueing for review.
+  if (opts.isUserOwned) {
+    return makeJudgment(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'user trusted');
+  }
+  return null;
 }
 
 /**
@@ -486,9 +571,21 @@ export function corroborateWebsite(value: string | null, ctx: CorroborationConte
 export function corroborateBySource(
   source: string | undefined,
   enrichmentConfidence: string | undefined,
-  field?: FieldMetaKey
+  field?: FieldMetaKey,
+  ctx?: CorroborationContext
 ): FieldJudgment | null {
   if (enrichmentConfidence !== 'high') return null;
+
+  // Liveness veto: source-trust is a metadata-only check, blind to whether
+  // the underlying URL is still live. For the `website` field, the judge
+  // pipeline runs a reachability probe on every invocation — if the site
+  // currently returns a definitive 4xx/5xx, do NOT auto-promote on stale
+  // enrichment-time provenance. The website corroboration rule and the AI
+  // judge will then re-evaluate with current reachability as a real signal.
+  // Bot-block codes (`null` reachability) don't veto — the site is probably
+  // alive in a browser, our probe just looks like a bot.
+  if (field === 'website' && ctx?.websiteReachable === false) return null;
+
   if (source === EnrichmentSource.ScrapingDog) {
     // LinkedIn ScrapingDog never fills `twitterHandler` / `telegramHandler` —
     // those come from a separate ScrapingDog endpoint. Surface the actual

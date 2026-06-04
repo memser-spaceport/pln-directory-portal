@@ -1,4 +1,5 @@
 import {
+  extractSupersedingTwitterHandle,
   ScrapingDogTwitterProfile,
   TeamEnrichmentScrapingDogService,
   verifyTwitterProfileMatchesTeam,
@@ -222,5 +223,110 @@ describe('verifyTwitterProfileMatchesTeam', () => {
     );
     expect(v.verified).toBe(true);
     expect(v.anchors).toEqual(['name match', 'handle prefix match']);
+  });
+});
+
+describe('extractSupersedingTwitterHandle', () => {
+  // Canonical case the recovery path was designed around — clpr2ryag0002vg02fmgdd6ay
+  // (human.tech, by Holonym). The user-supplied handle @0xHolonym still resolves
+  // on X, but the X bio explicitly identifies the successor account.
+  it('extracts handle from "old handle of @X" — the canonical Holonym case', () => {
+    expect(
+      extractSupersedingTwitterHandle('This is the old handle of @humntech', '0xHolonym')
+    ).toEqual({ newHandle: 'humntech', pattern: 'old handle of' });
+  });
+
+  it('handles "old account of"', () => {
+    expect(extractSupersedingTwitterHandle('Old account of @newco', 'oldco')).toEqual({
+      newHandle: 'newco',
+      pattern: 'old handle of',
+    });
+  });
+
+  it('handles "moved to @X"', () => {
+    expect(extractSupersedingTwitterHandle("We've moved to @newco — see you there!", 'oldco')).toEqual({
+      newHandle: 'newco',
+      pattern: 'moved to',
+    });
+  });
+
+  it('handles "migrated to @X" / "switched to @X"', () => {
+    expect(extractSupersedingTwitterHandle('Migrated to @newco', 'oldco')).toEqual({
+      newHandle: 'newco',
+      pattern: 'moved to',
+    });
+    expect(extractSupersedingTwitterHandle('Switched to @newco for updates', 'oldco')).toEqual({
+      newHandle: 'newco',
+      pattern: 'moved to',
+    });
+  });
+
+  it('handles "rebranded to @X" / "renamed as @X"', () => {
+    expect(extractSupersedingTwitterHandle('Rebranded to @newco in 2024', 'oldco')).toEqual({
+      newHandle: 'newco',
+      pattern: 'rebranded to',
+    });
+    expect(extractSupersedingTwitterHandle('Renamed as @newco', 'oldco')).toEqual({
+      newHandle: 'newco',
+      pattern: 'rebranded to',
+    });
+  });
+
+  it('handles "new account is @X" / "main handle is @X"', () => {
+    expect(extractSupersedingTwitterHandle('Our new account is @newco', 'oldco')).toEqual({
+      newHandle: 'newco',
+      pattern: 'new account is',
+    });
+    expect(extractSupersedingTwitterHandle('Main handle: @newco', 'oldco')).toEqual({
+      newHandle: 'newco',
+      pattern: 'new account is',
+    });
+  });
+
+  it('handles "follow us at @X"', () => {
+    expect(extractSupersedingTwitterHandle('Inactive. Follow us at @newco', 'oldco')).toEqual({
+      newHandle: 'newco',
+      pattern: 'follow us at',
+    });
+  });
+
+  it('lowercases the extracted handle (X usernames are case-insensitive)', () => {
+    expect(extractSupersedingTwitterHandle('Old handle of @HumnTech', '0xholonym')).toEqual({
+      newHandle: 'humntech',
+      pattern: 'old handle of',
+    });
+  });
+
+  it('returns null when the matched handle equals the current handle', () => {
+    // A description that mentions its own handle isn't superseding itself.
+    expect(
+      extractSupersedingTwitterHandle('We are @humntech, formerly known as the old handle of @humntech', 'humntech')
+    ).toBeNull();
+  });
+
+  it('returns null on empty / missing description', () => {
+    expect(extractSupersedingTwitterHandle(null, 'oldco')).toBeNull();
+    expect(extractSupersedingTwitterHandle(undefined, 'oldco')).toBeNull();
+    expect(extractSupersedingTwitterHandle('', 'oldco')).toBeNull();
+  });
+
+  it('does NOT match generic "follow @X" mentions', () => {
+    // Avoid silently rebinding to whatever handle the bio mentions.
+    expect(extractSupersedingTwitterHandle('Follow @ourpartners for updates', 'oldco')).toBeNull();
+    expect(extractSupersedingTwitterHandle('Big shoutout to @anotherteam', 'oldco')).toBeNull();
+  });
+
+  it('does NOT match "now hiring @recruiter" (verb between "now" and @ blocks it)', () => {
+    // The pattern set intentionally omits a bare "now @X" — too risky.
+    expect(extractSupersedingTwitterHandle('We are now hiring — apply to @recruiter', 'oldco')).toBeNull();
+  });
+
+  it('does NOT match mid-word substrings or hyphen-extended handles', () => {
+    // X handles are alphanumeric + underscore; the regex stops at the first
+    // non-handle char so "@oldco-team" extracts "oldco" but the equality
+    // guard against the current handle drops it.
+    expect(
+      extractSupersedingTwitterHandle('Old handle of @oldco-team', 'oldco')
+    ).toBeNull();
   });
 });

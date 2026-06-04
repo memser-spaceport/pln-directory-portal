@@ -203,6 +203,54 @@ All enrichment writes target `TeamEnrichment` (candidate values + `dataEnrichmen
 
 After enrichment completes, a separate **AI Judge** cron independently verifies each enriched field, then **promotes high-confidence values from `TeamEnrichment` onto `Team`** in the same transaction. The judge uses a **different AI model** from the enricher (configurable via `TEAM_ENRICHMENT_JUDGE_AI_PROVIDER`) and can leverage ScrapingDog's LinkedIn profile for a deterministic first stage where applicable. Verdict metadata is written back to `TeamEnrichment.dataEnrichment.judgment` and `fieldsMeta[field].judgment`.
 
+### Pipeline at a glance
+
+Per field, the judge walks a cost-tiered ladder. A field exits the pipeline at the first tier that fires `agrees+high` (auto-promote) or `disagrees+low` (definitive negative). Anything that falls all the way through reaches the AI judge.
+
+```mermaid
+flowchart TD
+  Start([Enriched field to verify]) --> Probe[Website reachability probe<br/>NETWORK_PROBE · runs once per team]
+  Probe --> SD{Stage 1 · SCRAPING_API<br/>ScrapingDog LinkedIn<br/>name match exact/partial?}
+  SD -->|yes| SDV[Per-field comparators<br/>linkedinHandler · descriptions<br/>industryTags · moreDetails]
+  SD -->|no / skipped| ST
+  SDV --> ST
+
+  ST{Stage 1.5 · SOURCE_TRUST<br/>value was filled at enrichment time<br/>by a trusted source at high confidence?<br/>fieldsMeta.source ∈ scrapingdog or open-graph}
+  ST -->|yes| Promote
+  ST -->|no| FR
+
+  FR{Stage 1.5 · DETERMINISTIC<br/>per-field corroboration:<br/>contactMethod · twitter · linkedin<br/>telegram · blog · website<br/>≥2 anchors converge?}
+  FR -->|yes| Promote
+  FR -->|no| UT
+
+  UT{Stage 1.5 · user-trusted fallback<br/>ChangedByUser + shape ok?<br/>no hard-disprove signal?}
+  UT -->|yes| Promote
+  UT -->|no| AI
+
+  AI[Stage 2 · AI judge<br/>LLM + web search · low temperature<br/>verify candidate on its own merits]
+  AI -->|agrees+high| Promote
+  AI -->|disagrees / uncertain / low| SR
+
+  SR{Stage 3 · stale-user recovery<br/>ChangedByUser field with hard signal?<br/>website/blog 4xx · in slug linkedin<br/>free-provider personal email · X bio names successor}
+  SR -->|website 4xx · blog 4xx · in slug linkedin · personal email| AIRD[Shared AI re-discovery<br/>+ per-field verification:<br/>probe · Stage 1.5 corroboration · sd company]
+  SR -->|twitter superseded| XV[Re-fetch ScrapingDog X<br/>for named successor handle<br/>+ verifyTwitterProfileMatchesTeam]
+  SR -->|no signal| Review
+  AIRD -->|verified| Promote
+  AIRD -->|verify-failed| Drop[Dropped from review<br/>no actionable signal]
+  XV -->|verified| Promote
+  XV -->|verify-failed| Drop
+
+  Promote([Auto-promote to Team])
+  Review([Admin review queue<br/>fieldsForReview])
+  Drop([No action · stays as-is on Team])
+```
+
+The whole point of the ladder is to detect correctness (or incorrectness) as cheaply as possible — every tier the field clears saves a downstream AI call and a row in the admin review queue.
+
+> **Note on `open-graph`** — the `open-graph` source tag is populated during the **enrichment phase** (not visualized above), where the website signal extractor pulls JSON-LD `Organization` nodes, OG tags, Twitter Cards, microdata, and anchor hrefs from the team's own website HTML. The judge's SOURCE_TRUST rule just reads the `fieldsMeta[field].source` metadata that was written then. ScrapingDog provenance is set both at enrichment time (`scrapingdog` company / X profile fills) and re-confirmed at judge time (Stage 1).
+
+See `team-enrichment-judge-pipeline.ts` for the typed registry and the `team-enrichment-rules` Claude Skill for the rule-extension guide.
+
 ### Promotion rule
 
 For each Enriched field whose Stage 1 or Stage 2 verdict is `agrees` at `high` confidence, the judge writes the candidate value from `TeamEnrichment` to its corresponding home:
@@ -214,7 +262,7 @@ For each Enriched field whose Stage 1 or Stage 2 verdict is `agrees` at `high` c
 | `investmentFocus`                              | `InvestorProfile.investmentFocus` (creating the profile if missing) |
 | `logo`                                         | **not promoted by the judge** — logo isn't judged. Stays on `TeamEnrichment.logoUid` until the logo-verification pipeline or an admin review handles it. |
 
-Anything less than `agrees + high` stays on `TeamEnrichment` only — the user-facing `Team` row does not receive it. Fields whose status is `ChangedByUser` are never promoted (the user's value is already on `Team`; the candidate, if any, is informational).
+Anything less than `agrees + high` stays on `TeamEnrichment` only — the user-facing `Team` row does not receive it. Fields whose status is `ChangedByUser` are never promoted (the user's value is already on `Team`; the candidate, if any, is informational) **with one narrow exception**: the [stale-user-value recovery](#stage-3--stale-user-value-recovery) sub-pipeline flips a ChangedByUser field to `Enriched` and promotes a fresh candidate when there is hard evidence the user's value is no longer canonical (4xx website, X bio that names a successor handle). Recovery never fires on ambiguous AI verdicts — only on deterministic staleness signals.
 
 ### What the judge evaluates
 
@@ -223,7 +271,7 @@ Anything less than `agrees + high` stays on `TeamEnrichment` only — the user-f
   - any field whose `fieldsMeta[field].status === Enriched` (reads the candidate from `TeamEnrichment.<field>`), OR
   - a **user-supplied** website / contact link (`fieldsMeta[field].status === ChangedByUser`, reads from `Team.<field>`) — restricted to: `website`, `blog`, `contactMethod`, `linkedinHandler`, `twitterHandler`, `telegramHandler`. These are the high-signal identity fields a team lead can fill in directly, and we want an independent check that the value really belongs to the team.
 - **Excluded**: `logo` (binary presence, not a semantic value), `CannotEnrich`, any `ChangedByUser` field outside the user-judgable subset above (descriptions, `industryTags`, `investmentFocus`).
-- **Non-destructive for user data**: when judging a `ChangedByUser` field, the judge writes only the `judgment` sub-object. The field's value on `Team`, its `status`, `confidence`, and `source` are preserved verbatim, and the promotion path is bypassed. A "disagrees" verdict surfaces the field in `fieldsForReview` for admin review but never overwrites the user's input. The bad-LinkedIn-handle nulling path also continues to skip user-supplied handles.
+- **Non-destructive for user data — by default**: when judging a `ChangedByUser` field, the judge writes only the `judgment` sub-object. The field's value on `Team`, its `status`, `confidence`, and `source` are preserved verbatim, and the promotion path is bypassed. A "disagrees" or "uncertain" verdict surfaces the field in `fieldsForReview` for admin review but never overwrites the user's input. The bad-LinkedIn-handle nulling path also continues to skip user-supplied handles. The single exception is the [Stage 3 stale-user-value recovery](#stage-3--stale-user-value-recovery) — fires only on deterministic staleness signals (4xx website, X bio naming a successor handle) and is idempotent per team via `judgment.staleUserRecoveryAttempted`.
 
 ### Two stages
 
@@ -393,6 +441,98 @@ The enrichment-time `confidence` must be `high` — `medium`/`low` indicates the
 
 The full rule implementations + an eval bench live in `team-enrichment-corroboration.ts` and `team-enrichment-corroboration.spec.ts`. The bench pins precision/recall: any rule change that regresses fixtures fails CI.
 
+### Stage 3 — Stale User-Value Recovery
+
+Runs after Stage 1.5 + Stage 2 finish, **only** on `ChangedByUser` fields that carry hard evidence the user's value is no longer the team's canonical one. Lives in `team-enrichment-judge.service.ts → attemptStaleUserRecovery`. Idempotent per team via `dataEnrichment.judgment.staleUserRecoveryAttempted` — the next enrichment write clears the flag (the judgment block is rebuilt fresh from each enrichment run), so the recovery can re-fire if a later edit produces a new stale value.
+
+Triggers are deterministic, narrow, and per-field. The judge does **not** re-enrich a field just because its first verdict was `disagrees` or `uncertain`: those are too noisy a gate to justify rewriting user data without explicit staleness evidence.
+
+| Trigger | Signal | Field(s) | Recovery action | Cost |
+| --- | --- | --- | --- | --- |
+| `website-4xx` | Reachability probe returned a definitive 4xx / 5xx (`websiteReachable === false`). Bot-blocked (403, etc.) does NOT count — see [reachability probe](#two-stages). | `website` | Focused AI re-discovery (`enrichTeamViaAI` with the website slot blanked + user-confirmed description hints). Re-probe the new URL; if reachable, run a single-field Stage 1.5 corroboration pass on the new URL. On `agrees + high` the new URL replaces the user's. | Shared AI call¹ + 1 HTTP probe |
+| `blog-4xx` | Symmetric to website-4xx: a dedicated blog reachability probe (same `probeWebsiteReachable` helper) returned a definitive 4xx / 5xx. | `blog` | Focused AI re-discovery (blog slot blanked). Probe + single-field Stage 1.5 corroboration on the new URL (rules: `host corroborated`, `name in blog handle`). | Shared AI call¹ + 1 HTTP probe |
+| `linkedin-personal` | `team.linkedinHandler` is structurally a personal LinkedIn profile (`in/<slug>` form, full or bare). Teams should be on `company/<slug>`; pasting a personal `/in/` URL is the canonical "user supplied wrong-shape value" case. | `linkedinHandler` | AI re-discovery + **strict** verification: `ScrapingDog.fetchCompanyProfile(newHandle)` must return `kind: 'ok'` AND `classifyNameMatch !== 'none'`. Only a real, name-matching company profile is accepted. Replaces with `source: scrapingdog + high`. | Shared AI call¹ + 1 ScrapingDog LinkedIn call |
+| `contact-personal-email` | `team.contactMethod` is an email at a known consumer provider (`FREE_EMAIL_DOMAINS` — gmail, yahoo, hotmail, outlook, icloud, proton, fastmail, …) AND is NOT on the team-lead Member roster (so the existing Stage 1.5 `founder contact match` rule didn't promote it). | `contactMethod` | AI re-discovery + single-field Stage 1.5 corroboration (rules: `email domain matches website`, `email domain matches jsonld`, `founder contact match`, etc.). Rejected if the AI candidate is ALSO a personal-provider email. | Shared AI call¹ |
+| `twitter-superseded` | Existing `team.twitterHandler` resolves to an X profile whose `description` matches one of `SUPERSEDING_HANDLE_PATTERNS` (`"old handle of @X"`, `"moved to @X"`, `"rebranded to @X"`, `"new account is @X"`, `"follow us at @X"`). | `twitterHandler` | Extract the named successor handle, re-fetch ScrapingDog X for it, run the existing `verifyTwitterProfileMatchesTeam` against the team identity. On verified, the new handle replaces the user's at `source=scrapingdog + confidence=high` — Stage 1.5's source-trust rule auto-promotes it (no AI judge call). | 2 ScrapingDog X calls |
+
+¹ When **any** of `website-4xx`, `blog-4xx`, `linkedin-personal`, `contact-personal-email` fires, the recovery makes a **single** `enrichTeamViaAI` call covering all of them — fields triggering recovery are passed as null (so the model rediscovers), fields the user trusts are passed verbatim (so the model has context). N triggered fields = 1 AI call. Twitter is independent (deterministic, no AI).
+
+A recovered field is written to `TeamEnrichment.<field>` AND has its `fieldsMeta[field].status` flipped from `ChangedByUser` → `Enriched`. The caller's `buildPromotionPayload` then sees the field as `Enriched` + `agrees + high` and promotes it to `Team.<field>` in the same transaction as the verdict write. From here on out the field behaves like any other AI-enriched-then-judge-promoted field: a future user edit flips it back to `ChangedByUser`, the next force-enrichment skips it via the `alreadyPromoted` guard, etc.
+
+**Provenance is preserved on `TeamJudgment.staleUserRecovery`** — a per-event log on the team-level judgment block so admins can see exactly which user values the judge superseded and why:
+
+```ts
+staleUserRecovery?: Array<{
+  field: FieldMetaKey;
+  trigger:
+    | 'website-4xx'
+    | 'blog-4xx'
+    | 'linkedin-personal'
+    | 'contact-personal-email'
+    | 'twitter-superseded';
+  outcome: 'recovered' | 'no-better-candidate' | 'verify-failed';
+  priorValue?: string | null;    // original user value
+  newValue?: string | null;       // what we wrote (when recovered)
+  note?: string;                  // short explainability (e.g. "old handle of -> @humntech")
+}>
+```
+
+Token usage from the website AI re-discovery rolls up into `usage.enrichment` (it IS an enrichment call by lineage — discovery, not verification), not `usage.judge`. The judge cron logs include `recovered=[...]` alongside `promoted=[...]` so the recovery rate is visible without parsing the JSON block.
+
+#### Dead-/personal-user-value cleanup — no actionable signal, no review entry
+
+A consequence of recovery's existence: when a ChangedByUser field is in its trigger state (4xx website, 4xx blog, `in/<slug>` linkedin, free-provider personal contact email, or — for Twitter only — an X bio that named a successor we couldn't verify) AND recovery returned `no-better-candidate` / `verify-failed`, the field is **suppressed from the review queue**. The AI's per-field `judgment` on `fieldsMeta.<field>` is **preserved verbatim** (the verdict, score, confidence, note, judgedVia all stay) — only the operational "show this in admin review" decision changes. The field is removed from `fieldsForReview` and added to `judgment.reviewSuppressedFields`, which `listEnrichmentsForReview` consults as a hide-list. This mirrors how `hasJudgableValue` silently excludes shape-junk values (`"Coming soon!"`, `"n/a"`, etc.) at the judge gate — same operator-burden reasoning:
+
+- The user supplied something the AI couldn't verify or replace.
+- A human reviewer looking at the field has no extra signal beyond what the AI already searched.
+- Asking the admin to "review" the field is wasted work — they'd open it, see a dead/personal value with no suggested alternative, and have to skip.
+
+**Applies to** `website`, `blog`, `linkedinHandler`, `contactMethod`, and `twitterHandler` — every field with a recovery trigger. Twitter is included even when its recovery never returned a candidate (verify-failed counts as exhausted: the X bio gave us a named successor, we tried, the verification rules said no — a manual reviewer has no extra information about that handle's identity that the rules didn't already check).
+
+Fires in two situations:
+- **This-run failure**: recovery's events log shows `outcome === 'no-better-candidate'` or `outcome === 'verify-failed'` for the field.
+- **Stuck from a prior run**: `staleUserRecoveryAttempted === true` is set on the team AND the field is still in its trigger state (still 4xx, still `in/<slug>`, still free-provider personal email). Recovery short-circuited this run via the flag, but the field is still in the dead/personal state — meaning the prior recovery must also have failed (otherwise the field would have been promoted to `Enriched`). Same treatment as the this-run case.
+
+**Bot-blocked websites do NOT trigger the drop.** `websiteReachable === null` (Cloudflare 403, transient timeouts, etc.) is inconclusive evidence; the site is almost certainly fine for humans, and the field continues to surface in review under its existing verdict.
+
+To re-surface a dropped field (e.g., the team came back online and updated their bio), clear `dataEnrichment.judgment.staleUserRecoveryAttempted` so the next force-judge re-attempts recovery. The simplest practical path is the user editing `Team.<field>` to a fresh value — the regular `handleUserFieldChange` flow records the new value, the next enrichment cycle clears the judgment block, and the next judge run gets a clean shot at it.
+
+#### User trust-transfer from a verified website
+
+A separate review-pruning heuristic with the same end effect: drop ChangedByUser fields from the admin queue when there is no actionable signal admin review could add.
+
+**Rule**: when `team.website` is `ChangedByUser` AND its judgment is `agrees + high` (deterministic anchors confirm it's the team's canonical site — `name in website host`, `og name match`, `jsonld name match`, or ScrapingDog `website host match` — see Stage 1.5), every OTHER `ChangedByUser` user-judgable field (`blog`, `contactMethod`, `linkedinHandler`, `twitterHandler`, `telegramHandler`) whose individual verdict was less than `agrees + high` is added to `judgment.reviewSuppressedFields` so the admin review endpoint hides it. The AI's per-field `judgment` block is **preserved verbatim** on `fieldsMeta[field].judgment` — never overwritten, stripped, or downgraded. The judge's score for the field stays exactly what the AI assigned; only the operational queue decision is changed. `Enriched` fields are not touched.
+
+**Reasoning**: a user who correctly supplied the team's canonical website almost certainly supplied correct values for the other team-contact fields too. Admin review on borderline `uncertain`/`disagrees` verdicts for those fields is wasted work — the user has demonstrated they know the team's identity, and the AI judge is just unable to independently verify (which is the gap Stage 1.5 corroboration is designed to bridge, but doesn't always succeed at on small or niche teams).
+
+**Constraints (mirror the dead-value cleanup section above)**:
+- Only `ChangedByUser` fields are touched. `Enriched` candidates (AI-discovered, not yet promoted) are unaffected — they still surface in review at low/medium confidence as before, so empty-slot enrichment still flows through the normal review path.
+- Personal-shape values that triggered Stage 3 recovery (`linkedin-personal`, `contact-personal-email`) are handled by the recovery sub-pipeline FIRST — successful recoveries promote to `Enriched`, failures get dropped via the dead-value cleanup. Trust-transfer only runs after both, so the obvious wrong-shape cases are already resolved when trust-transfer looks at them.
+- Idempotent: re-runs of the judge produce the same trust-transfer outcome given the same input state.
+
+**Trade-off (worth knowing)**: a user who typed the right website but a personal-shape value on another field (e.g., wrong `@john_doe` twitter handle) that *didn't* trigger Stage 3 recovery would silently bypass admin review under this rule. We accept this trade-off because (a) Stage 3 already catches the deterministically-detectable personal-shape cases (`in/<slug>` linkedin, free-provider personal email), (b) admin time is a scarcer resource than perfect correctness on every social handle, and (c) the persisted log on `dataEnrichment.judgment.userTrustTransfer` lets admins audit exactly what was dropped — combined with the preserved `fieldsMeta[field].judgment` block, you can always see the AI's original verdict on a suppressed field even after it's been hidden from the queue.
+
+**Persisted log** on `TeamJudgment.userTrustTransfer`:
+
+```ts
+userTrustTransfer?: {
+  basis: FieldMetaKey;            // always 'website' today
+  droppedFields: FieldMetaKey[];  // e.g. ['contactMethod', 'twitterHandler']
+}
+```
+
+Omitted when no fields were dropped.
+
+To force a dropped field back into review (e.g., spot-check), edit the corresponding `Team.<field>` value or clear `dataEnrichment.judgment` outright — both paths cause the next judge run to start fresh on the affected fields. The cleanest is for the user to actually correct the field they got wrong; if they do, `handleUserFieldChange` records a fresh `lastModifiedAt`, and the next judge run re-evaluates with that newer signal.
+
+> **Canonical failure cases this fixes:**
+>
+> - **`clpr2ryag0002vg02fmgdd6ay`** (`human.tech, by Holonym`) — user-supplied `twitterHandler = "@0xHolonym"` resolves to an X account whose bio is `"This is the old handle of @humntech"`. The first judge pass marked the field `uncertain + medium` (note `"website declares humntech not 0xHolonym possible rebrand"`) — accurate diagnosis but no action. Recovery: extracts `humntech`, re-fetches the X profile, `verifyTwitterProfileMatchesTeam` fires on the `website host match` anchor (X profile's website is `human.tech`), promotes `twitterHandler = "humntech"` with `source: scrapingdog + high`, note `"superseded old handle of"`.
+> - Team's user-supplied `website = "https://oldco.example"` returns HTTP 404. The reachability probe sets `websiteReachable = false`. Recovery: AI re-discovers `https://newco.example`, the new URL probes 200, Stage 1.5's `name in website host` rule fires on the team's substantive token, and the new URL promotes. The original `oldco.example` is recorded in `staleUserRecovery[0].priorValue` for admin auditing.
+> - Team's user-supplied website returns HTTP 403 (Cloudflare bot-block). `websiteReachable === null` (inconclusive), so recovery does NOT fire — the site is almost certainly fine for humans. The AI judge handles this via Stage 2 as usual.
+> - **`linkedin-personal`** — admin pasted `linkedinHandler = "in/jane-doe"` (the founder's personal LinkedIn) into the team slot. The judge can't auto-promote it (it's the wrong shape for a team), and the AI judge would mark it disagrees/uncertain → admin queue. Recovery: AI re-discovers `company/acme`, `fetchCompanyProfile` returns `kind: 'ok'` with exact name match → promotes with `source: scrapingdog + high`, note `linkedin company verified (exact name)`.
+> - **`contact-personal-email`** — admin pasted `contactMethod = "founder.personal@gmail.com"`. The founder is not on the `TeamMemberRole` roster, so Stage 1.5's `founder contact match` rule doesn't fire. The address is at a consumer provider (`gmail.com` ∈ `FREE_EMAIL_DOMAINS`) → trigger fires. Recovery: AI re-discovers `hello@acme.com`, the `email domain matches website` rule auto-promotes it.
+
 ### Website signal persistence (`dataEnrichment.websiteSignals`)
 
 `fetchSocialSignalsFromWebsite` already extracts self-declared signals from the team's website HTML during enrichment (JSON-LD `Organization` nodes, Twitter cards, microdata, anchors, `og:site_name`, `meta description`). The extracted block is now also **persisted** to `TeamEnrichment.dataEnrichment.websiteSignals` so Stage 1.5 can read it as a second independent source:
@@ -487,7 +627,20 @@ TeamEnrichment.dataEnrichment.judgment: {
   overallAssessment: string,       // max 120 chars — compact one-liner
   fieldsForReview: string[],       // DB column names needing manual check: ['website','contactMethod',...]
                                    // — includes every field whose judge verdict is disagrees,
-                                   //   uncertain, or agrees-at-low-confidence
+                                   //   uncertain, or agrees-at-low-confidence (minus anything in
+                                   //   reviewSuppressedFields below)
+  reviewSuppressedFields?: FieldMetaKey[],
+                                   // — hide-list consulted by listEnrichmentsForReview.
+                                   //   Fields here have an AI judgment on `fieldsMeta.<field>.judgment`
+                                   //   (NEVER stripped), but the admin review endpoint hides them
+                                   //   because there's no actionable signal a human reviewer could
+                                   //   add (Stage 3 recovery exhaustion) or because the user is
+                                   //   trusted via a verified ChangedByUser website (trust-transfer).
+                                   //   Reason per field is queryable via `staleUserRecovery` events
+                                   //   + `userTrustTransfer.droppedFields` below.
+  staleUserRecoveryAttempted?: boolean,
+  staleUserRecovery?: Array<{ field, trigger, outcome, priorValue, newValue, note }>,
+  userTrustTransfer?: { basis: FieldMetaKey, droppedFields: FieldMetaKey[] },
   scrapingDog?: {
     used, fetchedAt, nameMatch, companyNameFromLinkedIn, verifiedFields, linkedinInternalId,
     websiteReachable?: boolean | null,   // true = 2xx final, false = 4xx/5xx, null = not probed / transient / invalid URL
