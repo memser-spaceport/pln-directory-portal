@@ -921,6 +921,21 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict?.note).toBe('name in blog handle');
     });
 
+    // Bench case (SmartFunds): medium.com/smart-money-defi-studio for team
+    // "Smart Money (SmartFunds)". Team tokenizes to ['smart','money','smartfunds'].
+    // Publication slug `smart-money-defi-studio` starts with team token
+    // 'smart' → `name in blog handle` fires. Auto-promotes without needing
+    // the user-trusted fallback.
+    it('medium publication hyphenated slug starting with team token → name in blog handle', () => {
+      const verdict = corroborateBlog('https://medium.com/smart-money-defi-studio', {
+        teamName: 'Smart Money (SmartFunds)',
+        website: 'https://www.smartfunds.xyz/',
+      });
+      expect(verdict?.note).toBe('name in blog handle');
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+    });
+
     it('user-supplied custom-domain blog (not on platform) with no name match → user trusted', () => {
       const verdict = corroborateBlog(
         'https://random-team-blog.example.org/',
@@ -1266,6 +1281,46 @@ describe('team-enrichment-corroboration', () => {
     it('unknown source → null', () => {
       expect(corroborateBySource('something-else', 'high')).toBeNull();
       expect(corroborateBySource(undefined, 'high')).toBeNull();
+    });
+
+    // Liveness veto: source-trust is metadata-only and can't see if the URL
+    // is still live. For `website`, the judge's reachability probe gets a
+    // veto when it returns definitive 4xx/5xx — otherwise stale enrichment-
+    // time provenance would keep a dead site at agrees+high forever.
+    it('website + definitive 4xx/5xx (reachable=false) vetoes source-trust', () => {
+      const v = corroborateBySource(EnrichmentSource.ScrapingDog, 'high', 'website', {
+        teamName: 'Acme',
+        websiteReachable: false,
+      });
+      expect(v).toBeNull();
+    });
+
+    it('website + reachable=true allows source-trust', () => {
+      const v = corroborateBySource(EnrichmentSource.ScrapingDog, 'high', 'website', {
+        teamName: 'Acme',
+        websiteReachable: true,
+      });
+      expect(v?.note).toBe('sourced from linkedin');
+    });
+
+    it('website + reachable=null (bot-block / unknown) allows source-trust', () => {
+      // 403/429 etc. mean the site is almost certainly alive in a browser —
+      // our probe just looks like a bot. Don't veto on these.
+      const v = corroborateBySource(EnrichmentSource.OpenGraph, 'high', 'website', {
+        teamName: 'Acme',
+        websiteReachable: null,
+      });
+      expect(v?.note).toBe('sourced from website');
+    });
+
+    it('non-website field is unaffected by website reachability', () => {
+      // The veto is website-specific; other fields don't have a reachability
+      // signal at Stage 1.5.
+      const v = corroborateBySource(EnrichmentSource.ScrapingDog, 'high', 'linkedinHandler', {
+        teamName: 'Acme',
+        websiteReachable: false,
+      });
+      expect(v?.note).toBe('sourced from linkedin');
     });
   });
 });

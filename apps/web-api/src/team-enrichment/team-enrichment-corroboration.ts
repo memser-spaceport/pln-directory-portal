@@ -571,9 +571,21 @@ export function corroborateWebsite(
 export function corroborateBySource(
   source: string | undefined,
   enrichmentConfidence: string | undefined,
-  field?: FieldMetaKey
+  field?: FieldMetaKey,
+  ctx?: CorroborationContext
 ): FieldJudgment | null {
   if (enrichmentConfidence !== 'high') return null;
+
+  // Liveness veto: source-trust is a metadata-only check, blind to whether
+  // the underlying URL is still live. For the `website` field, the judge
+  // pipeline runs a reachability probe on every invocation — if the site
+  // currently returns a definitive 4xx/5xx, do NOT auto-promote on stale
+  // enrichment-time provenance. The website corroboration rule and the AI
+  // judge will then re-evaluate with current reachability as a real signal.
+  // Bot-block codes (`null` reachability) don't veto — the site is probably
+  // alive in a browser, our probe just looks like a bot.
+  if (field === 'website' && ctx?.websiteReachable === false) return null;
+
   if (source === EnrichmentSource.ScrapingDog) {
     // LinkedIn ScrapingDog never fills `twitterHandler` / `telegramHandler` —
     // those come from a separate ScrapingDog endpoint. Surface the actual

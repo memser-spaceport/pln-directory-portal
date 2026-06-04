@@ -97,9 +97,9 @@ const SOURCE_TRUST_RULE: JudgeRule = {
   name: 'source-trust',
   costTier: JudgeCostTier.SOURCE_TRUST,
   appliesTo: '*',
-  description: 'Promote values previously written by a trusted deterministic source (scrapingdog, open-graph) at high confidence.',
-  run: ({ field, source, enrichmentConfidence }) =>
-    corroborateBySource(source, enrichmentConfidence, field),
+  description: 'Promote values previously written by a trusted deterministic source (scrapingdog, open-graph) at high confidence. Vetoes on definitive website unreachability for the website field.',
+  run: ({ field, source, enrichmentConfidence }, ctx) =>
+    corroborateBySource(source, enrichmentConfidence, field, ctx),
 };
 
 const CONTACT_METHOD_RULE: JudgeRule = {
