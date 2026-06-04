@@ -76,3 +76,24 @@ export function normalizeTelegramHandle(raw: string): string {
     .replace(/[/?#].*$/, '')
     .toLowerCase();
 }
+
+/**
+ * True when `raw` looks like a **personal** LinkedIn profile URL/slug
+ * (`in/<slug>` form) rather than the `company/<slug>` form a team's
+ * `linkedinHandler` should carry. Accepts the same surface forms as the
+ * field-shape validator: bare slug (treated as NOT personal — could be a
+ * company slug), `in/<slug>`, full `linkedin.com/in/<slug>` URL.
+ *
+ * Used by the judge's stale-user-recovery pass: a user pasting their own
+ * `in/<slug>` profile into the team's LinkedIn slot is the canonical
+ * "personal value where a team-canonical value belongs" case.
+ */
+export function isPersonalLinkedinHandle(raw: string | null | undefined): boolean {
+  if (!raw || typeof raw !== 'string') return false;
+  const norm = raw
+    .trim()
+    .replace(/^https?:\/\/(?:www\.)?linkedin\.com\//i, '')
+    .replace(/\/+$/, '')
+    .toLowerCase();
+  return /^in\/[a-z0-9_.-]+/.test(norm);
+}
