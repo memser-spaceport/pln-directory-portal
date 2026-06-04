@@ -374,7 +374,7 @@ const TeamPitchDetailPage = () => {
                   />
                 ) : (
                   <div className={s.fieldValue}>
-                    <RichText content={pitch.description} />
+                    <RichText text={pitch.description ?? ''} />
                   </div>
                 )}
               </div>
