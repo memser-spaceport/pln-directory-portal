@@ -9,6 +9,7 @@ import type {
   TeamNewsListQuery,
   TeamNewsListResponse,
 } from 'libs/contracts/src/schema/team-news';
+import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
@@ -31,9 +32,9 @@ export class TeamNewsQueryService {
   ): Prisma.TeamNewsItemWhereInput {
     const and: Prisma.TeamNewsItemWhereInput[] = [];
 
-    const since = this.resolveSinceCutoff(query);
-    if (since) {
-      and.push({ eventDate: { gte: since } });
+    const eventDateWhere = buildTeamNewsEventDateWhere(query);
+    if (eventDateWhere) {
+      and.push(eventDateWhere);
     }
 
     if (query.q) {
@@ -78,17 +79,6 @@ export class TeamNewsQueryService {
     }
 
     return and.length > 0 ? { AND: and } : {};
-  }
-
-  private resolveSinceCutoff(query: TeamNewsListQuery): Date | null {
-    if (query.since) {
-      const explicit = new Date(query.since);
-      if (!Number.isNaN(explicit.getTime())) return explicit;
-    }
-    if (query.windowDays > 0) {
-      return new Date(Date.now() - query.windowDays * 24 * 60 * 60 * 1000);
-    }
-    return null;
   }
 
   async listTeamNews(query: TeamNewsListQuery): Promise<TeamNewsListResponse> {
