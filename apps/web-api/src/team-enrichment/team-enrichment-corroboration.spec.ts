@@ -880,6 +880,47 @@ describe('team-enrichment-corroboration', () => {
       expect(verdict?.note).toBe('name in blog handle');
     });
 
+    // Bench case (Notifi): Medium publication URL without `@` prefix.
+    // medium.com supports BOTH `medium.com/@<user>` (user profile, at-handle
+    // style) AND `medium.com/<publication>` (team publication, plain path).
+    // The publication slug IS team-identifying.
+    it('medium publication URL (no @ prefix) matching team token → name in blog handle', () => {
+      const verdict = corroborateBlog('https://medium.com/notifi', {
+        teamName: 'Notifi',
+        website: 'https://notifi.network/',
+      });
+      expect(verdict?.note).toBe('name in blog handle');
+      expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(verdict?.confidence).toBe(FieldConfidence.High);
+    });
+
+    it('medium publication URL with article path → name in blog handle (first segment is publication)', () => {
+      const verdict = corroborateBlog('https://medium.com/notifi/some-article-title-abc123', {
+        teamName: 'Notifi',
+        website: 'https://notifi.network/',
+      });
+      expect(verdict?.note).toBe('name in blog handle');
+    });
+
+    it('medium reserved route `/tag/<x>` does NOT extract as a slug', () => {
+      const verdict = corroborateBlog('https://medium.com/tag/notifi', {
+        teamName: 'Notifi',
+        website: 'https://notifi.network/',
+      });
+      // First segment is "tag", which is reserved — handle returns null,
+      // falls through to host-name check (`medium.com` first-label `medium`
+      // doesn't match team token `notifi`) → no verdict.
+      expect(verdict).toBeNull();
+    });
+
+    it('medium @-handle still works for user profiles', () => {
+      const verdict = corroborateBlog('https://medium.com/@notifi', {
+        teamName: 'Notifi',
+        website: 'https://notifi.network/',
+      });
+      expect(verdict?.note).toBe('name in blog handle');
+    });
+
     it('user-supplied custom-domain blog (not on platform) with no name match → user trusted', () => {
       const verdict = corroborateBlog(
         'https://random-team-blog.example.org/',

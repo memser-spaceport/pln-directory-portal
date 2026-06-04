@@ -368,23 +368,38 @@ export function extractBlogHandle(blogUrl: string): string | null {
   // Note: substack.com appears in BOTH the subdomain branch (publication URLs)
   // and here (user-profile URLs). The subdomain branch only fires when host !==
   // platform, so the two patterns don't collide.
-  const pathPlatforms: Record<string, 'at-handle' | 'plain'> = {
-    'medium.com': 'at-handle',
+  //
+  // `'either'` style accepts both `@<handle>` and plain `<slug>` first
+  // segments — Medium uses both (`medium.com/@user` for profiles,
+  // `medium.com/<publication>` for team publications). Reserved routes
+  // (`tag`, `p`, `m`, etc.) are filtered below to avoid false-matching them
+  // as publication slugs.
+  const pathPlatforms: Record<string, 'at-handle' | 'plain' | 'either'> = {
+    'medium.com': 'either',
     'substack.com': 'at-handle',
     'paragraph.xyz': 'at-handle',
     'mirror.xyz': 'plain',
     'dev.to': 'plain',
     'hashnode.com': 'at-handle',
   };
+  // Reserved first-path segments that aren't team-identifying slugs on the
+  // platforms above. Apply only to `'plain'` and `'either'` styles (an
+  // `@<handle>` is always identity-bearing).
+  const PLATFORM_RESERVED_SEGMENTS = new Set([
+    'tag', 'tags', 'topic', 'topics',
+    'm', 'me', 'p', 's', '_',
+    'signin', 'signup', 'search', 'about',
+    'policy', 'terms', 'help', 'subscribe',
+  ]);
   const style = pathPlatforms[host];
   if (style && segments.length > 0) {
     const first = decodeURIComponent(segments[0]);
-    if (style === 'at-handle' && first.startsWith('@')) {
+    if ((style === 'at-handle' || style === 'either') && first.startsWith('@')) {
       return first.slice(1).toLowerCase();
     }
-    if (style === 'plain') {
-      // Strip ENS-style suffix common on mirror.xyz handles ("acme.eth" -> "acme").
-      return first.replace(/\.eth$/i, '').toLowerCase();
+    if (style === 'plain' || style === 'either') {
+      const slug = first.replace(/\.eth$/i, '').toLowerCase();
+      if (!PLATFORM_RESERVED_SEGMENTS.has(slug)) return slug;
     }
   }
 
