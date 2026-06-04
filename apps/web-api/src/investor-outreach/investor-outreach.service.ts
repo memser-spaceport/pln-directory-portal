@@ -15,7 +15,6 @@ import {
   isAllowedEmailStatus,
   isAllowedEngagementTier,
   isAllowedEnrichmentStatus,
-  isAllowedInvestorSource,
   isAllowedInvestorType,
   isAllowedStageFocus,
   normalizeRaisingNow,
@@ -359,7 +358,7 @@ export class InvestorOutreachService {
     if (!investorId) throw new Error('investor_id is empty');
     if (!dedupeKey) throw new Error('dedupe_key is empty');
     if (!email) throw new Error('email is empty');
-    if (!isAllowedInvestorSource(source)) throw new Error(`Invalid source: ${source}`);
+    if (!source) throw new Error('source is empty');
     if (!isAllowedEmailStatus(emailStatus)) throw new Error(`Invalid email_status: ${emailStatus}`);
     if (!isAllowedInvestorType(investorType)) throw new Error(`Invalid investor_type: ${investorType}`);
     if (!isAllowedStageFocus(stageFocus)) throw new Error(`Invalid stage_focus: ${stageFocus}`);

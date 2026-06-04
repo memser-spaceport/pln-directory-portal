@@ -18,7 +18,6 @@ import {
   isAllowedEmailStatus,
   isAllowedEngagementTier,
   isAllowedEnrichmentStatus,
-  isAllowedInvestorSource,
   isAllowedInvestorType,
   isAllowedStageFocus,
   INVESTOR_OUTREACH_SECTOR_TAGS,
@@ -191,8 +190,8 @@ export class InvestorOutreachQueryService {
       return values.length ? values : undefined;
     };
 
-    const source = enumFilter(query.source, isAllowedInvestorSource);
-    if (source) conditions.push({ source: { in: source } });
+    const source = parseCsv(query.source);
+    if (source.length) conditions.push({ source: { in: source } });
 
     const investorType = enumFilter(query.investorType, isAllowedInvestorType);
     if (investorType) conditions.push({ investorType: { in: investorType } });

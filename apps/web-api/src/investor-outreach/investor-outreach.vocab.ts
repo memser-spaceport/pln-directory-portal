@@ -1,5 +1,6 @@
 /** Mirrors apps_script DROPDOWNS + SECTOR_TAGS in pln-investor-outreach-enrichment; DB stores plain strings. */
 
+/** Suggested sources for UI dropdowns; ingest and filters accept any non-empty string. */
 export const INVESTOR_OUTREACH_SOURCES = [
   'W26',
   'OpenVC',
@@ -77,7 +78,6 @@ function toStringSet(arr: readonly string[]): Set<string> {
   return new Set(arr);
 }
 
-const SOURCE_SET = toStringSet(INVESTOR_OUTREACH_SOURCES);
 const EMAIL_STATUS_SET = toStringSet(INVESTOR_OUTREACH_EMAIL_STATUS);
 const INVESTOR_TYPE_SET = toStringSet(INVESTOR_OUTREACH_INVESTOR_TYPES);
 const AUM_SET = toStringSet(INVESTOR_OUTREACH_AUM_RANGES);
@@ -87,10 +87,6 @@ const RAISING_NOW_SET = toStringSet(INVESTOR_OUTREACH_RAISING_NOW);
 const ENGAGEMENT_SET = toStringSet(INVESTOR_OUTREACH_ENGAGEMENT_TIER);
 const ENRICHMENT_SET = toStringSet(INVESTOR_OUTREACH_ENRICHMENT_STATUS);
 const ATTRIBUTION_FUND_SET = toStringSet(INVESTOR_OUTREACH_ATTRIBUTION_FUNDS);
-
-export function isAllowedInvestorSource(v: string): boolean {
-  return SOURCE_SET.has(v);
-}
 
 export function isAllowedEmailStatus(v: string): boolean {
   return EMAIL_STATUS_SET.has(v);
