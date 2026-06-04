@@ -1,16 +1,17 @@
-name: Deploy to EKS with Helm [Dev]
+name: Deploy to EKS with Helm [Uat]
 
 on:
   push:
     branches:
       - develop   # Triggers Dev deployment
   workflow_dispatch:
+
 jobs:
-  dev-deploy:
+  uat-deploy:
     name: Deploy Helm Chart to EKS preprod
     runs-on: ubuntu-latest
     env:
-      ENVIRONMENT: dev
+      ENVIRONMENT: uat
       APPNAME: directory-service
       DOCKER_IMAGE: directory-service
       ECR_REPOSITORY: pln-directory-service
@@ -19,7 +20,7 @@ jobs:
       APP_MODE: directory_service
 
     permissions:
-      id-token: write # Required for OIDC auth to AWS
+      id-token: write
       contents: read
 
     steps:
@@ -27,34 +28,38 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            aws-region: us-west-1
+          role-to-assume: arn:aws:iam::013228333448:role/github-actions-pln-uat
+          aws-region: us-west-1
 
       - name: Login to Amazon ECR
-        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Docker image
-        run: |
-          docker build -t ${{ env.DOCKER_IMAGE }} .
-
-      - name: Tag Docker image
+      - name: Resolve image metadata
         run: |
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
-          ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
+          ECR_REGISTRY=$(aws ecr describe-repositories \
+            --repository-names ${{ env.ECR_REPOSITORY }} \
+            --query 'repositories[0].repositoryUri' \
+            --output text)
 
-          docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:$git_hash
-          docker tag ${{ env.DOCKER_IMAGE }}:latest $ECR_REGISTRY:dev
+          echo "IMAGE_TAG=$git_hash" >> "$GITHUB_ENV"
+          echo "ECR_REGISTRY=$ECR_REGISTRY" >> "$GITHUB_ENV"
 
-      - name: Push Docker image to ECR
-        run: |
-          git_hash=$(git rev-parse --short "$GITHUB_SHA")
-          ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
-          docker push $ECR_REGISTRY:$git_hash
-          docker push $ECR_REGISTRY:dev
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image with cache
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}:${{ env.IMAGE_TAG }}
+            ${{ env.ECR_REGISTRY }}:uat
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -76,7 +81,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: 'memser-spaceport/pl-infra-pipeline'
-          ref: 'prod_release_v2' # branch, tag or commit SHA
+          ref: 'prod_release_v2'
           token: ${{ secrets.GIT_TOKEN }}
           path: './'
 
@@ -87,7 +92,15 @@ jobs:
 
       - name: Update kubeconfig for EKS
         run: |
-          aws eks update-kubeconfig --region us-west-1 --name ${{ env.CLUSTER_NAME }}
+          aws sts get-caller-identity
+          aws eks update-kubeconfig \
+            --region us-west-1 \
+            --name ${{ env.CLUSTER_NAME }}
+
+      - name: Verify Kubernetes access
+        run: |
+          kubectl config current-context
+          kubectl get pods -n pln-uat
 
       - name: poetry install for comprehend modules
         run: |
@@ -103,6 +116,7 @@ jobs:
         id: get-secret
         run: |
           CERT_ARN=$(aws ssm get-parameter \
+            --region us-west-1 \
             --name "/pln/acm/config" \
             --with-decryption \
             --query "Parameter.Value" \
@@ -111,6 +125,17 @@ jobs:
 
       - name: Deploy using Helm
         run: |
-          git_hash=$(git rev-parse --short "$GITHUB_SHA")
-          ECR_REGISTRY=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
-          helm upgrade --install directory-service deployment/chart/ --set image.repository=$ECR_REGISTRY --set image.tag=$git_hash --set nodeSelector.allocationtags=pln-dev-k8s --set ingress.grpname=dev-pln-internal --set ingress.healthcheck_path=/ --set ingress.host=dev-directory.plnetwork.io --set service.port=3000 --set ingress.acm_arn=$CERT_ARN -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml -n pln-dev
+          helm upgrade --install directory-service deployment/chart/ \
+            --set image.repository=${{ env.ECR_REGISTRY }} \
+            --set image.tag=${{ env.IMAGE_TAG }} \
+            --set nodeSelector.allocationtags=pln-uat-k8s \
+            --set ingress.grpname=uat-pln-internal \
+            --set ingress.healthcheck_path=/ \
+            --set ingress.host=api-uat-directory.plnetwork.io \
+            --set service.port=3000 \
+            --set ingress.acm_arn=$CERT_ARN \
+            --set serviceAccount.create=true \
+            --set serviceAccount.name=directory-service-sa \
+            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=arn:aws:iam::013228333448:role/directory-service-uat-irsa \
+            -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml \
+            -n pln-uat
