@@ -203,6 +203,44 @@ All enrichment writes target `TeamEnrichment` (candidate values + `dataEnrichmen
 
 After enrichment completes, a separate **AI Judge** cron independently verifies each enriched field, then **promotes high-confidence values from `TeamEnrichment` onto `Team`** in the same transaction. The judge uses a **different AI model** from the enricher (configurable via `TEAM_ENRICHMENT_JUDGE_AI_PROVIDER`) and can leverage ScrapingDog's LinkedIn profile for a deterministic first stage where applicable. Verdict metadata is written back to `TeamEnrichment.dataEnrichment.judgment` and `fieldsMeta[field].judgment`.
 
+### Pipeline at a glance
+
+Per field, the judge walks a cost-tiered ladder. A field exits the pipeline at the first tier that fires `agrees+high` (auto-promote) or `disagrees+low` (definitive negative). Anything that falls all the way through reaches the AI judge.
+
+```mermaid
+flowchart TD
+  Start([Enriched field to verify]) --> Probe[Website reachability probe<br/>NETWORK_PROBE · runs once per team]
+  Probe --> SD{Stage 1 · SCRAPING_API<br/>ScrapingDog LinkedIn<br/>name match exact/partial?}
+  SD -->|yes| SDV[Per-field comparators<br/>linkedinHandler · descriptions<br/>industryTags · moreDetails]
+  SD -->|no / skipped| ST
+  SDV --> ST
+
+  ST{Stage 1.5 · SOURCE_TRUST<br/>value was filled at enrichment time<br/>by a trusted source at high confidence?<br/>fieldsMeta.source ∈ scrapingdog or open-graph}
+  ST -->|yes| Promote
+  ST -->|no| FR
+
+  FR{Stage 1.5 · DETERMINISTIC<br/>per-field corroboration:<br/>contactMethod · twitter · linkedin<br/>telegram · blog · website<br/>≥2 anchors converge?}
+  FR -->|yes| Promote
+  FR -->|no| UT
+
+  UT{Stage 1.5 · user-trusted fallback<br/>ChangedByUser + shape ok?<br/>no hard-disprove signal?}
+  UT -->|yes| Promote
+  UT -->|no| AI
+
+  AI[Stage 2 · AI judge<br/>LLM + web search · low temperature<br/>verify candidate on its own merits]
+  AI -->|agrees+high| Promote
+  AI -->|disagrees / uncertain / low| Review
+
+  Promote([Auto-promote to Team])
+  Review([Admin review queue<br/>fieldsForReview])
+```
+
+The whole point of the ladder is to detect correctness (or incorrectness) as cheaply as possible — every tier the field clears saves a downstream AI call and a row in the admin review queue.
+
+> **Note on `open-graph`** — the `open-graph` source tag is populated during the **enrichment phase** (not visualized above), where the website signal extractor pulls JSON-LD `Organization` nodes, OG tags, Twitter Cards, microdata, and anchor hrefs from the team's own website HTML. The judge's SOURCE_TRUST rule just reads the `fieldsMeta[field].source` metadata that was written then. ScrapingDog provenance is set both at enrichment time (`scrapingdog` company / X profile fills) and re-confirmed at judge time (Stage 1).
+
+See `team-enrichment-judge-pipeline.ts` for the typed registry and the `team-enrichment-rules` Claude Skill for the rule-extension guide.
+
 ### Promotion rule
 
 For each Enriched field whose Stage 1 or Stage 2 verdict is `agrees` at `high` confidence, the judge writes the candidate value from `TeamEnrichment` to its corresponding home:
