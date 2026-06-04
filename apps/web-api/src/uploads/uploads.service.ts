@@ -59,10 +59,7 @@ export class UploadsService {
   }
 
   private isHlsEnabled(): boolean {
-    return (
-      String(process.env.DEPLOYMENT_ENVIRONMENT || process.env.ENVIRONMENT || '').toLowerCase().includes('prod') &&
-      String(process.env.IS_HLS_ENABLED || '').toLowerCase() === 'true'
-    );
+    return String(process.env.IS_HLS_ENABLED || '').toLowerCase() === 'true';
   }
 
   private buildPublicUrl(bucket: string, key: string): string {
