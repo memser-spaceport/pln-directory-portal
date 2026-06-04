@@ -3,7 +3,7 @@ name: Deploy to EKS with Helm [Uat]
 on:
   push:
     branches:
-      - release/*   # Triggers UAT deployment
+      - release/event-contributors   # Triggers UAT deployment
 jobs:
   uat-deploy:
     name: Deploy Helm Chart to EKS preprod
