@@ -142,6 +142,7 @@ const DataQualityPage: React.FC = () => {
           teams={filteredTeams}
           isLoading={teamsLoading}
           hasActiveFilters={hasActiveFilters}
+          authToken={authToken}
           onEdit={setSelectedTeam}
         />
 
