@@ -1074,6 +1074,16 @@
   font-size: 13px;
 }
 
+.reviewLogoThumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: contain;
+  border: 1px solid rgba(203, 213, 225, 0.4);
+  background: #f9fafb;
+  flex-shrink: 0;
+}
+
 .qualityBadgeLow {
   display: inline-flex;
   align-items: center;
