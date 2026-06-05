@@ -32,7 +32,8 @@ export const TeamsMenu = () => {
           </a>
         </Link>
 
-        {canViewTeamPitches && (
+        {/* TODO: Re-enable this when we have a way to manage team pitches */}
+        {/* {canViewTeamPitches && (
           <Link href="/teams/team-pitches" passHref>
             <a className={s.menuItem}>
               <PitchIcon />
@@ -40,7 +41,7 @@ export const TeamsMenu = () => {
               <CaretIcon />
             </a>
           </Link>
-        )}
+        )} */}
 
         {isDirectoryAdmin && (
           <Link href="/teams/data-quality" passHref>
