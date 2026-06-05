@@ -1058,7 +1058,7 @@
 .reviewFieldName {
   font-weight: 500;
   color: #455468;
-  width: 96px;
+  width: 130px;
   flex-shrink: 0;
   white-space: nowrap;
   font-size: 13px;
@@ -1134,7 +1134,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 106px;
+  margin-left: 138px; /* 130px field-name + 8px gap */
   padding: 6px 10px;
   background: #e8edff;
   border: 1px solid rgba(27, 77, 255, 0.18);
