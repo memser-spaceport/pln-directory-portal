@@ -1058,7 +1058,11 @@
 .reviewFieldName {
   font-weight: 500;
   color: #455468;
+<<<<<<< HEAD
   width: 130px;
+=======
+  width: 96px;
+>>>>>>> 720e5059 (style(back-office): align data quality table to prototype design)
   flex-shrink: 0;
   white-space: nowrap;
   font-size: 13px;
@@ -1144,7 +1148,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
+<<<<<<< HEAD
   margin-left: 138px; /* 130px field-name + 8px gap */
+=======
+  margin-left: 106px;
+>>>>>>> 720e5059 (style(back-office): align data quality table to prototype design)
   padding: 6px 10px;
   background: #e8edff;
   border: 1px solid rgba(27, 77, 255, 0.18);
