@@ -9,26 +9,26 @@ export class OpenSearchService {
   private readonly client: Client;
 
   constructor() {
-    const accessKeyId = process.env.AWS_OPENSEARCH_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.AWS_OPENSEARCH_SECRET_ACCESS_KEY;
     const region = process.env.AWS_OPENSEARCH_REGION;
     const openSearchEndpoint = process.env.AWS_OPENSEARCH_ENDPOINT;
 
-    if (!accessKeyId || !secretAccessKey || !region || !openSearchEndpoint) {
-      throw new Error('Missing AWS credentials for OpenSearch in environment variables.');
+    if (!region || !openSearchEndpoint) {
+      throw new Error('Missing AWS OpenSearch region or endpoint in environment variables.');
     }
 
     this.client = new Client({
       ...AwsSigv4Signer({
-        region: region,
+        region,
         service: 'aoss',
         getCredentials: () =>
-          Promise.resolve(
-            new AWS.Credentials({
-              accessKeyId: accessKeyId,
-              secretAccessKey: secretAccessKey,
-            })
-          ),
+          new Promise((resolve, reject) => {
+            AWS.config.getCredentials((err, credentials) => {
+              if (err || !credentials) {
+                return reject(err || new Error('Unable to resolve AWS credentials'));
+              }
+              resolve(credentials);
+            });
+          }),
       }),
       node: openSearchEndpoint,
     });
