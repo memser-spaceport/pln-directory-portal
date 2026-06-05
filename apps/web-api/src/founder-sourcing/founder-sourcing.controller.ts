@@ -42,6 +42,13 @@ export class FounderSourcingController {
   }
 
   @NoCache()
+  @Get('filters')
+  @RequirePermissions(READ_PERMS)
+  async filters() {
+    return this.queryService.getFilterOptions();
+  }
+
+  @NoCache()
   @Get('founders/:founderId')
   @RequirePermissions(READ_PERMS)
   async founderById(@Param('founderId') founderId: string) {
