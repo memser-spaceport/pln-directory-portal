@@ -1,7 +1,7 @@
 import React from 'react';
 import { clsx } from 'clsx';
 
-import { EnrichmentTeam, FieldKey } from '../../../hooks/teams/useTeamsEnrichmentReview';
+import { EnrichmentTeam, FieldEntry, FieldKey } from '../../../hooks/teams/useTeamsEnrichmentReview';
 import { FIELD_KEYS, FIELD_LABELS, getEntry, isAIEnriched, needsReview } from './constants';
 import { formatFieldContent } from './utils';
 import s from '../../../pages/teams/data-quality.module.scss';
@@ -15,10 +15,16 @@ interface Props {
   onEdit: (team: EnrichmentTeam) => void;
 }
 
+function getLogoUrl(content: FieldEntry['content']): string | null {
+  if (!content) return null;
+  if (typeof content === 'string') return content.trim() || null;
+  if (Array.isArray(content)) return null;
+  if (typeof content === 'object' && 'url' in content) return content.url || null;
+  return null;
+}
+
 export function NeedsReviewCell({ team, confirmedKeys, isPending, onConfirm, onApply, onEdit }: Props) {
-  const lowFields = FIELD_KEYS.filter(
-    (key) => needsReview(team, key) && !confirmedKeys.has(key)
-  );
+  const lowFields = FIELD_KEYS.filter((key) => needsReview(team, key) && !confirmedKeys.has(key));
 
   if (lowFields.length === 0) {
     return <span className={s.reviewEmpty}>All good — no low-quality fields</span>;
@@ -33,6 +39,7 @@ export function NeedsReviewCell({ team, confirmedKeys, isPending, onConfirm, onA
         const displayValue = formatFieldContent(entry.content);
         const fullValue = typeof entry.content === 'string' ? entry.content : displayValue;
         const isAI = isAIEnriched(entry);
+        const logoUrl = key === 'logo' ? getLogoUrl(entry.content) : null;
 
         const alt = entry.alternative;
 
@@ -56,13 +63,18 @@ export function NeedsReviewCell({ team, confirmedKeys, isPending, onConfirm, onA
           <div key={key} className={s.reviewItem}>
             <div className={s.reviewItemMain}>
               <span className={s.reviewFieldName}>{FIELD_LABELS[key]}</span>
-              <span className={s.reviewFieldValue} title={fullValue}>
-                {displayValue || '(no value)'}
-              </span>
-              <span className={s.qualityBadgeLow}>
-                {isAI ? <SparkleIcon /> : <UserIcon />}
-                Low
-              </span>
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt="" className={s.reviewLogoThumb} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              ) : (
+                <span className={s.reviewFieldValue} title={fullValue}>
+                  {displayValue || '(no value)'}
+                </span>
+              )}
+              {/*<span className={s.qualityBadgeLow}>*/}
+              {/*  {isAI ? <SparkleIcon /> : <UserIcon />}*/}
+              {/*  Low*/}
+              {/*</span>*/}
               <span className={s.cellActions}>
                 <button
                   type="button"
@@ -90,9 +102,14 @@ export function NeedsReviewCell({ team, confirmedKeys, isPending, onConfirm, onA
                 <span className={s.aiSuggestionLabel}>
                   <SparkleIcon /> AI suggestion:
                 </span>
-                <span className={s.aiSuggestionValue} title={suggestionContent}>
-                  {formatFieldContent(suggestionContent)}
-                </span>
+                {key === 'logo' ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={suggestionContent} alt="" className={s.reviewLogoThumb} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : (
+                  <span className={s.aiSuggestionValue} title={suggestionContent}>
+                    {formatFieldContent(suggestionContent)}
+                  </span>
+                )}
                 <button
                   type="button"
                   className={s.aiApplyBtn}
@@ -117,11 +134,6 @@ const SparkleIcon = () => (
   </svg>
 );
 
-const UserIcon = () => (
-  <svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
-    <path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z" />
-  </svg>
-);
 
 const PencilIcon = () => (
   <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
