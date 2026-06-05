@@ -287,20 +287,29 @@ export function EditModal({ team, authToken, onClose }: Props) {
                       aiValue.trim().toLowerCase() !== (form[key] ?? '').trim().toLowerCase();
                     // The judge note describes the value the judge actually
                     // evaluated, which depends on fieldsMeta.status:
+                    //   - ChangedByUser → judge read Team (= the user's
+                    //     value), so the note refers to what's in the input.
+                    //     Render in the header row, next to Confirm.
                     //   - Enriched / CannotEnrich → judge read TeamEnrichment
-                    //     (= the AI candidate), so the note refers to the AI
-                    //     suggestion. Render it next to the pill, not the input.
-                    //   - ChangedByUser → judge read Team (= the user's value),
-                    //     so the note refers to what's in the input. Keep it
-                    //     in the header row.
-                    // This avoids the misleading-by-default pattern where the
-                    // input shows the user's value but the header note is
-                    // actually about the AI candidate (bench case: Akave).
+                    //     (= the AI candidate). When the AI value differs
+                    //     from the input (Team had its own value), render
+                    //     next to the AI suggestion pill so admins can see
+                    //     which value the note describes. When the AI value
+                    //     equals the input (common case: Team.<field> was
+                    //     empty, so `teamToForm` initialized the input to
+                    //     the AI candidate), the pill is hidden — fall back
+                    //     to the header row so the note still surfaces.
+                    //     Without this fallback, the note disappears for
+                    //     every Enriched field judged on a previously-empty
+                    //     Team slot.
                     const judgmentNote = enrichmentEntry?.judgment?.note;
                     const noteAppliesToAi =
-                      !!judgmentNote && enrichmentEntry?.metadata?.status !== 'ChangedByUser';
+                      !!judgmentNote &&
+                      enrichmentEntry?.metadata?.status !== 'ChangedByUser' &&
+                      showAiSuggestion;
                     const noteAppliesToInput =
-                      !!judgmentNote && enrichmentEntry?.metadata?.status === 'ChangedByUser';
+                      !!judgmentNote &&
+                      (enrichmentEntry?.metadata?.status === 'ChangedByUser' || !showAiSuggestion);
 
                     return (
                       <div key={key} className={s.editFieldRow}>
