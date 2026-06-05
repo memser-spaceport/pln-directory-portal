@@ -7,7 +7,7 @@ import { EnrichmentTeam, FieldEntry, FieldKey } from '../../../hooks/teams/useTe
 import { useGetTeam, TeamDetail } from '../../../hooks/teams/useGetTeam';
 import { useUpdateAdminTeam, TeamUpdatePayload } from '../../../hooks/teams/useUpdateAdminTeam';
 import { useApproveEnrichmentFields } from '../../../hooks/teams/useApproveEnrichmentFields';
-import { FIELD_KEYS, FIELD_LABELS, getEntry, needsReview } from './constants';
+import { FIELD_KEYS, FIELD_LABELS, getEntry, isAIEnriched, needsReview } from './constants';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
 import api from '../../../utils/api';
 import s from '../../../pages/teams/data-quality.module.scss';
@@ -267,18 +267,21 @@ export function EditModal({ team, authToken, onClose }: Props) {
                     // API's primary `content`. Render the AI value as the
                     // "AI suggestion: …" pill with an Apply button.
                     const aiValue = pickAiSideValue(enrichmentEntry);
-                    // Source badge reflects `fieldsMeta.status`, NOT whether
-                    // Team.<field> is populated. A Team value can legitimately
-                    // be an AI-promoted value from a prior judge run — when
-                    // the latest enrichment re-runs (`mode=all`), the old
-                    // AI value still sits on Team while a new candidate
-                    // lives on TeamEnrichment (bench case: Akave's blog, both
-                    // sides AI-derived from different runs). Showing
-                    // "Provided by user" in that case would mislead the
-                    // admin into thinking they're choosing between user
-                    // truth vs AI guess. Only `ChangedByUser` is truly
-                    // user-typed; everything else is some flavor of AI.
-                    const isAI = enrichmentEntry?.metadata?.status !== 'ChangedByUser';
+                    // Source badge mirrors the list-view chip (`isAIEnriched`):
+                    // a field counts as AI only when it has an AI `source`
+                    // (`ai` / `open-graph` / `scrapingdog`) AND the user
+                    // hasn't taken it over (status !== `ChangedByUser`).
+                    // Status alone is insufficient — `CannotEnrich` leaves
+                    // `source` unset because the AI never produced a value,
+                    // so any Team value present is user-typed and must read
+                    // "Provided by user". A status-only check would mislabel
+                    // it as "AI Suggestion".
+                    //
+                    // For Enriched fields, both checks agree: `source` is
+                    // always set when the AI emitted a candidate, including
+                    // the bench-case re-run where Team holds an old AI
+                    // promotion and TeamEnrichment holds a fresh AI value.
+                    const isAI = enrichmentEntry ? isAIEnriched(enrichmentEntry) : false;
                     // Show the AI pill only when the AI value differs from
                     // what's currently in the input (otherwise Apply would
                     // be a no-op).
