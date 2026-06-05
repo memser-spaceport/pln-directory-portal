@@ -23,7 +23,9 @@ export class OpenSearchService {
         getCredentials: () =>
           new Promise((resolve, reject) => {
             AWS.config.getCredentials((err, credentials) => {
-              if (err || !credentials) return reject(err || new Error('Unable to resolve AWS credentials'));
+              if (err || !credentials) {
+                return reject(err || new Error('Unable to resolve AWS credentials'));
+              }
               resolve(credentials);
             });
           }),
