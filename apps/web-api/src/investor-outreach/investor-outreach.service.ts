@@ -15,9 +15,9 @@ import {
   isAllowedEmailStatus,
   isAllowedEngagementTier,
   isAllowedEnrichmentStatus,
-  isAllowedInvestorSource,
   isAllowedInvestorType,
   isAllowedStageFocus,
+  normalizeRaisingNow,
   parseSectorTagsList,
 } from './investor-outreach.vocab';
 
@@ -193,9 +193,7 @@ export class InvestorOutreachService {
       const attributionFund =
         o.attribution_fund == null || o.attribution_fund.trim() === '' ? null : o.attribution_fund.trim();
       if (attributionFund !== null && !isAllowedAttributionFund(attributionFund)) {
-        errors.push(
-          `Item ${itemIndex}: portfolio_overlaps[${j}].attribution_fund invalid: ${attributionFund}`
-        );
+        errors.push(`Item ${itemIndex}: portfolio_overlaps[${j}].attribution_fund invalid: ${attributionFund}`);
         continue;
       }
 
@@ -265,18 +263,35 @@ export class InvestorOutreachService {
 
     const plInvestedAt = parseIsoDateOnly(entry.pl_invested_at, 'pl_invested_at');
 
-    const stage = entry.pl_invested_stage == null || entry.pl_invested_stage.trim() === ''
-      ? null
-      : entry.pl_invested_stage.trim();
+    const stage =
+      entry.pl_invested_stage == null || entry.pl_invested_stage.trim() === '' ? null : entry.pl_invested_stage.trim();
     if (stage !== null && !isAllowedStageFocus(stage)) {
       throw new Error(`pl_invested_stage invalid: ${stage}`);
     }
 
-    const raisingNow = entry.raising_now == null || entry.raising_now.trim() === ''
-      ? null
-      : entry.raising_now.trim();
-    if (raisingNow !== null && !isAllowedStageFocus(raisingNow)) {
-      throw new Error(`raising_now invalid: ${raisingNow}`);
+    const normalizedRaising = normalizeRaisingNow(entry.raising_now);
+
+    const raisingStage =
+      entry.raising_stage == null || entry.raising_stage.trim() === ''
+        ? normalizedRaising.raisingStage
+        : entry.raising_stage.trim();
+    if (raisingStage !== null && !isAllowedStageFocus(raisingStage)) {
+      throw new Error(`raising_stage invalid: ${raisingStage}`);
+    }
+
+    const lastRoundStage =
+      entry.last_round_stage == null || entry.last_round_stage.trim() === '' ? null : entry.last_round_stage.trim();
+    if (lastRoundStage !== null && !isAllowedStageFocus(lastRoundStage)) {
+      throw new Error(`last_round_stage invalid: ${lastRoundStage}`);
+    }
+
+    const lastRoundDate = parseIsoDateOnly(entry.last_round_date, 'last_round_date');
+    const raisingAsOf = parseIsoDateOnly(entry.raising_as_of, 'raising_as_of');
+
+    const raisingSource =
+      entry.raising_source == null || entry.raising_source.trim() === '' ? null : entry.raising_source.trim();
+    if (raisingSource !== null && raisingSource.length > 120) {
+      throw new Error('raising_source exceeds 120 characters');
     }
 
     let sectors: string | null = null;
@@ -297,14 +312,24 @@ export class InvestorOutreachService {
         teamUid,
         plInvestedAt: plInvestedAt ?? null,
         plInvestedStage: stage,
-        raisingNow,
+        raisingNow: normalizedRaising.raisingNow,
+        raisingStage,
+        lastRoundStage,
+        lastRoundDate: lastRoundDate ?? null,
+        raisingAsOf: raisingAsOf ?? null,
+        raisingSource,
         sectors,
         geo,
       },
       update: {
         plInvestedAt: plInvestedAt ?? null,
         plInvestedStage: stage,
-        raisingNow,
+        raisingNow: normalizedRaising.raisingNow,
+        raisingStage,
+        lastRoundStage,
+        lastRoundDate: lastRoundDate ?? null,
+        raisingAsOf: raisingAsOf ?? null,
+        raisingSource,
         sectors,
         geo,
       },
@@ -333,7 +358,7 @@ export class InvestorOutreachService {
     if (!investorId) throw new Error('investor_id is empty');
     if (!dedupeKey) throw new Error('dedupe_key is empty');
     if (!email) throw new Error('email is empty');
-    if (!isAllowedInvestorSource(source)) throw new Error(`Invalid source: ${source}`);
+    if (!source) throw new Error('source is empty');
     if (!isAllowedEmailStatus(emailStatus)) throw new Error(`Invalid email_status: ${emailStatus}`);
     if (!isAllowedInvestorType(investorType)) throw new Error(`Invalid investor_type: ${investorType}`);
     if (!isAllowedStageFocus(stageFocus)) throw new Error(`Invalid stage_focus: ${stageFocus}`);

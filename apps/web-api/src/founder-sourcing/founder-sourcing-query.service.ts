@@ -2,10 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { FounderDto, PaginatedFoundersDto } from './dto/founder.dto';
+import { FounderFiltersDto } from './dto/founder-filters.dto';
 import { FounderKpiSummaryDto } from './dto/kpi-summary.dto';
 import { ListFoundersQueryDto } from './dto/list-founders.query.dto';
 import { toFounderDto } from './founder-sourcing.mapper';
-import { isAllowedFundCode, parseReviewStatus } from './founder-sourcing.vocab';
+import { isAllowedFundCode, parseReviewStatus, parseSourceList } from './founder-sourcing.vocab';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 50;
@@ -20,7 +21,7 @@ export class FounderSourcingQueryService {
   async listFounders(query: ListFoundersQueryDto): Promise<PaginatedFoundersDto> {
     const page = clampPage(query.page);
     const limit = clampLimit(query.limit);
-    const where = this.buildWhere(query);
+    const where = await this.buildWhere(query);
     const orderBy = this.buildOrderBy(query.sort);
 
     const [total, records] = await this.prisma.$transaction([
@@ -39,6 +40,21 @@ export class FounderSourcingQueryService {
       total,
       items: records.map((record) => toFounderDto(record)),
     };
+  }
+
+  async getFilterOptions(): Promise<FounderFiltersDto> {
+    const rows = await this.prisma.$queryRaw<{ val: string }[]>`
+      WITH all_sources AS (
+        SELECT trim("source") AS val FROM "FounderSourcingRecord" WHERE trim("source") <> ''
+        UNION ALL
+        SELECT trim(u) AS val FROM "FounderSourcingRecord", unnest("sources") AS u WHERE trim(u) <> ''
+      )
+      SELECT DISTINCT ON (lower(val)) val
+      FROM all_sources
+      ORDER BY lower(val), val
+    `;
+
+    return { sources: rows.map((row) => row.val) };
   }
 
   async findFounderById(founderId: string): Promise<FounderDto> {
@@ -99,7 +115,7 @@ export class FounderSourcingQueryService {
     };
   }
 
-  private buildWhere(query: ListFoundersQueryDto): Prisma.FounderSourcingRecordWhereInput {
+  private async buildWhere(query: ListFoundersQueryDto): Promise<Prisma.FounderSourcingRecordWhereInput> {
     const where: Prisma.FounderSourcingRecordWhereInput = {};
     const and: Prisma.FounderSourcingRecordWhereInput[] = [];
 
@@ -125,9 +141,10 @@ export class FounderSourcingQueryService {
       if (status) where.reviewStatus = status;
     }
 
-    if (query.source && query.source.trim() !== '') {
-      const source = query.source.trim();
-      and.push({ OR: [{ source }, { sources: { has: source } }] });
+    const sources = parseSourceList(query.source);
+    if (sources.length > 0) {
+      const founderIds = await this.findFounderIdsBySources(sources);
+      where.founderId = { in: founderIds };
     }
 
     const minAlignment = parseRange(query.minAlignment, 'minAlignment');
@@ -145,6 +162,23 @@ export class FounderSourcingQueryService {
     }
 
     return where;
+  }
+
+  private async findFounderIdsBySources(sources: string[]): Promise<string[]> {
+    const sourceConditions = sources.map(
+      (source) =>
+        Prisma.sql`(
+          LOWER("source") = LOWER(${source})
+          OR EXISTS (SELECT 1 FROM unnest("sources") AS u WHERE LOWER(u) = LOWER(${source}))
+        )`
+    );
+
+    const rows = await this.prisma.$queryRaw<{ founderId: string }[]>`
+      SELECT "founderId" FROM "FounderSourcingRecord"
+      WHERE ${Prisma.join(sourceConditions, ' OR ')}
+    `;
+
+    return rows.map((row) => row.founderId);
   }
 
   private buildOrderBy(sortRaw?: string): Prisma.FounderSourcingRecordOrderByWithRelationInput {

@@ -9,7 +9,7 @@ export class OpenSearchService {
   private readonly client: Client;
 
   constructor() {
-    const region = process.env.AWS_OPENSEARCH_REGION;
+    const region = process.env.AWS_OPENSEARCH_REGION || process.env.AWS_REGION;
     const openSearchEndpoint = process.env.AWS_OPENSEARCH_ENDPOINT;
 
     if (!region || !openSearchEndpoint) {

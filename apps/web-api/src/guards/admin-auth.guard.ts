@@ -5,6 +5,7 @@ import {
   DEMODAY_PERMISSIONS,
   MEMBER_PERMISSIONS,
   TEAM_MEMBERSHIP_PERMISSIONS,
+  TEAM_PITCH_PERMISSIONS,
 } from '../access-control-v2/access-control-v2.constants';
 import { MemberRole } from '../utils/constants';
 
@@ -123,6 +124,17 @@ export class DemoDayReadAuthGuard extends BaseAdminAuthGuard {
 
   protected allowsPermissionPrefix(permissionCode: string): boolean {
     return permissionCode.startsWith('demoday.admin.');
+  }
+}
+
+@Injectable()
+export class TeamPitchAdminAuthGuard extends BaseAdminAuthGuard {
+  constructor(jwtService: JwtService) {
+    super(jwtService);
+  }
+
+  protected getAllowedPermissions(): string[] {
+    return [ADMIN_PERMISSIONS.DIRECTORY_FULL, TEAM_PITCH_PERMISSIONS.ADMIN];
   }
 }
 

@@ -18,6 +18,14 @@ const REVIEW_FEEDBACKS = new Set<FounderReviewFeedback>([
 
 export const isAllowedFundCode = (value: string): value is FounderFundCode => FUND_CODES.has(value as FounderFundCode);
 
+export const parseSourceList = (raw?: string): string[] => {
+  if (!raw || raw.trim() === '') return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+};
+
 export const parseReviewStatus = (value: string): FounderReviewStatus | undefined => {
   const normalized = value.trim().toLowerCase();
   const mapped =

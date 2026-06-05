@@ -22,7 +22,7 @@ export const JobsListQueryParams = z.object({
   location: ListParam,
   workMode: ListParam,
   q: z.string().optional(),
-  sort: z.enum(['newest', 'company_az']).optional().default('newest'),
+  sort: z.enum(['newest', 'company_az', 'company_za']).optional().default('newest'),
   page: z
     .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1))
     .optional()

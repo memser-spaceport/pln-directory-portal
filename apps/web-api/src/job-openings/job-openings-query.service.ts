@@ -112,8 +112,11 @@ export class JobOpeningsQueryService {
       take?: number;
     }) => Promise<{ teamUid: string | null; _count: { _all: number } }[]>;
 
+    const { sort } = query;
     let pageRows: PagedTeamGroupRow[] = [];
-    if (query.sort === 'company_az') {
+    if (['company_az', 'company_za'].includes(sort)) {
+      const orderBy = sort === 'company_az' ? 'asc' : 'desc';
+
       const teamsPage = await this.prisma.team.findMany({
         where: {
           jobOpenings: {
@@ -121,7 +124,7 @@ export class JobOpeningsQueryService {
           },
         },
         select: { uid: true },
-        orderBy: [{ name: 'asc' }, { uid: 'asc' }],
+        orderBy: [{ name: orderBy }, { uid: 'asc' }],
         skip,
         take: limit,
       });

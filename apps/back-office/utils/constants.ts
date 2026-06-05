@@ -65,6 +65,8 @@ export const API_ROUTE = {
   ADMIN_RECOMMENDATIONS: APP_CONSTANTS.V1 + 'admin/recommendations',
   ADMIN_MEMBERS: `${APP_CONSTANTS.V1}admin/members`,
   ADMIN_DEMO_DAYS: `${APP_CONSTANTS.V1}admin/demo-days`,
+  ADMIN_TEAM_PITCHES: `${APP_CONSTANTS.V1}admin/team-pitches`,
+  TEAMS_SEARCH: `${APP_CONSTANTS.V1}teams-search`,
   ADMIN_DEMO_DAY_SUBSCRIBERS: `${APP_CONSTANTS.V1}admin/demo-days/subscribers`,
   ADMIN_IRL_GATHERING_PUSH_CONFIG: `${APP_CONSTANTS.V1}admin/irl-gathering-push-config`,
   ADMIN_IRL_GATHERING_PUSH_CONFIG_ACTIVE: `${APP_CONSTANTS.V1}admin/irl-gathering-push-config/active`,
@@ -128,10 +130,13 @@ export const INVESTOR_PROFILE_CONSTANTS = {
   ],
 };
 
-
 export const ADMIN_PERMISSIONS = {
   DIRECTORY_FULL: 'directory.admin.full',
   TOOLS_ACCESS: 'admin.tools.access',
+} as const;
+
+export const TEAM_PITCH_PERMISSIONS = {
+  ADMIN: 'team_pitch.admin',
 } as const;
 
 export const DEMODAY_PERMISSIONS = {

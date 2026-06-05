@@ -3,11 +3,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { clsx } from 'clsx';
 
-import { EnrichmentTeam, FieldKey } from '../../../hooks/teams/useTeamsEnrichmentReview';
+import { EnrichmentTeam, FieldEntry, FieldKey } from '../../../hooks/teams/useTeamsEnrichmentReview';
 import { useGetTeam, TeamDetail } from '../../../hooks/teams/useGetTeam';
 import { useUpdateAdminTeam, TeamUpdatePayload } from '../../../hooks/teams/useUpdateAdminTeam';
 import { useApproveEnrichmentFields } from '../../../hooks/teams/useApproveEnrichmentFields';
-import { FIELD_KEYS, FIELD_LABELS, getEntry, isAIEnriched, needsReview } from './constants';
+import { FIELD_KEYS, FIELD_LABELS, getEntry, needsReview } from './constants';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
 import api from '../../../utils/api';
 import s from '../../../pages/teams/data-quality.module.scss';
@@ -27,11 +27,22 @@ const MULTILINE: Partial<Record<EditableFieldKey, boolean>> = {
   longDescription: true,
 };
 
+/**
+ * Pulls each field's CURRENT value off the live `Team` row (via teamDetail).
+ * The input always reflects what's actually saved on Team — the AI candidate
+ * from `TeamEnrichment` is offered separately as the "AI suggestion" pill
+ * under the input (admins click `Apply` to copy it into the input).
+ *
+ * Falls back to the enrichment entry only when Team has no value on file —
+ * that way a brand-new team whose Team.<field> is null still shows the AI
+ * candidate in the input rather than an empty box.
+ */
 function teamToForm(teamDetail: TeamDetail, enrichmentTeam: EnrichmentTeam): TeamUpdatePayload {
   const getContent = (key: EditableFieldKey): string => {
-    const entry = enrichmentTeam.fields[key];
-    if (entry?.content && typeof entry.content === 'string') return entry.content;
-    return (teamDetail[key as keyof TeamDetail] as string | null | undefined) ?? '';
+    const teamVal = teamDetail[key as keyof TeamDetail];
+    if (typeof teamVal === 'string' && teamVal.trim() !== '') return teamVal;
+    const aiVal = pickAiSideValue(enrichmentTeam.fields[key]);
+    return aiVal ?? '';
   };
 
   return {
@@ -43,6 +54,38 @@ function teamToForm(teamDetail: TeamDetail, enrichmentTeam: EnrichmentTeam): Tea
     shortDescription: getContent('shortDescription'),
     longDescription: getContent('longDescription'),
   };
+}
+
+/**
+ * Extracts the `TeamEnrichment` (AI) side from a review entry, regardless of
+ * which side is currently `content` vs `alternative`:
+ *
+ *   - `status === ChangedByUser` → primary `content` is the Team value, so
+ *     the AI candidate lives in `alternative` (which always has
+ *     `fromSide: 'enrichment'` for this status).
+ *   - `status === Enriched` → primary `content` IS the AI candidate;
+ *     `alternative`, if present, is the Team-side value.
+ *   - `status === CannotEnrich` → no AI candidate exists. The review API
+ *     falls back to the Team value as `entry.content` so something
+ *     renders, but that value is user-provided, not AI — return null so
+ *     the badge / suggestion-pill logic doesn't treat the fallback as an
+ *     AI side.
+ *
+ * Returns null when no AI side is available (e.g. enrichment never produced a
+ * candidate for this field).
+ */
+function pickAiSideValue(entry: FieldEntry | undefined): string | null {
+  if (!entry) return null;
+  if (entry.metadata.status === 'ChangedByUser') {
+    if (entry.alternative?.fromSide === 'enrichment' && typeof entry.alternative.content === 'string') {
+      return entry.alternative.content;
+    }
+    return null;
+  }
+  if (entry.metadata.status === 'CannotEnrich') {
+    return null;
+  }
+  return typeof entry.content === 'string' ? entry.content : null;
 }
 
 export function EditModal({ team, authToken, onClose }: Props) {
@@ -226,7 +269,71 @@ export function EditModal({ team, authToken, onClose }: Props) {
                   {reviewableEditableKeys.map((key) => {
                     const enrichmentEntry = team.fields[key];
                     const isConfirmed = confirmedFields.has(key);
-                    const isAI = enrichmentEntry ? isAIEnriched(enrichmentEntry) : false;
+                    // Input always reflects the Team-side value (via
+                    // `teamToForm` initial + form state). AI candidate lives
+                    // in `aiValue` regardless of which side ended up as the
+                    // API's primary `content`. Render the AI value as the
+                    // "AI suggestion: …" pill with an Apply button.
+                    const aiValue = pickAiSideValue(enrichmentEntry);
+                    // Show the AI pill only when the AI value differs from
+                    // what's currently in the input (otherwise Apply would
+                    // be a no-op).
+                    const showAiSuggestion =
+                      !!aiValue && aiValue.trim() !== '' &&
+                      aiValue.trim().toLowerCase() !== (form[key] ?? '').trim().toLowerCase();
+                    // Source badge reflects what's in the INPUT, not the
+                    // field's enrichment status. The input is populated by
+                    // `teamToForm`: Team value if non-empty, else the AI
+                    // candidate. The AI candidate (when it differs) is
+                    // surfaced separately in the suggestion pill below, so
+                    // the badge needs to describe the input specifically.
+                    //
+                    // Status alone is wrong in two ways:
+                    //   - `CannotEnrich`: AI produced no candidate; the
+                    //     input value is the user's Team value. Status is
+                    //     not `ChangedByUser`, but the badge should still
+                    //     read "Provided by user".
+                    //   - AI-recovery on `Enriched` (`team-enrichment-judge.service.ts`
+                    //     `applyRecoveredField`): the recovery writes a
+                    //     fresh AI candidate to `TeamEnrichment` and stamps
+                    //     `status=Enriched, source=ai`, but leaves
+                    //     `Team.<field>` (the user's value) untouched.
+                    //     Input keeps showing the user value while the AI
+                    //     candidate sits in the pill — badge must read
+                    //     "Provided by user". Bench case: ANDÉN's
+                    //     `Team.contactMethod = "simopuebla@gmail.com"`
+                    //     vs recovered AI candidate `info@anden.work`.
+                    //
+                    // The reliable signal is whether the input matches the
+                    // AI candidate: matching ↔ the input IS the AI
+                    // suggestion. When they differ (or no AI candidate
+                    // exists), the input is the user's value.
+                    const isAI = !!aiValue && aiValue.trim() !== '' && !showAiSuggestion;
+                    // The judge note describes the value the judge actually
+                    // evaluated, which depends on fieldsMeta.status:
+                    //   - ChangedByUser → judge read Team (= the user's
+                    //     value), so the note refers to what's in the input.
+                    //     Render in the header row, next to Confirm.
+                    //   - Enriched / CannotEnrich → judge read TeamEnrichment
+                    //     (= the AI candidate). When the AI value differs
+                    //     from the input (Team had its own value), render
+                    //     next to the AI suggestion pill so admins can see
+                    //     which value the note describes. When the AI value
+                    //     equals the input (common case: Team.<field> was
+                    //     empty, so `teamToForm` initialized the input to
+                    //     the AI candidate), the pill is hidden — fall back
+                    //     to the header row so the note still surfaces.
+                    //     Without this fallback, the note disappears for
+                    //     every Enriched field judged on a previously-empty
+                    //     Team slot.
+                    const judgmentNote = enrichmentEntry?.judgment?.note;
+                    const noteAppliesToAi =
+                      !!judgmentNote &&
+                      enrichmentEntry?.metadata?.status !== 'ChangedByUser' &&
+                      showAiSuggestion;
+                    const noteAppliesToInput =
+                      !!judgmentNote &&
+                      (enrichmentEntry?.metadata?.status === 'ChangedByUser' || !showAiSuggestion);
 
                     return (
                       <div key={key} className={s.editFieldRow}>
@@ -241,11 +348,14 @@ export function EditModal({ team, authToken, onClose }: Props) {
                               </span>
                             )}
                           </div>
-                          {/* Right: judge note + Confirm button */}
+                          {/* Right: judge note (only when it applies to the
+                              input value, i.e. status=ChangedByUser) + Confirm
+                              button. AI-side notes are rendered next to the
+                              AI suggestion pill instead. */}
                           <div className={s.editFieldActions}>
-                            {enrichmentEntry?.judgment?.note && (
-                              <span className={s.editJudgmentNote} title={enrichmentEntry.judgment.note}>
-                                {enrichmentEntry.judgment.note}
+                            {noteAppliesToInput && (
+                              <span className={s.editJudgmentNote} title={judgmentNote}>
+                                {judgmentNote}
                               </span>
                             )}
                             <button
@@ -278,6 +388,29 @@ export function EditModal({ team, authToken, onClose }: Props) {
                               addConfirm(key);
                             }}
                           />
+                        )}
+
+                        {showAiSuggestion && (
+                          <div className={s.editSuggestion}>
+                            <span className={s.editSuggestionLabel}>
+                              <SparkleIcon /> AI suggestion:
+                            </span>
+                            <span className={s.editSuggestionValue}>{aiValue}</span>
+                            {noteAppliesToAi && (
+                              <span className={s.editJudgmentNote} title={judgmentNote}>
+                                {judgmentNote}
+                              </span>
+                            )}
+                            <button
+                              className={s.editApplyBtn}
+                              onClick={() => {
+                                setForm((prev) => (prev ? { ...prev, [key]: aiValue } : prev));
+                                addConfirm(key);
+                              }}
+                            >
+                              Apply
+                            </button>
+                          </div>
                         )}
                       </div>
                     );

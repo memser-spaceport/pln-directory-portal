@@ -124,4 +124,46 @@ describe('InvestorOutreachServiceController', () => {
       })
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('rejects portfolio_teams last_round_date that is not YYYY-MM-DD', async () => {
+    await expect(
+      controller.ingest({
+        items: [
+          {
+            investor_id: 'INV-1',
+            dedupe_key: 'a@b.com',
+            source: 'Manual',
+            email: 'a@b.com',
+            email_status: 'verified',
+            investor_type: 'fund',
+            stage_focus: 'seed',
+            engagement_tier: 'T4_cold',
+            enrichment_status: 'pending',
+          },
+        ],
+        portfolio_teams: [{ team_uid: 'team-a', last_round_date: '2024/12/01' } as never],
+      })
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects portfolio_teams raising_as_of that is not YYYY-MM-DD', async () => {
+    await expect(
+      controller.ingest({
+        items: [
+          {
+            investor_id: 'INV-1',
+            dedupe_key: 'a@b.com',
+            source: 'Manual',
+            email: 'a@b.com',
+            email_status: 'verified',
+            investor_type: 'fund',
+            stage_focus: 'seed',
+            engagement_tier: 'T4_cold',
+            enrichment_status: 'pending',
+          },
+        ],
+        portfolio_teams: [{ team_uid: 'team-a', raising_as_of: '2024/12/01' } as never],
+      })
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });

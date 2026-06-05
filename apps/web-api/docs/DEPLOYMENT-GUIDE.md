@@ -385,8 +385,6 @@ The following secrets must be configured in the GitHub repository settings:
 
 | Secret Name | Description | Required For |
 |-------------|-------------|--------------|
-| `AWS_ACCESS_KEY_ID` | AWS IAM user access key | All environments |
-| `AWS_SECRET_ACCESS_KEY` | AWS IAM user secret key | All environments |
 | `GIT_TOKEN` | GitHub personal access token | Infrastructure checkout |
 
 ### 7.2 AWS IAM Permissions

@@ -5,7 +5,13 @@ import { FileUploadService } from '../utils/file-upload/file-upload.service';
 import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
-import { ScrapingDogCompanyProfile, TeamEnrichmentScrapingDogService } from './team-enrichment-scrapingdog.service';
+import {
+  ScrapingDogCompanyProfile,
+  TeamEnrichmentScrapingDogService,
+  verifyTwitterProfileMatchesTeam,
+} from './team-enrichment-scrapingdog.service';
+import { deriveTeamFieldsFromLeads } from './team-enrichment-lead-backfill';
+import { isLikelyValueForField } from './team-enrichment-field-shape.util';
 import {
   ENRICHABLE_TEAM_FIELDS,
   EnrichableTeamField,
@@ -24,9 +30,37 @@ import {
 } from './team-enrichment.types';
 
 export type EnrichmentReviewFieldEntry = {
+  /**
+   * Primary value. ChangedByUser → reads from `Team.<field>` (user's value
+   * is the source of truth). Enriched / CannotEnrich → reads from
+   * `TeamEnrichment.<field>` (AI candidate, possibly junk-overridden into
+   * Enriched on this team). Empty side falls back to the other.
+   */
   content: string | string[];
   metadata: { status?: FieldEnrichmentStatus; source?: EnrichmentSource; lastModifiedAt?: string };
   judgment: { note?: string; score?: number; verdict?: JudgmentVerdict; confidence?: FieldConfidence };
+  /**
+   * The opposite-side candidate when it exists, differs from `content`, and
+   * is shape-valid. Lets the back-office show "user typed X, AI suggests Y"
+   * side-by-side so admins can pick the AI candidate when the user typed a
+   * placeholder (`"Coming soon!"`, `"n/a"`) or got it wrong. `fromSide`
+   * tells the UI which side this came from:
+   *
+   *   - `'enrichment'`: primary is the user's value (status=ChangedByUser),
+   *     this is the AI candidate. Show as "AI suggestion".
+   *   - `'team'`: primary is the AI candidate (status=Enriched after the
+   *     junk-override path), this is the literal value on the Team row.
+   *     Show as "Current user value (likely junk)" so admins can confirm
+   *     the AI candidate replaces it.
+   *
+   * Omitted when the two sides are equal, when the opposite side is empty,
+   * or when the opposite side fails the per-field shape gate (no point
+   * surfacing a second junk value).
+   */
+  alternative?: {
+    content: string | string[];
+    fromSide: 'team' | 'enrichment';
+  };
 };
 
 export type EnrichmentReviewLogo = {
@@ -135,11 +169,20 @@ type FieldsMetaMap = Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
 function isFieldUserOwned(
   fieldsMeta: Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>,
   field: FieldMetaKey,
-  teamSlotHasValue: boolean
+  teamValue: string | null | undefined
 ): boolean {
+  // A value is "user-owned" only if the user provided meaningful data.
+  // Junk-shaped placeholders ("Coming soon!", "n/a", field-name typos like
+  // "email" / "Twitter") are treated as effectively-empty, so they don't
+  // block enrichment and don't get promoted as if they were real user data.
+  // The shape validator is the same one the judge uses (`isLikelyValueForField`),
+  // so enrichment and judging agree on what counts as a real value.
+  if (!teamValue || teamValue.trim() === '' || !isLikelyValueForField(field, teamValue)) {
+    return false;
+  }
   const status = fieldsMeta[field]?.status;
   if (status === FieldEnrichmentStatus.ChangedByUser) return true;
-  if (teamSlotHasValue && !fieldsMeta[field]) return true;
+  if (!fieldsMeta[field]) return true; // pre-enrichment user data
   return false;
 }
 
@@ -176,6 +219,21 @@ type TeamWithEnrichment = {
   logoUid: string | null;
   industryTags: Array<{ uid: string; title: string }>;
   investorProfile: { uid: string; investmentFocus: string[] } | null;
+  /**
+   * Team leads + role-tagged founders — pre-filtered at the DB layer so we
+   * don't pull every member. Used by the lead-backfill step (an additional
+   * non-AI source of team-shaped contact/social fields).
+   */
+  teamMemberRoles: Array<{
+    teamLead: boolean;
+    role: string | null;
+    member: {
+      email: string | null;
+      twitterHandler: string | null;
+      linkedinHandler: string | null;
+      telegramHandler: string | null;
+    };
+  }>;
   teamEnrichment: TeamEnrichmentRow | null;
 };
 
@@ -211,6 +269,32 @@ const TEAM_WITH_ENRICHMENT_SELECT = {
   logoUid: true,
   industryTags: { select: { uid: true, title: true } },
   investorProfile: { select: { uid: true, investmentFocus: true } },
+  // Lead-backfill input. Filtered at the DB layer to teamLead OR role-mentions-founder
+  // so we don't pull every member for teams with large rosters. Member fields
+  // selected are the ones that could plausibly identity-match the team.
+  teamMemberRoles: {
+    // `as Prisma.TeamMemberRoleWhereInput[]` so the surrounding `as const` on
+    // TEAM_WITH_ENRICHMENT_SELECT doesn't make this tuple readonly (Prisma
+    // rejects readonly arrays for `OR`).
+    where: {
+      OR: [
+        { teamLead: true },
+        { role: { contains: 'founder', mode: 'insensitive' } },
+      ] as Prisma.TeamMemberRoleWhereInput[],
+    },
+    select: {
+      teamLead: true,
+      role: true,
+      member: {
+        select: {
+          email: true,
+          twitterHandler: true,
+          linkedinHandler: true,
+          telegramHandler: true,
+        },
+      },
+    },
+  },
   teamEnrichment: {
     select: {
       uid: true,
@@ -347,7 +431,7 @@ export class TeamEnrichmentService {
             ),
           "updatedAt" = NOW()
       WHERE "dataEnrichment"->>'status' = 'InProgress'
-        AND "updatedAt" < NOW() - make_interval(mins => ${ttlMinutes})
+        AND "updatedAt" < NOW() - make_interval(mins => ${ttlMinutes}::int)
     `;
     if (updated > 0) {
       this.logger.warn(
@@ -597,7 +681,7 @@ export class TeamEnrichmentService {
       let scrapingDogInternalId: string | null | undefined;
 
       if (this.scrapingDogService.isConfigured() && team.linkedinHandler) {
-        const linkedinIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
+        const linkedinIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', team.linkedinHandler);
         this.logger.log(
           `Logo refetch: trying ScrapingDog for team ${teamUid} (${team.name}) handle "${team.linkedinHandler}"${
             linkedinIsUserOwned ? ' (user-owned handle, entity check bypassed)' : ''
@@ -779,13 +863,13 @@ export class TeamEnrichmentService {
       // high-trust identity hints — disambiguates ambiguous team names so the AI searches for
       // the entity described by the hint, not the bare name.
       const userConfirmedIdentityHints = {
-        shortDescription: isFieldUserOwned(existingFieldsMeta, 'shortDescription', !!team.shortDescription)
+        shortDescription: isFieldUserOwned(existingFieldsMeta, 'shortDescription', team.shortDescription)
           ? team.shortDescription
           : null,
-        longDescription: isFieldUserOwned(existingFieldsMeta, 'longDescription', !!team.longDescription)
+        longDescription: isFieldUserOwned(existingFieldsMeta, 'longDescription', team.longDescription)
           ? team.longDescription
           : null,
-        moreDetails: isFieldUserOwned(existingFieldsMeta, 'moreDetails', !!team.moreDetails) ? team.moreDetails : null,
+        moreDetails: isFieldUserOwned(existingFieldsMeta, 'moreDetails', team.moreDetails) ? team.moreDetails : null,
       };
 
       const aiResult = await this.aiService.enrichTeamViaAI(team.name, {
@@ -816,7 +900,7 @@ export class TeamEnrichmentService {
 
       // Website-signal extraction: parse the team's website for self-declared socials.
       const websiteToScan = team.website?.trim() || aiResponse.website?.trim() || null;
-      const websiteIsUserOwned = !!team.website && isFieldUserOwned(existingFieldsMeta, 'website', !!team.website);
+      const websiteIsUserOwned = !!team.website && isFieldUserOwned(existingFieldsMeta, 'website', team.website);
       const websiteBackfilledFields = new Set<EnrichableTeamField>();
       const websiteHtml = websiteToScan ? await this.aiService.fetchWebsiteHtml(websiteToScan) : null;
 
@@ -871,6 +955,37 @@ export class TeamEnrichmentService {
         }
       }
 
+      // Lead-backfill: before deciding per-field outcomes, fill any aiResponse
+      // nulls from team-lead Member rows whose value structurally matches the
+      // team's identity (`info@<website-host>`, `@<team-name-prefixed>` etc.).
+      // Same backfill pattern as the website-signal pass above. Lead-derived
+      // values get their source re-stamped to `team-lead` after the field
+      // loop (mirroring how website backfill re-stamps to `open-graph`).
+      const leadBackfilledFields = new Set<EnrichableTeamField>();
+      const leadBackfill = deriveTeamFieldsFromLeads(
+        team.name,
+        team.website ?? aiResponse.website ?? null,
+        (team.teamMemberRoles ?? []).map((r) => r.member)
+      );
+      const leadBackfillMap: Array<[EnrichableTeamField, string | undefined]> = [
+        ['contactMethod', leadBackfill.contactMethod],
+        ['twitterHandler', leadBackfill.twitterHandler],
+        ['telegramHandler', leadBackfill.telegramHandler],
+      ];
+      for (const [field, value] of leadBackfillMap) {
+        if (!value) continue;
+        if (aiResponse[field]) continue; // AI already filled it — don't override
+        aiResponse[field] = value;
+        aiResponse.confidence ||= {};
+        aiResponse.confidence[field] = 'high';
+        leadBackfilledFields.add(field);
+      }
+      if (leadBackfilledFields.size > 0) {
+        this.logger.log(
+          `Team ${teamUid} (${team.name}): team-lead backfill → [${[...leadBackfilledFields].join(', ')}]`
+        );
+      }
+
       // Determine which fields need enrichment. Writes go to TeamEnrichment, not Team —
       // the judge later promotes high-confidence values to Team.
       const enrichmentUpdate: Prisma.TeamEnrichmentUpdateInput = {};
@@ -880,22 +995,39 @@ export class TeamEnrichmentService {
         userEdited: [],
         userOwned: [],
         alreadyEnriched: [],
+        alreadyPromoted: [],
         aiReturnedNull: [],
         aiCannotEnrich: [],
+        userJunkOverridden: [],
       };
 
       for (const field of ENRICHABLE_TEAM_FIELDS) {
         const fieldStatus = existingFieldsMeta[field]?.status;
 
-        if (fieldStatus === FieldEnrichmentStatus.ChangedByUser) {
+        // Junk-aware empty check. A `Team` value of "Coming soon!", "n/a",
+        // "email" (as contactMethod), "TBD" — anything that fails the per-field
+        // shape validator — is treated as effectively empty. The ChangedByUser
+        // short-circuit AND the user-owned guard below both honor this, so the
+        // field falls through to AI enrichment and the AI's new value is
+        // written with status `Enriched` (overriding the prior junk
+        // ChangedByUser status). Lets the judge then promote it normally,
+        // which overwrites the junk Team.<field> value.
+        const teamValue = team[field];
+        const teamValueHasContent = !!teamValue && teamValue.trim() !== '';
+        const teamValueIsJunk = teamValueHasContent && !isLikelyValueForField(field, teamValue as string);
+        const teamSlotIsEmpty = !teamValueHasContent || teamValueIsJunk;
+
+        if (teamValueIsJunk) {
+          skipReasons.userJunkOverridden.push(field);
+        }
+
+        // ChangedByUser short-circuit: skip ONLY when the user value is real.
+        // Junk ChangedByUser values fall through to enrichment and get
+        // overwritten by the AI candidate when the judge agrees at high.
+        if (fieldStatus === FieldEnrichmentStatus.ChangedByUser && !teamValueIsJunk) {
           skipReasons.userEdited.push(field);
           continue;
         }
-
-        // user-owned check is against the Team row (what the user/judge see),
-        // not the TeamEnrichment candidate row.
-        const teamValue = team[field];
-        const teamSlotIsEmpty = !teamValue || teamValue.trim() === '';
 
         if (!teamSlotIsEmpty && fieldStatus !== FieldEnrichmentStatus.Enriched) {
           newFieldsMeta[field] = {
@@ -903,6 +1035,31 @@ export class TeamEnrichmentService {
             status: FieldEnrichmentStatus.ChangedByUser,
           };
           skipReasons.userOwned.push(field);
+          continue;
+        }
+
+        // Previously-promoted guard: when `Team.<field>` is non-empty AND
+        // shape-valid AND `fieldsMeta.status === Enriched`, the value got
+        // onto Team via the only path that lets AI values cross that
+        // boundary — the judge's promotion at `agrees + high`. So the
+        // field is already judge-verified at high confidence. Re-querying
+        // it (even in force mode) only risks producing a worse candidate
+        // on `TeamEnrichment.<field>` that drags the team back into the
+        // review queue for a question we already answered. ChangedByUser
+        // is handled above; this guard is the symmetric "judge-promoted
+        // is also settled" case. Bench symptom: Akave's
+        // `Team.blog = "https://akave.ai/blog"` (promoted at agrees+high
+        // in an earlier run) got replaced on TE by an unreachable
+        // `blog.akave.cloud` from a later `mode=all` re-query, and the
+        // judge marked the new candidate `uncertain + medium` → team back
+        // in review. Admins who actually want to refresh a stale promoted
+        // value should edit `Team.<field>` directly (which flips status
+        // to ChangedByUser and lets enrichment re-evaluate naturally).
+        if (
+          fieldStatus === FieldEnrichmentStatus.Enriched &&
+          !teamSlotIsEmpty
+        ) {
+          skipReasons.alreadyPromoted.push(field);
           continue;
         }
 
@@ -942,6 +1099,16 @@ export class TeamEnrichmentService {
         const meta = newFieldsMeta[field];
         if (meta?.status === FieldEnrichmentStatus.Enriched && meta.source === EnrichmentSource.AI) {
           newFieldsMeta[field] = { ...meta, source: EnrichmentSource.OpenGraph };
+        }
+      }
+
+      // Lead-backfill re-stamp: any field the lead-backfill filled (and the
+      // AI didn't override) should be sourced as `team-lead` so the judge's
+      // source-trust rule (Stage 1.5) auto-promotes it.
+      for (const field of leadBackfilledFields) {
+        const meta = newFieldsMeta[field];
+        if (meta?.status === FieldEnrichmentStatus.Enriched && meta.source === EnrichmentSource.AI) {
+          newFieldsMeta[field] = { ...meta, source: EnrichmentSource.TeamLead };
         }
       }
 
@@ -1088,6 +1255,20 @@ export class TeamEnrichmentService {
         forceOverwrite,
       });
 
+      // ScrapingDog X verification — runs independently of the LinkedIn fallback.
+      // Verifies a candidate twitterHandler (from AI, website-signal backfill,
+      // lead-backfill, or an orphan value carried over from a prior enrichment
+      // run) against the X profile's website / display name. When verified,
+      // promotes the handle's `source` to `scrapingdog + high` so the judge's
+      // Stage 1.5 source-trust rule auto-promotes it without an AI call.
+      await this.maybeVerifyTwitterHandleViaScrapingDog({
+        teamUid,
+        team,
+        existingFieldsMeta,
+        enrichmentUpdate,
+        newFieldsMeta,
+      });
+
       const now = new Date().toISOString();
       const mergedFieldsMeta: FieldsMetaMap = { ...existingFieldsMeta };
       for (const [field, fresh] of Object.entries(newFieldsMeta) as Array<
@@ -1102,6 +1283,18 @@ export class TeamEnrichmentService {
           ...(prior ?? {}),
           ...freshDefined,
         } as FieldEnrichmentMeta;
+        // Drop any stale `judgment` block on every fresh enrichment write.
+        // The judgment is owned by the judge stage — it is rendered against
+        // a specific (status, value) tuple, so any time enrichment rewrites
+        // the field's meta the prior verdict no longer applies. Without
+        // this, a value that flipped from `Enriched` → `CannotEnrich`
+        // (AI lost its previous answer) or was re-enriched with a different
+        // candidate keeps surfacing the team in admin review because the
+        // legacy verdict (likely `uncertain` / `medium`) is still attached.
+        // The next judge run will write a fresh verdict if warranted.
+        if (fresh.status) {
+          delete (merged as any).judgment;
+        }
         // Stamp `lastModifiedAt` only when the value actually changed this run.
         if (merged.status !== FieldEnrichmentStatus.ChangedByUser) {
           merged = stampModified(merged, now);
@@ -1380,6 +1573,14 @@ export class TeamEnrichmentService {
       const meta = this.parseEnrichmentMeta(row.dataEnrichment);
       if (!meta?.fieldsMeta) continue;
 
+      // Fields the judge marked as suppressed (Stage 3 recovery exhaustion
+      // OR website trust-transfer). The AI's per-field judgment is still on
+      // `fieldsMeta[field].judgment` — we never overwrite it — but the
+      // review endpoint treats these fields as if they had no judgment for
+      // visibility purposes. See `dataEnrichment.judgment.reviewSuppressedFields`
+      // doc in `team-enrichment.types.ts` for the full rule.
+      const suppressed = new Set<FieldMetaKey>(meta.judgment?.reviewSuppressedFields ?? []);
+
       // A field is "auto-approved" iff the judge would have promoted it, i.e.
       // verdict=agrees AND confidence=high (admin approval also normalizes to this).
       // Score is intentionally NOT the gate — ScrapingDog/AI can emit score=90
@@ -1389,7 +1590,28 @@ export class TeamEnrichmentService {
       // verdict='verified' AND confidence='high' (what admin-approve writes).
       const hasUnapprovedField = Object.entries(meta.fieldsMeta).some(([k, fm]) => {
         if (k === 'logo' || !fm?.judgment) return false;
+        if (suppressed.has(k as FieldMetaKey)) return false;
         return !(fm.judgment.verdict === JudgmentVerdict.Agrees && fm.judgment.confidence === FieldConfidence.High);
+      });
+      // A team also needs review when a ChangedByUser field's *user value*
+      // is junk-shaped (fails `isLikelyValueForField`) AND TeamEnrichment
+      // has a shape-valid AI candidate to suggest. The judge might have
+      // already marked the field `agrees + high` via the `user trusted`
+      // fallback (because the user supplied it), but with junk + AI
+      // alternative the admin should still confirm. Bench case: ANDÉN
+      // with `Team.website = "Coming soon!"` and AI candidate
+      // `https://andendigital.com/`.
+      const hasJunkUserValueWithAiAlt = (Object.keys(meta.fieldsMeta) as FieldMetaKey[]).some((k) => {
+        if (k === 'logo') return false;
+        if (suppressed.has(k)) return false;
+        const fm = meta.fieldsMeta[k];
+        if (fm?.status !== FieldEnrichmentStatus.ChangedByUser) return false;
+        const teamValue = (row.team as any)[k];
+        const enrichmentValue = (row as any)[k];
+        if (typeof teamValue !== 'string' || teamValue.trim() === '') return false;
+        if (typeof enrichmentValue !== 'string' || enrichmentValue.trim() === '') return false;
+        // Junk on the user side AND shape-valid on the AI side.
+        return !isLikelyValueForField(k, teamValue) && isLikelyValueForField(k, enrichmentValue);
       });
       const latestLogoVerif = latestByTeam.get(row.teamUid);
       const logoFieldMeta = meta.fieldsMeta.logo;
@@ -1399,13 +1621,18 @@ export class TeamEnrichmentService {
       const logoApprovedByVLM =
         latestLogoVerif?.verdict === 'verified' && latestLogoVerif?.confidence === 'high';
       const hasUnapprovedLogo = !!row.logoUid && !logoApprovedByAdmin && !logoApprovedByVLM;
-      if (!hasUnapprovedField && !hasUnapprovedLogo) continue;
+      if (!hasUnapprovedField && !hasUnapprovedLogo && !hasJunkUserValueWithAiAlt) continue;
 
       const fields: EnrichmentReviewItem['fields'] = {};
       for (const [keyStr, fieldMeta] of Object.entries(meta.fieldsMeta) as Array<
         [FieldMetaKey, FieldEnrichmentMeta | undefined]
       >) {
         if (keyStr === 'moreDetails') continue;
+        // Suppressed by the judge's recovery-exhaustion or trust-transfer
+        // logic — the AI's verdict is still on `fieldMeta.judgment` for
+        // audit, but the operational decision is to hide this field from
+        // admin review.
+        if (suppressed.has(keyStr)) continue;
 
         // Logo: no AI judgment exists (logo isn't judged — binary presence, not semantic).
         // Emit it as a regular field with `content = Image.url` so the UI can iterate
@@ -1425,15 +1652,13 @@ export class TeamEnrichmentService {
           continue;
         }
 
-        if (!fieldMeta?.judgment) continue;
-
-        // Status decides the source of truth:
-        //   - ChangedByUser → Team.<field> (user-owned value lives on Team; the TeamEnrichment
-        //     candidate, if any, is informational provenance)
-        //   - Enriched / CannotEnrich → TeamEnrichment.<field> (AI candidate not yet promoted)
-        // Fallback to the other side covers rows where one side is empty (e.g. AI candidate
-        // promoted-then-cleared, or pre-tracking user data with stale meta).
-        const isUserOwned = fieldMeta.status === FieldEnrichmentStatus.ChangedByUser;
+        if (!fieldMeta) continue;
+        const fieldStatus = fieldMeta.status;
+        // Most fields require a judgment to surface. The exception is the
+        // ChangedByUser-with-junk-Team-value case: the judge accepts the
+        // user's value (often via the `user trusted` fallback), but the AI
+        // has a better alternative we want to put in front of the admin.
+        // Emit the field so the back-office can render the AI suggestion.
         const teamValue = (row.team as any)[keyStr];
         const enrichmentValue = (row as any)[keyStr];
         const isEmpty = (v: any) =>
@@ -1441,10 +1666,53 @@ export class TeamEnrichmentService {
           v === undefined ||
           (typeof v === 'string' && v.trim() === '') ||
           (Array.isArray(v) && v.length === 0);
+        const userValIsJunk =
+          fieldStatus === FieldEnrichmentStatus.ChangedByUser &&
+          typeof teamValue === 'string' &&
+          teamValue.trim() !== '' &&
+          !isLikelyValueForField(keyStr, teamValue);
+        const teValIsShapeValid =
+          typeof enrichmentValue === 'string' &&
+          enrichmentValue.trim() !== '' &&
+          isLikelyValueForField(keyStr, enrichmentValue);
+
+        // Skip fields with no judgment UNLESS this is the junk-user + AI-alt case.
+        if (!fieldMeta.judgment && !(userValIsJunk && teValIsShapeValid)) continue;
+
+        // Status decides the source of truth:
+        //   - ChangedByUser → Team.<field> (user-owned value lives on Team; the TeamEnrichment
+        //     candidate, if any, is informational provenance)
+        //   - Enriched / CannotEnrich → TeamEnrichment.<field> (AI candidate not yet promoted)
+        // Fallback to the other side covers rows where one side is empty (e.g. AI candidate
+        // promoted-then-cleared, or pre-tracking user data with stale meta).
+        const isUserOwned = fieldStatus === FieldEnrichmentStatus.ChangedByUser;
         const primary = isUserOwned ? teamValue : enrichmentValue;
         const fallback = isUserOwned ? enrichmentValue : teamValue;
         const candidate = !isEmpty(primary) ? primary : fallback;
         if (isEmpty(candidate)) continue;
+
+        // Compute the opposite-side alternative — surface it when:
+        //   - both sides are non-empty,
+        //   - they differ (case-insensitive trimmed compare, to avoid
+        //     "https://acme.com" vs "https://acme.com/" looking distinct),
+        //   - and at least ONE of the two sides is shape-valid. This lets
+        //     us show the literal user-typed `"Coming soon!"` as the
+        //     alternative when the primary is the AI's shape-valid URL —
+        //     admins benefit from seeing what the user typed even when
+        //     it's junk. We only suppress when BOTH sides are junk; then
+        //     there's nothing actionable to surface.
+        let alternative: EnrichmentReviewFieldEntry['alternative'] | undefined;
+        const otherSide = isUserOwned ? enrichmentValue : teamValue;
+        const otherSideSide: 'team' | 'enrichment' = isUserOwned ? 'enrichment' : 'team';
+        if (
+          typeof otherSide === 'string' &&
+          otherSide.trim() !== '' &&
+          typeof candidate === 'string' &&
+          otherSide.trim().toLowerCase() !== candidate.trim().toLowerCase() &&
+          (isLikelyValueForField(keyStr, otherSide) || isLikelyValueForField(keyStr, candidate))
+        ) {
+          alternative = { content: otherSide, fromSide: otherSideSide };
+        }
 
         fields[keyStr] = {
           content: candidate,
@@ -1453,12 +1721,15 @@ export class TeamEnrichmentService {
             source: fieldMeta.source,
             lastModifiedAt: fieldMeta.lastModifiedAt,
           },
-          judgment: {
-            note: fieldMeta.judgment.note,
-            score: fieldMeta.judgment.score,
-            verdict: fieldMeta.judgment.verdict,
-            confidence: fieldMeta.judgment.confidence,
-          },
+          judgment: fieldMeta.judgment
+            ? {
+                note: fieldMeta.judgment.note,
+                score: fieldMeta.judgment.score,
+                verdict: fieldMeta.judgment.verdict,
+                confidence: fieldMeta.judgment.confidence,
+              }
+            : {},
+          ...(alternative ? { alternative } : {}),
         };
       }
 
@@ -1898,7 +2169,7 @@ export class TeamEnrichmentService {
 
     const usingUserOwnedHandle =
       handle === team.linkedinHandler &&
-      isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
+      isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', team.linkedinHandler);
 
     this.logger.log(
       `Team ${teamUid} (${team.name}): invoking ScrapingDog for handle "${handle}"${
@@ -1915,7 +2186,7 @@ export class TeamEnrichmentService {
     }
 
     if (fetchResult.kind === 'not-found') {
-      const handleIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', !!team.linkedinHandler);
+      const handleIsUserOwned = isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', team.linkedinHandler);
       if (handleIsUserOwned) {
         this.logger.warn(
           `Team ${teamUid} (${team.name}): ScrapingDog reports "${handle}" not found, but handle is user-owned — leaving as-is`
@@ -2069,6 +2340,100 @@ export class TeamEnrichmentService {
   private verifyScrapingDogEntity(teamName: string, profile: ScrapingDogCompanyProfile): boolean {
     return this.scrapingDogService.classifyNameMatch(teamName, profile) !== 'none';
   }
+
+  /**
+   * Verifies a candidate `twitterHandler` against ScrapingDog's X profile.
+   * Mirrors the LinkedIn fallback's intent — turn an AI guess into a
+   * deterministically-corroborated value — but with three differences:
+   *
+   *   1. It runs even when the field has no "gap" (since the goal is to
+   *      upgrade an already-filled candidate, not to discover a new one).
+   *   2. It picks up orphan values left behind by a prior run (a candidate
+   *      stored on `te.twitterHandler` whose `fieldsMeta` status got flipped to
+   *      `CannotEnrich` on a later force-enrich where the AI returned null).
+   *   3. On a verified profile it writes `source = scrapingdog` /
+   *      `confidence = high`, which the judge's Stage 1.5 source-trust rule
+   *      auto-promotes — no AI call, no admin review.
+   *
+   * Verification accepts the handle when ANY of:
+   *   - profile website host equals team website host (strongest single signal),
+   *   - profile name shares a substantive token with the team name AND the
+   *     account is X-verified as a Business/Government org,
+   *   - profile name shares a substantive token with the team name AND the
+   *     handle's first label prefix-matches a team-name token (two converging
+   *     identity anchors, same doctrine as the existing `name in twitter handle`
+   *     corroboration rule).
+   *
+   * Non-verifying outcomes (profile fetched but no anchor fires, or
+   * not-found / error) are non-destructive on first occurrence — the prior
+   * state stands and the AI judge gets a normal turn at the field. We
+   * intentionally do NOT null an orphan handle here because the same handle
+   * can be correct even when X's parsed payload misses an anchor (an org
+   * account with no listed website and a brand-different display name is
+   * plausible); the LinkedIn `nullBadLinkedinHandle` path has the much
+   * stronger signal of a hard "not found" response, which the X endpoint
+   * provides equivalently.
+   */
+  private async maybeVerifyTwitterHandleViaScrapingDog(ctx: {
+    teamUid: string;
+    team: TeamWithEnrichment;
+    existingFieldsMeta: FieldsMetaMap;
+    enrichmentUpdate: Prisma.TeamEnrichmentUpdateInput;
+    newFieldsMeta: FieldsMetaMap;
+  }): Promise<void> {
+    if (!this.scrapingDogService.isConfigured()) return;
+
+    const { teamUid, team, existingFieldsMeta, enrichmentUpdate, newFieldsMeta } = ctx;
+
+    if (isFieldUserOwned(existingFieldsMeta, 'twitterHandler', team.twitterHandler)) return;
+
+    // Candidate priority:
+    //   1. Value being written this run (AI / website-signal / lead-backfill).
+    //   2. Existing TeamEnrichment.twitterHandler (orphan from a prior run, or
+    //      from the previous Enriched state that this force-run is re-evaluating).
+    // The newFieldsMeta status is the in-flight write; the existing fieldsMeta
+    // status is what's about to be overwritten.
+    const candidateFromUpdate =
+      typeof (enrichmentUpdate as any).twitterHandler === 'string'
+        ? ((enrichmentUpdate as any).twitterHandler as string)
+        : null;
+    const candidate = candidateFromUpdate ?? team.teamEnrichment?.twitterHandler ?? null;
+    if (!candidate || !isLikelyValueForField('twitterHandler', candidate)) return;
+
+    const result = await this.scrapingDogService.fetchTwitterProfile(candidate);
+    if (result.kind !== 'ok') {
+      this.logger.log(
+        `Team ${teamUid} (${team.name}): X profile for "${candidate}" returned ${result.kind}` +
+          (result.kind === 'error' ? ` (${result.reason})` : '') +
+          ' — leaving twitterHandler state untouched'
+      );
+      return;
+    }
+
+    const verification = verifyTwitterProfileMatchesTeam(team, result.profile);
+    if (!verification.verified) {
+      this.logger.log(
+        `Team ${teamUid} (${team.name}): X profile fetched for "${candidate}" but no identity anchor fired ` +
+          `(profile.name="${result.profile.name ?? ''}" website="${result.profile.website ?? ''}" verifiedType="${result.profile.verifiedType ?? ''}")`
+      );
+      return;
+    }
+
+    // Canonical handle from the verified profile (X's preferred casing,
+    // stripped of `@`). Fall back to the candidate when the profile omits
+    // its own username (shouldn't happen for a parsed payload, but defensive).
+    const canonicalHandle = result.profile.username ?? candidate.replace(/^@/, '');
+    (enrichmentUpdate as any).twitterHandler = canonicalHandle;
+    newFieldsMeta.twitterHandler = {
+      status: FieldEnrichmentStatus.Enriched,
+      confidence: FieldConfidence.High,
+      source: EnrichmentSource.ScrapingDog,
+    };
+    this.logger.log(
+      `Team ${teamUid} (${team.name}): X profile verified twitterHandler="${canonicalHandle}" via [${verification.anchors.join(', ')}]`
+    );
+  }
+
 
   parseEnrichmentMeta(raw: any): TeamDataEnrichment | null {
     if (!raw) return null;

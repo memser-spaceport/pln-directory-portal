@@ -13,7 +13,9 @@ import { OtpModule } from '../otp/otp.module';
 import { HuskyModule } from '../husky/husky.module';
 import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
 import { AdminDemoDaysController } from './demo-day.controller';
+import { AdminTeamPitchController } from './team-pitch.controller';
 import { DemoDaysModule } from '../demo-days/demo-days.module';
+import { TeamPitchesModule } from '../team-pitches/team-pitches.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { AdminTeamsController } from './admin-teams.controller';
@@ -42,6 +44,7 @@ import { AccessControlV2Module } from '../access-control-v2/access-control-v2.mo
     NotificationsModule,
     forwardRef(() => MembersModule),
     DemoDaysModule,
+    TeamPitchesModule,
     AnalyticsModule,
     TeamEnrichmentModule,
     DealsModule,
@@ -54,6 +57,7 @@ import { AccessControlV2Module } from '../access-control-v2/access-control-v2.mo
     MemberController,
     RecommendationsController,
     AdminDemoDaysController,
+    AdminTeamPitchController,
     AdminTeamsController,
   ],
   exports: [MemberService],
