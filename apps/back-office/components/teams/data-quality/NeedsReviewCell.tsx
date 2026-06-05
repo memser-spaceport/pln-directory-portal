@@ -35,11 +35,22 @@ export function NeedsReviewCell({ team, confirmedKeys, isPending, onConfirm, onA
         const isAI = isAIEnriched(entry);
 
         const alt = entry.alternative;
-        // Narrow to string so downstream JSX needs no non-null assertions
-        const suggestionContent =
+
+        // Case 1: explicit alternative where the alternative.content is the AI candidate
+        // (entry.content is the user's value, alternative.fromSide === 'enrichment')
+        const explicitSuggestion =
           alt?.fromSide === 'enrichment' && typeof alt.content === 'string' && alt.content.trim() !== ''
             ? alt.content
             : null;
+
+        // Case 2: entry.content itself is AI-enriched (status=Enriched, no explicit alternative).
+        // Treat the content as the AI suggestion so the admin can explicitly Apply it.
+        const implicitSuggestion =
+          isAI && !explicitSuggestion && typeof entry.content === 'string' && entry.content.trim() !== ''
+            ? entry.content
+            : null;
+
+        const suggestionContent = explicitSuggestion ?? implicitSuggestion;
 
         return (
           <div key={key} className={s.reviewItem}>
