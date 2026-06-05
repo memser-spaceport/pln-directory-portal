@@ -7,7 +7,7 @@ import { EnrichmentTeam, FieldEntry, FieldKey } from '../../../hooks/teams/useTe
 import { useGetTeam, TeamDetail } from '../../../hooks/teams/useGetTeam';
 import { useUpdateAdminTeam, TeamUpdatePayload } from '../../../hooks/teams/useUpdateAdminTeam';
 import { useApproveEnrichmentFields } from '../../../hooks/teams/useApproveEnrichmentFields';
-import { FIELD_KEYS, FIELD_LABELS, getEntry, isAIEnriched, needsReview } from './constants';
+import { FIELD_KEYS, FIELD_LABELS, getEntry, needsReview } from './constants';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
 import api from '../../../utils/api';
 import s from '../../../pages/teams/data-quality.module.scss';
@@ -63,8 +63,13 @@ function teamToForm(teamDetail: TeamDetail, enrichmentTeam: EnrichmentTeam): Tea
  *   - `status === ChangedByUser` → primary `content` is the Team value, so
  *     the AI candidate lives in `alternative` (which always has
  *     `fromSide: 'enrichment'` for this status).
- *   - `status === Enriched | CannotEnrich` → primary `content` IS the AI
- *     candidate; `alternative`, if present, is the Team-side value.
+ *   - `status === Enriched` → primary `content` IS the AI candidate;
+ *     `alternative`, if present, is the Team-side value.
+ *   - `status === CannotEnrich` → no AI candidate exists. The review API
+ *     falls back to the Team value as `entry.content` so something
+ *     renders, but that value is user-provided, not AI — return null so
+ *     the badge / suggestion-pill logic doesn't treat the fallback as an
+ *     AI side.
  *
  * Returns null when no AI side is available (e.g. enrichment never produced a
  * candidate for this field).
@@ -75,6 +80,9 @@ function pickAiSideValue(entry: FieldEntry | undefined): string | null {
     if (entry.alternative?.fromSide === 'enrichment' && typeof entry.alternative.content === 'string') {
       return entry.alternative.content;
     }
+    return null;
+  }
+  if (entry.metadata.status === 'CannotEnrich') {
     return null;
   }
   return typeof entry.content === 'string' ? entry.content : null;
@@ -267,27 +275,40 @@ export function EditModal({ team, authToken, onClose }: Props) {
                     // API's primary `content`. Render the AI value as the
                     // "AI suggestion: …" pill with an Apply button.
                     const aiValue = pickAiSideValue(enrichmentEntry);
-                    // Source badge mirrors the list-view chip (`isAIEnriched`):
-                    // a field counts as AI only when it has an AI `source`
-                    // (`ai` / `open-graph` / `scrapingdog`) AND the user
-                    // hasn't taken it over (status !== `ChangedByUser`).
-                    // Status alone is insufficient — `CannotEnrich` leaves
-                    // `source` unset because the AI never produced a value,
-                    // so any Team value present is user-typed and must read
-                    // "Provided by user". A status-only check would mislabel
-                    // it as "AI Suggestion".
-                    //
-                    // For Enriched fields, both checks agree: `source` is
-                    // always set when the AI emitted a candidate, including
-                    // the bench-case re-run where Team holds an old AI
-                    // promotion and TeamEnrichment holds a fresh AI value.
-                    const isAI = enrichmentEntry ? isAIEnriched(enrichmentEntry) : false;
                     // Show the AI pill only when the AI value differs from
                     // what's currently in the input (otherwise Apply would
                     // be a no-op).
                     const showAiSuggestion =
                       !!aiValue && aiValue.trim() !== '' &&
                       aiValue.trim().toLowerCase() !== (form[key] ?? '').trim().toLowerCase();
+                    // Source badge reflects what's in the INPUT, not the
+                    // field's enrichment status. The input is populated by
+                    // `teamToForm`: Team value if non-empty, else the AI
+                    // candidate. The AI candidate (when it differs) is
+                    // surfaced separately in the suggestion pill below, so
+                    // the badge needs to describe the input specifically.
+                    //
+                    // Status alone is wrong in two ways:
+                    //   - `CannotEnrich`: AI produced no candidate; the
+                    //     input value is the user's Team value. Status is
+                    //     not `ChangedByUser`, but the badge should still
+                    //     read "Provided by user".
+                    //   - AI-recovery on `Enriched` (`team-enrichment-judge.service.ts`
+                    //     `applyRecoveredField`): the recovery writes a
+                    //     fresh AI candidate to `TeamEnrichment` and stamps
+                    //     `status=Enriched, source=ai`, but leaves
+                    //     `Team.<field>` (the user's value) untouched.
+                    //     Input keeps showing the user value while the AI
+                    //     candidate sits in the pill — badge must read
+                    //     "Provided by user". Bench case: ANDÉN's
+                    //     `Team.contactMethod = "simopuebla@gmail.com"`
+                    //     vs recovered AI candidate `info@anden.work`.
+                    //
+                    // The reliable signal is whether the input matches the
+                    // AI candidate: matching ↔ the input IS the AI
+                    // suggestion. When they differ (or no AI candidate
+                    // exists), the input is the user's value.
+                    const isAI = !!aiValue && aiValue.trim() !== '' && !showAiSuggestion;
                     // The judge note describes the value the judge actually
                     // evaluated, which depends on fieldsMeta.status:
                     //   - ChangedByUser → judge read Team (= the user's
