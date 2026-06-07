@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
@@ -31,14 +31,6 @@ function actorOf(req: AuthedRequest): ListMembershipActor {
   };
 }
 
-function parseListId(raw: string): number {
-  const id = parseInt(raw, 10);
-  if (!Number.isFinite(id) || id <= 0) {
-    throw new BadRequestException(`Invalid listId: ${raw}`);
-  }
-  return id;
-}
-
 /**
  * Investor Lists — curated target sets of investors for the warm-intros workspace.
  * Reuses the Investor DB permissions (no new perms): view to read, edit to mutate membership.
@@ -63,18 +55,18 @@ export class InvestorListsController {
   @Get(':listId/members')
   @RequirePermissions(VIEW_PERMS)
   async listMembers(@Param('listId') listId: string, @Query() query: ListMembersQueryDto) {
-    return this.queryService.listMembers(parseListId(listId), query);
+    return this.queryService.listMembers(await this.queryService.resolveListId(listId), query);
   }
 
   @Post(':listId/members')
   @RequirePermissions(EDIT_PERMS)
   async addMember(@Param('listId') listId: string, @Body() dto: AddListMemberDto, @Req() req: AuthedRequest) {
-    return this.listsService.addMember(parseListId(listId), dto, actorOf(req));
+    return this.listsService.addMember(await this.queryService.resolveListId(listId), dto, actorOf(req));
   }
 
   @Delete(':listId/members/:investorId')
   @RequirePermissions(EDIT_PERMS)
   async removeMember(@Param('listId') listId: string, @Param('investorId') investorId: string) {
-    return this.listsService.removeMember(parseListId(listId), investorId);
+    return this.listsService.removeMember(await this.queryService.resolveListId(listId), investorId);
   }
 }

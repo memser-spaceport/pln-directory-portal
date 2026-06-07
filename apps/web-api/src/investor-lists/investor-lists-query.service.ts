@@ -22,6 +22,24 @@ type Relationship = typeof RELATIONSHIPS[number];
 export class InvestorListsQueryService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Resolve a route param that is a SLUG (the public list identifier — the numeric
+   * `id` is concealed by ConcealEntityIDInterceptor, so slug is what the client
+   * holds) into the internal numeric list id. Accepts a numeric id too, for
+   * backward-compat / internal callers.
+   */
+  async resolveListId(idOrSlug: string): Promise<number> {
+    const raw = (idOrSlug ?? '').trim();
+    const n = Number(raw);
+    if (Number.isInteger(n) && n > 0 && String(n) === raw) return n;
+    const list = await this.prisma.investorList.findUnique({
+      where: { slug: raw },
+      select: { id: true },
+    });
+    if (!list) throw new NotFoundException(`Investor list not found: ${raw}`);
+    return list.id;
+  }
+
   /** GET /v1/investor-lists → `{ items: InvestorListDto[] }` with member counts. */
   async listLists(): Promise<InvestorListsResponseDto> {
     const lists = await this.prisma.investorList.findMany({
