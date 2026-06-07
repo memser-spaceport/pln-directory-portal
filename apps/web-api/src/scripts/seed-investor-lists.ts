@@ -38,7 +38,7 @@ const LISTS = [
     source: 'affinity',
     externalRef: '183682', // Affinity "Gold Co-Investors" person list
     isGraphed: false,
-    targetSet: 'gold-coinvestors',
+    targetSet: 'gold-co-investors', // must match run-pathfinder-gold.ts TARGET_SET
   },
 ] as const;
 
