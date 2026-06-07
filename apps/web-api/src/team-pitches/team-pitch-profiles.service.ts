@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { TeamPitchParticipantType, UploadKind } from '@prisma/client';
+import { TeamPitchParticipantAccess, TeamPitchParticipantType, UploadKind } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { AwsService } from '../utils/aws/aws.service';
@@ -35,17 +35,23 @@ export class TeamPitchProfilesService {
     }
 
     if (pitch.status === 'DRAFT' && isInvestor && !resolved.isPitchAdmin) {
-      return {
-        uid: pitch.uid,
-        slug: pitch.slug,
-        status: pitch.status,
-        title: pitch.title,
-        team: {
-          uid: pitch.team.uid,
-          name: pitch.team.name,
-        },
-        teamProfile: null,
-      };
+      const canViewDraft =
+        resolved.participantAccess === TeamPitchParticipantAccess.VIEW_ADMIN ||
+        resolved.participantAccess === TeamPitchParticipantAccess.EDIT;
+
+      if (!canViewDraft) {
+        return {
+          uid: pitch.uid,
+          slug: pitch.slug,
+          status: pitch.status,
+          title: pitch.title,
+          team: {
+            uid: pitch.team.uid,
+            name: pitch.team.name,
+          },
+          teamProfile: null,
+        };
+      }
     }
 
     const teamProfile = await this.buildTeamProfileCard(pitch.uid, pitch.teamUid);

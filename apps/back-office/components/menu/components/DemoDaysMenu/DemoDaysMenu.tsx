@@ -5,10 +5,12 @@ import { useOnClickOutside } from '../../../../hooks/useOnClickOutside';
 
 import s from './DemoDaysMenu.module.scss';
 import { clsx } from 'clsx';
+import { useAuth } from '../../../../context/auth-context';
 
 export const DemoDaysMenu = () => {
   const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const { canViewTeamPitches } = useAuth();
 
   useOnClickOutside([menuRef], () => setOpen(false));
 
@@ -41,6 +43,16 @@ export const DemoDaysMenu = () => {
             <CaretIcon />
           </a>
         </Link>
+
+        {canViewTeamPitches && (
+          <Link href="/teams/team-pitches" passHref>
+            <a className={s.menuItem}>
+              <PitchIcon />
+              <span className={s.menuItemLabel}>Team Pitches</span>
+              <CaretIcon />
+            </a>
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -96,6 +108,15 @@ const CaretIcon = () => (
     <path
       d="M11.5306 8.5306L6.5306 13.5306C6.3897 13.6715 6.19861 13.7506 5.99935 13.7506C5.80009 13.7506 5.60899 13.6715 5.4681 13.5306C5.3272 13.3897 5.24805 13.1986 5.24805 12.9993C5.24805 12.8001 5.3272 12.609 5.4681 12.4681L9.93747 7.99997L5.46935 3.5306C5.39958 3.46083 5.34424 3.37801 5.30649 3.28686C5.26873 3.19571 5.2493 3.09801 5.2493 2.99935C5.2493 2.90069 5.26873 2.80299 5.30649 2.71184C5.34424 2.62069 5.39958 2.53786 5.46935 2.4681C5.53911 2.39833 5.62194 2.34299 5.71309 2.30524C5.80424 2.26748 5.90194 2.24805 6.0006 2.24805C6.09926 2.24805 6.19696 2.26748 6.28811 2.30524C6.37926 2.34299 6.46208 2.39833 6.53185 2.4681L11.5318 7.4681C11.6017 7.53786 11.6571 7.62072 11.6948 7.71193C11.7326 7.80313 11.7519 7.9009 11.7518 7.99961C11.7517 8.09832 11.7321 8.19604 11.6941 8.28715C11.6562 8.37827 11.6006 8.461 11.5306 8.5306Z"
       fill="#8897AE"
+    />
+  </svg>
+);
+
+const PitchIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M4 3h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1zm2 3v2h8V6H6zm0 4v2h5v-2H6z"
+      fill="#3D4A5C"
     />
   </svg>
 );

@@ -3,7 +3,6 @@ import { ApprovalLayout } from '../../../layout/approval-layout';
 import { useRouter } from 'next/router';
 import { useCookie } from 'react-use';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useAuth } from '../../../context/auth-context';
 import { useTeamPitchesList } from '../../../hooks/team-pitches/useTeamPitchesList';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
@@ -144,25 +143,14 @@ const TeamPitchesPage = () => {
                   <tr key={pitch.uid} className="hover:bg-gray-50">
                     <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{pitch.title}</td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        {pitch.logoUrl && (
-                          <Image
-                            src={pitch.logoUrl}
-                            alt=""
-                            width={32}
-                            height={32}
-                            className="h-8 w-8 rounded object-cover"
-                          />
-                        )}
-                        <a
-                          href={`${WEB_UI_BASE_URL}/teams/${pitch.team.uid}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium text-blue-600 hover:text-blue-900"
-                        >
-                          {pitch.team.name}
-                        </a>
-                      </div>
+                      <a
+                        href={`${WEB_UI_BASE_URL}/teams/${pitch.team.uid}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-blue-600 hover:text-blue-900"
+                      >
+                        {pitch.team.name}
+                      </a>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{formatDate(pitch.createdAt)}</td>
                     <td className="whitespace-nowrap px-6 py-4">

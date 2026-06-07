@@ -2,12 +2,13 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Prisma, TeamPitchParticipantAccess, TeamPitchParticipantType, TeamPitchStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ADMIN_PERMISSIONS, TEAM_PITCH_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
-import { defaultAccessForParticipantType, toKebabSlug } from './team-pitch.utils';
+import { resolveTeamPitchSupportEmail, toKebabSlug } from './team-pitch.utils';
 
 export type TeamPitchAccessLevel = 'restricted' | 'view' | 'edit';
 
 export type ResolvedTeamPitchAccess = {
   access: TeamPitchAccessLevel;
+  participantAccess?: TeamPitchParticipantAccess;
   participantType?: TeamPitchParticipantType;
   isPitchAdmin?: boolean;
   confidentialityAccepted?: boolean;
@@ -104,6 +105,7 @@ export class TeamPitchesService {
 
     return {
       access: participant.access === TeamPitchParticipantAccess.EDIT ? 'edit' : 'view',
+      participantAccess: participant.access,
       participantType: participant.type,
       confidentialityAccepted: participant.confidentialityAccepted,
       participantUid: participant.uid,
@@ -132,6 +134,7 @@ export class TeamPitchesService {
       teamUid: pitch.team.uid,
       teamName: pitch.team.name,
       access: resolved.access,
+      participantAccess: resolved.participantAccess ?? null,
       participantType: resolved.participantType ?? null,
       isPitchAdmin: resolved.isPitchAdmin ?? false,
       confidentialityAccepted: resolved.confidentialityAccepted ?? false,
@@ -211,7 +214,7 @@ export class TeamPitchesService {
     description: string;
     slug?: string;
     status?: TeamPitchStatus;
-    supportEmail: string;
+    supportEmail?: string;
     headerImageUid?: string | null;
     logoUid?: string | null;
     primaryColor?: string | null;
@@ -229,6 +232,11 @@ export class TeamPitchesService {
       orderBy: { updatedAt: 'desc' },
     });
 
+    const supportEmail = resolveTeamPitchSupportEmail(data.supportEmail);
+    if (!supportEmail) {
+      throw new BadRequestException('Support email is required; set LABOS_SUPPORT_EMAIL or provide supportEmail');
+    }
+
     const pitch = await this.prisma.teamPitch.create({
       data: {
         teamUid: data.teamUid,
@@ -236,7 +244,7 @@ export class TeamPitchesService {
         title: data.title,
         description: data.description,
         status: data.status ?? TeamPitchStatus.DRAFT,
-        supportEmail: data.supportEmail,
+        supportEmail,
         headerImageUid: data.headerImageUid ?? undefined,
         logoUid: data.logoUid ?? undefined,
         primaryColor: data.primaryColor ?? '#1a45e6',
@@ -309,6 +317,14 @@ export class TeamPitchesService {
       slug = await this.ensureUniqueSlug(toKebabSlug(data.slug), pitchUid);
     }
 
+    let resolvedSupportEmail: string | undefined;
+    if (data.supportEmail !== undefined) {
+      resolvedSupportEmail = resolveTeamPitchSupportEmail(data.supportEmail) ?? undefined;
+      if (!resolvedSupportEmail) {
+        throw new BadRequestException('Support email is required; set LABOS_SUPPORT_EMAIL or provide supportEmail');
+      }
+    }
+
     return this.prisma.teamPitch.update({
       where: { uid: pitchUid },
       data: {
@@ -316,7 +332,7 @@ export class TeamPitchesService {
         description: data.description,
         slug,
         status: data.status,
-        supportEmail: data.supportEmail,
+        supportEmail: resolvedSupportEmail,
         headerImageUid: data.headerImageUid,
         logoUid: data.logoUid,
         primaryColor: data.primaryColor ?? '#1a45e6',

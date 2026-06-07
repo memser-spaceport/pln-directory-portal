@@ -1372,6 +1372,7 @@ enum TeamPitchParticipantType {
 
 enum TeamPitchParticipantAccess {
   VIEW
+  VIEW_ADMIN
   EDIT
   RESTRICTED
 }
