@@ -149,7 +149,9 @@ async function seedRecords(): Promise<{ created: number; enriched: number }> {
         dedupeKey: s.investor_id,
         canonicalId: s.investor_id,
         source: NEW_SOURCE,
-        firstName: '',
+        // Firm/person label as the display name so the "investor" column isn't
+        // blank (these targets are firm-grain; the 5 person-LPs use their name).
+        firstName: label,
         lastName: '',
         email: `${s.investor_id}@lp.local`,
         emailStatus: 'unverified',

@@ -66,17 +66,18 @@ async function seedRecords(): Promise<number> {
   }
   let created = 0;
   for (const s of dump.summaries) {
+    const label = deslug(s.investor_id);
     await prisma.investorOutreachRecord.create({
       data: {
         investorId: s.investor_id,
         dedupeKey: s.investor_id,
         canonicalId: s.investor_id,
         source: SOURCE,
-        firstName: '',
+        firstName: label, // firm label as display name (column was blank)
         lastName: '',
         email: `${s.investor_id}@gold.local`,
         emailStatus: 'unverified',
-        firm: deslug(s.investor_id),
+        firm: label,
         investorType: 'fund',
         stageFocus: '',
         engagementTier: '',
