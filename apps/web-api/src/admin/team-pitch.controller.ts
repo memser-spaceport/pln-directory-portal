@@ -7,6 +7,7 @@ import { TeamPitchesService } from '../team-pitches/team-pitches.service';
 import { TeamPitchParticipantsService } from '../team-pitches/team-pitch-participants.service';
 import {
   AddTeamPitchParticipantDto,
+  AddTeamPitchParticipantsBulkDto,
   CreateTeamPitchDto,
   GetTeamPitchParticipantsQueryDto,
   GetTeamPitchesQueryDto,
@@ -83,6 +84,16 @@ export class AdminTeamPitchController {
   @NoCache()
   async addParticipant(@Param('pitchUid') pitchUid: string, @Body() body: AddTeamPitchParticipantDto) {
     return this.teamPitchParticipantsService.addParticipant(pitchUid, body);
+  }
+
+  @Post(':pitchUid/participants-bulk')
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async addInvestorParticipantsBulk(
+    @Param('pitchUid') pitchUid: string,
+    @Body() body: AddTeamPitchParticipantsBulkDto
+  ) {
+    return this.teamPitchParticipantsService.addInvestorParticipantsBulk(pitchUid, body);
   }
 
   @Patch(':pitchUid/participants/:participantUid')

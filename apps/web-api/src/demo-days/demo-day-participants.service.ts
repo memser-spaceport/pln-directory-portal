@@ -6,6 +6,8 @@ import { AnalyticsService } from '../analytics/service/analytics.service';
 import { TeamsService } from '../teams/teams.service';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { applyDemoDayParticipantPolicyAssignments } from './demo-day-investor-policy.util';
+import { InvestorBulkProvisionService } from '../investors/investor-bulk-provision.service';
+import { InvestorBulkRowResult, InvestorBulkSummary } from '../investors/investor-bulk.types';
 
 @Injectable()
 export class DemoDayParticipantsService {
@@ -14,7 +16,8 @@ export class DemoDayParticipantsService {
     private readonly demoDaysService: DemoDaysService,
     private readonly analyticsService: AnalyticsService,
     private readonly teamService: TeamsService,
-    private readonly teamEnrichmentService: TeamEnrichmentService
+    private readonly teamEnrichmentService: TeamEnrichmentService,
+    private readonly investorBulkProvisionService: InvestorBulkProvisionService
   ) {}
 
   async addParticipant(
@@ -196,50 +199,6 @@ export class DemoDayParticipantsService {
     return created;
   }
 
-  private normalizeTwitterHandler(handler?: string): string | undefined {
-    if (!handler) return undefined;
-
-    // Remove @ prefix if present
-    let normalized = handler.trim().replace(/^@/, '');
-
-    // Extract handle from Twitter URLs
-    const twitterUrlMatch = normalized.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)/);
-    if (twitterUrlMatch) {
-      normalized = twitterUrlMatch[1];
-    }
-
-    return normalized || undefined;
-  }
-
-  private normalizeLinkedinHandler(handler?: string): string | undefined {
-    if (!handler) return undefined;
-
-    const trimmed = handler.trim();
-
-    // Extract handle from LinkedIn URLs
-    const linkedinUrlMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([a-zA-Z0-9-]+)/);
-    if (linkedinUrlMatch) {
-      return linkedinUrlMatch[1];
-    }
-
-    return trimmed || undefined;
-  }
-
-  private normalizeTelegramHandler(handler?: string): string | undefined {
-    if (!handler) return undefined;
-
-    // Remove @ prefix if present
-    let normalized = handler.trim().replace(/^@/, '');
-
-    // Extract handle from Telegram URLs
-    const telegramUrlMatch = normalized.match(/(?:https?:\/\/)?(?:www\.)?(?:telegram\.org|t\.me)\/([a-zA-Z0-9_]+)/);
-    if (telegramUrlMatch) {
-      normalized = telegramUrlMatch[1];
-    }
-
-    return normalized || undefined;
-  }
-
   private async ensureTeamFundraisingProfile(teamUid: string, demoDayUid: string, actorUid?: string): Promise<void> {
     const existingFundraisingProfile = await this.prisma.teamFundraisingProfile.findUnique({
       where: {
@@ -283,35 +242,8 @@ export class DemoDayParticipantsService {
     actorEmail?: string,
     adminJwt?: { memberUid?: string; uid?: string }
   ): Promise<{
-    summary: {
-      total: number;
-      createdUsers: number;
-      updatedUsers: number;
-      createdTeams: number;
-      updatedMemberships: number;
-      promotedToLead: number;
-      errors: number;
-    };
-    rows: Array<{
-      email: string;
-      name: string;
-      organization?: string | null;
-      organizationEmail?: string | null;
-      twitterHandler?: string | null;
-      linkedinHandler?: string | null;
-      telegramHandler?: string | null;
-      role?: string | null;
-      investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
-      typicalCheckSize?: number | null;
-      investInStartupStages?: string[] | null;
-      secRulesAccepted?: boolean | null;
-      makeTeamLead?: boolean;
-      willBeTeamLead: boolean;
-      status: 'success' | 'error';
-      message?: string;
-      userId?: string;
-      teamId?: string;
-    }>;
+    summary: InvestorBulkSummary;
+    rows: InvestorBulkRowResult[];
   }> {
     const demoDayRecord = await this.demoDaysService.getDemoDayByUidOrSlug(demoDayUid);
 
@@ -334,26 +266,7 @@ export class DemoDayParticipantsService {
       errors: 0,
     };
 
-    const rows: Array<{
-      email: string;
-      name: string;
-      organization?: string | null;
-      organizationEmail?: string | null;
-      twitterHandler?: string | null;
-      linkedinHandler?: string | null;
-      telegramHandler?: string | null;
-      role?: string | null;
-      investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
-      typicalCheckSize?: number | null;
-      investInStartupStages?: string[] | null;
-      secRulesAccepted?: boolean | null;
-      makeTeamLead?: boolean;
-      willBeTeamLead: boolean;
-      status: 'success' | 'error';
-      message?: string;
-      userId?: string;
-      teamId?: string;
-    }> = [];
+    const rows: InvestorBulkRowResult[] = [];
 
     // Pending analytics events to emit after transaction commit
     const pendingEvents: Array<{ name: string; payload: any }> = [];
@@ -390,61 +303,24 @@ export class DemoDayParticipantsService {
     await this.prisma.$transaction(async (tx) => {
       for (const participantData of data.participants) {
         try {
-          // Normalize social media handles
-          const normalizedTwitter = this.normalizeTwitterHandler(participantData.twitterHandler || undefined);
-          const normalizedLinkedin = this.normalizeLinkedinHandler(participantData.linkedinHandler || undefined);
-          const normalizedTelegram = this.normalizeTelegramHandler(participantData.telegramHandler || undefined);
+          const willBeTeamLead = participantData.organization
+            ? typeof participantData.makeTeamLead === 'boolean'
+              ? participantData.makeTeamLead
+              : true
+            : false;
 
-          // Determine if telegram handle is already used by another member
-          let telegramOwnerUid: string | null = null;
-          if (normalizedTelegram) {
-            if (telegramOwnerCache.has(normalizedTelegram)) {
-              telegramOwnerUid = telegramOwnerCache.get(normalizedTelegram) || null;
-            } else {
-              const owner = await tx.member.findFirst({
-                where: { telegramHandler: normalizedTelegram },
-                select: { uid: true },
-              });
-              telegramOwnerUid = owner?.uid || null;
-              telegramOwnerCache.set(normalizedTelegram, telegramOwnerUid);
-            }
-          }
-          const isTeamInvestorProfile =
-            (participantData.investmentType === 'FUND' || participantData.investmentType === 'ANGEL_AND_FUND') &&
-            participantData.organization;
-          let willBeTeamLead = false;
-
-          if (participantData.organization) {
-            willBeTeamLead = typeof participantData.makeTeamLead === 'boolean' ? participantData.makeTeamLead : true;
-          }
-
-          const rowResult: {
-            email: string;
-            name: string;
-            organization?: string | null;
-            organizationEmail?: string | null;
-            twitterHandler?: string;
-            linkedinHandler?: string;
-            telegramHandler?: string;
-            role?: string | null;
-            investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
-            typicalCheckSize?: number | null;
-            investInStartupStages?: string[] | null;
-            secRulesAccepted?: boolean | null;
-            makeTeamLead?: boolean;
-            willBeTeamLead: boolean;
-            status: 'success' | 'error';
-            message?: string;
-            userId?: string;
-            teamId?: string;
-          } = {
+          const rowResult: InvestorBulkRowResult = {
             email: participantData.email,
             name: participantData.name,
             organization: participantData.organization,
             organizationEmail: participantData.organizationEmail,
-            twitterHandler: normalizedTwitter,
-            linkedinHandler: normalizedLinkedin,
-            telegramHandler: normalizedTelegram,
+            twitterHandler: this.investorBulkProvisionService.normalizeTwitterHandler(participantData.twitterHandler),
+            linkedinHandler: this.investorBulkProvisionService.normalizeLinkedinHandler(
+              participantData.linkedinHandler
+            ),
+            telegramHandler: this.investorBulkProvisionService.normalizeTelegramHandler(
+              participantData.telegramHandler
+            ),
             role: participantData.role,
             investmentType: participantData.investmentType,
             typicalCheckSize: participantData.typicalCheckSize,
@@ -455,7 +331,6 @@ export class DemoDayParticipantsService {
             status: 'success',
           };
 
-          // Check if participant already exists for this demo day
           if (existingParticipantEmails.has(participantData.email)) {
             rowResult.status = 'error';
             rowResult.message = 'Participant already exists for this demo day';
@@ -465,305 +340,76 @@ export class DemoDayParticipantsService {
           }
 
           const existingMember = existingMembersByEmail.get(participantData.email);
-          let memberUid: string;
-          let isNewUser = false;
-
-          if (existingMember) {
-            // Update existing member
-            memberUid = existingMember.uid;
-
-            // Update member data
-            const updateData: any = {
-              name: participantData.name,
-              twitterHandler: normalizedTwitter,
-              linkedinHandler: normalizedLinkedin,
-            };
-
-            // Only set telegramHandler if it's not used by a different member
-            if (normalizedTelegram && (!telegramOwnerUid || telegramOwnerUid === existingMember.uid)) {
-              updateData.telegramHandler = normalizedTelegram;
+          const provisioned = await this.investorBulkProvisionService.provisionInvestorFromBulkRow(
+            tx,
+            participantData,
+            existingMember,
+            { teamCache, telegramOwnerCache },
+            {
+              memberCreationReason: 'Auto-created on demo day participant addition',
             }
+          );
 
-            // Update investor profile if it exists - only set type if explicitly provided
-            if (existingMember.investorProfile) {
-              const updatedInvestorType = participantData.investmentType || existingMember.investorProfile.type;
-              updateData.investorProfile = {
-                update: {
-                  type: updatedInvestorType,
-                  ...(isTeamInvestorProfile
-                    ? {
-                        secRulesAccepted:
-                          participantData.secRulesAccepted !== undefined
-                            ? participantData.secRulesAccepted
-                            : existingMember.investorProfile.secRulesAccepted,
-                      }
-                    : {
-                        typicalCheckSize:
-                          participantData.typicalCheckSize !== undefined
-                            ? participantData.typicalCheckSize
-                            : existingMember.investorProfile.typicalCheckSize,
-                        investInStartupStages:
-                          participantData.investInStartupStages !== undefined
-                            ? participantData.investInStartupStages
-                            : existingMember.investorProfile.investInStartupStages,
-                        secRulesAccepted:
-                          participantData.secRulesAccepted !== undefined
-                            ? participantData.secRulesAccepted
-                            : existingMember.investorProfile.secRulesAccepted,
-                      }),
-                },
-              };
-            }
+          summary.createdUsers += provisioned.summaryDelta.createdUsers;
+          summary.updatedUsers += provisioned.summaryDelta.updatedUsers;
+          summary.createdTeams += provisioned.summaryDelta.createdTeams;
+          summary.updatedMemberships += provisioned.summaryDelta.updatedMemberships;
+          summary.promotedToLead += provisioned.summaryDelta.promotedToLead;
 
-            await tx.member.update({
-              where: { uid: memberUid },
-              data: updateData,
-            });
-            summary.updatedUsers++;
-          } else {
-            // Create new member - default investor type logic
-            let investorType = participantData.investmentType; // Keep as provided, or undefined if not provided
+          rowResult.userId = provisioned.memberUid;
+          rowResult.teamId = provisioned.orgTeamUid;
+          rowResult.twitterHandler = provisioned.normalizedTwitter;
+          rowResult.linkedinHandler = provisioned.normalizedLinkedin;
+          rowResult.telegramHandler = provisioned.normalizedTelegram;
+          rowResult.willBeTeamLead = provisioned.willBeTeamLead;
 
-            // Only set to ANGEL if T&C is accepted (secRulesAccepted is true)
-            if (!investorType && participantData.secRulesAccepted) {
-              investorType = 'ANGEL';
-            }
-
-            const createData: any = {
-              name: participantData.name,
-              email: participantData.email,
-              twitterHandler: normalizedTwitter,
-              linkedinHandler: normalizedLinkedin,
-              memberApproval: {
-                create: {
-                  state: 'PENDING',
-                  reason: 'Auto-created on demo day participant addition',
-                },
-              },
-              investorProfile: isTeamInvestorProfile
-                ? {
-                    create: {
-                      type: investorType || undefined, // Keep as null if not provided
-                      secRulesAccepted: participantData.secRulesAccepted || false,
-                    },
-                  }
-                : {
-                    create: {
-                      type: investorType || undefined, // Keep as null if not provided
-                      typicalCheckSize: participantData.typicalCheckSize || undefined,
-                      investInStartupStages: participantData.investInStartupStages || undefined,
-                      secRulesAccepted: participantData.secRulesAccepted || false,
-                    },
-                  },
-            };
-
-            // Only set telegramHandler if it's not used by another member
-            if (normalizedTelegram && !telegramOwnerUid) {
-              createData.telegramHandler = normalizedTelegram;
-            }
-
-            const newMember = await tx.member.create({
-              data: createData,
-            });
-            memberUid = newMember.uid;
-            isNewUser = true;
-            summary.createdUsers++;
-          }
-
-          rowResult.userId = memberUid;
-
-          // Handle team logic if organization is provided
-          let teamUid: string | undefined;
-          if (participantData.organization) {
-            const orgName = participantData.organization.trim();
-
-            // Check cache first
-            let team = teamCache.get(orgName.toLowerCase());
-
-            if (!team) {
-              // Try to find existing team (case-insensitive)
-              team = await tx.team.findFirst({
-                where: {
-                  name: {
-                    equals: orgName,
-                    mode: 'insensitive',
-                  },
-                },
-              });
-
-              if (!team) {
-                // Create new team
-                const isFund =
-                  participantData.investmentType === 'FUND' || participantData.investmentType === 'ANGEL_AND_FUND';
-
-                team = await tx.team.create({
-                  data: {
-                    name: orgName,
-                    contactMethod: participantData.organizationEmail || undefined,
-                    isFund,
-                    accessLevel: 'L0',
-                    accessLevelUpdatedAt: new Date(),
-                    tier: -1,
-                    priority: 99,
-                  },
-                });
-                summary.createdTeams++;
-              } else {
-                // Update existing team if it has no contactMethod and organizationEmail is provided
-                if (participantData.organizationEmail && (!team.contactMethod || team.contactMethod.trim() === '')) {
-                  team = await tx.team.update({
-                    where: { uid: team.uid },
-                    data: {
-                      name: orgName,
-                      contactMethod: participantData.organizationEmail,
-                    },
-                  });
-                }
-              }
-
-              // Cache the team
-              teamCache.set(orgName.toLowerCase(), team);
-            }
-
-            if (isTeamInvestorProfile) {
-              const teamInvestorProfile = await tx.investorProfile.findUnique({
-                where: { teamUid: team.uid },
-              });
-
-              if (teamInvestorProfile) {
-                await tx.investorProfile.update({
-                  where: { uid: teamInvestorProfile.uid },
-                  data: {
-                    typicalCheckSize: participantData.typicalCheckSize || undefined,
-                    investInStartupStages: participantData.investInStartupStages || undefined,
-                  },
-                });
-              } else {
-                const newInvestorProfile = await tx.investorProfile.create({
-                  data: {
-                    teamUid: team.uid,
-                    typicalCheckSize: participantData.typicalCheckSize || undefined,
-                    investInStartupStages: participantData.investInStartupStages || undefined,
-                  },
-                });
-                await tx.team.update({
-                  where: { uid: team.uid },
-                  data: { investorProfileId: newInvestorProfile.uid, name: team.name },
-                });
-              }
-            }
-
-            teamUid = team.uid;
-            rowResult.teamId = teamUid;
-
-            // Upsert TeamMemberRole - teamUid is guaranteed to exist here
-            if (teamUid) {
-              const existingRole = await tx.teamMemberRole.findUnique({
-                where: {
-                  memberUid_teamUid: { memberUid, teamUid },
-                },
-              });
-
-              if (existingRole) {
-                // Determine if we should update the role based on provided role or teamLead status
-                const shouldBeTeamLead = willBeTeamLead || participantData.role === 'Lead';
-                const shouldUpdateRole =
-                  participantData.role && participantData.role !== (existingRole.teamLead ? 'Lead' : 'Contributor');
-
-                if ((shouldBeTeamLead && !existingRole.teamLead) || shouldUpdateRole) {
-                  const newRole = participantData.role || (shouldBeTeamLead ? 'Lead' : 'Contributor');
-                  const newTeamLead = shouldBeTeamLead || participantData.role === 'Lead';
-
-                  await tx.teamMemberRole.update({
-                    where: {
-                      memberUid_teamUid: { memberUid, teamUid },
-                    },
-                    data: {
-                      teamLead: newTeamLead,
-                      role: newRole,
-                      investmentTeam:
-                        !!isTeamInvestorProfile && !existingMember?.teamMemberRoles?.find((r) => r.investmentTeam),
-                    },
-                  });
-
-                  if (!existingRole.teamLead && newTeamLead) {
-                    summary.promotedToLead++;
-                  }
-                }
-              } else {
-                // Create new team membership
-                const isTeamLead = willBeTeamLead || participantData.role === 'Lead';
-
-                await tx.teamMemberRole.create({
-                  data: {
-                    memberUid,
-                    teamUid,
-                    teamLead: isTeamLead,
-                    role: participantData.role || (willBeTeamLead ? 'Lead' : 'Contributor'),
-                    mainTeam: !existingMember?.teamMemberRoles?.find((r) => r.mainTeam),
-                    investmentTeam:
-                      !!isTeamInvestorProfile && !existingMember?.teamMemberRoles?.find((r) => r.investmentTeam),
-                  },
-                });
-                summary.updatedMemberships++;
-
-                if (isTeamLead) {
-                  summary.promotedToLead++;
-                }
-              }
-            }
-          }
-
-          // Determine if participant existed before
           const existedBefore = await tx.demoDayParticipant.findUnique({
-            where: { demoDayUid_memberUid: { demoDayUid, memberUid } },
+            where: { demoDayUid_memberUid: { demoDayUid, memberUid: provisioned.memberUid } },
             select: { uid: true },
           });
 
-          // Create/update DemoDayParticipant
           const upserted = await tx.demoDayParticipant.upsert({
             where: {
-              demoDayUid_memberUid: { demoDayUid, memberUid },
+              demoDayUid_memberUid: { demoDayUid, memberUid: provisioned.memberUid },
             },
             update: {
               type: 'INVESTOR',
-              teamUid,
+              teamUid: provisioned.orgTeamUid,
               statusUpdatedAt: new Date(),
             },
             create: {
               demoDayUid,
-              memberUid,
+              memberUid: provisioned.memberUid,
               type: 'INVESTOR',
-              status: isNewUser ? 'INVITED' : 'ENABLED',
-              teamUid,
+              status: provisioned.isNewUser ? 'INVITED' : 'ENABLED',
+              teamUid: provisioned.orgTeamUid,
               statusUpdatedAt: new Date(),
             },
           });
 
-          if (!isNewUser) {
+          if (!provisioned.isNewUser) {
             const rolesAfter = await tx.teamMemberRole.findMany({
-              where: { memberUid },
+              where: { memberUid: provisioned.memberUid },
               select: { investmentTeam: true },
             });
-            await applyDemoDayParticipantPolicyAssignments(tx, memberUid, 'INVESTOR', demoDayRecord.host, {
+            await applyDemoDayParticipantPolicyAssignments(tx, provisioned.memberUid, 'INVESTOR', demoDayRecord.host, {
               teamMemberRoles: rolesAfter,
             });
           }
 
-          // If it did not exist before, track "participant added" after commit
           if (!existedBefore) {
             pendingEvents.push({
               name: 'demo-day-participant-added',
               payload: {
-                distinctId: memberUid,
+                distinctId: provisioned.memberUid,
                 properties: {
                   demoDayUid,
                   participantUid: upserted.uid,
-                  memberUid,
+                  memberUid: provisioned.memberUid,
                   type: upserted.type,
                   status: upserted.status,
                   teamUid: upserted.teamUid || null,
-                  isNewMember: isNewUser,
+                  isNewMember: provisioned.isNewUser,
                   actorUid: actorUid || null,
                   actorEmail: actorEmail || null,
                 },
@@ -779,9 +425,13 @@ export class DemoDayParticipantsService {
             name: participantData.name,
             organization: participantData.organization,
             organizationEmail: participantData.organizationEmail,
-            twitterHandler: participantData.twitterHandler || undefined,
-            linkedinHandler: participantData.linkedinHandler || undefined,
-            telegramHandler: this.normalizeTelegramHandler(participantData.telegramHandler || undefined),
+            twitterHandler: this.investorBulkProvisionService.normalizeTwitterHandler(participantData.twitterHandler),
+            linkedinHandler: this.investorBulkProvisionService.normalizeLinkedinHandler(
+              participantData.linkedinHandler
+            ),
+            telegramHandler: this.investorBulkProvisionService.normalizeTelegramHandler(
+              participantData.telegramHandler
+            ),
             role: participantData.role,
             investmentType: participantData.investmentType,
             typicalCheckSize: participantData.typicalCheckSize,

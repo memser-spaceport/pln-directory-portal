@@ -12,6 +12,7 @@ import { useUpdateTeamPitch } from '../../../hooks/team-pitches/useUpdateTeamPit
 import { useUpdateTeamPitchParticipant } from '../../../hooks/team-pitches/useUpdateTeamPitchParticipant';
 import { useSendTeamPitchInvite } from '../../../hooks/team-pitches/useSendTeamPitchInvite';
 import { AddTeamPitchParticipantModal } from '../../../components/team-pitches/AddTeamPitchParticipantModal';
+import { UploadTeamPitchInvestorsModal } from '../../../components/team-pitches/UploadTeamPitchInvestorsModal';
 import { TeamPitchConfirmModal } from '../../../components/team-pitches/TeamPitchConfirmModal';
 import { RichText } from '../../../components/common/rich-text';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
@@ -21,7 +22,14 @@ import s from '../../demo-days/styles.module.scss';
 
 const RichTextEditor = dynamic(() => import('../../../components/common/rich-text-editor'), { ssr: false });
 
-const ACCESS_OPTIONS = ['VIEW', 'EDIT', 'RESTRICTED'] as const;
+const ACCESS_OPTIONS = ['VIEW', 'VIEW_ADMIN', 'EDIT', 'RESTRICTED'] as const;
+
+const ACCESS_LABELS: Record<typeof ACCESS_OPTIONS[number], string> = {
+  VIEW: 'View Open Pitch',
+  VIEW_ADMIN: 'View Draft + Open Pitch',
+  EDIT: 'Admin (View/Edit)',
+  RESTRICTED: 'No Access',
+};
 
 const getParticipantTypeSelectClass = (type: string) => {
   switch (type) {
@@ -42,6 +50,8 @@ const getAccessSelectClass = (access: string) => {
       return 'bg-green-100 text-green-800';
     case 'VIEW':
       return 'bg-blue-100 text-blue-800';
+    case 'VIEW_ADMIN':
+      return 'bg-indigo-100 text-indigo-800';
     case 'RESTRICTED':
       return 'bg-red-100 text-red-800';
     default:
@@ -63,7 +73,7 @@ type PendingParticipantFields = {
 
 const formatParticipantTypeLabel = (type: string) => type.charAt(0) + type.slice(1).toLowerCase();
 
-const formatAccessLabel = (access: string) => access.charAt(0) + access.slice(1).toLowerCase();
+const formatAccessLabel = (access: string) => ACCESS_LABELS[access as typeof ACCESS_OPTIONS[number]] ?? access;
 
 const TeamExternalLinkIcon = () => (
   <svg className="ml-1 w-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
@@ -81,10 +91,11 @@ const TeamPitchDetailPage = () => {
   const [authToken] = useCookie('plnadmin');
   const { canViewTeamPitches, canMutateTeamPitches, isLoading: authLoading } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'investors' | 'founders' | 'support'>('investors');
+  const [activeTab, setActiveTab] = useState<'investors' | 'founders'>('investors');
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [pendingTypeChange, setPendingTypeChange] = useState<(PendingParticipantFields & { type: string }) | null>(
     null
   );
@@ -93,7 +104,7 @@ const TeamPitchDetailPage = () => {
   >(null);
   const [pendingInvite, setPendingInvite] = useState<(PendingParticipantFields & { isResend: boolean }) | null>(null);
 
-  const typeMap = { investors: 'INVESTOR', founders: 'FOUNDER', support: 'SUPPORT' } as const;
+  const typeMap = { investors: 'INVESTOR', founders: 'FOUNDER' } as const;
 
   const { data: pitch, isLoading: pitchLoading, refetch: refetchPitch } = useTeamPitchDetail(authToken, uid);
   const {
@@ -112,7 +123,6 @@ const TeamPitchDetailPage = () => {
     slug: '',
     status: 'DRAFT',
     supportEmail: '',
-    primaryColor: '#1a45e6',
   });
 
   useEffect(() => {
@@ -131,7 +141,6 @@ const TeamPitchDetailPage = () => {
         slug: pitch.slug,
         status: pitch.status,
         supportEmail: pitch.supportEmail,
-        primaryColor: pitch.primaryColor || '#1a45e6',
       });
     }
   }, [pitch]);
@@ -256,7 +265,6 @@ const TeamPitchDetailPage = () => {
                           slug: pitch.slug,
                           status: pitch.status,
                           supportEmail: pitch.supportEmail,
-                          primaryColor: pitch.primaryColor || '#1a45e6',
                         });
                       }}
                       className={s.editButton}
@@ -325,43 +333,10 @@ const TeamPitchDetailPage = () => {
                     value={editFormData.supportEmail}
                     onChange={(e) => handleEditFormChange('supportEmail', e.target.value)}
                     className={s.fieldInput}
+                    placeholder="Leave blank to use default support email"
                   />
                 ) : (
                   <div className={s.fieldValue}>{pitch.supportEmail}</div>
-                )}
-              </div>
-              <div className={s.overviewField}>
-                <label className={s.fieldLabel}>Primary Color</label>
-                {isEditing ? (
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-6 w-6 flex-shrink-0 rounded border border-gray-300"
-                      style={{
-                        backgroundColor: /^#[0-9A-Fa-f]{6}$/.test(editFormData.primaryColor)
-                          ? editFormData.primaryColor
-                          : '#1a45e6',
-                      }}
-                      aria-hidden
-                    />
-                    <input
-                      type="text"
-                      value={editFormData.primaryColor}
-                      onChange={(e) => handleEditFormChange('primaryColor', e.target.value)}
-                      className={s.fieldInput}
-                      pattern="^#[0-9A-Fa-f]{6}$"
-                    />
-                  </div>
-                ) : (
-                  <div className={s.fieldValue}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="h-6 w-6 rounded border border-gray-300"
-                        style={{ backgroundColor: pitch.primaryColor || '#1a45e6' }}
-                        aria-hidden
-                      />
-                      <span>{pitch.primaryColor || '#1a45e6'}</span>
-                    </div>
-                  </div>
                 )}
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
@@ -404,11 +379,19 @@ const TeamPitchDetailPage = () => {
                       Add Participant
                     </button>
                   )}
+                  {canMutateTeamPitches && activeTab === 'investors' && (
+                    <button
+                      onClick={() => setShowUploadModal(true)}
+                      className="rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
+                    >
+                      Upload Investors CSV
+                    </button>
+                  )}
                 </div>
               </div>
 
               <div className={s.tabs}>
-                {(['investors', 'founders', 'support'] as const).map((tab) => (
+                {(['investors', 'founders'] as const).map((tab) => (
                   <button
                     key={tab}
                     className={clsx(s.tab, { [s.active]: activeTab === tab })}
@@ -457,7 +440,7 @@ const TeamPitchDetailPage = () => {
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Type
                   </div>
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>
                     Access
                   </div>
                   {activeTab === 'investors' && (
@@ -593,11 +576,10 @@ const TeamPitchDetailPage = () => {
                         >
                           <option value="INVESTOR">Investor</option>
                           <option value="FOUNDER">Founder</option>
-                          <option value="SUPPORT">Support</option>
                         </select>
                       </div>
 
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 220 }}>
                         <select
                           value={participant.access}
                           disabled={!canMutateTeamPitches || updateParticipant.isPending}
@@ -616,7 +598,7 @@ const TeamPitchDetailPage = () => {
                         >
                           {ACCESS_OPTIONS.map((a) => (
                             <option key={a} value={a}>
-                              {a}
+                              {ACCESS_LABELS[a]}
                             </option>
                           ))}
                         </select>
@@ -656,6 +638,15 @@ const TeamPitchDetailPage = () => {
           pitchUid={uid}
           defaultType={typeMap[activeTab]}
           onAdded={() => refetchParticipants()}
+        />
+
+        <UploadTeamPitchInvestorsModal
+          isOpen={showUploadModal}
+          onClose={() => {
+            setShowUploadModal(false);
+            refetchParticipants();
+          }}
+          pitchUid={uid}
         />
 
         <TeamPitchConfirmModal
