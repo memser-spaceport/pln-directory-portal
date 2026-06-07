@@ -1,57 +1,100 @@
 /**
- * LOCAL-ONLY ingest of the Gold PLC Co-Investors run into the Investor DB, so the
- * gold-coinvestors list shows proximity (it ships ungraphed by default).
+ * LOCAL-ONLY ingest of the Gold PLC Co-Investors run into the Investor DB.
  *
- * Idempotent:
- *   1. Purges prior gold pathfinder paths + the prior gold run records
- *      (source=PATHFINDER_GOLD).
- *   2. Creates one InvestorOutreachRecord per gold firm target in the gold runner
- *      dump (investorId = the gold_* id — the FK the pathfinder ingest needs).
- *   3. Repoints the gold-coinvestors list at targetSet=gold-co-investors (the gold
- *      runner's set), flips isGraphed=true, replaces membership with the records.
+ * PERSON-GRAIN (the Gold list 183682 is a person list): rows are PEOPLE
+ * (contacts at co-investor firms), identified by their Affinity entity id. Each
+ * person inherits the proximity of their FIRM (best across firms). No prestige
+ * enrichment — Gold caliber is relationship-only by design.
  *
- * Does NOT create paths — run the gold runner with --post AFTER this:
- *   cd pln-data-enrichment/apps/data-enrichment && npx ts-node scripts/run-pathfinder-gold.ts --post
+ * Idempotent: purge prior gold run + its paths, create person records keyed by
+ * Affinity id with person-keyed PathfinderPath rows copied from each person's best
+ * firm, repoint + graph the gold-coinvestors list, set membership.
  *
- * Gold targets are co-investor FIRMS, so there is no contact-prestige enrichment
- * (that pass enriched LP persons); caliber is relationship-only by design.
- *
- * Reads the gold runner dump from local scratch (firm names — never committed).
- * NOT for production. Run via `npm run api:seed-pathfinder-gold`.
+ * Needs the gold runner dump (with firm_label) — regenerate via
+ *   cd pln-data-enrichment/apps/data-enrichment && npx ts-node scripts/run-pathfinder-gold.ts
+ * Reads scratch (firm names — never committed). NOT for production.
+ * Run via `npm run api:seed-pathfinder-gold`.
  */
 import { readFileSync } from 'fs';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 const TARGET_SET = 'gold-co-investors';
 const SOURCE = 'PATHFINDER_GOLD';
+const RUN_ID = 'gold-person-seed';
 const LIST_SLUG = 'gold-coinvestors';
 
-// Override via env on a different machine; default is this operator's local layout.
 const SCRATCH_DIR =
   process.env.PATHFINDER_SCRATCH_DIR ||
   'C:/Users/anpan/code/claudecode/investor_paths_work/pplx_paths';
 const DUMP_PATH = `${SCRATCH_DIR}/_pathfinder_gold_dump.json`;
+const AFFINITY_PATH = `${SCRATCH_DIR}/_affinity_183682.json`;
 
+interface DumpPath {
+  targetInvestorId: string;
+  connectorType: string;
+  hops: number;
+  caliber: string | null;
+  caliberConfidence: number | null;
+  proximityCode: string;
+  score: number;
+  rank: number;
+  hopChain: unknown;
+}
 interface DumpSummary {
   investor_id: string;
+  firm_label: string;
   best_proximity_code: string;
   has_path: boolean;
 }
 interface Dump {
   targetSet: string;
+  paths: DumpPath[];
   summaries: DumpSummary[];
 }
+interface AffinityField {
+  id: string;
+  value?: { data?: unknown };
+}
+interface AffinityEntity {
+  id: number | string;
+  firstName?: string | null;
+  lastName?: string | null;
+  primaryEmailAddress?: string | null;
+  emailAddresses?: string[] | null;
+  fields?: AffinityField[];
+}
 
-/** gold_pony_shiny -> "Pony Shiny"; gold_arteriacapital -> "Arteriacapital". */
-function deslug(id: string): string {
-  return id
-    .replace(/^gold_/, '')
-    .split('_')
-    .filter(Boolean)
-    .map((w) => (w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)))
-    .join(' ');
+const norm = (s: string | null | undefined): string =>
+  (s ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+function entryFirmNames(entity: AffinityEntity): string[] {
+  const comp = (entity.fields ?? []).find((f) => f.id === 'companies');
+  const data = comp?.value?.data;
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((d) => (d && typeof d === 'object' ? (d as { name?: unknown }).name : null))
+    .filter((n): n is string => typeof n === 'string' && n.trim().length > 0);
+}
+
+function proximityRank(code: string | null, hasPath: boolean): number {
+  if (!hasPath || !code) return 1e9;
+  const m = /\+(\d)([AB])/.exec(code);
+  if (!m) return 1e6;
+  const caliber = m[2] === 'A' ? 0 : 1;
+  return caliber * 100 + parseInt(m[1], 10);
+}
+
+interface FirmProximity {
+  firmId: string;
+  label: string;
+  code: string;
+  hasPath: boolean;
 }
 
 async function cleanup() {
@@ -59,39 +102,115 @@ async function cleanup() {
   await prisma.investorOutreachRecord.deleteMany({ where: { source: SOURCE } });
 }
 
-async function seedRecords(): Promise<number> {
+async function seed() {
   const dump = JSON.parse(readFileSync(DUMP_PATH, 'utf-8')) as Dump;
   if (dump.targetSet !== TARGET_SET) {
     throw new Error(`dump targetSet "${dump.targetSet}" != expected "${TARGET_SET}"`);
   }
-  let created = 0;
+  const firmByLabel = new Map<string, FirmProximity>();
   for (const s of dump.summaries) {
-    const label = deslug(s.investor_id);
-    await prisma.investorOutreachRecord.create({
-      data: {
-        investorId: s.investor_id,
-        dedupeKey: s.investor_id,
-        canonicalId: s.investor_id,
+    const key = norm(s.firm_label);
+    if (key) {
+      firmByLabel.set(key, {
+        firmId: s.investor_id,
+        label: s.firm_label,
+        code: s.best_proximity_code,
+        hasPath: s.has_path,
+      });
+    }
+  }
+  const pathsByFirm = new Map<string, DumpPath[]>();
+  for (const p of dump.paths) {
+    const arr = pathsByFirm.get(p.targetInvestorId) ?? [];
+    arr.push(p);
+    pathsByFirm.set(p.targetInvestorId, arr);
+  }
+
+  const entries =
+    (JSON.parse(readFileSync(AFFINITY_PATH, 'utf-8')) as { entries?: { entity: AffinityEntity }[] })
+      .entries ?? [];
+
+  let created = 0;
+  let reachable = 0;
+  let pathRows = 0;
+  const seen = new Set<string>();
+
+  for (const e of entries) {
+    const ent = e.entity;
+    const affinityId = String(ent.id);
+    if (!affinityId || seen.has(affinityId)) continue;
+    seen.add(affinityId);
+
+    const firstName = (ent.firstName ?? '').trim();
+    const lastName = (ent.lastName ?? '').trim();
+    const email =
+      (ent.primaryEmailAddress ?? '').trim() ||
+      (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') ||
+      `aff-${affinityId}@gold.local`;
+    const firms = entryFirmNames(ent);
+
+    let best: FirmProximity | null = null;
+    for (const fn of firms) {
+      const fp = firmByLabel.get(norm(fn));
+      if (!fp) continue;
+      if (!best || proximityRank(fp.code, fp.hasPath) < proximityRank(best.code, best.hasPath)) {
+        best = fp;
+      }
+    }
+    const firmLabel = best?.label ?? firms[0] ?? '';
+    const hasPath = best?.hasPath ?? false;
+
+    // Upsert by investorId — a person may already exist via the Neuro list
+    // (shared Affinity id). Reuse the record; just add gold paths + membership.
+    await prisma.investorOutreachRecord.upsert({
+      where: { investorId: affinityId },
+      update: {},
+      create: {
+        investorId: affinityId,
+        dedupeKey: affinityId,
+        canonicalId: affinityId,
         source: SOURCE,
-        firstName: label, // firm label as display name (column was blank)
-        lastName: '',
-        email: `${s.investor_id}@gold.local`,
+        firstName,
+        lastName,
+        email,
         emailStatus: 'unverified',
-        firm: label,
+        firm: firmLabel,
         investorType: 'fund',
         stageFocus: '',
         engagementTier: '',
         enrichmentStatus: 'pending',
-        bestProximityCode: s.has_path ? s.best_proximity_code : null,
-        hasPath: s.has_path,
+        bestProximityCode: hasPath ? best!.code : null,
+        hasPath,
       },
     });
     created += 1;
+
+    if (best && hasPath) {
+      reachable += 1;
+      for (const p of pathsByFirm.get(best.firmId) ?? []) {
+        await prisma.pathfinderPath.create({
+          data: {
+            targetInvestorId: affinityId,
+            targetSet: TARGET_SET,
+            connectorType: p.connectorType,
+            hops: p.hops,
+            caliber: p.caliber,
+            proximityCode: p.proximityCode,
+            score: p.score,
+            caliberConfidence: p.caliberConfidence,
+            hopChain: p.hopChain as Prisma.InputJsonValue,
+            rank: p.rank,
+            ingestRunId: RUN_ID,
+          },
+        });
+        pathRows += 1;
+      }
+    }
   }
-  return created;
+  return { created, reachable, pathRows, ids: [...seen] };
 }
 
-async function repointListAndMembers(): Promise<number> {
+async function repointListAndMembers(ids: string[]): Promise<number> {
   const list = await prisma.investorList.upsert({
     where: { slug: LIST_SLUG },
     update: { isGraphed: true, targetSet: TARGET_SET, externalRef: '183682' },
@@ -107,7 +226,7 @@ async function repointListAndMembers(): Promise<number> {
   });
   await prisma.investorListMembership.deleteMany({ where: { listId: list.id } });
   const records = await prisma.investorOutreachRecord.findMany({
-    where: { source: SOURCE },
+    where: { investorId: { in: ids } },
     select: { id: true },
   });
   await prisma.investorListMembership.createMany({
@@ -115,7 +234,7 @@ async function repointListAndMembers(): Promise<number> {
       listId: list.id,
       investorOutreachRecordId: r.id,
       addedByEmail: 'seed@local',
-      note: 'Seeded from the Gold co-investors run.',
+      note: 'Seeded from the Gold co-investors run (person-grain).',
     })),
     skipDuplicates: true,
   });
@@ -125,13 +244,12 @@ async function repointListAndMembers(): Promise<number> {
 async function main() {
   console.log('Purging prior gold run…');
   await cleanup();
-  console.log('Creating gold firm records from the gold runner dump…');
-  const created = await seedRecords();
+  console.log('Creating person-grain gold records + paths…');
+  const { created, reachable, pathRows, ids } = await seed();
   console.log('Repointing gold-coinvestors list + membership…');
-  const members = await repointListAndMembers();
-  console.log('— Gold seed complete —');
-  console.log(`records: ${created} | gold-coinvestors members: ${members}`);
-  console.log('NEXT: run the gold runner with --post to attach paths + proximity codes.');
+  const members = await repointListAndMembers(ids);
+  console.log('— Gold seed (person-grain) complete —');
+  console.log(`people: ${created} | reachable: ${reachable} | path rows: ${pathRows} | members: ${members}`);
 }
 
 main()
