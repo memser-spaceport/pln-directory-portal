@@ -5,7 +5,7 @@ import { useCookie } from 'react-use';
 import { useAddTeamPitchParticipant } from '../../hooks/team-pitches/useAddTeamPitchParticipant';
 import clsx from 'clsx';
 
-type ParticipantTabType = 'INVESTOR' | 'FOUNDER' | 'SUPPORT';
+type ParticipantTabType = 'INVESTOR' | 'FOUNDER';
 
 interface AddTeamPitchParticipantModalProps {
   isOpen: boolean;
@@ -113,8 +113,8 @@ export const AddTeamPitchParticipantModal: React.FC<AddTeamPitchParticipantModal
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Participant Type <span className="text-red-500">*</span>
               </label>
-              <div className="grid grid-cols-3 gap-3">
-                {(['INVESTOR', 'FOUNDER', 'SUPPORT'] as const).map((type) => (
+              <div className="grid grid-cols-2 gap-3">
+                {(['INVESTOR', 'FOUNDER'] as const).map((type) => (
                   <label
                     key={type}
                     className={clsx(
