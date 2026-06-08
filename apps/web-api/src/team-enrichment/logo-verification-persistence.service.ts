@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
-import { buildTeamEnrichmentEligibilityFilterSql } from './team-enrichment-eligibility-filter';
 import { LogoVerificationResult } from './logo-verification.types';
 import {
   FIELD_JUDGMENT_NOTE_MAX_LENGTH,
@@ -57,7 +56,7 @@ export class LogoVerificationPersistenceService {
           FROM "TeamLogoVerificationResult" tlvr
           WHERE tlvr."teamUid" = t."uid"
             AND tlvr."provider" = ${params.provider}
-            AND tlvr."logoUid" = t."logoUid"
+            AND tlvr."logoUid" = COALESCE(te."logoUid", t."logoUid")
             AND tlvr."model" IS NOT DISTINCT FROM ${params.model}
         )
       `;
@@ -84,15 +83,13 @@ export class LogoVerificationPersistenceService {
         t."uid",
         t."name",
         t."website",
-        t."logoUid",
+        COALESCE(te."logoUid", t."logoUid") AS "logoUid",
         i."uid" AS "logoImageUid",
         i."url" AS "logoUrl"
       FROM "Team" t
-      INNER JOIN "Image" i ON i."uid" = t."logoUid"
       INNER JOIN "TeamEnrichment" te ON te."teamUid" = t."uid"
-      WHERE t."logoUid" IS NOT NULL
-        AND i."url" IS NOT NULL
-        AND ${buildTeamEnrichmentEligibilityFilterSql('t')}
+      INNER JOIN "Image" i ON i."uid" = COALESCE(te."logoUid", t."logoUid")
+      WHERE i."url" IS NOT NULL
         ${needsVerificationFilter}
         ${excludeClause}
       ORDER BY t."priority" ASC, t."updatedAt" DESC
@@ -119,8 +116,9 @@ export class LogoVerificationPersistenceService {
    * trigger endpoint where the admin has explicitly named the target.
    *
    * Still enforces the hard requirements that the VLM call needs: there
-   * must be a `Team`, a `logoUid`, an `Image.url`, and an associated
-   * `TeamEnrichment` row. Returns null if any of those are missing.
+   * must be a `Team`, a logo to verify (`TeamEnrichment.logoUid`, else
+   * `Team.logoUid`), an `Image.url`, and an associated `TeamEnrichment` row.
+   * Returns null if any of those are missing.
    */
   async getTeamForVerificationByUid(uid: string): Promise<{
     uid: string;
@@ -141,12 +139,12 @@ export class LogoVerificationPersistenceService {
         t."uid",
         t."name",
         t."website",
-        t."logoUid",
+        COALESCE(te."logoUid", t."logoUid") AS "logoUid",
         i."uid" AS "logoImageUid",
         i."url" AS "logoUrl"
       FROM "Team" t
-      INNER JOIN "Image" i ON i."uid" = t."logoUid"
       INNER JOIN "TeamEnrichment" te ON te."teamUid" = t."uid"
+      INNER JOIN "Image" i ON i."uid" = COALESCE(te."logoUid", t."logoUid")
       WHERE t."uid" = ${uid}
       LIMIT 1
     `);
