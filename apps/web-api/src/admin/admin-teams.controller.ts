@@ -26,6 +26,7 @@ import { TeamEnrichmentJudgeService } from '../team-enrichment/team-enrichment-j
 import { TeamEnrichmentReportService } from '../team-enrichment/team-enrichment-report.service';
 import { TeamEnrichmentJob } from '../team-enrichment/team-enrichment.job';
 import { TeamEnrichmentJudgeJob } from '../team-enrichment/team-enrichment-judge.job';
+import { LogoVerificationJobService } from '../team-enrichment/logo-verification-job.service';
 
 @ApiTags('Admin Teams')
 @Controller('v1/admin/teams')
@@ -37,7 +38,8 @@ export class AdminTeamsController {
     private readonly teamEnrichmentJudgeService: TeamEnrichmentJudgeService,
     private readonly teamEnrichmentReportService: TeamEnrichmentReportService,
     private readonly teamEnrichmentJob: TeamEnrichmentJob,
-    private readonly teamEnrichmentJudgeJob: TeamEnrichmentJudgeJob
+    private readonly teamEnrichmentJudgeJob: TeamEnrichmentJudgeJob,
+    private readonly logoVerificationJobService: LogoVerificationJobService
   ) {}
 
   @Post('tiers/upload')
@@ -298,6 +300,60 @@ export class AdminTeamsController {
   async triggerForceJudgmentAll() {
     const result = await this.teamEnrichmentJudgeService.forceJudgeAllEnrichedTeams('manually');
     return { success: true, ...result, message: 'Force-judgment triggered in background' };
+  }
+
+  /**
+   * Manually run the VLM logo verification job over every eligible team
+   * right now, instead of waiting for the next `LOGO_VERIFICATION_CRON`
+   * tick. Same pipeline as the cron — fetches teams via
+   * `LogoVerificationPersistenceService.getTeamsForVerification` (priority
+   * 1–3, non-fund, has logo, has `TeamEnrichment`), iterates in chunks of
+   * `LOGO_VERIFICATION_BATCH_SIZE`, calls the VLM per team, and writes the
+   * verdict to `TeamLogoVerificationResult` (with auto-promotion to
+   * `Team.logo` when verdict='verified' + confidence='high').
+   *
+   * Does NOT require `IS_LOGO_VERIFICATION_ENABLED` to be true — that env
+   * gates the scheduled cron, not on-demand admin triggers. Will block the
+   * request until the full sweep completes (mirrors `trigger-judgment`'s
+   * synchronous shape).
+   */
+  @Post('trigger-logo-verification')
+  @NoCache()
+  async triggerLogoVerificationAll() {
+    const result = await this.logoVerificationJobService.verifyAllPendingTeams('manually');
+    return {
+      success: true,
+      ...result,
+      message: 'Logo verification swept all eligible teams',
+    };
+  }
+
+  /**
+   * Verify one specific team's logo immediately, bypassing the
+   * `shouldVerifyTeam` dedupe gate. Useful for one-off re-verification
+   * after manually updating `Team.logoUid` or for debugging a specific
+   * team's VLM verdict.
+   */
+  @Post('/:uid/trigger-logo-verification')
+  @NoCache()
+  async triggerLogoVerificationOne(@Param('uid') uid: string) {
+    const result = await this.logoVerificationJobService.verifyTeamByUid(uid, 'manually');
+
+    if (result.status === 'not_found') {
+      throw new BadRequestException(
+        `Team ${uid} not found, or has no Image/TeamEnrichment row required for verification`
+      );
+    }
+    if (result.status === 'no_logo') {
+      return { success: false, message: `Team ${uid} has no logo URL to verify` };
+    }
+
+    return {
+      success: true,
+      verdict: result.verdict,
+      confidence: result.confidence,
+      message: `Logo verified for team ${uid}`,
+    };
   }
 
   /**
