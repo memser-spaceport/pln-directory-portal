@@ -108,7 +108,13 @@ const policies: PolicySeed[] = [
     name: 'Demo Day Admin / PL Internal',
     role: 'Demo Day Admin',
     group: 'PL Internal',
-    permissions: ['member.contacts.read', 'demoday.admin.all', 'demoday.stats.read', 'demoday.report_link.read'],
+    permissions: [
+      'member.contacts.read',
+      'demoday.admin.all',
+      'demoday.stats.read',
+      'demoday.report_link.read',
+      'team_pitch.admin',
+    ],
   },
   {
     code: 'demo_day_admin_pl_crecimiento_founder_school',
@@ -120,6 +126,7 @@ const policies: PolicySeed[] = [
       'demoday.admin.crecimiento_founder_school',
       'demoday.stats.read',
       'demoday.report_link.read',
+      'team_pitch.admin',
     ],
   },
   {

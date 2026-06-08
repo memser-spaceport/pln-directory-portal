@@ -33,6 +33,8 @@ const StageListParam = commaSeparatedListParam();
 
 export const RoadmapItemListQueryParams = z.object({
   stage: StageListParam,
+  tags: commaSeparatedListParam(),
+  type: z.string().optional(),
   focusArea: z.string().optional(),
   mine: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
   includeDeclined: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
@@ -52,6 +54,9 @@ export const RoadmapItemSchema = z.object({
   acceptanceCriteria: z.string().nullable(),
   stage: RoadmapStageSchema,
   focusArea: z.string().nullable(),
+  type: z.string().nullable(),
+  tags: z.array(z.string()),
+  order: z.number().int(),
   createdByUid: z.string(),
   createdBy: RoadmapMemberSummarySchema,
   promotedAt: z.string().nullable(),
@@ -75,6 +80,8 @@ export const CreateRoadmapItemSchema = z.object({
   description: roadmapDescriptionCreate(),
   acceptanceCriteria: z.string().optional().nullable(),
   focusArea: z.string().max(500).optional().nullable(),
+  type: z.string().max(500).optional().nullable(),
+  tags: z.array(z.string()).optional(),
   externalTrackerUrl: z.string().max(2000).optional().nullable(),
   stage: RoadmapStageSchema.optional(),
 });
@@ -84,6 +91,8 @@ export const UpdateRoadmapItemSchema = z.object({
   description: roadmapDescriptionUpdate(),
   acceptanceCriteria: z.string().optional().nullable(),
   focusArea: z.string().max(500).optional().nullable(),
+  type: z.string().max(500).optional().nullable(),
+  tags: z.array(z.string()).optional(),
   externalTrackerUrl: z.string().max(2000).optional().nullable(),
 });
 

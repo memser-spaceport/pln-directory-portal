@@ -16,6 +16,7 @@ import { PushNotificationsModule } from '../push-notifications/push-notification
 import { DemoDayNotificationsJob } from './demo-day-notifications.job';
 import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
 import { MemberApprovalsModule } from '../member-approvals/member-approvals.module';
+import { InvestorsModule } from '../investors/investors.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { MemberApprovalsModule } from '../member-approvals/member-approvals.modu
     NotificationsModule,
     forwardRef(() => PushNotificationsModule),
     TeamEnrichmentModule,
+    InvestorsModule,
   ],
   controllers: [DemoDaysController, DemoDaySubscriptionsController],
   providers: [
