@@ -73,6 +73,16 @@ const norm = (s: string | null | undefined): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/** Prod dedupe_key form: normalized email (lowercase, trim, plus-tag stripped). */
+function normalizeEmailKey(email: string | null | undefined): string {
+  const raw = (email ?? '').trim().toLowerCase();
+  const at = raw.indexOf('@');
+  if (at <= 0 || at === raw.length - 1) return '';
+  const local = raw.slice(0, at).split('+')[0];
+  if (!local) return '';
+  return `${local}@${raw.slice(at + 1)}`;
+}
+
 function entryFirmNames(entity: AffinityEntity): string[] {
   const comp = (entity.fields ?? []).find((f) => f.id === 'companies');
   const data = comp?.value?.data;
@@ -143,10 +153,12 @@ async function seed() {
 
     const firstName = (ent.firstName ?? '').trim();
     const lastName = (ent.lastName ?? '').trim();
-    const email =
+    const realEmail =
       (ent.primaryEmailAddress ?? '').trim() ||
       (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') ||
-      `aff-${affinityId}@gold.local`;
+      '';
+    const email = realEmail || `aff-${affinityId}@gold.local`;
+    const dedupeKey = normalizeEmailKey(realEmail) || `aff-${affinityId}`;
     const firms = entryFirmNames(ent);
 
     let best: FirmProximity | null = null;
@@ -167,7 +179,7 @@ async function seed() {
       update: {},
       create: {
         investorId: affinityId,
-        dedupeKey: affinityId,
+        dedupeKey, // normalized email (prod-shaped)
         canonicalId: affinityId,
         source: SOURCE,
         firstName,

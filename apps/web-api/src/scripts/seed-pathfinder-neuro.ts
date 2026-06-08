@@ -103,6 +103,20 @@ const norm = (s: string | null | undefined): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/**
+ * Prod dedupe_key form: normalized email (lowercased, trimmed, plus-tag stripped)
+ * — matches the enrichment SCHEMA.md convention so these records line up with the
+ * existing investor DB on ingest. Empty when there is no usable email.
+ */
+function normalizeEmailKey(email: string | null | undefined): string {
+  const raw = (email ?? '').trim().toLowerCase();
+  const at = raw.indexOf('@');
+  if (at <= 0 || at === raw.length - 1) return '';
+  const local = raw.slice(0, at).split('+')[0];
+  if (!local) return '';
+  return `${local}@${raw.slice(at + 1)}`;
+}
+
 /** Firm names attached to an Affinity person's `companies` field. */
 function entryFirmNames(entity: AffinityEntity): string[] {
   const comp = (entity.fields ?? []).find((f) => f.id === 'companies');
@@ -214,10 +228,14 @@ async function seed() {
 
     const firstName = (ent.firstName ?? '').trim();
     const lastName = (ent.lastName ?? '').trim();
-    const email =
+    const realEmail =
       (ent.primaryEmailAddress ?? '').trim() ||
       (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') ||
-      `aff-${affinityId}@lp.local`;
+      '';
+    const email = realEmail || `aff-${affinityId}@lp.local`;
+    // dedupeKey = normalized email (prod convention) so this person matches the
+    // existing investor DB on ingest; aff-<id> fallback when no real email.
+    const dedupeKey = normalizeEmailKey(realEmail) || `aff-${affinityId}`;
     const firms = entryFirmNames(ent);
 
     // Best (warmest) firm across this person's companies.
@@ -252,7 +270,7 @@ async function seed() {
       },
       create: {
         investorId: affinityId, // Affinity entity id = the authoritative LP id
-        dedupeKey: affinityId,
+        dedupeKey, // normalized email (prod-shaped) — see normalizeEmailKey
         canonicalId: affinityId,
         source: NEW_SOURCE,
         firstName,
