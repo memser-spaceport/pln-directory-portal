@@ -295,6 +295,13 @@ export class AdminTeamsController {
     return { success: true, message: `Force-judgment triggered for team ${uid}` };
   }
 
+  @Post('trigger-force-judgment')
+  @NoCache()
+  async triggerForceJudgmentAll() {
+    const result = await this.teamEnrichmentJudgeService.forceJudgeAllEnrichedTeams('manually');
+    return { success: true, ...result, message: 'Force-judgment triggered in background' };
+  }
+
   /**
    * Manually run the VLM logo verification job over every eligible team
    * right now, instead of waiting for the next `LOGO_VERIFICATION_CRON`

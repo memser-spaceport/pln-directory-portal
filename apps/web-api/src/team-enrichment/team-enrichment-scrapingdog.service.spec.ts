@@ -1,9 +1,12 @@
 import {
   extractSupersedingTwitterHandle,
+  ScrapingDogCompanyProfile,
   ScrapingDogTwitterProfile,
   TeamEnrichmentScrapingDogService,
+  TeamSnapshotForCompare,
   verifyTwitterProfileMatchesTeam,
 } from './team-enrichment-scrapingdog.service';
+import { FieldConfidence, JudgmentVerdict } from './team-enrichment.types';
 
 /**
  * Unit-tests the small bits of `TeamEnrichmentScrapingDogService` that are
@@ -328,5 +331,70 @@ describe('extractSupersedingTwitterHandle', () => {
     expect(
       extractSupersedingTwitterHandle('Old handle of @oldco-team', 'oldco')
     ).toBeNull();
+  });
+});
+
+describe('compareProfileToTeam — description fields are positive-only', () => {
+  const service = new TeamEnrichmentScrapingDogService();
+
+  const baseProfile = (over: Partial<ScrapingDogCompanyProfile> = {}): ScrapingDogCompanyProfile => ({
+    universalNameId: 'acme',
+    companyName: 'Acme',
+    profilePhoto: null,
+    website: null,
+    tagline: null,
+    about: null,
+    industries: [],
+    specialties: [],
+    founded: null,
+    headquarters: null,
+    linkedinInternalId: null,
+    ...over,
+  });
+  const team = (over: Partial<TeamSnapshotForCompare> = {}): TeamSnapshotForCompare => ({ name: 'Acme', ...over });
+
+  it('emits agrees+high when the tagline overlaps shortDescription', () => {
+    const r = service.compareProfileToTeam(
+      team({ shortDescription: 'Decentralized storage for the web' }),
+      baseProfile({ tagline: 'Decentralized storage for the web' }),
+      'exact'
+    );
+    expect(r.shortDescription?.verdict).toBe(JudgmentVerdict.Agrees);
+    expect(r.shortDescription?.confidence).toBe(FieldConfidence.High);
+  });
+
+  it('emits NO verdict (defers to AI) when the tagline does not overlap — never uncertain', () => {
+    const r = service.compareProfileToTeam(
+      team({ shortDescription: 'Decentralized storage for the web' }),
+      baseProfile({ tagline: 'We sell artisanal coffee beans' }),
+      'exact'
+    );
+    expect(r.shortDescription).toBeUndefined();
+  });
+
+  it('emits NO verdict when the about text does not overlap longDescription', () => {
+    const r = service.compareProfileToTeam(
+      team({ longDescription: 'Acme builds peer-to-peer storage infrastructure for developers.' }),
+      baseProfile({ about: 'A completely unrelated paragraph about coffee roasting and cafes.' }),
+      'exact'
+    );
+    expect(r.longDescription).toBeUndefined();
+  });
+
+  it('emits agrees+medium for moreDetails on a founded-year hit, and nothing on a miss', () => {
+    const hit = service.compareProfileToTeam(
+      team({ moreDetails: 'Acme was founded in 2019 in Berlin.' }),
+      baseProfile({ founded: '2019' }),
+      'exact'
+    );
+    expect(hit.moreDetails?.verdict).toBe(JudgmentVerdict.Agrees);
+    expect(hit.moreDetails?.confidence).toBe(FieldConfidence.Medium);
+
+    const miss = service.compareProfileToTeam(
+      team({ moreDetails: 'Acme builds developer tools.' }),
+      baseProfile({ founded: '2019', headquarters: 'Berlin, Germany' }),
+      'exact'
+    );
+    expect(miss.moreDetails).toBeUndefined();
   });
 });
