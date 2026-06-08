@@ -12,6 +12,7 @@ import {
 } from './team-enrichment-scrapingdog.service';
 import { deriveTeamFieldsFromLeads } from './team-enrichment-lead-backfill';
 import { isLikelyValueForField, looksLikeAiNonAnswer } from './team-enrichment-field-shape.util';
+import { resolveLogoMetaOnFetchFailure } from './team-enrichment-logo.util';
 import {
   ENRICHABLE_TEAM_FIELDS,
   EnrichableTeamField,
@@ -1203,6 +1204,18 @@ export class TeamEnrichmentService {
         (!!team.logoUid && !existingFieldsMeta.logo);
       const shouldRefetchLogo = !logoIsUserOwned && (!team.logoUid || forceOverwrite);
 
+      // A failed (re)fetch must NOT orphan a previously-discovered logo. When a
+      // logo candidate already exists (TeamEnrichment.logoUid, or a logo on
+      // Team), a fetch that comes up empty this run keeps the prior candidate and
+      // heals its status to Enriched — rather than flipping to CannotEnrich,
+      // which would leave `status: CannotEnrich` while `TeamEnrichment.logoUid`
+      // still points at a real Image. That mismatch is exactly the inconsistency
+      // seen on prod (status CannotEnrich + a populated logoUid) and it would
+      // confuse the logo-verification job, which keys off the stored logoUid.
+      // Only declare CannotEnrich when there is genuinely no logo on record.
+      const existingLogoUid = team.teamEnrichment?.logoUid ?? team.logoUid ?? null;
+      const logoFetchFailedMeta = resolveLogoMetaOnFetchFailure(existingLogoUid, existingFieldsMeta.logo);
+
       if (shouldRefetchLogo && effectiveWebsite) {
         this.logger.log(
           `Attempting logo fetch for team ${teamUid} (${team.name}) from website: ${effectiveWebsite}${
@@ -1228,15 +1241,15 @@ export class TeamEnrichmentService {
               );
             } else {
               this.logger.warn(`Logo upload returned no URL for team ${teamUid} (${team.name})`);
-              newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
+              newFieldsMeta.logo = logoFetchFailedMeta;
             }
           } catch (logoError) {
             this.logger.warn(`Failed to download/upload logo for team ${teamUid} (${team.name}): ${logoError.message}`);
-            newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
+            newFieldsMeta.logo = logoFetchFailedMeta;
           }
         } else {
           this.logger.log(`No logo found in website metadata for team ${teamUid} (${team.name})`);
-          newFieldsMeta.logo = { status: FieldEnrichmentStatus.CannotEnrich };
+          newFieldsMeta.logo = logoFetchFailedMeta;
         }
       } else if (logoIsUserOwned) {
         this.logger.log(`Team ${teamUid} (${team.name}) logo is user-owned, skipping logo fetch`);
