@@ -383,6 +383,7 @@ export class InvestorOutreachService {
     if (!sectorParsed.ok) throw new Error(sectorParsed.reason);
 
     const title = truncateOptional(item.title, 'title', 120);
+    const proximityCode = truncateOptional(item.proximity_code, 'proximity_code', 8);
     const geoFocus = truncateOptional(item.geo_focus, 'geo_focus', 120);
     const recentDeals = truncateOptional(item.recent_deals, 'recent_deals', 200);
     const enrichmentNotes = truncateOptional(item.enrichment_notes, 'enrichment_notes', 500);
@@ -413,6 +414,7 @@ export class InvestorOutreachService {
       firm: emptyToUndefined(item.firm?.trim()),
       firmDomain,
       title,
+      proximityCode,
       investorType,
       fundThesis: emptyToUndefined(item.fund_thesis?.trim()),
       aumRange,

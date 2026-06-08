@@ -2356,6 +2356,8 @@ model InvestorOutreachRecord {
   firm        String?
   firmDomain  String?
   title       String? @db.VarChar(120)
+  /// Firm-level warm-intro reachability from the co-investment graph, e.g. "VC+1A", "C".
+  proximityCode String? @db.VarChar(8)
 
   investorType   String
   fundThesis     String?
