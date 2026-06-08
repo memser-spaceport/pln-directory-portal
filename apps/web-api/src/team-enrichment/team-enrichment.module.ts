@@ -35,6 +35,7 @@ import { LogoVerificationJobService } from './logo-verification-job.service';
     TeamEnrichmentJudgeJob,
     LogoVerificationService,
     LogoVerificationPersistenceService,
+    LogoVerificationJobService,
   ],
 })
 export class TeamEnrichmentModule {}

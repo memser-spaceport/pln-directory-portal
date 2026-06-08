@@ -1511,7 +1511,7 @@ export class TeamEnrichmentService {
             uid: true,
             name: true,
             priority: true,
-            logo: { select: { uid: true, url: true } },
+            logo: { select: { uid: true, url: true, size: true, type: true, width: true, height: true } },
             website: true,
             blog: true,
             contactMethod: true,
@@ -1531,7 +1531,7 @@ export class TeamEnrichmentService {
         shortDescription: true,
         longDescription: true,
         logoUid: true,
-        logo: { select: { uid: true, url: true } },
+        logo: { select: { uid: true, url: true, size: true, type: true, width: true, height: true } },
         investmentFocus: true,
         industryTags: true,
         dataEnrichment: true,
@@ -1620,7 +1620,16 @@ export class TeamEnrichmentService {
         logoFieldMeta?.judgment?.confidence === FieldConfidence.High;
       const logoApprovedByVLM =
         latestLogoVerif?.verdict === 'verified' && latestLogoVerif?.confidence === 'high';
-      const hasUnapprovedLogo = !!row.logoUid && !logoApprovedByAdmin && !logoApprovedByVLM;
+      // The AI-suggested logo (TeamEnrichment.logo) is pointless to review when
+      // it's the same image as the one already on the team (Team.logo) — the
+      // admin would see "Current" and "AI suggestion" rendering identically.
+      // This happens because `persistLogoImage` re-fetches the same og:image on
+      // each run and stores it as a brand-new `Image` row (cid/url carry a
+      // timestamp, so they always differ); the byte-identical content is only
+      // detectable via the stored size/type/dimensions. See `isSameStoredImage`.
+      const logoMatchesCurrent = this.isSameStoredImage(row.logo, row.team.logo);
+      const hasUnapprovedLogo =
+        !!row.logoUid && !logoApprovedByAdmin && !logoApprovedByVLM && !logoMatchesCurrent;
       if (!hasUnapprovedField && !hasUnapprovedLogo && !hasJunkUserValueWithAiAlt) continue;
 
       const fields: EnrichmentReviewItem['fields'] = {};
@@ -1638,6 +1647,9 @@ export class TeamEnrichmentService {
         // Emit it as a regular field with `content = Image.url` so the UI can iterate
         // uniformly. The richer VLM verification still lives on the top-level `logo` block.
         if (keyStr === 'logo') {
+          // Hide the logo from review when the AI suggestion is the same image
+          // as the current one — nothing for the admin to compare.
+          if (logoMatchesCurrent) continue;
           const logoUrl = row.logo?.url ?? row.team.logo?.url;
           if (!logoUrl) continue;
           fields.logo = {
@@ -1735,7 +1747,7 @@ export class TeamEnrichmentService {
 
       let logo: EnrichmentReviewLogo | undefined;
       const logoMeta = meta.fieldsMeta.logo;
-      if (row.logoUid) {
+      if (row.logoUid && !logoMatchesCurrent) {
         logo = {
           content: row.logo ? { uid: row.logo.uid, url: row.logo.url } : null,
           metadata: {
@@ -1777,6 +1789,30 @@ export class TeamEnrichmentService {
     }
 
     return { teams: items };
+  }
+
+  /**
+   * Whether two stored `Image` rows hold the same logo. `Image.cid`/`url` are
+   * per-upload (S3 key embeds a timestamp), so identical bytes re-fetched on a
+   * later enrichment run land in distinct rows with distinct urls — uid/url
+   * equality alone misses the duplicate. We therefore also treat images as the
+   * same when their content-derived attributes match: byte `size` + `type`
+   * (+ `width`/`height`, which are `0` for enrichment-fetched logos but real
+   * for user uploads, keeping the comparison conservative across sources).
+   *
+   * Returns false if either side is missing — with no AI suggestion or no
+   * current logo there's nothing to dedupe.
+   */
+  private isSameStoredImage(
+    a: { uid: string; url: string; size: number; type: string; width: number; height: number } | null | undefined,
+    b: { uid: string; url: string; size: number; type: string; width: number; height: number } | null | undefined
+  ): boolean {
+    if (!a || !b) return false;
+    if (a.uid === b.uid) return true;
+    if (a.url === b.url) return true;
+    return (
+      a.size === b.size && a.type === b.type && a.width === b.width && a.height === b.height
+    );
   }
 
   /**
