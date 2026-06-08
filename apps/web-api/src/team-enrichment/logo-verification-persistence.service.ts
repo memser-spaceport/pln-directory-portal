@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { buildTeamEnrichmentEligibilityFilterSql } from './team-enrichment-eligibility-filter';
 import { LogoVerificationResult } from './logo-verification.types';
 import {
   FIELD_JUDGMENT_NOTE_MAX_LENGTH,
@@ -91,8 +92,7 @@ export class LogoVerificationPersistenceService {
       INNER JOIN "TeamEnrichment" te ON te."teamUid" = t."uid"
       WHERE t."logoUid" IS NOT NULL
         AND i."url" IS NOT NULL
-        AND t."isFund" = false
-        AND t."priority" IN (1, 2, 3)
+        AND ${buildTeamEnrichmentEligibilityFilterSql('t')}
         ${needsVerificationFilter}
         ${excludeClause}
       ORDER BY t."priority" ASC, t."updatedAt" DESC
