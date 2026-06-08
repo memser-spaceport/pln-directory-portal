@@ -1,4 +1,4 @@
-import { isLikelyValueForField } from './team-enrichment-field-shape.util';
+import { isLikelyValueForField, looksLikeAiNonAnswer } from './team-enrichment-field-shape.util';
 
 describe('isLikelyValueForField', () => {
   describe('website / blog', () => {
@@ -137,16 +137,57 @@ describe('isLikelyValueForField', () => {
     });
   });
 
-  describe('fields without a shape gate', () => {
-    it('shortDescription / longDescription / moreDetails always pass non-empty values', () => {
+  describe('free-text fields (descriptions)', () => {
+    it('passes genuine prose', () => {
       expect(isLikelyValueForField('shortDescription', 'A short blurb about the company.')).toBe(true);
       expect(isLikelyValueForField('longDescription', 'A long blurb.')).toBe(true);
       expect(isLikelyValueForField('moreDetails', 'Founded 2010 in Cambridge.')).toBe(true);
     });
 
+    it('does not trip on legitimate prose that resembles narration vocabulary', () => {
+      expect(isLikelyValueForField('moreDetails', 'Acme was founded in 2019 by Jane Doe.')).toBe(true);
+      expect(
+        isLikelyValueForField('shortDescription', 'Its embedded wallets are widely used across consumer crypto apps.')
+      ).toBe(true);
+      expect(
+        isLikelyValueForField('longDescription', 'A non-profit library of millions of free books, movies, and websites.')
+      ).toBe(true);
+    });
+
+    it('rejects AI search-failure narration in place of a description', () => {
+      expect(
+        isLikelyValueForField(
+          'shortDescription',
+          'No specific investment fund named "Angel Fund" was found that exactly matches the provided name. The term "angel fund" is widely used generically to describe a type of early-stage investment vehicle.'
+        )
+      ).toBe(false);
+      expect(isLikelyValueForField('longDescription', 'I could not find any information about this company.')).toBe(false);
+      expect(isLikelyValueForField('moreDetails', 'Unfortunately, no official website was found for this entity.')).toBe(
+        false
+      );
+    });
+
     it('rejects empty values uniformly', () => {
       expect(isLikelyValueForField('shortDescription', '')).toBe(false);
       expect(isLikelyValueForField('moreDetails', '   ')).toBe(false);
+    });
+  });
+
+  describe('looksLikeAiNonAnswer', () => {
+    it('flags search-failure narration', () => {
+      expect(looksLikeAiNonAnswer('No specific company was found matching that name.')).toBe(true);
+      expect(looksLikeAiNonAnswer('Could not locate a verifiable LinkedIn page for the team.')).toBe(true);
+      expect(looksLikeAiNonAnswer('The name appears to be a generic term and does not match a specific company.')).toBe(
+        true
+      );
+    });
+
+    it('does not flag genuine descriptions or empty input', () => {
+      expect(looksLikeAiNonAnswer('Filecoin Foundation supports the growth of the Filecoin ecosystem.')).toBe(false);
+      expect(looksLikeAiNonAnswer('The fund invests in early-stage Web3 infrastructure startups.')).toBe(false);
+      expect(looksLikeAiNonAnswer('')).toBe(false);
+      expect(looksLikeAiNonAnswer(null)).toBe(false);
+      expect(looksLikeAiNonAnswer(undefined)).toBe(false);
     });
   });
 });

@@ -37,6 +37,7 @@ CRITICAL REQUIREMENTS:
 2. Never fabricate URLs - only return URLs you found in search results
 3. LinkedIn handlers should be in format "company/name" (without full URL)
 4. Pay close attention to the EXACT entity name provided. If multiple entities with similar names exist, choose the one that EXACTLY matches the provided name.
+5. If you cannot find credible information for a field, return null for it. NEVER narrate the search itself. Text such as "No specific … was found", "I could not find …", "the name is generic", "unfortunately …", or any explanation of what you couldn't find is NOT a valid value — it is junk. This applies especially to shortDescription / longDescription / moreDetails: a description must describe the team, never the search. When in doubt, return null.
 
 WEBSITE DISCOVERY:
 - The company may have its own standalone domain OR a dedicated page on a parent organization's website
@@ -78,7 +79,7 @@ FIELDS TO POPULATE:
    - Key features or differentiators
    - Portfolio companies (if investment fund)
    - Partnerships or integrations
-   NEVER leave this empty if any additional information was found.
+   NEVER leave this empty if any additional information was found. But if you found NO additional information, return null — do NOT write a sentence explaining that nothing was found.
 
 10. industryTags: Array of 2-6 SHORT industry/sector tags (1-3 words each) describing the industry or sector the company operates in.
    Examples: ["Blockchain", "DeFi", "AI", "Cloud Infrastructure", "Developer Tools", "Data Analytics", "Gaming", "NFT", "Privacy", "Fintech", "SaaS", "IoT", "Cybersecurity"]

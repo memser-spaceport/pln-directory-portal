@@ -39,6 +39,7 @@ import {
   FieldEnrichmentStatus,
   FieldJudgment,
   FieldMetaKey,
+  FIELD_JUDGMENT_NOTE_MAX_LENGTH,
   JudgmentSource,
   JudgmentStatus,
   JudgmentVerdict,
@@ -104,6 +105,21 @@ type TeamEnrichmentSnapshot = {
 };
 
 type FieldsMetaMap = Partial<Record<FieldMetaKey, FieldEnrichmentMeta>>;
+
+/**
+ * Free-text fields that paraphrase the team's own LinkedIn / website copy. They
+ * are judged on CONTENT, and fuzzy methods (text overlap, AI core-facts check)
+ * intentionally start them at `medium`. See the identity-corroborated upshift in
+ * `runJudgmentPipeline`.
+ */
+const DESCRIPTION_FIELD_KEYS: readonly FieldMetaKey[] = ['shortDescription', 'longDescription', 'moreDetails'];
+
+/**
+ * Identity anchors. Confirming any one at `agrees+high` means we know WHICH
+ * real-world entity this team is — which is what licenses trusting an
+ * already-`agrees` description without an admin double-check.
+ */
+const IDENTITY_ANCHOR_FIELDS: readonly FieldMetaKey[] = ['website', 'linkedinHandler', 'twitterHandler'];
 
 export type JudgeTeamResult =
   | { status: 'started' | 'already_judged' | 'in_progress' | 'not_found' | 'not_eligible' };
@@ -214,6 +230,40 @@ export class TeamEnrichmentJudgeService {
   }
 
   /**
+   * Force-judge population: eligible teams whose enrichment is `Enriched` and
+   * that have ≥1 judgable field — REGARDLESS of current judgment status. Unlike
+   * {@link findTeamsPendingJudgment}, this deliberately INCLUDES already-`Judged`
+   * teams so a full re-judge re-runs them (the force analog of the pending
+   * trigger). `InProgress` teams are excluded here and also guarded per-team by
+   * {@link forceJudgeTeam}. Admin-finalized states (Reviewed/Approved) are left
+   * out of the bulk path — re-judging a settled team is done one-off via the
+   * single-team `trigger-force-judgment` endpoint.
+   */
+  async findTeamsForForceJudgment(): Promise<TeamRecord[]> {
+    await this.resetStaleInProgressJudgment();
+
+    const candidates = (await this.prisma.team.findMany({
+      where: {
+        AND: [
+          buildTeamEnrichmentEligibilityFilter(),
+          {
+            teamEnrichment: {
+              dataEnrichment: { path: ['status'], equals: EnrichmentStatus.Enriched },
+            },
+          },
+        ],
+      },
+      select: TEAM_RECORD_SELECT,
+    })) as unknown as TeamRecord[];
+
+    return candidates.filter((t) => {
+      const meta = this.parseEnrichmentMeta(t.teamEnrichment?.dataEnrichment);
+      if (meta?.judgment?.status === JudgmentStatus.InProgress) return false;
+      return this.collectJudgableFieldKeys(t, meta?.fieldsMeta ?? {}).length > 0;
+    });
+  }
+
+  /**
    * Self-heals rows whose `dataEnrichment.judgment.status = 'InProgress'` and `updatedAt`
    * is older than the stuck-TTL — the pod was killed mid-judge. Drops the `judgment` block
    * so the team is judgable again on this same call.
@@ -314,6 +364,28 @@ export class TeamEnrichmentJudgeService {
     let skipped = 0;
     for (const team of teams) {
       const { status } = await this.judgeTeam(team.uid, judgedBy);
+      if (status === 'started') started++;
+      else skipped++;
+    }
+    return { total: teams.length, started, skipped };
+  }
+
+  /**
+   * Force re-judge of every eligible Enriched team, INCLUDING already-judged
+   * ones — the bulk analog of `forceJudgeTeam`, mirroring
+   * `TeamEnrichmentService.forceEnrichAllCompletedTeams`. Each per-team judge is
+   * fire-and-forget (see `forceJudgeTeam`), so this kicks off the population in
+   * the background and returns counts immediately.
+   */
+  async forceJudgeAllEnrichedTeams(
+    judgedBy = 'manually'
+  ): Promise<{ total: number; started: number; skipped: number }> {
+    const teams = await this.findTeamsForForceJudgment();
+    this.logger.log(`Force judge all: found ${teams.length} enriched teams to re-judge`);
+    let started = 0;
+    let skipped = 0;
+    for (const team of teams) {
+      const { status } = await this.forceJudgeTeam(team.uid, judgedBy);
       if (status === 'started') started++;
       else skipped++;
     }
@@ -527,6 +599,38 @@ export class TeamEnrichmentJudgeService {
       const refreshedMeta = await this.readEnrichmentMeta(teamUid);
       const baseFieldsMeta = refreshedMeta?.fieldsMeta ?? existingMeta.fieldsMeta ?? {};
       const mergedFieldsMeta: FieldsMetaMap = { ...baseFieldsMeta };
+
+      // Identity-corroborated description upshift.
+      // A description verdict that is already `agrees` but only `medium` was
+      // hedged over PHRASING variance, not a factual disagreement — descriptions
+      // are paraphrases of the team's own LinkedIn / website copy, and both the
+      // ScrapingDog text-overlap comparator and the AI judge deliberately start
+      // them at `medium` because the method is fuzzy. Once the team's IDENTITY is
+      // independently confirmed (a website / LinkedIn / Twitter anchor verified at
+      // `agrees+high` this run or on a prior run), that `medium` is the only thing
+      // keeping a correct description in the admin queue — the review endpoint
+      // flags anything below `agrees+high`. Lift it to `high` so it auto-promotes.
+      //
+      // Scope is deliberately narrow: only `agrees` is lifted (genuine
+      // `uncertain`/`disagrees` content doubt still surfaces for review), and only
+      // description fields (Enriched identity/social candidates still require their
+      // own independent verification — trust-transfer doctrine forbids riding one
+      // anchor to promote another identity field).
+      const resolveAnchorJudgment = (f: FieldMetaKey): FieldJudgment | undefined =>
+        allVerdicts[f] ?? baseFieldsMeta[f]?.judgment;
+      const identityCorroborated = IDENTITY_ANCHOR_FIELDS.some((f) => isAgreesHigh(resolveAnchorJudgment(f)));
+      if (identityCorroborated) {
+        for (const f of DESCRIPTION_FIELD_KEYS) {
+          const v = allVerdicts[f];
+          if (v?.verdict === JudgmentVerdict.Agrees && v.confidence === FieldConfidence.Medium) {
+            const note = (v.note ? `${v.note} + identity corroborated` : 'identity corroborated').slice(
+              0,
+              FIELD_JUDGMENT_NOTE_MAX_LENGTH
+            );
+            allVerdicts[f] = { ...v, confidence: FieldConfidence.High, note };
+          }
+        }
+      }
 
       // Non-destructive: only writes a judgment sub-object; never touches status/value/source on
       // Team or TeamEnrichment. ChangedByUser fields are evaluated for review but the user's
