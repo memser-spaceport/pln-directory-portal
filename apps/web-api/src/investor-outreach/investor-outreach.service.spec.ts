@@ -168,6 +168,38 @@ describe('InvestorOutreachService', () => {
     expect(upsert).toHaveBeenCalledTimes(1);
   });
 
+  describe('proximity_code', () => {
+    beforeEach(() => {
+      findUnique.mockResolvedValue(null);
+    });
+
+    it('persists a valid proximity_code on ingest', async () => {
+      await service.ingest({ items: [minimalItem({ proximity_code: 'VC+1A' })] });
+      const args = upsert.mock.calls[0][0];
+      expect(args.create.proximityCode).toBe('VC+1A');
+      expect(args.update.proximityCode).toBe('VC+1A');
+    });
+
+    it('accepts cold code C without enum validation', async () => {
+      await service.ingest({ items: [minimalItem({ proximity_code: 'C' })] });
+      const args = upsert.mock.calls[0][0];
+      expect(args.create.proximityCode).toBe('C');
+    });
+
+    it('rejects proximity_code longer than 8 characters', async () => {
+      const res = await service.ingest({ items: [minimalItem({ proximity_code: 'VC+12345A' })] });
+      expect(res.failed).toBe(1);
+      expect(upsert).not.toHaveBeenCalled();
+    });
+
+    it('omits proximity_code when absent', async () => {
+      await service.ingest({ items: [minimalItem()] });
+      const args = upsert.mock.calls[0][0];
+      expect(args.create).not.toHaveProperty('proximityCode');
+      expect(args.update).not.toHaveProperty('proximityCode');
+    });
+  });
+
   describe('Phase 2 — tags', () => {
     beforeEach(() => {
       findUnique.mockResolvedValue(null);

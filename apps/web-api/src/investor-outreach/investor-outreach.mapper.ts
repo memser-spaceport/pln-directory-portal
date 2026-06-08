@@ -108,6 +108,7 @@ export function toInvestorDto(
     firm: record.firm,
     firmDomain: record.firmDomain,
     title: record.title,
+    proximityCode: record.proximityCode,
 
     investorType: record.investorType,
     fundThesis: record.fundThesis,

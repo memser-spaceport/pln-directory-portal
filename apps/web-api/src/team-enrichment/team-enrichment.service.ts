@@ -11,7 +11,7 @@ import {
   verifyTwitterProfileMatchesTeam,
 } from './team-enrichment-scrapingdog.service';
 import { deriveTeamFieldsFromLeads } from './team-enrichment-lead-backfill';
-import { isLikelyValueForField } from './team-enrichment-field-shape.util';
+import { isLikelyValueForField, looksLikeAiNonAnswer } from './team-enrichment-field-shape.util';
 import {
   ENRICHABLE_TEAM_FIELDS,
   EnrichableTeamField,
@@ -999,6 +999,7 @@ export class TeamEnrichmentService {
         aiReturnedNull: [],
         aiCannotEnrich: [],
         userJunkOverridden: [],
+        aiNarrationRejected: [],
       };
 
       for (const field of ENRICHABLE_TEAM_FIELDS) {
@@ -1068,7 +1069,16 @@ export class TeamEnrichmentService {
           continue;
         }
 
-        const newValue = aiResponse[field];
+        let newValue = aiResponse[field];
+        // Reject search-failure narration the model sometimes emits for free-text
+        // fields instead of returning null (e.g. `No specific fund named "X" was
+        // found …`). Treat it as "AI returned nothing" so the field falls through
+        // to CannotEnrich / stays empty rather than storing the meta-text as a
+        // description. Same gate the judge/review path uses via isLikelyValueForField.
+        if (typeof newValue === 'string' && looksLikeAiNonAnswer(newValue)) {
+          skipReasons.aiNarrationRejected.push(field);
+          newValue = null;
+        }
         if (newValue) {
           (enrichmentUpdate as any)[field] = newValue;
           newFieldsMeta[field] = {
