@@ -416,20 +416,27 @@ export class TeamEnrichmentScrapingDogService {
       }
     }
 
-    if (team.shortDescription && profile.tagline) {
-      if (textsOverlap(team.shortDescription, profile.tagline, TAGLINE_LEVENSHTEIN_RATIO)) {
-        result.shortDescription = mkVerdict(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'tagline overlap');
-      } else {
-        result.shortDescription = mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'tagline differs');
-      }
+    // Description fields: emit a verdict ONLY on a positive overlap. A failed
+    // fuzzy text-overlap is too weak a signal to park the field at `uncertain`
+    // (doctrine: skip rather than guess a negative from one anchor) — the AI's
+    // description content is usually drawn from the website rather than the
+    // LinkedIn tagline/about, so a non-overlap is expected and not a defect.
+    // Returning no verdict here lets the AI judge (Stage 2) be the arbiter
+    // instead of this comparator silently overriding the AI at merge time.
+    if (
+      team.shortDescription &&
+      profile.tagline &&
+      textsOverlap(team.shortDescription, profile.tagline, TAGLINE_LEVENSHTEIN_RATIO)
+    ) {
+      result.shortDescription = mkVerdict(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'tagline overlap');
     }
 
-    if (team.longDescription && profile.about) {
-      if (sentenceOverlap(team.longDescription, profile.about, ABOUT_SENTENCE_OVERLAP_RATIO)) {
-        result.longDescription = mkVerdict(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'about overlap');
-      } else {
-        result.longDescription = mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'about low overlap');
-      }
+    if (
+      team.longDescription &&
+      profile.about &&
+      sentenceOverlap(team.longDescription, profile.about, ABOUT_SENTENCE_OVERLAP_RATIO)
+    ) {
+      result.longDescription = mkVerdict(FieldConfidence.High, JudgmentVerdict.Agrees, 85, 'about overlap');
     }
 
     if (team.industryTags && team.industryTags.length > 0) {
@@ -451,10 +458,11 @@ export class TeamEnrichmentScrapingDogService {
       const text = team.moreDetails.toLowerCase();
       const foundedHit = !!profile.founded && text.includes(profile.founded.toLowerCase());
       const hqHit = !!profile.headquarters && this.extractCity(profile.headquarters).some((c) => text.includes(c));
+      // Positive-only (same reasoning as the description fields above): a missing
+      // founded-year / HQ substring doesn't mean the details are wrong, so defer
+      // the negative to the AI judge rather than emitting `uncertain`.
       if (foundedHit || hqHit) {
         result.moreDetails = mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Agrees, 70, 'details match');
-      } else {
-        result.moreDetails = mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 50, 'details no match');
       }
     }
 
