@@ -2572,6 +2572,9 @@ model RoadmapItem {
   stage              RoadmapStage @default(IDEA)
 
   focusArea String?
+  type      String?
+  tags      String[] @default([])
+  order     Int      @default(99)
 
   createdByUid String
   createdBy    Member @relation("roadmapItemCreatedBy", fields: [createdByUid], references: [uid])

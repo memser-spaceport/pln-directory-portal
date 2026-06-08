@@ -43,6 +43,9 @@ interface RoadmapItemRow {
   acceptanceCriteria: string | null;
   stage: RoadmapStage;
   focusArea: string | null;
+  type: string | null;
+  tags: string[];
+  order: number;
   createdByUid: string;
   createdBy: { uid: string; name: string; image: { url: string } | null };
   promotedAt: Date | null;
@@ -103,6 +106,8 @@ export class RoadmapService {
     });
 
     const sorted = (rows as unknown as (RoadmapItemRow & { upvotes: { uid: string }[] })[]).sort((a, b) => {
+      const orderDiff = a.order - b.order;
+      if (orderDiff !== 0) return orderDiff;
       const countDiff = b._count.upvotes - a._count.upvotes;
       if (countDiff !== 0) return countDiff;
       return b.updatedAt.getTime() - a.updatedAt.getTime();
@@ -144,6 +149,8 @@ export class RoadmapService {
         description: body.description,
         acceptanceCriteria: body.acceptanceCriteria ?? null,
         focusArea: body.focusArea ?? null,
+        type: body.type ?? null,
+        tags: body.tags ?? [],
         externalTrackerUrl: body.externalTrackerUrl ?? null,
         stage,
         createdByUid: actorUid,
@@ -175,6 +182,8 @@ export class RoadmapService {
         ...(body.description !== undefined ? { description: body.description } : {}),
         ...(body.acceptanceCriteria !== undefined ? { acceptanceCriteria: body.acceptanceCriteria } : {}),
         ...(body.focusArea !== undefined ? { focusArea: body.focusArea } : {}),
+        ...(body.type !== undefined ? { type: body.type } : {}),
+        ...(body.tags !== undefined ? { tags: body.tags } : {}),
         ...(body.externalTrackerUrl !== undefined ? { externalTrackerUrl: body.externalTrackerUrl } : {}),
       },
       include: itemInclude,
@@ -335,6 +344,15 @@ export class RoadmapService {
       where.focusArea = query.focusArea;
     }
 
+    if (query.type) {
+      where.type = query.type;
+    }
+
+    const tags = query.tags as string[] | undefined;
+    if (tags?.length) {
+      where.tags = { hasSome: tags };
+    }
+
     const stages = query.stage as RoadmapStage[] | undefined;
     if (stages?.length) {
       where.stage = { in: stages };
@@ -372,6 +390,9 @@ export class RoadmapService {
       acceptanceCriteria: row.acceptanceCriteria,
       stage: row.stage,
       focusArea: row.focusArea,
+      type: row.type,
+      tags: row.tags,
+      order: row.order,
       createdByUid: row.createdByUid,
       createdBy: {
         uid: row.createdBy.uid,
