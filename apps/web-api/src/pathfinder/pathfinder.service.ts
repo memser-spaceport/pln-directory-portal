@@ -45,6 +45,26 @@ export class PathfinderService {
       byTarget.set(p.target_investor_id, bucket);
     }
 
+    if (errors.length > 0) {
+      throw new BadRequestException({ message: 'invalid paths', errors });
+    }
+
+    const targetIds = [...byTarget.keys()];
+    if (targetIds.length > 0) {
+      const existing = await this.prisma.investorOutreachRecord.findMany({
+        where: { investorId: { in: targetIds } },
+        select: { investorId: true },
+      });
+      const existingSet = new Set(existing.map((r) => r.investorId));
+      const missing = targetIds.filter((id) => !existingSet.has(id));
+      if (missing.length > 0) {
+        throw new BadRequestException({
+          message: 'investor records not found for path targets',
+          missing_investor_ids: missing,
+        });
+      }
+    }
+
     let pathsIngested = 0;
     let targetsReplaced = 0;
     let crosswalkUpserted = 0;
@@ -125,8 +145,7 @@ export class PathfinderService {
       targets_replaced: targetsReplaced,
       crosswalk_upserted: crosswalkUpserted,
       summaries_applied: summariesApplied,
-      failed: errors.length,
-      errors: errors.length ? errors : undefined,
+      failed: 0,
     };
   }
 

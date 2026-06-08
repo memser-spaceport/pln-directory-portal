@@ -26,6 +26,7 @@
  * (PII, never committed). NOT for production. Run via `npm run api:seed-pathfinder-neuro`.
  */
 import { readFileSync } from 'fs';
+import path from 'path';
 import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -38,14 +39,11 @@ const DEMO_RUN_ID = 'demo-seed';
 const RUN_ID = 'neuro-person-seed';
 const LIST_SLUG = 'neuro-lp';
 
-const SCRATCH_DIR =
-  process.env.PATHFINDER_SCRATCH_DIR ||
-  'C:/Users/anpan/code/claudecode/investor_paths_work/pplx_paths';
+const DEFAULT_SCRATCH = path.resolve(__dirname, '../../../../..', 'seed_data', 'path_finder');
+const SCRATCH_DIR = process.env.PATHFINDER_SCRATCH_DIR || DEFAULT_SCRATCH;
 const DUMP_PATH = `${SCRATCH_DIR}/_pathfinder_dump.json`;
 const AFFINITY_PATH = `${SCRATCH_DIR}/_affinity_352080.json`;
-const PRESTIGE_PATH =
-  process.env.PATHFINDER_PRESTIGE_CACHE ||
-  'C:/Users/anpan/code/pln-data-enrichment/apps/data-enrichment/_lp_prestige_cache.json';
+const PRESTIGE_PATH = process.env.PATHFINDER_PRESTIGE_CACHE || `${SCRATCH_DIR}/_lp_prestige_cache.json`;
 
 // ── Types (loose — these are local scratch JSON shapes) ──────────────────────
 interface DumpPath {
@@ -211,8 +209,7 @@ async function seed() {
     pathsByFirm.set(p.targetInvestorId, arr);
   }
 
-  const entries = (JSON.parse(readFileSync(AFFINITY_PATH, 'utf-8')) as { entries?: AffinityEntry[] })
-    .entries ?? [];
+  const entries = (JSON.parse(readFileSync(AFFINITY_PATH, 'utf-8')) as { entries?: AffinityEntry[] }).entries ?? [];
 
   let created = 0;
   let reachable = 0;
@@ -229,9 +226,7 @@ async function seed() {
     const firstName = (ent.firstName ?? '').trim();
     const lastName = (ent.lastName ?? '').trim();
     const realEmail =
-      (ent.primaryEmailAddress ?? '').trim() ||
-      (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') ||
-      '';
+      (ent.primaryEmailAddress ?? '').trim() || (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') || '';
     const email = realEmail || `aff-${affinityId}@lp.local`;
     // dedupeKey = normalized email (prod convention) so this person matches the
     // existing investor DB on ingest; aff-<id> fallback when no real email.
@@ -358,7 +353,7 @@ async function main() {
   console.log('— Real Neuro LP seed (person-grain) complete —');
   console.log(
     `people: ${created} | reachable (has warm path): ${reachable} | enriched: ${enriched} | ` +
-      `path rows: ${pathRows} | neuro-lp members: ${members}`,
+      `path rows: ${pathRows} | neuro-lp members: ${members}`
   );
 }
 

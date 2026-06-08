@@ -16,6 +16,7 @@
  * Run via `npm run api:seed-pathfinder-gold`.
  */
 import { readFileSync } from 'fs';
+import path from 'path';
 import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -25,9 +26,8 @@ const SOURCE = 'PATHFINDER_GOLD';
 const RUN_ID = 'gold-person-seed';
 const LIST_SLUG = 'gold-coinvestors';
 
-const SCRATCH_DIR =
-  process.env.PATHFINDER_SCRATCH_DIR ||
-  'C:/Users/anpan/code/claudecode/investor_paths_work/pplx_paths';
+const DEFAULT_SCRATCH = path.resolve(__dirname, '../../../../..', 'seed_data', 'path_finder');
+const SCRATCH_DIR = process.env.PATHFINDER_SCRATCH_DIR || DEFAULT_SCRATCH;
 const DUMP_PATH = `${SCRATCH_DIR}/_pathfinder_gold_dump.json`;
 const AFFINITY_PATH = `${SCRATCH_DIR}/_affinity_183682.json`;
 

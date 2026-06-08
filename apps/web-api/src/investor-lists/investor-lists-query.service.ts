@@ -75,6 +75,24 @@ export class InvestorListsQueryService {
 
     const where = this.buildMemberWhere(listId, query);
 
+    if (list.isGraphed) {
+      const [total, allRecords] = await this.prisma.$transaction([
+        this.prisma.investorOutreachRecord.count({ where }),
+        this.prisma.investorOutreachRecord.findMany({ where }),
+      ]);
+      const proximityByInvestorId = await this.loadListProximity(
+        list.targetSet,
+        allRecords.map((r) => r.investorId)
+      );
+      const sorted = (await this.attachJoins(allRecords, proximityByInvestorId)).sort((a, b) => {
+        const rankDiff = proximityRank(a.bestProximityCode, a.hasPath) - proximityRank(b.bestProximityCode, b.hasPath);
+        if (rankDiff !== 0) return rankDiff;
+        return (a.lastName ?? '').localeCompare(b.lastName ?? '');
+      });
+      const items = sorted.slice((page - 1) * limit, page * limit);
+      return { page, limit, total, items };
+    }
+
     const [total, records] = await this.prisma.$transaction([
       this.prisma.investorOutreachRecord.count({ where }),
       this.prisma.investorOutreachRecord.findMany({
@@ -87,6 +105,28 @@ export class InvestorListsQueryService {
 
     const items = await this.attachJoins(records);
     return { page, limit, total, items };
+  }
+
+  /** Best path (rank 1) per member for this list's targetSet — overrides denormalized record fields. */
+  private async loadListProximity(
+    targetSet: string,
+    investorIds: string[]
+  ): Promise<Map<string, { code: string | null; hasPath: boolean }>> {
+    const map = new Map<string, { code: string | null; hasPath: boolean }>();
+    if (!investorIds.length) return map;
+
+    for (const id of investorIds) {
+      map.set(id, { code: null, hasPath: false });
+    }
+
+    const paths = await this.prisma.pathfinderPath.findMany({
+      where: { targetSet, targetInvestorId: { in: investorIds }, rank: 1 },
+      select: { targetInvestorId: true, proximityCode: true },
+    });
+    for (const p of paths) {
+      map.set(p.targetInvestorId, { code: p.proximityCode, hasPath: true });
+    }
+    return map;
   }
 
   private buildMemberWhere(listId: number, query: ListMembersQueryDto): Prisma.InvestorOutreachRecordWhereInput {
@@ -148,7 +188,8 @@ export class InvestorListsQueryService {
   }
 
   private async attachJoins(
-    records: Prisma.InvestorOutreachRecordGetPayload<Record<string, never>>[]
+    records: Prisma.InvestorOutreachRecordGetPayload<Record<string, never>>[],
+    proximityByInvestorId?: Map<string, { code: string | null; hasPath: boolean }>
   ): Promise<InvestorDto[]> {
     if (records.length === 0) return [];
 
@@ -192,8 +233,22 @@ export class InvestorListsQueryService {
       overlapsByInvestorId.set(overlap.investorOutreachRecordId, list);
     }
 
-    return records.map((record) => toInvestorDto(record, membersByEmail, overlapsByInvestorId));
+    return records.map((record) => {
+      const dto = toInvestorDto(record, membersByEmail, overlapsByInvestorId);
+      const prox = proximityByInvestorId?.get(record.investorId);
+      if (!prox) return dto;
+      return { ...dto, bestProximityCode: prox.code, hasPath: prox.hasPath };
+    });
   }
+}
+
+/** Warmer = smaller. Cold (no path) sinks last. Matches FE + seed scripts. */
+function proximityRank(code: string | null, hasPath: boolean): number {
+  if (!hasPath || !code) return 999;
+  const m = /\+(\d)([AB])/.exec(code);
+  if (!m) return 999;
+  const caliber = m[2] === 'A' ? 0 : 1;
+  return caliber * 100 + parseInt(m[1], 10);
 }
 
 function clampPage(raw: string | undefined): number {
