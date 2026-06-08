@@ -22,6 +22,7 @@ export interface InvestorDto {
   firm: string | null;
   firmDomain: string | null;
   title: string | null;
+  proximityCode: string | null;
 
   investorType: string;
   fundThesis: string | null;

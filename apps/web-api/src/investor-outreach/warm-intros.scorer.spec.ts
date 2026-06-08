@@ -15,6 +15,7 @@ function investor(overrides: Partial<InvestorDto> = {}): InvestorDto {
     firm: null,
     firmDomain: null,
     title: null,
+    proximityCode: null,
     investorType: 'fund',
     fundThesis: null,
     aumRange: null,
