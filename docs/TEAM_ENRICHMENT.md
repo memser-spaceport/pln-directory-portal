@@ -296,6 +296,8 @@ Anything less than `agrees + high` stays on `TeamEnrichment` only — the user-f
 
    Same doctrine extends to the descriptions / industries / details rows: when the website corroborates, `agrees + medium` text-overlap verdicts (tagline overlap, about overlap, details match, tags overlap) are upshifted to `agrees + high`. This is the bench fix that recovered the `moreDetails` auto-promote rate after ScrapingDog Stage 1 came online (Stage 1 was previously capping these at Medium and overwriting Stage 1.5's high-confidence source-trust verdicts).
 
+   **Description comparators are positive-only.** For `shortDescription` / `longDescription` / `moreDetails`, Stage 1 emits a verdict **only on a positive overlap** (`tagline overlap` / `about overlap` / `details match`). A *failed* fuzzy overlap no longer emits a negative `uncertain` verdict (`tagline differs` / `about low overlap` / `details no match`) — a single weak text-overlap miss is too thin to judge on (doctrine: skip rather than guess a negative from one anchor), and the AI's description usually comes from the team's website rather than the LinkedIn tagline/about, so a non-overlap is expected, not a defect. Returning no verdict lets the AI judge (Stage 2) be the arbiter instead of this comparator silently overriding the AI at merge time. See also the [identity-corroborated description upshift](#identity-corroborated-description-upshift).
+
    **`website` (and other URL fields) — not judged by Stage 1.** Earlier revisions emitted a `host-match` / `host-mismatch` verdict by comparing the team's stored URL to the URL listed on the LinkedIn profile. This produced too many false negatives — companies routinely use alias domains, product subdomains, or rebrand without updating LinkedIn (e.g. team `Mercle` with website `mercle.ai` whose LinkedIn profile lists a different host) — so the comparator was condemning correct websites. The deterministic comparator is therefore intentionally silent on URL fields; the AI judge (Stage 2) verifies them via web search instead, and is explicitly instructed not to disagree on a URL solely because it differs from another URL we already have on file. Same reasoning as the `linkedinHandler` slug-equality removal.
 
    **Website reachability probe.** The judge runs a lightweight reachability probe on the website value being judged (single GET, follows redirects, 8s timeout, **uses the same `BROWSER_REQUEST_HEADERS` bouquet as `fetchWebsiteHtml`** so it doesn't get Cloudflare-blocked on real-but-bot-protected sites). The probe runs **unconditionally** when the team has a judgable website — it was previously nested inside the ScrapingDog success branch, which meant that any team without a `linkedinHandler` (or any ScrapingDog 403) silently skipped the probe and left the AI judge to guess at reachability.
@@ -336,6 +338,18 @@ A pure-function pass inserted between Stage 1 (ScrapingDog) and Stage 2 (AI judg
 `agrees + high` verdicts from Stage 1.5 are merged into the Stage-1 verdict map BEFORE the `stage1Resolved` set is computed — so any corroborated field skips the AI judge entirely and is promoted to `Team.<field>` on the same promotion gate as before. This is the primary mechanism by which the admin review queue shrinks.
 
 **Merge is confidence-aware, not positional.** When both Stage 1 (the ScrapingDog `compareProfileToTeam` comparator) AND Stage 1.5 produce a verdict for the same field, the `agrees + high` verdict is preserved — Stage 1 only overwrites Stage 1.5 when both are at the same tier (or when Stage 1 is `agrees + high`). This guards against Stage 1's fuzzy text-overlap heuristics silently demoting fields that Stage 1.5's source-trust rule already accepted. Bench evidence: an earlier version of this merge let Stage 1 unconditionally overwrite Stage 1.5, which dropped the `moreDetails` auto-promote rate from 47% → 16% and `linkedinHandler` from 97% → 73% once ScrapingDog Stage 1 came online (because `compareProfileToTeam` re-derives the same verdict at a weaker tier — `agrees+medium` from tagline / partial-name overlap — and was overwriting the high-confidence source-trust verdicts).
+
+#### Identity-corroborated description upshift
+
+After all verdicts are merged (Stage 1 + 1.5 + 2), a final pass lifts description verdicts that are `agrees` but only `medium` → `agrees + high` **when the team's identity is independently corroborated**. The rationale: `shortDescription` / `longDescription` / `moreDetails` paraphrase the team's own LinkedIn / website copy, so both the fuzzy text-overlap comparator and the AI judge deliberately start them at `medium` over *phrasing* variance — not a factual disagreement. Once we know **which** real-world entity the team is (any of `website` / `linkedinHandler` / `twitterHandler` verified at `agrees + high`, this run or persisted), that `medium` is the only thing keeping a correct description in the review queue — `listEnrichmentsForReview` flags anything below `agrees + high`. Lifting it auto-promotes the description.
+
+Scope is deliberately narrow:
+
+- Only `agrees` verdicts are lifted. Genuine `uncertain` / `disagrees` content doubt still surfaces for review.
+- Only the three description fields. Per trust-transfer doctrine, `Enriched` identity / social candidates still require their **own** independent verification — confirming one anchor never promotes a *different* identity field.
+- The original judge `note` is preserved with an `+ identity corroborated` marker (truncated to the 60-char note limit) so the upgrade is auditable.
+
+This is why a description blocked only on a `medium` confidence no longer pins its team in the admin queue when that team already has a verified website / LinkedIn / Twitter — which is the common case.
 
 #### Rule index
 
@@ -588,7 +602,10 @@ The validator rejects values **by structure**, not by enumerating placeholder st
 | `twitterHandler` | 1-15 alphanumeric / underscore (with optional `@` prefix or full `twitter.com` / `x.com` URL) | `acme team` (space), `acme-team` (hyphen), `n/a`, anything >15 chars |
 | `linkedinHandler` | `company/<slug>`, `school/<slug>`, `in/<slug>`, bare slug (2-100 alphanumeric / `_` / `-` / `.`), or full `linkedin.com/...` URL | `Coming soon!`, `n/a` |
 | `telegramHandler` | 3-32 alphanumeric / underscore (with optional `@` prefix or full `t.me` / `telegram.me` URL) | `@ab` (too short), `n/a`, `Coming soon!` |
-| descriptions, `moreDetails`, array fields (`industryTags` / `investmentFocus`) | any non-empty value | empty / whitespace-only / empty array |
+| `shortDescription` / `longDescription` / `moreDetails` | any non-empty prose that is NOT AI search-failure narration | empty / whitespace-only; AI "non-answer" text (see below) |
+| array fields (`industryTags` / `investmentFocus`) | any non-empty value | empty / whitespace-only / empty array |
+
+**AI non-answer rejection (description fields).** The enrichment AI sometimes narrates a failed search into a description instead of returning `null` — e.g. `No specific investment fund named "Angel Fund" was found that exactly matches the provided name. The term "angel fund" is widely used generically…`. `looksLikeAiNonAnswer` (in `team-enrichment-field-shape.util.ts`) flags that text by structure — search-meta phrasing like "no X was found", "could not find/locate", "unfortunately", "the name is generic" — and `isLikelyValueForField` rejects it for the three description fields. Two layers enforce this: (1) the enrichment AI prompt instructs the model to return `null` and never narrate; (2) the enrichment write path drops a narration value before it is persisted (logged under `aiNarrationRejected=[...]`), so the field is recorded as `CannotEnrich` / left empty rather than storing the meta-text. The patterns are anchored on search-meta phrasing so they don't trip on legitimate prose ("Acme **was founded** in 2019", "widely **used across** consumer apps").
 
 Two design choices worth noting:
 
@@ -664,10 +681,13 @@ Both the judge (Stage 1) and the enrichment pipeline (ScrapingDog branch) distin
 ```
 POST /v1/admin/teams/:uid/trigger-judgment           # Run judge for a team (skips if already judged)
 POST /v1/admin/teams/trigger-judgment                # Run judge for all pending teams
-POST /v1/admin/teams/:uid/trigger-force-judgment     # Re-run judge even if already judged
+POST /v1/admin/teams/:uid/trigger-force-judgment     # Re-run judge for one team even if already judged
+POST /v1/admin/teams/trigger-force-judgment          # Re-run judge for ALL eligible Enriched teams (incl. already-judged)
 ```
 
 All require `AdminAuthGuard`. They do NOT require `IS_TEAM_ENRICHMENT_ENABLED` — manual overrides.
+
+`trigger-force-judgment` (all) is the force analog of `trigger-force-enrichment` (all): it selects every eligibility-filtered team whose enrichment status is `Enriched` and that has ≥1 judgable field — **including** teams already `Judged` (that is the difference from the pending `trigger-judgment`, which skips them). Each team is re-judged fire-and-forget in the background; the response returns `{ total, started, skipped }` immediately. `InProgress` teams are skipped (per-team guard), and admin-finalized states (`Reviewed`/`Approved`) are left out of the bulk path — re-judge those one-off via the single-team `:uid/trigger-force-judgment`.
 
 ## Logo Verification (Vision-Model Pass)
 

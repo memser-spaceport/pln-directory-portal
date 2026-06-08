@@ -293,6 +293,13 @@ export class AdminTeamsController {
     return { success: true, message: `Force-judgment triggered for team ${uid}` };
   }
 
+  @Post('trigger-force-judgment')
+  @NoCache()
+  async triggerForceJudgmentAll() {
+    const result = await this.teamEnrichmentJudgeService.forceJudgeAllEnrichedTeams('manually');
+    return { success: true, ...result, message: 'Force-judgment triggered in background' };
+  }
+
   /**
    * Aggregated AI token usage + USD cost report for the enrichment + judge pipelines.
    * Reads `TeamEnrichment.dataEnrichment.usage` persisted on each team and rolls up totals, per-model
