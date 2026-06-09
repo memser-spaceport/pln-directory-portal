@@ -1,10 +1,14 @@
-export function resolveTeamPitchSupportEmail(supportEmail?: string | null): string | null {
+export const DEFAULT_TEAM_PITCH_SUPPORT_EMAIL = 'pldemoday@protocol.ai';
+
+export function resolveTeamPitchSupportEmail(supportEmail?: string | null): string {
   const trimmed = supportEmail?.trim();
   if (trimmed) {
     return trimmed;
   }
 
-  return process.env.LABOS_SUPPORT_EMAIL?.trim() || null;
+  return (
+    process.env.LABOS_SUPPORT_EMAIL?.trim() || process.env.DEMO_DAY_EMAIL?.trim() || DEFAULT_TEAM_PITCH_SUPPORT_EMAIL
+  );
 }
 
 export function toKebabSlug(value: string): string {
