@@ -137,8 +137,7 @@ async function seed() {
   }
 
   const entries =
-    (JSON.parse(readFileSync(AFFINITY_PATH, 'utf-8')) as { entries?: { entity: AffinityEntity }[] })
-      .entries ?? [];
+    (JSON.parse(readFileSync(AFFINITY_PATH, 'utf-8')) as { entries?: { entity: AffinityEntity }[] }).entries ?? [];
 
   let created = 0;
   let reachable = 0;
@@ -154,9 +153,7 @@ async function seed() {
     const firstName = (ent.firstName ?? '').trim();
     const lastName = (ent.lastName ?? '').trim();
     const realEmail =
-      (ent.primaryEmailAddress ?? '').trim() ||
-      (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') ||
-      '';
+      (ent.primaryEmailAddress ?? '').trim() || (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') || '';
     const email = realEmail || `aff-${affinityId}@gold.local`;
     const dedupeKey = normalizeEmailKey(realEmail) || `aff-${affinityId}`;
     const firms = entryFirmNames(ent);
@@ -172,28 +169,37 @@ async function seed() {
     const firmLabel = best?.label ?? firms[0] ?? '';
     const hasPath = best?.hasPath ?? false;
 
-    // Upsert by investorId — a person may already exist via the Neuro list
-    // (shared Affinity id). Reuse the record; just add gold paths + membership.
+    // Upsert by dedupeKey — reuses Neuro rows and existing investor DB matches on dev.
+    // On update, leave source untouched so neuro-first shared people stay neuro-sourced.
+    const createFields = {
+      investorId: affinityId,
+      canonicalId: affinityId,
+      source: SOURCE,
+      firstName,
+      lastName,
+      email,
+      emailStatus: 'unverified',
+      firm: firmLabel,
+      investorType: 'fund',
+      stageFocus: '',
+      engagementTier: '',
+      enrichmentStatus: 'pending',
+      bestProximityCode: hasPath ? best!.code : null,
+      hasPath,
+    };
     await prisma.investorOutreachRecord.upsert({
-      where: { investorId: affinityId },
-      update: {},
-      create: {
+      where: { dedupeKey },
+      update: {
         investorId: affinityId,
-        dedupeKey, // normalized email (prod-shaped)
         canonicalId: affinityId,
-        source: SOURCE,
         firstName,
         lastName,
         email,
-        emailStatus: 'unverified',
         firm: firmLabel,
-        investorType: 'fund',
-        stageFocus: '',
-        engagementTier: '',
-        enrichmentStatus: 'pending',
         bestProximityCode: hasPath ? best!.code : null,
         hasPath,
       },
+      create: { dedupeKey, ...createFields },
     });
     created += 1;
 

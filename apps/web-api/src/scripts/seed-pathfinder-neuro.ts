@@ -250,37 +250,29 @@ async function seed() {
     const enrichment = prest ? toEnrichment(prest) : undefined;
     if (enrichment) enriched += 1;
 
-    // Upsert by investorId — a person may already exist via the Gold list
-    // (shared Affinity id). Update keeps this list's name/firm/enrichment current.
+    // Upsert by dedupeKey (prod convention) — merges with existing investor DB rows
+    // on dev; a person may also already exist via the Gold list (shared Affinity id).
+    const recordFields = {
+      investorId: affinityId,
+      canonicalId: affinityId,
+      source: NEW_SOURCE,
+      firstName,
+      lastName,
+      email,
+      emailStatus: 'unverified',
+      firm: firmLabel,
+      investorType: 'fund',
+      stageFocus: '',
+      engagementTier: '',
+      enrichmentStatus: enrichment ? 'enriched' : 'pending',
+      bestProximityCode: bestCode,
+      hasPath,
+      rawPayload: enrichment ? ({ enrichment } as Prisma.InputJsonValue) : undefined,
+    };
     await prisma.investorOutreachRecord.upsert({
-      where: { investorId: affinityId },
-      update: {
-        firstName,
-        lastName,
-        firm: firmLabel,
-        enrichmentStatus: enrichment ? 'enriched' : 'pending',
-        bestProximityCode: bestCode,
-        hasPath,
-        rawPayload: enrichment ? ({ enrichment } as Prisma.InputJsonValue) : undefined,
-      },
-      create: {
-        investorId: affinityId, // Affinity entity id = the authoritative LP id
-        dedupeKey, // normalized email (prod-shaped) — see normalizeEmailKey
-        canonicalId: affinityId,
-        source: NEW_SOURCE,
-        firstName,
-        lastName,
-        email,
-        emailStatus: 'unverified',
-        firm: firmLabel,
-        investorType: 'fund',
-        stageFocus: '',
-        engagementTier: '',
-        enrichmentStatus: enrichment ? 'enriched' : 'pending',
-        bestProximityCode: bestCode,
-        hasPath,
-        rawPayload: enrichment ? ({ enrichment } as Prisma.InputJsonValue) : undefined,
-      },
+      where: { dedupeKey },
+      update: recordFields,
+      create: { dedupeKey, ...recordFields },
     });
     created += 1;
 
