@@ -8,7 +8,7 @@ export const CreateTeamPitchSchema = z.object({
   description: z.string().min(1),
   slug: z.string().min(1).optional(),
   status: z.enum(['DRAFT', 'OPEN', 'CLOSED']).optional(),
-  supportEmail: z.string().optional(),
+  supportEmail: z.string().email().optional().nullable(),
   headerImageUid: z.string().optional().nullable(),
   logoUid: z.string().optional().nullable(),
   primaryColor: z
@@ -25,7 +25,7 @@ export const UpdateTeamPitchSchema = z.object({
   description: z.string().min(1).optional(),
   slug: z.string().min(1).optional(),
   status: z.enum(['DRAFT', 'OPEN', 'CLOSED']).optional(),
-  supportEmail: z.string().optional(),
+  supportEmail: z.string().email().optional().nullable(),
   headerImageUid: z.string().optional().nullable(),
   logoUid: z.string().optional().nullable(),
   primaryColor: z
