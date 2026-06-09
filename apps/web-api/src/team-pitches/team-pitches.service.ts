@@ -233,9 +233,6 @@ export class TeamPitchesService {
     });
 
     const supportEmail = resolveTeamPitchSupportEmail(data.supportEmail);
-    if (!supportEmail) {
-      throw new BadRequestException('Support email is required; set LABOS_SUPPORT_EMAIL or provide supportEmail');
-    }
 
     const pitch = await this.prisma.teamPitch.create({
       data: {
@@ -317,13 +314,8 @@ export class TeamPitchesService {
       slug = await this.ensureUniqueSlug(toKebabSlug(data.slug), pitchUid);
     }
 
-    let resolvedSupportEmail: string | undefined;
-    if (data.supportEmail !== undefined) {
-      resolvedSupportEmail = resolveTeamPitchSupportEmail(data.supportEmail) ?? undefined;
-      if (!resolvedSupportEmail) {
-        throw new BadRequestException('Support email is required; set LABOS_SUPPORT_EMAIL or provide supportEmail');
-      }
-    }
+    const resolvedSupportEmail =
+      data.supportEmail !== undefined ? resolveTeamPitchSupportEmail(data.supportEmail) : undefined;
 
     return this.prisma.teamPitch.update({
       where: { uid: pitchUid },
