@@ -2391,7 +2391,15 @@ model InvestorOutreachRecord {
   /// the ingest pipeline will only populate this once the script starts emitting it (Phase 2+).
   tags String[] @default([])
 
+  /// PL Path Finder — best (warmest) proximity code for this target, denormalized from
+  /// PathfinderPath for fast list sort/render without a join. e.g. "JB+1A", "F+2B", "C".
+  bestProximityCode String? @db.VarChar(16)
+  /// PL Path Finder — true when at least one non-cold path exists. Denormalized for fast filtering.
+  hasPath Boolean @default(false)
+
   portfolioOverlaps InvestorPortfolioOverlap[]
+  pathfinderPaths   PathfinderPath[]
+  listMemberships   InvestorListMembership[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2402,6 +2410,7 @@ model InvestorOutreachRecord {
   @@index([engagementTier])
   @@index([enrichmentStatus])
   @@index([enrichmentDate])
+  @@index([hasPath])
 }
 
 /// Cap-table overlap between an external investor (InvestorOutreachRecord) and a PL portfolio Team.
@@ -2452,6 +2461,192 @@ model PlPortfolioTeamMeta {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// PL Path Finder — a single ranked warm-intro path from PL's network to a target investor.
+/// Many rows per target (alternative paths). Produced by the offline graph job (pln-data-enrichment)
+/// and written via the service-ingest endpoint, which replaces a target's rows per ingest run.
+model PathfinderPath {
+  id Int @id @default(autoincrement())
+
+  /// Stable external id of the target investor (matches InvestorOutreachRecord.investorId).
+  targetInvestorId String
+  target           InvestorOutreachRecord @relation(fields: [targetInvestorId], references: [investorId], onDelete: Cascade)
+
+  /// Target-set this path was computed for (Affinity list id / saved-filter id / team uid).
+  /// Enables the pluggable target set; v1 = the Neuro Fund I LP pipeline.
+  targetSet String @db.VarChar(120)
+
+  /// Connector category (which door): F | VC | JB | PL | O | C (cold).
+  connectorType String @db.VarChar(8)
+  /// Social distance: 1 = direct, 2 = one intermediary, 3 = hard ceiling.
+  hops Int
+  /// Caliber gate result: A (relationship AND contact) | B (relationship OR contact) | null when cold.
+  caliber String? @db.VarChar(2)
+  /// Denormalized human-facing code, e.g. "JB+1A", "F+2B", "C".
+  proximityCode String @db.VarChar(16)
+
+  /// 0..1 success-probability score (product of edge probabilities). Higher = warmer.
+  score Float
+  /// 0..1 confidence in the computed caliber/code.
+  caliberConfidence Float?
+
+  /// Ordered hop chain + provenance: nodes, edges, evidence, source attributions,
+  /// and the plain-English explanation surfaced in the drawer.
+  hopChain Json
+
+  /// Rank within this target's path list at compute time (1 = best). Lets the list view
+  /// pick the best path without re-sorting.
+  rank Int @default(0)
+
+  computedAt DateTime @default(now())
+  /// Ingest run that produced this row (batch replacement + provenance).
+  ingestRunId String? @db.VarChar(64)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([targetInvestorId])
+  @@index([targetSet])
+  @@index([connectorType])
+  @@index([targetInvestorId, rank])
+}
+
+/// PL Path Finder — entity-resolution crosswalk linking the same real-world entity across the two
+/// authoritative ID domains (Directory uid for founders, Affinity id for LPs) under one canonicalId.
+/// Bootstrapped from the Investor DB email->LabOS join; extended with exact name+firm and cap-table edges.
+/// Conservative: deterministic matches auto-link (isConfirmed); fuzzy candidates route to review (needsReview).
+model PathfinderEntityCrosswalk {
+  id Int @id @default(autoincrement())
+
+  /// Canonical entity id assigned by the resolver (stable across recomputes).
+  canonicalId String @db.VarChar(64)
+
+  /// Directory member/team uid (founder side). Null if entity not in Directory.
+  directoryUid String? @db.VarChar(64)
+  /// Affinity id (LP/target side). Null if entity not in Affinity.
+  affinityId String? @db.VarChar(64)
+  /// Investor outreach external id, when the entity is an ingested target.
+  investorId String? @db.VarChar(64)
+
+  /// person | org
+  entityType String @db.VarChar(16)
+
+  displayName String? @db.VarChar(200)
+  firm        String? @db.VarChar(200)
+
+  /// How the link was made: email | name_firm | cap_table | manual | bootstrap_labos.
+  matchMethod String @db.VarChar(32)
+  /// 0..1 confidence in the link.
+  matchConfidence Float
+  /// true when a deterministic link auto-applied; false when pending human confirm.
+  isConfirmed Boolean @default(false)
+  /// true when this is a founder-who-is-also-LP LINK (preserve both identities, never merge).
+  isFounderLpLink Boolean @default(false)
+  /// true when this candidate is queued for human review (fuzzy/ambiguous).
+  needsReview Boolean @default(false)
+
+  ingestRunId String? @db.VarChar(64)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([canonicalId])
+  @@index([directoryUid])
+  @@index([affinityId])
+  @@index([investorId])
+  @@index([needsReview])
+}
+
+/// PL Path Finder — a human correction/override. Wherever the algorithm is uncertain
+/// (caliber, connector, entity merge, path validity) the UI persists the override here with
+/// provenance. Corrections feed the next recompute and seed the future Affinity write-back.
+/// Generalizes the prototype's _lp_curation.json overlay (hide / match_exceptions /
+/// historical_memberships / drawer_notes) into a first-class store.
+model PathfinderCorrection {
+  id Int @id @default(autoincrement())
+
+  /// What the correction is about: path | caliber | connector | crosswalk | entity | action | curation.
+  subjectType String @db.VarChar(24)
+  /// Id of the subject (canonical/affinity/investor id, path id, or crosswalk id).
+  subjectId String @db.VarChar(64)
+
+  /// Field being corrected, e.g. "caliber", "connector", "proximityCode", "match", "hide", "intro_status".
+  field String @db.VarChar(48)
+
+  oldValue Json?
+  newValue Json?
+
+  /// Free-form note / rationale, carried into recompute provenance + future Affinity write-back.
+  note String? @db.VarChar(1000)
+
+  /// Actor identity (Directory member uid / email).
+  actorUid   String? @db.VarChar(64)
+  actorEmail String? @db.VarChar(200)
+
+  /// Set once this correction has been folded into a recompute.
+  appliedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([subjectType, subjectId])
+  @@index([field])
+  @@index([appliedAt])
+}
+
+/// Investor Lists — a curated target set of investors (a "list"). Proximity is computed per list
+/// (PathfinderPath.targetSet == an InvestorList.targetSet). The 5,000+ InvestorOutreachRecord DB is the
+/// universe; lists are curated subsets. v1: "Neuro Fund I LP Pipeline" (graphed) + "Gold PLC Co-Investors".
+model InvestorList {
+  id Int @id @default(autoincrement())
+
+  slug        String  @unique @db.VarChar(120)
+  name        String  @db.VarChar(200)
+  description String? @db.VarChar(1000)
+
+  /// Where the list originates: 'affinity' | 'manual'.
+  source String @db.VarChar(24)
+  /// External reference (e.g. the Affinity list id) when source != manual.
+  externalRef String? @db.VarChar(120)
+
+  /// True once the offline graph job has computed proximity for this list's members.
+  isGraphed Boolean @default(false)
+
+  /// Ties this list to PathfinderPath.targetSet so per-list proximity codes resolve.
+  targetSet String @db.VarChar(120)
+
+  memberships InvestorListMembership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([source])
+  @@index([targetSet])
+}
+
+/// Investor Lists — membership join between an InvestorList and an InvestorOutreachRecord (an investor).
+/// One investor can belong to many lists; a list has many members.
+model InvestorListMembership {
+  id Int @id @default(autoincrement())
+
+  listId Int
+  list   InvestorList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  investorOutreachRecordId Int
+  investorOutreachRecord   InvestorOutreachRecord @relation(fields: [investorOutreachRecordId], references: [id], onDelete: Cascade)
+
+  /// Actor who added the membership (Directory member uid / email).
+  addedByUid   String? @db.VarChar(64)
+  addedByEmail String? @db.VarChar(200)
+
+  note String? @db.VarChar(1000)
+
+  createdAt DateTime @default(now())
+
+  @@unique([listId, investorOutreachRecordId])
+  @@index([listId])
+  @@index([investorOutreachRecordId])
 }
 
 enum FounderReviewStatus {

@@ -7,6 +7,23 @@ export interface LabOsProfileDto {
   lastActiveAt: string | null;
 }
 
+/**
+ * Aggregated "who is this investor/LP" enrichment (bio, fund focus, AUM, thesis,
+ * marquee deals) + source links for verification. Produced by the Phase-1 /
+ * prestige enrichment pass and carried on InvestorOutreachRecord.rawPayload.
+ */
+export interface InvestorEnrichmentDto {
+  bio: string | null;
+  fundFocus: string | null;
+  aum: string | null;
+  notableInvestments: string[];
+  thesis: string | null;
+  /** Source URLs; bio/thesis may reference them as [1], [2]… markers. */
+  sources: string[];
+  enrichedVia: string | null;
+  fetchedAt: string | null;
+}
+
 export interface InvestorDto {
   investorId: string;
   canonicalId: string | null;
@@ -52,6 +69,15 @@ export interface InvestorDto {
   tags: string[];
   labOsProfile: LabOsProfileDto | null;
   coInvestedTeamIds: string[];
+
+  /** PL Path Finder summary, denormalized by the pathfinder ingest. Lets the
+   *  list render the proximity axis without fetching the full path list.
+   *  null/false until a pathfinder run has covered this investor. */
+  bestProximityCode: string | null;
+  hasPath: boolean;
+
+  /** Aggregated background + sources; null until enriched. */
+  enrichment: InvestorEnrichmentDto | null;
 
   createdAt: string;
   updatedAt: string;

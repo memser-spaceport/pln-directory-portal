@@ -4,6 +4,12 @@ export interface PlPortfolioTeamCoInvestorDto {
   dealDate: string | null;
 }
 
+/** A team member surfaced for founder-name search in the warm-intros workspace. */
+export interface PlPortfolioTeamFounderDto {
+  name: string;
+  memberUid: string | null;
+}
+
 export interface PlPortfolioTeamDto {
   teamUid: string;
   teamName: string;
@@ -19,4 +25,5 @@ export interface PlPortfolioTeamDto {
   sectors: string[];
   geo: string | null;
   coInvestors: PlPortfolioTeamCoInvestorDto[];
+  founders: PlPortfolioTeamFounderDto[];
 }
