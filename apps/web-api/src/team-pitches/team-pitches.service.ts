@@ -214,7 +214,7 @@ export class TeamPitchesService {
     description: string;
     slug?: string;
     status?: TeamPitchStatus;
-    supportEmail?: string;
+    supportEmail?: string | null;
     headerImageUid?: string | null;
     logoUid?: string | null;
     primaryColor?: string | null;
@@ -298,7 +298,7 @@ export class TeamPitchesService {
       description?: string;
       slug?: string;
       status?: TeamPitchStatus;
-      supportEmail?: string;
+      supportEmail?: string | null;
       headerImageUid?: string | null;
       logoUid?: string | null;
       primaryColor?: string | null;
