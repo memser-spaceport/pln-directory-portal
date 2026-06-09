@@ -31,11 +31,15 @@ const commaSeparatedListParam = () =>
 
 const StageListParam = commaSeparatedListParam();
 
+export const RoadmapSortParam = z.enum(['default', 'trending', 'top_pins', 'newest']);
+
 export const RoadmapItemListQueryParams = z.object({
   stage: StageListParam,
   tags: commaSeparatedListParam(),
   type: z.string().optional(),
   focusArea: z.string().optional(),
+  objectiveUid: z.string().optional(),
+  sort: RoadmapSortParam.optional(),
   mine: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
   includeDeclined: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
   includeArchived: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
@@ -47,6 +51,11 @@ export const RoadmapMemberSummarySchema = z.object({
   imageUrl: z.string().nullable(),
 });
 
+export const RoadmapObjectiveRefSchema = z.object({
+  uid: z.string(),
+  title: z.string(),
+});
+
 export const RoadmapItemSchema = z.object({
   uid: z.string(),
   title: z.string(),
@@ -56,15 +65,20 @@ export const RoadmapItemSchema = z.object({
   focusArea: z.string().nullable(),
   type: z.string().nullable(),
   tags: z.array(z.string()),
-  order: z.number().int(),
+  order: z.number(),
   createdByUid: z.string(),
   createdBy: RoadmapMemberSummarySchema,
   promotedAt: z.string().nullable(),
   promotedByUid: z.string().nullable(),
   declinedReason: z.string().nullable(),
   externalTrackerUrl: z.string().nullable(),
+  objective: RoadmapObjectiveRefSchema.nullable(),
   upvoteCount: z.number().int(),
   viewerHasUpvoted: z.boolean(),
+  /** Active pins while the item is pinnable; frozen total (incl. released) otherwise. */
+  pinCount: z.number().int(),
+  viewerHasPinned: z.boolean(),
+  viewerPinNote: z.string().nullable(),
   deletedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -94,6 +108,8 @@ export const UpdateRoadmapItemSchema = z.object({
   type: z.string().max(500).optional().nullable(),
   tags: z.array(z.string()).optional(),
   externalTrackerUrl: z.string().max(2000).optional().nullable(),
+  /** Curators only; fractional values are allowed (frontend computes midpoints). */
+  order: z.number().optional(),
 });
 
 export const ArchiveRoadmapItemSchema = z.object({
@@ -113,3 +129,123 @@ export const RoadmapUpvoteSchema = z.object({
 });
 
 export const RoadmapBuildButtonClickSchema = z.object({});
+
+// --- Priority signaling: pins ---
+
+export const PinRoadmapItemSchema = z.object({
+  note: z.string().trim().max(500).optional().nullable(),
+  /** Run-out swap: unpin this item and pin the target atomically (net budget 0). */
+  swapItemUid: z.string().optional().nullable(),
+});
+
+export const UpdatePinNoteSchema = z.object({
+  note: z.string().trim().max(500).nullable(),
+});
+
+export const RoadmapPinBalanceSummarySchema = z.object({
+  limit: z.number().int(),
+  used: z.number().int(),
+  remaining: z.number().int(),
+});
+
+export const RoadmapPinActionResponseSchema = z.object({
+  item: RoadmapItemSchema,
+  balance: RoadmapPinBalanceSummarySchema,
+});
+
+export const RoadmapMyPinSchema = z.object({
+  uid: z.string(),
+  note: z.string().nullable(),
+  createdAt: z.string(),
+  item: z.object({
+    uid: z.string(),
+    title: z.string(),
+    stage: RoadmapStageSchema,
+  }),
+});
+
+export const RoadmapPinBalanceSchema = RoadmapPinBalanceSummarySchema.extend({
+  pins: z.array(RoadmapMyPinSchema),
+});
+
+export const RoadmapItemPinnersResponseSchema = z.object({
+  total: z.number().int(),
+  pins: z.array(
+    z.object({
+      uid: z.string(),
+      note: z.string().nullable(),
+      createdAt: z.string(),
+      /** Non-null for historical pins auto-returned on a stage transition. */
+      releasedAt: z.string().nullable(),
+      member: RoadmapMemberSummarySchema,
+    })
+  ),
+});
+
+export const RoadmapItemUpvotersResponseSchema = z.object({
+  total: z.number().int(),
+  upvotes: z.array(
+    z.object({
+      uid: z.string(),
+      note: z.string().nullable(),
+      createdAt: z.string(),
+      member: RoadmapMemberSummarySchema,
+    })
+  ),
+});
+
+// --- Priority signaling: ordering ---
+
+export const ReorderRoadmapItemsSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        uid: z.string().min(1),
+        order: z.number(),
+      })
+    )
+    .min(1)
+    .max(200),
+});
+
+export const ReorderRoadmapItemsResponseSchema = z.object({
+  updated: z.number().int(),
+});
+
+// --- Priority signaling: objectives ---
+
+export const RoadmapObjectiveSchema = z.object({
+  uid: z.string(),
+  title: z.string(),
+  itemCount: z.number().int(),
+  createdAt: z.string(),
+});
+
+export const RoadmapObjectiveListResponseSchema = z.object({
+  objectives: z.array(RoadmapObjectiveSchema),
+});
+
+export const CreateRoadmapObjectiveSchema = z.object({
+  title: z.string().trim().min(1).max(150),
+});
+
+export const SetRoadmapItemObjectiveSchema = z
+  .object({
+    /** Existing objective uid, or null to clear the chip. */
+    objectiveUid: z.string().optional().nullable(),
+    /** Find-or-create an objective by title and assign it. */
+    title: z.string().trim().min(1).max(150).optional(),
+  })
+  .refine((v) => v.objectiveUid !== undefined || v.title !== undefined, {
+    message: 'Provide objectiveUid or title',
+  });
+
+// --- Priority signaling: settings ---
+
+export const RoadmapSettingsSchema = z.object({
+  pinLimit: z.number().int(),
+});
+
+export const UpdateRoadmapSettingsSchema = z.object({
+  pinLimit: z.number().int().min(0).max(100),
+});

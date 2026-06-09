@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { RoadmapStage } from '@prisma/client';
 
 jest.mock('../analytics/service/analytics.service', () => ({
@@ -37,19 +37,37 @@ const baseItem = {
   updatedAt: new Date(),
 };
 
-const buildPrismaMock = () => ({
-  roadmapItem: {
-    findFirst: jest.fn(),
-    findMany: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-  },
-  roadmapItemUpvote: {
-    findUnique: jest.fn(),
-    upsert: jest.fn(),
-    deleteMany: jest.fn(),
-  },
-});
+const buildPrismaMock = () => {
+  const mock: any = {
+    roadmapItem: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    roadmapItemUpvote: {
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    roadmapItemPin: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+  };
+  mock.$transaction = jest.fn(async (arg: unknown) => {
+    if (typeof arg === 'function') {
+      return arg(mock);
+    }
+    return Promise.all(arg as Promise<unknown>[]);
+  });
+  return mock;
+};
 
 describe('RoadmapService', () => {
   let service: RoadmapService;
@@ -141,7 +159,8 @@ describe('RoadmapService', () => {
         focusArea: null,
         createdBy: { uid: 'creator-1', name: 'A', image: null },
         promotedBy: null,
-        _count: { upvotes: 1 },
+        objective: null,
+        _count: { upvotes: 1, pins: 0 },
       };
       prisma.roadmapItem.findFirst
         .mockResolvedValueOnce(row)
@@ -152,6 +171,126 @@ describe('RoadmapService', () => {
       const result = await service.addUpvote('item-1', null, 'voter-1');
       expect(result.viewerHasUpvoted).toBe(true);
       expect(prisma.roadmapItemUpvote.upsert).toHaveBeenCalled();
+    });
+
+    it.each([RoadmapStage.IN_PROGRESS, RoadmapStage.BACKLOG, RoadmapStage.SHIPPED, RoadmapStage.DECLINED])(
+      'rejects likes on %s items (counts frozen)',
+      async (stage) => {
+        prisma.roadmapItem.findFirst.mockResolvedValue({
+          ...baseItem,
+          stage,
+          createdBy: { uid: 'creator-1', name: 'A', image: null },
+          promotedBy: null,
+          objective: null,
+          _count: { upvotes: 0, pins: 0 },
+        });
+
+        await expect(service.addUpvote('item-1', null, 'voter-1')).rejects.toBeInstanceOf(BadRequestException);
+        expect(prisma.roadmapItemUpvote.upsert).not.toHaveBeenCalled();
+      }
+    );
+
+    it('rejects unliking frozen items', async () => {
+      prisma.roadmapItem.findFirst.mockResolvedValue({
+        ...baseItem,
+        stage: RoadmapStage.SHIPPED,
+        createdBy: { uid: 'creator-1', name: 'A', image: null },
+        promotedBy: null,
+        objective: null,
+        _count: { upvotes: 0, pins: 0 },
+      });
+
+      await expect(service.removeUpvote('item-1', 'voter-1')).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.roadmapItemUpvote.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('transitionItem pin release', () => {
+    const rowFor = (stage: RoadmapStage) => ({
+      ...baseItem,
+      stage,
+      createdBy: { uid: 'creator-1', name: 'A', image: null },
+      promotedBy: null,
+      objective: null,
+      _count: { upvotes: 0, pins: 2 },
+    });
+
+    beforeEach(() => {
+      accessControl.getMemberAccess.mockResolvedValue({
+        effectivePermissions: ['roadmap.item.transition'],
+      });
+    });
+
+    it('releases active pins when an item enters IN_PROGRESS', async () => {
+      prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.PLANNED));
+      prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.IN_PROGRESS));
+      prisma.roadmapItemPin.updateMany.mockResolvedValue({ count: 2 });
+
+      await service.transitionItem('item-1', { stage: 'IN_PROGRESS' }, 'curator-1');
+
+      expect(prisma.roadmapItemPin.updateMany).toHaveBeenCalledWith({
+        where: { itemUid: 'item-1', releasedAt: null },
+        data: { releasedAt: expect.any(Date) },
+      });
+    });
+
+    it('does not release pins when moving between pinnable stages', async () => {
+      prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.IDEA));
+      prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.PLANNED));
+
+      await service.transitionItem('item-1', { stage: 'PLANNED' }, 'curator-1');
+
+      expect(prisma.roadmapItemPin.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reorderItems', () => {
+    beforeEach(() => {
+      accessControl.getMemberAccess.mockResolvedValue({
+        effectivePermissions: ['roadmap.item.curate'],
+      });
+    });
+
+    it('rejects non-curators', async () => {
+      accessControl.getMemberAccess.mockResolvedValue({ effectivePermissions: [] });
+      await expect(service.reorderItems({ items: [{ uid: 'item-1', order: 1 }] }, 'member-1')).rejects.toBeInstanceOf(
+        ForbiddenException
+      );
+    });
+
+    it('rejects unknown item uids', async () => {
+      prisma.roadmapItem.findMany.mockResolvedValue([{ uid: 'item-1' }]);
+      await expect(
+        service.reorderItems(
+          {
+            items: [
+              { uid: 'item-1', order: 1 },
+              { uid: 'item-2', order: 2 },
+            ],
+          },
+          'curator-1'
+        )
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('writes orders verbatim in one transaction', async () => {
+      prisma.roadmapItem.findMany.mockResolvedValue([{ uid: 'item-1' }, { uid: 'item-2' }]);
+      prisma.roadmapItem.update.mockResolvedValue({});
+
+      const result = await service.reorderItems(
+        {
+          items: [
+            { uid: 'item-1', order: 1.5 },
+            { uid: 'item-2', order: 2 },
+          ],
+        },
+        'curator-1'
+      );
+
+      expect(result).toEqual({ updated: 2 });
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(prisma.roadmapItem.update).toHaveBeenCalledWith({ where: { uid: 'item-1' }, data: { order: 1.5 } });
+      expect(prisma.roadmapItem.update).toHaveBeenCalledWith({ where: { uid: 'item-2' }, data: { order: 2 } });
     });
   });
 });

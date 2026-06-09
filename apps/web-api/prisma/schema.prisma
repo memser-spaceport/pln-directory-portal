@@ -239,6 +239,8 @@ model Member {
   roadmapItemsCreated       RoadmapItem[]         @relation("roadmapItemCreatedBy")
   roadmapItemsPromoted      RoadmapItem[]         @relation("roadmapItemPromotedBy")
   roadmapItemUpvotes        RoadmapItemUpvote[]   @relation("roadmapItemUpvoter")
+  roadmapItemPins           RoadmapItemPin[]      @relation("roadmapItemPinner")
+  roadmapObjectivesCreated  RoadmapObjective[]    @relation("roadmapObjectiveCreatedBy")
 }
 
 model MemberApproval {
@@ -2771,7 +2773,7 @@ model RoadmapItem {
   focusArea String?
   type      String?
   tags      String[] @default([])
-  order     Int      @default(99)
+  order     Float    @default(99)
 
   createdByUid String
   createdBy    Member @relation("roadmapItemCreatedBy", fields: [createdByUid], references: [uid])
@@ -2783,7 +2785,11 @@ model RoadmapItem {
 
   externalTrackerUrl String?
 
+  objectiveUid String?
+  objective    RoadmapObjective? @relation(fields: [objectiveUid], references: [uid])
+
   upvotes RoadmapItemUpvote[]
+  pins    RoadmapItemPin[]
 
   deletedAt      DateTime?
   deletionReason String?
@@ -2792,6 +2798,7 @@ model RoadmapItem {
 
   @@index([stage, deletedAt])
   @@index([createdByUid])
+  @@index([objectiveUid])
 }
 
 model RoadmapItemUpvote {
@@ -2806,4 +2813,46 @@ model RoadmapItemUpvote {
 
   @@unique([itemUid, memberUid])
   @@index([memberUid])
+}
+
+/// Scarce priority pin. Active while releasedAt is null; releasedAt is set when the
+/// pin auto-returns to the member's budget (item enters a non-pinnable stage or is
+/// archived). Released rows are kept as history for frozen counts and admin views.
+/// Uniqueness of (itemUid, memberUid) is enforced only for active pins via a partial
+/// unique index added in the migration (Prisma cannot express partial indexes):
+///   CREATE UNIQUE INDEX "RoadmapItemPin_active_item_member_key"
+///     ON "RoadmapItemPin"("itemUid", "memberUid") WHERE "releasedAt" IS NULL;
+model RoadmapItemPin {
+  id         Int         @id @default(autoincrement())
+  uid        String      @unique @default(cuid())
+  itemUid    String
+  item       RoadmapItem @relation(fields: [itemUid], references: [uid], onDelete: Cascade)
+  memberUid  String
+  member     Member      @relation("roadmapItemPinner", fields: [memberUid], references: [uid])
+  note       String?
+  releasedAt DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([itemUid, releasedAt])
+  @@index([memberUid, releasedAt])
+}
+
+model RoadmapObjective {
+  id           Int           @id @default(autoincrement())
+  uid          String        @unique @default(cuid())
+  title        String        @unique
+  createdByUid String?
+  createdBy    Member?       @relation("roadmapObjectiveCreatedBy", fields: [createdByUid], references: [uid])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  items        RoadmapItem[]
+}
+
+/// Single-row table (id = 1) holding roadmap-wide configuration.
+model RoadmapSettings {
+  id           Int      @id @default(1)
+  pinLimit     Int      @default(3)
+  updatedByUid String?
+  updatedAt    DateTime @updatedAt
 }
