@@ -664,7 +664,8 @@ export class RoadmapService {
     await this.sendMemberNotification(
       item.createdByUid,
       ROADMAP_NOTIFICATION_COPY.needDeclined(item.title, reason),
-      item.uid
+      item.uid,
+      'need_declined'
     );
   }
 
