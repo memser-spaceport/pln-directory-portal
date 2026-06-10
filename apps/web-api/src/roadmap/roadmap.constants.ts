@@ -44,9 +44,10 @@ export const ROADMAP_KANBAN_STAGES: RoadmapStage[] = [
   RoadmapStage.SHIPPED,
 ];
 
+// Relative route — the notification bell resolves links against the frontend
+// origin and breaks on absolute URLs.
 export function itemDetailPath(itemUid: string): string {
-  const base = process.env.WEB_UI_BASE_URL?.replace(/\/$/, '') ?? '';
-  return `${base}/gantry/${itemUid}`;
+  return `/gantry/${itemUid}`;
 }
 
 /**
