@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { PrismaService } from '../shared/prisma.service';
 import { DEFAULT_PIN_LIMIT, ROADMAP_ANALYTICS_EVENTS } from './roadmap.constants';
+import { toAdminPinList } from './roadmap-pin.util';
 import { RoadmapService } from './roadmap.service';
 
 type PinBody = z.infer<typeof PinRoadmapItemSchema>;
@@ -151,21 +152,9 @@ export class RoadmapPinsService {
       select: { uid: true, note: true, createdAt: true, releasedAt: true, ...pinnerMemberSelect },
     });
 
-    // Active pins first, then most recent.
-    pins.sort((a, b) => {
-      if (!a.releasedAt !== !b.releasedAt) return a.releasedAt ? 1 : -1;
-      return b.createdAt.getTime() - a.createdAt.getTime();
-    });
-
     return {
       total: pins.length,
-      pins: pins.map((pin) => ({
-        uid: pin.uid,
-        note: pin.note,
-        createdAt: pin.createdAt.toISOString(),
-        releasedAt: pin.releasedAt?.toISOString() ?? null,
-        member: this.toMemberSummary(pin.member),
-      })),
+      pins: toAdminPinList(pins),
     };
   }
 

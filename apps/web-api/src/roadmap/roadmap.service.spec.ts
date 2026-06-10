@@ -127,9 +127,57 @@ describe('RoadmapService', () => {
   });
 
   describe('getItem', () => {
+    const row = {
+      ...baseItem,
+      createdBy: { uid: 'creator-1', name: 'A', image: null },
+      promotedBy: null,
+      objective: null,
+      _count: { upvotes: 0, pins: 0 },
+    };
+
     it('throws NotFound when item missing', async () => {
       prisma.roadmapItem.findFirst.mockResolvedValue(null);
       await expect(service.getItem('missing', 'member-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('embeds the pinner list (incl. released) for curators', async () => {
+      accessControl.getMemberAccess.mockResolvedValue({
+        effectivePermissions: ['roadmap.item.curate'],
+      });
+      prisma.roadmapItem.findFirst.mockResolvedValue(row);
+      prisma.roadmapItemPin.findMany.mockResolvedValue([
+        {
+          uid: 'pin-old',
+          note: 'old',
+          createdAt: new Date('2026-01-01'),
+          releasedAt: new Date('2026-02-01'),
+          member: { uid: 'm1', name: 'M1', image: null },
+        },
+        {
+          uid: 'pin-new',
+          note: 'blocking',
+          createdAt: new Date('2026-03-01'),
+          releasedAt: null,
+          member: { uid: 'admin-1', name: 'Admin', image: { url: 'http://img' } },
+        },
+      ]);
+
+      const result = await service.getItem('item-1', 'admin-1');
+
+      expect(result.pins).toHaveLength(2);
+      expect(result.pins?.[0]).toMatchObject({ uid: 'pin-new', note: 'blocking', member: { name: 'Admin' } });
+      expect(result.pins?.[1].releasedAt).not.toBeNull();
+      expect(result.pinCount).toBe(1); // active pins only (IDEA is pinnable)
+      expect(result.viewerHasPinned).toBe(true); // admin-1 holds the active pin
+      expect(result.viewerPinNote).toBe('blocking');
+    });
+
+    it('returns pins as null for non-curators', async () => {
+      prisma.roadmapItem.findFirst.mockResolvedValue(row);
+
+      const result = await service.getItem('item-1', 'member-1');
+
+      expect(result.pins).toBeNull();
     });
   });
 
