@@ -606,7 +606,7 @@ const TeamPitchDetailPage = () => {
 
                       {activeTab === 'investors' && (
                         <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                          {canMutateTeamPitches && (
+                          {canMutateTeamPitches && false && (
                             <button
                               type="button"
                               className="text-sm font-medium text-blue-600 hover:text-blue-800"
