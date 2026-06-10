@@ -306,11 +306,13 @@ export class AdminTeamsController {
    * Manually run the VLM logo verification job over every eligible team
    * right now, instead of waiting for the next `LOGO_VERIFICATION_CRON`
    * tick. Same pipeline as the cron — fetches teams via
-   * `LogoVerificationPersistenceService.getTeamsForVerification` (priority
-   * 1–3, non-fund, has logo, has `TeamEnrichment`), iterates in chunks of
-   * `LOGO_VERIFICATION_BATCH_SIZE`, calls the VLM per team, and writes the
-   * verdict to `TeamLogoVerificationResult` (with auto-promotion to
-   * `Team.logo` when verdict='verified' + confidence='high').
+   * `LogoVerificationPersistenceService.getTeamsForVerification` (any team
+   * with an enriched logo candidate on `TeamEnrichment.logoUid`, falling back
+   * to `Team.logoUid`; no priority / isFund gating — the enrichment logo is
+   * the source of truth), iterates in chunks of `LOGO_VERIFICATION_BATCH_SIZE`,
+   * calls the VLM per team, and writes the verdict to
+   * `TeamLogoVerificationResult` (with auto-promotion to `Team.logo` when
+   * verdict='verified' + confidence='high').
    *
    * Does NOT require `IS_LOGO_VERIFICATION_ENABLED` to be true — that env
    * gates the scheduled cron, not on-demand admin triggers. Will block the
