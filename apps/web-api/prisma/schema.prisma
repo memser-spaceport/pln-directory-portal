@@ -2842,6 +2842,7 @@ model RoadmapObjective {
   id           Int           @id @default(autoincrement())
   uid          String        @unique @default(cuid())
   title        String        @unique
+  order        Int           @unique @default(autoincrement())
   createdByUid String?
   createdBy    Member?       @relation("roadmapObjectiveCreatedBy", fields: [createdByUid], references: [uid])
   createdAt    DateTime      @default(now())

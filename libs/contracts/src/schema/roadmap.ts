@@ -54,6 +54,16 @@ export const RoadmapMemberSummarySchema = z.object({
 export const RoadmapObjectiveRefSchema = z.object({
   uid: z.string(),
   title: z.string(),
+  order: z.number().int(),
+});
+
+export const RoadmapItemPinEntrySchema = z.object({
+  uid: z.string(),
+  note: z.string().nullable(),
+  createdAt: z.string(),
+  /** Non-null for historical pins auto-returned on a stage transition. */
+  releasedAt: z.string().nullable(),
+  member: RoadmapMemberSummarySchema,
 });
 
 export const RoadmapItemSchema = z.object({
@@ -79,6 +89,8 @@ export const RoadmapItemSchema = z.object({
   pinCount: z.number().int(),
   viewerHasPinned: z.boolean(),
   viewerPinNote: z.string().nullable(),
+  /** Pinner identities + notes; only populated for curators, null for everyone else. */
+  pins: z.array(RoadmapItemPinEntrySchema).nullable(),
   deletedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -170,16 +182,7 @@ export const RoadmapPinBalanceSchema = RoadmapPinBalanceSummarySchema.extend({
 
 export const RoadmapItemPinnersResponseSchema = z.object({
   total: z.number().int(),
-  pins: z.array(
-    z.object({
-      uid: z.string(),
-      note: z.string().nullable(),
-      createdAt: z.string(),
-      /** Non-null for historical pins auto-returned on a stage transition. */
-      releasedAt: z.string().nullable(),
-      member: RoadmapMemberSummarySchema,
-    })
-  ),
+  pins: z.array(RoadmapItemPinEntrySchema),
 });
 
 export const RoadmapItemUpvotersResponseSchema = z.object({
@@ -217,6 +220,8 @@ export const ReorderRoadmapItemsResponseSchema = z.object({
 export const RoadmapObjectiveSchema = z.object({
   uid: z.string(),
   title: z.string(),
+  /** Auto-assigned on creation, unique, ascending; used to sort objective lists/chips. */
+  order: z.number().int(),
   itemCount: z.number().int(),
   createdAt: z.string(),
 });

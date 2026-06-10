@@ -20,13 +20,14 @@ export class RoadmapObjectivesService {
 
   async listObjectives() {
     const rows = await this.prisma.roadmapObjective.findMany({
-      orderBy: { title: 'asc' },
+      orderBy: { order: 'asc' },
       include: { _count: { select: { items: true } } },
     });
     return {
       objectives: rows.map((row) => ({
         uid: row.uid,
         title: row.title,
+        order: row.order,
         itemCount: row._count.items,
         createdAt: row.createdAt.toISOString(),
       })),
@@ -45,6 +46,7 @@ export class RoadmapObjectivesService {
     return {
       uid: objective.uid,
       title: objective.title,
+      order: objective.order,
       itemCount,
       createdAt: objective.createdAt.toISOString(),
     };
