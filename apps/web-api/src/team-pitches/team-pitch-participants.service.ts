@@ -1,14 +1,17 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MemberApprovalState, TeamPitchParticipantType } from '@prisma/client';
+import { MemberApprovalState, Prisma, Team, TeamPitchParticipantType } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { upsertPolicyAssignmentByCode } from '../demo-days/demo-day-investor-policy.util';
 import { defaultAccessForParticipantType } from './team-pitch.utils';
+import { InvestorBulkProvisionService } from '../investors/investor-bulk-provision.service';
+import { InvestorBulkRowResult, InvestorBulkSummary } from '../investors/investor-bulk.types';
 @Injectable()
 export class TeamPitchParticipantsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notificationServiceClient: NotificationServiceClient
+    private readonly notificationServiceClient: NotificationServiceClient,
+    private readonly investorBulkProvisionService: InvestorBulkProvisionService
   ) {}
 
   async listParticipants(pitchUid: string, type?: TeamPitchParticipantType) {
@@ -169,7 +172,7 @@ export class TeamPitchParticipantsService {
   async updateParticipant(
     pitchUid: string,
     participantUid: string,
-    data: { type?: TeamPitchParticipantType; access?: 'VIEW' | 'EDIT' | 'RESTRICTED' }
+    data: { type?: TeamPitchParticipantType; access?: 'VIEW' | 'VIEW_ADMIN' | 'EDIT' | 'RESTRICTED' }
   ) {
     const participant = await this.prisma.teamPitchParticipant.findFirst({
       where: { uid: participantUid, teamPitchUid: pitchUid },
@@ -278,8 +281,184 @@ export class TeamPitchParticipantsService {
     return { success: true };
   }
 
-  private async setApproveOnLoginForUnapprovedInvestor(memberUid: string): Promise<void> {
-    const member = await this.prisma.member.findUnique({
+  async addInvestorParticipantsBulk(
+    pitchUid: string,
+    data: {
+      participants: Array<{
+        email: string;
+        name: string;
+        organization?: string | null;
+        organizationEmail?: string | null;
+        twitterHandler?: string | null;
+        linkedinHandler?: string | null;
+        telegramHandler?: string | null;
+        role?: string | null;
+        investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
+        typicalCheckSize?: number | null;
+        investInStartupStages?: string[] | null;
+        secRulesAccepted?: boolean | null;
+        makeTeamLead?: boolean;
+      }>;
+    }
+  ): Promise<{ summary: InvestorBulkSummary; rows: InvestorBulkRowResult[] }> {
+    const pitch = await this.prisma.teamPitch.findUnique({ where: { uid: pitchUid } });
+    if (!pitch) {
+      throw new NotFoundException('Team pitch not found');
+    }
+
+    const summary: InvestorBulkSummary = {
+      total: data.participants.length,
+      createdUsers: 0,
+      updatedUsers: 0,
+      createdTeams: 0,
+      updatedMemberships: 0,
+      promotedToLead: 0,
+      errors: 0,
+    };
+
+    const rows: InvestorBulkRowResult[] = [];
+    const emails = data.participants.map((p) => p.email);
+
+    const existingMembers = await this.prisma.member.findMany({
+      where: { email: { in: emails } },
+      include: {
+        investorProfile: true,
+        teamMemberRoles: {
+          include: { team: true },
+        },
+        teamPitchParticipants: {
+          where: { teamPitchUid: pitchUid },
+        },
+      },
+    });
+
+    const existingMembersByEmail = new Map(existingMembers.map((m) => [m.email, m]));
+    const existingParticipantEmails = new Set(
+      existingMembers.filter((m) => m.teamPitchParticipants.length > 0).map((m) => m.email)
+    );
+
+    const teamCache = new Map<string, Team>();
+    const telegramOwnerCache = new Map<string, string | null>();
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const participantData of data.participants) {
+        try {
+          const willBeTeamLead = participantData.organization
+            ? typeof participantData.makeTeamLead === 'boolean'
+              ? participantData.makeTeamLead
+              : true
+            : false;
+
+          const rowResult: InvestorBulkRowResult = {
+            email: participantData.email,
+            name: participantData.name,
+            organization: participantData.organization,
+            organizationEmail: participantData.organizationEmail,
+            twitterHandler: this.investorBulkProvisionService.normalizeTwitterHandler(participantData.twitterHandler),
+            linkedinHandler: this.investorBulkProvisionService.normalizeLinkedinHandler(
+              participantData.linkedinHandler
+            ),
+            telegramHandler: this.investorBulkProvisionService.normalizeTelegramHandler(
+              participantData.telegramHandler
+            ),
+            role: participantData.role,
+            investmentType: participantData.investmentType,
+            typicalCheckSize: participantData.typicalCheckSize,
+            investInStartupStages: participantData.investInStartupStages,
+            secRulesAccepted: participantData.secRulesAccepted,
+            makeTeamLead: participantData.makeTeamLead,
+            willBeTeamLead,
+            status: 'success',
+          };
+
+          if (existingParticipantEmails.has(participantData.email)) {
+            rowResult.status = 'error';
+            rowResult.message = 'Participant already exists for this team pitch';
+            rows.push(rowResult);
+            summary.errors++;
+            continue;
+          }
+
+          const existingMember = existingMembersByEmail.get(participantData.email);
+          const provisioned = await this.investorBulkProvisionService.provisionInvestorFromBulkRow(
+            tx,
+            participantData,
+            existingMember,
+            { teamCache, telegramOwnerCache },
+            {
+              useApproveOnLogin: true,
+              memberCreationReason: 'Auto-created for team pitch participant',
+            }
+          );
+
+          summary.createdUsers += provisioned.summaryDelta.createdUsers;
+          summary.updatedUsers += provisioned.summaryDelta.updatedUsers;
+          summary.createdTeams += provisioned.summaryDelta.createdTeams;
+          summary.updatedMemberships += provisioned.summaryDelta.updatedMemberships;
+          summary.promotedToLead += provisioned.summaryDelta.promotedToLead;
+
+          if (!provisioned.isNewUser) {
+            await this.setApproveOnLoginForUnapprovedInvestor(provisioned.memberUid, tx);
+          }
+
+          await upsertPolicyAssignmentByCode(tx, provisioned.memberUid, 'investor_pl');
+
+          await tx.teamPitchParticipant.create({
+            data: {
+              teamPitchUid: pitchUid,
+              memberUid: provisioned.memberUid,
+              type: 'INVESTOR',
+              access: 'VIEW',
+              teamUid: null,
+            },
+          });
+
+          existingParticipantEmails.add(participantData.email);
+
+          rowResult.userId = provisioned.memberUid;
+          rowResult.teamId = provisioned.orgTeamUid;
+          rowResult.twitterHandler = provisioned.normalizedTwitter;
+          rowResult.linkedinHandler = provisioned.normalizedLinkedin;
+          rowResult.telegramHandler = provisioned.normalizedTelegram;
+          rowResult.willBeTeamLead = provisioned.willBeTeamLead;
+
+          rows.push(rowResult);
+        } catch (error) {
+          summary.errors++;
+          rows.push({
+            email: participantData.email,
+            name: participantData.name,
+            organization: participantData.organization,
+            organizationEmail: participantData.organizationEmail,
+            twitterHandler: this.investorBulkProvisionService.normalizeTwitterHandler(participantData.twitterHandler),
+            linkedinHandler: this.investorBulkProvisionService.normalizeLinkedinHandler(
+              participantData.linkedinHandler
+            ),
+            telegramHandler: this.investorBulkProvisionService.normalizeTelegramHandler(
+              participantData.telegramHandler
+            ),
+            role: participantData.role,
+            investmentType: participantData.investmentType,
+            typicalCheckSize: participantData.typicalCheckSize,
+            investInStartupStages: participantData.investInStartupStages,
+            secRulesAccepted: participantData.secRulesAccepted,
+            makeTeamLead: participantData.makeTeamLead,
+            willBeTeamLead: participantData.organization ? true : participantData.makeTeamLead || false,
+            status: 'error',
+            message: error instanceof Error ? error.message : 'Unknown error occurred',
+          });
+        }
+      }
+    });
+
+    return { summary, rows };
+  }
+
+  private async setApproveOnLoginForUnapprovedInvestor(
+    memberUid: string,
+    db: PrismaService | Prisma.TransactionClient = this.prisma
+  ): Promise<void> {
+    const member = await db.member.findUnique({
       where: { uid: memberUid },
       select: {
         approveOnLogin: true,
@@ -296,14 +475,14 @@ export class TeamPitchParticipantsService {
     }
 
     if (!member.memberApproval) {
-      await this.prisma.memberApproval.create({
+      await db.memberApproval.create({
         data: {
           memberUid,
           state: MemberApprovalState.PENDING,
           reason: 'Team pitch investor participant added',
         },
       });
-      await this.prisma.member.update({
+      await db.member.update({
         where: { uid: memberUid },
         data: { approveOnLogin: true },
       });
@@ -314,7 +493,7 @@ export class TeamPitchParticipantsService {
       return;
     }
 
-    await this.prisma.member.update({
+    await db.member.update({
       where: { uid: memberUid },
       data: { approveOnLogin: true },
     });

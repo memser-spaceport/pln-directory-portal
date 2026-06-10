@@ -1,5 +1,20 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Req, UseGuards, UsePipes } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Req,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+  UsePipes,
+} from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
@@ -127,6 +142,46 @@ export class TeamPitchesController {
   @NoCache()
   async confirmOnePager(@Param('slugOrUid') slugOrUid: string, @Req() req, @Body() body: { uploadUid: string }) {
     return this.teamPitchProfilesService.confirmOnePagerUpload(req.userEmail, slugOrUid, body.uploadUid);
+  }
+
+  @Post(':slugOrUid/profile/one-pager/preview')
+  @UseGuards(UserTokenValidation)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        previewImage: { type: 'string', format: 'binary' },
+        previewImageSmall: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'previewImage', maxCount: 1 },
+      { name: 'previewImageSmall', maxCount: 1 },
+    ])
+  )
+  @NoCache()
+  async uploadOnePagerPreview(
+    @Param('slugOrUid') slugOrUid: string,
+    @Req() req,
+    @UploadedFiles()
+    files: {
+      previewImage?: Express.Multer.File[];
+      previewImageSmall?: Express.Multer.File[];
+    }
+  ) {
+    if (!files.previewImage?.[0]) {
+      throw new Error('previewImage is required');
+    }
+
+    return this.teamPitchProfilesService.uploadOnePagerPreview(
+      req.userEmail,
+      slugOrUid,
+      files.previewImage[0],
+      files.previewImageSmall?.[0]
+    );
   }
 
   @Post(':slugOrUid/express-interest')

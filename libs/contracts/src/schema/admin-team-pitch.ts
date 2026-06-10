@@ -1,5 +1,6 @@
 import { createZodDto } from '@abitia/zod-dto';
 import { z } from 'zod';
+import { AddParticipantsBulkSchema, ResponseBulkParticipantsSchema } from './admin-demo-day';
 
 export const CreateTeamPitchSchema = z.object({
   teamUid: z.string().min(1),
@@ -7,7 +8,7 @@ export const CreateTeamPitchSchema = z.object({
   description: z.string().min(1),
   slug: z.string().min(1).optional(),
   status: z.enum(['DRAFT', 'OPEN', 'CLOSED']).optional(),
-  supportEmail: z.string().email(),
+  supportEmail: z.string().email().optional().nullable(),
   headerImageUid: z.string().optional().nullable(),
   logoUid: z.string().optional().nullable(),
   primaryColor: z
@@ -24,7 +25,7 @@ export const UpdateTeamPitchSchema = z.object({
   description: z.string().min(1).optional(),
   slug: z.string().min(1).optional(),
   status: z.enum(['DRAFT', 'OPEN', 'CLOSED']).optional(),
-  supportEmail: z.string().email().optional(),
+  supportEmail: z.string().email().optional().nullable(),
   headerImageUid: z.string().optional().nullable(),
   logoUid: z.string().optional().nullable(),
   primaryColor: z
@@ -51,7 +52,7 @@ export class AddTeamPitchParticipantDto extends createZodDto(AddTeamPitchPartici
 
 export const UpdateTeamPitchParticipantSchema = z.object({
   type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']).optional(),
-  access: z.enum(['VIEW', 'EDIT', 'RESTRICTED']).optional(),
+  access: z.enum(['VIEW', 'VIEW_ADMIN', 'EDIT', 'RESTRICTED']).optional(),
 });
 
 export class UpdateTeamPitchParticipantDto extends createZodDto(UpdateTeamPitchParticipantSchema) {}
@@ -68,3 +69,12 @@ export const GetTeamPitchParticipantsQuerySchema = z.object({
 });
 
 export class GetTeamPitchParticipantsQueryDto extends createZodDto(GetTeamPitchParticipantsQuerySchema) {}
+
+export const AddTeamPitchParticipantsBulkSchema = z.object({
+  participants: AddParticipantsBulkSchema.shape.participants.max(50),
+});
+
+export class AddTeamPitchParticipantsBulkDto extends createZodDto(AddTeamPitchParticipantsBulkSchema) {}
+
+export { ResponseBulkParticipantsSchema as ResponseTeamPitchParticipantsBulkSchema };
+export class ResponseTeamPitchParticipantsBulkDto extends createZodDto(ResponseBulkParticipantsSchema) {}

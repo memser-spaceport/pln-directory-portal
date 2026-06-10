@@ -1,3 +1,16 @@
+export const DEFAULT_TEAM_PITCH_SUPPORT_EMAIL = 'pldemoday@protocol.ai';
+
+export function resolveTeamPitchSupportEmail(supportEmail?: string | null): string {
+  const trimmed = supportEmail?.trim();
+  if (trimmed) {
+    return trimmed;
+  }
+
+  return (
+    process.env.LABOS_SUPPORT_EMAIL?.trim() || process.env.DEMO_DAY_EMAIL?.trim() || DEFAULT_TEAM_PITCH_SUPPORT_EMAIL
+  );
+}
+
 export function toKebabSlug(value: string): string {
   return value
     .trim()
@@ -7,6 +20,8 @@ export function toKebabSlug(value: string): string {
     .slice(0, 80);
 }
 
-export function defaultAccessForParticipantType(type: 'FOUNDER' | 'INVESTOR' | 'SUPPORT'): 'VIEW' | 'EDIT' {
+export function defaultAccessForParticipantType(
+  type: 'FOUNDER' | 'INVESTOR' | 'SUPPORT'
+): 'VIEW' | 'VIEW_ADMIN' | 'EDIT' {
   return type === 'FOUNDER' ? 'EDIT' : 'VIEW';
 }

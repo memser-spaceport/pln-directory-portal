@@ -4,337 +4,39 @@ import { useQueryClient } from '@tanstack/react-query';
 import Modal from '../modal/modal';
 import { useCookie } from 'react-use';
 import { useAddInvestorParticipantsBulk } from '../../hooks/demo-days/useAddInvestorParticipantsBulk';
+import { useAddTeamPitchParticipantsBulk } from '../../hooks/team-pitches/useAddTeamPitchParticipantsBulk';
 import { BulkParticipantsResponse } from '../../screens/demo-days/types/demo-day';
 import UploadParticipantsResultModal from './UploadParticipantsResultModal';
 import { DemoDaysQueryKeys } from '../../hooks/demo-days/constants/queryKeys';
+import { TeamPitchesQueryKeys } from '../../hooks/team-pitches/constants/queryKeys';
 import clsx from 'clsx';
+import {
+  INVESTOR_CSV_CHUNK_SIZE,
+  INVESTOR_CSV_ITEMS_PER_PAGE,
+  INVESTOR_CSV_MAX_PARTICIPANTS,
+  ParsedInvestorParticipant,
+  downloadInvestorCsvTemplate,
+  parseInvestorCsv,
+  revalidateParsedInvestorParticipant,
+  toInvestorParticipantsForApi,
+} from '../../utils/investor-csv';
 
 interface UploadParticipantsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  demoDayUid: string;
+  demoDayUid?: string;
+  pitchUid?: string;
 }
 
-interface ParsedParticipant {
-  email: string;
-  name: string;
-  organization?: string;
-  organizationEmail?: string;
-  twitterHandler?: string | null;
-  linkedinHandler?: string | null;
-  telegramHandler?: string | null;
-  role?: string | null;
-  investmentType?: 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null;
-  typicalCheckSize?: number | null;
-  investInStartupStages?: string[] | null;
-  secRulesAccepted?: boolean | null;
-  makeTeamLead?: boolean;
-  willBeTeamLead?: boolean; // computed field for preview
-  errors?: string[];
-}
-
-// Header aliases for normalization
-const headerAliases = {
-  email: ['email', 'e-mail', 'email_address'],
-  name: ['name', 'full_name', 'investor_name', 'participant_name'],
-  twitter_handler: ['x', 'x_handle', 'twitter', 'twitter_handle', 'x_username', 'twitter_handler'],
-  linkedin_handler: ['linkedin', 'linkedin_handle', 'linkedin_url', 'linkedin_profile', 'linkedin_handler'],
-  telegram_handler: ['telegram_handler', 'telegram', 'telegram_handle', 'tg'],
-  role: ['role', 'organization_role', 'fund_role', 'organization/fund_role', 'team_role'],
-  investment_type: ['type', 'investment_type', 'invest_type', 'investor_type', 'how_do_you_invest'],
-  typical_check_size: ['typical_check_size', 'check_size'],
-  invest_in_startup_stages: ['investment_stages', 'invest_in_startup_stages'],
-  sec_rules_accepted: [
-    'sec_rules_accepted',
-    't&c',
-    't_&_c',
-    'terms_and_conditions',
-    'terms_&_conditions',
-    'terms&conditions',
-  ],
-  organization: [
-    'organization_fund_name',
-    'organization/fund_name',
-    'organization_/_fund_name',
-    'organisation_/_fund_name',
-    'organisation/fund_name',
-    'organisation_fund_name',
-    'org_fund_name',
-    'org/fund_name',
-    'org_/_fund_name',
-    'organization',
-    'organization_name',
-    'org',
-    'org_name',
-    'team',
-    'team_name',
-    'fund',
-    'fund_name',
-    'company',
-  ],
-  organization_email: [
-    'organization_email',
-    'organization_fund_email',
-    'organization/fund_email',
-    'organization_/_fund_email',
-    'org_fund_email',
-    'org/fund_email',
-    'org_/_fund_email',
-    'fund_email',
-    'fundemail',
-    'org_email',
-    'team_email',
-    'contact_email',
-    'organizationemail',
-  ],
-  team_lead: ['make_team_lead', 'is_team_lead', 'team_lead', 'lead', 'add_as_team_lead', 'team_lead_flag'],
-};
-
-const normalizeHeader = (header: string): string => {
-  // Normalize: lowercase, trim, replace spaces/dashes/dots with underscore
-  const normalized = header
-    .toLowerCase()
-    .trim()
-    .replace(/[\s-.]/g, '_');
-
-  // Find matching field based on aliases
-  for (const [field, aliases] of Object.entries(headerAliases)) {
-    if (aliases.includes(normalized)) {
-      return field;
-    }
-  }
-  return normalized;
-};
-
-const normalizeXHandle = (value: string): string => {
-  if (!value) return '';
-  // Extract username from @user, user, or https://x.com/user → store "user"
-  const match = value.match(/@?([a-zA-Z0-9_]+)/) || value.match(/x\.com\/([a-zA-Z0-9_]+)/);
-  return match ? match[1] : value.trim();
-};
-
-const normalizeLinkedInHandle = (value: string): string => {
-  if (!value) return '';
-  // Extract username from user, in/user, or full LinkedIn URL → store "user"
-  const match = value.match(/(?:linkedin\.com\/in\/|in\/)([a-zA-Z0-9-]+)/) || value.match(/^([a-zA-Z0-9-]+)$/);
-  return match ? match[1] : value.trim();
-};
-
-const parseBoolean = (value: string): boolean => {
-  if (!value) return false;
-  const normalized = String(value).toLowerCase().trim();
-  return ['true', '1', 'yes', 'y'].includes(normalized);
-};
-
-const normalizeTelegramHandle = (value: string): string => {
-  if (!value) return '';
-  // Extract username from @user, user, or https://t.me/user → store "user"
-  const match = value.match(/@?([a-zA-Z0-9_]+)/) || value.match(/t\.me\/([a-zA-Z0-9_]+)/);
-  return match ? match[1] : value.trim();
-};
-
-const parseInvestmentType = (value: string): 'ANGEL' | 'FUND' | 'ANGEL_AND_FUND' | null => {
-  if (!value) return null;
-  const normalized = String(value).toLowerCase().trim();
-
-  // ANGEL mappings
-  if (['angel', 'i angel invest', 'angel invest'].includes(normalized)) {
-    return 'ANGEL';
-  }
-
-  // FUND mappings
-  if (['fund', 'i invest through fund(s)', 'i invest thru fund(s)'].includes(normalized)) {
-    return 'FUND';
-  }
-
-  // ANGEL_AND_FUND mappings
-  if (
-    [
-      'angel_and_fund',
-      'angel and fund',
-      'angel+fund',
-      'i angel invest + invest through fund(s)',
-      'i angel invest + i invest thru fund(s)',
-    ].includes(normalized)
-  ) {
-    return 'ANGEL_AND_FUND';
-  }
-
-  return null;
-};
-
-const parseNumber = (value: string): number | null => {
-  if (!value) return null;
-  const parsed = parseFloat(String(value).trim());
-  return isNaN(parsed) ? null : parsed;
-};
-
-const parseArrayFromPipe = (value: string): string[] | null => {
-  if (!value) return null;
-  return String(value)
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-};
-
-const validateEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-// Proper CSV parser that handles quoted values and commas within quotes
-const parseCSVLine = (line: string): string[] => {
-  const fields: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  let i = 0;
-
-  while (i < line.length) {
-    const char = line[i];
-    const nextChar = line[i + 1];
-
-    if (char === '"') {
-      if (inQuotes && nextChar === '"') {
-        // Escaped quote - add single quote and skip next character
-        current += '"';
-        i += 2;
-      } else {
-        // Toggle quote state
-        inQuotes = !inQuotes;
-        i++;
-      }
-    } else if (char === ',' && !inQuotes) {
-      // Field separator outside of quotes
-      fields.push(current);
-      current = '';
-      i++;
-    } else {
-      current += char;
-      i++;
-    }
-  }
-
-  // Add the last field
-  fields.push(current);
-
-  return fields;
-};
-
-const parseCSV = (csvContent: string): { participants: ParsedParticipant[]; errors: string[] } => {
-  const lines = csvContent.split('\n').filter((line) => line.trim());
-  const errors: string[] = [];
-
-  if (lines.length === 0) {
-    errors.push('CSV file is empty');
-    return { participants: [], errors };
-  }
-
-  if (lines.length < 2) {
-    errors.push('CSV must contain at least a header row and one data row');
-    return { participants: [], errors };
-  }
-
-  // Parse headers using proper CSV parser
-  const rawHeaders = parseCSVLine(lines[0]).map((h) => h.trim().replace(/"/g, ''));
-  const normalizedHeaders = rawHeaders.map(normalizeHeader);
-
-  // Check for required email column
-  const emailIndex = normalizedHeaders.indexOf('email');
-  if (emailIndex === -1) {
-    errors.push('CSV must contain an "email" column');
-    return { participants: [], errors };
-  }
-
-  // Get column indices
-  const nameIndex = normalizedHeaders.indexOf('name');
-  const organizationIndex = normalizedHeaders.indexOf('organization');
-  const organizationEmailIndex = normalizedHeaders.indexOf('organization_email');
-  const twitterHandlerIndex = normalizedHeaders.indexOf('twitter_handler');
-  const linkedinHandlerIndex = normalizedHeaders.indexOf('linkedin_handler');
-  const telegramHandlerIndex = normalizedHeaders.indexOf('telegram_handler');
-  const roleIndex = normalizedHeaders.indexOf('role');
-  const investmentTypeIndex = normalizedHeaders.indexOf('investment_type');
-  const typicalCheckSizeIndex = normalizedHeaders.indexOf('typical_check_size');
-  const investInStartupStagesIndex = normalizedHeaders.indexOf('invest_in_startup_stages');
-  const secRulesAcceptedIndex = normalizedHeaders.indexOf('sec_rules_accepted');
-  const makeTeamLeadIndex = normalizedHeaders.indexOf('team_lead');
-
-  const participants: ParsedParticipant[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseCSVLine(lines[i]).map((v) => v.trim().replace(/"/g, ''));
-    const rowErrors: string[] = [];
-
-    // Parse email (required)
-    const email = values[emailIndex]?.trim().toLowerCase() || '';
-    if (!email) {
-      rowErrors.push('Email is required');
-    } else if (!validateEmail(email)) {
-      rowErrors.push('Invalid email format');
-    }
-
-    // Parse name (required)
-    const name = values[nameIndex]?.trim() || '';
-    if (!name) {
-      rowErrors.push('Name is required');
-    }
-
-    // Parse optional fields
-    const organization = values[organizationIndex]?.trim() || undefined;
-    const organizationEmail = values[organizationEmailIndex]?.trim() || undefined;
-    const twitterHandler =
-      twitterHandlerIndex >= 0 ? normalizeXHandle(values[twitterHandlerIndex] || '') || undefined : undefined;
-    const linkedinHandler =
-      linkedinHandlerIndex >= 0 ? normalizeLinkedInHandle(values[linkedinHandlerIndex] || '') || undefined : undefined;
-    const telegramHandler =
-      telegramHandlerIndex >= 0 ? normalizeTelegramHandle(values[telegramHandlerIndex] || '') || undefined : undefined;
-    const role = values[roleIndex]?.trim() || undefined;
-    const investmentType =
-      investmentTypeIndex >= 0 ? parseInvestmentType(values[investmentTypeIndex] || '') : undefined;
-    const typicalCheckSize = typicalCheckSizeIndex >= 0 ? parseNumber(values[typicalCheckSizeIndex] || '') : undefined;
-    const investInStartupStages =
-      investInStartupStagesIndex >= 0 ? parseArrayFromPipe(values[investInStartupStagesIndex] || '') : undefined;
-    const secRulesAccepted = secRulesAcceptedIndex >= 0 ? parseBoolean(values[secRulesAcceptedIndex] || '') : undefined;
-
-    const makeTeamLead =
-      makeTeamLeadIndex >= 0
-        ? !values[makeTeamLeadIndex]
-          ? true
-          : parseBoolean(values[makeTeamLeadIndex] || '')
-        : true;
-
-    // Compute willBeTeamLead for preview
-    const willBeTeamLead = Boolean(organization || makeTeamLead);
-
-    // Only add participant if we have at least an email
-    if (email) {
-      participants.push({
-        email,
-        name,
-        organization,
-        organizationEmail,
-        twitterHandler,
-        linkedinHandler,
-        telegramHandler,
-        role,
-        investmentType,
-        typicalCheckSize,
-        investInStartupStages,
-        secRulesAccepted,
-        makeTeamLead,
-        willBeTeamLead,
-        errors: rowErrors.length > 0 ? rowErrors : undefined,
-      });
-    }
-  }
-
-  return { participants, errors };
-};
-
-export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = ({ isOpen, onClose, demoDayUid }) => {
+export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = ({
+  isOpen,
+  onClose,
+  demoDayUid,
+  pitchUid,
+}) => {
   const queryClient = useQueryClient();
   const [authToken] = useCookie('plnadmin');
-  const [parsedParticipants, setParsedParticipants] = useState<ParsedParticipant[]>([]);
+  const [parsedParticipants, setParsedParticipants] = useState<ParsedInvestorParticipant[]>([]);
   const [error, setError] = useState<string>('');
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [uploadResult, setUploadResult] = useState<BulkParticipantsResponse | null>(null);
@@ -342,14 +44,16 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50;
-  const maxParticipants = 15000;
+  const itemsPerPage = INVESTOR_CSV_ITEMS_PER_PAGE;
+  const maxParticipants = INVESTOR_CSV_MAX_PARTICIPANTS;
 
   // Upload progress state
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
 
   const addInvestorParticipantsBulkMutation = useAddInvestorParticipantsBulk();
+  const addTeamPitchParticipantsBulkMutation = useAddTeamPitchParticipantsBulk();
+  const isTeamPitch = Boolean(pitchUid);
 
   // Pagination calculations
   const totalPages = Math.ceil(parsedParticipants.length / itemsPerPage);
@@ -371,7 +75,7 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
       reader.onload = (e) => {
         try {
           const csvContent = e.target?.result as string;
-          const { participants, errors } = parseCSV(csvContent);
+          const { participants, errors } = parseInvestorCsv(csvContent);
 
           // Check participant limit
           if (participants.length > maxParticipants) {
@@ -405,52 +109,11 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
     multiple: false,
   });
 
-  const downloadCSVTemplate = () => {
-    const headers = [
-      'email',
-      'name',
-      'organization_name',
-      'organization_email',
-      'x_handle',
-      'linkedin_handle',
-      'telegram_handler',
-      'role',
-      'investment_type',
-      'typical_check_size',
-      'investment_stages',
-      't&c',
-      'team_lead',
-    ];
-    const exampleRow = [
-      'investor@example.com',
-      'John Doe',
-      'Example Fund',
-      'contact@examplefund.com',
-      'johndoe',
-      'johndoe',
-      'johndoe',
-      'Lead',
-      'I invest through fund(s)',
-      '50000',
-      '"Pre-seed,Seed"',
-      'true',
-      'true',
-    ];
-    const csvContent = [headers.join(','), exampleRow.join(',')].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'participants_template.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const downloadCSVTemplate = () => downloadInvestorCsvTemplate();
 
   const handleSubmit = async () => {
     if (!authToken || parsedParticipants.length === 0) return;
+    if (!pitchUid && !demoDayUid) return;
 
     // Check participant limit
     if (parsedParticipants.length > maxParticipants) {
@@ -469,11 +132,9 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
     setUploadProgress({ current: 0, total: parsedParticipants.length });
 
     try {
-      // Transform participants to match API schema (remove computed fields)
-      const participantsForAPI = parsedParticipants.map(({ willBeTeamLead, errors, ...participant }) => participant);
+      const participantsForAPI = toInvestorParticipantsForApi(parsedParticipants);
 
-      // Split participants into chunks of 50
-      const chunkSize = 50;
+      const chunkSize = INVESTOR_CSV_CHUNK_SIZE;
       const chunks = [];
       for (let i = 0; i < participantsForAPI.length; i += chunkSize) {
         chunks.push(participantsForAPI.slice(i, i + chunkSize));
@@ -489,13 +150,22 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
 
         setUploadProgress({ current: nextProcessed, total: participantsForAPI.length });
 
-        const result = await addInvestorParticipantsBulkMutation.mutateAsync({
-          authToken,
-          demoDayUid,
-          data: {
-            participants: chunk,
-          },
-        });
+        let result: BulkParticipantsResponse;
+        if (isTeamPitch && pitchUid) {
+          result = await addTeamPitchParticipantsBulkMutation.mutateAsync({
+            authToken,
+            pitchUid,
+            data: { participants: chunk },
+          });
+        } else if (demoDayUid) {
+          result = await addInvestorParticipantsBulkMutation.mutateAsync({
+            authToken,
+            demoDayUid,
+            data: { participants: chunk },
+          });
+        } else {
+          continue;
+        }
 
         allResults.push(result);
 
@@ -517,9 +187,15 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
       };
 
       // Invalidate participants query only after all chunks are processed
-      queryClient.invalidateQueries({
-        queryKey: [DemoDaysQueryKeys.GET_DEMO_DAY_PARTICIPANTS, authToken, demoDayUid],
-      });
+      if (isTeamPitch) {
+        queryClient.invalidateQueries({
+          queryKey: [TeamPitchesQueryKeys.PARTICIPANTS, authToken, pitchUid],
+        });
+      } else {
+        queryClient.invalidateQueries({
+          queryKey: [DemoDaysQueryKeys.GET_DEMO_DAY_PARTICIPANTS, authToken, demoDayUid],
+        });
+      }
 
       // Show results modal
       setUploadResult(finalResult);
@@ -563,45 +239,11 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
 
   const updateParticipant = (
     index: number,
-    field: keyof Omit<ParsedParticipant, 'errors' | 'willBeTeamLead'>,
+    field: keyof Omit<ParsedInvestorParticipant, 'errors' | 'willBeTeamLead'>,
     value: string | boolean | number | string[] | null
   ) => {
     setParsedParticipants((prev) =>
-      prev.map((p, i) => {
-        if (i === index) {
-          const updated = { ...p, [field]: value };
-
-          // Re-validate the participant
-          const errors: string[] = [];
-
-          if (field === 'email' || !updated.email) {
-            const email = typeof value === 'string' && field === 'email' ? value.trim()?.toLowerCase() : updated.email;
-            if (!email) {
-              errors.push('Email is required');
-            } else if (!validateEmail(email)) {
-              errors.push('Invalid email format');
-            }
-            if (field === 'email') updated.email = email;
-          }
-
-          if (field === 'name' || !updated.name) {
-            const name = typeof value === 'string' && field === 'name' ? value.trim() : updated.name;
-            if (!name) {
-              errors.push('Name is required');
-            }
-            if (field === 'name') updated.name = name;
-          }
-
-          // Update computed willBeTeamLead
-          updated.willBeTeamLead = Boolean(updated.organization || updated.makeTeamLead);
-
-          // Update errors
-          updated.errors = errors.length > 0 ? errors : undefined;
-
-          return updated;
-        }
-        return p;
-      })
+      prev.map((p, i) => (i === index ? revalidateParsedInvestorParticipant(p, field, value) : p))
     );
   };
 
@@ -1216,13 +858,17 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
                 disabled={
                   isUploading ||
                   parsedParticipants.length === 0 ||
-                  parsedParticipants.some((p) => p.errors && p.errors.length > 0)
+                  parsedParticipants.some((p) => p.errors && p.errors.length > 0) ||
+                  addInvestorParticipantsBulkMutation.isPending ||
+                  addTeamPitchParticipantsBulkMutation.isPending
                 }
                 className={clsx(
                   'inline-flex items-center rounded-lg border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
                   isUploading ||
                     parsedParticipants.length === 0 ||
-                    parsedParticipants.some((p) => p.errors && p.errors.length > 0)
+                    parsedParticipants.some((p) => p.errors && p.errors.length > 0) ||
+                    addInvestorParticipantsBulkMutation.isPending ||
+                    addTeamPitchParticipantsBulkMutation.isPending
                     ? 'cursor-not-allowed bg-gray-400'
                     : 'bg-green-600 hover:bg-green-700'
                 )}

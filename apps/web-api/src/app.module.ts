@@ -220,6 +220,7 @@ export class AppModule {
         },
         { path: 'v1/admin/teams/tiers/upload', method: RequestMethod.POST },
         { path: 'v1/team-pitches/:slugOrUid/profile/one-pager', method: RequestMethod.PUT },
+        { path: 'v1/team-pitches/:slugOrUid/profile/one-pager/preview', method: RequestMethod.POST },
         { path: 'v1/team-pitches/:slugOrUid/profile/video', method: RequestMethod.PUT }
       )
       .forRoutes(

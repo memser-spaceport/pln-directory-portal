@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { TeamPitchParticipantType, UploadKind } from '@prisma/client';
+import { TeamPitchParticipantAccess, TeamPitchParticipantType, UploadKind } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { AwsService } from '../utils/aws/aws.service';
@@ -35,17 +35,23 @@ export class TeamPitchProfilesService {
     }
 
     if (pitch.status === 'DRAFT' && isInvestor && !resolved.isPitchAdmin) {
-      return {
-        uid: pitch.uid,
-        slug: pitch.slug,
-        status: pitch.status,
-        title: pitch.title,
-        team: {
-          uid: pitch.team.uid,
-          name: pitch.team.name,
-        },
-        teamProfile: null,
-      };
+      const canViewDraft =
+        resolved.participantAccess === TeamPitchParticipantAccess.VIEW_ADMIN ||
+        resolved.participantAccess === TeamPitchParticipantAccess.EDIT;
+
+      if (!canViewDraft) {
+        return {
+          uid: pitch.uid,
+          slug: pitch.slug,
+          status: pitch.status,
+          title: pitch.title,
+          team: {
+            uid: pitch.team.uid,
+            name: pitch.team.name,
+          },
+          teamProfile: null,
+        };
+      }
     }
 
     const teamProfile = await this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
@@ -364,6 +370,48 @@ export class TeamPitchProfilesService {
       where: { teamPitchUid: pitch.uid },
       data: { onePagerUploadUid: confirmedUpload.uid },
     });
+    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
+  }
+
+  async uploadOnePagerPreview(
+    memberEmail: string,
+    slugOrUid: string,
+    previewImage: Express.Multer.File,
+    previewImageSmall?: Express.Multer.File
+  ) {
+    const pitch = await this.getPitchForEdit(memberEmail, slugOrUid);
+    const profile = await this.prisma.teamPitchProfile.findUnique({
+      where: { teamPitchUid: pitch.uid },
+      include: { onePagerUpload: true },
+    });
+
+    if (!profile?.onePagerUpload) {
+      throw new BadRequestException('No one-pager upload found. Please upload a one-pager first.');
+    }
+
+    const [previewUpload, previewSmallUpload] = await Promise.all([
+      this.uploadsService.uploadGeneric({
+        file: previewImage,
+        kind: UploadKind.IMAGE,
+        scopeType: 'NONE',
+      }),
+      previewImageSmall
+        ? this.uploadsService.uploadGeneric({
+            file: previewImageSmall,
+            kind: UploadKind.IMAGE,
+            scopeType: 'NONE',
+          })
+        : Promise.resolve(),
+    ]);
+
+    await this.prisma.upload.update({
+      where: { uid: profile.onePagerUpload.uid },
+      data: {
+        previewImageUrl: previewUpload.url,
+        previewImageSmallUrl: previewSmallUpload?.url,
+      },
+    });
+
     return this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
   }
 }

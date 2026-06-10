@@ -30,7 +30,6 @@ const CreateTeamPitchPage = () => {
     slug: '',
     status: 'DRAFT',
     supportEmail: '',
-    primaryColor: '#1a45e6',
   });
 
   useEffect(() => {
@@ -250,41 +249,16 @@ const CreateTeamPitchPage = () => {
 
             <div>
               <label htmlFor="supportEmail" className="mb-2 block text-sm font-medium text-gray-700">
-                Support Email *
+                Support Email
               </label>
               <input
                 type="email"
                 id="supportEmail"
-                required
                 value={form.supportEmail}
                 onChange={(e) => setForm((f) => ({ ...f, supportEmail: e.target.value }))}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="support@example.com"
+                placeholder="Leave blank to use default support email"
               />
-            </div>
-
-            <div>
-              <label htmlFor="primaryColor" className="mb-2 block text-sm font-medium text-gray-700">
-                Primary Color
-              </label>
-              <div className="flex items-center gap-2">
-                <div
-                  className="h-8 w-8 flex-shrink-0 rounded border border-gray-300"
-                  style={{
-                    backgroundColor: /^#[0-9A-Fa-f]{6}$/.test(form.primaryColor) ? form.primaryColor : '#1a45e6',
-                  }}
-                  aria-hidden
-                />
-                <input
-                  type="text"
-                  id="primaryColor"
-                  value={form.primaryColor}
-                  onChange={(e) => setForm((f) => ({ ...f, primaryColor: e.target.value }))}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="#1a45e6"
-                  pattern="^#[0-9A-Fa-f]{6}$"
-                />
-              </div>
             </div>
 
             <div className="flex justify-end space-x-4">
