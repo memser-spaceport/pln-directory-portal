@@ -136,7 +136,7 @@ The Boost Signaling PRD (LabOS · Gantry, 2026-06-09) defines the target model:
   Submitted+Planned; In Progress likes returned; over-budget users grandfathered).
 - Team-authored **rank badges** (#1, #2…) on Planned/In Progress + OKR chips.
 - In-app notifications: new need submitted (group), boost returned (item →
-  In Progress), backed item shipped.
+  In Progress), backed item shipped, submitter's need shipped.
 
 **Implementation status**: the backend pin machinery is live (budget, notes, swap,
 release-on-commitment, balance endpoint, pinners list, trending sort, reorder,
@@ -155,14 +155,13 @@ are logged and never fail the underlying action. Copy lives in one place —
 the planned "pin"→"boost" wording swap is a one-file change. Links point at
 `/gantry/<uid>` (built by `itemDetailPath`).
 
-| Trigger | Recipients | Copy |
+| Trigger | Recipients | Title — Description |
 | --- | --- | --- |
-| New need submitted (IDEA only — curator direct-creates don't broadcast) | everyone holding `roadmap.view` or `roadmap.admin` (one permission-gated notification, not per-member fan-out) | New need: "{title}" — take a look, boost it if it matters to you. |
-| Item enters In Progress | each member whose pin was just auto-released | "{title}" is now in progress — your boost is back to spend. |
-| Item ships | every member who ever pinned it (released pins included, deduped; creator excluded — they get the dedicated line below) | "{title}" you backed just shipped 🎉 |
-| Idea promoted to roadmap | item creator | Your idea "{title}" is now on the roadmap. |
-| Idea declined | item creator | Your idea "{title}" was not taken forward. Reason: {reason} |
-| Item ships | item creator | "{title}" has shipped. |
+| New need submitted (IDEA only — curator direct-creates don't broadcast) | everyone holding `roadmap.view` or `roadmap.admin` (one permission-gated notification, not per-member fan-out) | New need: "{title}" — Take a look — boost it if it matters to you. |
+| Item enters In Progress | each member whose pin was just auto-released | "{title}" is now in progress — Your boost budget is back — spend it on what matters next. |
+| Item ships | every member who ever pinned it (released pins included, deduped; creator excluded — they get the dedicated line below) | "{title}" just shipped 🎉 — Something you boosted is now live. |
+| Item ships | original submitter | Your need "{title}" just shipped 🎉 — It's live now — go try it out. |
+| Need declined | original submitter | Your need "{title}" was not taken forward — Reason: {reason} |
 
 No double-fire on IN_PROGRESS → SHIPPED: pins are released exactly once (at
 IN_PROGRESS), so the boost-returned notification cannot repeat at SHIPPED. Moves to

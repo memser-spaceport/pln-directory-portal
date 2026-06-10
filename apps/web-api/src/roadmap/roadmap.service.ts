@@ -479,7 +479,6 @@ export class RoadmapService {
     }
 
     if (isPromoteTransition(existing.stage, to)) {
-      await this.notifyPromoted(row);
       await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_PROMOTED, actorUid, { itemUid: uid });
     } else if (to === RoadmapStage.SHIPPED) {
       await this.notifyShipped(row);
@@ -661,20 +660,22 @@ export class RoadmapService {
     };
   }
 
-  private async notifyPromoted(item: { uid: string; title: string; createdByUid: string }) {
-    await this.sendMemberNotification(item.createdByUid, ROADMAP_NOTIFICATION_COPY.ideaPromoted(item.title), item.uid);
-  }
-
   private async notifyDeclined(item: { uid: string; title: string; createdByUid: string }, reason: string) {
     await this.sendMemberNotification(
       item.createdByUid,
-      ROADMAP_NOTIFICATION_COPY.ideaDeclined(item.title, reason),
+      ROADMAP_NOTIFICATION_COPY.needDeclined(item.title, reason),
       item.uid
     );
   }
 
+  /** Trigger 4 — tell the original submitter their need shipped. */
   private async notifyShipped(item: { uid: string; title: string; createdByUid: string }) {
-    await this.sendMemberNotification(item.createdByUid, ROADMAP_NOTIFICATION_COPY.ideaShipped(item.title), item.uid);
+    await this.sendMemberNotification(
+      item.createdByUid,
+      ROADMAP_NOTIFICATION_COPY.needShipped(item.title),
+      item.uid,
+      'need_shipped'
+    );
   }
 
   /**
@@ -687,7 +688,7 @@ export class RoadmapService {
     try {
       await this.pushNotifications.create({
         category: PushNotificationCategory.GANTRY,
-        title: ROADMAP_NOTIFICATION_COPY.newSubmission(item.title),
+        ...ROADMAP_NOTIFICATION_COPY.newSubmission(item.title),
         link: itemDetailPath(item.uid),
         isPublic: false,
         requiredPermissions: [ROADMAP_PERMISSIONS.VIEW, ROADMAP_PERMISSIONS.ADMIN],
@@ -715,7 +716,7 @@ export class RoadmapService {
   /**
    * PRD §7 trigger 3 — tell everyone who ever pinned the item (released pins included,
    * deduped) that it shipped. The creator is excluded: they already get the dedicated
-   * "has shipped" notification from notifyShipped.
+   * need-shipped notification from notifyShipped.
    */
   private async notifyBackersShipped(item: { uid: string; title: string; createdByUid: string }) {
     try {
@@ -740,11 +741,16 @@ export class RoadmapService {
     }
   }
 
-  private async sendMemberNotification(recipientUid: string, title: string, itemUid: string, trigger?: string) {
+  private async sendMemberNotification(
+    recipientUid: string,
+    copy: { title: string; description: string },
+    itemUid: string,
+    trigger?: string
+  ) {
     try {
       await this.pushNotifications.create({
         category: PushNotificationCategory.GANTRY,
-        title,
+        ...copy,
         link: itemDetailPath(itemUid),
         recipientUid,
         isPublic: false,

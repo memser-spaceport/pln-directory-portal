@@ -51,15 +51,28 @@ export function itemDetailPath(itemUid: string): string {
 }
 
 /**
- * All user-facing roadmap notification copy lives here so a wording change
- * (e.g. the planned "pin" → "boost" rename) is a one-file swap. PRD §7 copy is
- * placeholder until the boost-signaling spec is final.
+ * All user-facing roadmap notification copy lives here so a wording change is a
+ * one-file swap. Each entry maps to the bell's title + description fields.
  */
 export const ROADMAP_NOTIFICATION_COPY = {
-  newSubmission: (title: string) => `New need: "${title}" — take a look, boost it if it matters to you.`,
-  boostReturned: (title: string) => `"${title}" is now in progress — your boost is back to spend.`,
-  backedItemShipped: (title: string) => `"${title}" you backed just shipped 🎉`,
-  ideaPromoted: (title: string) => `Your idea "${title}" is now on the roadmap.`,
-  ideaDeclined: (title: string, reason: string) => `Your idea "${title}" was not taken forward. Reason: ${reason}`,
-  ideaShipped: (title: string) => `"${title}" has shipped.`,
+  newSubmission: (title: string) => ({
+    title: `New need: "${title}"`,
+    description: 'Take a look — boost it if it matters to you.',
+  }),
+  boostReturned: (title: string) => ({
+    title: `"${title}" is now in progress`,
+    description: 'Your boost budget is back — spend it on what matters next.',
+  }),
+  backedItemShipped: (title: string) => ({
+    title: `"${title}" just shipped 🎉`,
+    description: 'Something you boosted is now live.',
+  }),
+  needShipped: (title: string) => ({
+    title: `Your need "${title}" just shipped 🎉`,
+    description: "It's live now — go try it out.",
+  }),
+  needDeclined: (title: string, reason: string) => ({
+    title: `Your need "${title}" was not taken forward`,
+    description: `Reason: ${reason}`,
+  }),
 } as const;

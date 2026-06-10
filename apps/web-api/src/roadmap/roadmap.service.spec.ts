@@ -320,7 +320,8 @@ describe('RoadmapService', () => {
         expect(pushNotifications.create).toHaveBeenCalledTimes(1);
         expect(pushNotifications.create).toHaveBeenCalledWith(
           expect.objectContaining({
-            title: 'New need: "Test" — take a look, boost it if it matters to you.',
+            title: 'New need: "Test"',
+            description: 'Take a look — boost it if it matters to you.',
             link: expect.stringContaining('/gantry/item-1'),
             requiredPermissions: ['roadmap.view', 'roadmap.admin'],
             isPublic: false,
@@ -359,14 +360,14 @@ describe('RoadmapService', () => {
 
         await service.transitionItem('item-1', { stage: 'IN_PROGRESS' }, 'curator-1');
 
-        const boostReturnedCalls = pushNotifications.create.mock.calls.filter(([dto]: [any]) =>
-          dto.title.includes('your boost is back to spend')
+        const boostReturnedCalls = pushNotifications.create.mock.calls.filter(
+          ([dto]: [any]) => dto.metadata?.trigger === 'boost_returned'
         );
         expect(boostReturnedCalls.map(([dto]: [any]) => dto.recipientUid)).toEqual(['pinner-1', 'pinner-2']);
         expect(boostReturnedCalls[0][0]).toMatchObject({
-          title: '"Test" is now in progress — your boost is back to spend.',
+          title: '"Test" is now in progress',
+          description: 'Your boost budget is back — spend it on what matters next.',
           link: expect.stringContaining('/gantry/item-1'),
-          metadata: expect.objectContaining({ trigger: 'boost_returned' }),
         });
       });
 
@@ -377,8 +378,8 @@ describe('RoadmapService', () => {
 
         await service.transitionItem('item-1', { stage: 'BACKLOG' }, 'curator-1');
 
-        const boostReturnedCalls = pushNotifications.create.mock.calls.filter(([dto]: [any]) =>
-          dto.title.includes('your boost is back to spend')
+        const boostReturnedCalls = pushNotifications.create.mock.calls.filter(
+          ([dto]: [any]) => dto.metadata?.trigger === 'boost_returned'
         );
         expect(boostReturnedCalls).toHaveLength(0);
       });
@@ -407,13 +408,13 @@ describe('RoadmapService', () => {
 
         await service.transitionItem('item-1', { stage: 'SHIPPED' }, 'curator-1');
 
-        const shippedBackerCalls = pushNotifications.create.mock.calls.filter(([dto]: [any]) =>
-          dto.title.includes('just shipped')
+        const shippedBackerCalls = pushNotifications.create.mock.calls.filter(
+          ([dto]: [any]) => dto.metadata?.trigger === 'backed_item_shipped'
         );
         expect(shippedBackerCalls.map(([dto]: [any]) => dto.recipientUid)).toEqual(['pinner-1', 'pinner-2']);
         expect(shippedBackerCalls[0][0]).toMatchObject({
-          title: '"Test" you backed just shipped 🎉',
-          metadata: expect.objectContaining({ trigger: 'backed_item_shipped' }),
+          title: '"Test" just shipped 🎉',
+          description: 'Something you boosted is now live.',
         });
 
         // the creator still gets their dedicated shipped notification
@@ -421,7 +422,11 @@ describe('RoadmapService', () => {
           ([dto]: [any]) => dto.recipientUid === 'creator-1'
         );
         expect(creatorCalls).toHaveLength(1);
-        expect(creatorCalls[0][0].title).toBe('"Test" has shipped.');
+        expect(creatorCalls[0][0]).toMatchObject({
+          title: 'Your need "Test" just shipped 🎉',
+          description: "It's live now — go try it out.",
+          metadata: expect.objectContaining({ trigger: 'need_shipped' }),
+        });
       });
 
       it('does not re-fire boost-returned on IN_PROGRESS → SHIPPED (pins already released)', async () => {
@@ -431,8 +436,8 @@ describe('RoadmapService', () => {
 
         await service.transitionItem('item-1', { stage: 'SHIPPED' }, 'curator-1');
 
-        const boostReturnedCalls = pushNotifications.create.mock.calls.filter(([dto]: [any]) =>
-          dto.title.includes('your boost is back to spend')
+        const boostReturnedCalls = pushNotifications.create.mock.calls.filter(
+          ([dto]: [any]) => dto.metadata?.trigger === 'boost_returned'
         );
         expect(boostReturnedCalls).toHaveLength(0);
       });
