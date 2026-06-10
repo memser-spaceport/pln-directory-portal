@@ -46,5 +46,19 @@ export const ROADMAP_KANBAN_STAGES: RoadmapStage[] = [
 
 export function itemDetailPath(itemUid: string): string {
   const base = process.env.WEB_UI_BASE_URL?.replace(/\/$/, '') ?? '';
-  return `${base}/roadmap/items/${itemUid}`;
+  return `${base}/gantry/${itemUid}`;
 }
+
+/**
+ * All user-facing roadmap notification copy lives here so a wording change
+ * (e.g. the planned "pin" → "boost" rename) is a one-file swap. PRD §7 copy is
+ * placeholder until the boost-signaling spec is final.
+ */
+export const ROADMAP_NOTIFICATION_COPY = {
+  newSubmission: (title: string) => `New need: "${title}" — take a look, boost it if it matters to you.`,
+  boostReturned: (title: string) => `"${title}" is now in progress — your boost is back to spend.`,
+  backedItemShipped: (title: string) => `"${title}" you backed just shipped 🎉`,
+  ideaPromoted: (title: string) => `Your idea "${title}" is now on the roadmap.`,
+  ideaDeclined: (title: string, reason: string) => `Your idea "${title}" was not taken forward. Reason: ${reason}`,
+  ideaShipped: (title: string) => `"${title}" has shipped.`,
+} as const;
