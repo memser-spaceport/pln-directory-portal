@@ -320,7 +320,7 @@ describe('RoadmapService', () => {
         expect(pushNotifications.create).toHaveBeenCalledTimes(1);
         expect(pushNotifications.create).toHaveBeenCalledWith(
           expect.objectContaining({
-            title: 'New need: "Test"',
+            title: 'New need: Test',
             description: 'Take a look — boost it if it matters to you.',
             link: expect.stringContaining('/gantry/item-1'),
             requiredPermissions: ['roadmap.view', 'roadmap.admin'],
@@ -365,7 +365,7 @@ describe('RoadmapService', () => {
         );
         expect(boostReturnedCalls.map(([dto]: [any]) => dto.recipientUid)).toEqual(['pinner-1', 'pinner-2']);
         expect(boostReturnedCalls[0][0]).toMatchObject({
-          title: '"Test" is now in progress',
+          title: 'In Progress: Test',
           description: 'Your boost budget is back — spend it on what matters next.',
           link: expect.stringContaining('/gantry/item-1'),
         });
@@ -413,7 +413,7 @@ describe('RoadmapService', () => {
         );
         expect(shippedBackerCalls.map(([dto]: [any]) => dto.recipientUid)).toEqual(['pinner-1', 'pinner-2']);
         expect(shippedBackerCalls[0][0]).toMatchObject({
-          title: '"Test" just shipped 🎉',
+          title: 'Just Shipped: Test 🎉',
           description: 'Something you boosted is now live.',
         });
 
@@ -423,7 +423,7 @@ describe('RoadmapService', () => {
         );
         expect(creatorCalls).toHaveLength(1);
         expect(creatorCalls[0][0]).toMatchObject({
-          title: 'Your need "Test" just shipped 🎉',
+          title: 'Just Shipped: Test 🎉',
           description: "It's live now — go try it out.",
           metadata: expect.objectContaining({ trigger: 'need_shipped' }),
         });
