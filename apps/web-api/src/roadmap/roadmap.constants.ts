@@ -65,6 +65,18 @@ export const ROADMAP_NOTIFICATION_COPY = {
     title: `In Progress: ${title}`,
     description: 'Your boost budget is back — spend it on what matters next.',
   }),
+  needPlanned: (title: string) => ({
+    title: `Planned: ${title}`,
+    description: 'Your need is on the roadmap.',
+  }),
+  needInProgress: (title: string) => ({
+    title: `In Progress: ${title}`,
+    description: 'Work on your need has started.',
+  }),
+  needBacklogged: (title: string) => ({
+    title: `Backlog: ${title}`,
+    description: 'Your need was moved to the backlog.',
+  }),
   backedItemShipped: (title: string) => ({
     title: `Just Shipped: ${title} 🎉`,
     description: 'Something you boosted is now live.',

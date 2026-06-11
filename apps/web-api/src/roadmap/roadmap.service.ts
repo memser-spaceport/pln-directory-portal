@@ -478,10 +478,13 @@ export class RoadmapService {
       await this.notifyBoostsReturned(row, releasedPins);
     }
 
+    if (existing.stage !== to) {
+      await this.notifySubmitterStageChange(row, to, opts.declinedReason);
+    }
+
     if (isPromoteTransition(existing.stage, to)) {
       await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_PROMOTED, actorUid, { itemUid: uid });
     } else if (to === RoadmapStage.SHIPPED) {
-      await this.notifyShipped(row);
       await this.notifyBackersShipped(row);
     } else {
       await this.track(ROADMAP_ANALYTICS_EVENTS.ROADMAP_STATUS_CHANGED, actorUid, {
@@ -658,6 +661,48 @@ export class RoadmapService {
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
+  }
+
+  /**
+   * Tell the original submitter their need moved to a new stage. Every stage has a
+   * dedicated line except moves back to IDEA (curator corrections — intentionally
+   * silent). Declines through the dedicated decline endpoint carry the curator's
+   * reason; a raw transition to DECLINED falls back to a generic one.
+   */
+  private async notifySubmitterStageChange(
+    item: { uid: string; title: string; createdByUid: string },
+    to: RoadmapStage,
+    declinedReason?: string
+  ) {
+    switch (to) {
+      case RoadmapStage.PLANNED:
+        return this.sendMemberNotification(
+          item.createdByUid,
+          ROADMAP_NOTIFICATION_COPY.needPlanned(item.title),
+          item.uid,
+          'need_planned'
+        );
+      case RoadmapStage.IN_PROGRESS:
+        return this.sendMemberNotification(
+          item.createdByUid,
+          ROADMAP_NOTIFICATION_COPY.needInProgress(item.title),
+          item.uid,
+          'need_in_progress'
+        );
+      case RoadmapStage.BACKLOG:
+        return this.sendMemberNotification(
+          item.createdByUid,
+          ROADMAP_NOTIFICATION_COPY.needBacklogged(item.title),
+          item.uid,
+          'need_backlogged'
+        );
+      case RoadmapStage.SHIPPED:
+        return this.notifyShipped(item);
+      case RoadmapStage.DECLINED:
+        return this.notifyDeclined(item, declinedReason ?? 'No reason provided.');
+      default:
+        return;
+    }
   }
 
   private async notifyDeclined(item: { uid: string; title: string; createdByUid: string }, reason: string) {
