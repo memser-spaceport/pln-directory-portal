@@ -13,13 +13,11 @@ import {
   RoadmapItemListResponseSchema,
   RoadmapItemPinnersResponseSchema,
   RoadmapItemSchema,
-  RoadmapItemUpvotersResponseSchema,
   RoadmapObjectiveListResponseSchema,
   RoadmapObjectiveSchema,
   RoadmapPinActionResponseSchema,
   RoadmapPinBalanceSchema,
   RoadmapSettingsSchema,
-  RoadmapUpvoteSchema,
   SetRoadmapItemObjectiveSchema,
   TransitionRoadmapItemSchema,
   UpdatePinNoteSchema,
@@ -110,26 +108,6 @@ export const apiRoadmap = contract.router({
     },
     summary: 'Change item stage (kanban move, under review, etc.)',
   },
-  addRoadmapUpvote: {
-    method: 'POST',
-    path: `${getAPIVersionAsPath('1')}/roadmap/items/:uid/upvote`,
-    pathParams: itemPathParams,
-    body: RoadmapUpvoteSchema,
-    responses: {
-      200: RoadmapItemSchema,
-    },
-    summary: 'Add or update upvote on an item',
-  },
-  removeRoadmapUpvote: {
-    method: 'DELETE',
-    path: `${getAPIVersionAsPath('1')}/roadmap/items/:uid/upvote`,
-    pathParams: itemPathParams,
-    body: z.object({}),
-    responses: {
-      200: RoadmapItemSchema,
-    },
-    summary: 'Remove current member upvote',
-  },
   trackBuildButtonClick: {
     method: 'POST',
     path: `${getAPIVersionAsPath('1')}/roadmap/items/:uid/build-button-click`,
@@ -195,15 +173,6 @@ export const apiRoadmap = contract.router({
       200: RoadmapItemPinnersResponseSchema,
     },
     summary: 'List members who pinned an item, with notes (curators only)',
-  },
-  listRoadmapItemUpvoters: {
-    method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/roadmap/items/:uid/upvotes`,
-    pathParams: itemPathParams,
-    responses: {
-      200: RoadmapItemUpvotersResponseSchema,
-    },
-    summary: 'List members who upvoted an item (curators only)',
   },
   listRoadmapObjectives: {
     method: 'GET',

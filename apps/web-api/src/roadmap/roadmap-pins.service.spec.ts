@@ -31,9 +31,6 @@ const buildPrismaMock = () => {
       update: jest.fn().mockResolvedValue({}),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
-    roadmapItemUpvote: {
-      upsert: jest.fn().mockResolvedValue({}),
-    },
     roadmapSettings: {
       upsert: jest.fn().mockResolvedValue({ pinLimit: 3 }),
     },
@@ -72,18 +69,13 @@ describe('RoadmapPinsService', () => {
   });
 
   describe('pinItem', () => {
-    it('creates a pin and auto-upvotes without touching an existing upvote note', async () => {
+    it('creates a pin with an optional note', async () => {
       prisma.roadmapItem.findFirst.mockResolvedValue(pinnableItem);
 
       await service.pinItem('item-1', { note: 'blocking my work' }, 'member-1');
 
       expect(prisma.roadmapItemPin.create).toHaveBeenCalledWith({
         data: { itemUid: 'item-1', memberUid: 'member-1', note: 'blocking my work' },
-      });
-      expect(prisma.roadmapItemUpvote.upsert).toHaveBeenCalledWith({
-        where: { itemUid_memberUid: { itemUid: 'item-1', memberUid: 'member-1' } },
-        create: { itemUid: 'item-1', memberUid: 'member-1', note: null },
-        update: {},
       });
     });
 
@@ -102,7 +94,6 @@ describe('RoadmapPinsService', () => {
       await service.pinItem('item-1', {}, 'member-1');
 
       expect(prisma.roadmapItemPin.create).not.toHaveBeenCalled();
-      expect(prisma.roadmapItemUpvote.upsert).not.toHaveBeenCalled();
     });
 
     it('rejects pinning items in frozen stages', async () => {

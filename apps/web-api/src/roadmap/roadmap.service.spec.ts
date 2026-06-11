@@ -45,11 +45,6 @@ const buildPrismaMock = () => {
       create: jest.fn(),
       update: jest.fn(),
     },
-    roadmapItemUpvote: {
-      findUnique: jest.fn(),
-      upsert: jest.fn(),
-      deleteMany: jest.fn(),
-    },
     roadmapItemPin: {
       findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
@@ -132,7 +127,7 @@ describe('RoadmapService', () => {
       createdBy: { uid: 'creator-1', name: 'A', image: null },
       promotedBy: null,
       objective: null,
-      _count: { upvotes: 0, pins: 0 },
+      _count: { pins: 0 },
     };
 
     it('throws NotFound when item missing', async () => {
@@ -188,7 +183,7 @@ describe('RoadmapService', () => {
         focusArea: null,
         createdBy: { uid: 'creator-1', name: 'A', image: null },
         promotedBy: null,
-        _count: { upvotes: 0 },
+        _count: { pins: 0 },
       });
       accessControl.getMemberAccess.mockResolvedValue({
         effectivePermissions: [],
@@ -200,59 +195,6 @@ describe('RoadmapService', () => {
     });
   });
 
-  describe('addUpvote', () => {
-    it('upserts upvote and returns item', async () => {
-      const row = {
-        ...baseItem,
-        focusArea: null,
-        createdBy: { uid: 'creator-1', name: 'A', image: null },
-        promotedBy: null,
-        objective: null,
-        _count: { upvotes: 1, pins: 0 },
-      };
-      prisma.roadmapItem.findFirst
-        .mockResolvedValueOnce(row)
-        .mockResolvedValueOnce({ ...row, upvotes: [{ uid: 'up-1' }] });
-      prisma.roadmapItemUpvote.upsert.mockResolvedValue({});
-      prisma.roadmapItemUpvote.findUnique.mockResolvedValue({ uid: 'up-1' });
-
-      const result = await service.addUpvote('item-1', null, 'voter-1');
-      expect(result.viewerHasUpvoted).toBe(true);
-      expect(prisma.roadmapItemUpvote.upsert).toHaveBeenCalled();
-    });
-
-    it.each([RoadmapStage.IN_PROGRESS, RoadmapStage.BACKLOG, RoadmapStage.SHIPPED, RoadmapStage.DECLINED])(
-      'rejects likes on %s items (counts frozen)',
-      async (stage) => {
-        prisma.roadmapItem.findFirst.mockResolvedValue({
-          ...baseItem,
-          stage,
-          createdBy: { uid: 'creator-1', name: 'A', image: null },
-          promotedBy: null,
-          objective: null,
-          _count: { upvotes: 0, pins: 0 },
-        });
-
-        await expect(service.addUpvote('item-1', null, 'voter-1')).rejects.toBeInstanceOf(BadRequestException);
-        expect(prisma.roadmapItemUpvote.upsert).not.toHaveBeenCalled();
-      }
-    );
-
-    it('rejects unliking frozen items', async () => {
-      prisma.roadmapItem.findFirst.mockResolvedValue({
-        ...baseItem,
-        stage: RoadmapStage.SHIPPED,
-        createdBy: { uid: 'creator-1', name: 'A', image: null },
-        promotedBy: null,
-        objective: null,
-        _count: { upvotes: 0, pins: 0 },
-      });
-
-      await expect(service.removeUpvote('item-1', 'voter-1')).rejects.toBeInstanceOf(BadRequestException);
-      expect(prisma.roadmapItemUpvote.deleteMany).not.toHaveBeenCalled();
-    });
-  });
-
   describe('transitionItem pin release', () => {
     const rowFor = (stage: RoadmapStage) => ({
       ...baseItem,
@@ -260,7 +202,7 @@ describe('RoadmapService', () => {
       createdBy: { uid: 'creator-1', name: 'A', image: null },
       promotedBy: null,
       objective: null,
-      _count: { upvotes: 0, pins: 2 },
+      _count: { pins: 2 },
     });
 
     beforeEach(() => {
@@ -299,7 +241,7 @@ describe('RoadmapService', () => {
       createdBy: { uid: 'creator-1', name: 'A', image: null },
       promotedBy: null,
       objective: null,
-      _count: { upvotes: 0, pins: 2 },
+      _count: { pins: 2 },
     });
 
     beforeEach(() => {

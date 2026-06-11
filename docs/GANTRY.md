@@ -40,9 +40,9 @@ ask an admin.
 | --- | --- |
 | `roadmap.view` | See the Gantry board and item details (minimum to use Gantry at all) |
 | `roadmap.idea.create` | Submit a new need/idea |
-| `roadmap.item.upvote` | Upvote and pin (boost) items |
+| `roadmap.item.upvote` | Pin (boost) items |
 | `roadmap.item.edit_own` | Edit/archive your own item while it is still an idea (IDEA/BACKLOG) |
-| `roadmap.item.curate` | Product team: edit any item, reorder the roadmap, manage objectives, change settings, see who pinned/upvoted (and their notes) |
+| `roadmap.item.curate` | Product team: edit any item, reorder the roadmap, manage objectives, change settings, see who pinned (and their notes) |
 | `roadmap.item.transition` | Product team: promote, decline, move items between kanban columns |
 | `roadmap.admin` | Aggregate — implies all of the above |
 
@@ -73,7 +73,7 @@ Two paths in the Back Office:
 > explicitly if an admin needs it.
 
 The frontend resolves these via `useGantryAccess()` and gates every control
-accordingly (e.g. the upvote button is disabled without `roadmap.item.upvote`;
+accordingly (e.g. the boost button is disabled without `roadmap.item.upvote`;
 drag-to-reorder only appears with `roadmap.item.curate`).
 
 ## The board
@@ -82,9 +82,9 @@ drag-to-reorder only appears with `roadmap.item.curate`).
 
 | Stage (code) | UI label | Who puts items here | Signals |
 | --- | --- | --- | --- |
-| `IDEA` | Submitted | Any user with `idea.create` | Upvote + pin (interactive) |
+| `IDEA` | Submitted | Any user with `idea.create` | Boost (pin) interactive |
 | `BACKLOG` | Backlog | Product team | Frozen — entering releases pins |
-| `PLANNED` | Planned | Product team (promote) | Upvote + pin interactive; team rank order |
+| `PLANNED` | Planned | Product team (promote) | Boost interactive; team rank order |
 | `IN_PROGRESS` | In Progress | Product team | Frozen — entering releases pins; team rank order |
 | `SHIPPED` | Shipped | Product team | Frozen snapshot |
 | `DECLINED` | Declined | Product team (decline, reason required) | Frozen — entering releases pins |
@@ -96,13 +96,12 @@ drag-to-reorder only appears with `roadmap.item.curate`).
 - **Submit a need**: "Share a need" → title, description, optional acceptance
   criteria, type (Bug / Improvement / Feature Request), tags, focus area. Submitting
   is always free and unlimited — it is never gated by your boost budget.
-- **Upvote**: one per item; optional note (max 500 chars).
 - **Boost (pin)**: spend one of your scarce pins (default budget: 3) on an item in
   Submitted or Planned to tell the product team it's a priority for you. Optional
-  one-line "why now" note. Max one pin per item. Remove a pin any time to get it
-  back. At zero budget you can swap in one motion (remove one + pin another). Pinning
-  also counts as an upvote automatically.
-- **Anonymity**: pin/upvote *counts* are public; *who* pinned and the note text are
+  one-line "why now" note (max 500 chars). Max one pin per item. Remove a pin any
+  time to get it back. At zero budget you can swap in one motion (remove one + pin
+  another).
+- **Anonymity**: boost *counts* are public; *who* pinned and the note text are
   visible to the product team only.
 - **Boost return**: when an item you pinned is committed (moves to In Progress) or
   leaves play (Backlog / Declined / archived), the pin returns to your budget
@@ -119,8 +118,8 @@ drag-to-reorder only appears with `roadmap.item.curate`).
 - **Roadmap order**: drag-and-drop to set explicit priority order on Planned and
   In Progress (stored as a fractional `order` value). Crowd boosts never reorder the
   roadmap — they're advisory input only.
-- **Review demand**: on any item, see the list of pinners and upvoters with their
-  notes (`curate`-gated endpoints) to weight the signal and follow up.
+- **Review demand**: on any item, see the list of pinners with their notes
+  (`GET /items/:uid/pins`, `curate`-gated) to weight the signal and follow up.
 - **Objectives (OKR chips)**: create/assign an objective to roadmap items and filter
   the board by it. Objectives feed no score — re-tagging each quarter is harmless.
 - **Settings**: tune the pin budget size (`PATCH /v1/roadmap/settings`, default 3).
@@ -140,13 +139,12 @@ The Boost Signaling PRD (LabOS · Gantry, 2026-06-09) defines the target model:
   every stage change of their need (planned / in progress / backlog / shipped /
   declined).
 
-**Implementation status**: the backend pin machinery is live (budget, notes, swap,
-release-on-commitment, balance endpoint, pinners list, trending sort, reorder,
-objectives, settings), and the PRD §7 notifications are implemented (see below).
-The frontend currently ships the **upvote** UI only — the boost affordance, budget
-counter, run-out swap, opt-in boost-on-submit, rank badges, and the like→boost
-migration are not yet built (UI explorations live in
-`prototypes/entries/gantry-priority-support/` in the frontend repo).
+**Implementation status**: backend and frontend boost machinery is live (budget,
+notes, swap, release-on-commitment, balance endpoint, pinners list, trending sort,
+reorder, objectives, settings), and PRD §7 notifications are implemented (see
+below). The free like/upvote API is removed; existing likes are migrated to pins
+via a one-time SQL script run post-deploy. Opt-in boost-on-submit remains
+out of scope.
 
 ## Notifications (in-app)
 
@@ -191,7 +189,8 @@ All models in `apps/web-api/prisma/schema.prisma`:
 - **`RoadmapItem`** — title, description, acceptance criteria, `stage`, type, tags,
   focus area, `order` (Float — team rank), creator, promoted-by/at, declined reason,
   external tracker URL, `objectiveUid`, soft-delete fields.
-- **`RoadmapItemUpvote`** — one per (item, member), optional note. The v0 "like".
+- **`RoadmapItemUpvote`** — legacy v0 "like" table; retained for historical rows
+  after the likes→pins migration. No longer read or written at runtime.
 - **`RoadmapItemPin`** — the boost. One *active* pin per (item, member) (partial
   unique index `WHERE releasedAt IS NULL`); `releasedAt` set on unpin or when the
   item leaves a pinnable stage — released rows are the frozen history.
@@ -206,14 +205,13 @@ Base: `/v1/roadmap` (guards: `UserTokenCheckGuard` + `RbacGuard`). Contracts in
 | Endpoint | Method | Permission | Purpose |
 | --- | --- | --- | --- |
 | `/items` | GET | view | List/filter/sort (`default`, `trending`, `top_pins`, `newest`) |
-| `/items/:uid` | GET | view | Detail incl. viewer's upvote/pin state |
+| `/items/:uid` | GET | view | Detail incl. viewer's pin state |
 | `/items` | POST | idea.create | Submit a need (curators may create directly in PLANNED/IN_PROGRESS) |
 | `/items/:uid` | PATCH / DELETE | view (owner/curate checked in service) | Edit / archive (archiving releases pins) |
 | `/items/:uid/promote` · `/decline` · `/transition` | POST | item.transition | Stage moves; decline requires a reason |
-| `/items/:uid/upvote` | POST / DELETE | item.upvote | Like with optional note (IDEA/PLANNED only) |
 | `/items/:uid/pin` | POST / DELETE / PATCH | item.upvote | Boost (optional note, optional `swapItemUid`) / unpin / edit note |
 | `/pins/me` | GET | view | `{ limit, used, remaining, pins }` budget summary |
-| `/items/:uid/pins` · `/upvotes` | GET | item.curate | Who pinned/upvoted + notes (product team only) |
+| `/items/:uid/pins` | GET | item.curate | Who pinned + notes (product team only) |
 | `/items/reorder` | POST | item.curate | Bulk set roadmap rank order |
 | `/objectives` | GET / POST | view / item.curate | List / create-or-find objective |
 | `/items/:uid/objective` | PATCH | item.curate | Set/clear an item's objective |

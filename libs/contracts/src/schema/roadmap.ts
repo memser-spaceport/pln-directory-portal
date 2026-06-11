@@ -83,7 +83,9 @@ export const RoadmapItemSchema = z.object({
   declinedReason: z.string().nullable(),
   externalTrackerUrl: z.string().nullable(),
   objective: RoadmapObjectiveRefSchema.nullable(),
+  /** @deprecated Always 0 — likes removed; use pinCount. Kept for API compat. */
   upvoteCount: z.number().int(),
+  /** @deprecated Always false — likes removed; use viewerHasPinned. Kept for API compat. */
   viewerHasUpvoted: z.boolean(),
   /** Active pins while the item is pinnable; frozen total (incl. released) otherwise. */
   pinCount: z.number().int(),
@@ -136,10 +138,6 @@ export const TransitionRoadmapItemSchema = z.object({
   stage: RoadmapStageSchema,
 });
 
-export const RoadmapUpvoteSchema = z.object({
-  note: z.string().max(500).optional().nullable(),
-});
-
 export const RoadmapBuildButtonClickSchema = z.object({});
 
 // --- Priority signaling: pins ---
@@ -183,18 +181,6 @@ export const RoadmapPinBalanceSchema = RoadmapPinBalanceSummarySchema.extend({
 export const RoadmapItemPinnersResponseSchema = z.object({
   total: z.number().int(),
   pins: z.array(RoadmapItemPinEntrySchema),
-});
-
-export const RoadmapItemUpvotersResponseSchema = z.object({
-  total: z.number().int(),
-  upvotes: z.array(
-    z.object({
-      uid: z.string(),
-      note: z.string().nullable(),
-      createdAt: z.string(),
-      member: RoadmapMemberSummarySchema,
-    })
-  ),
 });
 
 // --- Priority signaling: ordering ---

@@ -4,8 +4,6 @@ export const ROADMAP_ANALYTICS_EVENTS = {
   IDEA_CREATED: 'gantry_idea_created',
   IDEA_UPDATED: 'gantry_idea_updated',
   IDEA_ARCHIVED: 'gantry_idea_archived',
-  ITEM_UPVOTED: 'gantry_item_upvoted',
-  UPVOTE_REMOVED: 'gantry_item_upvote_removed',
   IDEA_PROMOTED: 'gantry_idea_promoted',
   IDEA_DECLINED: 'gantry_idea_declined',
   ROADMAP_STATUS_CHANGED: 'gantry_roadmap_status_changed',
@@ -22,7 +20,7 @@ export const ROADMAP_ANALYTICS_EVENTS = {
 
 export const IDEA_STAGES: RoadmapStage[] = [RoadmapStage.IDEA, RoadmapStage.BACKLOG];
 
-/** Stages where members can like and pin items. Everywhere else counts are frozen. */
+/** Stages where members can pin (boost) items. Everywhere else counts are frozen. */
 export const PINNABLE_STAGES: RoadmapStage[] = [RoadmapStage.IDEA, RoadmapStage.PLANNED];
 
 /** Entering any of these stages auto-returns active pins to their owners' budgets. */

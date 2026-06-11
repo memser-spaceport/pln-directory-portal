@@ -10,7 +10,6 @@ import {
   PinRoadmapItemSchema,
   ReorderRoadmapItemsSchema,
   RoadmapItemListQueryParams,
-  RoadmapUpvoteSchema,
   SetRoadmapItemObjectiveSchema,
   TransitionRoadmapItemSchema,
   UpdatePinNoteSchema,
@@ -110,21 +109,6 @@ export class RoadmapController {
     return this.roadmapService.transitionItem(req.params.uid, parsed, member.uid);
   }
 
-  @Api(server.route.addRoadmapUpvote)
-  @RequirePermissions(UPVOTE)
-  async addRoadmapUpvote(@Body() body: unknown, @Req() req: Request) {
-    const member = await this.resolveMember(req);
-    const parsed = RoadmapUpvoteSchema.parse(body ?? {});
-    return this.roadmapService.addUpvote(req.params.uid, parsed.note, member.uid);
-  }
-
-  @Api(server.route.removeRoadmapUpvote)
-  @RequirePermissions(UPVOTE)
-  async removeRoadmapUpvote(@Req() req: Request) {
-    const member = await this.resolveMember(req);
-    return this.roadmapService.removeUpvote(req.params.uid, member.uid);
-  }
-
   @Api(server.route.trackBuildButtonClick)
   @RequirePermissions(VIEW)
   async trackBuildButtonClick(@Req() req: Request) {
@@ -178,14 +162,6 @@ export class RoadmapController {
   async listRoadmapItemPinners(@Req() req: Request) {
     const member = await this.resolveMember(req);
     return this.roadmapPinsService.listItemPinners(req.params.uid, member.uid);
-  }
-
-  @Api(server.route.listRoadmapItemUpvoters)
-  @RequirePermissions(CURATE)
-  @NoCache()
-  async listRoadmapItemUpvoters(@Req() req: Request) {
-    const member = await this.resolveMember(req);
-    return this.roadmapPinsService.listItemUpvoters(req.params.uid, member.uid);
   }
 
   @Api(server.route.listRoadmapObjectives)

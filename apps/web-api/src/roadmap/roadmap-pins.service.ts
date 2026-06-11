@@ -39,7 +39,7 @@ export class RoadmapPinsService {
       if (!item) {
         throw new NotFoundException(`Roadmap item ${uid} not found`);
       }
-      this.roadmapService.assertStageAllowsSignals(item.stage, 'pin');
+      this.roadmapService.assertStageAllowsSignals(item.stage);
 
       const existingPin = await tx.roadmapItemPin.findFirst({
         where: { itemUid: uid, memberUid: actorUid, releasedAt: null },
@@ -74,13 +74,6 @@ export class RoadmapPinsService {
 
       await tx.roadmapItemPin.create({
         data: { itemUid: uid, memberUid: actorUid, note: body.note ?? null },
-      });
-
-      // Pinning implies a like; `update: {}` keeps an existing upvote (and its note) untouched.
-      await tx.roadmapItemUpvote.upsert({
-        where: { itemUid_memberUid: { itemUid: uid, memberUid: actorUid } },
-        create: { itemUid: uid, memberUid: actorUid, note: null },
-        update: {},
       });
     });
 
@@ -155,27 +148,6 @@ export class RoadmapPinsService {
     return {
       total: pins.length,
       pins: toAdminPinList(pins),
-    };
-  }
-
-  async listItemUpvoters(uid: string, actorUid: string) {
-    await this.assertCurator(actorUid);
-    await this.assertItemExists(uid);
-
-    const upvotes = await this.prisma.roadmapItemUpvote.findMany({
-      where: { itemUid: uid },
-      orderBy: { createdAt: 'desc' },
-      select: { uid: true, note: true, createdAt: true, ...pinnerMemberSelect },
-    });
-
-    return {
-      total: upvotes.length,
-      upvotes: upvotes.map((upvote) => ({
-        uid: upvote.uid,
-        note: upvote.note,
-        createdAt: upvote.createdAt.toISOString(),
-        member: this.toMemberSummary(upvote.member),
-      })),
     };
   }
 

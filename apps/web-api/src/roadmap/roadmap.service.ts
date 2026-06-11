@@ -44,7 +44,7 @@ const itemInclude: Prisma.RoadmapItemInclude = {
   createdBy: { select: { uid: true, name: true, image: { select: { url: true } } } },
   promotedBy: { select: { uid: true, name: true } },
   objective: { select: { uid: true, title: true, order: true } },
-  _count: { select: { upvotes: true, pins: true } },
+  _count: { select: { pins: true } },
 };
 
 const adminPinSelect = {
@@ -75,7 +75,7 @@ interface RoadmapItemRow {
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  _count: { upvotes: number; pins: number };
+  _count: { pins: number };
 }
 
 interface ViewerPinState {
@@ -130,10 +130,9 @@ export class RoadmapService {
       where,
       include: {
         ...itemInclude,
-        upvotes: { where: { memberUid: viewerUid }, select: { uid: true }, take: 1 },
         pins: { where: { memberUid: viewerUid, releasedAt: null }, select: { note: true }, take: 1 },
       },
-    })) as unknown as (RoadmapItemRow & { upvotes: { uid: string }[]; pins: { note: string | null }[] })[];
+    })) as unknown as (RoadmapItemRow & { pins: { note: string | null }[] })[];
 
     // Curators get the full pinner lists embedded; everyone else only needs active-pin
     // timestamps for counts and trending scores.
@@ -184,14 +183,10 @@ export class RoadmapService {
         }
         const pinDiff = displayedPinCount(b) - displayedPinCount(a);
         if (pinDiff !== 0) return pinDiff;
-        const upvoteDiff = b._count.upvotes - a._count.upvotes;
-        if (upvoteDiff !== 0) return upvoteDiff;
         return b.updatedAt.getTime() - a.updatedAt.getTime();
       }
       const orderDiff = a.order - b.order;
       if (orderDiff !== 0) return orderDiff;
-      const countDiff = b._count.upvotes - a._count.upvotes;
-      if (countDiff !== 0) return countDiff;
       return b.updatedAt.getTime() - a.updatedAt.getTime();
     });
 
@@ -200,7 +195,6 @@ export class RoadmapService {
         this.toDto(
           row,
           viewerUid,
-          row.upvotes.length > 0,
           {
             viewerHasPinned: row.pins.length > 0,
             viewerPinNote: row.pins[0]?.note ?? null,
@@ -261,7 +255,7 @@ export class RoadmapService {
       await this.notifyNewSubmission(row, actorUid);
     }
 
-    return this.toDto(row as unknown as RoadmapItemRow, actorUid, false, EMPTY_PIN_STATE, access.canCurate ? [] : null);
+    return this.toDto(row as unknown as RoadmapItemRow, actorUid, EMPTY_PIN_STATE, access.canCurate ? [] : null);
   }
 
   async updateItem(uid: string, body: UpdateBody, actorUid: string) {
@@ -344,7 +338,7 @@ export class RoadmapService {
 
     await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_ARCHIVED, actorUid, { itemUid: uid });
     await this.trackPinsReleased(uid, actorUid, releasedPins, 'archived');
-    return this.toDto(row as unknown as RoadmapItemRow, actorUid, false, EMPTY_PIN_STATE);
+    return this.toDto(row as unknown as RoadmapItemRow, actorUid, EMPTY_PIN_STATE);
   }
 
   async promoteItem(uid: string, actorUid: string) {
@@ -392,38 +386,16 @@ export class RoadmapService {
     });
   }
 
-  async addUpvote(uid: string, note: string | null | undefined, actorUid: string) {
-    const existing = await this.findActiveOrThrow(uid);
-    this.assertStageAllowsSignals(existing.stage, 'like');
-    await this.prisma.roadmapItemUpvote.upsert({
-      where: { itemUid_memberUid: { itemUid: uid, memberUid: actorUid } },
-      create: { itemUid: uid, memberUid: actorUid, note: note ?? null },
-      update: { note: note ?? null },
-    });
-    await this.track(ROADMAP_ANALYTICS_EVENTS.ITEM_UPVOTED, actorUid, { itemUid: uid });
-    return this.getItem(uid, actorUid);
-  }
-
-  async removeUpvote(uid: string, actorUid: string) {
-    const existing = await this.findActiveOrThrow(uid);
-    this.assertStageAllowsSignals(existing.stage, 'like');
-    await this.prisma.roadmapItemUpvote.deleteMany({
-      where: { itemUid: uid, memberUid: actorUid },
-    });
-    await this.track(ROADMAP_ANALYTICS_EVENTS.UPVOTE_REMOVED, actorUid, { itemUid: uid });
-    return this.getItem(uid, actorUid);
-  }
-
   isPinnableStage(stage: RoadmapStage): boolean {
     return PINNABLE_STAGES.includes(stage);
   }
 
-  /** Likes and pins are only allowed while an item is in a pinnable stage; counts are frozen elsewhere. */
-  assertStageAllowsSignals(stage: RoadmapStage, signal: 'like' | 'pin'): void {
+  /** Pins are only allowed while an item is in a pinnable stage; counts are frozen elsewhere. */
+  assertStageAllowsSignals(stage: RoadmapStage): void {
     if (!this.isPinnableStage(stage)) {
       throw new BadRequestException({
-        message: `Items in stage ${stage} cannot be ${signal === 'like' ? 'liked' : 'pinned'}; counts are frozen`,
-        code: signal === 'like' ? 'ITEM_NOT_LIKEABLE' : 'ITEM_NOT_PINNABLE',
+        message: `Items in stage ${stage} cannot be pinned; counts are frozen`,
+        code: 'ITEM_NOT_PINNABLE',
       });
     }
   }
@@ -569,28 +541,20 @@ export class RoadmapService {
     return row as unknown as RoadmapItemRow;
   }
 
-  /** Builds the item DTO, fetching the viewer's upvote/pin state, active pin count, and (for curators) the pinner list. */
+  /** Builds the item DTO, fetching the viewer's pin state, active pin count, and (for curators) the pinner list. */
   private async composeDto(row: RoadmapItemRow, viewerUid: string, access?: MemberAccess) {
     const memberAccess = access ?? (await this.getMemberAccess(viewerUid));
-    const viewerUpvotePromise = this.prisma.roadmapItemUpvote.findUnique({
-      where: { itemUid_memberUid: { itemUid: row.uid, memberUid: viewerUid } },
-      select: { uid: true },
-    });
 
     if (memberAccess.canCurate) {
-      const [viewerUpvote, pins] = await Promise.all([
-        viewerUpvotePromise,
-        this.prisma.roadmapItemPin.findMany({
-          where: { itemUid: row.uid },
-          select: adminPinSelect,
-        }),
-      ]);
+      const pins = await this.prisma.roadmapItemPin.findMany({
+        where: { itemUid: row.uid },
+        select: adminPinSelect,
+      });
       const activePins = pins.filter((pin) => !pin.releasedAt);
       const viewerPin = activePins.find((pin) => pin.member.uid === viewerUid);
       return this.toDto(
         row,
         viewerUid,
-        !!viewerUpvote,
         {
           viewerHasPinned: !!viewerPin,
           viewerPinNote: viewerPin?.note ?? null,
@@ -600,8 +564,7 @@ export class RoadmapService {
       );
     }
 
-    const [viewerUpvote, viewerPin, activePinCount] = await Promise.all([
-      viewerUpvotePromise,
+    const [viewerPin, activePinCount] = await Promise.all([
       this.prisma.roadmapItemPin.findFirst({
         where: { itemUid: row.uid, memberUid: viewerUid, releasedAt: null },
         select: { note: true },
@@ -611,7 +574,6 @@ export class RoadmapService {
     return this.toDto(
       row,
       viewerUid,
-      !!viewerUpvote,
       {
         viewerHasPinned: !!viewerPin,
         viewerPinNote: viewerPin?.note ?? null,
@@ -624,7 +586,6 @@ export class RoadmapService {
   private toDto(
     row: RoadmapItemRow,
     _viewerUid: string,
-    viewerHasUpvoted: boolean,
     pinState: ViewerPinState,
     adminPins: AdminPinDto[] | null = null
   ) {
@@ -651,8 +612,8 @@ export class RoadmapService {
       objective: row.objective
         ? { uid: row.objective.uid, title: row.objective.title, order: row.objective.order }
         : null,
-      upvoteCount: row._count.upvotes,
-      viewerHasUpvoted,
+      upvoteCount: 0,
+      viewerHasUpvoted: false,
       pinCount: this.isPinnableStage(row.stage) ? pinState.activePinCount : row._count.pins,
       viewerHasPinned: pinState.viewerHasPinned,
       viewerPinNote: pinState.viewerPinNote,
