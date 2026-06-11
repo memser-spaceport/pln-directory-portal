@@ -19,7 +19,9 @@ import {
   PINNABLE_STAGES,
   PIN_RELEASING_STAGES,
   ROADMAP_ANALYTICS_EVENTS,
+  ROADMAP_NOTIFICATION_COPY,
   TRENDING_HALF_LIFE_DAYS,
+  itemDetailPath,
 } from './roadmap.constants';
 import { AdminPinDto, AdminPinRow, toAdminPinList } from './roadmap-pin.util';
 import { assertTransitionAllowed, isDeclineTransition, isIdeaStage, isPromoteTransition } from './roadmap-stage.util';
@@ -253,6 +255,12 @@ export class RoadmapService {
       stage: row.stage,
     });
 
+    // Only true submissions ("Share a need" → IDEA) are broadcast; curator
+    // direct-creates into PLANNED/IN_PROGRESS are roadmap work, not new needs.
+    if (stage === RoadmapStage.IDEA) {
+      await this.notifyNewSubmission(row, actorUid);
+    }
+
     return this.toDto(row as unknown as RoadmapItemRow, actorUid, false, EMPTY_PIN_STATE, access.canCurate ? [] : null);
   }
 
@@ -457,17 +465,24 @@ export class RoadmapService {
         data,
         include: itemInclude,
       });
-      const released = PIN_RELEASING_STAGES.includes(to) ? await this.releaseActivePins(tx, uid) : 0;
+      const released = PIN_RELEASING_STAGES.includes(to) ? await this.releaseActivePins(tx, uid) : [];
       return { row: updated, releasedPins: released };
     });
 
     await this.trackPinsReleased(uid, actorUid, releasedPins, to);
 
+    // Boost-returned notifications fire only on commitment (IN_PROGRESS). Pins are
+    // released exactly once, so a later IN_PROGRESS → SHIPPED move releases nothing
+    // and cannot double-fire this.
+    if (to === RoadmapStage.IN_PROGRESS) {
+      await this.notifyBoostsReturned(row, releasedPins);
+    }
+
     if (isPromoteTransition(existing.stage, to)) {
-      await this.notifyPromoted(row);
       await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_PROMOTED, actorUid, { itemUid: uid });
     } else if (to === RoadmapStage.SHIPPED) {
       await this.notifyShipped(row);
+      await this.notifyBackersShipped(row);
     } else {
       await this.track(ROADMAP_ANALYTICS_EVENTS.ROADMAP_STATUS_CHANGED, actorUid, {
         itemUid: uid,
@@ -479,17 +494,26 @@ export class RoadmapService {
     return this.composeDto(row as unknown as RoadmapItemRow, actorUid, access);
   }
 
-  private async releaseActivePins(tx: Prisma.TransactionClient, itemUid: string): Promise<number> {
-    const result = await tx.roadmapItemPin.updateMany({
+  /** Releases all active pins on an item and returns the uids of the members whose pin was just returned. */
+  private async releaseActivePins(tx: Prisma.TransactionClient, itemUid: string): Promise<string[]> {
+    const active = await tx.roadmapItemPin.findMany({
+      where: { itemUid, releasedAt: null },
+      select: { memberUid: true },
+    });
+    await tx.roadmapItemPin.updateMany({
       where: { itemUid, releasedAt: null },
       data: { releasedAt: new Date() },
     });
-    return result.count;
+    return active.map((pin) => pin.memberUid);
   }
 
-  private async trackPinsReleased(itemUid: string, actorUid: string, count: number, reason: string) {
-    if (count > 0) {
-      await this.track(ROADMAP_ANALYTICS_EVENTS.PINS_RELEASED, actorUid, { itemUid, count, reason });
+  private async trackPinsReleased(itemUid: string, actorUid: string, releasedPins: string[], reason: string) {
+    if (releasedPins.length > 0) {
+      await this.track(ROADMAP_ANALYTICS_EVENTS.PINS_RELEASED, actorUid, {
+        itemUid,
+        count: releasedPins.length,
+        reason,
+      });
     }
   }
 
@@ -636,31 +660,102 @@ export class RoadmapService {
     };
   }
 
-  private async notifyPromoted(item: { uid: string; title: string; createdByUid: string }) {
-    await this.sendCreatorNotification(item.createdByUid, `Your idea "${item.title}" is now on the roadmap.`, item.uid);
-  }
-
   private async notifyDeclined(item: { uid: string; title: string; createdByUid: string }, reason: string) {
-    await this.sendCreatorNotification(
+    await this.sendMemberNotification(
       item.createdByUid,
-      `Your idea "${item.title}" was not taken forward. Reason: ${reason}`,
-      item.uid
+      ROADMAP_NOTIFICATION_COPY.needDeclined(item.title, reason),
+      item.uid,
+      'need_declined'
     );
   }
 
+  /** Trigger 4 — tell the original submitter their need shipped. */
   private async notifyShipped(item: { uid: string; title: string; createdByUid: string }) {
-    await this.sendCreatorNotification(item.createdByUid, `"${item.title}" has shipped.`, item.uid);
+    await this.sendMemberNotification(
+      item.createdByUid,
+      ROADMAP_NOTIFICATION_COPY.needShipped(item.title),
+      item.uid,
+      'need_shipped'
+    );
   }
 
-  private async sendCreatorNotification(recipientUid: string, title: string, itemUid: string) {
+  /**
+   * PRD §7 trigger 1 — broadcast a new submission to everyone with roadmap access.
+   * One permission-gated notification: holders of roadmap.view see it; roadmap.admin
+   * is listed too because the websocket fan-out matches raw permission codes without
+   * expanding the aggregate.
+   */
+  private async notifyNewSubmission(item: { uid: string; title: string }, authorUid: string) {
     try {
       await this.pushNotifications.create({
-        category: PushNotificationCategory.SYSTEM,
-        title,
-        link: `/roadmap/items/${itemUid}`,
+        category: PushNotificationCategory.GANTRY,
+        ...ROADMAP_NOTIFICATION_COPY.newSubmission(item.title),
+        link: itemDetailPath(item.uid),
+        isPublic: false,
+        requiredPermissions: [ROADMAP_PERMISSIONS.VIEW, ROADMAP_PERMISSIONS.ADMIN],
+        metadata: { eventType: 'roadmap', itemUid: item.uid, trigger: 'new_submission', authorUid },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Roadmap new-submission notification failed for ${item.uid}: ${error instanceof Error ? error.message : error}`
+      );
+    }
+  }
+
+  /** PRD §7 trigger 2 — tell each member whose pin was just auto-released that their boost is back. */
+  private async notifyBoostsReturned(item: { uid: string; title: string }, releasedMemberUids: string[]) {
+    for (const memberUid of releasedMemberUids) {
+      await this.sendMemberNotification(
+        memberUid,
+        ROADMAP_NOTIFICATION_COPY.boostReturned(item.title),
+        item.uid,
+        'boost_returned'
+      );
+    }
+  }
+
+  /**
+   * PRD §7 trigger 3 — tell everyone who ever pinned the item (released pins included,
+   * deduped) that it shipped. The creator is excluded: they already get the dedicated
+   * need-shipped notification from notifyShipped.
+   */
+  private async notifyBackersShipped(item: { uid: string; title: string; createdByUid: string }) {
+    try {
+      const backers = await this.prisma.roadmapItemPin.findMany({
+        where: { itemUid: item.uid },
+        select: { memberUid: true },
+        distinct: ['memberUid'],
+      });
+      const recipients = backers.map((pin) => pin.memberUid).filter((memberUid) => memberUid !== item.createdByUid);
+      for (const memberUid of recipients) {
+        await this.sendMemberNotification(
+          memberUid,
+          ROADMAP_NOTIFICATION_COPY.backedItemShipped(item.title),
+          item.uid,
+          'backed_item_shipped'
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Roadmap backers-shipped notification failed for ${item.uid}: ${error instanceof Error ? error.message : error}`
+      );
+    }
+  }
+
+  private async sendMemberNotification(
+    recipientUid: string,
+    copy: { title: string; description: string },
+    itemUid: string,
+    trigger?: string
+  ) {
+    try {
+      await this.pushNotifications.create({
+        category: PushNotificationCategory.GANTRY,
+        ...copy,
+        link: itemDetailPath(itemUid),
         recipientUid,
         isPublic: false,
-        metadata: { eventType: 'roadmap', itemUid },
+        metadata: { eventType: 'roadmap', itemUid, ...(trigger ? { trigger } : {}) },
       });
     } catch (error) {
       this.logger.warn(`Roadmap notification failed for ${itemUid}: ${error instanceof Error ? error.message : error}`);

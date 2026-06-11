@@ -44,7 +44,35 @@ export const ROADMAP_KANBAN_STAGES: RoadmapStage[] = [
   RoadmapStage.SHIPPED,
 ];
 
+// Relative route — the notification bell resolves links against the frontend
+// origin and breaks on absolute URLs.
 export function itemDetailPath(itemUid: string): string {
-  const base = process.env.WEB_UI_BASE_URL?.replace(/\/$/, '') ?? '';
-  return `${base}/roadmap/items/${itemUid}`;
+  return `/gantry/${itemUid}`;
 }
+
+/**
+ * All user-facing roadmap notification copy lives here so a wording change is a
+ * one-file swap. Each entry maps to the bell's title + description fields.
+ */
+export const ROADMAP_NOTIFICATION_COPY = {
+  newSubmission: (title: string) => ({
+    title: `New need: "${title}"`,
+    description: 'Take a look — boost it if it matters to you.',
+  }),
+  boostReturned: (title: string) => ({
+    title: `"${title}" is now in progress`,
+    description: 'Your boost budget is back — spend it on what matters next.',
+  }),
+  backedItemShipped: (title: string) => ({
+    title: `"${title}" just shipped 🎉`,
+    description: 'Something you boosted is now live.',
+  }),
+  needShipped: (title: string) => ({
+    title: `Your need "${title}" just shipped 🎉`,
+    description: "It's live now — go try it out.",
+  }),
+  needDeclined: (title: string, reason: string) => ({
+    title: `Your need "${title}" was not taken forward`,
+    description: `Reason: ${reason}`,
+  }),
+} as const;

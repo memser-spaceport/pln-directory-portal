@@ -1524,6 +1524,9 @@ enum PushNotificationCategory {
 
   // New feature announcements
   NEW_FEATURE
+
+  // Gantry (roadmap) notifications
+  GANTRY
 }
 
 // Push notifications for WebSocket delivery

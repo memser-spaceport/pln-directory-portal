@@ -73,12 +73,18 @@ export class PushNotificationsService {
     private readonly accessControlV2Service: AccessControlV2Service
   ) {}
 
-  private isSelfAuthoredForumPost(
+  /** Categories whose broadcasts are hidden from their own author (metadata.authorUid). */
+  private static readonly AUTHOR_EXCLUDED_CATEGORIES: PushNotificationCategory[] = [
+    PushNotificationCategory.FORUM_POST,
+    PushNotificationCategory.GANTRY,
+  ];
+
+  private isSelfAuthoredBroadcast(
     notification: { category: PushNotificationCategory; metadata: Prisma.JsonValue },
     memberUid: string
   ): boolean {
     return (
-      notification.category === PushNotificationCategory.FORUM_POST &&
+      PushNotificationsService.AUTHOR_EXCLUDED_CATEGORIES.includes(notification.category) &&
       notification.metadata != null &&
       typeof notification.metadata === 'object' &&
       (notification.metadata as any)?.authorUid === memberUid
@@ -250,7 +256,7 @@ export class PushNotificationsService {
         // Send to users with ANY of the required permissions
         const memberUids = await this.getMemberUidsByPermissions(dto.requiredPermissions);
         const excludeUid =
-          dto.category === PushNotificationCategory.FORUM_POST &&
+          PushNotificationsService.AUTHOR_EXCLUDED_CATEGORIES.includes(dto.category) &&
           dto.metadata?.authorUid &&
           typeof dto.metadata.authorUid === 'string'
             ? dto.metadata.authorUid
@@ -267,7 +273,7 @@ export class PushNotificationsService {
       } else if (dto.accessLevels && dto.accessLevels.length > 0) {
         // Send to users with specified access levels
         const excludeUid =
-          dto.category === PushNotificationCategory.FORUM_POST &&
+          PushNotificationsService.AUTHOR_EXCLUDED_CATEGORIES.includes(dto.category) &&
           dto.metadata?.authorUid &&
           typeof dto.metadata.authorUid === 'string'
             ? dto.metadata.authorUid
@@ -463,7 +469,7 @@ export class PushNotificationsService {
           isRead: n.readStatuses.length > 0,
           createdAt: n.createdAt,
         })),
-    ].filter((n) => !this.isSelfAuthoredForumPost(n, memberUid));
+    ].filter((n) => !this.isSelfAuthoredBroadcast(n, memberUid));
 
     // Filter notifications by requiredPermissions (user must have ANY of the required permissions)
     const notifications: NotificationWithReadStatus[] = [];
@@ -634,7 +640,7 @@ export class PushNotificationsService {
     let permissionBasedUnread = 0;
     for (const notification of permissionBasedNotifications) {
       // Skip self-authored forum posts
-      if (this.isSelfAuthoredForumPost(notification as any, memberUid)) {
+      if (this.isSelfAuthoredBroadcast(notification as any, memberUid)) {
         continue;
       }
 
@@ -705,7 +711,7 @@ export class PushNotificationsService {
     //   : [];
     const accessLevelLinks: any[] = [];
 
-    const filteredAccessLevelLinks = accessLevelLinks.filter((n) => !this.isSelfAuthoredForumPost(n as any, memberUid));
+    const filteredAccessLevelLinks = accessLevelLinks.filter((n) => !this.isSelfAuthoredBroadcast(n as any, memberUid));
 
     // Unread permission-based notifications with links
     // Filter: notifications created after member joined OR NEW_FEATURE category
@@ -725,7 +731,7 @@ export class PushNotificationsService {
     });
 
     const filteredPermissionBasedLinks = permissionBasedLinks.filter(
-      (n) => !this.isSelfAuthoredForumPost(n as any, memberUid)
+      (n) => !this.isSelfAuthoredBroadcast(n as any, memberUid)
     );
 
     // Combine all links
