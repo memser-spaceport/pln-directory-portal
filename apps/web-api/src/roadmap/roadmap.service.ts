@@ -229,7 +229,7 @@ export class RoadmapService {
       include: itemInclude,
     });
 
-    await this.notifyDeclined(row, body.reason);
+    // await this.notifyDeclined(row, body.reason);
     await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_DECLINED, actorUid, {
       itemUid: uid,
       reason: body.reason,
@@ -304,10 +304,10 @@ export class RoadmapService {
     });
 
     if (isPromoteTransition(existing.stage, to)) {
-      await this.notifyPromoted(row);
+      // await this.notifyPromoted(row);
       await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_PROMOTED, actorUid, { itemUid: uid });
     } else if (to === RoadmapStage.SHIPPED) {
-      await this.notifyShipped(row);
+      // await this.notifyShipped(row);
     } else {
       await this.track(ROADMAP_ANALYTICS_EVENTS.ROADMAP_STATUS_CHANGED, actorUid, {
         itemUid: uid,
