@@ -54,25 +54,27 @@ export function itemDetailPath(itemUid: string): string {
  * All user-facing roadmap notification copy lives here so a wording change is a
  * one-file swap. Each entry maps to the bell's title + description fields.
  */
+// Titles lead with the status — item titles can be long or weird, so the status
+// prefix keeps the bell scannable.
 export const ROADMAP_NOTIFICATION_COPY = {
   newSubmission: (title: string) => ({
-    title: `New need: "${title}"`,
+    title: `New need: ${title}`,
     description: 'Take a look — boost it if it matters to you.',
   }),
   boostReturned: (title: string) => ({
-    title: `"${title}" is now in progress`,
+    title: `In Progress: ${title}`,
     description: 'Your boost budget is back — spend it on what matters next.',
   }),
   backedItemShipped: (title: string) => ({
-    title: `"${title}" just shipped 🎉`,
+    title: `Just Shipped: ${title} 🎉`,
     description: 'Something you boosted is now live.',
   }),
   needShipped: (title: string) => ({
-    title: `Your need "${title}" just shipped 🎉`,
+    title: `Just Shipped: ${title} 🎉`,
     description: "It's live now — go try it out.",
   }),
   needDeclined: (title: string, reason: string) => ({
-    title: `Your need "${title}" was not taken forward`,
+    title: `Declined: ${title}`,
     description: `Reason: ${reason}`,
   }),
 } as const;

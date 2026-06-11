@@ -157,11 +157,11 @@ the planned "pin"→"boost" wording swap is a one-file change. Links point at
 
 | Trigger | Recipients | Title — Description |
 | --- | --- | --- |
-| New need submitted (IDEA only — curator direct-creates don't broadcast) | everyone holding `roadmap.view` or `roadmap.admin` (one permission-gated notification, not per-member fan-out; the submitter is excluded — `PushNotificationsService` hides GANTRY broadcasts from their `metadata.authorUid`) | New need: "{title}" — Take a look — boost it if it matters to you. |
-| Item enters In Progress | each member whose pin was just auto-released | "{title}" is now in progress — Your boost budget is back — spend it on what matters next. |
-| Item ships | every member who ever pinned it (released pins included, deduped; creator excluded — they get the dedicated line below) | "{title}" just shipped 🎉 — Something you boosted is now live. |
-| Item ships | original submitter | Your need "{title}" just shipped 🎉 — It's live now — go try it out. |
-| Need declined | original submitter | Your need "{title}" was not taken forward — Reason: {reason} |
+| New need submitted (IDEA only — curator direct-creates don't broadcast) | everyone holding `roadmap.view` or `roadmap.admin` (one permission-gated notification, not per-member fan-out; the submitter is excluded — `PushNotificationsService` hides GANTRY broadcasts from their `metadata.authorUid`) | New need: {title} — Take a look — boost it if it matters to you. |
+| Item enters In Progress | each member whose pin was just auto-released | In Progress: {title} — Your boost budget is back — spend it on what matters next. |
+| Item ships | every member who ever pinned it (released pins included, deduped; creator excluded — they get the dedicated line below) | Just Shipped: {title} 🎉 — Something you boosted is now live. |
+| Item ships | original submitter | Just Shipped: {title} 🎉 — It's live now — go try it out. |
+| Need declined | original submitter | Declined: {title} — Reason: {reason} |
 
 No double-fire on IN_PROGRESS → SHIPPED: pins are released exactly once (at
 IN_PROGRESS), so the boost-returned notification cannot repeat at SHIPPED. Moves to
