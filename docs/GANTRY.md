@@ -136,7 +136,9 @@ The Boost Signaling PRD (LabOS · Gantry, 2026-06-09) defines the target model:
   Submitted+Planned; In Progress likes returned; over-budget users grandfathered).
 - Team-authored **rank badges** (#1, #2…) on Planned/In Progress + OKR chips.
 - In-app notifications: new need submitted (group), boost returned (item →
-  In Progress), backed item shipped, submitter's need shipped.
+  In Progress), backed item shipped, plus a private line to the submitter on
+  every stage change of their need (planned / in progress / backlog / shipped /
+  declined).
 
 **Implementation status**: the backend pin machinery is live (budget, notes, swap,
 release-on-commitment, balance endpoint, pinners list, trending sort, reorder,
@@ -160,13 +162,23 @@ the planned "pin"→"boost" wording swap is a one-file change. Links point at
 | New need submitted (IDEA only — curator direct-creates don't broadcast) | everyone holding `roadmap.view` or `roadmap.admin` (one permission-gated notification, not per-member fan-out; the submitter is excluded — `PushNotificationsService` hides GANTRY broadcasts from their `metadata.authorUid`) | New need: {title} — Take a look — boost it if it matters to you. |
 | Item enters In Progress | each member whose pin was just auto-released | In Progress: {title} — Your boost budget is back — spend it on what matters next. |
 | Item ships | every member who ever pinned it (released pins included, deduped; creator excluded — they get the dedicated line below) | Just Shipped: {title} 🎉 — Something you boosted is now live. |
-| Item ships | original submitter | Just Shipped: {title} 🎉 — It's live now — go try it out. |
+| Need planned | original submitter | Planned: {title} — Your need is on the roadmap. |
+| Need enters In Progress | original submitter | In Progress: {title} — Work on your need has started. |
+| Need backlogged | original submitter | Backlog: {title} — Your need was moved to the backlog. |
+| Need ships | original submitter | Just Shipped: {title} 🎉 — It's live now — go try it out. |
 | Need declined | original submitter | Declined: {title} — Reason: {reason} |
+
+The submitter is notified on every stage change of their need (the five "Need …"
+rows above) except moves back to Submitted, which are curator corrections and stay
+silent. Same-stage transitions never re-notify. Declines through the decline
+endpoint carry the curator's reason; a raw stage transition to DECLINED falls back
+to "No reason provided."
 
 No double-fire on IN_PROGRESS → SHIPPED: pins are released exactly once (at
 IN_PROGRESS), so the boost-returned notification cannot repeat at SHIPPED. Moves to
 BACKLOG/DECLINED also return pins but intentionally send no boost-returned
-notification (PRD lists only the In Progress return).
+notification to boosters (PRD lists only the In Progress return) — only the
+submitter hears about those moves.
 
 For engineering conventions and invariants (budget state machine, attribution
 boundary, stage groups), see the **`gantry-boost-signaling`** Claude skill at

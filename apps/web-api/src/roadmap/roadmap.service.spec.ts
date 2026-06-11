@@ -442,6 +442,83 @@ describe('RoadmapService', () => {
         expect(boostReturnedCalls).toHaveLength(0);
       });
     });
+
+    describe('submitter stage-change notifications', () => {
+      const submitterCallsByTrigger = (trigger: string) =>
+        pushNotifications.create.mock.calls.filter(([dto]: [any]) => dto.metadata?.trigger === trigger);
+
+      it('notifies the submitter when their need is planned', async () => {
+        prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.IDEA));
+        prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.PLANNED));
+
+        await service.transitionItem('item-1', { stage: 'PLANNED' }, 'curator-1');
+
+        const calls = submitterCallsByTrigger('need_planned');
+        expect(calls).toHaveLength(1);
+        expect(calls[0][0]).toMatchObject({
+          recipientUid: 'creator-1',
+          title: 'Planned: Test',
+          description: 'Your need is on the roadmap.',
+        });
+      });
+
+      it('notifies the submitter when their need enters In Progress', async () => {
+        prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.PLANNED));
+        prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.IN_PROGRESS));
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]);
+
+        await service.transitionItem('item-1', { stage: 'IN_PROGRESS' }, 'curator-1');
+
+        const calls = submitterCallsByTrigger('need_in_progress');
+        expect(calls).toHaveLength(1);
+        expect(calls[0][0]).toMatchObject({
+          recipientUid: 'creator-1',
+          title: 'In Progress: Test',
+          description: 'Work on your need has started.',
+        });
+      });
+
+      it('notifies the submitter when their need is backlogged', async () => {
+        prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.IDEA));
+        prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.BACKLOG));
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]);
+
+        await service.transitionItem('item-1', { stage: 'BACKLOG' }, 'curator-1');
+
+        const calls = submitterCallsByTrigger('need_backlogged');
+        expect(calls).toHaveLength(1);
+        expect(calls[0][0]).toMatchObject({
+          recipientUid: 'creator-1',
+          title: 'Backlog: Test',
+          description: 'Your need was moved to the backlog.',
+        });
+      });
+
+      it('notifies the submitter with a fallback reason on DECLINED via raw transition', async () => {
+        prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.PLANNED));
+        prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.DECLINED));
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]);
+
+        await service.transitionItem('item-1', { stage: 'DECLINED' }, 'curator-1');
+
+        const calls = submitterCallsByTrigger('need_declined');
+        expect(calls).toHaveLength(1);
+        expect(calls[0][0]).toMatchObject({
+          recipientUid: 'creator-1',
+          title: 'Declined: Test',
+          description: 'Reason: No reason provided.',
+        });
+      });
+
+      it('does not notify when the stage does not change', async () => {
+        prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.PLANNED));
+        prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.PLANNED));
+
+        await service.transitionItem('item-1', { stage: 'PLANNED' }, 'curator-1');
+
+        expect(pushNotifications.create).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('reorderItems', () => {
