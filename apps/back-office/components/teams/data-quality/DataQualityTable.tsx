@@ -11,13 +11,13 @@ import {
 } from '@tanstack/react-table';
 import { clsx } from 'clsx';
 
-import { EnrichmentTeam, FieldKey, LogoEntry } from '../../../hooks/teams/useTeamsEnrichmentReview';
+import { EnrichmentTeam, FieldKey } from '../../../hooks/teams/useTeamsEnrichmentReview';
 import { useApproveEnrichmentFields } from '../../../hooks/teams/useApproveEnrichmentFields';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
 import PaginationControls from '../../../screens/members/components/PaginationControls/PaginationControls';
 import { TeamLogoCell } from './TeamLogoCell';
 import { NeedsReviewCell } from './NeedsReviewCell';
-import { FIELD_KEYS, needsReview } from './constants';
+import { FIELD_KEYS, isAIEnriched, needsReview } from './constants';
 import s from '../../../pages/teams/data-quality.module.scss';
 
 interface Props {
@@ -133,9 +133,10 @@ export function DataQualityTable({ teams, isLoading, hasActiveFilters, authToken
         sortingFn: 'alphanumeric',
         cell: (info) => {
           const team = info.row.original;
+          const confirmedLogo = team.logo && !isAIEnriched(team.logo) ? team.logo : undefined;
           return (
             <a href={`${WEB_UI_BASE_URL}/teams/${team.uid}`} target="_blank" rel="noreferrer" className={s.teamLink}>
-              <TeamLogoCell logo={team.logo ?? (team.fields?.logo as LogoEntry)} name={team.name} />
+              <TeamLogoCell logo={confirmedLogo} name={team.name} />
               <span className={s.teamName}>{team.name}</span>
             </a>
           );

@@ -58,18 +58,26 @@ export function NeedsReviewCell({ team, confirmedKeys, isPending, onConfirm, onA
             : null;
 
         const suggestionContent = explicitSuggestion ?? implicitSuggestion;
+        // When entry.content is itself the AI suggestion (Case 2), the "current" value is empty
+        const currentLogoUrl = implicitSuggestion ? null : logoUrl;
+        const currentDisplayValue = implicitSuggestion ? null : displayValue;
+        const currentFullValue = implicitSuggestion ? null : fullValue;
 
         return (
           <div key={key} className={s.reviewItem}>
             <div className={s.reviewItemMain}>
               <span className={s.reviewFieldName}>{FIELD_LABELS[key]}</span>
-              {logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={logoUrl} alt="" className={s.reviewLogoThumb} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              ) : (
-                <span className={s.reviewFieldValue} title={fullValue}>
-                  {displayValue || '(no value)'}
+              {currentLogoUrl ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={currentLogoUrl} alt="" className={s.reviewLogoThumb} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                </>
+              ) : currentDisplayValue ? (
+                <span className={s.reviewFieldValue} title={currentFullValue ?? ''}>
+                  {currentDisplayValue}
                 </span>
+              ) : (
+                <span className={s.reviewFieldEmpty}>(no value)</span>
               )}
               {/*<span className={s.qualityBadgeLow}>*/}
               {/*  {isAI ? <SparkleIcon /> : <UserIcon />}*/}
