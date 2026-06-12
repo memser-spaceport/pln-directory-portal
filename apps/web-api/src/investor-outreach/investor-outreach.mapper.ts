@@ -5,9 +5,14 @@ import type {
   Member,
   PlPortfolioTeamMeta,
   Team,
+  TeamMemberRole,
 } from '@prisma/client';
-import { InvestorDto, LabOsProfileDto } from './dto/investor.dto';
-import { PlPortfolioTeamCoInvestorDto, PlPortfolioTeamDto } from './dto/pl-portfolio-team.dto';
+import { InvestorDto, InvestorEnrichmentDto, LabOsProfileDto } from './dto/investor.dto';
+import {
+  PlPortfolioTeamCoInvestorDto,
+  PlPortfolioTeamDto,
+  PlPortfolioTeamFounderDto,
+} from './dto/pl-portfolio-team.dto';
 import { isAllowedStageFocus } from './investor-outreach.vocab';
 
 type MemberWithImage = Member & { image: Image | null };
@@ -41,6 +46,30 @@ export const splitCsv = (raw: string | null | undefined): string[] => {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+};
+
+/** Extract the "who is this investor" enrichment block from rawPayload.enrichment. */
+const buildEnrichment = (raw: unknown): InvestorEnrichmentDto | null => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const e = (raw as Record<string, unknown>).enrichment;
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+  const o = e as Record<string, unknown>;
+  const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v : null);
+  const arr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  const result: InvestorEnrichmentDto = {
+    bio: str(o.bio),
+    fundFocus: str(o.fundFocus),
+    aum: str(o.aum),
+    notableInvestments: arr(o.notableInvestments),
+    thesis: str(o.thesis),
+    sources: arr(o.sources),
+    enrichedVia: str(o.enrichedVia),
+    fetchedAt: str(o.fetchedAt),
+  };
+  // Nothing useful → treat as no enrichment.
+  const hasContent =
+    result.bio || result.fundFocus || result.aum || result.thesis || result.notableInvestments.length > 0;
+  return hasContent ? result : null;
 };
 
 const buildLabOsProfile = (member: MemberWithImage | undefined): LabOsProfileDto | null => {
@@ -79,6 +108,7 @@ export function toInvestorDto(
     firm: record.firm,
     firmDomain: record.firmDomain,
     title: record.title,
+    proximityCode: record.proximityCode,
 
     investorType: record.investorType,
     fundThesis: record.fundThesis,
@@ -109,6 +139,11 @@ export function toInvestorDto(
     labOsProfile: buildLabOsProfile(member),
     coInvestedTeamIds: teamUids,
 
+    bestProximityCode: record.bestProximityCode ?? null,
+    hasPath: record.hasPath ?? false,
+
+    enrichment: buildEnrichment(record.rawPayload),
+
     createdAt: dateToIso(record.createdAt) ?? '',
     updatedAt: dateToIso(record.updatedAt) ?? '',
   };
@@ -118,6 +153,7 @@ type TeamWithMetaAndOverlaps = Team & {
   logo: Image | null;
   portfolioMeta: PlPortfolioTeamMeta | null;
   portfolioOverlaps: Array<InvestorPortfolioOverlap & { investorOutreachRecord: { investorId: string } }>;
+  teamMemberRoles?: Array<TeamMemberRole & { member: { uid: string; name: string } }>;
 };
 
 const toCoInvestor = (
@@ -126,6 +162,11 @@ const toCoInvestor = (
   investorId: overlap.investorOutreachRecord.investorId,
   dealAmount: overlap.dealAmount == null ? null : Number(overlap.dealAmount),
   dealDate: dateToYmd(overlap.dealDate),
+});
+
+const toFounder = (role: TeamMemberRole & { member: { uid: string; name: string } }): PlPortfolioTeamFounderDto => ({
+  name: role.member.name,
+  memberUid: role.member.uid,
 });
 
 export function toPlPortfolioTeamDto(team: TeamWithMetaAndOverlaps): PlPortfolioTeamDto {
@@ -145,5 +186,6 @@ export function toPlPortfolioTeamDto(team: TeamWithMetaAndOverlaps): PlPortfolio
     sectors: splitCsv(meta?.sectors ?? null),
     geo: meta?.geo ?? null,
     coInvestors: team.portfolioOverlaps.map(toCoInvestor),
+    founders: (team.teamMemberRoles ?? []).map(toFounder),
   };
 }

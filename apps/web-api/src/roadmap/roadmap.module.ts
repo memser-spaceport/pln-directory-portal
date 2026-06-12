@@ -6,12 +6,14 @@ import { PushNotificationsModule } from '../push-notifications/push-notification
 import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
 import { RoadmapController } from './roadmap.controller';
+import { RoadmapObjectivesService } from './roadmap-objectives.service';
+import { RoadmapPinsService } from './roadmap-pins.service';
 import { RoadmapService } from './roadmap.service';
 
 @Module({
   imports: [SharedModule, MembersModule, RbacModule, AccessControlV2Module, PushNotificationsModule, AnalyticsModule],
   controllers: [RoadmapController],
-  providers: [RoadmapService],
-  exports: [RoadmapService],
+  providers: [RoadmapService, RoadmapPinsService, RoadmapObjectivesService],
+  exports: [RoadmapService, RoadmapPinsService, RoadmapObjectivesService],
 })
 export class RoadmapModule {}

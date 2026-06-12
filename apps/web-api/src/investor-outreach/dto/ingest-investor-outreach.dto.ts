@@ -50,6 +50,8 @@ export interface InvestorOutreachIngestItem {
   firm?: string;
   firm_domain?: string;
   title?: string;
+  /** Firm-level warm-intro reachability, e.g. "VC+1A", "C". Free string, ≤8 chars. */
+  proximity_code?: string;
   investor_type: string;
   fund_thesis?: string;
   aum_range?: string;

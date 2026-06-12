@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "RoadmapItem" ADD COLUMN     "order" INTEGER NOT NULL DEFAULT 99,
+ADD COLUMN     "tags" TEXT[] DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN     "type" TEXT;

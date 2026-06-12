@@ -75,6 +75,9 @@ export class InvestorOutreachQueryService {
         portfolioOverlaps: {
           include: { investorOutreachRecord: { select: { investorId: true } } },
         },
+        teamMemberRoles: {
+          include: { member: { select: { uid: true, name: true } } },
+        },
       },
       orderBy: { name: 'asc' },
     });

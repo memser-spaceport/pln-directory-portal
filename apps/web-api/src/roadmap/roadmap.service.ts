@@ -4,6 +4,7 @@ import {
   ArchiveRoadmapItemSchema,
   CreateRoadmapItemSchema,
   DeclineRoadmapItemSchema,
+  ReorderRoadmapItemsSchema,
   RoadmapItemListQueryParams,
   TransitionRoadmapItemSchema,
   UpdateRoadmapItemSchema,
@@ -14,7 +15,15 @@ import { AccessControlV2Service } from '../access-control-v2/services/access-con
 import { ADMIN_PERMISSIONS, ROADMAP_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { PrismaService } from '../shared/prisma.service';
-import { ROADMAP_ANALYTICS_EVENTS } from './roadmap.constants';
+import {
+  PINNABLE_STAGES,
+  PIN_RELEASING_STAGES,
+  ROADMAP_ANALYTICS_EVENTS,
+  ROADMAP_NOTIFICATION_COPY,
+  TRENDING_HALF_LIFE_DAYS,
+  itemDetailPath,
+} from './roadmap.constants';
+import { AdminPinDto, AdminPinRow, toAdminPinList } from './roadmap-pin.util';
 import { assertTransitionAllowed, isDeclineTransition, isIdeaStage, isPromoteTransition } from './roadmap-stage.util';
 
 type CreateBody = z.infer<typeof CreateRoadmapItemSchema>;
@@ -23,6 +32,7 @@ type ListQuery = z.infer<typeof RoadmapItemListQueryParams>;
 type ArchiveBody = z.infer<typeof ArchiveRoadmapItemSchema>;
 type DeclineBody = z.infer<typeof DeclineRoadmapItemSchema>;
 type TransitionBody = z.infer<typeof TransitionRoadmapItemSchema>;
+type ReorderBody = z.infer<typeof ReorderRoadmapItemsSchema>;
 
 type MemberAccess = {
   canEditOwn: boolean;
@@ -33,8 +43,17 @@ type MemberAccess = {
 const itemInclude: Prisma.RoadmapItemInclude = {
   createdBy: { select: { uid: true, name: true, image: { select: { url: true } } } },
   promotedBy: { select: { uid: true, name: true } },
-  _count: { select: { upvotes: true } },
+  objective: { select: { uid: true, title: true, order: true } },
+  _count: { select: { pins: true } },
 };
+
+const adminPinSelect = {
+  uid: true,
+  note: true,
+  createdAt: true,
+  releasedAt: true,
+  member: { select: { uid: true, name: true, image: { select: { url: true } } } },
+} as const;
 
 interface RoadmapItemRow {
   uid: string;
@@ -43,17 +62,29 @@ interface RoadmapItemRow {
   acceptanceCriteria: string | null;
   stage: RoadmapStage;
   focusArea: string | null;
+  type: string | null;
+  tags: string[];
+  order: number;
   createdByUid: string;
   createdBy: { uid: string; name: string; image: { url: string } | null };
   promotedAt: Date | null;
   promotedByUid: string | null;
   declinedReason: string | null;
   externalTrackerUrl: string | null;
+  objective: { uid: string; title: string; order: number } | null;
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  _count: { upvotes: number };
+  _count: { pins: number };
 }
+
+interface ViewerPinState {
+  viewerHasPinned: boolean;
+  viewerPinNote: string | null;
+  activePinCount: number;
+}
+
+const EMPTY_PIN_STATE: ViewerPinState = { viewerHasPinned: false, viewerPinNote: null, activePinCount: 0 };
 
 @Injectable()
 export class RoadmapService {
@@ -94,33 +125,91 @@ export class RoadmapService {
 
   async listItems(query: ListQuery, viewerUid: string) {
     const where = this.buildListWhere(query, viewerUid);
-    const rows = await this.prisma.roadmapItem.findMany({
+    const access = await this.getMemberAccess(viewerUid);
+    const rows = (await this.prisma.roadmapItem.findMany({
       where,
       include: {
         ...itemInclude,
-        upvotes: { where: { memberUid: viewerUid }, select: { uid: true }, take: 1 },
+        pins: { where: { memberUid: viewerUid, releasedAt: null }, select: { note: true }, take: 1 },
       },
-    });
+    })) as unknown as (RoadmapItemRow & { pins: { note: string | null }[] })[];
 
-    const sorted = (rows as unknown as (RoadmapItemRow & { upvotes: { uid: string }[] })[]).sort((a, b) => {
-      const countDiff = b._count.upvotes - a._count.upvotes;
-      if (countDiff !== 0) return countDiff;
+    // Curators get the full pinner lists embedded; everyone else only needs active-pin
+    // timestamps for counts and trending scores.
+    let activePins: { itemUid: string; createdAt: Date }[];
+    let adminPinsByItem: Map<string, AdminPinRow[]> | null = null;
+    if (access.canCurate) {
+      const fullPins = await this.prisma.roadmapItemPin.findMany({
+        where: { itemUid: { in: rows.map((row) => row.uid) } },
+        select: { itemUid: true, ...adminPinSelect },
+      });
+      adminPinsByItem = new Map();
+      for (const pin of fullPins) {
+        const list = adminPinsByItem.get(pin.itemUid) ?? [];
+        list.push(pin);
+        adminPinsByItem.set(pin.itemUid, list);
+      }
+      activePins = fullPins.filter((pin) => !pin.releasedAt);
+    } else {
+      activePins = await this.prisma.roadmapItemPin.findMany({
+        where: { itemUid: { in: rows.map((row) => row.uid) }, releasedAt: null },
+        select: { itemUid: true, createdAt: true },
+      });
+    }
+
+    const activePinCounts = new Map<string, number>();
+    const trendingScores = new Map<string, number>();
+    const now = Date.now();
+    const msPerDay = 24 * 60 * 60 * 1000;
+    for (const pin of activePins) {
+      activePinCounts.set(pin.itemUid, (activePinCounts.get(pin.itemUid) ?? 0) + 1);
+      const ageDays = Math.max(0, now - pin.createdAt.getTime()) / msPerDay;
+      const score = Math.pow(0.5, ageDays / TRENDING_HALF_LIFE_DAYS);
+      trendingScores.set(pin.itemUid, (trendingScores.get(pin.itemUid) ?? 0) + score);
+    }
+
+    const displayedPinCount = (row: RoadmapItemRow) =>
+      this.isPinnableStage(row.stage) ? activePinCounts.get(row.uid) ?? 0 : row._count.pins;
+
+    const sortMode = query.sort ?? 'default';
+    const sorted = rows.sort((a, b) => {
+      if (sortMode === 'newest') {
+        return b.createdAt.getTime() - a.createdAt.getTime();
+      }
+      if (sortMode === 'top_pins' || sortMode === 'trending') {
+        if (sortMode === 'trending') {
+          const scoreDiff = (trendingScores.get(b.uid) ?? 0) - (trendingScores.get(a.uid) ?? 0);
+          if (scoreDiff !== 0) return scoreDiff;
+        }
+        const pinDiff = displayedPinCount(b) - displayedPinCount(a);
+        if (pinDiff !== 0) return pinDiff;
+        return b.updatedAt.getTime() - a.updatedAt.getTime();
+      }
+      const orderDiff = a.order - b.order;
+      if (orderDiff !== 0) return orderDiff;
       return b.updatedAt.getTime() - a.updatedAt.getTime();
     });
 
     return {
-      items: sorted.map((row) => this.toDto(row, viewerUid, row.upvotes.length > 0)),
+      items: sorted.map((row) =>
+        this.toDto(
+          row,
+          viewerUid,
+          {
+            viewerHasPinned: row.pins.length > 0,
+            viewerPinNote: row.pins[0]?.note ?? null,
+            activePinCount: activePinCounts.get(row.uid) ?? 0,
+          },
+          adminPinsByItem ? toAdminPinList(adminPinsByItem.get(row.uid) ?? []) : null
+        )
+      ),
       total: sorted.length,
     };
   }
 
   async getItem(uid: string, viewerUid: string) {
     const row = await this.findActiveOrThrow(uid);
-    const viewerUpvote = await this.prisma.roadmapItemUpvote.findUnique({
-      where: { itemUid_memberUid: { itemUid: uid, memberUid: viewerUid } },
-      select: { uid: true },
-    });
-    return this.toDto(row as unknown as RoadmapItemRow, viewerUid, !!viewerUpvote);
+    return this.composeDto(row, viewerUid);
   }
 
   async createItem(body: CreateBody, actorUid: string) {
@@ -144,6 +233,8 @@ export class RoadmapService {
         description: body.description,
         acceptanceCriteria: body.acceptanceCriteria ?? null,
         focusArea: body.focusArea ?? null,
+        type: body.type ?? null,
+        tags: body.tags ?? [],
         externalTrackerUrl: body.externalTrackerUrl ?? null,
         stage,
         createdByUid: actorUid,
@@ -158,7 +249,13 @@ export class RoadmapService {
       stage: row.stage,
     });
 
-    return this.toDto(row as unknown as RoadmapItemRow, actorUid, false);
+    // Only true submissions ("Share a need" → IDEA) are broadcast; curator
+    // direct-creates into PLANNED/IN_PROGRESS are roadmap work, not new needs.
+    if (stage === RoadmapStage.IDEA) {
+      await this.notifyNewSubmission(row, actorUid);
+    }
+
+    return this.toDto(row as unknown as RoadmapItemRow, actorUid, EMPTY_PIN_STATE, access.canCurate ? [] : null);
   }
 
   async updateItem(uid: string, body: UpdateBody, actorUid: string) {
@@ -166,6 +263,9 @@ export class RoadmapService {
     const access = await this.getMemberAccess(actorUid);
     if (!this.canEditItem(existing, actorUid, access)) {
       throw new ForbiddenException('You cannot edit this item');
+    }
+    if (body.order !== undefined && !access.canCurate) {
+      throw new ForbiddenException('Only the product team can reorder items');
     }
 
     const row = await this.prisma.roadmapItem.update({
@@ -175,14 +275,45 @@ export class RoadmapService {
         ...(body.description !== undefined ? { description: body.description } : {}),
         ...(body.acceptanceCriteria !== undefined ? { acceptanceCriteria: body.acceptanceCriteria } : {}),
         ...(body.focusArea !== undefined ? { focusArea: body.focusArea } : {}),
+        ...(body.type !== undefined ? { type: body.type } : {}),
+        ...(body.tags !== undefined ? { tags: body.tags } : {}),
         ...(body.externalTrackerUrl !== undefined ? { externalTrackerUrl: body.externalTrackerUrl } : {}),
+        ...(body.order !== undefined ? { order: body.order } : {}),
       },
       include: itemInclude,
     });
 
     await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_UPDATED, actorUid, { itemUid: uid });
-    const viewerUpvote = await this.hasViewerUpvoted(uid, actorUid);
-    return this.toDto(row as unknown as RoadmapItemRow, actorUid, viewerUpvote);
+    return this.composeDto(row as unknown as RoadmapItemRow, actorUid, access);
+  }
+
+  async reorderItems(body: ReorderBody, actorUid: string) {
+    const access = await this.getMemberAccess(actorUid);
+    if (!access.canCurate) {
+      throw new ForbiddenException('Only the product team can reorder items');
+    }
+
+    const uids = body.items.map((item) => item.uid);
+    if (new Set(uids).size !== uids.length) {
+      throw new BadRequestException('Duplicate item uids in reorder payload');
+    }
+
+    const existing = await this.prisma.roadmapItem.findMany({
+      where: { uid: { in: uids }, deletedAt: null },
+      select: { uid: true },
+    });
+    const known = new Set(existing.map((item) => item.uid));
+    const unknown = uids.filter((uid) => !known.has(uid));
+    if (unknown.length) {
+      throw new BadRequestException(`Unknown roadmap items: ${unknown.join(', ')}`);
+    }
+
+    await this.prisma.$transaction(
+      body.items.map(({ uid, order }) => this.prisma.roadmapItem.update({ where: { uid }, data: { order } }))
+    );
+
+    await this.track(ROADMAP_ANALYTICS_EVENTS.ITEMS_REORDERED, actorUid, { count: body.items.length });
+    return { updated: body.items.length };
   }
 
   async archiveItem(uid: string, body: ArchiveBody, actorUid: string) {
@@ -192,17 +323,22 @@ export class RoadmapService {
       throw new ForbiddenException('You cannot archive this item');
     }
 
-    const row = await this.prisma.roadmapItem.update({
-      where: { uid },
-      data: {
-        deletedAt: new Date(),
-        deletionReason: body.deletionReason ?? null,
-      },
-      include: itemInclude,
+    const { row, releasedPins } = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.roadmapItem.update({
+        where: { uid },
+        data: {
+          deletedAt: new Date(),
+          deletionReason: body.deletionReason ?? null,
+        },
+        include: itemInclude,
+      });
+      const released = await this.releaseActivePins(tx, uid);
+      return { row: updated, releasedPins: released };
     });
 
     await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_ARCHIVED, actorUid, { itemUid: uid });
-    return this.toDto(row as unknown as RoadmapItemRow, actorUid, false);
+    await this.trackPinsReleased(uid, actorUid, releasedPins, 'archived');
+    return this.toDto(row as unknown as RoadmapItemRow, actorUid, EMPTY_PIN_STATE);
   }
 
   async promoteItem(uid: string, actorUid: string) {
@@ -220,13 +356,17 @@ export class RoadmapService {
     }
     assertTransitionAllowed(existing.stage, RoadmapStage.DECLINED);
 
-    const row = await this.prisma.roadmapItem.update({
-      where: { uid },
-      data: {
-        stage: RoadmapStage.DECLINED,
-        declinedReason: body.reason,
-      },
-      include: itemInclude,
+    const { row, releasedPins } = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.roadmapItem.update({
+        where: { uid },
+        data: {
+          stage: RoadmapStage.DECLINED,
+          declinedReason: body.reason,
+        },
+        include: itemInclude,
+      });
+      const released = await this.releaseActivePins(tx, uid);
+      return { row: updated, releasedPins: released };
     });
 
     // await this.notifyDeclined(row, body.reason);
@@ -234,9 +374,9 @@ export class RoadmapService {
       itemUid: uid,
       reason: body.reason,
     });
+    await this.trackPinsReleased(uid, actorUid, releasedPins, RoadmapStage.DECLINED);
 
-    const viewerUpvote = await this.hasViewerUpvoted(uid, actorUid);
-    return this.toDto(row as unknown as RoadmapItemRow, actorUid, viewerUpvote);
+    return this.composeDto(row as unknown as RoadmapItemRow, actorUid, access);
   }
 
   async transitionItem(uid: string, body: TransitionBody, actorUid: string) {
@@ -246,24 +386,18 @@ export class RoadmapService {
     });
   }
 
-  async addUpvote(uid: string, note: string | null | undefined, actorUid: string) {
-    await this.findActiveOrThrow(uid);
-    await this.prisma.roadmapItemUpvote.upsert({
-      where: { itemUid_memberUid: { itemUid: uid, memberUid: actorUid } },
-      create: { itemUid: uid, memberUid: actorUid, note: note ?? null },
-      update: { note: note ?? null },
-    });
-    await this.track(ROADMAP_ANALYTICS_EVENTS.ITEM_UPVOTED, actorUid, { itemUid: uid });
-    return this.getItem(uid, actorUid);
+  isPinnableStage(stage: RoadmapStage): boolean {
+    return PINNABLE_STAGES.includes(stage);
   }
 
-  async removeUpvote(uid: string, actorUid: string) {
-    await this.findActiveOrThrow(uid);
-    await this.prisma.roadmapItemUpvote.deleteMany({
-      where: { itemUid: uid, memberUid: actorUid },
-    });
-    await this.track(ROADMAP_ANALYTICS_EVENTS.UPVOTE_REMOVED, actorUid, { itemUid: uid });
-    return this.getItem(uid, actorUid);
+  /** Pins are only allowed while an item is in a pinnable stage; counts are frozen elsewhere. */
+  assertStageAllowsSignals(stage: RoadmapStage): void {
+    if (!this.isPinnableStage(stage)) {
+      throw new BadRequestException({
+        message: `Items in stage ${stage} cannot be pinned; counts are frozen`,
+        code: 'ITEM_NOT_PINNABLE',
+      });
+    }
   }
 
   async trackBuildButtonClick(uid: string, actorUid: string) {
@@ -297,17 +431,33 @@ export class RoadmapService {
       data.declinedReason = null;
     }
 
-    const row = await this.prisma.roadmapItem.update({
-      where: { uid },
-      data,
-      include: itemInclude,
+    const { row, releasedPins } = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.roadmapItem.update({
+        where: { uid },
+        data,
+        include: itemInclude,
+      });
+      const released = PIN_RELEASING_STAGES.includes(to) ? await this.releaseActivePins(tx, uid) : [];
+      return { row: updated, releasedPins: released };
     });
 
+    await this.trackPinsReleased(uid, actorUid, releasedPins, to);
+
+    // Boost-returned notifications fire only on commitment (IN_PROGRESS). Pins are
+    // released exactly once, so a later IN_PROGRESS → SHIPPED move releases nothing
+    // and cannot double-fire this.
+    if (to === RoadmapStage.IN_PROGRESS) {
+      await this.notifyBoostsReturned(row, releasedPins);
+    }
+
+    if (existing.stage !== to) {
+      await this.notifySubmitterStageChange(row, to, opts.declinedReason);
+    }
+
     if (isPromoteTransition(existing.stage, to)) {
-      // await this.notifyPromoted(row);
       await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_PROMOTED, actorUid, { itemUid: uid });
     } else if (to === RoadmapStage.SHIPPED) {
-      // await this.notifyShipped(row);
+      await this.notifyBackersShipped(row);
     } else {
       await this.track(ROADMAP_ANALYTICS_EVENTS.ROADMAP_STATUS_CHANGED, actorUid, {
         itemUid: uid,
@@ -316,8 +466,30 @@ export class RoadmapService {
       });
     }
 
-    const viewerUpvote = await this.hasViewerUpvoted(uid, actorUid);
-    return this.toDto(row as unknown as RoadmapItemRow, actorUid, viewerUpvote);
+    return this.composeDto(row as unknown as RoadmapItemRow, actorUid, access);
+  }
+
+  /** Releases all active pins on an item and returns the uids of the members whose pin was just returned. */
+  private async releaseActivePins(tx: Prisma.TransactionClient, itemUid: string): Promise<string[]> {
+    const active = await tx.roadmapItemPin.findMany({
+      where: { itemUid, releasedAt: null },
+      select: { memberUid: true },
+    });
+    await tx.roadmapItemPin.updateMany({
+      where: { itemUid, releasedAt: null },
+      data: { releasedAt: new Date() },
+    });
+    return active.map((pin) => pin.memberUid);
+  }
+
+  private async trackPinsReleased(itemUid: string, actorUid: string, releasedPins: string[], reason: string) {
+    if (releasedPins.length > 0) {
+      await this.track(ROADMAP_ANALYTICS_EVENTS.PINS_RELEASED, actorUid, {
+        itemUid,
+        count: releasedPins.length,
+        reason,
+      });
+    }
   }
 
   private buildListWhere(query: ListQuery, viewerUid: string): Prisma.RoadmapItemWhereInput {
@@ -333,6 +505,19 @@ export class RoadmapService {
 
     if (query.focusArea) {
       where.focusArea = query.focusArea;
+    }
+
+    if (query.objectiveUid) {
+      where.objectiveUid = query.objectiveUid;
+    }
+
+    if (query.type) {
+      where.type = query.type;
+    }
+
+    const tags = query.tags as string[] | undefined;
+    if (tags?.length) {
+      where.tags = { hasSome: tags };
     }
 
     const stages = query.stage as RoadmapStage[] | undefined;
@@ -356,15 +541,54 @@ export class RoadmapService {
     return row as unknown as RoadmapItemRow;
   }
 
-  private async hasViewerUpvoted(itemUid: string, memberUid: string) {
-    const row = await this.prisma.roadmapItemUpvote.findUnique({
-      where: { itemUid_memberUid: { itemUid, memberUid } },
-      select: { uid: true },
-    });
-    return !!row;
+  /** Builds the item DTO, fetching the viewer's pin state, active pin count, and (for curators) the pinner list. */
+  private async composeDto(row: RoadmapItemRow, viewerUid: string, access?: MemberAccess) {
+    const memberAccess = access ?? (await this.getMemberAccess(viewerUid));
+
+    if (memberAccess.canCurate) {
+      const pins = await this.prisma.roadmapItemPin.findMany({
+        where: { itemUid: row.uid },
+        select: adminPinSelect,
+      });
+      const activePins = pins.filter((pin) => !pin.releasedAt);
+      const viewerPin = activePins.find((pin) => pin.member.uid === viewerUid);
+      return this.toDto(
+        row,
+        viewerUid,
+        {
+          viewerHasPinned: !!viewerPin,
+          viewerPinNote: viewerPin?.note ?? null,
+          activePinCount: activePins.length,
+        },
+        toAdminPinList(pins)
+      );
+    }
+
+    const [viewerPin, activePinCount] = await Promise.all([
+      this.prisma.roadmapItemPin.findFirst({
+        where: { itemUid: row.uid, memberUid: viewerUid, releasedAt: null },
+        select: { note: true },
+      }),
+      this.prisma.roadmapItemPin.count({ where: { itemUid: row.uid, releasedAt: null } }),
+    ]);
+    return this.toDto(
+      row,
+      viewerUid,
+      {
+        viewerHasPinned: !!viewerPin,
+        viewerPinNote: viewerPin?.note ?? null,
+        activePinCount,
+      },
+      null
+    );
   }
 
-  private toDto(row: RoadmapItemRow, _viewerUid: string, viewerHasUpvoted: boolean) {
+  private toDto(
+    row: RoadmapItemRow,
+    _viewerUid: string,
+    pinState: ViewerPinState,
+    adminPins: AdminPinDto[] | null = null
+  ) {
     return {
       uid: row.uid,
       title: row.title,
@@ -372,6 +596,9 @@ export class RoadmapService {
       acceptanceCriteria: row.acceptanceCriteria,
       stage: row.stage,
       focusArea: row.focusArea,
+      type: row.type,
+      tags: row.tags,
+      order: row.order,
       createdByUid: row.createdByUid,
       createdBy: {
         uid: row.createdBy.uid,
@@ -382,39 +609,163 @@ export class RoadmapService {
       promotedByUid: row.promotedByUid,
       declinedReason: row.declinedReason,
       externalTrackerUrl: row.externalTrackerUrl,
-      upvoteCount: row._count.upvotes,
-      viewerHasUpvoted,
+      objective: row.objective
+        ? { uid: row.objective.uid, title: row.objective.title, order: row.objective.order }
+        : null,
+      upvoteCount: 0,
+      viewerHasUpvoted: false,
+      pinCount: this.isPinnableStage(row.stage) ? pinState.activePinCount : row._count.pins,
+      viewerHasPinned: pinState.viewerHasPinned,
+      viewerPinNote: pinState.viewerPinNote,
+      pins: adminPins,
       deletedAt: row.deletedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
   }
 
-  private async notifyPromoted(item: { uid: string; title: string; createdByUid: string }) {
-    await this.sendCreatorNotification(item.createdByUid, `Your idea "${item.title}" is now on the roadmap.`, item.uid);
+  /**
+   * Tell the original submitter their need moved to a new stage. Every stage has a
+   * dedicated line except moves back to IDEA (curator corrections — intentionally
+   * silent). Declines through the dedicated decline endpoint carry the curator's
+   * reason; a raw transition to DECLINED falls back to a generic one.
+   */
+  private async notifySubmitterStageChange(
+    item: { uid: string; title: string; createdByUid: string },
+    to: RoadmapStage,
+    declinedReason?: string
+  ) {
+    switch (to) {
+      case RoadmapStage.PLANNED:
+        return this.sendMemberNotification(
+          item.createdByUid,
+          ROADMAP_NOTIFICATION_COPY.needPlanned(item.title),
+          item.uid,
+          'need_planned'
+        );
+      case RoadmapStage.IN_PROGRESS:
+        return this.sendMemberNotification(
+          item.createdByUid,
+          ROADMAP_NOTIFICATION_COPY.needInProgress(item.title),
+          item.uid,
+          'need_in_progress'
+        );
+      case RoadmapStage.BACKLOG:
+        return this.sendMemberNotification(
+          item.createdByUid,
+          ROADMAP_NOTIFICATION_COPY.needBacklogged(item.title),
+          item.uid,
+          'need_backlogged'
+        );
+      case RoadmapStage.SHIPPED:
+        return this.notifyShipped(item);
+      case RoadmapStage.DECLINED:
+        return this.notifyDeclined(item, declinedReason ?? 'No reason provided.');
+      default:
+        return;
+    }
   }
 
   private async notifyDeclined(item: { uid: string; title: string; createdByUid: string }, reason: string) {
-    await this.sendCreatorNotification(
+    await this.sendMemberNotification(
       item.createdByUid,
-      `Your idea "${item.title}" was not taken forward. Reason: ${reason}`,
-      item.uid
+      ROADMAP_NOTIFICATION_COPY.needDeclined(item.title, reason),
+      item.uid,
+      'need_declined'
     );
   }
 
+  /** Trigger 4 — tell the original submitter their need shipped. */
   private async notifyShipped(item: { uid: string; title: string; createdByUid: string }) {
-    await this.sendCreatorNotification(item.createdByUid, `"${item.title}" has shipped.`, item.uid);
+    await this.sendMemberNotification(
+      item.createdByUid,
+      ROADMAP_NOTIFICATION_COPY.needShipped(item.title),
+      item.uid,
+      'need_shipped'
+    );
   }
 
-  private async sendCreatorNotification(recipientUid: string, title: string, itemUid: string) {
+  /**
+   * PRD §7 trigger 1 — broadcast a new submission to everyone with roadmap access.
+   * One permission-gated notification: holders of roadmap.view see it; roadmap.admin
+   * is listed too because the websocket fan-out matches raw permission codes without
+   * expanding the aggregate.
+   */
+  private async notifyNewSubmission(item: { uid: string; title: string }, authorUid: string) {
     try {
       await this.pushNotifications.create({
-        category: PushNotificationCategory.SYSTEM,
-        title,
-        link: `/roadmap/items/${itemUid}`,
+        category: PushNotificationCategory.GANTRY,
+        ...ROADMAP_NOTIFICATION_COPY.newSubmission(item.title),
+        link: itemDetailPath(item.uid),
+        isPublic: false,
+        requiredPermissions: [ROADMAP_PERMISSIONS.VIEW, ROADMAP_PERMISSIONS.ADMIN],
+        metadata: { eventType: 'roadmap', itemUid: item.uid, trigger: 'new_submission', authorUid },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Roadmap new-submission notification failed for ${item.uid}: ${error instanceof Error ? error.message : error}`
+      );
+    }
+  }
+
+  /** PRD §7 trigger 2 — tell each member whose pin was just auto-released that their boost is back. */
+  private async notifyBoostsReturned(
+    item: { uid: string; title: string; createdByUid: string },
+    releasedMemberUids: string[]
+  ) {
+    const recipients = releasedMemberUids.filter((memberUid) => memberUid !== item.createdByUid);
+    for (const memberUid of recipients) {
+      await this.sendMemberNotification(
+        memberUid,
+        ROADMAP_NOTIFICATION_COPY.boostReturned(item.title),
+        item.uid,
+        'boost_returned'
+      );
+    }
+  }
+
+  /**
+   * PRD §7 trigger 3 — tell everyone who ever pinned the item (released pins included,
+   * deduped) that it shipped. The creator is excluded: they already get the dedicated
+   * need-shipped notification from notifyShipped.
+   */
+  private async notifyBackersShipped(item: { uid: string; title: string; createdByUid: string }) {
+    try {
+      const backers = await this.prisma.roadmapItemPin.findMany({
+        where: { itemUid: item.uid },
+        select: { memberUid: true },
+        distinct: ['memberUid'],
+      });
+      const recipients = backers.map((pin) => pin.memberUid).filter((memberUid) => memberUid !== item.createdByUid);
+      for (const memberUid of recipients) {
+        await this.sendMemberNotification(
+          memberUid,
+          ROADMAP_NOTIFICATION_COPY.backedItemShipped(item.title),
+          item.uid,
+          'backed_item_shipped'
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Roadmap backers-shipped notification failed for ${item.uid}: ${error instanceof Error ? error.message : error}`
+      );
+    }
+  }
+
+  private async sendMemberNotification(
+    recipientUid: string,
+    copy: { title: string; description: string },
+    itemUid: string,
+    trigger?: string
+  ) {
+    try {
+      await this.pushNotifications.create({
+        category: PushNotificationCategory.GANTRY,
+        ...copy,
+        link: itemDetailPath(itemUid),
         recipientUid,
         isPublic: false,
-        metadata: { eventType: 'roadmap', itemUid },
+        metadata: { eventType: 'roadmap', itemUid, ...(trigger ? { trigger } : {}) },
       });
     } catch (error) {
       this.logger.warn(`Roadmap notification failed for ${itemUid}: ${error instanceof Error ? error.message : error}`);

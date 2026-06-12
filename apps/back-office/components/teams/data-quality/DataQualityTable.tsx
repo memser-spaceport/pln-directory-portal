@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   createColumnHelper,
   flexRender,
@@ -11,21 +11,25 @@ import {
 } from '@tanstack/react-table';
 import { clsx } from 'clsx';
 
-import { EnrichmentTeam, LogoEntry } from '../../../hooks/teams/useTeamsEnrichmentReview';
+import { EnrichmentTeam, FieldKey } from '../../../hooks/teams/useTeamsEnrichmentReview';
+import { useApproveEnrichmentFields } from '../../../hooks/teams/useApproveEnrichmentFields';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
 import PaginationControls from '../../../screens/members/components/PaginationControls/PaginationControls';
 import { TeamLogoCell } from './TeamLogoCell';
-import { FIELD_KEYS, FIELD_LABELS, getEntry, isAIEnriched, needsReview } from './constants';
+import { NeedsReviewCell } from './NeedsReviewCell';
+import { FIELD_KEYS, isAIEnriched, needsReview } from './constants';
 import s from '../../../pages/teams/data-quality.module.scss';
 
 interface Props {
   teams: EnrichmentTeam[];
   isLoading: boolean;
   hasActiveFilters: boolean;
+  authToken: string | null | undefined;
   onEdit: (team: EnrichmentTeam) => void;
 }
 
 const columnHelper = createColumnHelper<EnrichmentTeam>();
+const emptySet = new Set<FieldKey>();
 
 function formatDate(iso: string | null): { main: string; time: string } | null {
   if (!iso) return null;
@@ -36,9 +40,80 @@ function formatDate(iso: string | null): { main: string; time: string } | null {
   };
 }
 
-export function DataQualityTable({ teams, isLoading, hasActiveFilters, onEdit }: Props) {
+export function DataQualityTable({ teams, isLoading, hasActiveFilters, authToken, onEdit }: Props) {
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 });
   const [sorting, setSorting] = useState<SortingState>([]);
+
+  // Optimistic confirmed-fields state: teamUid → Set<FieldKey>
+  const [confirmedFields, setConfirmedFields] = useState<Map<string, Set<FieldKey>>>(new Map());
+  // Teams with an in-flight mutation — disables all confirm/apply for that team
+  const [pendingTeams, setPendingTeams] = useState<Set<string>>(new Set());
+
+  const { mutateAsync: approveFields } = useApproveEnrichmentFields();
+
+  // Use a ref so callbacks below don't need the mutation in their dependency arrays
+  const approveFieldsRef = useRef(approveFields);
+  approveFieldsRef.current = approveFields;
+
+  const addConfirmed = useCallback((teamUid: string, keys: FieldKey[]) => {
+    setConfirmedFields((prev) => {
+      const next = new Map(prev);
+      const existing = new Set(next.get(teamUid));
+      keys.forEach((k) => existing.add(k));
+      next.set(teamUid, existing);
+      return next;
+    });
+  }, []);
+
+  const removeConfirmed = useCallback((teamUid: string, keys: FieldKey[]) => {
+    setConfirmedFields((prev) => {
+      const next = new Map(prev);
+      const existing = new Set(next.get(teamUid));
+      keys.forEach((k) => existing.delete(k));
+      next.set(teamUid, existing);
+      return next;
+    });
+  }, []);
+
+  const handleConfirmField = useCallback(
+    async (teamUid: string, key: FieldKey, content?: string) => {
+      if (!authToken) return;
+      addConfirmed(teamUid, [key]);
+      setPendingTeams((prev) => new Set(prev).add(teamUid));
+      try {
+        await approveFieldsRef.current({ authToken, teamUid, fields: [{ key, content }] });
+      } catch {
+        removeConfirmed(teamUid, [key]);
+      } finally {
+        setPendingTeams((prev) => {
+          const s = new Set(prev);
+          s.delete(teamUid);
+          return s;
+        });
+      }
+    },
+    [authToken, addConfirmed, removeConfirmed]
+  );
+
+  const handleConfirmAll = useCallback(
+    async (teamUid: string, keys: FieldKey[]) => {
+      if (!authToken || keys.length === 0) return;
+      addConfirmed(teamUid, keys);
+      setPendingTeams((prev) => new Set(prev).add(teamUid));
+      try {
+        await approveFieldsRef.current({ authToken, teamUid, fields: keys.map((key) => ({ key })) });
+      } catch {
+        removeConfirmed(teamUid, keys);
+      } finally {
+        setPendingTeams((prev) => {
+          const s = new Set(prev);
+          s.delete(teamUid);
+          return s;
+        });
+      }
+    },
+    [authToken, addConfirmed, removeConfirmed]
+  );
 
   const columns = useMemo(
     () => [
@@ -54,39 +129,22 @@ export function DataQualityTable({ teams, isLoading, hasActiveFilters, onEdit }:
       columnHelper.accessor('name', {
         id: 'name',
         header: 'Team',
-        size: 300,
+        size: 220,
         sortingFn: 'alphanumeric',
         cell: (info) => {
           const team = info.row.original;
+          const confirmedLogo = team.logo && !isAIEnriched(team.logo) ? team.logo : undefined;
           return (
             <a href={`${WEB_UI_BASE_URL}/teams/${team.uid}`} target="_blank" rel="noreferrer" className={s.teamLink}>
-              <TeamLogoCell logo={team.logo ?? (team.fields?.logo as LogoEntry)} name={team.name} />
+              <TeamLogoCell logo={confirmedLogo} name={team.name} />
               <span className={s.teamName}>{team.name}</span>
             </a>
           );
         },
       }),
-      columnHelper.display({
-        id: 'needsReview',
-        header: 'Needs Review',
-        enableSorting: false,
-        cell: (info) => {
-          const team = info.row.original;
-          const chips = FIELD_KEYS.flatMap((key) => {
-            const entry = getEntry(team, key);
-            if (!entry || !needsReview(team, key)) return [];
-            return [
-              <span key={key} className={clsx(s.reviewChip, isAIEnriched(entry) ? s.reviewChipAI : s.reviewChipUser)}>
-                {FIELD_LABELS[key]}
-              </span>,
-            ];
-          });
-          return chips.length > 0 ? <div className={s.reviewChips}>{chips}</div> : null;
-        },
-      }),
       columnHelper.accessor('judgedAt', {
         id: 'judgedAt',
-        header: 'Last Judged',
+        header: 'Last Enrichment',
         size: 160,
         sortingFn: 'datetime',
         cell: (info) => {
@@ -101,18 +159,65 @@ export function DataQualityTable({ teams, isLoading, hasActiveFilters, onEdit }:
         },
       }),
       columnHelper.display({
+        id: 'needsReview',
+        header: 'Needs Review',
+        enableSorting: false,
+        cell: (info) => {
+          const team = info.row.original;
+          return (
+            <NeedsReviewCell
+              team={team}
+              confirmedKeys={confirmedFields.get(team.uid) ?? emptySet}
+              isPending={pendingTeams.has(team.uid)}
+              onConfirm={(key) => handleConfirmField(team.uid, key)}
+              onApply={(key, content) => handleConfirmField(team.uid, key, content)}
+              onEdit={onEdit}
+            />
+          );
+        },
+      }),
+      columnHelper.display({
         id: 'actions',
         header: 'Actions',
-        size: 100,
+        size: 200,
         enableSorting: false,
-        cell: (info) => (
-          <button className={s.reviewButton} onClick={() => onEdit(info.row.original)}>
-            <EditIcon /> Edit
-          </button>
-        ),
+        cell: (info) => {
+          const team = info.row.original;
+          const teamConfirmed = confirmedFields.get(team.uid) ?? emptySet;
+          const lowKeys = FIELD_KEYS.filter(
+            (key) => needsReview(team, key) && !teamConfirmed.has(key)
+          );
+          const isPending = pendingTeams.has(team.uid);
+          const allConfirmed = lowKeys.length === 0;
+
+          return (
+            <div className={s.actionsCell}>
+              {allConfirmed ? (
+                <span className={s.allConfirmedBadge}>
+                  <CheckIcon /> Confirmed
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className={s.confirmAllBtn}
+                  disabled={isPending}
+                  onClick={() => handleConfirmAll(team.uid, lowKeys)}
+                  aria-label={`Confirm all fields for ${team.name}`}
+                >
+                  {isPending ? <SpinnerIcon /> : <CheckIcon />}
+                  Confirm all
+                </button>
+              )}
+              <button type="button" className={s.editRowBtn} onClick={() => onEdit(team)}>
+                <PencilIcon /> Edit
+              </button>
+            </div>
+          );
+        },
       }),
     ],
-    [onEdit]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onEdit, confirmedFields, pendingTeams, handleConfirmField, handleConfirmAll]
   );
 
   const table = useReactTable({
@@ -124,7 +229,6 @@ export function DataQualityTable({ teams, isLoading, hasActiveFilters, onEdit }:
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-
     getRowId: (row) => row.uid,
   });
 
@@ -140,11 +244,22 @@ export function DataQualityTable({ teams, isLoading, hasActiveFilters, onEdit }:
                 {hg.headers.map((header) => {
                   const canSort = header.column.getCanSort();
                   const sorted = header.column.getIsSorted();
+                  const isPriority = header.id === 'priority';
+                  const isTeam = header.id === 'name';
                   return (
                     <th
                       key={header.id}
-                      className={clsx(s.th, canSort && s.thSortable)}
-                      style={header.id !== 'needsReview' ? { width: header.getSize() } : undefined}
+                      className={clsx(
+                        s.th,
+                        canSort && s.thSortable,
+                        isPriority && s.stickyPriority,
+                        isTeam && s.stickyTeam
+                      )}
+                      style={
+                        header.id !== 'needsReview'
+                          ? { width: header.getSize() }
+                          : undefined
+                      }
                       onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                     >
                       <span className={s.thContent}>
@@ -185,11 +300,24 @@ export function DataQualityTable({ teams, isLoading, hasActiveFilters, onEdit }:
             {!isLoading &&
               table.getRowModel().rows.map((row) => (
                 <tr key={row.id} className={s.tr}>
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className={s.td}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const isP = cell.column.id === 'priority';
+                    const isT = cell.column.id === 'name';
+                    const isNR = cell.column.id === 'needsReview';
+                    return (
+                      <td
+                        key={cell.id}
+                        className={clsx(
+                          s.td,
+                          isP && s.stickyPriority,
+                          isT && s.stickyTeam,
+                          isNR && s.tdTop
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
           </tbody>
@@ -221,11 +349,30 @@ const SortDescIcon = () => (
   </svg>
 );
 
-const EditIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 14 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M12.8789 1.35156L13.3984 1.87109C14 2.47266 14 3.42969 13.3984 4.03125L12.5781 4.85156L9.89844 2.17188L10.7188 1.35156C11.3203 0.75 12.2773 0.75 12.8789 1.35156ZM4.70312 7.36719L9.26953 2.80078L11.9492 5.48047L7.38281 10.0469C7.21875 10.2109 7 10.3477 6.78125 10.4297L4.34766 11.2227C4.12891 11.3047 3.85547 11.25 3.69141 11.0586C3.5 10.8945 3.44531 10.6211 3.52734 10.4023L4.32031 7.96875C4.40234 7.75 4.53906 7.53125 4.70312 7.36719ZM2.625 2.5H5.25C5.71484 2.5 6.125 2.91016 6.125 3.375C6.125 3.86719 5.71484 4.25 5.25 4.25H2.625C2.13281 4.25 1.75 4.66016 1.75 5.125V12.125C1.75 12.6172 2.13281 13 2.625 13H9.625C10.0898 13 10.5 12.6172 10.5 12.125V9.5C10.5 9.03516 10.8828 8.625 11.375 8.625C11.8398 8.625 12.25 9.03516 12.25 9.5V12.125C12.25 13.5742 11.0742 14.75 9.625 14.75H2.625C1.17578 14.75 0 13.5742 0 12.125V5.125C0 3.67578 1.17578 2.5 2.625 2.5Z"
-      fill="#64748B"
-    />
+const PencilIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+    <path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96A16,16,0,0,0,227.31,73.37ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z" />
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+    <path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z" />
+  </svg>
+);
+
+const SpinnerIcon = () => (
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    aria-hidden="true"
+    style={{ animation: 'spin 0.8s linear infinite' }}
+  >
+    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
   </svg>
 );

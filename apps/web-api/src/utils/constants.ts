@@ -158,8 +158,10 @@ export function hasDemoDayAdminRole(member: MemberWithRoles): boolean {
 export function hasAnyDemoDayAdminPermissionCode(member: MemberWithRoles): boolean {
   const permissionCodes = [
     ...(member?.effectivePermissionCodes ?? []),
-    ...(member?.effectivePermissions ?? []).map((p) => (typeof p === 'string' ? p : p?.code)).filter(Boolean) as string[],
-    ...(member?.permissions ?? []).map((p) => (typeof p === 'string' ? p : p?.code)).filter(Boolean) as string[],
+    ...((member?.effectivePermissions ?? [])
+      .map((p) => (typeof p === 'string' ? p : p?.code))
+      .filter(Boolean) as string[]),
+    ...((member?.permissions ?? []).map((p) => (typeof p === 'string' ? p : p?.code)).filter(Boolean) as string[]),
   ];
 
   return (
@@ -226,6 +228,7 @@ export const InteractionFailureReasons: { [key: string]: string } = {
 /********* HUSKY CONSTANTS ********/
 
 export const IGNORED_URLS_FOR_CONCEALID = [
+  '/v1/pathfinder',
   '/v1/husky/chat/assistant',
   '/v1/husky/chat/feedback',
   '/v1/husky/chat/contextual',
