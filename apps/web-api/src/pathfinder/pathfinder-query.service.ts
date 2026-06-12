@@ -47,12 +47,42 @@ export class PathfinderQueryService {
     return { page, limit, total, items };
   }
 
-  /** All ranked paths for a single target (best first). Used by the drawer. */
+  /** All ranked paths for a single target (best first), each carrying its pending
+   *  (not yet recomputed) corrections so the UI can show what was already
+   *  submitted. Used by the drawer. */
   async getPathsForTarget(targetInvestorId: string) {
-    const items = await this.prisma.pathfinderPath.findMany({
-      where: { targetInvestorId },
-      orderBy: { rank: 'asc' },
-    });
+    const [paths, pendingCorrections] = await this.prisma.$transaction([
+      this.prisma.pathfinderPath.findMany({
+        where: { targetInvestorId },
+        orderBy: { rank: 'asc' },
+      }),
+      this.prisma.pathfinderCorrection.findMany({
+        where: { subjectType: 'path', targetInvestorId, appliedAt: null },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          subjectId: true,
+          field: true,
+          oldValue: true,
+          newValue: true,
+          note: true,
+          actorEmail: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    const correctionsByPathId = new Map<string, typeof pendingCorrections>();
+    for (const c of pendingCorrections) {
+      const list = correctionsByPathId.get(c.subjectId) ?? [];
+      list.push(c);
+      correctionsByPathId.set(c.subjectId, list);
+    }
+
+    const items = paths.map((p) => ({
+      ...p,
+      corrections: correctionsByPathId.get(String(p.id)) ?? [],
+    }));
     return { targetInvestorId, total: items.length, items };
   }
 

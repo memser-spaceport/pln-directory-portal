@@ -2571,12 +2571,15 @@ model PathfinderEntityCrosswalk {
 model PathfinderCorrection {
   id Int @id @default(autoincrement())
 
-  /// What the correction is about: path | caliber | connector | crosswalk | entity | action | curation.
+  /// The ID domain subjectId belongs to: path | crosswalk | entity | action | curation.
+  /// (Legacy rows may carry 'caliber' / 'connector' — those were path corrections; the field
+  /// column is what says which attribute was corrected.)
   subjectType String @db.VarChar(24)
-  /// Id of the subject (canonical/affinity/investor id, path id, or crosswalk id).
+  /// Id of the subject in that domain (PathfinderPath.id, crosswalk id, canonical/investor id).
   subjectId String @db.VarChar(64)
 
-  /// Field being corrected, e.g. "caliber", "connector", "proximityCode", "match", "hide", "intro_status".
+  /// Attribute being corrected. For subjectType 'path': caliber | connector_type | valid | note.
+  /// Others e.g. "match" (crosswalk), "hide", "intro_status".
   field String @db.VarChar(48)
 
   oldValue Json?
@@ -2584,6 +2587,10 @@ model PathfinderCorrection {
 
   /// Free-form note / rationale, carried into recompute provenance + future Affinity write-back.
   note String? @db.VarChar(1000)
+
+  /// Denormalized target investor (InvestorOutreachRecord.investorId) for path-level corrections,
+  /// so "all corrections for investor X" needs no join against possibly-replaced path rows.
+  targetInvestorId String? @db.VarChar(64)
 
   /// Actor identity (Directory member uid / email).
   actorUid   String? @db.VarChar(64)
@@ -2598,6 +2605,7 @@ model PathfinderCorrection {
   @@index([subjectType, subjectId])
   @@index([field])
   @@index([appliedAt])
+  @@index([targetInvestorId])
 }
 
 /// Investor Lists — a curated target set of investors (a "list"). Proximity is computed per list

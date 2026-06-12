@@ -2,7 +2,12 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { IngestPathfinderDto, IngestPathfinderResponse, PathfinderPathInput } from './dto/ingest-pathfinder.dto';
-import { CreateCorrectionDto, ResolveCrosswalkDto } from './dto/correction.dto';
+import {
+  CORRECTION_SUBJECT_TYPES,
+  CreateCorrectionDto,
+  PATH_CORRECTION_FIELDS,
+  ResolveCrosswalkDto,
+} from './dto/correction.dto';
 
 export interface CorrectionActor {
   uid?: string | null;
@@ -153,6 +158,33 @@ export class PathfinderService {
     if (!dto.subject_type || !dto.subject_id || !dto.field) {
       throw new BadRequestException('subject_type, subject_id and field are required');
     }
+    if (!(CORRECTION_SUBJECT_TYPES as readonly string[]).includes(dto.subject_type)) {
+      throw new BadRequestException(`subject_type must be one of: ${CORRECTION_SUBJECT_TYPES.join(', ')}`);
+    }
+    if (dto.note && dto.note.length > 1000) {
+      throw new BadRequestException('note must be at most 1000 characters');
+    }
+
+    // Path corrections must reference an existing path; denormalize its target
+    // investor so the row stays self-describing after path rows are batch-replaced.
+    let targetInvestorId: string | null = null;
+    if (dto.subject_type === 'path') {
+      if (!(PATH_CORRECTION_FIELDS as readonly string[]).includes(dto.field)) {
+        throw new BadRequestException(
+          `field must be one of ${PATH_CORRECTION_FIELDS.join(', ')} when subject_type is 'path'`
+        );
+      }
+      const pathId = parseInt(dto.subject_id, 10);
+      if (!/^\d+$/.test(dto.subject_id) || Number.isNaN(pathId)) {
+        throw new BadRequestException("subject_id must be a PathfinderPath id when subject_type is 'path'");
+      }
+      const path = await this.prisma.pathfinderPath.findUnique({ where: { id: pathId } });
+      if (!path) {
+        throw new NotFoundException(`path ${pathId} not found`);
+      }
+      targetInvestorId = path.targetInvestorId;
+    }
+
     return this.prisma.pathfinderCorrection.create({
       data: {
         subjectType: dto.subject_type,
@@ -161,6 +193,7 @@ export class PathfinderService {
         oldValue: dto.old_value === undefined ? undefined : (dto.old_value as Prisma.InputJsonValue),
         newValue: dto.new_value === undefined ? undefined : (dto.new_value as Prisma.InputJsonValue),
         note: dto.note ?? null,
+        targetInvestorId,
         actorUid: actor.uid ?? null,
         actorEmail: actor.email ?? null,
       },
