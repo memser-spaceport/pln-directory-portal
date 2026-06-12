@@ -109,7 +109,14 @@ interface FirmProximity {
 
 async function cleanup() {
   await prisma.pathfinderPath.deleteMany({ where: { targetSet: TARGET_SET } });
-  await prisma.investorOutreachRecord.deleteMany({ where: { source: SOURCE } });
+  await prisma.pathfinderEntityCrosswalk.deleteMany({ where: { ingestRunId: RUN_ID } });
+  // Delete ONLY rows this seed created itself (createdAt ~ updatedAt at creation);
+  // pre-existing investor rows absorbed by a pre-fix run are spared and re-matched
+  // by dedupeKey in the loop below. See seed-pathfinder-neuro.ts cleanup().
+  await prisma.$executeRaw`
+    DELETE FROM "InvestorOutreachRecord"
+    WHERE source = ${SOURCE}
+      AND "updatedAt" - "createdAt" < interval '1 minute'`;
 }
 
 async function seed() {
@@ -139,11 +146,52 @@ async function seed() {
   const entries =
     (JSON.parse(readFileSync(AFFINITY_PATH, 'utf-8')) as { entries?: { entity: AffinityEntity }[] }).entries ?? [];
 
-  let created = 0;
-  let reachable = 0;
-  let pathRows = 0;
-  const seen = new Set<string>();
+  // ── Pass 1 (pure memory): classify every entry against a one-shot snapshot
+  // of existing records, then write in bulk — row-by-row awaits took minutes
+  // over a remote DB. Mirrors seed-pathfinder-neuro.ts.
+  console.log(`Snapshotting existing records…`);
+  type ExistingRef = { id: number; dedupeKey: string; investorId: string };
+  const existingRows: ExistingRef[] = await prisma.investorOutreachRecord.findMany({
+    select: { id: true, dedupeKey: true, investorId: true },
+  });
+  const byDedupeKey = new Map<string, ExistingRef>(existingRows.map((r) => [r.dedupeKey, r]));
+  const byInvestorId = new Map<string, ExistingRef>(existingRows.map((r) => [r.investorId, r]));
+  const PENDING_ID = -1; // marks rows queued for creation in this run
 
+  let duplicates = 0;
+  let reachable = 0;
+  const seen = new Set<string>();
+  /** investorIds to enroll in the gold list (the existing record's id when a duplicate was detected). */
+  const memberIds: string[] = [];
+
+  const creates: Prisma.InvestorOutreachRecordCreateManyInput[] = [];
+  const createByInvestorId = new Map<string, Prisma.InvestorOutreachRecordCreateManyInput>();
+  const updates: { id: number; data: Prisma.InvestorOutreachRecordUpdateInput }[] = [];
+  const crosswalkRows: Prisma.PathfinderEntityCrosswalkCreateManyInput[] = [];
+  const pathInserts: Prisma.PathfinderPathCreateManyInput[] = [];
+  const pathTargetsQueued = new Set<string>();
+  const dupPathCandidates: { investorId: string; firmId: string; bestCode: string }[] = [];
+
+  const queuePaths = (targetInvestorId: string, firmId: string) => {
+    for (const p of pathsByFirm.get(firmId) ?? []) {
+      pathInserts.push({
+        targetInvestorId,
+        targetSet: TARGET_SET,
+        connectorType: p.connectorType,
+        hops: p.hops,
+        caliber: p.caliber,
+        proximityCode: p.proximityCode,
+        score: p.score,
+        caliberConfidence: p.caliberConfidence,
+        hopChain: p.hopChain as Prisma.InputJsonValue,
+        rank: p.rank,
+        ingestRunId: RUN_ID,
+      });
+    }
+    pathTargetsQueued.add(targetInvestorId);
+  };
+
+  console.log(`Processing ${entries.length} Affinity entries…`);
   for (const e of entries) {
     const ent = e.entity;
     const affinityId = String(ent.id);
@@ -168,64 +216,140 @@ async function seed() {
     }
     const firmLabel = best?.label ?? firms[0] ?? '';
     const hasPath = best?.hasPath ?? false;
+    const bestCode = best && hasPath ? best.code : null;
 
-    // Upsert by dedupeKey — reuses Neuro rows and existing investor DB matches on dev.
-    // On update, leave source untouched so neuro-first shared people stay neuro-sourced.
-    const createFields = {
-      investorId: affinityId,
-      canonicalId: affinityId,
-      source: SOURCE,
-      firstName,
-      lastName,
-      email,
-      emailStatus: 'unverified',
-      firm: firmLabel,
-      investorType: 'fund',
-      stageFocus: '',
-      engagementTier: '',
-      enrichmentStatus: 'pending',
-      bestProximityCode: hasPath ? best!.code : null,
-      hasPath,
-    };
-    await prisma.investorOutreachRecord.upsert({
-      where: { dedupeKey },
-      update: {
+    // Match by dedupeKey — a person may already exist via the Neuro list (same
+    // Affinity id) or the wider investor DB (same email).
+    const existing = byDedupeKey.get(dedupeKey) ?? byInvestorId.get(affinityId);
+
+    if (existing && existing.investorId !== affinityId) {
+      // Same email, DIFFERENT id: a duplicate entity. Never overwrite the
+      // existing record's identity — queue the match for human confirmation in
+      // the crosswalk review and keep the existing record as canonical.
+      duplicates += 1;
+      console.log(
+        `  duplicate: affinity ${affinityId} (${firstName} ${lastName}) shares email with existing ` +
+          `${existing.investorId} — queued for crosswalk review`
+      );
+      crosswalkRows.push({
+        canonicalId: existing.investorId,
+        affinityId,
+        investorId: existing.investorId,
+        entityType: 'person',
+        displayName: `${firstName} ${lastName}`.trim() || null,
+        firm: firmLabel || null,
+        matchMethod: 'email',
+        matchConfidence: 0.95,
+        isConfirmed: false,
+        needsReview: true,
+        ingestRunId: RUN_ID,
+      });
+      if (best && hasPath) {
+        dupPathCandidates.push({ investorId: existing.investorId, firmId: best.firmId, bestCode: best.code });
+      }
+      memberIds.push(existing.investorId);
+      continue;
+    }
+
+    // Same Affinity id (re-run / Neuro-shared person) or brand new. On update,
+    // leave source untouched so neuro-first shared people stay neuro-sourced.
+    if (existing) {
+      updates.push({
+        id: existing.id,
+        data: { firstName, lastName, email, firm: firmLabel, bestProximityCode: bestCode, hasPath },
+      });
+    } else {
+      const createInput: Prisma.InvestorOutreachRecordCreateManyInput = {
+        dedupeKey,
         investorId: affinityId,
         canonicalId: affinityId,
+        source: SOURCE,
         firstName,
         lastName,
         email,
+        emailStatus: 'unverified',
         firm: firmLabel,
-        bestProximityCode: hasPath ? best!.code : null,
+        investorType: 'fund',
+        stageFocus: '',
+        engagementTier: '',
+        enrichmentStatus: 'pending',
+        bestProximityCode: bestCode,
         hasPath,
-      },
-      create: { dedupeKey, ...createFields },
-    });
-    created += 1;
+      };
+      creates.push(createInput);
+      createByInvestorId.set(affinityId, createInput);
+      const pending: ExistingRef = { id: PENDING_ID, dedupeKey, investorId: affinityId };
+      byDedupeKey.set(dedupeKey, pending);
+      byInvestorId.set(affinityId, pending);
+    }
+    memberIds.push(affinityId);
 
     if (best && hasPath) {
       reachable += 1;
-      for (const p of pathsByFirm.get(best.firmId) ?? []) {
-        await prisma.pathfinderPath.create({
-          data: {
-            targetInvestorId: affinityId,
-            targetSet: TARGET_SET,
-            connectorType: p.connectorType,
-            hops: p.hops,
-            caliber: p.caliber,
-            proximityCode: p.proximityCode,
-            score: p.score,
-            caliberConfidence: p.caliberConfidence,
-            hopChain: p.hopChain as Prisma.InputJsonValue,
-            rank: p.rank,
-            ingestRunId: RUN_ID,
-          },
-        });
-        pathRows += 1;
+      queuePaths(affinityId, best.firmId);
+    }
+  }
+
+  // ── Pass 2: attach this run's paths to duplicate-matched existing records
+  // that have none (one grouped count instead of one count per match).
+  const candidateIds = [...new Set(dupPathCandidates.map((d) => d.investorId))].filter(
+    (id) => !pathTargetsQueued.has(id)
+  );
+  const pathCounts = candidateIds.length
+    ? await prisma.pathfinderPath.groupBy({
+        by: ['targetInvestorId'],
+        where: { targetInvestorId: { in: candidateIds } },
+        _count: { _all: true },
+      })
+    : [];
+  const alreadyHasPaths = new Set(pathCounts.map((c) => c.targetInvestorId));
+  for (const d of dupPathCandidates) {
+    if (pathTargetsQueued.has(d.investorId) || alreadyHasPaths.has(d.investorId)) continue;
+    reachable += 1;
+    queuePaths(d.investorId, d.firmId);
+    const pendingCreate = createByInvestorId.get(d.investorId);
+    if (pendingCreate) {
+      pendingCreate.bestProximityCode = d.bestCode;
+      pendingCreate.hasPath = true;
+    } else {
+      const ref = byInvestorId.get(d.investorId);
+      if (ref && ref.id !== PENDING_ID) {
+        updates.push({ id: ref.id, data: { bestProximityCode: d.bestCode, hasPath: true } });
       }
     }
   }
-  return { created, reachable, pathRows, ids: [...seen] };
+
+  // ── Pass 3: bulk writes. Records before paths (paths FK onto investorId).
+  console.log(
+    `Writing ${creates.length} new records, ${updates.length} updates, ` +
+      `${pathInserts.length} paths, ${crosswalkRows.length} crosswalk rows…`
+  );
+  if (creates.length > 0) {
+    await prisma.investorOutreachRecord.createMany({ data: creates, skipDuplicates: true });
+  }
+  const UPDATE_CHUNK = 100;
+  for (let i = 0; i < updates.length; i += UPDATE_CHUNK) {
+    await prisma.$transaction(
+      updates
+        .slice(i, i + UPDATE_CHUNK)
+        .map((u) => prisma.investorOutreachRecord.update({ where: { id: u.id }, data: u.data }))
+    );
+  }
+  const PATH_CHUNK = 500;
+  for (let i = 0; i < pathInserts.length; i += PATH_CHUNK) {
+    await prisma.pathfinderPath.createMany({ data: pathInserts.slice(i, i + PATH_CHUNK) });
+  }
+  if (crosswalkRows.length > 0) {
+    await prisma.pathfinderEntityCrosswalk.createMany({ data: crosswalkRows });
+  }
+  return {
+    created: creates.length,
+    updated: updates.length,
+    duplicates,
+    reachable,
+    pathRows: pathInserts.length,
+    ids: memberIds,
+  };
 }
 
 async function repointListAndMembers(ids: string[]): Promise<number> {
@@ -263,11 +387,18 @@ async function main() {
   console.log('Purging prior gold run…');
   await cleanup();
   console.log('Creating person-grain gold records + paths…');
-  const { created, reachable, pathRows, ids } = await seed();
+  const { created, updated, duplicates, reachable, pathRows, ids } = await seed();
   console.log('Repointing gold-coinvestors list + membership…');
   const members = await repointListAndMembers(ids);
   console.log('— Gold seed (person-grain) complete —');
-  console.log(`people: ${created} | reachable: ${reachable} | path rows: ${pathRows} | members: ${members}`);
+  console.log(
+    `created: ${created} | updated in place: ${updated} | ` +
+      `duplicates (queued for crosswalk review): ${duplicates} | ` +
+      `reachable: ${reachable} | path rows: ${pathRows} | members: ${members}`
+  );
+  if (duplicates > 0) {
+    console.log('Review the duplicate matches in the Investor DB → Crosswalk review panel.');
+  }
 }
 
 main()
