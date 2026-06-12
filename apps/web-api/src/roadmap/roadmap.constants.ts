@@ -56,7 +56,7 @@ export function itemDetailPath(itemUid: string): string {
 // prefix keeps the bell scannable.
 export const ROADMAP_NOTIFICATION_COPY = {
   newSubmission: (title: string) => ({
-    title: `New need: ${title}`,
+    title: `New submission: ${title}`,
     description: 'Take a look — boost it if it matters to you.',
   }),
   boostReturned: (title: string) => ({
@@ -69,7 +69,7 @@ export const ROADMAP_NOTIFICATION_COPY = {
   }),
   needInProgress: (title: string) => ({
     title: `In Progress: ${title}`,
-    description: 'Work on your need has started.',
+    description: "Your submission is being worked on. We will notify you when it's shipped.",
   }),
   needBacklogged: (title: string) => ({
     title: `Backlog: ${title}`,

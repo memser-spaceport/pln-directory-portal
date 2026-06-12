@@ -369,7 +369,7 @@ export class RoadmapService {
       return { row: updated, releasedPins: released };
     });
 
-    await this.notifyDeclined(row, body.reason);
+    // await this.notifyDeclined(row, body.reason);
     await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_DECLINED, actorUid, {
       itemUid: uid,
       reason: body.reason,
@@ -709,8 +709,12 @@ export class RoadmapService {
   }
 
   /** PRD §7 trigger 2 — tell each member whose pin was just auto-released that their boost is back. */
-  private async notifyBoostsReturned(item: { uid: string; title: string }, releasedMemberUids: string[]) {
-    for (const memberUid of releasedMemberUids) {
+  private async notifyBoostsReturned(
+    item: { uid: string; title: string; createdByUid: string },
+    releasedMemberUids: string[]
+  ) {
+    const recipients = releasedMemberUids.filter((memberUid) => memberUid !== item.createdByUid);
+    for (const memberUid of recipients) {
       await this.sendMemberNotification(
         memberUid,
         ROADMAP_NOTIFICATION_COPY.boostReturned(item.title),

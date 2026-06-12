@@ -262,7 +262,7 @@ describe('RoadmapService', () => {
         expect(pushNotifications.create).toHaveBeenCalledTimes(1);
         expect(pushNotifications.create).toHaveBeenCalledWith(
           expect.objectContaining({
-            title: 'New need: Test',
+            title: 'New submission: Test',
             description: 'Take a look — boost it if it matters to you.',
             link: expect.stringContaining('/gantry/item-1'),
             requiredPermissions: ['roadmap.view', 'roadmap.admin'],
@@ -311,6 +311,26 @@ describe('RoadmapService', () => {
           description: 'Your boost budget is back — spend it on what matters next.',
           link: expect.stringContaining('/gantry/item-1'),
         });
+      });
+
+      it('skips boost-returned for the submitter who also pinned their own item', async () => {
+        prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.PLANNED));
+        prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.IN_PROGRESS));
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([{ memberUid: 'pinner-1' }, { memberUid: 'creator-1' }]);
+        prisma.roadmapItemPin.updateMany.mockResolvedValue({ count: 2 });
+
+        await service.transitionItem('item-1', { stage: 'IN_PROGRESS' }, 'curator-1');
+
+        const boostReturnedCalls = pushNotifications.create.mock.calls.filter(
+          ([dto]: [any]) => dto.metadata?.trigger === 'boost_returned'
+        );
+        expect(boostReturnedCalls.map(([dto]: [any]) => dto.recipientUid)).toEqual(['pinner-1']);
+
+        const creatorCalls = pushNotifications.create.mock.calls.filter(
+          ([dto]: [any]) => dto.recipientUid === 'creator-1'
+        );
+        expect(creatorCalls).toHaveLength(1);
+        expect(creatorCalls[0][0].metadata?.trigger).toBe('need_in_progress');
       });
 
       it('does not notify on pin-releasing stages other than IN_PROGRESS', async () => {
@@ -416,7 +436,7 @@ describe('RoadmapService', () => {
         expect(calls[0][0]).toMatchObject({
           recipientUid: 'creator-1',
           title: 'In Progress: Test',
-          description: 'Work on your need has started.',
+          description: "Your submission is being worked on. We will notify you when it's shipped.",
         });
       });
 

@@ -157,11 +157,11 @@ the planned "pin"→"boost" wording swap is a one-file change. Links point at
 
 | Trigger | Recipients | Title — Description |
 | --- | --- | --- |
-| New need submitted (IDEA only — curator direct-creates don't broadcast) | everyone holding `roadmap.view` or `roadmap.admin` (one permission-gated notification, not per-member fan-out; the submitter is excluded — `PushNotificationsService` hides GANTRY broadcasts from their `metadata.authorUid`) | New need: {title} — Take a look — boost it if it matters to you. |
-| Item enters In Progress | each member whose pin was just auto-released | In Progress: {title} — Your boost budget is back — spend it on what matters next. |
+| New submission (IDEA only — curator direct-creates don't broadcast) | everyone holding `roadmap.view` or `roadmap.admin` (one permission-gated notification, not per-member fan-out; the submitter is excluded — `PushNotificationsService` hides GANTRY broadcasts from their `metadata.authorUid`) | New submission: {title} — Take a look — boost it if it matters to you. |
+| Item enters In Progress | each member whose pin was just auto-released (submitter excluded — they get the dedicated line below) | In Progress: {title} — Your boost budget is back — spend it on what matters next. |
 | Item ships | every member who ever pinned it (released pins included, deduped; creator excluded — they get the dedicated line below) | Just Shipped: {title} 🎉 — Something you boosted is now live. |
 | Need planned | original submitter | Planned: {title} — Your need is on the roadmap. |
-| Need enters In Progress | original submitter | In Progress: {title} — Work on your need has started. |
+| Need enters In Progress | original submitter | In Progress: {title} — Your submission is being worked on. We will notify you when it's shipped. |
 | Need backlogged | original submitter | Backlog: {title} — Your need was moved to the backlog. |
 | Need ships | original submitter | Just Shipped: {title} 🎉 — It's live now — go try it out. |
 | Need declined | original submitter | Declined: {title} — Reason: {reason} |
