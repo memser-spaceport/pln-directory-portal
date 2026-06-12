@@ -6,7 +6,7 @@ import { RbacGuard } from '../rbac/rbac.guard';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
-import { CrosswalkReviewQueryDto, ListPathfinderPathsQueryDto } from './dto/pathfinder.query.dto';
+import { ConnectorMatchesDto, CrosswalkReviewQueryDto, ListPathfinderPathsQueryDto } from './dto/pathfinder.query.dto';
 import { CreateCorrectionDto, ResolveCrosswalkDto } from './dto/correction.dto';
 import { PathfinderQueryService } from './pathfinder-query.service';
 import { CorrectionActor, PathfinderService } from './pathfinder.service';
@@ -56,6 +56,14 @@ export class PathfinderController {
   @RequirePermissions(VIEW_PERMS)
   async getPathsForTarget(@Param('investorId') investorId: string) {
     return this.queryService.getPathsForTarget(investorId);
+  }
+
+  /** Batch read (POST because the id list is too long for a query string). */
+  @NoCache()
+  @Post('connector-matches')
+  @RequirePermissions(VIEW_PERMS)
+  async connectorMatches(@Body() dto: ConnectorMatchesDto) {
+    return this.queryService.connectorMatches(dto);
   }
 
   @NoCache()

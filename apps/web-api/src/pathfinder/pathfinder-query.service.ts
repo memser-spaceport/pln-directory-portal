@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
-import { CrosswalkReviewQueryDto, ListPathfinderPathsQueryDto } from './dto/pathfinder.query.dto';
+import { ConnectorMatchesDto, CrosswalkReviewQueryDto, ListPathfinderPathsQueryDto } from './dto/pathfinder.query.dto';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+const MAX_CONNECTOR_MATCH_IDS = 500;
+const MAX_CONNECTOR_LABELS = 20;
 
 function parsePage(value: string | undefined): number {
   const n = parseInt(value ?? '1', 10);
@@ -84,6 +86,39 @@ export class PathfinderQueryService {
       corrections: correctionsByPathId.get(String(p.id)) ?? [],
     }));
     return { targetInvestorId, total: items.length, items };
+  }
+
+  /** Batch connector lens: of the given targets, which have a path whose hop
+   *  chain routes through any of the given connector node labels. One query for
+   *  the whole visible page — replaces the per-row paths fan-out that 429'd. */
+  async connectorMatches(dto: ConnectorMatchesDto) {
+    const ids = (dto.target_investor_ids ?? []).filter((id) => typeof id === 'string' && id.trim() !== '');
+    const labels = (dto.connector_labels ?? [])
+      .filter((l) => typeof l === 'string')
+      .map((l) => l.trim().toLowerCase())
+      .filter((l) => l !== '');
+
+    if (ids.length === 0 || labels.length === 0) {
+      return { matchedIds: [] };
+    }
+    if (ids.length > MAX_CONNECTOR_MATCH_IDS) {
+      throw new BadRequestException(`target_investor_ids must contain at most ${MAX_CONNECTOR_MATCH_IDS} ids`);
+    }
+    if (labels.length > MAX_CONNECTOR_LABELS) {
+      throw new BadRequestException(`connector_labels must contain at most ${MAX_CONNECTOR_LABELS} labels`);
+    }
+
+    const rows = await this.prisma.$queryRaw<{ targetInvestorId: string }[]>`
+      SELECT DISTINCT p."targetInvestorId"
+      FROM "PathfinderPath" p
+      WHERE p."targetInvestorId" IN (${Prisma.join(ids)})
+        AND jsonb_typeof(p."hopChain"->'nodes') = 'array'
+        AND EXISTS (
+          SELECT 1 FROM jsonb_array_elements(p."hopChain"->'nodes') AS n
+          WHERE lower(btrim(n->>'label')) IN (${Prisma.join(labels)})
+        )`;
+
+    return { matchedIds: rows.map((r) => r.targetInvestorId) };
   }
 
   /** The fuzzy-match human-confirm queue. */
