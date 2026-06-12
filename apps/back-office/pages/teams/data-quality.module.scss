@@ -1074,6 +1074,14 @@
   font-size: 13px;
 }
 
+.reviewFieldEmpty {
+  flex: 1;
+  min-width: 0;
+  color: #9ca3af;
+  font-size: 13px;
+  font-style: italic;
+}
+
 .reviewLogoThumb {
   width: 32px;
   height: 32px;
