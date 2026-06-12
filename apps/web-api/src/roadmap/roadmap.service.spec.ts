@@ -284,6 +284,22 @@ describe('RoadmapService', () => {
         expect(pushNotifications.create).not.toHaveBeenCalled();
       });
 
+      it.each(['BACKLOG', 'SHIPPED', 'DECLINED'] as const)(
+        'allows curators to direct-create into %s',
+        async (stage) => {
+          accessControl.getMemberAccess.mockResolvedValue({ effectivePermissions: ['roadmap.item.curate'] });
+          prisma.roadmapItem.create.mockResolvedValue(rowFor(stage as RoadmapStage));
+
+          const result = await service.createItem({ title: 'Test', description: 'Desc', stage }, 'curator-1');
+
+          expect(result.stage).toBe(stage);
+          expect(prisma.roadmapItem.create).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ stage }) })
+          );
+          expect(pushNotifications.create).not.toHaveBeenCalled();
+        }
+      );
+
       it('does not fail the submission when the broadcast errors', async () => {
         pushNotifications.create.mockRejectedValue(new Error('ws down'));
 

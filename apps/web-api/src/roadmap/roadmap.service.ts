@@ -220,10 +220,6 @@ export class RoadmapService {
       if (!access.canCurate) {
         throw new ForbiddenException('Only the product team can create roadmap-stage items directly');
       }
-      const directStages: RoadmapStage[] = [RoadmapStage.PLANNED, RoadmapStage.IN_PROGRESS];
-      if (!directStages.includes(body.stage as RoadmapStage)) {
-        throw new BadRequestException('Direct create supports PLANNED or IN_PROGRESS only');
-      }
       stage = body.stage as RoadmapStage;
     }
 
@@ -250,7 +246,7 @@ export class RoadmapService {
     });
 
     // Only true submissions ("Share a need" → IDEA) are broadcast; curator
-    // direct-creates into PLANNED/IN_PROGRESS are roadmap work, not new needs.
+    // direct-creates into other stages are roadmap work, not new needs.
     if (stage === RoadmapStage.IDEA) {
       await this.notifyNewSubmission(row, actorUid);
     }
