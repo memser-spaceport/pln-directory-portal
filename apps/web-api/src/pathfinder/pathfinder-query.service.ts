@@ -7,6 +7,7 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const MAX_CONNECTOR_MATCH_IDS = 500;
 const MAX_CONNECTOR_LABELS = 20;
+const MIN_CONNECTOR_CONTAINS_LENGTH = 3;
 
 function parsePage(value: string | undefined): number {
   const n = parseInt(value ?? '1', 10);
@@ -97,8 +98,12 @@ export class PathfinderQueryService {
       .filter((l) => typeof l === 'string')
       .map((l) => l.trim().toLowerCase())
       .filter((l) => l !== '');
+    const containsLabels = (dto.connector_labels_contains ?? [])
+      .filter((l) => typeof l === 'string')
+      .map((l) => l.trim().toLowerCase())
+      .filter((l) => l.length >= MIN_CONNECTOR_CONTAINS_LENGTH);
 
-    if (ids.length === 0 || labels.length === 0) {
+    if (ids.length === 0 || (labels.length === 0 && containsLabels.length === 0)) {
       return { matchedIds: [] };
     }
     if (ids.length > MAX_CONNECTOR_MATCH_IDS) {
@@ -106,6 +111,17 @@ export class PathfinderQueryService {
     }
     if (labels.length > MAX_CONNECTOR_LABELS) {
       throw new BadRequestException(`connector_labels must contain at most ${MAX_CONNECTOR_LABELS} labels`);
+    }
+    if (containsLabels.length > MAX_CONNECTOR_LABELS) {
+      throw new BadRequestException(`connector_labels_contains must contain at most ${MAX_CONNECTOR_LABELS} labels`);
+    }
+
+    const matchParts: Prisma.Sql[] = [];
+    if (labels.length > 0) {
+      matchParts.push(Prisma.sql`lower(btrim(n->>'label')) IN (${Prisma.join(labels)})`);
+    }
+    for (const label of containsLabels) {
+      matchParts.push(Prisma.sql`lower(btrim(n->>'label')) LIKE ${'%' + label + '%'}`);
     }
 
     const rows = await this.prisma.$queryRaw<{ targetInvestorId: string }[]>`
@@ -115,7 +131,7 @@ export class PathfinderQueryService {
         AND jsonb_typeof(p."hopChain"->'nodes') = 'array'
         AND EXISTS (
           SELECT 1 FROM jsonb_array_elements(p."hopChain"->'nodes') AS n
-          WHERE lower(btrim(n->>'label')) IN (${Prisma.join(labels)})
+          WHERE ${Prisma.join(matchParts, ' OR ')}
         )`;
 
     return { matchedIds: rows.map((r) => r.targetInvestorId) };
