@@ -305,6 +305,31 @@ export class PushNotificationsService {
   }
 
   /**
+   * Returns true if a notification has already been stored for the given item
+   * (`metadata.itemUid`) with any of the given `metadata.trigger` values. Callers use
+   * this to fire a notification at most once per item even when an action repeats
+   * (e.g. a roadmap item re-entering a stage). Matches stored rows regardless of
+   * recipient, so a broadcast or any single recipient's copy counts.
+   */
+  async hasItemTriggerNotification(itemUid: string, triggers: string[]): Promise<boolean> {
+    if (!itemUid || !triggers?.length) {
+      return false;
+    }
+
+    const existing = await this.prisma.pushNotification.findFirst({
+      where: {
+        AND: [
+          { metadata: { path: ['itemUid'], equals: itemUid } },
+          { OR: triggers.map((trigger) => ({ metadata: { path: ['trigger'], equals: trigger } })) },
+        ],
+      },
+      select: { uid: true },
+    });
+
+    return !!existing;
+  }
+
+  /**
    * Get push notifications for a user.
    * - Private notifications: use isRead field directly
    * - Public notifications: check PushNotificationReadStatus table
