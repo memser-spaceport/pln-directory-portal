@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
@@ -46,6 +46,17 @@ export class FounderSourcingController {
   @RequirePermissions(READ_PERMS)
   async filters() {
     return this.queryService.getFilterOptions();
+  }
+
+  @NoCache()
+  @Get('methodology')
+  @RequirePermissions(READ_PERMS)
+  async methodology() {
+    const data = await this.queryService.getLatestMethodology();
+    if (!data) {
+      throw new NotFoundException('No methodology payload has been ingested yet');
+    }
+    return data;
   }
 
   @NoCache()

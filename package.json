@@ -10,6 +10,8 @@
     "start": "nx serve",
     "build": "nx build",
     "test": "nx test",
+    "start:api": "node --stack-size=4000 --max-old-space-size=4096 node_modules/nx/bin/nx.js serve web-api",
+    "typecheck:api": "node --stack-size=4000 ./node_modules/typescript/bin/tsc -p apps/web-api/tsconfig.build.json --noEmit",
     "start:back-office": "nx serve back-office -p 4201",
     "api:prisma-sync": "npx prisma generate --schema=./apps/web-api/prisma/schema.prisma && npx prisma db push --schema=./apps/web-api/prisma/schema.prisma",
     "api:prod-migrate-airtable-data": "node ./dist/apps/web-api/cli/cli.js migrate-airtable-data",

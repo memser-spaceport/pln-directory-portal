@@ -1,5 +1,6 @@
 import { FounderReviewFeedback, FounderReviewStatus } from '@prisma/client';
 import { FounderFundCode } from './dto/ingest-founder-sourcing.dto';
+import { ReviewChannel } from './dto/review-state.dto';
 
 const FUND_CODES = new Set<FounderFundCode>(['PLVS', 'NEURO', 'CRYPTO']);
 const REVIEW_STATUSES = new Set<FounderReviewStatus>([
@@ -15,10 +16,19 @@ const REVIEW_FEEDBACKS = new Set<FounderReviewFeedback>([
   FounderReviewFeedback.WRONG_FUND,
   FounderReviewFeedback.NEEDS_CONTEXT,
 ]);
+const REVIEW_CHANNELS = new Set<ReviewChannel>(['lead-decision', 'record-quality', 'platform']);
 
 export const isAllowedFundCode = (value: string): value is FounderFundCode => FUND_CODES.has(value as FounderFundCode);
 
 export const parseSourceList = (raw?: string): string[] => {
+  if (!raw || raw.trim() === '') return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+};
+
+export const parseFocusAreaList = (raw?: string): string[] => {
   if (!raw || raw.trim() === '') return [];
   return raw
     .split(',')
@@ -58,6 +68,18 @@ export const parseReviewFeedback = (value: string): FounderReviewFeedback | unde
       : undefined;
   if (!mapped || !REVIEW_FEEDBACKS.has(mapped)) return undefined;
   return mapped;
+};
+
+export const parseReviewChannel = (value: string): ReviewChannel | undefined => {
+  const normalized = value.trim().toLowerCase() as ReviewChannel;
+  if (!REVIEW_CHANNELS.has(normalized)) return undefined;
+  return normalized;
+};
+
+export const reviewChannelToApi = (value: string | null | undefined): ReviewChannel | undefined => {
+  if (!value) return undefined;
+  const parsed = parseReviewChannel(value);
+  return parsed;
 };
 
 export const reviewStatusToApi = (value: FounderReviewStatus): 'new' | 'in-review' | 'approved' | 'rejected' | 'hold' =>

@@ -2723,9 +2723,18 @@ model FounderSourcingRecord {
   intentSignals   Json?
 
   provenance   Json?
-  lastSignalAt DateTime?
-  whyNow       String?   @db.VarChar(500)
-  thinEvidence Boolean?
+  lastSignalAt         DateTime?
+  lastActivitySeenAt   DateTime?
+  whyNow               String?   @db.VarChar(500)
+  criteriaHeadline     String?   @db.VarChar(500)
+  pedigree             String?   @db.VarChar(500)
+  focusArea            String?
+  thinEvidence         Boolean?
+  isRaising            Boolean?
+  isCofounderSearch    Boolean?
+  isComingOutOfStealth Boolean?
+  nearNetwork          Boolean?
+  plAligned            Boolean?
 
   runId                 String?
   signalSourcingVersion String?
@@ -2735,6 +2744,9 @@ model FounderSourcingRecord {
 
   reviewStatus        FounderReviewStatus    @default(NEW)
   reviewFeedback      FounderReviewFeedback?
+  reviewChannel       String?
+  reviewField         String?                @db.VarChar(80)
+  reviewArea          String?                @db.VarChar(80)
   reviewDecidedAt     DateTime?
   reviewNote          String?                @db.VarChar(500)
   reviewedByMemberUid String?
@@ -2751,6 +2763,16 @@ model FounderSourcingRecord {
   @@index([lastSignalAt])
   @@index([runId])
   @@index([plvsScore])
+  @@index([focusArea])
+  @@index([isRaising])
+}
+
+model FounderSourcingMethodology {
+  version   String   @id
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model FounderSourcingIngestRun {

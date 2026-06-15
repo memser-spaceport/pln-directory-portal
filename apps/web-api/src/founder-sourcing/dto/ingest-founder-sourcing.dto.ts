@@ -5,6 +5,7 @@ export interface FounderFundTagInput {
   confidence: number;
   primary_signal?: string;
   matched_terms?: string[];
+  domain?: string;
 }
 
 export interface FounderReviewStateInput {
@@ -46,6 +47,9 @@ export interface FounderIngestItem {
   identity_completeness?: number;
 
   fund_tags?: FounderFundTagInput[];
+  focus_area?: string;
+  criteria_headline?: string;
+  pedigree?: string;
   plvs_score?: number;
   plvs_recommendation?: 'Pass' | 'Progress' | 'Strong Pass';
   plvs_features?: Record<string, number>;
@@ -56,12 +60,18 @@ export interface FounderIngestItem {
 
   pln_proximity?: number;
   pl_alignment?: number;
+  near_network?: boolean;
+  pl_aligned?: boolean;
   reputation_flags?: Array<Record<string, unknown>>;
   warm_intro_paths?: Array<Record<string, unknown>>;
   intent_signals?: Array<Record<string, unknown>>;
+  is_raising?: boolean;
+  is_cofounder_search?: boolean;
+  is_coming_out_of_stealth?: boolean;
 
   provenance?: Array<Record<string, unknown>>;
   last_signal_at?: string;
+  last_activity_seen_at?: string;
   why_now?: string;
   thin_evidence?: boolean;
 }
@@ -69,6 +79,8 @@ export interface FounderIngestItem {
 export interface IngestFounderSourcingDto {
   runId?: string;
   source?: string;
+  methodology_version?: string;
+  methodology?: Record<string, unknown>;
   items: FounderIngestItem[];
 }
 
