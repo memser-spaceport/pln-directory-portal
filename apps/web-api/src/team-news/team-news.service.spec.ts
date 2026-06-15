@@ -1,5 +1,13 @@
 import { NotFoundException } from '@nestjs/common';
+
+// Mock the push-notifications module so loading TeamNewsService does not pull in
+// the websocket gateway (and its ESM-only axios import) under jest.
+jest.mock('../push-notifications/push-notifications.service', () => ({
+  PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
+}));
+
 import type { PrismaService } from '../shared/prisma.service';
+import type { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { TeamNewsService } from './team-news.service';
 
 type PrismaMock = {
@@ -11,6 +19,8 @@ const buildPrismaMock = (): PrismaMock => ({
   teamNewsItem: { findUnique: jest.fn() },
   teamNewsForumLink: { findUnique: jest.fn(), upsert: jest.fn() },
 });
+
+const buildPushMock = () => ({ create: jest.fn().mockResolvedValue(undefined) });
 
 const makeRow = (overrides: Record<string, unknown> = {}) => ({
   uid: 'link-1',
@@ -29,7 +39,10 @@ describe('TeamNewsService.createForumLink', () => {
 
   beforeEach(() => {
     prisma = buildPrismaMock();
-    service = new TeamNewsService(prisma as unknown as PrismaService);
+    service = new TeamNewsService(
+      prisma as unknown as PrismaService,
+      buildPushMock() as unknown as PushNotificationsService,
+    );
   });
 
   it('throws NotFound when the news item does not exist', async () => {
@@ -111,5 +124,100 @@ describe('TeamNewsService.createForumLink', () => {
     );
 
     expect(result.link.createdByUid).toBeNull();
+  });
+});
+
+type IngestPrismaMock = {
+  team: { findMany: jest.Mock };
+  teamNewsItem: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock; count: jest.Mock };
+  teamNewsEnrichment: { upsert: jest.Mock };
+};
+
+const buildIngestPrismaMock = (): IngestPrismaMock => ({
+  team: {
+    findMany: jest.fn().mockResolvedValue([
+      { uid: 't1', name: 'ARIA', logo: { url: 'https://cdn/aria.png' } },
+      { uid: 't2', name: 'Bluesky', logo: null },
+    ]),
+  },
+  teamNewsItem: {
+    findUnique: jest.fn(),
+    create: jest.fn().mockResolvedValue({}),
+    update: jest.fn().mockResolvedValue({}),
+    count: jest.fn().mockResolvedValue(1),
+  },
+  teamNewsEnrichment: { upsert: jest.fn().mockResolvedValue({}) },
+});
+
+const ingestItem = (overrides: Record<string, unknown> = {}) => ({
+  teamUid: 't1',
+  eventDate: '2026-06-10T00:00:00.000Z',
+  title: 'ARIA raised a seed round',
+  sourceUrl: 'https://news.example.com/a',
+  eventType: 'FUNDING' as const,
+  tags: [],
+  ...overrides,
+});
+
+describe('TeamNewsService.ingestTeamNews notifications', () => {
+  let service: TeamNewsService;
+  let prisma: IngestPrismaMock;
+  let push: ReturnType<typeof buildPushMock>;
+
+  beforeEach(() => {
+    prisma = buildIngestPrismaMock();
+    push = buildPushMock();
+    service = new TeamNewsService(
+      prisma as unknown as PrismaService,
+      push as unknown as PushNotificationsService,
+    );
+  });
+
+  it('broadcasts one TEAM_NEWS notification per team for newly-created items', async () => {
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null); // every item is new
+
+    await service.ingestTeamNews({
+      items: [
+        ingestItem({ teamUid: 't1', title: 'older', eventDate: '2026-06-09T00:00:00.000Z', sourceUrl: 'https://x/1' }),
+        ingestItem({ teamUid: 't1', title: 'newest', eventDate: '2026-06-11T00:00:00.000Z', sourceUrl: 'https://x/2' }),
+        ingestItem({ teamUid: 't2', title: 'bsky update', sourceUrl: 'https://x/3' }),
+      ],
+    });
+
+    expect(push.create).toHaveBeenCalledTimes(2);
+
+    const calls = push.create.mock.calls.map((c) => c[0]);
+    const aria = calls.find((c) => c.metadata?.teamUid === 't1');
+    const bsky = calls.find((c) => c.metadata?.teamUid === 't2');
+
+    expect(aria).toMatchObject({
+      category: 'TEAM_NEWS',
+      title: 'ARIA shared 2 updates',
+      description: 'newest', // most recent item's title is the preview
+      image: 'https://cdn/aria.png',
+      link: '/home',
+      isPublic: true,
+    });
+    expect(bsky).toMatchObject({ category: 'TEAM_NEWS', title: 'Bluesky shared an update', isPublic: true });
+    expect(bsky?.image).toBeUndefined(); // team has no logo
+  });
+
+  it('does not notify when items only update existing rows', async () => {
+    prisma.teamNewsItem.findUnique.mockResolvedValue({ id: 1 }); // every item already exists
+
+    await service.ingestTeamNews({ items: [ingestItem()] });
+
+    expect(prisma.teamNewsItem.update).toHaveBeenCalled();
+    expect(push.create).not.toHaveBeenCalled();
+  });
+
+  it('does not let a notification failure fail the ingest', async () => {
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null);
+    push.create.mockRejectedValueOnce(new Error('ws down'));
+
+    const result = await service.ingestTeamNews({ items: [ingestItem()] });
+
+    expect(result.created).toBe(1);
+    expect(result.ingested).toBe(1);
   });
 });

@@ -1527,6 +1527,9 @@ enum PushNotificationCategory {
 
   // Gantry (roadmap) notifications
   GANTRY
+
+  // Team news — "News from the network" updates surfaced on /home
+  TEAM_NEWS
 }
 
 // Push notifications for WebSocket delivery

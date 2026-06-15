@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, PushNotificationCategory } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { IngestTeamNewsDto, IngestTeamNewsResponse, TeamNewsIngestItem } from './dto/ingest-team-news.dto';
 import type {
   CreateTeamNewsDiscussionRequest,
@@ -15,17 +16,29 @@ import { extractDomain } from './utils/url-normalize';
 // producers decide what they ingest; the directory decides what it counts.
 const RECENT_WINDOW_DAYS = 14;
 
+// Where a "News from the network" notification deep-links to. The feed lives on
+// the home page; there is no per-item detail route.
+const TEAM_NEWS_NOTIFICATION_LINK = '/home';
+
 interface ParseOutcome {
   ok: boolean;
   eventDate?: Date;
   reason?: 'no-source' | 'unparseable-date' | 'unknown-team';
 }
 
+// Per-team running tally of the newly-created items in a single ingest run.
+// Drives one broadcast notification per team (see notifyTeamsWithNews).
+interface CreatedTeamNews {
+  count: number;
+  latestTitle: string;
+  latestEventDate: Date;
+}
+
 @Injectable()
 export class TeamNewsService {
   private readonly logger = new Logger(TeamNewsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly pushNotifications: PushNotificationsService) {}
 
   async ingestTeamNews(dto: IngestTeamNewsDto): Promise<IngestTeamNewsResponse> {
     const result: IngestTeamNewsResponse = {
@@ -51,6 +64,9 @@ export class TeamNewsService {
     const validTeamUids = new Set(validTeams.map((t) => t.uid));
 
     const teamsTouched = new Set<string>();
+    // Only items that were genuinely inserted (not re-ingested updates) should
+    // trigger a notification, so we track creations per team here.
+    const createdByTeam = new Map<string, CreatedTeamNews>();
 
     for (const item of dto.items) {
       try {
@@ -67,6 +83,7 @@ export class TeamNewsService {
         const created = await this.upsertNewsItem(item, parsed.eventDate);
         if (created) {
           result.created++;
+          this.trackCreatedItem(createdByTeam, item, parsed.eventDate);
         } else {
           result.updated++;
         }
@@ -81,6 +98,7 @@ export class TeamNewsService {
     }
 
     await this.recomputeRecentNewsCounts(teamsTouched);
+    await this.notifyTeamsWithNews(createdByTeam);
 
     this.logger.log(
       `Team-news ingest complete (runId=${dto.runId ?? 'none'}, source=${dto.source ?? 'none'}): ` +
@@ -90,6 +108,69 @@ export class TeamNewsService {
     );
 
     return result;
+  }
+
+  private trackCreatedItem(createdByTeam: Map<string, CreatedTeamNews>, item: TeamNewsIngestItem, eventDate: Date) {
+    const agg = createdByTeam.get(item.teamUid);
+    if (!agg) {
+      createdByTeam.set(item.teamUid, { count: 1, latestTitle: item.title, latestEventDate: eventDate });
+      return;
+    }
+    agg.count++;
+    // Keep the most recent item's title as the notification preview.
+    if (eventDate.getTime() >= agg.latestEventDate.getTime()) {
+      agg.latestTitle = item.title;
+      agg.latestEventDate = eventDate;
+    }
+  }
+
+  /**
+   * Broadcast one in-app notification per team that received new news in this
+   * ingest run. Re-ingesting the same items updates rather than inserts (see
+   * upsertNewsItem), so replays do not re-notify. Each notification is public
+   * (broadcast to all users) and links to the home-page news feed.
+   *
+   * Failures here never fail the ingest — news is already persisted; the
+   * notification is best-effort.
+   */
+  private async notifyTeamsWithNews(createdByTeam: Map<string, CreatedTeamNews>) {
+    if (createdByTeam.size === 0) return;
+
+    const teamUids = [...createdByTeam.keys()];
+    const teams = await this.prisma.team.findMany({
+      where: { uid: { in: teamUids } },
+      select: { uid: true, name: true, logo: { select: { url: true } } },
+    });
+    const teamByUid = new Map(teams.map((t) => [t.uid, t]));
+
+    for (const [teamUid, agg] of createdByTeam) {
+      const team = teamByUid.get(teamUid);
+      const teamName = team?.name ?? 'A team';
+      const title = agg.count === 1 ? `${teamName} shared an update` : `${teamName} shared ${agg.count} updates`;
+
+      try {
+        await this.pushNotifications.create({
+          category: PushNotificationCategory.TEAM_NEWS,
+          title,
+          description: agg.latestTitle,
+          image: team?.logo?.url ?? undefined,
+          link: TEAM_NEWS_NOTIFICATION_LINK,
+          linkText: 'View news',
+          isPublic: true,
+          metadata: {
+            eventType: 'team_news',
+            teamUid,
+            itemCount: agg.count,
+          },
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Team-news notification failed for team ${teamUid}: ${error instanceof Error ? error.message : error}`
+        );
+      }
+    }
+
+    this.logger.log(`Team-news notifications broadcast for ${createdByTeam.size} team(s)`);
   }
 
   private bumpRejectionCounter(result: IngestTeamNewsResponse, reason: ParseOutcome['reason']) {
@@ -198,7 +279,7 @@ export class TeamNewsService {
   async createForumLink(
     newsItemUid: string,
     body: CreateTeamNewsDiscussionRequest,
-    actorUid: string | null,
+    actorUid: string | null
   ): Promise<CreateTeamNewsDiscussionResponse> {
     const item = await this.prisma.teamNewsItem.findUnique({
       where: { uid: newsItemUid },

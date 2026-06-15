@@ -260,10 +260,26 @@ POST /v1/admin/push-notifications/send
 | `DEMO_DAY_INVEST` | Investment interest from demo day |
 | `DEMO_DAY_REFERRAL` | Referral from demo day |
 | `DEMO_DAY_FEEDBACK` | Feedback received on demo day |
-| `FORUM_POST` | New forum post notification |
+| `FORUM_POST` | New forum post notification (hidden from its own author) |
 | `FORUM_REPLY` | Reply to a forum post |
 | `EVENT` | Event-related notification |
+| `IRL_GATHERING` | In-real-life gathering reminders/announcements (location-scoped) |
 | `SYSTEM` | System notification |
+| `GUIDE_POST` | Comment on a Founder Guide you authored |
+| `GUIDE_REPLY` | Reply to your comment on a Founder Guide |
+| `NEW_FEATURE` | New-feature announcement (visible to all members regardless of join date) |
+| `GANTRY` | Gantry roadmap events — new submission, status change, boost returned, shipped (hidden from its own author) |
+| `TEAM_NEWS` | "News from the network" — broadcast to all users when a team gets new news on ingest (one per team per run). See below. |
+
+### Team News (`TEAM_NEWS`)
+
+The `TEAM_NEWS` category powers the in-app notification fired when the "News from the network" feed (`/home`) gets fresh items.
+
+- **Trigger**: `TeamNewsService.ingestTeamNews()` (`apps/web-api/src/team-news/team-news.service.ts`). After the batch ingest persists items, it broadcasts **one public notification per team that received ≥1 newly-created item** (`notifyTeamsWithNews`).
+- **Idempotency**: Re-ingesting the same item *updates* the existing row (matched on `canonicalKey`) instead of inserting, so replays do not re-notify — only genuine inserts count.
+- **Shape**: `isPublic: true` (broadcast to all users), `title` = `"{Team} shared an update"` / `"{Team} shared N updates"`, `description` = most recent item's title, `image` = team logo, `link` = `/home`, `metadata` = `{ eventType: 'team_news', teamUid, itemCount }`.
+- **Read on view**: The frontend `AutoMarkNewsNotification` component (rendered only on `/home`) marks unread `TEAM_NEWS` (and `NEW_FEATURE`) notifications as read on mount.
+- **Frontend handling**: `PushNotificationCategory` union, `CATEGORY_CONFIG`, and `getCategoryLabel` in the web-app repo must list `TEAM_NEWS` (label "Team News") for the bell UI to render it.
 
 ## Database Schema
 
