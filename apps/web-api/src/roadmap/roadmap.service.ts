@@ -70,6 +70,8 @@ interface RoadmapItemRow {
   promotedAt: Date | null;
   promotedByUid: string | null;
   declinedReason: string | null;
+  firstInProgressAt: Date | null;
+  firstShippedAt: Date | null;
   externalTrackerUrl: string | null;
   objective: { uid: string; title: string; order: number } | null;
   deletedAt: Date | null;
@@ -236,6 +238,11 @@ export class RoadmapService {
         createdByUid: actorUid,
         promotedAt: stage === RoadmapStage.PLANNED ? new Date() : null,
         promotedByUid: stage === RoadmapStage.PLANNED ? actorUid : null,
+        // Keep the committed-stage timestamps consistent with the stage an item is
+        // created in, so a later re-entry can't fire a first-time notification.
+        firstInProgressAt:
+          stage === RoadmapStage.IN_PROGRESS || stage === RoadmapStage.SHIPPED ? new Date() : null,
+        firstShippedAt: stage === RoadmapStage.SHIPPED ? new Date() : null,
       },
       include: itemInclude,
     });
@@ -414,6 +421,12 @@ export class RoadmapService {
     }
     assertTransitionAllowed(existing.stage, to);
 
+    // "In Progress" / "Shipped" notifications fire only the first time the item
+    // reaches that committed stage. An item that already shipped is also treated as
+    // already having been In Progress, so a Shipped → In Progress bounce stays silent.
+    const reachedInProgressBefore = !!existing.firstInProgressAt || !!existing.firstShippedAt;
+    const reachedShippedBefore = !!existing.firstShippedAt;
+
     const data: Prisma.RoadmapItemUpdateInput = { stage: to };
     if (opts.setPromoted || isPromoteTransition(existing.stage, to)) {
       data.promotedAt = new Date();
@@ -425,6 +438,12 @@ export class RoadmapService {
     }
     if (to !== RoadmapStage.DECLINED) {
       data.declinedReason = null;
+    }
+    if (to === RoadmapStage.IN_PROGRESS && !existing.firstInProgressAt) {
+      data.firstInProgressAt = new Date();
+    }
+    if (to === RoadmapStage.SHIPPED && !existing.firstShippedAt) {
+      data.firstShippedAt = new Date();
     }
 
     const { row, releasedPins } = await this.prisma.$transaction(async (tx) => {
@@ -439,21 +458,30 @@ export class RoadmapService {
 
     await this.trackPinsReleased(uid, actorUid, releasedPins, to);
 
-    // Boost-returned notifications fire only on commitment (IN_PROGRESS). Pins are
-    // released exactly once, so a later IN_PROGRESS → SHIPPED move releases nothing
-    // and cannot double-fire this.
-    if (to === RoadmapStage.IN_PROGRESS) {
+    // Boost-returned + submitter "In Progress" notifications fire only the first time
+    // the item reaches In Progress. Pins are released exactly once, so a later
+    // IN_PROGRESS → SHIPPED move releases nothing; the reached-before guard additionally
+    // suppresses repeat In Progress entries (e.g. Planned → In Progress → Planned →
+    // In Progress) and Shipped → In Progress bounces.
+    if (to === RoadmapStage.IN_PROGRESS && !reachedInProgressBefore) {
       await this.notifyBoostsReturned(row, releasedPins);
     }
 
     if (existing.stage !== to) {
-      await this.notifySubmitterStageChange(row, to, opts.declinedReason);
+      const suppressForRepeat =
+        (to === RoadmapStage.IN_PROGRESS && reachedInProgressBefore) ||
+        (to === RoadmapStage.SHIPPED && reachedShippedBefore);
+      if (!suppressForRepeat) {
+        await this.notifySubmitterStageChange(row, to, opts.declinedReason);
+      }
     }
 
     if (isPromoteTransition(existing.stage, to)) {
       await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_PROMOTED, actorUid, { itemUid: uid });
     } else if (to === RoadmapStage.SHIPPED) {
-      await this.notifyBackersShipped(row);
+      if (!reachedShippedBefore) {
+        await this.notifyBackersShipped(row);
+      }
     } else {
       await this.track(ROADMAP_ANALYTICS_EVENTS.ROADMAP_STATUS_CHANGED, actorUid, {
         itemUid: uid,

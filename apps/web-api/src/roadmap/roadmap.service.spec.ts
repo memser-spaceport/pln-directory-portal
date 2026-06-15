@@ -421,6 +421,86 @@ describe('RoadmapService', () => {
       });
     });
 
+    describe('committed-stage notifications fire exactly once', () => {
+      const triggerCalls = (trigger: string) =>
+        pushNotifications.create.mock.calls.filter(([dto]: [any]) => dto.metadata?.trigger === trigger);
+
+      it('stamps firstInProgressAt the first time an item enters IN_PROGRESS', async () => {
+        prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.PLANNED));
+        prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.IN_PROGRESS));
+
+        await service.transitionItem('item-1', { stage: 'IN_PROGRESS' }, 'curator-1');
+
+        expect(prisma.roadmapItem.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ firstInProgressAt: expect.any(Date) }) })
+        );
+      });
+
+      it('does not re-notify In Progress when the item was already In Progress before', async () => {
+        prisma.roadmapItem.findFirst.mockResolvedValue({
+          ...rowFor(RoadmapStage.PLANNED),
+          firstInProgressAt: new Date('2026-01-01'),
+        });
+        prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.IN_PROGRESS));
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([{ memberUid: 'pinner-1' }]);
+        prisma.roadmapItemPin.updateMany.mockResolvedValue({ count: 1 });
+
+        await service.transitionItem('item-1', { stage: 'IN_PROGRESS' }, 'curator-1');
+
+        expect(triggerCalls('boost_returned')).toHaveLength(0);
+        expect(triggerCalls('need_in_progress')).toHaveLength(0);
+        // it must not re-stamp the original timestamp
+        expect(prisma.roadmapItem.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.not.objectContaining({ firstInProgressAt: expect.anything() }) })
+        );
+      });
+
+      it('does not notify In Progress when the item was already Shipped (Shipped → In Progress)', async () => {
+        prisma.roadmapItem.findFirst.mockResolvedValue({
+          ...rowFor(RoadmapStage.SHIPPED),
+          firstInProgressAt: new Date('2026-01-01'),
+          firstShippedAt: new Date('2026-02-01'),
+        });
+        prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.IN_PROGRESS));
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([{ memberUid: 'pinner-1' }]);
+        prisma.roadmapItemPin.updateMany.mockResolvedValue({ count: 1 });
+
+        await service.transitionItem('item-1', { stage: 'IN_PROGRESS' }, 'curator-1');
+
+        expect(triggerCalls('boost_returned')).toHaveLength(0);
+        expect(triggerCalls('need_in_progress')).toHaveLength(0);
+      });
+
+      it('stamps firstShippedAt and notifies the first time an item ships', async () => {
+        prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.IN_PROGRESS));
+        prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.SHIPPED));
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ memberUid: 'pinner-1' }]);
+
+        await service.transitionItem('item-1', { stage: 'SHIPPED' }, 'curator-1');
+
+        expect(prisma.roadmapItem.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ firstShippedAt: expect.any(Date) }) })
+        );
+        expect(triggerCalls('backed_item_shipped')).toHaveLength(1);
+        expect(triggerCalls('need_shipped')).toHaveLength(1);
+      });
+
+      it('does not re-notify Shipped when the item was already Shipped before', async () => {
+        prisma.roadmapItem.findFirst.mockResolvedValue({
+          ...rowFor(RoadmapStage.IN_PROGRESS),
+          firstInProgressAt: new Date('2026-01-01'),
+          firstShippedAt: new Date('2026-02-01'),
+        });
+        prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.SHIPPED));
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ memberUid: 'pinner-1' }]);
+
+        await service.transitionItem('item-1', { stage: 'SHIPPED' }, 'curator-1');
+
+        expect(triggerCalls('backed_item_shipped')).toHaveLength(0);
+        expect(triggerCalls('need_shipped')).toHaveLength(0);
+      });
+    });
+
     describe('submitter stage-change notifications', () => {
       const submitterCallsByTrigger = (trigger: string) =>
         pushNotifications.create.mock.calls.filter(([dto]: [any]) => dto.metadata?.trigger === trigger);

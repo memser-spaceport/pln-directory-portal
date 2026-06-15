@@ -178,6 +178,18 @@ BACKLOG/DECLINED also return pins but intentionally send no boost-returned
 notification to boosters (PRD lists only the In Progress return) — only the
 submitter hears about those moves.
 
+**Committed stages notify exactly once.** Every "In Progress" notification (the
+submitter line *and* the boost-returned line) fires only the first time an item
+reaches In Progress, and every "Shipped" notification (submitter + backers) fires
+only the first time it ships. The item records `firstInProgressAt` / `firstShippedAt`
+the first time it lands in each stage, and an item that has already shipped is
+treated as having already been In Progress. So re-entry cannot re-notify:
+`Planned → In Progress → Planned → In Progress` sends one In Progress notification;
+`Planned → Shipped → In Progress` sends one Shipped notification and stays silent on
+the later In Progress; a second move into Shipped sends nothing. (Backfill on
+migration `20260615120000` stamps already-committed/shipped items so the deploy does
+not re-notify them.)
+
 For engineering conventions and invariants (budget state machine, attribution
 boundary, stage groups), see the **`gantry-boost-signaling`** Claude skill at
 `.claude/skills/gantry-boost-signaling/SKILL.md`.
@@ -188,7 +200,8 @@ All models in `apps/web-api/prisma/schema.prisma`:
 
 - **`RoadmapItem`** — title, description, acceptance criteria, `stage`, type, tags,
   focus area, `order` (Float — team rank), creator, promoted-by/at, declined reason,
-  external tracker URL, `objectiveUid`, soft-delete fields.
+  external tracker URL, `objectiveUid`, `firstInProgressAt` / `firstShippedAt`
+  (set once, to fire committed-stage notifications exactly once), soft-delete fields.
 - **`RoadmapItemUpvote`** — legacy v0 "like" table; retained for historical rows
   after the likes→pins migration. No longer read or written at runtime.
 - **`RoadmapItemPin`** — the boost. One *active* pin per (item, member) (partial

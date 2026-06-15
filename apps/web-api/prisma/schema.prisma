@@ -2794,6 +2794,12 @@ model RoadmapItem {
   promotedBy     Member?   @relation("roadmapItemPromotedBy", fields: [promotedByUid], references: [uid])
   declinedReason String?
 
+  // First time the item reached each committed stage; used to fire the
+  // "In Progress" / "Shipped" notifications exactly once even if the item
+  // bounces back and re-enters the stage later.
+  firstInProgressAt DateTime?
+  firstShippedAt    DateTime?
+
   externalTrackerUrl String?
 
   objectiveUid String?
