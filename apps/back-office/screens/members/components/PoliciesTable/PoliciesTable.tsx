@@ -12,7 +12,7 @@ import clsx from 'clsx';
 
 import { Policy } from '../../../../hooks/access-control/usePoliciesList';
 import PaginationControls from '../PaginationControls/PaginationControls';
-import { PolicyViewDialog } from './PolicyViewDialog';
+import { PolicyViewDialog } from './components/PolicyViewDialog';
 import { iconForRole } from '../MemberForm/RbacSection/PolicyMultiSelect/roleIconMap';
 import s from './PoliciesTable.module.scss';
 
