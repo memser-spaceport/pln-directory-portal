@@ -316,12 +316,13 @@ export class PushNotificationsService {
       return false;
     }
 
+    const triggerConditions: Prisma.PushNotificationWhereInput[] = triggers.map((trigger) => ({
+      metadata: { path: ['trigger'], equals: trigger },
+    }));
+
     const existing = await this.prisma.pushNotification.findFirst({
       where: {
-        AND: [
-          { metadata: { path: ['itemUid'], equals: itemUid } },
-          { OR: triggers.map((trigger) => ({ metadata: { path: ['trigger'], equals: trigger } })) },
-        ],
+        AND: [{ metadata: { path: ['itemUid'], equals: itemUid } }, { OR: triggerConditions }],
       },
       select: { uid: true },
     });
