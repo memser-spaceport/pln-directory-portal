@@ -5,7 +5,6 @@ import { DemoDaysService } from './demo-days.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { AwsService } from '../utils/aws/aws.service';
-import { DEMODAY_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 
 @Injectable()
@@ -218,8 +217,8 @@ export class DemoDayFundraisingProfilesService {
       const access = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDayUid);
       if (access.isAdmin) return true;
 
-      const member = await this.validateTeamFounderAccess(memberEmail, teamUid, demoDayUid);
-      return this.memberHasPermissionCode(member.uid, DEMODAY_PERMISSIONS.STATS_READ);
+      await this.validateTeamFounderAccess(memberEmail, teamUid, demoDayUid);
+      return true;
     } catch {
       return false;
     }
@@ -232,7 +231,11 @@ export class DemoDayFundraisingProfilesService {
    * @param demoDayUid - UID of the demo day
    * @throws ForbiddenException if user doesn't have access
    */
-  private async validateTeamFounderAccess(memberEmail: string, teamUid: string, demoDayUid: string): Promise<{ uid: string }> {
+  private async validateTeamFounderAccess(
+    memberEmail: string,
+    teamUid: string,
+    demoDayUid: string
+  ): Promise<{ uid: string }> {
     const member = await this.prisma.member.findUnique({
       where: { email: memberEmail },
       include: {
@@ -254,56 +257,6 @@ export class DemoDayFundraisingProfilesService {
     }
 
     return { uid: member.uid };
-  }
-
-  private async memberHasPermissionCode(memberUid: string, permissionCode: string): Promise<boolean> {
-    const permission = await this.prisma.permission.findUnique({
-      where: { code: permissionCode },
-      select: { uid: true },
-    });
-
-    if (!permission) {
-      return false;
-    }
-
-    const directPermission = await this.prisma.memberPermissionV2.findFirst({
-      where: { memberUid, permissionUid: permission.uid },
-      select: { uid: true },
-    });
-
-    if (directPermission) {
-      return true;
-    }
-
-    const policyPermission = await this.prisma.policyAssignment.findFirst({
-      where: {
-        memberUid,
-        policy: {
-          policyPermissions: {
-            some: { permissionUid: permission.uid },
-          },
-        },
-      },
-      select: { uid: true },
-    });
-
-    if (policyPermission) {
-      return true;
-    }
-
-    const rolePermission = await this.prisma.roleAssignment.findFirst({
-      where: {
-        memberUid,
-        role: {
-          rolePermissions: {
-            some: { permissionUid: permission.uid },
-          },
-        },
-      },
-      select: { uid: true },
-    });
-
-    return !!rolePermission;
   }
 
   async updateFundraisingProfileStatus(teamUid: string, demoDayUid: string): Promise<void> {
