@@ -1,0 +1,36 @@
+.muted {
+  font-size: 14px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.teamList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.teamBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #4f71ff;
+  white-space: nowrap;
+
+  > svg {
+    color: #4f71ff;
+    flex-shrink: 0;
+  }
+}
+
+.teamOverflow {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 12px;
+  white-space: nowrap;
+}
