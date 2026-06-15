@@ -3,6 +3,8 @@ export class ListFoundersQueryDto {
   fund?: string;
   status?: string;
   source?: string;
+  isRaising?: string;
+  focusArea?: string;
   minAlignment?: string;
   minPlnProximity?: string;
   sort?: string;

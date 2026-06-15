@@ -28,7 +28,16 @@ export interface FounderDto {
   plnProximity: number | null;
   plAlignment: number | null;
   lastSignalAt: string | null;
+  lastActivitySeenAt: string | null;
   whyNow: string | null;
+  criteriaHeadline: string | null;
+  pedigree: string | null;
+  focusArea: string | null;
+  isRaising: boolean | null;
+  isCofounderSearch: boolean | null;
+  isComingOutOfStealth: boolean | null;
+  nearNetwork: boolean | null;
+  plAligned: boolean | null;
   thinEvidence: boolean | null;
   reviewState: ReviewStateDto;
   rawPayload: Record<string, unknown>;

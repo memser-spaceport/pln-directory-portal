@@ -34,6 +34,19 @@ export class FounderSourcingService {
       });
     }
 
+    if (dto.methodology_version && dto.methodology_version.trim() !== '' && dto.methodology) {
+      await this.prisma.founderSourcingMethodology.upsert({
+        where: { version: dto.methodology_version.trim() },
+        create: {
+          version: dto.methodology_version.trim(),
+          payload: dto.methodology as Prisma.InputJsonValue,
+        },
+        update: {
+          payload: dto.methodology as Prisma.InputJsonValue,
+        },
+      });
+    }
+
     for (let i = 0; i < dto.items.length; i++) {
       const item = dto.items[i];
       try {
@@ -64,7 +77,7 @@ export class FounderSourcingService {
         await this.prisma.founderSourcingRecord.upsert({
           where: { dedupeKey: data.dedupeKey },
           create: data,
-          update: this.stripKeysForUpdate(data),
+          update: this.stripKeysForUpdate(data, item),
         });
 
         result.ingested++;
@@ -184,11 +197,20 @@ export class FounderSourcingService {
       intentSignals: item.intent_signals as unknown as Prisma.InputJsonValue,
       provenance: item.provenance as unknown as Prisma.InputJsonValue,
       lastSignalAt: parseIsoDateTime(item.last_signal_at, 'last_signal_at'),
+      lastActivitySeenAt: parseIsoDateTime(item.last_activity_seen_at, 'last_activity_seen_at'),
       whyNow: truncateOptional(
         trimToUndefined(item.why_now) ?? trimToUndefined((item as unknown as Record<string, unknown>).whyNow as string),
         'why_now',
         500
       ),
+      criteriaHeadline: truncateOptional(trimToUndefined(item.criteria_headline), 'criteria_headline', 500),
+      pedigree: truncateOptional(trimToUndefined(item.pedigree), 'pedigree', 500),
+      focusArea: trimToUndefined(item.focus_area),
+      isRaising: optionalTrueFlag(item.is_raising),
+      isCofounderSearch: optionalTrueFlag(item.is_cofounder_search),
+      isComingOutOfStealth: optionalTrueFlag(item.is_coming_out_of_stealth),
+      nearNetwork: optionalTrueFlag(item.near_network),
+      plAligned: optionalTrueFlag(item.pl_aligned),
       thinEvidence: item.thin_evidence,
       runId: trimToUndefined(item.run_id),
       signalSourcingVersion: trimToUndefined(item.signal_sourcing_version),
@@ -202,13 +224,17 @@ export class FounderSourcingService {
   }
 
   private stripKeysForUpdate(
-    data: Prisma.FounderSourcingRecordUncheckedCreateInput
+    data: Prisma.FounderSourcingRecordUncheckedCreateInput,
+    item: FounderIngestItem
   ): Prisma.FounderSourcingRecordUncheckedUpdateInput {
     const {
       founderId: _founderId,
       dedupeKey: _dedupeKey,
       reviewStatus: _reviewStatus,
       reviewFeedback: _reviewFeedback,
+      reviewChannel: _reviewChannel,
+      reviewField: _reviewField,
+      reviewArea: _reviewArea,
       reviewDecidedAt: _reviewDecidedAt,
       reviewNote: _reviewNote,
       reviewedByMemberUid: _reviewedByMemberUid,
@@ -218,9 +244,29 @@ export class FounderSourcingService {
     void _dedupeKey;
     void _reviewStatus;
     void _reviewFeedback;
+    void _reviewChannel;
+    void _reviewField;
+    void _reviewArea;
     void _reviewDecidedAt;
     void _reviewNote;
     void _reviewedByMemberUid;
+
+    const stickyFields: Array<{
+      key: keyof Prisma.FounderSourcingRecordUncheckedUpdateInput;
+      present: boolean;
+    }> = [
+      { key: 'isRaising', present: item.is_raising === true },
+      { key: 'isCofounderSearch', present: item.is_cofounder_search === true },
+      { key: 'isComingOutOfStealth', present: item.is_coming_out_of_stealth === true },
+      { key: 'nearNetwork', present: item.near_network === true },
+      { key: 'plAligned', present: item.pl_aligned === true },
+    ];
+    for (const { key, present } of stickyFields) {
+      if (!present) {
+        delete rest[key];
+      }
+    }
+
     return rest;
   }
 
@@ -307,4 +353,8 @@ function truncateOptional(raw: string | undefined, label: string, max: number): 
   const s = raw.trim();
   if (s.length > max) throw new Error(`${label} exceeds ${max} characters`);
   return s;
+}
+
+function optionalTrueFlag(value: boolean | undefined): true | undefined {
+  return value === true ? true : undefined;
 }

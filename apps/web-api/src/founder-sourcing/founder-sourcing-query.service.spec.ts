@@ -26,10 +26,15 @@ describe('FounderSourcingQueryService', () => {
   const queryRaw = jest.fn();
   const transaction = jest.fn();
 
+  const methodologyFindFirst = jest.fn();
+
   const prismaMock = {
     founderSourcingRecord: {
       count,
       findMany,
+    },
+    founderSourcingMethodology: {
+      findFirst: methodologyFindFirst,
     },
     $queryRaw: queryRaw,
     $transaction: transaction,
@@ -44,13 +49,33 @@ describe('FounderSourcingQueryService', () => {
   });
 
   describe('getFilterOptions', () => {
-    it('returns distinct sources from raw query', async () => {
-      queryRaw.mockResolvedValue([{ val: 'github-events' }, { val: 'LinkedIn' }]);
+    it('returns distinct sources and focus areas from raw query', async () => {
+      queryRaw
+        .mockResolvedValueOnce([{ val: 'github-events' }, { val: 'LinkedIn' }])
+        .mockResolvedValueOnce([{ val: 'FA3 Embodied AI' }]);
 
       const result = await service.getFilterOptions();
 
-      expect(result).toEqual({ sources: ['github-events', 'LinkedIn'] });
-      expect(queryRaw).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ sources: ['github-events', 'LinkedIn'], focusAreas: ['FA3 Embodied AI'] });
+      expect(queryRaw).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('listFounders filters', () => {
+    it('filters isRaising=true', async () => {
+      await service.listFounders({ isRaising: 'true' });
+
+      expect(count).toHaveBeenCalledWith({
+        where: { isRaising: true },
+      });
+    });
+
+    it('filters by focusArea list', async () => {
+      await service.listFounders({ focusArea: 'FA3 Embodied AI,FA4 Human-AI Interfaces' });
+
+      expect(count).toHaveBeenCalledWith({
+        where: { focusArea: { in: ['FA3 Embodied AI', 'FA4 Human-AI Interfaces'] } },
+      });
     });
   });
 
