@@ -5,6 +5,7 @@ import { DemoDaysService } from './demo-days.service';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { AwsService } from '../utils/aws/aws.service';
+import { DEMODAY_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 
 @Injectable()
@@ -215,13 +216,42 @@ export class DemoDayFundraisingProfilesService {
   async canViewAnalyticsReportUrl(memberEmail: string, teamUid: string, demoDayUid: string): Promise<boolean> {
     try {
       const access = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDayUid);
-      if (access.isAdmin) return true;
+
+      if (access.isAdmin || access.isViewOnlyAdmin) {
+        return true;
+      }
+
+      if (await this.memberHasDemoDayAnalyticsReadAccess(access.participantUid)) {
+        return true;
+      }
 
       await this.validateTeamFounderAccess(memberEmail, teamUid, demoDayUid);
       return true;
     } catch {
       return false;
     }
+  }
+
+  private async memberHasDemoDayAnalyticsReadAccess(memberUid: string): Promise<boolean> {
+    const readCodes = [DEMODAY_PERMISSIONS.STATS_READ, DEMODAY_PERMISSIONS.REPORT_LINK_READ];
+
+    const direct = await this.prisma.memberPermissionV2.findFirst({
+      where: { memberUid, permission: { code: { in: readCodes } } },
+      select: { uid: true },
+    });
+    if (direct) {
+      return true;
+    }
+
+    const viaPolicy = await this.prisma.policyAssignment.findFirst({
+      where: {
+        memberUid,
+        policy: { policyPermissions: { some: { permission: { code: { in: readCodes } } } } },
+      },
+      select: { uid: true },
+    });
+
+    return !!viaPolicy;
   }
 
   /**
@@ -737,7 +767,10 @@ export class DemoDayFundraisingProfilesService {
     }
 
     // Check access and get user info - throws if no access
-    const { participantUid, isAdmin } = await this.demoDaysService.checkDemoDayAccess(memberEmail, demoDay.uid);
+    const { participantUid, isAdmin, isViewOnlyAdmin } = await this.demoDaysService.checkDemoDayAccess(
+      memberEmail,
+      demoDay.uid
+    );
 
     //Condition #1: admins with showDraft get all profiles - otherwise only published ones
     const where = this.buildProfilesWhere(params, demoDay.uid, showDraft);
@@ -778,7 +811,8 @@ export class DemoDayFundraisingProfilesService {
       };
       return acc;
     }, {} as Record<string, { saved: boolean; liked: boolean; connected: boolean; invested: boolean; referral: boolean; feedback: boolean }>);
-    const canViewAllAnalytics = isAdmin;
+    const canViewAllAnalytics =
+      isAdmin || isViewOnlyAdmin || (await this.memberHasDemoDayAnalyticsReadAccess(participantUid));
     let founderTeamUids: Set<string> | null = null;
     if (!canViewAllAnalytics) {
       const founderParticipants = await this.prisma.demoDayParticipant.findMany({
