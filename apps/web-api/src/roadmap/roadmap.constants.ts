@@ -18,6 +18,39 @@ export const ROADMAP_ANALYTICS_EVENTS = {
   PIN_LIMIT_CHANGED: 'gantry_pin_limit_changed',
 } as const;
 
+/**
+ * `metadata.trigger` values stamped on each roadmap bell notification. Used both when
+ * sending and when checking whether a given notification already fired for an item, so
+ * the two must stay in sync — always reference these constants, never inline strings.
+ */
+export const ROADMAP_NOTIFICATION_TRIGGERS = {
+  NEW_SUBMISSION: 'new_submission',
+  NEED_PLANNED: 'need_planned',
+  NEED_IN_PROGRESS: 'need_in_progress',
+  NEED_BACKLOGGED: 'need_backlogged',
+  NEED_SHIPPED: 'need_shipped',
+  NEED_DECLINED: 'need_declined',
+  BOOST_RETURNED: 'boost_returned',
+  BACKED_ITEM_SHIPPED: 'backed_item_shipped',
+} as const;
+
+/** A persisted notification with any of these triggers proves the item already shipped. */
+export const SHIPPED_NOTIFICATION_TRIGGERS: string[] = [
+  ROADMAP_NOTIFICATION_TRIGGERS.NEED_SHIPPED,
+  ROADMAP_NOTIFICATION_TRIGGERS.BACKED_ITEM_SHIPPED,
+];
+
+/**
+ * A persisted notification with any of these triggers proves the item already reached
+ * In Progress — which, per the PRD, also includes anything that already shipped (a
+ * Shipped → In Progress bounce must stay silent).
+ */
+export const REACHED_IN_PROGRESS_NOTIFICATION_TRIGGERS: string[] = [
+  ROADMAP_NOTIFICATION_TRIGGERS.NEED_IN_PROGRESS,
+  ROADMAP_NOTIFICATION_TRIGGERS.BOOST_RETURNED,
+  ...SHIPPED_NOTIFICATION_TRIGGERS,
+];
+
 export const IDEA_STAGES: RoadmapStage[] = [RoadmapStage.IDEA, RoadmapStage.BACKLOG];
 
 /** Stages where members can pin (boost) items. Everywhere else counts are frozen. */
