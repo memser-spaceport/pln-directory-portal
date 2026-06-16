@@ -1,0 +1,23 @@
+.muted {
+  font-size: 14px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.dateCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dateLine {
+  font-size: 13px;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.timeLine {
+  font-size: 12px;
+  color: #9ca3af;
+  white-space: nowrap;
+}

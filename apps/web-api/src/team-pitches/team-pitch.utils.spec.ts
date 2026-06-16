@@ -1,4 +1,4 @@
-import { DEFAULT_TEAM_PITCH_SUPPORT_EMAIL, resolveTeamPitchSupportEmail } from './team-pitch.utils';
+import { DEFAULT_TEAM_PITCH_SUPPORT_EMAIL, resolveTeamPitchSupportEmail, resolveTeamPitchClosedAt } from './team-pitch.utils';
 
 describe('resolveTeamPitchSupportEmail', () => {
   const originalLabosSupportEmail = process.env.LABOS_SUPPORT_EMAIL;
@@ -46,5 +46,39 @@ describe('resolveTeamPitchSupportEmail', () => {
     delete process.env.DEMO_DAY_EMAIL;
 
     expect(resolveTeamPitchSupportEmail('')).toBe(DEFAULT_TEAM_PITCH_SUPPORT_EMAIL);
+  });
+});
+
+describe('resolveTeamPitchClosedAt', () => {
+  it('returns null when pitch is not closed', () => {
+    expect(
+      resolveTeamPitchClosedAt({
+        status: 'OPEN',
+        closedAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-02-01T00:00:00.000Z'),
+      })
+    ).toBeNull();
+  });
+
+  it('returns closedAt when set on a closed pitch', () => {
+    const closedAt = new Date('2026-03-15T12:00:00.000Z');
+    expect(
+      resolveTeamPitchClosedAt({
+        status: 'CLOSED',
+        closedAt,
+        updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+      })
+    ).toBe(closedAt.toISOString());
+  });
+
+  it('falls back to updatedAt when closedAt is missing', () => {
+    const updatedAt = new Date('2026-04-01T00:00:00.000Z');
+    expect(
+      resolveTeamPitchClosedAt({
+        status: 'CLOSED',
+        closedAt: null,
+        updatedAt,
+      })
+    ).toBe(updatedAt.toISOString());
   });
 });

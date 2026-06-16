@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Prisma, TeamPitchParticipantAccess, TeamPitchParticipantType, TeamPitchStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ADMIN_PERMISSIONS, TEAM_PITCH_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
-import { resolveTeamPitchSupportEmail, toKebabSlug } from './team-pitch.utils';
+import { resolveTeamPitchSupportEmail, resolveTeamPitchClosedAt, toKebabSlug } from './team-pitch.utils';
 
 export type TeamPitchAccessLevel = 'restricted' | 'view' | 'edit';
 
@@ -125,6 +125,7 @@ export class TeamPitchesService {
       slug: pitch.slug,
       createdAt: pitch.createdAt.toISOString(),
       status: pitch.status,
+      closedAt: resolveTeamPitchClosedAt(pitch),
       title: pitch.title,
       description: pitch.description,
       supportEmail: pitch.supportEmail,
@@ -241,6 +242,7 @@ export class TeamPitchesService {
         title: data.title,
         description: data.description,
         status: data.status ?? TeamPitchStatus.DRAFT,
+        closedAt: data.status === TeamPitchStatus.CLOSED ? new Date() : undefined,
         supportEmail,
         headerImageUid: data.headerImageUid ?? undefined,
         logoUid: data.logoUid ?? undefined,
@@ -317,6 +319,15 @@ export class TeamPitchesService {
     const resolvedSupportEmail =
       data.supportEmail !== undefined ? resolveTeamPitchSupportEmail(data.supportEmail) : undefined;
 
+    let closedAt: Date | null | undefined;
+    if (data.status !== undefined) {
+      if (data.status === TeamPitchStatus.CLOSED && existing.status !== TeamPitchStatus.CLOSED) {
+        closedAt = new Date();
+      } else if (data.status !== TeamPitchStatus.CLOSED) {
+        closedAt = null;
+      }
+    }
+
     return this.prisma.teamPitch.update({
       where: { uid: pitchUid },
       data: {
@@ -324,6 +335,7 @@ export class TeamPitchesService {
         description: data.description,
         slug,
         status: data.status,
+        closedAt,
         supportEmail: resolvedSupportEmail,
         headerImageUid: data.headerImageUid,
         logoUid: data.logoUid,

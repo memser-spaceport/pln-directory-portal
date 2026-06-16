@@ -1388,6 +1388,7 @@ model TeamPitch {
   title           String
   description     String
   status          TeamPitchStatus            @default(DRAFT)
+  closedAt        DateTime?
   supportEmail    String
   headerImageUid  String?
   headerImage     Image?                     @relation("TeamPitchHeaderImage", fields: [headerImageUid], references: [uid])

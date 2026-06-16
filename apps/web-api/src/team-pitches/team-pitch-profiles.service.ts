@@ -5,6 +5,7 @@ import { UploadsService } from '../uploads/uploads.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { TeamEnrichmentService } from '../team-enrichment/team-enrichment.service';
 import { TeamPitchesService } from './team-pitches.service';
+import { resolveTeamPitchClosedAt } from './team-pitch.utils';
 
 @Injectable()
 export class TeamPitchProfilesService {
@@ -31,7 +32,18 @@ export class TeamPitchProfilesService {
     const isInvestor = resolved.participantType === TeamPitchParticipantType.INVESTOR;
 
     if (pitch.status === 'CLOSED' && isInvestor && !resolved.isPitchAdmin) {
-      throw new NotFoundException('Team pitch is closed');
+      return {
+        uid: pitch.uid,
+        slug: pitch.slug,
+        status: pitch.status,
+        closedAt: resolveTeamPitchClosedAt(pitch),
+        title: pitch.title,
+        team: {
+          uid: pitch.team.uid,
+          name: pitch.team.name,
+        },
+        teamProfile: null,
+      };
     }
 
     if (pitch.status === 'DRAFT' && isInvestor && !resolved.isPitchAdmin) {
@@ -67,6 +79,7 @@ export class TeamPitchProfilesService {
       logoUrl: pitch.logo?.url ?? null,
       headerImageUrl: pitch.headerImage?.url ?? null,
       createdAt: pitch.createdAt.toISOString(),
+      closedAt: resolveTeamPitchClosedAt(pitch),
       access: resolved.access,
       participantType: resolved.participantType ?? null,
       isPitchAdmin: resolved.isPitchAdmin ?? false,

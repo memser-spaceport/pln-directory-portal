@@ -25,3 +25,15 @@ export function defaultAccessForParticipantType(
 ): 'VIEW' | 'VIEW_ADMIN' | 'EDIT' {
   return type === 'FOUNDER' ? 'EDIT' : 'VIEW';
 }
+
+export function resolveTeamPitchClosedAt(pitch: {
+  status: string;
+  closedAt: Date | null;
+  updatedAt: Date;
+}): string | null {
+  if (pitch.status !== 'CLOSED') {
+    return null;
+  }
+
+  return (pitch.closedAt ?? pitch.updatedAt).toISOString();
+}

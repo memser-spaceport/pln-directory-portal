@@ -325,115 +325,25 @@
   color: #9ca3af;
 }
 
-/* ─── Member name cell ────────────────────────────────── */
+/* ─── Remove button ──────────────────────────────────── */
 
-.memberNameCell {
+.removeBtn {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  overflow: hidden;
   flex-shrink: 0;
-  background: #e5e7eb;
-
-  > img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-}
-
-.avatarPlaceholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: #455468;
-  text-transform: uppercase;
-}
 
-.memberText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
 
-.memberName {
-  font-size: 14px;
-  font-weight: 500;
-  color: #111827;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.memberEmail {
-  font-size: 12px;
-  color: #6b7280;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ─── Team/Project cell ───────────────────────────────── */
-
-.teamList {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.teamBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  color: #4f71ff;
-  white-space: nowrap;
-
-  > svg {
-    color: #4f71ff;
-    flex-shrink: 0;
+  &:hover {
+    background: #fef2f2;
+    color: #ef4444;
   }
 }
 
-.teamOverflow {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 7px;
-  border-radius: 10px;
-  background: #e2e8f0;
-  color: #64748b;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-/* ─── Date cell ───────────────────────────────────────── */
-
-.dateCell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.dateLine {
-  font-size: 13px;
-  color: #374151;
-  white-space: nowrap;
-}
-
-.timeLine {
-  font-size: 12px;
-  color: #9ca3af;
-  white-space: nowrap;
-}
