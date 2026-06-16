@@ -269,17 +269,18 @@ POST /v1/admin/push-notifications/send
 | `GUIDE_REPLY` | Reply to your comment on a Founder Guide |
 | `NEW_FEATURE` | New-feature announcement (visible to all members regardless of join date) |
 | `GANTRY` | Gantry roadmap events — new submission, status change, boost returned, shipped (hidden from its own author) |
-| `TEAM_NEWS` | "News from the network" — broadcast to all users when a team gets new news on ingest (one per team per run). See below. |
+| `TEAM_NEWS` | "News from the network" — ONE broadcast per ingest run summarising all teams' new news. See below. |
 
 ### Team News (`TEAM_NEWS`)
 
-The `TEAM_NEWS` category powers the in-app notification fired when the "News from the network" feed (`/home`) gets fresh items.
+The `TEAM_NEWS` category powers the in-app notification fired when the "News from the network" feed (`/home`) gets fresh items. It mirrors the **"Latest Network News"** email template.
 
-- **Trigger**: `TeamNewsService.ingestTeamNews()` (`apps/web-api/src/team-news/team-news.service.ts`). After the batch ingest persists items, it broadcasts **one public notification per team that received ≥1 newly-created item** (`notifyTeamsWithNews`).
-- **Idempotency**: Re-ingesting the same item *updates* the existing row (matched on `canonicalKey`) instead of inserting, so replays do not re-notify — only genuine inserts count.
-- **Shape**: `isPublic: true` (broadcast to all users), `title` = `"{Team} shared an update"` / `"{Team} shared N updates"`, `description` = most recent item's title, `image` = team logo, `link` = `/home`, `metadata` = `{ eventType: 'team_news', teamUid, itemCount }`.
-- **Read on view**: The frontend `AutoMarkNewsNotification` component (rendered only on `/home`) marks unread `TEAM_NEWS` (and `NEW_FEATURE`) notifications as read on mount.
-- **Frontend handling**: `PushNotificationCategory` union, `CATEGORY_CONFIG`, and `getCategoryLabel` in the web-app repo must list `TEAM_NEWS` (label "Team News") for the bell UI to render it.
+- **Trigger**: `TeamNewsService.ingestTeamNews()` → `notifyRun()` (`apps/web-api/src/team-news/team-news.service.ts`). The producer (`pln-data-enrichment`) ingests one run in several batched HTTP calls that share a `runId`; the run produces **exactly one** notification.
+- **One per run (`runId`)**: The first batch with new items creates and broadcasts the notification; later batches of the same run merge their counts into that single row **in place, without re-broadcasting**. The DB always settles on the run's final totals, which any refetch (reload / new login / opening the bell) shows. A run with no `runId` (e.g. a manual ingest) gets one notification per call.
+- **Idempotency**: Re-ingesting the same item *updates* the existing row (matched on `canonicalKey`) instead of inserting, so replays contribute zero new items and never inflate counts.
+- **Shape**: `isPublic: true` (broadcast to all users), `title` = `"Latest Network News"` (constant, matches the email), `description` = the substance — 1 team: the latest headline (`"… +N more"` when several); N teams: `"{N} teams shared news across the network."`. `link` = `/home`, `image` = team logo (single-team only), `metadata` = `{ eventType: 'team_news', runId, teamUids, teamCount, updateCount, latestTitle, latestEventDate }`.
+- **Read on view**: The provider's "direct scan" effect marks the notification read on `/home` (because `link='/home'`). `AutoMarkNewsNotification` handles only `NEW_FEATURE` (which can be link-less).
+- **Frontend handling**: `PushNotificationCategory` union, `CATEGORY_CONFIG`, and `getCategoryLabel` in the web-app repo must list `TEAM_NEWS` (label "Network News") for the bell UI to render it.
 
 ## Database Schema
 

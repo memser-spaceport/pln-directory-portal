@@ -20,6 +20,11 @@ const RECENT_WINDOW_DAYS = 14;
 // the home page; there is no per-item detail route.
 const TEAM_NEWS_NOTIFICATION_LINK = '/home';
 
+// Constant notification title, matching the "Latest Network News" email template
+// so the in-app and email channels read consistently. The substance (which
+// teams / how many updates) goes in the description.
+const TEAM_NEWS_NOTIFICATION_TITLE = 'Latest Network News';
+
 interface ParseOutcome {
   ok: boolean;
   eventDate?: Date;
@@ -98,7 +103,7 @@ export class TeamNewsService {
     }
 
     await this.recomputeRecentNewsCounts(teamsTouched);
-    await this.notifyTeamsWithNews(createdByTeam);
+    await this.notifyRun(dto, createdByTeam);
 
     this.logger.log(
       `Team-news ingest complete (runId=${dto.runId ?? 'none'}, source=${dto.source ?? 'none'}): ` +
@@ -125,52 +130,139 @@ export class TeamNewsService {
   }
 
   /**
-   * Broadcast one in-app notification per team that received new news in this
-   * ingest run. Re-ingesting the same items updates rather than inserts (see
-   * upsertNewsItem), so replays do not re-notify. Each notification is public
-   * (broadcast to all users) and links to the home-page news feed.
+   * Emit a SINGLE in-app notification summarising an ingest run — e.g. "Fresh
+   * news from 20 teams across the network".
+   *
+   * The producer (pln-data-enrichment) splits one run into several ingest HTTP
+   * calls (batches) that share the same `runId`. We key the notification on
+   * `metadata.runId`: the first batch with new items creates and broadcasts it;
+   * later batches of the same run merge their counts into that one row in place
+   * (no re-broadcast). The DB therefore always settles on the run's final
+   * totals, which any refetch (reload / new login / opening the bell) shows.
+   *
+   * Re-ingesting the same items updates rather than inserts (see upsertNewsItem),
+   * so replays contribute zero new items and never inflate the counts. When the
+   * run has no `runId` (e.g. a manual ingest), each call is treated as its own
+   * run and gets its own notification.
    *
    * Failures here never fail the ingest — news is already persisted; the
    * notification is best-effort.
    */
-  private async notifyTeamsWithNews(createdByTeam: Map<string, CreatedTeamNews>) {
+  private async notifyRun(dto: IngestTeamNewsDto, createdByTeam: Map<string, CreatedTeamNews>) {
     if (createdByTeam.size === 0) return;
+    const runId = dto.runId ?? null;
 
-    const teamUids = [...createdByTeam.keys()];
+    // This batch's contribution.
+    const batchTeamUids = [...createdByTeam.keys()];
+    const batchUpdates = [...createdByTeam.values()].reduce((sum, agg) => sum + agg.count, 0);
+    let batchLatest = { title: '', date: new Date(0) };
+    for (const agg of createdByTeam.values()) {
+      if (agg.latestEventDate.getTime() >= batchLatest.date.getTime()) {
+        batchLatest = { title: agg.latestTitle, date: agg.latestEventDate };
+      }
+    }
+
+    try {
+      // Find an existing notification for this run (same runId), if any.
+      const existing = runId
+        ? await this.prisma.pushNotification.findFirst({
+            where: {
+              category: PushNotificationCategory.TEAM_NEWS,
+              AND: [{ metadata: { path: ['runId'], equals: runId } }],
+            },
+          })
+        : null;
+
+      // Merge this batch into the run's running totals.
+      const prevMeta = (existing?.metadata as Record<string, any>) ?? {};
+      const teamUids: string[] = [...new Set<string>([...(prevMeta.teamUids ?? []), ...batchTeamUids])];
+      const updateCount: number = (prevMeta.updateCount ?? 0) + batchUpdates;
+      const prevLatestDate = prevMeta.latestEventDate ? new Date(prevMeta.latestEventDate) : new Date(0);
+      const latest =
+        batchLatest.date.getTime() >= prevLatestDate.getTime()
+          ? batchLatest
+          : { title: prevMeta.latestTitle ?? '', date: prevLatestDate };
+
+      const copy = await this.buildRunCopy(teamUids, updateCount, latest.title);
+      const metadata = {
+        eventType: 'team_news',
+        runId,
+        teamUids,
+        teamCount: teamUids.length,
+        updateCount,
+        latestTitle: latest.title,
+        latestEventDate: latest.date.toISOString(),
+      };
+
+      if (existing) {
+        // Later batch of the same run: update the stored counts in place.
+        await this.prisma.pushNotification.update({
+          where: { id: existing.id },
+          data: { title: copy.title, description: copy.description, image: copy.image ?? null, metadata },
+        });
+      } else {
+        // First batch of the run (or no runId): create + broadcast to all users.
+        await this.pushNotifications.create({
+          category: PushNotificationCategory.TEAM_NEWS,
+          title: copy.title,
+          description: copy.description,
+          image: copy.image,
+          link: TEAM_NEWS_NOTIFICATION_LINK,
+          linkText: 'View news',
+          isPublic: true,
+          metadata,
+        });
+      }
+
+      this.logger.log(
+        `Team-news run notification (runId=${runId ?? 'none'}): teams=${teamUids.length} updates=${updateCount} ${
+          existing ? 'updated' : 'created'
+        }`
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Team-news run notification failed (runId=${runId ?? 'none'}): ${
+          error instanceof Error ? error.message : error
+        }`
+      );
+    }
+  }
+
+  /**
+   * Build the notification copy for a run from its merged totals.
+   * The title is always "Latest Network News" (matching the email template); the
+   * description carries the substance:
+   * - 1 team:   the latest headline (with "+N more" when the run had several)
+   * - N teams:  "{N} teams shared news across the network."
+   */
+  private async buildRunCopy(
+    teamUids: string[],
+    updateCount: number,
+    latestTitle: string
+  ): Promise<{ title: string; description?: string; image?: string }> {
     const teams = await this.prisma.team.findMany({
       where: { uid: { in: teamUids } },
       select: { uid: true, name: true, logo: { select: { url: true } } },
     });
     const teamByUid = new Map(teams.map((t) => [t.uid, t]));
+    const names = teamUids.map((uid) => teamByUid.get(uid)?.name ?? 'A team');
 
-    for (const [teamUid, agg] of createdByTeam) {
-      const team = teamByUid.get(teamUid);
-      const teamName = team?.name ?? 'A team';
-      const title = agg.count === 1 ? `${teamName} shared an update` : `${teamName} shared ${agg.count} updates`;
-
-      try {
-        await this.pushNotifications.create({
-          category: PushNotificationCategory.TEAM_NEWS,
-          title,
-          description: agg.latestTitle,
-          image: team?.logo?.url ?? undefined,
-          link: TEAM_NEWS_NOTIFICATION_LINK,
-          linkText: 'View news',
-          isPublic: true,
-          metadata: {
-            eventType: 'team_news',
-            teamUid,
-            itemCount: agg.count,
-          },
-        });
-      } catch (error) {
-        this.logger.warn(
-          `Team-news notification failed for team ${teamUid}: ${error instanceof Error ? error.message : error}`
-        );
-      }
+    if (teamUids.length === 1) {
+      const name = names[0];
+      const headline = latestTitle || `${name} shared ${updateCount === 1 ? 'an update' : `${updateCount} updates`}`;
+      const description = updateCount > 1 && latestTitle ? `${headline} +${updateCount - 1} more` : headline;
+      return {
+        title: TEAM_NEWS_NOTIFICATION_TITLE,
+        description,
+        image: teamByUid.get(teamUids[0])?.logo?.url ?? undefined,
+      };
     }
 
-    this.logger.log(`Team-news notifications broadcast for ${createdByTeam.size} team(s)`);
+    return {
+      title: TEAM_NEWS_NOTIFICATION_TITLE,
+      description: `${teamUids.length} teams shared news across the network.`,
+      image: undefined,
+    };
   }
 
   private bumpRejectionCounter(result: IngestTeamNewsResponse, reason: ParseOutcome['reason']) {

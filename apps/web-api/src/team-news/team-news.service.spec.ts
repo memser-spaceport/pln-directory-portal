@@ -131,6 +131,7 @@ type IngestPrismaMock = {
   team: { findMany: jest.Mock };
   teamNewsItem: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock; count: jest.Mock };
   teamNewsEnrichment: { upsert: jest.Mock };
+  pushNotification: { findFirst: jest.Mock; update: jest.Mock };
 };
 
 const buildIngestPrismaMock = (): IngestPrismaMock => ({
@@ -147,6 +148,7 @@ const buildIngestPrismaMock = (): IngestPrismaMock => ({
     count: jest.fn().mockResolvedValue(1),
   },
   teamNewsEnrichment: { upsert: jest.fn().mockResolvedValue({}) },
+  pushNotification: { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn().mockResolvedValue({}) },
 });
 
 const ingestItem = (overrides: Record<string, unknown> = {}) => ({
@@ -173,10 +175,11 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
     );
   });
 
-  it('broadcasts one TEAM_NEWS notification per team for newly-created items', async () => {
+  it('emits ONE run notification summarising all teams in the batch', async () => {
     prisma.teamNewsItem.findUnique.mockResolvedValue(null); // every item is new
 
     await service.ingestTeamNews({
+      runId: 'run-1',
       items: [
         ingestItem({ teamUid: 't1', title: 'older', eventDate: '2026-06-09T00:00:00.000Z', sourceUrl: 'https://x/1' }),
         ingestItem({ teamUid: 't1', title: 'newest', eventDate: '2026-06-11T00:00:00.000Z', sourceUrl: 'https://x/2' }),
@@ -184,38 +187,85 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
       ],
     });
 
-    expect(push.create).toHaveBeenCalledTimes(2);
-
-    const calls = push.create.mock.calls.map((c) => c[0]);
-    const aria = calls.find((c) => c.metadata?.teamUid === 't1');
-    const bsky = calls.find((c) => c.metadata?.teamUid === 't2');
-
-    expect(aria).toMatchObject({
+    expect(push.create).toHaveBeenCalledTimes(1);
+    const dto = push.create.mock.calls[0][0];
+    expect(dto).toMatchObject({
       category: 'TEAM_NEWS',
-      title: 'ARIA shared 2 updates',
-      description: 'newest', // most recent item's title is the preview
-      image: 'https://cdn/aria.png',
+      title: 'Latest Network News',
+      description: '2 teams shared news across the network.',
       link: '/home',
       isPublic: true,
     });
-    expect(bsky).toMatchObject({ category: 'TEAM_NEWS', title: 'Bluesky shared an update', isPublic: true });
-    expect(bsky?.image).toBeUndefined(); // team has no logo
+    expect(dto.metadata).toMatchObject({ eventType: 'team_news', runId: 'run-1', teamCount: 2, updateCount: 3 });
+    expect(dto.metadata.teamUids).toEqual(['t1', 't2']);
+  });
+
+  it('uses single-team copy with the latest headline when only one team has news', async () => {
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null);
+
+    await service.ingestTeamNews({
+      runId: 'run-2',
+      items: [
+        ingestItem({ teamUid: 't1', title: 'older', eventDate: '2026-06-09T00:00:00.000Z', sourceUrl: 'https://x/1' }),
+        ingestItem({ teamUid: 't1', title: 'newest', eventDate: '2026-06-11T00:00:00.000Z', sourceUrl: 'https://x/2' }),
+      ],
+    });
+
+    expect(push.create).toHaveBeenCalledTimes(1);
+    expect(push.create.mock.calls[0][0]).toMatchObject({
+      title: 'Latest Network News',
+      description: 'newest +1 more', // latest headline + remaining count
+      image: 'https://cdn/aria.png',
+      metadata: { teamCount: 1, updateCount: 2 },
+    });
+  });
+
+  it('merges a later batch of the same run in place, without re-broadcasting', async () => {
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null);
+
+    // Batch 1 of run-3: no existing notification -> create.
+    await service.ingestTeamNews({ runId: 'run-3', items: [ingestItem({ teamUid: 't1', sourceUrl: 'https://x/1' })] });
+    expect(push.create).toHaveBeenCalledTimes(1);
+
+    // Batch 2 of run-3: the run notification now exists -> update in place, no new broadcast.
+    prisma.pushNotification.findFirst.mockResolvedValueOnce({
+      id: 99,
+      metadata: {
+        runId: 'run-3',
+        teamUids: ['t1'],
+        teamCount: 1,
+        updateCount: 1,
+        latestTitle: 'ARIA raised a seed round',
+        latestEventDate: '2026-06-10T00:00:00.000Z',
+      },
+    });
+
+    await service.ingestTeamNews({ runId: 'run-3', items: [ingestItem({ teamUid: 't2', sourceUrl: 'https://x/2' })] });
+
+    expect(push.create).toHaveBeenCalledTimes(1); // still only the first broadcast
+    expect(prisma.pushNotification.update).toHaveBeenCalledTimes(1);
+    const updateArg = prisma.pushNotification.update.mock.calls[0][0];
+    expect(updateArg.where).toEqual({ id: 99 });
+    expect(updateArg.data.metadata).toMatchObject({ teamCount: 2, updateCount: 2 });
+    expect(updateArg.data.metadata.teamUids).toEqual(['t1', 't2']);
+    expect(updateArg.data.title).toBe('Latest Network News');
   });
 
   it('does not notify when items only update existing rows', async () => {
     prisma.teamNewsItem.findUnique.mockResolvedValue({ id: 1 }); // every item already exists
 
-    await service.ingestTeamNews({ items: [ingestItem()] });
+    await service.ingestTeamNews({ runId: 'run-4', items: [ingestItem()] });
 
     expect(prisma.teamNewsItem.update).toHaveBeenCalled();
     expect(push.create).not.toHaveBeenCalled();
+    expect(prisma.pushNotification.findFirst).not.toHaveBeenCalled();
   });
 
   it('does not let a notification failure fail the ingest', async () => {
     prisma.teamNewsItem.findUnique.mockResolvedValue(null);
     push.create.mockRejectedValueOnce(new Error('ws down'));
 
-    const result = await service.ingestTeamNews({ items: [ingestItem()] });
+    const result = await service.ingestTeamNews({ runId: 'run-5', items: [ingestItem()] });
 
     expect(result.created).toBe(1);
     expect(result.ingested).toBe(1);
