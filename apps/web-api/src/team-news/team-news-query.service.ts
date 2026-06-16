@@ -8,6 +8,7 @@ import type {
   TeamNewsItemDto,
   TeamNewsListQuery,
   TeamNewsListResponse,
+  TeamNewsRecentResponse,
 } from 'libs/contracts/src/schema/team-news';
 import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
@@ -169,6 +170,65 @@ export class TeamNewsQueryService {
           items,
         };
       }),
+    };
+  }
+
+  /**
+   * Recent network news across all teams for the combined daily digest email's
+   * "Latest Network News" section. Consumed by the notification service.
+   *
+   * Selection is by ingestion time (`createdAt`) over the half-open watermark
+   * window `(sinceCreatedAt, untilCreatedAt]`. The notification service passes
+   * sinceCreatedAt = the start of the previous successful digest run and
+   * untilCreatedAt = the start of the current run, so each item is delivered in
+   * exactly one digest — no gaps, no duplicates — even though `eventDate` can
+   * trail ingestion by days. Items are still ordered/displayed by `eventDate`,
+   * matching the public feed. Applies the same excluded-team filter as the feed.
+   *
+   * Defaults (used only if the caller omits a bound, e.g. the very first run):
+   * untilCreatedAt = now, sinceCreatedAt = until − 1 day.
+   */
+  async getRecentNews(opts: {
+    sinceCreatedAt?: Date;
+    untilCreatedAt?: Date;
+    limit?: number;
+  }): Promise<TeamNewsRecentResponse> {
+    const until = opts.untilCreatedAt ?? new Date();
+    const since = opts.sinceCreatedAt ?? new Date(until.getTime() - 24 * 60 * 60 * 1000);
+    const limit = opts.limit ?? 50;
+
+    const where: Prisma.TeamNewsItemWhereInput = { createdAt: { gt: since, lte: until } };
+    if (TEAM_NEWS_EXCLUDED_TEAM_NAMES.length > 0) {
+      where.NOT = {
+        OR: TEAM_NEWS_EXCLUDED_TEAM_NAMES.map((name) => ({
+          team: { name: { equals: name, mode: 'insensitive' } },
+        })),
+      };
+    }
+
+    const rows = await this.prisma.teamNewsItem.findMany({
+      where,
+      orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
+      take: limit,
+      include: {
+        team: {
+          select: {
+            uid: true,
+            name: true,
+            logo: { select: { url: true } },
+            teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
+          },
+        },
+      },
+    });
+
+    const discussions = await this.loadDiscussions(rows.map((r) => r.uid));
+
+    return {
+      generatedAt: new Date().toISOString(),
+      since: since.toISOString(),
+      until: until.toISOString(),
+      items: rows.map((row) => this.toDto(row, discussions.get(row.uid))),
     };
   }
 

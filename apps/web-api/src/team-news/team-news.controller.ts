@@ -5,6 +5,7 @@ import { apiTeamNews } from 'libs/contracts/src/lib/contract-team-news';
 import {
   CreateTeamNewsDiscussionRequestSchema,
   TeamNewsListQueryParams,
+  TeamNewsRecentQueryParams,
 } from 'libs/contracts/src/schema/team-news';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
@@ -24,7 +25,7 @@ export class TeamNewsController {
     private readonly teamNewsQueryService: TeamNewsQueryService,
     private readonly teamNewsService: TeamNewsService,
     private readonly membersService: MembersService,
-    private readonly accessControl: AccessControlV2Service,
+    private readonly accessControl: AccessControlV2Service
   ) {}
 
   @Api(server.route.getTeamNews)
@@ -48,12 +49,31 @@ export class TeamNewsController {
     return this.teamNewsQueryService.getFilters(params);
   }
 
+  // The notification service pulls this at digest-cron time
+  // to build the "Latest Network News" email section. Selection is by the
+  // ingestion-time watermark window (sinceCreatedAt, untilCreatedAt].
+  @Api(server.route.getTeamNewsRecent)
+  @NoCache()
+  async getTeamNewsRecent(@Req() request: Request) {
+    const { sinceCreatedAt, untilCreatedAt, limit } = TeamNewsRecentQueryParams.parse(request.query);
+    const toDate = (value?: string): Date | undefined => {
+      if (!value) return undefined;
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? undefined : d;
+    };
+    return this.teamNewsQueryService.getRecentNews({
+      sinceCreatedAt: toDate(sinceCreatedAt),
+      untilCreatedAt: toDate(untilCreatedAt),
+      limit,
+    });
+  }
+
   @Api(server.route.createTeamNewsDiscussion)
   @UseGuards(UserTokenValidation)
   async createTeamNewsDiscussion(
     @Param('newsItemUid') newsItemUid: string,
     @Body() body: unknown,
-    @Req() req: Request & { userEmail?: string },
+    @Req() req: Request & { userEmail?: string }
   ) {
     const validated = CreateTeamNewsDiscussionRequestSchema.parse(body);
 

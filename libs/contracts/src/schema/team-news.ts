@@ -221,6 +221,33 @@ export const TeamNewsPerTeamResponseSchema = z.object({
   items: z.array(TeamNewsItemSchema),
 });
 
+// Recent network news across all teams, ordered newest-first. Consumed by the
+// notification service (pl-notification-service) when it builds the combined
+// "Daily Forum Digest + Latest Network News" email. Public (no service auth).
+//
+// Selection is by ingestion time (`createdAt`), NOT `eventDate`: the digest is a
+// "what was ingested since the last digest" feed, so the notification service
+// passes a watermark window `(sinceCreatedAt, untilCreatedAt]` = (last
+// successful digest run, this run). createdAt is monotonic and never backdated,
+// which guarantees no gaps and no duplicates across daily runs even though
+// `eventDate` can trail ingestion by days. `eventDate` is still used for display
+// ("19d ago") and ordering, matching the public News feed.
+export const TeamNewsRecentQueryParams = z.object({
+  sinceCreatedAt: z.string().optional(),
+  untilCreatedAt: z.string().optional(),
+  limit: z
+    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1).max(100).optional())
+    .default(50),
+});
+
+export const TeamNewsRecentResponseSchema = z.object({
+  generatedAt: z.string(),
+  // Echo of the resolved watermark window actually applied (after defaults).
+  since: z.string().nullable(),
+  until: z.string(),
+  items: z.array(TeamNewsItemSchema),
+});
+
 export type NewsEventType = z.infer<typeof NewsEventTypeSchema>;
 export type NewsDiscoveryOutcome = z.infer<typeof NewsDiscoveryOutcomeSchema>;
 export type TeamNewsItemDto = z.infer<typeof TeamNewsItemSchema>;
@@ -237,6 +264,8 @@ export type TeamNewsEnrichmentResponseItem = z.infer<typeof TeamNewsEnrichmentSc
 export type TeamWithNewsEnrichment = z.infer<typeof TeamWithNewsEnrichmentSchema>;
 export type TeamsWithNewsEnrichmentResponse = z.infer<typeof TeamsWithNewsEnrichmentResponseSchema>;
 export type TeamNewsPerTeamResponse = z.infer<typeof TeamNewsPerTeamResponseSchema>;
+export type TeamNewsRecentQuery = z.infer<typeof TeamNewsRecentQueryParams>;
+export type TeamNewsRecentResponse = z.infer<typeof TeamNewsRecentResponseSchema>;
 export type TeamNewsDiscussion = z.infer<typeof TeamNewsDiscussionSchema>;
 export type CreateTeamNewsDiscussionRequest = z.infer<typeof CreateTeamNewsDiscussionRequestSchema>;
 export type CreateTeamNewsDiscussionResponse = z.infer<typeof CreateTeamNewsDiscussionResponseSchema>;
