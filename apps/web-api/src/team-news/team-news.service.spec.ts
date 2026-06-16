@@ -191,8 +191,8 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
     const dto = push.create.mock.calls[0][0];
     expect(dto).toMatchObject({
       category: 'TEAM_NEWS',
-      title: 'Latest Network News',
-      description: '2 teams shared news across the network.',
+      title: '3 news updates from ARIA, Bluesky', // small run -> count + team names
+      description: 'newest +2 more', // latest headline across the run + remaining count
       link: '/home',
       isPublic: true,
     });
@@ -213,10 +213,28 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
 
     expect(push.create).toHaveBeenCalledTimes(1);
     expect(push.create.mock.calls[0][0]).toMatchObject({
-      title: 'Latest Network News',
+      title: '2 news updates from ARIA',
       description: 'newest +1 more', // latest headline + remaining count
       image: 'https://cdn/aria.png',
       metadata: { teamCount: 1, updateCount: 2 },
+    });
+  });
+
+  it('drops the count from the title for a large run (> small-run threshold)', async () => {
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null);
+
+    // 6 items for one team — above TEAM_NEWS_SMALL_RUN_MAX (5).
+    const items = Array.from({ length: 6 }, (_, i) =>
+      ingestItem({ teamUid: 't1', title: `item ${i}`, sourceUrl: `https://x/${i}`, eventDate: `2026-06-${10 + i}T00:00:00.000Z` })
+    );
+
+    await service.ingestTeamNews({ runId: 'run-big', items });
+
+    expect(push.create).toHaveBeenCalledTimes(1);
+    expect(push.create.mock.calls[0][0]).toMatchObject({
+      title: 'Latest news from ARIA', // no count for large runs
+      description: 'item 5 +5 more', // newest eventDate (10+5=15) + remaining
+      metadata: { teamCount: 1, updateCount: 6 },
     });
   });
 
@@ -248,7 +266,7 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
     expect(updateArg.where).toEqual({ id: 99 });
     expect(updateArg.data.metadata).toMatchObject({ teamCount: 2, updateCount: 2 });
     expect(updateArg.data.metadata.teamUids).toEqual(['t1', 't2']);
-    expect(updateArg.data.title).toBe('Latest Network News');
+    expect(updateArg.data.title).toBe('2 news updates from ARIA, Bluesky');
   });
 
   it('does not notify when items only update existing rows', async () => {

@@ -278,9 +278,18 @@ The `TEAM_NEWS` category powers the in-app notification fired when the "News fro
 - **Trigger**: `TeamNewsService.ingestTeamNews()` → `notifyRun()` (`apps/web-api/src/team-news/team-news.service.ts`). The producer (`pln-data-enrichment`) ingests one run in several batched HTTP calls that share a `runId`; the run produces **exactly one** notification.
 - **One per run (`runId`)**: The first batch with new items creates and broadcasts the notification; later batches of the same run merge their counts into that single row **in place, without re-broadcasting**. The DB always settles on the run's final totals, which any refetch (reload / new login / opening the bell) shows. A run with no `runId` (e.g. a manual ingest) gets one notification per call.
 - **Idempotency**: Re-ingesting the same item *updates* the existing row (matched on `canonicalKey`) instead of inserting, so replays contribute zero new items and never inflate counts.
-- **Shape**: `isPublic: true` (broadcast to all users), `title` = `"Latest Network News"` (constant, matches the email), `description` = the substance — 1 team: the latest headline (`"… +N more"` when several); N teams: `"{N} teams shared news across the network."`. `link` = `/home`, `image` = team logo (single-team only), `metadata` = `{ eventType: 'team_news', runId, teamUids, teamCount, updateCount, latestTitle, latestEventDate }`.
+- **Shape**: `isPublic: true` (broadcast to all users), `title` names up to 2 teams (`"…, and more"` beyond that) — small runs (≤ `TEAM_NEWS_SMALL_RUN_MAX` = 5 updates) include the count (`"4 news updates from Bluesky, Coinbase, and more"`), larger runs drop it (`"Latest news from Bluesky, Coinbase, and more"`). `description` = the most recent headline (`"… +N more"` when the run had several). `link` = `/home`, `image` = team logo (single-team runs only), `metadata` = `{ eventType: 'team_news', runId, teamUids, teamCount, updateCount, latestTitle, latestEventDate }`.
 - **Read on view**: The provider's "direct scan" effect marks the notification read on `/home` (because `link='/home'`). `AutoMarkNewsNotification` handles only `NEW_FEATURE` (which can be link-less).
 - **Frontend handling**: `PushNotificationCategory` union, `CATEGORY_CONFIG`, and `getCategoryLabel` in the web-app repo must list `TEAM_NEWS` (label "Network News") for the bell UI to render it.
+
+**Copy & bell rendering** (Icon/Type come from `CATEGORY_CONFIG['TEAM_NEWS']` in the web-app — constant for the category):
+
+| Case | Title | Description | Icon | Type |
+|------|-------|-------------|------|------|
+| Small run (≤5 updates) | `{M} news update(s) from {Team A}, {Team B}, and more` | the latest headline (`"… +{M-1} more"` when M>1) | `system` | Network News |
+| Large run (>5 updates) | `Latest news from {Team A}, {Team B}, and more` | the latest headline `"… +{M-1} more"` | `system` | Network News |
+
+(Title names up to 2 teams; `", and more"` is appended only when the run spans more than 2 teams.)
 
 ## Database Schema
 

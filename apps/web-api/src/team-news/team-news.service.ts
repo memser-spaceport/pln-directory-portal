@@ -20,10 +20,10 @@ const RECENT_WINDOW_DAYS = 14;
 // the home page; there is no per-item detail route.
 const TEAM_NEWS_NOTIFICATION_LINK = '/home';
 
-// Constant notification title, matching the "Latest Network News" email template
-// so the in-app and email channels read consistently. The substance (which
-// teams / how many updates) goes in the description.
-const TEAM_NEWS_NOTIFICATION_TITLE = 'Latest Network News';
+// At or below this many updates, the title includes the exact count
+// ("4 news updates from …"); above it, the count is dropped for a broader
+// headline ("Latest news from …") since a precise number reads as noise.
+const TEAM_NEWS_SMALL_RUN_MAX = 5;
 
 interface ParseOutcome {
   ok: boolean;
@@ -229,40 +229,41 @@ export class TeamNewsService {
   }
 
   /**
-   * Build the notification copy for a run from its merged totals.
-   * The title is always "Latest Network News" (matching the email template); the
-   * description carries the substance:
-   * - 1 team:   the latest headline (with "+N more" when the run had several)
-   * - N teams:  "{N} teams shared news across the network."
+   * Build the notification copy for a run from its merged totals. Title names a
+   * couple of teams; the count is included only for small runs, and the most
+   * recent headline is the preview — e.g.:
+   *   small:  "4 news updates from Bluesky, Coinbase, and more"
+   *           "Bluesky shipped v1.122… +3 more"
+   *   large:  "Latest news from Bluesky, Coinbase, and more"
+   *           "Bluesky shipped v1.122… +59 more"
+   * A team logo is attached only when the whole run is about one team.
    */
   private async buildRunCopy(
     teamUids: string[],
     updateCount: number,
     latestTitle: string
   ): Promise<{ title: string; description?: string; image?: string }> {
+    // Only the first couple of names appear in the title; fetch just those.
+    const sampleUids = teamUids.slice(0, 2);
     const teams = await this.prisma.team.findMany({
-      where: { uid: { in: teamUids } },
+      where: { uid: { in: sampleUids } },
       select: { uid: true, name: true, logo: { select: { url: true } } },
     });
     const teamByUid = new Map(teams.map((t) => [t.uid, t]));
-    const names = teamUids.map((uid) => teamByUid.get(uid)?.name ?? 'A team');
+    const names = sampleUids.map((uid) => teamByUid.get(uid)?.name ?? 'a team');
+    const teamList = teamUids.length > 2 ? `${names.join(', ')}, and more` : names.join(', ');
 
-    if (teamUids.length === 1) {
-      const name = names[0];
-      const headline = latestTitle || `${name} shared ${updateCount === 1 ? 'an update' : `${updateCount} updates`}`;
-      const description = updateCount > 1 && latestTitle ? `${headline} +${updateCount - 1} more` : headline;
-      return {
-        title: TEAM_NEWS_NOTIFICATION_TITLE,
-        description,
-        image: teamByUid.get(teamUids[0])?.logo?.url ?? undefined,
-      };
-    }
+    const title =
+      updateCount <= TEAM_NEWS_SMALL_RUN_MAX
+        ? `${updateCount} news update${updateCount === 1 ? '' : 's'} from ${teamList}`
+        : `Latest news from ${teamList}`;
 
-    return {
-      title: TEAM_NEWS_NOTIFICATION_TITLE,
-      description: `${teamUids.length} teams shared news across the network.`,
-      image: undefined,
-    };
+    const headline = latestTitle || title;
+    const description = updateCount > 1 ? `${headline} +${updateCount - 1} more` : headline;
+
+    const image = teamUids.length === 1 ? teamByUid.get(teamUids[0])?.logo?.url ?? undefined : undefined;
+
+    return { title, description, image };
   }
 
   private bumpRejectionCounter(result: IngestTeamNewsResponse, reason: ParseOutcome['reason']) {
