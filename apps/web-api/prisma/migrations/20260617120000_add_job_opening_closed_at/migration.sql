@@ -1,0 +1,10 @@
+ALTER TABLE "JobOpening" ADD COLUMN "closedAt" TIMESTAMP(3);
+
+UPDATE "JobOpening"
+SET "closedAt" = "updatedAt"
+WHERE "status" IN (
+  'CLOSED_DUPLICATE',
+  'CLOSED_INCORRECT_SIGNAL',
+  'CLOSED_NOT_HIRING_SIGNAL',
+  'CLOSED_ROLE_FILLED'
+);

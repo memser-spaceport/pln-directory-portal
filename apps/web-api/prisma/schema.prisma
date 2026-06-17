@@ -2206,6 +2206,7 @@ model JobOpening {
   notes           String?
   portfolio       String?
   rawPayload      Json?
+  closedAt        DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
