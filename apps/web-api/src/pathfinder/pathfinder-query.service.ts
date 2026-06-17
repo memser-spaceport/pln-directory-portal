@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ConnectorMatchesDto, CrosswalkReviewQueryDto, ListPathfinderPathsQueryDto } from './dto/pathfinder.query.dto';
+import { connectorMatchClause } from './connector-match.util';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -116,35 +117,14 @@ export class PathfinderQueryService {
       throw new BadRequestException(`connector_labels_contains must contain at most ${MAX_CONNECTOR_LABELS} labels`);
     }
 
-    // A label can match either a hop-chain NODE label (founders, firms, the JB
-    // rolodex node, …) or the PL venture-team CONNECTOR name. The latter lives in
-    // hopChain.plConnector.name (a structured field set by the relationship-axis
-    // seed — task 01), NOT as a node, so it needs its own clause. This is what
-    // makes a PL-team search ("Brad Holden") resolve (task 04).
-    const nodeParts: Prisma.Sql[] = [];
-    const plConnectorParts: Prisma.Sql[] = [];
-    if (labels.length > 0) {
-      nodeParts.push(Prisma.sql`lower(btrim(n->>'label')) IN (${Prisma.join(labels)})`);
-      plConnectorParts.push(Prisma.sql`lower(btrim(p."hopChain"->'plConnector'->>'name')) IN (${Prisma.join(labels)})`);
-    }
-    for (const label of containsLabels) {
-      nodeParts.push(Prisma.sql`lower(btrim(n->>'label')) LIKE ${'%' + label + '%'}`);
-      plConnectorParts.push(Prisma.sql`lower(btrim(p."hopChain"->'plConnector'->>'name')) LIKE ${'%' + label + '%'}`);
-    }
-
-    const nodeMatch = Prisma.sql`(
-      jsonb_typeof(p."hopChain"->'nodes') = 'array' AND EXISTS (
-        SELECT 1 FROM jsonb_array_elements(p."hopChain"->'nodes') AS n
-        WHERE ${Prisma.join(nodeParts, ' OR ')}
-      )
-    )`;
-    const plConnectorMatch = Prisma.sql`(${Prisma.join(plConnectorParts, ' OR ')})`;
-
+    // Match against hop-chain node labels OR the PL-team connector name — see
+    // connectorMatchClause (single-sourced so this per-page batch and the
+    // full-list members filter agree on what "connected" means).
     const rows = await this.prisma.$queryRaw<{ targetInvestorId: string }[]>`
       SELECT DISTINCT p."targetInvestorId"
       FROM "PathfinderPath" p
       WHERE p."targetInvestorId" IN (${Prisma.join(ids)})
-        AND (${nodeMatch} OR ${plConnectorMatch})`;
+        AND ${connectorMatchClause(labels, containsLabels)}`;
 
     return { matchedIds: rows.map((r) => r.targetInvestorId) };
   }

@@ -5,12 +5,15 @@ import { InvestorDto, PaginatedInvestorsDto } from '../investor-outreach/dto/inv
 import { MemberByEmail, OverlapsByInvestorId, toInvestorDto } from '../investor-outreach/investor-outreach.mapper';
 import { INVESTOR_OUTREACH_SECTOR_TAGS, isAllowedStageFocus } from '../investor-outreach/investor-outreach.vocab';
 import { buildInvestorTextSearch } from '../investor-outreach/investor-text-search.util';
+import { connectorMatchClause } from '../pathfinder/connector-match.util';
 import { InvestorListDto, InvestorListsResponseDto } from './dto/investor-list.dto';
 import { ListMembersQueryDto } from './dto/list-members.query.dto';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+const MAX_CONNECTOR_LABELS = 20;
+const MIN_CONNECTOR_CONTAINS_LENGTH = 3;
 
 const SECTOR_TAG_SET = new Set<string>(INVESTOR_OUTREACH_SECTOR_TAGS);
 
@@ -74,7 +77,11 @@ export class InvestorListsQueryService {
     const page = clampPage(query.page);
     const limit = clampLimit(query.limit);
 
-    const where = this.buildMemberWhere(listId, query);
+    // Connector lens (task 04): resolve the set of members reachable through the
+    // requested connector ACROSS THE WHOLE LIST (not just a loaded page) before
+    // building the member query, so pagination + total reflect the filter.
+    const connectorMatchIds = await this.resolveConnectorMatchIds(list.targetSet, query);
+    const where = this.buildMemberWhere(listId, query, connectorMatchIds);
 
     if (list.isGraphed) {
       const [total, allRecords] = await this.prisma.$transaction([
@@ -130,8 +137,46 @@ export class InvestorListsQueryService {
     return map;
   }
 
-  private buildMemberWhere(listId: number, query: ListMembersQueryDto): Prisma.InvestorOutreachRecordWhereInput {
+  /**
+   * Resolve the targetInvestorIds reachable through the requested connector across
+   * the entire list's targetSet. Returns `null` when no connector filter is set
+   * (so the caller leaves the member set unfiltered), or `string[]` of matches
+   * (possibly empty → the member query yields nothing). Match semantics are shared
+   * with the per-page connector lens via connectorMatchClause.
+   */
+  private async resolveConnectorMatchIds(
+    targetSet: string,
+    query: ListMembersQueryDto
+  ): Promise<string[] | null> {
+    const labels = parseCsv(query.connectorLabels)
+      .map((l) => l.toLowerCase())
+      .slice(0, MAX_CONNECTOR_LABELS);
+    const containsLabels = parseCsv(query.connectorLabelsContains)
+      .map((l) => l.toLowerCase())
+      .filter((l) => l.length >= MIN_CONNECTOR_CONTAINS_LENGTH)
+      .slice(0, MAX_CONNECTOR_LABELS);
+    if (labels.length === 0 && containsLabels.length === 0) return null;
+
+    const rows = await this.prisma.$queryRaw<{ targetInvestorId: string }[]>`
+      SELECT DISTINCT p."targetInvestorId"
+      FROM "PathfinderPath" p
+      WHERE p."targetSet" = ${targetSet}
+        AND ${connectorMatchClause(labels, containsLabels)}`;
+    return rows.map((r) => r.targetInvestorId);
+  }
+
+  private buildMemberWhere(
+    listId: number,
+    query: ListMembersQueryDto,
+    connectorMatchIds: string[] | null
+  ): Prisma.InvestorOutreachRecordWhereInput {
     const conditions: Prisma.InvestorOutreachRecordWhereInput[] = [{ listMemberships: { some: { listId } } }];
+
+    // Connector lens: restrict to the matched members (empty array → no member
+    // matches, so the list comes back empty — the correct "no LPs" result).
+    if (connectorMatchIds !== null) {
+      conditions.push({ investorId: { in: connectorMatchIds } });
+    }
 
     if (query.q && query.q.trim()) {
       conditions.push(buildInvestorTextSearch(query.q));
