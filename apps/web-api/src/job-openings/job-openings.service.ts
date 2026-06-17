@@ -134,7 +134,7 @@ export class JobOpeningsService {
       Confirmed: JobOpeningStatus.CONFIRMED,
       'Routed to WS4': JobOpeningStatus.ROUTED_TO_WS4,
       Stale: JobOpeningStatus.STALE,
-      Closed: JobOpeningStatus.CLOSED_ROLE_FILLED,
+      Closed: JobOpeningStatus.STALE,
       'Closed - Duplicate': JobOpeningStatus.CLOSED_DUPLICATE,
       'Closed - Incorrect Signal': JobOpeningStatus.CLOSED_INCORRECT_SIGNAL,
       'Closed - Not a Hiring Signal': JobOpeningStatus.CLOSED_NOT_HIRING_SIGNAL,
