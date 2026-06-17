@@ -15,6 +15,7 @@ import PaginationControls from '../../../PaginationControls/PaginationControls';
 import { getModuleIcon } from './utils/getModuleIcon';
 import { useGetColumns } from './hooks/useGetColumns';
 
+import { AddMemberPanel } from './components/AddMemberPanel';
 import { ConfirmDeleteMember } from './components/ConfirmDeleteMember';
 import { XIcon, SearchIcon, ChevronIcon, PolicyHeaderIcon } from './components/Icons';
 
@@ -38,6 +39,7 @@ export function PolicyViewDialog({ policy, authToken, isOpen, onClose }: Props) 
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [dialogPagination, setDialogPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 12 });
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null);
+  const [showAddPanel, setShowAddPanel] = useState(false);
 
   const queryClient = useQueryClient();
   const revokePolicy = useRevokePolicy();
@@ -57,6 +59,7 @@ export function PolicyViewDialog({ policy, authToken, isOpen, onClose }: Props) 
     setMemberSearchRaw('');
     setDebouncedMemberSearch('');
     setDialogPagination({ pageIndex: 0, pageSize: 12 });
+    setShowAddPanel(false);
   }, [policy?.uid]);
 
   const { data: assigneesData } = useMembersList(
@@ -235,7 +238,23 @@ export function PolicyViewDialog({ policy, authToken, isOpen, onClose }: Props) 
 
         {/* Members */}
         <section className={s.section}>
-          <h4 className={s.sectionHeading}>Members ({totalAssigned.toLocaleString()})</h4>
+          <div className={s.sectionHeader}>
+            <h4 className={s.sectionHeading}>Members ({totalAssigned.toLocaleString()})</h4>
+            {!showAddPanel && (
+              <button type="button" className={s.addMemberBtn} onClick={() => setShowAddPanel(true)}>
+                + Add Member
+              </button>
+            )}
+          </div>
+
+          {showAddPanel && policy && (
+            <AddMemberPanel
+              authToken={authToken}
+              policyCode={policy.code}
+              existingMemberUids={policyMembers.map((m) => m.uid)}
+              onDone={() => setShowAddPanel(false)}
+            />
+          )}
 
           <div className={s.memberSearchWrapper}>
             <span className={s.memberSearchIcon}>
