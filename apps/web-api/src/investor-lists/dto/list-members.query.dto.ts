@@ -15,6 +15,16 @@ export class ListMembersQueryDto {
   /** CSV of co_invested | engaged | cold */
   relationship?: string;
 
+  /**
+   * Connector lens (task 04): CSV of connector labels — keep only members with a
+   * warm path whose hop chain routes through a matching node label OR PL-team
+   * connector name. `connectorLabels` is an exact match; `connectorLabelsContains`
+   * a substring match (≥3 chars). Server-side so the filter spans the whole list,
+   * not just the loaded page.
+   */
+  connectorLabels?: string;
+  connectorLabelsContains?: string;
+
   page?: string;
   limit?: string;
 }

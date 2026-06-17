@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ConnectorMatchesDto, CrosswalkReviewQueryDto, ListPathfinderPathsQueryDto } from './dto/pathfinder.query.dto';
+import { connectorMatchClause } from './connector-match.util';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -116,23 +117,14 @@ export class PathfinderQueryService {
       throw new BadRequestException(`connector_labels_contains must contain at most ${MAX_CONNECTOR_LABELS} labels`);
     }
 
-    const matchParts: Prisma.Sql[] = [];
-    if (labels.length > 0) {
-      matchParts.push(Prisma.sql`lower(btrim(n->>'label')) IN (${Prisma.join(labels)})`);
-    }
-    for (const label of containsLabels) {
-      matchParts.push(Prisma.sql`lower(btrim(n->>'label')) LIKE ${'%' + label + '%'}`);
-    }
-
+    // Match against hop-chain node labels OR the PL-team connector name — see
+    // connectorMatchClause (single-sourced so this per-page batch and the
+    // full-list members filter agree on what "connected" means).
     const rows = await this.prisma.$queryRaw<{ targetInvestorId: string }[]>`
       SELECT DISTINCT p."targetInvestorId"
       FROM "PathfinderPath" p
       WHERE p."targetInvestorId" IN (${Prisma.join(ids)})
-        AND jsonb_typeof(p."hopChain"->'nodes') = 'array'
-        AND EXISTS (
-          SELECT 1 FROM jsonb_array_elements(p."hopChain"->'nodes') AS n
-          WHERE ${Prisma.join(matchParts, ' OR ')}
-        )`;
+        AND ${connectorMatchClause(labels, containsLabels)}`;
 
     return { matchedIds: rows.map((r) => r.targetInvestorId) };
   }
