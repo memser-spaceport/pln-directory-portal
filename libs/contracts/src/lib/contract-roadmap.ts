@@ -5,7 +5,9 @@ import {
   CreateRoadmapItemSchema,
   CreateRoadmapObjectiveSchema,
   DeclineRoadmapItemSchema,
+  DeleteRoadmapDraftResponseSchema,
   PinRoadmapItemSchema,
+  RoadmapDraftResponseSchema,
   ReorderRoadmapItemsResponseSchema,
   ReorderRoadmapItemsSchema,
   RoadmapBuildButtonClickSchema,
@@ -23,6 +25,7 @@ import {
   UpdatePinNoteSchema,
   UpdateRoadmapItemSchema,
   UpdateRoadmapSettingsSchema,
+  UpsertRoadmapDraftSchema,
 } from '../schema/roadmap';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -217,5 +220,31 @@ export const apiRoadmap = contract.router({
       200: RoadmapSettingsSchema,
     },
     summary: 'Update roadmap settings (curators only)',
+  },
+  getMyRoadmapDraft: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/roadmap/drafts/me`,
+    responses: {
+      200: RoadmapDraftResponseSchema,
+    },
+    summary: "Get the current member's in-progress submission draft (or null)",
+  },
+  upsertMyRoadmapDraft: {
+    method: 'PUT',
+    path: `${getAPIVersionAsPath('1')}/roadmap/drafts/me`,
+    body: UpsertRoadmapDraftSchema,
+    responses: {
+      200: RoadmapDraftResponseSchema,
+    },
+    summary: "Create or replace the current member's submission draft (autosave)",
+  },
+  deleteMyRoadmapDraft: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/roadmap/drafts/me`,
+    body: z.object({}),
+    responses: {
+      200: DeleteRoadmapDraftResponseSchema,
+    },
+    summary: "Discard the current member's submission draft",
   },
 });

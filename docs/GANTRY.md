@@ -210,6 +210,11 @@ All models in `apps/web-api/prisma/schema.prisma`:
   item leaves a pinnable stage — released rows are the frozen history.
 - **`RoadmapObjective`** — OKR chip: unique title, display order, assigned items.
 - **`RoadmapSettings`** — single row; `pinLimit` (default 3).
+- **`RoadmapSubmissionDraft`** — server-side snapshot of a member's in-progress
+  create/submit form, so a draft follows them across devices. One row per member
+  (unique `memberUid`); all payload fields (`variant`, `title`, `description`, `tags`,
+  `type`, `stage`, `objectiveUid`, `newObjectiveTitle`, `showCreateObjective`) are
+  nullable partial form state, plus `updatedAt` for the "last edited" UI.
 
 ## API quick reference
 
@@ -230,6 +235,7 @@ Base: `/v1/roadmap` (guards: `UserTokenCheckGuard` + `RbacGuard`). Contracts in
 | `/objectives` | GET / POST | view / item.curate | List / create-or-find objective |
 | `/items/:uid/objective` | PATCH | item.curate | Set/clear an item's objective |
 | `/settings` | GET / PATCH | view / item.curate | Read / tune the pin budget |
+| `/drafts/me` | GET / PUT / DELETE | view | Read (or null) / autosave-upsert / discard the member's own in-progress submission draft |
 
 ## Reference files
 
