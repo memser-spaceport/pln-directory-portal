@@ -50,6 +50,32 @@ describe('PathfinderQueryService', () => {
       expect(queryRaw).toHaveBeenCalledTimes(1);
     });
 
+    it('also matches the PL venture-team connector name, not just node labels (task 04)', async () => {
+      queryRaw.mockResolvedValue([{ targetInvestorId: 'inv-9' }]);
+
+      const result = await service.connectorMatches({
+        target_investor_ids: ['inv-9'],
+        connector_labels: ['Brad Holden'],
+      });
+
+      expect(result).toEqual({ matchedIds: ['inv-9'] });
+      // The composed query must reach into hopChain.plConnector.name — that is
+      // where the relationship-axis seed stores the PL-team connector (task 01),
+      // so a PL-team search resolves even though it is not a hop-chain node.
+      const args = queryRaw.mock.calls[0] as unknown[];
+      const sqlText = args
+        .slice(1)
+        .map((v) => {
+          const sql = (v as { sql?: unknown }).sql;
+          const strings = (v as { strings?: unknown }).strings;
+          if (typeof sql === 'string') return sql;
+          if (Array.isArray(strings)) return strings.join(' ');
+          return '';
+        })
+        .join(' ');
+      expect(sqlText).toContain('plConnector');
+    });
+
     it('drops contains labels shorter than 3 characters', async () => {
       const result = await service.connectorMatches({
         target_investor_ids: ['inv-1'],
