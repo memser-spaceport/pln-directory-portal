@@ -16,6 +16,8 @@ export const ROADMAP_ANALYTICS_EVENTS = {
   OBJECTIVE_CREATED: 'gantry_objective_created',
   OBJECTIVE_SET: 'gantry_objective_set',
   PIN_LIMIT_CHANGED: 'gantry_pin_limit_changed',
+  DRAFT_SAVED: 'gantry_draft_saved',
+  DRAFT_DISCARDED: 'gantry_draft_discarded',
 } as const;
 
 /**

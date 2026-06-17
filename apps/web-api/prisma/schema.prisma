@@ -241,6 +241,7 @@ model Member {
   roadmapItemUpvotes        RoadmapItemUpvote[]   @relation("roadmapItemUpvoter")
   roadmapItemPins           RoadmapItemPin[]      @relation("roadmapItemPinner")
   roadmapObjectivesCreated  RoadmapObjective[]    @relation("roadmapObjectiveCreatedBy")
+  roadmapSubmissionDraft    RoadmapSubmissionDraft? @relation("roadmapSubmissionDraftOwner")
 }
 
 model MemberApproval {
@@ -2886,6 +2887,31 @@ model RoadmapObjective {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   items        RoadmapItem[]
+}
+
+/// Server-persisted snapshot of a member's in-progress Gantry create/submit form, so
+/// the draft follows them across devices and browsers. At most one active draft per
+/// member (unique memberUid). Payload fields are nullable — this is partial, unsaved
+/// form state, not a validated item. `variant` is "idea" | "roadmap"; `stage` mirrors
+/// RoadmapStage but is stored loosely as a string since it is unsubmitted form input.
+model RoadmapSubmissionDraft {
+  id        Int    @id @default(autoincrement())
+  uid       String @unique @default(cuid())
+  memberUid String @unique
+  member    Member @relation("roadmapSubmissionDraftOwner", fields: [memberUid], references: [uid], onDelete: Cascade)
+
+  variant             String   @default("idea")
+  title               String?
+  description         String?
+  tags                String[] @default([])
+  type                String?
+  stage               String?
+  objectiveUid        String?
+  newObjectiveTitle   String?
+  showCreateObjective Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// Single-row table (id = 1) holding roadmap-wide configuration.
