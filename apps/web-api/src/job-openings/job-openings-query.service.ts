@@ -13,6 +13,14 @@ const TOP_LEVEL_FOCUS_AREAS = [
 
 const TOP_LEVEL_ORDER = new Map(TOP_LEVEL_FOCUS_AREAS.map((title, i) => [title, i]));
 
+const HIDDEN_JOB_OPENING_STATUSES: JobOpeningStatus[] = [
+  JobOpeningStatus.STALE,
+  JobOpeningStatus.CLOSED_DUPLICATE,
+  JobOpeningStatus.CLOSED_INCORRECT_SIGNAL,
+  JobOpeningStatus.CLOSED_NOT_HIRING_SIGNAL,
+  JobOpeningStatus.CLOSED_ROLE_FILLED,
+];
+
 type PagedTeamGroupRow = {
   teamUid: string;
   roleCount: number;
@@ -72,7 +80,7 @@ export class JobOpeningsQueryService {
     }
 
     return {
-      status: { not: JobOpeningStatus.STALE },
+      status: { notIn: HIDDEN_JOB_OPENING_STATUSES },
       teamUid: { not: null },
       ...(and.length > 0 ? { AND: and } : {}),
     };
@@ -367,11 +375,7 @@ export class JobOpeningsQueryService {
     return rows
       .map((row) => {
         const value =
-          field === 'roleCategory'
-            ? row.roleCategory
-            : field === 'seniority'
-            ? row.seniority
-            : row.workMode;
+          field === 'roleCategory' ? row.roleCategory : field === 'seniority' ? row.seniority : row.workMode;
         return {
           value,
           count: row._count?._all ?? 0,
@@ -382,10 +386,7 @@ export class JobOpeningsQueryService {
       .sort((a, b) => a.value.localeCompare(b.value));
   }
 
-  private async countLocationArray(
-    where: Prisma.JobOpeningWhereInput,
-    include?: (value: string) => boolean
-  ) {
+  private async countLocationArray(where: Prisma.JobOpeningWhereInput, include?: (value: string) => boolean) {
     // Get all matching job IDs with non-empty location arrays
     const jobs = await this.prisma.jobOpening.findMany({
       where: {

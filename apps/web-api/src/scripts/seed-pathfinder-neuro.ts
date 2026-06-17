@@ -50,6 +50,9 @@ const SCRATCH_DIR = process.env.PATHFINDER_SCRATCH_DIR || DEFAULT_SCRATCH;
 const DUMP_PATH = `${SCRATCH_DIR}/_pathfinder_dump.json`;
 const AFFINITY_PATH = `${SCRATCH_DIR}/_affinity_352080.json`;
 const PRESTIGE_PATH = process.env.PATHFINDER_PRESTIGE_CACHE || `${SCRATCH_DIR}/_lp_prestige_cache.json`;
+// Per-LP PL venture-team connector (relationship axis), keyed by Affinity person
+// id — precomputed by pln-data-enrichment scripts/pull-affinity-pl-relationships.ts.
+const PL_REL_PATH = `${SCRATCH_DIR}/_pl_relationships_352080.json`;
 
 // ── Types (loose — these are local scratch JSON shapes) ──────────────────────
 interface DumpPath {
@@ -99,6 +102,15 @@ interface AffinityEntity {
 interface AffinityEntry {
   entity: AffinityEntity;
 }
+/**
+ * One LP's PL-team connector, as written by pull-affinity-pl-relationships.ts
+ * (shape mirrors PlTeamRelationship). Only `summary` + `bestConnector` are used
+ * here — they are grafted onto the person's hop chain. Loose by design (scratch JSON).
+ */
+interface PlRelEntry {
+  summary: string | null;
+  bestConnector: Record<string, unknown> | null;
+}
 
 const norm = (s: string | null | undefined): string =>
   (s ?? '')
@@ -129,6 +141,21 @@ function entryFirmNames(entity: AffinityEntity): string[] {
   return data
     .map((d) => (d && typeof d === 'object' ? (d as { name?: unknown }).name : null))
     .filter((n): n is string => typeof n === 'string' && n.trim().length > 0);
+}
+
+/**
+ * Per-LP PL-team connectors keyed by Affinity person id. Optional input: if the
+ * relationship pull hasn't been run, return an empty map and skip attribution
+ * (the run still succeeds — connector copy just won't appear).
+ */
+function loadPlConnectors(): Map<string, PlRelEntry> {
+  try {
+    const raw = JSON.parse(readFileSync(PL_REL_PATH, 'utf-8')) as Record<string, PlRelEntry>;
+    return new Map(Object.entries(raw));
+  } catch {
+    console.warn(`(no ${PL_REL_PATH} — PL-team connector attribution skipped)`);
+    return new Map();
+  }
 }
 
 /** Warmer = smaller. Cold (no path) sinks last. */
@@ -200,6 +227,8 @@ async function seed() {
     throw new Error(`dump targetSet "${dump.targetSet}" != expected "${TARGET_SET}"`);
   }
   const prestige = loadPrestigeByName();
+  const plConnectors = loadPlConnectors();
+  let personsWithConnector = 0;
 
   // Index firm proximity by normalized firm label, and firm paths by firm id.
   const firmByLabel = new Map<string, FirmProximity>();
@@ -254,7 +283,25 @@ async function seed() {
   const dupPathCandidates: { investorId: string; firmId: string; bestCode: string }[] = [];
 
   const queuePaths = (targetInvestorId: string, firmId: string) => {
+    // Relationship-axis graft: this person's PL-team connector (keyed by their
+    // Affinity id). Person-grain — the firm-grain runner can't carry it.
+    const rel = plConnectors.get(targetInvestorId);
+    let attachedHere = false;
     for (const p of pathsByFirm.get(firmId) ?? []) {
+      let hopChain = p.hopChain;
+      if (rel?.bestConnector && rel.summary) {
+        // Clone first — the same firm hop-chain object is shared across everyone
+        // at the firm, so in-place mutation would leak to other people. JSON
+        // round-trip: the hop chain is plain JSON and small.
+        const hc = JSON.parse(JSON.stringify(p.hopChain)) as {
+          explanation?: string;
+          plConnector?: unknown;
+        };
+        hc.explanation = hc.explanation ? `${hc.explanation} ${rel.summary}.` : `${rel.summary}.`;
+        hc.plConnector = rel.bestConnector;
+        hopChain = hc;
+        attachedHere = true;
+      }
       pathInserts.push({
         targetInvestorId,
         targetSet: TARGET_SET,
@@ -264,11 +311,12 @@ async function seed() {
         proximityCode: p.proximityCode,
         score: p.score,
         caliberConfidence: p.caliberConfidence,
-        hopChain: p.hopChain as Prisma.InputJsonValue,
+        hopChain: hopChain as Prisma.InputJsonValue,
         rank: p.rank,
         ingestRunId: RUN_ID,
       });
     }
+    if (attachedHere) personsWithConnector += 1;
     pathTargetsQueued.add(targetInvestorId);
   };
 
@@ -414,6 +462,10 @@ async function seed() {
   console.log(
     `Writing ${creates.length} new records, ${updates.length} updates, ` +
       `${pathInserts.length} paths, ${crosswalkRows.length} crosswalk rows…`
+  );
+  console.log(
+    `  PL-team connector attached to ${personsWithConnector} people` +
+      (plConnectors.size ? ` (of ${plConnectors.size} LPs in the relationship file)` : ' (no relationship file)')
   );
   if (creates.length > 0) {
     await prisma.investorOutreachRecord.createMany({ data: creates, skipDuplicates: true });

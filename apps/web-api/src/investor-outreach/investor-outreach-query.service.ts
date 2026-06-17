@@ -22,6 +22,7 @@ import {
   isAllowedStageFocus,
   INVESTOR_OUTREACH_SECTOR_TAGS,
 } from './investor-outreach.vocab';
+import { buildInvestorTextSearch } from './investor-text-search.util';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 50;
@@ -177,15 +178,7 @@ export class InvestorOutreachQueryService {
     const conditions: Prisma.InvestorOutreachRecordWhereInput[] = [];
 
     if (query.q && query.q.trim()) {
-      const q = query.q.trim();
-      conditions.push({
-        OR: [
-          { firstName: { contains: q, mode: 'insensitive' } },
-          { lastName: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
-          { firm: { contains: q, mode: 'insensitive' } },
-        ],
-      });
+      conditions.push(buildInvestorTextSearch(query.q));
     }
 
     const enumFilter = (raw: string | undefined, isAllowed: (v: string) => boolean) => {
