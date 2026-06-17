@@ -4,6 +4,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { InvestorDto, PaginatedInvestorsDto } from '../investor-outreach/dto/investor.dto';
 import { MemberByEmail, OverlapsByInvestorId, toInvestorDto } from '../investor-outreach/investor-outreach.mapper';
 import { INVESTOR_OUTREACH_SECTOR_TAGS, isAllowedStageFocus } from '../investor-outreach/investor-outreach.vocab';
+import { buildInvestorTextSearch } from '../investor-outreach/investor-text-search.util';
 import { InvestorListDto, InvestorListsResponseDto } from './dto/investor-list.dto';
 import { ListMembersQueryDto } from './dto/list-members.query.dto';
 
@@ -133,15 +134,7 @@ export class InvestorListsQueryService {
     const conditions: Prisma.InvestorOutreachRecordWhereInput[] = [{ listMemberships: { some: { listId } } }];
 
     if (query.q && query.q.trim()) {
-      const q = query.q.trim();
-      conditions.push({
-        OR: [
-          { firstName: { contains: q, mode: 'insensitive' } },
-          { lastName: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
-          { firm: { contains: q, mode: 'insensitive' } },
-        ],
-      });
+      conditions.push(buildInvestorTextSearch(query.q));
     }
 
     // sectorTags is stored as a comma-separated string; match each tag as a discrete token.
