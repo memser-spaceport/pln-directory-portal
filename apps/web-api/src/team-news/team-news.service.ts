@@ -20,10 +20,13 @@ const RECENT_WINDOW_DAYS = 14;
 // the home page; there is no per-item detail route.
 const TEAM_NEWS_NOTIFICATION_LINK = '/home';
 
-// At or below this many updates, the title includes the exact count
-// ("4 news updates from …"); above it, the count is dropped for a broader
-// headline ("Latest news from …") since a precise number reads as noise.
-const TEAM_NEWS_SMALL_RUN_MAX = 5;
+// Static title for every run notification — the team breakdown lives in the
+// description instead (see buildRunCopy).
+const TEAM_NEWS_NOTIFICATION_TITLE = 'Latest News from the network';
+
+// How many team names to spell out in the description before collapsing the
+// remainder into "+N more".
+const TEAM_NEWS_NAMED_TEAMS = 2;
 
 interface ParseOutcome {
   ok: boolean;
@@ -152,11 +155,13 @@ export class TeamNewsService {
     if (createdByTeam.size === 0) return;
     const runId = dto.runId ?? null;
 
-    // This batch's contribution.
-    const batchTeamUids = [...createdByTeam.keys()];
+    // This batch's contribution: total inserts + each team's most-recent
+    // event date (the basis for ordering teams in the copy).
     const batchUpdates = [...createdByTeam.values()].reduce((sum, agg) => sum + agg.count, 0);
+    const batchLatestByTeam = new Map<string, number>();
     let batchLatest = { title: '', date: new Date(0) };
-    for (const agg of createdByTeam.values()) {
+    for (const [uid, agg] of createdByTeam) {
+      batchLatestByTeam.set(uid, agg.latestEventDate.getTime());
       if (agg.latestEventDate.getTime() >= batchLatest.date.getTime()) {
         batchLatest = { title: agg.latestTitle, date: agg.latestEventDate };
       }
@@ -175,7 +180,24 @@ export class TeamNewsService {
 
       // Merge this batch into the run's running totals.
       const prevMeta = (existing?.metadata as Record<string, any>) ?? {};
-      const teamUids: string[] = [...new Set<string>([...(prevMeta.teamUids ?? []), ...batchTeamUids])];
+
+      // Track each team's latest event date across the whole run so the team
+      // list can be ordered most-recent-first — the same order the home feed's
+      // "All" tab uses (eventDate DESC). Seed from any teams already on the
+      // notification (legacy rows may lack `teamLatest`) so a mid-run deploy
+      // never drops earlier teams.
+      const teamLatest: Record<string, string> = {};
+      for (const uid of prevMeta.teamUids ?? []) {
+        teamLatest[uid] = prevMeta.teamLatest?.[uid] ?? new Date(0).toISOString();
+      }
+      for (const [uid, ms] of batchLatestByTeam) {
+        const prev = teamLatest[uid] ? new Date(teamLatest[uid]).getTime() : 0;
+        if (ms >= prev) teamLatest[uid] = new Date(ms).toISOString();
+      }
+      const teamUids = Object.keys(teamLatest).sort(
+        (a, b) => new Date(teamLatest[b]).getTime() - new Date(teamLatest[a]).getTime()
+      );
+
       const updateCount: number = (prevMeta.updateCount ?? 0) + batchUpdates;
       const prevLatestDate = prevMeta.latestEventDate ? new Date(prevMeta.latestEventDate) : new Date(0);
       const latest =
@@ -183,13 +205,14 @@ export class TeamNewsService {
           ? batchLatest
           : { title: prevMeta.latestTitle ?? '', date: prevLatestDate };
 
-      const copy = await this.buildRunCopy(teamUids, updateCount, latest.title);
+      const copy = await this.buildRunCopy(teamUids);
       const metadata = {
         eventType: 'team_news',
         runId,
         teamUids,
         teamCount: teamUids.length,
         updateCount,
+        teamLatest,
         latestTitle: latest.title,
         latestEventDate: latest.date.toISOString(),
       };
@@ -229,41 +252,39 @@ export class TeamNewsService {
   }
 
   /**
-   * Build the notification copy for a run from its merged totals. Title names a
-   * couple of teams; the count is included only for small runs, and the most
-   * recent headline is the preview — e.g.:
-   *   small:  "4 news updates from Bluesky, Coinbase, and more"
-   *           "Bluesky shipped v1.122… +3 more"
-   *   large:  "Latest news from Bluesky, Coinbase, and more"
-   *           "Bluesky shipped v1.122… +59 more"
+   * Build the notification copy for a run. The title is fixed; the description
+   * lists the teams with fresh news, ordered most-recent-first (same order as
+   * the home feed's "All" tab) so the first team named matches the first card
+   * on /home — e.g.:
+   *   many:   title "Latest News from the network"
+   *           desc  "New updates from companies like Lido Finance, Lava Network + 40 more"
+   *   one:    title "Latest News from the network"
+   *           desc  "New updates from Lido Finance"
+   * `teamUids` is expected pre-sorted by latest event date (see notifyRun).
    * A team logo is attached only when the whole run is about one team.
    */
   private async buildRunCopy(
-    teamUids: string[],
-    updateCount: number,
-    latestTitle: string
-  ): Promise<{ title: string; description?: string; image?: string }> {
-    // Only the first couple of names appear in the title; fetch just those.
-    const sampleUids = teamUids.slice(0, 2);
+    teamUids: string[]
+  ): Promise<{ title: string; description: string; image?: string }> {
+    // Only the spelled-out names need fetching; the rest collapse into "+N more".
+    const sampleUids = teamUids.slice(0, TEAM_NEWS_NAMED_TEAMS);
     const teams = await this.prisma.team.findMany({
       where: { uid: { in: sampleUids } },
       select: { uid: true, name: true, logo: { select: { url: true } } },
     });
     const teamByUid = new Map(teams.map((t) => [t.uid, t]));
     const names = sampleUids.map((uid) => teamByUid.get(uid)?.name ?? 'a team');
-    const teamList = teamUids.length > 2 ? `${names.join(', ')}, and more` : names.join(', ');
+    const nameList = names.join(', ');
 
-    const title =
-      updateCount <= TEAM_NEWS_SMALL_RUN_MAX
-        ? `${updateCount} news update${updateCount === 1 ? '' : 's'} from ${teamList}`
-        : `Latest news from ${teamList}`;
-
-    const headline = latestTitle || title;
-    const description = updateCount > 1 ? `${headline} +${updateCount - 1} more` : headline;
+    const remaining = teamUids.length - names.length;
+    const description =
+      remaining > 0
+        ? `New updates from companies like ${nameList} + ${remaining} more`
+        : `New updates from ${nameList}`;
 
     const image = teamUids.length === 1 ? teamByUid.get(teamUids[0])?.logo?.url ?? undefined : undefined;
 
-    return { title, description, image };
+    return { title: TEAM_NEWS_NOTIFICATION_TITLE, description, image };
   }
 
   private bumpRejectionCounter(result: IngestTeamNewsResponse, reason: ParseOutcome['reason']) {
