@@ -54,6 +54,22 @@ export const parseReviewStatus = (value: string): FounderReviewStatus | undefine
   return mapped;
 };
 
+export const parseReviewStatusList = (raw?: string): FounderReviewStatus[] => {
+  if (!raw || raw.trim() === '') {
+    return [];
+  }
+
+  return raw.split(',').reduce<FounderReviewStatus[]>((acc, s) => {
+    const parsed = parseReviewStatus(s);
+
+    if (parsed) {
+      acc.push(parsed);
+    }
+
+    return acc;
+  }, []);
+};
+
 export const parseReviewFeedback = (value: string): FounderReviewFeedback | undefined => {
   const normalized = value.trim().toLowerCase();
   const mapped =

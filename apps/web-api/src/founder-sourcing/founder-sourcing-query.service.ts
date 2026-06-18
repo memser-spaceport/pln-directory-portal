@@ -7,7 +7,12 @@ import { FounderKpiSummaryDto } from './dto/kpi-summary.dto';
 import { FounderMethodologyDto } from './dto/methodology.dto';
 import { ListFoundersQueryDto } from './dto/list-founders.query.dto';
 import { toFounderDto } from './founder-sourcing.mapper';
-import { isAllowedFundCode, parseFocusAreaList, parseReviewStatus, parseSourceList } from './founder-sourcing.vocab';
+import {
+  parseSourceList,
+  isAllowedFundCode,
+  parseFocusAreaList,
+  parseReviewStatusList,
+} from './founder-sourcing.vocab';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 50;
@@ -162,9 +167,9 @@ export class FounderSourcingQueryService {
       }
     }
 
-    if (query.status) {
-      const status = parseReviewStatus(query.status);
-      if (status) where.reviewStatus = status;
+    const statuses = parseReviewStatusList(query.status);
+    if (statuses.length > 0) {
+      where.reviewStatus = { in: statuses };
     }
 
     if (query.isRaising?.trim().toLowerCase() === 'true') {
