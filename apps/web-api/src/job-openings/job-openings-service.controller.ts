@@ -36,7 +36,7 @@ export class JobOpeningsServiceController {
     // Validate required fields for each job
     for (let i = 0; i < dto.jobs.length; i++) {
       const job = dto.jobs[i];
-      if (!job.companyName) {
+      if (!job.companyName && !job.teamUid) {
         throw new BadRequestException(`Job at index ${i}: companyName is required`);
       }
       if (!job.roleTitle) {
