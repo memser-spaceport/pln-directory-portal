@@ -191,16 +191,17 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
     const dto = push.create.mock.calls[0][0];
     expect(dto).toMatchObject({
       category: 'TEAM_NEWS',
-      title: '3 news updates from ARIA, Bluesky', // small run -> count + team names
-      description: 'newest +2 more', // latest headline across the run + remaining count
+      title: 'Latest News from the network', // static title — teams live in the description
+      description: 'New updates from ARIA, Bluesky', // ≤2 teams, no "+N more"
       link: '/home',
       isPublic: true,
     });
     expect(dto.metadata).toMatchObject({ eventType: 'team_news', runId: 'run-1', teamCount: 2, updateCount: 3 });
+    // Ordered most-recent-first: t1's newest event (06-11) leads t2's (06-10).
     expect(dto.metadata.teamUids).toEqual(['t1', 't2']);
   });
 
-  it('uses single-team copy with the latest headline when only one team has news', async () => {
+  it('uses single-team copy when only one team has news', async () => {
     prisma.teamNewsItem.findUnique.mockResolvedValue(null);
 
     await service.ingestTeamNews({
@@ -213,17 +214,17 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
 
     expect(push.create).toHaveBeenCalledTimes(1);
     expect(push.create.mock.calls[0][0]).toMatchObject({
-      title: '2 news updates from ARIA',
-      description: 'newest +1 more', // latest headline + remaining count
+      title: 'Latest News from the network',
+      description: 'New updates from ARIA',
       image: 'https://cdn/aria.png',
       metadata: { teamCount: 1, updateCount: 2 },
     });
   });
 
-  it('drops the count from the title for a large run (> small-run threshold)', async () => {
+  it('keeps the static title regardless of run size', async () => {
     prisma.teamNewsItem.findUnique.mockResolvedValue(null);
 
-    // 6 items for one team — above TEAM_NEWS_SMALL_RUN_MAX (5).
+    // 6 items for one team — run size no longer affects the title.
     const items = Array.from({ length: 6 }, (_, i) =>
       ingestItem({ teamUid: 't1', title: `item ${i}`, sourceUrl: `https://x/${i}`, eventDate: `2026-06-${10 + i}T00:00:00.000Z` })
     );
@@ -232,8 +233,8 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
 
     expect(push.create).toHaveBeenCalledTimes(1);
     expect(push.create.mock.calls[0][0]).toMatchObject({
-      title: 'Latest news from ARIA', // no count for large runs
-      description: 'item 5 +5 more', // newest eventDate (10+5=15) + remaining
+      title: 'Latest News from the network',
+      description: 'New updates from ARIA',
       metadata: { teamCount: 1, updateCount: 6 },
     });
   });
@@ -253,6 +254,7 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
         teamUids: ['t1'],
         teamCount: 1,
         updateCount: 1,
+        teamLatest: { t1: '2026-06-10T00:00:00.000Z' },
         latestTitle: 'ARIA raised a seed round',
         latestEventDate: '2026-06-10T00:00:00.000Z',
       },
@@ -266,7 +268,8 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
     expect(updateArg.where).toEqual({ id: 99 });
     expect(updateArg.data.metadata).toMatchObject({ teamCount: 2, updateCount: 2 });
     expect(updateArg.data.metadata.teamUids).toEqual(['t1', 't2']);
-    expect(updateArg.data.title).toBe('2 news updates from ARIA, Bluesky');
+    expect(updateArg.data.title).toBe('Latest News from the network');
+    expect(updateArg.data.description).toBe('New updates from ARIA, Bluesky');
   });
 
   it('does not notify when items only update existing rows', async () => {
