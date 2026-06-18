@@ -12,7 +12,7 @@ import { isAllowedFundCode, parseFocusAreaList, parseReviewStatus, parseSourceLi
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
-const SORT_FIELDS = ['alignmentMax', 'lastSignalAt', 'plvsScore', 'createdAt'] as const;
+const SORT_FIELDS = ['alignmentMax', 'lastSignalAt', 'plvsScore', 'createdAt', 'name'] as const;
 type SortField = typeof SORT_FIELDS[number];
 
 @Injectable()
