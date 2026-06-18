@@ -48,7 +48,7 @@ export const DemoDaysMenu = () => {
           <Link href="/teams/team-pitches" passHref>
             <a className={s.menuItem}>
               <PitchIcon />
-              <span className={s.menuItemLabel}>Team Pitches</span>
+              <span className={s.menuItemLabel}>Team Spotlights</span>
               <CaretIcon />
             </a>
           </Link>

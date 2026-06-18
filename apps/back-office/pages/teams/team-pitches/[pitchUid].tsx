@@ -25,8 +25,8 @@ const RichTextEditor = dynamic(() => import('../../../components/common/rich-tex
 const ACCESS_OPTIONS = ['VIEW', 'VIEW_ADMIN', 'EDIT', 'RESTRICTED'] as const;
 
 const ACCESS_LABELS: Record<typeof ACCESS_OPTIONS[number], string> = {
-  VIEW: 'View Open Pitch',
-  VIEW_ADMIN: 'View Draft + Open Pitch',
+  VIEW: 'View Open Spotlight',
+  VIEW_ADMIN: 'View Draft + Open Spotlight',
   EDIT: 'Admin (View/Edit)',
   RESTRICTED: 'No Access',
 };
@@ -177,11 +177,11 @@ const TeamPitchDetailPage = () => {
     if (!authToken) return;
     try {
       await updatePitch.mutateAsync({ authToken, pitchUid: uid, data: editFormData });
-      toast.success('Team pitch updated');
+      toast.success('Team spotlight updated');
       setIsEditing(false);
       refetchPitch();
     } catch {
-      toast.error('Failed to update team pitch');
+      toast.error('Failed to update team spotlight');
     }
   };
 
@@ -193,7 +193,7 @@ const TeamPitchDetailPage = () => {
     return (
       <ApprovalLayout>
         <div className={s.root}>
-          <div className={s.loadingState}>Loading team pitch details...</div>
+          <div className={s.loadingState}>Loading team spotlight details...</div>
         </div>
       </ApprovalLayout>
     );
@@ -204,9 +204,9 @@ const TeamPitchDetailPage = () => {
       <ApprovalLayout>
         <div className={s.root}>
           <div className={s.emptyState}>
-            <div>Team pitch not found</div>
+            <div>Team spotlight not found</div>
             <button onClick={() => router.push('/teams/team-pitches')} className={clsx(s.editButton, s.primary)}>
-              Back to Team Pitches
+              Back to Team Spotlights
             </button>
           </div>
         </div>
@@ -219,7 +219,7 @@ const TeamPitchDetailPage = () => {
       <div className={s.root}>
         <div className={s.backButton}>
           <button onClick={() => router.push('/teams/team-pitches')} className="mb-4 text-blue-600 hover:text-blue-800">
-            ← Back to Team Pitches
+            ← Back to Team Spotlights
           </button>
         </div>
 
@@ -354,7 +354,7 @@ const TeamPitchDetailPage = () => {
                 )}
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
-                <label className={s.fieldLabel}>Pitch Page URL</label>
+                <label className={s.fieldLabel}>Spotlight Page URL</label>
                 <div className={s.fieldValue}>
                   <a
                     href={pitch.publicUrl}
@@ -466,7 +466,7 @@ const TeamPitchDetailPage = () => {
                         <div className="flex items-center">
                           {participant.member?.profilePicture && (
                             <Image
-                              className="mr-3 h-8 w-8 rounded-full"
+                              className="mr-3 h-8 w-8 flex-shrink-0 rounded-full object-cover"
                               src={participant.member.profilePicture}
                               alt=""
                               width={32}
@@ -714,8 +714,8 @@ const TeamPitchDetailPage = () => {
           title={pendingInvite?.isResend ? 'Resend investor invite' : 'Send investor invite'}
           message={
             pendingInvite?.isResend
-              ? 'Resend the team pitch investor invitation email to this participant?'
-              : 'Send the team pitch investor invitation email to this participant?'
+              ? 'Resend the team spotlight investor invitation email to this participant?'
+              : 'Send the team spotlight investor invitation email to this participant?'
           }
           participantName={pendingInvite?.name}
           participantEmail={pendingInvite?.email}
@@ -728,10 +728,10 @@ const TeamPitchDetailPage = () => {
                 <p className="font-medium text-gray-700">Email that will be sent:</p>
                 <ul className="list-disc space-y-1 pl-5">
                   <li>
-                    <span className="font-medium">Team pitch investor invite</span> — a branded invitation to view{' '}
+                    <span className="font-medium">Team spotlight investor invite</span> — a branded invitation to view{' '}
                     <span className="font-medium">{pitch.title}</span>
                   </li>
-                  <li>A link to the pitch page on the directory, with their email pre-filled for sign-in</li>
+                  <li>A link to the spotlight page on the directory, with their email pre-filled for sign-in</li>
                   <li>
                     Context for <span className="font-medium">{pitch.team?.name ?? 'the team'}</span> and support
                     contact ({pitch.supportEmail})

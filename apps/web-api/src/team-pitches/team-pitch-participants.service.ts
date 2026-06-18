@@ -231,7 +231,7 @@ export class TeamPitchParticipantsService {
     }
 
     const webBase = process.env.WEB_UI_BASE_URL || '';
-    const pitchLink = `${webBase}/pitch/${participant.teamPitch.slug}?prefillEmail=${encodeURIComponent(
+    const pitchLink = `${webBase}/spotlight/${participant.teamPitch.slug}?prefillEmail=${encodeURIComponent(
       participant.member.email
     )}`;
 

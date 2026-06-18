@@ -287,7 +287,7 @@ export class TeamPitchesService {
     const webBase = process.env.WEB_UI_BASE_URL || '';
     return {
       ...pitch,
-      publicUrl: `${webBase}/pitch/${pitch.slug}`,
+      publicUrl: `${webBase}/spotlight/${pitch.slug}`,
       logoUrl: pitch.logo?.url ?? null,
       headerImageUrl: pitch.headerImage?.url ?? null,
     };

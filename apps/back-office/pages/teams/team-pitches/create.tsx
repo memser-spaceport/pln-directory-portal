@@ -83,7 +83,7 @@ const CreateTeamPitchPage = () => {
       const created = await createMutation.mutateAsync({ authToken, data: form });
       router.push(`/teams/team-pitches/${created.uid}`);
     } catch {
-      alert('Failed to create team pitch. Please try again.');
+      alert('Failed to create team spotlight. Please try again.');
     }
   };
 
@@ -96,9 +96,9 @@ const CreateTeamPitchPage = () => {
       <div className="mx-auto max-w-2xl p-6">
         <div className="mb-6">
           <button onClick={() => router.back()} className="mb-4 text-blue-600 hover:text-blue-800">
-            ← Back to Team Pitches
+            ← Back to Team Spotlights
           </button>
-          <h1 className="text-3xl font-semibold text-gray-900">Create New Team Pitch</h1>
+          <h1 className="text-3xl font-semibold text-gray-900">Create New Team Spotlight</h1>
         </div>
 
         <div className="rounded-lg bg-white p-6 shadow-sm">
@@ -197,7 +197,7 @@ const CreateTeamPitchPage = () => {
                   }))
                 }
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter pitch title"
+                placeholder="Enter spotlight title"
               />
             </div>
 
@@ -212,10 +212,10 @@ const CreateTeamPitchPage = () => {
                 value={form.slug}
                 onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="team-pitch-slug"
+                placeholder="team-spotlight-slug"
               />
               <p className="mt-1 text-sm text-gray-500">
-                This will be used in the URL: /pitch/{form.slug || 'team-pitch-slug'}
+                This will be used in the URL: /spotlight/{form.slug || 'team-spotlight-slug'}
               </p>
             </div>
 
@@ -227,7 +227,7 @@ const CreateTeamPitchPage = () => {
                 id="description"
                 value={form.description}
                 onChange={(value) => setForm((f) => ({ ...f, description: value }))}
-                placeholder="Enter pitch description"
+                placeholder="Enter spotlight description"
               />
             </div>
 
@@ -274,7 +274,7 @@ const CreateTeamPitchPage = () => {
                 disabled={createMutation.isPending || !form.teamUid}
                 className="rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {createMutation.isPending ? 'Creating...' : 'Create Team Pitch'}
+                {createMutation.isPending ? 'Creating...' : 'Create Team Spotlight'}
               </button>
             </div>
           </form>
