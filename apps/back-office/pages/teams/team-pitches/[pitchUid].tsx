@@ -352,24 +352,6 @@ const TeamPitchDetailPage = () => {
                   <div className={s.fieldValue}>{pitch.supportEmail}</div>
                 )}
               </div>
-              <div className={s.overviewField}>
-                <label className={s.fieldLabel}>Spotlight Frequency</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editFormData.spotlightFrequency}
-                    onChange={(e) => handleEditFormChange('spotlightFrequency', e.target.value)}
-                    className={s.fieldInput}
-                    placeholder="month"
-                  />
-                ) : (
-                  <div className={s.fieldValue}>{pitch.spotlightFrequency ?? 'month'}</div>
-                )}
-                <p className="mt-1 text-xs text-gray-500">
-                  Used in the investor intro: &quot;Every {editFormData.spotlightFrequency || 'month'}, PL Spotlight
-                  introduces investors…&quot;
-                </p>
-              </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
                 <label className={s.fieldLabel}>Spotlight Statement</label>
                 {isEditing ? (
