@@ -1386,9 +1386,11 @@ model TeamPitch {
   teamUid         String
   team            Team                       @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
   slug            String                     @unique
-  title           String
-  description     String
-  status          TeamPitchStatus            @default(DRAFT)
+  title               String
+  description         String
+  spotlightFrequency  String                     @default("month")
+  spotlightStatement  String?
+  status              TeamPitchStatus            @default(DRAFT)
   closedAt        DateTime?
   supportEmail    String
   headerImageUid  String?

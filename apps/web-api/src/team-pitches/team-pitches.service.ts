@@ -128,6 +128,8 @@ export class TeamPitchesService {
       closedAt: resolveTeamPitchClosedAt(pitch),
       title: pitch.title,
       description: pitch.description,
+      spotlightFrequency: pitch.spotlightFrequency,
+      spotlightStatement: pitch.spotlightStatement,
       supportEmail: pitch.supportEmail,
       logoUrl: pitch.logo?.url ?? null,
       primaryColor: pitch.primaryColor,
@@ -298,6 +300,8 @@ export class TeamPitchesService {
     data: {
       title?: string;
       description?: string;
+      spotlightFrequency?: string;
+      spotlightStatement?: string | null;
       slug?: string;
       status?: TeamPitchStatus;
       supportEmail?: string | null;
@@ -333,6 +337,8 @@ export class TeamPitchesService {
       data: {
         title: data.title,
         description: data.description,
+        spotlightFrequency: data.spotlightFrequency,
+        spotlightStatement: data.spotlightStatement,
         slug,
         status: data.status,
         closedAt,

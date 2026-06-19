@@ -120,6 +120,8 @@ const TeamPitchDetailPage = () => {
   const [editFormData, setEditFormData] = useState({
     title: '',
     description: '',
+    spotlightFrequency: 'month',
+    spotlightStatement: '',
     slug: '',
     status: 'DRAFT',
     supportEmail: '',
@@ -138,6 +140,8 @@ const TeamPitchDetailPage = () => {
       setEditFormData({
         title: pitch.title,
         description: pitch.description,
+        spotlightFrequency: pitch.spotlightFrequency ?? 'month',
+        spotlightStatement: pitch.spotlightStatement ?? '',
         slug: pitch.slug,
         status: pitch.status,
         supportEmail: pitch.supportEmail,
@@ -176,7 +180,14 @@ const TeamPitchDetailPage = () => {
   const handleSavePitch = async () => {
     if (!authToken) return;
     try {
-      await updatePitch.mutateAsync({ authToken, pitchUid: uid, data: editFormData });
+      await updatePitch.mutateAsync({
+        authToken,
+        pitchUid: uid,
+        data: {
+          ...editFormData,
+          spotlightStatement: editFormData.spotlightStatement.trim() || null,
+        },
+      });
       toast.success('Team spotlight updated');
       setIsEditing(false);
       refetchPitch();
@@ -262,6 +273,8 @@ const TeamPitchDetailPage = () => {
                         setEditFormData({
                           title: pitch.title,
                           description: pitch.description,
+                          spotlightFrequency: pitch.spotlightFrequency ?? 'month',
+                          spotlightStatement: pitch.spotlightStatement ?? '',
                           slug: pitch.slug,
                           status: pitch.status,
                           supportEmail: pitch.supportEmail,
@@ -338,6 +351,42 @@ const TeamPitchDetailPage = () => {
                 ) : (
                   <div className={s.fieldValue}>{pitch.supportEmail}</div>
                 )}
+              </div>
+              <div className={s.overviewField}>
+                <label className={s.fieldLabel}>Spotlight Frequency</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editFormData.spotlightFrequency}
+                    onChange={(e) => handleEditFormChange('spotlightFrequency', e.target.value)}
+                    className={s.fieldInput}
+                    placeholder="month"
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{pitch.spotlightFrequency ?? 'month'}</div>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Used in the investor intro: &quot;Every {editFormData.spotlightFrequency || 'month'}, PL Spotlight
+                  introduces investors…&quot;
+                </p>
+              </div>
+              <div className={clsx(s.overviewField, s.fullWidth)}>
+                <label className={s.fieldLabel}>Spotlight Statement</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editFormData.spotlightStatement}
+                    onChange={(e) => handleEditFormChange('spotlightStatement', e.target.value)}
+                    className={s.fieldInput}
+                    placeholder="One-line statement shown after the team name (optional)"
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{pitch.spotlightStatement || '—'}</div>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Investor hero line: This Spotlight: {pitch.team?.name ?? 'Team'} — statement. Leave blank to show
+                  only the linked team name.
+                </p>
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
                 <label className={s.fieldLabel}>Description</label>

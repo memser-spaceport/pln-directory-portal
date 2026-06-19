@@ -23,6 +23,8 @@ export class CreateTeamPitchDto extends createZodDto(CreateTeamPitchSchema) {}
 export const UpdateTeamPitchSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
+  spotlightFrequency: z.string().min(1).optional(),
+  spotlightStatement: z.string().optional().nullable(),
   slug: z.string().min(1).optional(),
   status: z.enum(['DRAFT', 'OPEN', 'CLOSED']).optional(),
   supportEmail: z.string().email().optional().nullable(),
