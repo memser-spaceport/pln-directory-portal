@@ -38,6 +38,8 @@ export class TeamPitchProfilesService {
         status: pitch.status,
         closedAt: resolveTeamPitchClosedAt(pitch),
         title: pitch.title,
+        spotlightFrequency: pitch.spotlightFrequency,
+        spotlightStatement: pitch.spotlightStatement,
         team: {
           uid: pitch.team.uid,
           name: pitch.team.name,
@@ -57,6 +59,8 @@ export class TeamPitchProfilesService {
           slug: pitch.slug,
           status: pitch.status,
           title: pitch.title,
+          spotlightFrequency: pitch.spotlightFrequency,
+          spotlightStatement: pitch.spotlightStatement,
           team: {
             uid: pitch.team.uid,
             name: pitch.team.name,
@@ -74,6 +78,8 @@ export class TeamPitchProfilesService {
       status: pitch.status,
       title: pitch.title,
       description: pitch.description,
+      spotlightFrequency: pitch.spotlightFrequency,
+      spotlightStatement: pitch.spotlightStatement,
       supportEmail: pitch.supportEmail,
       primaryColor: pitch.primaryColor,
       logoUrl: pitch.logo?.url ?? null,
