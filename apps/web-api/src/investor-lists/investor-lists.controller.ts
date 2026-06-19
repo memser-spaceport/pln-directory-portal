@@ -47,8 +47,8 @@ export class InvestorListsController {
   @NoCache()
   @Get()
   @RequirePermissions(VIEW_PERMS)
-  async listLists() {
-    return this.queryService.listLists();
+  async listLists(@Query('investorId') investorId?: string) {
+    return this.queryService.listLists(investorId?.trim() || undefined);
   }
 
   @NoCache()

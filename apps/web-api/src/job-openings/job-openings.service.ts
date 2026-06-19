@@ -74,9 +74,38 @@ export class JobOpeningsService {
     return Array.isArray(item.location) ? item.location : item.location ? [item.location] : [];
   }
 
+  private isClosedStatus(status: JobOpeningStatus, rawStatus: string): boolean {
+    if (status.startsWith('CLOSED_')) {
+      return true;
+    }
+    return status === JobOpeningStatus.STALE && rawStatus === 'Closed';
+  }
+
+  private resolveClosedAt(
+    item: JobOpeningIngestItem,
+    status: JobOpeningStatus,
+    existing?: { closedAt: Date | null } | null
+  ): Date | null | undefined {
+    if (item.closedAt) {
+      return new Date(item.closedAt);
+    }
+    if (!this.isClosedStatus(status, item.status)) {
+      return undefined;
+    }
+    if (existing?.closedAt) {
+      return existing.closedAt;
+    }
+    return new Date();
+  }
+
   private async upsertJobOpening(item: JobOpeningIngestItem): Promise<void> {
     const status = this.mapStatus(item.status);
     const location = this.resolveIngestLocations(item);
+    const existing = await this.prisma.jobOpening.findUnique({
+      where: { dedupKey: item.dedupKey },
+      select: { closedAt: true },
+    });
+    const closedAt = this.resolveClosedAt(item, status, existing);
 
     const data: Prisma.JobOpeningUncheckedCreateInput = {
       status,
@@ -109,6 +138,7 @@ export class JobOpeningsService {
       needsReview: item.needsReview ?? null,
       notes: item.notes ?? null,
       portfolio: item.portfolio ?? null,
+      closedAt: closedAt ?? null,
     };
 
     await this.prisma.jobOpening.upsert({
@@ -123,6 +153,7 @@ export class JobOpeningsService {
         workMode: data.workMode,
         lastSeenLive: data.lastSeenLive,
         detectionDate: data.detectionDate,
+        ...(closedAt !== undefined ? { closedAt } : {}),
         updatedAt: new Date(),
       },
     });

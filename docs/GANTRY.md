@@ -178,6 +178,20 @@ BACKLOG/DECLINED also return pins but intentionally send no boost-returned
 notification to boosters (PRD lists only the In Progress return) — only the
 submitter hears about those moves.
 
+**Committed stages notify exactly once.** Every "In Progress" notification (the
+submitter line *and* the boost-returned line) fires only the first time an item
+reaches In Progress, and every "Shipped" notification (submitter + backers) fires
+only the first time it ships. There is no extra state on the item: the service asks
+the bell whether a notification with that `metadata.itemUid` + `trigger` was already
+stored (`PushNotificationsService.hasItemTriggerNotification`), and an item that has
+already shipped also counts as having already been In Progress. So re-entry cannot
+re-notify: `Planned → In Progress → Planned → In Progress` sends one In Progress
+notification; `Planned → Shipped → In Progress` sends one Shipped notification and
+stays silent on the later In Progress; a second move into Shipped sends nothing.
+(Items committed/shipped before the notification feature existed carry no stored
+notification, so a future transition may notify once — acceptable, and avoids a
+backfill.)
+
 For engineering conventions and invariants (budget state machine, attribution
 boundary, stage groups), see the **`gantry-boost-signaling`** Claude skill at
 `.claude/skills/gantry-boost-signaling/SKILL.md`.
@@ -196,6 +210,11 @@ All models in `apps/web-api/prisma/schema.prisma`:
   item leaves a pinnable stage — released rows are the frozen history.
 - **`RoadmapObjective`** — OKR chip: unique title, display order, assigned items.
 - **`RoadmapSettings`** — single row; `pinLimit` (default 3).
+- **`RoadmapSubmissionDraft`** — server-side snapshot of a member's in-progress
+  create/submit form, so a draft follows them across devices. One row per member
+  (unique `memberUid`); all payload fields (`variant`, `title`, `description`, `tags`,
+  `type`, `stage`, `objectiveUid`, `newObjectiveTitle`, `showCreateObjective`) are
+  nullable partial form state, plus `updatedAt` for the "last edited" UI.
 
 ## API quick reference
 
@@ -216,6 +235,7 @@ Base: `/v1/roadmap` (guards: `UserTokenCheckGuard` + `RbacGuard`). Contracts in
 | `/objectives` | GET / POST | view / item.curate | List / create-or-find objective |
 | `/items/:uid/objective` | PATCH | item.curate | Set/clear an item's objective |
 | `/settings` | GET / PATCH | view / item.curate | Read / tune the pin budget |
+| `/drafts/me` | GET / PUT / DELETE | view | Read (or null) / autosave-upsert / discard the member's own in-progress submission draft |
 
 ## Reference files
 

@@ -13,6 +13,8 @@ export interface InvestorListDto {
   description: string | null;
   isGraphed: boolean;
   memberCount: number;
+  /** Present only when GET /v1/investor-lists is called with ?investorId= */
+  isMember?: boolean;
 }
 
 export interface InvestorListsResponseDto {

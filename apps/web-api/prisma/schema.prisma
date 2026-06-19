@@ -241,6 +241,7 @@ model Member {
   roadmapItemUpvotes        RoadmapItemUpvote[]   @relation("roadmapItemUpvoter")
   roadmapItemPins           RoadmapItemPin[]      @relation("roadmapItemPinner")
   roadmapObjectivesCreated  RoadmapObjective[]    @relation("roadmapObjectiveCreatedBy")
+  roadmapSubmissionDraft    RoadmapSubmissionDraft? @relation("roadmapSubmissionDraftOwner")
 }
 
 model MemberApproval {
@@ -1385,9 +1386,12 @@ model TeamPitch {
   teamUid         String
   team            Team                       @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
   slug            String                     @unique
-  title           String
-  description     String
-  status          TeamPitchStatus            @default(DRAFT)
+  title               String
+  description         String
+  spotlightFrequency  String                     @default("month")
+  spotlightStatement  String?
+  status              TeamPitchStatus            @default(DRAFT)
+  closedAt        DateTime?
   supportEmail    String
   headerImageUid  String?
   headerImage     Image?                     @relation("TeamPitchHeaderImage", fields: [headerImageUid], references: [uid])
@@ -1527,6 +1531,9 @@ enum PushNotificationCategory {
 
   // Gantry (roadmap) notifications
   GANTRY
+
+  // Team news — "News from the network" updates surfaced on /home
+  TEAM_NEWS
 }
 
 // Push notifications for WebSocket delivery
@@ -2202,6 +2209,7 @@ model JobOpening {
   notes           String?
   portfolio       String?
   rawPayload      Json?
+  closedAt        DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -2723,9 +2731,18 @@ model FounderSourcingRecord {
   intentSignals   Json?
 
   provenance   Json?
-  lastSignalAt DateTime?
-  whyNow       String?   @db.VarChar(500)
-  thinEvidence Boolean?
+  lastSignalAt         DateTime?
+  lastActivitySeenAt   DateTime?
+  whyNow               String?   @db.VarChar(500)
+  criteriaHeadline     String?   @db.VarChar(500)
+  pedigree             String?   @db.VarChar(500)
+  focusArea            String?
+  thinEvidence         Boolean?
+  isRaising            Boolean?
+  isCofounderSearch    Boolean?
+  isComingOutOfStealth Boolean?
+  nearNetwork          Boolean?
+  plAligned            Boolean?
 
   runId                 String?
   signalSourcingVersion String?
@@ -2735,6 +2752,9 @@ model FounderSourcingRecord {
 
   reviewStatus        FounderReviewStatus    @default(NEW)
   reviewFeedback      FounderReviewFeedback?
+  reviewChannel       String?
+  reviewField         String?                @db.VarChar(80)
+  reviewArea          String?                @db.VarChar(80)
   reviewDecidedAt     DateTime?
   reviewNote          String?                @db.VarChar(500)
   reviewedByMemberUid String?
@@ -2751,6 +2771,16 @@ model FounderSourcingRecord {
   @@index([lastSignalAt])
   @@index([runId])
   @@index([plvsScore])
+  @@index([focusArea])
+  @@index([isRaising])
+}
+
+model FounderSourcingMethodology {
+  version   String   @id
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model FounderSourcingIngestRun {
@@ -2859,6 +2889,31 @@ model RoadmapObjective {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   items        RoadmapItem[]
+}
+
+/// Server-persisted snapshot of a member's in-progress Gantry create/submit form, so
+/// the draft follows them across devices and browsers. At most one active draft per
+/// member (unique memberUid). Payload fields are nullable — this is partial, unsaved
+/// form state, not a validated item. `variant` is "idea" | "roadmap"; `stage` mirrors
+/// RoadmapStage but is stored loosely as a string since it is unsubmitted form input.
+model RoadmapSubmissionDraft {
+  id        Int    @id @default(autoincrement())
+  uid       String @unique @default(cuid())
+  memberUid String @unique
+  member    Member @relation("roadmapSubmissionDraftOwner", fields: [memberUid], references: [uid], onDelete: Cascade)
+
+  variant             String   @default("idea")
+  title               String?
+  description         String?
+  tags                String[] @default([])
+  type                String?
+  stage               String?
+  objectiveUid        String?
+  newObjectiveTitle   String?
+  showCreateObjective Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// Single-row table (id = 1) holding roadmap-wide configuration.

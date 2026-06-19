@@ -240,3 +240,51 @@ export const RoadmapSettingsSchema = z.object({
 export const UpdateRoadmapSettingsSchema = z.object({
   pinLimit: z.number().int().min(0).max(100),
 });
+
+// --- Submission drafts ---
+
+/** Which form the member was filling in: a member idea or a curator roadmap card. */
+export const RoadmapDraftVariantSchema = z.enum(['idea', 'roadmap']);
+
+/**
+ * Server-persisted snapshot of an in-progress create/submit form. Every payload field
+ * is nullable — this is partial, unsaved form state, not a validated item.
+ */
+export const RoadmapSubmissionDraftSchema = z.object({
+  uid: z.string(),
+  variant: RoadmapDraftVariantSchema,
+  title: z.string().nullable(),
+  description: z.string().nullable(),
+  tags: z.array(z.string()),
+  type: z.string().nullable(),
+  stage: RoadmapStageSchema.nullable(),
+  objectiveUid: z.string().nullable(),
+  newObjectiveTitle: z.string().nullable(),
+  showCreateObjective: z.boolean(),
+  updatedAt: z.string(),
+});
+
+/** GET response: the member's single draft, or null when none has been saved. */
+export const RoadmapDraftResponseSchema = z.object({
+  draft: RoadmapSubmissionDraftSchema.nullable(),
+});
+
+/**
+ * Full-replace upsert body for the debounced autosave. Omitted fields fall back to
+ * their empty defaults (PUT semantics — the UI sends the whole form each save).
+ */
+export const UpsertRoadmapDraftSchema = z.object({
+  variant: RoadmapDraftVariantSchema.optional(),
+  title: z.string().max(500).optional().nullable(),
+  description: z.string().optional().nullable(),
+  tags: z.array(z.string()).optional(),
+  type: z.string().max(500).optional().nullable(),
+  stage: RoadmapStageSchema.optional().nullable(),
+  objectiveUid: z.string().optional().nullable(),
+  newObjectiveTitle: z.string().max(150).optional().nullable(),
+  showCreateObjective: z.boolean().optional(),
+});
+
+export const DeleteRoadmapDraftResponseSchema = z.object({
+  deleted: z.boolean(),
+});

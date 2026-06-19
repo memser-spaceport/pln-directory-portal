@@ -76,6 +76,9 @@ export const JobOpeningsPerTeamResponseSchema = z.object({
   jobOpenings: z.array(
     z.object({
       uid: z.string(),
+      canonicalKey: z.string(),
+      dedupKey: z.string(),
+      teamUid: z.string(),
       roleTitle: z.string(),
       roleCategory: z.string().nullable(),
       seniority: z.string().nullable(),
@@ -83,6 +86,7 @@ export const JobOpeningsPerTeamResponseSchema = z.object({
       workMode: z.string().nullable(),
       sourceLink: z.string().nullable(),
       postedDate: z.string().nullable(),
+      lastSeenLive: z.string().nullable(),
       status: z.string(),
       detectionDate: z.string(),
       updatedAt: z.string(),

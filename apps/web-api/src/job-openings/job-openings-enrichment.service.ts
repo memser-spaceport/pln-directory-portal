@@ -109,6 +109,9 @@ export class JobOpeningsEnrichmentService {
       teamName: team.name,
       jobOpenings: jobOpenings.map((job) => ({
         uid: job.uid,
+        canonicalKey: job.canonicalKey,
+        dedupKey: job.dedupKey,
+        teamUid: job.teamUid ?? teamUid,
         roleTitle: job.roleTitle,
         roleCategory: job.roleCategory ?? null,
         seniority: job.seniority ?? null,
@@ -116,6 +119,7 @@ export class JobOpeningsEnrichmentService {
         workMode: job.workMode ?? null,
         sourceLink: job.sourceLink ?? null,
         postedDate: job.postedDate?.toISOString() ?? null,
+        lastSeenLive: job.lastSeenLive?.toISOString() ?? null,
         status: job.status,
         detectionDate: job.detectionDate.toISOString(),
         updatedAt: job.updatedAt.toISOString(),

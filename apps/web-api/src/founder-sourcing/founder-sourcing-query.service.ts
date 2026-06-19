@@ -4,14 +4,20 @@ import { PrismaService } from '../shared/prisma.service';
 import { FounderDto, PaginatedFoundersDto } from './dto/founder.dto';
 import { FounderFiltersDto } from './dto/founder-filters.dto';
 import { FounderKpiSummaryDto } from './dto/kpi-summary.dto';
+import { FounderMethodologyDto } from './dto/methodology.dto';
 import { ListFoundersQueryDto } from './dto/list-founders.query.dto';
 import { toFounderDto } from './founder-sourcing.mapper';
-import { isAllowedFundCode, parseReviewStatus, parseSourceList } from './founder-sourcing.vocab';
+import {
+  parseSourceList,
+  isAllowedFundCode,
+  parseFocusAreaList,
+  parseReviewStatusList,
+} from './founder-sourcing.vocab';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
-const SORT_FIELDS = ['alignmentMax', 'lastSignalAt', 'plvsScore', 'createdAt'] as const;
+const SORT_FIELDS = ['alignmentMax', 'lastSignalAt', 'plvsScore', 'createdAt', 'name'] as const;
 type SortField = typeof SORT_FIELDS[number];
 
 @Injectable()
@@ -54,7 +60,26 @@ export class FounderSourcingQueryService {
       ORDER BY lower(val), val
     `;
 
-    return { sources: rows.map((row) => row.val) };
+    const focusAreaRows = await this.prisma.$queryRaw<{ val: string }[]>`
+      SELECT DISTINCT ON (lower("focusArea")) "focusArea" AS val
+      FROM "FounderSourcingRecord"
+      WHERE "focusArea" IS NOT NULL AND trim("focusArea") <> ''
+      ORDER BY lower("focusArea"), "focusArea"
+    `;
+
+    return { sources: rows.map((row) => row.val), focusAreas: focusAreaRows.map((row) => row.val) };
+  }
+
+  async getLatestMethodology(): Promise<FounderMethodologyDto | null> {
+    const row = await this.prisma.founderSourcingMethodology.findFirst({
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!row) return null;
+    return {
+      version: row.version,
+      payload: row.payload as Record<string, unknown>,
+      createdAt: row.createdAt.toISOString(),
+    };
   }
 
   async findFounderById(founderId: string): Promise<FounderDto> {
@@ -132,13 +157,30 @@ export class FounderSourcingQueryService {
       });
     }
 
-    if (query.fund && isAllowedFundCode(query.fund.trim().toUpperCase())) {
-      where.fundCodes = { has: query.fund.trim().toUpperCase() };
+    const funds = parseSourceList(query.fund);
+    if (funds.length > 0) {
+      const validFunds = funds.map((f) => f.trim().toUpperCase()).filter((f) => isAllowedFundCode(f));
+      if (validFunds.length === 1) {
+        where.fundCodes = { has: validFunds[0] };
+      } else if (validFunds.length > 1) {
+        where.fundCodes = { hasSome: validFunds };
+      }
     }
 
-    if (query.status) {
-      const status = parseReviewStatus(query.status);
-      if (status) where.reviewStatus = status;
+    const statuses = parseReviewStatusList(query.status);
+    if (statuses.length > 0) {
+      where.reviewStatus = { in: statuses };
+    }
+
+    if (query.isRaising?.trim().toLowerCase() === 'true') {
+      where.isRaising = true;
+    }
+
+    const focusAreas = parseFocusAreaList(query.focusArea);
+    if (focusAreas.length === 1) {
+      where.focusArea = focusAreas[0];
+    } else if (focusAreas.length > 1) {
+      where.focusArea = { in: focusAreas };
     }
 
     const sources = parseSourceList(query.source);

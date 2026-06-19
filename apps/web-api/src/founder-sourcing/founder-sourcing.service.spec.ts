@@ -20,6 +20,8 @@ describe('FounderSourcingService', () => {
   const upsert = jest.fn();
   const ingestRunUpsert = jest.fn();
 
+  const methodologyUpsert = jest.fn();
+
   const prismaMock = {
     founderSourcingRecord: {
       findUnique,
@@ -28,6 +30,9 @@ describe('FounderSourcingService', () => {
     founderSourcingIngestRun: {
       upsert: ingestRunUpsert,
     },
+    founderSourcingMethodology: {
+      upsert: methodologyUpsert,
+    },
   } as unknown as PrismaService;
 
   beforeEach(() => {
@@ -35,6 +40,7 @@ describe('FounderSourcingService', () => {
     service = new FounderSourcingService(prismaMock);
     upsert.mockResolvedValue({ id: 1 });
     ingestRunUpsert.mockResolvedValue({});
+    methodologyUpsert.mockResolvedValue({});
   });
 
   it('creates when no existing rows', async () => {
@@ -80,15 +86,65 @@ describe('FounderSourcingService', () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 
-  it('does not overwrite review fields on update payload', async () => {
-    const input = service.buildRecordInput(minimalItem(), 'run-1', 'signal-sourcing');
-    const update = service['stripKeysForUpdate'](input);
+  it('does not overwrite review fields on update payload', () => {
+    const item = minimalItem();
+    const input = service.buildRecordInput(item, 'run-1', 'signal-sourcing');
+    const update = service['stripKeysForUpdate'](input, item);
 
     expect(update.reviewStatus).toBeUndefined();
     expect(update.reviewFeedback).toBeUndefined();
+    expect(update.reviewChannel).toBeUndefined();
+    expect(update.reviewField).toBeUndefined();
+    expect(update.reviewArea).toBeUndefined();
     expect(update.reviewDecidedAt).toBeUndefined();
     expect(update.reviewNote).toBeUndefined();
     expect(update.reviewedByMemberUid).toBeUndefined();
+  });
+
+  it('maps contract fields and sticky booleans on create', () => {
+    const input = service.buildRecordInput(
+      minimalItem({
+        focus_area: 'FA3 Embodied AI',
+        criteria_headline: 'PLVS · embodied robotics',
+        pedigree: 'DeepMind',
+        is_raising: true,
+        near_network: true,
+      }),
+    );
+
+    expect(input.focusArea).toBe('FA3 Embodied AI');
+    expect(input.criteriaHeadline).toBe('PLVS · embodied robotics');
+    expect(input.pedigree).toBe('DeepMind');
+    expect(input.isRaising).toBe(true);
+    expect(input.nearNetwork).toBe(true);
+    expect(input.isCofounderSearch).toBeUndefined();
+  });
+
+  it('omits sticky booleans on update when not present in payload', () => {
+    const item = minimalItem();
+    const input = service.buildRecordInput({ ...item, is_raising: true }, 'run-1', 'signal-sourcing');
+    const updateWithoutFlag = service['stripKeysForUpdate'](input, minimalItem());
+    expect(updateWithoutFlag.isRaising).toBeUndefined();
+
+    const updateWithFlag = service['stripKeysForUpdate'](input, minimalItem({ is_raising: true }));
+    expect(updateWithFlag.isRaising).toBe(true);
+  });
+
+  it('upserts methodology when version and payload are provided', async () => {
+    findUnique.mockResolvedValue(null);
+
+    await service.ingest({
+      methodology_version: 'abc123',
+      methodology: { summary: 'test' },
+      items: [minimalItem()],
+    });
+
+    expect(methodologyUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { version: 'abc123' },
+        create: expect.objectContaining({ version: 'abc123' }),
+      }),
+    );
   });
 
   it('omits optional scalar fields when absent on payload', () => {

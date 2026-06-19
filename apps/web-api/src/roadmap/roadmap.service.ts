@@ -18,8 +18,11 @@ import { PrismaService } from '../shared/prisma.service';
 import {
   PINNABLE_STAGES,
   PIN_RELEASING_STAGES,
+  REACHED_IN_PROGRESS_NOTIFICATION_TRIGGERS,
   ROADMAP_ANALYTICS_EVENTS,
   ROADMAP_NOTIFICATION_COPY,
+  ROADMAP_NOTIFICATION_TRIGGERS,
+  SHIPPED_NOTIFICATION_TRIGGERS,
   TRENDING_HALF_LIFE_DAYS,
   itemDetailPath,
 } from './roadmap.constants';
@@ -439,21 +442,40 @@ export class RoadmapService {
 
     await this.trackPinsReleased(uid, actorUid, releasedPins, to);
 
-    // Boost-returned notifications fire only on commitment (IN_PROGRESS). Pins are
-    // released exactly once, so a later IN_PROGRESS → SHIPPED move releases nothing
-    // and cannot double-fire this.
-    if (to === RoadmapStage.IN_PROGRESS) {
+    // Committed-stage notifications fire at most once per item. We derive "already
+    // notified" from the persisted bell notifications themselves (metadata.itemUid +
+    // trigger), not from item state, so a re-entry can never re-notify:
+    //   - In Progress is suppressed if the item was ever In Progress OR Shipped — covers
+    //     Planned → In Progress → Planned → In Progress and Shipped → In Progress bounces.
+    //   - Shipped is suppressed if the item was ever Shipped.
+    // (Pins also release exactly once, so an IN_PROGRESS → SHIPPED move releases nothing
+    // and the boost-returned line can't repeat regardless.)
+    const reachedInProgressBefore =
+      to === RoadmapStage.IN_PROGRESS &&
+      (await this.pushNotifications.hasItemTriggerNotification(uid, REACHED_IN_PROGRESS_NOTIFICATION_TRIGGERS));
+    const reachedShippedBefore =
+      to === RoadmapStage.SHIPPED &&
+      (await this.pushNotifications.hasItemTriggerNotification(uid, SHIPPED_NOTIFICATION_TRIGGERS));
+
+    if (to === RoadmapStage.IN_PROGRESS && !reachedInProgressBefore) {
       await this.notifyBoostsReturned(row, releasedPins);
     }
 
     if (existing.stage !== to) {
-      await this.notifySubmitterStageChange(row, to, opts.declinedReason);
+      const suppressForRepeat =
+        (to === RoadmapStage.IN_PROGRESS && reachedInProgressBefore) ||
+        (to === RoadmapStage.SHIPPED && reachedShippedBefore);
+      if (!suppressForRepeat) {
+        await this.notifySubmitterStageChange(row, to, opts.declinedReason);
+      }
     }
 
     if (isPromoteTransition(existing.stage, to)) {
       await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_PROMOTED, actorUid, { itemUid: uid });
     } else if (to === RoadmapStage.SHIPPED) {
-      await this.notifyBackersShipped(row);
+      if (!reachedShippedBefore) {
+        await this.notifyBackersShipped(row);
+      }
     } else {
       await this.track(ROADMAP_ANALYTICS_EVENTS.ROADMAP_STATUS_CHANGED, actorUid, {
         itemUid: uid,
@@ -637,21 +659,21 @@ export class RoadmapService {
           item.createdByUid,
           ROADMAP_NOTIFICATION_COPY.needPlanned(item.title),
           item.uid,
-          'need_planned'
+          ROADMAP_NOTIFICATION_TRIGGERS.NEED_PLANNED
         );
       case RoadmapStage.IN_PROGRESS:
         return this.sendMemberNotification(
           item.createdByUid,
           ROADMAP_NOTIFICATION_COPY.needInProgress(item.title),
           item.uid,
-          'need_in_progress'
+          ROADMAP_NOTIFICATION_TRIGGERS.NEED_IN_PROGRESS
         );
       case RoadmapStage.BACKLOG:
         return this.sendMemberNotification(
           item.createdByUid,
           ROADMAP_NOTIFICATION_COPY.needBacklogged(item.title),
           item.uid,
-          'need_backlogged'
+          ROADMAP_NOTIFICATION_TRIGGERS.NEED_BACKLOGGED
         );
       case RoadmapStage.SHIPPED:
         return this.notifyShipped(item);
@@ -667,7 +689,7 @@ export class RoadmapService {
       item.createdByUid,
       ROADMAP_NOTIFICATION_COPY.needDeclined(item.title, reason),
       item.uid,
-      'need_declined'
+      ROADMAP_NOTIFICATION_TRIGGERS.NEED_DECLINED
     );
   }
 
@@ -677,7 +699,7 @@ export class RoadmapService {
       item.createdByUid,
       ROADMAP_NOTIFICATION_COPY.needShipped(item.title),
       item.uid,
-      'need_shipped'
+      ROADMAP_NOTIFICATION_TRIGGERS.NEED_SHIPPED
     );
   }
 
@@ -695,7 +717,12 @@ export class RoadmapService {
         link: itemDetailPath(item.uid),
         isPublic: false,
         requiredPermissions: [ROADMAP_PERMISSIONS.VIEW, ROADMAP_PERMISSIONS.ADMIN],
-        metadata: { eventType: 'roadmap', itemUid: item.uid, trigger: 'new_submission', authorUid },
+        metadata: {
+          eventType: 'roadmap',
+          itemUid: item.uid,
+          trigger: ROADMAP_NOTIFICATION_TRIGGERS.NEW_SUBMISSION,
+          authorUid,
+        },
       });
     } catch (error) {
       this.logger.warn(
@@ -715,7 +742,7 @@ export class RoadmapService {
         memberUid,
         ROADMAP_NOTIFICATION_COPY.boostReturned(item.title),
         item.uid,
-        'boost_returned'
+        ROADMAP_NOTIFICATION_TRIGGERS.BOOST_RETURNED
       );
     }
   }
@@ -738,7 +765,7 @@ export class RoadmapService {
           memberUid,
           ROADMAP_NOTIFICATION_COPY.backedItemShipped(item.title),
           item.uid,
-          'backed_item_shipped'
+          ROADMAP_NOTIFICATION_TRIGGERS.BACKED_ITEM_SHIPPED
         );
       }
     } catch (error) {

@@ -65,13 +65,13 @@ const TeamPitchesPage = () => {
     <ApprovalLayout>
       <div className="mx-auto max-w-6xl p-6">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-3xl font-semibold text-gray-900">Team Pitches</h1>
+          <h1 className="text-3xl font-semibold text-gray-900">Team Spotlights</h1>
           {canMutateTeamPitches && (
             <button
               onClick={() => router.push('/teams/team-pitches/create')}
               className="rounded-lg bg-blue-600 px-4 py-2 text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              Create New Pitch
+              Create New Spotlight
             </button>
           )}
         </div>
@@ -79,7 +79,7 @@ const TeamPitchesPage = () => {
         <div className="mb-4 flex gap-3">
           <input
             type="text"
-            placeholder="Search by pitch or team name"
+            placeholder="Search by spotlight or team name"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -102,7 +102,7 @@ const TeamPitchesPage = () => {
           </div>
         ) : !pitches || pitches.length === 0 ? (
           <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-500">
-            No team pitches found.
+            No team spotlights found.
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">

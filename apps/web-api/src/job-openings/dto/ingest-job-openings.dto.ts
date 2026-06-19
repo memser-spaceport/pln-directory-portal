@@ -23,6 +23,7 @@ export interface JobOpeningIngestItem {
   sourceDate?: string;
   postedDate?: string;
   lastSeenLive?: string;
+  closedAt?: string;
   signalId?: string;
   canonicalKey: string;
   dedupKey: string;

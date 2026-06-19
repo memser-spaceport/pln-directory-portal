@@ -64,6 +64,8 @@ export class AdminTeamPitchController {
     return this.teamPitchesService.updatePitch(pitchUid, {
       title: body.title,
       description: body.description,
+      spotlightFrequency: body.spotlightFrequency,
+      spotlightStatement: body.spotlightStatement,
       slug: body.slug,
       status: body.status as TeamPitchStatus | undefined,
       supportEmail: body.supportEmail,

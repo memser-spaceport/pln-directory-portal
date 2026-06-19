@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Prisma, TeamPitchParticipantAccess, TeamPitchParticipantType, TeamPitchStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ADMIN_PERMISSIONS, TEAM_PITCH_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
-import { resolveTeamPitchSupportEmail, toKebabSlug } from './team-pitch.utils';
+import { resolveTeamPitchSupportEmail, resolveTeamPitchClosedAt, toKebabSlug } from './team-pitch.utils';
 
 export type TeamPitchAccessLevel = 'restricted' | 'view' | 'edit';
 
@@ -125,8 +125,11 @@ export class TeamPitchesService {
       slug: pitch.slug,
       createdAt: pitch.createdAt.toISOString(),
       status: pitch.status,
+      closedAt: resolveTeamPitchClosedAt(pitch),
       title: pitch.title,
       description: pitch.description,
+      spotlightFrequency: pitch.spotlightFrequency,
+      spotlightStatement: pitch.spotlightStatement,
       supportEmail: pitch.supportEmail,
       logoUrl: pitch.logo?.url ?? null,
       primaryColor: pitch.primaryColor,
@@ -241,6 +244,7 @@ export class TeamPitchesService {
         title: data.title,
         description: data.description,
         status: data.status ?? TeamPitchStatus.DRAFT,
+        closedAt: data.status === TeamPitchStatus.CLOSED ? new Date() : undefined,
         supportEmail,
         headerImageUid: data.headerImageUid ?? undefined,
         logoUid: data.logoUid ?? undefined,
@@ -285,7 +289,7 @@ export class TeamPitchesService {
     const webBase = process.env.WEB_UI_BASE_URL || '';
     return {
       ...pitch,
-      publicUrl: `${webBase}/pitch/${pitch.slug}`,
+      publicUrl: `${webBase}/spotlight/${pitch.slug}`,
       logoUrl: pitch.logo?.url ?? null,
       headerImageUrl: pitch.headerImage?.url ?? null,
     };
@@ -296,6 +300,8 @@ export class TeamPitchesService {
     data: {
       title?: string;
       description?: string;
+      spotlightFrequency?: string;
+      spotlightStatement?: string | null;
       slug?: string;
       status?: TeamPitchStatus;
       supportEmail?: string | null;
@@ -317,13 +323,25 @@ export class TeamPitchesService {
     const resolvedSupportEmail =
       data.supportEmail !== undefined ? resolveTeamPitchSupportEmail(data.supportEmail) : undefined;
 
+    let closedAt: Date | null | undefined;
+    if (data.status !== undefined) {
+      if (data.status === TeamPitchStatus.CLOSED && existing.status !== TeamPitchStatus.CLOSED) {
+        closedAt = new Date();
+      } else if (data.status !== TeamPitchStatus.CLOSED) {
+        closedAt = null;
+      }
+    }
+
     return this.prisma.teamPitch.update({
       where: { uid: pitchUid },
       data: {
         title: data.title,
         description: data.description,
+        spotlightFrequency: data.spotlightFrequency,
+        spotlightStatement: data.spotlightStatement,
         slug,
         status: data.status,
+        closedAt,
         supportEmail: resolvedSupportEmail,
         headerImageUid: data.headerImageUid,
         logoUid: data.logoUid,

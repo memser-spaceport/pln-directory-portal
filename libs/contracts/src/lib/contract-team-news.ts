@@ -7,6 +7,8 @@ import {
   TeamNewsGroupedResponseSchema,
   TeamNewsListQueryParams,
   TeamNewsListResponseSchema,
+  TeamNewsRecentQueryParams,
+  TeamNewsRecentResponseSchema,
 } from '../schema/team-news';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -39,6 +41,15 @@ export const apiTeamNews = contract.router({
       200: TeamNewsFiltersResponseSchema,
     },
     summary: 'Facet counts for the Team News list',
+  },
+  getTeamNewsRecent: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/team-news/recent`,
+    query: TeamNewsRecentQueryParams,
+    responses: {
+      200: TeamNewsRecentResponseSchema,
+    },
+    summary: 'Recent network news across all teams (for the digest email)',
   },
   createTeamNewsDiscussion: {
     method: 'POST',

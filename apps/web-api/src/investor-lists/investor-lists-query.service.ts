@@ -45,20 +45,43 @@ export class InvestorListsQueryService {
   }
 
   /** GET /v1/investor-lists → `{ items: InvestorListDto[] }` with member counts. */
-  async listLists(): Promise<InvestorListsResponseDto> {
+  async listLists(investorId?: string): Promise<InvestorListsResponseDto> {
     const lists = await this.prisma.investorList.findMany({
       orderBy: { name: 'asc' },
       include: { _count: { select: { memberships: true } } },
     });
 
-    const items: InvestorListDto[] = lists.map((list) => ({
-      id: list.id,
-      slug: list.slug,
-      name: list.name,
-      description: list.description,
-      isGraphed: list.isGraphed,
-      memberCount: list._count.memberships,
-    }));
+    let memberListIds: Set<number> | null = null;
+    if (investorId) {
+      const record = await this.prisma.investorOutreachRecord.findUnique({
+        where: { investorId },
+        select: { id: true },
+      });
+      if (record) {
+        const memberships = await this.prisma.investorListMembership.findMany({
+          where: { investorOutreachRecordId: record.id },
+          select: { listId: true },
+        });
+        memberListIds = new Set(memberships.map((m) => m.listId));
+      } else {
+        memberListIds = new Set();
+      }
+    }
+
+    const items: InvestorListDto[] = lists.map((list) => {
+      const dto: InvestorListDto = {
+        id: list.id,
+        slug: list.slug,
+        name: list.name,
+        description: list.description,
+        isGraphed: list.isGraphed,
+        memberCount: list._count.memberships,
+      };
+      if (memberListIds !== null) {
+        dto.isMember = memberListIds.has(list.id);
+      }
+      return dto;
+    });
 
     return { items };
   }
@@ -144,10 +167,7 @@ export class InvestorListsQueryService {
    * (possibly empty → the member query yields nothing). Match semantics are shared
    * with the per-page connector lens via connectorMatchClause.
    */
-  private async resolveConnectorMatchIds(
-    targetSet: string,
-    query: ListMembersQueryDto
-  ): Promise<string[] | null> {
+  private async resolveConnectorMatchIds(targetSet: string, query: ListMembersQueryDto): Promise<string[] | null> {
     const labels = parseCsv(query.connectorLabels)
       .map((l) => l.toLowerCase())
       .slice(0, MAX_CONNECTOR_LABELS);

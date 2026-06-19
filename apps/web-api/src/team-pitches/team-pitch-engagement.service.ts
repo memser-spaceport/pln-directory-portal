@@ -92,7 +92,7 @@ export class TeamPitchEngagementService {
     const template = templateMap[interestType];
 
     const webBase = process.env.WEB_UI_BASE_URL || '';
-    const pitchLink = `${webBase}/pitch/${pitch.slug}`;
+    const pitchLink = `${webBase}/spotlight/${pitch.slug}`;
     const investorLink = `${webBase}/members/${member.uid}`;
     const investorTeamLink = investorTeam ? `${webBase}/teams/${investorTeam.uid}` : '';
     const founderTeamLink = `${webBase}/teams/${team.uid}`;

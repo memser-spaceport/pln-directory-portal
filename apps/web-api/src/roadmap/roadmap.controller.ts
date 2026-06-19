@@ -15,6 +15,7 @@ import {
   UpdatePinNoteSchema,
   UpdateRoadmapItemSchema,
   UpdateRoadmapSettingsSchema,
+  UpsertRoadmapDraftSchema,
 } from 'libs/contracts/src/schema/roadmap';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
@@ -22,6 +23,7 @@ import { MembersService } from '../members/members.service';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { ADMIN_PERMISSIONS, ROADMAP_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { RoadmapDraftsService } from './roadmap-drafts.service';
 import { RoadmapObjectivesService } from './roadmap-objectives.service';
 import { RoadmapPinsService } from './roadmap-pins.service';
 import { RoadmapService } from './roadmap.service';
@@ -41,6 +43,7 @@ export class RoadmapController {
     private readonly roadmapService: RoadmapService,
     private readonly roadmapPinsService: RoadmapPinsService,
     private readonly roadmapObjectivesService: RoadmapObjectivesService,
+    private readonly roadmapDraftsService: RoadmapDraftsService,
     private readonly membersService: MembersService
   ) {}
 
@@ -202,6 +205,29 @@ export class RoadmapController {
     const member = await this.resolveMember(req);
     const parsed = UpdateRoadmapSettingsSchema.parse(body);
     return this.roadmapPinsService.updateSettings(parsed, member.uid);
+  }
+
+  @Api(server.route.getMyRoadmapDraft)
+  @RequirePermissions(VIEW)
+  @NoCache()
+  async getMyRoadmapDraft(@Req() req: Request) {
+    const member = await this.resolveMember(req);
+    return this.roadmapDraftsService.getMyDraft(member.uid);
+  }
+
+  @Api(server.route.upsertMyRoadmapDraft)
+  @RequirePermissions(VIEW)
+  async upsertMyRoadmapDraft(@Body() body: unknown, @Req() req: Request) {
+    const member = await this.resolveMember(req);
+    const parsed = UpsertRoadmapDraftSchema.parse(body ?? {});
+    return this.roadmapDraftsService.upsertMyDraft(parsed, member.uid);
+  }
+
+  @Api(server.route.deleteMyRoadmapDraft)
+  @RequirePermissions(VIEW)
+  async deleteMyRoadmapDraft(@Req() req: Request) {
+    const member = await this.resolveMember(req);
+    return this.roadmapDraftsService.discardMyDraft(member.uid);
   }
 
   private async resolveMember(req: Request & { userEmail?: string }) {
