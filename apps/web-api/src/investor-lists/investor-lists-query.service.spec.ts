@@ -5,17 +5,33 @@ describe('InvestorListsQueryService', () => {
   let service: InvestorListsQueryService;
 
   const investorListFindMany = jest.fn();
+  const investorListFindUnique = jest.fn();
   const investorOutreachRecordFindUnique = jest.fn();
   const investorListMembershipFindMany = jest.fn();
+  const investorOutreachRecordCount = jest.fn();
+  const investorOutreachRecordFindMany = jest.fn();
+  const pathfinderPathFindMany = jest.fn();
+  const memberFindMany = jest.fn();
+  const investorPortfolioOverlapFindMany = jest.fn();
 
   const prismaMock = {
-    investorList: { findMany: investorListFindMany },
-    investorOutreachRecord: { findUnique: investorOutreachRecordFindUnique },
+    investorList: { findMany: investorListFindMany, findUnique: investorListFindUnique },
+    investorOutreachRecord: {
+      findUnique: investorOutreachRecordFindUnique,
+      count: investorOutreachRecordCount,
+      findMany: investorOutreachRecordFindMany,
+    },
     investorListMembership: { findMany: investorListMembershipFindMany },
+    pathfinderPath: { findMany: pathfinderPathFindMany },
+    member: { findMany: memberFindMany },
+    investorPortfolioOverlap: { findMany: investorPortfolioOverlapFindMany },
+    $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   } as unknown as PrismaService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    memberFindMany.mockResolvedValue([]);
+    investorPortfolioOverlapFindMany.mockResolvedValue([]);
     service = new InvestorListsQueryService(prismaMock);
   });
 
@@ -80,6 +96,62 @@ describe('InvestorListsQueryService', () => {
 
       expect(investorListMembershipFindMany).not.toHaveBeenCalled();
       expect(result.items.every((item) => item.isMember === false)).toBe(true);
+    });
+  });
+
+  describe('listMembers (graphed list sort — Task 07)', () => {
+    const graphedList = {
+      id: 1,
+      slug: 'neuro-lp',
+      isGraphed: true,
+      targetSet: 'neuro-fund-i',
+    };
+
+    const record = (investorId: string, lastName: string, bestProximityCode: string | null, hasPath: boolean) => ({
+      id: Number(investorId),
+      investorId,
+      canonicalId: investorId,
+      dedupeKey: `aff-${investorId}`,
+      firstName: 'Test',
+      lastName,
+      email: `${investorId}@lp.local`,
+      emailStatus: 'unverified',
+      firm: 'Firm',
+      title: null,
+      investorType: 'fund',
+      stageFocus: '',
+      checkSizeRange: null,
+      sectorTags: '',
+      geoFocus: null,
+      engagementTier: '',
+      source: 'PATHFINDER_NEURO',
+      bestProximityCode,
+      hasPath,
+      enrichmentStatus: 'pending',
+      rawPayload: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    beforeEach(() => {
+      investorListFindUnique.mockResolvedValue(graphedList);
+      investorOutreachRecordCount.mockResolvedValue(2);
+    });
+
+    it('sorts direct 1-hop members before warmer 2-hop members', async () => {
+      const direct = record('101', 'Alpha', 'F+1B', true);
+      const multiHop = record('102', 'Beta', 'VC+2A', true);
+      investorOutreachRecordFindMany.mockResolvedValue([multiHop, direct]);
+      pathfinderPathFindMany.mockResolvedValue([
+        { targetInvestorId: '101', proximityCode: 'F+1B', hops: 1, score: 0.25 },
+        { targetInvestorId: '102', proximityCode: 'VC+2A', hops: 2, score: 0.85 },
+      ]);
+
+      const result = await service.listMembers(1, {});
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].investorId).toBe('101');
+      expect(result.items[1].investorId).toBe('102');
     });
   });
 });

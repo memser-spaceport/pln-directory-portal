@@ -35,6 +35,7 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { firmKey, resolveFirmLookupKey } from './firm-key.util';
+import { affinityBoost, blendGraphScore, comparePathsByWarmth } from './affinity-warmth-boost.util';
 import { finalizePersonHopChain } from './path-route.util';
 
 const prisma = new PrismaClient();
@@ -327,12 +328,20 @@ async function seed() {
     targetInvestorId: string,
     firmId: string,
     person: { firstName: string; lastName: string; memberUid?: string }
-  ) => {
-    // Relationship-axis graft: this person's PL-team connector (keyed by their
-    // Affinity id). Person-grain — the firm-grain runner can't carry it.
+  ): string | null => {
     const rel = plConnectors.get(targetInvestorId);
+    const boost = affinityBoost((rel?.bestConnector as Parameters<typeof affinityBoost>[0]) ?? null);
     let attachedHere = false;
-    for (const p of pathsByFirm.get(firmId) ?? []) {
+
+    const firmPaths = pathsByFirm.get(firmId) ?? [];
+    const sorted = firmPaths.map((p) => ({ ...p, score: blendGraphScore(p.score, boost) })).sort(comparePathsByWarmth);
+
+    let rank1Code: string | null = null;
+    for (let i = 0; i < sorted.length; i++) {
+      const p = sorted[i];
+      const rank = i + 1;
+      if (rank === 1) rank1Code = p.proximityCode;
+
       let hopChain = JSON.parse(JSON.stringify(p.hopChain)) as Record<string, unknown>;
       if (rel?.bestConnector && rel.summary) {
         const hc = hopChain as { explanation?: string; plConnector?: unknown };
@@ -351,12 +360,13 @@ async function seed() {
         score: p.score,
         caliberConfidence: p.caliberConfidence,
         hopChain: hopChain as Prisma.InputJsonValue,
-        rank: p.rank,
+        rank,
         ingestRunId: RUN_ID,
       });
     }
     if (attachedHere) personsWithConnector += 1;
     pathTargetsQueued.add(targetInvestorId);
+    return rank1Code;
   };
 
   console.log(`Processing ${entries.length} Affinity entries…`);
@@ -387,11 +397,12 @@ async function seed() {
     }
     const firmLabel = best?.label ?? firms[0] ?? '';
     const hasPath = best?.hasPath ?? false;
-    const bestCode = best && hasPath ? best.code : null;
 
     const prest = prestige.get(norm(`${firstName} ${lastName}`)) ?? null;
     const enrichment = prest ? toEnrichment(prest) : undefined;
     if (enrichment) enriched += 1;
+
+    let bestProximityForRecord: string | null = hasPath && best ? best.code : null;
 
     // Match by dedupeKey (prod convention) — a person may already exist via the
     // Gold list (same Affinity id) or the wider investor DB (same email).
@@ -435,6 +446,16 @@ async function seed() {
       continue;
     }
 
+    if (best && hasPath) {
+      reachable += 1;
+      const rank1 = queuePaths(affinityId, best.firmId, {
+        firstName,
+        lastName,
+        memberUid: memberByEmail.get(dedupeKey),
+      });
+      if (rank1) bestProximityForRecord = rank1;
+    }
+
     // Same Affinity id (re-run / Gold-shared person) or brand new. On update,
     // leave source untouched so Gold-first shared people stay gold-sourced (and
     // each seed's cleanup only ever deletes its own rows).
@@ -450,7 +471,7 @@ async function seed() {
       stageFocus: '',
       engagementTier: '',
       enrichmentStatus: enrichment ? 'enriched' : 'pending',
-      bestProximityCode: bestCode,
+      bestProximityCode: bestProximityForRecord,
       hasPath,
       rawPayload: enrichment ? ({ enrichment } as Prisma.InputJsonValue) : undefined,
     };
@@ -465,16 +486,6 @@ async function seed() {
       byInvestorId.set(affinityId, pending);
     }
     memberIds.push(affinityId);
-
-    // Copy the best firm's paths onto this person (target = affinity id).
-    if (best && hasPath) {
-      reachable += 1;
-      queuePaths(affinityId, best.firmId, {
-        firstName,
-        lastName,
-        memberUid: memberByEmail.get(dedupeKey),
-      });
-    }
   }
 
   // ── Pass 2: surface this run's warm paths on duplicate-matched existing
@@ -495,19 +506,20 @@ async function seed() {
   for (const d of dupPathCandidates) {
     if (pathTargetsQueued.has(d.investorId) || alreadyHasPaths.has(d.investorId)) continue;
     reachable += 1;
-    queuePaths(d.investorId, d.firmId, {
-      firstName: d.firstName,
-      lastName: d.lastName,
-      memberUid: d.memberUid,
-    });
+    const rank1 =
+      queuePaths(d.investorId, d.firmId, {
+        firstName: d.firstName,
+        lastName: d.lastName,
+        memberUid: d.memberUid,
+      }) ?? d.bestCode;
     const pendingCreate = createByInvestorId.get(d.investorId);
     if (pendingCreate) {
-      pendingCreate.bestProximityCode = d.bestCode;
+      pendingCreate.bestProximityCode = rank1;
       pendingCreate.hasPath = true;
     } else {
       const ref = byInvestorId.get(d.investorId);
       if (ref && ref.id !== PENDING_ID) {
-        updates.push({ id: ref.id, data: { bestProximityCode: d.bestCode, hasPath: true } });
+        updates.push({ id: ref.id, data: { bestProximityCode: rank1, hasPath: true } });
       }
     }
   }
