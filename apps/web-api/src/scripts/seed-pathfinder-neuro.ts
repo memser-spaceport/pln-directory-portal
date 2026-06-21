@@ -34,6 +34,7 @@
 import { readFileSync } from 'fs';
 import path from 'path';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { firmKey, resolveFirmLookupKey } from './firm-key.util';
 
 const prisma = new PrismaClient();
 
@@ -118,6 +119,18 @@ const norm = (s: string | null | undefined): string =>
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+function lookupFirmProximity(
+  firmName: string,
+  firmByLabel: Map<string, FirmProximity>,
+): FirmProximity | undefined {
+  const keys = [resolveFirmLookupKey(firmName), firmKey(firmName), norm(firmName)].filter(Boolean);
+  for (const key of keys) {
+    const hit = firmByLabel.get(key);
+    if (hit) return hit;
+  }
+  return undefined;
+}
 
 /**
  * Prod dedupe_key form: normalized email (lowercased, trimmed, plus-tag stripped)
@@ -233,15 +246,16 @@ async function seed() {
   // Index firm proximity by normalized firm label, and firm paths by firm id.
   const firmByLabel = new Map<string, FirmProximity>();
   for (const s of dump.summaries) {
-    const key = norm(s.firm_label);
-    if (key) {
-      firmByLabel.set(key, {
-        firmId: s.investor_id,
-        label: s.firm_label,
-        code: s.best_proximity_code,
-        hasPath: s.has_path,
-      });
-    }
+    const fp: FirmProximity = {
+      firmId: s.investor_id,
+      label: s.firm_label,
+      code: s.best_proximity_code,
+      hasPath: s.has_path,
+    };
+    const normKey = norm(s.firm_label);
+    const fk = firmKey(s.firm_label);
+    if (normKey) firmByLabel.set(normKey, fp);
+    if (fk) firmByLabel.set(fk, fp);
   }
   const pathsByFirm = new Map<string, DumpPath[]>();
   for (const p of dump.paths) {
@@ -340,7 +354,7 @@ async function seed() {
     // Best (warmest) firm across this person's companies.
     let best: FirmProximity | null = null;
     for (const fn of firms) {
-      const fp = firmByLabel.get(norm(fn));
+      const fp = lookupFirmProximity(fn, firmByLabel);
       if (!fp) continue;
       if (!best || proximityRank(fp.code, fp.hasPath) < proximityRank(best.code, best.hasPath)) {
         best = fp;
