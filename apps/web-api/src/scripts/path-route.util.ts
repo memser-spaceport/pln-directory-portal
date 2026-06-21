@@ -3,6 +3,8 @@
  * path-route.util.ts — keep in sync for investor terminus + legacy fallback).
  */
 
+import { enrichFounderContacts, type FounderResolveIndexes } from './founder-member-resolve.util';
+
 export type RouteNodeVariant = 'member' | 'external' | 'org';
 
 export interface RouteNode {
@@ -22,7 +24,12 @@ interface LegacyHopChainNode {
 interface LegacyHopChain {
   nodes?: LegacyHopChainNode[];
   routeNodes?: RouteNode[];
-  contact?: { name: string; role: string };
+  contact?: {
+    name: string;
+    role: string;
+    memberUid?: string;
+    teams?: Array<{ name: string; teamUid?: string; logo?: string }>;
+  };
   orgConnector?: { name: string; description: string; tags: string[] };
   connectorTeam?: { name: string; leads: Array<{ name: string; role: string }> };
   edges?: Array<{ evidence?: string | null; connectorType?: string }>;
@@ -95,8 +102,18 @@ function enrichLegacyPresentation(hc: LegacyHopChain): LegacyHopChain {
 }
 
 function connectorRouteNodes(hc: LegacyHopChain): RouteNode[] {
+  if (hc.contact) {
+    return [
+      {
+        label: hc.contact.name,
+        memberUid: hc.contact.memberUid,
+        teamUid: hc.contact.teams?.[0]?.teamUid,
+        logo: hc.contact.teams?.[0]?.logo,
+        variant: hc.contact.memberUid ? 'member' : 'external',
+      },
+    ];
+  }
   if (hc.routeNodes && hc.routeNodes.length > 0) return hc.routeNodes;
-  if (hc.contact) return [{ label: hc.contact.name, variant: 'external' }];
   if (hc.orgConnector) return [{ label: hc.orgConnector.name, variant: 'org' }];
   return deriveConnectorRouteNodesFromLegacy(hc);
 }
@@ -104,9 +121,13 @@ function connectorRouteNodes(hc: LegacyHopChain): RouteNode[] {
 /** Append investor to routeNodes; clone-safe (returns new object). */
 export function finalizePersonHopChain(
   hopChain: Record<string, unknown>,
-  person: { firstName: string; lastName: string; memberUid?: string }
+  person: { firstName: string; lastName: string; memberUid?: string },
+  founderIndexes?: FounderResolveIndexes
 ): Record<string, unknown> {
-  const enriched = enrichLegacyPresentation(hopChain as LegacyHopChain);
+  let enriched = enrichLegacyPresentation(hopChain as LegacyHopChain);
+  if (founderIndexes) {
+    enriched = enrichFounderContacts(enriched, founderIndexes);
+  }
   const connectorNodes = connectorRouteNodes(enriched);
   const investorNode = buildInvestorRouteNode(person);
   return {

@@ -37,6 +37,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { firmKey, resolveFirmLookupKey } from './firm-key.util';
 import { affinityBoost, blendGraphScore, comparePathsByWarmth } from './affinity-warmth-boost.util';
 import { finalizePersonHopChain } from './path-route.util';
+import { loadMemberNameIndex, loadPortfolioFounderIndex } from './founder-member-resolve.util';
 
 const prisma = new PrismaClient();
 
@@ -287,6 +288,12 @@ async function seed() {
     }
   }
 
+  console.log('Loading founder → LabOS member indexes…');
+  const portfolioTeams = await loadPortfolioFounderIndex(prisma);
+  const membersByName = await loadMemberNameIndex(prisma);
+  const founderIndexes = { portfolioTeams, membersByName };
+  console.log(`  portfolio teams: ${portfolioTeams.size} keys, unique member names: ${membersByName.size}`);
+
   // ── Pass 1 (pure memory): classify every entry against a one-shot snapshot
   // of existing records. All writes happen in bulk afterwards — the previous
   // row-by-row awaits cost 3-5 round-trips per person and took minutes over a
@@ -349,7 +356,7 @@ async function seed() {
         hc.plConnector = rel.bestConnector;
         attachedHere = true;
       }
-      hopChain = finalizePersonHopChain(hopChain, person);
+      hopChain = finalizePersonHopChain(hopChain, person, founderIndexes);
       pathInserts.push({
         targetInvestorId,
         targetSet: TARGET_SET,
