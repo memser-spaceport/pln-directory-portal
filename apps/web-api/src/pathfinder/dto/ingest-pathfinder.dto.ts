@@ -22,10 +22,51 @@ export interface PathfinderHopChainEdge {
   evidence: string | null;
 }
 
+/** People-first route presentation (task 06). Stored camelCase in DB JSON. */
+export interface PathRouteNode {
+  label: string;
+  memberUid?: string;
+  teamUid?: string;
+  logo?: string;
+  variant: 'member' | 'external' | 'org';
+}
+
+export interface PathContactPerson {
+  name: string;
+  role: string;
+  email?: string;
+  linkedin?: string;
+  telegram?: string;
+  memberUid?: string;
+  teams?: Array<{ name: string; teamUid?: string; logo?: string }>;
+}
+
+export interface PathOrgConnector {
+  name: string;
+  teamUid?: string;
+  logo?: string;
+  description: string;
+  tags: string[];
+  email?: string;
+  website?: string;
+}
+
+export interface PathConnectorTeam {
+  name: string;
+  teamUid?: string;
+  leads: PathContactPerson[];
+}
+
 export interface PathfinderHopChain {
   nodes: PathfinderHopChainNode[];
   edges: PathfinderHopChainEdge[];
   explanation: string;
+  /** People-first presentation (task 06) — optional extensions on hop_chain JSON. */
+  route_nodes?: PathRouteNode[];
+  contact?: PathContactPerson;
+  org_connector?: PathOrgConnector;
+  connector_team?: PathConnectorTeam;
+  pl_connector?: Record<string, unknown>;
 }
 
 export interface PathfinderPathInput {

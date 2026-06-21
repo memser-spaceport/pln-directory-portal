@@ -35,6 +35,7 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { firmKey, resolveFirmLookupKey } from './firm-key.util';
+import { finalizePersonHopChain } from './path-route.util';
 
 const prisma = new PrismaClient();
 
@@ -120,10 +121,7 @@ const norm = (s: string | null | undefined): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
-function lookupFirmProximity(
-  firmName: string,
-  firmByLabel: Map<string, FirmProximity>,
-): FirmProximity | undefined {
+function lookupFirmProximity(firmName: string, firmByLabel: Map<string, FirmProximity>): FirmProximity | undefined {
   const keys = [resolveFirmLookupKey(firmName), firmKey(firmName), norm(firmName)].filter(Boolean);
   for (const key of keys) {
     const hit = firmByLabel.get(key);
@@ -266,6 +264,28 @@ async function seed() {
 
   const entries = (JSON.parse(readFileSync(AFFINITY_PATH, 'utf-8')) as { entries?: AffinityEntry[] }).entries ?? [];
 
+  // LabOS member uid by normalized email (investor routeNodes terminus).
+  const entryEmails = entries
+    .map((e) => {
+      const ent = e.entity;
+      const raw =
+        (ent.primaryEmailAddress ?? '').trim() ||
+        (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') ||
+        '';
+      return normalizeEmailKey(raw);
+    })
+    .filter((em) => em.length > 0);
+  const memberByEmail = new Map<string, string>();
+  if (entryEmails.length > 0) {
+    const members = await prisma.member.findMany({
+      where: { email: { in: [...new Set(entryEmails)] } },
+      select: { email: true, uid: true },
+    });
+    for (const m of members) {
+      if (m.email) memberByEmail.set(normalizeEmailKey(m.email), m.uid);
+    }
+  }
+
   // ── Pass 1 (pure memory): classify every entry against a one-shot snapshot
   // of existing records. All writes happen in bulk afterwards — the previous
   // row-by-row awaits cost 3-5 round-trips per person and took minutes over a
@@ -294,28 +314,33 @@ async function seed() {
   /** investorIds whose paths are already queued this run (avoid double-attach). */
   const pathTargetsQueued = new Set<string>();
   /** Duplicate matches that may need this run's paths attached to the existing record. */
-  const dupPathCandidates: { investorId: string; firmId: string; bestCode: string }[] = [];
+  const dupPathCandidates: {
+    investorId: string;
+    firmId: string;
+    bestCode: string;
+    firstName: string;
+    lastName: string;
+    memberUid?: string;
+  }[] = [];
 
-  const queuePaths = (targetInvestorId: string, firmId: string) => {
+  const queuePaths = (
+    targetInvestorId: string,
+    firmId: string,
+    person: { firstName: string; lastName: string; memberUid?: string }
+  ) => {
     // Relationship-axis graft: this person's PL-team connector (keyed by their
     // Affinity id). Person-grain — the firm-grain runner can't carry it.
     const rel = plConnectors.get(targetInvestorId);
     let attachedHere = false;
     for (const p of pathsByFirm.get(firmId) ?? []) {
-      let hopChain = p.hopChain;
+      let hopChain = JSON.parse(JSON.stringify(p.hopChain)) as Record<string, unknown>;
       if (rel?.bestConnector && rel.summary) {
-        // Clone first — the same firm hop-chain object is shared across everyone
-        // at the firm, so in-place mutation would leak to other people. JSON
-        // round-trip: the hop chain is plain JSON and small.
-        const hc = JSON.parse(JSON.stringify(p.hopChain)) as {
-          explanation?: string;
-          plConnector?: unknown;
-        };
+        const hc = hopChain as { explanation?: string; plConnector?: unknown };
         hc.explanation = hc.explanation ? `${hc.explanation} ${rel.summary}.` : `${rel.summary}.`;
         hc.plConnector = rel.bestConnector;
-        hopChain = hc;
         attachedHere = true;
       }
+      hopChain = finalizePersonHopChain(hopChain, person);
       pathInserts.push({
         targetInvestorId,
         targetSet: TARGET_SET,
@@ -397,7 +422,14 @@ async function seed() {
         ingestRunId: RUN_ID,
       });
       if (best && hasPath) {
-        dupPathCandidates.push({ investorId: existing.investorId, firmId: best.firmId, bestCode: best.code });
+        dupPathCandidates.push({
+          investorId: existing.investorId,
+          firmId: best.firmId,
+          bestCode: best.code,
+          firstName,
+          lastName,
+          memberUid: memberByEmail.get(dedupeKey),
+        });
       }
       memberIds.push(existing.investorId);
       continue;
@@ -437,7 +469,11 @@ async function seed() {
     // Copy the best firm's paths onto this person (target = affinity id).
     if (best && hasPath) {
       reachable += 1;
-      queuePaths(affinityId, best.firmId);
+      queuePaths(affinityId, best.firmId, {
+        firstName,
+        lastName,
+        memberUid: memberByEmail.get(dedupeKey),
+      });
     }
   }
 
@@ -459,7 +495,11 @@ async function seed() {
   for (const d of dupPathCandidates) {
     if (pathTargetsQueued.has(d.investorId) || alreadyHasPaths.has(d.investorId)) continue;
     reachable += 1;
-    queuePaths(d.investorId, d.firmId);
+    queuePaths(d.investorId, d.firmId, {
+      firstName: d.firstName,
+      lastName: d.lastName,
+      memberUid: d.memberUid,
+    });
     const pendingCreate = createByInvestorId.get(d.investorId);
     if (pendingCreate) {
       pendingCreate.bestProximityCode = d.bestCode;
