@@ -6,6 +6,7 @@ import { MemberByEmail, OverlapsByInvestorId, toInvestorDto } from '../investor-
 import { INVESTOR_OUTREACH_SECTOR_TAGS, isAllowedStageFocus } from '../investor-outreach/investor-outreach.vocab';
 import { buildInvestorTextSearch } from '../investor-outreach/investor-text-search.util';
 import { connectorMatchClause } from '../pathfinder/connector-match.util';
+import { compareWarmIntroMembers } from './warm-intro-list-sort.util';
 import { InvestorListDto, InvestorListsResponseDto } from './dto/investor-list.dto';
 import { ListMembersQueryDto } from './dto/list-members.query.dto';
 
@@ -115,11 +116,24 @@ export class InvestorListsQueryService {
         list.targetSet,
         allRecords.map((r) => r.investorId)
       );
-      const sorted = (await this.attachJoins(allRecords, proximityByInvestorId)).sort((a, b) => {
-        const rankDiff = proximityRank(a.bestProximityCode, a.hasPath) - proximityRank(b.bestProximityCode, b.hasPath);
-        if (rankDiff !== 0) return rankDiff;
-        return (a.lastName ?? '').localeCompare(b.lastName ?? '');
-      });
+      const sorted = (await this.attachJoins(allRecords, proximityByInvestorId)).sort((a, b) =>
+        compareWarmIntroMembers(
+          {
+            hasPath: a.hasPath ?? false,
+            hops: proximityByInvestorId.get(a.investorId)?.hops ?? null,
+            score: proximityByInvestorId.get(a.investorId)?.score ?? null,
+            bestProximityCode: a.bestProximityCode ?? null,
+            lastName: a.lastName ?? null,
+          },
+          {
+            hasPath: b.hasPath ?? false,
+            hops: proximityByInvestorId.get(b.investorId)?.hops ?? null,
+            score: proximityByInvestorId.get(b.investorId)?.score ?? null,
+            bestProximityCode: b.bestProximityCode ?? null,
+            lastName: b.lastName ?? null,
+          }
+        )
+      );
       const items = sorted.slice((page - 1) * limit, page * limit);
       return { page, limit, total, items };
     }
@@ -142,20 +156,25 @@ export class InvestorListsQueryService {
   private async loadListProximity(
     targetSet: string,
     investorIds: string[]
-  ): Promise<Map<string, { code: string | null; hasPath: boolean }>> {
-    const map = new Map<string, { code: string | null; hasPath: boolean }>();
+  ): Promise<Map<string, { code: string | null; hasPath: boolean; hops: number | null; score: number | null }>> {
+    const map = new Map<string, { code: string | null; hasPath: boolean; hops: number | null; score: number | null }>();
     if (!investorIds.length) return map;
 
     for (const id of investorIds) {
-      map.set(id, { code: null, hasPath: false });
+      map.set(id, { code: null, hasPath: false, hops: null, score: null });
     }
 
     const paths = await this.prisma.pathfinderPath.findMany({
       where: { targetSet, targetInvestorId: { in: investorIds }, rank: 1 },
-      select: { targetInvestorId: true, proximityCode: true },
+      select: { targetInvestorId: true, proximityCode: true, hops: true, score: true },
     });
     for (const p of paths) {
-      map.set(p.targetInvestorId, { code: p.proximityCode, hasPath: true });
+      map.set(p.targetInvestorId, {
+        code: p.proximityCode,
+        hasPath: true,
+        hops: p.hops,
+        score: p.score,
+      });
     }
     return map;
   }
@@ -247,7 +266,10 @@ export class InvestorListsQueryService {
 
   private async attachJoins(
     records: Prisma.InvestorOutreachRecordGetPayload<Record<string, never>>[],
-    proximityByInvestorId?: Map<string, { code: string | null; hasPath: boolean }>
+    proximityByInvestorId?: Map<
+      string,
+      { code: string | null; hasPath: boolean; hops: number | null; score: number | null }
+    >
   ): Promise<InvestorDto[]> {
     if (records.length === 0) return [];
 
@@ -298,15 +320,6 @@ export class InvestorListsQueryService {
       return { ...dto, bestProximityCode: prox.code, hasPath: prox.hasPath };
     });
   }
-}
-
-/** Warmer = smaller. Cold (no path) sinks last. Matches FE + seed scripts. */
-function proximityRank(code: string | null, hasPath: boolean): number {
-  if (!hasPath || !code) return 999;
-  const m = /\+(\d)([AB])/.exec(code);
-  if (!m) return 999;
-  const caliber = m[2] === 'A' ? 0 : 1;
-  return caliber * 100 + parseInt(m[1], 10);
 }
 
 function clampPage(raw: string | undefined): number {
