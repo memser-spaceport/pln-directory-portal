@@ -1,3 +1,5 @@
+import { PathHopNodeDto } from '../../pathfinder/dto/ingest-pathfinder.dto';
+
 export interface LabOsProfileDto {
   type: 'member';
   uid: string;
@@ -75,6 +77,13 @@ export interface InvestorDto {
    *  null/false until a pathfinder run has covered this investor. */
   bestProximityCode: string | null;
   hasPath: boolean;
+
+  /** Rank-1 path warmth (0–1) for inline table display. */
+  bestRouteScore?: number | null;
+  /** Total computed paths in this list's targetSet (for "View all (N)"). */
+  pathCount?: number | null;
+  /** Rank-1 people-first route chips for the warm-intros table. */
+  bestRouteNodes?: PathHopNodeDto[];
 
   /** Aggregated background + sources; null until enriched. */
   enrichment: InvestorEnrichmentDto | null;
