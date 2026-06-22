@@ -1,12 +1,50 @@
 import { INestApplication, Logger } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
-import { patchNestjsSwagger } from '@abitia/zod-dto';
-import { patchNestJsSwagger } from 'nestjs-zod';
+import { SchemaObjectFactory } from '@nestjs/swagger/dist/services/schema-object-factory';
+import { zodTypeToOpenApi } from '@abitia/zod-dto/dist/OpenApi/zodTypeToOpenApi';
+import { zodToOpenAPI } from 'nestjs-zod';
 import { DocAudience, SECURITY_SCHEMES, SWAGGER_DOCS, DEFAULT_AUDIENCE } from './swagger.constants';
 import { buildRouteMetaMap, RouteMeta } from './route-audience.util';
 import { buildOperationFromAppRoute } from './tsrest-schema.util';
 
 const logger = new Logger('Swagger');
+
+let zodDtoPatchApplied = false;
+
+/**
+ * Render both @abitia/zod-dto and nestjs-zod DTO classes in the OpenAPI schema.
+ *
+ * Both libraries ship a `patchNestjsSwagger()` helper that monkey-patches
+ * `SchemaObjectFactory.prototype.exploreModelSchema`, but neither preserves
+ * `this` when it falls through to the previously installed patch. Stacking them
+ * therefore throws `Cannot read properties of undefined (reading 'isLazyTypeFunc')`
+ * the moment the second patch delegates to the first. We install a single wrapper
+ * that recognises both DTO styles and calls the original with the correct `this`.
+ */
+function patchSwaggerForZodDtos(): void {
+  if (zodDtoPatchApplied) return;
+  zodDtoPatchApplied = true;
+
+  const proto = SchemaObjectFactory.prototype as any;
+  const original = proto.exploreModelSchema;
+
+  proto.exploreModelSchema = function (type: any, schemas: any, schemaRefsStack: any) {
+    if (this.isLazyTypeFunc(type)) {
+      type = type();
+    }
+    // @abitia/zod-dto DTOs expose `zodSchema`.
+    if (type?.zodSchema) {
+      schemas[type.name] = zodTypeToOpenApi(type.zodSchema);
+      return type.name;
+    }
+    // nestjs-zod DTOs expose `isZodDto` + `schema`.
+    if (type?.isZodDto && type?.schema) {
+      schemas[type.name] = zodToOpenAPI(type.schema);
+      return type.name;
+    }
+    return original.call(this, type, schemas, schemaRefsStack);
+  };
+}
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'] as const;
 
@@ -148,10 +186,30 @@ function splitByAudience(
  * from the ts-rest contracts — no per-controller annotation required.
  */
 export function setupSwagger(app: INestApplication): void {
-  // Render zod DTO classes (admin/back-office controllers) — the two patches compose,
-  // each falling through to the other for unrecognised types.
-  patchNestjsSwagger();
-  patchNestJsSwagger();
+  // Render both @abitia/zod-dto and nestjs-zod DTO classes (one composed patch).
+  patchSwaggerForZodDtos();
+
+  // The global Helmet CSP sets `default-src 'none'` with no `connect-src`, which
+  // blocks Swagger UI's "Try it out" fetch (it falls back to default-src). curl
+  // works because it ignores CSP. Relax the CSP only on the doc routes so the UI
+  // can call the API on its own origin; the strict CSP still applies everywhere else.
+  const docPaths = SWAGGER_DOCS.map((cfg) => `/${cfg.path}`);
+  app.use((req: any, res: any, next: () => void) => {
+    if (docPaths.some((p) => req.path === p || req.path.startsWith(`${p}/`) || req.path.startsWith(`${p}-`))) {
+      res.setHeader(
+        'Content-Security-Policy',
+        [
+          "default-src 'self'",
+          "connect-src 'self'",
+          "img-src 'self' data: https:",
+          "script-src 'self' 'unsafe-inline'",
+          "style-src 'self' https: 'unsafe-inline'",
+          "font-src 'self' https: data:",
+        ].join('; ')
+      );
+    }
+    next();
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Protocol Labs Directory API')
