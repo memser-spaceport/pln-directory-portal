@@ -20,6 +20,10 @@ export const TeamWithEnrichmentSchema = z.object({
   uid: z.string(),
   name: z.string(),
   priority: z.number().nullable(),
+  /** True when the team has the "PL Portfolio" community affiliation. */
+  isPresentInPlPortfolio: z.boolean(),
+  /** True when the team has the "Discontinued" industry tag. */
+  isDiscontinued: z.boolean(),
   website: z.string().nullable(),
   linkedinHandler: z.string().nullable(),
   focusAreas: z.array(z.string()),
