@@ -7,7 +7,7 @@ import type {
   Team,
   TeamMemberRole,
 } from '@prisma/client';
-import { InvestorDto, InvestorEnrichmentDto, LabOsProfileDto } from './dto/investor.dto';
+import { AffinityDataDto, InvestorDto, InvestorEnrichmentDto, LabOsProfileDto } from './dto/investor.dto';
 import {
   PlPortfolioTeamCoInvestorDto,
   PlPortfolioTeamDto,
@@ -69,6 +69,54 @@ const buildEnrichment = (raw: unknown): InvestorEnrichmentDto | null => {
   // Nothing useful → treat as no enrichment.
   const hasContent =
     result.bio || result.fundFocus || result.aum || result.thesis || result.notableInvestments.length > 0;
+  return hasContent ? result : null;
+};
+
+const mapPersonRef = (o: unknown): AffinityDataDto['sourceOfIntroduction'] => {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  const p = o as Record<string, unknown>;
+  const name = typeof p.name === 'string' && p.name.trim() ? p.name.trim() : null;
+  if (!name) return null;
+  const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v : null);
+  const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  return {
+    name,
+    email: str(p.email),
+    affinityPersonId: num(p.affinityPersonId),
+    memberUid: str(p.memberUid),
+  };
+};
+
+const mapInteractionRef = (o: unknown): AffinityDataDto['lastContact'] => {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  const p = o as Record<string, unknown>;
+  const date = typeof p.date === 'string' && p.date.trim() ? p.date.trim() : null;
+  if (!date) return null;
+  const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v : null);
+  return {
+    date,
+    method: str(p.method),
+    subject: str(p.subject),
+    from: mapPersonRef(p.from),
+  };
+};
+
+/** Extract Affinity CRM block from rawPayload.affinityData. */
+export const buildAffinityData = (raw: unknown): AffinityDataDto | null => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const a = (raw as Record<string, unknown>).affinityData;
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return null;
+  const o = a as Record<string, unknown>;
+  const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v : null);
+  const result: AffinityDataDto = {
+    lastContact: mapInteractionRef(o.lastContact),
+    lastEmail: mapInteractionRef(o.lastEmail),
+    sourceOfIntroduction: mapPersonRef(o.sourceOfIntroduction),
+    keyContact: mapPersonRef(o.keyContact),
+    lpStage: str(o.lpStage),
+  };
+  const hasContent =
+    result.lastContact || result.lastEmail || result.sourceOfIntroduction || result.keyContact || result.lpStage;
   return hasContent ? result : null;
 };
 
@@ -143,6 +191,7 @@ export function toInvestorDto(
     hasPath: record.hasPath ?? false,
 
     enrichment: buildEnrichment(record.rawPayload),
+    affinityData: buildAffinityData(record.rawPayload),
 
     createdAt: dateToIso(record.createdAt) ?? '',
     updatedAt: dateToIso(record.updatedAt) ?? '',

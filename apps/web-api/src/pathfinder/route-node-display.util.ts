@@ -53,8 +53,11 @@ export function routeNodeToHopNodeDto(node: PathRouteNode, index: number): PathH
   const primary = node.contacts?.[0];
   const label = primary?.name ?? node.label;
   const memberUid = primary?.memberUid ?? node.memberUid;
-  const imageUrl = primary?.imageUrl;
-  const email = primary?.email;
+  const imageUrl = primary?.imageUrl ?? node.imageUrl;
+  const email = primary?.email ?? node.email;
+  const role = primary?.role ?? node.role;
+  const linkedin = primary?.linkedin ?? node.linkedin;
+  const telegram = primary?.telegram ?? node.telegram;
 
   if (primary || node.variant === 'member' || node.variant === 'external') {
     const dto: PathHopNodeDto = {
@@ -67,10 +70,21 @@ export function routeNodeToHopNodeDto(node: PathRouteNode, index: number): PathH
     if (memberUid) dto.memberUid = memberUid;
     if (imageUrl) dto.imageUrl = imageUrl;
     if (email) dto.email = email;
+    if (role) dto.role = role;
+    if (linkedin) dto.linkedin = linkedin;
+    if (telegram) dto.telegram = telegram;
+    if (node.teamUid) dto.teamUid = node.teamUid;
     return dto;
   }
   if (node.teamUid) {
-    return { id, label: node.label, type: 'org', teamUid: node.teamUid, orgName: node.orgName, contacts: node.contacts };
+    return {
+      id,
+      label: node.label,
+      type: 'org',
+      teamUid: node.teamUid,
+      orgName: node.orgName,
+      contacts: node.contacts,
+    };
   }
   return { id, label: node.label, type: 'org', orgName: node.orgName, contacts: node.contacts };
 }

@@ -154,6 +154,7 @@ describe('path-route.util (seed)', () => {
         2,
         {
           byEmail: new Map([['jonathan.king@coinbase.com', { uid: 'uid-jk', imageUrl: 'https://img/jk.webp' }]]),
+          byUid: new Map([['uid-jk', { uid: 'uid-jk', imageUrl: 'https://img/jk.webp' }]]),
           membersByName: new Map(),
         }
       );
