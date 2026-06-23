@@ -206,6 +206,7 @@ export class AppModule {
       .exclude(
         { path: 'v1/images', method: RequestMethod.POST },
         { path: 'v1/uploads', method: RequestMethod.POST },
+        { path: 'v1/ai-apps/deploy', method: RequestMethod.POST },
         { path: 'v1/demo-days/current/fundraising-profile/one-pager', method: RequestMethod.PUT },
         { path: 'v1/demo-days/current/fundraising-profile/video', method: RequestMethod.PUT },
         { path: 'v1/admin/demo-days/current/teams/:teamUid/fundraising-profile/one-pager', method: RequestMethod.PUT },
