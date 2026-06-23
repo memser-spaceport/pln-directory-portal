@@ -41,9 +41,15 @@ import {
   type PlConnectorInput,
 } from './affinity-direct-path.util';
 import { finalizePersonHopChain } from './path-route.util';
-import { loadMemberNameIndex, loadPortfolioFounderIndex } from './founder-member-resolve.util';
+import { loadMemberNameIndex, loadPortfolioFounderIndex, normalizePersonName } from './founder-member-resolve.util';
 import { loadMemberContactIndex } from './org-contact-resolve.util';
 import { resolvePathfinderScratchDir } from './pathfinder-scratch.util';
+import {
+  buildRawPayload,
+  mapAffinityListEntry,
+  mergeProfileFields,
+  type MemberResolver,
+} from './affinity-roster-mapper.util';
 
 const prisma = new PrismaClient();
 
@@ -311,6 +317,28 @@ async function seed() {
   });
   const byDedupeKey = new Map<string, ExistingRef>(existingRows.map((r) => [r.dedupeKey, r]));
   const byInvestorId = new Map<string, ExistingRef>(existingRows.map((r) => [r.investorId, r]));
+
+  const existingProfileRows = await prisma.investorOutreachRecord.findMany({
+    select: {
+      id: true,
+      investorId: true,
+      linkedinUrl: true,
+      title: true,
+      geoFocus: true,
+      investorType: true,
+      sectorTags: true,
+      stageFocus: true,
+      checkSizeRange: true,
+      firmDomain: true,
+      rawPayload: true,
+    },
+  });
+  const profileByInvestorId = new Map(existingProfileRows.map((r) => [r.investorId, r]));
+
+  const memberResolver: MemberResolver = {
+    byEmail: (email) => memberByEmail.get(email) ?? memberContactIndex.byEmail.get(email)?.uid,
+    byName: (name) => membersByName.get(normalizePersonName(name)),
+  };
   const PENDING_ID = -1; // marks rows queued for creation in this run
 
   let duplicates = 0;
@@ -445,6 +473,8 @@ async function seed() {
     const enrichment = prest ? toEnrichment(prest) : undefined;
     if (enrichment) enriched += 1;
 
+    const { profile: affinityProfile, affinityData } = mapAffinityListEntry(ent, { memberResolver });
+
     let bestProximityForRecord: string | null = personHasPath && best ? best.code : null;
 
     // Match by dedupeKey (prod convention) — a person may already exist via the
@@ -485,6 +515,18 @@ async function seed() {
           memberUid: memberByEmail.get(dedupeKey),
         });
       }
+      const canonicalProfile = profileByInvestorId.get(existing.investorId);
+      if (canonicalProfile) {
+        const mergedProfile = mergeProfileFields(canonicalProfile, affinityProfile);
+        const rawPayload = buildRawPayload(undefined, affinityData, canonicalProfile.rawPayload);
+        updates.push({
+          id: canonicalProfile.id,
+          data: {
+            ...mergedProfile,
+            ...(rawPayload ? { rawPayload: rawPayload as Prisma.InputJsonValue } : {}),
+          },
+        });
+      }
       memberIds.push(existing.investorId);
       continue;
     }
@@ -503,6 +545,9 @@ async function seed() {
     // Same Affinity id (re-run / Gold-shared person) or brand new. On update,
     // leave source untouched so Gold-first shared people stay gold-sourced (and
     // each seed's cleanup only ever deletes its own rows).
+    const priorProfile = profileByInvestorId.get(affinityId);
+    const mergedProfile = mergeProfileFields(priorProfile ?? {}, affinityProfile);
+    const rawPayload = buildRawPayload(enrichment, affinityData, priorProfile?.rawPayload);
     const recordFields = {
       investorId: affinityId,
       canonicalId: affinityId,
@@ -511,13 +556,12 @@ async function seed() {
       email,
       emailStatus: 'unverified',
       firm: firmLabel,
-      investorType: 'fund',
-      stageFocus: '',
+      ...mergedProfile,
       engagementTier: '',
       enrichmentStatus: enrichment ? 'enriched' : 'pending',
       bestProximityCode: bestProximityForRecord,
       hasPath: personHasPath,
-      rawPayload: enrichment ? ({ enrichment } as Prisma.InputJsonValue) : undefined,
+      ...(rawPayload ? { rawPayload: rawPayload as Prisma.InputJsonValue } : {}),
     };
     if (existing) {
       updates.push({ id: existing.id, data: recordFields });

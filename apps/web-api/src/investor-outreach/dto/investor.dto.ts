@@ -26,6 +26,29 @@ export interface InvestorEnrichmentDto {
   fetchedAt: string | null;
 }
 
+export interface AffinityPersonRefDto {
+  name: string;
+  email?: string | null;
+  affinityPersonId?: number | null;
+  memberUid?: string | null;
+}
+
+export interface AffinityInteractionRefDto {
+  date: string;
+  method?: string | null;
+  subject?: string | null;
+  from?: AffinityPersonRefDto | null;
+}
+
+/** CRM fields from Affinity roster export (rawPayload.affinityData). */
+export interface AffinityDataDto {
+  lastContact?: AffinityInteractionRefDto | null;
+  lastEmail?: AffinityInteractionRefDto | null;
+  sourceOfIntroduction?: AffinityPersonRefDto | null;
+  keyContact?: AffinityPersonRefDto | null;
+  lpStage?: string | null;
+}
+
 export interface InvestorDto {
   investorId: string;
   canonicalId: string | null;
@@ -87,6 +110,9 @@ export interface InvestorDto {
 
   /** Aggregated background + sources; null until enriched. */
   enrichment: InvestorEnrichmentDto | null;
+
+  /** Affinity CRM fields from roster export; null when absent. */
+  affinityData: AffinityDataDto | null;
 
   createdAt: string;
   updatedAt: string;
