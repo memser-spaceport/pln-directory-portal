@@ -46,6 +46,15 @@ export const DEMODAY_PERMISSIONS = {
   STATS_READ: 'demoday.stats.read',
 } as const;
 
+// ── AI Apps (PL Infra) ────────────────────────────────────────────────────
+
+export const AI_APPS_PERMISSIONS = {
+  /** View AI Apps and their deploy status on the dashboard */
+  READ: 'ai_apps.read',
+  /** Download the starter kit and deploy apps */
+  WRITE: 'ai_apps.write',
+} as const;
+
 // ── Members ─────────────────────────────────────────────────────────────
 
 export const MEMBER_PERMISSIONS = {
@@ -199,6 +208,10 @@ export const ALL_PERMISSION_CODES = [
 
   // Deals
   DEALS_PERMISSIONS.READ,
+
+  // AI Apps
+  AI_APPS_PERMISSIONS.READ,
+  AI_APPS_PERMISSIONS.WRITE,
 
   // Demo Day
   DEMODAY_PERMISSIONS.REPORT_LINK_READ,

@@ -76,6 +76,7 @@ import { PathfinderModule } from './pathfinder/pathfinder.module';
 import { InvestorListsModule } from './investor-lists/investor-lists.module';
 import { FounderSourcingModule } from './founder-sourcing/founder-sourcing.module';
 import { RoadmapModule } from './roadmap/roadmap.module';
+import { AiAppsModule } from './ai-apps/ai-apps.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -172,6 +173,7 @@ import { RoadmapModule } from './roadmap/roadmap.module';
     InvestorListsModule,
     FounderSourcingModule,
     RoadmapModule,
+    AiAppsModule,
   ],
   providers: [
     {
@@ -204,6 +206,7 @@ export class AppModule {
       .exclude(
         { path: 'v1/images', method: RequestMethod.POST },
         { path: 'v1/uploads', method: RequestMethod.POST },
+        { path: 'v1/ai-apps/deploy', method: RequestMethod.POST },
         { path: 'v1/demo-days/current/fundraising-profile/one-pager', method: RequestMethod.PUT },
         { path: 'v1/demo-days/current/fundraising-profile/video', method: RequestMethod.PUT },
         { path: 'v1/admin/demo-days/current/teams/:teamUid/fundraising-profile/one-pager', method: RequestMethod.PUT },

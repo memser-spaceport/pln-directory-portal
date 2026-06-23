@@ -36,6 +36,8 @@ const permissionSeeds: PermissionSeed[] = [
   { code: 'irlg.going.write', module: 'IRL Gatherings' },
   { code: 'deals.read', module: 'Deals' },
   { code: 'deals.view', module: 'Deals' },
+  { code: 'ai_apps.read', module: 'AI Apps' },
+  { code: 'ai_apps.write', module: 'AI Apps' },
   { code: 'founder_guides.view', module: 'Founder Guides' },
   { code: 'founder_guides.view.plvs', module: 'Founder Guides' },
   { code: 'founder_guides.view.plcc', module: 'Founder Guides' },
@@ -101,6 +103,8 @@ const policies: PolicySeed[] = [
       'oh.supply.write',
       'oh.demand.read',
       'oh.demand.write',
+      'ai_apps.read',
+      'ai_apps.write',
     ],
   },
   {
