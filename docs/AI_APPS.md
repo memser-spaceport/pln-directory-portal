@@ -39,7 +39,9 @@ The agent only ever holds its personal deploy token — it ships the app ZIP to 
 | Method | Path                              | Auth                         | Permission        | Purpose |
 |--------|-----------------------------------|------------------------------|-------------------|---------|
 | GET    | `/v1/ai-apps`                     | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | List all apps with owner + status |
+| GET    | `/v1/ai-apps/events`             | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Event log (audit feed); `?appUid=` to scope, `?limit=` (default 100, max 500) |
 | GET    | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Single app detail |
+| GET    | `/v1/ai-apps/:uid/events`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Full event/status history for one app (404 if app missing) |
 | GET    | `/v1/ai-apps/starter-kit/download` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Stream the starter-kit ZIP (creates token on first use) |
 | POST   | `/v1/ai-apps/deploy`              | `AiAppTokenGuard` (`x-app-token`) | — (token = member) | Upload app ZIP → S3 → sandbox runner |
 
@@ -83,9 +85,24 @@ model AiAppToken {            // reusable per-member deploy token, bundled in th
   lastUsedAt DateTime?
   revokedAt  DateTime?
 }
+
+enum AiAppEventType { KIT_DOWNLOADED  DEPLOY_STARTED  DEPLOY_SUCCEEDED  DEPLOY_FAILED }
+
+model AiAppEvent {            // append-only audit log — one row per event, never updated
+  uid          String @unique
+  memberUid    String         // who triggered it
+  type         AiAppEventType
+  appUid       String?        // set for deploy events (null for KIT_DOWNLOADED)
+  appId        String?
+  deploymentId String?
+  message      String?        // e.g. error detail on DEPLOY_FAILED, url on success
+  createdAt    DateTime @default(now())
+}
 ```
 
 Apps are **lazy-created on first deploy** — there is no registration form.
+
+`AiApp.status` is the current-state snapshot for the dashboard; `AiAppEvent` is the immutable event flow. A row is appended on kit download (`KIT_DOWNLOADED`), at the start of every deploy (`DEPLOY_STARTED`), and on its outcome (`DEPLOY_SUCCEEDED` / `DEPLOY_FAILED`). Event logging never throws — a logging failure won't break a download or deploy.
 
 ## RBAC
 
@@ -124,8 +141,9 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 ## Code map
 
 - `apps/web-api/src/ai-apps/` — module, controller, services, guard, DTO, constants.
-- `apps/web-api/prisma/schema.prisma` — `AiApp`, `AiAppToken`, `AiAppStatus`.
+- `apps/web-api/prisma/schema.prisma` — `AiApp`, `AiAppToken`, `AiAppEvent`, `AiAppStatus`, `AiAppEventType`.
 - `apps/web-api/prisma/migrations/20260623120000_ai_apps/` — tables + permission seed.
+- `apps/web-api/prisma/migrations/20260623150000_ai_app_events/` — event log table.
 - `.claude/skills/ai-apps/SKILL.md` — agent guidance for working on this feature.
 
 ## Out of scope (POC)

@@ -2972,3 +2972,33 @@ model AiAppToken {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 }
+
+enum AiAppEventType {
+  KIT_DOWNLOADED
+  DEPLOY_STARTED
+  DEPLOY_SUCCEEDED
+  DEPLOY_FAILED
+}
+
+/// Append-only audit log of AI Apps activity: who downloaded the kit and every
+/// deploy attempt + outcome. One row per event (never updated) so the full
+/// event flow is preserved. `AiApp.status` remains the current-state snapshot.
+model AiAppEvent {
+  id           Int            @id @default(autoincrement())
+  uid          String         @unique @default(cuid())
+  memberUid    String
+  type         AiAppEventType
+  /// Set for deploy events once the AiApp row exists (null for KIT_DOWNLOADED).
+  appUid       String?
+  /// Business key for deploy events (null for KIT_DOWNLOADED).
+  appId        String?
+  deploymentId String?
+  /// Free-form context, e.g. the error detail on DEPLOY_FAILED.
+  message      String?
+  createdAt    DateTime       @default(now())
+
+  @@index([memberUid])
+  @@index([type])
+  @@index([appUid])
+  @@index([createdAt])
+}

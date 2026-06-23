@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import axios from 'axios';
-import { AiApp } from '@prisma/client';
+import { AiApp, AiAppEvent, AiAppEventType } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { DeployAppDto } from './dto/deploy-app.dto';
@@ -73,6 +73,46 @@ export class AiAppsService {
   }
 
   /**
+   * Append an event to the audit log. Never throws — event logging must not
+   * break the primary flow (download/deploy).
+   */
+  private async recordEvent(
+    type: AiAppEventType,
+    memberUid: string,
+    extra: { appUid?: string; appId?: string; deploymentId?: string; message?: string } = {}
+  ): Promise<void> {
+    try {
+      await this.prisma.aiAppEvent.create({ data: { type, memberUid, ...extra } });
+    } catch (error) {
+      this.logger.error(`Failed to record AI App event ${type}: ${(error as Error).message}`);
+    }
+  }
+
+  /** Logs that a member downloaded the starter kit. */
+  async logKitDownloaded(memberUid: string): Promise<void> {
+    await this.recordEvent('KIT_DOWNLOADED', memberUid);
+  }
+
+  /** Event log (audit feed) — newest first, optionally scoped to one app. */
+  async listEvents(
+    appUid?: string,
+    limit = 100
+  ): Promise<Array<AiAppEvent & { member: { uid: string; name: string } | null }>> {
+    const events = await this.prisma.aiAppEvent.findMany({
+      where: appUid ? { appUid } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit, 1), 500),
+    });
+    const memberUids = Array.from(new Set(events.map((e) => e.memberUid)));
+    const members = await this.prisma.member.findMany({
+      where: { uid: { in: memberUids } },
+      select: { uid: true, name: true },
+    });
+    const byUid = new Map(members.map((m) => [m.uid, m]));
+    return events.map((e) => ({ ...e, member: byUid.get(e.memberUid) ?? null }));
+  }
+
+  /**
    * Lazy-creates/updates the app record, uploads the app ZIP to S3, then proxies
    * the deploy to the sandbox runner (keeping AWS creds + the runner token
    * server-side) and stores the result.
@@ -106,6 +146,9 @@ export class AiAppsService {
       },
     });
 
+    const eventContext = { appUid: app.uid, appId: dto.appId, deploymentId: dto.deploymentId };
+    await this.recordEvent('DEPLOY_STARTED', memberUid, eventContext);
+
     try {
       await this.awsService.uploadFileToS3(
         { buffer: file.buffer, mimetype: 'application/zip' },
@@ -119,7 +162,7 @@ export class AiAppsService {
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
 
-      return this.prisma.aiApp.update({
+      const updated = await this.prisma.aiApp.update({
         where: { uid: app.uid },
         data: {
           status: 'READY',
@@ -130,6 +173,8 @@ export class AiAppsService {
           notes: null,
         },
       });
+      await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: updated.url ?? undefined });
+      return updated;
     } catch (error) {
       const message = axios.isAxiosError(error)
         ? `Runner error: ${error.response?.status ?? ''} ${JSON.stringify(error.response?.data ?? error.message)}`
@@ -139,6 +184,7 @@ export class AiAppsService {
         where: { uid: app.uid },
         data: { status: 'ERROR', notes: message.slice(0, 2000) },
       });
+      await this.recordEvent('DEPLOY_FAILED', memberUid, { ...eventContext, message: message.slice(0, 2000) });
       throw new BadGatewayException('Failed to deploy app to the sandbox runner');
     }
   }

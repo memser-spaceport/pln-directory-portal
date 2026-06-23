@@ -5,6 +5,7 @@ import {
   Param,
   Post,
   Body,
+  Query,
   Req,
   Res,
   UploadedFile,
@@ -49,6 +50,19 @@ export class AiAppsController {
     return this.aiAppsService.listApps();
   }
 
+  /**
+   * Event log (audit feed): kit downloads + deploy attempts/outcomes, newest
+   * first. Optionally scope to one app with `?appUid=`. Declared before `:uid`
+   * so the literal path wins over the param route.
+   */
+  @NoCache()
+  @Get('events')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listEvents(@Query('appUid') appUid?: string, @Query('limit') limit?: string) {
+    return this.aiAppsService.listEvents(appUid, limit ? Number(limit) : undefined);
+  }
+
   /** Single AI App detail. */
   @NoCache()
   @Get(':uid')
@@ -56,6 +70,16 @@ export class AiAppsController {
   @RequirePermissions(READ)
   async getApp(@Param('uid') uid: string) {
     return this.aiAppsService.getApp(uid);
+  }
+
+  /** Full event/status history for a single app, newest first. */
+  @NoCache()
+  @Get(':uid/events')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getAppEvents(@Param('uid') uid: string, @Query('limit') limit?: string) {
+    await this.aiAppsService.getApp(uid); // 404 if the app doesn't exist
+    return this.aiAppsService.listEvents(uid, limit ? Number(limit) : undefined);
   }
 
   /** Download the reusable starter kit ZIP (creates the member's token on first use). */
@@ -67,6 +91,7 @@ export class AiAppsController {
     const memberUid = await this.resolveMemberUid(req);
     const token = await this.aiAppsService.ensureToken(memberUid);
     const zip = this.starterKitService.buildZip(token);
+    await this.aiAppsService.logKitDownloaded(memberUid);
 
     res.set({
       'Content-Type': 'application/zip',
