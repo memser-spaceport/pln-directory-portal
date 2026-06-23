@@ -4,12 +4,12 @@ import type { PrismaService } from '../shared/prisma.service';
 import { JobOpeningsEnrichmentService } from './job-openings-enrichment.service';
 
 type PrismaMock = {
-  team: { findUnique: jest.Mock };
+  team: { findUnique: jest.Mock; findMany: jest.Mock; count: jest.Mock };
   jobOpening: { findMany: jest.Mock };
 };
 
 const buildPrismaMock = (): PrismaMock => ({
-  team: { findUnique: jest.fn() },
+  team: { findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() },
   jobOpening: { findMany: jest.fn() },
 });
 
@@ -20,6 +20,68 @@ describe('JobOpeningsEnrichmentService', () => {
   beforeEach(() => {
     prisma = buildPrismaMock();
     service = new JobOpeningsEnrichmentService(prisma as unknown as PrismaService);
+  });
+
+  describe('getTeamsWithEnrichment', () => {
+    it('stamps isPresentInPlPortfolio and isDiscontinued from team relations', async () => {
+      prisma.team.findMany.mockResolvedValue([
+        {
+          uid: 'team-a',
+          name: 'Portco Active',
+          priority: 2,
+          website: null,
+          linkedinHandler: null,
+          communityAffiliations: [{ title: 'PL Portfolio' }],
+          industryTags: [],
+          teamFocusAreas: [],
+          jobEnrichment: null,
+        },
+        {
+          uid: 'team-b',
+          name: 'Discontinued Co',
+          priority: 3,
+          website: null,
+          linkedinHandler: null,
+          communityAffiliations: [],
+          industryTags: [{ title: 'Discontinued' }],
+          teamFocusAreas: [],
+          jobEnrichment: null,
+        },
+        {
+          uid: 'team-c',
+          name: 'Plain Team',
+          priority: 99,
+          website: null,
+          linkedinHandler: null,
+          communityAffiliations: [],
+          industryTags: [{ title: 'AI' }],
+          teamFocusAreas: [],
+          jobEnrichment: null,
+        },
+      ]);
+      prisma.team.count.mockResolvedValue(3);
+
+      const out = await service.getTeamsWithEnrichment(1, 100);
+
+      expect(out.teams).toHaveLength(3);
+      expect(out.teams[0]).toMatchObject({
+        uid: 'team-a',
+        priority: 2,
+        isPresentInPlPortfolio: true,
+        isDiscontinued: false,
+      });
+      expect(out.teams[1]).toMatchObject({
+        uid: 'team-b',
+        isPresentInPlPortfolio: false,
+        isDiscontinued: true,
+      });
+      expect(out.teams[2]).toMatchObject({
+        uid: 'team-c',
+        priority: null,
+        isPresentInPlPortfolio: false,
+        isDiscontinued: false,
+      });
+    });
   });
 
   describe('getJobOpeningsByTeam', () => {

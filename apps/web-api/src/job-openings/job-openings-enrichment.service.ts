@@ -8,6 +8,9 @@ import {
   UpdateTeamEnrichmentDto,
 } from 'libs/contracts/src/schema/team-job-enrichment';
 
+const PL_PORTFOLIO_COMMUNITY_AFFILIATION = 'PL Portfolio';
+const DISCONTINUED_INDUSTRY_TAG = 'Discontinued';
+
 @Injectable()
 export class JobOpeningsEnrichmentService {
   private readonly logger = new Logger(JobOpeningsEnrichmentService.name);
@@ -32,6 +35,8 @@ export class JobOpeningsEnrichmentService {
           priority: true,
           website: true,
           linkedinHandler: true,
+          communityAffiliations: { select: { title: true } },
+          industryTags: { select: { title: true } },
           teamFocusAreas: {
             include: {
               focusArea: true,
@@ -61,6 +66,10 @@ export class JobOpeningsEnrichmentService {
           uid: team.uid,
           name: team.name,
           priority: team.priority === 99 ? null : team.priority,
+          isPresentInPlPortfolio: team.communityAffiliations.some(
+            (affiliation) => affiliation.title === PL_PORTFOLIO_COMMUNITY_AFFILIATION
+          ),
+          isDiscontinued: team.industryTags.some((tag) => tag.title === DISCONTINUED_INDUSTRY_TAG),
           website: team.website ?? null,
           linkedinHandler: team.linkedinHandler ?? null,
           focusAreas: [...new Set(focusAreas)],
