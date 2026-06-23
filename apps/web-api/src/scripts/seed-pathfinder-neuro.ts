@@ -340,7 +340,7 @@ async function seed() {
   const queuePaths = (
     targetInvestorId: string,
     firmId: string,
-    person: { firstName: string; lastName: string; memberUid?: string }
+    person: { firstName: string; lastName: string; memberUid?: string; email?: string; role?: string }
   ): string | null => {
     const rel = plConnectors.get(targetInvestorId);
     const boost = affinityBoost((rel?.bestConnector as Parameters<typeof affinityBoost>[0]) ?? null);
@@ -495,6 +495,7 @@ async function seed() {
         firstName,
         lastName,
         memberUid: memberByEmail.get(dedupeKey),
+        email: realEmail || undefined,
       });
       if (rank1) bestProximityForRecord = rank1;
     }

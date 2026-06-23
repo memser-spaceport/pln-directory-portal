@@ -20,6 +20,34 @@ describe('route-node-display.util', () => {
       });
     });
 
+    it('maps person with role, linkedin, telegram from node top-level', () => {
+      expect(
+        routeNodeToHopNodeDto(
+          {
+            label: 'Alicia Mer',
+            variant: 'member',
+            memberUid: 'uid-alicia',
+            orgName: 'Modular Globe',
+            role: 'CEO & Co-founder',
+            email: 'alicia@modularglobe.xyz',
+            linkedin: 'alicia-mer',
+            telegram: 'aliciamer',
+          },
+          0
+        )
+      ).toEqual({
+        id: 'route-0',
+        label: 'Alicia Mer',
+        type: 'person',
+        memberUid: 'uid-alicia',
+        orgName: 'Modular Globe',
+        role: 'CEO & Co-founder',
+        email: 'alicia@modularglobe.xyz',
+        linkedin: 'alicia-mer',
+        telegram: 'aliciamer',
+      });
+    });
+
     it('maps org with teamUid', () => {
       expect(routeNodeToHopNodeDto({ label: 'Modular', variant: 'org', teamUid: 'team-1' }, 0)).toEqual({
         id: 'route-0',

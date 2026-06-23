@@ -4,13 +4,23 @@
  */
 
 import { enrichFounderContacts, normalizePersonName, type FounderResolveIndexes } from './founder-member-resolve.util';
-import { enrichOrgConnectorContacts, type MemberContactIndex, type RouteNodeContact } from './org-contact-resolve.util';
+import {
+  enrichOrgConnectorContacts,
+  hydratePersonRouteNodes,
+  type MemberContactIndex,
+  type RouteNodeContact,
+} from './org-contact-resolve.util';
 
 export type RouteNodeVariant = 'member' | 'external' | 'org';
 
 export interface RouteNode {
   label: string;
   orgName?: string;
+  role?: string;
+  email?: string;
+  linkedin?: string;
+  telegram?: string;
+  imageUrl?: string;
   memberUid?: string;
   teamUid?: string;
   logo?: string;
@@ -94,6 +104,8 @@ interface LegacyHopChain {
     name: string;
     role: string;
     memberUid?: string;
+    email?: string;
+    linkedin?: string;
     teams?: Array<{ name: string; teamUid?: string; logo?: string }>;
   };
   orgConnector?: {
@@ -206,11 +218,22 @@ function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
               {
                 name: hc.contact.name,
                 role: hc.contact.role,
+                email: hc.contact.email,
+                linkedin: hc.contact.linkedin,
                 memberUid: hc.contact.memberUid,
                 source: 'portfolio',
               },
             ]
-          : undefined,
+          : [
+              {
+                name: hc.contact.name,
+                role: hc.contact.role,
+                email: hc.contact.email,
+                linkedin: hc.contact.linkedin,
+                memberUid: hc.contact.memberUid,
+                source: 'portfolio',
+              },
+            ],
       },
     ];
   }
@@ -242,7 +265,13 @@ function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
 /** Append investor to routeNodes; clone-safe (returns new object). */
 export function finalizePersonHopChain(
   hopChain: Record<string, unknown>,
-  person: { firstName: string; lastName: string; memberUid?: string },
+  person: {
+    firstName: string;
+    lastName: string;
+    memberUid?: string;
+    email?: string;
+    role?: string;
+  },
   founderIndexes?: FounderResolveIndexes,
   hops?: number,
   memberContactIndex?: MemberContactIndex
@@ -259,13 +288,34 @@ export function finalizePersonHopChain(
     plConnector && founderIndexes ? founderIndexes.membersByName.get(normalizePersonName(plConnector.name)) : undefined;
   const bridgeNodes = bridgeRouteNodes(enriched);
   const investorNode = buildInvestorRouteNode(person);
-  const routeNodes = buildFullRouteNodes({
+  let routeNodes = buildFullRouteNodes({
     bridgeNodes,
     plConnector,
     plConnectorMemberUid,
     investorNode,
     hops,
   });
+  if (memberContactIndex) {
+    routeNodes = hydratePersonRouteNodes(
+      routeNodes,
+      {
+        investor: person,
+        bridgeContact: enriched.contact
+          ? {
+              name: enriched.contact.name,
+              role: enriched.contact.role,
+              memberUid: enriched.contact.memberUid,
+              email: enriched.contact.email,
+              linkedin: enriched.contact.linkedin,
+              teams: enriched.contact.teams,
+            }
+          : undefined,
+        plConnector: plConnector ?? undefined,
+        plConnectorMemberUid,
+      },
+      memberContactIndex
+    ) as RouteNode[];
+  }
   const orgConnectors = enriched.orgConnectors ?? (enriched.orgConnector ? [enriched.orgConnector] : undefined);
   return {
     ...hopChain,

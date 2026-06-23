@@ -32,12 +32,17 @@ export interface RouteNodeContact {
   memberUid?: string;
   imageUrl?: string;
   affinityId?: string;
-  source?: 'gold_list' | 'v8' | 'labos' | 'portfolio';
+  source?: 'gold_list' | 'v8' | 'labos' | 'portfolio' | 'affinity';
 }
 
 export interface PathRouteNode {
   label: string;
   orgName?: string;
+  role?: string;
+  email?: string;
+  linkedin?: string;
+  telegram?: string;
+  imageUrl?: string;
   memberUid?: string;
   teamUid?: string;
   logo?: string;
@@ -55,6 +60,9 @@ export interface PathHopNodeDto {
   orgName?: string;
   imageUrl?: string;
   email?: string;
+  role?: string;
+  linkedin?: string;
+  telegram?: string;
   contacts?: RouteNodeContact[];
 }
 
