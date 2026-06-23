@@ -76,6 +76,7 @@ import { PathfinderModule } from './pathfinder/pathfinder.module';
 import { InvestorListsModule } from './investor-lists/investor-lists.module';
 import { FounderSourcingModule } from './founder-sourcing/founder-sourcing.module';
 import { RoadmapModule } from './roadmap/roadmap.module';
+import { AiAppsModule } from './ai-apps/ai-apps.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -172,6 +173,7 @@ import { RoadmapModule } from './roadmap/roadmap.module';
     InvestorListsModule,
     FounderSourcingModule,
     RoadmapModule,
+    AiAppsModule,
   ],
   providers: [
     {

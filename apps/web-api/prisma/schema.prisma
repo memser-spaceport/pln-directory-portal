@@ -2923,3 +2923,52 @@ model RoadmapSettings {
   updatedByUid String?
   updatedAt    DateTime @updatedAt
 }
+
+// ── AI Apps (PL Infra) ─────────────────────────────────────────────────────
+// POC: PLN members vibe-code an app locally with our starter kit, then their AI
+// agent deploys it to our sandbox runner. We track each app + its deploy status.
+
+enum AiAppStatus {
+  IN_DEVELOPMENT
+  DEPLOYING
+  READY
+  ERROR
+}
+
+/// One vibe-coded sandbox app, lazy-created on first deploy by its owning member.
+model AiApp {
+  id           Int         @id @default(autoincrement())
+  uid          String      @unique @default(cuid())
+  /// Owning member (no FK relation to keep the POC isolated from the Member model).
+  memberUid    String
+  /// Business key supplied in the deploy payload; unique per owner.
+  appId        String
+  name         String
+  description  String?
+  status       AiAppStatus @default(IN_DEVELOPMENT)
+  notes        String?
+  /// Hosting details returned by the sandbox runner on a successful deploy.
+  url          String?
+  httpUrl      String?
+  host         String?
+  port         Int?
+  deploymentId String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([memberUid, appId])
+  @@index([memberUid])
+  @@index([status])
+}
+
+/// Reusable per-member deploy token bundled into the starter kit ZIP.
+model AiAppToken {
+  id         Int       @id @default(autoincrement())
+  uid        String    @unique @default(cuid())
+  memberUid  String    @unique
+  token      String    @unique
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
