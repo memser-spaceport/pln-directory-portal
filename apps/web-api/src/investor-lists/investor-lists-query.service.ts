@@ -6,9 +6,11 @@ import { MemberByEmail, OverlapsByInvestorId, toInvestorDto } from '../investor-
 import { INVESTOR_OUTREACH_SECTOR_TAGS, isAllowedStageFocus } from '../investor-outreach/investor-outreach.vocab';
 import { buildInvestorTextSearch } from '../investor-outreach/investor-text-search.util';
 import { connectorMatchClause } from '../pathfinder/connector-match.util';
+import { parseRouteNodesFromHopChain } from '../pathfinder/route-node-display.util';
 import { compareWarmIntroMembers } from './warm-intro-list-sort.util';
 import { InvestorListDto, InvestorListsResponseDto } from './dto/investor-list.dto';
 import { ListMembersQueryDto } from './dto/list-members.query.dto';
+import type { PathHopNodeDto } from '../pathfinder/dto/ingest-pathfinder.dto';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 50;
@@ -22,6 +24,12 @@ const SECTOR_TAG_SET = new Set<string>(INVESTOR_OUTREACH_SECTOR_TAGS);
 const ENGAGED_TIERS = ['T1_registered', 'T2_clicked', 'T3_opened'];
 const RELATIONSHIPS = ['co_invested', 'engaged', 'cold'] as const;
 type Relationship = typeof RELATIONSHIPS[number];
+
+interface PathDisplayFields {
+  bestRouteNodes?: PathHopNodeDto[];
+  bestRouteScore?: number | null;
+  pathCount?: number | null;
+}
 
 @Injectable()
 export class InvestorListsQueryService {
@@ -134,7 +142,15 @@ export class InvestorListsQueryService {
           }
         )
       );
-      const items = sorted.slice((page - 1) * limit, page * limit);
+      const pageItems = sorted.slice((page - 1) * limit, page * limit);
+      const displayByInvestorId = await this.loadPathDisplayForPage(
+        list.targetSet,
+        pageItems.map((i) => i.investorId)
+      );
+      const items = pageItems.map((item) => {
+        const display = displayByInvestorId.get(item.investorId);
+        return display ? { ...item, ...display } : item;
+      });
       return { page, limit, total, items };
     }
 
@@ -177,6 +193,40 @@ export class InvestorListsQueryService {
       });
     }
     return map;
+  }
+
+  /** Rank-1 route chips + path totals for the current results page only. */
+  private async loadPathDisplayForPage(
+    targetSet: string,
+    investorIds: string[]
+  ): Promise<Map<string, PathDisplayFields>> {
+    const out = new Map<string, PathDisplayFields>();
+    if (!investorIds.length) return out;
+
+    const [rank1Paths, pathCounts] = await Promise.all([
+      this.prisma.pathfinderPath.findMany({
+        where: { targetSet, targetInvestorId: { in: investorIds }, rank: 1 },
+        select: { targetInvestorId: true, score: true, hopChain: true },
+      }),
+      this.prisma.pathfinderPath.groupBy({
+        by: ['targetInvestorId'],
+        where: { targetSet, targetInvestorId: { in: investorIds } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const countByInvestorId = new Map(pathCounts.map((row) => [row.targetInvestorId, row._count._all]));
+
+    for (const p of rank1Paths) {
+      const nodes = parseRouteNodesFromHopChain(p.hopChain);
+      out.set(p.targetInvestorId, {
+        bestRouteNodes: nodes.length > 0 ? nodes : undefined,
+        bestRouteScore: p.score,
+        pathCount: countByInvestorId.get(p.targetInvestorId) ?? null,
+      });
+    }
+
+    return out;
   }
 
   /**
@@ -317,7 +367,12 @@ export class InvestorListsQueryService {
       const dto = toInvestorDto(record, membersByEmail, overlapsByInvestorId);
       const prox = proximityByInvestorId?.get(record.investorId);
       if (!prox) return dto;
-      return { ...dto, bestProximityCode: prox.code, hasPath: prox.hasPath };
+      return {
+        ...dto,
+        bestProximityCode: prox.code,
+        hasPath: prox.hasPath,
+        bestRouteScore: prox.hasPath ? prox.score : null,
+      };
     });
   }
 }

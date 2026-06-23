@@ -3,16 +3,81 @@
  * path-route.util.ts — keep in sync for investor terminus + legacy fallback).
  */
 
-import { enrichFounderContacts, type FounderResolveIndexes } from './founder-member-resolve.util';
+import { enrichFounderContacts, normalizePersonName, type FounderResolveIndexes } from './founder-member-resolve.util';
+import { enrichOrgConnectorContacts, type MemberContactIndex, type RouteNodeContact } from './org-contact-resolve.util';
 
 export type RouteNodeVariant = 'member' | 'external' | 'org';
 
 export interface RouteNode {
   label: string;
+  orgName?: string;
   memberUid?: string;
   teamUid?: string;
   logo?: string;
   variant: RouteNodeVariant;
+  contacts?: RouteNodeContact[];
+}
+
+export interface PlConnectorInput {
+  name: string;
+  internalId?: number;
+  strength?: number | null;
+  recencyDays?: number | null;
+  evidenceKind?: string | null;
+  evidenceDate?: string | null;
+  eventOnly?: boolean;
+  tier?: number;
+}
+
+export const PROTOCOL_LABS_ORG_NODE: RouteNode = {
+  label: 'Protocol Labs',
+  variant: 'org',
+};
+
+export function plConnectorToRouteNode(connector: PlConnectorInput, memberUid?: string): RouteNode {
+  return {
+    label: connector.name,
+    memberUid,
+    variant: memberUid ? 'member' : 'external',
+  };
+}
+
+function stripPlConnectorFromBridge(bridge: RouteNode[], connectorName?: string | null): RouteNode[] {
+  if (!connectorName?.trim()) return bridge;
+  const key = normalizePersonName(connectorName);
+  return bridge.filter((n) => normalizePersonName(n.label) !== key);
+}
+
+function connectorMatchesPlContact(contactName: string, plConnector?: PlConnectorInput | null): boolean {
+  if (!plConnector?.name) return false;
+  return normalizePersonName(contactName) === normalizePersonName(plConnector.name);
+}
+
+function stripLeadingPlOrg(nodes: RouteNode[]): RouteNode[] {
+  if (nodes.length > 0 && nodes[0].label === PROTOCOL_LABS_ORG_NODE.label && nodes[0].variant === 'org') {
+    return nodes.slice(1);
+  }
+  return nodes;
+}
+
+export function buildFullRouteNodes(input: {
+  bridgeNodes: RouteNode[];
+  plConnector?: PlConnectorInput | null;
+  plConnectorMemberUid?: string;
+  investorNode?: RouteNode;
+  hops?: number;
+}): RouteNode[] {
+  const bridge = stripPlaceholderInvestor(
+    stripPlConnectorFromBridge(stripLeadingPlOrg(input.bridgeNodes), input.plConnector?.name)
+  );
+  const prefix: RouteNode[] = input.plConnector
+    ? [plConnectorToRouteNode(input.plConnector, input.plConnectorMemberUid)]
+    : bridge.length > 0 && (input.hops === undefined || input.hops >= 2)
+    ? [PROTOCOL_LABS_ORG_NODE]
+    : [];
+
+  const core = [...prefix, ...bridge];
+  return input.investorNode ? [...core, input.investorNode] : core;
 }
 
 interface LegacyHopChainNode {
@@ -24,13 +89,29 @@ interface LegacyHopChainNode {
 interface LegacyHopChain {
   nodes?: LegacyHopChainNode[];
   routeNodes?: RouteNode[];
+  plConnector?: PlConnectorInput;
   contact?: {
     name: string;
     role: string;
     memberUid?: string;
     teams?: Array<{ name: string; teamUid?: string; logo?: string }>;
   };
-  orgConnector?: { name: string; description: string; tags: string[] };
+  orgConnector?: {
+    name: string;
+    description: string;
+    tags: string[];
+    teamUid?: string;
+    logo?: string;
+    contacts?: RouteNodeContact[];
+  };
+  orgConnectors?: Array<{
+    name: string;
+    description: string;
+    tags: string[];
+    teamUid?: string;
+    logo?: string;
+    contacts?: RouteNodeContact[];
+  }>;
   connectorTeam?: { name: string; leads: Array<{ name: string; role: string }> };
   edges?: Array<{ evidence?: string | null; connectorType?: string }>;
   explanation?: string;
@@ -50,8 +131,16 @@ function isPersonNode(node: LegacyHopChainNode): boolean {
   return node.type === 'person' || id.startsWith('f_');
 }
 
+function isPlaceholderInvestorNode(node: LegacyHopChainNode): boolean {
+  return (node.label ?? '').toLowerCase() === 'investor' && isPersonNode(node);
+}
+
+function stripPlaceholderInvestor(nodes: RouteNode[]): RouteNode[] {
+  return nodes.filter((n) => n.label.toLowerCase() !== 'investor');
+}
+
 function pickConnectorNode(nodes: LegacyHopChainNode[]): LegacyHopChainNode | null {
-  const inner = nodes.filter((n) => !isPlNode(n));
+  const inner = nodes.filter((n) => !isPlNode(n) && !isPlaceholderInvestorNode(n));
   if (inner.length <= 1) return inner[0] ?? null;
   return inner[0] ?? null;
 }
@@ -101,20 +190,52 @@ function enrichLegacyPresentation(hc: LegacyHopChain): LegacyHopChain {
   };
 }
 
-function connectorRouteNodes(hc: LegacyHopChain): RouteNode[] {
-  if (hc.contact) {
+function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
+  if (hc.contact && !connectorMatchesPlContact(hc.contact.name, hc.plConnector)) {
+    const orgName = hc.orgConnectors?.[0]?.name ?? hc.orgConnector?.name;
     return [
       {
         label: hc.contact.name,
+        orgName,
         memberUid: hc.contact.memberUid,
         teamUid: hc.contact.teams?.[0]?.teamUid,
         logo: hc.contact.teams?.[0]?.logo,
         variant: hc.contact.memberUid ? 'member' : 'external',
+        contacts: orgName
+          ? [
+              {
+                name: hc.contact.name,
+                role: hc.contact.role,
+                memberUid: hc.contact.memberUid,
+                source: 'portfolio',
+              },
+            ]
+          : undefined,
       },
     ];
   }
-  if (hc.routeNodes && hc.routeNodes.length > 0) return hc.routeNodes;
-  if (hc.orgConnector) return [{ label: hc.orgConnector.name, variant: 'org' }];
+  if (hc.routeNodes && hc.routeNodes.length > 0) {
+    return stripPlConnectorFromBridge(stripLeadingPlOrg(hc.routeNodes), hc.plConnector?.name);
+  }
+  const org = hc.orgConnectors?.[0] ?? hc.orgConnector;
+  if (org) {
+    const contacts = org.contacts ?? [];
+    if (contacts.length > 0) {
+      const primary = contacts[0];
+      return [
+        {
+          label: primary.name,
+          orgName: org.name,
+          memberUid: primary.memberUid,
+          teamUid: org.teamUid,
+          logo: org.logo,
+          variant: primary.memberUid ? 'member' : 'external',
+          contacts,
+        },
+      ];
+    }
+    return [{ label: org.name, variant: 'org' }];
+  }
   return deriveConnectorRouteNodesFromLegacy(hc);
 }
 
@@ -122,19 +243,35 @@ function connectorRouteNodes(hc: LegacyHopChain): RouteNode[] {
 export function finalizePersonHopChain(
   hopChain: Record<string, unknown>,
   person: { firstName: string; lastName: string; memberUid?: string },
-  founderIndexes?: FounderResolveIndexes
+  founderIndexes?: FounderResolveIndexes,
+  hops?: number,
+  memberContactIndex?: MemberContactIndex
 ): Record<string, unknown> {
   let enriched = enrichLegacyPresentation(hopChain as LegacyHopChain);
+  if (memberContactIndex) {
+    enriched = enrichOrgConnectorContacts(enriched, memberContactIndex);
+  }
   if (founderIndexes) {
     enriched = enrichFounderContacts(enriched, founderIndexes);
   }
-  const connectorNodes = connectorRouteNodes(enriched);
+  const plConnector = enriched.plConnector ?? null;
+  const plConnectorMemberUid =
+    plConnector && founderIndexes ? founderIndexes.membersByName.get(normalizePersonName(plConnector.name)) : undefined;
+  const bridgeNodes = bridgeRouteNodes(enriched);
   const investorNode = buildInvestorRouteNode(person);
+  const routeNodes = buildFullRouteNodes({
+    bridgeNodes,
+    plConnector,
+    plConnectorMemberUid,
+    investorNode,
+    hops,
+  });
+  const orgConnectors = enriched.orgConnectors ?? (enriched.orgConnector ? [enriched.orgConnector] : undefined);
   return {
     ...hopChain,
     ...(enriched.contact ? { contact: enriched.contact } : {}),
-    ...(enriched.orgConnector ? { orgConnector: enriched.orgConnector } : {}),
+    ...(orgConnectors ? { orgConnectors, orgConnector: orgConnectors[0] } : {}),
     ...(enriched.connectorTeam ? { connectorTeam: enriched.connectorTeam } : {}),
-    routeNodes: [...connectorNodes, investorNode],
+    routeNodes,
   };
 }
