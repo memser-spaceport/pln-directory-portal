@@ -23,12 +23,26 @@ export interface PathfinderHopChainEdge {
 }
 
 /** People-first route presentation (task 06). Stored camelCase in DB JSON. */
+export interface RouteNodeContact {
+  name: string;
+  role?: string;
+  email?: string;
+  linkedin?: string;
+  telegram?: string;
+  memberUid?: string;
+  imageUrl?: string;
+  affinityId?: string;
+  source?: 'gold_list' | 'v8' | 'labos' | 'portfolio';
+}
+
 export interface PathRouteNode {
   label: string;
+  orgName?: string;
   memberUid?: string;
   teamUid?: string;
   logo?: string;
   variant: 'member' | 'external' | 'org';
+  contacts?: RouteNodeContact[];
 }
 
 /** Table/drawer hop node — matches FE PathHopNode / mapHopNode contract. */
@@ -38,6 +52,10 @@ export interface PathHopNodeDto {
   type: 'person' | 'org';
   memberUid?: string;
   teamUid?: string;
+  orgName?: string;
+  imageUrl?: string;
+  email?: string;
+  contacts?: RouteNodeContact[];
 }
 
 export interface PathContactPerson {
@@ -58,6 +76,8 @@ export interface PathOrgConnector {
   tags: string[];
   email?: string;
   website?: string;
+  affinityOrgId?: string;
+  contacts?: RouteNodeContact[];
 }
 
 export interface PathConnectorTeam {
@@ -79,7 +99,9 @@ export interface PathfinderHopChain {
    */
   route_nodes?: PathRouteNode[];
   contact?: PathContactPerson;
+  /** @deprecated Prefer org_connectors[0] */
   org_connector?: PathOrgConnector;
+  org_connectors?: PathOrgConnector[];
   connector_team?: PathConnectorTeam;
   pl_connector?: Record<string, unknown>;
 }

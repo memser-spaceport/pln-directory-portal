@@ -1,4 +1,5 @@
 import { parseRouteNodesFromHopChain, routeNodeToHopNodeDto } from './route-node-display.util';
+import { RouteNodeContact } from './dto/ingest-pathfinder.dto';
 
 describe('route-node-display.util', () => {
   describe('routeNodeToHopNodeDto', () => {
@@ -79,6 +80,51 @@ describe('route-node-display.util', () => {
       expect(nodes.map((n) => n.label)).toEqual(['Brad Holden', 'Jane Founder', 'Rauno Miljand']);
       expect(nodes[0].type).toBe('person');
       expect(nodes[2].type).toBe('person');
+    });
+
+    it('drops firm-grain Investor placeholder from stored routeNodes', () => {
+      const nodes = parseRouteNodesFromHopChain({
+        routeNodes: [
+          { label: 'Brad Holden', variant: 'member', memberUid: 'uid-brad' },
+          { label: 'Investor', variant: 'external' },
+          { label: "Ciarán O'Leary", variant: 'external' },
+        ],
+      });
+      expect(nodes.map((n) => n.label)).toEqual(['Brad Holden', "Ciarán O'Leary"]);
+    });
+
+    it('maps person-primary org bridge with contacts', () => {
+      const contacts: RouteNodeContact[] = [
+        {
+          name: 'Jonathan King',
+          email: 'jonathan.king@coinbase.com',
+          memberUid: 'uid-jk',
+          imageUrl: 'https://img/jk.webp',
+          source: 'gold_list',
+        },
+      ];
+      const nodes = parseRouteNodesFromHopChain({
+        routeNodes: [
+          { label: 'Brad Holden', variant: 'member', memberUid: 'uid-brad' },
+          {
+            label: 'Jonathan King',
+            orgName: 'Coinbase',
+            variant: 'member',
+            memberUid: 'uid-jk',
+            contacts,
+          },
+          { label: 'Jacqueline Kwok', variant: 'external' },
+        ],
+      });
+      expect(nodes[1]).toMatchObject({
+        label: 'Jonathan King',
+        type: 'person',
+        orgName: 'Coinbase',
+        memberUid: 'uid-jk',
+        imageUrl: 'https://img/jk.webp',
+        email: 'jonathan.king@coinbase.com',
+        contacts,
+      });
     });
   });
 });
