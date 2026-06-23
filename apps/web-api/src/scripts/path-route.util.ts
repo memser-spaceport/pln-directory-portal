@@ -15,6 +15,50 @@ export interface RouteNode {
   variant: RouteNodeVariant;
 }
 
+export interface PlConnectorInput {
+  name: string;
+  internalId?: number;
+  strength?: number | null;
+  recencyDays?: number | null;
+  evidenceKind?: string | null;
+  evidenceDate?: string | null;
+  eventOnly?: boolean;
+  tier?: number;
+}
+
+export const PROTOCOL_LABS_ORG_NODE: RouteNode = {
+  label: 'Protocol Labs',
+  variant: 'org',
+};
+
+export function plConnectorToRouteNode(connector: PlConnectorInput): RouteNode {
+  return { label: connector.name, variant: 'external' };
+}
+
+function stripLeadingPlOrg(nodes: RouteNode[]): RouteNode[] {
+  if (nodes.length > 0 && nodes[0].label === PROTOCOL_LABS_ORG_NODE.label && nodes[0].variant === 'org') {
+    return nodes.slice(1);
+  }
+  return nodes;
+}
+
+export function buildFullRouteNodes(input: {
+  bridgeNodes: RouteNode[];
+  plConnector?: PlConnectorInput | null;
+  investorNode?: RouteNode;
+  hops?: number;
+}): RouteNode[] {
+  const bridge = stripLeadingPlOrg(input.bridgeNodes);
+  const prefix: RouteNode[] = input.plConnector
+    ? [plConnectorToRouteNode(input.plConnector)]
+    : bridge.length > 0 && (input.hops === undefined || input.hops >= 2)
+    ? [PROTOCOL_LABS_ORG_NODE]
+    : [];
+
+  const core = [...prefix, ...bridge];
+  return input.investorNode ? [...core, input.investorNode] : core;
+}
+
 interface LegacyHopChainNode {
   id?: string;
   label?: string;
@@ -24,6 +68,7 @@ interface LegacyHopChainNode {
 interface LegacyHopChain {
   nodes?: LegacyHopChainNode[];
   routeNodes?: RouteNode[];
+  plConnector?: PlConnectorInput;
   contact?: {
     name: string;
     role: string;
@@ -101,7 +146,7 @@ function enrichLegacyPresentation(hc: LegacyHopChain): LegacyHopChain {
   };
 }
 
-function connectorRouteNodes(hc: LegacyHopChain): RouteNode[] {
+function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
   if (hc.contact) {
     return [
       {
@@ -113,7 +158,9 @@ function connectorRouteNodes(hc: LegacyHopChain): RouteNode[] {
       },
     ];
   }
-  if (hc.routeNodes && hc.routeNodes.length > 0) return hc.routeNodes;
+  if (hc.routeNodes && hc.routeNodes.length > 0) {
+    return stripLeadingPlOrg(hc.routeNodes);
+  }
   if (hc.orgConnector) return [{ label: hc.orgConnector.name, variant: 'org' }];
   return deriveConnectorRouteNodesFromLegacy(hc);
 }
@@ -122,19 +169,27 @@ function connectorRouteNodes(hc: LegacyHopChain): RouteNode[] {
 export function finalizePersonHopChain(
   hopChain: Record<string, unknown>,
   person: { firstName: string; lastName: string; memberUid?: string },
-  founderIndexes?: FounderResolveIndexes
+  founderIndexes?: FounderResolveIndexes,
+  hops?: number
 ): Record<string, unknown> {
   let enriched = enrichLegacyPresentation(hopChain as LegacyHopChain);
   if (founderIndexes) {
     enriched = enrichFounderContacts(enriched, founderIndexes);
   }
-  const connectorNodes = connectorRouteNodes(enriched);
+  const plConnector = enriched.plConnector ?? null;
+  const bridgeNodes = bridgeRouteNodes(enriched);
   const investorNode = buildInvestorRouteNode(person);
+  const routeNodes = buildFullRouteNodes({
+    bridgeNodes,
+    plConnector,
+    investorNode,
+    hops,
+  });
   return {
     ...hopChain,
     ...(enriched.contact ? { contact: enriched.contact } : {}),
     ...(enriched.orgConnector ? { orgConnector: enriched.orgConnector } : {}),
     ...(enriched.connectorTeam ? { connectorTeam: enriched.connectorTeam } : {}),
-    routeNodes: [...connectorNodes, investorNode],
+    routeNodes,
   };
 }

@@ -70,7 +70,13 @@ export interface PathfinderHopChain {
   nodes: PathfinderHopChainNode[];
   edges: PathfinderHopChainEdge[];
   explanation: string;
-  /** People-first presentation (task 06) — optional extensions on hop_chain JSON. */
+  /**
+   * People-first route chain for table/drawer (stored as camelCase `routeNodes` in DB).
+   * May be 2–3 nodes before investor terminus:
+   *   case 1 — [PL connector person, investor]
+   *   case 2 — [PL connector person, bridge, investor]
+   *   case 3 — [Protocol Labs org, bridge, investor]
+   */
   route_nodes?: PathRouteNode[];
   contact?: PathContactPerson;
   org_connector?: PathOrgConnector;

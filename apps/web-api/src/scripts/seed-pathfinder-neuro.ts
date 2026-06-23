@@ -32,12 +32,17 @@
  * (PII, never committed). NOT for production. Run via `npm run api:seed-pathfinder-neuro`.
  */
 import { readFileSync } from 'fs';
-import path from 'path';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { firmKey, resolveFirmLookupKey } from './firm-key.util';
 import { affinityBoost, blendGraphScore, comparePathsByWarmth } from './affinity-warmth-boost.util';
+import {
+  buildAffinityDirectPath,
+  passesAffinityDirectThreshold,
+  type PlConnectorInput,
+} from './affinity-direct-path.util';
 import { finalizePersonHopChain } from './path-route.util';
 import { loadMemberNameIndex, loadPortfolioFounderIndex } from './founder-member-resolve.util';
+import { resolvePathfinderScratchDir } from './pathfinder-scratch.util';
 
 const prisma = new PrismaClient();
 
@@ -49,8 +54,7 @@ const DEMO_RUN_ID = 'demo-seed';
 const RUN_ID = 'neuro-person-seed';
 const LIST_SLUG = 'neuro-lp';
 
-const DEFAULT_SCRATCH = path.resolve(__dirname, '../../../../..', 'seed_data', 'path_finder');
-const SCRATCH_DIR = process.env.PATHFINDER_SCRATCH_DIR || DEFAULT_SCRATCH;
+const SCRATCH_DIR = resolvePathfinderScratchDir();
 const DUMP_PATH = `${SCRATCH_DIR}/_pathfinder_dump.json`;
 const AFFINITY_PATH = `${SCRATCH_DIR}/_affinity_352080.json`;
 const PRESTIGE_PATH = process.env.PATHFINDER_PRESTIGE_CACHE || `${SCRATCH_DIR}/_lp_prestige_cache.json`;
@@ -340,8 +344,30 @@ async function seed() {
     const boost = affinityBoost((rel?.bestConnector as Parameters<typeof affinityBoost>[0]) ?? null);
     let attachedHere = false;
 
+    type PathCandidate = DumpPath & { score: number };
     const firmPaths = pathsByFirm.get(firmId) ?? [];
-    const sorted = firmPaths.map((p) => ({ ...p, score: blendGraphScore(p.score, boost) })).sort(comparePathsByWarmth);
+    const candidates: PathCandidate[] = firmPaths.map((p) => ({
+      ...p,
+      score: blendGraphScore(p.score, boost),
+    }));
+
+    if (rel?.bestConnector && passesAffinityDirectThreshold(rel.bestConnector as unknown as PlConnectorInput)) {
+      const baseCaliber = firmPaths[0]?.caliber ?? 'B';
+      const baseConf = firmPaths[0]?.caliberConfidence ?? 0.4;
+      const direct = buildAffinityDirectPath({
+        targetInvestorId,
+        plConnector: rel.bestConnector as unknown as PlConnectorInput,
+        caliber: baseCaliber,
+        caliberConfidence: baseConf,
+        targetSet: TARGET_SET,
+        summary: rel.summary,
+      });
+      candidates.push({ ...direct, rank: 0 } as PathCandidate);
+    }
+
+    if (candidates.length === 0) return null;
+
+    const sorted = [...candidates].sort(comparePathsByWarmth);
 
     let rank1Code: string | null = null;
     for (let i = 0; i < sorted.length; i++) {
@@ -352,11 +378,15 @@ async function seed() {
       let hopChain = JSON.parse(JSON.stringify(p.hopChain)) as Record<string, unknown>;
       if (rel?.bestConnector && rel.summary) {
         const hc = hopChain as { explanation?: string; plConnector?: unknown };
-        hc.explanation = hc.explanation ? `${hc.explanation} ${rel.summary}.` : `${rel.summary}.`;
+        const summary = rel.summary;
+        const existing = typeof hc.explanation === 'string' ? hc.explanation : '';
+        if (!existing.includes(summary)) {
+          hc.explanation = existing ? `${existing} ${summary}.` : `${summary}.`;
+        }
         hc.plConnector = rel.bestConnector;
         attachedHere = true;
       }
-      hopChain = finalizePersonHopChain(hopChain, person, founderIndexes);
+      hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops);
       pathInserts.push({
         targetInvestorId,
         targetSet: TARGET_SET,
@@ -403,13 +433,17 @@ async function seed() {
       }
     }
     const firmLabel = best?.label ?? firms[0] ?? '';
-    const hasPath = best?.hasPath ?? false;
+    const hasGraphPath = best?.hasPath ?? false;
+    const relEntry = plConnectors.get(affinityId);
+    const hasAffinityDirect =
+      !!relEntry?.bestConnector && passesAffinityDirectThreshold(relEntry.bestConnector as unknown as PlConnectorInput);
+    const personHasPath = hasGraphPath || hasAffinityDirect;
 
     const prest = prestige.get(norm(`${firstName} ${lastName}`)) ?? null;
     const enrichment = prest ? toEnrichment(prest) : undefined;
     if (enrichment) enriched += 1;
 
-    let bestProximityForRecord: string | null = hasPath && best ? best.code : null;
+    let bestProximityForRecord: string | null = personHasPath && best ? best.code : null;
 
     // Match by dedupeKey (prod convention) — a person may already exist via the
     // Gold list (same Affinity id) or the wider investor DB (same email).
@@ -439,7 +473,7 @@ async function seed() {
         needsReview: true,
         ingestRunId: RUN_ID,
       });
-      if (best && hasPath) {
+      if (best && personHasPath) {
         dupPathCandidates.push({
           investorId: existing.investorId,
           firmId: best.firmId,
@@ -453,9 +487,9 @@ async function seed() {
       continue;
     }
 
-    if (best && hasPath) {
+    if (personHasPath) {
       reachable += 1;
-      const rank1 = queuePaths(affinityId, best.firmId, {
+      const rank1 = queuePaths(affinityId, best?.firmId ?? '', {
         firstName,
         lastName,
         memberUid: memberByEmail.get(dedupeKey),
@@ -479,7 +513,7 @@ async function seed() {
       engagementTier: '',
       enrichmentStatus: enrichment ? 'enriched' : 'pending',
       bestProximityCode: bestProximityForRecord,
-      hasPath,
+      hasPath: personHasPath,
       rawPayload: enrichment ? ({ enrichment } as Prisma.InputJsonValue) : undefined,
     };
     if (existing) {

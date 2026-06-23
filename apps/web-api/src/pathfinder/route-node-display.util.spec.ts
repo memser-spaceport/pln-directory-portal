@@ -1,7 +1,4 @@
-import {
-  parseRouteNodesFromHopChain,
-  routeNodeToHopNodeDto,
-} from './route-node-display.util';
+import { parseRouteNodesFromHopChain, routeNodeToHopNodeDto } from './route-node-display.util';
 
 describe('route-node-display.util', () => {
   describe('routeNodeToHopNodeDto', () => {
@@ -68,6 +65,20 @@ describe('route-node-display.util', () => {
     it('returns empty for invalid input', () => {
       expect(parseRouteNodesFromHopChain(null)).toEqual([]);
       expect(parseRouteNodesFromHopChain({})).toEqual([]);
+    });
+
+    it('reads 3-node case-2 chain (PL connector → bridge → investor)', () => {
+      const nodes = parseRouteNodesFromHopChain({
+        routeNodes: [
+          { label: 'Brad Holden', variant: 'external' },
+          { label: 'Jane Founder', variant: 'external' },
+          { label: 'Rauno Miljand', variant: 'external' },
+        ],
+      });
+      expect(nodes).toHaveLength(3);
+      expect(nodes.map((n) => n.label)).toEqual(['Brad Holden', 'Jane Founder', 'Rauno Miljand']);
+      expect(nodes[0].type).toBe('person');
+      expect(nodes[2].type).toBe('person');
     });
   });
 });
