@@ -31,6 +31,15 @@ export interface PathRouteNode {
   variant: 'member' | 'external' | 'org';
 }
 
+/** Table/drawer hop node — matches FE PathHopNode / mapHopNode contract. */
+export interface PathHopNodeDto {
+  id: string;
+  label: string;
+  type: 'person' | 'org';
+  memberUid?: string;
+  teamUid?: string;
+}
+
 export interface PathContactPerson {
   name: string;
   role: string;

@@ -11,6 +11,7 @@ describe('InvestorListsQueryService', () => {
   const investorOutreachRecordCount = jest.fn();
   const investorOutreachRecordFindMany = jest.fn();
   const pathfinderPathFindMany = jest.fn();
+  const pathfinderPathGroupBy = jest.fn();
   const memberFindMany = jest.fn();
   const investorPortfolioOverlapFindMany = jest.fn();
 
@@ -22,7 +23,7 @@ describe('InvestorListsQueryService', () => {
       findMany: investorOutreachRecordFindMany,
     },
     investorListMembership: { findMany: investorListMembershipFindMany },
-    pathfinderPath: { findMany: pathfinderPathFindMany },
+    pathfinderPath: { findMany: pathfinderPathFindMany, groupBy: pathfinderPathGroupBy },
     member: { findMany: memberFindMany },
     investorPortfolioOverlap: { findMany: investorPortfolioOverlapFindMany },
     $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
@@ -32,6 +33,7 @@ describe('InvestorListsQueryService', () => {
     jest.clearAllMocks();
     memberFindMany.mockResolvedValue([]);
     investorPortfolioOverlapFindMany.mockResolvedValue([]);
+    pathfinderPathGroupBy.mockResolvedValue([]);
     service = new InvestorListsQueryService(prismaMock);
   });
 
@@ -152,6 +154,36 @@ describe('InvestorListsQueryService', () => {
       expect(result.items).toHaveLength(2);
       expect(result.items[0].investorId).toBe('101');
       expect(result.items[1].investorId).toBe('102');
+    });
+
+    it('attaches bestRouteNodes, bestRouteScore, and pathCount for page members', async () => {
+      const warm = record('118282344', 'Gil', 'VC+2A', true);
+      investorOutreachRecordFindMany.mockResolvedValue([warm]);
+      pathfinderPathFindMany
+        .mockResolvedValueOnce([{ targetInvestorId: '118282344', proximityCode: 'VC+2A', hops: 2, score: 0.146 }])
+        .mockResolvedValueOnce([
+          {
+            targetInvestorId: '118282344',
+            score: 0.146,
+            hopChain: {
+              routeNodes: [
+                { label: 'Coatue', variant: 'org' },
+                { label: 'Elad Gil', variant: 'external' },
+              ],
+            },
+          },
+        ]);
+      pathfinderPathGroupBy.mockResolvedValue([{ targetInvestorId: '118282344', _count: { _all: 5 } }]);
+
+      const result = await service.listMembers(1, { limit: '10' });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].bestRouteScore).toBe(0.146);
+      expect(result.items[0].pathCount).toBe(5);
+      expect(result.items[0].bestRouteNodes).toEqual([
+        { id: 'route-0', label: 'Coatue', type: 'org' },
+        { id: 'route-1', label: 'Elad Gil', type: 'person' },
+      ]);
     });
   });
 });
