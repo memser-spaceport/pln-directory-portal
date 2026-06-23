@@ -42,6 +42,7 @@ import {
 } from './affinity-direct-path.util';
 import { finalizePersonHopChain } from './path-route.util';
 import { loadMemberNameIndex, loadPortfolioFounderIndex } from './founder-member-resolve.util';
+import { loadMemberContactIndex } from './org-contact-resolve.util';
 import { resolvePathfinderScratchDir } from './pathfinder-scratch.util';
 
 const prisma = new PrismaClient();
@@ -295,6 +296,7 @@ async function seed() {
   console.log('Loading founder → LabOS member indexes…');
   const portfolioTeams = await loadPortfolioFounderIndex(prisma);
   const membersByName = await loadMemberNameIndex(prisma);
+  const memberContactIndex = await loadMemberContactIndex(prisma);
   const founderIndexes = { portfolioTeams, membersByName };
   console.log(`  portfolio teams: ${portfolioTeams.size} keys, unique member names: ${membersByName.size}`);
 
@@ -386,7 +388,7 @@ async function seed() {
         hc.plConnector = rel.bestConnector;
         attachedHere = true;
       }
-      hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops);
+      hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops, memberContactIndex);
       pathInserts.push({
         targetInvestorId,
         targetSet: TARGET_SET,

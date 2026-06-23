@@ -56,12 +56,14 @@ describe('founder-member-resolve.util', () => {
     expect(out.contact?.memberUid).toBe('uid-roman');
   });
 
-  it('leaves VC org paths unchanged', () => {
+  it('does not fabricate contact on org-only paths', () => {
     const hc = {
       orgConnector: { name: 'CoinList', description: 'x', tags: ['Org connection'] },
       routeNodes: [{ label: 'CoinList', variant: 'org' as const }],
     };
-    expect(enrichFounderContacts(hc, indexes())).toEqual(hc);
+    const out = enrichFounderContacts(hc, indexes()) as HopChainForFounderResolve;
+    expect(out.contact).toBeUndefined();
+    expect(out.routeNodes).toEqual(hc.routeNodes);
   });
 
   it('enriches connectorTeam leads', () => {

@@ -76,8 +76,6 @@ export function buildAffinityDirectPath(input: {
       ],
       explanation,
       plConnector,
-      contact: { name: plConnector.name, role: 'Protocol Labs' },
-      routeNodes: [{ label: plConnector.name, variant: 'external' }],
     },
   };
 }

@@ -133,8 +133,6 @@ export function enrichFounderContacts<T extends HopChainForFounderResolve>(
   hopChain: T,
   indexes: FounderResolveIndexes
 ): T {
-  if (hopChain.orgConnector) return hopChain;
-
   const bridgeName = parseBridgeFromHopChain(hopChain);
   let contact = hopChain.contact ? resolveContactUid(hopChain.contact, bridgeName, indexes) : undefined;
 
