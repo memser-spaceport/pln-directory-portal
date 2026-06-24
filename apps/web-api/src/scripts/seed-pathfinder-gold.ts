@@ -3,8 +3,11 @@
  *
  * PERSON-GRAIN (the Gold list 183682 is a person list): rows are PEOPLE
  * (contacts at co-investor firms), identified by their Affinity entity id. Each
- * person inherits the proximity of their FIRM (best across firms). No prestige
- * enrichment — Gold caliber is relationship-only by design.
+ * person inherits the proximity of their FIRM (best across firms). Prestige
+ * enrichment by name when present in the shared LP prestige cache.
+ *
+ * PL venture-lead connectors are grafted from `_pl_relationships_183682.json`
+ * (same pull as Neuro — run pull-affinity-pl-relationships.ts for both lists).
  *
  * Idempotent: purge prior gold run + its paths, create person records keyed by
  * Affinity id with person-keyed PathfinderPath rows copied from each person's best
@@ -17,7 +20,21 @@
  */
 import { readFileSync } from 'fs';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { affinityBoost, blendGraphScore, comparePathsByWarmth } from './affinity-warmth-boost.util';
+import { buildAffinityDirectPath, passesAffinityDirectThreshold } from './affinity-direct-path.util';
+import { finalizePersonHopChain } from './path-route.util';
+import { loadMemberNameIndex, loadPortfolioFounderIndex, normalizePersonName } from './founder-member-resolve.util';
+import { loadMemberContactIndex } from './org-contact-resolve.util';
+import { buildMergedPlConnectors, loadPlConnectorsFromFile } from './pl-relationship-seed.util';
 import { resolvePathfinderScratchDir } from './pathfinder-scratch.util';
+import {
+  buildRawPayload,
+  mapAffinityListEntry,
+  mergeProfileFields,
+  type MemberResolver,
+} from './affinity-roster-mapper.util';
+import { loadPrestigeByName, toEnrichment } from './prestige-seed.util';
+import { buildFirmByLabelIndex, lookupFirmProximity, type FirmProximity } from './firm-proximity-seed.util';
 
 const prisma = new PrismaClient();
 
@@ -29,6 +46,8 @@ const LIST_SLUG = 'gold-coinvestors';
 const SCRATCH_DIR = resolvePathfinderScratchDir();
 const DUMP_PATH = `${SCRATCH_DIR}/_pathfinder_gold_dump.json`;
 const AFFINITY_PATH = `${SCRATCH_DIR}/_affinity_183682.json`;
+const PL_REL_PATH = `${SCRATCH_DIR}/_pl_relationships_183682.json`;
+const PRESTIGE_PATH = process.env.PATHFINDER_PRESTIGE_CACHE || `${SCRATCH_DIR}/_lp_prestige_cache.json`;
 
 interface DumpPath {
   targetInvestorId: string;
@@ -63,6 +82,9 @@ interface AffinityEntity {
   primaryEmailAddress?: string | null;
   emailAddresses?: string[] | null;
   fields?: AffinityField[];
+}
+interface AffinityEntry {
+  entity: AffinityEntity;
 }
 
 const norm = (s: string | null | undefined): string =>
@@ -99,19 +121,9 @@ function proximityRank(code: string | null, hasPath: boolean): number {
   return caliber * 100 + parseInt(m[1], 10);
 }
 
-interface FirmProximity {
-  firmId: string;
-  label: string;
-  code: string;
-  hasPath: boolean;
-}
-
 async function cleanup() {
   await prisma.pathfinderPath.deleteMany({ where: { targetSet: TARGET_SET } });
   await prisma.pathfinderEntityCrosswalk.deleteMany({ where: { ingestRunId: RUN_ID } });
-  // Delete ONLY rows this seed created itself (createdAt ~ updatedAt at creation);
-  // pre-existing investor rows absorbed by a pre-fix run are spared and re-matched
-  // by dedupeKey in the loop below. See seed-pathfinder-neuro.ts cleanup().
   await prisma.$executeRaw`
     DELETE FROM "InvestorOutreachRecord"
     WHERE source = ${SOURCE}
@@ -123,18 +135,8 @@ async function seed() {
   if (dump.targetSet !== TARGET_SET) {
     throw new Error(`dump targetSet "${dump.targetSet}" != expected "${TARGET_SET}"`);
   }
-  const firmByLabel = new Map<string, FirmProximity>();
-  for (const s of dump.summaries) {
-    const key = norm(s.firm_label);
-    if (key) {
-      firmByLabel.set(key, {
-        firmId: s.investor_id,
-        label: s.firm_label,
-        code: s.best_proximity_code,
-        hasPath: s.has_path,
-      });
-    }
-  }
+  const prestige = loadPrestigeByName(PRESTIGE_PATH);
+  const firmByLabel = buildFirmByLabelIndex(dump.summaries);
   const pathsByFirm = new Map<string, DumpPath[]>();
   for (const p of dump.paths) {
     const arr = pathsByFirm.get(p.targetInvestorId) ?? [];
@@ -142,12 +144,40 @@ async function seed() {
     pathsByFirm.set(p.targetInvestorId, arr);
   }
 
-  const entries =
-    (JSON.parse(readFileSync(AFFINITY_PATH, 'utf-8')) as { entries?: { entity: AffinityEntity }[] }).entries ?? [];
+  const entries = (JSON.parse(readFileSync(AFFINITY_PATH, 'utf-8')) as { entries?: AffinityEntry[] }).entries ?? [];
+  const plConnectors = buildMergedPlConnectors(
+    loadPlConnectorsFromFile(PL_REL_PATH),
+    entries,
+    new Date().toISOString()
+  );
 
-  // ── Pass 1 (pure memory): classify every entry against a one-shot snapshot
-  // of existing records, then write in bulk — row-by-row awaits took minutes
-  // over a remote DB. Mirrors seed-pathfinder-neuro.ts.
+  console.log('Loading founder → LabOS member indexes…');
+  const portfolioTeams = await loadPortfolioFounderIndex(prisma);
+  const membersByName = await loadMemberNameIndex(prisma);
+  const memberContactIndex = await loadMemberContactIndex(prisma);
+  const founderIndexes = { portfolioTeams, membersByName };
+
+  const entryEmails = entries
+    .map((e) => {
+      const ent = e.entity;
+      const raw =
+        (ent.primaryEmailAddress ?? '').trim() ||
+        (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') ||
+        '';
+      return normalizeEmailKey(raw);
+    })
+    .filter((em) => em.length > 0);
+  const memberByEmail = new Map<string, string>();
+  if (entryEmails.length > 0) {
+    const members = await prisma.member.findMany({
+      where: { email: { in: [...new Set(entryEmails)] } },
+      select: { email: true, uid: true },
+    });
+    for (const m of members) {
+      if (m.email) memberByEmail.set(normalizeEmailKey(m.email), m.uid);
+    }
+  }
+
   console.log(`Snapshotting existing records…`);
   type ExistingRef = { id: number; dedupeKey: string; investorId: string };
   const existingRows: ExistingRef[] = await prisma.investorOutreachRecord.findMany({
@@ -155,12 +185,34 @@ async function seed() {
   });
   const byDedupeKey = new Map<string, ExistingRef>(existingRows.map((r) => [r.dedupeKey, r]));
   const byInvestorId = new Map<string, ExistingRef>(existingRows.map((r) => [r.investorId, r]));
-  const PENDING_ID = -1; // marks rows queued for creation in this run
+
+  const existingProfileRows = await prisma.investorOutreachRecord.findMany({
+    select: {
+      id: true,
+      investorId: true,
+      linkedinUrl: true,
+      title: true,
+      geoFocus: true,
+      investorType: true,
+      sectorTags: true,
+      stageFocus: true,
+      checkSizeRange: true,
+      firmDomain: true,
+      rawPayload: true,
+    },
+  });
+  const profileByInvestorId = new Map(existingProfileRows.map((r) => [r.investorId, r]));
+
+  const memberResolver: MemberResolver = {
+    byEmail: (email) => memberByEmail.get(email) ?? memberContactIndex.byEmail.get(email)?.uid,
+    byName: (name) => membersByName.get(normalizePersonName(name)),
+  };
+  const PENDING_ID = -1;
 
   let duplicates = 0;
   let reachable = 0;
+  let enriched = 0;
   const seen = new Set<string>();
-  /** investorIds to enroll in the gold list (the existing record's id when a duplicate was detected). */
   const memberIds: string[] = [];
 
   const creates: Prisma.InvestorOutreachRecordCreateManyInput[] = [];
@@ -169,10 +221,68 @@ async function seed() {
   const crosswalkRows: Prisma.PathfinderEntityCrosswalkCreateManyInput[] = [];
   const pathInserts: Prisma.PathfinderPathCreateManyInput[] = [];
   const pathTargetsQueued = new Set<string>();
-  const dupPathCandidates: { investorId: string; firmId: string; bestCode: string }[] = [];
+  let personsWithConnector = 0;
+  const dupPathCandidates: {
+    investorId: string;
+    firmId: string;
+    bestCode: string;
+    firstName: string;
+    lastName: string;
+    memberUid?: string;
+  }[] = [];
 
-  const queuePaths = (targetInvestorId: string, firmId: string) => {
-    for (const p of pathsByFirm.get(firmId) ?? []) {
+  const queuePaths = (
+    targetInvestorId: string,
+    firmId: string,
+    person: { firstName: string; lastName: string; memberUid?: string; email?: string; role?: string }
+  ): string | null => {
+    const rel = plConnectors.get(targetInvestorId);
+    const boost = affinityBoost(rel?.bestConnector ?? null);
+    let attachedHere = false;
+
+    type PathCandidate = DumpPath & { score: number };
+    const firmPaths = pathsByFirm.get(firmId) ?? [];
+    const candidates: PathCandidate[] = firmPaths.map((p) => ({
+      ...p,
+      score: blendGraphScore(p.score, boost),
+    }));
+
+    if (rel?.bestConnector && passesAffinityDirectThreshold(rel.bestConnector)) {
+      const baseCaliber = firmPaths[0]?.caliber ?? 'B';
+      const baseConf = firmPaths[0]?.caliberConfidence ?? 0.4;
+      const direct = buildAffinityDirectPath({
+        targetInvestorId,
+        plConnector: rel.bestConnector,
+        caliber: baseCaliber,
+        caliberConfidence: baseConf,
+        targetSet: TARGET_SET,
+        summary: rel.summary,
+      });
+      candidates.push({ ...direct, rank: 0 } as PathCandidate);
+    }
+
+    if (candidates.length === 0) return null;
+
+    const sorted = [...candidates].sort(comparePathsByWarmth);
+    let rank1Code: string | null = null;
+
+    for (let i = 0; i < sorted.length; i++) {
+      const p = sorted[i];
+      const rank = i + 1;
+      if (rank === 1) rank1Code = p.proximityCode;
+
+      let hopChain = JSON.parse(JSON.stringify(p.hopChain)) as Record<string, unknown>;
+      if (rel?.bestConnector && rel.summary) {
+        const hc = hopChain as { explanation?: string; plConnector?: unknown };
+        const summary = rel.summary;
+        const existing = typeof hc.explanation === 'string' ? hc.explanation : '';
+        if (!existing.includes(summary)) {
+          hc.explanation = existing ? `${existing} ${summary}.` : `${summary}.`;
+        }
+        hc.plConnector = rel.bestConnector;
+        attachedHere = true;
+      }
+      hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops, memberContactIndex);
       pathInserts.push({
         targetInvestorId,
         targetSet: TARGET_SET,
@@ -182,12 +292,14 @@ async function seed() {
         proximityCode: p.proximityCode,
         score: p.score,
         caliberConfidence: p.caliberConfidence,
-        hopChain: p.hopChain as Prisma.InputJsonValue,
-        rank: p.rank,
+        hopChain: hopChain as Prisma.InputJsonValue,
+        rank,
         ingestRunId: RUN_ID,
       });
     }
+    if (attachedHere) personsWithConnector += 1;
     pathTargetsQueued.add(targetInvestorId);
+    return rank1Code;
   };
 
   console.log(`Processing ${entries.length} Affinity entries…`);
@@ -207,24 +319,29 @@ async function seed() {
 
     let best: FirmProximity | null = null;
     for (const fn of firms) {
-      const fp = firmByLabel.get(norm(fn));
+      const fp = lookupFirmProximity(fn, firmByLabel);
       if (!fp) continue;
       if (!best || proximityRank(fp.code, fp.hasPath) < proximityRank(best.code, best.hasPath)) {
         best = fp;
       }
     }
     const firmLabel = best?.label ?? firms[0] ?? '';
-    const hasPath = best?.hasPath ?? false;
-    const bestCode = best && hasPath ? best.code : null;
+    const hasGraphPath = best?.hasPath ?? false;
+    const relEntry = plConnectors.get(affinityId);
+    const hasAffinityDirect = !!relEntry?.bestConnector && passesAffinityDirectThreshold(relEntry.bestConnector);
+    const personHasPath = hasGraphPath || hasAffinityDirect;
 
-    // Match by dedupeKey — a person may already exist via the Neuro list (same
-    // Affinity id) or the wider investor DB (same email).
+    const prest = prestige.get(norm(`${firstName} ${lastName}`)) ?? null;
+    const enrichment = prest ? toEnrichment(prest) : undefined;
+    if (enrichment) enriched += 1;
+
+    const { profile: affinityProfile, affinityData } = mapAffinityListEntry(ent, { memberResolver });
+
+    let bestProximityForRecord: string | null = personHasPath && best ? best.code : null;
+
     const existing = byDedupeKey.get(dedupeKey) ?? byInvestorId.get(affinityId);
 
     if (existing && existing.investorId !== affinityId) {
-      // Same email, DIFFERENT id: a duplicate entity. Never overwrite the
-      // existing record's identity — queue the match for human confirmation in
-      // the crosswalk review and keep the existing record as canonical.
       duplicates += 1;
       console.log(
         `  duplicate: affinity ${affinityId} (${firstName} ${lastName}) shares email with existing ` +
@@ -243,38 +360,66 @@ async function seed() {
         needsReview: true,
         ingestRunId: RUN_ID,
       });
-      if (best && hasPath) {
-        dupPathCandidates.push({ investorId: existing.investorId, firmId: best.firmId, bestCode: best.code });
+      if (best && personHasPath) {
+        dupPathCandidates.push({
+          investorId: existing.investorId,
+          firmId: best.firmId,
+          bestCode: best.code,
+          firstName,
+          lastName,
+          memberUid: memberByEmail.get(dedupeKey),
+        });
+      }
+      const canonicalProfile = profileByInvestorId.get(existing.investorId);
+      if (canonicalProfile) {
+        const mergedProfile = mergeProfileFields(canonicalProfile, affinityProfile);
+        const rawPayload = buildRawPayload(undefined, affinityData, canonicalProfile.rawPayload);
+        updates.push({
+          id: canonicalProfile.id,
+          data: {
+            ...mergedProfile,
+            ...(rawPayload ? { rawPayload: rawPayload as Prisma.InputJsonValue } : {}),
+          },
+        });
       }
       memberIds.push(existing.investorId);
       continue;
     }
 
-    // Same Affinity id (re-run / Neuro-shared person) or brand new. On update,
-    // leave source untouched so neuro-first shared people stay neuro-sourced.
-    if (existing) {
-      updates.push({
-        id: existing.id,
-        data: { firstName, lastName, email, firm: firmLabel, bestProximityCode: bestCode, hasPath },
-      });
-    } else {
-      const createInput: Prisma.InvestorOutreachRecordCreateManyInput = {
-        dedupeKey,
-        investorId: affinityId,
-        canonicalId: affinityId,
-        source: SOURCE,
+    if (personHasPath) {
+      reachable += 1;
+      const rank1 = queuePaths(affinityId, best?.firmId ?? '', {
         firstName,
         lastName,
-        email,
-        emailStatus: 'unverified',
-        firm: firmLabel,
-        investorType: 'fund',
-        stageFocus: '',
-        engagementTier: '',
-        enrichmentStatus: 'pending',
-        bestProximityCode: bestCode,
-        hasPath,
-      };
+        memberUid: memberByEmail.get(dedupeKey),
+        email: realEmail || undefined,
+      });
+      if (rank1) bestProximityForRecord = rank1;
+    }
+
+    const priorProfile = profileByInvestorId.get(affinityId);
+    const mergedProfile = mergeProfileFields(priorProfile ?? {}, affinityProfile);
+    const rawPayload = buildRawPayload(enrichment, affinityData, priorProfile?.rawPayload);
+    const recordFields = {
+      investorId: affinityId,
+      canonicalId: affinityId,
+      firstName,
+      lastName,
+      email,
+      emailStatus: 'unverified',
+      firm: firmLabel,
+      ...mergedProfile,
+      engagementTier: '',
+      enrichmentStatus: enrichment ? 'enriched' : 'pending',
+      bestProximityCode: bestProximityForRecord,
+      hasPath: personHasPath,
+      ...(rawPayload ? { rawPayload: rawPayload as Prisma.InputJsonValue } : {}),
+    };
+
+    if (existing) {
+      updates.push({ id: existing.id, data: recordFields });
+    } else {
+      const createInput = { dedupeKey, source: SOURCE, ...recordFields };
       creates.push(createInput);
       createByInvestorId.set(affinityId, createInput);
       const pending: ExistingRef = { id: PENDING_ID, dedupeKey, investorId: affinityId };
@@ -282,15 +427,8 @@ async function seed() {
       byInvestorId.set(affinityId, pending);
     }
     memberIds.push(affinityId);
-
-    if (best && hasPath) {
-      reachable += 1;
-      queuePaths(affinityId, best.firmId);
-    }
   }
 
-  // ── Pass 2: attach this run's paths to duplicate-matched existing records
-  // that have none (one grouped count instead of one count per match).
   const candidateIds = [...new Set(dupPathCandidates.map((d) => d.investorId))].filter(
     (id) => !pathTargetsQueued.has(id)
   );
@@ -305,23 +443,31 @@ async function seed() {
   for (const d of dupPathCandidates) {
     if (pathTargetsQueued.has(d.investorId) || alreadyHasPaths.has(d.investorId)) continue;
     reachable += 1;
-    queuePaths(d.investorId, d.firmId);
+    const rank1 =
+      queuePaths(d.investorId, d.firmId, {
+        firstName: d.firstName,
+        lastName: d.lastName,
+        memberUid: d.memberUid,
+      }) ?? d.bestCode;
     const pendingCreate = createByInvestorId.get(d.investorId);
     if (pendingCreate) {
-      pendingCreate.bestProximityCode = d.bestCode;
+      pendingCreate.bestProximityCode = rank1;
       pendingCreate.hasPath = true;
     } else {
       const ref = byInvestorId.get(d.investorId);
       if (ref && ref.id !== PENDING_ID) {
-        updates.push({ id: ref.id, data: { bestProximityCode: d.bestCode, hasPath: true } });
+        updates.push({ id: ref.id, data: { bestProximityCode: rank1, hasPath: true } });
       }
     }
   }
 
-  // ── Pass 3: bulk writes. Records before paths (paths FK onto investorId).
   console.log(
     `Writing ${creates.length} new records, ${updates.length} updates, ` +
       `${pathInserts.length} paths, ${crosswalkRows.length} crosswalk rows…`
+  );
+  console.log(
+    `  PL-team connector attached to ${personsWithConnector} people` +
+      (plConnectors.size ? ` (of ${plConnectors.size} in the relationship file)` : ' (no relationship file)')
   );
   if (creates.length > 0) {
     await prisma.investorOutreachRecord.createMany({ data: creates, skipDuplicates: true });
@@ -346,7 +492,9 @@ async function seed() {
     updated: updates.length,
     duplicates,
     reachable,
+    enriched,
     pathRows: pathInserts.length,
+    personsWithConnector,
     ids: memberIds,
   };
 }
@@ -386,14 +534,15 @@ async function main() {
   console.log('Purging prior gold run…');
   await cleanup();
   console.log('Creating person-grain gold records + paths…');
-  const { created, updated, duplicates, reachable, pathRows, ids } = await seed();
+  const { created, updated, duplicates, reachable, enriched, pathRows, personsWithConnector, ids } = await seed();
   console.log('Repointing gold-coinvestors list + membership…');
   const members = await repointListAndMembers(ids);
   console.log('— Gold seed (person-grain) complete —');
   console.log(
     `created: ${created} | updated in place: ${updated} | ` +
       `duplicates (queued for crosswalk review): ${duplicates} | ` +
-      `reachable: ${reachable} | path rows: ${pathRows} | members: ${members}`
+      `reachable: ${reachable} | enriched: ${enriched} | path rows: ${pathRows} | ` +
+      `PL connectors on paths: ${personsWithConnector} | members: ${members}`
   );
   if (duplicates > 0) {
     console.log('Review the duplicate matches in the Investor DB → Crosswalk review panel.');

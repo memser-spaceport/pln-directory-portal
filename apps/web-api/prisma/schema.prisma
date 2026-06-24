@@ -92,6 +92,9 @@ model Team {
   portfolioMeta         PlPortfolioTeamMeta?
   teamPitches           TeamPitch[]
   teamPitchParticipants TeamPitchParticipant[]
+
+  /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
+  affinityCompany AffinityCompany?
 }
 
 enum AskStatus {
@@ -208,40 +211,43 @@ model Member {
   pushNotificationReadStatuses       PushNotificationReadStatus[]      @relation("PushNotificationReadStatuses")
   eventAssociations                  PLEventAssociation[]
 
-  dealSubmissions           DealSubmission[]      @relation("MemberDealSubmissions")
-  reviewedDealSubmissions   DealSubmission[]      @relation("MemberReviewedDealSubmissions")
-  dealIssues                DealIssue[]           @relation("MemberDealIssues")
-  resolvedDealIssues        DealIssue[]           @relation("MemberResolvedDealIssues")
-  dealRedemptions           DealRedemption[]      @relation("MemberDealRedemptions")
-  dealUsages                DealUsage[]           @relation("MemberDealUsages")
-  dealWhitelist             DealWhitelist?        @relation("MemberDealWhitelist")
-  dealRequests              DealRequest[]         @relation("MemberDealRequests")
-  articles                  Article[]             @relation("MemberArticles")
-  articleStatistics         ArticleStatistic[]    @relation("MemberArticleStatistics")
-  articleWhitelist          ArticleWhitelist?     @relation("MemberArticleWhitelist")
-  articleRequests           ArticleRequest[]      @relation("MemberArticleRequests")
-  articleComments           ArticleComment[]      @relation("MemberArticleComments")
-  articleCommentLikes       ArticleCommentLike[]  @relation("MemberArticleCommentLikes")
-  roleAssignments           RoleAssignment[]      @relation("MemberRoleAssignments")
-  policyAssignmentsV2       PolicyAssignment[]    @relation("PolicyAssignmentMember")
-  policyAssignmentsV2Given  PolicyAssignment[]    @relation("PolicyAssignmentAssignedBy")
-  memberPermissionsV2       MemberPermissionV2[]  @relation("MemberPermissionV2Member")
-  memberPermissionsV2Given  MemberPermissionV2[]  @relation("MemberPermissionV2GrantedBy")
-  roleAssignmentsGiven      RoleAssignment[]      @relation("MemberRoleAssignmentsGiven")
-  memberPermissions         MemberPermission[]    @relation("MemberDirectPermissions")
-  memberPermissionsGiven    MemberPermission[]    @relation("MemberDirectPermissionsGiven")
+  dealSubmissions           DealSubmission[]        @relation("MemberDealSubmissions")
+  reviewedDealSubmissions   DealSubmission[]        @relation("MemberReviewedDealSubmissions")
+  dealIssues                DealIssue[]             @relation("MemberDealIssues")
+  resolvedDealIssues        DealIssue[]             @relation("MemberResolvedDealIssues")
+  dealRedemptions           DealRedemption[]        @relation("MemberDealRedemptions")
+  dealUsages                DealUsage[]             @relation("MemberDealUsages")
+  dealWhitelist             DealWhitelist?          @relation("MemberDealWhitelist")
+  dealRequests              DealRequest[]           @relation("MemberDealRequests")
+  articles                  Article[]               @relation("MemberArticles")
+  articleStatistics         ArticleStatistic[]      @relation("MemberArticleStatistics")
+  articleWhitelist          ArticleWhitelist?       @relation("MemberArticleWhitelist")
+  articleRequests           ArticleRequest[]        @relation("MemberArticleRequests")
+  articleComments           ArticleComment[]        @relation("MemberArticleComments")
+  articleCommentLikes       ArticleCommentLike[]    @relation("MemberArticleCommentLikes")
+  roleAssignments           RoleAssignment[]        @relation("MemberRoleAssignments")
+  policyAssignmentsV2       PolicyAssignment[]      @relation("PolicyAssignmentMember")
+  policyAssignmentsV2Given  PolicyAssignment[]      @relation("PolicyAssignmentAssignedBy")
+  memberPermissionsV2       MemberPermissionV2[]    @relation("MemberPermissionV2Member")
+  memberPermissionsV2Given  MemberPermissionV2[]    @relation("MemberPermissionV2GrantedBy")
+  roleAssignmentsGiven      RoleAssignment[]        @relation("MemberRoleAssignmentsGiven")
+  memberPermissions         MemberPermission[]      @relation("MemberDirectPermissions")
+  memberPermissionsGiven    MemberPermission[]      @relation("MemberDirectPermissionsGiven")
   memberApproval            MemberApproval?
-  requestedMemberApprovals  MemberApproval[]      @relation("MemberApprovalRequestedBy")
-  reviewedMemberApprovals   MemberApproval[]      @relation("MemberApprovalReviewedBy")
-  memberApprovalEvents      MemberApprovalEvent[] @relation("MemberApprovalEventMember")
-  actedMemberApprovalEvents MemberApprovalEvent[] @relation("MemberApprovalEventActor")
-  jobAlerts                 JobAlert[]            @relation("MemberJobAlerts")
-  roadmapItemsCreated       RoadmapItem[]         @relation("roadmapItemCreatedBy")
-  roadmapItemsPromoted      RoadmapItem[]         @relation("roadmapItemPromotedBy")
-  roadmapItemUpvotes        RoadmapItemUpvote[]   @relation("roadmapItemUpvoter")
-  roadmapItemPins           RoadmapItemPin[]      @relation("roadmapItemPinner")
-  roadmapObjectivesCreated  RoadmapObjective[]    @relation("roadmapObjectiveCreatedBy")
+  requestedMemberApprovals  MemberApproval[]        @relation("MemberApprovalRequestedBy")
+  reviewedMemberApprovals   MemberApproval[]        @relation("MemberApprovalReviewedBy")
+  memberApprovalEvents      MemberApprovalEvent[]   @relation("MemberApprovalEventMember")
+  actedMemberApprovalEvents MemberApprovalEvent[]   @relation("MemberApprovalEventActor")
+  jobAlerts                 JobAlert[]              @relation("MemberJobAlerts")
+  roadmapItemsCreated       RoadmapItem[]           @relation("roadmapItemCreatedBy")
+  roadmapItemsPromoted      RoadmapItem[]           @relation("roadmapItemPromotedBy")
+  roadmapItemUpvotes        RoadmapItemUpvote[]     @relation("roadmapItemUpvoter")
+  roadmapItemPins           RoadmapItemPin[]        @relation("roadmapItemPinner")
+  roadmapObjectivesCreated  RoadmapObjective[]      @relation("roadmapObjectiveCreatedBy")
   roadmapSubmissionDraft    RoadmapSubmissionDraft? @relation("roadmapSubmissionDraftOwner")
+
+  /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
+  affinityPerson AffinityPerson?
 }
 
 model MemberApproval {
@@ -1381,28 +1387,28 @@ enum TeamPitchParticipantAccess {
 }
 
 model TeamPitch {
-  id              Int                        @id @default(autoincrement())
-  uid             String                     @unique @default(cuid())
-  teamUid         String
-  team            Team                       @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
-  slug            String                     @unique
-  title               String
-  description         String
-  spotlightFrequency  String                     @default("month")
-  spotlightStatement  String?
-  status              TeamPitchStatus            @default(DRAFT)
-  closedAt        DateTime?
-  supportEmail    String
-  headerImageUid  String?
-  headerImage     Image?                     @relation("TeamPitchHeaderImage", fields: [headerImageUid], references: [uid])
-  logoUid         String?
-  logo            Image?                     @relation("TeamPitchLogo", fields: [logoUid], references: [uid])
-  primaryColor    String                     @default("#1a45e6")
-  createdAt       DateTime                   @default(now())
-  updatedAt       DateTime                   @updatedAt
-  profile         TeamPitchProfile?
-  participants    TeamPitchParticipant[]
-  expressInterest TeamPitchExpressInterest[]
+  id                 Int                        @id @default(autoincrement())
+  uid                String                     @unique @default(cuid())
+  teamUid            String
+  team               Team                       @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  slug               String                     @unique
+  title              String
+  description        String
+  spotlightFrequency String                     @default("month")
+  spotlightStatement String?
+  status             TeamPitchStatus            @default(DRAFT)
+  closedAt           DateTime?
+  supportEmail       String
+  headerImageUid     String?
+  headerImage        Image?                     @relation("TeamPitchHeaderImage", fields: [headerImageUid], references: [uid])
+  logoUid            String?
+  logo               Image?                     @relation("TeamPitchLogo", fields: [logoUid], references: [uid])
+  primaryColor       String                     @default("#1a45e6")
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  profile            TeamPitchProfile?
+  participants       TeamPitchParticipant[]
+  expressInterest    TeamPitchExpressInterest[]
 
   @@index([teamUid])
   @@index([status])
@@ -2365,11 +2371,11 @@ model InvestorOutreachRecord {
   lastName  String?
   email     String
 
-  emailStatus String
-  linkedinUrl String?
-  firm        String?
-  firmDomain  String?
-  title       String? @db.VarChar(120)
+  emailStatus   String
+  linkedinUrl   String?
+  firm          String?
+  firmDomain    String?
+  title         String? @db.VarChar(120)
   /// Firm-level warm-intro reachability from the co-investment graph, e.g. "VC+1A", "C".
   proximityCode String? @db.VarChar(8)
 
@@ -2408,7 +2414,7 @@ model InvestorOutreachRecord {
   /// PathfinderPath for fast list sort/render without a join. e.g. "JB+1A", "F+2B", "C".
   bestProximityCode String? @db.VarChar(16)
   /// PL Path Finder — true when at least one non-cold path exists. Denormalized for fast filtering.
-  hasPath Boolean @default(false)
+  hasPath           Boolean @default(false)
 
   portfolioOverlaps InvestorPortfolioOverlap[]
   pathfinderPaths   PathfinderPath[]
@@ -2491,16 +2497,16 @@ model PathfinderPath {
   targetSet String @db.VarChar(120)
 
   /// Connector category (which door): F | VC | JB | PL | O | C (cold).
-  connectorType String @db.VarChar(8)
+  connectorType String  @db.VarChar(8)
   /// Social distance: 1 = direct, 2 = one intermediary, 3 = hard ceiling.
-  hops Int
+  hops          Int
   /// Caliber gate result: A (relationship AND contact) | B (relationship OR contact) | null when cold.
-  caliber String? @db.VarChar(2)
+  caliber       String? @db.VarChar(2)
   /// Denormalized human-facing code, e.g. "JB+1A", "F+2B", "C".
-  proximityCode String @db.VarChar(16)
+  proximityCode String  @db.VarChar(16)
 
   /// 0..1 success-probability score (product of edge probabilities). Higher = warmer.
-  score Float
+  score             Float
   /// 0..1 confidence in the computed caliber/code.
   caliberConfidence Float?
 
@@ -2512,9 +2518,9 @@ model PathfinderPath {
   /// pick the best path without re-sorting.
   rank Int @default(0)
 
-  computedAt DateTime @default(now())
+  computedAt  DateTime @default(now())
   /// Ingest run that produced this row (batch replacement + provenance).
-  ingestRunId String? @db.VarChar(64)
+  ingestRunId String?  @db.VarChar(64)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2538,9 +2544,9 @@ model PathfinderEntityCrosswalk {
   /// Directory member/team uid (founder side). Null if entity not in Directory.
   directoryUid String? @db.VarChar(64)
   /// Affinity id (LP/target side). Null if entity not in Affinity.
-  affinityId String? @db.VarChar(64)
+  affinityId   String? @db.VarChar(64)
   /// Investor outreach external id, when the entity is an ingested target.
-  investorId String? @db.VarChar(64)
+  investorId   String? @db.VarChar(64)
 
   /// person | org
   entityType String @db.VarChar(16)
@@ -2549,15 +2555,15 @@ model PathfinderEntityCrosswalk {
   firm        String? @db.VarChar(200)
 
   /// How the link was made: email | name_firm | cap_table | manual | bootstrap_labos.
-  matchMethod String @db.VarChar(32)
+  matchMethod     String  @db.VarChar(32)
   /// 0..1 confidence in the link.
   matchConfidence Float
   /// true when a deterministic link auto-applied; false when pending human confirm.
-  isConfirmed Boolean @default(false)
+  isConfirmed     Boolean @default(false)
   /// true when this is a founder-who-is-also-LP LINK (preserve both identities, never merge).
   isFounderLpLink Boolean @default(false)
   /// true when this candidate is queued for human review (fuzzy/ambiguous).
-  needsReview Boolean @default(false)
+  needsReview     Boolean @default(false)
 
   ingestRunId String? @db.VarChar(64)
 
@@ -2584,7 +2590,7 @@ model PathfinderCorrection {
   /// column is what says which attribute was corrected.)
   subjectType String @db.VarChar(24)
   /// Id of the subject in that domain (PathfinderPath.id, crosswalk id, canonical/investor id).
-  subjectId String @db.VarChar(64)
+  subjectId   String @db.VarChar(64)
 
   /// Attribute being corrected. For subjectType 'path': caliber | connector_type | valid | note.
   /// Others e.g. "match" (crosswalk), "hide", "intro_status".
@@ -2627,7 +2633,7 @@ model InvestorList {
   description String? @db.VarChar(1000)
 
   /// Where the list originates: 'affinity' | 'manual'.
-  source String @db.VarChar(24)
+  source      String  @db.VarChar(24)
   /// External reference (e.g. the Affinity list id) when source != manual.
   externalRef String? @db.VarChar(120)
 
@@ -2730,7 +2736,7 @@ model FounderSourcingRecord {
   warmIntroPaths  Json?
   intentSignals   Json?
 
-  provenance   Json?
+  provenance           Json?
   lastSignalAt         DateTime?
   lastActivitySeenAt   DateTime?
   whyNow               String?   @db.VarChar(500)
@@ -3001,4 +3007,281 @@ model AiAppEvent {
   @@index([type])
   @@index([appUid])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Affinity CRM sidecars (read-only ingest from Affinity API — task 02)
+// Separate from Team/Member core rows; optional FK when crosswalk succeeds.
+// ---------------------------------------------------------------------------
+
+enum AffinityIngestRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum AffinityEntityLinkMethod {
+  AIRTABLE_REC_ID
+  DOMAIN
+  EMAIL
+  AFFINITY_ID
+  DIRECTORY_UID
+  MANUAL
+}
+
+/// Audit row per Affinity pull/ingest execution.
+model AffinityIngestRun {
+  id           String                  @id @default(cuid())
+  startedAt    DateTime                @default(now())
+  finishedAt   DateTime?
+  status       AffinityIngestRunStatus @default(RUNNING)
+  /// e.g. companies | founders | full
+  scope        String                  @db.VarChar(32)
+  dryRun       Boolean                 @default(false)
+  stats        Json?
+  errorMessage String?                 @db.Text
+
+  companies AffinityCompany[]
+  persons   AffinityPerson[]
+
+  @@index([startedAt])
+  @@index([status])
+}
+
+/// Affinity organization (company) — teams/portfolio companies.
+/// Upserted by affinityOrgId. Merges Portfolio Companies + Portfolio KPIs list fields.
+model AffinityCompany {
+  id  Int    @id @default(autoincrement())
+  uid String @unique @default(cuid())
+
+  /// Affinity organization id (entity.id from list-entries).
+  affinityOrgId String @unique @db.VarChar(64)
+
+  name    String
+  domain  String?  @db.VarChar(255)
+  domains String[] @default([])
+
+  /// Builders Funnel Record ID (global field-3635409) — usually Airtable rec….
+  buildersFunnelRecordId String? @db.VarChar(128)
+
+  // --- Global CRM (Portfolio Companies) ---
+  dealStatus         String?   @db.VarChar(120)
+  tags               String[]  @default([])
+  tokenStatus        String?   @db.VarChar(80)
+  postMoneyValuation Decimal?  @db.Decimal(20, 2)
+  exitDate           DateTime?
+  deckLink           String?   @db.Text
+  acceleratorProgram String?   @db.VarChar(120)
+  investorType       String?   @db.VarChar(80)
+  relationshipRoles  String[]  @default([])
+  fundRelevance      String[]  @default([])
+
+  // --- Affinity / Dealroom enrichment ---
+  description       String?   @db.Text
+  investmentStage   String?   @db.VarChar(120)
+  industries        String[]  @default([])
+  investors         String[]  @default([])
+  yearFounded       Int?
+  totalFundingUsd   Decimal?  @db.Decimal(20, 2)
+  lastFundingUsd    Decimal?  @db.Decimal(20, 2)
+  lastFundingDate   DateTime?
+  linkedinUrl       String?   @db.Text
+  employeeCount     Int?
+  linkedinHeadcount Int?
+  location          Json?
+
+  // --- Portfolio KPIs (merged when org is on KPI list) ---
+  priority                 String?   @db.VarChar(80)
+  kpiListStatus            String?   @db.VarChar(80)
+  mrr                      Decimal?  @db.Decimal(20, 2)
+  revenueLtm               Decimal?  @db.Decimal(20, 2)
+  monthlyBurn              Decimal?  @db.Decimal(20, 2)
+  cashBalance              Decimal?  @db.Decimal(20, 2)
+  runwayMonths             Int?
+  teamFte                  Int?
+  totalUsers               Int?
+  maus                     Int?
+  daus                     Int?
+  initialInvestmentUsd     Decimal?  @db.Decimal(20, 2)
+  valuationAtInvestmentUsd Decimal?  @db.Decimal(20, 2)
+  latestPostMoneyUsd       Decimal?  @db.Decimal(20, 2)
+  fundedVia                String[]  @default([])
+  kpiLastUpdateAt          DateTime?
+  planToFundraise6Mo       String?   @db.VarChar(80)
+
+  // --- Relationship intelligence (normalized dates) ---
+  lastContactAt        DateTime?
+  lastEmailAt          DateTime?
+  firstEmailAt         DateTime?
+  lastEventAt          DateTime?
+  firstEventAt         DateTime?
+  nextEventAt          DateTime?
+  /// Person ref: { id, firstName, lastName, primaryEmailAddress, type }
+  sourceOfIntroduction Json?
+
+  /// Affinity person ids from `persons` field + v1 org.person_ids (deduped).
+  linkedPersonIds Int[] @default([])
+
+  // --- Optional Directory link ---
+  teamUid        String?                   @unique
+  team           Team?                     @relation(fields: [teamUid], references: [uid], onDelete: SetNull)
+  linkMethod     AffinityEntityLinkMethod?
+  linkConfidence Float?
+  linkedAt       DateTime?
+
+  listMemberships     AffinityListMembership[]
+  personOrganizations AffinityPersonOrganization[] @relation("AffinityCompanyPersonOrgs")
+  primaryForPersons   AffinityPerson[]             @relation("AffinityPersonPrimaryCompany")
+
+  /// All list-entry field values keyed by Affinity field id.
+  rawFields         Json
+  /// Optional v1 GET /organizations/{id} payload.
+  rawV1Organization Json?
+
+  pulledAt        DateTime           @default(now())
+  lastIngestRunId String?
+  lastIngestRun   AffinityIngestRun? @relation(fields: [lastIngestRunId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([domain])
+  @@index([buildersFunnelRecordId])
+  @@index([dealStatus])
+  @@index([priority])
+  @@index([teamUid])
+  @@index([lastIngestRunId])
+}
+
+/// Affinity person — founders and other people on founder lists.
+model AffinityPerson {
+  id  Int    @id @default(autoincrement())
+  uid String @unique @default(cuid())
+
+  /// Affinity person id (entity.id from list-entries).
+  affinityPersonId String @unique @db.VarChar(64)
+
+  firstName      String?  @db.VarChar(120)
+  lastName       String?  @db.VarChar(120)
+  fullName       String?  @db.VarChar(240)
+  primaryEmail   String?  @db.VarChar(320)
+  emailAddresses String[] @default([])
+
+  /// field-4173262 — Airtable rec…, email, or rarely Directory uid.
+  buildersFunnelRecordId String?  @db.VarChar(128)
+  telegram               String?  @db.VarChar(120)
+  linkedinUrl            String?  @db.Text
+  phoneNumbers           String[] @default([])
+
+  currentJobTitle               String?  @db.VarChar(240)
+  currentOrganizationName       String?  @db.VarChar(240)
+  currentOrganizationAffinityId String?  @db.VarChar(64)
+  industries                    String[] @default([])
+  location                      Json?
+
+  // --- CRM scoring / segmentation ---
+  relationshipTiers String[] @default([])
+  relationshipRoles String[] @default([])
+  fundRelevance     String[] @default([])
+  investorTypes     String[] @default([])
+  stagePreference   String?  @db.Text
+  sectorFocus       String?  @db.Text
+  dataSources       String[] @default([])
+  dataQuality       String?  @db.Text
+  engagementScore   Float?
+  relationshipScore Float?
+  qualityScore      Float?
+  keyContact        String?  @db.VarChar(240)
+  standing          String?  @db.VarChar(80)
+  listStatus        String?  @db.VarChar(80)
+  gender            String?  @db.VarChar(40)
+
+  // --- Relationship intelligence ---
+  lastContactAt        DateTime?
+  lastEmailAt          DateTime?
+  firstEmailAt         DateTime?
+  lastEventAt          DateTime?
+  firstEventAt         DateTime?
+  nextEventAt          DateTime?
+  sourceOfIntroduction Json?
+
+  // --- Optional Directory links ---
+  memberUid      String?                   @unique
+  member         Member?                   @relation(fields: [memberUid], references: [uid], onDelete: SetNull)
+  linkMethod     AffinityEntityLinkMethod?
+  linkConfidence Float?
+  linkedAt       DateTime?
+
+  /// Best-effort company link from current organization / companies[] field.
+  primaryCompanyUid String?
+  primaryCompany    AffinityCompany? @relation("AffinityPersonPrimaryCompany", fields: [primaryCompanyUid], references: [uid], onDelete: SetNull)
+
+  listMemberships AffinityListMembership[]
+  organizations   AffinityPersonOrganization[]
+
+  rawFields   Json
+  /// Optional v1 GET /persons/{id} payload (emails, interaction_dates, …).
+  rawV1Person Json?
+
+  pulledAt        DateTime           @default(now())
+  lastIngestRunId String?
+  lastIngestRun   AffinityIngestRun? @relation(fields: [lastIngestRunId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([primaryEmail])
+  @@index([buildersFunnelRecordId])
+  @@index([currentOrganizationAffinityId])
+  @@index([memberUid])
+  @@index([primaryCompanyUid])
+  @@index([lastIngestRunId])
+}
+
+/// Person ↔ company edges from Affinity `companies` / org associations.
+model AffinityPersonOrganization {
+  id Int @id @default(autoincrement())
+
+  personUid  String
+  person     AffinityPerson  @relation(fields: [personUid], references: [uid], onDelete: Cascade)
+  companyUid String
+  company    AffinityCompany @relation("AffinityCompanyPersonOrgs", fields: [companyUid], references: [uid], onDelete: Cascade)
+
+  /// Affinity org id denormalized for upserts without joins.
+  affinityOrgId    String  @db.VarChar(64)
+  affinityPersonId String  @db.VarChar(64)
+  isCurrent        Boolean @default(false)
+  /// Job title at this org when known.
+  jobTitle         String? @db.VarChar(240)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([personUid, companyUid])
+  @@index([affinityOrgId])
+  @@index([affinityPersonId])
+}
+
+/// Which Affinity lists an entity appears on (companies can be on Companies + KPIs).
+model AffinityListMembership {
+  id Int @id @default(autoincrement())
+
+  affinityListId      Int
+  affinityListEntryId Int    @unique
+  listName            String @db.VarChar(200)
+
+  companyUid String?
+  company    AffinityCompany? @relation(fields: [companyUid], references: [uid], onDelete: Cascade)
+  personUid  String?
+  person     AffinityPerson?  @relation(fields: [personUid], references: [uid], onDelete: Cascade)
+
+  /// List-specific field subset (Status, Owners, Amount, …) keyed by field id.
+  listFields Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([affinityListId])
+  @@index([companyUid])
+  @@index([personUid])
 }

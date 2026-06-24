@@ -75,6 +75,7 @@ import { InvestorOutreachModule } from './investor-outreach/investor-outreach.mo
 import { PathfinderModule } from './pathfinder/pathfinder.module';
 import { InvestorListsModule } from './investor-lists/investor-lists.module';
 import { FounderSourcingModule } from './founder-sourcing/founder-sourcing.module';
+import { AffinityModule } from './affinity/affinity.module';
 import { RoadmapModule } from './roadmap/roadmap.module';
 import { AiAppsModule } from './ai-apps/ai-apps.module';
 
@@ -172,6 +173,7 @@ import { AiAppsModule } from './ai-apps/ai-apps.module';
     PathfinderModule,
     InvestorListsModule,
     FounderSourcingModule,
+    AffinityModule,
     RoadmapModule,
     AiAppsModule,
   ],
