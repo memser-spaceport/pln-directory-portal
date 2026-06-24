@@ -3026,6 +3026,7 @@ enum AffinityEntityLinkMethod {
   EMAIL
   AFFINITY_ID
   DIRECTORY_UID
+  NAME
   MANUAL
 }
 

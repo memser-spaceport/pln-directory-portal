@@ -25,6 +25,7 @@ const permissionSeeds: PermissionSeed[] = [
   { code: 'team.membership_source.read', module: 'Directory' },
   { code: 'membership.source.read', module: 'Directory' },
   { code: 'member.contacts.read', module: 'Directory' },
+  { code: 'member.affinity.read', module: 'Members' },
   { code: 'member.onboarding', module: 'Directory' },
   { code: 'oh.supply.read', module: 'Office Hours' },
   { code: 'oh.supply.write', module: 'Office Hours' },
@@ -64,6 +65,7 @@ const policies: PolicySeed[] = [
     permissions: [
       'directory.admin.full',
       'member.contacts.read',
+      'member.affinity.read',
       'team.search.read',
       'member.search.read',
       'team.priority.read',
@@ -90,6 +92,7 @@ const policies: PolicySeed[] = [
     group: 'PL Internal',
     permissions: [
       'member.contacts.read',
+      'member.affinity.read',
       'team.priority.read',
       'team.membership_source.read',
       'irlg.going.read',
