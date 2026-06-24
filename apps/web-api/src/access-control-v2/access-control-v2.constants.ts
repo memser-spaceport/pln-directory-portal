@@ -62,6 +62,8 @@ export const MEMBER_PERMISSIONS = {
   SEARCH_READ: 'member.search.read',
   /** Read access to member contacts (email, etc.) */
   CONTACTS_READ: 'member.contacts.read',
+  /** View Affinity CRM context on the member profile (PL Infra) */
+  AFFINITY_READ: 'member.affinity.read',
   /** Access to onboarding flow (replaces L4-based onboarding) */
   ONBOARDING: 'member.onboarding',
   /** Manage investor-only settings and profile actions */
@@ -228,6 +230,7 @@ export const ALL_PERMISSION_CODES = [
   // Members
   MEMBER_PERMISSIONS.SEARCH_READ,
   MEMBER_PERMISSIONS.CONTACTS_READ,
+  MEMBER_PERMISSIONS.AFFINITY_READ,
   MEMBER_PERMISSIONS.ONBOARDING,
   MEMBER_PERMISSIONS.INVESTOR_MANAGE,
 

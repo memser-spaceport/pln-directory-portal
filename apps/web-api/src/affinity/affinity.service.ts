@@ -93,10 +93,10 @@ export class AffinityService {
     try {
       const [teams, members, existingCompanies, existingPersons] = await Promise.all([
         this.prisma.team.findMany({
-          select: { uid: true, airtableRecId: true, website: true },
+          select: { uid: true, name: true, airtableRecId: true, website: true },
         }),
         this.prisma.member.findMany({
-          select: { uid: true, email: true, airtableRecId: true },
+          select: { uid: true, name: true, email: true, airtableRecId: true },
         }),
         this.prisma.affinityCompany.findMany({
           select: { uid: true, affinityOrgId: true, teamUid: true },
@@ -152,6 +152,7 @@ export class AffinityService {
           const m = matchTeam(
             {
               affinityOrgId: item.affinity_org_id,
+              name: item.name,
               buildersFunnelRecordId: item.builders_funnel_record_id,
               domain: item.domain,
               domains: item.domains,
@@ -165,6 +166,9 @@ export class AffinityService {
           const m = matchMember(
             {
               affinityPersonId: item.affinity_person_id,
+              firstName: item.first_name,
+              lastName: item.last_name,
+              fullName: item.full_name,
               buildersFunnelRecordId: item.builders_funnel_record_id,
               primaryEmail: item.primary_email,
               emailAddresses: item.email_addresses,
@@ -289,6 +293,7 @@ export class AffinityService {
     const match = matchTeam(
       {
         affinityOrgId: item.affinity_org_id,
+        name: item.name,
         buildersFunnelRecordId: item.builders_funnel_record_id,
         domain: item.domain,
         domains: item.domains,
@@ -409,6 +414,9 @@ export class AffinityService {
     const memberMatch = matchMember(
       {
         affinityPersonId: item.affinity_person_id,
+        firstName: item.first_name,
+        lastName: item.last_name,
+        fullName: item.full_name,
         buildersFunnelRecordId: item.builders_funnel_record_id,
         primaryEmail: item.primary_email,
         emailAddresses: item.email_addresses,
