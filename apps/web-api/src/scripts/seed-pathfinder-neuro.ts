@@ -35,21 +35,24 @@ import { readFileSync } from 'fs';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { firmKey, resolveFirmLookupKey } from './firm-key.util';
 import { affinityBoost, blendGraphScore, comparePathsByWarmth } from './affinity-warmth-boost.util';
-import {
-  buildAffinityDirectPath,
-  passesAffinityDirectThreshold,
-  type PlConnectorInput,
-} from './affinity-direct-path.util';
+import { buildAffinityDirectPath, passesAffinityDirectThreshold } from './affinity-direct-path.util';
 import { finalizePersonHopChain } from './path-route.util';
 import { loadMemberNameIndex, loadPortfolioFounderIndex, normalizePersonName } from './founder-member-resolve.util';
 import { loadMemberContactIndex } from './org-contact-resolve.util';
 import { resolvePathfinderScratchDir } from './pathfinder-scratch.util';
 import {
   buildRawPayload,
+  extractRosterConnectorHints,
   mapAffinityListEntry,
   mergeProfileFields,
   type MemberResolver,
 } from './affinity-roster-mapper.util';
+import {
+  DEFAULT_PL_TEAM_LEADS,
+  mergePlTeamRelationship,
+  type PlConnector,
+  type PlTeamRelationship,
+} from './pl-team-relationship.util';
 
 const prisma = new PrismaClient();
 
@@ -124,7 +127,9 @@ interface AffinityEntry {
  */
 interface PlRelEntry {
   summary: string | null;
-  bestConnector: Record<string, unknown> | null;
+  bestConnector: PlConnector | null;
+  connectors?: PlConnector[];
+  externalId?: number | null;
 }
 
 const norm = (s: string | null | undefined): string =>
@@ -180,6 +185,42 @@ function loadPlConnectors(): Map<string, PlRelEntry> {
     console.warn(`(no ${PL_REL_PATH} — PL-team connector attribution skipped)`);
     return new Map();
   }
+}
+
+function v1RelFromEntry(raw: PlRelEntry | undefined): PlTeamRelationship {
+  const extended = raw as PlRelEntry & { connectors?: PlConnector[]; externalId?: number | null };
+  return {
+    externalId: extended?.externalId ?? null,
+    connectors: extended?.connectors ?? [],
+    bestConnector: extended?.bestConnector ?? null,
+    summary: extended?.summary ?? null,
+  };
+}
+
+/** Merge v1 relationship pull with roster key-contact / last-touch fallback per LP. */
+function buildMergedPlConnectors(
+  v1Map: Map<string, PlRelEntry>,
+  affinityEntries: AffinityEntry[],
+  referenceIso: string
+): Map<string, PlRelEntry> {
+  const merged = new Map<string, PlRelEntry>();
+  for (const e of affinityEntries) {
+    const affinityId = String(e.entity.id ?? '');
+    if (!affinityId) continue;
+    const result = mergePlTeamRelationship(
+      v1RelFromEntry(v1Map.get(affinityId)),
+      extractRosterConnectorHints(e.entity),
+      DEFAULT_PL_TEAM_LEADS,
+      referenceIso
+    );
+    merged.set(affinityId, {
+      summary: result.summary,
+      bestConnector: result.bestConnector,
+      connectors: result.connectors,
+      externalId: result.externalId,
+    });
+  }
+  return merged;
 }
 
 /** Warmer = smaller. Cold (no path) sinks last. */
@@ -251,7 +292,7 @@ async function seed() {
     throw new Error(`dump targetSet "${dump.targetSet}" != expected "${TARGET_SET}"`);
   }
   const prestige = loadPrestigeByName();
-  const plConnectors = loadPlConnectors();
+  const v1PlConnectors = loadPlConnectors();
   let personsWithConnector = 0;
 
   // Index firm proximity by normalized firm label, and firm paths by firm id.
@@ -276,6 +317,7 @@ async function seed() {
   }
 
   const entries = (JSON.parse(readFileSync(AFFINITY_PATH, 'utf-8')) as { entries?: AffinityEntry[] }).entries ?? [];
+  const plConnectors = buildMergedPlConnectors(v1PlConnectors, entries, new Date().toISOString());
 
   // LabOS member uid by normalized email (investor routeNodes terminus).
   const entryEmails = entries
@@ -371,7 +413,7 @@ async function seed() {
     person: { firstName: string; lastName: string; memberUid?: string; email?: string; role?: string }
   ): string | null => {
     const rel = plConnectors.get(targetInvestorId);
-    const boost = affinityBoost((rel?.bestConnector as Parameters<typeof affinityBoost>[0]) ?? null);
+    const boost = affinityBoost(rel?.bestConnector ?? null);
     let attachedHere = false;
 
     type PathCandidate = DumpPath & { score: number };
@@ -381,12 +423,12 @@ async function seed() {
       score: blendGraphScore(p.score, boost),
     }));
 
-    if (rel?.bestConnector && passesAffinityDirectThreshold(rel.bestConnector as unknown as PlConnectorInput)) {
+    if (rel?.bestConnector && passesAffinityDirectThreshold(rel.bestConnector)) {
       const baseCaliber = firmPaths[0]?.caliber ?? 'B';
       const baseConf = firmPaths[0]?.caliberConfidence ?? 0.4;
       const direct = buildAffinityDirectPath({
         targetInvestorId,
-        plConnector: rel.bestConnector as unknown as PlConnectorInput,
+        plConnector: rel.bestConnector,
         caliber: baseCaliber,
         caliberConfidence: baseConf,
         targetSet: TARGET_SET,
@@ -465,8 +507,7 @@ async function seed() {
     const firmLabel = best?.label ?? firms[0] ?? '';
     const hasGraphPath = best?.hasPath ?? false;
     const relEntry = plConnectors.get(affinityId);
-    const hasAffinityDirect =
-      !!relEntry?.bestConnector && passesAffinityDirectThreshold(relEntry.bestConnector as unknown as PlConnectorInput);
+    const hasAffinityDirect = !!relEntry?.bestConnector && passesAffinityDirectThreshold(relEntry.bestConnector);
     const personHasPath = hasGraphPath || hasAffinityDirect;
 
     const prest = prestige.get(norm(`${firstName} ${lastName}`)) ?? null;

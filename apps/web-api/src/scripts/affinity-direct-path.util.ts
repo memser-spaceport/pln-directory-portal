@@ -17,9 +17,15 @@ export interface PlConnectorInput {
   evidenceDate?: string | null;
   eventOnly?: boolean;
   tier?: number;
+  attributionSource?: 'affinity-v1' | 'keyContact' | 'lastContact' | 'lastEmail';
 }
 
+const ROSTER_SOURCES = new Set(['keyContact', 'lastContact', 'lastEmail']);
+
 export function passesAffinityDirectThreshold(connector: PlConnectorInput): boolean {
+  if (connector.attributionSource && ROSTER_SOURCES.has(connector.attributionSource)) {
+    return true;
+  }
   const tier = connector.tier ?? ConnectorTier.EventOnly;
   if (tier >= ConnectorTier.Email) return true;
   const strength = connector.strength;
@@ -50,6 +56,10 @@ export function buildAffinityDirectPath(input: {
   const score = affinityBoost(plConnector);
   const caliberSuffix = caliber ?? '';
   const explanation = summary?.trim() || `Reach directly through ${plConnector.name} (Affinity relationship).`;
+  const provenance =
+    plConnector.attributionSource && plConnector.attributionSource !== 'affinity-v1'
+      ? 'affinity-direct-roster'
+      : 'affinity-direct';
 
   return {
     targetInvestorId,
@@ -71,7 +81,7 @@ export function buildAffinityDirectPath(input: {
           connectorType: 'PL',
           probability: score,
           evidence: plConnector.evidenceKind ?? null,
-          provenance: 'affinity-direct',
+          provenance,
         },
       ],
       explanation,
