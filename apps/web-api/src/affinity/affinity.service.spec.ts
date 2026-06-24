@@ -123,7 +123,7 @@ describe('AffinityService', () => {
     expect(prisma.affinityPerson.upsert).not.toHaveBeenCalled();
   });
 
-  it('merges stats across chunked ingest calls with same runId', async () => {
+  it('returns chunk-local stats but persists merged stats on the ingest run', async () => {
     prisma.affinityIngestRun.upsert.mockResolvedValueOnce({
       id: 'run-chunk',
       stats: null,
@@ -140,7 +140,7 @@ describe('AffinityService', () => {
       },
     });
 
-    await service.ingest({
+    const first = await service.ingest({
       runId: 'run-chunk',
       scope: 'companies',
       companies: [
@@ -168,8 +168,17 @@ describe('AffinityService', () => {
       ],
     });
 
-    expect(second.received).toEqual({ companies: 1, persons: 1 });
-    expect(second.ingested).toEqual({ companies: 1, persons: 1 });
-    expect(second.linked.personsToMember).toBe(1);
+    expect(first.received).toEqual({ companies: 1, persons: 0 });
+    expect(second.received).toEqual({ companies: 0, persons: 1 });
+    expect(prisma.affinityIngestRun.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          stats: expect.objectContaining({
+            received: { companies: 1, persons: 1 },
+            ingested: { companies: 1, persons: 1 },
+          }),
+        }),
+      })
+    );
   });
 });

@@ -26,6 +26,11 @@ function dec(value: number | null | undefined): Prisma.Decimal | null {
   return new Prisma.Decimal(value);
 }
 
+function toInt(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  return Math.round(value);
+}
+
 export function mergeAffinityIngestResponses(
   a: IngestAffinityResponse,
   b: IngestAffinityResponse
@@ -117,11 +122,25 @@ export class AffinityService {
       }
 
       const companySidecarByOrgId = new Map(existingCompanies.map((c) => [c.affinityOrgId, c.uid]));
+      const teamUidOwner = new Map<string, string>();
+      for (const c of existingCompanies) {
+        if (c.teamUid) teamUidOwner.set(c.teamUid, c.affinityOrgId);
+      }
+      const memberUidOwner = new Map<string, string>();
+      for (const p of existingPersons) {
+        if (p.memberUid) memberUidOwner.set(p.memberUid, p.affinityPersonId);
+      }
 
       if (!dto.dryRun) {
         for (let i = 0; i < companies.length; i++) {
           try {
-            const linked = await this.upsertCompany(companies[i], dto.runId, teamIndex, companySidecarByOrgId);
+            const linked = await this.upsertCompany(
+              companies[i],
+              dto.runId,
+              teamIndex,
+              companySidecarByOrgId,
+              teamUidOwner
+            );
             response.ingested.companies++;
             if (linked) response.linked.companiesToTeam++;
             else response.unmatched.companies++;
@@ -135,7 +154,13 @@ export class AffinityService {
 
         for (let i = 0; i < persons.length; i++) {
           try {
-            const linked = await this.upsertPerson(persons[i], dto.runId, memberIndex, companySidecarByOrgId);
+            const linked = await this.upsertPerson(
+              persons[i],
+              dto.runId,
+              memberIndex,
+              companySidecarByOrgId,
+              memberUidOwner
+            );
             response.ingested.persons++;
             if (linked.member) response.linked.personsToMember++;
             else response.unmatched.persons++;
@@ -199,7 +224,7 @@ export class AffinityService {
         },
       });
 
-      return finalStats;
+      return response;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await this.prisma.affinityIngestRun.update({
@@ -235,13 +260,13 @@ export class AffinityService {
       investmentStage: item.investment_stage ?? null,
       industries: item.industries ?? [],
       investors: item.investors ?? [],
-      yearFounded: item.year_founded ?? null,
+      yearFounded: toInt(item.year_founded),
       totalFundingUsd: dec(item.total_funding_usd),
       lastFundingUsd: dec(item.last_funding_usd),
       lastFundingDate: parseIsoDate(item.last_funding_date),
       linkedinUrl: item.linkedin_url ?? null,
-      employeeCount: item.employee_count ?? null,
-      linkedinHeadcount: item.linkedin_headcount ?? null,
+      employeeCount: toInt(item.employee_count),
+      linkedinHeadcount: toInt(item.linkedin_headcount),
       location: item.location ? (item.location as Prisma.InputJsonValue) : Prisma.JsonNull,
       priority: item.priority ?? null,
       kpiListStatus: item.kpi_list_status ?? null,
@@ -249,11 +274,11 @@ export class AffinityService {
       revenueLtm: dec(item.revenue_ltm),
       monthlyBurn: dec(item.monthly_burn),
       cashBalance: dec(item.cash_balance),
-      runwayMonths: item.runway_months ?? null,
-      teamFte: item.team_fte ?? null,
-      totalUsers: item.total_users ?? null,
-      maus: item.maus ?? null,
-      daus: item.daus ?? null,
+      runwayMonths: toInt(item.runway_months),
+      teamFte: toInt(item.team_fte),
+      totalUsers: toInt(item.total_users),
+      maus: toInt(item.maus),
+      daus: toInt(item.daus),
       initialInvestmentUsd: dec(item.initial_investment_usd),
       valuationAtInvestmentUsd: dec(item.valuation_at_investment_usd),
       latestPostMoneyUsd: dec(item.latest_post_money_usd),
@@ -288,7 +313,8 @@ export class AffinityService {
     item: AffinityCompanyIngestItem,
     runId: string,
     teamIndex: ReturnType<typeof buildTeamMatchIndex>,
-    companySidecarByOrgId: Map<string, string>
+    companySidecarByOrgId: Map<string, string>,
+    teamUidOwner: Map<string, string>
   ): Promise<boolean> {
     const match = matchTeam(
       {
@@ -301,11 +327,19 @@ export class AffinityService {
       teamIndex
     );
 
-    const data = this.companyData(
-      item,
-      runId,
-      match ? { teamUid: match.uid, method: match.method, confidence: match.confidence } : undefined
-    );
+    let link = match
+      ? { teamUid: match.uid, method: match.method, confidence: match.confidence }
+      : undefined;
+    if (link) {
+      const ownerOrgId = teamUidOwner.get(link.teamUid);
+      if (ownerOrgId && ownerOrgId !== item.affinity_org_id) {
+        link = undefined;
+      } else {
+        teamUidOwner.set(link.teamUid, item.affinity_org_id);
+      }
+    }
+
+    const data = this.companyData(item, runId, link);
     const row = await this.prisma.affinityCompany.upsert({
       where: { affinityOrgId: item.affinity_org_id },
       create: data,
@@ -339,7 +373,7 @@ export class AffinityService {
       });
     }
 
-    return Boolean(match);
+    return Boolean(link);
   }
 
   private personData(
@@ -409,7 +443,8 @@ export class AffinityService {
     item: AffinityPersonIngestItem,
     runId: string,
     memberIndex: ReturnType<typeof buildMemberMatchIndex>,
-    companySidecarByOrgId: Map<string, string>
+    companySidecarByOrgId: Map<string, string>,
+    memberUidOwner: Map<string, string>
   ): Promise<{ member: boolean; company: boolean }> {
     const memberMatch = matchMember(
       {
@@ -424,14 +459,24 @@ export class AffinityService {
       memberIndex
     );
 
+    let memberLink = memberMatch
+      ? { uid: memberMatch.uid, method: memberMatch.method, confidence: memberMatch.confidence }
+      : undefined;
+    if (memberLink) {
+      const ownerPersonId = memberUidOwner.get(memberLink.uid);
+      if (ownerPersonId && ownerPersonId !== item.affinity_person_id) {
+        memberLink = undefined;
+      } else {
+        memberUidOwner.set(memberLink.uid, item.affinity_person_id);
+      }
+    }
+
     const primaryCompanyUid = matchCompanySidecar(item.current_organization_affinity_id, {
       byAffinityOrgId: companySidecarByOrgId,
     });
 
     const data = this.personData(item, runId, {
-      member: memberMatch
-        ? { uid: memberMatch.uid, method: memberMatch.method, confidence: memberMatch.confidence }
-        : undefined,
+      member: memberLink,
       primaryCompanyUid,
     });
 
@@ -487,6 +532,6 @@ export class AffinityService {
       });
     }
 
-    return { member: Boolean(memberMatch), company: Boolean(primaryCompanyUid) };
+    return { member: Boolean(memberLink), company: Boolean(primaryCompanyUid) };
   }
 }
