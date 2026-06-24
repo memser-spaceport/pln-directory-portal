@@ -31,7 +31,8 @@ export const ALLOWED_CORS_ORIGINS = {
     // Required because feature frontends run on random Vercel preview hosts
     // while APIs run on feature backends such as directory-fe-pr-123.plnetwork.io.
     /\.vercel\.app$/,
-    /-fe-pr-[0-9]+\.plnetwork\.io$/,
+    // Feature environments
+    /-[a-z0-9-]+\.plnetwork\.io$/,
   ],
   [APP_ENV.STAGING]: [
     /.-protocol-labs-spaceport.vercel.app/,
