@@ -94,6 +94,16 @@ export interface PathConnectorTeam {
   leads: PathContactPerson[];
 }
 
+/** Affinity list 166215 prior-backer flags (camelCase in stored hopChain JSON). */
+export interface PriorBackingFlags {
+  backedProtocolLabs: boolean;
+  backedFilecoin: boolean;
+  matchKind: 'person' | 'firm' | 'both';
+  source: 'affinity-list-166215';
+  firmName?: string;
+  affinityOrgId?: number;
+}
+
 export interface PathfinderHopChain {
   nodes: PathfinderHopChainNode[];
   edges: PathfinderHopChainEdge[];
@@ -112,6 +122,7 @@ export interface PathfinderHopChain {
   org_connectors?: PathOrgConnector[];
   connector_team?: PathConnectorTeam;
   pl_connector?: Record<string, unknown>;
+  priorBacking?: PriorBackingFlags;
 }
 
 export interface PathfinderPathInput {

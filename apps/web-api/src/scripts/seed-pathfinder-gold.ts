@@ -35,6 +35,8 @@ import {
 } from './affinity-roster-mapper.util';
 import { loadPrestigeByName, toEnrichment } from './prestige-seed.util';
 import { buildFirmByLabelIndex, lookupFirmProximity, type FirmProximity } from './firm-proximity-seed.util';
+import { loadPriorBackingMap } from './pl-investors-seed.util';
+import { applyPriorBackingToHopChain, backingWarmthBoost } from './prior-backing-warmth.util';
 
 const prisma = new PrismaClient();
 
@@ -157,6 +159,10 @@ async function seed() {
   const memberContactIndex = await loadMemberContactIndex(prisma);
   const founderIndexes = { portfolioTeams, membersByName };
 
+  console.log('Loading PL prior-backer index (Affinity list 166215)…');
+  const priorBackingByInvestor = loadPriorBackingMap(SCRATCH_DIR, entries);
+  console.log(`  prior backers matched: ${priorBackingByInvestor.size}`);
+
   const entryEmails = entries
     .map((e) => {
       const ent = e.entity;
@@ -237,7 +243,8 @@ async function seed() {
     person: { firstName: string; lastName: string; memberUid?: string; email?: string; role?: string }
   ): string | null => {
     const rel = plConnectors.get(targetInvestorId);
-    const boost = affinityBoost(rel?.bestConnector ?? null);
+    const priorBacking = priorBackingByInvestor.get(targetInvestorId);
+    const boost = Math.max(affinityBoost(rel?.bestConnector ?? null), backingWarmthBoost(priorBacking));
     let attachedHere = false;
 
     type PathCandidate = DumpPath & { score: number };
@@ -258,7 +265,7 @@ async function seed() {
         targetSet: TARGET_SET,
         summary: rel.summary,
       });
-      candidates.push({ ...direct, rank: 0 } as PathCandidate);
+      candidates.push({ ...direct, rank: 0, score: blendGraphScore(direct.score, boost) } as PathCandidate);
     }
 
     if (candidates.length === 0) return null;
@@ -283,6 +290,7 @@ async function seed() {
         attachedHere = true;
       }
       hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops, memberContactIndex);
+      hopChain = applyPriorBackingToHopChain(hopChain, priorBacking);
       pathInserts.push({
         targetInvestorId,
         targetSet: TARGET_SET,
@@ -400,6 +408,7 @@ async function seed() {
     const priorProfile = profileByInvestorId.get(affinityId);
     const mergedProfile = mergeProfileFields(priorProfile ?? {}, affinityProfile);
     const rawPayload = buildRawPayload(enrichment, affinityData, priorProfile?.rawPayload);
+    const priorBacking = priorBackingByInvestor.get(affinityId);
     const recordFields = {
       investorId: affinityId,
       canonicalId: affinityId,
@@ -413,7 +422,14 @@ async function seed() {
       enrichmentStatus: enrichment ? 'enriched' : 'pending',
       bestProximityCode: bestProximityForRecord,
       hasPath: personHasPath,
-      ...(rawPayload ? { rawPayload: rawPayload as Prisma.InputJsonValue } : {}),
+      ...(rawPayload || priorBacking
+        ? {
+            rawPayload: {
+              ...((rawPayload as Record<string, unknown> | undefined) ?? {}),
+              ...(priorBacking ? { priorBacking } : {}),
+            } as Prisma.InputJsonValue,
+          }
+        : {}),
     };
 
     if (existing) {
