@@ -27,11 +27,31 @@ interface RunnerDeployResponse {
   port?: number;
 }
 
+type AiAppMember = { uid: string; name: string };
+
+/** Response shape across all AI Apps endpoints: `memberUid` replaced by `member`. */
+type WithMember<T extends { memberUid: string }> = Omit<T, 'memberUid'> & { member: AiAppMember | null };
+
 @Injectable()
 export class AiAppsService {
   private readonly logger = new Logger(AiAppsService.name);
 
   constructor(private readonly prisma: PrismaService, private readonly awsService: AwsService) {}
+
+  private async withMember<T extends { memberUid: string }>(records: T[]): Promise<Array<WithMember<T>>> {
+    const memberUids = Array.from(new Set(records.map((r) => r.memberUid)));
+    const members = memberUids.length
+      ? await this.prisma.member.findMany({
+          where: { uid: { in: memberUids } },
+          select: { uid: true, name: true },
+        })
+      : [];
+    const byUid = new Map(members.map((m) => [m.uid, m]));
+    return records.map(({ memberUid, ...rest }) => ({
+      ...(rest as Omit<T, 'memberUid'>),
+      member: byUid.get(memberUid) ?? null,
+    }));
+  }
 
   /** Returns the member's reusable deploy token, creating one on first use. */
   async ensureToken(memberUid: string): Promise<string> {
@@ -53,23 +73,17 @@ export class AiAppsService {
   }
 
   /** Dashboard list — all apps across PL Infra users, newest first, with owner info. */
-  async listApps(): Promise<Array<AiApp & { member: { uid: string; name: string } | null }>> {
+  async listApps(): Promise<Array<WithMember<AiApp>>> {
     const apps = await this.prisma.aiApp.findMany({ orderBy: { updatedAt: 'desc' } });
-    const memberUids = Array.from(new Set(apps.map((app) => app.memberUid)));
-    const members = await this.prisma.member.findMany({
-      where: { uid: { in: memberUids } },
-      select: { uid: true, name: true },
-    });
-    const byUid = new Map(members.map((m) => [m.uid, m]));
-    return apps.map((app) => ({ ...app, member: byUid.get(app.memberUid) ?? null }));
+    return this.withMember(apps);
   }
 
-  async getApp(uid: string): Promise<AiApp> {
+  async getApp(uid: string): Promise<WithMember<AiApp>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
-    return app;
+    return (await this.withMember([app]))[0];
   }
 
   /**
@@ -94,22 +108,13 @@ export class AiAppsService {
   }
 
   /** Event log (audit feed) — newest first, optionally scoped to one app. */
-  async listEvents(
-    appUid?: string,
-    limit = 100
-  ): Promise<Array<AiAppEvent & { member: { uid: string; name: string } | null }>> {
+  async listEvents(appUid?: string, limit = 100): Promise<Array<WithMember<AiAppEvent>>> {
     const events = await this.prisma.aiAppEvent.findMany({
       where: appUid ? { appUid } : undefined,
       orderBy: { createdAt: 'desc' },
       take: Math.min(Math.max(limit, 1), 500),
     });
-    const memberUids = Array.from(new Set(events.map((e) => e.memberUid)));
-    const members = await this.prisma.member.findMany({
-      where: { uid: { in: memberUids } },
-      select: { uid: true, name: true },
-    });
-    const byUid = new Map(members.map((m) => [m.uid, m]));
-    return events.map((e) => ({ ...e, member: byUid.get(e.memberUid) ?? null }));
+    return this.withMember(events);
   }
 
   /**
@@ -117,7 +122,7 @@ export class AiAppsService {
    * the deploy to the sandbox runner (keeping AWS creds + the runner token
    * server-side) and stores the result.
    */
-  async deploy(memberUid: string, dto: DeployAppDto, file: Express.Multer.File): Promise<AiApp> {
+  async deploy(memberUid: string, dto: DeployAppDto, file: Express.Multer.File): Promise<WithMember<AiApp>> {
     if (!file?.buffer?.length) {
       throw new BadGatewayException('Missing app ZIP file');
     }
@@ -174,7 +179,7 @@ export class AiAppsService {
         },
       });
       await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: updated.url ?? undefined });
-      return updated;
+      return (await this.withMember([updated]))[0];
     } catch (error) {
       const message = axios.isAxiosError(error)
         ? `Runner error: ${error.response?.status ?? ''} ${JSON.stringify(error.response?.data ?? error.message)}`
