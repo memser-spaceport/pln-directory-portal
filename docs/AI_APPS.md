@@ -102,6 +102,8 @@ model AiAppEvent {            // append-only audit log — one row per event, ne
 
 Apps are **lazy-created on first deploy** — there is no registration form.
 
+**Response shape:** every AI Apps endpoint (`list`, detail, `events`, and the `deploy` result) returns the owner as `member: { uid, name }` and omits the raw `memberUid` (the uid lives in `member.uid`, so it isn't duplicated). `memberUid` remains a column on the DB models above.
+
 `AiApp.status` is the current-state snapshot for the dashboard; `AiAppEvent` is the immutable event flow. A row is appended on kit download (`KIT_DOWNLOADED`), at the start of every deploy (`DEPLOY_STARTED`), and on its outcome (`DEPLOY_SUCCEEDED` / `DEPLOY_FAILED`). Event logging never throws — a logging failure won't break a download or deploy.
 
 ## RBAC
