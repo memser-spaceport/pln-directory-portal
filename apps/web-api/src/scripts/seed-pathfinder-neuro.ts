@@ -33,7 +33,6 @@
  */
 import { readFileSync } from 'fs';
 import { PrismaClient, Prisma } from '@prisma/client';
-import { firmKey, resolveFirmLookupKey } from './firm-key.util';
 import { affinityBoost, blendGraphScore, comparePathsByWarmth } from './affinity-warmth-boost.util';
 import { buildAffinityDirectPath, passesAffinityDirectThreshold } from './affinity-direct-path.util';
 import { finalizePersonHopChain } from './path-route.util';
@@ -42,21 +41,19 @@ import { loadMemberContactIndex } from './org-contact-resolve.util';
 import { resolvePathfinderScratchDir } from './pathfinder-scratch.util';
 import {
   buildRawPayload,
-  extractRosterConnectorHints,
   mapAffinityListEntry,
   mergeProfileFields,
   type MemberResolver,
 } from './affinity-roster-mapper.util';
-import {
-  DEFAULT_PL_TEAM_LEADS,
-  mergePlTeamRelationship,
-  type PlConnector,
-  type PlTeamRelationship,
-} from './pl-team-relationship.util';
+import { buildMergedPlConnectors, loadPlConnectorsFromFile } from './pl-relationship-seed.util';
+import { loadPrestigeByName, toEnrichment } from './prestige-seed.util';
+import { buildFirmByLabelIndex, lookupFirmProximity, type FirmProximity } from './firm-proximity-seed.util';
 
 const prisma = new PrismaClient();
 
 const TARGET_SET = 'neuro-fund-i';
+/** Legacy default from run-pathfinder before TARGET_SET was aligned to neuro-fund-i. */
+const LEGACY_DUMP_TARGET_SET = 'lp-target-set';
 const NEW_SOURCE = 'PATHFINDER_NEURO';
 const DEMO_SOURCE = 'DEMO_PATHFINDER';
 const DEMO_TARGET_SET = 'demo-neuro-lp';
@@ -95,16 +92,6 @@ interface Dump {
   paths: DumpPath[];
   summaries: DumpSummary[];
 }
-interface PrestigeEntry {
-  name?: string;
-  aum?: string | null;
-  notableInvestments?: string[] | null;
-  bio?: string | null;
-  thesis?: string | null;
-  fundFocus?: string | null;
-  sources?: string[] | null;
-  enrichedAt?: string;
-}
 interface AffinityField {
   id: string;
   value?: { data?: unknown };
@@ -120,17 +107,6 @@ interface AffinityEntity {
 interface AffinityEntry {
   entity: AffinityEntity;
 }
-/**
- * One LP's PL-team connector, as written by pull-affinity-pl-relationships.ts
- * (shape mirrors PlTeamRelationship). Only `summary` + `bestConnector` are used
- * here — they are grafted onto the person's hop chain. Loose by design (scratch JSON).
- */
-interface PlRelEntry {
-  summary: string | null;
-  bestConnector: PlConnector | null;
-  connectors?: PlConnector[];
-  externalId?: number | null;
-}
 
 const norm = (s: string | null | undefined): string =>
   (s ?? '')
@@ -138,15 +114,6 @@ const norm = (s: string | null | undefined): string =>
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-
-function lookupFirmProximity(firmName: string, firmByLabel: Map<string, FirmProximity>): FirmProximity | undefined {
-  const keys = [resolveFirmLookupKey(firmName), firmKey(firmName), norm(firmName)].filter(Boolean);
-  for (const key of keys) {
-    const hit = firmByLabel.get(key);
-    if (hit) return hit;
-  }
-  return undefined;
-}
 
 /**
  * Prod dedupe_key form: normalized email (lowercased, trimmed, plus-tag stripped)
@@ -172,57 +139,6 @@ function entryFirmNames(entity: AffinityEntity): string[] {
     .filter((n): n is string => typeof n === 'string' && n.trim().length > 0);
 }
 
-/**
- * Per-LP PL-team connectors keyed by Affinity person id. Optional input: if the
- * relationship pull hasn't been run, return an empty map and skip attribution
- * (the run still succeeds — connector copy just won't appear).
- */
-function loadPlConnectors(): Map<string, PlRelEntry> {
-  try {
-    const raw = JSON.parse(readFileSync(PL_REL_PATH, 'utf-8')) as Record<string, PlRelEntry>;
-    return new Map(Object.entries(raw));
-  } catch {
-    console.warn(`(no ${PL_REL_PATH} — PL-team connector attribution skipped)`);
-    return new Map();
-  }
-}
-
-function v1RelFromEntry(raw: PlRelEntry | undefined): PlTeamRelationship {
-  const extended = raw as PlRelEntry & { connectors?: PlConnector[]; externalId?: number | null };
-  return {
-    externalId: extended?.externalId ?? null,
-    connectors: extended?.connectors ?? [],
-    bestConnector: extended?.bestConnector ?? null,
-    summary: extended?.summary ?? null,
-  };
-}
-
-/** Merge v1 relationship pull with roster key-contact / last-touch fallback per LP. */
-function buildMergedPlConnectors(
-  v1Map: Map<string, PlRelEntry>,
-  affinityEntries: AffinityEntry[],
-  referenceIso: string
-): Map<string, PlRelEntry> {
-  const merged = new Map<string, PlRelEntry>();
-  for (const e of affinityEntries) {
-    const affinityId = String(e.entity.id ?? '');
-    if (!affinityId) continue;
-    const result = mergePlTeamRelationship(
-      v1RelFromEntry(v1Map.get(affinityId)),
-      extractRosterConnectorHints(e.entity),
-      DEFAULT_PL_TEAM_LEADS,
-      referenceIso
-    );
-    merged.set(affinityId, {
-      summary: result.summary,
-      bestConnector: result.bestConnector,
-      connectors: result.connectors,
-      externalId: result.externalId,
-    });
-  }
-  return merged;
-}
-
 /** Warmer = smaller. Cold (no path) sinks last. */
 function proximityRank(code: string | null, hasPath: boolean): number {
   if (!hasPath || !code) return 1e9;
@@ -231,41 +147,6 @@ function proximityRank(code: string | null, hasPath: boolean): number {
   const caliber = m[2] === 'A' ? 0 : 1;
   const hops = parseInt(m[1], 10);
   return caliber * 100 + hops;
-}
-
-function loadPrestigeByName(): Map<string, PrestigeEntry> {
-  const byName = new Map<string, PrestigeEntry>();
-  try {
-    const raw = JSON.parse(readFileSync(PRESTIGE_PATH, 'utf-8')) as Record<string, PrestigeEntry>;
-    for (const [key, e] of Object.entries(raw)) {
-      const name = e.name ?? key.split('||')[0];
-      if (name && !byName.has(norm(name))) byName.set(norm(name), e);
-    }
-  } catch {
-    console.warn('(no prestige cache — records will have no enrichment)');
-  }
-  return byName;
-}
-
-function toEnrichment(e: PrestigeEntry): Record<string, unknown> | undefined {
-  const enrichment: Record<string, unknown> = {};
-  if (e.bio) enrichment.bio = e.bio;
-  if (e.fundFocus) enrichment.fundFocus = e.fundFocus;
-  if (e.aum) enrichment.aum = e.aum;
-  if (e.notableInvestments?.length) enrichment.notableInvestments = e.notableInvestments;
-  if (e.thesis) enrichment.thesis = e.thesis;
-  if (e.sources?.length) enrichment.sources = e.sources;
-  if (Object.keys(enrichment).length === 0) return undefined;
-  enrichment.enrichedVia = 'perplexity+exa+firecrawl';
-  enrichment.fetchedAt = e.enrichedAt ?? '2026-06-06';
-  return enrichment;
-}
-
-interface FirmProximity {
-  firmId: string;
-  label: string;
-  code: string;
-  hasPath: boolean;
 }
 
 async function cleanup() {
@@ -289,26 +170,20 @@ async function cleanup() {
 async function seed() {
   const dump = JSON.parse(readFileSync(DUMP_PATH, 'utf-8')) as Dump;
   if (dump.targetSet !== TARGET_SET) {
-    throw new Error(`dump targetSet "${dump.targetSet}" != expected "${TARGET_SET}"`);
+    if (dump.targetSet === LEGACY_DUMP_TARGET_SET) {
+      console.warn(
+        `dump targetSet "${dump.targetSet}" is legacy — paths will be stored as "${TARGET_SET}". ` +
+          'Re-run run-pathfinder.ts (or set PATHFINDER_TARGET_SET=neuro-fund-i) to refresh the dump label.',
+      );
+    } else {
+      throw new Error(`dump targetSet "${dump.targetSet}" != expected "${TARGET_SET}"`);
+    }
   }
-  const prestige = loadPrestigeByName();
-  const v1PlConnectors = loadPlConnectors();
+  const prestige = loadPrestigeByName(PRESTIGE_PATH);
+  const v1PlConnectors = loadPlConnectorsFromFile(PL_REL_PATH);
   let personsWithConnector = 0;
 
-  // Index firm proximity by normalized firm label, and firm paths by firm id.
-  const firmByLabel = new Map<string, FirmProximity>();
-  for (const s of dump.summaries) {
-    const fp: FirmProximity = {
-      firmId: s.investor_id,
-      label: s.firm_label,
-      code: s.best_proximity_code,
-      hasPath: s.has_path,
-    };
-    const normKey = norm(s.firm_label);
-    const fk = firmKey(s.firm_label);
-    if (normKey) firmByLabel.set(normKey, fp);
-    if (fk) firmByLabel.set(fk, fp);
-  }
+  const firmByLabel = buildFirmByLabelIndex(dump.summaries);
   const pathsByFirm = new Map<string, DumpPath[]>();
   for (const p of dump.paths) {
     const arr = pathsByFirm.get(p.targetInvestorId) ?? [];

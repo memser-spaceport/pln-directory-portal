@@ -4,6 +4,7 @@ import { Request } from 'express';
 import { apiTeamNews } from 'libs/contracts/src/lib/contract-team-news';
 import {
   CreateTeamNewsDiscussionRequestSchema,
+  TeamNewsByTeamQueryParams,
   TeamNewsListQueryParams,
   TeamNewsRecentQueryParams,
 } from 'libs/contracts/src/schema/team-news';
@@ -66,6 +67,13 @@ export class TeamNewsController {
       untilCreatedAt: toDate(untilCreatedAt),
       limit,
     });
+  }
+
+  @Api(server.route.getTeamNewsByTeam)
+  @NoCache()
+  async getTeamNewsByTeam(@Param('teamUid') teamUid: string, @Req() request: Request) {
+    const params = TeamNewsByTeamQueryParams.parse(request.query);
+    return this.teamNewsQueryService.listTeamNewsByTeam(teamUid, params);
   }
 
   @Api(server.route.createTeamNewsDiscussion)

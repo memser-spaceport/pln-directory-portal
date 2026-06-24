@@ -221,6 +221,27 @@ export const TeamNewsPerTeamResponseSchema = z.object({
   items: z.array(TeamNewsItemSchema),
 });
 
+export const TeamNewsByTeamQueryParams = z.object({
+  q: z.string().optional(),
+  page: z
+    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1))
+    .optional()
+    .default(1),
+  limit: z
+    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1).max(200))
+    .optional()
+    .default(50),
+});
+
+export const TeamNewsByTeamResponseSchema = z.object({
+  teamUid: z.string(),
+  teamName: z.string(),
+  page: z.number().int(),
+  limit: z.number().int(),
+  total: z.number().int(),
+  items: z.array(TeamNewsItemSchema),
+});
+
 // Recent network news across all teams, ordered newest-first. Consumed by the
 // notification service (pl-notification-service) when it builds the combined
 // "Daily Forum Digest + Latest Network News" email. Public (no service auth).
@@ -264,6 +285,8 @@ export type TeamNewsEnrichmentResponseItem = z.infer<typeof TeamNewsEnrichmentSc
 export type TeamWithNewsEnrichment = z.infer<typeof TeamWithNewsEnrichmentSchema>;
 export type TeamsWithNewsEnrichmentResponse = z.infer<typeof TeamsWithNewsEnrichmentResponseSchema>;
 export type TeamNewsPerTeamResponse = z.infer<typeof TeamNewsPerTeamResponseSchema>;
+export type TeamNewsByTeamQuery = z.infer<typeof TeamNewsByTeamQueryParams>;
+export type TeamNewsByTeamResponse = z.infer<typeof TeamNewsByTeamResponseSchema>;
 export type TeamNewsRecentQuery = z.infer<typeof TeamNewsRecentQueryParams>;
 export type TeamNewsRecentResponse = z.infer<typeof TeamNewsRecentResponseSchema>;
 export type TeamNewsDiscussion = z.infer<typeof TeamNewsDiscussionSchema>;
