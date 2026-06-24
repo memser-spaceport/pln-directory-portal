@@ -4,6 +4,8 @@
  * Map an Affinity LP list export entry to investor profile fallbacks + affinityData.
  * Pure: no I/O — input is entity.fields[] from _affinity_352080.json.
  */
+import type { RosterConnectorHints } from './pl-team-relationship.util';
+
 export interface AffinityListField {
   id: string;
   name?: string;
@@ -22,6 +24,7 @@ export interface AffinityPersonRef {
   email?: string;
   affinityPersonId?: number;
   memberUid?: string;
+  affinityPersonType?: 'internal' | 'external';
 }
 
 export interface AffinityInteractionRef {
@@ -148,6 +151,7 @@ function personFromData(data: unknown, resolver?: MemberResolver): AffinityPerso
     firstName?: string;
     lastName?: string;
     primaryEmailAddress?: string;
+    type?: string;
   };
   const first = (p.firstName ?? '').trim();
   const last = (p.lastName ?? '').trim();
@@ -155,11 +159,13 @@ function personFromData(data: unknown, resolver?: MemberResolver): AffinityPerso
   if (!name) return null;
   const email = (p.primaryEmailAddress ?? '').trim() || undefined;
   const memberUid = email && resolver?.byEmail ? resolver.byEmail(email.toLowerCase()) : undefined;
+  const personType = p.type === 'internal' || p.type === 'external' ? p.type : undefined;
   return {
     name,
     ...(email ? { email } : {}),
     ...(typeof p.id === 'number' ? { affinityPersonId: p.id } : {}),
     ...(memberUid ? { memberUid } : {}),
+    ...(personType ? { affinityPersonType: personType } : {}),
   };
 }
 
@@ -211,6 +217,35 @@ export function extractPersonRef(
     return { name, ...(memberUid ? { memberUid } : {}) };
   }
   return personFromData(data, resolver);
+}
+
+/** Hints for PL connector roster fallback (key contact + last touch from PL leads). */
+export function extractRosterConnectorHints(entity: AffinityListEntity): RosterConnectorHints {
+  const fields = entity.fields ?? [];
+  const keyContactField = fields.find((f) => f.name === FIELD_NAMES.keyContact);
+  const lastContactField = fieldByIdOrName(fields, FIELD_IDS.lastContact, 'Last Contact');
+  const lastEmailField = fieldByIdOrName(fields, FIELD_IDS.lastEmail, 'Last Email');
+  const keyContact = extractPersonRef(keyContactField);
+  const lastContact = extractInteraction(lastContactField);
+  const lastEmail = extractInteraction(lastEmailField);
+
+  return {
+    ...(keyContact?.name ? { keyContactName: keyContact.name } : {}),
+    ...(lastContact?.from?.name
+      ? {
+          lastContactFromName: lastContact.from.name,
+          lastContactFromInternal: lastContact.from.affinityPersonType === 'internal',
+          lastContactDate: lastContact.date,
+        }
+      : {}),
+    ...(lastEmail?.from?.name
+      ? {
+          lastEmailFromName: lastEmail.from.name,
+          lastEmailFromInternal: lastEmail.from.affinityPersonType === 'internal',
+          lastEmailDate: lastEmail.date,
+        }
+      : {}),
+  };
 }
 
 export function mapInvestorType(lpType: string | null, investorType: string | null): string | undefined {

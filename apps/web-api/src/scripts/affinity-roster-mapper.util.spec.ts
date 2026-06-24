@@ -1,6 +1,7 @@
 import {
   extractInteraction,
   extractPersonRef,
+  extractRosterConnectorHints,
   hasAffinityData,
   mapAffinityListEntry,
   mapCheckSizeUsd,
@@ -78,6 +79,32 @@ describe('extractPersonRef', () => {
   it('parses text key contact', () => {
     const f = field('field-5577222', 'Key Contact (Relationship owner)', 'Brad');
     expect(extractPersonRef(f, { byName: (n) => (n === 'Brad' ? 'uid-brad' : undefined) })?.memberUid).toBe('uid-brad');
+  });
+});
+
+describe('extractRosterConnectorHints', () => {
+  it('extracts key contact and internal last-contact from fields', () => {
+    const hints = extractRosterConnectorHints({
+      fields: [
+        field('field-5577222', 'Key Contact (Relationship owner)', 'Brad Holden'),
+        field('last-contact', 'Last Contact', {
+          type: 'email',
+          sentAt: '2026-06-08T11:31:18Z',
+          from: {
+            emailAddress: 'charlotte.kapoor@protocol.ai',
+            person: {
+              id: 244408594,
+              firstName: 'Charlotte',
+              lastName: 'Kapoor',
+              type: 'internal',
+            },
+          },
+        }),
+      ],
+    });
+    expect(hints.keyContactName).toBe('Brad Holden');
+    expect(hints.lastContactFromName).toBe('Charlotte Kapoor');
+    expect(hints.lastContactFromInternal).toBe(true);
   });
 });
 
