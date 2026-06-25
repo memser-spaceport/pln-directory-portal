@@ -3033,8 +3033,6 @@ enum AffinityEntityLinkMethod {
 
 enum AffinityFrequencyTier {
   HIGH
-  STEADY
-  COOLING
   NEGLECTED
 }
 
