@@ -30,6 +30,14 @@ export const AI_APPS_S3_BUCKET = process.env.AI_APPS_S3_BUCKET || '';
 export const buildAppS3Key = (appId: string, deploymentId: string): string => `apps/${appId}/${deploymentId}/app.zip`;
 
 /**
+ * The sandbox host/URL for an app is deterministic from its appId, so we can
+ * compute it up front (before the runner responds): sandbox-<appId>.plnetwork.io
+ */
+export const buildAppHost = (appId: string): string => `sandbox-${appId}.plnetwork.io`;
+export const buildAppUrl = (appId: string): string => `https://${buildAppHost(appId)}`;
+export const buildAppHttpUrl = (appId: string): string => `http://${buildAppHost(appId)}`;
+
+/**
  * Public URL of THIS API's deploy endpoint, written into the starter kit so the
  * agent knows where to POST. Defaults to the conventional prod path.
  */
