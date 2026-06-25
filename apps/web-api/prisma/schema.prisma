@@ -3256,6 +3256,7 @@ model AffinityPerson {
   @@index([currentOrganizationAffinityId])
   @@index([memberUid])
   @@index([primaryCompanyUid])
+  @@index([relationshipOwnerMemberUid])
   @@index([lastIngestRunId])
 }
 
