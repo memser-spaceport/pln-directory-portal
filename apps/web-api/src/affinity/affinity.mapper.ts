@@ -5,6 +5,10 @@ import {
   AffinityPersonOrganization,
   Team,
 } from '@prisma/client';
+import {
+  AffinityPersonRelationshipSource,
+  toMemberRelationshipDto,
+} from './affinity-relationship.mapper';
 
 const decimalToNumber = (v: { toNumber(): number } | null | undefined): number | null =>
   v == null ? null : v.toNumber();
@@ -91,7 +95,7 @@ export function toAffinityPersonDto(row: AffinityPerson) {
   };
 }
 
-export type AffinityPersonWithRelations = AffinityPerson & {
+export type AffinityPersonWithRelations = AffinityPersonRelationshipSource & {
   listMemberships: AffinityListMembership[];
   primaryCompany: AffinityCompanyRow | null;
   organizations: Array<
@@ -118,5 +122,6 @@ export function toMemberAffinityResponse(memberUid: string, person: AffinityPers
     },
     primary_company: primaryCompany,
     organizations,
+    relationship: toMemberRelationshipDto(person),
   };
 }

@@ -247,7 +247,8 @@ model Member {
   roadmapSubmissionDraft    RoadmapSubmissionDraft? @relation("roadmapSubmissionDraftOwner")
 
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
-  affinityPerson AffinityPerson?
+  affinityPerson                    AffinityPerson?
+  affinityRelationshipOwnerFor      AffinityPerson[] @relation("AffinityRelationshipOwner")
 }
 
 model MemberApproval {
@@ -3030,6 +3031,13 @@ enum AffinityEntityLinkMethod {
   MANUAL
 }
 
+enum AffinityFrequencyTier {
+  HIGH
+  STEADY
+  COOLING
+  NEGLECTED
+}
+
 /// Audit row per Affinity pull/ingest execution.
 model AffinityIngestRun {
   id           String                  @id @default(cuid())
@@ -3205,6 +3213,20 @@ model AffinityPerson {
   firstEventAt         DateTime?
   nextEventAt          DateTime?
   sourceOfIntroduction Json?
+
+  // --- Member profile relationship card (normalized) ---
+  relationshipOwnerName             String?               @db.VarChar(240)
+  relationshipOwnerEmail            String?               @db.VarChar(320)
+  relationshipOwnerAffinityPersonId String?               @db.VarChar(64)
+  relationshipOwnerMemberUid        String?
+  relationshipOwnerMember           Member?               @relation("AffinityRelationshipOwner", fields: [relationshipOwnerMemberUid], references: [uid], onDelete: SetNull)
+  lastContactSummary                String?               @db.Text
+  lastContactMethod                 String?               @db.VarChar(32)
+  touchpoints6m                     Int?
+  touchpointsByMonth                Json?
+  frequencyTier                     AffinityFrequencyTier?
+  interactionWindowMonths           Int?                  @default(6)
+  relationshipStatsPulledAt         DateTime?
 
   // --- Optional Directory links ---
   memberUid      String?                   @unique
