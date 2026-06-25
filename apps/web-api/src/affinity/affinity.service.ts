@@ -14,7 +14,7 @@ import {
   matchMember,
   matchTeam,
 } from './affinity-match.util';
-import { dbTierFromApi, resolveOwnerMemberUid } from './affinity-relationship.mapper';
+import { dbTierFromApi, resolveOwnerMemberUid, resolveRelationshipOwner } from './affinity-relationship.mapper';
 
 function parseIsoDate(value: string | null | undefined): Date | null {
   if (!value?.trim()) return null;
@@ -132,6 +132,8 @@ export class AffinityService {
         if (p.memberUid) memberUidOwner.set(p.memberUid, p.affinityPersonId);
       }
 
+      const companyListFieldsByOrgId = new Map<string, Record<string, unknown>[]>();
+
       if (!dto.dryRun) {
         for (let i = 0; i < companies.length; i++) {
           try {
@@ -142,6 +144,13 @@ export class AffinityService {
               companySidecarByOrgId,
               teamUidOwner
             );
+            const orgId = companies[i]?.affinity_org_id;
+            if (orgId) {
+              const fields = (companies[i]?.list_memberships ?? [])
+                .map((m) => m.list_fields)
+                .filter((f): f is Record<string, unknown> => Boolean(f));
+              if (fields.length) companyListFieldsByOrgId.set(orgId, fields);
+            }
             response.ingested.companies++;
             if (linked) response.linked.companiesToTeam++;
             else response.unmatched.companies++;
@@ -162,6 +171,7 @@ export class AffinityService {
               companySidecarByOrgId,
               memberUidOwner,
               members,
+              companyListFieldsByOrgId
             );
             response.ingested.persons++;
             if (linked.member) response.linked.personsToMember++;
@@ -329,9 +339,7 @@ export class AffinityService {
       teamIndex
     );
 
-    let link = match
-      ? { teamUid: match.uid, method: match.method, confidence: match.confidence }
-      : undefined;
+    let link = match ? { teamUid: match.uid, method: match.method, confidence: match.confidence } : undefined;
     if (link) {
       const ownerOrgId = teamUidOwner.get(link.teamUid);
       if (ownerOrgId && ownerOrgId !== item.affinity_org_id) {
@@ -439,8 +447,7 @@ export class AffinityService {
         : Prisma.JsonNull,
       frequencyTier: dbTierFromApi(item.frequency_tier),
       interactionWindowMonths: item.interaction_window_months ?? 6,
-      relationshipStatsPulledAt:
-        item.touchpoints_6m != null || item.frequency_tier != null ? new Date() : null,
+      relationshipStatsPulledAt: item.touchpoints_6m != null || item.frequency_tier != null ? new Date() : null,
       rawFields: item.raw_fields as Prisma.InputJsonValue,
       lastIngestRunId: runId,
       pulledAt: new Date(),
@@ -462,7 +469,8 @@ export class AffinityService {
     memberIndex: ReturnType<typeof buildMemberMatchIndex>,
     companySidecarByOrgId: Map<string, string>,
     memberUidOwner: Map<string, string>,
-    members: Array<{ uid: string; email: string | null }>,
+    members: Array<{ uid: string; email: string | null; name: string }>,
+    companyListFieldsByOrgId: Map<string, Record<string, unknown>[]>
   ): Promise<{ member: boolean; company: boolean }> {
     const memberMatch = matchMember(
       {
@@ -493,12 +501,48 @@ export class AffinityService {
       byAffinityOrgId: companySidecarByOrgId,
     });
 
+    let relationshipOwner = item.relationship_owner;
+    if (!relationshipOwner?.name?.trim()) {
+      const companyListFields: Array<{ listFields: Prisma.JsonValue }> = [];
+      const orgIds = [
+        item.current_organization_affinity_id,
+        ...(item.organizations ?? []).map((o) => o.affinity_org_id),
+      ].filter((id): id is string => Boolean(id?.trim()));
+      const seen = new Set<string>();
+      for (const orgId of orgIds) {
+        if (seen.has(orgId)) continue;
+        seen.add(orgId);
+        for (const fields of companyListFieldsByOrgId.get(orgId) ?? []) {
+          companyListFields.push({ listFields: fields as Prisma.JsonValue });
+        }
+      }
+      const resolved = resolveRelationshipOwner({
+        personListMemberships: (item.list_memberships ?? []).map((m) => ({
+          listFields: (m.list_fields ?? null) as Prisma.JsonValue,
+        })),
+        companyListMemberships: companyListFields,
+        keyContact: item.key_contact,
+        rawFields: item.raw_fields as Prisma.JsonValue,
+      });
+      if (resolved) {
+        relationshipOwner = {
+          name: resolved.name,
+          email: resolved.email ?? null,
+          affinity_person_id: resolved.affinity_person_id ?? null,
+        };
+        item.relationship_owner = relationshipOwner;
+      }
+    }
+
     const data = this.personData(item, runId, {
       member: memberLink,
       primaryCompanyUid,
       relationshipOwnerMemberUid: resolveOwnerMemberUid(
-        item.relationship_owner?.email,
-        members,
+        {
+          name: relationshipOwner?.name ?? item.relationship_owner?.name,
+          email: relationshipOwner?.email ?? item.relationship_owner?.email,
+        },
+        members
       ),
     });
 

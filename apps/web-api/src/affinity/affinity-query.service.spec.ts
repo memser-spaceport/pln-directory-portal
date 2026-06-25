@@ -3,12 +3,12 @@ import type { PrismaService } from '../shared/prisma.service';
 import { AffinityQueryService } from './affinity-query.service';
 
 type PrismaMock = {
-  member: { findUnique: jest.Mock };
+  member: { findUnique: jest.Mock; findMany: jest.Mock };
   affinityPerson: { findFirst: jest.Mock };
 };
 
 const buildPrismaMock = (): PrismaMock => ({
-  member: { findUnique: jest.fn() },
+  member: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
   affinityPerson: { findFirst: jest.fn() },
 });
 

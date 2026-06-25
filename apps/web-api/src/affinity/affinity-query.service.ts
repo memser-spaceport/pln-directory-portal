@@ -20,23 +20,28 @@ export class AffinityQueryService {
       throw new NotFoundException(`Member not found: ${memberUid}`);
     }
 
-    const person = await this.prisma.affinityPerson.findFirst({
-      where: { memberUid },
-      include: {
-        listMemberships: { orderBy: { listName: 'asc' } },
-        relationshipOwnerMember: { select: { uid: true, name: true } },
-        primaryCompany: { include: companyInclude },
-        organizations: {
-          include: { company: { include: companyInclude } },
-          orderBy: [{ isCurrent: 'desc' }, { updatedAt: 'desc' }],
+    const [person, membersForResolve] = await Promise.all([
+      this.prisma.affinityPerson.findFirst({
+        where: { memberUid },
+        include: {
+          listMemberships: { orderBy: { listName: 'asc' } },
+          relationshipOwnerMember: { select: { uid: true, name: true } },
+          primaryCompany: { include: companyInclude },
+          organizations: {
+            include: { company: { include: companyInclude } },
+            orderBy: [{ isCurrent: 'desc' }, { updatedAt: 'desc' }],
+          },
         },
-      },
-    });
+      }),
+      this.prisma.member.findMany({
+        select: { uid: true, name: true, email: true },
+      }),
+    ]);
 
     if (!person) {
       throw new NotFoundException(`No Affinity profile linked to member: ${memberUid}`);
     }
 
-    return toMemberAffinityResponse(memberUid, person);
+    return toMemberAffinityResponse(memberUid, person, membersForResolve);
   }
 }

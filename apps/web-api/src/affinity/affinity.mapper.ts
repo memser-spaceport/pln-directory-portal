@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import {
   AffinityPersonRelationshipSource,
+  MemberForOwnerResolve,
   toMemberRelationshipDto,
 } from './affinity-relationship.mapper';
 
@@ -105,7 +106,11 @@ export type AffinityPersonWithRelations = AffinityPersonRelationshipSource & {
   >;
 };
 
-export function toMemberAffinityResponse(memberUid: string, person: AffinityPersonWithRelations) {
+export function toMemberAffinityResponse(
+  memberUid: string,
+  person: AffinityPersonWithRelations,
+  membersForResolve?: MemberForOwnerResolve[]
+) {
   const primaryCompany = person.primaryCompany ? toAffinityCompanyDto(person.primaryCompany) : null;
   const organizations = person.organizations.map((edge) => ({
     affinity_org_id: edge.affinityOrgId,
@@ -122,6 +127,6 @@ export function toMemberAffinityResponse(memberUid: string, person: AffinityPers
     },
     primary_company: primaryCompany,
     organizations,
-    relationship: toMemberRelationshipDto(person),
+    relationship: toMemberRelationshipDto(person, membersForResolve),
   };
 }

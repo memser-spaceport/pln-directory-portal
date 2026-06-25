@@ -171,7 +171,61 @@ describe('AffinityService', () => {
           touchpoints6m: 16,
           frequencyTier: 'HIGH',
         }),
-      }),
+      })
+    );
+  });
+
+  it('falls back to company Owners when person owner is missing', async () => {
+    await service.ingest({
+      runId: 'run-company-owner',
+      scope: 'full',
+      companies: [
+        {
+          affinity_org_id: '100',
+          name: 'Acme',
+          domain: 'acme.io',
+          raw_fields: {},
+          list_memberships: [
+            {
+              affinity_list_id: 176789,
+              affinity_list_entry_id: 1,
+              list_name: 'Portfolio Companies',
+              list_fields: {
+                'field-3378414': {
+                  name: 'Owners',
+                  data: [
+                    {
+                      id: 118239754,
+                      type: 'internal',
+                      firstName: 'Lacey',
+                      lastName: 'Wisdom',
+                      primaryEmailAddress: 'lacey.wisdom@protocol.ai',
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      ],
+      persons: [
+        {
+          affinity_person_id: '200',
+          primary_email: 'founder@acme.io',
+          current_organization_affinity_id: '100',
+          raw_fields: {},
+          list_memberships: [],
+          organizations: [{ affinity_org_id: '100', is_current: true }],
+        },
+      ],
+    });
+
+    expect(prisma.affinityPerson.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          relationshipOwnerName: 'Lacey Wisdom',
+        }),
+      })
     );
   });
 

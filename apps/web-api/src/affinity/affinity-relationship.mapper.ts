@@ -37,6 +37,19 @@ const TIER_THRESHOLDS = {
   highMaxDaysSinceContact: 60,
 } as const;
 
+/** Must match pln-data-enrichment affinity-relationship.util.ts */
+export const OWNER_FIELD_IDS = {
+  portfolioFounders: 'field-3040811',
+  strategicFounders: 'field-4904646',
+  portfolioCompanies: 'field-3378414',
+} as const;
+
+export type MemberForOwnerResolve = {
+  uid: string;
+  email: string | null;
+  name: string;
+};
+
 export function apiTierFromDb(tier: AffinityFrequencyTier | null | undefined): ApiFrequencyTier | null {
   if (!tier) return null;
   return tier.toLowerCase() as ApiFrequencyTier;
@@ -47,6 +60,10 @@ export function dbTierFromApi(
 ): AffinityFrequencyTier | null {
   if (!tier) return null;
   return tier.toUpperCase() as AffinityFrequencyTier;
+}
+
+export function normalizeOwnerName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 function fieldEntry(
@@ -96,19 +113,32 @@ function personRefFromData(data: unknown): RelationshipOwnerDto | null {
   };
 }
 
-export function extractOwnerFromListMemberships(
+function extractOwnerFromPersonListMemberships(
   memberships: Pick<AffinityListMembership, 'listFields'>[],
-  keyContact?: string | null,
 ): RelationshipOwnerDto | null {
   for (const membership of memberships) {
     const ownersField =
-      fieldEntry(membership.listFields, 'field-3040811', 'Owners') ??
-      fieldEntry(membership.listFields, 'field-4904644', 'Owners');
+      fieldEntry(membership.listFields, OWNER_FIELD_IDS.portfolioFounders, 'Owners') ??
+      fieldEntry(membership.listFields, OWNER_FIELD_IDS.strategicFounders, 'Owners');
     const owner = personRefFromData(ownersField?.data);
     if (owner) return owner;
   }
-  const trimmed = keyContact?.trim();
-  return trimmed ? { name: trimmed } : null;
+  return null;
+}
+
+export function extractOwnerFromCompanyListMemberships(
+  memberships: Pick<AffinityListMembership, 'listFields'>[],
+): RelationshipOwnerDto | null {
+  for (const membership of memberships) {
+    const ownersField = fieldEntry(
+      membership.listFields,
+      OWNER_FIELD_IDS.portfolioCompanies,
+      'Owners',
+    );
+    const owner = personRefFromData(ownersField?.data);
+    if (owner) return owner;
+  }
+  return null;
 }
 
 function rawFieldData(rawFields: Prisma.JsonValue, fieldId: string): unknown {
@@ -118,6 +148,48 @@ function rawFieldData(rawFields: Prisma.JsonValue, fieldId: string): unknown {
     return (entry as { data?: unknown }).data;
   }
   return null;
+}
+
+export function extractOwnerFromLastContactInternal(
+  rawFields: Prisma.JsonValue,
+): RelationshipOwnerDto | null {
+  const data = rawFieldData(rawFields, 'last-contact');
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const from = (data as { from?: { person?: unknown } }).from?.person;
+  const p = from as { type?: string } | undefined;
+  if (p?.type !== 'internal') return null;
+  return personRefFromData(from);
+}
+
+export function resolveRelationshipOwner(input: {
+  personListMemberships?: Pick<AffinityListMembership, 'listFields'>[];
+  companyListMemberships?: Pick<AffinityListMembership, 'listFields'>[];
+  keyContact?: string | null;
+  rawFields?: Prisma.JsonValue;
+}): RelationshipOwnerDto | null {
+  const fromPersonList = extractOwnerFromPersonListMemberships(input.personListMemberships ?? []);
+  if (fromPersonList) return fromPersonList;
+
+  if (input.companyListMemberships?.length) {
+    const fromCompany = extractOwnerFromCompanyListMemberships(input.companyListMemberships);
+    if (fromCompany) return fromCompany;
+  }
+
+  if (input.rawFields) {
+    const fromLastContact = extractOwnerFromLastContactInternal(input.rawFields);
+    if (fromLastContact) return fromLastContact;
+  }
+
+  const trimmed = input.keyContact?.trim();
+  return trimmed ? { name: trimmed } : null;
+}
+
+/** @deprecated use resolveRelationshipOwner */
+export function extractOwnerFromListMemberships(
+  memberships: Pick<AffinityListMembership, 'listFields'>[],
+  keyContact?: string | null,
+): RelationshipOwnerDto | null {
+  return resolveRelationshipOwner({ personListMemberships: memberships, keyContact });
 }
 
 export function extractLastContactFromRawFields(
@@ -206,11 +278,13 @@ function emptyBuckets(windowMonths: number): MonthlyBucketDto[] {
 
 export type AffinityPersonRelationshipSource = AffinityPerson & {
   listMemberships?: AffinityListMembership[];
+  primaryCompany?: { listMemberships?: AffinityListMembership[] } | null;
   relationshipOwnerMember?: { uid: string; name: string } | null;
 };
 
 export function toMemberRelationshipDto(
   person: AffinityPersonRelationshipSource,
+  membersForResolve?: MemberForOwnerResolve[],
 ): MemberRelationshipDto {
   const windowMonths = person.interactionWindowMonths ?? 6;
 
@@ -239,8 +313,13 @@ export function toMemberRelationshipDto(
   let months = parseMonthlyBuckets(person.touchpointsByMonth);
   let frequencyTier = apiTierFromDb(person.frequencyTier);
 
-  if (!owner && person.listMemberships?.length) {
-    owner = extractOwnerFromListMemberships(person.listMemberships, person.keyContact);
+  if (!owner) {
+    owner = resolveRelationshipOwner({
+      personListMemberships: person.listMemberships,
+      companyListMemberships: person.primaryCompany?.listMemberships,
+      keyContact: person.keyContact,
+      rawFields: person.rawFields,
+    });
   }
 
   if (!lastContact?.date && person.rawFields) {
@@ -263,6 +342,11 @@ export function toMemberRelationshipDto(
     months = emptyBuckets(windowMonths);
   }
 
+  if (owner && !owner.member_uid && membersForResolve?.length) {
+    const resolvedUid = resolveOwnerMemberUid(owner, membersForResolve);
+    if (resolvedUid) owner = { ...owner, member_uid: resolvedUid };
+  }
+
   const empty =
     !owner?.name &&
     !lastContact?.date &&
@@ -281,11 +365,18 @@ export function toMemberRelationshipDto(
 }
 
 export function resolveOwnerMemberUid(
-  ownerEmail: string | null | undefined,
-  members: Array<{ uid: string; email: string | null }>,
+  owner: { name?: string | null; email?: string | null },
+  members: MemberForOwnerResolve[],
 ): string | null {
-  const email = ownerEmail?.trim().toLowerCase();
-  if (!email) return null;
-  const match = members.find((m) => (m.email ?? '').trim().toLowerCase() === email);
-  return match?.uid ?? null;
+  const email = owner.email?.trim().toLowerCase();
+  if (email) {
+    const byEmail = members.find((m) => (m.email ?? '').trim().toLowerCase() === email);
+    if (byEmail) return byEmail.uid;
+  }
+
+  const normalized = owner.name ? normalizeOwnerName(owner.name) : '';
+  if (!normalized) return null;
+
+  const matches = members.filter((m) => normalizeOwnerName(m.name) === normalized);
+  return matches.length === 1 ? matches[0].uid : null;
 }
