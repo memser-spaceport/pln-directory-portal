@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Param,
@@ -80,6 +81,19 @@ export class AiAppsController {
   async getAppEvents(@Param('uid') uid: string, @Query('limit') limit?: string) {
     await this.aiAppsService.getApp(uid); // 404 if the app doesn't exist
     return this.aiAppsService.listEvents(uid, limit ? Number(limit) : undefined);
+  }
+
+  /**
+   * Delete an app: tears it down on the sandbox runner, marks it `DELETED`, and
+   * records the delete events. Requires `ai_apps.write`.
+   */
+  @NoCache()
+  @Delete(':uid')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(WRITE)
+  async deleteApp(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.deleteApp(memberUid, uid);
   }
 
   /** Download the reusable starter kit ZIP (creates the member's token on first use). */

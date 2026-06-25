@@ -193,4 +193,44 @@ export class AiAppsService {
       throw new BadGatewayException('Failed to deploy app to the sandbox runner');
     }
   }
+
+  /**
+   * Deletes the app from the sandbox runner, then marks it `DELETED` and records
+   * the delete events. The row is kept (status flips to `DELETED`) so the audit
+   * trail survives. `memberUid` is the member performing the deletion.
+   */
+  async deleteApp(memberUid: string, uid: string): Promise<WithMember<AiApp>> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app) {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+
+    const eventContext = { appUid: app.uid, appId: app.appId, deploymentId: app.deploymentId ?? undefined };
+    await this.prisma.aiApp.update({ where: { uid: app.uid }, data: { status: 'DELETING', notes: null } });
+    await this.recordEvent('DELETE_STARTED', memberUid, eventContext);
+
+    try {
+      await axios.delete(`${AI_APPS_RUNNER_URL}/apps/${app.appId}`, {
+        headers: { 'x-runner-token': AI_APPS_RUNNER_TOKEN },
+      });
+
+      const updated = await this.prisma.aiApp.update({
+        where: { uid: app.uid },
+        data: { status: 'DELETED', url: null, httpUrl: null, host: null, port: null, notes: null },
+      });
+      await this.recordEvent('DELETE_SUCCEEDED', memberUid, eventContext);
+      return (await this.withMember([updated]))[0];
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? `Runner error: ${error.response?.status ?? ''} ${JSON.stringify(error.response?.data ?? error.message)}`
+        : `Delete failed: ${(error as Error).message}`;
+      this.logger.error(`AI App delete failed for ${app.appId}: ${message}`);
+      await this.prisma.aiApp.update({
+        where: { uid: app.uid },
+        data: { status: 'ERROR', notes: message.slice(0, 2000) },
+      });
+      await this.recordEvent('DELETE_FAILED', memberUid, { ...eventContext, message: message.slice(0, 2000) });
+      throw new BadGatewayException('Failed to delete app on the sandbox runner');
+    }
+  }
 }
