@@ -16,8 +16,17 @@ import {
   AI_APPS_RUNNER_TOKEN,
   AI_APPS_RUNNER_URL,
   AI_APPS_S3_BUCKET,
+  buildAppHost,
+  buildAppHttpUrl,
   buildAppS3Key,
+  buildAppUrl,
 } from './ai-apps.constants';
+
+/** Edge/gateway statuses that mean "the runner may still have finished" — verify, don't fail. */
+const GATEWAY_TIMEOUT_STATUSES = [408, 502, 503, 504, 521, 522, 523, 524];
+/** How long to wait for the app to come up after a runner timeout. */
+const VERIFY_ATTEMPTS = 8;
+const VERIFY_INTERVAL_MS = 8000;
 
 interface RunnerDeployResponse {
   status?: string;
@@ -131,6 +140,10 @@ export class AiAppsService {
     }
 
     const s3Key = buildAppS3Key(dto.appId, dto.deploymentId);
+    // The sandbox host is deterministic from appId, so set the link up front.
+    const host = buildAppHost(dto.appId);
+    const url = buildAppUrl(dto.appId);
+    const httpUrl = buildAppHttpUrl(dto.appId);
 
     const app = await this.prisma.aiApp.upsert({
       where: { memberUid_appId: { memberUid, appId: dto.appId } },
@@ -141,18 +154,33 @@ export class AiAppsService {
         description: dto.description,
         status: 'DEPLOYING',
         deploymentId: dto.deploymentId,
+        url,
+        httpUrl,
+        host,
       },
       update: {
         name: dto.name,
         description: dto.description,
         status: 'DEPLOYING',
         deploymentId: dto.deploymentId,
+        url,
+        httpUrl,
+        host,
         notes: null,
       },
     });
 
     const eventContext = { appUid: app.uid, appId: dto.appId, deploymentId: dto.deploymentId };
     await this.recordEvent('DEPLOY_STARTED', memberUid, eventContext);
+
+    const markReady = async (port: number | null) => {
+      const updated = await this.prisma.aiApp.update({
+        where: { uid: app.uid },
+        data: { status: 'READY', url, httpUrl, host, port, notes: null },
+      });
+      await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
+      return (await this.withMember([updated]))[0];
+    };
 
     try {
       await this.awsService.uploadFileToS3(
@@ -166,24 +194,23 @@ export class AiAppsService {
         { appId: dto.appId, deploymentId: dto.deploymentId, s3Key },
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
-
-      const updated = await this.prisma.aiApp.update({
-        where: { uid: app.uid },
-        data: {
-          status: 'READY',
-          url: data.url ?? null,
-          httpUrl: data.httpUrl ?? null,
-          host: data.host ?? null,
-          port: data.port ?? null,
-          notes: null,
-        },
-      });
-      await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: updated.url ?? undefined });
-      return (await this.withMember([updated]))[0];
+      return markReady(data.port ?? null);
     } catch (error) {
       const message = axios.isAxiosError(error)
         ? `Runner error: ${error.response?.status ?? ''} ${JSON.stringify(error.response?.data ?? error.message)}`
         : `Deploy failed: ${(error as Error).message}`;
+
+      // A gateway timeout (Cloudflare 504/524, etc.) or no response doesn't mean the
+      // deploy failed — the long-running build often completes on the origin. Verify
+      // by checking whether the app is actually reachable before declaring failure.
+      if (this.isUncertainRunnerError(error)) {
+        this.logger.warn(`Runner timed out for ${dto.appId}; verifying app at ${url}. (${message})`);
+        if (await this.verifyAppLive(url)) {
+          this.logger.log(`AI App ${dto.appId} is live despite runner timeout — marking READY`);
+          return markReady(null);
+        }
+      }
+
       this.logger.error(`AI App deploy failed for ${dto.appId}: ${message}`);
       await this.prisma.aiApp.update({
         where: { uid: app.uid },
@@ -192,6 +219,40 @@ export class AiAppsService {
       await this.recordEvent('DEPLOY_FAILED', memberUid, { ...eventContext, message: message.slice(0, 2000) });
       throw new BadGatewayException('Failed to deploy app to the sandbox runner');
     }
+  }
+
+  /** True when the runner call timed out / hit a gateway error and the outcome is unknown. */
+  private isUncertainRunnerError(error: unknown): boolean {
+    if (!axios.isAxiosError(error)) {
+      return false;
+    }
+    // No response at all (connection reset / our own timeout) → unknown.
+    if (!error.response) {
+      return true;
+    }
+    return GATEWAY_TIMEOUT_STATUSES.includes(error.response.status);
+  }
+
+  /**
+   * Polls the app URL until it responds (any non-gateway HTTP status means the
+   * server is up — even a 404 from the app counts). Returns false if it never
+   * becomes reachable within the verification window.
+   */
+  private async verifyAppLive(url: string): Promise<boolean> {
+    for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt++) {
+      try {
+        const res = await axios.get(url, { timeout: 10000, validateStatus: () => true, maxRedirects: 0 });
+        if (res.status && !GATEWAY_TIMEOUT_STATUSES.includes(res.status)) {
+          return true;
+        }
+      } catch {
+        // Not reachable yet — keep polling.
+      }
+      if (attempt < VERIFY_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, VERIFY_INTERVAL_MS));
+      }
+    }
+    return false;
   }
 
   /**

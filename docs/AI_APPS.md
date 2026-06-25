@@ -21,11 +21,12 @@ GET  /starter-kit/download  ──►  RBAC ai_apps.write
                             ◄──  ZIP (instructions, token, styles, app/)
 
 POST /deploy (multipart)    ──►  AiAppTokenGuard (x-app-token)
-  x-app-token: <token>           upsert AiApp (status=DEPLOYING)
+  x-app-token: <token>           upsert AiApp (status=DEPLOYING, url=sandbox-<appId>.plnetwork.io set up front)
   file=app.zip + metadata        upload app.zip ──────────────────►  s3://<bucket>/apps/<appId>/<deploymentId>/app.zip
                                  POST /deploy ────────────────────►  pull from S3, build + run
                                    x-runner-token: <server secret>
-                                 store url/host/port (status=READY) ◄── { url, host, port }
+                                 200 → status=READY                ◄── { port } (or 504 timeout)
+                                 504/timeout → poll app URL, READY if reachable
                             ◄──  AiApp record
 
 GET  /            ──► RBAC ai_apps.read ── list all apps (dashboard)
@@ -61,6 +62,10 @@ curl -X POST "$AI_APPS_DEPLOY_ENDPOINT" \
 ```
 
 The backend uploads the ZIP to `s3://<AI_APPS_S3_BUCKET>/apps/<appId>/<deploymentId>/app.zip`, then calls the runner with that `s3Key`. Response is the stored `AiApp` record (status `READY` with `url`/`host`/`port`, or `ERROR` with `notes`).
+
+**Deterministic URL:** the sandbox host is always `sandbox-<appId>.plnetwork.io`, so `url`/`httpUrl`/`host` are computed from `appId` and stored on the record **at deploy start** (status `DEPLOYING`) — the link exists before the runner finishes. For `appId` `test-hello-01` the URL is `https://sandbox-test-hello-01.plnetwork.io`.
+
+**Timeout handling:** the runner build can exceed the edge (Cloudflare) timeout and return `504`/`524` even though the deploy actually completes. On a gateway timeout (or no response), the backend does **not** fail blindly — it polls the app URL (`buildAppUrl(appId)`) for ~1 min and marks the app `READY` if it becomes reachable (any non-gateway HTTP status counts, including `404` from the app). Only if it stays unreachable — or the runner returns a non-timeout error (e.g. `400`/auth) — is it marked `ERROR` / `DEPLOY_FAILED`. This prevents false failures for slow-but-successful deploys.
 
 ### Delete request
 
