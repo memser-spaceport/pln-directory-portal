@@ -1,6 +1,6 @@
 import { AffinityFrequencyTier, AffinityListMembership, AffinityPerson, Prisma } from '@prisma/client';
 
-export type ApiFrequencyTier = 'high' | 'steady' | 'cooling' | 'neglected';
+export type ApiFrequencyTier = 'high' | 'neglected';
 
 export interface RelationshipOwnerDto {
   name: string;
@@ -35,13 +35,6 @@ const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 const TIER_THRESHOLDS = {
   highMinTouchpoints: 8,
   highMaxDaysSinceContact: 60,
-  steadyMinTouchpoints: 4,
-  steadyMaxDaysSinceContact: 90,
-  coolingMinTouchpoints: 1,
-  coolingMinDaysSinceContact: 61,
-  coolingMaxDaysSinceContact: 150,
-  neglectedMaxTouchpoints: 3,
-  neglectedMinDaysSinceContact: 151,
 } as const;
 
 export function apiTierFromDb(tier: AffinityFrequencyTier | null | undefined): ApiFrequencyTier | null {
@@ -180,27 +173,6 @@ export function computeFrequencyTierFromSignals(input: {
     days <= t.highMaxDaysSinceContact
   ) {
     return 'high';
-  }
-  if (
-    touchpoints6m <= t.neglectedMaxTouchpoints ||
-    (days !== null && days >= t.neglectedMinDaysSinceContact)
-  ) {
-    return 'neglected';
-  }
-  if (
-    touchpoints6m >= t.coolingMinTouchpoints &&
-    days !== null &&
-    days >= t.coolingMinDaysSinceContact &&
-    days <= t.coolingMaxDaysSinceContact
-  ) {
-    return 'cooling';
-  }
-  if (
-    touchpoints6m >= t.steadyMinTouchpoints &&
-    days !== null &&
-    days <= t.steadyMaxDaysSinceContact
-  ) {
-    return 'steady';
   }
   if (touchpoints6m > 0 || lastIso) return 'neglected';
   return null;

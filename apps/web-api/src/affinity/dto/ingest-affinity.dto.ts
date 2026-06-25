@@ -120,7 +120,7 @@ export interface AffinityPersonIngestItem {
   last_contact_method?: string | null;
   touchpoints_6m?: number | null;
   touchpoints_by_month?: { label: string; count: number }[] | null;
-  frequency_tier?: 'high' | 'steady' | 'cooling' | 'neglected' | null;
+  frequency_tier?: 'high' | 'neglected' | null;
   interaction_window_months?: number | null;
 }
 
