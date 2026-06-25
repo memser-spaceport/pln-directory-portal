@@ -21,14 +21,10 @@ async function main(): Promise<void> {
 
   let updated = 0;
   for (const person of persons) {
-    const owner =
-      person.relationshipOwnerName
-        ? null
-        : extractOwnerFromListMemberships(person.listMemberships, person.keyContact);
-    const lastContact =
-      person.lastContactSummary
-        ? null
-        : extractLastContactFromRawFields(person.rawFields);
+    const owner = person.relationshipOwnerName
+      ? null
+      : extractOwnerFromListMemberships(person.listMemberships, person.keyContact);
+    const lastContact = person.lastContactSummary ? null : extractLastContactFromRawFields(person.rawFields);
 
     const touchpoints6m = person.touchpoints6m ?? 0;
     const frequencyTier =
@@ -37,10 +33,11 @@ async function main(): Promise<void> {
         computeFrequencyTierFromSignals({
           touchpoints6m,
           lastContactAt: person.lastContactAt ?? lastContact?.date ?? null,
-        }),
+        })
       );
 
-    if (!owner && !lastContact && person.relationshipOwnerName) continue;
+    const hasUpdates = Boolean(owner || lastContact || (frequencyTier && !person.frequencyTier));
+    if (!hasUpdates) continue;
 
     await prisma.affinityPerson.update({
       where: { uid: person.uid },
