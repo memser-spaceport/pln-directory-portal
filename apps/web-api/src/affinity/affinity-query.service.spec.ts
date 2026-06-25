@@ -43,8 +43,22 @@ describe('AffinityQueryService', () => {
       engagementScore: null,
       relationshipScore: null,
       qualityScore: null,
-      lastContactAt: null,
+      keyContact: null,
+      lastContactAt: new Date('2026-06-22T00:00:00Z'),
       lastEmailAt: null,
+      relationshipOwnerName: 'Brad Holden',
+      relationshipOwnerEmail: 'brad@protocol.vc',
+      relationshipOwnerAffinityPersonId: '118269819',
+      relationshipOwnerMemberUid: 'owner-1',
+      relationshipOwnerMember: { uid: 'owner-1', name: 'Brad Holden' },
+      lastContactSummary: 'Intro call',
+      lastContactMethod: 'meeting',
+      touchpoints6m: 16,
+      touchpointsByMonth: [{ label: 'Jun', count: 4 }],
+      frequencyTier: 'HIGH',
+      interactionWindowMonths: 6,
+      relationshipStatsPulledAt: new Date('2026-06-24'),
+      rawFields: {},
       linkMethod: 'EMAIL',
       linkConfidence: 1,
       linkedAt: new Date('2026-01-01'),
@@ -130,6 +144,12 @@ describe('AffinityQueryService', () => {
     expect(out.primary_company?.name).toBe('Acme');
     expect(out.primary_company?.linked_team?.uid).toBe('team-1');
     expect(out.organizations).toHaveLength(1);
+    expect(out.relationship.empty).toBe(false);
+    expect(out.relationship.owner?.name).toBe('Brad Holden');
+    expect(out.relationship.owner?.member_uid).toBe('owner-1');
+    expect(out.relationship.last_contact?.summary).toBe('Intro call');
+    expect(out.relationship.frequency_tier).toBe('high');
+    expect(out.relationship.touchpoints_6m).toBe(16);
   });
 
   it('throws when member missing', async () => {

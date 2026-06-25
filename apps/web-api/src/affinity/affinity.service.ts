@@ -14,6 +14,7 @@ import {
   matchMember,
   matchTeam,
 } from './affinity-match.util';
+import { dbTierFromApi, resolveOwnerMemberUid } from './affinity-relationship.mapper';
 
 function parseIsoDate(value: string | null | undefined): Date | null {
   if (!value?.trim()) return null;
@@ -159,7 +160,8 @@ export class AffinityService {
               dto.runId,
               memberIndex,
               companySidecarByOrgId,
-              memberUidOwner
+              memberUidOwner,
+              members,
             );
             response.ingested.persons++;
             if (linked.member) response.linked.personsToMember++;
@@ -382,6 +384,7 @@ export class AffinityService {
     links: {
       member?: { uid: string; method: AffinityEntityLinkMethod; confidence: number };
       primaryCompanyUid?: string | null;
+      relationshipOwnerMemberUid?: string | null;
     }
   ): Prisma.AffinityPersonUncheckedCreateInput {
     return {
@@ -424,6 +427,20 @@ export class AffinityService {
       sourceOfIntroduction: item.source_of_introduction
         ? (item.source_of_introduction as Prisma.InputJsonValue)
         : Prisma.JsonNull,
+      relationshipOwnerName: item.relationship_owner?.name ?? null,
+      relationshipOwnerEmail: item.relationship_owner?.email ?? null,
+      relationshipOwnerAffinityPersonId: item.relationship_owner?.affinity_person_id ?? null,
+      relationshipOwnerMemberUid: links.relationshipOwnerMemberUid ?? null,
+      lastContactSummary: item.last_contact_summary ?? null,
+      lastContactMethod: item.last_contact_method ?? null,
+      touchpoints6m: item.touchpoints_6m ?? null,
+      touchpointsByMonth: item.touchpoints_by_month
+        ? (item.touchpoints_by_month as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
+      frequencyTier: dbTierFromApi(item.frequency_tier),
+      interactionWindowMonths: item.interaction_window_months ?? 6,
+      relationshipStatsPulledAt:
+        item.touchpoints_6m != null || item.frequency_tier != null ? new Date() : null,
       rawFields: item.raw_fields as Prisma.InputJsonValue,
       lastIngestRunId: runId,
       pulledAt: new Date(),
@@ -444,7 +461,8 @@ export class AffinityService {
     runId: string,
     memberIndex: ReturnType<typeof buildMemberMatchIndex>,
     companySidecarByOrgId: Map<string, string>,
-    memberUidOwner: Map<string, string>
+    memberUidOwner: Map<string, string>,
+    members: Array<{ uid: string; email: string | null }>,
   ): Promise<{ member: boolean; company: boolean }> {
     const memberMatch = matchMember(
       {
@@ -478,6 +496,10 @@ export class AffinityService {
     const data = this.personData(item, runId, {
       member: memberLink,
       primaryCompanyUid,
+      relationshipOwnerMemberUid: resolveOwnerMemberUid(
+        item.relationship_owner?.email,
+        members,
+      ),
     });
 
     const row = await this.prisma.affinityPerson.upsert({

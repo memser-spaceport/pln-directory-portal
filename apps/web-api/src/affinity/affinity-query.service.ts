@@ -24,6 +24,7 @@ export class AffinityQueryService {
       where: { memberUid },
       include: {
         listMemberships: { orderBy: { listName: 'asc' } },
+        relationshipOwnerMember: { select: { uid: true, name: true } },
         primaryCompany: { include: companyInclude },
         organizations: {
           include: { company: { include: companyInclude } },

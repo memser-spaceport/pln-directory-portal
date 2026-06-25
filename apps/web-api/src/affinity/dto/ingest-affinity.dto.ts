@@ -111,6 +111,17 @@ export interface AffinityPersonIngestItem {
   raw_fields: Record<string, unknown>;
   list_memberships?: AffinityListMembershipInput[];
   organizations?: AffinityPersonOrganizationInput[];
+  relationship_owner?: {
+    name: string;
+    email?: string | null;
+    affinity_person_id?: string | null;
+  } | null;
+  last_contact_summary?: string | null;
+  last_contact_method?: string | null;
+  touchpoints_6m?: number | null;
+  touchpoints_by_month?: { label: string; count: number }[] | null;
+  frequency_tier?: 'high' | 'steady' | 'cooling' | 'neglected' | null;
+  interaction_window_months?: number | null;
 }
 
 export interface IngestAffinityDto {

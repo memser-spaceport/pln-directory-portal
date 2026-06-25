@@ -36,7 +36,20 @@ describe('AffinityService', () => {
     });
     prisma.affinityIngestRun.update.mockResolvedValue({});
     prisma.team.findMany.mockResolvedValue([{ uid: 'team-1', airtableRecId: 'recTEAM', website: 'https://acme.io' }]);
-    prisma.member.findMany.mockResolvedValue([{ uid: 'member-1', email: 'founder@acme.io', airtableRecId: 'recMEM' }]);
+    prisma.member.findMany.mockResolvedValue([
+      {
+        uid: 'member-1',
+        name: 'Founder',
+        email: 'founder@acme.io',
+        airtableRecId: 'recMEM',
+      },
+      {
+        uid: 'owner-1',
+        name: 'Brad Holden',
+        email: 'brad@protocol.vc',
+        airtableRecId: null,
+      },
+    ]);
     prisma.affinityCompany.findMany.mockResolvedValue([]);
     prisma.affinityPerson.findMany.mockResolvedValue([]);
     prisma.affinityCompany.upsert.mockResolvedValue({ uid: 'comp-uid-1' });
@@ -121,6 +134,45 @@ describe('AffinityService', () => {
     expect(result.linked.personsToMember).toBe(1);
     expect(prisma.affinityCompany.upsert).not.toHaveBeenCalled();
     expect(prisma.affinityPerson.upsert).not.toHaveBeenCalled();
+  });
+
+  it('persists relationship card fields and resolves owner member uid', async () => {
+    await service.ingest({
+      runId: 'run-rel',
+      scope: 'founders',
+      persons: [
+        {
+          affinity_person_id: '200',
+          primary_email: 'founder@acme.io',
+          raw_fields: {},
+          list_memberships: [],
+          organizations: [],
+          relationship_owner: {
+            name: 'Brad Holden',
+            email: 'brad@protocol.vc',
+            affinity_person_id: '118269819',
+          },
+          last_contact_summary: 'Intro call',
+          last_contact_method: 'meeting',
+          touchpoints_6m: 16,
+          touchpoints_by_month: [{ label: 'Jun', count: 4 }],
+          frequency_tier: 'high',
+          interaction_window_months: 6,
+        },
+      ],
+    });
+
+    expect(prisma.affinityPerson.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          relationshipOwnerName: 'Brad Holden',
+          relationshipOwnerMemberUid: 'owner-1',
+          lastContactSummary: 'Intro call',
+          touchpoints6m: 16,
+          frequencyTier: 'HIGH',
+        }),
+      }),
+    );
   });
 
   it('returns chunk-local stats but persists merged stats on the ingest run', async () => {
