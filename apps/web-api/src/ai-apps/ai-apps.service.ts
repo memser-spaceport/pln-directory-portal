@@ -81,9 +81,12 @@ export class AiAppsService {
     return token;
   }
 
-  /** Dashboard list — all apps across PL Infra users, newest first, with owner info. */
+  /** Dashboard list — all non-deleted apps across PL Infra users, newest first, with owner info. */
   async listApps(): Promise<Array<WithMember<AiApp>>> {
-    const apps = await this.prisma.aiApp.findMany({ orderBy: { updatedAt: 'desc' } });
+    const apps = await this.prisma.aiApp.findMany({
+      where: { status: { not: 'DELETED' } },
+      orderBy: { updatedAt: 'desc' },
+    });
     return this.withMember(apps);
   }
 
