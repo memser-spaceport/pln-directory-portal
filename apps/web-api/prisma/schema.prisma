@@ -2940,6 +2940,8 @@ enum AiAppStatus {
   DEPLOYING
   READY
   ERROR
+  DELETING
+  DELETED
 }
 
 /// One vibe-coded sandbox app, lazy-created on first deploy by its owning member.
@@ -2985,6 +2987,9 @@ enum AiAppEventType {
   DEPLOY_STARTED
   DEPLOY_SUCCEEDED
   DEPLOY_FAILED
+  DELETE_STARTED
+  DELETE_SUCCEEDED
+  DELETE_FAILED
 }
 
 /// Append-only audit log of AI Apps activity: who downloaded the kit and every
