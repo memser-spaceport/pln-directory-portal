@@ -32,12 +32,30 @@
  * (PII, never committed). NOT for production. Run via `npm run api:seed-pathfinder-neuro`.
  */
 import { readFileSync } from 'fs';
-import path from 'path';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { affinityBoost, blendGraphScore, comparePathsByWarmth } from './affinity-warmth-boost.util';
+import { buildAffinityDirectPath, passesAffinityDirectThreshold } from './affinity-direct-path.util';
+import { finalizePersonHopChain } from './path-route.util';
+import { loadMemberNameIndex, loadPortfolioFounderIndex, normalizePersonName } from './founder-member-resolve.util';
+import { loadMemberContactIndex } from './org-contact-resolve.util';
+import { resolvePathfinderScratchDir } from './pathfinder-scratch.util';
+import {
+  buildRawPayload,
+  mapAffinityListEntry,
+  mergeProfileFields,
+  type MemberResolver,
+} from './affinity-roster-mapper.util';
+import { buildMergedPlConnectors, loadPlConnectorsFromFile } from './pl-relationship-seed.util';
+import { loadPrestigeByName, toEnrichment } from './prestige-seed.util';
+import { buildFirmByLabelIndex, lookupFirmProximity, type FirmProximity } from './firm-proximity-seed.util';
+import { loadPriorBackingMap } from './pl-investors-seed.util';
+import { applyPriorBackingToHopChain, backingWarmthBoost } from './prior-backing-warmth.util';
 
 const prisma = new PrismaClient();
 
 const TARGET_SET = 'neuro-fund-i';
+/** Legacy default from run-pathfinder before TARGET_SET was aligned to neuro-fund-i. */
+const LEGACY_DUMP_TARGET_SET = 'lp-target-set';
 const NEW_SOURCE = 'PATHFINDER_NEURO';
 const DEMO_SOURCE = 'DEMO_PATHFINDER';
 const DEMO_TARGET_SET = 'demo-neuro-lp';
@@ -45,8 +63,7 @@ const DEMO_RUN_ID = 'demo-seed';
 const RUN_ID = 'neuro-person-seed';
 const LIST_SLUG = 'neuro-lp';
 
-const DEFAULT_SCRATCH = path.resolve(__dirname, '../../../../..', 'seed_data', 'path_finder');
-const SCRATCH_DIR = process.env.PATHFINDER_SCRATCH_DIR || DEFAULT_SCRATCH;
+const SCRATCH_DIR = resolvePathfinderScratchDir();
 const DUMP_PATH = `${SCRATCH_DIR}/_pathfinder_dump.json`;
 const AFFINITY_PATH = `${SCRATCH_DIR}/_affinity_352080.json`;
 const PRESTIGE_PATH = process.env.PATHFINDER_PRESTIGE_CACHE || `${SCRATCH_DIR}/_lp_prestige_cache.json`;
@@ -77,16 +94,6 @@ interface Dump {
   paths: DumpPath[];
   summaries: DumpSummary[];
 }
-interface PrestigeEntry {
-  name?: string;
-  aum?: string | null;
-  notableInvestments?: string[] | null;
-  bio?: string | null;
-  thesis?: string | null;
-  fundFocus?: string | null;
-  sources?: string[] | null;
-  enrichedAt?: string;
-}
 interface AffinityField {
   id: string;
   value?: { data?: unknown };
@@ -101,15 +108,6 @@ interface AffinityEntity {
 }
 interface AffinityEntry {
   entity: AffinityEntity;
-}
-/**
- * One LP's PL-team connector, as written by pull-affinity-pl-relationships.ts
- * (shape mirrors PlTeamRelationship). Only `summary` + `bestConnector` are used
- * here — they are grafted onto the person's hop chain. Loose by design (scratch JSON).
- */
-interface PlRelEntry {
-  summary: string | null;
-  bestConnector: Record<string, unknown> | null;
 }
 
 const norm = (s: string | null | undefined): string =>
@@ -143,21 +141,6 @@ function entryFirmNames(entity: AffinityEntity): string[] {
     .filter((n): n is string => typeof n === 'string' && n.trim().length > 0);
 }
 
-/**
- * Per-LP PL-team connectors keyed by Affinity person id. Optional input: if the
- * relationship pull hasn't been run, return an empty map and skip attribution
- * (the run still succeeds — connector copy just won't appear).
- */
-function loadPlConnectors(): Map<string, PlRelEntry> {
-  try {
-    const raw = JSON.parse(readFileSync(PL_REL_PATH, 'utf-8')) as Record<string, PlRelEntry>;
-    return new Map(Object.entries(raw));
-  } catch {
-    console.warn(`(no ${PL_REL_PATH} — PL-team connector attribution skipped)`);
-    return new Map();
-  }
-}
-
 /** Warmer = smaller. Cold (no path) sinks last. */
 function proximityRank(code: string | null, hasPath: boolean): number {
   if (!hasPath || !code) return 1e9;
@@ -166,41 +149,6 @@ function proximityRank(code: string | null, hasPath: boolean): number {
   const caliber = m[2] === 'A' ? 0 : 1;
   const hops = parseInt(m[1], 10);
   return caliber * 100 + hops;
-}
-
-function loadPrestigeByName(): Map<string, PrestigeEntry> {
-  const byName = new Map<string, PrestigeEntry>();
-  try {
-    const raw = JSON.parse(readFileSync(PRESTIGE_PATH, 'utf-8')) as Record<string, PrestigeEntry>;
-    for (const [key, e] of Object.entries(raw)) {
-      const name = e.name ?? key.split('||')[0];
-      if (name && !byName.has(norm(name))) byName.set(norm(name), e);
-    }
-  } catch {
-    console.warn('(no prestige cache — records will have no enrichment)');
-  }
-  return byName;
-}
-
-function toEnrichment(e: PrestigeEntry): Record<string, unknown> | undefined {
-  const enrichment: Record<string, unknown> = {};
-  if (e.bio) enrichment.bio = e.bio;
-  if (e.fundFocus) enrichment.fundFocus = e.fundFocus;
-  if (e.aum) enrichment.aum = e.aum;
-  if (e.notableInvestments?.length) enrichment.notableInvestments = e.notableInvestments;
-  if (e.thesis) enrichment.thesis = e.thesis;
-  if (e.sources?.length) enrichment.sources = e.sources;
-  if (Object.keys(enrichment).length === 0) return undefined;
-  enrichment.enrichedVia = 'perplexity+exa+firecrawl';
-  enrichment.fetchedAt = e.enrichedAt ?? '2026-06-06';
-  return enrichment;
-}
-
-interface FirmProximity {
-  firmId: string;
-  label: string;
-  code: string;
-  hasPath: boolean;
 }
 
 async function cleanup() {
@@ -224,25 +172,20 @@ async function cleanup() {
 async function seed() {
   const dump = JSON.parse(readFileSync(DUMP_PATH, 'utf-8')) as Dump;
   if (dump.targetSet !== TARGET_SET) {
-    throw new Error(`dump targetSet "${dump.targetSet}" != expected "${TARGET_SET}"`);
-  }
-  const prestige = loadPrestigeByName();
-  const plConnectors = loadPlConnectors();
-  let personsWithConnector = 0;
-
-  // Index firm proximity by normalized firm label, and firm paths by firm id.
-  const firmByLabel = new Map<string, FirmProximity>();
-  for (const s of dump.summaries) {
-    const key = norm(s.firm_label);
-    if (key) {
-      firmByLabel.set(key, {
-        firmId: s.investor_id,
-        label: s.firm_label,
-        code: s.best_proximity_code,
-        hasPath: s.has_path,
-      });
+    if (dump.targetSet === LEGACY_DUMP_TARGET_SET) {
+      console.warn(
+        `dump targetSet "${dump.targetSet}" is legacy — paths will be stored as "${TARGET_SET}". ` +
+          'Re-run run-pathfinder.ts (or set PATHFINDER_TARGET_SET=neuro-fund-i) to refresh the dump label.'
+      );
+    } else {
+      throw new Error(`dump targetSet "${dump.targetSet}" != expected "${TARGET_SET}"`);
     }
   }
+  const prestige = loadPrestigeByName(PRESTIGE_PATH);
+  const v1PlConnectors = loadPlConnectorsFromFile(PL_REL_PATH);
+  let personsWithConnector = 0;
+
+  const firmByLabel = buildFirmByLabelIndex(dump.summaries);
   const pathsByFirm = new Map<string, DumpPath[]>();
   for (const p of dump.paths) {
     const arr = pathsByFirm.get(p.targetInvestorId) ?? [];
@@ -251,6 +194,40 @@ async function seed() {
   }
 
   const entries = (JSON.parse(readFileSync(AFFINITY_PATH, 'utf-8')) as { entries?: AffinityEntry[] }).entries ?? [];
+  const plConnectors = buildMergedPlConnectors(v1PlConnectors, entries, new Date().toISOString());
+
+  // LabOS member uid by normalized email (investor routeNodes terminus).
+  const entryEmails = entries
+    .map((e) => {
+      const ent = e.entity;
+      const raw =
+        (ent.primaryEmailAddress ?? '').trim() ||
+        (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') ||
+        '';
+      return normalizeEmailKey(raw);
+    })
+    .filter((em) => em.length > 0);
+  const memberByEmail = new Map<string, string>();
+  if (entryEmails.length > 0) {
+    const members = await prisma.member.findMany({
+      where: { email: { in: [...new Set(entryEmails)] } },
+      select: { email: true, uid: true },
+    });
+    for (const m of members) {
+      if (m.email) memberByEmail.set(normalizeEmailKey(m.email), m.uid);
+    }
+  }
+
+  console.log('Loading founder → LabOS member indexes…');
+  const portfolioTeams = await loadPortfolioFounderIndex(prisma);
+  const membersByName = await loadMemberNameIndex(prisma);
+  const memberContactIndex = await loadMemberContactIndex(prisma);
+  const founderIndexes = { portfolioTeams, membersByName };
+  console.log(`  portfolio teams: ${portfolioTeams.size} keys, unique member names: ${membersByName.size}`);
+
+  console.log('Loading PL prior-backer index (Affinity list 166215)…');
+  const priorBackingByInvestor = loadPriorBackingMap(SCRATCH_DIR, entries);
+  console.log(`  prior backers matched: ${priorBackingByInvestor.size}`);
 
   // ── Pass 1 (pure memory): classify every entry against a one-shot snapshot
   // of existing records. All writes happen in bulk afterwards — the previous
@@ -263,6 +240,28 @@ async function seed() {
   });
   const byDedupeKey = new Map<string, ExistingRef>(existingRows.map((r) => [r.dedupeKey, r]));
   const byInvestorId = new Map<string, ExistingRef>(existingRows.map((r) => [r.investorId, r]));
+
+  const existingProfileRows = await prisma.investorOutreachRecord.findMany({
+    select: {
+      id: true,
+      investorId: true,
+      linkedinUrl: true,
+      title: true,
+      geoFocus: true,
+      investorType: true,
+      sectorTags: true,
+      stageFocus: true,
+      checkSizeRange: true,
+      firmDomain: true,
+      rawPayload: true,
+    },
+  });
+  const profileByInvestorId = new Map(existingProfileRows.map((r) => [r.investorId, r]));
+
+  const memberResolver: MemberResolver = {
+    byEmail: (email) => memberByEmail.get(email) ?? memberContactIndex.byEmail.get(email)?.uid,
+    byName: (name) => membersByName.get(normalizePersonName(name)),
+  };
   const PENDING_ID = -1; // marks rows queued for creation in this run
 
   let duplicates = 0;
@@ -280,28 +279,69 @@ async function seed() {
   /** investorIds whose paths are already queued this run (avoid double-attach). */
   const pathTargetsQueued = new Set<string>();
   /** Duplicate matches that may need this run's paths attached to the existing record. */
-  const dupPathCandidates: { investorId: string; firmId: string; bestCode: string }[] = [];
+  const dupPathCandidates: {
+    investorId: string;
+    firmId: string;
+    bestCode: string;
+    firstName: string;
+    lastName: string;
+    memberUid?: string;
+  }[] = [];
 
-  const queuePaths = (targetInvestorId: string, firmId: string) => {
-    // Relationship-axis graft: this person's PL-team connector (keyed by their
-    // Affinity id). Person-grain — the firm-grain runner can't carry it.
+  const queuePaths = (
+    targetInvestorId: string,
+    firmId: string,
+    person: { firstName: string; lastName: string; memberUid?: string; email?: string; role?: string }
+  ): string | null => {
     const rel = plConnectors.get(targetInvestorId);
+    const priorBacking = priorBackingByInvestor.get(targetInvestorId);
+    const boost = Math.max(affinityBoost(rel?.bestConnector ?? null), backingWarmthBoost(priorBacking));
     let attachedHere = false;
-    for (const p of pathsByFirm.get(firmId) ?? []) {
-      let hopChain = p.hopChain;
+
+    type PathCandidate = DumpPath & { score: number };
+    const firmPaths = pathsByFirm.get(firmId) ?? [];
+    const candidates: PathCandidate[] = firmPaths.map((p) => ({
+      ...p,
+      score: blendGraphScore(p.score, boost),
+    }));
+
+    if (rel?.bestConnector && passesAffinityDirectThreshold(rel.bestConnector)) {
+      const baseCaliber = firmPaths[0]?.caliber ?? 'B';
+      const baseConf = firmPaths[0]?.caliberConfidence ?? 0.4;
+      const direct = buildAffinityDirectPath({
+        targetInvestorId,
+        plConnector: rel.bestConnector,
+        caliber: baseCaliber,
+        caliberConfidence: baseConf,
+        targetSet: TARGET_SET,
+        summary: rel.summary,
+      });
+      candidates.push({ ...direct, rank: 0, score: blendGraphScore(direct.score, boost) } as PathCandidate);
+    }
+
+    if (candidates.length === 0) return null;
+
+    const sorted = [...candidates].sort(comparePathsByWarmth);
+
+    let rank1Code: string | null = null;
+    for (let i = 0; i < sorted.length; i++) {
+      const p = sorted[i];
+      const rank = i + 1;
+      if (rank === 1) rank1Code = p.proximityCode;
+
+      let hopChain = JSON.parse(JSON.stringify(p.hopChain)) as Record<string, unknown>;
       if (rel?.bestConnector && rel.summary) {
-        // Clone first — the same firm hop-chain object is shared across everyone
-        // at the firm, so in-place mutation would leak to other people. JSON
-        // round-trip: the hop chain is plain JSON and small.
-        const hc = JSON.parse(JSON.stringify(p.hopChain)) as {
-          explanation?: string;
-          plConnector?: unknown;
-        };
-        hc.explanation = hc.explanation ? `${hc.explanation} ${rel.summary}.` : `${rel.summary}.`;
+        const hc = hopChain as { explanation?: string; plConnector?: unknown };
+        const summary = rel.summary;
+        const existing = typeof hc.explanation === 'string' ? hc.explanation : '';
+        if (!existing.includes(summary)) {
+          hc.explanation = existing ? `${existing} ${summary}.` : `${summary}.`;
+        }
         hc.plConnector = rel.bestConnector;
-        hopChain = hc;
         attachedHere = true;
       }
+      hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops, memberContactIndex);
+      hopChain = applyPriorBackingToHopChain(hopChain, priorBacking);
       pathInserts.push({
         targetInvestorId,
         targetSet: TARGET_SET,
@@ -312,12 +352,13 @@ async function seed() {
         score: p.score,
         caliberConfidence: p.caliberConfidence,
         hopChain: hopChain as Prisma.InputJsonValue,
-        rank: p.rank,
+        rank,
         ingestRunId: RUN_ID,
       });
     }
     if (attachedHere) personsWithConnector += 1;
     pathTargetsQueued.add(targetInvestorId);
+    return rank1Code;
   };
 
   console.log(`Processing ${entries.length} Affinity entries…`);
@@ -340,19 +381,25 @@ async function seed() {
     // Best (warmest) firm across this person's companies.
     let best: FirmProximity | null = null;
     for (const fn of firms) {
-      const fp = firmByLabel.get(norm(fn));
+      const fp = lookupFirmProximity(fn, firmByLabel);
       if (!fp) continue;
       if (!best || proximityRank(fp.code, fp.hasPath) < proximityRank(best.code, best.hasPath)) {
         best = fp;
       }
     }
     const firmLabel = best?.label ?? firms[0] ?? '';
-    const hasPath = best?.hasPath ?? false;
-    const bestCode = best && hasPath ? best.code : null;
+    const hasGraphPath = best?.hasPath ?? false;
+    const relEntry = plConnectors.get(affinityId);
+    const hasAffinityDirect = !!relEntry?.bestConnector && passesAffinityDirectThreshold(relEntry.bestConnector);
+    const personHasPath = hasGraphPath || hasAffinityDirect;
 
     const prest = prestige.get(norm(`${firstName} ${lastName}`)) ?? null;
     const enrichment = prest ? toEnrichment(prest) : undefined;
     if (enrichment) enriched += 1;
+
+    const { profile: affinityProfile, affinityData } = mapAffinityListEntry(ent, { memberResolver });
+
+    let bestProximityForRecord: string | null = personHasPath && best ? best.code : null;
 
     // Match by dedupeKey (prod convention) — a person may already exist via the
     // Gold list (same Affinity id) or the wider investor DB (same email).
@@ -382,16 +429,50 @@ async function seed() {
         needsReview: true,
         ingestRunId: RUN_ID,
       });
-      if (best && hasPath) {
-        dupPathCandidates.push({ investorId: existing.investorId, firmId: best.firmId, bestCode: best.code });
+      if (best && personHasPath) {
+        dupPathCandidates.push({
+          investorId: existing.investorId,
+          firmId: best.firmId,
+          bestCode: best.code,
+          firstName,
+          lastName,
+          memberUid: memberByEmail.get(dedupeKey),
+        });
+      }
+      const canonicalProfile = profileByInvestorId.get(existing.investorId);
+      if (canonicalProfile) {
+        const mergedProfile = mergeProfileFields(canonicalProfile, affinityProfile);
+        const rawPayload = buildRawPayload(undefined, affinityData, canonicalProfile.rawPayload);
+        updates.push({
+          id: canonicalProfile.id,
+          data: {
+            ...mergedProfile,
+            ...(rawPayload ? { rawPayload: rawPayload as Prisma.InputJsonValue } : {}),
+          },
+        });
       }
       memberIds.push(existing.investorId);
       continue;
     }
 
+    if (personHasPath) {
+      reachable += 1;
+      const rank1 = queuePaths(affinityId, best?.firmId ?? '', {
+        firstName,
+        lastName,
+        memberUid: memberByEmail.get(dedupeKey),
+        email: realEmail || undefined,
+      });
+      if (rank1) bestProximityForRecord = rank1;
+    }
+
     // Same Affinity id (re-run / Gold-shared person) or brand new. On update,
     // leave source untouched so Gold-first shared people stay gold-sourced (and
     // each seed's cleanup only ever deletes its own rows).
+    const priorProfile = profileByInvestorId.get(affinityId);
+    const mergedProfile = mergeProfileFields(priorProfile ?? {}, affinityProfile);
+    const rawPayload = buildRawPayload(enrichment, affinityData, priorProfile?.rawPayload);
+    const priorBacking = priorBackingByInvestor.get(affinityId);
     const recordFields = {
       investorId: affinityId,
       canonicalId: affinityId,
@@ -400,13 +481,19 @@ async function seed() {
       email,
       emailStatus: 'unverified',
       firm: firmLabel,
-      investorType: 'fund',
-      stageFocus: '',
+      ...mergedProfile,
       engagementTier: '',
       enrichmentStatus: enrichment ? 'enriched' : 'pending',
-      bestProximityCode: bestCode,
-      hasPath,
-      rawPayload: enrichment ? ({ enrichment } as Prisma.InputJsonValue) : undefined,
+      bestProximityCode: bestProximityForRecord,
+      hasPath: personHasPath,
+      ...(rawPayload || priorBacking
+        ? {
+            rawPayload: {
+              ...((rawPayload as Record<string, unknown> | undefined) ?? {}),
+              ...(priorBacking ? { priorBacking } : {}),
+            } as Prisma.InputJsonValue,
+          }
+        : {}),
     };
     if (existing) {
       updates.push({ id: existing.id, data: recordFields });
@@ -419,12 +506,6 @@ async function seed() {
       byInvestorId.set(affinityId, pending);
     }
     memberIds.push(affinityId);
-
-    // Copy the best firm's paths onto this person (target = affinity id).
-    if (best && hasPath) {
-      reachable += 1;
-      queuePaths(affinityId, best.firmId);
-    }
   }
 
   // ── Pass 2: surface this run's warm paths on duplicate-matched existing
@@ -445,15 +526,20 @@ async function seed() {
   for (const d of dupPathCandidates) {
     if (pathTargetsQueued.has(d.investorId) || alreadyHasPaths.has(d.investorId)) continue;
     reachable += 1;
-    queuePaths(d.investorId, d.firmId);
+    const rank1 =
+      queuePaths(d.investorId, d.firmId, {
+        firstName: d.firstName,
+        lastName: d.lastName,
+        memberUid: d.memberUid,
+      }) ?? d.bestCode;
     const pendingCreate = createByInvestorId.get(d.investorId);
     if (pendingCreate) {
-      pendingCreate.bestProximityCode = d.bestCode;
+      pendingCreate.bestProximityCode = rank1;
       pendingCreate.hasPath = true;
     } else {
       const ref = byInvestorId.get(d.investorId);
       if (ref && ref.id !== PENDING_ID) {
-        updates.push({ id: ref.id, data: { bestProximityCode: d.bestCode, hasPath: true } });
+        updates.push({ id: ref.id, data: { bestProximityCode: rank1, hasPath: true } });
       }
     }
   }

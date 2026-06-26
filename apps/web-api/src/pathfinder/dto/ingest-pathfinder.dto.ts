@@ -22,10 +22,107 @@ export interface PathfinderHopChainEdge {
   evidence: string | null;
 }
 
+/** People-first route presentation (task 06). Stored camelCase in DB JSON. */
+export interface RouteNodeContact {
+  name: string;
+  role?: string;
+  email?: string;
+  linkedin?: string;
+  telegram?: string;
+  memberUid?: string;
+  imageUrl?: string;
+  affinityId?: string;
+  source?: 'gold_list' | 'v8' | 'labos' | 'portfolio' | 'affinity';
+}
+
+export interface PathRouteNode {
+  label: string;
+  orgName?: string;
+  role?: string;
+  email?: string;
+  linkedin?: string;
+  telegram?: string;
+  imageUrl?: string;
+  memberUid?: string;
+  teamUid?: string;
+  logo?: string;
+  variant: 'member' | 'external' | 'org';
+  contacts?: RouteNodeContact[];
+}
+
+/** Table/drawer hop node — matches FE PathHopNode / mapHopNode contract. */
+export interface PathHopNodeDto {
+  id: string;
+  label: string;
+  type: 'person' | 'org';
+  memberUid?: string;
+  teamUid?: string;
+  orgName?: string;
+  imageUrl?: string;
+  email?: string;
+  role?: string;
+  linkedin?: string;
+  telegram?: string;
+  contacts?: RouteNodeContact[];
+}
+
+export interface PathContactPerson {
+  name: string;
+  role: string;
+  email?: string;
+  linkedin?: string;
+  telegram?: string;
+  memberUid?: string;
+  teams?: Array<{ name: string; teamUid?: string; logo?: string }>;
+}
+
+export interface PathOrgConnector {
+  name: string;
+  teamUid?: string;
+  logo?: string;
+  description: string;
+  tags: string[];
+  email?: string;
+  website?: string;
+  affinityOrgId?: string;
+  contacts?: RouteNodeContact[];
+}
+
+export interface PathConnectorTeam {
+  name: string;
+  teamUid?: string;
+  leads: PathContactPerson[];
+}
+
+/** Affinity list 166215 prior-backer flags (camelCase in stored hopChain JSON). */
+export interface PriorBackingFlags {
+  backedProtocolLabs: boolean;
+  backedFilecoin: boolean;
+  matchKind: 'person' | 'firm' | 'both';
+  source: 'affinity-list-166215';
+  firmName?: string;
+  affinityOrgId?: number;
+}
+
 export interface PathfinderHopChain {
   nodes: PathfinderHopChainNode[];
   edges: PathfinderHopChainEdge[];
   explanation: string;
+  /**
+   * People-first route chain for table/drawer (stored as camelCase `routeNodes` in DB).
+   * May be 2–3 nodes before investor terminus:
+   *   case 1 — [PL connector person, investor]
+   *   case 2 — [PL connector person, bridge, investor]
+   *   case 3 — [Protocol Labs org, bridge, investor]
+   */
+  route_nodes?: PathRouteNode[];
+  contact?: PathContactPerson;
+  /** @deprecated Prefer org_connectors[0] */
+  org_connector?: PathOrgConnector;
+  org_connectors?: PathOrgConnector[];
+  connector_team?: PathConnectorTeam;
+  pl_connector?: Record<string, unknown>;
+  priorBacking?: PriorBackingFlags;
 }
 
 export interface PathfinderPathInput {

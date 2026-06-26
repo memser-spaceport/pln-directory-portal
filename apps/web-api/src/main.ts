@@ -3,13 +3,13 @@
 // Do NOT move this import below others — doing so may break logging, metrics, or tracing!
 import './instrumentation';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
 import { mainConfig } from './main.config';
 import { APP_ENV } from './utils/constants';
 import { createForestAdminAgent } from './utils/forest-admin/agent';
 import { SetupService } from './setup.service';
+import { setupSwagger } from './swagger/swagger.setup';
 
 export async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -20,15 +20,9 @@ export async function bootstrap() {
   // Responsible for loading every major app configuration:
   mainConfig(app);
 
-  // Swagger Documentation
-  const config = new DocumentBuilder()
-    .setTitle('Protocol Labs Directory API')
-    .setDescription('The Protocol Labs Directory API documentation')
-    .setVersion('1.0')
-    .addTag('PL')
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  // Swagger Documentation — three audience-scoped docs:
+  //   /api/docs (user) · /api/admin/docs (back-office) · /api/internal/docs (service)
+  setupSwagger(app);
 
   // Sentry - Error Reporting
   Sentry.init({

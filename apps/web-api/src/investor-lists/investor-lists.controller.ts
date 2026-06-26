@@ -52,6 +52,13 @@ export class InvestorListsController {
   }
 
   @NoCache()
+  @Get(':listId/warm-intro-facets')
+  @RequirePermissions(VIEW_PERMS)
+  async warmIntroFacets(@Param('listId') listId: string) {
+    return this.queryService.listWarmIntroFacets(await this.queryService.resolveListId(listId));
+  }
+
+  @NoCache()
   @Get(':listId/members')
   @RequirePermissions(VIEW_PERMS)
   async listMembers(@Param('listId') listId: string, @Query() query: ListMembersQueryDto) {

@@ -1,3 +1,5 @@
+import { PathHopNodeDto } from '../../pathfinder/dto/ingest-pathfinder.dto';
+
 export interface LabOsProfileDto {
   type: 'member';
   uid: string;
@@ -22,6 +24,29 @@ export interface InvestorEnrichmentDto {
   sources: string[];
   enrichedVia: string | null;
   fetchedAt: string | null;
+}
+
+export interface AffinityPersonRefDto {
+  name: string;
+  email?: string | null;
+  affinityPersonId?: number | null;
+  memberUid?: string | null;
+}
+
+export interface AffinityInteractionRefDto {
+  date: string;
+  method?: string | null;
+  subject?: string | null;
+  from?: AffinityPersonRefDto | null;
+}
+
+/** CRM fields from Affinity roster export (rawPayload.affinityData). */
+export interface AffinityDataDto {
+  lastContact?: AffinityInteractionRefDto | null;
+  lastEmail?: AffinityInteractionRefDto | null;
+  sourceOfIntroduction?: AffinityPersonRefDto | null;
+  keyContact?: AffinityPersonRefDto | null;
+  lpStage?: string | null;
 }
 
 export interface InvestorDto {
@@ -76,8 +101,18 @@ export interface InvestorDto {
   bestProximityCode: string | null;
   hasPath: boolean;
 
+  /** Rank-1 path warmth (0–1) for inline table display. */
+  bestRouteScore?: number | null;
+  /** Total computed paths in this list's targetSet (for "View all (N)"). */
+  pathCount?: number | null;
+  /** Rank-1 people-first route chips for the warm-intros table. */
+  bestRouteNodes?: PathHopNodeDto[];
+
   /** Aggregated background + sources; null until enriched. */
   enrichment: InvestorEnrichmentDto | null;
+
+  /** Affinity CRM fields from roster export; null when absent. */
+  affinityData: AffinityDataDto | null;
 
   createdAt: string;
   updatedAt: string;

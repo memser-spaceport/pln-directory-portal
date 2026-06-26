@@ -3,6 +3,8 @@ import { z } from 'zod';
 import {
   CreateTeamNewsDiscussionRequestSchema,
   CreateTeamNewsDiscussionResponseSchema,
+  TeamNewsByTeamQueryParams,
+  TeamNewsByTeamResponseSchema,
   TeamNewsFiltersResponseSchema,
   TeamNewsGroupedResponseSchema,
   TeamNewsListQueryParams,
@@ -50,6 +52,16 @@ export const apiTeamNews = contract.router({
       200: TeamNewsRecentResponseSchema,
     },
     summary: 'Recent network news across all teams (for the digest email)',
+  },
+  getTeamNewsByTeam: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/teams/:teamUid/team-news`,
+    pathParams: z.object({ teamUid: z.string() }),
+    query: TeamNewsByTeamQueryParams,
+    responses: {
+      200: TeamNewsByTeamResponseSchema,
+    },
+    summary: 'List news items for a team, ordered newest first with pagination and search',
   },
   createTeamNewsDiscussion: {
     method: 'POST',

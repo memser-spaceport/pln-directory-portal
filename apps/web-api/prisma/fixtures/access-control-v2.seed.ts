@@ -25,6 +25,7 @@ const permissionSeeds: PermissionSeed[] = [
   { code: 'team.membership_source.read', module: 'Directory' },
   { code: 'membership.source.read', module: 'Directory' },
   { code: 'member.contacts.read', module: 'Directory' },
+  { code: 'member.affinity.read', module: 'Members' },
   { code: 'member.onboarding', module: 'Directory' },
   { code: 'oh.supply.read', module: 'Office Hours' },
   { code: 'oh.supply.write', module: 'Office Hours' },
@@ -36,6 +37,8 @@ const permissionSeeds: PermissionSeed[] = [
   { code: 'irlg.going.write', module: 'IRL Gatherings' },
   { code: 'deals.read', module: 'Deals' },
   { code: 'deals.view', module: 'Deals' },
+  { code: 'ai_apps.read', module: 'AI Apps' },
+  { code: 'ai_apps.write', module: 'AI Apps' },
   { code: 'founder_guides.view', module: 'Founder Guides' },
   { code: 'founder_guides.view.plvs', module: 'Founder Guides' },
   { code: 'founder_guides.view.plcc', module: 'Founder Guides' },
@@ -62,6 +65,7 @@ const policies: PolicySeed[] = [
     permissions: [
       'directory.admin.full',
       'member.contacts.read',
+      'member.affinity.read',
       'team.search.read',
       'member.search.read',
       'team.priority.read',
@@ -88,6 +92,7 @@ const policies: PolicySeed[] = [
     group: 'PL Internal',
     permissions: [
       'member.contacts.read',
+      'member.affinity.read',
       'team.priority.read',
       'team.membership_source.read',
       'irlg.going.read',
@@ -101,6 +106,8 @@ const policies: PolicySeed[] = [
       'oh.supply.write',
       'oh.demand.read',
       'oh.demand.write',
+      'ai_apps.read',
+      'ai_apps.write',
     ],
   },
   {

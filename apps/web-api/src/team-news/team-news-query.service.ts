@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, NewsEventType } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import type {
+  TeamNewsByTeamQuery,
+  TeamNewsByTeamResponse,
   TeamNewsDiscussion,
   TeamNewsFiltersResponse,
   TeamNewsGroupedResponse,
@@ -109,6 +111,63 @@ export class TeamNewsQueryService {
     const discussions = await this.loadDiscussions(rows.map((r) => r.uid));
 
     return {
+      page: query.page,
+      limit: query.limit,
+      total,
+      items: rows.map((row) => this.toDto(row, discussions.get(row.uid))),
+    };
+  }
+
+  async listTeamNewsByTeam(teamUid: string, query: TeamNewsByTeamQuery): Promise<TeamNewsByTeamResponse> {
+    const team = await this.prisma.team.findUnique({
+      where: { uid: teamUid },
+      select: { uid: true, name: true },
+    });
+
+    if (!team) {
+      throw new NotFoundException(`Team with uid ${teamUid} not found`);
+    }
+
+    const and: Prisma.TeamNewsItemWhereInput[] = [{ teamUid }];
+    if (query.q?.trim()) {
+      const search = query.q.trim();
+      and.push({
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { summary: { contains: search, mode: 'insensitive' } },
+          { sourceDomain: { contains: search, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    const where: Prisma.TeamNewsItemWhereInput = { AND: and };
+    const skip = (query.page - 1) * query.limit;
+
+    const [rows, total] = await Promise.all([
+      this.prisma.teamNewsItem.findMany({
+        where,
+        orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
+        skip,
+        take: query.limit,
+        include: {
+          team: {
+            select: {
+              uid: true,
+              name: true,
+              logo: { select: { url: true } },
+              teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.teamNewsItem.count({ where }),
+    ]);
+
+    const discussions = await this.loadDiscussions(rows.map((r) => r.uid));
+
+    return {
+      teamUid: team.uid,
+      teamName: team.name,
       page: query.page,
       limit: query.limit,
       total,
