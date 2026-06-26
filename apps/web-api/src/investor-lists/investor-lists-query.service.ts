@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { InvestorDto, PaginatedInvestorsDto } from '../investor-outreach/dto/investor.dto';
@@ -6,10 +6,22 @@ import { MemberByEmail, OverlapsByInvestorId, toInvestorDto } from '../investor-
 import { INVESTOR_OUTREACH_SECTOR_TAGS, isAllowedStageFocus } from '../investor-outreach/investor-outreach.vocab';
 import { buildInvestorTextSearch } from '../investor-outreach/investor-text-search.util';
 import { connectorMatchClause } from '../pathfinder/connector-match.util';
+import { pathKeywordMatchClause, tokenizeKeywordQuery } from '../pathfinder/path-keyword-search.util';
+import {
+  hasPathViaFilters,
+  MAX_PATH_VIA_VALUES,
+  pathViaMatchClause,
+  type PathViaFilterInput,
+} from '../pathfinder/path-via-match.util';
 import { parseRouteNodesFromHopChain } from '../pathfinder/route-node-display.util';
 import { compareWarmIntroMembers } from './warm-intro-list-sort.util';
 import { InvestorListDto, InvestorListsResponseDto } from './dto/investor-list.dto';
 import { ListMembersQueryDto } from './dto/list-members.query.dto';
+import {
+  WarmIntroFacetsResponseDto,
+  WarmIntroFounderFacetDto,
+  WarmIntroPlMemberFacetDto,
+} from './dto/warm-intro-facets.dto';
 import type { PathHopNodeDto } from '../pathfinder/dto/ingest-pathfinder.dto';
 
 const DEFAULT_PAGE = 1;
@@ -109,11 +121,14 @@ export class InvestorListsQueryService {
     const page = clampPage(query.page);
     const limit = clampLimit(query.limit);
 
-    // Connector lens (task 04): resolve the set of members reachable through the
-    // requested connector ACROSS THE WHOLE LIST (not just a loaded page) before
-    // building the member query, so pagination + total reflect the filter.
-    const connectorMatchIds = await this.resolveConnectorMatchIds(list.targetSet, query);
-    const where = this.buildMemberWhere(listId, query, connectorMatchIds);
+    validateListMembersQuery(query);
+
+    // Path filters (connector lens + path-via) resolve ACROSS THE WHOLE LIST before
+    // building the member query so pagination + total reflect the filter.
+    const pathFilterMatchIds = await this.resolvePathFilterMatchIds(list.targetSet, query);
+    const pathKeywordMatchIds =
+      query.q && query.q.trim() ? await this.resolvePathKeywordMatchIds(list.targetSet, listId, query.q) : null;
+    const where = this.buildMemberWhere(listId, query, pathFilterMatchIds, pathKeywordMatchIds);
 
     if (list.isGraphed) {
       const [total, allRecords] = await this.prisma.$transaction([
@@ -166,6 +181,24 @@ export class InvestorListsQueryService {
 
     const items = await this.attachJoins(records);
     return { page, limit, total, items };
+  }
+
+  /** Facet counts for warm-intros PL member / founder dropdowns (full list scope). */
+  async listWarmIntroFacets(listId: number): Promise<WarmIntroFacetsResponseDto> {
+    const list = await this.prisma.investorList.findUnique({ where: { id: listId } });
+    if (!list) {
+      throw new NotFoundException(`Investor list not found: ${listId}`);
+    }
+    if (!list.isGraphed) {
+      return { plMembers: [], founders: [] };
+    }
+
+    const [plRows, founderRows] = await Promise.all([
+      this.queryPlMemberFacets(list.targetSet, listId),
+      this.queryFounderFacets(list.targetSet, listId),
+    ]);
+
+    return { plMembers: plRows, founders: founderRows };
   }
 
   /** Best path (rank 1) per member for this list's targetSet — overrides denormalized record fields. */
@@ -230,6 +263,16 @@ export class InvestorListsQueryService {
   }
 
   /**
+   * Intersect connector-lens and path-via match sets (AND between groups).
+   * Returns `null` when neither group is active.
+   */
+  private async resolvePathFilterMatchIds(targetSet: string, query: ListMembersQueryDto): Promise<string[] | null> {
+    const connectorIds = await this.resolveConnectorMatchIds(targetSet, query);
+    const pathViaIds = await this.resolvePathViaMatchIds(targetSet, query);
+    return intersectIdSets(connectorIds, pathViaIds);
+  }
+
+  /**
    * Resolve the targetInvestorIds reachable through the requested connector across
    * the entire list's targetSet. Returns `null` when no connector filter is set
    * (so the caller leaves the member set unfiltered), or `string[]` of matches
@@ -254,21 +297,123 @@ export class InvestorListsQueryService {
     return rows.map((r) => r.targetInvestorId);
   }
 
+  /** Path-via structured filters (PL member / founder / direct). OR within group. */
+  private async resolvePathViaMatchIds(targetSet: string, query: ListMembersQueryDto): Promise<string[] | null> {
+    const input = parsePathViaFilters(query);
+    if (!hasPathViaFilters(input)) return null;
+
+    const rows = await this.prisma.$queryRaw<{ targetInvestorId: string }[]>`
+      SELECT DISTINCT p."targetInvestorId"
+      FROM "PathfinderPath" p
+      WHERE p."targetSet" = ${targetSet}
+        AND ${pathViaMatchClause(input)}`;
+    return rows.map((r) => r.targetInvestorId);
+  }
+
+  /** Founder / portfolio-company keyword matches scoped to list members. */
+  private async resolvePathKeywordMatchIds(targetSet: string, listId: number, q: string): Promise<string[] | null> {
+    const tokens = tokenizeKeywordQuery(q);
+    if (tokens.length === 0) return null;
+
+    const memberIds = await this.fetchListMemberInvestorIds(listId);
+    if (memberIds.length === 0) return [];
+
+    const rows = await this.prisma.$queryRaw<{ targetInvestorId: string }[]>`
+      SELECT DISTINCT p."targetInvestorId"
+      FROM "PathfinderPath" p
+      WHERE p."targetSet" = ${targetSet}
+        AND p."targetInvestorId" IN (${Prisma.join(memberIds)})
+        AND ${pathKeywordMatchClause(tokens)}`;
+    return rows.map((r) => r.targetInvestorId);
+  }
+
+  private async fetchListMemberInvestorIds(listId: number): Promise<string[]> {
+    const rows = await this.prisma.investorOutreachRecord.findMany({
+      where: { listMemberships: { some: { listId } } },
+      select: { investorId: true },
+    });
+    return rows.map((r) => r.investorId);
+  }
+
+  private async queryPlMemberFacets(targetSet: string, listId: number): Promise<WarmIntroPlMemberFacetDto[]> {
+    const rows = await this.prisma.$queryRaw<{ name: string; member_uid: string | null; cnt: number }[]>`
+      SELECT
+        lower(btrim(p."hopChain"->'plConnector'->>'name')) AS name,
+        max(p."hopChain"->'plConnector'->>'memberUid') AS member_uid,
+        count(DISTINCT p."targetInvestorId")::int AS cnt
+      FROM "PathfinderPath" p
+      INNER JOIN "InvestorOutreachRecord" r ON r."investorId" = p."targetInvestorId"
+      INNER JOIN "InvestorListMembership" m ON m."investorOutreachRecordId" = r."id" AND m."listId" = ${listId}
+      WHERE p."targetSet" = ${targetSet}
+        AND p."hopChain"->'plConnector'->>'name' IS NOT NULL
+        AND btrim(p."hopChain"->'plConnector'->>'name') <> ''
+      GROUP BY 1
+      ORDER BY cnt DESC, name ASC`;
+
+    return rows.map((row) => ({
+      name: titleCaseName(row.name),
+      ...(row.member_uid ? { memberUid: row.member_uid } : {}),
+      count: row.cnt,
+    }));
+  }
+
+  private async queryFounderFacets(targetSet: string, listId: number): Promise<WarmIntroFounderFacetDto[]> {
+    const rows = await this.prisma.$queryRaw<
+      {
+        member_uid: string;
+        name: string | null;
+        role: string | null;
+        teams: unknown;
+        cnt: number;
+      }[]
+    >`
+      SELECT
+        p."hopChain"->'contact'->>'memberUid' AS member_uid,
+        max(p."hopChain"->'contact'->>'name') AS name,
+        max(p."hopChain"->'contact'->>'role') AS role,
+        (array_agg(p."hopChain"->'contact'->'teams' ORDER BY p."score" DESC))[1] AS teams,
+        count(DISTINCT p."targetInvestorId")::int AS cnt
+      FROM "PathfinderPath" p
+      INNER JOIN "InvestorOutreachRecord" r ON r."investorId" = p."targetInvestorId"
+      INNER JOIN "InvestorListMembership" m ON m."investorOutreachRecordId" = r."id" AND m."listId" = ${listId}
+      WHERE p."targetSet" = ${targetSet}
+        AND p."connectorType" = 'F'
+        AND p."hopChain"->'contact'->>'memberUid' IS NOT NULL
+        AND btrim(p."hopChain"->'contact'->>'memberUid') <> ''
+      GROUP BY member_uid
+      ORDER BY cnt DESC, name ASC`;
+
+    return rows.map((row) => ({
+      memberUid: row.member_uid,
+      name: row.name ?? row.member_uid,
+      ...(row.role ? { role: row.role } : {}),
+      ...(parseTeamsFacet(row.teams).length ? { teams: parseTeamsFacet(row.teams) } : {}),
+      count: row.cnt,
+    }));
+  }
+
   private buildMemberWhere(
     listId: number,
     query: ListMembersQueryDto,
-    connectorMatchIds: string[] | null
+    pathFilterMatchIds: string[] | null,
+    pathKeywordMatchIds: string[] | null
   ): Prisma.InvestorOutreachRecordWhereInput {
     const conditions: Prisma.InvestorOutreachRecordWhereInput[] = [{ listMemberships: { some: { listId } } }];
 
-    // Connector lens: restrict to the matched members (empty array → no member
-    // matches, so the list comes back empty — the correct "no LPs" result).
-    if (connectorMatchIds !== null) {
-      conditions.push({ investorId: { in: connectorMatchIds } });
+    // Path filters: restrict to matched members (empty array → no member matches).
+    if (pathFilterMatchIds !== null) {
+      conditions.push({ investorId: { in: pathFilterMatchIds } });
     }
 
     if (query.q && query.q.trim()) {
-      conditions.push(buildInvestorTextSearch(query.q));
+      const textSearch = buildInvestorTextSearch(query.q);
+      if (pathKeywordMatchIds !== null && pathKeywordMatchIds.length > 0) {
+        conditions.push({
+          OR: [textSearch, { investorId: { in: pathKeywordMatchIds } }],
+        });
+      } else {
+        conditions.push(textSearch);
+      }
     }
 
     // sectorTags is stored as a comma-separated string; match each tag as a discrete token.
@@ -395,4 +540,59 @@ function parseCsv(raw: string | undefined): string[] {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function parsePathViaFilters(query: ListMembersQueryDto): PathViaFilterInput {
+  return {
+    plMembers: parseCsv(query.plMembers).map((n) => n.toLowerCase()),
+    founderUids: parseCsv(query.founderUids).map((uid) => uid.toLowerCase()),
+    anyFounder: query.anyFounder === 'true',
+    directOnly: query.directOnly === 'true',
+  };
+}
+
+function validateListMembersQuery(query: ListMembersQueryDto): void {
+  const plMembers = parseCsv(query.plMembers);
+  if (plMembers.length > MAX_PATH_VIA_VALUES) {
+    throw new BadRequestException(`plMembers must contain at most ${MAX_PATH_VIA_VALUES} values`);
+  }
+  const founderUids = parseCsv(query.founderUids);
+  if (founderUids.length > MAX_PATH_VIA_VALUES) {
+    throw new BadRequestException(`founderUids must contain at most ${MAX_PATH_VIA_VALUES} values`);
+  }
+  const connectorLabels = parseCsv(query.connectorLabels);
+  if (connectorLabels.length > MAX_CONNECTOR_LABELS) {
+    throw new BadRequestException(`connectorLabels must contain at most ${MAX_CONNECTOR_LABELS} labels`);
+  }
+  const connectorContains = parseCsv(query.connectorLabelsContains);
+  if (connectorContains.length > MAX_CONNECTOR_LABELS) {
+    throw new BadRequestException(`connectorLabelsContains must contain at most ${MAX_CONNECTOR_LABELS} labels`);
+  }
+}
+
+function intersectIdSets(a: string[] | null, b: string[] | null): string[] | null {
+  if (a === null && b === null) return null;
+  if (a === null) return b;
+  if (b === null) return a;
+  const allowed = new Set(b);
+  return a.filter((id) => allowed.has(id));
+}
+
+function titleCaseName(lowerName: string): string {
+  return lowerName
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function parseTeamsFacet(raw: unknown): { name: string; teamUid?: string }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((item) => ({
+      name: String(item.name ?? ''),
+      ...(typeof item.teamUid === 'string' && item.teamUid ? { teamUid: item.teamUid } : {}),
+    }))
+    .filter((t) => t.name);
 }

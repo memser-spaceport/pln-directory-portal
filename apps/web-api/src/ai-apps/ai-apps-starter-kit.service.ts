@@ -50,6 +50,14 @@ to the Protocol Labs Network sandbox with a single instruction.
    packages \`app/\`, and ships it to the PLN sandbox.
 4. Your app appears on the PL Infra → AI Apps dashboard with its live URL.
 
+## Embedding in the dashboard
+Your app is displayed inside the AI Apps dashboard in an \`<iframe>\` served from a
+\`*.plnetwork.io\` subdomain. The starter app embeds fine as-is. If you add security
+headers (e.g. \`helmet\` or a Content-Security-Policy), keep it embeddable: don't send
+\`X-Frame-Options\`, and if you set a CSP make sure \`frame-ancestors\` allows
+\`https://*.plnetwork.io\`. Otherwise the dashboard shows "refused to connect". See the
+framing rule in \`AGENTS.md\`; the deploy skill verifies this automatically.
+
 ## Keep your token private
 \`pln-app.config.json\` holds a personal deploy token tied to your account. Do not
 commit it to a public repo or share it.
@@ -135,6 +143,23 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
    \`\`\`
 
    Report the \`url\` to the member. If \`status\` is \`ERROR\`, surface \`notes\`.
+
+6. **Verify the app is iframe-embeddable** (the dashboard shows it in an \`<iframe>\`
+   from a sibling \`*.plnetwork.io\` subdomain). Check the live response headers:
+
+   \`\`\`bash
+   curl -sSI "https://sandbox-<appId>.plnetwork.io/" \
+     | grep -iE 'x-frame-options|content-security-policy'
+   \`\`\`
+
+   It must pass BOTH:
+   - **No \`X-Frame-Options\` header** (it can't allow a sibling subdomain; if present
+     it blocks the embed).
+   - If a \`Content-Security-Policy\` is present, its \`frame-ancestors\` must include
+     \`https://*.plnetwork.io\` (and must NOT be \`'none'\`).
+
+   If either fails, the embed will show \`refused to connect\`. Fix the app's headers
+   (see the framing rule in \`AGENTS.md\`) and redeploy before reporting success.
 
 ## Notes
 - Reuse the same \`appId\` to redeploy an existing app; use a new \`deploymentId\`

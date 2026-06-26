@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { InvestorListsQueryService } from './investor-lists-query.service';
 import { PrismaService } from '../shared/prisma.service';
 
@@ -14,6 +15,7 @@ describe('InvestorListsQueryService', () => {
   const pathfinderPathGroupBy = jest.fn();
   const memberFindMany = jest.fn();
   const investorPortfolioOverlapFindMany = jest.fn();
+  const queryRaw = jest.fn();
 
   const prismaMock = {
     investorList: { findMany: investorListFindMany, findUnique: investorListFindUnique },
@@ -27,6 +29,7 @@ describe('InvestorListsQueryService', () => {
     member: { findMany: memberFindMany },
     investorPortfolioOverlap: { findMany: investorPortfolioOverlapFindMany },
     $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
+    $queryRaw: queryRaw,
   } as unknown as PrismaService;
 
   beforeEach(() => {
@@ -184,6 +187,110 @@ describe('InvestorListsQueryService', () => {
         { id: 'route-0', label: 'Coatue', type: 'org' },
         { id: 'route-1', label: 'Elad Gil', type: 'person' },
       ]);
+    });
+
+    it('intersects connector lens and path-via filters', async () => {
+      queryRaw
+        .mockResolvedValueOnce([{ targetInvestorId: '101' }, { targetInvestorId: '102' }])
+        .mockResolvedValueOnce([{ targetInvestorId: '102' }, { targetInvestorId: '103' }]);
+      investorOutreachRecordCount.mockResolvedValue(0);
+      investorOutreachRecordFindMany.mockResolvedValue([]);
+
+      await service.listMembers(1, {
+        connectorLabels: 'Brad Holden',
+        plMembers: 'Brad Holden',
+      });
+
+      expect(queryRaw).toHaveBeenCalledTimes(2);
+      expect(investorOutreachRecordFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                investorId: { in: ['102'] },
+              }),
+            ]),
+          }),
+        })
+      );
+    });
+
+    it('extends q with founder path keyword matches', async () => {
+      investorOutreachRecordFindMany.mockResolvedValueOnce([{ investorId: '201' }]).mockResolvedValueOnce([]);
+      queryRaw.mockResolvedValueOnce([{ targetInvestorId: '201' }]);
+      investorOutreachRecordCount.mockResolvedValue(0);
+
+      await service.listMembers(1, { q: 'Modular Globe' });
+
+      expect(queryRaw).toHaveBeenCalledTimes(1);
+      expect(investorOutreachRecordFindMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  expect.objectContaining({
+                    investorId: { in: ['201'] },
+                  }),
+                ]),
+              }),
+            ]),
+          }),
+        })
+      );
+    });
+
+    it('rejects too many plMembers values', async () => {
+      const plMembers = Array.from({ length: 21 }, (_, i) => `member-${i}`).join(',');
+      await expect(service.listMembers(1, { plMembers })).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('listWarmIntroFacets', () => {
+    it('returns empty facets for non-graphed lists', async () => {
+      investorListFindUnique.mockResolvedValue({
+        id: 1,
+        isGraphed: false,
+        targetSet: 'unused',
+      });
+
+      const result = await service.listWarmIntroFacets(1);
+
+      expect(result).toEqual({ plMembers: [], founders: [] });
+      expect(queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('returns PL member and founder facet rows for graphed lists', async () => {
+      investorListFindUnique.mockResolvedValue({
+        id: 1,
+        isGraphed: true,
+        targetSet: 'neuro-fund-i',
+      });
+      queryRaw
+        .mockResolvedValueOnce([{ name: 'brad holden', member_uid: 'brad-holden', cnt: 12 }])
+        .mockResolvedValueOnce([
+          {
+            member_uid: 'alicia-mer',
+            name: 'Alicia Mer',
+            role: 'CEO',
+            teams: [{ name: 'Modular Globe', teamUid: 'modular-globe' }],
+            cnt: 8,
+          },
+        ]);
+
+      const result = await service.listWarmIntroFacets(1);
+
+      expect(result.plMembers).toEqual([{ name: 'Brad Holden', memberUid: 'brad-holden', count: 12 }]);
+      expect(result.founders).toEqual([
+        {
+          memberUid: 'alicia-mer',
+          name: 'Alicia Mer',
+          role: 'CEO',
+          teams: [{ name: 'Modular Globe', teamUid: 'modular-globe' }],
+          count: 8,
+        },
+      ]);
+      expect(queryRaw).toHaveBeenCalledTimes(2);
     });
   });
 });

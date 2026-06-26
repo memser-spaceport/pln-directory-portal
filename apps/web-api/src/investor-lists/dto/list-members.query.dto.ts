@@ -25,6 +25,21 @@ export class ListMembersQueryDto {
   connectorLabels?: string;
   connectorLabelsContains?: string;
 
+  /**
+   * Path-via filters (warm-intros filter update): OR within this group, AND with
+   * connectorLabels and investor-field filters. Exact match on PL-side first node.
+   */
+  plMembers?: string;
+
+  /** CSV of LabOS member uids — founder-led paths (`connectorType = F`). */
+  founderUids?: string;
+
+  /** When `'true'`, keep members with any founder-led path. */
+  anyFounder?: string;
+
+  /** When `'true'`, keep members with a direct PL tie (no intermediary). */
+  directOnly?: string;
+
   page?: string;
   limit?: string;
 }
