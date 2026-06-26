@@ -40,23 +40,30 @@ to the Protocol Labs Network sandbox with a single instruction.
 - \`.claude/skills/deploy-to-labs/\` — the deploy skill your agent uses.
 - \`pln-app.config.json\` — your personal deploy token + the deploy endpoint.
 - \`styles/\` — PLN design tokens (CSS variables) and font guidance.
-- \`app/\` — a minimal runnable Node app to start from.
+- \`app/\` — a minimal runnable Node app to start from (its \`server.js\`,
+  \`package.json\`, and \`Dockerfile\` are placeholders you can replace).
 
 ## How to use
 1. Unzip this folder and open it in Claude Code (or your AI tool of choice).
-2. Tell your agent what you want to build (e.g. "build a leaderboard page using
-   the PLN styles"). It edits files in \`app/\`.
-3. When you're happy, say "deploy this app". The agent follows the deploy skill,
-   packages \`app/\`, and ships it to the PLN sandbox.
+2. Add your app to the \`app/\` folder:
+   - **New app:** tell your agent what to build (e.g. "build a leaderboard page
+     using the PLN styles"). It works in \`app/\`.
+   - **Existing app:** copy your project's files into \`app/\`, then say "migrate this
+     existing app and deploy it to LabOS". Your agent takes care of whatever setup is
+     needed to run it there.
+3. When you're happy, say "deploy this app". Your agent ships it to the PLN sandbox;
+   the first deploy can take a minute or two.
 4. Your app appears on the PL Infra → AI Apps dashboard with its live URL.
 
+> **Don't copy passwords or secret keys into \`app/\`** — apps run on shared
+> infrastructure with no credentials provided. If your app needs them, ask your
+> agent how to handle it.
+
 ## Embedding in the dashboard
-Your app is displayed inside the AI Apps dashboard in an \`<iframe>\` served from a
-\`*.plnetwork.io\` subdomain. The starter app embeds fine as-is. If you add security
-headers (e.g. \`helmet\` or a Content-Security-Policy), keep it embeddable: don't send
-\`X-Frame-Options\`, and if you set a CSP make sure \`frame-ancestors\` allows
-\`https://*.plnetwork.io\`. Otherwise the dashboard shows "refused to connect". See the
-framing rule in \`AGENTS.md\`; the deploy skill verifies this automatically.
+Your app is shown inside the AI Apps dashboard. Apps built with this kit display
+correctly out of the box, and your agent checks this for you on every deploy — so you
+don't need to do anything special. (The technical rule lives in \`AGENTS.md\` for your
+agent's reference.)
 
 ## Keep your token private
 \`pln-app.config.json\` holds a personal deploy token tied to your account. Do not
@@ -73,10 +80,51 @@ to the PLN sandbox. Follow these rules.
 ## Building the app
 - All application code lives in the \`app/\` directory.
 - \`app/\` must stay independently runnable: \`npm install && npm start\` serves it
-  on the port given by the \`PORT\` env var (default 3000).
-- The app must expose a \`GET /health\` endpoint returning HTTP 200.
+  on the port given by the \`PORT\` env var (default 3000), bound to \`0.0.0.0\` (not
+  \`localhost\` — the container must accept connections from outside it).
+- The app must expose a \`GET /health\` endpoint returning HTTP 200, and a usable
+  \`GET /\` (the dashboard loads the app at its root — a bare \`/\` that 404s looks
+  broken in the iframe; a redirect to your main page is fine).
 - Use the PLN design tokens in \`styles/pln-theme.css\` for any UI you create.
 - Keep dependencies minimal. The sandbox builds from the \`app/Dockerfile\`.
+- **Must be iframe-embeddable from \`*.plnetwork.io\`.** The app is shown inside the
+  PL Infra → AI Apps dashboard via an \`<iframe>\` served from a sibling
+  \`*.plnetwork.io\` subdomain. A different subdomain is a *different origin*, so any
+  framing guard that defaults to "same-origin only" will break the embed with
+  \`refused to connect\`. Therefore:
+  - **Do NOT send \`X-Frame-Options\`.** It only understands \`DENY\`/\`SAMEORIGIN\` —
+    it cannot allow a sibling subdomain, and if present browsers honor it and block
+    the frame. (Note: \`helmet()\` sends \`X-Frame-Options: SAMEORIGIN\` by default —
+    pass \`frameguard: false\` to turn it off.)
+  - If you set a \`Content-Security-Policy\`, its \`frame-ancestors\` MUST include
+    \`'self' https://plnetwork.io https://*.plnetwork.io\`. Never use
+    \`frame-ancestors 'none'\`.
+  - The default scaffold sends neither header, so it already embeds fine — this
+    only matters once you add \`helmet\`, a CSP, or other security headers.
+
+## Migrating an existing app
+When the member already has an app and wants it on LabOS, you are *adapting their
+code*, not authoring into the scaffold. The scaffold's \`app/server.js\`,
+\`app/package.json\`, and \`app/Dockerfile\` are placeholders — replace them. The deploy
+contract (PORT / 0.0.0.0 / \`/health\` / iframe-embeddable, above) is all that matters,
+not the scaffold's shape or language.
+
+1. **Put the app in \`app/\` and make it self-contained.** Copy their project into
+   \`app/\`, overwriting the placeholders. Remove references to anything outside \`app/\`
+   (monorepo \`tsconfig\` \`extends\`, workspace/sibling packages, parent lockfiles) and
+   include the app's own lockfile — only \`app/\` is shipped.
+2. **Write a \`Dockerfile\` that fits the app.** The scaffold's assumes a single-file
+   Node app with no build. If the app compiles (TypeScript, Go, a bundler, …), write
+   an appropriate (e.g. multi-stage) Dockerfile. Only hard requirement: the image
+   starts a server that listens on \`$PORT\`, binds \`0.0.0.0\`, and answers \`GET /health\`.
+3. **Assume no runtime config.** The sandbox injects NO env vars or secrets. Decide
+   how the app runs without its usual credentials — degrade to sample/mock data, or
+   clearly surface what's missing. Never hardcode real secrets to compensate.
+4. **Never ship secrets.** Keep real \`.env\` files, tokens, keys, and data dirs OUT of
+   the uploaded zip: add them to \`.dockerignore\` and confirm they're absent before
+   deploying. The zip is built and stored server-side.
+5. **Verify before deploying:** \`cd app && npm install && npm start\` (or the app's
+   equivalent), then confirm \`GET /health\` is 200 and \`GET /\` renders.
 
 ## Deploying the app
 When the member asks you to deploy, use the **deploy-to-labs** skill in
@@ -84,10 +132,10 @@ When the member asks you to deploy, use the **deploy-to-labs** skill in
 1. Read \`pln-app.config.json\` for the deploy token and endpoint.
 2. Choose a stable, lowercase \`appId\` (e.g. \`my-leaderboard\`) and a fresh
    \`deploymentId\` for each deploy.
-3. Zip the **contents** of \`app/\` (so \`Dockerfile\`, \`package.json\`, \`server.js\`
-   sit at the root of the ZIP) and upload that ZIP to the deploy endpoint as
-   multipart/form-data. The PLN backend stores it and runs the build — you do not
-   need any cloud credentials.
+3. Zip the **contents** of \`app/\` (so the \`Dockerfile\` sits at the root of the ZIP),
+   excluding \`node_modules\`, build output, and any secrets/\`.env\`/data dirs, then
+   upload that ZIP to the deploy endpoint as multipart/form-data. The PLN backend
+   stores it and runs the build — you do not need any cloud credentials.
 4. Report the returned live URL back to the member.
 
 ## Deploy token
@@ -116,11 +164,19 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
    present) a saved \`appId\`. If no \`appId\` exists yet, pick a short, stable,
    lowercase slug (e.g. \`hello-board\`) and save it back to the config.
 2. Make sure \`app/\` runs locally first (\`npm install && npm start\`, hit
-   \`/health\`).
-3. Zip the **contents** of \`app/\` so the \`Dockerfile\` sits at the ZIP root:
+   \`/health\`). For a migrated existing app, also confirm the migration checklist
+   in \`AGENTS.md\` is satisfied (self-contained \`app/\`, fitting Dockerfile, binds
+   \`0.0.0.0\`, no reliance on injected secrets).
+3. Zip the **contents** of \`app/\` so the \`Dockerfile\` sits at the ZIP root.
+   Exclude \`node_modules\`, build output, and — importantly — any secrets: real
+   \`.env\` files, tokens/keys, and data dirs must never enter the ZIP (the backend
+   stores it server-side).
 
    \`\`\`bash
-   cd app && zip -r ../app.zip . -x 'node_modules/*' '*/node_modules/*' && cd ..
+   cd app && zip -r ../app.zip . \\
+     -x 'node_modules/*' '*/node_modules/*' 'dist/*' '.env' '.env.*' '.data/*' && cd ..
+   # Sanity-check nothing sensitive slipped in:
+   unzip -l ../app.zip | grep -iE '\\.env|secret|credential|\\.pem|\\.key' && echo 'STOP: secret in zip' || echo 'ok'
    \`\`\`
 
 4. Upload the ZIP to the deploy endpoint as multipart/form-data. The PLN backend
@@ -148,8 +204,7 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
    from a sibling \`*.plnetwork.io\` subdomain). Check the live response headers:
 
    \`\`\`bash
-   curl -sSI "https://sandbox-<appId>.plnetwork.io/" \
-     | grep -iE 'x-frame-options|content-security-policy'
+   curl -sSI "https://sandbox-<appId>.plnetwork.io/" | grep -iE 'x-frame-options|content-security-policy'
    \`\`\`
 
    It must pass BOTH:
@@ -161,10 +216,25 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
    If either fails, the embed will show \`refused to connect\`. Fix the app's headers
    (see the framing rule in \`AGENTS.md\`) and redeploy before reporting success.
 
+## If the upload times out (504) or seems to hang
+A slow build can exceed the gateway's request timeout, so the upload may return a
+\`504 Gateway Time-out\` (or hang) **even though the build succeeded**. Do NOT assume
+failure and blindly re-upload. Instead poll the app:
+
+\`\`\`bash
+curl -sS -m 20 -o /dev/null -w '%{http_code}\\n' "https://sandbox-<appId>.plnetwork.io/health"
+\`\`\`
+
+If it returns \`200\` within a minute or two, the deploy worked — proceed to the
+verification steps. Only re-deploy if it stays unreachable.
+
 ## Notes
 - Reuse the same \`appId\` to redeploy an existing app; use a new \`deploymentId\`
   each time. The app is served at \`https://sandbox-<appId>.plnetwork.io\`.
 - The deploy token authenticates you as the member — keep it secret.
+- The sandbox injects no runtime env vars or secrets. An app that needs config must
+  ship sensible defaults or degrade gracefully (e.g. sample data) — see the
+  migration checklist in \`AGENTS.md\`.
 `;
   }
 
