@@ -360,32 +360,56 @@ export class InvestorListsQueryService {
   private async queryFounderFacets(targetSet: string, listId: number): Promise<WarmIntroFounderFacetDto[]> {
     const rows = await this.prisma.$queryRaw<
       {
-        member_uid: string;
+        facet_key: string;
         name: string | null;
+        member_uid: string | null;
         role: string | null;
         teams: unknown;
         cnt: number;
       }[]
     >`
       SELECT
-        p."hopChain"->'contact'->>'memberUid' AS member_uid,
-        max(p."hopChain"->'contact'->>'name') AS name,
-        max(p."hopChain"->'contact'->>'role') AS role,
-        (array_agg(p."hopChain"->'contact'->'teams' ORDER BY p."score" DESC))[1] AS teams,
-        count(DISTINCT p."targetInvestorId")::int AS cnt
-      FROM "PathfinderPath" p
-      INNER JOIN "InvestorOutreachRecord" r ON r."investorId" = p."targetInvestorId"
-      INNER JOIN "InvestorListMembership" m ON m."investorOutreachRecordId" = r."id" AND m."listId" = ${listId}
-      WHERE p."targetSet" = ${targetSet}
-        AND p."connectorType" = 'F'
-        AND p."hopChain"->'contact'->>'memberUid' IS NOT NULL
-        AND btrim(p."hopChain"->'contact'->>'memberUid') <> ''
-      GROUP BY member_uid
+        lower(btrim(broker.founder_name)) AS facet_key,
+        max(broker.founder_name) AS name,
+        max(broker.member_uid) AS member_uid,
+        max(broker.role) AS role,
+        (array_agg(broker.teams ORDER BY broker.score DESC))[1] AS teams,
+        count(DISTINCT broker."targetInvestorId")::int AS cnt
+      FROM (
+        SELECT
+          p."targetInvestorId",
+          p."score" AS score,
+          COALESCE(
+            NULLIF(btrim((
+              SELECT n->>'label'
+              FROM jsonb_array_elements(
+                CASE
+                  WHEN jsonb_typeof(p."hopChain"->'nodes') = 'array' THEN p."hopChain"->'nodes'
+                  ELSE '[]'::jsonb
+                END
+              ) AS n
+              WHERE n->>'id' LIKE 'f_%'
+              LIMIT 1
+            )), ''),
+            NULLIF(btrim(p."hopChain"->'connectorTeam'->'leads'->0->>'name'), '')
+          ) AS founder_name,
+          NULLIF(btrim(p."hopChain"->'connectorTeam'->'leads'->0->>'memberUid'), '') AS member_uid,
+          NULLIF(btrim(p."hopChain"->'connectorTeam'->'leads'->0->>'role'), '') AS role,
+          p."hopChain"->'connectorTeam'->'leads'->0->'teams' AS teams
+        FROM "PathfinderPath" p
+        INNER JOIN "InvestorOutreachRecord" r ON r."investorId" = p."targetInvestorId"
+        INNER JOIN "InvestorListMembership" m ON m."investorOutreachRecordId" = r."id" AND m."listId" = ${listId}
+        WHERE p."targetSet" = ${targetSet}
+          AND p."connectorType" = 'F'
+      ) AS broker
+      WHERE broker.founder_name IS NOT NULL
+        AND btrim(broker.founder_name) <> ''
+      GROUP BY facet_key
       ORDER BY cnt DESC, name ASC`;
 
     return rows.map((row) => ({
-      memberUid: row.member_uid,
-      name: row.name ?? row.member_uid,
+      name: row.name ?? titleCaseName(row.facet_key),
+      ...(row.member_uid ? { memberUid: row.member_uid } : {}),
       ...(row.role ? { role: row.role } : {}),
       ...(parseTeamsFacet(row.teams).length ? { teams: parseTeamsFacet(row.teams) } : {}),
       count: row.cnt,
@@ -546,6 +570,7 @@ function parsePathViaFilters(query: ListMembersQueryDto): PathViaFilterInput {
   return {
     plMembers: parseCsv(query.plMembers).map((n) => n.toLowerCase()),
     founderUids: parseCsv(query.founderUids).map((uid) => uid.toLowerCase()),
+    founderNames: parseCsv(query.founderNames).map((name) => name.toLowerCase()),
     anyFounder: query.anyFounder === 'true',
     directOnly: query.directOnly === 'true',
   };
@@ -559,6 +584,10 @@ function validateListMembersQuery(query: ListMembersQueryDto): void {
   const founderUids = parseCsv(query.founderUids);
   if (founderUids.length > MAX_PATH_VIA_VALUES) {
     throw new BadRequestException(`founderUids must contain at most ${MAX_PATH_VIA_VALUES} values`);
+  }
+  const founderNames = parseCsv(query.founderNames);
+  if (founderNames.length > MAX_PATH_VIA_VALUES) {
+    throw new BadRequestException(`founderNames must contain at most ${MAX_PATH_VIA_VALUES} values`);
   }
   const connectorLabels = parseCsv(query.connectorLabels);
   if (connectorLabels.length > MAX_CONNECTOR_LABELS) {

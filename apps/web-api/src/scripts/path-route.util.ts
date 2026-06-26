@@ -3,7 +3,12 @@
  * path-route.util.ts — keep in sync for investor terminus + legacy fallback).
  */
 
-import { enrichFounderContacts, normalizePersonName, type FounderResolveIndexes } from './founder-member-resolve.util';
+import {
+  enrichFounderContacts,
+  normalizePersonName,
+  parseBridgeFromHopChain,
+  type FounderResolveIndexes,
+} from './founder-member-resolve.util';
 import {
   enrichOrgConnectorContacts,
   hydratePersonRouteNodes,
@@ -202,9 +207,30 @@ function enrichLegacyPresentation(hc: LegacyHopChain): LegacyHopChain {
   };
 }
 
+function founderBrokerFromNodes(nodes?: LegacyHopChainNode[]): LegacyHopChainNode | null {
+  return nodes?.find((n) => (n.id ?? '').startsWith('f_')) ?? null;
+}
+
+/** V8 cap-table members on f_* nodes are LP co-investors, not the founder broker. */
+function correctFounderContactFromNodes(hc: LegacyHopChain): LegacyHopChain {
+  const founderBroker = founderBrokerFromNodes(hc.nodes);
+  if (!founderBroker?.label || !hc.contact) return hc;
+  if (connectorMatchesPlContact(hc.contact.name, hc.plConnector)) return hc;
+  if (normalizePersonName(hc.contact.name) === normalizePersonName(founderBroker.label)) return hc;
+
+  return {
+    ...hc,
+    contact: {
+      name: founderBroker.label,
+      role: 'Founder',
+    },
+  };
+}
+
 function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
   if (hc.contact && !connectorMatchesPlContact(hc.contact.name, hc.plConnector)) {
-    const orgName = hc.orgConnectors?.[0]?.name ?? hc.orgConnector?.name;
+    const orgName =
+      parseBridgeFromHopChain(hc) ?? hc.orgConnectors?.[0]?.name ?? hc.orgConnector?.name;
     return [
       {
         label: hc.contact.name,
@@ -276,7 +302,7 @@ export function finalizePersonHopChain(
   hops?: number,
   memberContactIndex?: MemberContactIndex
 ): Record<string, unknown> {
-  let enriched = enrichLegacyPresentation(hopChain as LegacyHopChain);
+  let enriched = correctFounderContactFromNodes(enrichLegacyPresentation(hopChain as LegacyHopChain));
   if (memberContactIndex) {
     enriched = enrichOrgConnectorContacts(enriched, memberContactIndex);
   }

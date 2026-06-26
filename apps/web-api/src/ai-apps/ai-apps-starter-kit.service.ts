@@ -53,7 +53,7 @@ to the Protocol Labs Network sandbox with a single instruction.
      needed to run it there.
 3. When you're happy, say "deploy this app". Your agent ships it to the PLN sandbox;
    the first deploy can take a minute or two.
-4. Your app appears on the PL Infra → AI Apps dashboard with its live URL.
+4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it.
 
 > **Don't copy passwords or secret keys into \`app/\`** — apps run on shared
 > infrastructure with no credentials provided. If your app needs them, ask your
@@ -136,7 +136,9 @@ When the member asks you to deploy, use the **deploy-to-labs** skill in
    excluding \`node_modules\`, build output, and any secrets/\`.env\`/data dirs, then
    upload that ZIP to the deploy endpoint as multipart/form-data. The PLN backend
    stores it and runs the build — you do not need any cloud credentials.
-4. Report the returned live URL back to the member.
+4. Tell the member the deploy succeeded and that they can open their app from the
+   PL Infra → AI Apps dashboard. **Do NOT reveal the deployment URL, host, or port**
+   (see "Keep the deployment URL private" in the deploy skill).
 
 ## Deploy token
 Your deploy token is in \`pln-app.config.json\` and is sent in the
@@ -192,16 +194,20 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
      -F "file=@app.zip;type=application/zip"
    \`\`\`
 
-5. On success the response contains the live URL:
+5. On success the response contains the deployment URL and status:
 
    \`\`\`json
    { "status": "READY", "url": "https://sandbox-<appId>.plnetwork.io", "host": "...", "port": 31001 }
    \`\`\`
 
-   Report the \`url\` to the member. If \`status\` is \`ERROR\`, surface \`notes\`.
+   Use this URL only for the internal checks below — **do not reveal it to the
+   member** (see "Keep the deployment URL private"). On \`READY\`, tell the member the
+   app is live and can be opened from the PL Infra → AI Apps dashboard. If \`status\`
+   is \`ERROR\`, surface \`notes\` (never the URL).
 
-6. **Verify the app is iframe-embeddable** (the dashboard shows it in an \`<iframe>\`
-   from a sibling \`*.plnetwork.io\` subdomain). Check the live response headers:
+6. **Verify the app is iframe-embeddable** (internal check — do not surface the URL
+   to the member). The dashboard shows it in an \`<iframe>\` from a sibling
+   \`*.plnetwork.io\` subdomain; check the live response headers:
 
    \`\`\`bash
    curl -sSI "https://sandbox-<appId>.plnetwork.io/" | grep -iE 'x-frame-options|content-security-policy'
@@ -216,10 +222,19 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
    If either fails, the embed will show \`refused to connect\`. Fix the app's headers
    (see the framing rule in \`AGENTS.md\`) and redeploy before reporting success.
 
+## Keep the deployment URL private
+Do not print, link, or otherwise tell the member the deployment URL, host, or port —
+in your messages, summaries, or saved files. The member opens their app through the
+PL Infra → AI Apps dashboard, which embeds it; they never need the raw URL. You may
+use the URL silently for the verification and health checks here, but it must not
+appear in anything you report back. (The config file stores only the \`appId\`, not the
+URL — keep it that way.)
+
 ## If the upload times out (504) or seems to hang
 A slow build can exceed the gateway's request timeout, so the upload may return a
 \`504 Gateway Time-out\` (or hang) **even though the build succeeded**. Do NOT assume
-failure and blindly re-upload. Instead poll the app:
+failure and blindly re-upload. Instead poll the app (internal check — don't share the
+URL with the member):
 
 \`\`\`bash
 curl -sS -m 20 -o /dev/null -w '%{http_code}\\n' "https://sandbox-<appId>.plnetwork.io/health"
@@ -230,7 +245,8 @@ verification steps. Only re-deploy if it stays unreachable.
 
 ## Notes
 - Reuse the same \`appId\` to redeploy an existing app; use a new \`deploymentId\`
-  each time. The app is served at \`https://sandbox-<appId>.plnetwork.io\`.
+  each time. Derive the URL from the \`appId\` for your own checks, but treat it as
+  sensitive (see "Keep the deployment URL private").
 - The deploy token authenticates you as the member — keep it secret.
 - The sandbox injects no runtime env vars or secrets. An app that needs config must
   ship sensible defaults or degrade gracefully (e.g. sample data) — see the

@@ -34,6 +34,9 @@ export class ListMembersQueryDto {
   /** CSV of LabOS member uids — founder-led paths (`connectorType = F`). */
   founderUids?: string;
 
+  /** CSV of founder contact names — same field as `hopChain.contact.name` on F paths. */
+  founderNames?: string;
+
   /** When `'true'`, keep members with any founder-led path. */
   anyFounder?: string;
 

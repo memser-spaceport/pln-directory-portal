@@ -1,4 +1,8 @@
 import { Prisma } from '@prisma/client';
+import {
+  founderBrokerPresentClause,
+  founderIdentityMatchClause,
+} from './founder-contact.util';
 
 export const MAX_PATH_VIA_VALUES = 20;
 
@@ -7,12 +11,20 @@ export interface PathViaFilterInput {
   plMembers: string[];
   /** Founder LabOS member uids (normalized lowercase). */
   founderUids: string[];
+  /** Founder contact display names (normalized lowercase). Primary key when uid absent. */
+  founderNames: string[];
   anyFounder: boolean;
   directOnly: boolean;
 }
 
 export function hasPathViaFilters(input: PathViaFilterInput): boolean {
-  return input.plMembers.length > 0 || input.founderUids.length > 0 || input.anyFounder || input.directOnly;
+  return (
+    input.plMembers.length > 0 ||
+    input.founderUids.length > 0 ||
+    input.founderNames.length > 0 ||
+    input.anyFounder ||
+    input.directOnly
+  );
 }
 
 /** Direct PL → investor path with no founder/VC broker in hopChain.contact. */
@@ -55,11 +67,12 @@ export function pathViaMatchClause(input: PathViaFilterInput): Prisma.Sql {
     );
   }
 
-  if (input.founderUids.length > 0) {
+  if (input.founderUids.length > 0 || input.founderNames.length > 0) {
     parts.push(
       Prisma.sql`(
         p."connectorType" = 'F'
-        AND lower(btrim(p."hopChain"->'contact'->>'memberUid')) IN (${Prisma.join(input.founderUids)})
+        AND ${founderBrokerPresentClause()}
+        AND ${founderIdentityMatchClause(input.founderUids, input.founderNames)}
       )`
     );
   }

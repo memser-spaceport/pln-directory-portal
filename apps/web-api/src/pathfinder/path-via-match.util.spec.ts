@@ -24,7 +24,13 @@ function sqlText(fragment: Prisma.Sql): string {
 
 describe('path-via-match.util', () => {
   describe('hasPathViaFilters', () => {
-    const empty: PathViaFilterInput = { plMembers: [], founderUids: [], anyFounder: false, directOnly: false };
+    const empty: PathViaFilterInput = {
+      plMembers: [],
+      founderUids: [],
+      founderNames: [],
+      anyFounder: false,
+      directOnly: false,
+    };
 
     it('returns false when no filters are active', () => {
       expect(hasPathViaFilters(empty)).toBe(false);
@@ -33,6 +39,7 @@ describe('path-via-match.util', () => {
     it('returns true when any filter is active', () => {
       expect(hasPathViaFilters({ ...empty, plMembers: ['brad holden'] })).toBe(true);
       expect(hasPathViaFilters({ ...empty, founderUids: ['alice'] })).toBe(true);
+      expect(hasPathViaFilters({ ...empty, founderNames: ['temasek'] })).toBe(true);
       expect(hasPathViaFilters({ ...empty, anyFounder: true })).toBe(true);
       expect(hasPathViaFilters({ ...empty, directOnly: true })).toBe(true);
     });
@@ -43,6 +50,7 @@ describe('path-via-match.util', () => {
       const clause = pathViaMatchClause({
         plMembers: ['brad holden', 'marc johnson'],
         founderUids: [],
+        founderNames: [],
         anyFounder: false,
         directOnly: false,
       });
@@ -55,6 +63,7 @@ describe('path-via-match.util', () => {
       const clause = pathViaMatchClause({
         plMembers: [],
         founderUids: ['alicia-mer'],
+        founderNames: [],
         anyFounder: false,
         directOnly: false,
       });
@@ -65,10 +74,25 @@ describe('path-via-match.util', () => {
       expect(text).toContain('alicia-mer');
     });
 
+    it('matches specific founder names on contact.name', () => {
+      const clause = pathViaMatchClause({
+        plMembers: [],
+        founderUids: [],
+        founderNames: ['temasek'],
+        anyFounder: false,
+        directOnly: false,
+      });
+      const text = sqlText(clause);
+      expect(text).toContain("connectorType");
+      expect(text).toContain("'nodes'");
+      expect(text).toContain('temasek');
+    });
+
     it('OR-composes multiple active filters', () => {
       const clause = pathViaMatchClause({
         plMembers: ['brad holden'],
         founderUids: [],
+        founderNames: [],
         anyFounder: true,
         directOnly: false,
       });
@@ -79,7 +103,13 @@ describe('path-via-match.util', () => {
 
     it('throws when no filters are active', () => {
       expect(() =>
-        pathViaMatchClause({ plMembers: [], founderUids: [], anyFounder: false, directOnly: false })
+        pathViaMatchClause({
+          plMembers: [],
+          founderUids: [],
+          founderNames: [],
+          anyFounder: false,
+          directOnly: false,
+        })
       ).toThrow();
     });
   });

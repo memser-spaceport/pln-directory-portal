@@ -10,8 +10,8 @@ export class WarmIntroFounderTeamFacetDto {
 }
 
 export class WarmIntroFounderFacetDto {
-  memberUid!: string;
   name!: string;
+  memberUid?: string;
   role?: string;
   teams?: WarmIntroFounderTeamFacetDto[];
   count!: number;

@@ -163,5 +163,45 @@ describe('path-route.util (seed)', () => {
       expect(routeNodes[1].orgName).toBe('Coinbase');
       expect(routeNodes[1].memberUid).toBe('uid-jk');
     });
+
+    it('F+2 misresolved dump uses f_* founder broker in routeNodes', () => {
+      const out = finalizePersonHopChain(
+        {
+          nodes: [
+            { id: 'PL', label: 'Protocol Labs', type: 'org' },
+            { id: 'f_andrew_milich', label: 'Andrew Milich', type: 'org' },
+            { id: 'lp_sequoia_capital', label: 'Sequoia Capital', type: 'org' },
+          ],
+          edges: [
+            {
+              from: 'f_andrew_milich',
+              to: 'lp_sequoia_capital',
+              evidence: 'co-invested via Sequoia Capital',
+            },
+          ],
+          contact: { name: 'Sequoia Capital', role: 'investor in Skiff' },
+          connectorTeam: {
+            name: 'Sequoia Capital',
+            leads: [
+              { name: 'Sequoia Capital', role: 'investor in Skiff' },
+              { name: 'Roelof Botha', role: 'LP @ Sequoia Capital (co-invested Skiff)' },
+            ],
+          },
+          routeNodes: [
+            { label: 'Protocol Labs', variant: 'org' },
+            { label: 'Sequoia Capital', variant: 'external' },
+          ],
+          plConnector: { name: 'Lacey Wisdom' },
+          hops: 2,
+        },
+        { firstName: 'Roelof', lastName: 'Botha' },
+        undefined,
+        2
+      );
+      const routeNodes = out.routeNodes as Array<{ label: string; orgName?: string }>;
+      expect(routeNodes.map((n) => n.label)).toEqual(['Lacey Wisdom', 'Andrew Milich', 'Roelof Botha']);
+      expect(routeNodes[1].orgName).toBe('Sequoia Capital');
+      expect((out.contact as { name: string }).name).toBe('Andrew Milich');
+    });
   });
 });

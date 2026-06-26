@@ -270,8 +270,9 @@ describe('InvestorListsQueryService', () => {
         .mockResolvedValueOnce([{ name: 'brad holden', member_uid: 'brad-holden', cnt: 12 }])
         .mockResolvedValueOnce([
           {
-            member_uid: 'alicia-mer',
+            facet_key: 'alicia mer',
             name: 'Alicia Mer',
+            member_uid: 'alicia-mer',
             role: 'CEO',
             teams: [{ name: 'Modular Globe', teamUid: 'modular-globe' }],
             cnt: 8,
@@ -283,8 +284,8 @@ describe('InvestorListsQueryService', () => {
       expect(result.plMembers).toEqual([{ name: 'Brad Holden', memberUid: 'brad-holden', count: 12 }]);
       expect(result.founders).toEqual([
         {
-          memberUid: 'alicia-mer',
           name: 'Alicia Mer',
+          memberUid: 'alicia-mer',
           role: 'CEO',
           teams: [{ name: 'Modular Globe', teamUid: 'modular-globe' }],
           count: 8,
