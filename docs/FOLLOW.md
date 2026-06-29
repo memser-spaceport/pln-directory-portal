@@ -119,7 +119,6 @@ curl "http://localhost:3000/v1/members/me/following/teams?page=1&limit=50" \
       "uid": "uid-murazik-leannon-and-cremin",
       "name": "Murazik, Leannon and Cremin",
       "logoUrl": "https://loremflickr.com/640/480/animals",
-      "shortDescription": null,
       "followedAt": "2026-06-28T17:32:42.747Z",
       "followerCount": 1
     },
@@ -127,7 +126,6 @@ curl "http://localhost:3000/v1/members/me/following/teams?page=1&limit=50" \
       "uid": "uid-ernser-borer-and-zboncak",
       "name": "Ernser, Borer and Zboncak",
       "logoUrl": "https://loremflickr.com/640/480/animals",
-      "shortDescription": null,
       "followedAt": "2026-06-27T17:32:42.747Z",
       "followerCount": 1
     },
@@ -135,7 +133,6 @@ curl "http://localhost:3000/v1/members/me/following/teams?page=1&limit=50" \
       "uid": "uid-beer---stamm",
       "name": "Beer - Stamm",
       "logoUrl": "https://loremflickr.com/640/480/animals",
-      "shortDescription": null,
       "followedAt": "2026-06-26T17:32:42.747Z",
       "followerCount": 3
     }

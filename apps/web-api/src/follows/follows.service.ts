@@ -70,7 +70,7 @@ export class FollowsService {
     const [teams, counts] = await Promise.all([
       this.prisma.team.findMany({
         where: { uid: { in: teamUids } },
-        select: { uid: true, name: true, shortDescription: true, logo: { select: { url: true } } },
+        select: { uid: true, name: true, logo: { select: { url: true } } },
       }),
       this.countFollowersByTeam(teamUids),
     ]);
@@ -86,7 +86,6 @@ export class FollowsService {
           uid: team.uid,
           name: team.name,
           logoUrl: team.logo?.url ?? null,
-          shortDescription: team.shortDescription ?? null,
           followedAt: f.createdAt.toISOString(),
           followerCount: counts.get(team.uid) ?? 0,
         };

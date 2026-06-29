@@ -44,7 +44,6 @@ export const FollowedTeamSchema = z.object({
   uid: z.string(),
   name: z.string(),
   logoUrl: z.string().nullable(),
-  shortDescription: z.string().nullable(),
   followedAt: z.string(),
   followerCount: z.number().int().min(0),
 });
