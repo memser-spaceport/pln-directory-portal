@@ -10,6 +10,7 @@ RUN corepack enable
 COPY package.json yarn.lock ./
 COPY .forestadmin-schema.json ./
 COPY patches ./patches
+
 RUN yarn install --frozen-lockfile
 
 COPY . .
@@ -20,16 +21,32 @@ RUN npx prisma generate --schema=apps/web-api/prisma/oso-schema.prisma
 RUN yarn build
 
 # ============================
-# Stage 2: Production
+# Stage 2: Production dependencies
 # ============================
-FROM node:20.19-bookworm
+FROM node:20.19-bookworm AS prod-deps
+
+WORKDIR /app
+
+RUN corepack enable
+
+COPY package.json yarn.lock ./
+COPY patches ./patches
+
+RUN yarn install --frozen-lockfile --production=true \
+  && yarn cache clean
+
+# ============================
+# Stage 3: Production
+# ============================
+FROM node:20.19-bookworm-slim
 
 RUN groupadd -r app && useradd -r -g app app
 
 WORKDIR /app
 
-COPY --from=builder /app/package.json /app/yarn.lock ./
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=prod-deps /app/package.json /app/yarn.lock ./
+COPY --from=prod-deps /app/node_modules ./node_modules
+
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/apps/web-api/prisma ./apps/web-api/prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
