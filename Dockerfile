@@ -1,6 +1,3 @@
-# ============================
-# Stage 1: Builder
-# ============================
 FROM node:20.19-bookworm AS builder
 
 WORKDIR /app
@@ -20,9 +17,6 @@ RUN npx prisma generate --schema=apps/web-api/prisma/oso-schema.prisma
 
 RUN yarn build
 
-# ============================
-# Stage 2: Production dependencies
-# ============================
 FROM node:20.19-bookworm AS prod-deps
 
 WORKDIR /app
@@ -32,12 +26,9 @@ RUN corepack enable
 COPY package.json yarn.lock ./
 COPY patches ./patches
 
-RUN yarn install --frozen-lockfile --production=true \
+RUN yarn install --frozen-lockfile --production=true --ignore-scripts \
   && yarn cache clean
 
-# ============================
-# Stage 3: Production
-# ============================
 FROM node:20.19-bookworm-slim
 
 RUN groupadd -r app && useradd -r -g app app
