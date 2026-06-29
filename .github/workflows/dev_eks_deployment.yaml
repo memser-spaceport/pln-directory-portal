@@ -10,6 +10,7 @@ jobs:
   dev-deploy:
     name: Deploy Helm Chart to EKS preprod
     runs-on: ubuntu-latest
+
     env:
       ENVIRONMENT: dev
       APPNAME: directory-service
@@ -18,14 +19,19 @@ jobs:
       GITHUB_SHA: ${{ github.sha }}
       CLUSTER_NAME: preprod-pln
       APP_MODE: directory_service
+      NAMESPACE: pln-dev
+      HELM_RELEASE: directory-service
+      DEPLOYMENT_NAME: directory-service-app
 
     permissions:
       id-token: write
       contents: read
 
     steps:
-      - name: Checkout repository
+      - name: Checkout application repository
         uses: actions/checkout@v4
+        with:
+          path: app
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -37,8 +43,10 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Resolve image metadata
+        working-directory: app
         run: |
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
+
           ECR_REGISTRY=$(aws ecr describe-repositories \
             --repository-names ${{ env.ECR_REPOSITORY }} \
             --query 'repositories[0].repositoryUri' \
@@ -47,19 +55,40 @@ jobs:
           echo "IMAGE_TAG=$git_hash" >> "$GITHUB_ENV"
           echo "ECR_REGISTRY=$ECR_REGISTRY" >> "$GITHUB_ENV"
 
+          echo "IMAGE_TAG=$git_hash"
+          echo "ECR_REGISTRY=$ECR_REGISTRY"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image with cache
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: app
           push: true
+          platforms: linux/amd64
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}:${{ env.IMAGE_TAG }}
             ${{ env.ECR_REGISTRY }}:dev
           cache-from: type=gha,scope=directory-service-dev
           cache-to: type=gha,mode=max,scope=directory-service-dev
+
+      - name: Print pushed image metadata
+        run: |
+          aws ecr describe-images \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --image-ids imageTag=${{ env.IMAGE_TAG }} \
+            --query 'imageDetails[0].{Digest:imageDigest,Tags:imageTags,PushedAt:imagePushedAt,Size:imageSizeInBytes}' \
+            --output table
+
+      - name: Checkout infrastructure repository
+        uses: actions/checkout@v4
+        with:
+          repository: memser-spaceport/pl-infra-pipeline
+          ref: main
+          token: ${{ secrets.GIT_TOKEN }}
+          path: infra
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -75,24 +104,17 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'latest'
-
-      - name: Checkout infrastructure repository
-        uses: actions/checkout@v4
-        with:
-          repository: 'memser-spaceport/pl-infra-pipeline'
-          ref: 'main'
-          token: ${{ secrets.GIT_TOKEN }}
-          path: './'
+          version: latest
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
         with:
-          version: 'latest'
+          version: latest
 
       - name: Update kubeconfig for EKS
         run: |
           aws sts get-caller-identity
+
           aws eks update-kubeconfig \
             --region us-west-1 \
             --name ${{ env.CLUSTER_NAME }}
@@ -100,20 +122,22 @@ jobs:
       - name: Verify Kubernetes access
         run: |
           kubectl config current-context
-          kubectl get pods -n pln-dev
+          kubectl get pods -n ${{ env.NAMESPACE }}
 
-      - name: poetry install for comprehend modules
+      - name: Install config generator dependencies
+        working-directory: infra/deployment/config_gen
         run: |
           poetry install --no-root
-        working-directory: ./deployment/config_gen
 
-      - name: Config generator
+      - name: Generate Helm secret values
+        working-directory: infra/deployment/config_gen
         run: |
-          poetry run python main.py APPNAME=${{ env.APPNAME }} ENVIRONMENT=${{ env.ENVIRONMENT }} APP_MODE=${{ env.APP_MODE }}
-        working-directory: ./deployment/config_gen
+          poetry run python main.py \
+            APPNAME=${{ env.APPNAME }} \
+            ENVIRONMENT=${{ env.ENVIRONMENT }} \
+            APP_MODE=${{ env.APP_MODE }}
 
       - name: Get Certificate ARN from SSM Parameter Store
-        id: get-secret
         run: |
           CERT_ARN=$(aws ssm get-parameter \
             --region us-west-1 \
@@ -121,11 +145,23 @@ jobs:
             --with-decryption \
             --query "Parameter.Value" \
             --output text)
+
           echo "CERT_ARN=$CERT_ARN" >> "$GITHUB_ENV"
+
+      - name: Pre-deploy Helm status
+        run: |
+          echo "Helm list:"
+          helm list -n ${{ env.NAMESPACE }} -a | grep ${{ env.HELM_RELEASE }} || true
+
+          echo "Helm history:"
+          helm history ${{ env.HELM_RELEASE }} -n ${{ env.NAMESPACE }} || true
+
+          echo "Current pods:"
+          kubectl get pods -n ${{ env.NAMESPACE }} | grep ${{ env.DEPLOYMENT_NAME }} || true
 
       - name: Deploy using Helm
         run: |
-          helm upgrade --install directory-service deployment/chart/ \
+          helm upgrade --install ${{ env.HELM_RELEASE }} infra/deployment/chart/ \
             --set image.repository=${{ env.ECR_REGISTRY }} \
             --set image.tag=${{ env.IMAGE_TAG }} \
             --set nodeSelector.allocationtags=pln-dev-k8s \
@@ -137,8 +173,8 @@ jobs:
             --set serviceAccount.create=true \
             --set serviceAccount.name=directory-service-sa \
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=arn:aws:iam::013228333448:role/directory-service-dev-irsa \
-            -f deployment/chart/${{ env.APP_MODE }}_secret_values.yaml \
-            -n pln-dev \
+            -f infra/deployment/chart/${{ env.APP_MODE }}_secret_values.yaml \
+            -n ${{ env.NAMESPACE }} \
             --wait \
             --timeout 12m \
             --atomic
@@ -146,27 +182,68 @@ jobs:
       - name: Verify rollout
         if: always()
         run: |
+          echo "Helm status:"
+          helm status ${{ env.HELM_RELEASE }} -n ${{ env.NAMESPACE }} || true
+
+          echo "Helm history:"
+          helm history ${{ env.HELM_RELEASE }} -n ${{ env.NAMESPACE }} || true
+
+          echo "Deployment:"
+          kubectl get deployment ${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }} -o wide || true
+
           echo "Pods:"
-          kubectl get pods -n pln-dev | grep directory-service || true
+          kubectl get pods -n ${{ env.NAMESPACE }} | grep ${{ env.DEPLOYMENT_NAME }} || true
+
+          echo "ReplicaSets:"
+          kubectl get rs -n ${{ env.NAMESPACE }} | grep ${{ env.DEPLOYMENT_NAME }} || true
 
           echo "Rollout status:"
-          kubectl rollout status deployment/directory-service-app -n pln-dev --timeout=5m || true
+          kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=5m || true
 
           echo "Deployment image:"
-          kubectl get deployment directory-service-app -n pln-dev \
+          kubectl get deployment ${{ env.DEPLOYMENT_NAME }} \
+            -n ${{ env.NAMESPACE }} \
             -o jsonpath='{.spec.template.spec.containers[*].image}{"\n"}' || true
 
           echo "Recent events:"
-          kubectl get events -n pln-dev --sort-by=.lastTimestamp | tail -80 || true
+          kubectl get events -n ${{ env.NAMESPACE }} --sort-by=.lastTimestamp | tail -100 || true
 
       - name: Debug failed rollout
         if: failure()
         run: |
+          echo "Helm list:"
+          helm list -n ${{ env.NAMESPACE }} -a | grep ${{ env.HELM_RELEASE }} || true
+
+          echo "Helm history:"
+          helm history ${{ env.HELM_RELEASE }} -n ${{ env.NAMESPACE }} || true
+
           echo "Pods:"
-          kubectl get pods -n pln-dev | grep directory-service || true
+          kubectl get pods -n ${{ env.NAMESPACE }} | grep ${{ env.DEPLOYMENT_NAME }} || true
 
-          echo "Describe pods:"
-          kubectl describe pods -n pln-dev -l app=directory-service-app || true
+          echo "ReplicaSets:"
+          kubectl get rs -n ${{ env.NAMESPACE }} | grep ${{ env.DEPLOYMENT_NAME }} || true
 
-          echo "Logs:"
-          kubectl logs -n pln-dev -l app=directory-service-app --all-containers --tail=200 || true
+          echo "Deployment describe:"
+          kubectl describe deployment ${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }} || true
+
+          echo "Pod describe:"
+          kubectl describe pods \
+            -n ${{ env.NAMESPACE }} \
+            -l app=${{ env.DEPLOYMENT_NAME }} || true
+
+          echo "Current logs:"
+          kubectl logs \
+            -n ${{ env.NAMESPACE }} \
+            -l app=${{ env.DEPLOYMENT_NAME }} \
+            --all-containers \
+            --tail=300 || true
+
+          echo "Previous logs:"
+          kubectl logs \
+            -n ${{ env.NAMESPACE }} \
+            -l app=${{ env.DEPLOYMENT_NAME }} \
+            --all-containers \
+            --previous \
+            --tail=300 || true
