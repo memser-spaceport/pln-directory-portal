@@ -1,4 +1,4 @@
-FROM node:20.19-bookworm AS builder
+FROM node:20.19-bullseye AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ RUN npx prisma generate --schema=apps/web-api/prisma/oso-schema.prisma
 
 RUN yarn build
 
-FROM node:20.19-bookworm AS prod-deps
+FROM node:20.19-bullseye AS prod-deps
 
 WORKDIR /app
 
@@ -29,7 +29,7 @@ COPY patches ./patches
 RUN yarn install --frozen-lockfile --production=true --ignore-scripts \
   && yarn cache clean
 
-FROM node:20.19-bookworm-slim
+FROM node:20.19-bullseye-slim
 
 RUN groupadd -r app && useradd -r -g app app
 
