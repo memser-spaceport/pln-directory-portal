@@ -34,7 +34,7 @@ COPY package.json yarn.lock ./
 COPY .forestadmin-schema.json ./
 COPY patches ./patches
 
-RUN yarn install --frozen-lockfile --production=true \
+RUN yarn install --frozen-lockfile --production=true --ignore-scripts \
   && yarn cache clean
 
 
@@ -46,6 +46,8 @@ FROM node:20.19-bookworm AS runner
 RUN groupadd -r app && useradd -r -g app app
 
 WORKDIR /app
+
+RUN corepack enable
 
 COPY --from=prod-deps /app/package.json /app/yarn.lock ./
 COPY --from=prod-deps /app/node_modules ./node_modules
