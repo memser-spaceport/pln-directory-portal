@@ -189,6 +189,27 @@ describe('InvestorListsQueryService', () => {
       ]);
     });
 
+    it('filters members to direct-only PL paths', async () => {
+      queryRaw.mockResolvedValueOnce([{ targetInvestorId: '101' }, { targetInvestorId: '102' }]);
+      investorOutreachRecordCount.mockResolvedValue(0);
+      investorOutreachRecordFindMany.mockResolvedValue([]);
+
+      await service.listMembers(1, { directOnly: 'true' });
+
+      expect(queryRaw).toHaveBeenCalledTimes(1);
+      expect(investorOutreachRecordFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                investorId: { in: ['101', '102'] },
+              }),
+            ]),
+          }),
+        })
+      );
+    });
+
     it('intersects connector lens and path-via filters', async () => {
       queryRaw
         .mockResolvedValueOnce([{ targetInvestorId: '101' }, { targetInvestorId: '102' }])

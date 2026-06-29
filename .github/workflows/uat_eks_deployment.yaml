@@ -81,7 +81,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: 'memser-spaceport/pl-infra-pipeline'
-          ref: 'prod_release_v2'
+          ref: 'main'
           token: ${{ secrets.GIT_TOKEN }}
           path: './'
 

@@ -38,6 +38,7 @@ import { buildAffinityDirectPath, passesAffinityDirectThreshold } from './affini
 import { finalizePersonHopChain } from './path-route.util';
 import { loadMemberNameIndex, loadPortfolioFounderIndex, normalizePersonName } from './founder-member-resolve.util';
 import { loadMemberContactIndex } from './org-contact-resolve.util';
+import { loadDirectoryTeamIndex } from './org-team-resolve.util';
 import { resolvePathfinderScratchDir } from './pathfinder-scratch.util';
 import {
   buildRawPayload,
@@ -222,8 +223,10 @@ async function seed() {
   const portfolioTeams = await loadPortfolioFounderIndex(prisma);
   const membersByName = await loadMemberNameIndex(prisma);
   const memberContactIndex = await loadMemberContactIndex(prisma);
+  const teamIndex = await loadDirectoryTeamIndex(prisma);
   const founderIndexes = { portfolioTeams, membersByName };
   console.log(`  portfolio teams: ${portfolioTeams.size} keys, unique member names: ${membersByName.size}`);
+  console.log(`  directory teams (L1+): ${teamIndex.byUid.size}`);
 
   console.log('Loading PL prior-backer index (Affinity list 166215)…');
   const priorBackingByInvestor = loadPriorBackingMap(SCRATCH_DIR, entries);
@@ -340,7 +343,7 @@ async function seed() {
         hc.plConnector = rel.bestConnector;
         attachedHere = true;
       }
-      hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops, memberContactIndex);
+      hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops, memberContactIndex, teamIndex);
       hopChain = applyPriorBackingToHopChain(hopChain, priorBacking);
       pathInserts.push({
         targetInvestorId,
