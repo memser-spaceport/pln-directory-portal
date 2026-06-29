@@ -29,7 +29,7 @@ COPY patches ./patches
 RUN yarn install --frozen-lockfile --production=true --ignore-scripts \
   && yarn cache clean
 
-FROM node:20.19-bullseye-slim
+FROM node:20.19-bullseye AS runner
 
 RUN groupadd -r app && useradd -r -g app app
 
