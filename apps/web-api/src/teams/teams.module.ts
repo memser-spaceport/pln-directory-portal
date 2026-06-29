@@ -10,6 +10,7 @@ import { AdminModule } from "../admin/admin.module";
 import { ParticipantsRequestModule } from "../participants-request/participants-request.module";
 import { OpenSearchModule } from '../opensearch/opensearch.module';
 import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
+import { FollowsModule } from '../follows/follows.module';
 import { JwtService } from '../utils/jwt/jwt.service';
 
 @Module({
@@ -22,6 +23,7 @@ import { JwtService } from '../utils/jwt/jwt.service';
     HuskyModule,
     OpenSearchModule,
     forwardRef(() => TeamEnrichmentModule),
+    FollowsModule,
   ],
   controllers: [TeamsController],
   providers: [TeamsService, TeamsHooksService, JwtService],

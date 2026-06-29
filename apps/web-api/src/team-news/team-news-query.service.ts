@@ -84,41 +84,91 @@ export class TeamNewsQueryService {
     return and.length > 0 ? { AND: and } : {};
   }
 
-  async listTeamNews(query: TeamNewsListQuery): Promise<TeamNewsListResponse> {
+  async listTeamNews(
+    query: TeamNewsListQuery,
+    followedTeamUids: Set<string> = new Set()
+  ): Promise<TeamNewsListResponse> {
     const where = this.buildWhere(query);
     const skip = (query.page - 1) * query.limit;
-
-    const [rows, total] = await Promise.all([
-      this.prisma.teamNewsItem.findMany({
-        where,
-        orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
-        skip,
-        take: query.limit,
-        include: {
-          team: {
-            select: {
-              uid: true,
-              name: true,
-              logo: { select: { url: true } },
-              teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
-            },
-          },
+    const orderBy: Prisma.TeamNewsItemOrderByWithRelationInput[] = [{ eventDate: 'desc' }, { createdAt: 'desc' }];
+    const include = {
+      team: {
+        select: {
+          uid: true,
+          name: true,
+          logo: { select: { url: true } },
+          teamFocusAreas: { include: { focusArea: true, ancestorArea: true } },
         },
-      }),
+      },
+    } as const;
+
+    const followed = [...followedTeamUids];
+
+    // Anonymous caller (or follows nothing): single ordered+paginated query.
+    if (followed.length === 0) {
+      const [rows, total] = await Promise.all([
+        this.prisma.teamNewsItem.findMany({ where, orderBy, skip, take: query.limit, include }),
+        this.prisma.teamNewsItem.count({ where }),
+      ]);
+      const discussions = await this.loadDiscussions(rows.map((r) => r.uid));
+      return {
+        page: query.page,
+        limit: query.limit,
+        total,
+        items: rows.map((row) => this.toDto(row, discussions.get(row.uid), followedTeamUids)),
+      };
+    }
+
+    // Followed-first: paginate across two ordered segments (followed teams,
+    // then everyone else) so the global ordering stays stable across pages.
+    const followedWhere: Prisma.TeamNewsItemWhereInput = { AND: [where, { teamUid: { in: followed } }] };
+    const unfollowedWhere: Prisma.TeamNewsItemWhereInput = { AND: [where, { teamUid: { notIn: followed } }] };
+
+    const [followedTotal, total] = await Promise.all([
+      this.prisma.teamNewsItem.count({ where: followedWhere }),
       this.prisma.teamNewsItem.count({ where }),
     ]);
 
-    const discussions = await this.loadDiscussions(rows.map((r) => r.uid));
+    const rows: Prisma.TeamNewsItemGetPayload<{ include: typeof include }>[] = [];
+    const followedTake = Math.min(query.limit, Math.max(0, followedTotal - skip));
+    if (followedTake > 0) {
+      rows.push(
+        ...(await this.prisma.teamNewsItem.findMany({
+          where: followedWhere,
+          orderBy,
+          skip: Math.min(skip, followedTotal),
+          take: followedTake,
+          include,
+        }))
+      );
+    }
+    const remaining = query.limit - followedTake;
+    if (remaining > 0) {
+      rows.push(
+        ...(await this.prisma.teamNewsItem.findMany({
+          where: unfollowedWhere,
+          orderBy,
+          skip: Math.max(0, skip - followedTotal),
+          take: remaining,
+          include,
+        }))
+      );
+    }
 
+    const discussions = await this.loadDiscussions(rows.map((r) => r.uid));
     return {
       page: query.page,
       limit: query.limit,
       total,
-      items: rows.map((row) => this.toDto(row, discussions.get(row.uid))),
+      items: rows.map((row) => this.toDto(row, discussions.get(row.uid), followedTeamUids)),
     };
   }
 
-  async listTeamNewsByTeam(teamUid: string, query: TeamNewsByTeamQuery): Promise<TeamNewsByTeamResponse> {
+  async listTeamNewsByTeam(
+    teamUid: string,
+    query: TeamNewsByTeamQuery,
+    followedTeamUids: Set<string> = new Set()
+  ): Promise<TeamNewsByTeamResponse> {
     const team = await this.prisma.team.findUnique({
       where: { uid: teamUid },
       select: { uid: true, name: true },
@@ -171,11 +221,14 @@ export class TeamNewsQueryService {
       page: query.page,
       limit: query.limit,
       total,
-      items: rows.map((row) => this.toDto(row, discussions.get(row.uid))),
+      items: rows.map((row) => this.toDto(row, discussions.get(row.uid), followedTeamUids)),
     };
   }
 
-  async listGroupedByFocusArea(query: TeamNewsListQuery): Promise<TeamNewsGroupedResponse> {
+  async listGroupedByFocusArea(
+    query: TeamNewsListQuery,
+    followedTeamUids: Set<string> = new Set()
+  ): Promise<TeamNewsGroupedResponse> {
     const where = this.buildWhere(query);
     const rows = await this.prisma.teamNewsItem.findMany({
       where,
@@ -203,12 +256,20 @@ export class TeamNewsQueryService {
 
     const groups = new Map<string, TeamNewsItemDto[]>();
     for (const row of rows) {
-      const dto = this.toDto(row, discussions.get(row.uid));
+      const dto = this.toDto(row, discussions.get(row.uid), followedTeamUids);
       if (dto.focusAreas.length === 0) continue;
       for (const title of dto.focusAreas) {
         if (!focusByTitle.has(title)) continue;
         if (!groups.has(title)) groups.set(title, []);
         groups.get(title)!.push(dto);
+      }
+    }
+
+    // Within each focus-area group, surface followed-team news first while
+    // preserving the eventDate-desc order the rows arrived in (stable sort).
+    if (followedTeamUids.size > 0) {
+      for (const items of groups.values()) {
+        items.sort((a, b) => Number(b.isFollowed) - Number(a.isFollowed));
       }
     }
 
@@ -394,7 +455,8 @@ export class TeamNewsQueryService {
         }>;
       };
     },
-    discussion: TeamNewsDiscussion | undefined
+    discussion: TeamNewsDiscussion | undefined,
+    followedTeamUids: Set<string> = new Set()
   ): TeamNewsItemDto {
     const focusAreas: string[] = [];
     const subFocusAreas: string[] = [];
@@ -421,6 +483,7 @@ export class TeamNewsQueryService {
       subFocusAreas: [...new Set(subFocusAreas)],
       createdAt: row.createdAt.toISOString(),
       discussion: discussion ?? EMPTY_DISCUSSION,
+      isFollowed: followedTeamUids.has(row.teamUid),
     };
   }
 }
