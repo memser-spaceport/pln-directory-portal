@@ -1,8 +1,5 @@
 import { Prisma } from '@prisma/client';
-import {
-  founderBrokerPresentClause,
-  founderIdentityMatchClause,
-} from './founder-contact.util';
+import { founderBrokerPresentClause, founderIdentityMatchClause } from './founder-contact.util';
 
 export const MAX_PATH_VIA_VALUES = 20;
 
@@ -30,24 +27,23 @@ export function hasPathViaFilters(input: PathViaFilterInput): boolean {
 /** Direct PL → investor path with no founder/VC broker in hopChain.contact. */
 export function directOnlyPathClause(): Prisma.Sql {
   return Prisma.sql`(
-    (
-      jsonb_typeof(p."hopChain"->'routeNodes') = 'array'
-      AND (
-        SELECT count(*)::int
-        FROM jsonb_array_elements(p."hopChain"->'routeNodes') AS rn
-        WHERE lower(btrim(rn->>'label')) <> 'investor'
-      ) = 1
-      AND p."hopChain"->'plConnector'->>'name' IS NOT NULL
-      AND btrim(p."hopChain"->'plConnector'->>'name') <> ''
-      AND (
-        p."hopChain"->'contact' IS NULL
-        OR jsonb_typeof(p."hopChain"->'contact') = 'null'
-      )
+    p."connectorType" = 'PL'
+    AND p."hopChain"->'plConnector'->>'name' IS NOT NULL
+    AND btrim(p."hopChain"->'plConnector'->>'name') <> ''
+    AND (
+      p."hopChain"->'contact' IS NULL
+      OR jsonb_typeof(p."hopChain"->'contact') = 'null'
     )
-    OR (
-      (p."hopChain"->'routeNodes' IS NULL OR jsonb_typeof(p."hopChain"->'routeNodes') <> 'array')
-      AND p."connectorType" = 'PL'
-      AND p."hops" = 1
+    AND (
+      p."hops" = 1
+      OR (
+        jsonb_typeof(p."hopChain"->'routeNodes') = 'array'
+        AND (
+          SELECT count(*)::int
+          FROM jsonb_array_elements(p."hopChain"->'routeNodes') AS rn
+          WHERE lower(btrim(rn->>'label')) <> 'investor'
+        ) = 2
+      )
     )
   )`;
 }

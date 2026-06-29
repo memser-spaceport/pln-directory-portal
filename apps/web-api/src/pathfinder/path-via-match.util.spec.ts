@@ -83,7 +83,7 @@ describe('path-via-match.util', () => {
         directOnly: false,
       });
       const text = sqlText(clause);
-      expect(text).toContain("connectorType");
+      expect(text).toContain('connectorType');
       expect(text).toContain("'nodes'");
       expect(text).toContain('temasek');
     });
@@ -115,11 +115,14 @@ describe('path-via-match.util', () => {
   });
 
   describe('directOnlyPathClause', () => {
-    it('checks routeNodes length and legacy PL+hops fallback', () => {
+    it('matches PL 1-hop paths and 2-node routeNodes chains', () => {
       const text = sqlText(directOnlyPathClause());
       expect(text).toContain('routeNodes');
       expect(text).toContain('connectorType');
       expect(text).toContain('hops');
+      expect(text).toContain('= 2');
+      expect(text).toContain('= 1');
+      expect(text).toContain('plConnector');
     });
   });
 });
