@@ -15,6 +15,7 @@ import {
   type MemberContactIndex,
   type RouteNodeContact,
 } from './org-contact-resolve.util';
+import { enrichOrgConnectorTeams, applyOrgTeamToRouteNodes, type DirectoryTeamIndex } from './org-team-resolve.util';
 
 export type RouteNodeVariant = 'member' | 'external' | 'org';
 
@@ -228,16 +229,16 @@ function correctFounderContactFromNodes(hc: LegacyHopChain): LegacyHopChain {
 }
 
 function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
+  const org = hc.orgConnectors?.[0] ?? hc.orgConnector;
   if (hc.contact && !connectorMatchesPlContact(hc.contact.name, hc.plConnector)) {
-    const orgName =
-      parseBridgeFromHopChain(hc) ?? hc.orgConnectors?.[0]?.name ?? hc.orgConnector?.name;
+    const orgName = parseBridgeFromHopChain(hc) ?? hc.orgConnectors?.[0]?.name ?? hc.orgConnector?.name;
     return [
       {
         label: hc.contact.name,
         orgName,
         memberUid: hc.contact.memberUid,
-        teamUid: hc.contact.teams?.[0]?.teamUid,
-        logo: hc.contact.teams?.[0]?.logo,
+        teamUid: hc.contact.teams?.[0]?.teamUid ?? org?.teamUid,
+        logo: hc.contact.teams?.[0]?.logo ?? org?.logo,
         variant: hc.contact.memberUid ? 'member' : 'external',
         contacts: orgName
           ? [
@@ -266,7 +267,6 @@ function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
   if (hc.routeNodes && hc.routeNodes.length > 0) {
     return stripPlConnectorFromBridge(stripLeadingPlOrg(hc.routeNodes), hc.plConnector?.name);
   }
-  const org = hc.orgConnectors?.[0] ?? hc.orgConnector;
   if (org) {
     const contacts = org.contacts ?? [];
     if (contacts.length > 0) {
@@ -300,7 +300,8 @@ export function finalizePersonHopChain(
   },
   founderIndexes?: FounderResolveIndexes,
   hops?: number,
-  memberContactIndex?: MemberContactIndex
+  memberContactIndex?: MemberContactIndex,
+  teamIndex?: DirectoryTeamIndex
 ): Record<string, unknown> {
   let enriched = correctFounderContactFromNodes(enrichLegacyPresentation(hopChain as LegacyHopChain));
   if (memberContactIndex) {
@@ -308,6 +309,9 @@ export function finalizePersonHopChain(
   }
   if (founderIndexes) {
     enriched = enrichFounderContacts(enriched, founderIndexes);
+  }
+  if (teamIndex) {
+    enriched = enrichOrgConnectorTeams(enriched, teamIndex);
   }
   const plConnector = enriched.plConnector ?? null;
   const plConnectorMemberUid =
@@ -343,6 +347,9 @@ export function finalizePersonHopChain(
     ) as RouteNode[];
   }
   const orgConnectors = enriched.orgConnectors ?? (enriched.orgConnector ? [enriched.orgConnector] : undefined);
+  if (orgConnectors?.length) {
+    routeNodes = applyOrgTeamToRouteNodes(routeNodes, orgConnectors) as RouteNode[];
+  }
   return {
     ...hopChain,
     ...(enriched.contact ? { contact: enriched.contact } : {}),
