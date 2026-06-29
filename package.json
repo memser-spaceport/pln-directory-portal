@@ -38,6 +38,7 @@
     "schema": "apps/web-api/prisma/schema.prisma"
   },
   "dependencies": {
+    "uuid": "^9.0.0",
     "@abitia/zod-dto": "^0.4.0",
     "@ai-sdk/anthropic": "1.2.12",
     "@ai-sdk/google": "1.2.22",
@@ -271,7 +272,6 @@
     "tsconfig-paths": "4.0.0",
     "typescript": "^4.3.5",
     "url-loader": "^3.0.0",
-    "uuid": "^9.0.0",
     "webpack-cli": "^4.10.0"
   },
   "packageManager": "yarn@1.22.22+sha1.ac34549e6aa8e7ead463a7407e1c7390f61a6610"
