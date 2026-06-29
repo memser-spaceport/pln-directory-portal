@@ -114,10 +114,6 @@ export class JobOpeningsQueryService {
       by: ['teamUid'];
       where: Prisma.JobOpeningWhereInput;
       _count: { _all: true };
-      _max?: { updatedAt: true };
-      orderBy?: Prisma.JobOpeningOrderByWithAggregationInput[];
-      skip?: number;
-      take?: number;
     }) => Promise<{ teamUid: string | null; _count: { _all: number } }[]>;
 
     const { sort } = query;
@@ -159,22 +155,42 @@ export class JobOpeningsQueryService {
         }));
       }
     } else {
-      const rows = await groupByTeamUid({
-        by: ['teamUid'],
+      // "newest": order teams by their most recent job opening (detectionDate desc).
+      // Ties are broken by comparing each team's next-most-recent opening, and so on —
+      // i.e. a lexicographic comparison of each team's detectionDates sorted descending.
+      // detectionDate is used (not updatedAt, which is bumped on every re-ingest/enrichment).
+      const jobs = await this.prisma.jobOpening.findMany({
         where,
-        _count: { _all: true },
-        _max: { updatedAt: true },
-        orderBy: [{ _max: { updatedAt: 'desc' } }, { teamUid: 'asc' }],
-        skip,
-        take: limit,
+        select: { teamUid: true, detectionDate: true },
       });
 
-      pageRows = rows
-        .filter((row): row is { teamUid: string; _count: { _all: number } } => Boolean(row.teamUid))
-        .map((row) => ({
-          teamUid: row.teamUid,
-          roleCount: row._count._all,
-        }));
+      const datesByTeam = new Map<string, Date[]>();
+      for (const job of jobs) {
+        if (!job.teamUid) continue;
+        const existing = datesByTeam.get(job.teamUid);
+        if (existing) existing.push(job.detectionDate);
+        else datesByTeam.set(job.teamUid, [job.detectionDate]);
+      }
+
+      const teamEntries = [...datesByTeam.entries()].map(([teamUid, dates]) => ({
+        teamUid,
+        dates: dates.sort((a, b) => b.getTime() - a.getTime()),
+      }));
+
+      teamEntries.sort((a, b) => {
+        const len = Math.min(a.dates.length, b.dates.length);
+        for (let i = 0; i < len; i++) {
+          const diff = b.dates[i].getTime() - a.dates[i].getTime();
+          if (diff !== 0) return diff;
+        }
+        if (a.dates.length !== b.dates.length) return b.dates.length - a.dates.length;
+        return a.teamUid.localeCompare(b.teamUid);
+      });
+
+      pageRows = teamEntries.slice(skip, skip + limit).map((entry) => ({
+        teamUid: entry.teamUid,
+        roleCount: entry.dates.length,
+      }));
     }
 
     return {
@@ -237,7 +253,7 @@ export class JobOpeningsQueryService {
               detectionDate: true,
               updatedAt: true,
             },
-            orderBy: { updatedAt: 'desc' },
+            orderBy: [{ detectionDate: 'desc' }, { uid: 'asc' }],
           },
         },
       }),
