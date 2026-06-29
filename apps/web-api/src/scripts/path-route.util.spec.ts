@@ -4,6 +4,18 @@ import {
   finalizePersonHopChain,
   PROTOCOL_LABS_ORG_NODE,
 } from './path-route.util';
+import { buildTeamMatchIndex } from '../affinity/affinity-match.util';
+import type { DirectoryTeamIndex } from './org-team-resolve.util';
+import { firmKey } from './firm-key.util';
+
+function teamIndexForCoinbase(): DirectoryTeamIndex {
+  const uid = 'uid-coinbase';
+  return {
+    match: buildTeamMatchIndex([{ uid, name: 'Coinbase', website: 'https://coinbase.com', airtableRecId: null }]),
+    byFirmKey: new Map([[firmKey('Coinbase'), uid]]),
+    byUid: new Map([[uid, { teamUid: uid, logoUrl: 'https://img/cb.png' }]]),
+  };
+}
 
 describe('path-route.util (seed)', () => {
   describe('buildFullRouteNodes', () => {
@@ -162,6 +174,45 @@ describe('path-route.util (seed)', () => {
       expect(routeNodes.map((n) => n.label)).toEqual(['Brad Holden', 'Jonathan King', 'Jacqueline Kwok']);
       expect(routeNodes[1].orgName).toBe('Coinbase');
       expect(routeNodes[1].memberUid).toBe('uid-jk');
+    });
+
+    it('VC org bridge resolves orgConnector.teamUid from Directory team index', () => {
+      const out = finalizePersonHopChain(
+        {
+          orgConnectors: [
+            {
+              name: 'Coinbase',
+              description: 'co-invested',
+              tags: ['Org connection'],
+              website: 'coinbase.com',
+              contacts: [
+                {
+                  name: 'Jonathan King',
+                  email: 'jonathan.king@coinbase.com',
+                  role: 'Principal',
+                  source: 'gold_list',
+                },
+              ],
+            },
+          ],
+          plConnector: { name: 'Brad Holden' },
+          hops: 2,
+        },
+        { firstName: 'Jacqueline', lastName: 'Kwok' },
+        { portfolioTeams: new Map(), membersByName: new Map([['brad holden', 'uid-brad']]) },
+        2,
+        {
+          byEmail: new Map([['jonathan.king@coinbase.com', { uid: 'uid-jk', imageUrl: 'https://img/jk.webp' }]]),
+          byUid: new Map([['uid-jk', { uid: 'uid-jk', imageUrl: 'https://img/jk.webp' }]]),
+          membersByName: new Map(),
+        },
+        teamIndexForCoinbase()
+      );
+      const orgConnector = out.orgConnector as { teamUid?: string; logo?: string };
+      expect(orgConnector.teamUid).toBe('uid-coinbase');
+      expect(orgConnector.logo).toBe('https://img/cb.png');
+      const bridge = (out.routeNodes as Array<{ teamUid?: string }>)[1];
+      expect(bridge?.teamUid).toBe('uid-coinbase');
     });
 
     it('F+2 misresolved dump uses f_* founder broker in routeNodes', () => {
