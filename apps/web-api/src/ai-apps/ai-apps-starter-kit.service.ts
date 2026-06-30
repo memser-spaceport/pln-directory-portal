@@ -1,24 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import AdmZip from 'adm-zip';
-import { AI_APP_TOKEN_HEADER, AI_APPS_DEPLOY_ENDPOINT } from './ai-apps.constants';
+import { AI_APP_TOKEN_HEADER, AI_APPS_CONNECT_ENDPOINT, AI_APPS_DEPLOY_ENDPOINT } from './ai-apps.constants';
 
 /**
- * Builds the reusable "AI Apps" starter kit ZIP a member downloads once and
- * unpacks into their AI coding tool (Claude Code, Cursor, …). It carries the
- * member's personal deploy token, deploy instructions for the agent, a minimal
- * runnable app scaffold, and the PLN design tokens — but no PLN private API info.
+ * Builds the "AI Apps" starter kit ZIP a member downloads and unpacks into their
+ * AI coding tool (Claude Code, Cursor, …). It carries deploy instructions for the
+ * agent, a minimal runnable app scaffold, and the PLN design tokens — but no
+ * deploy token and no PLN private API info. At deploy time the agent runs the
+ * LabOS connect flow to obtain a short-lived deploy token.
  */
 @Injectable()
 export class AiAppsStarterKitService {
-  buildZip(token: string): Buffer {
+  buildZip(): Buffer {
     const zip = new AdmZip();
     const add = (path: string, content: string) => zip.addFile(path, Buffer.from(content, 'utf8'));
 
     add('README.md', this.readme());
-    add('CLAUDE.md', this.agentInstructions(token));
-    add('AGENTS.md', this.agentInstructions(token));
+    add('CLAUDE.md', this.agentInstructions());
+    add('AGENTS.md', this.agentInstructions());
     add('.claude/skills/deploy-to-labs/SKILL.md', this.deploySkill());
-    add('pln-app.config.json', this.configJson(token));
+    add('pln-app.config.json', this.configJson());
     add('styles/pln-theme.css', this.themeCss());
     add('styles/FONTS.md', this.fontsDoc());
     add('app/server.js', this.appServer());
@@ -38,7 +39,7 @@ to the Protocol Labs Network sandbox with a single instruction.
 ## What's inside
 - \`CLAUDE.md\` / \`AGENTS.md\` — instructions your AI agent reads automatically.
 - \`.claude/skills/deploy-to-labs/\` — the deploy skill your agent uses.
-- \`pln-app.config.json\` — your personal deploy token + the deploy endpoint.
+- \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
 - \`styles/\` — PLN design tokens (CSS variables) and font guidance.
 - \`app/\` — a minimal runnable Node app to start from (its \`server.js\`,
   \`package.json\`, and \`Dockerfile\` are placeholders you can replace).
@@ -51,8 +52,10 @@ to the Protocol Labs Network sandbox with a single instruction.
    - **Existing app:** copy your project's files into \`app/\`, then say "migrate this
      existing app and deploy it to LabOS". Your agent takes care of whatever setup is
      needed to run it there.
-3. When you're happy, say "deploy this app". Your agent ships it to the PLN sandbox;
-   the first deploy can take a minute or two.
+3. When you're happy, say "deploy this app". The first time you deploy, your agent
+   will give you a LabOS link to open and approve — sign in and click **Approve**
+   to authorize the deploy. Your agent then ships the app to the PLN sandbox; the
+   first deploy can take a minute or two.
 4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it.
 
 > **Don't copy passwords or secret keys into \`app/\`** — apps run on shared
@@ -65,13 +68,16 @@ correctly out of the box, and your agent checks this for you on every deploy —
 don't need to do anything special. (The technical rule lives in \`AGENTS.md\` for your
 agent's reference.)
 
-## Keep your token private
-\`pln-app.config.json\` holds a personal deploy token tied to your account. Do not
-commit it to a public repo or share it.
+## How deploy authorization works
+This kit contains **no token**. When your agent deploys, it asks LabOS for a
+short-lived deploy credential: you open a LabOS link, sign in, and approve. The
+credential is tied to your account, expires after about an hour, and is never
+written to disk — so this folder is safe to commit or share (it grants nothing on
+its own). Each new deploy session just asks you to approve again.
 `;
   }
 
-  private agentInstructions(token: string): string {
+  private agentInstructions(): string {
     return `# AI Agent Instructions — PLN AI Apps
 
 You are helping a Protocol Labs Network member build and deploy a small web app
@@ -129,25 +135,35 @@ not the scaffold's shape or language.
 ## Deploying the app
 When the member asks you to deploy, use the **deploy-to-labs** skill in
 \`.claude/skills/deploy-to-labs/SKILL.md\`. In short:
-1. Read \`pln-app.config.json\` for the deploy token and endpoint.
-2. Choose a stable, lowercase \`appId\` (e.g. \`my-leaderboard\`) and a fresh
+1. Read \`pln-app.config.json\` for the \`connectEndpoint\`, \`deployEndpoint\`, and
+   (if present) a saved \`appId\`.
+2. **Get a deploy token via LabOS (the connect flow).** There is no token in the
+   kit. POST to \`connectEndpoint\` to start a connect session, give the member the
+   returned \`connectUrl\` + confirmation \`userCode\` to open and approve in LabOS,
+   then poll until you receive a short-lived \`deployToken\`. Full steps are in the
+   deploy skill. Keep the token **in memory only** — never write it to
+   \`pln-app.config.json\` or any file.
+3. Choose a stable, lowercase \`appId\` (e.g. \`my-leaderboard\`) and a fresh
    \`deploymentId\` for each deploy.
-3. Zip the **contents** of \`app/\` (so the \`Dockerfile\` sits at the root of the ZIP),
+4. Zip the **contents** of \`app/\` (so the \`Dockerfile\` sits at the root of the ZIP),
    excluding \`node_modules\`, build output, and any secrets/\`.env\`/data dirs, then
-   upload that ZIP to the deploy endpoint as multipart/form-data. The PLN backend
-   stores it and runs the build — you do not need any cloud credentials.
-4. Tell the member the deploy succeeded and that they can open their app from the
+   upload that ZIP to \`deployEndpoint\` as multipart/form-data with the
+   \`deployToken\` in the \`${AI_APP_TOKEN_HEADER}\` header. The PLN backend stores it
+   and runs the build — you do not need any cloud credentials.
+5. Tell the member the deploy succeeded and that they can open their app from the
    PL Infra → AI Apps dashboard. **Do NOT reveal the deployment URL, host, or port**
    (see "Keep the deployment URL private" in the deploy skill).
 
 ## Deploy token
-Your deploy token is in \`pln-app.config.json\` and is sent in the
-\`${AI_APP_TOKEN_HEADER}\` header. It is tied to this member's account and reused
-across all of their apps. Never print it in logs or commit it. (Token starts
-with \`${token.slice(0, 10)}…\`.)
+There is **no long-lived token** in this kit. You obtain a short-lived deploy
+token at deploy time through the LabOS connect flow (see the deploy skill), and
+send it in the \`${AI_APP_TOKEN_HEADER}\` header. The token expires after about an
+hour and is tied to the member who approved the connect link. Never print it in
+logs, write it to a file, or commit it; if a deploy returns 401 (expired), just
+run the connect flow again to get a fresh one.
 
-Do not ask for or use any internal PLN APIs — only the deploy endpoint in the
-config is available to you.
+Do not ask for or use any internal PLN APIs — only the connect and deploy
+endpoints in the config are available to you.
 `;
   }
 
@@ -162,14 +178,43 @@ description: Deploy the app in ./app to the Protocol Labs Network sandbox. Use w
 Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
 
 ## Steps
-1. Read \`pln-app.config.json\` to get \`deployToken\`, \`deployEndpoint\`, and (if
+1. Read \`pln-app.config.json\` to get \`connectEndpoint\`, \`deployEndpoint\`, and (if
    present) a saved \`appId\`. If no \`appId\` exists yet, pick a short, stable,
    lowercase slug (e.g. \`hello-board\`) and save it back to the config.
-2. Make sure \`app/\` runs locally first (\`npm install && npm start\`, hit
+2. **Get a deploy token via LabOS.** The kit has no token; obtain a short-lived one
+   through the connect flow:
+
+   a. Start a session (no auth needed):
+
+   \`\`\`bash
+   curl -sX POST "<connectEndpoint>" \\
+     -H "Content-Type: application/json" \\
+     -d '{"clientName":"Claude Code"}'
+   # → { "sessionId", "userCode", "connectUrl", "pollToken", "pollIntervalSec", "expiresAt" }
+   \`\`\`
+
+   b. **Tell the member, in your chat:** open \`connectUrl\` in their browser, sign in
+      to LabOS, confirm the code shown matches \`userCode\`, and click **Approve**.
+   c. Poll until the session is decided (every \`pollIntervalSec\` seconds, up to
+      \`expiresAt\`), sending the \`pollToken\` you received:
+
+   \`\`\`bash
+   curl -sX POST "<connectEndpoint>/poll" \\
+     -H "Content-Type: application/json" \\
+     -d '{"pollToken":"<pollToken>"}'
+   # pending  → keep polling
+   # approved → { "status":"approved", "deployToken":"plndeploy_…", "deployTokenExpiresAt" }
+   # denied   → the member lacks ai_apps.write; stop and tell them
+   # expired  → the link timed out; start a new session (step 2a)
+   \`\`\`
+
+   Hold \`deployToken\` **in memory only** — never write it to \`pln-app.config.json\`
+   or any other file, and never print it.
+3. Make sure \`app/\` runs locally first (\`npm install && npm start\`, hit
    \`/health\`). For a migrated existing app, also confirm the migration checklist
    in \`AGENTS.md\` is satisfied (self-contained \`app/\`, fitting Dockerfile, binds
    \`0.0.0.0\`, no reliance on injected secrets).
-3. Zip the **contents** of \`app/\` so the \`Dockerfile\` sits at the ZIP root.
+4. Zip the **contents** of \`app/\` so the \`Dockerfile\` sits at the ZIP root.
    Exclude \`node_modules\`, build output, and — importantly — any secrets: real
    \`.env\` files, tokens/keys, and data dirs must never enter the ZIP (the backend
    stores it server-side).
@@ -181,7 +226,8 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
    unzip -l ../app.zip | grep -iE '\\.env|secret|credential|\\.pem|\\.key' && echo 'STOP: secret in zip' || echo 'ok'
    \`\`\`
 
-4. Upload the ZIP to the deploy endpoint as multipart/form-data. The PLN backend
+5. Upload the ZIP to the deploy endpoint as multipart/form-data, sending the
+   \`deployToken\` from step 2 in the \`${AI_APP_TOKEN_HEADER}\` header. The PLN backend
    stores the ZIP and triggers the build — no cloud credentials are needed:
 
    \`\`\`bash
@@ -194,7 +240,7 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
      -F "file=@app.zip;type=application/zip"
    \`\`\`
 
-5. On success the response contains the deployment URL and status:
+6. On success the response contains the deployment URL and status:
 
    \`\`\`json
    { "status": "READY", "url": "https://sandbox-<appId>.plnetwork.io", "host": "...", "port": 31001 }
@@ -205,7 +251,7 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
    app is live and can be opened from the PL Infra → AI Apps dashboard. If \`status\`
    is \`ERROR\`, surface \`notes\` (never the URL).
 
-6. **Verify the app is iframe-embeddable** (internal check — do not surface the URL
+7. **Verify the app is iframe-embeddable** (internal check — do not surface the URL
    to the member). The dashboard shows it in an \`<iframe>\` from a sibling
    \`*.plnetwork.io\` subdomain; check the live response headers:
 
@@ -247,21 +293,25 @@ verification steps. Only re-deploy if it stays unreachable.
 - Reuse the same \`appId\` to redeploy an existing app; use a new \`deploymentId\`
   each time. Derive the URL from the \`appId\` for your own checks, but treat it as
   sensitive (see "Keep the deployment URL private").
-- The deploy token authenticates you as the member — keep it secret.
+- The deploy token is short-lived (≈1 hour) and tied to the member who approved the
+  connect link. Keep it in memory only — never save it to a file or print it. Within
+  the window you can redeploy without reconnecting; once it expires (deploy returns
+  \`401\`), run the connect flow again to get a fresh token.
 - The sandbox injects no runtime env vars or secrets. An app that needs config must
   ship sensible defaults or degrade gracefully (e.g. sample data) — see the
   migration checklist in \`AGENTS.md\`.
 `;
   }
 
-  private configJson(token: string): string {
+  private configJson(): string {
     return `${JSON.stringify(
       {
+        connectEndpoint: AI_APPS_CONNECT_ENDPOINT,
         deployEndpoint: AI_APPS_DEPLOY_ENDPOINT,
         deployTokenHeader: AI_APP_TOKEN_HEADER,
-        deployToken: token,
         appId: '',
-        notes: 'Set appId to a stable lowercase slug on first deploy and reuse it.',
+        notes:
+          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it.',
       },
       null,
       2

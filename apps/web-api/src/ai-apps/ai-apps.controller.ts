@@ -25,9 +25,12 @@ import { RbacGuard } from '../rbac/rbac.guard';
 import { RbacService } from '../rbac/rbac.service';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AiAppsService } from './ai-apps.service';
+import { AiAppsConnectService } from './ai-apps-connect.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { DeployAppDto } from './dto/deploy-app.dto';
+import { StartConnectDto } from './dto/start-connect.dto';
+import { PollConnectDto } from './dto/poll-connect.dto';
 import { AI_APPS_MAX_ZIP_BYTES } from './ai-apps.constants';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
@@ -38,9 +41,55 @@ const WRITE = { anyOf: [AI_APPS_PERMISSIONS.WRITE] };
 export class AiAppsController {
   constructor(
     private readonly aiAppsService: AiAppsService,
+    private readonly connectService: AiAppsConnectService,
     private readonly starterKitService: AiAppsStarterKitService,
     private readonly rbacService: RbacService
   ) {}
+
+  /**
+   * Start a connect session (called by the headless AI agent, no auth). Returns
+   * the LabOS connect URL + confirmation code to show the member, and the
+   * `pollToken` the agent uses to collect its deploy token once approved.
+   */
+  @NoCache()
+  @Post('connect')
+  @UsePipes(ZodValidationPipe)
+  async startConnect(@Body() body: StartConnectDto) {
+    return this.connectService.startSession(body.clientName);
+  }
+
+  /**
+   * Poll a connect session (agent, authenticated by the `pollToken`). Returns
+   * the issued deploy token once the member has approved. Declared before
+   * `connect/:uid` so the literal path wins.
+   */
+  @NoCache()
+  @Post('connect/poll')
+  @UsePipes(ZodValidationPipe)
+  async pollConnect(@Body() body: PollConnectDto) {
+    return this.connectService.poll(body.pollToken);
+  }
+
+  /** Connect-session display info for the LabOS connect page (member JWT). */
+  @NoCache()
+  @Get('connect/:uid')
+  @UseGuards(UserTokenCheckGuard)
+  async getConnectSession(@Param('uid') uid: string) {
+    return this.connectService.getSessionForDisplay(uid);
+  }
+
+  /**
+   * Approve a connect session from the LabOS connect page. Requires a logged-in
+   * member; the `ai_apps.write` check (and the success/denied audit) happens in
+   * the service so both outcomes are recorded.
+   */
+  @NoCache()
+  @Post('connect/:uid/approve')
+  @UseGuards(UserTokenCheckGuard)
+  async approveConnectSession(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.connectService.approve(uid, memberUid);
+  }
 
   /** Dashboard list of all AI Apps with their deploy status. */
   @NoCache()
@@ -96,15 +145,14 @@ export class AiAppsController {
     return this.aiAppsService.deleteApp(memberUid, uid);
   }
 
-  /** Download the reusable starter kit ZIP (creates the member's token on first use). */
+  /** Download the starter kit ZIP. Carries no token — the agent obtains a deploy credential at deploy time via the LabOS connect flow. */
   @NoCache()
   @Get('starter-kit/download')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(WRITE)
   async downloadStarterKit(@Req() req: any, @Res() res: Response) {
     const memberUid = await this.resolveMemberUid(req);
-    const token = await this.aiAppsService.ensureToken(memberUid);
-    const zip = this.starterKitService.buildZip(token);
+    const zip = this.starterKitService.buildZip();
     await this.aiAppsService.logKitDownloaded(memberUid);
 
     res.set({

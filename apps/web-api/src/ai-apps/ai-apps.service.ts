@@ -5,14 +5,12 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { randomBytes } from 'crypto';
 import axios from 'axios';
 import { AiApp, AiAppEvent, AiAppEventType } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AwsService } from '../utils/aws/aws.service';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import {
-  AI_APP_TOKEN_PREFIX,
   AI_APPS_RUNNER_TOKEN,
   AI_APPS_RUNNER_URL,
   AI_APPS_S3_BUCKET,
@@ -60,25 +58,6 @@ export class AiAppsService {
       ...(rest as Omit<T, 'memberUid'>),
       member: byUid.get(memberUid) ?? null,
     }));
-  }
-
-  /** Returns the member's reusable deploy token, creating one on first use. */
-  async ensureToken(memberUid: string): Promise<string> {
-    const existing = await this.prisma.aiAppToken.findUnique({ where: { memberUid } });
-    if (existing && !existing.revokedAt) {
-      return existing.token;
-    }
-
-    const token = `${AI_APP_TOKEN_PREFIX}${randomBytes(24).toString('hex')}`;
-    if (existing) {
-      await this.prisma.aiAppToken.update({
-        where: { memberUid },
-        data: { token, revokedAt: null },
-      });
-    } else {
-      await this.prisma.aiAppToken.create({ data: { memberUid, token } });
-    }
-    return token;
   }
 
   /** Dashboard list — all non-deleted apps across PL Infra users, newest first, with owner info. */

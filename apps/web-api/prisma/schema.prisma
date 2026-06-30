@@ -2971,20 +2971,53 @@ model AiApp {
   @@index([status])
 }
 
-/// Reusable per-member deploy token bundled into the starter kit ZIP.
-model AiAppToken {
-  id         Int       @id @default(autoincrement())
-  uid        String    @unique @default(cuid())
-  memberUid  String    @unique
-  token      String    @unique
-  lastUsedAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+enum AiAppConnectStatus {
+  PENDING // session started by the agent, awaiting member login + approval
+  APPROVED // member logged in with ai_apps.write; a short-lived deploy token was issued
+  DENIED // member logged in but lacks ai_apps.write
+  EXPIRED // session timed out before approval
+}
+
+/// Short-lived "connect" session used to hand the member's AI agent a deploy
+/// credential WITHOUT shipping a long-lived token in the starter kit. The agent
+/// starts a session (PENDING), the member opens the LabOS connect page and
+/// approves it; on approval we mint a short-lived `deployToken` the agent then
+/// collects via polling (proving ownership with `pollToken`) and uses to deploy.
+model AiAppConnectSession {
+  id                   Int                @id @default(autoincrement())
+  uid                  String             @unique @default(cuid())
+  /// Short, human-readable code shown both in the agent and on the connect page
+  /// so the member can confirm they are approving their own session.
+  userCode             String             @unique
+  /// Optional label for the agent/client that started the session (e.g.
+  /// "Claude Code"), shown on the connect page.
+  clientName           String?
+  /// Secret held only by the agent that started the session; required to poll
+  /// for and collect the issued deploy token.
+  pollToken            String             @unique
+  status               AiAppConnectStatus @default(PENDING)
+  /// Bound on approval (the member who logged in and approved).
+  memberUid            String?
+  /// Short-lived deploy credential minted on approval (sent by the agent as the
+  /// `x-app-token` header). Null until approved; expires at `deployTokenExpiresAt`.
+  deployToken          String?            @unique
+  deployTokenExpiresAt DateTime?
+  /// When the PENDING session stops accepting approvals.
+  expiresAt            DateTime
+  approvedAt           DateTime?
+  /// Last time the issued deploy token was used to deploy.
+  lastUsedAt           DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([memberUid])
+  @@index([status])
 }
 
 enum AiAppEventType {
   KIT_DOWNLOADED
+  CONNECT_APPROVED
+  CONNECT_DENIED
   DEPLOY_STARTED
   DEPLOY_SUCCEEDED
   DEPLOY_FAILED
