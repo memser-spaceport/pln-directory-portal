@@ -21,6 +21,7 @@ import { NotificationService } from '../utils/notification/notification.service'
 import { EmailOtpService } from '../otp/email-otp.service';
 import { AuthService } from '../auth/auth.service';
 import { LogService } from '../shared/log.service';
+import { PL_PORTFOLIO_COMMUNITY_AFFILIATION } from '../teams/team-affiliation.constants';
 import { DEFAULT_MEMBER_ROLES, MemberRole, isDirectoryAdmin } from '../utils/constants';
 import { hashFileName } from '../utils/hashing';
 import { buildMultiRelationMapping, copyObj } from '../utils/helper/helper';
@@ -2004,6 +2005,7 @@ export class MembersService {
     minTypicalCheckSize?: number;
     maxTypicalCheckSize?: number;
     investmentFocus?: string[];
+    isPortCoFounder?: boolean;
   }) {
     const page = filters.page || 1;
     const limit = Math.min(filters.limit || 20, 100);
@@ -2438,6 +2440,19 @@ export class MembersService {
           },
         });
       }
+    }
+
+    if (filters.isPortCoFounder) {
+      whereConditions.push({
+        teamMemberRoles: {
+          some: {
+            team: {
+              accessLevel: { not: 'L0' },
+              communityAffiliations: { some: { title: PL_PORTFOLIO_COMMUNITY_AFFILIATION } },
+            },
+          },
+        },
+      });
     }
 
     const where: Prisma.MemberWhereInput = {

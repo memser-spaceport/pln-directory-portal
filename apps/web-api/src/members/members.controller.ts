@@ -45,6 +45,9 @@ import { ParticipantsReqValidationPipe } from '../pipes/participant-request-vali
 import { IsVerifiedMemberInterceptor } from '../interceptors/verified-member.interceptor';
 import { isEmpty } from 'lodash';
 import { QueryCache } from '../decorators/query-cache.decorator';
+import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
+import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -55,6 +58,7 @@ export class MemberController {
   constructor(
     private readonly membersService: MembersService,
     private readonly investorProfileService: InvestorProfileService,
+    private readonly accessControlV2Service: AccessControlV2Service,
     private logger: LogService
   ) {}
 
@@ -376,12 +380,22 @@ export class MemberController {
    */
   @Api(server.route.searchMembers)
   @ApiQueryFromZod(MemberFilterQueryParams.optional())
+  @UseGuards(OptionalUserTokenCheckGuard)
   @UseInterceptors(IsVerifiedMemberInterceptor)
   @NoCache()
   // @QueryCache()
   // @CacheTTL(1) // 5 minutes
   async searchMembers(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof MemberFilterQueryParams>;
+    if (params?.isPortCoFounder) {
+      const userUid = request['userUid'] as string | undefined;
+      if (
+        !userUid ||
+        !(await this.accessControlV2Service.hasPermission(userUid, MEMBER_PERMISSIONS.AFFINITY_READ))
+      ) {
+        throw new ForbiddenException('member.affinity.read permission required for PortCo founder filter');
+      }
+    }
     return await this.membersService.searchMembers(params || {});
   }
 

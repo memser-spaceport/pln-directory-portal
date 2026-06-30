@@ -14,6 +14,7 @@ import { OfficeHoursModule } from '../office-hours/office-hours.module';
 import { TeamsModule } from "../teams/teams.module";
 import { OpenSearchModule } from '../opensearch/opensearch.module';
 import { MemberApprovalsModule } from '../member-approvals/member-approvals.module';
+import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { MemberApprovalsModule } from '../member-approvals/member-approvals.modu
     ParticipantsRequestModule,
     HuskyModule,
     OpenSearchModule,
+    AccessControlV2Module,
     forwardRef(() => MemberApprovalsModule),
     forwardRef(() => NotificationSettingsModule),
     forwardRef(() => OfficeHoursModule),
