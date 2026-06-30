@@ -13,32 +13,60 @@ PLN members "vibe-code" a small web app locally with an AI assistant (Claude Cod
 
 ## Architecture
 
-```
-Member's AI agent                 web-api (/v1/ai-apps)                S3 + Sandbox runner
-─────────────────                 ─────────────────────               ───────────────────
-GET  /starter-kit/download  ──►  RBAC ai_apps.write
-                            ◄──  ZIP (instructions, styles, pl-design-system.zip, app/ — NO token)
+The end-to-end flow, with the **auth credentials and their lifetimes** called out (kit = no token, connect session ≈ 10 min, deploy token ≈ 60 min):
 
-POST /connect               ──►  create AiAppConnectSession (PENDING)
-                            ◄──  { sessionId, userCode, connectUrl, pollToken, expiresAt }
-       ┌─ member opens connectUrl in LabOS, signs in, clicks Approve ─┐
-       │  POST /connect/:uid/approve ──► RBAC ai_apps.write?           │
-       │     yes → mint short-lived deployToken, status=APPROVED       │
-       │     no  → status=DENIED   (both audited)                      │
-       └───────────────────────────────────────────────────────────────┘
-POST /connect/poll          ──►  pollToken → PENDING | APPROVED(+deployToken) | DENIED | EXPIRED
+```mermaid
+sequenceDiagram
+    autonumber
+    actor M as Member (LabOS browser)
+    participant AG as AI agent (local)
+    participant API as web-api /v1/ai-apps
+    participant S3 as S3 bucket
+    participant RUN as Sandbox runner
 
-POST /deploy (multipart)    ──►  AiAppTokenGuard (x-app-token = short-lived deployToken)
-  x-app-token: <token>           upsert AiApp (status=DEPLOYING, url=sandbox-<appId>.plnetwork.io set up front)
-  file=app.zip + metadata        upload app.zip ──────────────────►  s3://<bucket>/apps/<appId>/<deploymentId>/app.zip
-                                 POST /deploy ────────────────────►  pull from S3, build + run
-                                   x-runner-token: <server secret>
-                                 200 → status=READY                ◄── { port } (or 504 timeout)
-                                 504/timeout → poll app URL, READY if reachable
-                            ◄──  AiApp record
+    Note over AG,API: 1 — Download starter kit (carries NO token)
+    AG->>API: GET /starter-kit/download (member JWT, ai_apps.write)
+    API-->>AG: starter-kit.zip (instructions, design system, app/)
 
-GET  /            ──► RBAC ai_apps.read ── list all apps (dashboard)
-GET  /:uid        ──► RBAC ai_apps.read ── single app
+    Note over AG,API: 2 — Start connect session (no auth)
+    AG->>API: POST /connect { clientName }
+    API->>API: create AiAppConnectSession (PENDING)
+    API-->>AG: sessionId, userCode, connectUrl, pollToken, expiresAt
+    Note over API: PENDING session — TTL approx 10 min (the approval window)
+
+    Note over M,API: 3 — Member approves in LabOS (member JWT)
+    M->>API: GET /connect/:uid (display info, no secrets)
+    M->>API: POST /connect/:uid/approve
+    alt has ai_apps.write
+        API->>API: mint deployToken (TTL approx 60 min), status APPROVED
+        API-->>M: Connected — CONNECT_APPROVED audited
+    else missing permission
+        API->>API: status DENIED
+        API-->>M: no access — CONNECT_DENIED audited
+    end
+
+    Note over AG,API: 4 — Agent collects the short-lived token
+    loop every pollIntervalSec until decided or expiresAt
+        AG->>API: POST /connect/poll { pollToken }
+        API-->>AG: PENDING | APPROVED (+deployToken, deployTokenExpiresAt) | DENIED | EXPIRED
+    end
+    Note over AG: deployToken kept in agent memory only — never written to disk
+
+    Note over AG,RUN: 5 — Deploy (deployToken in x-app-token header)
+    AG->>API: POST /deploy + multipart app.zip (header x-app-token: deployToken)
+    API->>API: AiAppTokenGuard checks token APPROVED and unexpired, then upsert AiApp (DEPLOYING)
+    Note over API: url sandbox-{appId}.plnetwork.io computed and stored up front
+    API->>S3: upload apps/{appId}/{deploymentId}/app.zip
+    API->>RUN: POST /deploy { s3Key } (header x-runner-token: server secret)
+    alt 200 OK
+        RUN-->>API: { port }
+        API->>API: status READY
+    else 504 or no response (gateway timeout)
+        API->>API: poll app URL approx 1 min → READY if reachable, else ERROR
+    end
+    API-->>AG: AiApp record (url, status)
+
+    Note over AG,API: within the approx 60 min window the agent may redeploy reusing deployToken. On 401 (expired) it reconnects from step 2 to mint a fresh token
 ```
 
 The agent only ever holds a **short-lived deploy token** it obtained through the connect flow — it ships the app ZIP to us and we handle the rest. **AWS credentials and the runner token both stay server-side**: the backend uploads the ZIP to S3 (reusing `AwsService`, the same uploader as member images) and calls the runner. The S3 key is derived as `apps/<appId>/<deploymentId>/app.zip`, and the app is served at `https://sandbox-<appId>.plnetwork.io`.
