@@ -155,25 +155,33 @@ export class JobOpeningsQueryService {
         }));
       }
     } else {
-      // "newest": order teams by their most recent job opening (detectionDate desc).
-      // Ties are broken by comparing each team's next-most-recent opening, and so on —
-      // i.e. a lexicographic comparison of each team's detectionDates sorted descending.
-      // detectionDate is used (not updatedAt, which is bumped on every re-ingest/enrichment).
+      // "newest": order teams by the recency of their job openings, using the SAME date
+      // the UI displays for each role.
       const jobs = await this.prisma.jobOpening.findMany({
         where,
-        select: { teamUid: true, detectionDate: true },
+        select: {
+          teamUid: true,
+          postedDate: true,
+          detectionDate: true,
+          updatedAt: true,
+          team: { select: { name: true } },
+        },
       });
 
       const datesByTeam = new Map<string, Date[]>();
+      const nameByTeam = new Map<string, string>();
       for (const job of jobs) {
         if (!job.teamUid) continue;
+        const displayDate = job.postedDate ?? job.detectionDate ?? job.updatedAt;
         const existing = datesByTeam.get(job.teamUid);
-        if (existing) existing.push(job.detectionDate);
-        else datesByTeam.set(job.teamUid, [job.detectionDate]);
+        if (existing) existing.push(displayDate);
+        else datesByTeam.set(job.teamUid, [displayDate]);
+        if (job.team?.name) nameByTeam.set(job.teamUid, job.team.name);
       }
 
       const teamEntries = [...datesByTeam.entries()].map(([teamUid, dates]) => ({
         teamUid,
+        name: nameByTeam.get(teamUid) ?? '',
         dates: dates.sort((a, b) => b.getTime() - a.getTime()),
       }));
 
@@ -184,7 +192,8 @@ export class JobOpeningsQueryService {
           if (diff !== 0) return diff;
         }
         if (a.dates.length !== b.dates.length) return b.dates.length - a.dates.length;
-        return a.teamUid.localeCompare(b.teamUid);
+        const byName = a.name.localeCompare(b.name);
+        return byName !== 0 ? byName : a.teamUid.localeCompare(b.teamUid);
       });
 
       pageRows = teamEntries.slice(skip, skip + limit).map((entry) => ({
@@ -253,7 +262,7 @@ export class JobOpeningsQueryService {
               detectionDate: true,
               updatedAt: true,
             },
-            orderBy: [{ detectionDate: 'desc' }, { uid: 'asc' }],
+            orderBy: [{ uid: 'asc' }],
           },
         },
       }),
@@ -285,7 +294,14 @@ export class JobOpeningsQueryService {
         const team = teamByUid.get(group.teamUid);
         if (!team) return null;
 
-        const teamRoles = team.jobOpenings;
+        // Newest role first, by the SAME date the UI shows (postedDate ?? detectionDate
+        // ?? updatedAt); uid asc is the stable tiebreak for equal dates.
+        const teamRoles = [...team.jobOpenings].sort((a, b) => {
+          const diff =
+            (b.postedDate ?? b.detectionDate ?? b.updatedAt).getTime() -
+            (a.postedDate ?? a.detectionDate ?? a.updatedAt).getTime();
+          return diff !== 0 ? diff : a.uid.localeCompare(b.uid);
+        });
         const focusAreas = [...(ancestorByTeam.get(group.teamUid)?.values() ?? [])].sort((a, b) => a.localeCompare(b));
         const subFocusAreas = [...(leafByTeam.get(group.teamUid)?.values() ?? [])].sort((a, b) => a.localeCompare(b));
 
