@@ -140,6 +140,8 @@ export class TeamNewsEnrichmentService {
           // The service-side per-team endpoint does not surface forum-link
           // counts; consumers that need them should use the public list APIs.
           discussion: { count: 0, latestTopicUrl: null },
+          // Service-to-service endpoint: no member context, so never "followed".
+          isFollowed: false,
         };
       }),
     };

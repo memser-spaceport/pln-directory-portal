@@ -74,6 +74,10 @@ export const TeamNewsItemSchema = z.object({
   subFocusAreas: z.array(z.string()),
   createdAt: z.string(),
   discussion: TeamNewsDiscussionSchema,
+  // True when the authenticated caller follows this item's team. Always false
+  // for anonymous requests. Followed-team news is also surfaced first in the
+  // flat list (`GET /v1/team-news`) and within each focus-area group.
+  isFollowed: z.boolean(),
 });
 
 // POST /v1/team-news/{newsItemUid}/discussions — links a TeamNewsItem to a

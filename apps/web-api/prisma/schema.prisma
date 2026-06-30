@@ -164,6 +164,7 @@ model Member {
   locationUid                        String?
   teamMemberRoles                    TeamMemberRole[]
   memberRoles                        MemberRole[]
+  following                          Follow[]                          @relation("MemberFollowing")
   preferences                        Json?
   projectContributions               ProjectContribution[]
   createdProjects                    Project[]
@@ -3311,4 +3312,33 @@ model AffinityListMembership {
   @@index([affinityListId])
   @@index([companyUid])
   @@index([personUid])
+}
+
+/// Polymorphic "follow" edge: a Member follows some entity. Today only Teams
+/// are followable (entityType = TEAM, entityUid = Team.uid), but the shape is
+/// intentionally generic — adding member-follows-member later means inserting
+/// rows with entityType = MEMBER and entityUid = Member.uid, no schema change.
+///
+/// `entityUid` is deliberately NOT a hard FK (it points at different tables per
+/// entityType), so cleanup of a followed entity is handled in the service layer
+/// / by the followed entity's own cascade where one exists. The follower side
+/// (`memberUid`) IS a real FK so a deleted member drops all their follows.
+enum FollowEntityType {
+  TEAM
+  MEMBER
+}
+
+model Follow {
+  id         Int              @id @default(autoincrement())
+  uid        String           @unique @default(cuid())
+  member     Member           @relation("MemberFollowing", fields: [memberUid], references: [uid], onDelete: Cascade)
+  memberUid  String
+  entityType FollowEntityType @default(TEAM)
+  entityUid  String
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([memberUid, entityType, entityUid])
+  @@index([entityType, entityUid])
+  @@index([memberUid, entityType])
 }

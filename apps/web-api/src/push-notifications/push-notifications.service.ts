@@ -577,11 +577,78 @@ export class PushNotificationsService {
       );
     }
 
+    // ---- TEAM_NEWS: personalize the copy to name the teams THIS member follows ----
+    await this.personalizeTeamNewsCopy(memberUid, paginatedNotifications);
+
     return {
       notifications: paginatedNotifications,
       total: notifications.length,
       unreadCount: await this.getUnreadCount(memberUid),
     };
+  }
+
+  /**
+   * Rewrite TEAM_NEWS notification copy per-recipient so it names the teams the
+   * member actually follows, rather than the run's most-recent teams.
+   *
+   * TEAM_NEWS is a single public broadcast row (one copy stored at ingest time
+   * naming the most-recent teams). Here, at read time, we know who is asking:
+   * for any team the member follows that is part of the run (metadata.teamUids),
+   * we float those teams to the front and rebuild the description so the named
+   * teams are the followed ones — e.g. "New updates from Lido Finance, Lava
+   * Network + 40 more". When the member follows none of the run's teams the
+   * stored (most-recent) copy is left untouched. The mutation is in-memory only
+   * (the response objects), never persisted.
+   */
+  private async personalizeTeamNewsCopy(memberUid: string, notifications: NotificationWithReadStatus[]): Promise<void> {
+    const teamNewsNotifs = notifications.filter(
+      (n) =>
+        n.category === PushNotificationCategory.TEAM_NEWS &&
+        Array.isArray((n.metadata as any)?.teamUids) &&
+        (n.metadata as any).teamUids.length > 0
+    );
+    if (teamNewsNotifs.length === 0) return;
+
+    const allTeamUids = [...new Set(teamNewsNotifs.flatMap((n) => (n.metadata as any).teamUids as string[]))];
+
+    const follows = await this.prisma.follow.findMany({
+      where: { memberUid, entityType: 'TEAM', entityUid: { in: allTeamUids } },
+      select: { entityUid: true },
+    });
+    const followedSet = new Set(follows.map((f) => f.entityUid));
+    if (followedSet.size === 0) return;
+
+    const NAMED = 2;
+    // Pre-fetch names for every team that could be named (the followed-first
+    // top-N of each notification) in one query.
+    const candidateUids = new Set<string>();
+    for (const n of teamNewsNotifs) {
+      const uids = (n.metadata as any).teamUids as string[];
+      const reordered = [...uids].sort((a, b) => Number(followedSet.has(b)) - Number(followedSet.has(a)));
+      reordered.slice(0, NAMED).forEach((uid) => candidateUids.add(uid));
+    }
+    const teams = await this.prisma.team.findMany({
+      where: { uid: { in: [...candidateUids] } },
+      select: { uid: true, name: true },
+    });
+    const nameByUid = new Map(teams.map((t) => [t.uid, t.name]));
+
+    for (const n of teamNewsNotifs) {
+      const uids = (n.metadata as any).teamUids as string[];
+      // Stable sort: followed teams first, original (most-recent) order within.
+      const reordered = [...uids].sort((a, b) => Number(followedSet.has(b)) - Number(followedSet.has(a)));
+      const names = reordered.slice(0, NAMED).map((uid) => nameByUid.get(uid) ?? 'a team');
+      const remaining = reordered.length - names.length;
+      n.description =
+        remaining > 0
+          ? `New updates from companies like ${names.join(', ')} + ${remaining} more`
+          : `New updates from ${names.join(', ')}`;
+      n.metadata = {
+        ...(n.metadata as Record<string, any>),
+        teamUids: reordered,
+        followedTeamUids: reordered.filter((uid) => followedSet.has(uid)),
+      } as Prisma.JsonValue;
+    }
   }
 
   /**
