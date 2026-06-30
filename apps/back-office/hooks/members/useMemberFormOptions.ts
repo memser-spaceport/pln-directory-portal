@@ -1,14 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { MembersQueryKeys } from './constants/queryKeys';
 import api from '../../utils/api';
+import publicApi from '../../utils/public-api';
 
 export const getMemberInfoFormValues = async () => {
-  const baseUrl = process.env.WEB_API_BASE_URL;
-
   const [teamsInfo, projectsInfo, skillsInfo] = await Promise.all([
-    api.get(`${baseUrl}/v1/teams?pagination=false`),
-    api.get(`${baseUrl}/v1/projects?pagination=false&select=name,uid,logo.url`),
-    api.get(`${baseUrl}/v1/skills?pagination=false`),
+    // Public route: UserTokenCheckGuard rejects the plnadmin JWT via introspect.
+    publicApi.get('/v1/teams?pagination=false'),
+    api.get('/v1/projects?pagination=false&select=name,uid,logo.url'),
+    api.get('/v1/skills?pagination=false'),
   ]);
 
   if (!teamsInfo || !projectsInfo || !skillsInfo) {
