@@ -2442,7 +2442,7 @@ export class MembersService {
       }
     }
 
-    if (filters.isPortCoFounder) {
+    if (filters.isPortCoFounder === true || (filters as { isPortCoFounder?: string }).isPortCoFounder === 'true') {
       whereConditions.push({
         teamMemberRoles: {
           some: {

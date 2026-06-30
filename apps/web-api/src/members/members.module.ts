@@ -11,10 +11,9 @@ import { AuthModule } from '../auth/auth.module';
 import { HuskyModule } from '../husky/husky.module';
 import { NotificationSettingsModule } from '../notification-settings/notification-settings.module';
 import { OfficeHoursModule } from '../office-hours/office-hours.module';
-import { TeamsModule } from "../teams/teams.module";
+import { TeamsModule } from '../teams/teams.module';
 import { OpenSearchModule } from '../opensearch/opensearch.module';
 import { MemberApprovalsModule } from '../member-approvals/member-approvals.module';
-import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 
 @Module({
   imports: [
@@ -24,11 +23,10 @@ import { AccessControlV2Module } from '../access-control-v2/access-control-v2.mo
     ParticipantsRequestModule,
     HuskyModule,
     OpenSearchModule,
-    AccessControlV2Module,
     forwardRef(() => MemberApprovalsModule),
     forwardRef(() => NotificationSettingsModule),
     forwardRef(() => OfficeHoursModule),
-    forwardRef(() => TeamsModule)
+    forwardRef(() => TeamsModule),
   ],
   providers: [MembersService, MembersHooksService, InvestorProfileService, OnboardingRemindersJob],
   controllers: [MemberController],
