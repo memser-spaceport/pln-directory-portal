@@ -26,7 +26,8 @@
           "apps/web-api/src/shared/memberRejected.hbs",
           "apps/web-api/src/shared/contactSupport.hbs",
           "apps/web-api/src/shared/jobAlertConfirmation.hbs",
-          "apps/web-api/src/shared/jobAlertDigest.hbs"
+          "apps/web-api/src/shared/jobAlertDigest.hbs",
+          "apps/web-api/src/ai-apps/assets/pl-design-system.zip"
         ]
       },
       "configurations": {
