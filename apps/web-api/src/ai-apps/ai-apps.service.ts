@@ -171,13 +171,19 @@ export class AiAppsService {
         s3Key
       );
 
-      const { data } = await axios.post<RunnerDeployResponse>(
+      this.logger.log(
+        `Runner deploy request for ${dto.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
+          `(deploymentId=${dto.deploymentId}, s3Key=${s3Key})`
+      );
+      const response = await axios.post<RunnerDeployResponse>(
         `${AI_APPS_RUNNER_URL}/deploy`,
         { appId: dto.appId, deploymentId: dto.deploymentId, s3Key },
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
-      return markReady(data.port ?? null);
+      this.logRunnerResponse('deploy', dto.appId, response.status, response.data);
+      return markReady(response.data.port ?? null);
     } catch (error) {
+      this.logRunnerError('deploy', dto.appId, error);
       const message = axios.isAxiosError(error)
         ? `Runner error: ${error.response?.status ?? ''} ${JSON.stringify(error.response?.data ?? error.message)}`
         : `Deploy failed: ${(error as Error).message}`;
@@ -200,6 +206,40 @@ export class AiAppsService {
       });
       await this.recordEvent('DEPLOY_FAILED', memberUid, { ...eventContext, message: message.slice(0, 2000) });
       throw new BadGatewayException('Failed to deploy app to the sandbox runner');
+    }
+  }
+
+  /**
+   * Log a runner response (status + body) so the full runner output is captured
+   * in the API logs (CloudWatch) for debugging. The runner sometimes returns a
+   * 2xx that still carries `status: "failed"` in the body, or a delete that
+   * succeeds at the HTTP level without actually tearing the container down —
+   * both are only visible if we log the body, not just the HTTP status.
+   */
+  private logRunnerResponse(op: string, appId: string, status: number | undefined, data: unknown): void {
+    this.logger.log(`Runner ${op} response for ${appId}: status=${status ?? 'n/a'} body=${this.safeStringify(data)}`);
+  }
+
+  /** Log a failed runner call: HTTP status + body when present, else the raw error / no-response cause. */
+  private logRunnerError(op: string, appId: string, error: unknown): void {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const body = error.response
+        ? this.safeStringify(error.response.data)
+        : `no response (${error.code ?? error.message})`;
+      this.logger.error(`Runner ${op} error for ${appId}: status=${status ?? 'n/a'} body=${body}`);
+    } else {
+      this.logger.error(`Runner ${op} error for ${appId}: ${(error as Error).message}`);
+    }
+  }
+
+  /** JSON-stringify a runner body for logging, tolerating non-JSON and capping length. */
+  private safeStringify(data: unknown): string {
+    try {
+      const str = typeof data === 'string' ? data : JSON.stringify(data);
+      return str.length > 4000 ? `${str.slice(0, 4000)}…[truncated ${str.length - 4000} chars]` : str;
+    } catch {
+      return String(data);
     }
   }
 
@@ -253,9 +293,11 @@ export class AiAppsService {
     await this.recordEvent('DELETE_STARTED', memberUid, eventContext);
 
     try {
-      await axios.delete(`${AI_APPS_RUNNER_URL}/apps/${app.appId}`, {
+      this.logger.log(`Runner delete request for ${app.appId}: DELETE ${AI_APPS_RUNNER_URL}/apps/${app.appId}`);
+      const response = await axios.delete(`${AI_APPS_RUNNER_URL}/apps/${app.appId}`, {
         headers: { 'x-runner-token': AI_APPS_RUNNER_TOKEN },
       });
+      this.logRunnerResponse('delete', app.appId, response.status, response.data);
 
       const updated = await this.prisma.aiApp.update({
         where: { uid: app.uid },
@@ -264,6 +306,7 @@ export class AiAppsService {
       await this.recordEvent('DELETE_SUCCEEDED', memberUid, eventContext);
       return (await this.withMember([updated]))[0];
     } catch (error) {
+      this.logRunnerError('delete', app.appId, error);
       const message = axios.isAxiosError(error)
         ? `Runner error: ${error.response?.status ?? ''} ${JSON.stringify(error.response?.data ?? error.message)}`
         : `Delete failed: ${(error as Error).message}`;

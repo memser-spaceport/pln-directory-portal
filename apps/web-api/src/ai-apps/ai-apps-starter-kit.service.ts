@@ -1,16 +1,27 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import AdmZip from 'adm-zip';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { AI_APP_TOKEN_HEADER, AI_APPS_CONNECT_ENDPOINT, AI_APPS_DEPLOY_ENDPOINT } from './ai-apps.constants';
+
+/** Prebuilt PL Design System bundle, shipped verbatim inside the starter kit. */
+const DESIGN_SYSTEM_ZIP_NAME = 'pl-design-system.zip';
+
+/** ZIP "stored" method (no compression) — see adm-zip util/constants STORED. */
+const ZIP_METHOD_STORED = 0;
 
 /**
  * Builds the "AI Apps" starter kit ZIP a member downloads and unpacks into their
  * AI coding tool (Claude Code, Cursor, …). It carries deploy instructions for the
- * agent, a minimal runnable app scaffold, and the PLN design tokens — but no
- * deploy token and no PLN private API info. At deploy time the agent runs the
- * LabOS connect flow to obtain a short-lived deploy token.
+ * agent, a minimal runnable app scaffold, and the full PL Design System (React
+ * components + design tokens + usage guidelines) — but no deploy token and no PLN
+ * private API info. At deploy time the agent runs the LabOS connect flow to obtain
+ * a short-lived deploy token.
  */
 @Injectable()
 export class AiAppsStarterKitService {
+  private readonly logger = new Logger(AiAppsStarterKitService.name);
+
   buildZip(): Buffer {
     const zip = new AdmZip();
     const add = (path: string, content: string) => zip.addFile(path, Buffer.from(content, 'utf8'));
@@ -27,7 +38,44 @@ export class AiAppsStarterKitService {
     add('app/Dockerfile', this.appDockerfile());
     add('app/.dockerignore', 'node_modules\nnpm-debug.log\n');
 
+    // The full PL Design System (React components, SCSS tokens, fonts, specs)
+    // ships as a single prebuilt ZIP embedded verbatim — the agent unzips it
+    // (see AGENTS.md). This avoids walking hundreds of files or writing any temp
+    // files per download. Members consume canonical components instead of
+    // hand-rolling buttons/cards/inputs.
+    this.addDesignSystem(zip);
+
     return zip.toBuffer();
+  }
+
+  /**
+   * Locate the prebuilt design-system ZIP bundled as a build asset. In a built
+   * app it sits next to the compiled code (`dist/apps/web-api/ai-apps/assets/…`,
+   * see `apps/web-api/project.json` assets); the source path is the fallback for
+   * unbundled runs (tests / ts-node).
+   */
+  private designSystemZipPath(): string {
+    const candidates = [
+      join(__dirname, 'ai-apps', 'assets', DESIGN_SYSTEM_ZIP_NAME),
+      join(process.cwd(), 'apps', 'web-api', 'src', 'ai-apps', 'assets', DESIGN_SYSTEM_ZIP_NAME),
+    ];
+    return candidates.find((p) => existsSync(p)) ?? candidates[0];
+  }
+
+  /**
+   * Add the prebuilt design-system ZIP into the kit as a single entry, stored
+   * (not recompressed) since it is already compressed. Adding it must never
+   * break the kit download — if the asset is missing (misconfigured build), log
+   * and ship the kit without it.
+   */
+  private addDesignSystem(zip: AdmZip): void {
+    const path = this.designSystemZipPath();
+    if (!existsSync(path)) {
+      this.logger.warn(`PL Design System bundle not found at ${path}; shipping starter kit without it.`);
+      return;
+    }
+    const entry = zip.addFile(DESIGN_SYSTEM_ZIP_NAME, readFileSync(path));
+    entry.header.method = ZIP_METHOD_STORED;
   }
 
   private readme(): string {
@@ -40,12 +88,20 @@ to the Protocol Labs Network sandbox with a single instruction.
 - \`CLAUDE.md\` / \`AGENTS.md\` — instructions your AI agent reads automatically.
 - \`.claude/skills/deploy-to-labs/\` — the deploy skill your agent uses.
 - \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
-- \`styles/\` — PLN design tokens (CSS variables) and font guidance.
+- \`pl-design-system.zip\` — the **PL Design System**: ready-made React components
+  (Button, MemberCard, TeamCard, Table, Tabs, Badge, PageHeader, SearchInput,
+  Pagination, …), SCSS design tokens, the Inter font, and \`guidelines.md\` /
+  \`USAGE.md\`. **Unzip it** (\`unzip pl-design-system.zip\`) to get a
+  \`pl-design-system/\` folder. Your agent uses these instead of hand-building UI,
+  so your app looks on-brand out of the box.
+- \`styles/\` — a tiny CSS-variable fallback (\`pln-theme.css\`) for plain-HTML apps
+  that don't use React, plus font guidance.
 - \`app/\` — a minimal runnable Node app to start from (its \`server.js\`,
   \`package.json\`, and \`Dockerfile\` are placeholders you can replace).
 
 ## How to use
-1. Unzip this folder and open it in Claude Code (or your AI tool of choice).
+1. Unzip this folder and open it in Claude Code (or your AI tool of choice). Also
+   unzip the bundled design system once: \`unzip pl-design-system.zip\`.
 2. Add your app to the \`app/\` folder:
    - **New app:** tell your agent what to build (e.g. "build a leaderboard page
      using the PLN styles"). It works in \`app/\`.
@@ -91,8 +147,34 @@ to the PLN sandbox. Follow these rules.
 - The app must expose a \`GET /health\` endpoint returning HTTP 200, and a usable
   \`GET /\` (the dashboard loads the app at its root — a bare \`/\` that 404s looks
   broken in the iframe; a redirect to your main page is fine).
-- Use the PLN design tokens in \`styles/pln-theme.css\` for any UI you create.
 - Keep dependencies minimal. The sandbox builds from the \`app/Dockerfile\`.
+
+## Use the PL Design System — do NOT hand-roll UI
+This kit ships the **PL Design System** as \`pl-design-system.zip\`. **Unzip it
+first** — \`unzip pl-design-system.zip\` — to get the \`pl-design-system/\` folder.
+It is the source of truth for how PLN apps look. Then read
+\`pl-design-system/USAGE.md\` (how to consume it) and
+\`pl-design-system/guidelines.md\` (the rules) before building any UI.
+
+- **Reuse the canonical React components in \`pl-design-system/components/\`** —
+  Button, Input, Textarea, Checkbox, Switch, Badge, Tabs, Tooltip, Dropdown,
+  Pagination, Table, SearchInput, PageHeader, MemberCard, TeamCard, Avatar,
+  Sidebar, NavBar, EmptyState, and more (see \`components/component-catalog.md\`).
+  **Do NOT recreate buttons, cards, inputs, badges, tables, tabs, dropdowns, or
+  sidebars from scratch** — import the existing component.
+- **Use the design tokens, never hardcoded values.** All colors, typography,
+  spacing, radius, and shadows come from \`pl-design-system/tokens/\` (CSS custom
+  properties like \`var(--background-brand-default)\`, \`var(--spacing-md)\`,
+  \`var(--radius-md)\`). Never hardcode hex colors or pixel font sizes.
+- **If a component you need is missing**, follow the "Missing Component Behavior"
+  in \`guidelines.md\`: prefer composing existing components and tokens over
+  inventing a bespoke one.
+- The components are React + SCSS modules (Next.js 14). For UI work, scaffold a
+  Next.js app in \`app/\` and consume the design system per \`USAGE.md\` (copy the
+  \`pl-design-system/\` folder into \`app/\` so it ships on deploy, install its peer
+  deps, and load the tokens globally). For a non-React/plain-HTML app, the
+  minimal \`styles/pln-theme.css\` fallback is available, but the React components
+  are strongly preferred.
 - **Must be iframe-embeddable from \`*.plnetwork.io\`.** The app is shown inside the
   PL Infra → AI Apps dashboard via an \`<iframe>\` served from a sibling
   \`*.plnetwork.io\` subdomain. A different subdomain is a *different origin*, so any
@@ -221,7 +303,7 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
 
    \`\`\`bash
    cd app && zip -r ../app.zip . \\
-     -x 'node_modules/*' '*/node_modules/*' 'dist/*' '.env' '.env.*' '.data/*' && cd ..
+     -x 'node_modules/*' '*/node_modules/*' 'dist/*' '.next/*' '.env' '.env.*' '.data/*' && cd ..
    # Sanity-check nothing sensitive slipped in:
    unzip -l ../app.zip | grep -iE '\\.env|secret|credential|\\.pem|\\.key' && echo 'STOP: secret in zip' || echo 'ok'
    \`\`\`
@@ -366,7 +448,13 @@ body {
 
 The PLN UI uses **Inter** as its primary typeface.
 
-Load it in your HTML \`<head>\`:
+**Building with the PL Design System (preferred)?** The Inter variable font is
+already self-hosted in \`pl-design-system/public/fonts/\` and wired up by
+\`pl-design-system/styles/globals.scss\` — see \`pl-design-system/USAGE.md\`. You
+don't need anything here.
+
+**Plain-HTML / non-React app** using \`styles/pln-theme.css\`? Load Inter from the
+CDN in your \`<head>\`:
 
 \`\`\`html
 <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -7,7 +7,7 @@ PLN members "vibe-code" a small web app locally with an AI assistant (Claude Cod
 ## User flow
 
 1. A member with `ai_apps.write` opens the AI Apps dashboard and downloads the **starter kit** ZIP. The kit carries **no token**.
-2. They unzip it into their AI coding tool and describe what to build. The agent edits files under `app/`.
+2. They unzip it into their AI coding tool and describe what to build. The agent edits files under `app/`, reusing the bundled **PL Design System** (`pl-design-system/`) for on-brand UI instead of hand-rolling components.
 3. When ready, the member says "deploy". The agent has no stored token, so it **starts a LabOS connect session**, gives the member a link + confirmation code to open and approve, then polls until it receives a **short-lived deploy token**.
 4. The agent packages `app/` and POSTs to our deploy endpoint with that short-lived token. The backend proxies the deploy to the sandbox runner, stores the result, and the app shows up on the dashboard with its live URL.
 
@@ -17,7 +17,7 @@ PLN members "vibe-code" a small web app locally with an AI assistant (Claude Cod
 Member's AI agent                 web-api (/v1/ai-apps)                S3 + Sandbox runner
 ─────────────────                 ─────────────────────               ───────────────────
 GET  /starter-kit/download  ──►  RBAC ai_apps.write
-                            ◄──  ZIP (instructions, styles, app/ — NO token)
+                            ◄──  ZIP (instructions, styles, pl-design-system.zip, app/ — NO token)
 
 POST /connect               ──►  create AiAppConnectSession (PENDING)
                             ◄──  { sessionId, userCode, connectUrl, pollToken, expiresAt }
@@ -168,19 +168,58 @@ Both are seeded in migration `20260623120000_ai_apps` and attached to the **PL I
 
 ## Starter kit ZIP
 
-Built in-memory by `AiAppsStarterKitService`:
+Built by `AiAppsStarterKitService` — text files are generated in-memory; the PL
+Design System is embedded as a prebuilt ZIP (see below):
 
 ```
 README.md                                human quick-start
 CLAUDE.md / AGENTS.md                    agent build + deploy instructions
 .claude/skills/deploy-to-labs/SKILL.md   the deploy skill for the agent (incl. connect flow)
 pln-app.config.json                      connect + deploy endpoints (+ appId slot) — NO token
-styles/pln-theme.css                     PLN design tokens (CSS variables)
+pl-design-system.zip                     full PL Design System, prebuilt (see below)
+styles/pln-theme.css                     minimal CSS-variable fallback (plain-HTML apps)
 styles/FONTS.md                          Inter font guidance
 app/                                     minimal runnable Node/Express scaffold
 ```
 
 The kit deliberately exposes **no internal PLN APIs** — only the connect and deploy endpoints — and **no token**.
+
+### Bundled PL Design System
+
+Members no longer hand-roll UI. The kit ships the full **PL Design System** as
+`pl-design-system.zip`; the agent unzips it once (`unzip pl-design-system.zip`)
+to get a `pl-design-system/` folder so apps look on-brand out of the box:
+
+```
+pl-design-system/            (after unzipping pl-design-system.zip)
+  USAGE.md                 how to consume the system in a Next.js 14 app
+  guidelines.md            design rules (retrieval order, token usage, do/don't)
+  components/              React components (.tsx + SCSS modules + types)
+                           primitives (Button, Input, Badge, Tabs, Table,
+                           Pagination, SearchInput, …) and product components
+                           (MemberCard, TeamCard, PageHeader, Sidebar, NavBar, …)
+                           plus per-component specs in primitives/ and product/
+  tokens/                  SCSS design tokens → CSS custom properties
+  styles/                  globals.scss (reset + tokens + @font-face), media, mixins
+  public/fonts/            self-hosted Inter variable font
+  patterns/ examples/      layout patterns + page-level reference compositions
+```
+
+The bundle is stored as a **single prebuilt ZIP** at
+`apps/web-api/src/ai-apps/assets/pl-design-system.zip` (one binary instead of
+hundreds of loose files — keeps Git clean; the editable `USAGE.md` source and a
+regeneration guide sit next to it in `assets/`). It is registered as a build
+asset in `apps/web-api/project.json`, so `nx build` copies it to
+`dist/apps/web-api/ai-apps/assets/pl-design-system.zip`. At download time
+`AiAppsStarterKitService` embeds that ZIP **verbatim** as a single entry
+(`addFile` with the STORED method — no folder walk, no recompression, no temp
+files), which is why the agent unzips it on its end. If the asset is ever missing
+at runtime, the kit still downloads — just without the design system (a warning
+is logged).
+
+The agent instructions (`AGENTS.md` / `CLAUDE.md`) direct the member's AI tool to
+reuse these components and tokens instead of recreating buttons, cards, inputs,
+badges, tables, tabs, dropdowns, or sidebars from scratch.
 
 ## Configuration (env)
 
