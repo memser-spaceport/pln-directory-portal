@@ -28,7 +28,8 @@ export class MyCacheInterceptor extends CacheInterceptor {
     if (isQueryBasedCache) {
       const followingOnlyParam = request.query?.followingOnly;
       const followingOnly =
-        followingOnlyParam === 'true' || (Array.isArray(followingOnlyParam) && followingOnlyParam.includes('true'));
+        followingOnlyParam === 'true' ||
+        (Array.isArray(followingOnlyParam) && followingOnlyParam.some((value) => value === 'true'));
       const isAuthenticated = !!(
         request['userEmail'] ||
         request['isUserLoggedIn'] ||
