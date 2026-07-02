@@ -58,6 +58,7 @@ export interface InvestorDto {
   firstName: string | null;
   lastName: string | null;
   email: string;
+  additionalEmails?: string[];
   emailStatus: string;
   linkedinUrl: string | null;
 

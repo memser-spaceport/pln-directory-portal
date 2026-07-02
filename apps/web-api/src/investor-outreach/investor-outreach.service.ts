@@ -8,6 +8,7 @@ import {
   IngestInvestorOutreachDto,
   IngestInvestorOutreachResponse,
 } from './dto/ingest-investor-outreach.dto';
+import { normalizeAdditionalEmails } from './investor-email.util';
 import {
   isAllowedAttributionFund,
   isAllowedAumRange,
@@ -443,6 +444,16 @@ export class InvestorOutreachService {
         throw new Error('tags must be an array of strings');
       }
       input.tags = item.tags.map((t) => String(t));
+    }
+
+    if (item.additional_emails !== undefined) {
+      if (!Array.isArray(item.additional_emails)) {
+        throw new Error('additional_emails must be an array of strings');
+      }
+      for (const e of item.additional_emails) {
+        if (typeof e !== 'string') throw new Error('additional_emails entries must be strings');
+      }
+      input.additionalEmails = normalizeAdditionalEmails(email, item.additional_emails);
     }
 
     return input;

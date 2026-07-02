@@ -227,6 +227,40 @@ describe('InvestorOutreachService', () => {
     });
   });
 
+  describe('additional_emails', () => {
+    beforeEach(() => {
+      findUnique.mockResolvedValue(null);
+      upsert.mockResolvedValue({ id: 1 });
+    });
+
+    it('omits additionalEmails from upsert input when the field is absent', async () => {
+      await service.ingest({ items: [minimalItem()] });
+      const args = upsert.mock.calls[0][0];
+      expect(args.create).not.toHaveProperty('additionalEmails');
+      expect(args.update).not.toHaveProperty('additionalEmails');
+    });
+
+    it('stores normalized additionalEmails when supplied', async () => {
+      await service.ingest({
+        items: [
+          minimalItem({
+            additional_emails: ['bob@acmevc.com', 'alice+tag@acmevc.com', 'bob@acmevc.com'],
+          }),
+        ],
+      });
+      const args = upsert.mock.calls[0][0];
+      expect(args.create.additionalEmails).toEqual(['bob@acmevc.com']);
+      expect(args.update.additionalEmails).toEqual(['bob@acmevc.com']);
+    });
+
+    it('explicit empty additional_emails array clears the column', async () => {
+      await service.ingest({ items: [minimalItem({ additional_emails: [] })] });
+      const args = upsert.mock.calls[0][0];
+      expect(args.create.additionalEmails).toEqual([]);
+      expect(args.update.additionalEmails).toEqual([]);
+    });
+  });
+
   describe('Phase 2 — portfolio_overlaps sync', () => {
     beforeEach(() => {
       findUnique.mockResolvedValue(null);

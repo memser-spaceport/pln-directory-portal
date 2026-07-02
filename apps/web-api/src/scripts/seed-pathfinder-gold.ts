@@ -38,6 +38,12 @@ import { loadPrestigeByName, toEnrichment } from './prestige-seed.util';
 import { buildFirmByLabelIndex, lookupFirmProximity, type FirmProximity } from './firm-proximity-seed.util';
 import { loadPriorBackingMap } from './pl-investors-seed.util';
 import { applyPriorBackingToHopChain, backingWarmthBoost } from './prior-backing-warmth.util';
+import {
+  normalizeEmailKey,
+  resolveAdditionalEmails,
+  resolvePrimaryEmail,
+  rosterNormalizedEmails,
+} from '../investor-outreach/investor-email.util';
 
 const prisma = new PrismaClient();
 
@@ -96,16 +102,6 @@ const norm = (s: string | null | undefined): string =>
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-
-/** Prod dedupe_key form: normalized email (lowercase, trim, plus-tag stripped). */
-function normalizeEmailKey(email: string | null | undefined): string {
-  const raw = (email ?? '').trim().toLowerCase();
-  const at = raw.indexOf('@');
-  if (at <= 0 || at === raw.length - 1) return '';
-  const local = raw.slice(0, at).split('+')[0];
-  if (!local) return '';
-  return `${local}@${raw.slice(at + 1)}`;
-}
 
 function entryFirmNames(entity: AffinityEntity): string[] {
   const comp = (entity.fields ?? []).find((f) => f.id === 'companies');
@@ -167,16 +163,7 @@ async function seed() {
   const priorBackingByInvestor = loadPriorBackingMap(SCRATCH_DIR, entries);
   console.log(`  prior backers matched: ${priorBackingByInvestor.size}`);
 
-  const entryEmails = entries
-    .map((e) => {
-      const ent = e.entity;
-      const raw =
-        (ent.primaryEmailAddress ?? '').trim() ||
-        (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') ||
-        '';
-      return normalizeEmailKey(raw);
-    })
-    .filter((em) => em.length > 0);
+  const entryEmails = entries.flatMap((e) => rosterNormalizedEmails(e.entity)).filter((em) => em.length > 0);
   const memberByEmail = new Map<string, string>();
   if (entryEmails.length > 0) {
     const members = await prisma.member.findMany({
@@ -323,8 +310,8 @@ async function seed() {
 
     const firstName = (ent.firstName ?? '').trim();
     const lastName = (ent.lastName ?? '').trim();
-    const realEmail =
-      (ent.primaryEmailAddress ?? '').trim() || (Array.isArray(ent.emailAddresses) ? ent.emailAddresses[0] : '') || '';
+    const realEmail = resolvePrimaryEmail(ent);
+    const additionalEmails = resolveAdditionalEmails(realEmail, ent);
     const email = realEmail || `aff-${affinityId}@gold.local`;
     const dedupeKey = normalizeEmailKey(realEmail) || `aff-${affinityId}`;
     const firms = entryFirmNames(ent);
@@ -419,6 +406,7 @@ async function seed() {
       firstName,
       lastName,
       email,
+      additionalEmails,
       emailStatus: 'unverified',
       firm: firmLabel,
       ...mergedProfile,

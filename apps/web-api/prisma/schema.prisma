@@ -248,8 +248,8 @@ model Member {
   roadmapSubmissionDraft    RoadmapSubmissionDraft? @relation("roadmapSubmissionDraftOwner")
 
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
-  affinityPerson                    AffinityPerson?
-  affinityRelationshipOwnerFor      AffinityPerson[] @relation("AffinityRelationshipOwner")
+  affinityPerson               AffinityPerson?
+  affinityRelationshipOwnerFor AffinityPerson[] @relation("AffinityRelationshipOwner")
 }
 
 model MemberApproval {
@@ -2369,9 +2369,11 @@ model InvestorOutreachRecord {
   dedupeKey   String  @unique
   source      String
 
-  firstName String?
-  lastName  String?
-  email     String
+  firstName        String?
+  lastName         String?
+  email            String
+  /// Secondary contact emails beyond `email` (e.g. Affinity emailAddresses minus primary).
+  additionalEmails String[] @default([])
 
   emailStatus   String
   linkedinUrl   String?
@@ -3252,17 +3254,17 @@ model AffinityPerson {
   sourceOfIntroduction Json?
 
   // --- Member profile relationship card (normalized) ---
-  relationshipOwnerName             String?               @db.VarChar(240)
-  relationshipOwnerEmail            String?               @db.VarChar(320)
-  relationshipOwnerAffinityPersonId String?               @db.VarChar(64)
+  relationshipOwnerName             String?                @db.VarChar(240)
+  relationshipOwnerEmail            String?                @db.VarChar(320)
+  relationshipOwnerAffinityPersonId String?                @db.VarChar(64)
   relationshipOwnerMemberUid        String?
-  relationshipOwnerMember           Member?               @relation("AffinityRelationshipOwner", fields: [relationshipOwnerMemberUid], references: [uid], onDelete: SetNull)
-  lastContactSummary                String?               @db.Text
-  lastContactMethod                 String?               @db.VarChar(32)
+  relationshipOwnerMember           Member?                @relation("AffinityRelationshipOwner", fields: [relationshipOwnerMemberUid], references: [uid], onDelete: SetNull)
+  lastContactSummary                String?                @db.Text
+  lastContactMethod                 String?                @db.VarChar(32)
   touchpoints6m                     Int?
   touchpointsByMonth                Json?
   frequencyTier                     AffinityFrequencyTier?
-  interactionWindowMonths           Int?                  @default(6)
+  interactionWindowMonths           Int?                   @default(6)
   relationshipStatsPulledAt         DateTime?
 
   // --- Optional Directory links ---

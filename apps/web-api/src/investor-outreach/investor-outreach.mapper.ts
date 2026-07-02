@@ -150,6 +150,7 @@ export function toInvestorDto(
     firstName: record.firstName,
     lastName: record.lastName,
     email: record.email,
+    additionalEmails: record.additionalEmails?.length ? record.additionalEmails : undefined,
     emailStatus: record.emailStatus,
     linkedinUrl: record.linkedinUrl,
 
