@@ -31,6 +31,7 @@ export class FollowsController {
   }
 
   @Api(server.route.getFollowedTeams)
+  @NoCache()
   @UseGuards(UserTokenValidation)
   async getFollowedTeams(@Req() req: Request & { userEmail?: string }) {
     const member = await this.resolveMember(req);
