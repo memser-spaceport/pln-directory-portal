@@ -55,7 +55,7 @@ sequenceDiagram
     Note over AG,RUN: 5 — Deploy (deployToken in x-app-token header)
     AG->>API: POST /deploy + multipart app.zip (header x-app-token: deployToken)
     API->>API: AiAppTokenGuard checks token APPROVED and unexpired, then upsert AiApp (DEPLOYING)
-    Note over API: url sandbox-{appId}.plnetwork.io computed and stored up front
+    Note over API: url {appId}.{AI_APPS_APP_DOMAIN} computed and stored up front
     API->>S3: upload apps/{appId}/{deploymentId}/app.zip
     API->>RUN: POST /deploy { s3Key } (header x-runner-token: server secret)
     alt 200 OK
@@ -69,7 +69,7 @@ sequenceDiagram
     Note over AG,API: within the approx 60 min window the agent may redeploy reusing deployToken. On 401 (expired) it reconnects from step 2 to mint a fresh token
 ```
 
-The agent only ever holds a **short-lived deploy token** it obtained through the connect flow — it ships the app ZIP to us and we handle the rest. **AWS credentials and the runner token both stay server-side**: the backend uploads the ZIP to S3 (reusing `AwsService`, the same uploader as member images) and calls the runner. The S3 key is derived as `apps/<appId>/<deploymentId>/app.zip`, and the app is served at `https://sandbox-<appId>.plnetwork.io`.
+The agent only ever holds a **short-lived deploy token** it obtained through the connect flow — it ships the app ZIP to us and we handle the rest. **AWS credentials and the runner token both stay server-side**: the backend uploads the ZIP to S3 (reusing `AwsService`, the same uploader as member images) and calls the runner. The S3 key is derived as `apps/<appId>/<deploymentId>/app.zip`, and the app is served at `https://<appId>.<AI_APPS_APP_DOMAIN>` (e.g. `<appId>.dev.plnetwork.io` on Dev, `<appId>.prod.plnetwork.io` on Prod).
 
 ## Connect flow (deploy auth)
 
@@ -114,7 +114,7 @@ curl -X POST "$AI_APPS_DEPLOY_ENDPOINT" \
 
 The backend uploads the ZIP to `s3://<AI_APPS_S3_BUCKET>/apps/<appId>/<deploymentId>/app.zip`, then calls the runner with that `s3Key`. Response is the stored `AiApp` record (status `READY` with `url`/`host`/`port`, or `ERROR` with `notes`).
 
-**Deterministic URL:** the sandbox host is always `sandbox-<appId>.plnetwork.io`, so `url`/`httpUrl`/`host` are computed from `appId` and stored on the record **at deploy start** (status `DEPLOYING`) — the link exists before the runner finishes. For `appId` `test-hello-01` the URL is `https://sandbox-test-hello-01.plnetwork.io`.
+**Deterministic URL:** the sandbox host is always `<appId>.<AI_APPS_APP_DOMAIN>` (env-configurable: `dev.plnetwork.io` on Dev, `prod.plnetwork.io` on Prod), so `url`/`httpUrl`/`host` are computed from `appId` and stored on the record **at deploy start** (status `DEPLOYING`) — the link exists before the runner finishes. For `appId` `test-hello-01` on Prod the URL is `https://test-hello-01.prod.plnetwork.io`.
 
 **Timeout handling:** the runner build can exceed the edge (Cloudflare) timeout and return `504`/`524` even though the deploy actually completes. On a gateway timeout (or no response), the backend does **not** fail blindly — it polls the app URL (`buildAppUrl(appId)`) for ~1 min and marks the app `READY` if it becomes reachable (any non-gateway HTTP status counts, including `404` from the app). Only if it stays unreachable — or the runner returns a non-timeout error (e.g. `400`/auth) — is it marked `ERROR` / `DEPLOY_FAILED`. This prevents false failures for slow-but-successful deploys.
 
@@ -256,6 +256,7 @@ badges, tables, tabs, dropdowns, or sidebars from scratch.
 | `AI_APPS_RUNNER_URL` | `https://sandbox-runner.plnetwork.io` | Sandbox runner base URL |
 | `AI_APPS_RUNNER_TOKEN` | _(empty)_ | **Required** for real deploys; `x-runner-token` to the runner |
 | `AI_APPS_S3_BUCKET` | _(empty)_ | **Required** for real deploys; bucket the runner reads app bundles from (e.g. `sandbox-apps-pln-dev-013228333448`) |
+| `AI_APPS_APP_DOMAIN` | `prod.plnetwork.io` | Base domain deployed apps are served under (app URL = `https://<appId>.<domain>`); set `dev.plnetwork.io` on Dev, `prod.plnetwork.io` on Prod |
 | `AI_APPS_DEPLOY_ENDPOINT` | `https://api.plnetwork.io/v1/ai-apps/deploy` | Written into the kit so the agent knows where to POST |
 | `AI_APPS_CONNECT_ENDPOINT` | `https://api.plnetwork.io/v1/ai-apps/connect` | Written into the kit so the agent knows where to start a connect session |
 | `AI_APPS_PORTAL_URL` | `https://directory.plnetwork.io` | Base URL of the LabOS portal hosting the connect/approval page (used to build `connectUrl`) |

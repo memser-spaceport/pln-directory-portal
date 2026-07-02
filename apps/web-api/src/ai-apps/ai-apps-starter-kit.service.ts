@@ -2,7 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import AdmZip from 'adm-zip';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { AI_APP_TOKEN_HEADER, AI_APPS_CONNECT_ENDPOINT, AI_APPS_DEPLOY_ENDPOINT } from './ai-apps.constants';
+import {
+  AI_APP_TOKEN_HEADER,
+  AI_APPS_APP_DOMAIN,
+  AI_APPS_CONNECT_ENDPOINT,
+  AI_APPS_DEPLOY_ENDPOINT,
+} from './ai-apps.constants';
 
 /** Prebuilt PL Design System bundle, shipped verbatim inside the starter kit. */
 const DESIGN_SYSTEM_ZIP_NAME = 'pl-design-system.zip';
@@ -325,7 +330,7 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
 6. On success the response contains the deployment URL and status:
 
    \`\`\`json
-   { "status": "READY", "url": "https://sandbox-<appId>.plnetwork.io", "host": "...", "port": 31001 }
+   { "status": "READY", "url": "https://<appId>.${AI_APPS_APP_DOMAIN}", "host": "...", "port": 31001 }
    \`\`\`
 
    Use this URL only for the internal checks below — **do not reveal it to the
@@ -338,7 +343,7 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
    \`*.plnetwork.io\` subdomain; check the live response headers:
 
    \`\`\`bash
-   curl -sSI "https://sandbox-<appId>.plnetwork.io/" | grep -iE 'x-frame-options|content-security-policy'
+   curl -sSI "https://<appId>.${AI_APPS_APP_DOMAIN}/" | grep -iE 'x-frame-options|content-security-policy'
    \`\`\`
 
    It must pass BOTH:
@@ -365,7 +370,7 @@ failure and blindly re-upload. Instead poll the app (internal check — don't sh
 URL with the member):
 
 \`\`\`bash
-curl -sS -m 20 -o /dev/null -w '%{http_code}\\n' "https://sandbox-<appId>.plnetwork.io/health"
+curl -sS -m 20 -o /dev/null -w '%{http_code}\\n' "https://<appId>.${AI_APPS_APP_DOMAIN}/health"
 \`\`\`
 
 If it returns \`200\` within a minute or two, the deploy worked — proceed to the
