@@ -39,18 +39,20 @@ Migration: `apps/web-api/prisma/migrations/20260629120000_add_follow/`.
 
 ## Endpoints
 
-| Method | Path | Auth | Notes |
-|--------|------|------|-------|
-| POST   | `/v1/teams/:teamUid/follow`            | `UserTokenValidation` (required) | Follow a team. Idempotent. |
-| DELETE | `/v1/teams/:teamUid/follow`            | `UserTokenValidation` (required) | Unfollow a team. Idempotent. |
-| GET    | `/v1/members/me/following/teams`       | `UserTokenValidation` (required) | Teams the caller follows, paginated, most-recent-follow first. |
-| GET    | `/v1/teams/:teamUid/followers`         | `UserTokenValidation` (required) | A team's followers. **403** unless caller is a member of the team or a directory admin. |
-| GET    | `/v1/teams`                            | `UserTokenCheckGuard` (optional) | Existing endpoint; each team now carries `isFollowed`. |
-| GET    | `/v1/team-news`                        | `UserTokenCheckGuard` (optional) | Existing endpoint; items carry `isFollowed`; followed-team news ordered first. |
-| GET    | `/v1/team-news/grouped-by-focus-area`  | `UserTokenCheckGuard` (optional) | Existing endpoint; `isFollowed` + followed-first within each group. |
-| GET    | `/v1/teams/:teamUid/team-news`         | `UserTokenCheckGuard` (optional) | Existing endpoint; items carry `isFollowed`. |
+| Method | Path                                  | Auth                             | Notes                                                                                                   |
+| ------ | ------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| POST   | `/v1/teams/:teamUid/follow`           | `UserTokenValidation` (required) | Follow a team. Idempotent.                                                                              |
+| DELETE | `/v1/teams/:teamUid/follow`           | `UserTokenValidation` (required) | Unfollow a team. Idempotent.                                                                            |
+| GET    | `/v1/members/me/following/teams`      | `UserTokenValidation` (required) | Teams the caller follows, paginated, most-recent-follow first.                                          |
+| GET    | `/v1/teams/:teamUid/followers`        | `UserTokenValidation` (required) | A team's followers. **403** unless caller is a member of the team or a directory admin.                 |
+| GET    | `/v1/teams`                           | `UserTokenCheckGuard` (optional) | Existing endpoint; each team now carries `isFollowed`.                                                  |
+| GET    | `/v1/teams-search`                    | `UserTokenCheckGuard` (optional) | Advanced team search; supports `followingOnly`, returns `followingTotal`, stamps `isFollowed` per team. |
+| GET    | `/v1/teams/:uid`                      | `UserTokenCheckGuard` (optional) | Team detail; carries `isFollowed` for the authenticated caller.                                         |
+| GET    | `/v1/team-news`                       | `UserTokenCheckGuard` (optional) | Existing endpoint; items carry `isFollowed`; followed-team news ordered first.                          |
+| GET    | `/v1/team-news/grouped-by-focus-area` | `UserTokenCheckGuard` (optional) | Existing endpoint; `isFollowed` + followed-first within each group.                                     |
+| GET    | `/v1/teams/:teamUid/team-news`        | `UserTokenCheckGuard` (optional) | Existing endpoint; items carry `isFollowed`.                                                            |
 
-Endpoints requiring auth use `UserTokenValidation` (rejects with **401** when no/invalid token). The four read endpoints use the **optional** `UserTokenCheckGuard` so they remain public: an anonymous caller gets `isFollowed: false` everywhere and the original ordering.
+Endpoints requiring auth use `UserTokenValidation` (rejects with **401** when no/invalid token). The read endpoints above that use the **optional** `UserTokenCheckGuard` remain public: an anonymous caller gets `isFollowed: false` everywhere, `followingTotal: 0`, and an empty list when `followingOnly=true`.
 
 Contracts: `libs/contracts/src/lib/contract-follow.ts` + `libs/contracts/src/schema/follow.ts`. Implementation: `apps/web-api/src/follows/`.
 
@@ -161,9 +163,14 @@ curl "http://localhost:3000/v1/teams/uid-beer---stamm/followers?page=1&limit=50"
   "limit": 50,
   "total": 3,
   "items": [
-    { "uid": "uid-bud",            "name": "Bud",             "imageUrl": null, "followedAt": "2026-06-29T12:51:35.053Z" },
-    { "uid": "uid-coby",           "name": "Coby",            "imageUrl": null, "followedAt": "2026-06-28T16:51:35.053Z" },
-    { "uid": "uid-directoryadmin", "name": "Directory Admin", "imageUrl": null, "followedAt": "2026-06-26T17:32:42.747Z" }
+    { "uid": "uid-bud", "name": "Bud", "imageUrl": null, "followedAt": "2026-06-29T12:51:35.053Z" },
+    { "uid": "uid-coby", "name": "Coby", "imageUrl": null, "followedAt": "2026-06-28T16:51:35.053Z" },
+    {
+      "uid": "uid-directoryadmin",
+      "name": "Directory Admin",
+      "imageUrl": null,
+      "followedAt": "2026-06-26T17:32:42.747Z"
+    }
   ]
 }
 ```
@@ -190,11 +197,48 @@ curl "http://localhost:3000/v1/teams?limit=3" -H "Authorization: Bearer $TOKEN"
 {
   "count": 160,
   "teams": [
-    { "uid": "uid-murazik-leannon-and-cremin", "name": "Murazik, Leannon and Cremin", "isFollowed": true,  "...": "..." },
-    { "uid": "uid-kuhn-group",                  "name": "Kuhn Group",                  "isFollowed": false, "...": "..." }
+    {
+      "uid": "uid-murazik-leannon-and-cremin",
+      "name": "Murazik, Leannon and Cremin",
+      "isFollowed": true,
+      "...": "..."
+    },
+    { "uid": "uid-kuhn-group", "name": "Kuhn Group", "isFollowed": false, "...": "..." }
   ]
 }
 ```
+
+### `followingOnly` + `followingTotal` on team search
+
+`GET /v1/teams-search` is the endpoint used by the `/teams` page. It accepts all existing filter params plus:
+
+- **`followingOnly=true`** — return only teams the caller follows, intersected with the other active filters. Anonymous callers get an empty list (`total: 0`).
+- **`followingTotal`** — in the response, the count of followed teams matching the current filters (for a "Following (N)" tab badge). `0` when anonymous.
+
+Each team in `teams` also carries `isFollowed` (same stamping as `GET /v1/teams`).
+
+```bash
+curl "http://localhost:3000/v1/teams-search?followingOnly=true&page=1&limit=20" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```jsonc
+{
+  "teams": [
+    { "uid": "uid-murazik-leannon-and-cremin", "name": "Murazik, Leannon and Cremin", "isFollowed": true, "...": "..." }
+  ],
+  "total": 1,
+  "followingTotal": 1,
+  "page": 1,
+  "hasMore": false
+}
+```
+
+When `followingOnly` is absent, `total` is the full filtered count and `followingTotal` is the followed subset.
+
+### `isFollowed` on team detail
+
+`GET /v1/teams/:uid` stamps `isFollowed` on the team payload for the authenticated caller. Anonymous callers get `isFollowed: false`. Follow/unfollow mutations remain on `POST`/`DELETE /v1/teams/:teamUid/follow`.
 
 ### `isFollowed` + followed-first ordering on team news
 
@@ -210,9 +254,9 @@ curl "http://localhost:3000/v1/team-news?limit=5&windowDays=365" -H "Authorizati
   "limit": 5,
   "total": 17,
   "items": [
-    { "teamName": "Murazik, Leannon and Cremin", "isFollowed": true,  "...": "..." },
-    { "teamName": "Ernser, Borer and Zboncak",   "isFollowed": true,  "...": "..." },
-    { "teamName": "Kuhn Group",                  "isFollowed": false, "...": "..." }
+    { "teamName": "Murazik, Leannon and Cremin", "isFollowed": true, "...": "..." },
+    { "teamName": "Ernser, Borer and Zboncak", "isFollowed": true, "...": "..." },
+    { "teamName": "Kuhn Group", "isFollowed": false, "...": "..." }
   ]
 }
 ```

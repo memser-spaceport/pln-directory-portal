@@ -1675,25 +1675,33 @@ export class TeamsService {
   /**
    * Advanced team search with filtering
    * @param filters - Filter parameters including isFund, typicalCheckSize range, and investmentFocus
+   * @param options - Optional follow-aware filters (restrictToTeamUids, followedTeamUids for followingTotal)
    * @returns Paginated search results with teams and metadata
    */
-  async searchTeams(filters: {
-    searchBy?: string;
-    membershipSources?: string;
-    communityAffiliations?: string;
-    focusAreas?: string;
-    fundingStage?: string;
-    tags?: string;
-    isFund?: boolean | string;
-    minTypicalCheckSize?: number | string;
-    maxTypicalCheckSize?: number | string;
-    investmentFocus?: string[];
-    sort?: 'name:asc' | 'name:desc';
-    page?: number | string;
-    limit?: number | string;
-    tiers?: string | number[];
-    plnFriend?: string;
-  }) {
+  async searchTeams(
+    filters: {
+      searchBy?: string;
+      membershipSources?: string;
+      communityAffiliations?: string;
+      focusAreas?: string;
+      fundingStage?: string;
+      tags?: string;
+      isFund?: boolean | string;
+      minTypicalCheckSize?: number | string;
+      maxTypicalCheckSize?: number | string;
+      investmentFocus?: string[];
+      sort?: 'name:asc' | 'name:desc';
+      page?: number | string;
+      limit?: number | string;
+      tiers?: string | number[];
+      plnFriend?: string;
+      followingOnly?: boolean | string;
+    },
+    options?: {
+      restrictToTeamUids?: string[];
+      followedTeamUids?: string[];
+    }
+  ) {
     const page = Number(filters.page) || 1;
     const limit = Math.min(Number(filters.limit) || 20, 100);
     const skip = (page - 1) * limit;
@@ -1890,9 +1898,25 @@ export class TeamsService {
       }
     }
 
+    if (options?.restrictToTeamUids !== undefined) {
+      whereConditions.push({
+        uid: { in: options.restrictToTeamUids },
+      });
+    }
+
     const where: Prisma.TeamWhereInput = {
       AND: whereConditions,
     };
+
+    const followingWhere: Prisma.TeamWhereInput | undefined =
+      options?.followedTeamUids !== undefined
+        ? {
+            AND: [
+              ...whereConditions,
+              { uid: { in: options.followedTeamUids.length > 0 ? options.followedTeamUids : [] } },
+            ],
+          }
+        : undefined;
 
     // Sorting - always include a unique secondary sort (uid) to ensure deterministic pagination
     const orderBy: Prisma.TeamOrderByWithRelationInput[] = [];
@@ -1907,7 +1931,7 @@ export class TeamsService {
     }
 
     try {
-      const [teams, total] = await Promise.all([
+      const [teams, total, followingTotal] = await Promise.all([
         this.prisma.team.findMany({
           where,
           orderBy,
@@ -1949,11 +1973,13 @@ export class TeamsService {
           },
         }),
         this.prisma.team.count({ where }),
+        followingWhere ? this.prisma.team.count({ where: followingWhere }) : Promise.resolve(0),
       ]);
 
       return {
         teams,
         total,
+        followingTotal,
         page,
         hasMore: skip + teams.length < total,
       };

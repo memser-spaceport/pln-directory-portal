@@ -187,11 +187,13 @@ export class TeamsController {
   @ApiQueryFromZod(TeamDetailQueryParams)
   @NoCache()
   @UseGuards(UserTokenCheckGuard)
-  findOne(@Req() request, @ApiDecorator() { params: { uid } }: RouteShape['getTeam']) {
+  async findOne(@Req() request, @ApiDecorator() { params: { uid } }: RouteShape['getTeam']) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseTeamWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields, ENABLED_RETRIEVAL_PROFILE);
     const builtQuery = builder.build(request.query);
-    return this.teamsService.findTeamByUid(uid, request.userEmail, builtQuery);
+    const team = await this.teamsService.findTeamByUid(uid, request.userEmail, builtQuery);
+    await this.stampIsFollowed([team], request['userEmail']);
+    return team;
   }
 
   @Api(server.route.modifyTeam)
@@ -256,9 +258,32 @@ export class TeamsController {
   @ApiQueryFromZod(TeamFilterQueryParams.optional())
   @QueryCache()
   @CacheTTL(60)
+  @UseGuards(UserTokenCheckGuard)
   async searchTeams(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof TeamFilterQueryParams>;
-    return await this.teamsService.searchTeams(params || {});
+    const followingOnly = params?.followingOnly === true || (params as any)?.followingOnly === 'true';
+
+    let followedTeamUids: string[] | undefined;
+    let restrictToTeamUids: string[] | undefined;
+
+    if (request['userEmail']) {
+      const member = await this.membersService.findMemberByEmail(request['userEmail']);
+      if (member) {
+        const followed = await this.followsService.getFollowedTeamUids(member.uid);
+        followedTeamUids = Array.from(followed);
+      }
+    }
+
+    if (followingOnly) {
+      restrictToTeamUids = followedTeamUids ?? [];
+    }
+
+    const result = await this.teamsService.searchTeams(params || {}, {
+      restrictToTeamUids,
+      followedTeamUids,
+    });
+    await this.stampIsFollowed(result.teams, request['userEmail']);
+    return result;
   }
 
   /**
