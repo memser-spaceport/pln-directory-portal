@@ -105,12 +105,13 @@ export class FollowsService {
     query: TeamFollowersQuery,
     authorized: boolean
   ): Promise<TeamFollowersResponse> {
+    if (!authorized) {
+      throw new ForbiddenException('Only members of this team can view its followers');
+    }
+
     const team = await this.prisma.team.findUnique({ where: { uid: teamUid }, select: { uid: true, name: true } });
     if (!team) {
       throw new NotFoundException(`Team with uid ${teamUid} not found`);
-    }
-    if (!authorized) {
-      throw new ForbiddenException('Only members of this team can view its followers');
     }
 
     const where: Prisma.FollowWhereInput = { entityType: FollowEntityType.TEAM, entityUid: teamUid };

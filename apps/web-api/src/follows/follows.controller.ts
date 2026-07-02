@@ -6,6 +6,7 @@ import { FollowedTeamsQueryParams, TeamFollowersQueryParams } from 'libs/contrac
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { MembersService } from '../members/members.service';
 import { FollowsService } from './follows.service';
+import { NoCache } from '../decorators/no-cache.decorator';
 
 const server = initNestServer(apiFollow);
 
@@ -38,6 +39,7 @@ export class FollowsController {
   }
 
   @Api(server.route.getTeamFollowers)
+  @NoCache()
   @UseGuards(UserTokenValidation)
   async getTeamFollowers(@Param('teamUid') teamUid: string, @Req() req: Request & { userEmail?: string }) {
     const member = await this.resolveMember(req);
