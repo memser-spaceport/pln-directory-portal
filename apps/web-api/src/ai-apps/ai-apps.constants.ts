@@ -47,10 +47,16 @@ export const AI_APPS_S3_BUCKET = process.env.AI_APPS_S3_BUCKET || '';
 export const buildAppS3Key = (appId: string, deploymentId: string): string => `apps/${appId}/${deploymentId}/app.zip`;
 
 /**
- * The sandbox host/URL for an app is deterministic from its appId, so we can
- * compute it up front (before the runner responds): sandbox-<appId>.plnetwork.io
+ * Base domain apps are served under, per environment:
+ * dev → dev.plnetwork.io, prod → prod.plnetwork.io.
  */
-export const buildAppHost = (appId: string): string => `sandbox-${appId}.plnetwork.io`;
+export const AI_APPS_APP_DOMAIN = process.env.AI_APPS_APP_DOMAIN || 'prod.plnetwork.io';
+
+/**
+ * The sandbox host/URL for an app is deterministic from its appId, so we can
+ * compute it up front (before the runner responds): <appId>.<AI_APPS_APP_DOMAIN>
+ */
+export const buildAppHost = (appId: string): string => `${appId}.${AI_APPS_APP_DOMAIN}`;
 export const buildAppUrl = (appId: string): string => `https://${buildAppHost(appId)}`;
 export const buildAppHttpUrl = (appId: string): string => `http://${buildAppHost(appId)}`;
 
