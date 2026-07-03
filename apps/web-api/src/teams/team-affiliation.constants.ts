@@ -1,0 +1,1 @@
+export const PL_PORTFOLIO_COMMUNITY_AFFILIATION = 'PL Portfolio';

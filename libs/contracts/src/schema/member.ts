@@ -173,6 +173,7 @@ export const MemberFilterQueryParams = z.object({
   minTypicalCheckSize: z.number().min(0).optional(),
   maxTypicalCheckSize: z.number().min(0).optional(),
   investmentFocus: z.array(z.string()).optional(),
+  isPortCoFounder: z.boolean().optional(),
 });
 
 export const AutocompleteQueryParams = z.object({

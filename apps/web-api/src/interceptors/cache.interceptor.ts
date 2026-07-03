@@ -14,13 +14,34 @@ export class MyCacheInterceptor extends CacheInterceptor {
    */
   isRequestCacheable(context: ExecutionContext): boolean {
     const http = context.switchToHttp();
-    const request = http.getRequest();
+    const request = http.getRequest<Request>();
 
     // Get the ignoreCaching metadata from the handler
     const ignoreCaching: boolean = this.reflector.get('ignoreCaching', context.getHandler());
 
-    // Only cache GET requests that don't have the ignoreCaching flag
-    return !ignoreCaching && request.method === 'GET';
+    if (ignoreCaching || request.method !== 'GET') {
+      return false;
+    }
+
+    // Query-based cache keys omit auth; skip cache for user-specific teams-search responses.
+    const isQueryBasedCache: boolean = this.reflector.get('queryBasedCache', context.getHandler());
+    if (isQueryBasedCache) {
+      const followingOnlyParam = request.query?.followingOnly;
+      const followingOnly =
+        followingOnlyParam === 'true' ||
+        (Array.isArray(followingOnlyParam) && followingOnlyParam.some((value) => value === 'true'));
+      const isAuthenticated = !!(
+        request['userEmail'] ||
+        request['isUserLoggedIn'] ||
+        request['userUid'] ||
+        request['userAccessToken']
+      );
+      if (followingOnly || isAuthenticated) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**

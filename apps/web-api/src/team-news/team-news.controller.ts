@@ -10,9 +10,11 @@ import {
 } from 'libs/contracts/src/schema/team-news';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { MembersService } from '../members/members.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { FORUM_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { FollowsService } from '../follows/follows.service';
 import { TeamNewsQueryService } from './team-news-query.service';
 import { TeamNewsService } from './team-news.service';
 
@@ -26,21 +28,26 @@ export class TeamNewsController {
     private readonly teamNewsQueryService: TeamNewsQueryService,
     private readonly teamNewsService: TeamNewsService,
     private readonly membersService: MembersService,
-    private readonly accessControl: AccessControlV2Service
+    private readonly accessControl: AccessControlV2Service,
+    private readonly followsService: FollowsService
   ) {}
 
   @Api(server.route.getTeamNews)
   @NoCache()
-  async getTeamNews(@Req() request: Request) {
+  @UseGuards(UserTokenCheckGuard)
+  async getTeamNews(@Req() request: Request & { userEmail?: string }) {
     const params = TeamNewsListQueryParams.parse(request.query);
-    return this.teamNewsQueryService.listTeamNews(params);
+    const followed = await this.resolveFollowedTeamUids(request.userEmail);
+    return this.teamNewsQueryService.listTeamNews(params, followed);
   }
 
   @Api(server.route.getTeamNewsGrouped)
   @NoCache()
-  async getTeamNewsGrouped(@Req() request: Request) {
+  @UseGuards(UserTokenCheckGuard)
+  async getTeamNewsGrouped(@Req() request: Request & { userEmail?: string }) {
     const params = TeamNewsListQueryParams.parse(request.query);
-    return this.teamNewsQueryService.listGroupedByFocusArea(params);
+    const followed = await this.resolveFollowedTeamUids(request.userEmail);
+    return this.teamNewsQueryService.listGroupedByFocusArea(params, followed);
   }
 
   @Api(server.route.getTeamNewsFilters)
@@ -71,9 +78,11 @@ export class TeamNewsController {
 
   @Api(server.route.getTeamNewsByTeam)
   @NoCache()
-  async getTeamNewsByTeam(@Param('teamUid') teamUid: string, @Req() request: Request) {
+  @UseGuards(UserTokenCheckGuard)
+  async getTeamNewsByTeam(@Param('teamUid') teamUid: string, @Req() request: Request & { userEmail?: string }) {
     const params = TeamNewsByTeamQueryParams.parse(request.query);
-    return this.teamNewsQueryService.listTeamNewsByTeam(teamUid, params);
+    const followed = await this.resolveFollowedTeamUids(request.userEmail);
+    return this.teamNewsQueryService.listTeamNewsByTeam(teamUid, params, followed);
   }
 
   @Api(server.route.createTeamNewsDiscussion)
@@ -104,5 +113,21 @@ export class TeamNewsController {
     }
 
     return this.teamNewsService.createForumLink(newsItemUid, validated, member.uid);
+  }
+
+  /**
+   * Resolve the authenticated caller's followed-team UIDs (empty set when
+   * anonymous or not a member). Used to stamp `isFollowed` and order
+   * followed-team news first on the public news endpoints.
+   */
+  private async resolveFollowedTeamUids(userEmail?: string): Promise<Set<string>> {
+    if (!userEmail) {
+      return new Set();
+    }
+    const member = await this.membersService.findMemberByEmail(userEmail);
+    if (!member) {
+      return new Set();
+    }
+    return this.followsService.getFollowedTeamUids(member.uid);
   }
 }

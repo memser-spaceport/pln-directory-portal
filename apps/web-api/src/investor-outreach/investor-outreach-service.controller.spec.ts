@@ -166,4 +166,25 @@ describe('InvestorOutreachServiceController', () => {
       })
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('rejects additional_emails when not an array', async () => {
+    await expect(
+      controller.ingest({
+        items: [
+          {
+            investor_id: 'INV-1',
+            dedupe_key: 'a@b.com',
+            source: 'Manual',
+            email: 'a@b.com',
+            email_status: 'verified',
+            investor_type: 'fund',
+            stage_focus: 'seed',
+            engagement_tier: 'T4_cold',
+            enrichment_status: 'pending',
+            additional_emails: 'bob@acme.com' as never,
+          },
+        ],
+      })
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });

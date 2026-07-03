@@ -3,9 +3,11 @@ import { PrismaService } from '../../shared/prisma.service';
 import { AI_APP_TOKEN_HEADER } from '../ai-apps.constants';
 
 /**
- * Authenticates the headless AI agent by its personal deploy token (sent in the
- * `x-app-token` header) instead of a user JWT. On success it stamps the
- * resolved member uid onto the request as `aiAppMemberUid`.
+ * Authenticates the headless AI agent by the short-lived deploy token (sent in
+ * the `x-app-token` header) that was minted when the member approved a connect
+ * session. The token must belong to an APPROVED session and be unexpired. On
+ * success it stamps the session's member uid onto the request as
+ * `aiAppMemberUid`.
  */
 @Injectable()
 export class AiAppTokenGuard implements CanActivate {
@@ -19,14 +21,17 @@ export class AiAppTokenGuard implements CanActivate {
       throw new UnauthorizedException('Missing AI Apps deploy token');
     }
 
-    const record = await this.prisma.aiAppToken.findUnique({ where: { token } });
-    if (!record || record.revokedAt) {
-      throw new UnauthorizedException('Invalid or revoked AI Apps deploy token');
+    const session = await this.prisma.aiAppConnectSession.findUnique({ where: { deployToken: token } });
+    if (!session || session.status !== 'APPROVED' || !session.memberUid) {
+      throw new UnauthorizedException('Invalid AI Apps deploy token');
+    }
+    if (!session.deployTokenExpiresAt || session.deployTokenExpiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedException('Expired AI Apps deploy token — reconnect via LabOS to get a new one');
     }
 
-    req.aiAppMemberUid = record.memberUid;
-    await this.prisma.aiAppToken.update({
-      where: { uid: record.uid },
+    req.aiAppMemberUid = session.memberUid;
+    await this.prisma.aiAppConnectSession.update({
+      where: { uid: session.uid },
       data: { lastUsedAt: new Date() },
     });
 

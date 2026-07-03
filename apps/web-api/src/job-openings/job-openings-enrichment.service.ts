@@ -7,8 +7,8 @@ import {
   BatchUpdateEnrichmentResponse,
   UpdateTeamEnrichmentDto,
 } from 'libs/contracts/src/schema/team-job-enrichment';
+import { PL_PORTFOLIO_COMMUNITY_AFFILIATION } from '../teams/team-affiliation.constants';
 
-const PL_PORTFOLIO_COMMUNITY_AFFILIATION = 'PL Portfolio';
 const DISCONTINUED_INDUSTRY_TAG = 'Discontinued';
 
 @Injectable()

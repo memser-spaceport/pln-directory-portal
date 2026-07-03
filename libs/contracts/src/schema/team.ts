@@ -68,6 +68,8 @@ export const ResponseTeamWithRelationsSchema = ResponseTeamSchema.extend({
   teamMemberRoles: ResponseTeamMemberRoleSchema.array().optional(),
   technologies: ResponseTechnologySchema.array().optional(),
   asks: ResponseAskSchemaWithRelationsSchema.array().optional(),
+  /** Present when the caller is authenticated; false for anonymous requests. */
+  isFollowed: z.boolean().optional(),
 });
 
 export const TeamQueryableFields = ResponseTeamSchema.keyof();
@@ -110,6 +112,14 @@ export const TeamFilterQueryParams = z.object({
    * Example: priorities=1,2,NA
    */
   priorities: z.union([z.string(), z.array(z.union([z.number(), z.string()]))]).optional(),
+  /**
+   * When true, return only teams the authenticated member follows (intersected with other filters).
+   * Anonymous callers receive an empty list.
+   */
+  followingOnly: z
+    .preprocess((v) => v === 'true' || v === true, z.boolean())
+    .optional()
+    .default(false),
 });
 
 export class TeamDto extends createZodDto(TeamSchema) {}
@@ -119,7 +129,6 @@ export class CreateTeamSchemaDto extends createZodDto(CreateTeamSchema) {}
 export class TeamFilterQueryParamsDto extends createZodDto(TeamFilterQueryParams) {}
 
 export type TTeamResponse = z.infer<typeof ResponseTeamWithRelationsSchema>;
-
 
 // ============================================
 // Team Search Schemas

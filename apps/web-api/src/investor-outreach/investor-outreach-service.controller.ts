@@ -78,6 +78,17 @@ export class InvestorOutreachServiceController {
         }
       }
 
+      if (item.additional_emails !== undefined && item.additional_emails !== null) {
+        if (!Array.isArray(item.additional_emails)) {
+          throw new BadRequestException(`Item ${i}: additional_emails must be an array of strings when provided`);
+        }
+        for (const e of item.additional_emails) {
+          if (typeof e !== 'string') {
+            throw new BadRequestException(`Item ${i}: additional_emails entries must be strings`);
+          }
+        }
+      }
+
       if (item.portfolio_overlaps !== undefined && item.portfolio_overlaps !== null) {
         if (!Array.isArray(item.portfolio_overlaps)) {
           throw new BadRequestException(`Item ${i}: portfolio_overlaps must be an array when provided`);

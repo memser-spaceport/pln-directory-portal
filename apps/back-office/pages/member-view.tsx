@@ -6,6 +6,7 @@ import { IFormValues } from '../utils/members.types';
 // import { fetchPendingMemberRequest } from '../utils/services/member';
 import { InputField } from '@protocol-labs-network/ui';
 import api from '../utils/api';
+import publicApi from '../utils/public-api';
 import { ApprovalLayout } from '../layout/approval-layout';
 import { FooterButtons } from '../components/footer-buttons/footer-buttons';
 import APP_CONSTANTS, { API_ROUTE, ENROLLMENT_TYPE, ROUTE_CONSTANTS } from '../utils/constants';
@@ -407,7 +408,7 @@ export const getServerSideProps = async (context) => {
     const [requestDetailResponse, allRequestResponse, memberTeamsResponse, skillsResponse] = await Promise.all([
       api.get(`${API_ROUTE.PARTICIPANTS_REQUEST}/${id}`, config),
       api.get(API_ROUTE.PARTICIPANTS_REQUEST, config),
-      api.get(API_ROUTE.TEAMS),
+      publicApi.get(API_ROUTE.TEAMS),
       api.get(API_ROUTE.SKILLS),
     ]);
 

@@ -74,6 +74,7 @@ export const apiTeam = contract.router({
       200: z.object({
         teams: ResponseTeamWithRelationsSchema.array(),
         total: z.number(),
+        followingTotal: z.number().int().min(0),
         page: z.number(),
         hasMore: z.boolean(),
       }),

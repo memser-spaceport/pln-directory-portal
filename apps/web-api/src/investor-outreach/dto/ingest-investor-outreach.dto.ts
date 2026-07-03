@@ -45,6 +45,8 @@ export interface InvestorOutreachIngestItem {
   first_name?: string;
   last_name?: string;
   email: string;
+  /** Secondary emails beyond `email`; omitted on update preserves existing values. */
+  additional_emails?: string[];
   email_status: string;
   linkedin_url?: string;
   firm?: string;

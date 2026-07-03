@@ -1,9 +1,9 @@
-import api from '../api';
+import publicApi from '../public-api';
 import { API_ROUTE } from '../constants';
 
 export const fetchTeams = async () => {
   try {
-    const response = await api.get(API_ROUTE.TEAMS);
+    const response = await publicApi.get(API_ROUTE.TEAMS);
     if (response.data) {
       return response.data.map((item) => {
         return { value: item.uid, label: item.name };
@@ -16,7 +16,7 @@ export const fetchTeams = async () => {
 
 export const fetchTeamsForAutocomplete = async (searchTerm) => {
   try {
-    const response = await api.get(`/v1/teams?name__istartswith=${searchTerm}&with=logo`);
+    const response = await publicApi.get(`/v1/teams?name__istartswith=${searchTerm}&with=logo`);
     if (response.data) {
       return response.data?.teams?.map((item) => {
         return { value: item.uid, label: item.name, logoUid: item.logoUid, logoUrl: item.logo?.url };
