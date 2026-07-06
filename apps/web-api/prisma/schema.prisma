@@ -2518,6 +2518,9 @@ model PathfinderPath {
   /// and the plain-English explanation surfaced in the drawer.
   hopChain Json
 
+  /// Structured social overlap (LinkedIn experience/education); explanation copy is derived for hopChain.
+  socialOverlap Json?
+
   /// Rank within this target's path list at compute time (1 = best). Lets the list view
   /// pick the best path without re-sorting.
   rank Int @default(0)
