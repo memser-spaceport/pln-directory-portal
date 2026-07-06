@@ -45,6 +45,7 @@ import {
   resolveTargetInvestorPersonKeys,
   type PathHopChain,
   type SocialOverlapCache,
+  type SocialOverlapEntry,
 } from './social-overlap-seed.util';
 import {
   normalizeEmailKey,
@@ -301,7 +302,7 @@ async function seed() {
       hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops, memberContactIndex, teamIndex);
       hopChain = applyPriorBackingToHopChain(hopChain, priorBacking);
 
-      let overlap = null;
+      let overlap: SocialOverlapEntry | null = null;
       if (socialOverlapCache) {
         const targetPersonKeys = resolveTargetInvestorPersonKeys(hopChain as PathHopChain, firmId);
         targetPersonKeys.add(`investor:${targetInvestorId}`);
@@ -330,7 +331,7 @@ async function seed() {
         score,
         caliberConfidence: p.caliberConfidence,
         hopChain: hopChain as Prisma.InputJsonValue,
-        ...(overlap ? { socialOverlap: overlap as Prisma.InputJsonValue } : {}),
+        ...(overlap ? { socialOverlap: overlap as unknown as Prisma.InputJsonValue } : {}),
         rank,
         ingestRunId: RUN_ID,
       });
