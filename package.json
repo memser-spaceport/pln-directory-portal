@@ -17,6 +17,7 @@
     "api:prod-migrate-airtable-data": "node ./dist/apps/web-api/cli/cli.js migrate-airtable-data",
     "api:migrate-airtable-data": "ts-node apps/web-api/src/cli.ts migrate-airtable-data",
     "api:import-job-openings": "ts-node apps/web-api/src/scripts/import-job-openings.ts",
+    "api:export-directory-linkedin": "ts-node apps/web-api/src/scripts/export-directory-linkedin.ts",
     "api:seed-team-news": "ts-node apps/web-api/src/scripts/seed-team-news.ts",
     "api:seed-pathfinder-demo": "ts-node apps/web-api/src/scripts/seed-pathfinder-demo.ts",
     "api:seed-investor-lists": "ts-node apps/web-api/src/scripts/seed-investor-lists.ts",
