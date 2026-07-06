@@ -2976,6 +2976,23 @@ model AiApp {
   @@index([status])
 }
 
+/// Free-text feedback left by a PL Infra member on an app's detail page. A
+/// member may submit multiple entries per app. Readable only by the app's
+/// creator and directory admins (enforced in the service).
+model AiAppFeedback {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  /// The app the feedback is about (AiApp.uid; no FK relation, matching the other POC tables).
+  appUid    String
+  /// The member who submitted the feedback.
+  memberUid String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([appUid])
+  @@index([memberUid])
+}
+
 enum AiAppConnectStatus {
   PENDING // session started by the agent, awaiting member login + approval
   APPROVED // member logged in with ai_apps.write; a short-lived deploy token was issued

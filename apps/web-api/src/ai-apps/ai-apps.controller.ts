@@ -31,6 +31,7 @@ import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
 import { PollConnectDto } from './dto/poll-connect.dto';
+import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
 import { AI_APPS_MAX_ZIP_BYTES } from './ai-apps.constants';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
@@ -130,6 +131,33 @@ export class AiAppsController {
   async getAppEvents(@Param('uid') uid: string, @Query('limit') limit?: string) {
     await this.aiAppsService.getApp(uid); // 404 if the app doesn't exist
     return this.aiAppsService.listEvents(uid, limit ? Number(limit) : undefined);
+  }
+
+  /**
+   * Submit free-text feedback on an app from its detail page. Any member with
+   * AI Apps access may submit, more than once per app.
+   */
+  @NoCache()
+  @Post(':uid/feedback')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async submitFeedback(@Param('uid') uid: string, @Body() body: SubmitFeedbackDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.submitFeedback(memberUid, uid, body.text);
+  }
+
+  /**
+   * All feedback for one app, newest first. Restricted to the app's creator and
+   * directory admins (checked in the service).
+   */
+  @NoCache()
+  @Get(':uid/feedback')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listFeedback(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listFeedback(memberUid, uid);
   }
 
   /**
