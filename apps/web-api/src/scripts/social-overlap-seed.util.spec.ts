@@ -2,8 +2,12 @@ import {
   appendOverlapToHopChain,
   applySocialOverlapScoreBump,
   buildSocialOverlapCacheKey,
+  extractFounderNodes,
   extractPlPeopleFromHopChain,
   lookupSocialOverlapForPath,
+  lookupSocialOverlapForPair,
+  resolveFounderPersonKey,
+  resolvePlConnectorPersonKey,
   resolveTargetInvestorPersonKeys,
   SOCIAL_OVERLAP_SCORE_MULTIPLIER,
   type PathHopChain,
@@ -94,9 +98,7 @@ function overlapEntry(
   partial: Partial<SocialOverlapEntry> & Pick<SocialOverlapEntry, 'kind' | 'label' | 'plPersonKey'>,
 ): SocialOverlapEntry {
   return {
-    targetSet: 'neuro-fund-i',
-    targetInvestorId: 'lp_sequoia_capital',
-    rank: 1,
+    investorId: '118269892',
     plName: 'PL person',
     confidence: 'high',
     affectsScore: true,
@@ -106,15 +108,36 @@ function overlapEntry(
 }
 
 describe('buildSocialOverlapCacheKey', () => {
-  it('matches enrichment cache key format', () => {
+  it('uses pair-scoped investor and pl person keys', () => {
     expect(
       buildSocialOverlapCacheKey({
-        targetSet: 'neuro-fund-i',
-        targetInvestorId: 'lp_sequoia_capital',
-        rank: 1,
-        plPersonKey: 'member:clxxx',
+        investorId: '118269892',
+        plPersonKey: 'investor:118239754',
       }),
-    ).toBe('neuro-fund-i|lp_sequoia_capital|rank:1|pl:member:clxxx');
+    ).toBe('pair:investor:118269892|pl:investor:118239754');
+  });
+});
+
+describe('resolvePlConnectorPersonKey', () => {
+  it('maps internalId to investor person key', () => {
+    expect(resolvePlConnectorPersonKey({ name: 'Lacey Wisdom', internalId: 118239754 })).toBe(
+      'investor:118239754',
+    );
+  });
+});
+
+describe('extractFounderNodes', () => {
+  it('uses founder-scoped personKey on raw F-path', () => {
+    const founders = extractFounderNodes(RAW_SEQUOIA_F_PATH);
+    expect(founders).toEqual([
+      {
+        personKey: 'founder:f_asta_li',
+        name: 'Asta Li',
+        memberUid: undefined,
+        source: 'nodes.founder',
+      },
+    ]);
+    expect(resolveFounderPersonKey('f_asta_li')).toBe('founder:f_asta_li');
   });
 });
 
@@ -123,7 +146,10 @@ describe('extractPlPeopleFromHopChain', () => {
     const exclude = resolveTargetInvestorPersonKeys(RAW_SEQUOIA_F_PATH, 'lp_sequoia_capital');
     const people = extractPlPeopleFromHopChain(RAW_SEQUOIA_F_PATH, exclude);
     expect(people.map((p) => p.source)).toEqual(['nodes.founder']);
-    expect(people[0].name).toBe('Asta Li');
+    expect(people[0]).toMatchObject({
+      name: 'Asta Li',
+      personKey: 'founder:f_asta_li',
+    });
   });
 
   it('extracts plConnector and member routeNodes', () => {
@@ -186,23 +212,87 @@ describe('applySocialOverlapScoreBump', () => {
 });
 
 describe('lookupSocialOverlapForPath', () => {
-  it('picks highest-priority overlap when multiple PL people hit', () => {
+  it('hits cache for founder on F-path', () => {
     const cache = {
       [buildSocialOverlapCacheKey({
-        targetSet: 'neuro-fund-i',
-        targetInvestorId: 'lp_sequoia_capital',
-        rank: 1,
-        plPersonKey: 'member:founder',
+        investorId: '118269892',
+        plPersonKey: 'founder:f_asta_li',
       })]: overlapEntry({
         kind: 'same_school',
-        label: 'school overlap',
-        plPersonKey: 'member:founder',
-        affectsScore: true,
+        label: 'school overlap with Asta',
+        plPersonKey: 'founder:f_asta_li',
+        plName: 'Asta Li',
+      }),
+    };
+
+    const hit = lookupSocialOverlapForPath(cache, {
+      investorId: '118269892',
+      hopChain: RAW_SEQUOIA_F_PATH,
+    });
+
+    expect(hit?.plPersonKey).toBe('founder:f_asta_li');
+    expect(hit?.label).toBe('school overlap with Asta');
+  });
+
+  it('prefers founder overlap over PL connector when both exist', () => {
+    const cache = {
+      [buildSocialOverlapCacheKey({
+        investorId: '118269892',
+        plPersonKey: 'founder:f_asta_li',
+      })]: overlapEntry({
+        kind: 'same_school',
+        label: 'founder overlap',
+        plPersonKey: 'founder:f_asta_li',
       }),
       [buildSocialOverlapCacheKey({
-        targetSet: 'neuro-fund-i',
-        targetInvestorId: 'lp_sequoia_capital',
-        rank: 1,
+        investorId: '118269892',
+        plPersonKey: 'investor:118269819',
+      })]: overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'connector overlap',
+        plPersonKey: 'investor:118269819',
+      }),
+    };
+
+    const hit = lookupSocialOverlapForPath(cache, {
+      investorId: '118269892',
+      hopChain: {
+        ...RAW_SEQUOIA_F_PATH,
+        plConnector: { name: 'Brad Holden', internalId: 118269819 },
+      },
+    });
+
+    expect(hit?.label).toBe('founder overlap');
+  });
+
+  it('falls back to PL connector on affinity-direct paths', () => {
+    const cache = {
+      [buildSocialOverlapCacheKey({
+        investorId: '118269892',
+        plPersonKey: 'investor:118239754',
+      })]: overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'work overlap',
+        plPersonKey: 'investor:118239754',
+      }),
+    };
+
+    const hit = lookupSocialOverlapForPath(cache, {
+      investorId: '118269892',
+      hopChain: {
+        plConnector: { name: 'Lacey Wisdom', internalId: 118239754 },
+      },
+    });
+
+    expect(hit?.label).toBe('work overlap');
+  });
+});
+
+describe('lookupSocialOverlapForPair', () => {
+  it('finds pair overlap from plConnector even when path had no founder overlap', () => {
+    const cache = {
+      [buildSocialOverlapCacheKey({
+        investorId: '118269892',
         plPersonKey: 'investor:118239754',
       })]: overlapEntry({
         kind: 'concurrent_employment',
@@ -213,24 +303,35 @@ describe('lookupSocialOverlapForPath', () => {
     };
 
     const hopChain: PathHopChain = {
-      nodes: [
-        { id: 'f_brad', label: 'Brad Holden', type: 'org' },
-        { id: 'lp_sequoia_capital', label: 'Sequoia', type: 'org' },
-      ],
-      edges: [{ from: 'PL', to: 'f_brad', connectorType: 'F' }],
       plConnector: { name: 'Lacey Wisdom', internalId: 118239754 },
     };
 
-    const targetPersonKeys = resolveTargetInvestorPersonKeys(hopChain, 'lp_sequoia_capital');
-    const winner = lookupSocialOverlapForPath(cache, {
-      targetSet: 'neuro-fund-i',
-      targetInvestorId: 'lp_sequoia_capital',
-      rank: 1,
-      hopChain,
-      targetPersonKeys,
+    const hit = lookupSocialOverlapForPair(cache, {
+      investorId: '118269892',
+      plConnector: hopChain.plConnector!,
     });
 
-    expect(winner?.kind).toBe('concurrent_employment');
-    expect(winner?.label).toBe('work overlap');
+    expect(hit?.kind).toBe('concurrent_employment');
+    expect(hit?.label).toBe('work overlap');
+  });
+
+  it('returns null when plConnector is missing', () => {
+    const cache = {
+      [buildSocialOverlapCacheKey({
+        investorId: '118269892',
+        plPersonKey: 'investor:118239754',
+      })]: overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'work overlap',
+        plPersonKey: 'investor:118239754',
+      }),
+    };
+
+    expect(
+      lookupSocialOverlapForPair(cache, {
+        investorId: '118269892',
+        plConnector: {},
+      }),
+    ).toBeNull();
   });
 });

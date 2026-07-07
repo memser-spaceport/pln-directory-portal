@@ -18,9 +18,7 @@ export interface YearRange {
 }
 
 export interface SocialOverlapEntry {
-  targetSet: string;
-  targetInvestorId: string;
-  rank: number;
+  investorId: string;
   plPersonKey: string;
   plName: string;
   kind: SocialOverlapKind;
@@ -38,15 +36,6 @@ export type SocialOverlapCache = Record<string, SocialOverlapEntry>;
 /** Conservative multiplicative bump when overlap.affectsScore is true. */
 export const SOCIAL_OVERLAP_SCORE_MULTIPLIER = 1.05;
 export const SOCIAL_OVERLAP_SCORE_CAP = 1.0;
-
-const KIND_PRIORITY: Record<SocialOverlapKind, number> = {
-  concurrent_employment: 1,
-  same_school: 2,
-  same_company_unknown_dates: 3,
-  same_school_unknown_dates: 4,
-};
-
-const CURRENT_YEAR = new Date().getFullYear();
 
 export interface HopChainContact {
   name?: string;
@@ -240,7 +229,15 @@ function founderNodeIds(hopChain: PathHopChain): Set<string> {
   return ids;
 }
 
-function extractFounderNodes(
+export function resolveFounderPersonKey(v8EntityId: string): string {
+  return `founder:${v8EntityId}`;
+}
+
+export function hasFounderNodes(hopChain: PathHopChain): boolean {
+  return founderNodeIds(hopChain).size > 0;
+}
+
+export function extractFounderNodes(
   hopChain: PathHopChain,
   resolveMemberUidByName?: (name: string) => string | undefined,
 ): PlPathPerson[] {
@@ -254,9 +251,8 @@ function extractFounderNodes(
     const node = byId.get(id);
     const name = asString(node?.label) ?? id.replace(/^f_/, '').replace(/_/g, ' ');
     const memberUid = resolveMemberUidByName?.(name);
-    const identity: PersonIdentity = { name, memberUid };
     people.push({
-      personKey: resolvePersonKey(identity),
+      personKey: resolveFounderPersonKey(id),
       name,
       memberUid,
       source: 'nodes.founder',
@@ -303,7 +299,7 @@ export function extractPlPeopleFromHopChain(
   const out = new Map<string, PlPathPerson>();
 
   for (const founder of extractFounderNodes(hopChain, options.resolveMemberUidByName)) {
-    addPerson(out, founder);
+    if (!out.has(founder.personKey)) out.set(founder.personKey, founder);
   }
 
   for (const node of hopChain.routeNodes ?? []) {
@@ -337,65 +333,85 @@ export function extractPlPeopleFromHopChain(
 }
 
 export function buildSocialOverlapCacheKey(input: {
-  targetSet: string;
-  targetInvestorId: string;
-  rank: number;
+  investorId: string;
   plPersonKey: string;
 }): string {
-  return `${input.targetSet}|${input.targetInvestorId}|rank:${input.rank}|pl:${input.plPersonKey}`;
+  return `pair:investor:${input.investorId}|pl:${input.plPersonKey}`;
 }
 
-function pickBestOverlap(entries: SocialOverlapEntry[]): SocialOverlapEntry | null {
-  if (entries.length === 0) return null;
-  const confidenceRank: Record<SocialOverlapConfidence, number> = {
-    high: 3,
-    medium: 2,
-    low: 1,
+/** Map hopChain.plConnector to the same personKey used in the overlap cache. */
+export function resolvePlConnectorPersonKey(
+  pl: HopChainPlConnector,
+  resolveMemberUidByName?: (name: string) => string | undefined,
+): string | null {
+  const name = asString(pl.name);
+  const memberUid =
+    asString(pl.memberUid) ?? (name ? resolveMemberUidByName?.(name) : undefined);
+  const investorId = pl.internalId != null ? String(pl.internalId) : undefined;
+
+  if (!investorId && !memberUid && !name) return null;
+
+  const identity: PersonIdentity = {
+    name: name ?? 'PL connector',
+    memberUid,
+    investorId,
   };
-  return [...entries].sort((a, b) => {
-    const pri = KIND_PRIORITY[a.kind] - KIND_PRIORITY[b.kind];
-    if (pri !== 0) return pri;
-    const conf = confidenceRank[b.confidence] - confidenceRank[a.confidence];
-    if (conf !== 0) return conf;
-    const aLen = a.overlapYears ? (a.overlapYears.end ?? CURRENT_YEAR) - a.overlapYears.start : 0;
-    const bLen = b.overlapYears ? (b.overlapYears.end ?? CURRENT_YEAR) - b.overlapYears.start : 0;
-    return bLen - aLen;
-  })[0];
+  return resolvePersonKey(identity);
 }
 
 /**
- * Lookup best overlap for a path row after hopChain is finalized.
- * `targetInvestorId` + `rank` must match the pathfinder dump identity (graph firm id + dump rank),
- * not the person-grain investor id or re-sorted seed rank written to the DB.
+ * Lookup overlap for founders on the path first, then hopChain.plConnector.
  */
 export function lookupSocialOverlapForPath(
   cache: SocialOverlapCache,
   input: {
-    targetSet: string;
-    targetInvestorId: string;
-    rank: number;
+    investorId: string;
     hopChain: PathHopChain;
-    targetPersonKeys: Set<string>;
     resolveMemberUidByName?: (name: string) => string | undefined;
   },
 ): SocialOverlapEntry | null {
-  const plPeople = extractPlPeopleFromHopChain(input.hopChain, input.targetPersonKeys, {
-    resolveMemberUidByName: input.resolveMemberUidByName,
-  });
-
-  const hits: SocialOverlapEntry[] = [];
-  for (const plPerson of plPeople) {
+  for (const founder of extractFounderNodes(input.hopChain, input.resolveMemberUidByName)) {
     const key = buildSocialOverlapCacheKey({
-      targetSet: input.targetSet,
-      targetInvestorId: input.targetInvestorId,
-      rank: input.rank,
-      plPersonKey: plPerson.personKey,
+      investorId: input.investorId,
+      plPersonKey: founder.personKey,
     });
-    const entry = cache[key];
-    if (entry) hits.push(entry);
+    const hit = cache[key];
+    if (hit) return hit;
   }
 
-  return pickBestOverlap(hits);
+  if (input.hopChain.plConnector) {
+    return lookupSocialOverlapForPair(cache, {
+      investorId: input.investorId,
+      plConnector: input.hopChain.plConnector,
+      resolveMemberUidByName: input.resolveMemberUidByName,
+    });
+  }
+
+  return null;
+}
+
+/**
+ * Lookup overlap for an investor × PL connector pair after hopChain.plConnector is grafted.
+ */
+export function lookupSocialOverlapForPair(
+  cache: SocialOverlapCache,
+  input: {
+    investorId: string;
+    plConnector: HopChainPlConnector;
+    resolveMemberUidByName?: (name: string) => string | undefined;
+  },
+): SocialOverlapEntry | null {
+  const plPersonKey = resolvePlConnectorPersonKey(
+    input.plConnector,
+    input.resolveMemberUidByName,
+  );
+  if (!plPersonKey) return null;
+
+  const key = buildSocialOverlapCacheKey({
+    investorId: input.investorId,
+    plPersonKey,
+  });
+  return cache[key] ?? null;
 }
 
 export function appendOverlapToHopChain(

@@ -42,7 +42,6 @@ import {
   appendOverlapToHopChain,
   applySocialOverlapScoreBump,
   lookupSocialOverlapForPath,
-  resolveTargetInvestorPersonKeys,
   type PathHopChain,
   type SocialOverlapCache,
   type SocialOverlapEntry,
@@ -304,14 +303,10 @@ async function seed() {
 
       let overlap: SocialOverlapEntry | null = null;
       if (socialOverlapCache) {
-        const targetPersonKeys = resolveTargetInvestorPersonKeys(hopChain as PathHopChain, firmId);
-        targetPersonKeys.add(`investor:${targetInvestorId}`);
+        const hc = hopChain as PathHopChain;
         overlap = lookupSocialOverlapForPath(socialOverlapCache, {
-          targetSet: TARGET_SET,
-          targetInvestorId: firmId,
-          rank: p.rank,
-          hopChain: hopChain as PathHopChain,
-          targetPersonKeys,
+          investorId: targetInvestorId,
+          hopChain: hc,
           resolveMemberUidByName: (name) => membersByName.get(normalizePersonName(name)),
         });
         if (overlap) {
