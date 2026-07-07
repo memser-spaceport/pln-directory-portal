@@ -54,8 +54,7 @@ import { applyPriorBackingToHopChain, backingWarmthBoost } from './prior-backing
 import {
   appendOverlapToHopChain,
   applySocialOverlapScoreBump,
-  lookupSocialOverlapForPath,
-  resolveTargetInvestorPersonKeys,
+  lookupSocialOverlapForPair,
   type PathHopChain,
   type SocialOverlapCache,
   type SocialOverlapEntry,
@@ -350,16 +349,14 @@ async function seed() {
 
       let overlap: SocialOverlapEntry | null = null;
       if (socialOverlapCache) {
-        const targetPersonKeys = resolveTargetInvestorPersonKeys(hopChain as PathHopChain, firmId);
-        targetPersonKeys.add(`investor:${targetInvestorId}`);
-        overlap = lookupSocialOverlapForPath(socialOverlapCache, {
-          targetSet: TARGET_SET,
-          targetInvestorId: firmId,
-          rank: p.rank,
-          hopChain: hopChain as PathHopChain,
-          targetPersonKeys,
-          resolveMemberUidByName: (name) => membersByName.get(normalizePersonName(name)),
-        });
+        const hc = hopChain as PathHopChain;
+        if (hc.plConnector) {
+          overlap = lookupSocialOverlapForPair(socialOverlapCache, {
+            investorId: targetInvestorId,
+            plConnector: hc.plConnector,
+            resolveMemberUidByName: (name) => membersByName.get(normalizePersonName(name)),
+          });
+        }
         if (overlap) {
           hopChain = appendOverlapToHopChain(hopChain, overlap);
           pathsWithSocialOverlap += 1;

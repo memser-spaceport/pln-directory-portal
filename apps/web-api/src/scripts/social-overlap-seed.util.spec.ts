@@ -3,7 +3,8 @@ import {
   applySocialOverlapScoreBump,
   buildSocialOverlapCacheKey,
   extractPlPeopleFromHopChain,
-  lookupSocialOverlapForPath,
+  lookupSocialOverlapForPair,
+  resolvePlConnectorPersonKey,
   resolveTargetInvestorPersonKeys,
   SOCIAL_OVERLAP_SCORE_MULTIPLIER,
   type PathHopChain,
@@ -94,9 +95,7 @@ function overlapEntry(
   partial: Partial<SocialOverlapEntry> & Pick<SocialOverlapEntry, 'kind' | 'label' | 'plPersonKey'>,
 ): SocialOverlapEntry {
   return {
-    targetSet: 'neuro-fund-i',
-    targetInvestorId: 'lp_sequoia_capital',
-    rank: 1,
+    investorId: '118269892',
     plName: 'PL person',
     confidence: 'high',
     affectsScore: true,
@@ -106,15 +105,21 @@ function overlapEntry(
 }
 
 describe('buildSocialOverlapCacheKey', () => {
-  it('matches enrichment cache key format', () => {
+  it('uses pair-scoped investor and pl person keys', () => {
     expect(
       buildSocialOverlapCacheKey({
-        targetSet: 'neuro-fund-i',
-        targetInvestorId: 'lp_sequoia_capital',
-        rank: 1,
-        plPersonKey: 'member:clxxx',
+        investorId: '118269892',
+        plPersonKey: 'investor:118239754',
       }),
-    ).toBe('neuro-fund-i|lp_sequoia_capital|rank:1|pl:member:clxxx');
+    ).toBe('pair:investor:118269892|pl:investor:118239754');
+  });
+});
+
+describe('resolvePlConnectorPersonKey', () => {
+  it('maps internalId to investor person key', () => {
+    expect(resolvePlConnectorPersonKey({ name: 'Lacey Wisdom', internalId: 118239754 })).toBe(
+      'investor:118239754',
+    );
   });
 });
 
@@ -185,24 +190,11 @@ describe('applySocialOverlapScoreBump', () => {
   });
 });
 
-describe('lookupSocialOverlapForPath', () => {
-  it('picks highest-priority overlap when multiple PL people hit', () => {
+describe('lookupSocialOverlapForPair', () => {
+  it('finds pair overlap from plConnector even when path had no founder overlap', () => {
     const cache = {
       [buildSocialOverlapCacheKey({
-        targetSet: 'neuro-fund-i',
-        targetInvestorId: 'lp_sequoia_capital',
-        rank: 1,
-        plPersonKey: 'member:founder',
-      })]: overlapEntry({
-        kind: 'same_school',
-        label: 'school overlap',
-        plPersonKey: 'member:founder',
-        affectsScore: true,
-      }),
-      [buildSocialOverlapCacheKey({
-        targetSet: 'neuro-fund-i',
-        targetInvestorId: 'lp_sequoia_capital',
-        rank: 1,
+        investorId: '118269892',
         plPersonKey: 'investor:118239754',
       })]: overlapEntry({
         kind: 'concurrent_employment',
@@ -213,24 +205,35 @@ describe('lookupSocialOverlapForPath', () => {
     };
 
     const hopChain: PathHopChain = {
-      nodes: [
-        { id: 'f_brad', label: 'Brad Holden', type: 'org' },
-        { id: 'lp_sequoia_capital', label: 'Sequoia', type: 'org' },
-      ],
-      edges: [{ from: 'PL', to: 'f_brad', connectorType: 'F' }],
       plConnector: { name: 'Lacey Wisdom', internalId: 118239754 },
     };
 
-    const targetPersonKeys = resolveTargetInvestorPersonKeys(hopChain, 'lp_sequoia_capital');
-    const winner = lookupSocialOverlapForPath(cache, {
-      targetSet: 'neuro-fund-i',
-      targetInvestorId: 'lp_sequoia_capital',
-      rank: 1,
-      hopChain,
-      targetPersonKeys,
+    const hit = lookupSocialOverlapForPair(cache, {
+      investorId: '118269892',
+      plConnector: hopChain.plConnector!,
     });
 
-    expect(winner?.kind).toBe('concurrent_employment');
-    expect(winner?.label).toBe('work overlap');
+    expect(hit?.kind).toBe('concurrent_employment');
+    expect(hit?.label).toBe('work overlap');
+  });
+
+  it('returns null when plConnector is missing', () => {
+    const cache = {
+      [buildSocialOverlapCacheKey({
+        investorId: '118269892',
+        plPersonKey: 'investor:118239754',
+      })]: overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'work overlap',
+        plPersonKey: 'investor:118239754',
+      }),
+    };
+
+    expect(
+      lookupSocialOverlapForPair(cache, {
+        investorId: '118269892',
+        plConnector: {},
+      }),
+    ).toBeNull();
   });
 });
