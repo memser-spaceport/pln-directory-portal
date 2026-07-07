@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -12,14 +13,18 @@ import { PrismaService } from '../shared/prisma.service';
 import { isDirectoryAdmin } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
 import { DeployAppDto } from './dto/deploy-app.dto';
+import { RegisterDraftDto } from './dto/register-draft.dto';
 import {
+  AI_APPS_RUNNER_ENVIRONMENT,
   AI_APPS_RUNNER_TOKEN,
   AI_APPS_RUNNER_URL,
   AI_APPS_S3_BUCKET,
   buildAppHost,
   buildAppHttpUrl,
+  buildAppPageUrl,
   buildAppS3Key,
   buildAppUrl,
+  buildRunnerSecretsUrl,
 } from './ai-apps.constants';
 
 /** Edge/gateway statuses that mean "the runner may still have finished" — verify, don't fail. */
@@ -134,20 +139,26 @@ export class AiAppsService {
     if (!app) {
       throw new NotFoundException(`AI App not found: ${appUid}`);
     }
-    if (app.memberUid !== requesterUid) {
-      const requester = await this.prisma.member.findUnique({
-        where: { uid: requesterUid },
-        select: { memberRoles: { select: { name: true } } },
-      });
-      if (!requester || !isDirectoryAdmin(requester)) {
-        throw new ForbiddenException('Only the app creator or a directory admin can view feedback');
-      }
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can view feedback');
     }
     const feedback = await this.prisma.aiAppFeedback.findMany({
       where: { appUid: app.uid },
       orderBy: { createdAt: 'desc' },
     });
     return this.withMember(feedback);
+  }
+
+  /** True when the requester created the app or is a directory admin. */
+  private async isCreatorOrDirectoryAdmin(requesterUid: string, app: Pick<AiApp, 'memberUid'>): Promise<boolean> {
+    if (app.memberUid === requesterUid) {
+      return true;
+    }
+    const requester = await this.prisma.member.findUnique({
+      where: { uid: requesterUid },
+      select: { memberRoles: { select: { name: true } } },
+    });
+    return !!requester && isDirectoryAdmin(requester);
   }
 
   /**
@@ -178,6 +189,7 @@ export class AiAppsService {
         description: dto.description,
         status: 'DEPLOYING',
         deploymentId: dto.deploymentId,
+        s3Key,
         url,
         httpUrl,
         host,
@@ -187,6 +199,7 @@ export class AiAppsService {
         description: dto.description,
         status: 'DEPLOYING',
         deploymentId: dto.deploymentId,
+        s3Key,
         url,
         httpUrl,
         host,
@@ -196,6 +209,185 @@ export class AiAppsService {
 
     const eventContext = { appUid: app.uid, appId: dto.appId, deploymentId: dto.deploymentId };
     await this.recordEvent('DEPLOY_STARTED', memberUid, eventContext);
+
+    try {
+      await this.awsService.uploadFileToS3(
+        { buffer: file.buffer, mimetype: 'application/zip' },
+        AI_APPS_S3_BUCKET,
+        s3Key
+      );
+    } catch (error) {
+      const message = `Deploy failed: ${(error as Error).message}`;
+      await this.failDeploy(app.uid, memberUid, eventContext, message);
+      throw new BadGatewayException('Failed to store the app bundle');
+    }
+
+    return this.proxyDeploy(memberUid, app, dto.deploymentId, s3Key);
+  }
+
+  /**
+   * Registers a DRAFT app for the agent (deploy-token auth): the app needs
+   * runtime secrets, so instead of deploying we store the bundle in S3 and the
+   * required env var NAMES, and hand back the LabOS app page URL where the
+   * member enters the values and triggers the deploy.
+   */
+  async registerDraft(
+    memberUid: string,
+    dto: RegisterDraftDto,
+    file: Express.Multer.File
+  ): Promise<WithMember<AiApp> & { appPageUrl: string; missingEnvVars: string[] }> {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Missing app ZIP file');
+    }
+    if (!AI_APPS_S3_BUCKET) {
+      throw new InternalServerErrorException('AI_APPS_S3_BUCKET is not configured');
+    }
+
+    const s3Key = buildAppS3Key(dto.appId, dto.deploymentId);
+    try {
+      await this.awsService.uploadFileToS3(
+        { buffer: file.buffer, mimetype: 'application/zip' },
+        AI_APPS_S3_BUCKET,
+        s3Key
+      );
+    } catch (error) {
+      this.logger.error(`AI App draft upload failed for ${dto.appId}: ${(error as Error).message}`);
+      throw new BadGatewayException('Failed to store the app bundle');
+    }
+
+    // `providedEnvVars` is intentionally left untouched on update: values the
+    // member already stored on the runner stay valid across draft re-registrations.
+    const app = await this.prisma.aiApp.upsert({
+      where: { memberUid_appId: { memberUid, appId: dto.appId } },
+      create: {
+        memberUid,
+        appId: dto.appId,
+        name: dto.name,
+        description: dto.description,
+        status: 'DRAFT',
+        deploymentId: dto.deploymentId,
+        s3Key,
+        requiredEnvVars: dto.requiredEnvVars,
+      },
+      update: {
+        name: dto.name,
+        description: dto.description,
+        status: 'DRAFT',
+        deploymentId: dto.deploymentId,
+        s3Key,
+        requiredEnvVars: dto.requiredEnvVars,
+        notes: null,
+      },
+    });
+
+    await this.recordEvent('DRAFT_CREATED', memberUid, {
+      appUid: app.uid,
+      appId: dto.appId,
+      deploymentId: dto.deploymentId,
+      message: `Required env vars: ${dto.requiredEnvVars.join(', ')}`,
+    });
+
+    const provided = new Set(app.providedEnvVars);
+    return {
+      ...(await this.withMember([app]))[0],
+      appPageUrl: buildAppPageUrl(app.uid),
+      missingEnvVars: app.requiredEnvVars.filter((name) => !provided.has(name)),
+    };
+  }
+
+  /**
+   * Member-triggered deploy from the LabOS app page (draft flow + redeploys).
+   * Optionally saves the submitted secret values to the sandbox runner first
+   * (merge/upsert — values never touch our DB), validates every required env
+   * var has a value, then redeploys the stored bundle.
+   */
+  async deployDraft(requesterUid: string, uid: string, secrets?: Record<string, string>): Promise<WithMember<AiApp>> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app) {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can deploy this app');
+    }
+    if (app.status === 'DELETED' || app.status === 'DELETING') {
+      throw new BadRequestException('This app has been deleted');
+    }
+    if (!app.s3Key || !app.deploymentId) {
+      throw new BadRequestException('This app has no uploaded bundle yet — ask your AI agent to register it first');
+    }
+
+    const submittedNames = Object.keys(secrets ?? {});
+    const provided = new Set([...app.providedEnvVars, ...submittedNames]);
+    const missing = app.requiredEnvVars.filter((name) => !provided.has(name));
+    if (missing.length) {
+      throw new BadRequestException(`Missing values for required environment variables: ${missing.join(', ')}`);
+    }
+
+    if (secrets && submittedNames.length) {
+      await this.saveSecrets(requesterUid, app, secrets);
+    }
+
+    await this.recordEvent('DEPLOY_STARTED', requesterUid, {
+      appUid: app.uid,
+      appId: app.appId,
+      deploymentId: app.deploymentId,
+    });
+    return this.proxyDeploy(requesterUid, app, app.deploymentId, app.s3Key);
+  }
+
+  /**
+   * Saves secret VALUES to the sandbox runner's secret store (merge/upsert per
+   * the runner's `/v1/projects/<project>/secrets` contract) and remembers only
+   * the NAMES on the app record. Never log or persist the values.
+   */
+  private async saveSecrets(memberUid: string, app: AiApp, secrets: Record<string, string>): Promise<void> {
+    const names = Object.keys(secrets);
+    try {
+      this.logger.log(`Runner secrets request for ${app.appId}: POST ${buildRunnerSecretsUrl()} (${names.join(', ')})`);
+      const response = await axios.post(
+        buildRunnerSecretsUrl(),
+        { appId: app.appId, environment: AI_APPS_RUNNER_ENVIRONMENT, secrets },
+        { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
+      );
+      // Log only the status — the request/response may echo secret values.
+      this.logger.log(`Runner secrets response for ${app.appId}: status=${response.status}`);
+    } catch (error) {
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      this.logger.error(`Runner secrets error for ${app.appId}: status=${status ?? 'n/a'}`);
+      throw new BadGatewayException('Failed to store secrets on the sandbox runner');
+    }
+
+    await this.prisma.aiApp.update({
+      where: { uid: app.uid },
+      data: { providedEnvVars: Array.from(new Set([...app.providedEnvVars, ...names])) },
+    });
+    await this.recordEvent('SECRETS_UPDATED', memberUid, {
+      appUid: app.uid,
+      appId: app.appId,
+      message: `Updated: ${names.join(', ')}`,
+    });
+  }
+
+  /**
+   * Shared deploy proxy: flips the app to DEPLOYING, asks the runner to build
+   * and start the bundle at `s3Key`, and settles READY/ERROR (with the timeout
+   * verification below). Callers record DEPLOY_STARTED themselves.
+   */
+  private async proxyDeploy(
+    memberUid: string,
+    app: Pick<AiApp, 'uid' | 'appId'>,
+    deploymentId: string,
+    s3Key: string
+  ): Promise<WithMember<AiApp>> {
+    const host = buildAppHost(app.appId);
+    const url = buildAppUrl(app.appId);
+    const httpUrl = buildAppHttpUrl(app.appId);
+    await this.prisma.aiApp.update({
+      where: { uid: app.uid },
+      data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null },
+    });
+
+    const eventContext = { appUid: app.uid, appId: app.appId, deploymentId };
 
     const markReady = async (port: number | null) => {
       const updated = await this.prisma.aiApp.update({
@@ -207,25 +399,19 @@ export class AiAppsService {
     };
 
     try {
-      await this.awsService.uploadFileToS3(
-        { buffer: file.buffer, mimetype: 'application/zip' },
-        AI_APPS_S3_BUCKET,
-        s3Key
-      );
-
       this.logger.log(
-        `Runner deploy request for ${dto.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
-          `(deploymentId=${dto.deploymentId}, s3Key=${s3Key})`
+        `Runner deploy request for ${app.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
+          `(deploymentId=${deploymentId}, s3Key=${s3Key})`
       );
       const response = await axios.post<RunnerDeployResponse>(
         `${AI_APPS_RUNNER_URL}/deploy`,
-        { appId: dto.appId, deploymentId: dto.deploymentId, s3Key },
+        { appId: app.appId, deploymentId, s3Key },
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
-      this.logRunnerResponse('deploy', dto.appId, response.status, response.data);
+      this.logRunnerResponse('deploy', app.appId, response.status, response.data);
       return markReady(response.data.port ?? null);
     } catch (error) {
-      this.logRunnerError('deploy', dto.appId, error);
+      this.logRunnerError('deploy', app.appId, error);
       const message = axios.isAxiosError(error)
         ? `Runner error: ${error.response?.status ?? ''} ${JSON.stringify(error.response?.data ?? error.message)}`
         : `Deploy failed: ${(error as Error).message}`;
@@ -234,21 +420,31 @@ export class AiAppsService {
       // deploy failed — the long-running build often completes on the origin. Verify
       // by checking whether the app is actually reachable before declaring failure.
       if (this.isUncertainRunnerError(error)) {
-        this.logger.warn(`Runner timed out for ${dto.appId}; verifying app at ${url}. (${message})`);
+        this.logger.warn(`Runner timed out for ${app.appId}; verifying app at ${url}. (${message})`);
         if (await this.verifyAppLive(url)) {
-          this.logger.log(`AI App ${dto.appId} is live despite runner timeout — marking READY`);
+          this.logger.log(`AI App ${app.appId} is live despite runner timeout — marking READY`);
           return markReady(null);
         }
       }
 
-      this.logger.error(`AI App deploy failed for ${dto.appId}: ${message}`);
-      await this.prisma.aiApp.update({
-        where: { uid: app.uid },
-        data: { status: 'ERROR', notes: message.slice(0, 2000) },
-      });
-      await this.recordEvent('DEPLOY_FAILED', memberUid, { ...eventContext, message: message.slice(0, 2000) });
+      this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
+      await this.failDeploy(app.uid, memberUid, eventContext, message);
       throw new BadGatewayException('Failed to deploy app to the sandbox runner');
     }
+  }
+
+  /** Marks a failed deploy: status ERROR with the trimmed message + DEPLOY_FAILED event. */
+  private async failDeploy(
+    appUid: string,
+    memberUid: string,
+    eventContext: { appUid: string; appId: string; deploymentId: string },
+    message: string
+  ): Promise<void> {
+    await this.prisma.aiApp.update({
+      where: { uid: appUid },
+      data: { status: 'ERROR', notes: message.slice(0, 2000) },
+    });
+    await this.recordEvent('DEPLOY_FAILED', memberUid, { ...eventContext, message: message.slice(0, 2000) });
   }
 
   /**

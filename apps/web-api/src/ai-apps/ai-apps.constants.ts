@@ -43,6 +43,16 @@ export const AI_APPS_RUNNER_TOKEN = process.env.AI_APPS_RUNNER_TOKEN || '';
 /** S3 bucket the sandbox runner reads app bundles from. */
 export const AI_APPS_S3_BUCKET = process.env.AI_APPS_S3_BUCKET || '';
 
+/** Project scope for the runner's secrets/deployments API (`/v1/projects/<project>/…`). */
+export const AI_APPS_RUNNER_PROJECT = process.env.AI_APPS_RUNNER_PROJECT || 'default';
+
+/** Environment label the runner stores secrets under (e.g. `dev` on Dev, `prod` on Prod). */
+export const AI_APPS_RUNNER_ENVIRONMENT = process.env.AI_APPS_RUNNER_ENVIRONMENT || 'prod';
+
+/** Runner endpoint that saves (merge/upsert) an app's runtime secrets. */
+export const buildRunnerSecretsUrl = (): string =>
+  `${AI_APPS_RUNNER_URL}/v1/projects/${AI_APPS_RUNNER_PROJECT}/secrets`;
+
 /** Build the S3 key for an app bundle: apps/<appId>/<deploymentId>/app.zip */
 export const buildAppS3Key = (appId: string, deploymentId: string): string => `apps/${appId}/${deploymentId}/app.zip`;
 
@@ -75,6 +85,12 @@ export const AI_APPS_CONNECT_ENDPOINT =
   process.env.AI_APPS_CONNECT_ENDPOINT || 'https://api.plnetwork.io/v1/ai-apps/connect';
 
 /**
+ * Public URL of THIS API's draft-registration endpoint, written into the starter
+ * kit so the agent knows where to register apps that need runtime secrets.
+ */
+export const AI_APPS_DRAFT_ENDPOINT = process.env.AI_APPS_DRAFT_ENDPOINT || 'https://api.plnetwork.io/v1/ai-apps/draft';
+
+/**
  * Base URL of the LabOS portal that hosts the connect page the member opens to
  * approve a session. Combined with the session uid to build the connect link.
  */
@@ -83,3 +99,11 @@ export const AI_APPS_PORTAL_URL = process.env.AI_APPS_PORTAL_URL || 'https://dir
 /** The LabOS connect page URL a member opens to approve an agent's session. */
 export const buildConnectUrl = (sessionUid: string): string =>
   `${AI_APPS_PORTAL_URL}/pl-infra/ai-apps/connect?session=${encodeURIComponent(sessionUid)}`;
+
+/**
+ * The LabOS app detail page for one AI App — for a draft this is where the
+ * member enters secret values and clicks Deploy. The agent hands this link to
+ * the member after registering a draft.
+ */
+export const buildAppPageUrl = (appUid: string): string =>
+  `${AI_APPS_PORTAL_URL}/pl-infra/ai-apps/${encodeURIComponent(appUid)}`;
