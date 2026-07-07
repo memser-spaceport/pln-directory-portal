@@ -2,8 +2,11 @@ import {
   appendOverlapToHopChain,
   applySocialOverlapScoreBump,
   buildSocialOverlapCacheKey,
+  extractFounderNodes,
   extractPlPeopleFromHopChain,
+  lookupSocialOverlapForPath,
   lookupSocialOverlapForPair,
+  resolveFounderPersonKey,
   resolvePlConnectorPersonKey,
   resolveTargetInvestorPersonKeys,
   SOCIAL_OVERLAP_SCORE_MULTIPLIER,
@@ -123,12 +126,30 @@ describe('resolvePlConnectorPersonKey', () => {
   });
 });
 
+describe('extractFounderNodes', () => {
+  it('uses founder-scoped personKey on raw F-path', () => {
+    const founders = extractFounderNodes(RAW_SEQUOIA_F_PATH);
+    expect(founders).toEqual([
+      {
+        personKey: 'founder:f_asta_li',
+        name: 'Asta Li',
+        memberUid: undefined,
+        source: 'nodes.founder',
+      },
+    ]);
+    expect(resolveFounderPersonKey('f_asta_li')).toBe('founder:f_asta_li');
+  });
+});
+
 describe('extractPlPeopleFromHopChain', () => {
   it('extracts founder nodes and excludes target-side contacts', () => {
     const exclude = resolveTargetInvestorPersonKeys(RAW_SEQUOIA_F_PATH, 'lp_sequoia_capital');
     const people = extractPlPeopleFromHopChain(RAW_SEQUOIA_F_PATH, exclude);
     expect(people.map((p) => p.source)).toEqual(['nodes.founder']);
-    expect(people[0].name).toBe('Asta Li');
+    expect(people[0]).toMatchObject({
+      name: 'Asta Li',
+      personKey: 'founder:f_asta_li',
+    });
   });
 
   it('extracts plConnector and member routeNodes', () => {
@@ -187,6 +208,83 @@ describe('applySocialOverlapScoreBump', () => {
         overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'm:1', affectsScore: true }),
       ),
     ).toBe(1.0);
+  });
+});
+
+describe('lookupSocialOverlapForPath', () => {
+  it('hits cache for founder on F-path', () => {
+    const cache = {
+      [buildSocialOverlapCacheKey({
+        investorId: '118269892',
+        plPersonKey: 'founder:f_asta_li',
+      })]: overlapEntry({
+        kind: 'same_school',
+        label: 'school overlap with Asta',
+        plPersonKey: 'founder:f_asta_li',
+        plName: 'Asta Li',
+      }),
+    };
+
+    const hit = lookupSocialOverlapForPath(cache, {
+      investorId: '118269892',
+      hopChain: RAW_SEQUOIA_F_PATH,
+    });
+
+    expect(hit?.plPersonKey).toBe('founder:f_asta_li');
+    expect(hit?.label).toBe('school overlap with Asta');
+  });
+
+  it('prefers founder overlap over PL connector when both exist', () => {
+    const cache = {
+      [buildSocialOverlapCacheKey({
+        investorId: '118269892',
+        plPersonKey: 'founder:f_asta_li',
+      })]: overlapEntry({
+        kind: 'same_school',
+        label: 'founder overlap',
+        plPersonKey: 'founder:f_asta_li',
+      }),
+      [buildSocialOverlapCacheKey({
+        investorId: '118269892',
+        plPersonKey: 'investor:118269819',
+      })]: overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'connector overlap',
+        plPersonKey: 'investor:118269819',
+      }),
+    };
+
+    const hit = lookupSocialOverlapForPath(cache, {
+      investorId: '118269892',
+      hopChain: {
+        ...RAW_SEQUOIA_F_PATH,
+        plConnector: { name: 'Brad Holden', internalId: 118269819 },
+      },
+    });
+
+    expect(hit?.label).toBe('founder overlap');
+  });
+
+  it('falls back to PL connector on affinity-direct paths', () => {
+    const cache = {
+      [buildSocialOverlapCacheKey({
+        investorId: '118269892',
+        plPersonKey: 'investor:118239754',
+      })]: overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'work overlap',
+        plPersonKey: 'investor:118239754',
+      }),
+    };
+
+    const hit = lookupSocialOverlapForPath(cache, {
+      investorId: '118269892',
+      hopChain: {
+        plConnector: { name: 'Lacey Wisdom', internalId: 118239754 },
+      },
+    });
+
+    expect(hit?.label).toBe('work overlap');
   });
 });
 

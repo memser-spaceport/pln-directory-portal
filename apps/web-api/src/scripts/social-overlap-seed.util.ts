@@ -229,7 +229,15 @@ function founderNodeIds(hopChain: PathHopChain): Set<string> {
   return ids;
 }
 
-function extractFounderNodes(
+export function resolveFounderPersonKey(v8EntityId: string): string {
+  return `founder:${v8EntityId}`;
+}
+
+export function hasFounderNodes(hopChain: PathHopChain): boolean {
+  return founderNodeIds(hopChain).size > 0;
+}
+
+export function extractFounderNodes(
   hopChain: PathHopChain,
   resolveMemberUidByName?: (name: string) => string | undefined,
 ): PlPathPerson[] {
@@ -243,9 +251,8 @@ function extractFounderNodes(
     const node = byId.get(id);
     const name = asString(node?.label) ?? id.replace(/^f_/, '').replace(/_/g, ' ');
     const memberUid = resolveMemberUidByName?.(name);
-    const identity: PersonIdentity = { name, memberUid };
     people.push({
-      personKey: resolvePersonKey(identity),
+      personKey: resolveFounderPersonKey(id),
       name,
       memberUid,
       source: 'nodes.founder',
@@ -292,7 +299,7 @@ export function extractPlPeopleFromHopChain(
   const out = new Map<string, PlPathPerson>();
 
   for (const founder of extractFounderNodes(hopChain, options.resolveMemberUidByName)) {
-    addPerson(out, founder);
+    if (!out.has(founder.personKey)) out.set(founder.personKey, founder);
   }
 
   for (const node of hopChain.routeNodes ?? []) {
@@ -350,6 +357,37 @@ export function resolvePlConnectorPersonKey(
     investorId,
   };
   return resolvePersonKey(identity);
+}
+
+/**
+ * Lookup overlap for founders on the path first, then hopChain.plConnector.
+ */
+export function lookupSocialOverlapForPath(
+  cache: SocialOverlapCache,
+  input: {
+    investorId: string;
+    hopChain: PathHopChain;
+    resolveMemberUidByName?: (name: string) => string | undefined;
+  },
+): SocialOverlapEntry | null {
+  for (const founder of extractFounderNodes(input.hopChain, input.resolveMemberUidByName)) {
+    const key = buildSocialOverlapCacheKey({
+      investorId: input.investorId,
+      plPersonKey: founder.personKey,
+    });
+    const hit = cache[key];
+    if (hit) return hit;
+  }
+
+  if (input.hopChain.plConnector) {
+    return lookupSocialOverlapForPair(cache, {
+      investorId: input.investorId,
+      plConnector: input.hopChain.plConnector,
+      resolveMemberUidByName: input.resolveMemberUidByName,
+    });
+  }
+
+  return null;
 }
 
 /**
