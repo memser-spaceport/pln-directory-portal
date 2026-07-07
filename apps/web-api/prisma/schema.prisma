@@ -2518,6 +2518,9 @@ model PathfinderPath {
   /// and the plain-English explanation surfaced in the drawer.
   hopChain Json
 
+  /// Structured social overlap (LinkedIn experience/education); explanation copy is derived for hopChain.
+  socialOverlap Json?
+
   /// Rank within this target's path list at compute time (1 = best). Lets the list view
   /// pick the best path without re-sorting.
   rank Int @default(0)
@@ -2971,6 +2974,23 @@ model AiApp {
   @@unique([memberUid, appId])
   @@index([memberUid])
   @@index([status])
+}
+
+/// Free-text feedback left by a PL Infra member on an app's detail page. A
+/// member may submit multiple entries per app. Readable only by the app's
+/// creator and directory admins (enforced in the service).
+model AiAppFeedback {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique @default(cuid())
+  /// The app the feedback is about (AiApp.uid; no FK relation, matching the other POC tables).
+  appUid    String
+  /// The member who submitted the feedback.
+  memberUid String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([appUid])
+  @@index([memberUid])
 }
 
 enum AiAppConnectStatus {

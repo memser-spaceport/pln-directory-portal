@@ -90,6 +90,8 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | GET    | `/v1/ai-apps/events`             | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Event log (audit feed); `?appUid=` to scope, `?limit=` (default 100, max 500) |
 | GET    | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Single app detail |
 | GET    | `/v1/ai-apps/:uid/events`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Full event/status history for one app (404 if app missing) |
+| POST   | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Submit free-text feedback on an app (multiple entries per member allowed) |
+| GET    | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | All feedback for one app, newest first, with submitter info |
 | GET    | `/v1/ai-apps/starter-kit/download` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Stream the starter-kit ZIP (no token inside) |
 | POST   | `/v1/ai-apps/connect`            | none (agent)                  | —                 | Start a connect session; returns `connectUrl`/`userCode`/`pollToken` |
 | POST   | `/v1/ai-apps/connect/poll`       | none (agent, `pollToken` in body) | —             | Poll a session; returns the `deployToken` once `APPROVED` |
@@ -169,6 +171,14 @@ enum AiAppEventType {
   DELETE_STARTED  DELETE_SUCCEEDED  DELETE_FAILED
 }
 
+model AiAppFeedback {         // free-text feedback from the app detail page
+  uid       String @unique
+  appUid    String             // AiApp.uid (no FK relation, matching the other POC tables)
+  memberUid String             // submitter; may submit multiple entries per app
+  text      String
+  createdAt DateTime @default(now())
+}
+
 model AiAppEvent {            // append-only audit log — one row per event, never updated
   uid          String @unique
   memberUid    String         // who triggered it
@@ -189,8 +199,12 @@ Apps are **lazy-created on first deploy** — there is no registration form.
 
 ## RBAC
 
-- `ai_apps.read` — view the dashboard (list/detail).
+- `ai_apps.read` — view the dashboard (list/detail) and submit feedback on an app.
 - `ai_apps.write` — download the starter kit and deploy.
+
+Reading an app's feedback list additionally requires being the app's creator or a
+directory admin (`isDirectoryAdmin`) — enforced in `AiAppsService.listFeedback`,
+not by a separate permission.
 
 Both are seeded in migration `20260623120000_ai_apps` and attached to the **PL Infra Team** policy (`pl_infra_team_pl_internal`), and registered in `access-control-v2.constants.ts` + `access-control-v2.seed.ts`.
 

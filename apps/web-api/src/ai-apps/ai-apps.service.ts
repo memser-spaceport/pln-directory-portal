@@ -1,13 +1,15 @@
 import {
   BadGatewayException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
-import { AiApp, AiAppEvent, AiAppEventType } from '@prisma/client';
+import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { isDirectoryAdmin } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import {
@@ -106,6 +108,46 @@ export class AiAppsService {
       take: Math.min(Math.max(limit, 1), 500),
     });
     return this.withMember(events);
+  }
+
+  /**
+   * Stores free-text feedback from a member viewing the app's detail page. Any
+   * member with AI Apps access may submit, and may do so more than once per app.
+   */
+  async submitFeedback(memberUid: string, appUid: string, text: string): Promise<WithMember<AiAppFeedback>> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app) {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    const feedback = await this.prisma.aiAppFeedback.create({
+      data: { appUid: app.uid, memberUid, text },
+    });
+    return (await this.withMember([feedback]))[0];
+  }
+
+  /**
+   * All feedback for one app, newest first, with submitter info. Visible only
+   * to the app's creator and directory admins.
+   */
+  async listFeedback(requesterUid: string, appUid: string): Promise<Array<WithMember<AiAppFeedback>>> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app) {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    if (app.memberUid !== requesterUid) {
+      const requester = await this.prisma.member.findUnique({
+        where: { uid: requesterUid },
+        select: { memberRoles: { select: { name: true } } },
+      });
+      if (!requester || !isDirectoryAdmin(requester)) {
+        throw new ForbiddenException('Only the app creator or a directory admin can view feedback');
+      }
+    }
+    const feedback = await this.prisma.aiAppFeedback.findMany({
+      where: { appUid: app.uid },
+      orderBy: { createdAt: 'desc' },
+    });
+    return this.withMember(feedback);
   }
 
   /**

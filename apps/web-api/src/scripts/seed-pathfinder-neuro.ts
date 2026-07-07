@@ -52,6 +52,15 @@ import { buildFirmByLabelIndex, lookupFirmProximity, type FirmProximity } from '
 import { loadPriorBackingMap } from './pl-investors-seed.util';
 import { applyPriorBackingToHopChain, backingWarmthBoost } from './prior-backing-warmth.util';
 import {
+  appendOverlapToHopChain,
+  applySocialOverlapScoreBump,
+  lookupSocialOverlapForPath,
+  resolveTargetInvestorPersonKeys,
+  type PathHopChain,
+  type SocialOverlapCache,
+  type SocialOverlapEntry,
+} from './social-overlap-seed.util';
+import {
   normalizeEmailKey,
   resolveAdditionalEmails,
   resolvePrimaryEmail,
@@ -77,6 +86,7 @@ const PRESTIGE_PATH = process.env.PATHFINDER_PRESTIGE_CACHE || `${SCRATCH_DIR}/_
 // Per-LP PL venture-team connector (relationship axis), keyed by Affinity person
 // id — precomputed by pln-data-enrichment scripts/pull-affinity-pl-relationships.ts.
 const PL_REL_PATH = `${SCRATCH_DIR}/_pl_relationships_352080.json`;
+const SOCIAL_OVERLAP_PATH = `${SCRATCH_DIR}/_social_overlap_cache.json`;
 
 // ── Types (loose — these are local scratch JSON shapes) ──────────────────────
 interface DumpPath {
@@ -215,6 +225,14 @@ async function seed() {
   const priorBackingByInvestor = loadPriorBackingMap(SCRATCH_DIR, entries);
   console.log(`  prior backers matched: ${priorBackingByInvestor.size}`);
 
+  let socialOverlapCache: SocialOverlapCache | null = null;
+  try {
+    socialOverlapCache = JSON.parse(readFileSync(SOCIAL_OVERLAP_PATH, 'utf-8')) as SocialOverlapCache;
+    console.log(`Loaded social overlap cache (${Object.keys(socialOverlapCache).length} entries)`);
+  } catch {
+    console.warn(`WARN: social overlap cache missing — skipping (${SOCIAL_OVERLAP_PATH})`);
+  }
+
   // ── Pass 1 (pure memory): classify every entry against a one-shot snapshot
   // of existing records. All writes happen in bulk afterwards — the previous
   // row-by-row awaits cost 3-5 round-trips per person and took minutes over a
@@ -264,6 +282,7 @@ async function seed() {
   const pathInserts: Prisma.PathfinderPathCreateManyInput[] = [];
   /** investorIds whose paths are already queued this run (avoid double-attach). */
   const pathTargetsQueued = new Set<string>();
+  let pathsWithSocialOverlap = 0;
   /** Duplicate matches that may need this run's paths attached to the existing record. */
   const dupPathCandidates: {
     investorId: string;
@@ -328,6 +347,26 @@ async function seed() {
       }
       hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops, memberContactIndex, teamIndex);
       hopChain = applyPriorBackingToHopChain(hopChain, priorBacking);
+
+      let overlap: SocialOverlapEntry | null = null;
+      if (socialOverlapCache) {
+        const targetPersonKeys = resolveTargetInvestorPersonKeys(hopChain as PathHopChain, firmId);
+        targetPersonKeys.add(`investor:${targetInvestorId}`);
+        overlap = lookupSocialOverlapForPath(socialOverlapCache, {
+          targetSet: TARGET_SET,
+          targetInvestorId: firmId,
+          rank: p.rank,
+          hopChain: hopChain as PathHopChain,
+          targetPersonKeys,
+          resolveMemberUidByName: (name) => membersByName.get(normalizePersonName(name)),
+        });
+        if (overlap) {
+          hopChain = appendOverlapToHopChain(hopChain, overlap);
+          pathsWithSocialOverlap += 1;
+        }
+      }
+
+      const score = applySocialOverlapScoreBump(p.score, overlap);
       pathInserts.push({
         targetInvestorId,
         targetSet: TARGET_SET,
@@ -335,9 +374,10 @@ async function seed() {
         hops: p.hops,
         caliber: p.caliber,
         proximityCode: p.proximityCode,
-        score: p.score,
+        score,
         caliberConfidence: p.caliberConfidence,
         hopChain: hopChain as Prisma.InputJsonValue,
+        ...(overlap ? { socialOverlap: overlap as unknown as Prisma.InputJsonValue } : {}),
         rank,
         ingestRunId: RUN_ID,
       });
@@ -540,6 +580,7 @@ async function seed() {
     `  PL-team connector attached to ${personsWithConnector} people` +
       (plConnectors.size ? ` (of ${plConnectors.size} LPs in the relationship file)` : ' (no relationship file)')
   );
+  console.log(`  pathsWithSocialOverlap: ${pathsWithSocialOverlap} / ${pathInserts.length} paths`);
   if (creates.length > 0) {
     await prisma.investorOutreachRecord.createMany({ data: creates, skipDuplicates: true });
   }
