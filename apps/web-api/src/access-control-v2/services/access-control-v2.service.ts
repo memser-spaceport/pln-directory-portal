@@ -1,13 +1,33 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { CACHE_MANAGER, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { createHash } from 'crypto';
 import { PrismaService } from '../../shared/prisma.service';
 import { MemberApprovalsService } from '../../member-approvals/member-approvals.service';
 import { expandEffectivePermissions } from '../access-control-v2.constants';
+
+function memberAccessCacheKey(token: string): string {
+  const env = process.env.ENVIRONMENT ?? 'local';
+  return `${env}:member-access:${createHash('sha256').update(token).digest('hex')}`;
+}
+
+function tokenTtlSeconds(token: string): number {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+    if (typeof payload.exp === 'number') {
+      return Math.max(0, payload.exp - Math.floor(Date.now() / 1000));
+    }
+  } catch {
+    // fall through
+  }
+  return 60;
+}
 
 @Injectable()
 export class AccessControlV2Service {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly memberApprovalsService: MemberApprovalsService
+    private readonly memberApprovalsService: MemberApprovalsService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache
   ) {}
 
   async listPolicies() {
@@ -340,6 +360,21 @@ export class AccessControlV2Service {
 
     if (!member) throw new NotFoundException(`Member not found for email or uid: ${emailOrUid}`);
     return this.getMemberAccess(member.uid);
+  }
+
+  async getCachedMemberAccess(token: string, email: string) {
+    const key = memberAccessCacheKey(token);
+    const cached = await this.cache.get(key);
+    if (cached) {
+      return cached;
+    }
+
+    const access = await this.getMemberAccessByEmail(email);
+    const ttl = tokenTtlSeconds(token);
+    if (ttl > 0) {
+      await this.cache.set(key, access, ttl);
+    }
+    return access;
   }
 
   async getMemberAccess(memberUid: string) {
