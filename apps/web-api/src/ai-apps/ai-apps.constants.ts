@@ -71,30 +71,31 @@ export const buildAppUrl = (appId: string): string => `https://${buildAppHost(ap
 export const buildAppHttpUrl = (appId: string): string => `http://${buildAppHost(appId)}`;
 
 /**
- * Public URL of THIS API's deploy endpoint, written into the starter kit so the
- * agent knows where to POST. Defaults to the conventional prod path.
+ * Public base URL of THIS API. The agent-facing endpoint URLs written into the
+ * starter kit are all derived from it (`<base>/v1/ai-apps/…`), so adding a new
+ * endpoint needs no new env var. The per-endpoint vars below remain as optional
+ * overrides for environments that already set them.
  */
-export const AI_APPS_DEPLOY_ENDPOINT =
-  process.env.AI_APPS_DEPLOY_ENDPOINT || 'https://api.plnetwork.io/v1/ai-apps/deploy';
+export const AI_APPS_BASE_URL = process.env.AI_APPS_BASE_URL;
 
-/**
- * Public URL of THIS API's connect-session endpoint, written into the starter
- * kit so the agent knows where to start a connect session.
- */
+/** Public URL of THIS API's deploy endpoint, written into the starter kit so the agent knows where to POST. */
+export const AI_APPS_DEPLOY_ENDPOINT = process.env.AI_APPS_DEPLOY_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/deploy`;
+
+/** Public URL of THIS API's connect-session endpoint, written into the starter kit. */
 export const AI_APPS_CONNECT_ENDPOINT =
-  process.env.AI_APPS_CONNECT_ENDPOINT || 'https://api.plnetwork.io/v1/ai-apps/connect';
+  process.env.AI_APPS_CONNECT_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/connect`;
 
 /**
- * Public URL of THIS API's draft-registration endpoint, written into the starter
- * kit so the agent knows where to register apps that need runtime secrets.
+ * Public URL of THIS API's draft-registration endpoint (apps that need runtime
+ * secrets), written into the starter kit.
  */
-export const AI_APPS_DRAFT_ENDPOINT = process.env.AI_APPS_DRAFT_ENDPOINT || 'https://api.plnetwork.io/v1/ai-apps/draft';
+export const AI_APPS_DRAFT_ENDPOINT = process.env.AI_APPS_DRAFT_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/draft`;
 
 /**
  * Base URL of the LabOS portal that hosts the connect page the member opens to
  * approve a session. Combined with the session uid to build the connect link.
  */
-export const AI_APPS_PORTAL_URL = process.env.AI_APPS_PORTAL_URL || 'https://directory.plnetwork.io';
+export const AI_APPS_PORTAL_URL = process.env.AI_APPS_PORTAL_URL;
 
 /** The LabOS connect page URL a member opens to approve an agent's session. */
 export const buildConnectUrl = (sessionUid: string): string =>

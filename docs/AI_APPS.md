@@ -312,9 +312,8 @@ badges, tables, tabs, dropdowns, or sidebars from scratch.
 | `AI_APPS_RUNNER_TOKEN` | _(empty)_ | **Required** for real deploys; `x-runner-token` to the runner |
 | `AI_APPS_S3_BUCKET` | _(empty)_ | **Required** for real deploys; bucket the runner reads app bundles from (e.g. `sandbox-apps-pln-dev-013228333448`) |
 | `AI_APPS_APP_DOMAIN` | `prod.plnetwork.io` | Base domain deployed apps are served under (app URL = `https://<appId>.<domain>`); set `dev.plnetwork.io` on Dev, `prod.plnetwork.io` on Prod |
-| `AI_APPS_DEPLOY_ENDPOINT` | `https://api.plnetwork.io/v1/ai-apps/deploy` | Written into the kit so the agent knows where to POST |
-| `AI_APPS_CONNECT_ENDPOINT` | `https://api.plnetwork.io/v1/ai-apps/connect` | Written into the kit so the agent knows where to start a connect session |
-| `AI_APPS_DRAFT_ENDPOINT` | `https://api.plnetwork.io/v1/ai-apps/draft` | Written into the kit so the agent knows where to register drafts (secrets flow) |
+| `AI_APPS_BASE_URL` | `https://api.plnetwork.io` | Public base URL of this API; the agent-facing endpoint URLs written into the kit (deploy/connect/draft) are derived from it as `<base>/v1/ai-apps/<endpoint>` |
+| `AI_APPS_DEPLOY_ENDPOINT` / `AI_APPS_CONNECT_ENDPOINT` / `AI_APPS_DRAFT_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional per-endpoint overrides; rarely needed |
 | `AI_APPS_PORTAL_URL` | `https://directory.plnetwork.io` | Base URL of the LabOS portal hosting the connect/approval page (used to build `connectUrl` and `appPageUrl`) |
 | `AI_APPS_RUNNER_PROJECT` | `default` | Project scope of the runner's secrets API (`/v1/projects/<project>/secrets`) |
 | `AI_APPS_RUNNER_ENVIRONMENT` | `prod` | Environment label secrets are stored under on the runner (`dev` on Dev, `prod` on Prod) |
