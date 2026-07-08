@@ -2943,6 +2943,7 @@ model RoadmapSettings {
 
 enum AiAppStatus {
   IN_DEVELOPMENT
+  DRAFT // registered by the agent with required env vars; awaiting member secrets + deploy
   DEPLOYING
   READY
   ERROR
@@ -2968,6 +2969,14 @@ model AiApp {
   host         String?
   port         Int?
   deploymentId String?
+  /// S3 key of the last uploaded app bundle, kept so a member-triggered deploy
+  /// (draft flow) can redeploy without the agent re-uploading.
+  s3Key        String?
+  /// Env var NAMES the agent declared the app needs at runtime (draft flow).
+  requiredEnvVars String[]  @default([])
+  /// Env var NAMES the member has provided values for. Values are never stored
+  /// here — they go straight to the sandbox runner's secret store.
+  providedEnvVars String[]  @default([])
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -3040,6 +3049,8 @@ enum AiAppEventType {
   KIT_DOWNLOADED
   CONNECT_APPROVED
   CONNECT_DENIED
+  DRAFT_CREATED
+  SECRETS_UPDATED
   DEPLOY_STARTED
   DEPLOY_SUCCEEDED
   DEPLOY_FAILED

@@ -7,6 +7,7 @@ import {
   AI_APPS_APP_DOMAIN,
   AI_APPS_CONNECT_ENDPOINT,
   AI_APPS_DEPLOY_ENDPOINT,
+  AI_APPS_DRAFT_ENDPOINT,
 } from './ai-apps.constants';
 
 /** Prebuilt PL Design System bundle, shipped verbatim inside the starter kit. */
@@ -119,9 +120,10 @@ to the Protocol Labs Network sandbox with a single instruction.
    first deploy can take a minute or two.
 4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it.
 
-> **Don't copy passwords or secret keys into \`app/\`** — apps run on shared
-> infrastructure with no credentials provided. If your app needs them, ask your
-> agent how to handle it.
+> **Don't copy passwords or secret keys into \`app/\`.** If your app needs API keys
+> or other secrets, your agent registers it as a **draft** and gives you a LabOS
+> link — you enter the values there and click **Deploy**. Secrets never go into
+> the code, the chat, or the uploaded ZIP.
 
 ## Embedding in the dashboard
 Your app is shown inside the AI Apps dashboard. Apps built with this kit display
@@ -210,18 +212,39 @@ not the scaffold's shape or language.
    Node app with no build. If the app compiles (TypeScript, Go, a bundler, …), write
    an appropriate (e.g. multi-stage) Dockerfile. Only hard requirement: the image
    starts a server that listens on \`$PORT\`, binds \`0.0.0.0\`, and answers \`GET /health\`.
-3. **Assume no runtime config.** The sandbox injects NO env vars or secrets. Decide
-   how the app runs without its usual credentials — degrade to sample/mock data, or
-   clearly surface what's missing. Never hardcode real secrets to compensate.
+3. **Runtime config comes from the secrets flow, not the ZIP.** If the app needs
+   API keys or other secrets at runtime, use the draft flow ("Apps that need
+   secrets" below): declare the env var NAMES and let the member provide the
+   values in LabOS. Anything that isn't secret should ship sensible defaults.
 4. **Never ship secrets.** Keep real \`.env\` files, tokens, keys, and data dirs OUT of
    the uploaded zip: add them to \`.dockerignore\` and confirm they're absent before
-   deploying. The zip is built and stored server-side.
+   deploying. The zip is built and stored server-side. Secret VALUES are entered by
+   the member in LabOS — never ask the member to paste them into the chat or a file.
 5. **Verify before deploying:** \`cd app && npm install && npm start\` (or the app's
    equivalent), then confirm \`GET /health\` is 200 and \`GET /\` renders.
 
+## Apps that need secrets (API keys, tokens, …)
+If the app reads any secret from the environment (\`process.env.OPENAI_API_KEY\`,
+a database URL with credentials, …), do **NOT** deploy it directly and do **NOT**
+put values in the ZIP. Instead use the draft flow (full steps in the deploy skill):
+1. Get a deploy token via the connect flow as usual.
+2. POST the app ZIP to the \`draftEndpoint\` from \`pln-app.config.json\` with a
+   \`requiredEnvVars\` field listing the env var NAMES the app needs. This
+   registers the app as a **draft** — nothing runs yet.
+3. Give the member the \`appPageUrl\` from the response: they open it in LabOS,
+   enter the secret values, and click **Deploy** there. The deploy then runs
+   with the stored secrets.
+4. To ship a code update later, register the draft again (same \`appId\`, fresh
+   \`deploymentId\`) — already-stored secret values stay valid; the member just
+   clicks Deploy again in LabOS.
+
+Never ask the member for secret values in the chat, and never write them to any
+file — LabOS is the only place they should be entered.
+
 ## Deploying the app
 When the member asks you to deploy, use the **deploy-to-labs** skill in
-\`.claude/skills/deploy-to-labs/SKILL.md\`. In short:
+\`.claude/skills/deploy-to-labs/SKILL.md\`. If the app needs runtime secrets,
+follow "Apps that need secrets" above instead of deploying directly. In short:
 1. Read \`pln-app.config.json\` for the \`connectEndpoint\`, \`deployEndpoint\`, and
    (if present) a saved \`appId\`.
 2. **Get a deploy token via LabOS (the connect flow).** There is no token in the
@@ -264,10 +287,16 @@ description: Deploy the app in ./app to the Protocol Labs Network sandbox. Use w
 
 Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
 
+**Needs secrets?** If the app reads any secret from the environment (API keys,
+tokens, credentialed URLs), do steps 1–4 as written but then follow
+"**Apps that need secrets (draft flow)**" below instead of step 5 — you register
+a draft and the member deploys from LabOS after entering the values.
+
 ## Steps
-1. Read \`pln-app.config.json\` to get \`connectEndpoint\`, \`deployEndpoint\`, and (if
-   present) a saved \`appId\`. If no \`appId\` exists yet, pick a short, stable,
-   lowercase slug (e.g. \`hello-board\`) and save it back to the config.
+1. Read \`pln-app.config.json\` to get \`connectEndpoint\`, \`deployEndpoint\`,
+   \`draftEndpoint\`, and (if present) a saved \`appId\`. If no \`appId\` exists yet,
+   pick a short, stable, lowercase slug (e.g. \`hello-board\`) and save it back to
+   the config.
 2. **Get a deploy token via LabOS.** The kit has no token; obtain a short-lived one
    through the connect flow:
 
@@ -355,6 +384,36 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
    If either fails, the embed will show \`refused to connect\`. Fix the app's headers
    (see the framing rule in \`AGENTS.md\`) and redeploy before reporting success.
 
+## Apps that need secrets (draft flow)
+When the app needs runtime secrets, replace the upload in step 5 with a **draft
+registration** — same multipart shape, posted to \`draftEndpoint\`, plus
+\`requiredEnvVars\` (the env var NAMES the app reads; JSON array or
+comma-separated). Nothing is deployed yet:
+
+\`\`\`bash
+curl -X POST "<draftEndpoint>" \\
+  -H "${AI_APP_TOKEN_HEADER}: <deployToken>" \\
+  -F "appId=<your-app-id>" \\
+  -F "name=<human-friendly app name>" \\
+  -F "description=<one line about the app>" \\
+  -F "deploymentId=<unique id per upload, e.g. a timestamp>" \\
+  -F 'requiredEnvVars=["OPENAI_API_KEY","SUPABASE_URL"]' \\
+  -F "file=@app.zip;type=application/zip"
+# → { "status": "DRAFT", "appPageUrl": "https://…/pl-infra/ai-apps/<uid>", "missingEnvVars": [ … ] }
+\`\`\`
+
+Then **tell the member, in your chat:** open \`appPageUrl\` in their browser, enter
+the secret values there, and click **Deploy**. The deploy runs immediately with
+the stored secrets; the app then appears as usual on the AI Apps dashboard.
+
+- **Never** ask the member to paste secret values into the chat, and never write
+  them to a file — LabOS is the only place values are entered.
+- To ship a **code update** later, re-register the draft (same \`appId\`, fresh
+  \`deploymentId\`, updated \`requiredEnvVars\` if they changed) and send the member
+  back to \`appPageUrl\` to click Deploy. Stored secret values remain valid.
+- The member can also update secret values and redeploy entirely from LabOS —
+  no agent involvement needed.
+
 ## Keep the deployment URL private
 Do not print, link, or otherwise tell the member the deployment URL, host, or port —
 in your messages, summaries, or saved files. The member opens their app through the
@@ -384,9 +443,9 @@ verification steps. Only re-deploy if it stays unreachable.
   connect link. Keep it in memory only — never save it to a file or print it. Within
   the window you can redeploy without reconnecting; once it expires (deploy returns
   \`401\`), run the connect flow again to get a fresh token.
-- The sandbox injects no runtime env vars or secrets. An app that needs config must
-  ship sensible defaults or degrade gracefully (e.g. sample data) — see the
-  migration checklist in \`AGENTS.md\`.
+- Runtime secrets are supported only through the draft flow above — the sandbox
+  injects exactly the env vars the member provided in LabOS. Non-secret config
+  should ship sensible defaults — see the migration checklist in \`AGENTS.md\`.
 `;
   }
 
@@ -395,10 +454,11 @@ verification steps. Only re-deploy if it stays unreachable.
       {
         connectEndpoint: AI_APPS_CONNECT_ENDPOINT,
         deployEndpoint: AI_APPS_DEPLOY_ENDPOINT,
+        draftEndpoint: AI_APPS_DRAFT_ENDPOINT,
         deployTokenHeader: AI_APP_TOKEN_HEADER,
         appId: '',
         notes:
-          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it.',
+          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill).',
       },
       null,
       2
