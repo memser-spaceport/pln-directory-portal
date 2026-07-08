@@ -155,7 +155,9 @@ The backend (creator or directory admin only) first checks every name in `requir
 
 3. **Update & redeploy** — the member can reopen the same page any time, change one or more values (`secrets` may be a subset — the runner merges), and Deploy again. `secrets` may also be omitted entirely to redeploy with the already-stored values. For a code update the agent re-registers the draft (same `appId`, fresh `deploymentId`); stored values stay valid.
 
-> **Runner contract assumption:** the deploy step assumes the runner injects the secrets stored under `appId`/`environment` when `/deploy` builds and starts the container (per the "Runtime Secrets" Postman collection, whose `deployments*` endpoints only cover already-built images). All runner calls are isolated in `AiAppsService.saveSecrets` / `proxyDeploy`, so if the contract turns out to require an explicit `deployments:with-secrets` call after build, only those methods change.
+> **Runner contract (verified 2026-07-08):** the legacy `/deploy` (s3Key build) does **NOT** inject stored secrets — the container comes up without them. The backend therefore runs a second call after a successful build: `GET /apps` to resolve the built image, then `POST /v1/projects/<project>/deployments` with `{ appId, environment, image, secretNames }` to redeploy it with the secrets injected (`AiAppsService.deployImageWithSecrets`, called from `proxyDeploy`; injection failure marks the app `ERROR` rather than shipping a broken "READY" app).
+>
+> ⚠️ **Currently blocked by a runner-side conflict:** `/deploy` installs helm release `sandbox-<appId>` while the deployments endpoint installs `<environment>-<appId>` (with host `<environment>-<appId>.<domain>`), and both own a Service named `<appId>` — so the second call fails with helm "invalid ownership metadata". The runner team needs to align the release naming (or accept `secretNames` on `/deploy` — its chart already supports `runtimeSecrets`). All of this is isolated in `saveSecrets` / `deployImageWithSecrets` / `proxyDeploy`.
 
 ### Delete request
 
@@ -234,7 +236,7 @@ model AiAppEvent {            // append-only audit log — one row per event, ne
 
 Apps are **lazy-created on first deploy** — there is no registration form. (A draft registration counts: it upserts the same record with status `DRAFT`.)
 
-**Response shape:** every AI Apps endpoint (`list`, detail, `events`, and the `deploy` result) returns the owner as `member: { uid, name }` and omits the raw `memberUid` (the uid lives in `member.uid`, so it isn't duplicated). `memberUid` remains a column on the DB models above.
+**Response shape:** every AI Apps endpoint (`list`, detail, `events`, and the `deploy` result) returns the owner as `member: { uid, name }` and omits the raw `memberUid` (the uid lives in `member.uid`, so it isn't duplicated). `memberUid` remains a column on the DB models above. The detail endpoint additionally returns `canManage` — whether the requesting member is the creator or a directory admin — computed server-side so the UI never compares member uids from a possibly stale login cookie.
 
 `AiApp.status` is the current-state snapshot for the dashboard; `AiAppEvent` is the immutable event flow. A row is appended on kit download (`KIT_DOWNLOADED`), on each connect approval/denial (`CONNECT_APPROVED` / `CONNECT_DENIED` — the `userCode` is recorded in `message`), at the start of every deploy (`DEPLOY_STARTED`) and its outcome (`DEPLOY_SUCCEEDED` / `DEPLOY_FAILED`), and likewise for deletes (`DELETE_STARTED` → `DELETE_SUCCEEDED` / `DELETE_FAILED`). Event logging never throws — a logging failure won't break a download, connect, deploy, or delete.
 

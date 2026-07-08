@@ -53,6 +53,14 @@ export const AI_APPS_RUNNER_ENVIRONMENT = process.env.AI_APPS_RUNNER_ENVIRONMENT
 export const buildRunnerSecretsUrl = (): string =>
   `${AI_APPS_RUNNER_URL}/v1/projects/${AI_APPS_RUNNER_PROJECT}/secrets`;
 
+/**
+ * Runner endpoint that (re)deploys an already-built image with the named stored
+ * secrets injected. The legacy `/deploy` (s3Key build) does NOT inject secrets,
+ * so secret-bearing apps need this second call after the build.
+ */
+export const buildRunnerDeploymentsUrl = (): string =>
+  `${AI_APPS_RUNNER_URL}/v1/projects/${AI_APPS_RUNNER_PROJECT}/deployments`;
+
 /** Build the S3 key for an app bundle: apps/<appId>/<deploymentId>/app.zip */
 export const buildAppS3Key = (appId: string, deploymentId: string): string => `apps/${appId}/${deploymentId}/app.zip`;
 
