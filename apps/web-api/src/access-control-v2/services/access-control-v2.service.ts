@@ -10,16 +10,19 @@ function memberAccessCacheKey(token: string): string {
   return `${env}:member-access:${createHash('sha256').update(token).digest('hex')}`;
 }
 
+const MEMBER_ACCESS_CACHE_MAX_TTL_SEC = 60;
+
 function tokenTtlSeconds(token: string): number {
+  let ttl = MEMBER_ACCESS_CACHE_MAX_TTL_SEC;
   try {
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
     if (typeof payload.exp === 'number') {
-      return Math.max(0, payload.exp - Math.floor(Date.now() / 1000));
+      ttl = Math.max(0, payload.exp - Math.floor(Date.now() / 1000));
     }
   } catch {
     // fall through
   }
-  return 60;
+  return Math.min(ttl, MEMBER_ACCESS_CACHE_MAX_TTL_SEC);
 }
 
 @Injectable()
