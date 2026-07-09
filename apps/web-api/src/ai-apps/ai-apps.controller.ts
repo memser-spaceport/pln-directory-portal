@@ -126,6 +126,19 @@ export class AiAppsController {
     return this.aiAppsService.getApp(uid, memberUid);
   }
 
+  /**
+   * Liveness probe for the LabOS detail page: one server-side reachability
+   * check of the app's public URL (a gateway timeout counts as down). The page
+   * polls this while a deploy settles so the iframe never shows a raw 504.
+   */
+  @NoCache()
+  @Get(':uid/live')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async checkAppLive(@Param('uid') uid: string) {
+    return this.aiAppsService.checkAppLive(uid);
+  }
+
   /** Full event/status history for a single app, newest first. */
   @NoCache()
   @Get(':uid/events')

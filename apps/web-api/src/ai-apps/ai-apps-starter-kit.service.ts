@@ -120,10 +120,24 @@ to the Protocol Labs Network sandbox with a single instruction.
    first deploy can take a minute or two.
 4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it.
 
-> **Don't copy passwords or secret keys into \`app/\`.** If your app needs API keys
-> or other secrets, your agent registers it as a **draft** and gives you a LabOS
-> link — you enter the values there and click **Deploy**. Secrets never go into
-> the code, the chat, or the uploaded ZIP.
+## Apps that need an API key or password (secrets)
+Some apps need a secret to work — for example an app that talks to ChatGPT/OpenAI,
+sends emails, or connects to a database needs an **API key** or password for that
+service. If yours does, the flow is slightly different, and your agent handles it
+for you:
+
+1. Build your app as usual — just tell your agent what you want (e.g. "an app that
+   summarizes news with ChatGPT"). It knows the app will need a key.
+2. **Never paste your API key into the chat** (and don't put it in any file). If
+   you do it by accident, your agent will ask you to use the secure page instead.
+3. When it's time to deploy, your agent registers the app as a **draft** and gives
+   you a LabOS link. Open it, enter your key(s) in the form there, and click
+   **Deploy** — that page is the only place your secrets should ever go.
+4. Updating a key later? Open your app's page in LabOS (PL Infra → AI Apps → your
+   app), click **Update secrets & redeploy**, enter the new value, and Deploy.
+
+Secrets never go into the code, the chat, or the uploaded ZIP — they are stored
+securely on the sandbox and injected into your app when it runs.
 
 ## Embedding in the dashboard
 Your app is shown inside the AI Apps dashboard. Apps built with this kit display
@@ -224,9 +238,32 @@ not the scaffold's shape or language.
    equivalent), then confirm \`GET /health\` is 200 and \`GET /\` renders.
 
 ## Apps that need secrets (API keys, tokens, …)
-If the app reads any secret from the environment (\`process.env.OPENAI_API_KEY\`,
-a database URL with credentials, …), do **NOT** deploy it directly and do **NOT**
-put values in the ZIP. Instead use the draft flow (full steps in the deploy skill):
+The member is usually **not a developer** — they will never say "environment
+variable" or "secret". It is YOUR job to recognize when the app needs one and to
+route the deploy through the **draft flow** instead of deploying directly.
+
+**Recognize the need yourself.** The app needs the draft flow whenever it (will)
+talk to any external service that requires a credential — an AI/LLM API (OpenAI,
+Anthropic, …), email/SMS sending, a database, a paid data API, a webhook with a
+signing secret, and so on. If the member asks for a feature like "summarize with
+ChatGPT" or "send me an email", that IS a secrets app: wire the code to read the
+credential from an env var (e.g. \`process.env.OPENAI_API_KEY\`), pick a clear
+UPPER_SNAKE_CASE name, and plan for the draft flow. Before any deploy, double-check
+the code for \`process.env.*\` reads (or the language's equivalent) you may have
+added along the way.
+
+**Explain it in plain words.** Tell the member something like: *"This app needs
+your OpenAI API key to work. I never handle keys directly — I'll register the app
+and give you a secure LabOS link where you paste the key and click Deploy."*
+Don't use the words "env var", "draft registration", or "runtime injection" with
+the member.
+
+**If the member pastes a secret into the chat**, do not use it, do not echo it
+back, and do not write it anywhere. Tell them the chat isn't a safe place for
+keys, ask them to revoke/rotate it if it's sensitive, and point them to the LabOS
+page from step 3 below — that form is the only place values should be entered.
+
+The flow (full steps in the deploy skill):
 1. Get a deploy token via the connect flow as usual.
 2. POST the app ZIP to the \`draftEndpoint\` from \`pln-app.config.json\` with a
    \`requiredEnvVars\` field listing the env var NAMES the app needs. This
@@ -237,6 +274,8 @@ put values in the ZIP. Instead use the draft flow (full steps in the deploy skil
 4. To ship a code update later, register the draft again (same \`appId\`, fresh
    \`deploymentId\`) — already-stored secret values stay valid; the member just
    clicks Deploy again in LabOS.
+5. To change a key later, the member doesn't need you at all: on the app's LabOS
+   page they click **Update secrets & redeploy**, enter the new value, and Deploy.
 
 Never ask the member for secret values in the chat, and never write them to any
 file — LabOS is the only place they should be entered.
@@ -287,10 +326,21 @@ description: Deploy the app in ./app to the Protocol Labs Network sandbox. Use w
 
 Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
 
-**Needs secrets?** If the app reads any secret from the environment (API keys,
-tokens, credentialed URLs), do steps 1–4 as written but then follow
-"**Apps that need secrets (draft flow)**" below instead of step 5 — you register
-a draft and the member deploys from LabOS after entering the values.
+**Needs secrets? Decide BEFORE deploying — don't wait for the member to say so.**
+The member usually has no coding background and won't know their app "has secrets".
+Check for it yourself: does the app read any credential from the environment
+(\`process.env.*\` or equivalent), or call any external service that needs an API
+key (OpenAI/Anthropic, email/SMS, a database, a paid API)? A quick check:
+
+\`\`\`bash
+grep -rniE 'process\\.env\\.|os\\.environ|getenv' app --include='*.js' --include='*.ts' --include='*.py' | grep -viE 'PORT|NODE_ENV'
+\`\`\`
+
+If anything secret shows up (or you wrote code that needs a key), do steps 1–4 as
+written but then follow "**Apps that need secrets (draft flow)**" below instead of
+step 5 — you register a draft and the member deploys from LabOS after entering the
+values there. Never deploy a secrets app directly and never accept key values in
+the chat.
 
 ## Steps
 1. Read \`pln-app.config.json\` to get \`connectEndpoint\`, \`deployEndpoint\`,
@@ -402,12 +452,17 @@ curl -X POST "<draftEndpoint>" \\
 # → { "status": "DRAFT", "appPageUrl": "https://…/pl-infra/ai-apps/<uid>", "missingEnvVars": [ … ] }
 \`\`\`
 
-Then **tell the member, in your chat:** open \`appPageUrl\` in their browser, enter
-the secret values there, and click **Deploy**. The deploy runs immediately with
-the stored secrets; the app then appears as usual on the AI Apps dashboard.
+Then **tell the member, in your chat, in plain non-technical language** — e.g.
+*"Your app is registered. Open this link, paste your OpenAI API key into the form,
+and click Deploy — that page is the only safe place for your key."* Give them
+\`appPageUrl\`; they enter the values there and click **Deploy**. The deploy runs
+immediately with the stored secrets; the app then appears as usual on the AI Apps
+dashboard.
 
 - **Never** ask the member to paste secret values into the chat, and never write
-  them to a file — LabOS is the only place values are entered.
+  them to a file — LabOS is the only place values are entered. If they paste a
+  key into the chat anyway, don't use or repeat it — point them to \`appPageUrl\`
+  (and suggest rotating the key if it's sensitive).
 - To ship a **code update** later, re-register the draft (same \`appId\`, fresh
   \`deploymentId\`, updated \`requiredEnvVars\` if they changed) and send the member
   back to \`appPageUrl\` to click Deploy. Stored secret values remain valid.

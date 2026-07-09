@@ -95,6 +95,29 @@ export class AiAppsService {
   }
 
   /**
+   * Single reachability probe of the app's public URL, for the LabOS detail
+   * page: it polls this while a redeploy settles so it can hold its own loading
+   * state instead of iframing a raw gateway error page. One attempt per call —
+   * the polling cadence belongs to the client (unlike `verifyAppLive`, which
+   * does its own retry loop inside the deploy flow).
+   */
+  async checkAppLive(uid: string): Promise<{ live: boolean }> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app) {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (!app.url) {
+      return { live: false };
+    }
+    try {
+      const res = await axios.get(app.url, { timeout: 8000, validateStatus: () => true, maxRedirects: 0 });
+      return { live: !!res.status && !GATEWAY_TIMEOUT_STATUSES.includes(res.status) };
+    } catch {
+      return { live: false };
+    }
+  }
+
+  /**
    * Append an event to the audit log. Never throws — event logging must not
    * break the primary flow (download/deploy).
    */

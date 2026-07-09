@@ -91,6 +91,7 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | GET    | `/v1/ai-apps/events`             | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Event log (audit feed); `?appUid=` to scope, `?limit=` (default 100, max 500) |
 | GET    | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Single app detail |
 | GET    | `/v1/ai-apps/:uid/events`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Full event/status history for one app (404 if app missing) |
+| GET    | `/v1/ai-apps/:uid/live`          | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Liveness probe: one server-side reachability check of the app URL → `{ live }`; the LabOS detail page polls it so the iframe never shows a raw gateway error |
 | POST   | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Submit free-text feedback on an app (multiple entries per member allowed) |
 | GET    | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | All feedback for one app, newest first, with submitter info |
 | GET    | `/v1/ai-apps/starter-kit/download` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Stream the starter-kit ZIP (no token inside) |
@@ -154,10 +155,6 @@ curl -X POST "https://api.plnetwork.io/v1/ai-apps/<uid>/deploy" \
 The backend (creator or directory admin only) first checks every name in `requiredEnvVars` has a value — stored earlier or submitted now — and otherwise rejects with a 400 naming the missing vars. It then saves the submitted values to the runner's secret store (`POST <AI_APPS_RUNNER_URL>/v1/projects/<AI_APPS_RUNNER_PROJECT>/secrets` with `{ appId, environment, secrets }` — merge/upsert semantics, `SECRETS_UPDATED` audited with names only) and redeploys the stored bundle through the normal runner `/deploy` proxy (status `DEPLOYING` → `READY`/`ERROR`).
 
 3. **Update & redeploy** — the member can reopen the same page any time, change one or more values (`secrets` may be a subset — the runner merges), and Deploy again. `secrets` may also be omitted entirely to redeploy with the already-stored values. For a code update the agent re-registers the draft (same `appId`, fresh `deploymentId`); stored values stay valid.
-
-> **Runner contract (verified 2026-07-08):** the legacy `/deploy` (s3Key build) does **NOT** inject stored secrets — the container comes up without them. The backend therefore runs a second call after a successful build: `GET /apps` to resolve the built image, then `POST /v1/projects/<project>/deployments` with `{ appId, environment, image, secretNames }` to redeploy it with the secrets injected (`AiAppsService.deployImageWithSecrets`, called from `proxyDeploy`; injection failure marks the app `ERROR` rather than shipping a broken "READY" app).
->
-> ⚠️ **Currently blocked by a runner-side conflict:** `/deploy` installs helm release `sandbox-<appId>` while the deployments endpoint installs `<environment>-<appId>` (with host `<environment>-<appId>.<domain>`), and both own a Service named `<appId>` — so the second call fails with helm "invalid ownership metadata". The runner team needs to align the release naming (or accept `secretNames` on `/deploy` — its chart already supports `runtimeSecrets`). All of this is isolated in `saveSecrets` / `deployImageWithSecrets` / `proxyDeploy`.
 
 ### Delete request
 
@@ -318,7 +315,7 @@ badges, tables, tabs, dropdowns, or sidebars from scratch.
 | `AI_APPS_DEPLOY_ENDPOINT` / `AI_APPS_CONNECT_ENDPOINT` / `AI_APPS_DRAFT_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional per-endpoint overrides; rarely needed |
 | `AI_APPS_PORTAL_URL` | `https://directory.plnetwork.io` | Base URL of the LabOS portal hosting the connect/approval page (used to build `connectUrl` and `appPageUrl`) |
 | `AI_APPS_RUNNER_PROJECT` | `default` | Project scope of the runner's secrets API (`/v1/projects/<project>/secrets`) |
-| `AI_APPS_RUNNER_ENVIRONMENT` | `prod` | Environment label secrets are stored under on the runner (`dev` on Dev, `prod` on Prod) |
+| `AI_APPS_RUNNER_ENVIRONMENT` | `prod` | Environment label for the runner secrets/deployments API. **Must match the environment the runner's `/deploy` build registers under** (its helm release is `<environment>-<appId>`; the legacy-compat build path registers as `sandbox`) — a mismatch makes the secrets-injection deploy collide with the build's release |
 
 S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` credentials must also be present.
 
