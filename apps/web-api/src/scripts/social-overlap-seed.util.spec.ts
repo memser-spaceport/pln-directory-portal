@@ -1,15 +1,26 @@
 import {
   appendOverlapToHopChain,
+  applyLinkedInPathWarmth,
+  applyPathAttributionAndWarmth,
   applySocialOverlapScoreBump,
+  buildAffinityAttributionText,
+  buildAttributionLines,
+  buildLinkedInOnlyPath,
   buildSocialOverlapCacheKey,
   extractFounderNodes,
   extractPlPeopleFromHopChain,
+  isVerifiedSocialOverlap,
+  linkedInBonusForOverlap,
+  linkedInBonusForOverlaps,
+  LINKEDIN_BONUS_UNVERIFIED,
+  LINKEDIN_BONUS_VERIFIED,
+  lookupAllSocialOverlapsForPath,
   lookupSocialOverlapForPath,
   lookupSocialOverlapForPair,
+  pickBestLinkedInOnlyOverlap,
   resolveFounderPersonKey,
   resolvePlConnectorPersonKey,
   resolveTargetInvestorPersonKeys,
-  SOCIAL_OVERLAP_SCORE_MULTIPLIER,
   type PathHopChain,
   type SocialOverlapEntry,
 } from './social-overlap-seed.util';
@@ -184,30 +195,198 @@ describe('appendOverlapToHopChain', () => {
   });
 });
 
-describe('applySocialOverlapScoreBump', () => {
-  it('bumps score only when affectsScore is true', () => {
-    expect(applySocialOverlapScoreBump(0.8, null)).toBe(0.8);
+describe('linkedInBonus', () => {
+  it('gives +0.25 for verified concurrent employment', () => {
     expect(
-      applySocialOverlapScoreBump(
-        0.8,
-        overlapEntry({ kind: 'same_school_unknown_dates', label: 'x', plPersonKey: 'm:1', affectsScore: false }),
+      linkedInBonusForOverlap(
+        overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }),
       ),
-    ).toBe(0.8);
-    expect(
-      applySocialOverlapScoreBump(
-        0.8,
-        overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'm:1', affectsScore: true }),
-      ),
-    ).toBeCloseTo(0.8 * SOCIAL_OVERLAP_SCORE_MULTIPLIER);
+    ).toBe(LINKEDIN_BONUS_VERIFIED);
+    expect(isVerifiedSocialOverlap(overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }))).toBe(
+      true,
+    );
   });
 
-  it('caps at 1.0', () => {
+  it('gives +0.25 for same_school with overlapYears', () => {
+    expect(
+      linkedInBonusForOverlap(
+        overlapEntry({
+          kind: 'same_school',
+          label: 'school',
+          plPersonKey: 'p:1',
+          overlapYears: { start: 2010, end: 2012 },
+          affectsScore: false,
+        }),
+      ),
+    ).toBe(LINKEDIN_BONUS_VERIFIED);
+  });
+
+  it('gives +0.10 for unverified company/school', () => {
+    expect(
+      linkedInBonusForOverlap(
+        overlapEntry({ kind: 'same_company_unknown_dates', label: 'x', plPersonKey: 'p:1', affectsScore: false }),
+      ),
+    ).toBe(LINKEDIN_BONUS_UNVERIFIED);
+    expect(
+      linkedInBonusForOverlap(
+        overlapEntry({ kind: 'same_school_unknown_dates', label: 'x', plPersonKey: 'p:1', affectsScore: false }),
+      ),
+    ).toBe(LINKEDIN_BONUS_UNVERIFIED);
+    expect(
+      linkedInBonusForOverlap(
+        overlapEntry({ kind: 'same_school', label: 'no years', plPersonKey: 'p:1', affectsScore: false }),
+      ),
+    ).toBe(LINKEDIN_BONUS_UNVERIFIED);
+  });
+
+  it('takes max across people, does not stack', () => {
+    const bonus = linkedInBonusForOverlaps([
+      overlapEntry({
+        kind: 'same_school_unknown_dates',
+        label: 'founder weak',
+        plPersonKey: 'founder:f_a',
+        affectsScore: false,
+      }),
+      overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'connector strong',
+        plPersonKey: 'investor:1',
+      }),
+    ]);
+    expect(bonus).toBe(LINKEDIN_BONUS_VERIFIED);
+  });
+
+  it('caps pathWarmth at 1.0', () => {
+    expect(
+      applyLinkedInPathWarmth(0.9, [
+        overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }),
+      ]),
+    ).toBe(1.0);
+  });
+
+  it('applySocialOverlapScoreBump uses additive model (compat wrapper)', () => {
     expect(
       applySocialOverlapScoreBump(
-        0.99,
-        overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'm:1', affectsScore: true }),
+        0.5,
+        overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }),
       ),
-    ).toBe(1.0);
+    ).toBeCloseTo(0.75);
+  });
+});
+
+describe('attribution lines', () => {
+  it('builds Affinity line with recency and tie', () => {
+    expect(
+      buildAffinityAttributionText({
+        name: 'Brad Holden',
+        strength: 0.1,
+        recencyDays: 120,
+        evidenceKind: 'last_email',
+      }),
+    ).toBe('Brad Holden last emailed ~4 months ago (tie 0.10)');
+  });
+
+  it('builds Affinity + LinkedIn lines without stacking into explanation', () => {
+    const lines = buildAttributionLines({
+      affinityConnector: {
+        name: 'Lacey Wisdom',
+        strength: 0.45,
+        recencyDays: 150,
+        evidenceKind: 'last_email',
+      },
+      overlaps: [
+        overlapEntry({
+          kind: 'concurrent_employment',
+          label: 'Lacey and Dan worked at Eniac Ventures (2021–2022)',
+          plPersonKey: 'investor:118239754',
+        }),
+      ],
+    });
+    expect(lines).toEqual([
+      { source: 'Affinity', text: 'Lacey Wisdom last emailed ~5 months ago (tie 0.45)' },
+      { source: 'LinkedIn', text: 'Lacey and Dan worked at Eniac Ventures (2021–2022)' },
+    ]);
+  });
+
+  it('applyPathAttributionAndWarmth keeps explanation untouched', () => {
+    const out = applyPathAttributionAndWarmth({
+      hopChain: { explanation: 'Filecoin ecosystem investor.' },
+      pathScore: 0.5,
+      affinityConnector: {
+        name: 'Brad Holden',
+        strength: 0.1,
+        recencyDays: 120,
+        evidenceKind: 'last_email',
+      },
+      overlaps: [],
+    });
+    expect(out.hopChain.explanation).toBe('Filecoin ecosystem investor.');
+    expect(out.hopChain.attributionLines).toEqual([
+      { source: 'Affinity', text: 'Brad Holden last emailed ~4 months ago (tie 0.10)' },
+    ]);
+    expect(out.score).toBe(0.5);
+  });
+});
+
+describe('buildLinkedInOnlyPath', () => {
+  it('emits F path for founder overlap', () => {
+    const path = buildLinkedInOnlyPath({
+      targetInvestorId: '118270077',
+      overlap: overlapEntry({
+        kind: 'same_company_unknown_dates',
+        label: 'worked together',
+        plPersonKey: 'founder:f_emma_cui',
+        plName: 'Emma Cui',
+        affectsScore: false,
+        evidenceUrls: [
+          'https://www.linkedin.com/in/investor',
+          'https://www.linkedin.com/in/emma-cui',
+        ],
+      }),
+    });
+    expect(path.connectorType).toBe('F');
+    expect(path.hops).toBe(2);
+    expect(path.proximityCode).toBe('F+2B');
+    expect(path.score).toBe(0);
+    expect((path.hopChain.attributionLines as { source: string }[])[0].source).toBe('LinkedIn');
+    expect((path.hopChain as { contact?: { name: string; linkedin?: string } }).contact).toEqual({
+      name: 'Emma Cui',
+      role: 'Founder',
+      source: 'linkedin-overlap',
+      linkedin: 'https://www.linkedin.com/in/emma-cui',
+    });
+  });
+
+  it('emits PL path for venture-lead overlap', () => {
+    const path = buildLinkedInOnlyPath({
+      targetInvestorId: '118270075',
+      overlap: overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'work overlap',
+        plPersonKey: 'investor:118239754',
+        plName: 'Lacey Wisdom',
+      }),
+    });
+    expect(path.connectorType).toBe('PL');
+    expect(path.proximityCode).toBe('PL+1B');
+    expect((path.hopChain as { plConnector?: { name: string } }).plConnector?.name).toBe('Lacey Wisdom');
+  });
+
+  it('pickBestLinkedInOnlyOverlap prefers verified bonus', () => {
+    const best = pickBestLinkedInOnlyOverlap([
+      overlapEntry({
+        kind: 'same_school_unknown_dates',
+        label: 'weak',
+        plPersonKey: 'founder:f_a',
+        affectsScore: false,
+      }),
+      overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'strong',
+        plPersonKey: 'investor:1',
+      }),
+    ]);
+    expect(best?.label).toBe('strong');
   });
 });
 
@@ -234,7 +413,7 @@ describe('lookupSocialOverlapForPath', () => {
     expect(hit?.label).toBe('school overlap with Asta');
   });
 
-  it('prefers founder overlap over PL connector when both exist', () => {
+  it('returns all founder + connector overlaps', () => {
     const cache = {
       [buildSocialOverlapCacheKey({
         investorId: '118269892',
@@ -254,7 +433,7 @@ describe('lookupSocialOverlapForPath', () => {
       }),
     };
 
-    const hit = lookupSocialOverlapForPath(cache, {
+    const hits = lookupAllSocialOverlapsForPath(cache, {
       investorId: '118269892',
       hopChain: {
         ...RAW_SEQUOIA_F_PATH,
@@ -262,7 +441,7 @@ describe('lookupSocialOverlapForPath', () => {
       },
     });
 
-    expect(hit?.label).toBe('founder overlap');
+    expect(hits.map((h) => h.label).sort()).toEqual(['connector overlap', 'founder overlap']);
   });
 
   it('falls back to PL connector on affinity-direct paths', () => {
