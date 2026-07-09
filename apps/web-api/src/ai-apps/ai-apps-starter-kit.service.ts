@@ -8,6 +8,7 @@ import {
   AI_APPS_CONNECT_ENDPOINT,
   AI_APPS_DEPLOY_ENDPOINT,
   AI_APPS_DRAFT_ENDPOINT,
+  AI_APPS_STARTER_KIT_VERSION,
 } from './ai-apps.constants';
 
 /** Prebuilt PL Design System bundle, shipped verbatim inside the starter kit. */
@@ -85,7 +86,7 @@ export class AiAppsStarterKitService {
   }
 
   private readme(): string {
-    return `# PLN AI Apps — Starter Kit
+    return `# PLN AI Apps — Starter Kit v${AI_APPS_STARTER_KIT_VERSION}
 
 Welcome! This kit lets you vibe-code an app with your AI assistant and deploy it
 to the Protocol Labs Network sandbox with a single instruction.

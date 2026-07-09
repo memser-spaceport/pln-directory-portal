@@ -34,7 +34,7 @@ import { DeployDraftDto } from './dto/deploy-draft.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
-import { AI_APPS_MAX_ZIP_BYTES } from './ai-apps.constants';
+import { AI_APPS_MAX_ZIP_BYTES, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
 const WRITE = { anyOf: [AI_APPS_PERMISSIONS.WRITE] };
@@ -201,7 +201,7 @@ export class AiAppsController {
 
     res.set({
       'Content-Type': 'application/zip',
-      'Content-Disposition': 'attachment; filename="pln-ai-apps-starter-kit.zip"',
+      'Content-Disposition': `attachment; filename="pln-ai-apps-starter-kit-v${AI_APPS_STARTER_KIT_VERSION}.zip"`,
       'Content-Length': zip.length.toString(),
     });
     res.send(zip);
