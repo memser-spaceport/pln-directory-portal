@@ -246,6 +246,7 @@ model Member {
   roadmapItemPins           RoadmapItemPin[]        @relation("roadmapItemPinner")
   roadmapObjectivesCreated  RoadmapObjective[]      @relation("roadmapObjectiveCreatedBy")
   roadmapSubmissionDraft    RoadmapSubmissionDraft? @relation("roadmapSubmissionDraftOwner")
+  teamNewsUpvotes           TeamNewsUpvote[]        @relation("MemberTeamNewsUpvotes")
 
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
   affinityPerson               AffinityPerson?
@@ -2286,11 +2287,29 @@ model TeamNewsItem {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
   forumLinks   TeamNewsForumLink[]
+  upvotes      TeamNewsUpvote[]
 
   @@index([teamUid])
   @@index([eventDate])
   @@index([eventType])
   @@index([teamUid, eventDate(sort: Desc)])
+}
+
+/// Per-member "I'm interested" signal on a team news item. One upvote per
+/// member per item (toggle on/off). Counts are aggregated at read time.
+model TeamNewsUpvote {
+  id          Int          @id @default(autoincrement())
+  uid         String       @unique @default(cuid())
+  newsItemUid String
+  newsItem    TeamNewsItem @relation(fields: [newsItemUid], references: [uid], onDelete: Cascade)
+  memberUid   String
+  member      Member       @relation("MemberTeamNewsUpvotes", fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+
+  @@unique([newsItemUid, memberUid])
+  @@index([newsItemUid])
+  @@index([memberUid])
+  @@index([createdAt])
 }
 
 /// Authoritative link between a TeamNewsItem and a forum (NodeBB) topic

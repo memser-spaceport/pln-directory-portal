@@ -6,11 +6,15 @@ import {
   TeamNewsByTeamQueryParams,
   TeamNewsByTeamResponseSchema,
   TeamNewsFiltersResponseSchema,
+  TeamNewsFollowSuggestionsResponseSchema,
   TeamNewsGroupedResponseSchema,
   TeamNewsListQueryParams,
   TeamNewsListResponseSchema,
+  TeamNewsPopularQueryParams,
+  TeamNewsPopularResponseSchema,
   TeamNewsRecentQueryParams,
   TeamNewsRecentResponseSchema,
+  TeamNewsUpvoteStatusSchema,
 } from '../schema/team-news';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -53,6 +57,24 @@ export const apiTeamNews = contract.router({
     },
     summary: 'Recent network news across all teams (for the digest email)',
   },
+  // Static paths before :newsItemUid routes so Nest matching stays unambiguous.
+  getTeamNewsFollowSuggestions: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/team-news/follow-suggestions`,
+    responses: {
+      200: TeamNewsFollowSuggestionsResponseSchema,
+    },
+    summary: 'Personalized teams-to-follow suggestions for the newsfeed sidebar',
+  },
+  getTeamNewsPopular: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/team-news/popular`,
+    query: TeamNewsPopularQueryParams,
+    responses: {
+      200: TeamNewsPopularResponseSchema,
+    },
+    summary: 'Most-upvoted team news from the last 7 days (popular this week rail)',
+  },
   getTeamNewsByTeam: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/teams/:teamUid/team-news`,
@@ -62,6 +84,26 @@ export const apiTeamNews = contract.router({
       200: TeamNewsByTeamResponseSchema,
     },
     summary: 'List news items for a team, ordered newest first with pagination and search',
+  },
+  upvoteTeamNews: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/team-news/:newsItemUid/upvote`,
+    pathParams: z.object({ newsItemUid: z.string() }),
+    body: z.object({}).optional(),
+    responses: {
+      200: TeamNewsUpvoteStatusSchema,
+    },
+    summary: 'Upvote a team news item (idempotent)',
+  },
+  removeTeamNewsUpvote: {
+    method: 'DELETE',
+    path: `${getAPIVersionAsPath('1')}/team-news/:newsItemUid/upvote`,
+    pathParams: z.object({ newsItemUid: z.string() }),
+    body: z.object({}).optional(),
+    responses: {
+      200: TeamNewsUpvoteStatusSchema,
+    },
+    summary: 'Remove an upvote from a team news item (idempotent)',
   },
   createTeamNewsDiscussion: {
     method: 'POST',

@@ -178,7 +178,8 @@ export class FollowsService {
     return { following, entityType: 'TEAM', entityUid: teamUid, followerCount };
   }
 
-  private async countFollowersByTeam(teamUids: string[]): Promise<Map<string, number>> {
+  /** Follower counts keyed by team UID — used by follow lists and news suggestions. */
+  async countFollowersByTeam(teamUids: string[]): Promise<Map<string, number>> {
     if (teamUids.length === 0) return new Map();
     const grouped = await this.prisma.follow.groupBy({
       by: ['entityUid'],
