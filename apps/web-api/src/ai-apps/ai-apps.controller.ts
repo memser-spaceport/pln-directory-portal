@@ -116,13 +116,14 @@ export class AiAppsController {
     return this.aiAppsService.listEvents(appUid, limit ? Number(limit) : undefined);
   }
 
-  /** Single AI App detail. */
+  /** Single AI App detail (includes `canManage` for the requesting member). */
   @NoCache()
   @Get(':uid')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(READ)
-  async getApp(@Param('uid') uid: string) {
-    return this.aiAppsService.getApp(uid);
+  async getApp(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req).catch(() => undefined);
+    return this.aiAppsService.getApp(uid, memberUid);
   }
 
   /** Full event/status history for a single app, newest first. */

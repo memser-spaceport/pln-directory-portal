@@ -24,6 +24,7 @@ import {
   buildAppPageUrl,
   buildAppS3Key,
   buildAppUrl,
+  buildRunnerDeploymentsUrl,
   buildRunnerSecretsUrl,
 } from './ai-apps.constants';
 
@@ -76,12 +77,21 @@ export class AiAppsService {
     return this.withMember(apps);
   }
 
-  async getApp(uid: string): Promise<WithMember<AiApp>> {
+  /**
+   * Single app detail. When the requester is known, the response carries
+   * `canManage` (creator or directory admin) — computed server-side so the UI
+   * never has to compare member uids from a possibly stale login cookie.
+   */
+  async getApp(uid: string, requesterUid?: string): Promise<WithMember<AiApp> & { canManage?: boolean }> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
-    return (await this.withMember([app]))[0];
+    const result = (await this.withMember([app]))[0];
+    if (!requesterUid) {
+      return result;
+    }
+    return { ...result, canManage: await this.isCreatorOrDirectoryAdmin(requesterUid, app) };
   }
 
   /**
@@ -222,7 +232,9 @@ export class AiAppsService {
       throw new BadGatewayException('Failed to store the app bundle');
     }
 
-    return this.proxyDeploy(memberUid, app, dto.deploymentId, s3Key);
+    // Apps that went through the draft flow keep their stored secrets across
+    // agent-initiated redeploys.
+    return this.proxyDeploy(memberUid, app, dto.deploymentId, s3Key, app.providedEnvVars);
   }
 
   /**
@@ -332,7 +344,7 @@ export class AiAppsService {
       appId: app.appId,
       deploymentId: app.deploymentId,
     });
-    return this.proxyDeploy(requesterUid, app, app.deploymentId, app.s3Key);
+    return this.proxyDeploy(requesterUid, app, app.deploymentId, app.s3Key, Array.from(provided));
   }
 
   /**
@@ -370,14 +382,17 @@ export class AiAppsService {
 
   /**
    * Shared deploy proxy: flips the app to DEPLOYING, asks the runner to build
-   * and start the bundle at `s3Key`, and settles READY/ERROR (with the timeout
+   * and start the bundle at `s3Key`, then — when the app has stored secrets —
+   * redeploys the built image with those secrets injected (the legacy `/deploy`
+   * build does NOT inject them), and settles READY/ERROR (with the timeout
    * verification below). Callers record DEPLOY_STARTED themselves.
    */
   private async proxyDeploy(
     memberUid: string,
     app: Pick<AiApp, 'uid' | 'appId'>,
     deploymentId: string,
-    s3Key: string
+    s3Key: string,
+    secretNames: string[] = []
   ): Promise<WithMember<AiApp>> {
     const host = buildAppHost(app.appId);
     const url = buildAppUrl(app.appId);
@@ -398,6 +413,7 @@ export class AiAppsService {
       return (await this.withMember([updated]))[0];
     };
 
+    let port: number | null = null;
     try {
       this.logger.log(
         `Runner deploy request for ${app.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
@@ -409,7 +425,7 @@ export class AiAppsService {
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
       this.logRunnerResponse('deploy', app.appId, response.status, response.data);
-      return markReady(response.data.port ?? null);
+      port = response.data.port ?? null;
     } catch (error) {
       this.logRunnerError('deploy', app.appId, error);
       const message = axios.isAxiosError(error)
@@ -419,17 +435,73 @@ export class AiAppsService {
       // A gateway timeout (Cloudflare 504/524, etc.) or no response doesn't mean the
       // deploy failed — the long-running build often completes on the origin. Verify
       // by checking whether the app is actually reachable before declaring failure.
+      let survivedTimeout = false;
       if (this.isUncertainRunnerError(error)) {
         this.logger.warn(`Runner timed out for ${app.appId}; verifying app at ${url}. (${message})`);
-        if (await this.verifyAppLive(url)) {
-          this.logger.log(`AI App ${app.appId} is live despite runner timeout — marking READY`);
-          return markReady(null);
-        }
+        survivedTimeout = await this.verifyAppLive(url);
       }
+      if (!survivedTimeout) {
+        this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
+        await this.failDeploy(app.uid, memberUid, eventContext, message);
+        throw new BadGatewayException('Failed to deploy app to the sandbox runner');
+      }
+      this.logger.log(`AI App ${app.appId} is live despite runner timeout — continuing`);
+    }
 
-      this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
-      await this.failDeploy(app.uid, memberUid, eventContext, message);
-      throw new BadGatewayException('Failed to deploy app to the sandbox runner');
+    // The build ran the app WITHOUT its secrets — redeploy the built image with
+    // the stored secret names injected. A secrets app that can't get its values
+    // must fail loudly rather than go READY in a broken state.
+    if (secretNames.length) {
+      try {
+        await this.deployImageWithSecrets(app.appId, secretNames, url);
+      } catch (error) {
+        const message = `Secrets injection failed: ${(error as Error).message}`;
+        this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
+        await this.failDeploy(app.uid, memberUid, eventContext, message);
+        throw new BadGatewayException('Failed to inject secrets on the sandbox runner');
+      }
+    }
+
+    return markReady(port);
+  }
+
+  /**
+   * Redeploys an app's already-built image with the named stored secrets
+   * injected (`POST /v1/projects/<project>/deployments`). The image reference
+   * comes from the runner's own app registry (`GET /apps`).
+   */
+  private async deployImageWithSecrets(appId: string, secretNames: string[], appUrl: string): Promise<void> {
+    const headers = { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN };
+
+    const registry = await axios.get<{ apps?: Array<{ app_id?: string; image?: string }> }>(
+      `${AI_APPS_RUNNER_URL}/apps`,
+      { headers: { 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
+    );
+    const image = registry.data?.apps?.find((entry) => entry.app_id === appId)?.image;
+    if (!image) {
+      throw new Error(`runner /apps has no image for ${appId}`);
+    }
+
+    try {
+      this.logger.log(
+        `Runner secrets-deploy request for ${appId}: POST ${buildRunnerDeploymentsUrl()} ` +
+          `(image=${image}, secretNames=${secretNames.join(', ')})`
+      );
+      const response = await axios.post(
+        buildRunnerDeploymentsUrl(),
+        { appId, environment: AI_APPS_RUNNER_ENVIRONMENT, image, secretNames },
+        { headers }
+      );
+      this.logRunnerResponse('secrets-deploy', appId, response.status, response.data);
+    } catch (error) {
+      this.logRunnerError('secrets-deploy', appId, error);
+      // Same edge-timeout caveat as the build: verify before declaring failure.
+      if (this.isUncertainRunnerError(error) && (await this.verifyAppLive(appUrl))) {
+        this.logger.warn(`Secrets deploy timed out for ${appId} but the app is reachable — continuing`);
+        return;
+      }
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      throw new Error(`runner deployments call failed (status=${status ?? 'n/a'})`);
     }
   }
 

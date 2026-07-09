@@ -53,13 +53,19 @@ function buildService(app: Record<string, any> | null = APP) {
   return { service: new AiAppsService(prisma as any, aws as any), prisma, aws };
 }
 
-/** Route runner calls by URL: secrets store + deploy both answer 200 by default. */
+/** Route runner calls by URL: secrets store, build, and secrets-deploy all answer 200 by default. */
 function mockRunnerOk() {
-  mockedAxios.post.mockImplementation((url: string) =>
-    url.includes('/secrets')
-      ? Promise.resolve({ status: 200, data: { ok: true } })
-      : Promise.resolve({ status: 200, data: { port: 31001 } })
-  );
+  // GET /apps — the registry lookup that resolves the built image for injection.
+  mockedAxios.get.mockResolvedValue({ status: 200, data: { apps: [{ app_id: 'demo', image: 'ecr/apps:demo-d1' }] } });
+  mockedAxios.post.mockImplementation((url: string) => {
+    if (url.includes('/secrets')) {
+      return Promise.resolve({ status: 200, data: { ok: true } });
+    }
+    if (url.includes('/deployments')) {
+      return Promise.resolve({ status: 200, data: { status: 'success' } });
+    }
+    return Promise.resolve({ status: 200, data: { port: 31001 } });
+  });
 }
 
 function eventTypes(prisma: any): string[] {
@@ -139,6 +145,24 @@ describe('AiAppsService.registerDraft', () => {
   });
 });
 
+describe('AiAppsService.getApp', () => {
+  it('sets canManage=true for the creator', async () => {
+    const { service } = buildService();
+    expect((await service.getApp('app-1', 'creator-1')).canManage).toBe(true);
+  });
+
+  it('sets canManage=false for a viewer who is neither creator nor admin', async () => {
+    const { service, prisma } = buildService();
+    prisma.member.findUnique.mockResolvedValue({ memberRoles: [] });
+    expect((await service.getApp('app-1', 'viewer-1')).canManage).toBe(false);
+  });
+
+  it('omits canManage when no requester is given', async () => {
+    const { service } = buildService();
+    expect('canManage' in (await service.getApp('app-1'))).toBe(false);
+  });
+});
+
 describe('AiAppsService.deployDraft', () => {
   const SECRETS = { OPENAI_API_KEY: 'sk-1', SUPABASE_URL: 'https://x.supabase.co' };
 
@@ -166,17 +190,27 @@ describe('AiAppsService.deployDraft', () => {
     expect(mockedAxios.post).not.toHaveBeenCalled();
   });
 
-  it('saves secrets to the runner, then deploys the stored bundle', async () => {
+  it('saves secrets, builds the bundle, then redeploys the image with the secrets injected', async () => {
     const { service, prisma } = buildService();
     mockRunnerOk();
 
     const result = await service.deployDraft('creator-1', 'app-1', SECRETS);
 
-    const [secretsCall, deployCall] = mockedAxios.post.mock.calls;
+    const [secretsCall, deployCall, injectCall] = mockedAxios.post.mock.calls;
     expect(secretsCall[0]).toContain('/v1/projects/default/secrets');
     expect(secretsCall[1]).toEqual(expect.objectContaining({ appId: 'demo', secrets: SECRETS }));
     expect(deployCall[0]).toContain('/deploy');
     expect(deployCall[1]).toEqual({ appId: 'demo', deploymentId: 'd1', s3Key: 'apps/demo/d1/app.zip' });
+    // The legacy /deploy build does not inject secrets — a follow-up deployments
+    // call must run the built image with the stored secret names.
+    expect(injectCall[0]).toContain('/v1/projects/default/deployments');
+    expect(injectCall[1]).toEqual(
+      expect.objectContaining({
+        appId: 'demo',
+        image: 'ecr/apps:demo-d1',
+        secretNames: ['OPENAI_API_KEY', 'SUPABASE_URL'],
+      })
+    );
 
     // Only the NAMES are remembered on the app record.
     expect(prisma.aiApp.update).toHaveBeenCalledWith(
@@ -192,9 +226,29 @@ describe('AiAppsService.deployDraft', () => {
 
     await service.deployDraft('creator-1', 'app-1', undefined);
 
-    expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+    // No secrets-store call — straight to build + inject.
+    expect(mockedAxios.post).toHaveBeenCalledTimes(2);
     expect(mockedAxios.post.mock.calls[0][0]).toContain('/deploy');
+    expect(mockedAxios.post.mock.calls[1][0]).toContain('/deployments');
     expect(eventTypes(prisma)).toEqual(['DEPLOY_STARTED', 'DEPLOY_SUCCEEDED']);
+  });
+
+  it('marks the app ERROR when the secrets injection fails after the build', async () => {
+    const { service, prisma } = buildService({ ...APP, providedEnvVars: ['OPENAI_API_KEY', 'SUPABASE_URL'] });
+    mockedAxios.get.mockResolvedValue({ status: 200, data: { apps: [{ app_id: 'demo', image: 'img' }] } });
+    mockedAxios.post.mockImplementation((url: string) =>
+      url.includes('/deployments')
+        ? Promise.reject(Object.assign(new Error('nope'), { isAxiosError: true, response: { status: 500, data: 'x' } }))
+        : Promise.resolve({ status: 200, data: { port: 31001 } })
+    );
+
+    await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toBeInstanceOf(BadGatewayException);
+    expect(prisma.aiApp.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'ERROR', notes: expect.stringContaining('Secrets injection failed') }),
+      })
+    );
+    expect(eventTypes(prisma)).toEqual(['DEPLOY_STARTED', 'DEPLOY_FAILED']);
   });
 
   it('fails with 502 and skips the deploy when the runner rejects the secrets', async () => {
