@@ -142,6 +142,8 @@ export class TeamNewsEnrichmentService {
           discussion: { count: 0, latestTopicUrl: null },
           // Service-to-service endpoint: no member context, so never "followed".
           isFollowed: false,
+          upvoteCount: 0,
+          viewerHasUpvoted: false,
         };
       }),
     };
