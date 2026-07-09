@@ -5,7 +5,7 @@ import { FollowsService } from '../follows/follows.service';
 import { PrismaService } from '../shared/prisma.service';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 
-const SUGGESTION_LIMIT = 10;
+const DEFAULT_SUGGESTION_LIMIT = 10;
 const RECENT_NEWS_WINDOW_DAYS = 14;
 
 type SharedAttrKind = 'focusArea' | 'communityAffiliation' | 'industryTag';
@@ -23,7 +23,10 @@ export class TeamNewsSuggestionsService {
    * Candidates must share an attribute, not already be followed/joined, and have
    * news in the last 14 days. Order is stable for a given member on a UTC calendar day.
    */
-  async getFollowSuggestions(memberUid: string): Promise<TeamNewsFollowSuggestionsResponse> {
+  async getFollowSuggestions(
+    memberUid: string,
+    limit: number = DEFAULT_SUGGESTION_LIMIT
+  ): Promise<TeamNewsFollowSuggestionsResponse> {
     const [memberRoles, followedUids] = await Promise.all([
       this.prisma.teamMemberRole.findMany({
         where: { memberUid },
@@ -128,7 +131,7 @@ export class TeamNewsSuggestionsService {
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
       .sort((a, b) => a.sortKey - b.sortKey || a.team.name.localeCompare(b.team.name))
-      .slice(0, SUGGESTION_LIMIT);
+      .slice(0, limit);
 
     const followerCounts = await this.followsService.countFollowersByTeam(ranked.map((r) => r.team.uid));
 

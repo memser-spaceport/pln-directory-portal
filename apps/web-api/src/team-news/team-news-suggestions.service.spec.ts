@@ -100,6 +100,37 @@ describe('TeamNewsSuggestionsService', () => {
     );
   });
 
+  it('respects the limit param', async () => {
+    teamMemberRoleFindMany.mockResolvedValue([{ teamUid: 'seed-team' }]);
+    getFollowedTeamUids.mockResolvedValue(new Set());
+
+    const candidates = Array.from({ length: 5 }, (_, i) => ({
+      uid: `team-${i}`,
+      name: `Team ${i}`,
+      logo: null,
+      teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+      communityAffiliations: [],
+      industryTags: [],
+    }));
+
+    teamFindMany
+      .mockResolvedValueOnce([
+        {
+          uid: 'seed-team',
+          teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+          communityAffiliations: [],
+          industryTags: [],
+        },
+      ])
+      .mockResolvedValueOnce(candidates);
+
+    countFollowersByTeam.mockResolvedValue(new Map());
+
+    const result = await service.getFollowSuggestions('member-1', 2);
+
+    expect(result.items).toHaveLength(2);
+  });
+
   it('returns a stable order for the same member on the same day', async () => {
     teamMemberRoleFindMany.mockResolvedValue([{ teamUid: 'seed-team' }]);
     getFollowedTeamUids.mockResolvedValue(new Set());

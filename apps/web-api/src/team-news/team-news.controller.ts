@@ -5,6 +5,7 @@ import { apiTeamNews } from 'libs/contracts/src/lib/contract-team-news';
 import {
   CreateTeamNewsDiscussionRequestSchema,
   TeamNewsByTeamQueryParams,
+  TeamNewsFollowSuggestionsQueryParams,
   TeamNewsListQueryParams,
   TeamNewsPopularQueryParams,
   TeamNewsRecentQueryParams,
@@ -85,8 +86,9 @@ export class TeamNewsController {
   @NoCache()
   @UseGuards(UserTokenValidation)
   async getTeamNewsFollowSuggestions(@Req() req: Request & { userEmail?: string }) {
+    const { limit } = TeamNewsFollowSuggestionsQueryParams.parse(req.query);
     const member = await this.resolveMember(req);
-    return this.teamNewsSuggestionsService.getFollowSuggestions(member.uid);
+    return this.teamNewsSuggestionsService.getFollowSuggestions(member.uid, limit);
   }
 
   @Api(server.route.getTeamNewsPopular)

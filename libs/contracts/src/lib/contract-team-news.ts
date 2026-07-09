@@ -6,6 +6,7 @@ import {
   TeamNewsByTeamQueryParams,
   TeamNewsByTeamResponseSchema,
   TeamNewsFiltersResponseSchema,
+  TeamNewsFollowSuggestionsQueryParams,
   TeamNewsFollowSuggestionsResponseSchema,
   TeamNewsGroupedResponseSchema,
   TeamNewsListQueryParams,
@@ -61,6 +62,7 @@ export const apiTeamNews = contract.router({
   getTeamNewsFollowSuggestions: {
     method: 'GET',
     path: `${getAPIVersionAsPath('1')}/team-news/follow-suggestions`,
+    query: TeamNewsFollowSuggestionsQueryParams,
     responses: {
       200: TeamNewsFollowSuggestionsResponseSchema,
     },

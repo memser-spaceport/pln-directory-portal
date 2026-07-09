@@ -98,6 +98,13 @@ export const TeamNewsFollowSuggestionSchema = z.object({
   reason: z.string(),
 });
 
+export const TeamNewsFollowSuggestionsQueryParams = z.object({
+  limit: z
+    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1).max(20))
+    .optional()
+    .default(10),
+});
+
 export const TeamNewsFollowSuggestionsResponseSchema = z.object({
   items: z.array(TeamNewsFollowSuggestionSchema),
 });
@@ -341,6 +348,7 @@ export type CreateTeamNewsDiscussionResponse = z.infer<typeof CreateTeamNewsDisc
 export type TeamNewsForumLinkDto = z.infer<typeof TeamNewsForumLinkSchema>;
 export type TeamNewsUpvoteStatus = z.infer<typeof TeamNewsUpvoteStatusSchema>;
 export type TeamNewsFollowSuggestion = z.infer<typeof TeamNewsFollowSuggestionSchema>;
+export type TeamNewsFollowSuggestionsQuery = z.infer<typeof TeamNewsFollowSuggestionsQueryParams>;
 export type TeamNewsFollowSuggestionsResponse = z.infer<typeof TeamNewsFollowSuggestionsResponseSchema>;
 export type TeamNewsPopularQuery = z.infer<typeof TeamNewsPopularQueryParams>;
 export type TeamNewsPopularItem = z.infer<typeof TeamNewsPopularItemSchema>;
