@@ -46,7 +46,10 @@ type MemberAccess = {
 const itemInclude: Prisma.RoadmapItemInclude = {
   createdBy: { select: { uid: true, name: true, image: { select: { url: true } } } },
   promotedBy: { select: { uid: true, name: true } },
-  objective: { select: { uid: true, title: true, order: true } },
+  objectives: {
+    include: { objective: { select: { uid: true, title: true, order: true } } },
+    orderBy: { objective: { order: 'asc' } },
+  },
   _count: { select: { pins: true } },
 };
 
@@ -74,7 +77,7 @@ interface RoadmapItemRow {
   promotedByUid: string | null;
   declinedReason: string | null;
   externalTrackerUrl: string | null;
-  objective: { uid: string; title: string; order: number } | null;
+  objectives: { objective: { uid: string; title: string; order: number } }[];
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -525,8 +528,9 @@ export class RoadmapService {
       where.focusArea = query.focusArea;
     }
 
-    if (query.objectiveUid) {
-      where.objectiveUid = query.objectiveUid;
+    const objectiveUids = query.objectiveUid as string[] | undefined;
+    if (objectiveUids?.length) {
+      where.objectives = { some: { objectiveUid: { in: objectiveUids } } };
     }
 
     if (query.type) {
@@ -627,9 +631,11 @@ export class RoadmapService {
       promotedByUid: row.promotedByUid,
       declinedReason: row.declinedReason,
       externalTrackerUrl: row.externalTrackerUrl,
-      objective: row.objective
-        ? { uid: row.objective.uid, title: row.objective.title, order: row.objective.order }
-        : null,
+      objectives: row.objectives.map((link) => ({
+        uid: link.objective.uid,
+        title: link.objective.title,
+        order: link.objective.order,
+      })),
       upvoteCount: 0,
       viewerHasUpvoted: false,
       pinCount: this.isPinnableStage(row.stage) ? pinState.activePinCount : row._count.pins,

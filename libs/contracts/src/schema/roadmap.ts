@@ -38,7 +38,7 @@ export const RoadmapItemListQueryParams = z.object({
   tags: commaSeparatedListParam(),
   type: z.string().optional(),
   focusArea: z.string().optional(),
-  objectiveUid: z.string().optional(),
+  objectiveUid: commaSeparatedListParam(),
   sort: RoadmapSortParam.optional(),
   mine: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
   includeDeclined: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
@@ -82,7 +82,7 @@ export const RoadmapItemSchema = z.object({
   promotedByUid: z.string().nullable(),
   declinedReason: z.string().nullable(),
   externalTrackerUrl: z.string().nullable(),
-  objective: RoadmapObjectiveRefSchema.nullable(),
+  objectives: z.array(RoadmapObjectiveRefSchema),
   /** @deprecated Always 0 — likes removed; use pinCount. Kept for API compat. */
   upvoteCount: z.number().int(),
   /** @deprecated Always false — likes removed; use viewerHasPinned. Kept for API compat. */
@@ -220,16 +220,13 @@ export const CreateRoadmapObjectiveSchema = z.object({
   title: z.string().trim().min(1).max(150),
 });
 
-export const SetRoadmapItemObjectiveSchema = z
-  .object({
-    /** Existing objective uid, or null to clear the chip. */
-    objectiveUid: z.string().optional().nullable(),
-    /** Find-or-create an objective by title and assign it. */
-    title: z.string().trim().min(1).max(150).optional(),
-  })
-  .refine((v) => v.objectiveUid !== undefined || v.title !== undefined, {
-    message: 'Provide objectiveUid or title',
-  });
+/** Replace-all assignment of objectives on an item. Empty objectiveUids clears all. */
+export const SetRoadmapItemObjectivesSchema = z.object({
+  /** Full desired set of existing objective uids (empty array clears). */
+  objectiveUids: z.array(z.string()).default([]),
+  /** Find-or-create objectives by title and merge into the assigned set. */
+  titles: z.array(z.string().trim().min(1).max(150)).optional(),
+});
 
 // --- Priority signaling: settings ---
 
@@ -258,7 +255,7 @@ export const RoadmapSubmissionDraftSchema = z.object({
   tags: z.array(z.string()),
   type: z.string().nullable(),
   stage: RoadmapStageSchema.nullable(),
-  objectiveUid: z.string().nullable(),
+  objectiveUids: z.array(z.string()),
   newObjectiveTitle: z.string().nullable(),
   showCreateObjective: z.boolean(),
   updatedAt: z.string(),
@@ -280,7 +277,7 @@ export const UpsertRoadmapDraftSchema = z.object({
   tags: z.array(z.string()).optional(),
   type: z.string().max(500).optional().nullable(),
   stage: RoadmapStageSchema.optional().nullable(),
-  objectiveUid: z.string().optional().nullable(),
+  objectiveUids: z.array(z.string()).optional(),
   newObjectiveTitle: z.string().max(150).optional().nullable(),
   showCreateObjective: z.boolean().optional(),
 });

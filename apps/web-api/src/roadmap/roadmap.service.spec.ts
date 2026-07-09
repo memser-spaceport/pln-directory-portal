@@ -129,7 +129,7 @@ describe('RoadmapService', () => {
       ...baseItem,
       createdBy: { uid: 'creator-1', name: 'A', image: null },
       promotedBy: null,
-      objective: null,
+      objectives: [],
       _count: { pins: 0 },
     };
 
@@ -204,7 +204,7 @@ describe('RoadmapService', () => {
       stage,
       createdBy: { uid: 'creator-1', name: 'A', image: null },
       promotedBy: null,
-      objective: null,
+      objectives: [],
       _count: { pins: 2 },
     });
 
@@ -243,7 +243,7 @@ describe('RoadmapService', () => {
       stage,
       createdBy: { uid: 'creator-1', name: 'A', image: null },
       promotedBy: null,
-      objective: null,
+      objectives: [],
       _count: { pins: 2 },
     });
 

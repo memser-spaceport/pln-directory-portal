@@ -28,7 +28,7 @@ export class RoadmapDraftsService {
       tags: body.tags ?? [],
       type: body.type ?? null,
       stage: body.stage ?? null,
-      objectiveUid: body.objectiveUid ?? null,
+      objectiveUids: body.objectiveUids ?? [],
       newObjectiveTitle: body.newObjectiveTitle ?? null,
       showCreateObjective: body.showCreateObjective ?? false,
     };
@@ -60,7 +60,7 @@ export class RoadmapDraftsService {
       tags: draft.tags,
       type: draft.type,
       stage: (draft.stage as DraftDto['stage']) ?? null,
-      objectiveUid: draft.objectiveUid,
+      objectiveUids: draft.objectiveUids,
       newObjectiveTitle: draft.newObjectiveTitle,
       showCreateObjective: draft.showCreateObjective,
       updatedAt: draft.updatedAt.toISOString(),

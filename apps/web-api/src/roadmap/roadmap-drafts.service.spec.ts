@@ -24,7 +24,7 @@ const draftRow = {
   tags: ['infra'],
   type: 'Feature Request',
   stage: 'IDEA',
-  objectiveUid: null,
+  objectiveUids: [],
   newObjectiveTitle: null,
   showCreateObjective: false,
   updatedAt: new Date('2026-06-17T00:00:00.000Z'),
@@ -79,7 +79,7 @@ describe('RoadmapDraftsService', () => {
         tags: [],
         type: null,
         stage: null,
-        objectiveUid: null,
+        objectiveUids: [],
         newObjectiveTitle: null,
         showCreateObjective: false,
       });

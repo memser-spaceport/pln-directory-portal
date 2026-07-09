@@ -2858,8 +2858,7 @@ model RoadmapItem {
 
   externalTrackerUrl String?
 
-  objectiveUid String?
-  objective    RoadmapObjective? @relation(fields: [objectiveUid], references: [uid])
+  objectives RoadmapItemObjective[]
 
   upvotes RoadmapItemUpvote[]
   pins    RoadmapItemPin[]
@@ -2871,7 +2870,6 @@ model RoadmapItem {
 
   @@index([stage, deletedAt])
   @@index([createdByUid])
-  @@index([objectiveUid])
 }
 
 model RoadmapItemUpvote {
@@ -2912,15 +2910,29 @@ model RoadmapItemPin {
 }
 
 model RoadmapObjective {
-  id           Int           @id @default(autoincrement())
-  uid          String        @unique @default(cuid())
-  title        String        @unique
-  order        Int           @unique @default(autoincrement())
+  id           Int                    @id @default(autoincrement())
+  uid          String                 @unique @default(cuid())
+  title        String                 @unique
+  order        Int                    @unique @default(autoincrement())
   createdByUid String?
-  createdBy    Member?       @relation("roadmapObjectiveCreatedBy", fields: [createdByUid], references: [uid])
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  items        RoadmapItem[]
+  createdBy    Member?                @relation("roadmapObjectiveCreatedBy", fields: [createdByUid], references: [uid])
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  items        RoadmapItemObjective[]
+}
+
+/// Many-to-many link between a roadmap item and its objectives (OKR chips).
+model RoadmapItemObjective {
+  id           Int              @id @default(autoincrement())
+  itemUid      String
+  item         RoadmapItem      @relation(fields: [itemUid], references: [uid], onDelete: Cascade)
+  objectiveUid String
+  objective    RoadmapObjective @relation(fields: [objectiveUid], references: [uid], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+
+  @@unique([itemUid, objectiveUid])
+  @@index([itemUid])
+  @@index([objectiveUid])
 }
 
 /// Server-persisted snapshot of a member's in-progress Gantry create/submit form, so
@@ -2940,7 +2952,7 @@ model RoadmapSubmissionDraft {
   tags                String[] @default([])
   type                String?
   stage               String?
-  objectiveUid        String?
+  objectiveUids       String[] @default([])
   newObjectiveTitle   String?
   showCreateObjective Boolean  @default(false)
 

@@ -10,7 +10,7 @@ import {
   PinRoadmapItemSchema,
   ReorderRoadmapItemsSchema,
   RoadmapItemListQueryParams,
-  SetRoadmapItemObjectiveSchema,
+  SetRoadmapItemObjectivesSchema,
   TransitionRoadmapItemSchema,
   UpdatePinNoteSchema,
   UpdateRoadmapItemSchema,
@@ -183,12 +183,12 @@ export class RoadmapController {
     return this.roadmapObjectivesService.createObjective(parsed, member.uid);
   }
 
-  @Api(server.route.setRoadmapItemObjective)
+  @Api(server.route.setRoadmapItemObjectives)
   @RequirePermissions(CURATE)
-  async setRoadmapItemObjective(@Body() body: unknown, @Req() req: Request) {
+  async setRoadmapItemObjectives(@Body() body: unknown, @Req() req: Request) {
     const member = await this.resolveMember(req);
-    const parsed = SetRoadmapItemObjectiveSchema.parse(body);
-    return this.roadmapObjectivesService.setItemObjective(req.params.uid, parsed, member.uid);
+    const parsed = SetRoadmapItemObjectivesSchema.parse(body ?? {});
+    return this.roadmapObjectivesService.setItemObjectives(req.params.uid, parsed, member.uid);
   }
 
   @Api(server.route.getRoadmapSettings)
