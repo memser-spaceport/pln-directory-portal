@@ -1,0 +1,81 @@
+.root {
+  position: relative;
+  width: 100%;
+}
+
+.viewport {
+  overflow: hidden;
+  width: 100%;
+}
+
+.track {
+  display: flex;
+  transition: transform 350ms ease;
+  will-change: transform;
+}
+
+.slide {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.prevButton,
+.nextButton {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface-light);
+  border: 1px solid var(--border-neutral-subtle);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground-neutral-secondary);
+  box-shadow: var(--shadow-sm);
+  z-index: 1;
+  transition: all 120ms;
+
+  &:hover {
+    background: var(--background-neutral-subtle);
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+}
+
+.prevButton {
+  left: -20px;
+}
+
+.nextButton {
+  right: -20px;
+}
+
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: var(--spacing-md);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-neutral-subtle);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: all 150ms;
+}
+
+.dot.active {
+  background: var(--foreground-brand-primary);
+  width: 20px;
+  border-radius: var(--radius-full);
+}

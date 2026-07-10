@@ -251,29 +251,29 @@ Both are seeded in migration `20260623120000_ai_apps` and attached to the **PL I
 ## Starter kit ZIP
 
 Built by `AiAppsStarterKitService` — text files are generated in-memory; the PL
-Design System is embedded as a prebuilt ZIP (see below):
+Design System is embedded as a curated folder (see below):
 
 ```
-README.md                                human quick-start
-CLAUDE.md / AGENTS.md                    agent build + deploy instructions
-.claude/skills/deploy-to-labs/SKILL.md   the deploy skill for the agent (incl. connect flow)
-pln-app.config.json                      connect + deploy endpoints (+ appId slot) — NO token
-pl-design-system.zip                     full PL Design System, prebuilt (see below)
-styles/pln-theme.css                     minimal CSS-variable fallback (plain-HTML apps)
-styles/FONTS.md                          Inter font guidance
-app/                                     minimal runnable Node/Express scaffold
+README.md                                      human quick-start
+CLAUDE.md / AGENTS.md                          agent build + deploy instructions
+.claude/skills/deploy-to-labs/SKILL.md         deploy skill (incl. connect flow)
+.claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
+pln-app.config.json                            connect + deploy endpoints (+ appId) — NO token
+pl-design-system/                              curated PL Design System (files, not a nested zip)
+styles/pln-theme.css                           minimal CSS-variable fallback (plain-HTML apps)
+styles/FONTS.md                                Inter font guidance
+app/                                           minimal runnable Node/Express scaffold
 ```
 
 The kit deliberately exposes **no internal PLN APIs** — only the connect and deploy endpoints — and **no token**.
 
 ### Bundled PL Design System
 
-Members no longer hand-roll UI. The kit ships the full **PL Design System** as
-`pl-design-system.zip`; the agent unzips it once (`unzip pl-design-system.zip`)
-to get a `pl-design-system/` folder so apps look on-brand out of the box:
+Members no longer hand-roll UI. The kit ships the curated **PL Design System** as
+a ready-to-use `pl-design-system/` folder (no nested zip for the agent to unpack):
 
 ```
-pl-design-system/            (after unzipping pl-design-system.zip)
+pl-design-system/
   USAGE.md                 how to consume the system in a Next.js 14 app
   guidelines.md            design rules (retrieval order, token usage, do/don't)
   components/              React components (.tsx + SCSS modules + types)
@@ -283,25 +283,20 @@ pl-design-system/            (after unzipping pl-design-system.zip)
                            plus per-component specs in primitives/ and product/
   tokens/                  SCSS design tokens → CSS custom properties
   styles/                  globals.scss (reset + tokens + @font-face), media, mixins
-  public/fonts/            self-hosted Inter variable font
+  public/fonts/            self-hosted Inter variable font (woff2)
   patterns/ examples/      layout patterns + page-level reference compositions
 ```
 
-The bundle is stored as a **single prebuilt ZIP** at
-`apps/web-api/src/ai-apps/assets/pl-design-system.zip` (one binary instead of
-hundreds of loose files — keeps Git clean; the editable `USAGE.md` source and a
-regeneration guide sit next to it in `assets/`). It is registered as a build
+The curated tree lives at `apps/web-api/src/ai-apps/assets/pl-design-system/`
+(kit overlays: `USAGE.md`, `guidelines.kit.md`). It is registered as a build
 asset in `apps/web-api/project.json`, so `nx build` copies it to
-`dist/apps/web-api/ai-apps/assets/pl-design-system.zip`. At download time
-`AiAppsStarterKitService` embeds that ZIP **verbatim** as a single entry
-(`addFile` with the STORED method — no folder walk, no recompression, no temp
-files), which is why the agent unzips it on its end. If the asset is ever missing
-at runtime, the kit still downloads — just without the design system (a warning
-is logged).
+`dist/apps/web-api/ai-apps/assets/pl-design-system/`. At download time
+`AiAppsStarterKitService` walks that folder into the kit ZIP. If the asset is
+ever missing at runtime, the kit still downloads — just without the design
+system (a warning is logged).
 
-The agent instructions (`AGENTS.md` / `CLAUDE.md`) direct the member's AI tool to
-reuse these components and tokens instead of recreating buttons, cards, inputs,
-badges, tables, tabs, dropdowns, or sidebars from scratch.
+The agent loads `.claude/skills/pl-design-system` for UI work and follows
+`AGENTS.md` / `CLAUDE.md` for deploy, secrets, and iframe rules.
 
 ## Configuration (env)
 

@@ -1,0 +1,110 @@
+// PL Design System — Spacing, Radius & Shadow Tokens
+// Three-layer architecture:
+//   Layer 1: --global-size-* primitives   (from global-style.css Figma export)
+//   Layer 3: Component spacing tokens     (--spacing-*, --radius-*, --shadow-*)
+//
+// Layer 1 uses px values (matching CSS pixel semantics for Figma compatibility).
+// Layer 3 uses rem (base 16px). No semantic layer exists yet for size tokens.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 1 — PRIMITIVE GLOBAL SIZE SCALE
+// Raw numeric steps from Figma's global-style.css export.
+// Use Layer 3 tokens in components; these are reference anchors.
+// ─────────────────────────────────────────────────────────────────────────────
+
+:root {
+  --global-size-size-0:    0px;
+  --global-size-size-25:   1px;
+  --global-size-size-50:   2px;
+  --global-size-size-100:  4px;
+  --global-size-size-150:  6px;
+  --global-size-size-200:  8px;
+  --global-size-size-250:  10px;
+  --global-size-size-300:  12px;
+  --global-size-size-350:  14px;
+  --global-size-size-400:  16px;
+  --global-size-size-450:  18px;
+  --global-size-size-500:  20px;
+  --global-size-size-550:  22px;
+  --global-size-size-600:  24px;
+  --global-size-size-650:  26px;
+  --global-size-size-700:  28px;
+  --global-size-size-750:  30px;
+  --global-size-size-800:  32px;
+  --global-size-size-900:  36px;
+  --global-size-size-1000: 40px;
+  --global-size-size-1100: 44px;
+  --global-size-size-1200: 48px;
+  --global-size-size-1300: 52px;
+  --global-size-size-1400: 56px;
+  --global-size-size-1500: 60px;
+  --global-size-size-1600: 64px;
+  --global-size-size-1800: 72px;
+  --global-size-size-2000: 80px;
+  --global-size-size-2400: 96px;
+  --global-size-size-2800: 112px;
+  --global-size-size-3200: 128px;
+  --global-size-size-3600: 144px;
+  --global-size-size-4000: 160px;
+  --global-size-size-4800: 192px;
+  --global-size-size-5600: 224px;
+  --global-size-size-6400: 256px;
+  --global-size-size-7200: 288px;
+  --global-size-size-8000: 320px;
+  --global-size-size-9600: 384px;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 3 — COMPONENT SPACING TOKENS
+// ─────────────────────────────────────────────────────────────────────────────
+
+:root {
+  // ─── Spacing scale (px values from Figma, expressed in rem) ──────────────
+  --spacing-zero:  0;
+  --spacing-5xs:   0.125rem;  // 2px
+  --spacing-4xs:   0.25rem;   // 4px
+  --spacing-3xs:   0.375rem;  // 6px
+  --spacing-2xs:   0.5rem;    // 8px
+  --spacing-xs:    0.625rem;  // 10px
+  --spacing-sm:    0.75rem;   // 12px
+  --spacing-md:    1rem;      // 16px
+  --spacing-lg:    1.25rem;   // 20px
+  --spacing-xl:    1.5rem;    // 24px
+  --spacing-2xl:   2rem;      // 32px
+  --spacing-3xl:   2.5rem;    // 40px
+  --spacing-4xl:   3rem;      // 48px
+  --spacing-6xl:   4.5rem;    // 72px
+  --spacing-7xl:   5rem;      // 80px
+
+  // ─── Corner radius ───────────────────────────────────────────────────────
+  --radius-zero:    0px;
+  --radius-xsm:     4px;
+  --radius-sm:      6px;
+  --radius-md:      8px;
+  --radius-lg:      10px;
+  --radius-xl:      12px;
+  --radius-2xl:     16px;
+  --radius-3xl:     20px;
+  --radius-full:    9999px;
+
+  // ─── Shadows ─────────────────────────────────────────────────────────────
+  --shadow-xs:      0px 1px 2px 0px #0e0f110f;
+  --shadow-sm:      0px 1px 2px 0px #0e0f110f, 0px 1px 3px 0px #0e0f111f;
+  --shadow-xl:      0px 10px 20px -5px #0e0f110f, 0px 20px 65px -5px #0e0f110f;
+  --shadow-button:  0px 1px 1px 0px #0f172a14;
+  --shadow-down-1:  0px 1px 4px 0px #e2e8f0;
+  --shadow-dropdown: 0px 2px 6px rgba(15, 23, 42, 0.16);
+
+  // ─── Layout ──────────────────────────────────────────────────────────────
+  --plaa-banner-height:    56px;
+  --plaa-sidebar-width:    215px;
+  --app-header-height:     56px;
+
+  // ─── Z-index scale ───────────────────────────────────────────────────────
+  --z-base:      0;
+  --z-dropdown:  100;
+  --z-sticky:    200;
+  --z-overlay:   300;
+  --z-modal:     400;
+  --z-toast:     500;
+}

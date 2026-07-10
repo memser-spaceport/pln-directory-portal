@@ -1,0 +1,196 @@
+@use '../../styles/media';
+@use '../../styles/mixins';
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  width: 100%;
+  background: var(--background-base-white);
+  border-bottom: 1px solid var(--border-neutral-subtle);
+  height: 64px; // navbar layout dimension — not a spacing token; keep hardcoded
+  display: flex;
+  align-items: center;
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xl);
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-xl);
+  height: 100%;
+
+  @include media.tablet-below {
+    padding: 0 var(--spacing-md);
+    gap: var(--spacing-md);
+  }
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  text-decoration: none;
+  color: inherit;
+  gap: var(--spacing-sm);
+}
+
+.logoMark {
+  width: 32px;  // brand mark touch target — not a spacing token; keep hardcoded
+  height: 32px; // brand mark touch target — not a spacing token; keep hardcoded
+  background: var(--action-bg-brand-normal);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground-light-primary);
+  font-size: var(--type-label-sm-strong-font-size);
+  font-weight: var(--font-weight-bold); // brand monogram weight; override is intentional
+}
+
+.logoText {
+  font-size: var(--type-label-md-strong-font-size);
+  line-height: var(--type-label-md-strong-line-height);
+  font-weight: var(--font-weight-semibold);
+  color: var(--foreground-neutral-primary);
+  letter-spacing: -0.3px; // brand wordmark — slightly tighter than label tracking
+
+  @include media.tablet-below {
+    display: none;
+  }
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4xs);
+  flex: 1;
+
+  @include media.tablet-below {
+    display: none;
+  }
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-md);
+  @include mixins.label-sm;
+  color: var(--foreground-neutral-secondary);
+  text-decoration: none;
+  transition: color 120ms, background 120ms;
+  white-space: nowrap;
+  position: relative;
+
+  &:hover { background: var(--background-neutral-subtle); color: var(--foreground-neutral-primary); }
+  &.active { color: var(--foreground-brand-primary); background: var(--transparent-brand-4); }
+}
+
+.navBadge {
+  background: var(--action-bg-brand-normal);
+  color: var(--foreground-light-primary);
+  border-radius: var(--radius-full);
+  padding: 1px var(--spacing-3xs); // 1px vertical is structural — matches Tabs/Sidebar badge
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-semibold);
+  min-width: 18px;
+  text-align: center;
+}
+
+.spacer { flex: 1; }
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.iconButton {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;  // icon button touch target — not a spacing token; keep hardcoded
+  height: 36px; // icon button touch target — not a spacing token; keep hardcoded
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--foreground-neutral-secondary);
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+
+  &:hover { background: var(--background-neutral-subtle); color: var(--foreground-neutral-primary); }
+}
+
+.notifDot {
+  position: absolute;
+  top: 6px;    // structural — positions dot at corner of 36px icon button
+  right: 6px;  // structural — positions dot at corner of 36px icon button
+  width: 8px;  // notification indicator size — not a spacing token
+  height: 8px; // notification indicator size — not a spacing token
+  background: var(--background-error-normal);
+  border-radius: 50%;
+  border: 2px solid var(--background-base-white); // halo ring — separates dot from icon background
+}
+
+.notifBadge {
+  position: absolute;
+  top: 3px;   // structural — positions badge at corner of 36px icon button
+  right: 3px; // structural — positions badge at corner of 36px icon button
+  min-width: 16px;
+  height: 16px;
+  background: var(--background-error-normal);
+  border-radius: var(--radius-full);
+  color: var(--foreground-light-primary);
+  font-size: 10px;  // layout-constrained micro element inside 16x16 dot
+  font-weight: 700; // layout-constrained micro element inside 16x16 dot
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px; // structural — minimal side padding inside 16px badge
+  border: 1.5px solid var(--background-base-white); // halo ring — separates badge from icon background
+}
+
+// Thin interactive shell around Avatar primitive.
+// outline (not border) so the 2px ring renders outside the 32px box
+// and doesn't clip the Avatar's content.
+.avatarBtn {
+  width: 32px;  // matches Avatar size="md" — not a spacing token; keep hardcoded
+  height: 32px; // matches Avatar size="md" — not a spacing token; keep hardcoded
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+  transition: outline-color 120ms;
+  flex-shrink: 0;
+  background: transparent;
+
+  &:hover       { outline-color: var(--foreground-brand-primary); }
+  &:focus-visible { outline-color: var(--foreground-brand-primary); }
+}
+
+.menuButton {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;  // icon button touch target — not a spacing token; keep hardcoded
+  height: 36px; // icon button touch target — not a spacing token; keep hardcoded
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--foreground-neutral-secondary);
+  cursor: pointer;
+  &:hover { background: var(--background-neutral-subtle); }
+
+  @include media.tablet-below {
+    display: flex;
+  }
+}

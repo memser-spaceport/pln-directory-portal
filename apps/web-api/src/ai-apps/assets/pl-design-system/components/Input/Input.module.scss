@@ -1,0 +1,140 @@
+@use '../../styles/mixins';
+
+// ─── Wrapper ──────────────────────────────────────────────────────────────────
+
+.wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+}
+
+.fullWidth {
+  width: 100%;
+
+  .inputWrapper,
+  .input {
+    width: 100%;
+  }
+}
+
+// ─── Label ────────────────────────────────────────────────────────────────────
+
+.label {
+  @include mixins.label-sm; // 14px/500/20px — exact match; adds system letter-spacing for labels
+  color: var(--foreground-neutral-primary);
+}
+
+// ─── Input wrapper (for icon slots) ──────────────────────────────────────────
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+// ─── Input ────────────────────────────────────────────────────────────────────
+
+.input {
+  width: 100%;
+  border: 1px solid var(--border-neutral-subtle);
+  border-radius: var(--radius-md);
+  background: var(--background-base-white);
+  color: var(--foreground-neutral-primary);
+  font-family: var(--font-family-primary);
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+
+  &::placeholder {
+    color: var(--foreground-neutral-tertiary);
+  }
+
+  &:hover:not(:disabled):not([data-error='true']) {
+    border-color: var(--action-border-neutral-normal);
+  }
+
+  &:focus:not([data-error='true']) {
+    border-color: var(--foreground-brand-primary);
+    box-shadow: 0 0 0 3px var(--transparent-brand-8);
+  }
+
+  &[data-error='true'] {
+    border-color: var(--action-border-error-focus);
+
+    &:focus {
+      box-shadow: 0 0 0 3px var(--transparent-error-12);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--background-neutral-subtle);
+  }
+}
+
+// ─── Sizes ────────────────────────────────────────────────────────────────────
+// Font-size via direct tokens (not mixin): mixin adds letter-spacing and
+// line-height that interfere with native <input> rendering.
+
+.size-sm {
+  height: 36px; // input height — not a spacing token; keep hardcoded
+  padding: 0 var(--spacing-sm);
+  font-size: var(--type-label-sm-strong-font-size);
+
+  &.hasLeftIcon  { padding-left: 36px; }  // icon slot offset — tied to icon size; keep hardcoded
+  &.hasRightIcon { padding-right: 36px; } // icon slot offset — tied to icon size; keep hardcoded
+}
+
+.size-md {
+  height: 40px; // input height — not a spacing token; keep hardcoded
+  padding: 0 var(--spacing-md);
+  font-size: var(--type-label-sm-strong-font-size);
+
+  &.hasLeftIcon  { padding-left: 40px; }  // icon slot offset — keep hardcoded
+  &.hasRightIcon { padding-right: 40px; } // icon slot offset — keep hardcoded
+}
+
+.size-lg {
+  height: 48px; // input height — not a spacing token; keep hardcoded
+  padding: 0 var(--spacing-lg);
+  font-size: var(--type-label-md-strong-font-size);
+
+  &.hasLeftIcon  { padding-left: 44px; }  // icon slot offset — keep hardcoded
+  &.hasRightIcon { padding-right: 44px; } // icon slot offset — keep hardcoded
+}
+
+// ─── Icon slots ───────────────────────────────────────────────────────────────
+
+.iconLeft,
+.iconRight {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground-neutral-tertiary);
+  pointer-events: none;
+  width: 16px;  // icon size — not a spacing token; keep hardcoded
+  height: 16px; // icon size — not a spacing token; keep hardcoded
+}
+
+.iconLeft  { left: var(--spacing-sm); }
+.iconRight { right: var(--spacing-sm); }
+
+// ─── Hint & Error ─────────────────────────────────────────────────────────────
+
+.hint {
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-regular); // hint text is unstyled — override mixin's 500 to 400
+  color: var(--foreground-neutral-tertiary);
+  margin-top: var(--spacing-2xs);
+}
+
+.errorMessage {
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-regular); // error message text is unstyled — override mixin's 500 to 400
+  color: var(--foreground-error-secondary); // semantic-error-500 — proper text-colour token (was --background-error-normal, same value)
+  margin-top: var(--spacing-2xs);
+}

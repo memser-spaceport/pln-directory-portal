@@ -1,0 +1,149 @@
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-2xl);
+  border: 2px dashed var(--border-neutral-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--background-neutral-soft-surface, #f9fafb);
+  cursor: pointer;
+  transition: all 150ms;
+  text-align: center;
+
+  &:hover,
+  &.dragging {
+    border-color: var(--foreground-brand-primary);
+    background: var(--background-brand-light-normal, rgba(27, 77, 255, 0.04));
+  }
+
+  &.error {
+    border-color: var(--background-error-normal);
+  }
+
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+}
+
+.icon {
+  color: var(--foreground-neutral-tertiary);
+  width: 40px;
+  height: 40px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground-neutral-primary);
+}
+
+.description {
+  font-size: 12px;
+  color: var(--foreground-neutral-tertiary);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.fileList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-neutral-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-light);
+}
+
+.fileIcon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--background-neutral-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground-neutral-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.fileIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.fileInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.fileName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground-neutral-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSize {
+  font-size: 12px;
+  color: var(--foreground-neutral-tertiary);
+}
+
+.progressBar {
+  height: 3px;
+  background: var(--background-neutral-subtle);
+  border-radius: var(--radius-full);
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--action-bg-brand-normal);
+  border-radius: var(--radius-full);
+  transition: width 300ms;
+}
+
+.removeButton {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--foreground-neutral-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: var(--background-neutral-subtle);
+    color: var(--foreground-neutral-primary);
+  }
+}
+
+.fileError {
+  font-size: 12px;
+  color: var(--background-error-normal);
+  margin-top: 2px;
+}

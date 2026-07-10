@@ -1,0 +1,99 @@
+@use '../../styles/mixins';
+@use '../../styles/media';
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.content {
+  background: var(--background-base-white);
+  border: 1px solid var(--border-neutral-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dropdown);
+  padding: var(--spacing-4xs);
+  min-width: 180px;
+  max-width: 320px;
+  z-index: var(--z-dropdown);
+
+  &[data-state='open'] {
+    animation: fadeIn 150ms ease;
+  }
+
+  &[data-state='closed'] {
+    animation: fadeOut 100ms ease;
+  }
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-md);
+  @include mixins.label-sm;
+  color: var(--foreground-neutral-primary);
+  cursor: pointer;
+  outline: none;
+  transition: background 100ms;
+  user-select: none;
+
+  &[data-highlighted] {
+    background: var(--background-neutral-subtle);
+  }
+
+  &[data-disabled] {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+}
+
+.itemIcon {
+  flex-shrink: 0;
+  width: 16px;  // icon size — not a spacing token; keep hardcoded
+  height: 16px; // icon size — not a spacing token; keep hardcoded
+  color: var(--foreground-neutral-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.itemRight {
+  margin-left: auto;
+  @include mixins.label-xs;
+  color: var(--foreground-neutral-tertiary);
+  display: flex;
+  align-items: center;
+}
+
+.label {
+  padding: var(--spacing-4xs) var(--spacing-md); // was --spacing-2xs (8px) with wrong 4px fallback; correct token is --spacing-4xs (4px)
+  font-size: var(--type-label-xs-strong-font-size); // 12px (rounded from 11px to scale)
+  font-weight: var(--font-weight-semibold);
+  color: var(--foreground-neutral-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em; // uppercase tracking — overrides mixin tracking; required for legibility on all-caps labels
+}
+
+.separator {
+  height: 1px;
+  background: var(--border-neutral-subtle);
+  margin: var(--spacing-4xs) 0;
+}

@@ -1,0 +1,109 @@
+@use '../../styles/mixins';
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--transparent-dark-50);
+  z-index: var(--z-overlay);
+  animation: fadeIn 200ms ease;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 280px; // sidebar layout dimension — not a spacing token; keep hardcoded
+  max-width: 90vw;
+  background: var(--background-base-white);
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar.left  { left: 0;  border-right: 1px solid var(--border-neutral-subtle); animation: slideInLeft 250ms ease; }
+.sidebar.right { right: 0; border-left: 1px solid var(--border-neutral-subtle);  animation: slideInRight 250ms ease; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-bottom: 1px solid var(--border-neutral-subtle);
+  flex-shrink: 0;
+}
+
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;  // icon button touch target — not a spacing token; keep hardcoded
+  height: 32px; // icon button touch target — not a spacing token; keep hardcoded
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--foreground-neutral-tertiary);
+  &:hover { background: var(--background-neutral-subtle); color: var(--foreground-neutral-primary); }
+}
+
+.body { flex: 1; overflow-y: auto; padding: var(--spacing-md) 0; }
+
+.section { margin-bottom: var(--spacing-md); }
+
+.sectionTitle {
+  padding: var(--spacing-xs) var(--spacing-xl);
+  font-size: var(--type-label-xs-strong-font-size); // 12px (rounded from 11px to scale)
+  font-weight: var(--font-weight-semibold);
+  color: var(--foreground-neutral-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em; // uppercase tracking — overrides mixin tracking; required for legibility on all-caps labels
+  margin-bottom: var(--spacing-4xs);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-xl);
+  @include mixins.label-sm;
+  color: var(--foreground-neutral-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+
+  &:hover { background: var(--background-neutral-subtle); color: var(--foreground-neutral-primary); }
+  &.active { background: var(--transparent-brand-4); color: var(--foreground-brand-primary); }
+}
+
+.itemIcon {
+  flex-shrink: 0;
+  width: 18px;  // icon size — not a spacing token; keep hardcoded
+  height: 18px; // icon size — not a spacing token; keep hardcoded
+  color: currentColor;
+  opacity: 0.7;
+}
+
+.itemBadge {
+  margin-left: auto;
+  background: var(--action-bg-brand-normal);
+  color: var(--foreground-light-primary);
+  border-radius: var(--radius-full);
+  padding: 1px var(--spacing-3xs); // 1px vertical is structural — matches Tabs badge
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-semibold); // badges use w600 for visual weight
+}
+
+.footer {
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-top: 1px solid var(--border-neutral-subtle);
+  flex-shrink: 0;
+}
+
+@keyframes fadeIn    { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideInLeft  { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes slideInRight { from { transform: translateX(100%); }  to { transform: translateX(0); } }

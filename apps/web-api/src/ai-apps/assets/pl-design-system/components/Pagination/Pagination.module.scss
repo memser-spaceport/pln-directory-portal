@@ -1,0 +1,118 @@
+@use '../../styles/mixins';
+@use '../../styles/media';
+
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs, 4px);
+  flex-wrap: wrap;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--spacing-xs, 8px);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-neutral-subtle);
+  background: var(--surface-light);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground-neutral-secondary);
+  cursor: pointer;
+  transition: all 100ms;
+  line-height: 1;
+
+  &:hover:not(:disabled):not(.active) {
+    background: var(--background-neutral-subtle);
+  }
+
+  &.active {
+    background: var(--action-bg-brand-normal);
+    color: #fff;
+    border-color: var(--action-bg-brand-normal);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--spacing-xs, 8px);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-neutral-subtle);
+  background: var(--surface-light);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground-neutral-secondary);
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+}
+
+.navButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 var(--spacing-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-neutral-subtle);
+  background: var(--surface-light);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground-neutral-secondary);
+  cursor: pointer;
+  transition: all 100ms;
+
+  &:hover:not(:disabled) {
+    background: var(--background-neutral-subtle);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.compactInfo {
+  font-size: 14px;
+  color: var(--foreground-neutral-secondary);
+  padding: 0 var(--spacing-sm);
+  white-space: nowrap;
+}
+
+.gotoWrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs, 8px);
+  font-size: 14px;
+  color: var(--foreground-neutral-secondary);
+}
+
+.gotoInput {
+  width: 56px;
+  height: 32px;
+  border: 1px solid var(--border-neutral-subtle);
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-size: 14px;
+  padding: 0 var(--spacing-xs, 8px);
+  outline: none;
+  background: var(--surface-light);
+  color: var(--foreground-neutral-primary);
+
+  &:focus {
+    border-color: var(--foreground-brand-primary);
+  }
+}

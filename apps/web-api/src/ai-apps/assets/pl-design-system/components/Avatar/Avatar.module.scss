@@ -1,0 +1,229 @@
+@use '../../styles/mixins';
+
+// ─── Root container ───────────────────────────────────────────────────────────
+
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  // overflow: visible (browser default) — rings + badge slots extend beyond bounds
+}
+
+// ─── Size scale ───────────────────────────────────────────────────────────────
+// Corrected from first implementation — Figma canonical values from node 10:1763.
+// Previous xl=48 (should be 64) and 3xl=80 (should be 96) are now fixed.
+// 28px had no Figma equivalent; see DESIGNER_REVIEW.md for ForumPostCard deviation.
+
+.size-xs  { width: 20px; height: 20px; }
+.size-sm  { width: 24px; height: 24px; }
+.size-md  { width: 32px; height: 32px; }
+.size-lg  { width: 40px; height: 40px; }
+.size-xl  { width: 56px; height: 56px; }
+.size-2xl { width: 64px; height: 64px; }
+.size-3xl { width: 96px; height: 96px; }
+
+// ─── Shape variants ───────────────────────────────────────────────────────────
+// Figma "Avatar" (10:1763) has exactly two shapes — see Avatar.types.ts for rationale.
+// 'circle'  = border-radius: 50% (--radius-full) — identical at all sizes
+// 'rounded' = border-radius scales with avatar size (Type=Image, Shape=Rounded verified):
+//   xs/sm  → --radius-xsm (4px)    Figma corner-radius/xsm
+//   md     → --radius-sm  (6px)    Figma corner-radius/sm
+//   lg     → --radius-md  (8px)    Figma corner-radius/md
+//   xl/2xl → --radius-xl  (12px)   Figma corner-radius/xl
+//   3xl    → --radius-2xl (16px)   Figma corner-radius/2xl
+// Previous impl used flat --radius-xsm (4px) at all rounded sizes — wrong for md+.
+
+.shape-circle { border-radius: var(--radius-full); }
+
+// rounded — size-aware
+.size-xs.shape-rounded,
+.size-sm.shape-rounded  { border-radius: var(--radius-xsm); }
+.size-md.shape-rounded  { border-radius: var(--radius-sm);  }
+.size-lg.shape-rounded  { border-radius: var(--radius-md);  }
+.size-xl.shape-rounded,
+.size-2xl.shape-rounded { border-radius: var(--radius-xl);  }
+.size-3xl.shape-rounded { border-radius: var(--radius-2xl); }
+
+// ─── Surface ──────────────────────────────────────────────────────────────────
+// Separate from root so decorative rings can render outside the clipping context.
+
+.surface {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  // Default background — overridden by type-specific rules below.
+  background-color: var(--background-neutral-subtle);
+}
+
+// ─── Type: image ──────────────────────────────────────────────────────────────
+
+.photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+// ─── Type: letter-of-name ─────────────────────────────────────────────────────
+// Figma: solid brand-primary blue background (#1b4dff) with white initials.
+// Previous impl used a 6-tint bgTint system — removed; Figma has no tint system.
+
+.surface:has(.initials) {
+  background-color: var(--foreground-brand-primary); // #1b4dff
+}
+
+.initials {
+  color: var(--background-base-white);
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  user-select: none;
+
+  // Avatar initials at xs/sm use container-constrained font sizes
+  // outside the standard type scale (Figma-canonical 11px). The 20px
+  // and 24px containers can't accommodate label-xs (12px) initials at
+  // semibold weight without visual crowding. Treat as structural
+  // exception (Container-Constrained category per DESIGN.md), not
+  // as drift to be normalized.
+  .size-xs  & { font-size: 11px; } // Figma Tiny: 11px
+  .size-sm  & { font-size: 11px; } // Figma Extra Small: 11px
+  .size-md  & { font-size: 12px; } // matches label-xs from here on
+  .size-lg  & { font-size: 14px; } // matches label-sm
+  .size-xl  & { font-size: 20px; }
+  .size-2xl & { font-size: 24px; }
+  .size-3xl & { font-size: 32px; }
+}
+
+// ─── Type: placeholder ────────────────────────────────────────────────────────
+// Figma: same brand-primary blue bg (#1b4dff) + white person silhouette icon.
+
+.surface:has(.placeholderIcon) {
+  background-color: var(--foreground-brand-primary);
+}
+
+.placeholderIcon {
+  color: var(--background-base-white);
+  // Icon fills ~60% of the avatar
+  .size-xs  & { width: 12px;  height: 12px;  }
+  .size-sm  & { width: 14px;  height: 14px;  }
+  .size-md  & { width: 20px;  height: 20px;  }
+  .size-lg  & { width: 24px;  height: 24px;  }
+  .size-xl  & { width: 34px;  height: 34px;  }
+  .size-2xl & { width: 38px;  height: 38px;  }
+  .size-3xl & { width: 58px;  height: 58px;  }
+}
+
+// ─── Type: brand-logo / emoji / flag ─────────────────────────────────────────
+// Consumers pass content via the `icon` prop. White bg (image default in Figma).
+
+.surface:has(.iconContent) {
+  background-color: var(--background-base-white);
+}
+
+.iconContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60%;
+  height: 60%;
+
+  > * {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}
+
+// ─── Badge slots ──────────────────────────────────────────────────────────────
+// Consumers are responsible for the content/styling of any badge.
+
+// Top-right — matches Figma AvatarStatusTop positioning
+.topBadgeSlot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+}
+
+// Bottom-center — for OH availability pill in MemberCard
+.bottomBadgeSlot {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: -2px; // slight anchor overlap for visual grounding
+}
+
+// ─── Decorative rings ─────────────────────────────────────────────────────────
+// Originally designed for 80px; now centered on 96px (3xl).
+// Inner (106px) extends 5px beyond each side; outer (~150px) extends 27px.
+// Rings are purely decorative — pointer-events: none; z-index below surface.
+
+.ringInner,
+.ringOuter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.ringInner {
+  width: 106px;
+  height: 106px;
+  z-index: -1;
+}
+
+.ringOuter {
+  width: 150px;
+  height: 150px;
+  z-index: -2;
+}
+
+// ─── AvatarStack ─────────────────────────────────────────────────────────────
+
+.stack {
+  display: inline-flex;
+  align-items: center;
+}
+
+.stackItem {
+  position: relative;
+  // White ring separates overlapping avatars
+  > * {
+    outline: 2px solid var(--background-base-white);
+    outline-offset: 0;
+  }
+}
+
+// Overflow pill — inherits size-* / shape-* rules already defined above.
+.stackOverflow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-neutral-subtle);
+  color: var(--foreground-neutral-secondary);
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  outline: 2px solid var(--background-base-white);
+  outline-offset: 0;
+  flex-shrink: 0;
+
+  // Font sizes matching initials scale
+  &.size-xs  { font-size: 8px;  }
+  &.size-sm  { font-size: 9px;  }
+  &.size-md  { font-size: 12px; }
+  &.size-lg  { font-size: 14px; }
+  &.size-xl  { font-size: 20px; }
+  &.size-2xl { font-size: 24px; }
+  &.size-3xl { font-size: 32px; }
+}

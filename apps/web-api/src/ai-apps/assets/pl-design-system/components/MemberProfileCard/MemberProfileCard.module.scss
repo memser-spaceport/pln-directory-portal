@@ -1,0 +1,163 @@
+@use '../../styles/mixins';
+
+// ─── Card geometry constants (structural — not spacing tokens) ────────────────
+//
+//   BANNER_HEIGHT   = 80px    gradient band height
+//   AVATAR_SIZE     = 96px    Avatar size="3xl"
+//   AVATAR_OVERLAP  = 48px    bottom half of avatar extends below banner
+//   RING_SVG_H      = 147px   outer ring SVG height
+//   RING_TOP        = 6.5px   80 − (147 ÷ 2) = 6.5 → centres ring on banner bottom
+//
+// Knobs to adjust after visual check against Figma node 25931:55667:
+//   - BANNER_HEIGHT   → change .banner height
+//   - gradient stops  → change .banner background (currently --transparent-dark-8; soften to -6)
+//   - ring dims       → change SVG width/height and ellipse/circle attrs in TSX
+//   - ring colours    → change stroke="var(--transparent-brand-*)" values in TSX
+//   - RING_TOP        → change .rings top value
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+
+.root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--background-base-white);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xs);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: box-shadow 150ms;
+  overflow: hidden;
+  isolation: isolate; // contain z-index stacking of rings / avatar
+
+  &:hover { box-shadow: var(--shadow-sm); }
+}
+
+// ─── Banner ───────────────────────────────────────────────────────────────────
+
+.banner {
+  position: relative;
+  height: 80px; // BANNER_HEIGHT
+  flex-shrink: 0;
+  // Compositional gradient per DESIGN.md §7 — neutral-slate lift, barely perceptible.
+  // Uses --transparent-dark-8 (slate/near-black at 8% opacity) for a cool-grey wash
+  // that reads against white. Brand-blue at similar opacity (--transparent-brand-4) is
+  // effectively invisible. If visually loud, dial back to --transparent-dark-6.
+  background: linear-gradient(
+    180deg,
+    var(--transparent-dark-8) 0%,
+    var(--background-base-white) 100%
+  );
+}
+
+// Decorative SVG rings centred on avatar centre (= banner bottom edge).
+// SVG ring centre is at y=73.5; card position sets ring centre at y=80 (banner bottom).
+// Formula: top = BANNER_HEIGHT − (RING_SVG_H ÷ 2) = 80 − 73.5 = 6.5px
+.rings {
+  position: absolute;
+  top: 6.5px; // structural — see RING_TOP above
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 0;
+  overflow: visible;
+}
+
+// Avatar centred on the banner/content boundary.
+// bottom: -48px places avatar centre exactly at banner bottom (AVATAR_OVERLAP).
+.avatarWrap {
+  position: absolute;
+  bottom: -48px; // structural — AVATAR_OVERLAP = AVATAR_SIZE ÷ 2
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2; // above rings (z:0), below pill (z:3)
+}
+
+// ─── Availability pill ────────────────────────────────────────────────────────
+// Mirrors MemberCard.module.scss exactly — same token set, same dimensions.
+
+.pill {
+  position: absolute;
+  bottom: -10px; // centres pill on avatar bottom edge (half-in, half-out of circle)
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4xs);
+  padding: 2px var(--spacing-2xs);
+  border-radius: var(--radius-full);
+  @include mixins.label-2xs;
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.01em;
+  border: 1.5px solid var(--background-base-white);
+  z-index: 3;
+}
+
+.available   { background: var(--transparent-brand-6);    border-color: var(--border-brand-subtle); color: var(--foreground-brand-primary);    }
+.booked      { background: var(--transparent-warning-8);                                            color: var(--foreground-warning-secondary); }
+.unavailable { background: var(--background-neutral-subtle);                                        color: var(--foreground-neutral-tertiary);  }
+
+.pillDot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+.available   .pillDot { background: var(--background-success-normal);  }
+.booked      .pillDot { background: var(--action-bg-warning-normal);   }
+.unavailable .pillDot { background: var(--foreground-neutral-tertiary); }
+
+// ─── Content ──────────────────────────────────────────────────────────────────
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  // padding-top: AVATAR_OVERLAP (48px) + spacing-lg (20px gap after avatar base)
+  padding: calc(48px + var(--spacing-lg)) var(--spacing-xl) var(--spacing-xl);
+  gap: var(--spacing-3xs);
+}
+
+.name {
+  @include mixins.label-lg;
+  font-weight: var(--font-weight-semibold);
+  color: var(--foreground-neutral-primary);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: var(--spacing-3xs);
+  @include mixins.label-sm;
+  font-weight: var(--font-weight-regular);
+}
+
+.role    { color: var(--foreground-neutral-secondary); }
+.company { color: var(--foreground-neutral-secondary); }
+.metaDot { color: var(--foreground-neutral-tertiary);  }
+
+.location {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-4xs);
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-regular);
+  color: var(--foreground-neutral-tertiary);
+}
+
+.locationIcon {
+  width: 14px;  // icon size — not a spacing token
+  height: 14px; // icon size — not a spacing token
+  flex-shrink: 0;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--spacing-3xs);
+  margin-top: var(--spacing-3xs);
+}

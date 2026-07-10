@@ -1,0 +1,118 @@
+@use '../../styles/mixins';
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xl);
+  background: var(--background-base-white);
+  border-radius: var(--radius-xl);
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--shadow-xs); // L1a: shadow only, no border — consistent with MemberCard/ForumPostCard/OfficeHoursCard
+  transition: box-shadow 150ms;
+
+  &:hover { box-shadow: var(--shadow-sm); }
+}
+
+.header { display: flex; align-items: flex-start; gap: var(--spacing-md); }
+
+.logo {
+  width: 52px;  // L2b: landscape layout — 52px fits header row; Figma portrait spec is 80px (flagged for designer review)
+  height: 52px; // L2b: landscape layout — 52px fits header row; Figma portrait spec is 80px (flagged for designer review)
+  border-radius: var(--radius-xl); // L3a: --radius-xl (12px) per Figma — code had --radius-md (8px)
+  object-fit: cover;
+  background: var(--background-neutral-subtle);
+  flex-shrink: 0;
+}
+
+.logoFallback {
+  width: 52px;  // L2b: see .logo comment
+  height: 52px; // L2b: see .logo comment
+  border-radius: var(--radius-xl); // L3a: matches .logo
+  background: var(--action-bg-brand-normal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  @include mixins.label-lg;
+  font-weight: var(--font-weight-bold); // Figma: w700 initials in brand-fill container
+  color: var(--foreground-light-primary);
+  flex-shrink: 0;
+}
+
+.headerContent { flex: 1; min-width: 0; }
+
+.nameRow { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
+
+.name {
+  @include mixins.label-lg; // Figma: Label/Large/strong — 18px/w500/24px/-0.4px; code had 18px/w600/-0.3px
+  color: var(--foreground-neutral-primary);
+}
+
+.externalIcon { color: var(--foreground-neutral-tertiary); }
+
+.tags { display: flex; flex-wrap: wrap; gap: var(--spacing-3xs); margin-top: var(--spacing-sm); }
+
+.tag {
+  padding: 2px var(--spacing-xs); // 2px vertical: sub-scale structural; --spacing-xs (10px) horizontal per Figma
+  border-radius: var(--radius-full);
+  @include mixins.label-xs; // Figma: Label/xSmall/strong — 12px/w500/16px — exact match, no overrides
+  background: var(--transparent-dark-6); // L4a: Figma filled treatment — replaces outline border
+  color: var(--foreground-neutral-secondary);
+
+  &.stage { background: var(--background-neutral-subtle); font-weight: var(--font-weight-semibold); }
+}
+
+.website {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-4xs);
+  @include mixins.label-sm;
+  font-weight: var(--font-weight-regular); // website link — body weight, not medium
+  color: var(--foreground-brand-primary);
+  text-decoration: none;
+  margin-top: var(--spacing-4xs);
+}
+
+.description {
+  @include mixins.label-sm;
+  font-weight: var(--font-weight-regular); // Figma: Label/Small/default — 14px/w400/20px; code had 14px/21px
+  color: var(--foreground-neutral-secondary);
+}
+
+.members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--border-neutral-subtle);
+}
+
+.memberItem { display: flex; align-items: center; gap: var(--spacing-sm); }
+
+
+.memberName {
+  @include mixins.label-sm; // 13px→14px per role (primary label in member row)
+  color: var(--foreground-neutral-primary);
+}
+.memberRole {
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-regular); // secondary metadata — override mixin's 500 to 400
+  color: var(--foreground-neutral-tertiary);
+}
+
+.overflowMember {
+  width: 32px;  // layout dimension — keep hardcoded
+  height: 32px; // layout dimension — keep hardcoded
+  border-radius: 50%;
+  background: var(--background-neutral-subtle);
+  border: 2px solid var(--background-base-white); // stacking border — structural 2px
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  @include mixins.label-2xs;
+  font-weight: var(--font-weight-semibold); // 10px/w600 — exact scale match for overflow count
+  color: var(--foreground-neutral-tertiary);
+}
+
+.actions { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }

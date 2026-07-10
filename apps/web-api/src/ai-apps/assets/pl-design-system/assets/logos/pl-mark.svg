@@ -1,0 +1,44 @@
+<!--
+  PL Mark  Protocol Labs logomark
+  viewBox: 48�48, transparent background, uses currentColor
+  Replace path data below with official brand asset from:
+    https://www.figma.com/design/ajJidFJgQCsS9nzXbq6upe/Design-System-Foundations-|-Protocol-Labs
+    (Brand � Logos � PL Mark)
+  License: Proprietary / Protocol Labs brand guidelines
+-->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 48 48"
+  width="48"
+  height="48"
+  fill="none"
+  aria-label="Protocol Labs"
+  role="img"
+>
+  <!--
+    PLACEHOLDER  swap with official Figma export.
+    The PL mark is a hexagonal geometric shape.
+    currentColor inherits from CSS `color` property.
+  -->
+  <path
+    d="M24 4L42 14V34L24 44L6 34V14L24 4Z"
+    stroke="currentColor"
+    stroke-width="2"
+    fill="none"
+  />
+  <path
+    d="M24 12L36 19V33L24 40L12 33V19L24 12Z"
+    fill="currentColor"
+    opacity="0.15"
+  />
+  <text
+    x="24"
+    y="28"
+    text-anchor="middle"
+    font-family="Inter, sans-serif"
+    font-size="10"
+    font-weight="600"
+    fill="currentColor"
+    letter-spacing="-0.5"
+  >PL</text>
+</svg>

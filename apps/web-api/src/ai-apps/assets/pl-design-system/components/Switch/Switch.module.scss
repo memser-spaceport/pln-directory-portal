@@ -1,0 +1,122 @@
+@use '../../styles/mixins';
+
+// ─── Wrapper ──────────────────────────────────────────────────────────────────
+
+.wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+}
+
+.wrapper-disabled {
+  cursor: not-allowed;
+}
+
+// ─── Root (Radix) ─────────────────────────────────────────────────────────────
+
+.root {
+  position: relative;
+  border-radius: var(--radius-full);
+  background: var(--background-neutral-soft-muted); // unchecked track — Figma: background/neutral/soft-muted (#e9eff6)
+  border: none;
+  cursor: pointer;
+  transition: background 200ms ease;
+  flex-shrink: 0;
+  outline: none;
+  padding: 0;
+
+  &[data-state='checked'] {
+    background: var(--action-bg-brand-normal);
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 3px var(--transparent-brand-8);
+  }
+
+  &[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+// ─── Thumb ────────────────────────────────────────────────────────────────────
+
+.thumb {
+  display: block;
+  background: var(--foreground-light-primary); // white thumb on track
+  border-radius: 50%; // circle — 50% is semantically correct for a circle; not the 9999px pill pattern
+  box-shadow: var(--shadow-sm);
+  transition: transform 200ms ease;
+  will-change: transform;
+}
+
+// ─── Sizes ────────────────────────────────────────────────────────────────────
+// All px values below are pixel-perfect toggle geometry (track size, thumb
+// size, translateX travel distance). These are not spacing-token candidates —
+// they are fixed component dimensions that must stay hardcoded.
+
+.size-sm {
+  width: 32px;  // track width — component geometry
+  height: 18px; // track height — component geometry
+
+  .thumb {
+    width: 14px;   // thumb diameter — component geometry
+    height: 14px;  // thumb diameter — component geometry
+    transform: translateX(2px);  // unchecked position — 2px inset
+
+    &[data-state='checked'] {
+      transform: translateX(16px); // checked position — track(32) - thumb(14) - inset(2) = 16
+    }
+  }
+}
+
+.size-md {
+  width: 40px;  // track width — component geometry
+  height: 22px; // track height — component geometry
+
+  .thumb {
+    width: 18px;   // thumb diameter — component geometry
+    height: 18px;  // thumb diameter — component geometry
+    transform: translateX(2px);  // unchecked position — 2px inset
+
+    &[data-state='checked'] {
+      transform: translateX(20px); // checked position — track(40) - thumb(18) - inset(2) = 20
+    }
+  }
+}
+
+.size-lg {
+  width: 48px;  // track width — component geometry
+  height: 26px; // track height — component geometry
+
+  .thumb {
+    width: 22px;   // thumb diameter — component geometry
+    height: 22px;  // thumb diameter — component geometry
+    transform: translateX(2px);  // unchecked position — 2px inset
+
+    &[data-state='checked'] {
+      transform: translateX(24px); // checked position — track(48) - thumb(22) - inset(2) = 24
+    }
+  }
+}
+
+// ─── Text content ─────────────────────────────────────────────────────────────
+
+.textContent {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  @include mixins.label-sm;
+  color: var(--foreground-neutral-primary);
+  cursor: pointer;
+}
+
+.description {
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-regular); // description text is unstyled — override mixin's 500 to 400
+  color: var(--foreground-neutral-tertiary);
+  margin-top: 2px; // sub-scale gap — structural; no token equivalent
+}

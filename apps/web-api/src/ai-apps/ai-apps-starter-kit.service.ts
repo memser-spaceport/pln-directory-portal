@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import AdmZip from 'adm-zip';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import {
   AI_APP_TOKEN_HEADER,
@@ -11,16 +11,13 @@ import {
   AI_APPS_STARTER_KIT_VERSION,
 } from './ai-apps.constants';
 
-/** Prebuilt PL Design System bundle, shipped verbatim inside the starter kit. */
-const DESIGN_SYSTEM_ZIP_NAME = 'pl-design-system.zip';
-
-/** ZIP "stored" method (no compression) — see adm-zip util/constants STORED. */
-const ZIP_METHOD_STORED = 0;
+/** Curated PL Design System folder, shipped as files inside the starter kit. */
+const DESIGN_SYSTEM_DIR = 'pl-design-system';
 
 /**
  * Builds the "AI Apps" starter kit ZIP a member downloads and unpacks into their
  * AI coding tool (Claude Code, Cursor, …). It carries deploy instructions for the
- * agent, a minimal runnable app scaffold, and the full PL Design System (React
+ * agent, a minimal runnable app scaffold, and the curated PL Design System (React
  * components + design tokens + usage guidelines) — but no deploy token and no PLN
  * private API info. At deploy time the agent runs the LabOS connect flow to obtain
  * a short-lived deploy token.
@@ -37,6 +34,7 @@ export class AiAppsStarterKitService {
     add('CLAUDE.md', this.agentInstructions());
     add('AGENTS.md', this.agentInstructions());
     add('.claude/skills/deploy-to-labs/SKILL.md', this.deploySkill());
+    add('.claude/skills/pl-design-system/SKILL.md', this.designSystemSkill());
     add('pln-app.config.json', this.configJson());
     add('styles/pln-theme.css', this.themeCss());
     add('styles/FONTS.md', this.fontsDoc());
@@ -45,44 +43,49 @@ export class AiAppsStarterKitService {
     add('app/Dockerfile', this.appDockerfile());
     add('app/.dockerignore', 'node_modules\nnpm-debug.log\n');
 
-    // The full PL Design System (React components, SCSS tokens, fonts, specs)
-    // ships as a single prebuilt ZIP embedded verbatim — the agent unzips it
-    // (see AGENTS.md). This avoids walking hundreds of files or writing any temp
-    // files per download. Members consume canonical components instead of
-    // hand-rolling buttons/cards/inputs.
     this.addDesignSystem(zip);
 
     return zip.toBuffer();
   }
 
   /**
-   * Locate the prebuilt design-system ZIP bundled as a build asset. In a built
-   * app it sits next to the compiled code (`dist/apps/web-api/ai-apps/assets/…`,
-   * see `apps/web-api/project.json` assets); the source path is the fallback for
+   * Locate the curated design-system folder. In a built app it sits next to the
+   * compiled code (`dist/apps/web-api/ai-apps/assets/pl-design-system`, see
+   * `apps/web-api/project.json` assets); the source path is the fallback for
    * unbundled runs (tests / ts-node).
    */
-  private designSystemZipPath(): string {
+  private designSystemDirPath(): string {
     const candidates = [
-      join(__dirname, 'ai-apps', 'assets', DESIGN_SYSTEM_ZIP_NAME),
-      join(process.cwd(), 'apps', 'web-api', 'src', 'ai-apps', 'assets', DESIGN_SYSTEM_ZIP_NAME),
+      join(__dirname, 'ai-apps', 'assets', DESIGN_SYSTEM_DIR),
+      join(process.cwd(), 'apps', 'web-api', 'src', 'ai-apps', 'assets', DESIGN_SYSTEM_DIR),
     ];
     return candidates.find((p) => existsSync(p)) ?? candidates[0];
   }
 
   /**
-   * Add the prebuilt design-system ZIP into the kit as a single entry, stored
-   * (not recompressed) since it is already compressed. Adding it must never
-   * break the kit download — if the asset is missing (misconfigured build), log
-   * and ship the kit without it.
+   * Embed the curated design-system tree as normal files under `pl-design-system/`
+   * in the kit (no nested zip). Missing asset must never break the kit download.
    */
   private addDesignSystem(zip: AdmZip): void {
-    const path = this.designSystemZipPath();
-    if (!existsSync(path)) {
-      this.logger.warn(`PL Design System bundle not found at ${path}; shipping starter kit without it.`);
+    const root = this.designSystemDirPath();
+    if (!existsSync(root)) {
+      this.logger.warn(`PL Design System folder not found at ${root}; shipping starter kit without it.`);
       return;
     }
-    const entry = zip.addFile(DESIGN_SYSTEM_ZIP_NAME, readFileSync(path));
-    entry.header.method = ZIP_METHOD_STORED;
+    this.addDirectoryToZip(zip, root, DESIGN_SYSTEM_DIR);
+  }
+
+  private addDirectoryToZip(zip: AdmZip, absDir: string, zipPrefix: string): void {
+    for (const name of readdirSync(absDir)) {
+      if (name === '.DS_Store') continue;
+      const abs = join(absDir, name);
+      const entry = join(zipPrefix, name);
+      if (statSync(abs).isDirectory()) {
+        this.addDirectoryToZip(zip, abs, entry);
+      } else {
+        zip.addFile(entry.replace(/\\/g, '/'), readFileSync(abs));
+      }
+    }
   }
 
   private readme(): string {
@@ -94,21 +97,19 @@ to the Protocol Labs Network sandbox with a single instruction.
 ## What's inside
 - \`CLAUDE.md\` / \`AGENTS.md\` — instructions your AI agent reads automatically.
 - \`.claude/skills/deploy-to-labs/\` — the deploy skill your agent uses.
+- \`.claude/skills/pl-design-system/\` — how to build on-brand UI with the PL Design System.
 - \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
-- \`pl-design-system.zip\` — the **PL Design System**: ready-made React components
+- \`pl-design-system/\` — the **PL Design System**: ready-made React components
   (Button, MemberCard, TeamCard, Table, Tabs, Badge, PageHeader, SearchInput,
-  Pagination, …), SCSS design tokens, the Inter font, and \`guidelines.md\` /
-  \`USAGE.md\`. **Unzip it** (\`unzip pl-design-system.zip\`) to get a
-  \`pl-design-system/\` folder. Your agent uses these instead of hand-building UI,
-  so your app looks on-brand out of the box.
+  Pagination, …), SCSS design tokens, the Inter font, and \`USAGE.md\` /
+  \`guidelines.md\`. Your agent uses these instead of hand-building UI.
 - \`styles/\` — a tiny CSS-variable fallback (\`pln-theme.css\`) for plain-HTML apps
   that don't use React, plus font guidance.
 - \`app/\` — a minimal runnable Node app to start from (its \`server.js\`,
   \`package.json\`, and \`Dockerfile\` are placeholders you can replace).
 
 ## How to use
-1. Unzip this folder and open it in Claude Code (or your AI tool of choice). Also
-   unzip the bundled design system once: \`unzip pl-design-system.zip\`.
+1. Unzip this folder and open it in Claude Code (or your AI tool of choice).
 2. Add your app to the \`app/\` folder:
    - **New app:** tell your agent what to build (e.g. "build a leaderboard page
      using the PLN styles"). It works in \`app/\`.
@@ -172,31 +173,20 @@ to the PLN sandbox. Follow these rules.
 - Keep dependencies minimal. The sandbox builds from the \`app/Dockerfile\`.
 
 ## Use the PL Design System — do NOT hand-roll UI
-This kit ships the **PL Design System** as \`pl-design-system.zip\`. **Unzip it
-first** — \`unzip pl-design-system.zip\` — to get the \`pl-design-system/\` folder.
-It is the source of truth for how PLN apps look. Then read
-\`pl-design-system/USAGE.md\` (how to consume it) and
-\`pl-design-system/guidelines.md\` (the rules) before building any UI.
+This kit ships the **PL Design System** as the ready-to-use \`pl-design-system/\`
+folder. Before any UI work, load the **pl-design-system** skill
+(\`.claude/skills/pl-design-system/SKILL.md\`) and follow
+\`pl-design-system/USAGE.md\` + \`pl-design-system/guidelines.md\`.
 
-- **Reuse the canonical React components in \`pl-design-system/components/\`** —
-  Button, Input, Textarea, Checkbox, Switch, Badge, Tabs, Tooltip, Dropdown,
-  Pagination, Table, SearchInput, PageHeader, MemberCard, TeamCard, Avatar,
-  Sidebar, NavBar, EmptyState, and more (see \`components/component-catalog.md\`).
-  **Do NOT recreate buttons, cards, inputs, badges, tables, tabs, dropdowns, or
-  sidebars from scratch** — import the existing component.
-- **Use the design tokens, never hardcoded values.** All colors, typography,
-  spacing, radius, and shadows come from \`pl-design-system/tokens/\` (CSS custom
-  properties like \`var(--background-brand-default)\`, \`var(--spacing-md)\`,
-  \`var(--radius-md)\`). Never hardcode hex colors or pixel font sizes.
-- **If a component you need is missing**, follow the "Missing Component Behavior"
-  in \`guidelines.md\`: prefer composing existing components and tokens over
-  inventing a bespoke one.
-- The components are React + SCSS modules (Next.js 14). For UI work, scaffold a
-  Next.js app in \`app/\` and consume the design system per \`USAGE.md\` (copy the
-  \`pl-design-system/\` folder into \`app/\` so it ships on deploy, install its peer
-  deps, and load the tokens globally). For a non-React/plain-HTML app, the
-  minimal \`styles/pln-theme.css\` fallback is available, but the React components
-  are strongly preferred.
+- **Reuse** React components from \`pl-design-system/components/\` — do not recreate
+  buttons, cards, inputs, badges, tables, tabs, dropdowns, or sidebars.
+- **Use tokens only** from \`pl-design-system/tokens/\` (e.g.
+  \`var(--background-brand-default)\`, \`var(--spacing-md)\`). Never hardcode hex or
+  pixel font sizes.
+- For UI work, scaffold a **Next.js 14** app in \`app/\`, copy \`pl-design-system/\`
+  into \`app/\` so it ships on deploy, and consume it per \`USAGE.md\`. For a
+  non-React/plain-HTML app, \`styles/pln-theme.css\` is a minimal fallback — the
+  React components are strongly preferred.
 - **Must be iframe-embeddable from \`*.plnetwork.io\`.** The app is shown inside the
   PL Infra → AI Apps dashboard via an \`<iframe>\` served from a sibling
   \`*.plnetwork.io\` subdomain. A different subdomain is a *different origin*, so any
@@ -314,6 +304,79 @@ run the connect flow again to get a fresh one.
 
 Do not ask for or use any internal PLN APIs — only the connect and deploy
 endpoints in the config are available to you.
+`;
+  }
+
+  private designSystemSkill(): string {
+    return `---
+name: pl-design-system
+description: Use whenever building or editing UI for a PLN AI App. Covers the bundled PL Design System — instantiate React components from pl-design-system/components, use design tokens only, layout patterns, and the LabOS consume steps in USAGE.md. Load before writing any JSX/TSX/SCSS for the app.
+---
+
+# PL Design System
+
+Companion to \`AGENTS.md\`. Source of truth for on-brand UI in this kit.
+
+## Before you write UI
+
+1. Read \`pl-design-system/guidelines.md\` (hard rules).
+2. Read \`pl-design-system/USAGE.md\` (how to wire it into \`app/\`).
+3. Check \`pl-design-system/components/component-catalog.md\` for the component you need.
+
+## Hard rules
+
+- **Instantiate, never recreate.** Import from \`pl-design-system/components/<Name>\`.
+  Do not hand-roll Button, Input, Badge, Table, Tabs, Dropdown, Sidebar, cards, etc.
+- **Tokens only.** Colors / type / spacing / radius / shadows come from
+  \`pl-design-system/tokens/\` as CSS variables (\`var(--foreground-neutral-primary)\`,
+  \`var(--background-brand-default)\`, \`var(--spacing-md)\`, \`var(--radius-md)\`,
+  \`var(--shadow-xs)\`). Never hardcode hex, raw px type sizes, or Tailwind color utilities.
+- **Layer 3 only** in component/layout styles — never \`var(--global-color-*)\` or
+  \`var(--semantic-*)\`.
+- Aesthetic: **structured · calm · technical · minimal**. No loud gradients, glow,
+  heavy decorative shadows, or random accents.
+
+## Consume in \`app/\` (Next.js 14)
+
+Only \`app/\` is deployed. Copy the kit's \`pl-design-system/\` into \`app/pl-design-system/\`,
+exclude it from \`tsconfig\` checking, install peer deps listed in \`USAGE.md\`, import
+\`styles/globals.scss\` once in the root layout, and copy \`public/fonts\` into the app's
+\`public/fonts\`. Import components from their folder (not only the barrel).
+
+Start script must honor \`PORT\` and bind \`0.0.0.0\`:
+\`"start": "next start -p \${PORT:-3000} -H 0.0.0.0"\`.
+
+## Which component?
+
+| Need | Reach for |
+|---|---|
+| Actions | \`Button\` |
+| Text entry | \`Input\`, \`Textarea\`, \`SearchInput\` |
+| Choice / toggle | \`Checkbox\`, \`Switch\`, \`Dropdown\`, \`Tabs\` |
+| Status / meta | \`Badge\`, \`Alert\`, \`Tooltip\`, \`EmptyState\` |
+| People / orgs | \`Avatar\`, \`MemberCard\` (dense), \`MemberProfileCard\` (hero), \`TeamCard\` |
+| Data | \`Table\`, \`Pagination\`, \`Progress\` |
+| Shell | \`NavBar\`, \`Sidebar\`, \`BottomNav\` (mobile), \`PageHeader\` |
+| Overlay | \`Drawer\` (modal / drawer / bottom-sheet patterns in \`patterns/overlay-patterns.md\`) |
+| Product cards | \`ForumPostCard\`, \`FocusAreaCard\`, \`OfficeHoursCard\`, \`CTACard\`, \`WelcomeCard\`, … |
+
+Specs: \`components/primitives/*.md\`, \`components/product/*.md\`.
+Layouts: \`patterns/\`. Page structure reference only: \`examples/\`.
+
+**MemberCard vs MemberProfileCard:** many in a list → MemberCard; single hero subject → MemberProfileCard.
+
+**Surfaces:** cards use elevation (\`--shadow-xs\` / \`--shadow-sm\`), no border at rest. Form controls use \`--border-*\`.
+
+## Missing component
+
+Prefer composing existing components + tokens. If you would have to invent a new
+primitive, stop and tell the member: \`Missing canonical component: [name]\`.
+
+## Sanity check
+
+- Every interactive control is an import from \`pl-design-system/components/\`
+- At most one primary Fill+Brand \`Button\` per section
+- No hardcoded colors/spacing; no \`X-Frame-Options\` on the app
 `;
   }
 

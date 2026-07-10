@@ -1,0 +1,74 @@
+@use '../../styles/mixins';
+
+.root {
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-xl);
+  background: var(--background-base-white);
+  border: 1px solid var(--border-neutral-subtle);
+  border-radius: var(--radius-xl);
+  gap: var(--spacing-sm);
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 150ms, border-color 150ms;
+  height: 100%;
+
+  &:hover {
+    border-color: var(--border-neutral-muted);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+.title {
+  @include mixins.label-lg;
+  font-weight: var(--font-weight-semibold); // Figma: 18px/600 — code had 16px, corrected to match Figma canonical
+  color: var(--foreground-neutral-primary);
+}
+
+.description {
+  @include mixins.label-sm;
+  font-weight: var(--font-weight-regular); // Figma: Label/Small/default (14px/w400/20px) — override mixin's 500 to 400
+  color: var(--foreground-neutral-secondary);
+  flex: 1;
+}
+
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--border-neutral-subtle);
+}
+
+.statRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.statLabel {
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-regular); // Figma-verified: Label/xSmall/default (12px/w400) — override mixin's 500 to 400
+  color: var(--foreground-neutral-tertiary);
+  white-space: nowrap;
+}
+
+.statRight {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+
+.arrow {
+  color: var(--foreground-neutral-tertiary);
+  font-size: 16px; // icon render size — not typography; keep hardcoded
+  margin-left: auto;
+}
+
+.count {
+  @include mixins.label-xs; // exact match: 12px/w500 — no overrides needed
+  color: var(--foreground-neutral-secondary);
+}

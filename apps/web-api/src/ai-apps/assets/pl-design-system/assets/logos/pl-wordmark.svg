@@ -1,0 +1,45 @@
+<!--
+  PL Wordmark  Protocol Labs full wordmark (mark + logotype)
+  viewBox: 172�40, transparent background, uses currentColor
+  Replace path data below with official brand asset from:
+    https://www.figma.com/design/ajJidFJgQCsS9nzXbq6upe/Design-System-Foundations-|-Protocol-Labs
+    (Brand � Logos � PL Wordmark)
+  License: Proprietary / Protocol Labs brand guidelines
+-->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 172 40"
+  width="172"
+  height="40"
+  fill="none"
+  aria-label="Protocol Labs"
+  role="img"
+>
+  <!--
+    PLACEHOLDER  swap with official Figma export.
+    Mark occupies the left 40�40 region; logotype text fills the rest.
+    currentColor inherits from CSS `color` property.
+  -->
+  <!-- Mark (40�40 region) -->
+  <path
+    d="M20 3L35 11.5V28.5L20 37L5 28.5V11.5L20 3Z"
+    stroke="currentColor"
+    stroke-width="1.5"
+    fill="none"
+  />
+  <path
+    d="M20 9L31 15.5V28.5L20 35L9 28.5V15.5L20 9Z"
+    fill="currentColor"
+    opacity="0.12"
+  />
+  <!-- Logotype text -->
+  <text
+    x="48"
+    y="26"
+    font-family="Inter, sans-serif"
+    font-size="14"
+    font-weight="600"
+    fill="currentColor"
+    letter-spacing="-0.3"
+  >Protocol Labs</text>
+</svg>
