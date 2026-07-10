@@ -1,0 +1,95 @@
+@use '../../styles/mixins';
+
+// ─── Wrapper ──────────────────────────────────────────────────────────────────
+
+.wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+}
+
+.fullWidth {
+  width: 100%;
+
+  .textarea {
+    width: 100%;
+  }
+}
+
+// ─── Label ────────────────────────────────────────────────────────────────────
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--foreground-neutral-primary);
+}
+
+// ─── Textarea ─────────────────────────────────────────────────────────────────
+
+.textarea {
+  border: 1px solid var(--border-neutral-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-light);
+  color: var(--foreground-neutral-primary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  min-height: 80px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+
+  &::placeholder {
+    color: var(--foreground-neutral-tertiary);
+  }
+
+  &:hover:not(:disabled):not([data-error='true']) {
+    border-color: var(--action-border-neutral-normal);
+  }
+
+  &:focus:not([data-error='true']) {
+    border-color: var(--foreground-brand-primary);
+    box-shadow: 0 0 0 3px var(--transparent-brand-8);
+  }
+
+  &[data-error='true'] {
+    border-color: var(--action-border-error-focus);
+
+    &:focus {
+      box-shadow: 0 0 0 3px rgba(255, 56, 56, 0.12);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--background-neutral-subtle);
+  }
+}
+
+.resize-none {
+  resize: none;
+}
+
+.resize-vertical {
+  resize: vertical;
+}
+
+// ─── Hint & Error ─────────────────────────────────────────────────────────────
+
+.hint {
+  font-size: 12px;
+  color: var(--foreground-neutral-tertiary);
+  margin-top: var(--spacing-2xs);
+  line-height: 16px;
+}
+
+.errorMessage {
+  font-size: 12px;
+  color: var(--background-error-normal);
+  margin-top: var(--spacing-2xs);
+  line-height: 16px;
+}

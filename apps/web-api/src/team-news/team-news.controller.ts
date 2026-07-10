@@ -5,7 +5,9 @@ import { apiTeamNews } from 'libs/contracts/src/lib/contract-team-news';
 import {
   CreateTeamNewsDiscussionRequestSchema,
   TeamNewsByTeamQueryParams,
+  TeamNewsFollowSuggestionsQueryParams,
   TeamNewsListQueryParams,
+  TeamNewsPopularQueryParams,
   TeamNewsRecentQueryParams,
 } from 'libs/contracts/src/schema/team-news';
 import { NoCache } from '../decorators/no-cache.decorator';
@@ -17,6 +19,8 @@ import { FORUM_PERMISSIONS } from '../access-control-v2/access-control-v2.consta
 import { FollowsService } from '../follows/follows.service';
 import { TeamNewsQueryService } from './team-news-query.service';
 import { TeamNewsService } from './team-news.service';
+import { TeamNewsUpvotesService } from './team-news-upvotes.service';
+import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 
 const server = initNestServer(apiTeamNews);
 
@@ -27,6 +31,8 @@ export class TeamNewsController {
   constructor(
     private readonly teamNewsQueryService: TeamNewsQueryService,
     private readonly teamNewsService: TeamNewsService,
+    private readonly teamNewsUpvotesService: TeamNewsUpvotesService,
+    private readonly teamNewsSuggestionsService: TeamNewsSuggestionsService,
     private readonly membersService: MembersService,
     private readonly accessControl: AccessControlV2Service,
     private readonly followsService: FollowsService
@@ -37,8 +43,8 @@ export class TeamNewsController {
   @UseGuards(UserTokenCheckGuard)
   async getTeamNews(@Req() request: Request & { userEmail?: string }) {
     const params = TeamNewsListQueryParams.parse(request.query);
-    const followed = await this.resolveFollowedTeamUids(request.userEmail);
-    return this.teamNewsQueryService.listTeamNews(params, followed);
+    const { followed, memberUid } = await this.resolveViewerContext(request.userEmail);
+    return this.teamNewsQueryService.listTeamNews(params, followed, memberUid);
   }
 
   @Api(server.route.getTeamNewsGrouped)
@@ -46,8 +52,8 @@ export class TeamNewsController {
   @UseGuards(UserTokenCheckGuard)
   async getTeamNewsGrouped(@Req() request: Request & { userEmail?: string }) {
     const params = TeamNewsListQueryParams.parse(request.query);
-    const followed = await this.resolveFollowedTeamUids(request.userEmail);
-    return this.teamNewsQueryService.listGroupedByFocusArea(params, followed);
+    const { followed, memberUid } = await this.resolveViewerContext(request.userEmail);
+    return this.teamNewsQueryService.listGroupedByFocusArea(params, followed, memberUid);
   }
 
   @Api(server.route.getTeamNewsFilters)
@@ -76,13 +82,44 @@ export class TeamNewsController {
     });
   }
 
+  @Api(server.route.getTeamNewsFollowSuggestions)
+  @NoCache()
+  @UseGuards(UserTokenValidation)
+  async getTeamNewsFollowSuggestions(@Req() req: Request & { userEmail?: string }) {
+    const { limit } = TeamNewsFollowSuggestionsQueryParams.parse(req.query);
+    const member = await this.resolveMember(req);
+    return this.teamNewsSuggestionsService.getFollowSuggestions(member.uid, limit);
+  }
+
+  @Api(server.route.getTeamNewsPopular)
+  @NoCache()
+  @UseGuards(UserTokenCheckGuard)
+  async getTeamNewsPopular(@Req() request: Request) {
+    const params = TeamNewsPopularQueryParams.parse(request.query);
+    return this.teamNewsQueryService.getPopular(params);
+  }
+
   @Api(server.route.getTeamNewsByTeam)
   @NoCache()
   @UseGuards(UserTokenCheckGuard)
   async getTeamNewsByTeam(@Param('teamUid') teamUid: string, @Req() request: Request & { userEmail?: string }) {
     const params = TeamNewsByTeamQueryParams.parse(request.query);
-    const followed = await this.resolveFollowedTeamUids(request.userEmail);
-    return this.teamNewsQueryService.listTeamNewsByTeam(teamUid, params, followed);
+    const { followed, memberUid } = await this.resolveViewerContext(request.userEmail);
+    return this.teamNewsQueryService.listTeamNewsByTeam(teamUid, params, followed, memberUid);
+  }
+
+  @Api(server.route.upvoteTeamNews)
+  @UseGuards(UserTokenValidation)
+  async upvoteTeamNews(@Param('newsItemUid') newsItemUid: string, @Req() req: Request & { userEmail?: string }) {
+    const member = await this.resolveMember(req);
+    return this.teamNewsUpvotesService.upvote(member.uid, newsItemUid);
+  }
+
+  @Api(server.route.removeTeamNewsUpvote)
+  @UseGuards(UserTokenValidation)
+  async removeTeamNewsUpvote(@Param('newsItemUid') newsItemUid: string, @Req() req: Request & { userEmail?: string }) {
+    const member = await this.resolveMember(req);
+    return this.teamNewsUpvotesService.removeUpvote(member.uid, newsItemUid);
   }
 
   @Api(server.route.createTeamNewsDiscussion)
@@ -115,19 +152,27 @@ export class TeamNewsController {
     return this.teamNewsService.createForumLink(newsItemUid, validated, member.uid);
   }
 
-  /**
-   * Resolve the authenticated caller's followed-team UIDs (empty set when
-   * anonymous or not a member). Used to stamp `isFollowed` and order
-   * followed-team news first on the public news endpoints.
-   */
-  private async resolveFollowedTeamUids(userEmail?: string): Promise<Set<string>> {
+  private async resolveViewerContext(userEmail?: string): Promise<{ followed: Set<string>; memberUid?: string }> {
     if (!userEmail) {
-      return new Set();
+      return { followed: new Set() };
     }
     const member = await this.membersService.findMemberByEmail(userEmail);
     if (!member) {
-      return new Set();
+      return { followed: new Set() };
     }
-    return this.followsService.getFollowedTeamUids(member.uid);
+    const followed = await this.followsService.getFollowedTeamUids(member.uid);
+    return { followed, memberUid: member.uid };
+  }
+
+  private async resolveMember(req: Request & { userEmail?: string }) {
+    if (!req.userEmail) {
+      throw new ForbiddenException('Authenticated member required');
+    }
+    const member = await this.membersService.findMemberByEmail(req.userEmail);
+    if (!member) {
+      this.logger.warn(`Team news request from authenticated email ${req.userEmail} that is not a member`);
+      throw new ForbiddenException('Member not found');
+    }
+    return member;
   }
 }

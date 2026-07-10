@@ -78,6 +78,55 @@ export const TeamNewsItemSchema = z.object({
   // for anonymous requests. Followed-team news is also surfaced first in the
   // flat list (`GET /v1/team-news`) and within each focus-area group.
   isFollowed: z.boolean(),
+  // Aggregate "I'm interested" upvotes. Always present (0 when none).
+  upvoteCount: z.number().int().min(0),
+  // True when the authenticated caller has upvoted this item. Always false
+  // for anonymous requests.
+  viewerHasUpvoted: z.boolean(),
+});
+
+export const TeamNewsUpvoteStatusSchema = z.object({
+  upvoteCount: z.number().int().min(0),
+  viewerHasUpvoted: z.boolean(),
+});
+
+export const TeamNewsFollowSuggestionSchema = z.object({
+  uid: z.string(),
+  name: z.string(),
+  logo: z.string().nullable(),
+  // Display string, e.g. "Storage · 1.2k followers"
+  reason: z.string(),
+});
+
+export const TeamNewsFollowSuggestionsQueryParams = z.object({
+  limit: z
+    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1).max(20))
+    .optional()
+    .default(10),
+});
+
+export const TeamNewsFollowSuggestionsResponseSchema = z.object({
+  items: z.array(TeamNewsFollowSuggestionSchema),
+});
+
+export const TeamNewsPopularQueryParams = z.object({
+  limit: z
+    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1).max(20))
+    .optional()
+    .default(3),
+});
+
+export const TeamNewsPopularItemSchema = z.object({
+  uid: z.string(),
+  title: z.string(),
+  teamUid: z.string(),
+  teamName: z.string(),
+  sourceUrl: z.string(),
+  upvoteCount: z.number().int().min(0),
+});
+
+export const TeamNewsPopularResponseSchema = z.object({
+  items: z.array(TeamNewsPopularItemSchema),
 });
 
 // POST /v1/team-news/{newsItemUid}/discussions — links a TeamNewsItem to a
@@ -297,3 +346,10 @@ export type TeamNewsDiscussion = z.infer<typeof TeamNewsDiscussionSchema>;
 export type CreateTeamNewsDiscussionRequest = z.infer<typeof CreateTeamNewsDiscussionRequestSchema>;
 export type CreateTeamNewsDiscussionResponse = z.infer<typeof CreateTeamNewsDiscussionResponseSchema>;
 export type TeamNewsForumLinkDto = z.infer<typeof TeamNewsForumLinkSchema>;
+export type TeamNewsUpvoteStatus = z.infer<typeof TeamNewsUpvoteStatusSchema>;
+export type TeamNewsFollowSuggestion = z.infer<typeof TeamNewsFollowSuggestionSchema>;
+export type TeamNewsFollowSuggestionsQuery = z.infer<typeof TeamNewsFollowSuggestionsQueryParams>;
+export type TeamNewsFollowSuggestionsResponse = z.infer<typeof TeamNewsFollowSuggestionsResponseSchema>;
+export type TeamNewsPopularQuery = z.infer<typeof TeamNewsPopularQueryParams>;
+export type TeamNewsPopularItem = z.infer<typeof TeamNewsPopularItemSchema>;
+export type TeamNewsPopularResponse = z.infer<typeof TeamNewsPopularResponseSchema>;

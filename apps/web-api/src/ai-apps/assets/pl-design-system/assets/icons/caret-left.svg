@@ -1,0 +1,7 @@
+<!-- Phosphor Icons — CaretLeft (Regular weight, 256×256)
+  Source: @phosphor-icons/react (MIT License)
+  Import in React: import { PhCaretLeft } from '@phosphor-icons/react'
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="16" height="16" fill="currentColor">
+  <path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/>
+</svg>

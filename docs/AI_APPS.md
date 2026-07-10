@@ -10,6 +10,7 @@ PLN members "vibe-code" a small web app locally with an AI assistant (Claude Cod
 2. They unzip it into their AI coding tool and describe what to build. The agent edits files under `app/`, reusing the bundled **PL Design System** (`pl-design-system/`) for on-brand UI instead of hand-rolling components.
 3. When ready, the member says "deploy". The agent has no stored token, so it **starts a LabOS connect session**, gives the member a link + confirmation code to open and approve, then polls until it receives a **short-lived deploy token**.
 4. The agent packages `app/` and POSTs to our deploy endpoint with that short-lived token. The backend proxies the deploy to the sandbox runner, stores the result, and the app shows up on the dashboard with its live URL.
+5. **Apps that need runtime secrets** (API keys etc.) take a detour: instead of deploying, the agent registers a **draft** (same upload + the required env var *names*), then hands the member a LabOS link. The member enters the secret *values* there and clicks **Deploy** — see "Draft apps & runtime secrets" below.
 
 ## Architecture
 
@@ -90,6 +91,7 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | GET    | `/v1/ai-apps/events`             | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Event log (audit feed); `?appUid=` to scope, `?limit=` (default 100, max 500) |
 | GET    | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Single app detail |
 | GET    | `/v1/ai-apps/:uid/events`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Full event/status history for one app (404 if app missing) |
+| GET    | `/v1/ai-apps/:uid/live`          | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Liveness probe: one server-side reachability check of the app URL → `{ live }`; the LabOS detail page polls it so the iframe never shows a raw gateway error |
 | POST   | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Submit free-text feedback on an app (multiple entries per member allowed) |
 | GET    | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | All feedback for one app, newest first, with submitter info |
 | GET    | `/v1/ai-apps/starter-kit/download` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Stream the starter-kit ZIP (no token inside) |
@@ -98,6 +100,8 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | GET    | `/v1/ai-apps/connect/:uid`       | `UserTokenCheckGuard`         | —                 | Connect-session display info for the LabOS page (no secrets) |
 | POST   | `/v1/ai-apps/connect/:uid/approve` | `UserTokenCheckGuard`       | `ai_apps.write` (checked in service) | Approve → mint deploy token; else mark `DENIED` (both audited) |
 | POST   | `/v1/ai-apps/deploy`              | `AiAppTokenGuard` (`x-app-token` = short-lived deploy token) | — (token = member) | Upload app ZIP → S3 → sandbox runner |
+| POST   | `/v1/ai-apps/draft`               | `AiAppTokenGuard` (`x-app-token`) | — (token = member) | Register a DRAFT app that needs runtime secrets: upload ZIP → S3, store required env var names; nothing deployed yet |
+| POST   | `/v1/ai-apps/:uid/deploy`         | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write` + creator/directory-admin (checked in service) | Member-triggered deploy: save submitted secret values to the runner, validate required vars, deploy the stored bundle |
 | DELETE | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Tear down on the runner → mark `DELETED` |
 
 ### Deploy request
@@ -120,6 +124,38 @@ The backend uploads the ZIP to `s3://<AI_APPS_S3_BUCKET>/apps/<appId>/<deploymen
 
 **Timeout handling:** the runner build can exceed the edge (Cloudflare) timeout and return `504`/`524` even though the deploy actually completes. On a gateway timeout (or no response), the backend does **not** fail blindly — it polls the app URL (`buildAppUrl(appId)`) for ~1 min and marks the app `READY` if it becomes reachable (any non-gateway HTTP status counts, including `404` from the app). Only if it stays unreachable — or the runner returns a non-timeout error (e.g. `400`/auth) — is it marked `ERROR` / `DEPLOY_FAILED`. This prevents false failures for slow-but-successful deploys.
 
+## Draft apps & runtime secrets
+
+Apps that read secrets from the environment (`OPENAI_API_KEY`, credentialed URLs, …) must never ship the values in the ZIP, and the agent must never see them. The **draft flow** splits responsibilities: the agent declares which env var *names* the app needs; the member supplies the *values* in LabOS; the backend forwards the values straight to the sandbox runner's secret store (they are **never persisted in our DB** — only the names are tracked, in `requiredEnvVars` / `providedEnvVars`).
+
+1. **Register (agent, deploy token)** — `POST /v1/ai-apps/draft`, same multipart shape as deploy plus `requiredEnvVars` (JSON array or comma-separated string; names must be `UPPER_SNAKE_CASE`):
+
+```bash
+curl -X POST "$AI_APPS_DRAFT_ENDPOINT" \
+  -H "x-app-token: $DEPLOY_TOKEN" \
+  -F "appId=my-ai-helper" \
+  -F "name=My AI Helper" \
+  -F "description=Chat helper that calls OpenAI" \
+  -F "deploymentId=draft-1751900000" \
+  -F 'requiredEnvVars=["OPENAI_API_KEY","SUPABASE_URL"]' \
+  -F "file=@app.zip;type=application/zip"
+```
+
+The ZIP goes to S3 as usual, the app is upserted with status **`DRAFT`** (`s3Key` + `requiredEnvVars` stored, `DRAFT_CREATED` audited), and the response carries `appPageUrl` — the LabOS app detail page (`/pl-infra/ai-apps/<uid>`) — plus `missingEnvVars`. The agent gives `appPageUrl` to the member. Nothing runs yet; a draft is not live and not iframe-ready, and the dashboard shows it with the distinct `DRAFT` status.
+
+2. **Deploy (member, LabOS)** — the member opens the page, enters the values, and clicks Deploy, which calls:
+
+```bash
+curl -X POST "https://api.plnetwork.io/v1/ai-apps/<uid>/deploy" \
+  -H "Authorization: Bearer $MEMBER_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"secrets":{"OPENAI_API_KEY":"sk-…","SUPABASE_URL":"https://…"}}'
+```
+
+The backend (creator or directory admin only) first checks every name in `requiredEnvVars` has a value — stored earlier or submitted now — and otherwise rejects with a 400 naming the missing vars. It then saves the submitted values to the runner's secret store (`POST <AI_APPS_RUNNER_URL>/v1/projects/<AI_APPS_RUNNER_PROJECT>/secrets` with `{ appId, environment, secrets }` — merge/upsert semantics, `SECRETS_UPDATED` audited with names only) and redeploys the stored bundle through the normal runner `/deploy` proxy (status `DEPLOYING` → `READY`/`ERROR`).
+
+3. **Update & redeploy** — the member can reopen the same page any time, change one or more values (`secrets` may be a subset — the runner merges), and Deploy again. `secrets` may also be omitted entirely to redeploy with the already-stored values. For a code update the agent re-registers the draft (same `appId`, fresh `deploymentId`); stored values stay valid.
+
 ### Delete request
 
 `DELETE /v1/ai-apps/:uid` (member JWT, `ai_apps.write`). The backend looks up the app by `uid`, calls the runner to tear it down, then marks the record `DELETED`:
@@ -134,7 +170,7 @@ Flow: set status `DELETING` + log `DELETE_STARTED` → call the runner → on su
 ## Data model
 
 ```prisma
-enum AiAppStatus { IN_DEVELOPMENT  DEPLOYING  READY  ERROR  DELETING  DELETED }
+enum AiAppStatus { IN_DEVELOPMENT  DRAFT  DEPLOYING  READY  ERROR  DELETING  DELETED }
 
 model AiApp {
   uid          String  @unique
@@ -146,6 +182,9 @@ model AiApp {
   notes        String?         // error detail on failed deploys
   url / httpUrl / host / port  // hosting details from the runner
   deploymentId String?
+  s3Key        String?         // last uploaded bundle (lets a member redeploy a draft)
+  requiredEnvVars String[]     // env var NAMES the agent declared (draft flow)
+  providedEnvVars String[]     // NAMES the member gave values for — values live only on the runner
   @@unique([memberUid, appId])
 }
 
@@ -167,6 +206,7 @@ model AiAppConnectSession {     // short-lived connect handshake (replaces AiApp
 
 enum AiAppEventType {
   KIT_DOWNLOADED  CONNECT_APPROVED  CONNECT_DENIED
+  DRAFT_CREATED   SECRETS_UPDATED
   DEPLOY_STARTED  DEPLOY_SUCCEEDED  DEPLOY_FAILED
   DELETE_STARTED  DELETE_SUCCEEDED  DELETE_FAILED
 }
@@ -191,9 +231,9 @@ model AiAppEvent {            // append-only audit log — one row per event, ne
 }
 ```
 
-Apps are **lazy-created on first deploy** — there is no registration form.
+Apps are **lazy-created on first deploy** — there is no registration form. (A draft registration counts: it upserts the same record with status `DRAFT`.)
 
-**Response shape:** every AI Apps endpoint (`list`, detail, `events`, and the `deploy` result) returns the owner as `member: { uid, name }` and omits the raw `memberUid` (the uid lives in `member.uid`, so it isn't duplicated). `memberUid` remains a column on the DB models above.
+**Response shape:** every AI Apps endpoint (`list`, detail, `events`, and the `deploy` result) returns the owner as `member: { uid, name }` and omits the raw `memberUid` (the uid lives in `member.uid`, so it isn't duplicated). `memberUid` remains a column on the DB models above. The detail endpoint additionally returns `canManage` — whether the requesting member is the creator or a directory admin — computed server-side so the UI never compares member uids from a possibly stale login cookie.
 
 `AiApp.status` is the current-state snapshot for the dashboard; `AiAppEvent` is the immutable event flow. A row is appended on kit download (`KIT_DOWNLOADED`), on each connect approval/denial (`CONNECT_APPROVED` / `CONNECT_DENIED` — the `userCode` is recorded in `message`), at the start of every deploy (`DEPLOY_STARTED`) and its outcome (`DEPLOY_SUCCEEDED` / `DEPLOY_FAILED`), and likewise for deletes (`DELETE_STARTED` → `DELETE_SUCCEEDED` / `DELETE_FAILED`). Event logging never throws — a logging failure won't break a download, connect, deploy, or delete.
 
@@ -211,29 +251,29 @@ Both are seeded in migration `20260623120000_ai_apps` and attached to the **PL I
 ## Starter kit ZIP
 
 Built by `AiAppsStarterKitService` — text files are generated in-memory; the PL
-Design System is embedded as a prebuilt ZIP (see below):
+Design System is embedded as a curated folder (see below):
 
 ```
-README.md                                human quick-start
-CLAUDE.md / AGENTS.md                    agent build + deploy instructions
-.claude/skills/deploy-to-labs/SKILL.md   the deploy skill for the agent (incl. connect flow)
-pln-app.config.json                      connect + deploy endpoints (+ appId slot) — NO token
-pl-design-system.zip                     full PL Design System, prebuilt (see below)
-styles/pln-theme.css                     minimal CSS-variable fallback (plain-HTML apps)
-styles/FONTS.md                          Inter font guidance
-app/                                     minimal runnable Node/Express scaffold
+README.md                                      human quick-start
+CLAUDE.md / AGENTS.md                          agent build + deploy instructions
+.claude/skills/deploy-to-labs/SKILL.md         deploy skill (incl. connect flow)
+.claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
+pln-app.config.json                            connect + deploy endpoints (+ appId) — NO token
+pl-design-system/                              curated PL Design System (files, not a nested zip)
+styles/pln-theme.css                           minimal CSS-variable fallback (plain-HTML apps)
+styles/FONTS.md                                Inter font guidance
+app/                                           minimal runnable Node/Express scaffold
 ```
 
 The kit deliberately exposes **no internal PLN APIs** — only the connect and deploy endpoints — and **no token**.
 
 ### Bundled PL Design System
 
-Members no longer hand-roll UI. The kit ships the full **PL Design System** as
-`pl-design-system.zip`; the agent unzips it once (`unzip pl-design-system.zip`)
-to get a `pl-design-system/` folder so apps look on-brand out of the box:
+Members no longer hand-roll UI. The kit ships the curated **PL Design System** as
+a ready-to-use `pl-design-system/` folder (no nested zip for the agent to unpack):
 
 ```
-pl-design-system/            (after unzipping pl-design-system.zip)
+pl-design-system/
   USAGE.md                 how to consume the system in a Next.js 14 app
   guidelines.md            design rules (retrieval order, token usage, do/don't)
   components/              React components (.tsx + SCSS modules + types)
@@ -243,25 +283,20 @@ pl-design-system/            (after unzipping pl-design-system.zip)
                            plus per-component specs in primitives/ and product/
   tokens/                  SCSS design tokens → CSS custom properties
   styles/                  globals.scss (reset + tokens + @font-face), media, mixins
-  public/fonts/            self-hosted Inter variable font
+  public/fonts/            self-hosted Inter variable font (woff2)
   patterns/ examples/      layout patterns + page-level reference compositions
 ```
 
-The bundle is stored as a **single prebuilt ZIP** at
-`apps/web-api/src/ai-apps/assets/pl-design-system.zip` (one binary instead of
-hundreds of loose files — keeps Git clean; the editable `USAGE.md` source and a
-regeneration guide sit next to it in `assets/`). It is registered as a build
+The curated tree lives at `apps/web-api/src/ai-apps/assets/pl-design-system/`
+(kit overlays: `USAGE.md`, `guidelines.kit.md`). It is registered as a build
 asset in `apps/web-api/project.json`, so `nx build` copies it to
-`dist/apps/web-api/ai-apps/assets/pl-design-system.zip`. At download time
-`AiAppsStarterKitService` embeds that ZIP **verbatim** as a single entry
-(`addFile` with the STORED method — no folder walk, no recompression, no temp
-files), which is why the agent unzips it on its end. If the asset is ever missing
-at runtime, the kit still downloads — just without the design system (a warning
-is logged).
+`dist/apps/web-api/ai-apps/assets/pl-design-system/`. At download time
+`AiAppsStarterKitService` walks that folder into the kit ZIP. If the asset is
+ever missing at runtime, the kit still downloads — just without the design
+system (a warning is logged).
 
-The agent instructions (`AGENTS.md` / `CLAUDE.md`) direct the member's AI tool to
-reuse these components and tokens instead of recreating buttons, cards, inputs,
-badges, tables, tabs, dropdowns, or sidebars from scratch.
+The agent loads `.claude/skills/pl-design-system` for UI work and follows
+`AGENTS.md` / `CLAUDE.md` for deploy, secrets, and iframe rules.
 
 ## Configuration (env)
 
@@ -271,9 +306,11 @@ badges, tables, tabs, dropdowns, or sidebars from scratch.
 | `AI_APPS_RUNNER_TOKEN` | _(empty)_ | **Required** for real deploys; `x-runner-token` to the runner |
 | `AI_APPS_S3_BUCKET` | _(empty)_ | **Required** for real deploys; bucket the runner reads app bundles from (e.g. `sandbox-apps-pln-dev-013228333448`) |
 | `AI_APPS_APP_DOMAIN` | `prod.plnetwork.io` | Base domain deployed apps are served under (app URL = `https://<appId>.<domain>`); set `dev.plnetwork.io` on Dev, `prod.plnetwork.io` on Prod |
-| `AI_APPS_DEPLOY_ENDPOINT` | `https://api.plnetwork.io/v1/ai-apps/deploy` | Written into the kit so the agent knows where to POST |
-| `AI_APPS_CONNECT_ENDPOINT` | `https://api.plnetwork.io/v1/ai-apps/connect` | Written into the kit so the agent knows where to start a connect session |
-| `AI_APPS_PORTAL_URL` | `https://directory.plnetwork.io` | Base URL of the LabOS portal hosting the connect/approval page (used to build `connectUrl`) |
+| `AI_APPS_BASE_URL` | `https://api.plnetwork.io` | Public base URL of this API; the agent-facing endpoint URLs written into the kit (deploy/connect/draft) are derived from it as `<base>/v1/ai-apps/<endpoint>` |
+| `AI_APPS_DEPLOY_ENDPOINT` / `AI_APPS_CONNECT_ENDPOINT` / `AI_APPS_DRAFT_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional per-endpoint overrides; rarely needed |
+| `AI_APPS_PORTAL_URL` | `https://directory.plnetwork.io` | Base URL of the LabOS portal hosting the connect/approval page (used to build `connectUrl` and `appPageUrl`) |
+| `AI_APPS_RUNNER_PROJECT` | `default` | Project scope of the runner's secrets API (`/v1/projects/<project>/secrets`) |
+| `AI_APPS_RUNNER_ENVIRONMENT` | `prod` | Environment label for the runner secrets/deployments API. **Must match the environment the runner's `/deploy` build registers under** (its helm release is `<environment>-<appId>`; the legacy-compat build path registers as `sandbox`) — a mismatch makes the secrets-injection deploy collide with the build's release |
 
 S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` credentials must also be present.
 
@@ -285,6 +322,7 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 - `apps/web-api/prisma/migrations/20260623150000_ai_app_events/` — event log table.
 - `apps/web-api/prisma/migrations/20260625120000_ai_apps_delete/` — `DELETING`/`DELETED` + delete event enum values.
 - `apps/web-api/prisma/migrations/20260630120000_ai_apps_connect/` — connect session table + connect event values; drops `AiAppToken`.
+- `apps/web-api/prisma/migrations/20260707120000_ai_apps_draft_secrets/` — `DRAFT` status, `s3Key`/`requiredEnvVars`/`providedEnvVars`, draft/secrets event values.
 - LabOS UI (`pln-directory-portal-v2`): `app/pl-infra/ai-apps/connect/page.tsx` + `components/page/ai-apps/AiAppsConnectPage/` — the approval page; connect calls in `services/ai-apps/ai-apps.service.ts`.
 - `.claude/skills/ai-apps/SKILL.md` — agent guidance for working on this feature.
 

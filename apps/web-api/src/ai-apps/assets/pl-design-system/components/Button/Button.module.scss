@@ -1,0 +1,311 @@
+@use '../../styles/mixins';
+
+// ─── Base ────────────────────────────────────────────────────────────────────
+
+.button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2xs);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, box-shadow 120ms ease, border-color 120ms ease, opacity 120ms ease;
+  outline: none;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+
+  &:focus-visible {
+    @include mixins.focus-ring;
+  }
+
+  &:disabled,
+  &[aria-disabled='true'] {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+// ─── Icon wrappers ───────────────────────────────────────────────────────────
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+// ─── Sizes ───────────────────────────────────────────────────────────────────
+
+.size-tiny {
+  height: 24px; // button height dimension — not a spacing token; keep hardcoded
+  padding: var(--spacing-4xs) var(--spacing-2xs);
+  font-size:      var(--type-label-xs-strong-font-size);
+  line-height:    var(--type-label-xs-strong-line-height);
+  letter-spacing: var(--type-label-xs-strong-letter-spacing); // -0.0125rem (was -0.013rem; negligible rounding)
+  border-radius: var(--radius-sm);
+
+  .icon { width: 14px; height: 14px; } // icon size — keep hardcoded
+}
+
+.size-xs {
+  height: 32px; // button height dimension — not a spacing token; keep hardcoded
+  padding: var(--spacing-3xs) var(--spacing-xs);
+  font-size:      var(--type-label-xs-strong-font-size);
+  line-height:    var(--type-label-xs-strong-line-height);
+  letter-spacing: var(--type-label-xs-strong-letter-spacing);
+
+  .icon { width: 14px; height: 14px; } // icon size — keep hardcoded
+}
+
+.size-sm {
+  height: 36px; // button height dimension — not a spacing token; keep hardcoded
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  font-size:      var(--type-label-sm-strong-font-size);
+  line-height:    var(--type-label-sm-strong-line-height);
+  letter-spacing: var(--type-label-sm-strong-letter-spacing);
+
+  .icon { width: 16px; height: 16px; } // icon size — keep hardcoded
+}
+
+.size-md {
+  height: 40px; // button height dimension — not a spacing token; keep hardcoded
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size:      var(--type-label-sm-strong-font-size);
+  line-height:    var(--type-label-sm-strong-line-height);
+  letter-spacing: var(--type-label-sm-strong-letter-spacing);
+
+  .icon { width: 18px; height: 18px; } // icon size — keep hardcoded
+}
+
+.size-lg {
+  height: 48px; // button height dimension — not a spacing token; keep hardcoded
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size:      var(--type-label-md-strong-font-size);
+  line-height:    var(--type-label-md-strong-line-height);
+  letter-spacing: var(--type-label-md-strong-letter-spacing); // -0.01875rem (was -0.019rem; negligible rounding)
+
+  .icon { width: 20px; height: 20px; } // icon size — keep hardcoded
+}
+
+.size-xl {
+  height: 56px; // button height dimension — not a spacing token; keep hardcoded
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size:      var(--type-label-md-strong-font-size);
+  line-height:    var(--type-label-md-strong-line-height);
+  letter-spacing: var(--type-label-md-strong-letter-spacing);
+
+  .icon { width: 20px; height: 20px; } // icon size — keep hardcoded
+}
+
+.size-big {
+  height: 58px; // button height dimension — not a spacing token; keep hardcoded
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size:      var(--type-label-lg-strong-font-size);
+  line-height:    var(--type-label-lg-strong-line-height);
+  letter-spacing: var(--type-label-lg-strong-letter-spacing); // -0.025rem — exact match
+
+  .icon { width: 22px; height: 22px; } // icon size — keep hardcoded
+}
+
+// ─── Variant × Style: Fill ───────────────────────────────────────────────────
+
+.primary-fill {
+  background: var(--action-bg-brand-normal);
+  color: var(--foreground-light-primary);
+  border-color: var(--transparent-dark-12);
+  box-shadow:
+    0px 1px 5px 0px var(--transparent-brand-16),
+    inset 0px 1px 3px 0px var(--transparent-light-32),
+    inset 0px 4px 6px 0px var(--transparent-light-6);
+
+  &:hover:not(:disabled) {
+    // Figma canonical hover = semantic-brand-600 (#0f3cd9); was #2657ff (uncorrected drift)
+    background: var(--action-bg-brand-hover);
+    box-shadow: 0px 1px 8px 0px var(--transparent-brand-16), inset 0px 1px 3px 0px var(--transparent-light-32);
+  }
+  &:active:not(:disabled) {
+    background: var(--action-bg-brand-active);
+    box-shadow: none;
+  }
+}
+
+.secondary-fill {
+  background: var(--action-bg-neutral-normal);
+  color: var(--foreground-light-primary);
+  border-color: var(--transparent-dark-12);
+  box-shadow: var(--shadow-sm);
+
+  &:hover:not(:disabled)  { background: var(--action-bg-neutral-hover); }
+  &:active:not(:disabled) { background: var(--action-bg-neutral-normal); box-shadow: none; } // active = same bg as normal; effect is shadow removal
+}
+
+.warning-fill {
+  background: var(--action-bg-warning-normal);
+  color: var(--foreground-light-primary);
+  border-color: rgba(245, 158, 11, 0.2); // ⚠ off-scale alpha (20%); Figma canonical border is --action-border-warning at 32% — needs designer reconciliation
+  box-shadow: var(--shadow-sm);
+
+  &:hover:not(:disabled)  { background: var(--action-bg-warning-hover); }
+  &:active:not(:disabled) { box-shadow: none; }
+}
+
+.error-fill {
+  background: var(--background-error-normal);
+  color: var(--foreground-light-primary);
+  border-color: rgba(255, 56, 56, 0.2); // ⚠ off-scale alpha (20%); Figma canonical uses error-600 (#e92215) at 24% — needs designer reconciliation
+  box-shadow: var(--shadow-sm);
+
+  // Figma canonical hover = semantic-error-600 (#e92215); was #e52e2e (drift)
+  &:hover:not(:disabled)  { background: var(--action-bg-error-hover); }
+  &:active:not(:disabled) { box-shadow: none; }
+}
+
+.success-fill {
+  // ⚠ VISUAL CHANGE: was #22c55e (Tailwind green); now PL canonical --semantic-success-500 (#11a75c)
+  background: var(--action-bg-success-normal);
+  color: var(--foreground-light-primary);
+  border-color: rgba(17, 167, 92, 0.2); // ⚠ off-scale alpha (20%); base corrected from Tailwind #22c55e to PL #11a75c
+  box-shadow: var(--shadow-sm);
+
+  // ⚠ VISUAL CHANGE: hover was #16a34a (Tailwind); now PL canonical --semantic-success-600 (#0a9952)
+  &:hover:not(:disabled)  { background: var(--action-bg-success-hover); }
+  &:active:not(:disabled) { box-shadow: none; }
+}
+
+.neutral-fill {
+  background: var(--background-neutral-subtle);
+  color: var(--foreground-neutral-primary);
+  border-color: var(--border-neutral-subtle);
+  box-shadow: var(--shadow-xs);
+
+  &:hover:not(:disabled)  { background: var(--semantic-neutral-100); } // slightly elevated neutral — L2 semantic (slate-100 = #e9eff6)
+  &:active:not(:disabled) { box-shadow: none; }
+}
+
+// ─── Variant × Style: Border ─────────────────────────────────────────────────
+
+.primary-border {
+  background: transparent;
+  color: var(--foreground-brand-primary);
+  border-color: var(--foreground-brand-primary);
+
+  &:hover:not(:disabled)  { background: var(--background-brand-light-normal); }
+  &:active:not(:disabled) { background: var(--action-bg-brand-light); }
+}
+
+.secondary-border {
+  background: transparent;
+  color: var(--foreground-neutral-secondary);
+  border-color: var(--action-border-neutral-normal);
+
+  &:hover:not(:disabled) { background: var(--action-bg-neutral-light); }
+}
+
+.warning-border {
+  background: transparent;
+  // Figma canonical foreground-warning = semantic-warning-600 (#d97706); was #f59e0b (500 — slight drift)
+  color: var(--foreground-warning-secondary);
+  border-color: var(--border-warning-default);
+
+  &:hover:not(:disabled) {
+    background: rgba(245, 158, 11, 0.06); // ⚠ 6% warning alpha; Figma canonical light-hover is 24% — needs designer reconciliation
+  }
+}
+
+.error-border {
+  background: transparent;
+  color: var(--foreground-error-secondary);
+  border-color: var(--border-error-default);
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 56, 56, 0.06); // ⚠ 6% error alpha; no direct Figma token at this alpha — needs designer reconciliation
+  }
+}
+
+.success-border {
+  background: transparent;
+  // ⚠ VISUAL CHANGE: was #22c55e (Tailwind); now PL canonical --semantic-success-500 (#11a75c)
+  color: var(--foreground-success-secondary);
+  border-color: var(--border-success-default);
+
+  &:hover:not(:disabled) {
+    background: rgba(17, 167, 92, 0.06); // ⚠ 6% success alpha; base corrected from Tailwind to PL #11a75c; alpha off-scale vs Figma
+  }
+}
+
+.neutral-border {
+  background: transparent;
+  color: var(--foreground-neutral-secondary);
+  border-color: var(--border-neutral-subtle);
+
+  &:hover:not(:disabled) { background: var(--background-neutral-subtle); }
+}
+
+// ─── Variant × Style: Light ──────────────────────────────────────────────────
+
+.primary-light {
+  background: var(--background-brand-light-normal);
+  color: var(--foreground-brand-primary);
+  border-color: transparent;
+
+  &:hover:not(:disabled)  { background: var(--background-brand-light-hover); }
+  &:active:not(:disabled) { background: var(--action-bg-brand-light); }
+}
+
+.secondary-light {
+  background: var(--action-bg-neutral-light);
+  color: var(--foreground-neutral-secondary);
+  border-color: transparent;
+
+  &:hover:not(:disabled) { background: var(--background-neutral-subtle); }
+}
+
+.warning-light {
+  background: rgba(245, 158, 11, 0.08); // ⚠ 8% warning alpha; Figma canonical light-normal is 16% (#f59e0b29) — needs designer reconciliation
+  // ⚠ VISUAL CHANGE: was #f59e0b (500); now PL canonical warning-600 (#d97706) per Figma action-foreground-warning-normal
+  color: var(--foreground-warning-secondary);
+  border-color: transparent;
+
+  &:hover:not(:disabled) {
+    background: rgba(245, 158, 11, 0.14); // ⚠ off-scale alpha (14%); not in 2/4/6/8/12/16 scale — needs designer reconciliation
+  }
+}
+
+.error-light {
+  background: var(--background-error-soft-surface); // #ff383814 = rgba(255,56,56,0.08)
+  color: var(--foreground-error-secondary);
+  border-color: transparent;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 56, 56, 0.14); // ⚠ off-scale alpha (14%); not in standard scale — needs designer reconciliation
+  }
+}
+
+.success-light {
+  background: rgba(17, 167, 92, 0.08); // ⚠ 8% success alpha; base corrected from Tailwind #22c55e to PL #11a75c; Figma canonical is 12% (#0a99521f)
+  // ⚠ VISUAL CHANGE: was #22c55e (Tailwind); now PL canonical --semantic-success-500 (#11a75c)
+  color: var(--foreground-success-secondary);
+  border-color: transparent;
+
+  &:hover:not(:disabled) {
+    background: rgba(17, 167, 92, 0.14); // ⚠ off-scale alpha (14%); base corrected from Tailwind; Figma canonical hover is 16% (#0a995229)
+  }
+}
+
+.neutral-light {
+  background: var(--background-neutral-subtle);
+  color: var(--foreground-neutral-secondary);
+  border-color: transparent;
+
+  &:hover:not(:disabled) { background: var(--semantic-neutral-100); } // slightly elevated neutral — L2 semantic (slate-100 = #e9eff6)
+}

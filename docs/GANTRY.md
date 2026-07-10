@@ -120,8 +120,9 @@ drag-to-reorder only appears with `roadmap.item.curate`).
   roadmap — they're advisory input only.
 - **Review demand**: on any item, see the list of pinners with their notes
   (`GET /items/:uid/pins`, `curate`-gated) to weight the signal and follow up.
-- **Objectives (OKR chips)**: create/assign an objective to roadmap items and filter
-  the board by it. Objectives feed no score — re-tagging each quarter is harmless.
+- **Objectives (OKR chips)**: create/assign one or more objectives to roadmap items
+  and filter the board by any of them. Objectives feed no score — re-tagging each
+  quarter is harmless.
 - **Settings**: tune the pin budget size (`PATCH /v1/roadmap/settings`, default 3).
   Scarcity is the point — bump it only if users routinely max out.
 
@@ -202,18 +203,20 @@ All models in `apps/web-api/prisma/schema.prisma`:
 
 - **`RoadmapItem`** — title, description, acceptance criteria, `stage`, type, tags,
   focus area, `order` (Float — team rank), creator, promoted-by/at, declined reason,
-  external tracker URL, `objectiveUid`, soft-delete fields.
+  external tracker URL, soft-delete fields. Objectives are linked via
+  `RoadmapItemObjective` (many-to-many).
 - **`RoadmapItemUpvote`** — legacy v0 "like" table; retained for historical rows
   after the likes→pins migration. No longer read or written at runtime.
 - **`RoadmapItemPin`** — the boost. One *active* pin per (item, member) (partial
   unique index `WHERE releasedAt IS NULL`); `releasedAt` set on unpin or when the
   item leaves a pinnable stage — released rows are the frozen history.
-- **`RoadmapObjective`** — OKR chip: unique title, display order, assigned items.
+- **`RoadmapObjective`** — OKR chip: unique title, display order.
+- **`RoadmapItemObjective`** — join table linking items to zero or more objectives.
 - **`RoadmapSettings`** — single row; `pinLimit` (default 3).
 - **`RoadmapSubmissionDraft`** — server-side snapshot of a member's in-progress
   create/submit form, so a draft follows them across devices. One row per member
   (unique `memberUid`); all payload fields (`variant`, `title`, `description`, `tags`,
-  `type`, `stage`, `objectiveUid`, `newObjectiveTitle`, `showCreateObjective`) are
+  `type`, `stage`, `objectiveUids`, `newObjectiveTitle`, `showCreateObjective`) are
   nullable partial form state, plus `updatedAt` for the "last edited" UI.
 
 ## API quick reference
@@ -233,7 +236,7 @@ Base: `/v1/roadmap` (guards: `UserTokenCheckGuard` + `RbacGuard`). Contracts in
 | `/items/:uid/pins` | GET | item.curate | Who pinned + notes (product team only) |
 | `/items/reorder` | POST | item.curate | Bulk set roadmap rank order |
 | `/objectives` | GET / POST | view / item.curate | List / create-or-find objective |
-| `/items/:uid/objective` | PATCH | item.curate | Set/clear an item's objective |
+| `/items/:uid/objectives` | PATCH | item.curate | Replace an item's objectives (`objectiveUids` + optional `titles`; empty clears) |
 | `/settings` | GET / PATCH | view / item.curate | Read / tune the pin budget |
 | `/drafts/me` | GET / PUT / DELETE | view | Read (or null) / autosave-upsert / discard the member's own in-progress submission draft |
 

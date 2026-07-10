@@ -1,0 +1,163 @@
+@use '../../styles/mixins';
+
+// ─── Base ─────────────────────────────────────────────────────────────────────
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-semibold); // matches Tabs and Sidebar badge precedent
+  white-space: nowrap;
+}
+
+// ─── Sizes ────────────────────────────────────────────────────────────────────
+// Badge is a display element (not a form field) — mixins are appropriate here.
+// Heights and off-scale dimensions are component geometry; keep hardcoded.
+
+.size-sm {
+  height: 16px; // badge height — component geometry
+  padding: 0 var(--spacing-4xs);
+  gap: 0;
+
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-semibold); // override mixin's 500 — badges use 600
+
+  .dotIndicator { width: var(--spacing-4xs); height: var(--spacing-4xs); } // 4px dot
+  .iconSlot     { width: var(--spacing-xs);  height: var(--spacing-xs);  } // 10px icon
+}
+
+.size-md {
+  height: 20px; // badge height — component geometry
+  padding: 0 var(--spacing-3xs);
+  gap: 2px; // sub-scale gap — structural; no token equivalent
+
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-semibold); // override mixin's 500 — badges use 600
+
+  .dotIndicator { width: 5px;             height: 5px;             } // 5px dot — off-scale; keep hardcoded
+  .iconSlot     { width: var(--spacing-sm); height: var(--spacing-sm); } // 12px icon
+}
+
+.size-lg {
+  height: 24px; // badge height — component geometry
+  padding: 2px var(--spacing-2xs); // 2px vertical — sub-scale; structural
+  gap: 2px; // sub-scale gap — structural; no token equivalent
+
+  @include mixins.label-sm;
+  font-weight: var(--font-weight-semibold); // override mixin's 500 — badges use 600
+  letter-spacing: -0.013rem; // brand typography tracking override
+
+  .dotIndicator { width: var(--spacing-3xs); height: var(--spacing-3xs); } // 6px dot
+  .iconSlot     { width: 14px;               height: 14px;               } // 14px icon — off-scale; keep hardcoded
+}
+
+// ─── Icon & Dot slots ─────────────────────────────────────────────────────────
+
+.iconSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dotIndicator {
+  display: inline-block;
+  border-radius: 50%; // circle — 50% is semantically correct; not the 9999px pill pattern
+  flex-shrink: 0;
+  background: currentColor;
+}
+
+// ─── Light style (color per hue) ──────────────────────────────────────────────
+
+.light-blue {
+  background: var(--transparent-brand-4);
+  color: var(--foreground-brand-secondary-inv);
+}
+
+.light-gray {
+  background: var(--background-neutral-subtle);
+  color: var(--foreground-neutral-secondary);
+}
+
+.light-green {
+  background: var(--transparent-success-8); // PL success-500 (#11a75c) base — was Tailwind rgba(34,197,94,0.08)
+  color: var(--foreground-success-primary);  // was #16a34a (Tailwind green-600) — corrected to PL canonical
+}
+
+.light-yellow {
+  background: var(--transparent-warning-8); // warning-500 (#f59e0b) base
+  color: var(--foreground-warning-secondary);
+}
+
+.light-red {
+  background: var(--transparent-error-8);    // error-500 (#ff3838) base
+  color: var(--foreground-error-secondary);  // was --background-error-normal — corrected to text token
+}
+
+// ─── Outline style ────────────────────────────────────────────────────────────
+
+.outline-blue {
+  background: transparent;
+  border-color: var(--foreground-brand-secondary-inv);
+  color: var(--foreground-brand-secondary-inv);
+}
+
+.outline-gray {
+  background: transparent;
+  border-color: var(--foreground-neutral-secondary);
+  color: var(--foreground-neutral-secondary);
+}
+
+.outline-green {
+  background: transparent;
+  border-color: var(--border-success-default);  // was #16a34a (Tailwind green-600) — corrected
+  color: var(--foreground-success-primary);      // was #16a34a — corrected to PL canonical
+}
+
+.outline-yellow {
+  background: transparent;
+  border-color: var(--border-warning-default);   // was #d97706 (same value, now token-referenced)
+  color: var(--foreground-warning-secondary);
+}
+
+.outline-red {
+  background: transparent;
+  border-color: var(--border-error-default);    // was --background-error-normal — corrected to border token
+  color: var(--foreground-error-secondary);      // was --background-error-normal — corrected to text token
+}
+
+// ─── Fill style ───────────────────────────────────────────────────────────────
+
+.fill-blue {
+  background: var(--action-bg-brand-normal);
+  color: var(--foreground-light-primary); // white icon/text on brand fill
+}
+
+.fill-gray {
+  background: var(--foreground-neutral-primary);
+  color: var(--foreground-light-primary); // white icon/text on dark fill
+}
+
+.fill-green {
+  background: var(--action-bg-success-normal);  // PL success-500 (#11a75c) — was #16a34a (Tailwind green-600)
+  color: var(--foreground-light-primary);
+}
+
+.fill-yellow {
+  background: var(--action-bg-warning-normal);  // warning-500 (#f59e0b) — was #d97706 (amber-600, lighter correction)
+  color: var(--foreground-light-primary);
+}
+
+.fill-red {
+  background: var(--action-bg-error-normal);    // was --background-error-normal — corrected to action token
+  color: var(--foreground-light-primary);
+}
+
+// ─── Disabled ─────────────────────────────────────────────────────────────────
+
+.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}

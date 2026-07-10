@@ -86,11 +86,14 @@ export function buildFullRouteNodes(input: {
   const bridge = stripPlaceholderInvestor(
     stripPlConnectorFromBridge(stripLeadingPlOrg(input.bridgeNodes), input.plConnector?.name)
   );
+  // Direct (person) prefix only when a PL connector is grafted. Otherwise, if there is a
+  // bridge (founder / VC / org), show Protocol Labs as the org door — including F+1
+  // LinkedIn-only founder paths that have no PL venture-lead connector (LAB-2108).
   const prefix: RouteNode[] = input.plConnector
     ? [plConnectorToRouteNode(input.plConnector, input.plConnectorMemberUid)]
-    : bridge.length > 0 && (input.hops === undefined || input.hops >= 2)
-    ? [PROTOCOL_LABS_ORG_NODE]
-    : [];
+    : bridge.length > 0
+      ? [PROTOCOL_LABS_ORG_NODE]
+      : [];
 
   const core = [...prefix, ...bridge];
   return input.investorNode ? [...core, input.investorNode] : core;
@@ -350,9 +353,24 @@ export function finalizePersonHopChain(
   if (orgConnectors?.length) {
     routeNodes = applyOrgTeamToRouteNodes(routeNodes, orgConnectors) as RouteNode[];
   }
+
+  // Founder resolve may attach memberUid after org-contact enrich — backfill LinkedIn
+  // from LabOS so WarmPathDetail contact cards can show the profile link.
+  let contact = enriched.contact;
+  if (contact && !contact.linkedin && memberContactIndex) {
+    const uid =
+      contact.memberUid ??
+      (founderIndexes ? founderIndexes.membersByName.get(normalizePersonName(contact.name)) : undefined);
+    const fromUid = uid ? memberContactIndex.byUid.get(uid)?.linkedin : undefined;
+    const fromName = memberContactIndex.membersByName.get(normalizePersonName(contact.name));
+    const fromNameProfile = fromName ? memberContactIndex.byUid.get(fromName)?.linkedin : undefined;
+    const linkedin = fromUid ?? fromNameProfile;
+    if (linkedin) contact = { ...contact, linkedin };
+  }
+
   return {
     ...hopChain,
-    ...(enriched.contact ? { contact: enriched.contact } : {}),
+    ...(contact ? { contact } : {}),
     ...(orgConnectors ? { orgConnectors, orgConnector: orgConnectors[0] } : {}),
     ...(enriched.connectorTeam ? { connectorTeam: enriched.connectorTeam } : {}),
     routeNodes,

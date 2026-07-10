@@ -1,0 +1,42 @@
+@use '../../styles/mixins';
+
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-4xl) var(--spacing-xl); // --spacing-3xl was a typo; intent was 48px (--spacing-4xl)
+  gap: var(--spacing-lg);
+}
+
+.iconWrapper {
+  width: 64px;  // icon container — layout dimension; keep hardcoded
+  height: 64px; // icon container — layout dimension; keep hardcoded
+  border-radius: var(--radius-2xl); // --radius-xl was a typo; intent was 16px (--radius-2xl) — softer decorative container
+  background: var(--background-neutral-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground-neutral-tertiary);
+}
+
+.title {
+  @include mixins.label-lg;
+  font-weight: var(--font-weight-semibold); // EmptyState title — section-level heading; override mixin's 500 to 600
+  color: var(--foreground-neutral-primary);
+}
+
+.description {
+  @include mixins.body-sm; // exact match: 14px / w400 / 22px — no overrides needed
+  color: var(--foreground-neutral-secondary);
+  max-width: 400px; // prose width cap — layout constraint; keep hardcoded
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  justify-content: center;
+}

@@ -9,11 +9,14 @@ describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
   const teamNewsItemFindMany = jest.fn();
   const teamNewsItemCount = jest.fn();
   const teamNewsForumLinkFindMany = jest.fn();
+  const teamNewsUpvoteGroupBy = jest.fn();
+  const teamNewsUpvoteFindMany = jest.fn();
 
   const prismaMock = {
     team: { findUnique: teamFindUnique },
     teamNewsItem: { findMany: teamNewsItemFindMany, count: teamNewsItemCount },
     teamNewsForumLink: { findMany: teamNewsForumLinkFindMany },
+    teamNewsUpvote: { groupBy: teamNewsUpvoteGroupBy, findMany: teamNewsUpvoteFindMany },
   } as unknown as PrismaService;
 
   const makeRow = (overrides: Record<string, unknown> = {}) => ({
@@ -47,6 +50,8 @@ describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
     teamNewsItemFindMany.mockResolvedValue([makeRow()]);
     teamNewsItemCount.mockResolvedValue(1);
     teamNewsForumLinkFindMany.mockResolvedValue([]);
+    teamNewsUpvoteGroupBy.mockResolvedValue([]);
+    teamNewsUpvoteFindMany.mockResolvedValue([]);
     service = new TeamNewsQueryService(prismaMock);
   });
 
@@ -75,6 +80,8 @@ describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
           teamName: 'Acme Labs',
           title: 'Raised Series A',
           discussion: { count: 0, latestTopicUrl: null },
+          upvoteCount: 0,
+          viewerHasUpvoted: false,
         }),
       ],
     });
@@ -85,6 +92,25 @@ describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
         orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
         skip: 10,
         take: 10,
+      })
+    );
+  });
+
+  it('stamps upvoteCount and viewerHasUpvoted when the viewer has voted', async () => {
+    teamNewsUpvoteGroupBy.mockResolvedValue([{ newsItemUid: 'news-1', _count: { _all: 3 } }]);
+    teamNewsUpvoteFindMany.mockResolvedValue([{ newsItemUid: 'news-1' }]);
+
+    const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 }, new Set(), 'member-1');
+
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        upvoteCount: 3,
+        viewerHasUpvoted: true,
+      })
+    );
+    expect(teamNewsUpvoteFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { newsItemUid: { in: ['news-1'] }, memberUid: 'member-1' },
       })
     );
   });
@@ -108,5 +134,87 @@ describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
         },
       })
     );
+  });
+});
+
+describe('TeamNewsQueryService.getPopular', () => {
+  let service: TeamNewsQueryService;
+  const teamNewsItemFindMany = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new TeamNewsQueryService({
+      teamNewsItem: { findMany: teamNewsItemFindMany },
+    } as unknown as PrismaService);
+  });
+
+  it('returns only items with at least 2 upvotes, sorted by count then eventDate', async () => {
+    const now = Date.now();
+    teamNewsItemFindMany.mockResolvedValue([
+      {
+        uid: 'n1',
+        title: 'One upvote',
+        teamUid: 't1',
+        sourceUrl: 'https://a',
+        eventDate: new Date(now - 1 * 24 * 60 * 60 * 1000),
+        team: { name: 'A' },
+        _count: { upvotes: 1 },
+      },
+      {
+        uid: 'n2',
+        title: 'Three upvotes older',
+        teamUid: 't2',
+        sourceUrl: 'https://b',
+        eventDate: new Date(now - 3 * 24 * 60 * 60 * 1000),
+        team: { name: 'B' },
+        _count: { upvotes: 3 },
+      },
+      {
+        uid: 'n3',
+        title: 'Three upvotes newer',
+        teamUid: 't3',
+        sourceUrl: 'https://c',
+        eventDate: new Date(now - 1 * 24 * 60 * 60 * 1000),
+        team: { name: 'C' },
+        _count: { upvotes: 3 },
+      },
+      {
+        uid: 'n4',
+        title: 'Two upvotes',
+        teamUid: 't4',
+        sourceUrl: 'https://d',
+        eventDate: new Date(now - 2 * 24 * 60 * 60 * 1000),
+        team: { name: 'D' },
+        _count: { upvotes: 2 },
+      },
+    ]);
+
+    const result = await service.getPopular({ limit: 3 });
+
+    expect(result.items.map((i) => i.uid)).toEqual(['n3', 'n2', 'n4']);
+    expect(result.items[0].upvoteCount).toBe(3);
+    expect(teamNewsItemFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          eventDate: { gte: expect.any(Date) },
+        }),
+      })
+    );
+  });
+
+  it('returns an empty list when nothing qualifies', async () => {
+    teamNewsItemFindMany.mockResolvedValue([
+      {
+        uid: 'n1',
+        title: 'Low',
+        teamUid: 't1',
+        sourceUrl: 'https://a',
+        eventDate: new Date(),
+        team: { name: 'A' },
+        _count: { upvotes: 1 },
+      },
+    ]);
+
+    await expect(service.getPopular({ limit: 3 })).resolves.toEqual({ items: [] });
   });
 });

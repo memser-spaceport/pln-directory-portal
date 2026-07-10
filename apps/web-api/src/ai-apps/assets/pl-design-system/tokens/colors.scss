@@ -1,0 +1,694 @@
+// PL Design System — Color Tokens
+// Three-layer architecture:
+//   Layer 1: Primitive global color scales  (--global-color-*)
+//   Layer 2: Semantic role aliases          (--semantic-*)
+//   Layer 3: Component tokens               (--background-*, --foreground-*, --border-*, --action-*, etc.)
+//
+// Source files:
+//   Layer 1+2: global-style.css + semantic-value.css (Figma exports)
+//   Layer 3:   previously hand-extracted; values now reference semantic layer
+//
+// DO NOT edit layers 1–2 manually — regenerate from Figma via `get_variable_defs`.
+// Layer 3 values may be adjusted to point to different semantic tokens as the system evolves.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 1 — PRIMITIVE GLOBAL COLOR SCALES
+// Raw named values from Figma's global-style.css export.
+// Never reference these directly in components — use Layer 3 tokens instead.
+// ─────────────────────────────────────────────────────────────────────────────
+
+:root {
+  // ─── Blue ────────────────────────────────────────────────────────────────
+  --global-color-blue-25:   #f2f5ff;
+  --global-color-blue-50:   #e8edff;
+  --global-color-blue-100:  #aebfff;
+  --global-color-blue-200:  #94abff;
+  --global-color-blue-300:  #6f8eff;
+  --global-color-blue-400:  #4a72ff;
+  --global-color-blue-500:  #1b4dff;
+  --global-color-blue-600:  #0f3cd9;
+  --global-color-blue-700:  #042bb2;
+  --global-color-blue-800:  #042185;
+  --global-color-blue-900:  #00114a;
+
+  // ─── Blue Dark ───────────────────────────────────────────────────────────
+  --global-color-blue-dark-25:   #dfe6fb;
+  --global-color-blue-dark-50:   #ced9fb;
+  --global-color-blue-dark-100:  #aabffc;
+  --global-color-blue-dark-200:  #87a6fd;
+  --global-color-blue-dark-300:  #658bfe;
+  --global-color-blue-dark-400:  #4174ff;
+  --global-color-blue-dark-500:  #1b54ff;
+  --global-color-blue-dark-600:  #1645d3;
+  --global-color-blue-dark-700:  #1036a8;
+  --global-color-blue-dark-800:  #0b277c;
+  --global-color-blue-dark-900:  #041546;
+
+  // ─── Blue Gray ───────────────────────────────────────────────────────────
+  --global-color-blue-gray-25:   #f0f3f7;
+  --global-color-blue-gray-50:   #e2e8ee;
+  --global-color-blue-gray-100:  #bccad9;
+  --global-color-blue-gray-200:  #8ea6bf;
+  --global-color-blue-gray-300:  #6989aa;
+  --global-color-blue-gray-400:  #446c95;
+  --global-color-blue-gray-500:  #365677;
+  --global-color-blue-gray-600:  #294059;
+  --global-color-blue-gray-700:  #213447;
+  --global-color-blue-gray-800:  #192736;
+  --global-color-blue-gray-900:  #0c1926;
+
+  // ─── Blue Light ──────────────────────────────────────────────────────────
+  --global-color-blue-light-25:   #e1ebff;
+  --global-color-blue-light-50:   #d1e0ff;
+  --global-color-blue-light-100:  #b2ccff;
+  --global-color-blue-light-200:  #92b6ff;
+  --global-color-blue-light-300:  #72a1ff;
+  --global-color-blue-light-400:  #538cff;
+  --global-color-blue-light-500:  #4382ff;
+  --global-color-blue-light-600:  #3b6ed5;
+  --global-color-blue-light-700:  #335baa;
+  --global-color-blue-light-800:  #1b356a;
+  --global-color-blue-light-900:  #1a2b4d;
+
+  // ─── Cyan ────────────────────────────────────────────────────────────────
+  --global-color-cyan-25:   #edfbfe;
+  --global-color-cyan-50:   #c9f4fb;
+  --global-color-cyan-100:  #a4edf8;
+  --global-color-cyan-200:  #80e5f5;
+  --global-color-cyan-300:  #5cdef2;
+  --global-color-cyan-400:  #38d6ef;
+  --global-color-cyan-500:  #13cfec;
+  --global-color-cyan-600:  #10afc7;
+  --global-color-cyan-700:  #0d8fa3;
+  --global-color-cyan-800:  #0a6f7f;
+  --global-color-cyan-900:  #07505b;
+
+  // ─── Dimgray ─────────────────────────────────────────────────────────────
+  --global-color-dimgray-25:   #f5f5f5;
+  --global-color-dimgray-50:   #e2e2e2;
+  --global-color-dimgray-100:  #cecece;
+  --global-color-dimgray-200:  #bababa;
+  --global-color-dimgray-300:  #a7a7a7;
+  --global-color-dimgray-400:  #939393;
+  --global-color-dimgray-500:  #808080;
+  --global-color-dimgray-600:  #6c6c6c;
+  --global-color-dimgray-700:  #585858;
+  --global-color-dimgray-800:  #454545;
+  --global-color-dimgray-900:  #313131;
+
+  // ─── Emerald ─────────────────────────────────────────────────────────────
+  --global-color-emerald-25:   #edfbf7;
+  --global-color-emerald-50:   #dbf6ee;
+  --global-color-emerald-100:  #adebd9;
+  --global-color-emerald-200:  #75debf;
+  --global-color-emerald-300:  #49d3aa;
+  --global-color-emerald-400:  #1bc895;
+  --global-color-emerald-500:  #16a077;
+  --global-color-emerald-600:  #107759;
+  --global-color-emerald-700:  #0d6047;
+  --global-color-emerald-800:  #0a4836;
+  --global-color-emerald-900:  #053a2b;
+
+  // ─── Fuchsia ─────────────────────────────────────────────────────────────
+  --global-color-fuchsia-25:   #fbedfd;
+  --global-color-fuchsia-50:   #f4c9fa;
+  --global-color-fuchsia-100:  #eca5f7;
+  --global-color-fuchsia-200:  #e581f4;
+  --global-color-fuchsia-300:  #de5df1;
+  --global-color-fuchsia-400:  #d638ee;
+  --global-color-fuchsia-500:  #cf14eb;
+  --global-color-fuchsia-600:  #af11c7;
+  --global-color-fuchsia-700:  #8f0ea2;
+  --global-color-fuchsia-800:  #6f0b7e;
+  --global-color-fuchsia-900:  #50085a;
+
+  // ─── Gold ────────────────────────────────────────────────────────────────
+  --global-color-gold-25:   #fffaf1;
+  --global-color-gold-50:   #fff5e4;
+  --global-color-gold-100:  #ffedcf;
+  --global-color-gold-200:  #ffe5bb;
+  --global-color-gold-300:  #ffd48f;
+  --global-color-gold-400:  #f3ce92;
+  --global-color-gold-500:  #e0bb7f;
+  --global-color-gold-600:  #c19c60;
+  --global-color-gold-700:  #8f6a2e;
+  --global-color-gold-800:  #715324;
+  --global-color-gold-900:  #5c431a;
+
+  // ─── Gray ────────────────────────────────────────────────────────────────
+  --global-color-gray-25:   #f4f5f6;
+  --global-color-gray-50:   #dee1e5;
+  --global-color-gray-100:  #c9cdd3;
+  --global-color-gray-200:  #b3b8c2;
+  --global-color-gray-300:  #9da4b0;
+  --global-color-gray-400:  #88909f;
+  --global-color-gray-500:  #727c8d;
+  --global-color-gray-600:  #606977;
+  --global-color-gray-700:  #4f5662;
+  --global-color-gray-800:  #3d434c;
+  --global-color-gray-900:  #1a1d21;
+
+  // ─── Green ───────────────────────────────────────────────────────────────
+  --global-color-green-25:   #e9f7f0;
+  --global-color-green-50:   #d9faea;
+  --global-color-green-100:  #8fe7b8;
+  --global-color-green-200:  #48d28e;
+  --global-color-green-300:  #2fd181;
+  --global-color-green-400:  #1db469;
+  --global-color-green-500:  #11a75c;
+  --global-color-green-600:  #0a9952;
+  --global-color-green-700:  #048746;
+  --global-color-green-800:  #046a37;
+  --global-color-green-900:  #02542b;
+
+  // ─── Green Dark ──────────────────────────────────────────────────────────
+  --global-color-green-dark-25:   #a6f4ce;
+  --global-color-green-dark-50:   #98eec4;
+  --global-color-green-dark-100:  #7be1af;
+  --global-color-green-dark-200:  #5fd49a;
+  --global-color-green-dark-300:  #43c785;
+  --global-color-green-dark-400:  #26ba70;
+  --global-color-green-dark-500:  #18b466;
+  --global-color-green-dark-600:  #149454;
+  --global-color-green-dark-700:  #107542;
+  --global-color-green-dark-800:  #0b5531;
+  --global-color-green-dark-900:  #012c16;
+
+  // ─── Indigo ──────────────────────────────────────────────────────────────
+  --global-color-indigo-25:   #f4f5ff;
+  --global-color-indigo-50:   #dddfff;
+  --global-color-indigo-100:  #c6caff;
+  --global-color-indigo-200:  #b7bdff;
+  --global-color-indigo-300:  #9ca5fd;
+  --global-color-indigo-400:  #7d88f4;
+  --global-color-indigo-500:  #636dd3;
+  --global-color-indigo-600:  #4c56bb;
+  --global-color-indigo-700:  #3c449f;
+  --global-color-indigo-800:  #303783;
+  --global-color-indigo-900:  #242967;
+
+  // ─── Lime ────────────────────────────────────────────────────────────────
+  --global-color-lime-25:   #f4ffe1;
+  --global-color-lime-50:   #e4ffb8;
+  --global-color-lime-100:  #d5fd95;
+  --global-color-lime-200:  #c5fb6e;
+  --global-color-lime-300:  #afef47;
+  --global-color-lime-400:  #a3e635;
+  --global-color-lime-500:  #94da22;
+  --global-color-lime-600:  #81c515;
+  --global-color-lime-700:  #73b10f;
+  --global-color-lime-800:  #5e9409;
+  --global-color-lime-900:  #497305;
+
+  // ─── Orange ──────────────────────────────────────────────────────────────
+  --global-color-orange-25:   #fff6ed;
+  --global-color-orange-50:   #ffebd8;
+  --global-color-orange-100:  #ffd8b4;
+  --global-color-orange-200:  #ffc793;
+  --global-color-orange-300:  #ffad62;
+  --global-color-orange-400:  #fc8e28;
+  --global-color-orange-500:  #fc8415;
+  --global-color-orange-600:  #eb7101;
+  --global-color-orange-700:  #d26500;
+  --global-color-orange-800:  #b45600;
+  --global-color-orange-900:  #884202;
+
+  // ─── Pink ────────────────────────────────────────────────────────────────
+  --global-color-pink-25:   #fff3f8;
+  --global-color-pink-50:   #ffdeec;
+  --global-color-pink-100:  #ffbed9;
+  --global-color-pink-200:  #ffa0c8;
+  --global-color-pink-300:  #fb6ca7;
+  --global-color-pink-400:  #e9538d;
+  --global-color-pink-500:  #e42f75;
+  --global-color-pink-600:  #cf195f;
+  --global-color-pink-700:  #bc0f51;
+  --global-color-pink-800:  #99053e;
+  --global-color-pink-900:  #78002e;
+
+  // ─── Purple ──────────────────────────────────────────────────────────────
+  --global-color-purple-25:   #f5ecfe;
+  --global-color-purple-50:   #e2c7fc;
+  --global-color-purple-100:  #cfa1fb;
+  --global-color-purple-200:  #bc7cf9;
+  --global-color-purple-300:  #a956f7;
+  --global-color-purple-400:  #9631f5;
+  --global-color-purple-500:  #820bf4;
+  --global-color-purple-600:  #6e0ace;
+  --global-color-purple-700:  #5a08a9;
+  --global-color-purple-800:  #460683;
+  --global-color-purple-900:  #32045e;
+
+  // ─── Red ─────────────────────────────────────────────────────────────────
+  --global-color-red-25:   #fff5f4;
+  --global-color-red-50:   #ffdcda;
+  --global-color-red-100:  #ffc5c1;
+  --global-color-red-200:  #ffa19b;
+  --global-color-red-300:  #ff7a72;
+  --global-color-red-400:  #ff574d;
+  --global-color-red-500:  #ff3838;
+  --global-color-red-600:  #e92215;
+  --global-color-red-700:  #d21a0e;
+  --global-color-red-800:  #be170c;
+  --global-color-red-900:  #ab0a00;
+
+  // ─── Red Dark ────────────────────────────────────────────────────────────
+  --global-color-red-dark-25:   #ffdddd;
+  --global-color-red-dark-50:   #fecbcb;
+  --global-color-red-dark-100:  #fba8a8;
+  --global-color-red-dark-200:  #f98484;
+  --global-color-red-dark-300:  #f66161;
+  --global-color-red-dark-400:  #f33e3e;
+  --global-color-red-dark-500:  #e32d2d;
+  --global-color-red-dark-600:  #c62424;
+  --global-color-red-dark-700:  #af3b33;
+  --global-color-red-dark-800:  #9c2a22;
+  --global-color-red-dark-900:  #4f1618;
+
+  // ─── Rose ────────────────────────────────────────────────────────────────
+  --global-color-rose-25:   #feecef;
+  --global-color-rose-50:   #ffdadf;
+  --global-color-rose-100:  #ffc2cb;
+  --global-color-rose-200:  #ff9caa;
+  --global-color-rose-300:  #ff8596;
+  --global-color-rose-400:  #f6697d;
+  --global-color-rose-500:  #f54c64;
+  --global-color-rose-600:  #eb2743;
+  --global-color-rose-700:  #db1733;
+  --global-color-rose-800:  #c10f29;
+  --global-color-rose-900:  #a00017;
+
+  // ─── Sky ─────────────────────────────────────────────────────────────────
+  --global-color-sky-25:   #f3faff;
+  --global-color-sky-50:   #e4f4ff;
+  --global-color-sky-100:  #c2e6ff;
+  --global-color-sky-200:  #b0e3ff;
+  --global-color-sky-300:  #6ac9ff;
+  --global-color-sky-400:  #3caafa;
+  --global-color-sky-500:  #2497eb;
+  --global-color-sky-600:  #1580cd;
+  --global-color-sky-700:  #1177c0;
+  --global-color-sky-800:  #0d5e99;
+  --global-color-sky-900:  #033f6b;
+
+  // ─── Slate ───────────────────────────────────────────────────────────────
+  --global-color-slate-25:   #f9fafb;
+  --global-color-slate-50:   #f0f3f9;
+  --global-color-slate-100:  #e9eff6;
+  --global-color-slate-200:  #d7dfe9;
+  --global-color-slate-300:  #afbaca;
+  --global-color-slate-400:  #8897ae;
+  --global-color-slate-500:  #5e718d;
+  --global-color-slate-600:  #455468;
+  --global-color-slate-700:  #3d4a5c;
+  --global-color-slate-800:  #2d3643;
+  --global-color-slate-900:  #0a0c11;
+
+  // ─── Stone ───────────────────────────────────────────────────────────────
+  --global-color-stone-25:   #f9f8f7;
+  --global-color-stone-50:   #f3f2ef;
+  --global-color-stone-100:  #e3e1da;
+  --global-color-stone-200:  #d0ccc1;
+  --global-color-stone-300:  #c1bcad;
+  --global-color-stone-400:  #b2ab98;
+  --global-color-stone-500:  #8e897a;
+  --global-color-stone-600:  #6a665b;
+  --global-color-stone-700:  #555249;
+  --global-color-stone-800:  #403e37;
+  --global-color-stone-900:  #2b2924;
+
+  // ─── Teal ────────────────────────────────────────────────────────────────
+  --global-color-teal-25:   #e8fdf9;
+  --global-color-teal-50:   #d3f8f2;
+  --global-color-teal-100:  #b0f5eb;
+  --global-color-teal-200:  #88efe0;
+  --global-color-teal-300:  #5eead5;
+  --global-color-teal-400:  #1edcc5;
+  --global-color-teal-500:  #27cab5;
+  --global-color-teal-600:  #1db19f;
+  --global-color-teal-700:  #159383;
+  --global-color-teal-800:  #0e786b;
+  --global-color-teal-900:  #065a50;
+
+  // ─── Violet ──────────────────────────────────────────────────────────────
+  --global-color-violet-25:   #f1ecfe;
+  --global-color-violet-50:   #d4c7fd;
+  --global-color-violet-100:  #b8a1fb;
+  --global-color-violet-200:  #9b7bf9;
+  --global-color-violet-300:  #7f56f8;
+  --global-color-violet-400:  #6230f6;
+  --global-color-violet-500:  #460bf4;
+  --global-color-violet-600:  #3b09cf;
+  --global-color-violet-700:  #3007a9;
+  --global-color-violet-800:  #250684;
+  --global-color-violet-900:  #1b045e;
+
+  // ─── Yellow ──────────────────────────────────────────────────────────────
+  --global-color-yellow-25:   #fffcef;
+  --global-color-yellow-50:   #fff8e9;
+  --global-color-yellow-100:  #fff4dd;
+  --global-color-yellow-200:  #fde68a;
+  --global-color-yellow-300:  #fcd34d;
+  --global-color-yellow-400:  #fbbf24;
+  --global-color-yellow-500:  #f59e0b;
+  --global-color-yellow-600:  #d97706;
+  --global-color-yellow-700:  #b45309;
+  --global-color-yellow-800:  #92400e;
+  --global-color-yellow-900:  #451a03;
+
+  // ─── Yellow Dark ─────────────────────────────────────────────────────────
+  --global-color-yellow-dark-25:   #fcf0c5;
+  --global-color-yellow-dark-50:   #faebb4;
+  --global-color-yellow-dark-100:  #f6e092;
+  --global-color-yellow-dark-200:  #f3d671;
+  --global-color-yellow-dark-300:  #efcc4f;
+  --global-color-yellow-dark-400:  #ebc12d;
+  --global-color-yellow-dark-500:  #cda61a;
+  --global-color-yellow-dark-600:  #be9917;
+  --global-color-yellow-dark-700:  #927612;
+  --global-color-yellow-dark-800:  #67530c;
+  --global-color-yellow-dark-900:  #362c07;
+
+  // ─── Zinc ────────────────────────────────────────────────────────────────
+  --global-color-zinc-25:   #f4f2f0;
+  --global-color-zinc-50:   #e6e1dd;
+  --global-color-zinc-100:  #d6cec6;
+  --global-color-zinc-200:  #c6baaf;
+  --global-color-zinc-300:  #b5a698;
+  --global-color-zinc-400:  #a59381;
+  --global-color-zinc-500:  #957f6a;
+  --global-color-zinc-600:  #7e6b5a;
+  --global-color-zinc-700:  #675849;
+  --global-color-zinc-800:  #504439;
+  --global-color-zinc-900:  #393129;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 2 — SEMANTIC ROLE ALIASES
+// Maps functional roles (brand, neutral, error, success, warning) to primitives.
+// Use these in Layer 3 only — not directly in components.
+// ─────────────────────────────────────────────────────────────────────────────
+
+:root {
+  // Base white (direct hex — no global primitive for pure white)
+  --semantic-base-00: #ffffff;
+
+  // ─── Brand (blue) ────────────────────────────────────────────────────────
+  --semantic-brand-25:   var(--global-color-blue-25);
+  --semantic-brand-50:   var(--global-color-blue-50);
+  --semantic-brand-100:  var(--global-color-blue-100);
+  --semantic-brand-200:  var(--global-color-blue-200);
+  --semantic-brand-300:  var(--global-color-blue-300);
+  --semantic-brand-400:  var(--global-color-blue-400);
+  --semantic-brand-500:  var(--global-color-blue-500);
+  --semantic-brand-600:  var(--global-color-blue-600);
+  --semantic-brand-700:  var(--global-color-blue-700);
+  --semantic-brand-800:  var(--global-color-blue-800);
+  --semantic-brand-900:  var(--global-color-blue-900);
+
+  // ─── Dark Brand (blue-dark) ───────────────────────────────────────────────
+  --semantic-dark-brand-25:   var(--global-color-blue-dark-25);
+  --semantic-dark-brand-50:   var(--global-color-blue-dark-50);
+  --semantic-dark-brand-100:  var(--global-color-blue-dark-100);
+  --semantic-dark-brand-200:  var(--global-color-blue-dark-200);
+  --semantic-dark-brand-300:  var(--global-color-blue-dark-300);
+  --semantic-dark-brand-400:  var(--global-color-blue-dark-400);
+  --semantic-dark-brand-500:  var(--global-color-blue-dark-500);
+  --semantic-dark-brand-600:  var(--global-color-blue-dark-600);
+  --semantic-dark-brand-700:  var(--global-color-blue-dark-700);
+  --semantic-dark-brand-800:  var(--global-color-blue-dark-800);
+  --semantic-dark-brand-900:  var(--global-color-blue-dark-900);
+
+  // ─── Dark Brand Alt (blue-light) ─────────────────────────────────────────
+  --semantic-dark-brand_alt-25:   var(--global-color-blue-light-25);
+  --semantic-dark-brand_alt-50:   var(--global-color-blue-light-50);
+  --semantic-dark-brand_alt-100:  var(--global-color-blue-light-100);
+  --semantic-dark-brand_alt-200:  var(--global-color-blue-light-200);
+  --semantic-dark-brand_alt-300:  var(--global-color-blue-light-300);
+  --semantic-dark-brand_alt-400:  var(--global-color-blue-light-400);
+  --semantic-dark-brand_alt-500:  var(--global-color-blue-light-500);
+  --semantic-dark-brand_alt-600:  var(--global-color-blue-light-600);
+  --semantic-dark-brand_alt-700:  var(--global-color-blue-light-700);
+  --semantic-dark-brand_alt-800:  var(--global-color-blue-light-800);
+  --semantic-dark-brand_alt-900:  var(--global-color-blue-light-900);
+
+  // ─── Dark Error (red-dark) ───────────────────────────────────────────────
+  --semantic-dark-error-25:   var(--global-color-red-dark-25);
+  --semantic-dark-error-50:   var(--global-color-red-dark-50);
+  --semantic-dark-error-100:  var(--global-color-red-dark-100);
+  --semantic-dark-error-200:  var(--global-color-red-dark-200);
+  --semantic-dark-error-300:  var(--global-color-red-dark-300);
+  --semantic-dark-error-400:  var(--global-color-red-dark-400);
+  --semantic-dark-error-500:  var(--global-color-red-dark-500);
+  --semantic-dark-error-600:  var(--global-color-red-dark-600);
+  --semantic-dark-error-700:  var(--global-color-red-dark-700);
+  --semantic-dark-error-800:  var(--global-color-red-dark-800);
+  --semantic-dark-error-900:  var(--global-color-red-dark-900);
+
+  // ─── Dark Success (green-dark) ───────────────────────────────────────────
+  --semantic-dark-success-25:   var(--global-color-green-dark-25);
+  --semantic-dark-success-50:   var(--global-color-green-dark-50);
+  --semantic-dark-success-100:  var(--global-color-green-dark-100);
+  --semantic-dark-success-200:  var(--global-color-green-dark-200);
+  --semantic-dark-success-300:  var(--global-color-green-dark-300);
+  --semantic-dark-success-400:  var(--global-color-green-dark-400);
+  --semantic-dark-success-500:  var(--global-color-green-dark-500);
+  --semantic-dark-success-600:  var(--global-color-green-dark-600);
+  --semantic-dark-success-700:  var(--global-color-green-dark-700);
+  --semantic-dark-success-800:  var(--global-color-green-dark-800);
+  --semantic-dark-success-900:  var(--global-color-green-dark-900);
+
+  // ─── Dark Warning (yellow-dark) ──────────────────────────────────────────
+  --semantic-dark-warning-25:   var(--global-color-yellow-dark-25);
+  --semantic-dark-warning-50:   var(--global-color-yellow-dark-50);
+  --semantic-dark-warning-100:  var(--global-color-yellow-dark-100);
+  --semantic-dark-warning-200:  var(--global-color-yellow-dark-200);
+  --semantic-dark-warning-300:  var(--global-color-yellow-dark-300);
+  --semantic-dark-warning-400:  var(--global-color-yellow-dark-400);
+  --semantic-dark-warning-500:  var(--global-color-yellow-dark-500);
+  --semantic-dark-warning-600:  var(--global-color-yellow-dark-600);
+  --semantic-dark-warning-700:  var(--global-color-yellow-dark-700);
+  --semantic-dark-warning-800:  var(--global-color-yellow-dark-800);
+  --semantic-dark-warning-900:  var(--global-color-yellow-dark-900);
+
+  // ─── Error (red) ─────────────────────────────────────────────────────────
+  --semantic-error-25:   var(--global-color-red-25);
+  --semantic-error-50:   var(--global-color-red-50);
+  --semantic-error-100:  var(--global-color-red-100);
+  --semantic-error-200:  var(--global-color-red-200);
+  --semantic-error-300:  var(--global-color-red-300);
+  --semantic-error-400:  var(--global-color-red-400);
+  --semantic-error-500:  var(--global-color-red-500);
+  --semantic-error-600:  var(--global-color-red-600);
+  --semantic-error-700:  var(--global-color-red-700);
+  --semantic-error-800:  var(--global-color-red-800);
+  --semantic-error-900:  var(--global-color-red-900);
+
+  // ─── Neutral (slate) ─────────────────────────────────────────────────────
+  --semantic-neutral-25:   var(--global-color-slate-25);
+  --semantic-neutral-50:   var(--global-color-slate-50);
+  --semantic-neutral-100:  var(--global-color-slate-100);
+  --semantic-neutral-200:  var(--global-color-slate-200);
+  --semantic-neutral-300:  var(--global-color-slate-300);
+  --semantic-neutral-400:  var(--global-color-slate-400);
+  --semantic-neutral-500:  var(--global-color-slate-500);
+  --semantic-neutral-600:  var(--global-color-slate-600);
+  --semantic-neutral-700:  var(--global-color-slate-700);
+  --semantic-neutral-800:  var(--global-color-slate-800);
+  --semantic-neutral-900:  var(--global-color-slate-900);
+
+  // ─── Success (green) ─────────────────────────────────────────────────────
+  --semantic-success-25:   var(--global-color-green-25);
+  --semantic-success-50:   var(--global-color-green-50);
+  --semantic-success-100:  var(--global-color-green-100);
+  --semantic-success-200:  var(--global-color-green-200);
+  --semantic-success-300:  var(--global-color-green-300);
+  --semantic-success-400:  var(--global-color-green-400);
+  --semantic-success-500:  var(--global-color-green-500);
+  --semantic-success-600:  var(--global-color-green-600);
+  --semantic-success-700:  var(--global-color-green-700);
+  --semantic-success-800:  var(--global-color-green-800);
+  --semantic-success-900:  var(--global-color-green-900);
+
+  // ─── Warning (yellow) ────────────────────────────────────────────────────
+  --semantic-warning-25:   var(--global-color-yellow-25);
+  --semantic-warning-50:   var(--global-color-yellow-50);
+  --semantic-warning-100:  var(--global-color-yellow-100);
+  --semantic-warning-200:  var(--global-color-yellow-200);
+  --semantic-warning-300:  var(--global-color-yellow-300);
+  --semantic-warning-400:  var(--global-color-yellow-400);
+  --semantic-warning-500:  var(--global-color-yellow-500);
+  --semantic-warning-600:  var(--global-color-yellow-600);
+  --semantic-warning-700:  var(--global-color-yellow-700);
+  --semantic-warning-800:  var(--global-color-yellow-800);
+  --semantic-warning-900:  var(--global-color-yellow-900);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 3 — COMPONENT TOKENS
+// Named by role and context. Values reference Layer 2 (semantic) wherever a
+// clean mapping exists. Transparent/alpha values and the legacy neutral-slate
+// scale have no Layer 2 equivalent and keep raw hex values — see MANUAL REVIEW
+// notes below.
+// ─────────────────────────────────────────────────────────────────────────────
+
+:root {
+  // ─── Background ──────────────────────────────────────────────────────────
+  --background-base-white:            var(--semantic-base-00);
+  --background-brand-default:         var(--semantic-brand-500);
+  --background-brand-soft-surface:    var(--semantic-brand-25);
+  --background-brand-light-normal:    var(--transparent-brand-4);
+  --background-brand-light-hover:     var(--semantic-brand-50);
+  --background-brand-active:          var(--semantic-brand-500);
+  --background-neutral-soft-surface:  var(--semantic-neutral-25);
+  --background-neutral-subtle:        var(--semantic-neutral-50);
+  --background-neutral-soft-muted:    var(--semantic-neutral-100); // Figma: background/neutral/soft-muted
+  --background-neutral-normal:        var(--semantic-neutral-800);
+  --background-neutral-hover:         var(--semantic-neutral-700);
+  --background-neutral-light:         var(--transparent-dark-4);
+  --background-error-normal:          var(--semantic-error-500);
+  --background-error-soft-surface:    #ff383814;  // 8% error-500 (rgba(255,56,56,0.08)) — used in error-light button bg
+  --background-warning-normal:        var(--semantic-warning-500);
+  --background-success-normal:        var(--semantic-success-500);
+
+  // ─── Foreground ──────────────────────────────────────────────────────────
+  --foreground-brand-primary:           var(--semantic-brand-500);
+  --foreground-brand-secondary:         var(--semantic-dark-brand-400);
+  --foreground-brand-secondary-inv:     var(--semantic-dark-brand-400);
+  --foreground-neutral-primary:         var(--semantic-neutral-900);
+  --foreground-neutral-secondary:       var(--semantic-neutral-600);
+  --foreground-neutral-tertiary:        var(--semantic-neutral-400);
+  --foreground-neutral-quaternary:      var(--semantic-neutral-300);
+  --foreground-light-primary:           var(--semantic-base-00);
+  --foreground-light-primary-inv:       var(--semantic-base-00);
+  --foreground-light-secondary-inv:     #ffffffcc;  // ⚠ transparent white 80% — no semantic equivalent
+  --foreground-error-secondary:         var(--semantic-error-500);
+  --foreground-warning-primary:         var(--semantic-warning-700);
+  --foreground-warning-secondary:       var(--semantic-warning-600);
+  --foreground-success-primary:         var(--semantic-success-600);
+  --foreground-success-secondary:       var(--semantic-success-500);
+
+  // ─── Border ──────────────────────────────────────────────────────────────
+  --border-base-white:                  var(--semantic-base-00);
+  --border-brand-subtle:                var(--semantic-brand-100);
+  --border-brand-xsubtle:               var(--semantic-brand-50);
+  --border-neutral-subtle:              #1b38601f;  // ⚠ transparent blue-tinted 12% — no semantic equivalent
+  --border-neutral-muted:               #1b38603d;  // ⚠ transparent blue-tinted 24% — no semantic equivalent
+  --border-neutral-xsubtle:             #1b38600f;  // ⚠ transparent blue-tinted 6% — no semantic equivalent
+  --border-error-default:               var(--semantic-error-500);
+  --border-warning-default:             var(--semantic-warning-500);
+  --border-success-default:             var(--semantic-success-500);
+
+  // ─── Action / Interactive ────────────────────────────────────────────────
+  --action-bg-base-white:               var(--semantic-base-00);
+  --action-bg-brand-normal:             var(--semantic-brand-500);
+  --action-bg-brand-hover:              var(--semantic-brand-600);    // #0f3cd9 — Figma canonical (was #2657ff in Button, now corrected)
+  --action-bg-brand-active:             var(--semantic-brand-500);    // same as normal; active effect is via box-shadow removal
+  --action-bg-brand-light:              var(--transparent-brand-4);
+  --action-bg-brand-light-hover:        var(--semantic-brand-50);
+  --action-bg-neutral-normal:           var(--semantic-neutral-800);
+  --action-bg-neutral-hover:            var(--semantic-neutral-700);
+  --action-bg-neutral-light:            var(--transparent-dark-4);
+  --action-bg-error-normal:             var(--semantic-error-500);
+  --action-bg-error-hover:              var(--semantic-error-600);    // #e92215 — Figma canonical hover
+  --action-bg-warning-normal:           var(--semantic-warning-500);  // #f59e0b
+  --action-bg-warning-hover:            var(--semantic-warning-600);  // #d97706
+  --action-bg-success-normal:           var(--semantic-success-500);  // #11a75c — PL canonical (Button was #22c55e, Tailwind drift)
+  --action-bg-success-hover:            var(--semantic-success-600);  // #0a9952 — PL canonical (Button was #16a34a, Tailwind drift)
+  --action-fg-brand-normal:             var(--semantic-brand-500);
+  --action-fg-brand-inv-normal:         var(--semantic-brand-500);
+  --action-fg-brand-inv-active:         var(--semantic-brand-500);
+  --action-fg-neutral-normal:           var(--semantic-neutral-600);
+  --action-fg-neutral-normal-light:     var(--semantic-neutral-400);
+  --action-fg-neutral-active:           var(--semantic-neutral-700);
+  --action-fg-base-inv-white:           var(--semantic-base-00);
+  --action-border-neutral-normal:       var(--semantic-neutral-500);
+  --action-border-neutral-light:        var(--transparent-dark-16);
+  --action-border-neutral-light-focus:  var(--transparent-dark-24);
+  --action-border-error-focus:          var(--semantic-error-500);
+
+  // ─── Surface ─────────────────────────────────────────────────────────────
+  --surface-light:                      var(--semantic-base-00);
+
+  // ─── Transparent overlays ────────────────────────────────────────────────
+  // Full Figma scale: 2/4/6/8/12/16/24/32/40/48/56/64/72/80/88/96 + 50 (scrim).
+  // Alpha hex = round(opacity% × 255). Base colours:
+  //   dark  = #0e0f11 (near-black)
+  //   light = #ffffff (white)
+  //   brand = #1b4dff (Protocol blue)
+  // No semantic layer yet — use these primitives directly in component tokens.
+
+  // Semantic transparent scales (not in Figma exports — system additions for named-token consistency)
+  // Figma only defines brand/dark/light transparent scales. Success/warning/error steps added on demand.
+  --transparent-success-8:  rgba(17, 167, 92, 0.08);   // success-500 (#11a75c) base — badge light-green bg
+  --transparent-warning-8:  rgba(245, 158, 11, 0.08);  // warning-500 (#f59e0b) base — badge light-yellow bg
+  --transparent-error-8:    rgba(255, 56, 56, 0.08);   // error-500 (#ff3838) base — badge light-red bg
+  --transparent-error-12:   rgba(255, 56, 56, 0.12);   // error-500 (#ff3838) base — input error focus ring shadow
+
+  // Dark scale
+  --transparent-dark-2:    #0e0f1105;
+  --transparent-dark-4:    #0e0f110a;
+  --transparent-dark-6:    #0e0f110f;
+  --transparent-dark-8:    #0e0f1114;
+  --transparent-dark-12:   #0e0f111f;
+  --transparent-dark-16:   #0e0f1129;
+  --transparent-dark-24:   #0e0f113d;
+  --transparent-dark-32:   #0e0f1152;
+  --transparent-dark-40:   #0e0f1166;
+  --transparent-dark-48:   #0e0f117a;
+  --transparent-dark-50:   #0e0f1180; // modal scrim (rgba(14,15,17,0.5))
+  --transparent-dark-56:   #0e0f118f;
+  --transparent-dark-64:   #0e0f11a3;
+  --transparent-dark-72:   #0e0f11b8;
+  --transparent-dark-80:   #0e0f11cc;
+  --transparent-dark-88:   #0e0f11e0;
+  --transparent-dark-96:   #0e0f11f5;
+
+  // Light scale
+  --transparent-light-2:   #ffffff05;
+  --transparent-light-4:   #ffffff0a;
+  --transparent-light-6:   #ffffff0f;
+  --transparent-light-8:   #ffffff14;
+  --transparent-light-12:  #ffffff1f;
+  --transparent-light-16:  #ffffff29;
+  --transparent-light-24:  #ffffff3d;
+  --transparent-light-32:  #ffffff52;
+  --transparent-light-40:  #ffffff66;
+  --transparent-light-48:  #ffffff7a;
+  --transparent-light-56:  #ffffff8f;
+  --transparent-light-64:  #ffffffa3;
+  --transparent-light-72:  #ffffffb8;
+  --transparent-light-80:  #ffffffcc;
+  --transparent-light-88:  #ffffffe0;
+  --transparent-light-96:  #fffffff5;
+
+  // Brand scale
+  --transparent-brand-2:   #1b4dff05;
+  --transparent-brand-4:   #1b4dff0a;
+  --transparent-brand-6:   #1b4dff0f;
+  --transparent-brand-8:   #1b4dff14;
+  --transparent-brand-12:  #1b4dff1f;
+  --transparent-brand-16:  #1b4dff29;
+  --transparent-brand-24:  #1b4dff3d;
+  --transparent-brand-32:  #1b4dff52;
+  --transparent-brand-40:  #1b4dff66;
+  --transparent-brand-48:  #1b4dff7a;
+  --transparent-brand-56:  #1b4dff8f;
+  --transparent-brand-64:  #1b4dffa3;
+  --transparent-brand-72:  #1b4dffb8;
+  --transparent-brand-80:  #1b4dffcc;
+  --transparent-brand-88:  #1b4dffe0;
+  --transparent-brand-96:  #1b4dfff5;
+
+  // ─── Legacy PLAA aliases (backward compat with portal-v2) ────────────────
+  // These reference Layer 3 / Layer 2 tokens — chain resolves automatically.
+  --plaa-primary-blue:         var(--foreground-brand-primary);
+  --plaa-border-blue:          var(--foreground-brand-secondary);
+  --plaa-text-dark:            var(--foreground-neutral-primary);    // was --neutral-slate-900 → L3
+  --plaa-text-menu:            var(--foreground-neutral-secondary);  // was --neutral-slate-600 → L3
+  --plaa-text-muted:           var(--foreground-neutral-tertiary);
+  --plaa-icon-dark:            var(--foreground-neutral-tertiary);
+  --plaa-neutral-white:        var(--semantic-base-00);              // was --neutral-white → L2
+  --plaa-surface-light-grey:   var(--background-neutral-soft-surface); // was --neutral-slate-100 → L3
+  --plaa-border-light:         var(--semantic-neutral-200);          // was --neutral-slate-200 → L2
+}

@@ -1,0 +1,109 @@
+@use '../../styles/media';
+
+.root {
+  position: relative;
+  width: 100%;
+  background: var(--action-bg-brand-normal);
+  border-radius: var(--radius-2xl, 20px);
+  overflow: hidden;
+  padding: var(--spacing-xl) var(--spacing-2xl);
+}
+
+.root.compact {
+  padding: var(--spacing-lg) var(--spacing-xl);
+}
+
+.pattern {
+  position: absolute;
+  inset: 0;
+  opacity: 0.1;
+  background-image: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255,255,255,0.2) 0%, transparent 40%),
+    repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.03) 20px, rgba(255,255,255,0.03) 21px);
+  pointer-events: none;
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1440px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--spacing-xl);
+
+  @include media.mobile {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.content { flex: 1; min-width: 0; }
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.breadcrumbItem {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  &:hover { color: #fff; }
+}
+
+.breadcrumbSep {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+}
+
+.title {
+  font-size: 48px;
+  font-weight: 500;
+  line-height: 60px;
+  letter-spacing: -1.75px;
+  color: #fff;
+  margin: 0;
+
+  @include media.tablet-below {
+    font-size: 32px;
+    line-height: 40px;
+    letter-spacing: -1px;
+  }
+
+  @include media.mobile {
+    font-size: 24px;
+    line-height: 32px;
+  }
+}
+
+.root.compact .title {
+  font-size: 28px;
+  line-height: 36px;
+  letter-spacing: -0.75px;
+}
+
+.subtitle {
+  font-size: 18px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  margin: var(--spacing-xs) 0 0;
+}
+
+.description {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+  margin: var(--spacing-sm) 0 0;
+  max-width: 560px;
+  line-height: 22px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-shrink: 0;
+}

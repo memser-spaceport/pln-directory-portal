@@ -150,12 +150,14 @@ function findLeadByName(name: string, leads: PlTeamMember[]): PlTeamMember | und
   return leads.find((l) => normalizePersonName(l.name) === key);
 }
 
-/** True when a connector is strong enough for a synthetic PL+1 direct path. */
+/**
+ * True when a connector is strong enough for a synthetic PL+1 direct path.
+ * Email-tier / one-way ties alone do not qualify (LAB-2108).
+ */
 export function passesPlConnectorThreshold(connector: PlConnector): boolean {
   if (connector.attributionSource && ROSTER_ATTRIBUTION_SOURCES.has(connector.attributionSource)) {
     return true;
   }
-  if (connector.tier >= ConnectorTier.Email) return true;
   if (connector.strength != null && connector.strength >= AFFINITY_DIRECT_STRENGTH_THRESHOLD) {
     return true;
   }

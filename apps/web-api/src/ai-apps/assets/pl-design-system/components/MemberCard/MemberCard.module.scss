@@ -1,0 +1,159 @@
+@use '../../styles/mixins';
+
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--spacing-xl);
+  background: var(--background-base-white);
+  border-radius: var(--radius-xl);
+  gap: var(--spacing-sm);
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 150ms, border-color 150ms;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs); // Figma: Shadow/xs always present; no border (J2a)
+
+  &:hover {
+    box-shadow: var(--shadow-sm); // elevated on hover
+  }
+}
+
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+
+.avatarWrapper {
+  position: relative;
+  width: 80px;  // J1a: corrected from 72px — Figma canonical 80px
+  height: 80px; // J1a: corrected from 72px — Figma canonical 80px
+  margin-bottom: var(--spacing-xs);
+}
+
+.avatar {
+  width: 80px;  // J1a: Figma canonical
+  height: 80px; // J1a: Figma canonical
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--background-neutral-subtle);
+}
+
+.avatarFallback {
+  width: 80px;  // J1a: Figma canonical
+  height: 80px; // J1a: Figma canonical
+  border-radius: 50%;
+  background: var(--background-neutral-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  @include mixins.label-2xl;
+  font-weight: var(--font-weight-semibold); // initials — override mixin's 500 to 600
+  color: var(--foreground-brand-primary);
+}
+
+// ─── Text content ─────────────────────────────────────────────────────────────
+
+.name {
+  @include mixins.label-lg; // Figma: Label/Large/strong — 18px/w500/24px; code had 16px/w600, corrected
+  color: var(--foreground-neutral-primary);
+}
+
+.role {
+  @include mixins.label-sm;
+  font-weight: var(--font-weight-regular); // Figma: Label/Small/default — 14px/w400/20px; code had 13px
+  color: var(--foreground-neutral-secondary);
+}
+
+.company {
+  @include mixins.label-sm;
+  font-weight: var(--font-weight-regular); // Figma: Label/Small/default — 14px/w400/20px; code had 13px
+  color: var(--foreground-neutral-secondary);
+}
+
+.location {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-4xs);
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-regular); // location text is regular weight
+  color: var(--foreground-neutral-tertiary);
+  margin-top: var(--spacing-xs);
+}
+
+.locationIcon {
+  width: 14px;  // icon size — not a spacing token; keep hardcoded
+  height: 14px; // icon size — not a spacing token; keep hardcoded
+  flex-shrink: 0;
+}
+
+// ─── Tags ─────────────────────────────────────────────────────────────────────
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3xs);
+  justify-content: center;
+  margin-top: var(--spacing-xs);
+}
+
+.tag {
+  padding: 2px var(--spacing-xs); // 2px vertical — sub-scale; structural
+  border-radius: var(--radius-full);
+  @include mixins.label-xs; // 12px by role (chip/tag = metadata); code had 11px
+  background: var(--background-neutral-subtle);
+  color: var(--foreground-neutral-secondary);
+}
+
+// ─── Compact (mobile) variant ─────────────────────────────────────────────────
+
+.root.compact {
+  flex-direction: row;
+  text-align: left;
+  padding: var(--spacing-md);
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.compact .avatarWrapper { width: 48px; height: 48px; margin-bottom: 0; } // compact avatar size — structural
+.compact .avatar,
+.compact .avatarFallback {
+  width: 48px;  // compact avatar size — structural
+  height: 48px; // compact avatar size — structural
+  font-size: var(--type-label-lg-strong-font-size); // 18px initials in 48px compact avatar
+}
+.compact .content { flex: 1; min-width: 0; }
+.compact .name    { font-size: var(--type-label-sm-strong-font-size); }  // 14px compact title
+.compact .role,
+.compact .company { font-size: var(--type-label-xs-strong-font-size); } // 12px compact secondary text
+.compact .location { justify-content: flex-start; }
+
+.content { width: 100%; }
+
+// ─── Availability badge ───────────────────────────────────────────────────────
+
+.availability {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4xs);
+  padding: 2px var(--spacing-2xs);
+  border-radius: var(--radius-full);
+  @include mixins.label-2xs;
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.01em;
+  border: 1.5px solid var(--background-base-white);
+}
+
+.availability.available   { background: var(--transparent-brand-6); border-color: var(--border-brand-subtle); color: var(--foreground-brand-primary); }
+.availability.booked      { background: var(--transparent-warning-8); color: var(--foreground-warning-secondary); }
+.availability.unavailable { background: var(--background-neutral-subtle); color: var(--foreground-neutral-tertiary); }
+
+.availabilityDot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+.available   .availabilityDot { background: var(--background-success-normal); }
+.booked      .availabilityDot { background: var(--action-bg-warning-normal); }
+.unavailable .availabilityDot { background: var(--foreground-neutral-tertiary); }

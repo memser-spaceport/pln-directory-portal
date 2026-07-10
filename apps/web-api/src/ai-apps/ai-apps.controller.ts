@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes } from '@nestjs/swagger';
-import { ZodValidationPipe } from 'nestjs-zod';
+import { ZodValidationPipe } from '@abitia/zod-dto';
 import { Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
@@ -29,10 +29,12 @@ import { AiAppsConnectService } from './ai-apps-connect.service';
 import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 import { DeployAppDto } from './dto/deploy-app.dto';
+import { RegisterDraftDto } from './dto/register-draft.dto';
+import { DeployDraftDto } from './dto/deploy-draft.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
-import { AI_APPS_MAX_ZIP_BYTES } from './ai-apps.constants';
+import { AI_APPS_MAX_ZIP_BYTES, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
 const WRITE = { anyOf: [AI_APPS_PERMISSIONS.WRITE] };
@@ -114,13 +116,27 @@ export class AiAppsController {
     return this.aiAppsService.listEvents(appUid, limit ? Number(limit) : undefined);
   }
 
-  /** Single AI App detail. */
+  /** Single AI App detail (includes `canManage` for the requesting member). */
   @NoCache()
   @Get(':uid')
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(READ)
-  async getApp(@Param('uid') uid: string) {
-    return this.aiAppsService.getApp(uid);
+  async getApp(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req).catch(() => undefined);
+    return this.aiAppsService.getApp(uid, memberUid);
+  }
+
+  /**
+   * Liveness probe for the LabOS detail page: one server-side reachability
+   * check of the app's public URL (a gateway timeout counts as down). The page
+   * polls this while a deploy settles so the iframe never shows a raw 504.
+   */
+  @NoCache()
+  @Get(':uid/live')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async checkAppLive(@Param('uid') uid: string) {
+    return this.aiAppsService.checkAppLive(uid);
   }
 
   /** Full event/status history for a single app, newest first. */
@@ -185,7 +201,7 @@ export class AiAppsController {
 
     res.set({
       'Content-Type': 'application/zip',
-      'Content-Disposition': 'attachment; filename="pln-ai-apps-starter-kit.zip"',
+      'Content-Disposition': `attachment; filename="pln-ai-apps-starter-kit-v${AI_APPS_STARTER_KIT_VERSION}.zip"`,
       'Content-Length': zip.length.toString(),
     });
     res.send(zip);
@@ -204,6 +220,38 @@ export class AiAppsController {
   @UsePipes(ZodValidationPipe)
   async deploy(@Req() req: any, @Body() body: DeployAppDto, @UploadedFile() file: Express.Multer.File) {
     return this.aiAppsService.deploy(req.aiAppMemberUid, body, file);
+  }
+
+  /**
+   * Register a DRAFT app that needs runtime secrets (agent, deploy-token auth).
+   * Same multipart shape as deploy plus `requiredEnvVars` (the env var NAMES).
+   * Nothing is deployed yet — the response carries `appPageUrl`, the LabOS page
+   * where the member enters the secret values and clicks Deploy.
+   */
+  @NoCache()
+  @Post('draft')
+  @UseGuards(AiAppTokenGuard)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AI_APPS_MAX_ZIP_BYTES } }))
+  @UsePipes(ZodValidationPipe)
+  async registerDraft(@Req() req: any, @Body() body: RegisterDraftDto, @UploadedFile() file: Express.Multer.File) {
+    return this.aiAppsService.registerDraft(req.aiAppMemberUid, body, file);
+  }
+
+  /**
+   * Member-triggered deploy from the LabOS app page (draft flow + redeploys
+   * after secret updates). Optionally carries `secrets` (name → value) which are
+   * forwarded to the sandbox runner's secret store — never persisted here.
+   * Blocks with a 400 listing the missing names if a required var has no value.
+   */
+  @NoCache()
+  @Post(':uid/deploy')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(WRITE)
+  @UsePipes(ZodValidationPipe)
+  async deployDraft(@Param('uid') uid: string, @Body() body: DeployDraftDto, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.deployDraft(memberUid, uid, body.secrets);
   }
 
   private async resolveMemberUid(req: any): Promise<string> {

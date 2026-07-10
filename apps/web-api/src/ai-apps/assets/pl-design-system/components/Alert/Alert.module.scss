@@ -1,0 +1,138 @@
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid transparent;
+  font-family: var(--font-family-primary);
+  position: relative;
+}
+
+.icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  margin-bottom: 4px;
+}
+
+.description {
+  font-size: 14px;
+  line-height: 20px;
+  opacity: 0.9;
+}
+
+.action {
+  margin-top: var(--spacing-sm);
+}
+
+.closeButton {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.6;
+  color: inherit;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+/* info */
+.info-light {
+  background: var(--background-brand-soft-surface, rgba(27, 77, 255, 0.06));
+  border-color: var(--border-brand-subtle, rgba(27, 77, 255, 0.2));
+  color: var(--foreground-brand-primary);
+
+  .title,
+  .description {
+    color: var(--foreground-neutral-primary);
+  }
+}
+
+.info-filled {
+  background: var(--action-bg-brand-normal);
+  color: #fff;
+  border-color: transparent;
+}
+
+.info-outline {
+  background: transparent;
+  border-color: var(--foreground-brand-primary);
+  color: var(--foreground-brand-primary);
+}
+
+/* success */
+.success-light {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #16a34a;
+}
+
+.success-filled {
+  background: #22c55e;
+  color: #fff;
+  border-color: transparent;
+}
+
+.success-outline {
+  background: transparent;
+  border-color: #22c55e;
+  color: #16a34a;
+}
+
+/* warning */
+.warning-light {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #d97706;
+}
+
+.warning-filled {
+  background: #f59e0b;
+  color: #fff;
+  border-color: transparent;
+}
+
+.warning-outline {
+  background: transparent;
+  border-color: #f59e0b;
+  color: #d97706;
+}
+
+/* error */
+.error-light {
+  background: rgba(255, 56, 56, 0.08);
+  border-color: rgba(255, 56, 56, 0.3);
+  color: var(--background-error-normal);
+}
+
+.error-filled {
+  background: var(--background-error-normal);
+  color: #fff;
+  border-color: transparent;
+}
+
+.error-outline {
+  background: transparent;
+  border-color: var(--background-error-normal);
+  color: var(--background-error-normal);
+}

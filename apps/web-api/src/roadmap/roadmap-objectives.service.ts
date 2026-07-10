@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { CreateRoadmapObjectiveSchema, SetRoadmapItemObjectiveSchema } from 'libs/contracts/src/schema/roadmap';
+import { CreateRoadmapObjectiveSchema, SetRoadmapItemObjectivesSchema } from 'libs/contracts/src/schema/roadmap';
 import { z } from 'zod';
 import { AnalyticsService } from '../analytics/service/analytics.service';
 import { PrismaService } from '../shared/prisma.service';
@@ -8,7 +8,7 @@ import { ROADMAP_ANALYTICS_EVENTS } from './roadmap.constants';
 import { RoadmapService } from './roadmap.service';
 
 type CreateObjectiveBody = z.infer<typeof CreateRoadmapObjectiveSchema>;
-type SetObjectiveBody = z.infer<typeof SetRoadmapItemObjectiveSchema>;
+type SetObjectivesBody = z.infer<typeof SetRoadmapItemObjectivesSchema>;
 
 @Injectable()
 export class RoadmapObjectivesService {
@@ -21,14 +21,26 @@ export class RoadmapObjectivesService {
   async listObjectives() {
     const rows = await this.prisma.roadmapObjective.findMany({
       orderBy: { order: 'asc' },
-      include: { _count: { select: { items: true } } },
+      include: {
+        _count: {
+          select: { items: true },
+        },
+      },
     });
+
+    const activeCounts = await this.prisma.roadmapItemObjective.groupBy({
+      by: ['objectiveUid'],
+      where: { item: { deletedAt: null } },
+      _count: { _all: true },
+    });
+    const activeCountByUid = new Map(activeCounts.map((row) => [row.objectiveUid, row._count._all]));
+
     return {
       objectives: rows.map((row) => ({
         uid: row.uid,
         title: row.title,
         order: row.order,
-        itemCount: row._count.items,
+        itemCount: activeCountByUid.get(row.uid) ?? 0,
         createdAt: row.createdAt.toISOString(),
       })),
     };
@@ -40,8 +52,8 @@ export class RoadmapObjectivesService {
     if (created) {
       await this.track(ROADMAP_ANALYTICS_EVENTS.OBJECTIVE_CREATED, actorUid, { objectiveUid: objective.uid });
     }
-    const itemCount = await this.prisma.roadmapItem.count({
-      where: { objectiveUid: objective.uid, deletedAt: null },
+    const itemCount = await this.prisma.roadmapItemObjective.count({
+      where: { objectiveUid: objective.uid, item: { deletedAt: null } },
     });
     return {
       uid: objective.uid,
@@ -52,7 +64,7 @@ export class RoadmapObjectivesService {
     };
   }
 
-  async setItemObjective(uid: string, body: SetObjectiveBody, actorUid: string) {
+  async setItemObjectives(uid: string, body: SetObjectivesBody, actorUid: string) {
     await this.assertCurator(actorUid);
 
     const item = await this.prisma.roadmapItem.findFirst({
@@ -63,26 +75,49 @@ export class RoadmapObjectivesService {
       throw new NotFoundException(`Roadmap item ${uid} not found`);
     }
 
-    let objectiveUid: string | null = null;
-    if (body.title !== undefined) {
-      const { objective, created } = await this.findOrCreateByTitle(body.title, actorUid);
+    const desiredUids = new Set(body.objectiveUids ?? []);
+
+    for (const title of body.titles ?? []) {
+      const { objective, created } = await this.findOrCreateByTitle(title, actorUid);
       if (created) {
         await this.track(ROADMAP_ANALYTICS_EVENTS.OBJECTIVE_CREATED, actorUid, { objectiveUid: objective.uid });
       }
-      objectiveUid = objective.uid;
-    } else if (body.objectiveUid) {
-      const objective = await this.prisma.roadmapObjective.findUnique({
-        where: { uid: body.objectiveUid },
-        select: { uid: true },
-      });
-      if (!objective) {
-        throw new NotFoundException(`Objective ${body.objectiveUid} not found`);
-      }
-      objectiveUid = objective.uid;
+      desiredUids.add(objective.uid);
     }
 
-    await this.prisma.roadmapItem.update({ where: { uid }, data: { objectiveUid } });
-    await this.track(ROADMAP_ANALYTICS_EVENTS.OBJECTIVE_SET, actorUid, { itemUid: uid, objectiveUid });
+    const objectiveUids = [...desiredUids];
+
+    if (objectiveUids.length > 0) {
+      const found = await this.prisma.roadmapObjective.findMany({
+        where: { uid: { in: objectiveUids } },
+        select: { uid: true },
+      });
+      const foundSet = new Set(found.map((o) => o.uid));
+      const missing = objectiveUids.filter((id) => !foundSet.has(id));
+      if (missing.length > 0) {
+        throw new NotFoundException(`Objective ${missing[0]} not found`);
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.roadmapItemObjective.deleteMany({
+        where: {
+          itemUid: uid,
+          ...(objectiveUids.length > 0 ? { objectiveUid: { notIn: objectiveUids } } : {}),
+        },
+      });
+
+      if (objectiveUids.length === 0) {
+        return;
+      }
+
+      await tx.roadmapItemObjective.createMany({
+        data: objectiveUids.map((objectiveUid) => ({ itemUid: uid, objectiveUid })),
+        skipDuplicates: true,
+      });
+    });
+
+    await this.track(ROADMAP_ANALYTICS_EVENTS.OBJECTIVE_SET, actorUid, { itemUid: uid, objectiveUids });
     return this.roadmapService.getItem(uid, actorUid);
   }
 

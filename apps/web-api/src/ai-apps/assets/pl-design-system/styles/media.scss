@@ -1,0 +1,77 @@
+// PL Design System — Responsive Breakpoints & Mixins
+
+$breakpoints: (
+  'mobile': 375px,
+  'tablet': 768px,
+  'tablet-landscape': 1024px,
+  'desktop': 1280px,
+  'desktop-wide': 1440px,
+);
+
+@mixin mobile {
+  @media (min-width: map-get($breakpoints, 'mobile')) {
+    @content;
+  }
+}
+
+@mixin tablet {
+  @media (min-width: map-get($breakpoints, 'tablet')) {
+    @content;
+  }
+}
+
+@mixin tablet-landscape {
+  @media (min-width: map-get($breakpoints, 'tablet-landscape')) {
+    @content;
+  }
+}
+
+@mixin desktop {
+  @media (min-width: map-get($breakpoints, 'desktop')) {
+    @content;
+  }
+}
+
+@mixin desktop-wide {
+  @media (min-width: map-get($breakpoints, 'desktop-wide')) {
+    @content;
+  }
+}
+
+// Mobile-first max-width helpers
+@mixin mobile-only {
+  @media (max-width: #{map-get($breakpoints, 'tablet') - 1px}) {
+    @content;
+  }
+}
+
+@mixin tablet-only {
+  @media (min-width: map-get($breakpoints, 'tablet')) and (max-width: #{map-get($breakpoints, 'tablet-landscape') - 1px}) {
+    @content;
+  }
+}
+
+// ─── Aliases ─────────────────────────────────────────────────────────────────
+// Named aliases used in page mockup components. Kept as explicit mixins
+// (not @forward of the canonical names) so callers are self-documenting.
+
+// Alias for tablet (min-width: 768px) — portrait tablet and up
+@mixin tablet-portrait {
+  @media (min-width: map-get($breakpoints, 'tablet')) {
+    @content;
+  }
+}
+
+// Alias for mobile-only (max-width: 767px) — below tablet breakpoint
+@mixin tablet-below {
+  @media (max-width: #{map-get($breakpoints, 'tablet') - 1px}) {
+    @content;
+  }
+}
+
+// Alias for tablet-landscape (min-width: 1024px) — explicit pixel callout
+@mixin breakpoint-1024 {
+  @media (min-width: map-get($breakpoints, 'tablet-landscape')) {
+    @content;
+  }
+}

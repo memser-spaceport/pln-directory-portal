@@ -10,6 +10,9 @@
  * ever leave our infrastructure.
  */
 
+/** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
+export const AI_APPS_STARTER_KIT_VERSION = '1.3';
+
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
 
@@ -43,6 +46,24 @@ export const AI_APPS_RUNNER_TOKEN = process.env.AI_APPS_RUNNER_TOKEN || '';
 /** S3 bucket the sandbox runner reads app bundles from. */
 export const AI_APPS_S3_BUCKET = process.env.AI_APPS_S3_BUCKET || '';
 
+/** Project scope for the runner's secrets/deployments API (`/v1/projects/<project>/…`). */
+export const AI_APPS_RUNNER_PROJECT = process.env.AI_APPS_RUNNER_PROJECT || 'default';
+
+/** Environment label the runner stores secrets under (e.g. `dev` on Dev, `prod` on Prod). */
+export const AI_APPS_RUNNER_ENVIRONMENT = process.env.AI_APPS_RUNNER_ENVIRONMENT || 'prod';
+
+/** Runner endpoint that saves (merge/upsert) an app's runtime secrets. */
+export const buildRunnerSecretsUrl = (): string =>
+  `${AI_APPS_RUNNER_URL}/v1/projects/${AI_APPS_RUNNER_PROJECT}/secrets`;
+
+/**
+ * Runner endpoint that (re)deploys an already-built image with the named stored
+ * secrets injected. The legacy `/deploy` (s3Key build) does NOT inject secrets,
+ * so secret-bearing apps need this second call after the build.
+ */
+export const buildRunnerDeploymentsUrl = (): string =>
+  `${AI_APPS_RUNNER_URL}/v1/projects/${AI_APPS_RUNNER_PROJECT}/deployments`;
+
 /** Build the S3 key for an app bundle: apps/<appId>/<deploymentId>/app.zip */
 export const buildAppS3Key = (appId: string, deploymentId: string): string => `apps/${appId}/${deploymentId}/app.zip`;
 
@@ -61,25 +82,40 @@ export const buildAppUrl = (appId: string): string => `https://${buildAppHost(ap
 export const buildAppHttpUrl = (appId: string): string => `http://${buildAppHost(appId)}`;
 
 /**
- * Public URL of THIS API's deploy endpoint, written into the starter kit so the
- * agent knows where to POST. Defaults to the conventional prod path.
+ * Public base URL of THIS API. The agent-facing endpoint URLs written into the
+ * starter kit are all derived from it (`<base>/v1/ai-apps/…`), so adding a new
+ * endpoint needs no new env var. The per-endpoint vars below remain as optional
+ * overrides for environments that already set them.
  */
-export const AI_APPS_DEPLOY_ENDPOINT =
-  process.env.AI_APPS_DEPLOY_ENDPOINT || 'https://api.plnetwork.io/v1/ai-apps/deploy';
+export const AI_APPS_BASE_URL = process.env.AI_APPS_BASE_URL;
+
+/** Public URL of THIS API's deploy endpoint, written into the starter kit so the agent knows where to POST. */
+export const AI_APPS_DEPLOY_ENDPOINT = process.env.AI_APPS_DEPLOY_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/deploy`;
+
+/** Public URL of THIS API's connect-session endpoint, written into the starter kit. */
+export const AI_APPS_CONNECT_ENDPOINT =
+  process.env.AI_APPS_CONNECT_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/connect`;
 
 /**
- * Public URL of THIS API's connect-session endpoint, written into the starter
- * kit so the agent knows where to start a connect session.
+ * Public URL of THIS API's draft-registration endpoint (apps that need runtime
+ * secrets), written into the starter kit.
  */
-export const AI_APPS_CONNECT_ENDPOINT =
-  process.env.AI_APPS_CONNECT_ENDPOINT || 'https://api.plnetwork.io/v1/ai-apps/connect';
+export const AI_APPS_DRAFT_ENDPOINT = process.env.AI_APPS_DRAFT_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/draft`;
 
 /**
  * Base URL of the LabOS portal that hosts the connect page the member opens to
  * approve a session. Combined with the session uid to build the connect link.
  */
-export const AI_APPS_PORTAL_URL = process.env.AI_APPS_PORTAL_URL || 'https://directory.plnetwork.io';
+export const AI_APPS_PORTAL_URL = process.env.AI_APPS_PORTAL_URL;
 
 /** The LabOS connect page URL a member opens to approve an agent's session. */
 export const buildConnectUrl = (sessionUid: string): string =>
   `${AI_APPS_PORTAL_URL}/pl-infra/ai-apps/connect?session=${encodeURIComponent(sessionUid)}`;
+
+/**
+ * The LabOS app detail page for one AI App — for a draft this is where the
+ * member enters secret values and clicks Deploy. The agent hands this link to
+ * the member after registering a draft.
+ */
+export const buildAppPageUrl = (appUid: string): string =>
+  `${AI_APPS_PORTAL_URL}/pl-infra/ai-apps/${encodeURIComponent(appUid)}`;

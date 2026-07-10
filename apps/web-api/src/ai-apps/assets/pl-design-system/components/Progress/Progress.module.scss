@@ -1,0 +1,88 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs, 8px);
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground-neutral-primary);
+}
+
+.valueText {
+  font-size: 12px;
+  color: var(--foreground-neutral-secondary);
+}
+
+.root {
+  width: 100%;
+  background: var(--background-neutral-subtle);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.size-sm {
+  height: 4px;
+}
+
+.size-md {
+  height: 8px;
+}
+
+.size-lg {
+  height: 12px;
+}
+
+.indicator {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: transform 500ms ease;
+}
+
+.blue {
+  background: var(--action-bg-brand-normal);
+}
+
+.green {
+  background: #22c55e;
+}
+
+.yellow {
+  background: #f59e0b;
+}
+
+.red {
+  background: var(--background-error-normal);
+}
+
+.animated {
+  background-size: 24px 24px;
+  animation: progressStripes 600ms linear infinite;
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+}
+
+@keyframes progressStripes {
+  from {
+    background-position: 24px 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}

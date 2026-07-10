@@ -1,0 +1,311 @@
+// PL Design System — Typography SCSS Mixins
+// Mixin-only partial: NO :root {} CSS output.
+//
+// Loaded via @forward in styles/mixins.scss so component CSS Modules
+// can @include these without emitting :root selectors (which CSS
+// Modules rejects as impure selectors).
+//
+// The matching --type-* custom properties are defined in
+// tokens/typography.scss, loaded globally via styles/globals.scss.
+//
+// Convention: bare name = default weight; "-strong" suffix = strong weight.
+
+// ─── Heading scale ───────────────────────────────────────────────────────────
+
+@mixin heading-3xl {
+  // Figma: Heading/3xLarge/default
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-heading-3xl-default-font-size);
+  line-height:    var(--type-heading-3xl-default-line-height);
+  font-weight:    var(--type-heading-3xl-default-font-weight);
+  letter-spacing: var(--type-heading-3xl-default-letter-spacing);
+}
+
+@mixin heading-lg {
+  // Figma: Heading/Large/default (40px / ls -1.5px)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-heading-lg-default-font-size);
+  line-height:    var(--type-heading-lg-default-line-height);
+  font-weight:    var(--type-heading-lg-default-font-weight);
+  letter-spacing: var(--type-heading-lg-default-letter-spacing);
+}
+
+@mixin heading-md {
+  // Figma: Heading/Medium/default
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-heading-md-default-font-size);
+  line-height:    var(--type-heading-md-default-line-height);
+  font-weight:    var(--type-heading-md-default-font-weight);
+  letter-spacing: var(--type-heading-md-default-letter-spacing);
+}
+
+@mixin heading-sm {
+  // Figma: Heading/Small/default
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-heading-sm-default-font-size);
+  line-height:    var(--type-heading-sm-default-line-height);
+  font-weight:    var(--type-heading-sm-default-font-weight);
+  letter-spacing: var(--type-heading-sm-default-letter-spacing);
+}
+
+// ─── Body scale ──────────────────────────────────────────────────────────────
+
+@mixin body-xl-strong {
+  // Figma: Body/xLarge/strong
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-body-xl-strong-font-size);
+  line-height:    var(--type-body-xl-strong-line-height);
+  font-weight:    var(--type-body-xl-strong-font-weight);
+  letter-spacing: var(--type-body-xl-strong-letter-spacing);
+}
+
+@mixin body-md {
+  // Figma: Body/Medium/default
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-body-md-default-font-size);
+  line-height:    var(--type-body-md-default-line-height);
+  font-weight:    var(--type-body-md-default-font-weight);
+  letter-spacing: var(--type-body-md-default-letter-spacing);
+}
+
+@mixin body-sm {
+  // Figma: Body/Small/default
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-body-sm-default-font-size);
+  line-height:    var(--type-body-sm-default-line-height);
+  font-weight:    var(--type-body-sm-default-font-weight);
+  letter-spacing: var(--type-body-sm-default-letter-spacing);
+}
+
+@mixin body-sm-strong {
+  // Figma: Body/Small/strong
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-body-sm-strong-font-size);
+  line-height:    var(--type-body-sm-strong-line-height);
+  font-weight:    var(--type-body-sm-strong-font-weight);
+  letter-spacing: var(--type-body-sm-strong-letter-spacing);
+}
+
+@mixin body-xs {
+  // Figma: Body/xSmall/default
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-body-xs-default-font-size);
+  line-height:    var(--type-body-xs-default-line-height);
+  font-weight:    var(--type-body-xs-default-font-weight);
+  letter-spacing: var(--type-body-xs-default-letter-spacing);
+}
+
+@mixin body-xs-strong {
+  // Figma: Body/xSmall/strong
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-body-xs-strong-font-size);
+  line-height:    var(--type-body-xs-strong-line-height);
+  font-weight:    var(--type-body-xs-strong-font-weight);
+  letter-spacing: var(--type-body-xs-strong-letter-spacing);
+}
+
+// ─── Label scale ─────────────────────────────────────────────────────────────
+
+@mixin label-2xl {
+  // Figma: Label/2xLarge/strong (24px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-label-2xl-strong-font-size);
+  line-height:    var(--type-label-2xl-strong-line-height);
+  font-weight:    var(--type-label-2xl-strong-font-weight);
+  letter-spacing: var(--type-label-2xl-strong-letter-spacing);
+}
+
+@mixin label-2xl-default {
+  // Figma: Label/2xLarge/default (24px / w400)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-label-2xl-default-font-size);
+  line-height:    var(--type-label-2xl-default-line-height);
+  font-weight:    var(--type-label-2xl-default-font-weight);
+  letter-spacing: var(--type-label-2xl-default-letter-spacing);
+}
+
+@mixin label-xl {
+  // Figma: Label/xLarge/strong (20px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-label-xl-strong-font-size);
+  line-height:    var(--type-label-xl-strong-line-height);
+  font-weight:    var(--type-label-xl-strong-font-weight);
+  letter-spacing: var(--type-label-xl-strong-letter-spacing);
+}
+
+@mixin label-xl-default {
+  // Figma: Label/xLarge/default (20px / w400)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-label-xl-default-font-size);
+  line-height:    var(--type-label-xl-default-line-height);
+  font-weight:    var(--type-label-xl-default-font-weight);
+  letter-spacing: var(--type-label-xl-default-letter-spacing);
+}
+
+@mixin label-lg {
+  // Figma: Label/Large/strong (18px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-label-lg-strong-font-size);
+  line-height:    var(--type-label-lg-strong-line-height);
+  font-weight:    var(--type-label-lg-strong-font-weight);
+  letter-spacing: var(--type-label-lg-strong-letter-spacing);
+}
+
+@mixin label-md {
+  // Figma: Label/Medium/strong (16px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-label-md-strong-font-size);
+  line-height:    var(--type-label-md-strong-line-height);
+  font-weight:    var(--type-label-md-strong-font-weight);
+  letter-spacing: var(--type-label-md-strong-letter-spacing);
+}
+
+@mixin label-sm {
+  // Figma: Label/Small/strong (14px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-label-sm-strong-font-size);
+  line-height:    var(--type-label-sm-strong-line-height);
+  font-weight:    var(--type-label-sm-strong-font-weight);
+  letter-spacing: var(--type-label-sm-strong-letter-spacing);
+}
+
+@mixin label-xs {
+  // Figma: Label/xSmall/strong (12px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-label-xs-strong-font-size);
+  line-height:    var(--type-label-xs-strong-line-height);
+  font-weight:    var(--type-label-xs-strong-font-weight);
+  letter-spacing: var(--type-label-xs-strong-letter-spacing);
+}
+
+@mixin label-2xs {
+  // Figma: Label/2xsmall/strong (10px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-label-2xs-strong-font-size);
+  line-height:    var(--type-label-2xs-strong-line-height);
+  font-weight:    var(--type-label-2xs-strong-font-weight);
+  letter-spacing: var(--type-label-2xs-strong-letter-spacing);
+}
+
+// ─── Underline scale ─────────────────────────────────────────────────────────
+// Default = w400, strong = w500. All include text-decoration: underline.
+
+@mixin underline-2xl {
+  // Figma: Underline/2xLarge/default (24px)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-2xl-default-font-size);
+  line-height:    var(--type-underline-2xl-default-line-height);
+  font-weight:    var(--type-underline-2xl-default-font-weight);
+  letter-spacing: var(--type-underline-2xl-default-letter-spacing);
+  text-decoration: underline;
+}
+
+@mixin underline-2xl-strong {
+  // Figma: Underline/2xLarge/strong (24px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-2xl-strong-font-size);
+  line-height:    var(--type-underline-2xl-strong-line-height);
+  font-weight:    var(--type-underline-2xl-strong-font-weight);
+  letter-spacing: var(--type-underline-2xl-strong-letter-spacing);
+  text-decoration: underline;
+}
+
+@mixin underline-xl {
+  // Figma: Underline/xLarge/default (20px)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-xl-default-font-size);
+  line-height:    var(--type-underline-xl-default-line-height);
+  font-weight:    var(--type-underline-xl-default-font-weight);
+  letter-spacing: var(--type-underline-xl-default-letter-spacing);
+  text-decoration: underline;
+}
+
+@mixin underline-xl-strong {
+  // Figma: Underline/xLarge/strong (20px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-xl-strong-font-size);
+  line-height:    var(--type-underline-xl-strong-line-height);
+  font-weight:    var(--type-underline-xl-strong-font-weight);
+  letter-spacing: var(--type-underline-xl-strong-letter-spacing);
+  text-decoration: underline;
+}
+
+@mixin underline-lg {
+  // Figma: Underline/Large/default (18px)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-lg-default-font-size);
+  line-height:    var(--type-underline-lg-default-line-height);
+  font-weight:    var(--type-underline-lg-default-font-weight);
+  letter-spacing: var(--type-underline-lg-default-letter-spacing);
+  text-decoration: underline;
+}
+
+@mixin underline-lg-strong {
+  // Figma: Underline/Large/strong (18px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-lg-strong-font-size);
+  line-height:    var(--type-underline-lg-strong-line-height);
+  font-weight:    var(--type-underline-lg-strong-font-weight);
+  letter-spacing: var(--type-underline-lg-strong-letter-spacing);
+  text-decoration: underline;
+}
+
+@mixin underline-md {
+  // Figma: Underline/Medium/default (16px)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-md-default-font-size);
+  line-height:    var(--type-underline-md-default-line-height);
+  font-weight:    var(--type-underline-md-default-font-weight);
+  letter-spacing: var(--type-underline-md-default-letter-spacing);
+  text-decoration: underline;
+}
+
+@mixin underline-md-strong {
+  // Figma: Underline/Medium/strong (16px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-md-strong-font-size);
+  line-height:    var(--type-underline-md-strong-line-height);
+  font-weight:    var(--type-underline-md-strong-font-weight);
+  letter-spacing: var(--type-underline-md-strong-letter-spacing);
+  text-decoration: underline;
+}
+
+@mixin underline-sm {
+  // Figma: Underline/Small/default (14px)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-sm-default-font-size);
+  line-height:    var(--type-underline-sm-default-line-height);
+  font-weight:    var(--type-underline-sm-default-font-weight);
+  letter-spacing: var(--type-underline-sm-default-letter-spacing);
+  text-decoration: underline;
+}
+
+@mixin underline-sm-strong {
+  // Figma: Underline/Small/strong (14px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-sm-strong-font-size);
+  line-height:    var(--type-underline-sm-strong-line-height);
+  font-weight:    var(--type-underline-sm-strong-font-weight);
+  letter-spacing: var(--type-underline-sm-strong-letter-spacing);
+  text-decoration: underline;
+}
+
+@mixin underline-xs {
+  // Figma: Underline/xSmall/default (12px)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-xs-default-font-size);
+  line-height:    var(--type-underline-xs-default-line-height);
+  font-weight:    var(--type-underline-xs-default-font-weight);
+  letter-spacing: var(--type-underline-xs-default-letter-spacing);
+  text-decoration: underline;
+}
+
+@mixin underline-xs-strong {
+  // Figma: Underline/xSmall/strong (12px / w500)
+  font-family: var(--font-family-primary);
+  font-size:      var(--type-underline-xs-strong-font-size);
+  line-height:    var(--type-underline-xs-strong-line-height);
+  font-weight:    var(--type-underline-xs-strong-font-weight);
+  letter-spacing: var(--type-underline-xs-strong-letter-spacing);
+  text-decoration: underline;
+}

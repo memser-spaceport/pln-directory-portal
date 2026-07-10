@@ -9,11 +9,19 @@ import { TeamNewsServiceController } from './team-news-service.controller';
 import { TeamNewsService } from './team-news.service';
 import { TeamNewsQueryService } from './team-news-query.service';
 import { TeamNewsEnrichmentService } from './team-news-enrichment.service';
+import { TeamNewsUpvotesService } from './team-news-upvotes.service';
+import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 
 @Module({
   imports: [SharedModule, forwardRef(() => MembersModule), AccessControlV2Module, PushNotificationsModule, FollowsModule],
   controllers: [TeamNewsController, TeamNewsServiceController],
-  providers: [TeamNewsService, TeamNewsQueryService, TeamNewsEnrichmentService],
+  providers: [
+    TeamNewsService,
+    TeamNewsQueryService,
+    TeamNewsEnrichmentService,
+    TeamNewsUpvotesService,
+    TeamNewsSuggestionsService,
+  ],
   exports: [TeamNewsService, TeamNewsQueryService, TeamNewsEnrichmentService],
 })
 export class TeamNewsModule {}

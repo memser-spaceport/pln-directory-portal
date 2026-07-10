@@ -1,0 +1,72 @@
+@use '../../styles/mixins';
+
+.root {
+  background: var(--background-base-white);
+  border-radius: var(--radius-md); // Figma: --radius-md (8px) — code had --radius-xl (12px), corrected
+  overflow: hidden;
+  box-shadow: var(--shadow-xs); // Figma: Shadow/xs always present; no border (K1a)
+}
+
+.title {
+  padding: var(--spacing-md) var(--spacing-lg);
+  @include mixins.label-sm; // Figma: Label/Small/strong — 14px/w500/20px; code had 13px
+  color: var(--foreground-neutral-secondary); // Figma: secondary — code had tertiary, corrected
+  border-bottom: 1px solid var(--border-neutral-subtle);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+
+.hostInfo { flex: 1; min-width: 0; }
+
+.hostName {
+  @include mixins.label-md;
+  font-weight: var(--font-weight-semibold); // Figma: Body/Medium/strong — 16px/w600; code had 15px/w600
+  color: var(--foreground-neutral-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.hostSep { color: var(--foreground-neutral-tertiary); font-weight: var(--font-weight-regular); }
+.hostAt  {
+  @include mixins.label-md;
+  font-weight: var(--font-weight-regular); // Figma: Body/Medium/default — 16px/w400; code had 14px/w400
+  color: var(--foreground-neutral-secondary);
+}
+
+.hostBio {
+  @include mixins.body-sm; // Figma: Body/Small/default — 14px/w400/22px; code had 13px/18px
+  color: var(--foreground-neutral-tertiary);
+  margin-top: 3px; // sub-scale gap — structural; no token equivalent
+}
+
+.scheduleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-xs) var(--spacing-lg);
+  background: var(--action-bg-brand-normal);
+  color: var(--foreground-light-primary);
+  border-radius: var(--radius-md);
+  @include mixins.label-sm; // Figma: Label/Small/strong — 14px/w500; code had 13px/w600, corrected
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: opacity 120ms;
+
+  &:hover { opacity: 0.9; }
+}
+
+.calIcon {
+  width: 14px;  // icon size — not a spacing token; keep hardcoded
+  height: 14px; // icon size — not a spacing token; keep hardcoded
+}

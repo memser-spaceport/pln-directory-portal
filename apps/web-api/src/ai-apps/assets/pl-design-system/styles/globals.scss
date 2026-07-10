@@ -1,0 +1,58 @@
+// PL Design System — Global Styles
+@use '../tokens/colors';
+@use '../tokens/typography';
+@use '../tokens/spacing';
+@use 'media';
+
+// ─── Inter variable font (self-hosted) ────────────────────────────────────────
+// TTF:   /fonts/Inter-VariableFont_opsz_wght.ttf  (Inter 4.1, wght 100–900, opsz 14–32)
+// woff2: /fonts/InterVariable.woff2               (web-optimised subset)
+// Source: https://github.com/rsms/inter/releases/tag/v4.1 (SIL OFL 1.1)
+//
+// In the Next.js app this font is loaded via next/font/local in src/app/layout.tsx,
+// which sets --font-inter and applies it to <html>. The @font-face below is the
+// fallback for Storybook, plain-CSS consumers, and CI snapshot environments.
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/InterVariable.woff2') format('woff2') tech('variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  font-family: var(--font-family-primary);
+  font-size: 1rem;
+  color: var(--foreground-neutral-primary);
+  background-color: var(--background-neutral-soft-surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--foreground-brand-primary);
+  outline-offset: 2px;
+}

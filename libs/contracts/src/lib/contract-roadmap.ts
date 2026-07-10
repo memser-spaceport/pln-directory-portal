@@ -20,7 +20,7 @@ import {
   RoadmapPinActionResponseSchema,
   RoadmapPinBalanceSchema,
   RoadmapSettingsSchema,
-  SetRoadmapItemObjectiveSchema,
+  SetRoadmapItemObjectivesSchema,
   TransitionRoadmapItemSchema,
   UpdatePinNoteSchema,
   UpdateRoadmapItemSchema,
@@ -194,15 +194,15 @@ export const apiRoadmap = contract.router({
     },
     summary: 'Create a roadmap objective (curators only; find-or-create by title)',
   },
-  setRoadmapItemObjective: {
+  setRoadmapItemObjectives: {
     method: 'PATCH',
-    path: `${getAPIVersionAsPath('1')}/roadmap/items/:uid/objective`,
+    path: `${getAPIVersionAsPath('1')}/roadmap/items/:uid/objectives`,
     pathParams: itemPathParams,
-    body: SetRoadmapItemObjectiveSchema,
+    body: SetRoadmapItemObjectivesSchema,
     responses: {
       200: RoadmapItemSchema,
     },
-    summary: 'Set, create-and-set, or clear the objective on an item (curators only)',
+    summary: 'Replace the set of objectives on an item (curators only; empty array clears)',
   },
   getRoadmapSettings: {
     method: 'GET',

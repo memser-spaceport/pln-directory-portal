@@ -1,0 +1,95 @@
+@use '../../styles/mixins';
+
+// ─── Wrapper ──────────────────────────────────────────────────────────────────
+
+.wrapper {
+  display: inline-flex;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+// ─── Root (Radix) ─────────────────────────────────────────────────────────────
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border-neutral-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--background-base-white);
+  flex-shrink: 0;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  cursor: pointer;
+  outline: none;
+  padding: 0;
+
+  &[data-state='checked'],
+  &[data-state='indeterminate'] {
+    background: var(--action-bg-brand-normal);
+    border-color: var(--action-bg-brand-normal);
+  }
+
+  &:hover:not([disabled]) {
+    border-color: var(--foreground-brand-primary);
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 3px var(--transparent-brand-8);
+    border-color: var(--foreground-brand-primary);
+  }
+
+  &[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+// ─── Sizes ────────────────────────────────────────────────────────────────────
+
+.size-sm {
+  width: 16px;  // checkbox size — not a spacing token; keep hardcoded
+  height: 16px; // checkbox size — not a spacing token; keep hardcoded
+  border-radius: var(--radius-xsm); // 4px — sm checkbox uses tighter corner than md/lg
+}
+
+.size-md {
+  width: 20px;  // checkbox size — not a spacing token; keep hardcoded
+  height: 20px; // checkbox size — not a spacing token; keep hardcoded
+  border-radius: var(--radius-sm);
+}
+
+.size-lg {
+  width: 24px;  // checkbox size — not a spacing token; keep hardcoded
+  height: 24px; // checkbox size — not a spacing token; keep hardcoded
+  border-radius: var(--radius-md);
+}
+
+// ─── Indicator ────────────────────────────────────────────────────────────────
+
+.indicator {
+  color: var(--foreground-light-primary); // white icon on brand fill
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// ─── Text content ─────────────────────────────────────────────────────────────
+
+.textContent {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  @include mixins.label-sm;
+  color: var(--foreground-neutral-primary);
+  cursor: pointer;
+}
+
+.description {
+  @include mixins.label-xs;
+  font-weight: var(--font-weight-regular); // description text is unstyled — override mixin's 500 to 400
+  color: var(--foreground-neutral-tertiary);
+  margin-top: 2px; // sub-scale gap — structural; no token equivalent
+}

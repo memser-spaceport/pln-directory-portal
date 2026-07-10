@@ -1,40 +1,30 @@
 # AI Apps starter-kit assets
 
-## `pl-design-system.zip`
+## `pl-design-system/`
 
-A curated, prebuilt copy of the **PL Design System**, shipped verbatim inside the
-AI Apps starter kit (`AiAppsStarterKitService` embeds this file as-is — it is not
-unpacked or recompressed server-side). It contains a single top-level
-`pl-design-system/` folder with:
+A curated copy of the **PL Design System**, embedded as normal files inside the
+AI Apps starter kit (`AiAppsStarterKitService` walks this folder into the kit
+ZIP — no nested zip for the agent to unpack). It contains:
 
 - `components/` — React components (`.tsx` + SCSS modules + types) and the
   per-component specs in `components/primitives/` and `components/product/`
 - `tokens/`, `styles/` — SCSS design tokens, global styles, mixins
-- `public/fonts/` — self-hosted Inter variable font
+- `public/fonts/` — self-hosted Inter variable font (`InterVariable.woff2` only)
 - `patterns/`, `examples/` — layout patterns and page-level reference compositions
-- `guidelines.md` — design rules for agents
+- `guidelines.md` — kit-specific design rules for agents (code-first)
 - `USAGE.md` — how to consume the system in a Next.js 14 app (PLN-specific)
 
-It is stored as one binary instead of hundreds of loose files to keep Git clean,
-and it is registered as a build asset in `apps/web-api/project.json` so it is
-copied to `dist/apps/web-api/ai-apps/assets/pl-design-system.zip` on build.
+Kit overlays that are copied into the bundle (or live beside it):
 
-### Regenerating
+- `USAGE.md` — consumption guide (also present inside `pl-design-system/`)
+- `guidelines.kit.md` — source for the kit's `guidelines.md`
 
-From a checkout of the PL Design System repo (`$DS`), stage the curated subset
-under a `pl-design-system/` folder, add the kit's `USAGE.md`, then zip:
+Registered as a build asset in `apps/web-api/project.json` so `nx build` copies
+it to `dist/apps/web-api/ai-apps/assets/pl-design-system/`. Excluded from the
+web-api TypeScript project (`tsconfig*.json`) so React/TSX files are not compiled
+by the API build.
 
-```bash
-STAGE=$(mktemp -d)/pl-design-system
-mkdir -p "$STAGE"
-cp -R "$DS"/{components,tokens,styles,assets,patterns,examples} "$STAGE"/
-cp -R "$DS"/public/fonts "$STAGE"/public/fonts
-cp "$DS"/guidelines.md "$STAGE"/guidelines.md
-cp USAGE.md "$STAGE"/USAGE.md        # keep the kit-specific consumption guide
-find "$STAGE" -name '.DS_Store' -delete
-( cd "$(dirname "$STAGE")" && zip -r -X -q pl-design-system.zip pl-design-system )
-mv "$(dirname "$STAGE")"/pl-design-system.zip ./pl-design-system.zip
-```
-
-Excluded from the bundle: the showcase Next.js app (`src/`), `node_modules`,
-`.next`, `_dist`, and `mockups/`.
+Excluded from the bundle: showcase Next.js app (`src/`), `mockups/`, `figma/`,
+`node_modules`, agent skill folders from the DS repo (the kit ships one lean
+`.claude/skills/pl-design-system` skill instead), `package-lock.json`, and the
+TTF font (woff2 only).

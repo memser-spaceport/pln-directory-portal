@@ -1,24 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import AdmZip from 'adm-zip';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import {
   AI_APP_TOKEN_HEADER,
   AI_APPS_APP_DOMAIN,
   AI_APPS_CONNECT_ENDPOINT,
   AI_APPS_DEPLOY_ENDPOINT,
+  AI_APPS_DRAFT_ENDPOINT,
+  AI_APPS_STARTER_KIT_VERSION,
 } from './ai-apps.constants';
 
-/** Prebuilt PL Design System bundle, shipped verbatim inside the starter kit. */
-const DESIGN_SYSTEM_ZIP_NAME = 'pl-design-system.zip';
-
-/** ZIP "stored" method (no compression) — see adm-zip util/constants STORED. */
-const ZIP_METHOD_STORED = 0;
+/** Curated PL Design System folder, shipped as files inside the starter kit. */
+const DESIGN_SYSTEM_DIR = 'pl-design-system';
 
 /**
  * Builds the "AI Apps" starter kit ZIP a member downloads and unpacks into their
  * AI coding tool (Claude Code, Cursor, …). It carries deploy instructions for the
- * agent, a minimal runnable app scaffold, and the full PL Design System (React
+ * agent, a minimal runnable app scaffold, and the curated PL Design System (React
  * components + design tokens + usage guidelines) — but no deploy token and no PLN
  * private API info. At deploy time the agent runs the LabOS connect flow to obtain
  * a short-lived deploy token.
@@ -35,6 +34,7 @@ export class AiAppsStarterKitService {
     add('CLAUDE.md', this.agentInstructions());
     add('AGENTS.md', this.agentInstructions());
     add('.claude/skills/deploy-to-labs/SKILL.md', this.deploySkill());
+    add('.claude/skills/pl-design-system/SKILL.md', this.designSystemSkill());
     add('pln-app.config.json', this.configJson());
     add('styles/pln-theme.css', this.themeCss());
     add('styles/FONTS.md', this.fontsDoc());
@@ -43,48 +43,53 @@ export class AiAppsStarterKitService {
     add('app/Dockerfile', this.appDockerfile());
     add('app/.dockerignore', 'node_modules\nnpm-debug.log\n');
 
-    // The full PL Design System (React components, SCSS tokens, fonts, specs)
-    // ships as a single prebuilt ZIP embedded verbatim — the agent unzips it
-    // (see AGENTS.md). This avoids walking hundreds of files or writing any temp
-    // files per download. Members consume canonical components instead of
-    // hand-rolling buttons/cards/inputs.
     this.addDesignSystem(zip);
 
     return zip.toBuffer();
   }
 
   /**
-   * Locate the prebuilt design-system ZIP bundled as a build asset. In a built
-   * app it sits next to the compiled code (`dist/apps/web-api/ai-apps/assets/…`,
-   * see `apps/web-api/project.json` assets); the source path is the fallback for
+   * Locate the curated design-system folder. In a built app it sits next to the
+   * compiled code (`dist/apps/web-api/ai-apps/assets/pl-design-system`, see
+   * `apps/web-api/project.json` assets); the source path is the fallback for
    * unbundled runs (tests / ts-node).
    */
-  private designSystemZipPath(): string {
+  private designSystemDirPath(): string {
     const candidates = [
-      join(__dirname, 'ai-apps', 'assets', DESIGN_SYSTEM_ZIP_NAME),
-      join(process.cwd(), 'apps', 'web-api', 'src', 'ai-apps', 'assets', DESIGN_SYSTEM_ZIP_NAME),
+      join(__dirname, 'ai-apps', 'assets', DESIGN_SYSTEM_DIR),
+      join(process.cwd(), 'apps', 'web-api', 'src', 'ai-apps', 'assets', DESIGN_SYSTEM_DIR),
     ];
     return candidates.find((p) => existsSync(p)) ?? candidates[0];
   }
 
   /**
-   * Add the prebuilt design-system ZIP into the kit as a single entry, stored
-   * (not recompressed) since it is already compressed. Adding it must never
-   * break the kit download — if the asset is missing (misconfigured build), log
-   * and ship the kit without it.
+   * Embed the curated design-system tree as normal files under `pl-design-system/`
+   * in the kit (no nested zip). Missing asset must never break the kit download.
    */
   private addDesignSystem(zip: AdmZip): void {
-    const path = this.designSystemZipPath();
-    if (!existsSync(path)) {
-      this.logger.warn(`PL Design System bundle not found at ${path}; shipping starter kit without it.`);
+    const root = this.designSystemDirPath();
+    if (!existsSync(root)) {
+      this.logger.warn(`PL Design System folder not found at ${root}; shipping starter kit without it.`);
       return;
     }
-    const entry = zip.addFile(DESIGN_SYSTEM_ZIP_NAME, readFileSync(path));
-    entry.header.method = ZIP_METHOD_STORED;
+    this.addDirectoryToZip(zip, root, DESIGN_SYSTEM_DIR);
+  }
+
+  private addDirectoryToZip(zip: AdmZip, absDir: string, zipPrefix: string): void {
+    for (const name of readdirSync(absDir)) {
+      if (name === '.DS_Store') continue;
+      const abs = join(absDir, name);
+      const entry = join(zipPrefix, name);
+      if (statSync(abs).isDirectory()) {
+        this.addDirectoryToZip(zip, abs, entry);
+      } else {
+        zip.addFile(entry.replace(/\\/g, '/'), readFileSync(abs));
+      }
+    }
   }
 
   private readme(): string {
-    return `# PLN AI Apps — Starter Kit
+    return `# PLN AI Apps — Starter Kit v${AI_APPS_STARTER_KIT_VERSION}
 
 Welcome! This kit lets you vibe-code an app with your AI assistant and deploy it
 to the Protocol Labs Network sandbox with a single instruction.
@@ -92,21 +97,19 @@ to the Protocol Labs Network sandbox with a single instruction.
 ## What's inside
 - \`CLAUDE.md\` / \`AGENTS.md\` — instructions your AI agent reads automatically.
 - \`.claude/skills/deploy-to-labs/\` — the deploy skill your agent uses.
+- \`.claude/skills/pl-design-system/\` — how to build on-brand UI with the PL Design System.
 - \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
-- \`pl-design-system.zip\` — the **PL Design System**: ready-made React components
+- \`pl-design-system/\` — the **PL Design System**: ready-made React components
   (Button, MemberCard, TeamCard, Table, Tabs, Badge, PageHeader, SearchInput,
-  Pagination, …), SCSS design tokens, the Inter font, and \`guidelines.md\` /
-  \`USAGE.md\`. **Unzip it** (\`unzip pl-design-system.zip\`) to get a
-  \`pl-design-system/\` folder. Your agent uses these instead of hand-building UI,
-  so your app looks on-brand out of the box.
+  Pagination, …), SCSS design tokens, the Inter font, and \`USAGE.md\` /
+  \`guidelines.md\`. Your agent uses these instead of hand-building UI.
 - \`styles/\` — a tiny CSS-variable fallback (\`pln-theme.css\`) for plain-HTML apps
   that don't use React, plus font guidance.
 - \`app/\` — a minimal runnable Node app to start from (its \`server.js\`,
   \`package.json\`, and \`Dockerfile\` are placeholders you can replace).
 
 ## How to use
-1. Unzip this folder and open it in Claude Code (or your AI tool of choice). Also
-   unzip the bundled design system once: \`unzip pl-design-system.zip\`.
+1. Unzip this folder and open it in Claude Code (or your AI tool of choice).
 2. Add your app to the \`app/\` folder:
    - **New app:** tell your agent what to build (e.g. "build a leaderboard page
      using the PLN styles"). It works in \`app/\`.
@@ -119,9 +122,24 @@ to the Protocol Labs Network sandbox with a single instruction.
    first deploy can take a minute or two.
 4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it.
 
-> **Don't copy passwords or secret keys into \`app/\`** — apps run on shared
-> infrastructure with no credentials provided. If your app needs them, ask your
-> agent how to handle it.
+## Apps that need an API key or password (secrets)
+Some apps need a secret to work — for example an app that talks to ChatGPT/OpenAI,
+sends emails, or connects to a database needs an **API key** or password for that
+service. If yours does, the flow is slightly different, and your agent handles it
+for you:
+
+1. Build your app as usual — just tell your agent what you want (e.g. "an app that
+   summarizes news with ChatGPT"). It knows the app will need a key.
+2. **Never paste your API key into the chat** (and don't put it in any file). If
+   you do it by accident, your agent will ask you to use the secure page instead.
+3. When it's time to deploy, your agent registers the app as a **draft** and gives
+   you a LabOS link. Open it, enter your key(s) in the form there, and click
+   **Deploy** — that page is the only place your secrets should ever go.
+4. Updating a key later? Open your app's page in LabOS (PL Infra → AI Apps → your
+   app), click **Update secrets & redeploy**, enter the new value, and Deploy.
+
+Secrets never go into the code, the chat, or the uploaded ZIP — they are stored
+securely on the sandbox and injected into your app when it runs.
 
 ## Embedding in the dashboard
 Your app is shown inside the AI Apps dashboard. Apps built with this kit display
@@ -155,31 +173,20 @@ to the PLN sandbox. Follow these rules.
 - Keep dependencies minimal. The sandbox builds from the \`app/Dockerfile\`.
 
 ## Use the PL Design System — do NOT hand-roll UI
-This kit ships the **PL Design System** as \`pl-design-system.zip\`. **Unzip it
-first** — \`unzip pl-design-system.zip\` — to get the \`pl-design-system/\` folder.
-It is the source of truth for how PLN apps look. Then read
-\`pl-design-system/USAGE.md\` (how to consume it) and
-\`pl-design-system/guidelines.md\` (the rules) before building any UI.
+This kit ships the **PL Design System** as the ready-to-use \`pl-design-system/\`
+folder. Before any UI work, load the **pl-design-system** skill
+(\`.claude/skills/pl-design-system/SKILL.md\`) and follow
+\`pl-design-system/USAGE.md\` + \`pl-design-system/guidelines.md\`.
 
-- **Reuse the canonical React components in \`pl-design-system/components/\`** —
-  Button, Input, Textarea, Checkbox, Switch, Badge, Tabs, Tooltip, Dropdown,
-  Pagination, Table, SearchInput, PageHeader, MemberCard, TeamCard, Avatar,
-  Sidebar, NavBar, EmptyState, and more (see \`components/component-catalog.md\`).
-  **Do NOT recreate buttons, cards, inputs, badges, tables, tabs, dropdowns, or
-  sidebars from scratch** — import the existing component.
-- **Use the design tokens, never hardcoded values.** All colors, typography,
-  spacing, radius, and shadows come from \`pl-design-system/tokens/\` (CSS custom
-  properties like \`var(--background-brand-default)\`, \`var(--spacing-md)\`,
-  \`var(--radius-md)\`). Never hardcode hex colors or pixel font sizes.
-- **If a component you need is missing**, follow the "Missing Component Behavior"
-  in \`guidelines.md\`: prefer composing existing components and tokens over
-  inventing a bespoke one.
-- The components are React + SCSS modules (Next.js 14). For UI work, scaffold a
-  Next.js app in \`app/\` and consume the design system per \`USAGE.md\` (copy the
-  \`pl-design-system/\` folder into \`app/\` so it ships on deploy, install its peer
-  deps, and load the tokens globally). For a non-React/plain-HTML app, the
-  minimal \`styles/pln-theme.css\` fallback is available, but the React components
-  are strongly preferred.
+- **Reuse** React components from \`pl-design-system/components/\` — do not recreate
+  buttons, cards, inputs, badges, tables, tabs, dropdowns, or sidebars.
+- **Use tokens only** from \`pl-design-system/tokens/\` (e.g.
+  \`var(--background-brand-default)\`, \`var(--spacing-md)\`). Never hardcode hex or
+  pixel font sizes.
+- For UI work, scaffold a **Next.js 14** app in \`app/\`, copy \`pl-design-system/\`
+  into \`app/\` so it ships on deploy, and consume it per \`USAGE.md\`. For a
+  non-React/plain-HTML app, \`styles/pln-theme.css\` is a minimal fallback — the
+  React components are strongly preferred.
 - **Must be iframe-embeddable from \`*.plnetwork.io\`.** The app is shown inside the
   PL Infra → AI Apps dashboard via an \`<iframe>\` served from a sibling
   \`*.plnetwork.io\` subdomain. A different subdomain is a *different origin*, so any
@@ -210,18 +217,64 @@ not the scaffold's shape or language.
    Node app with no build. If the app compiles (TypeScript, Go, a bundler, …), write
    an appropriate (e.g. multi-stage) Dockerfile. Only hard requirement: the image
    starts a server that listens on \`$PORT\`, binds \`0.0.0.0\`, and answers \`GET /health\`.
-3. **Assume no runtime config.** The sandbox injects NO env vars or secrets. Decide
-   how the app runs without its usual credentials — degrade to sample/mock data, or
-   clearly surface what's missing. Never hardcode real secrets to compensate.
+3. **Runtime config comes from the secrets flow, not the ZIP.** If the app needs
+   API keys or other secrets at runtime, use the draft flow ("Apps that need
+   secrets" below): declare the env var NAMES and let the member provide the
+   values in LabOS. Anything that isn't secret should ship sensible defaults.
 4. **Never ship secrets.** Keep real \`.env\` files, tokens, keys, and data dirs OUT of
    the uploaded zip: add them to \`.dockerignore\` and confirm they're absent before
-   deploying. The zip is built and stored server-side.
+   deploying. The zip is built and stored server-side. Secret VALUES are entered by
+   the member in LabOS — never ask the member to paste them into the chat or a file.
 5. **Verify before deploying:** \`cd app && npm install && npm start\` (or the app's
    equivalent), then confirm \`GET /health\` is 200 and \`GET /\` renders.
 
+## Apps that need secrets (API keys, tokens, …)
+The member is usually **not a developer** — they will never say "environment
+variable" or "secret". It is YOUR job to recognize when the app needs one and to
+route the deploy through the **draft flow** instead of deploying directly.
+
+**Recognize the need yourself.** The app needs the draft flow whenever it (will)
+talk to any external service that requires a credential — an AI/LLM API (OpenAI,
+Anthropic, …), email/SMS sending, a database, a paid data API, a webhook with a
+signing secret, and so on. If the member asks for a feature like "summarize with
+ChatGPT" or "send me an email", that IS a secrets app: wire the code to read the
+credential from an env var (e.g. \`process.env.OPENAI_API_KEY\`), pick a clear
+UPPER_SNAKE_CASE name, and plan for the draft flow. Before any deploy, double-check
+the code for \`process.env.*\` reads (or the language's equivalent) you may have
+added along the way.
+
+**Explain it in plain words.** Tell the member something like: *"This app needs
+your OpenAI API key to work. I never handle keys directly — I'll register the app
+and give you a secure LabOS link where you paste the key and click Deploy."*
+Don't use the words "env var", "draft registration", or "runtime injection" with
+the member.
+
+**If the member pastes a secret into the chat**, do not use it, do not echo it
+back, and do not write it anywhere. Tell them the chat isn't a safe place for
+keys, ask them to revoke/rotate it if it's sensitive, and point them to the LabOS
+page from step 3 below — that form is the only place values should be entered.
+
+The flow (full steps in the deploy skill):
+1. Get a deploy token via the connect flow as usual.
+2. POST the app ZIP to the \`draftEndpoint\` from \`pln-app.config.json\` with a
+   \`requiredEnvVars\` field listing the env var NAMES the app needs. This
+   registers the app as a **draft** — nothing runs yet.
+3. Give the member the \`appPageUrl\` from the response: they open it in LabOS,
+   enter the secret values, and click **Deploy** there. The deploy then runs
+   with the stored secrets.
+4. To ship a code update later, register the draft again (same \`appId\`, fresh
+   \`deploymentId\`) — already-stored secret values stay valid; the member just
+   clicks Deploy again in LabOS.
+5. To change a key later, the member doesn't need you at all: on the app's LabOS
+   page they click **Update secrets & redeploy**, enter the new value, and Deploy.
+
+Never ask the member for secret values in the chat, and never write them to any
+file — LabOS is the only place they should be entered.
+
 ## Deploying the app
 When the member asks you to deploy, use the **deploy-to-labs** skill in
-\`.claude/skills/deploy-to-labs/SKILL.md\`. In short:
+\`.claude/skills/deploy-to-labs/SKILL.md\`. If the app needs runtime secrets,
+follow "Apps that need secrets" above instead of deploying directly. In short:
 1. Read \`pln-app.config.json\` for the \`connectEndpoint\`, \`deployEndpoint\`, and
    (if present) a saved \`appId\`.
 2. **Get a deploy token via LabOS (the connect flow).** There is no token in the
@@ -254,6 +307,79 @@ endpoints in the config are available to you.
 `;
   }
 
+  private designSystemSkill(): string {
+    return `---
+name: pl-design-system
+description: Use whenever building or editing UI for a PLN AI App. Covers the bundled PL Design System — instantiate React components from pl-design-system/components, use design tokens only, layout patterns, and the LabOS consume steps in USAGE.md. Load before writing any JSX/TSX/SCSS for the app.
+---
+
+# PL Design System
+
+Companion to \`AGENTS.md\`. Source of truth for on-brand UI in this kit.
+
+## Before you write UI
+
+1. Read \`pl-design-system/guidelines.md\` (hard rules).
+2. Read \`pl-design-system/USAGE.md\` (how to wire it into \`app/\`).
+3. Check \`pl-design-system/components/component-catalog.md\` for the component you need.
+
+## Hard rules
+
+- **Instantiate, never recreate.** Import from \`pl-design-system/components/<Name>\`.
+  Do not hand-roll Button, Input, Badge, Table, Tabs, Dropdown, Sidebar, cards, etc.
+- **Tokens only.** Colors / type / spacing / radius / shadows come from
+  \`pl-design-system/tokens/\` as CSS variables (\`var(--foreground-neutral-primary)\`,
+  \`var(--background-brand-default)\`, \`var(--spacing-md)\`, \`var(--radius-md)\`,
+  \`var(--shadow-xs)\`). Never hardcode hex, raw px type sizes, or Tailwind color utilities.
+- **Layer 3 only** in component/layout styles — never \`var(--global-color-*)\` or
+  \`var(--semantic-*)\`.
+- Aesthetic: **structured · calm · technical · minimal**. No loud gradients, glow,
+  heavy decorative shadows, or random accents.
+
+## Consume in \`app/\` (Next.js 14)
+
+Only \`app/\` is deployed. Copy the kit's \`pl-design-system/\` into \`app/pl-design-system/\`,
+exclude it from \`tsconfig\` checking, install peer deps listed in \`USAGE.md\`, import
+\`styles/globals.scss\` once in the root layout, and copy \`public/fonts\` into the app's
+\`public/fonts\`. Import components from their folder (not only the barrel).
+
+Start script must honor \`PORT\` and bind \`0.0.0.0\`:
+\`"start": "next start -p \${PORT:-3000} -H 0.0.0.0"\`.
+
+## Which component?
+
+| Need | Reach for |
+|---|---|
+| Actions | \`Button\` |
+| Text entry | \`Input\`, \`Textarea\`, \`SearchInput\` |
+| Choice / toggle | \`Checkbox\`, \`Switch\`, \`Dropdown\`, \`Tabs\` |
+| Status / meta | \`Badge\`, \`Alert\`, \`Tooltip\`, \`EmptyState\` |
+| People / orgs | \`Avatar\`, \`MemberCard\` (dense), \`MemberProfileCard\` (hero), \`TeamCard\` |
+| Data | \`Table\`, \`Pagination\`, \`Progress\` |
+| Shell | \`NavBar\`, \`Sidebar\`, \`BottomNav\` (mobile), \`PageHeader\` |
+| Overlay | \`Drawer\` (modal / drawer / bottom-sheet patterns in \`patterns/overlay-patterns.md\`) |
+| Product cards | \`ForumPostCard\`, \`FocusAreaCard\`, \`OfficeHoursCard\`, \`CTACard\`, \`WelcomeCard\`, … |
+
+Specs: \`components/primitives/*.md\`, \`components/product/*.md\`.
+Layouts: \`patterns/\`. Page structure reference only: \`examples/\`.
+
+**MemberCard vs MemberProfileCard:** many in a list → MemberCard; single hero subject → MemberProfileCard.
+
+**Surfaces:** cards use elevation (\`--shadow-xs\` / \`--shadow-sm\`), no border at rest. Form controls use \`--border-*\`.
+
+## Missing component
+
+Prefer composing existing components + tokens. If you would have to invent a new
+primitive, stop and tell the member: \`Missing canonical component: [name]\`.
+
+## Sanity check
+
+- Every interactive control is an import from \`pl-design-system/components/\`
+- At most one primary Fill+Brand \`Button\` per section
+- No hardcoded colors/spacing; no \`X-Frame-Options\` on the app
+`;
+  }
+
   private deploySkill(): string {
     return `---
 name: deploy-to-labs
@@ -264,10 +390,27 @@ description: Deploy the app in ./app to the Protocol Labs Network sandbox. Use w
 
 Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
 
+**Needs secrets? Decide BEFORE deploying — don't wait for the member to say so.**
+The member usually has no coding background and won't know their app "has secrets".
+Check for it yourself: does the app read any credential from the environment
+(\`process.env.*\` or equivalent), or call any external service that needs an API
+key (OpenAI/Anthropic, email/SMS, a database, a paid API)? A quick check:
+
+\`\`\`bash
+grep -rniE 'process\\.env\\.|os\\.environ|getenv' app --include='*.js' --include='*.ts' --include='*.py' | grep -viE 'PORT|NODE_ENV'
+\`\`\`
+
+If anything secret shows up (or you wrote code that needs a key), do steps 1–4 as
+written but then follow "**Apps that need secrets (draft flow)**" below instead of
+step 5 — you register a draft and the member deploys from LabOS after entering the
+values there. Never deploy a secrets app directly and never accept key values in
+the chat.
+
 ## Steps
-1. Read \`pln-app.config.json\` to get \`connectEndpoint\`, \`deployEndpoint\`, and (if
-   present) a saved \`appId\`. If no \`appId\` exists yet, pick a short, stable,
-   lowercase slug (e.g. \`hello-board\`) and save it back to the config.
+1. Read \`pln-app.config.json\` to get \`connectEndpoint\`, \`deployEndpoint\`,
+   \`draftEndpoint\`, and (if present) a saved \`appId\`. If no \`appId\` exists yet,
+   pick a short, stable, lowercase slug (e.g. \`hello-board\`) and save it back to
+   the config.
 2. **Get a deploy token via LabOS.** The kit has no token; obtain a short-lived one
    through the connect flow:
 
@@ -355,6 +498,41 @@ Deploys the app in \`app/\` to the PLN sandbox and returns its live URL.
    If either fails, the embed will show \`refused to connect\`. Fix the app's headers
    (see the framing rule in \`AGENTS.md\`) and redeploy before reporting success.
 
+## Apps that need secrets (draft flow)
+When the app needs runtime secrets, replace the upload in step 5 with a **draft
+registration** — same multipart shape, posted to \`draftEndpoint\`, plus
+\`requiredEnvVars\` (the env var NAMES the app reads; JSON array or
+comma-separated). Nothing is deployed yet:
+
+\`\`\`bash
+curl -X POST "<draftEndpoint>" \\
+  -H "${AI_APP_TOKEN_HEADER}: <deployToken>" \\
+  -F "appId=<your-app-id>" \\
+  -F "name=<human-friendly app name>" \\
+  -F "description=<one line about the app>" \\
+  -F "deploymentId=<unique id per upload, e.g. a timestamp>" \\
+  -F 'requiredEnvVars=["OPENAI_API_KEY","SUPABASE_URL"]' \\
+  -F "file=@app.zip;type=application/zip"
+# → { "status": "DRAFT", "appPageUrl": "https://…/pl-infra/ai-apps/<uid>", "missingEnvVars": [ … ] }
+\`\`\`
+
+Then **tell the member, in your chat, in plain non-technical language** — e.g.
+*"Your app is registered. Open this link, paste your OpenAI API key into the form,
+and click Deploy — that page is the only safe place for your key."* Give them
+\`appPageUrl\`; they enter the values there and click **Deploy**. The deploy runs
+immediately with the stored secrets; the app then appears as usual on the AI Apps
+dashboard.
+
+- **Never** ask the member to paste secret values into the chat, and never write
+  them to a file — LabOS is the only place values are entered. If they paste a
+  key into the chat anyway, don't use or repeat it — point them to \`appPageUrl\`
+  (and suggest rotating the key if it's sensitive).
+- To ship a **code update** later, re-register the draft (same \`appId\`, fresh
+  \`deploymentId\`, updated \`requiredEnvVars\` if they changed) and send the member
+  back to \`appPageUrl\` to click Deploy. Stored secret values remain valid.
+- The member can also update secret values and redeploy entirely from LabOS —
+  no agent involvement needed.
+
 ## Keep the deployment URL private
 Do not print, link, or otherwise tell the member the deployment URL, host, or port —
 in your messages, summaries, or saved files. The member opens their app through the
@@ -384,9 +562,9 @@ verification steps. Only re-deploy if it stays unreachable.
   connect link. Keep it in memory only — never save it to a file or print it. Within
   the window you can redeploy without reconnecting; once it expires (deploy returns
   \`401\`), run the connect flow again to get a fresh token.
-- The sandbox injects no runtime env vars or secrets. An app that needs config must
-  ship sensible defaults or degrade gracefully (e.g. sample data) — see the
-  migration checklist in \`AGENTS.md\`.
+- Runtime secrets are supported only through the draft flow above — the sandbox
+  injects exactly the env vars the member provided in LabOS. Non-secret config
+  should ship sensible defaults — see the migration checklist in \`AGENTS.md\`.
 `;
   }
 
@@ -395,10 +573,11 @@ verification steps. Only re-deploy if it stays unreachable.
       {
         connectEndpoint: AI_APPS_CONNECT_ENDPOINT,
         deployEndpoint: AI_APPS_DEPLOY_ENDPOINT,
+        draftEndpoint: AI_APPS_DRAFT_ENDPOINT,
         deployTokenHeader: AI_APP_TOKEN_HEADER,
         appId: '',
         notes:
-          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it.',
+          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill).',
       },
       null,
       2

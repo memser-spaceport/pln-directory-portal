@@ -42,6 +42,16 @@ describe('path-route.util (seed)', () => {
       expect(nodes[0]).toEqual(PROTOCOL_LABS_ORG_NODE);
     });
 
+    it('prepends PL org for founder bridge without PL connector (including hops 1)', () => {
+      const nodes = buildFullRouteNodes({
+        bridgeNodes: [{ label: 'Jonathan King', variant: 'member' }],
+        plConnector: null,
+        investorNode: investor,
+        hops: 1,
+      });
+      expect(nodes.map((n) => n.label)).toEqual(['Protocol Labs', 'Jonathan King', 'Rauno Miljand']);
+    });
+
     it('case 1 strips duplicate connector from legacy bridge fields', () => {
       const nodes = buildFullRouteNodes({
         bridgeNodes: [{ label: 'Brad Holden', variant: 'external' }],

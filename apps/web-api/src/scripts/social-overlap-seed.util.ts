@@ -18,9 +18,7 @@ export interface YearRange {
 }
 
 export interface SocialOverlapEntry {
-  targetSet: string;
-  targetInvestorId: string;
-  rank: number;
+  investorId: string;
   plPersonKey: string;
   plName: string;
   kind: SocialOverlapKind;
@@ -35,18 +33,25 @@ export interface SocialOverlapEntry {
 
 export type SocialOverlapCache = Record<string, SocialOverlapEntry>;
 
-/** Conservative multiplicative bump when overlap.affectsScore is true. */
-export const SOCIAL_OVERLAP_SCORE_MULTIPLIER = 1.05;
-export const SOCIAL_OVERLAP_SCORE_CAP = 1.0;
+/** Cap for pathWarmth = pathScore + linkedInBonus (LAB-2108). */
+export const PATH_WARMTH_SCORE_CAP = 1.0;
 
-const KIND_PRIORITY: Record<SocialOverlapKind, number> = {
-  concurrent_employment: 1,
-  same_school: 2,
-  same_company_unknown_dates: 3,
-  same_school_unknown_dates: 4,
-};
+/** Verified overlapping work or education. */
+export const LINKEDIN_BONUS_VERIFIED = 0.25;
+/** Same company/school without verified overlapping dates. */
+export const LINKEDIN_BONUS_UNVERIFIED = 0.1;
+/**
+ * Extra when PL connector has a 1st-degree LinkedIn connection to the investor.
+ * Omitted until connection data exists (LAB-2108) — keep constant for follow-up.
+ */
+export const LINKEDIN_BONUS_FIRST_DEGREE = 0.1;
 
-const CURRENT_YEAR = new Date().getFullYear();
+export type AttributionSource = 'Affinity' | 'LinkedIn';
+
+export interface AttributionLine {
+  source: AttributionSource;
+  text: string;
+}
 
 export interface HopChainContact {
   name?: string;
@@ -240,7 +245,15 @@ function founderNodeIds(hopChain: PathHopChain): Set<string> {
   return ids;
 }
 
-function extractFounderNodes(
+export function resolveFounderPersonKey(v8EntityId: string): string {
+  return `founder:${v8EntityId}`;
+}
+
+export function hasFounderNodes(hopChain: PathHopChain): boolean {
+  return founderNodeIds(hopChain).size > 0;
+}
+
+export function extractFounderNodes(
   hopChain: PathHopChain,
   resolveMemberUidByName?: (name: string) => string | undefined,
 ): PlPathPerson[] {
@@ -254,9 +267,8 @@ function extractFounderNodes(
     const node = byId.get(id);
     const name = asString(node?.label) ?? id.replace(/^f_/, '').replace(/_/g, ' ');
     const memberUid = resolveMemberUidByName?.(name);
-    const identity: PersonIdentity = { name, memberUid };
     people.push({
-      personKey: resolvePersonKey(identity),
+      personKey: resolveFounderPersonKey(id),
       name,
       memberUid,
       source: 'nodes.founder',
@@ -303,7 +315,7 @@ export function extractPlPeopleFromHopChain(
   const out = new Map<string, PlPathPerson>();
 
   for (const founder of extractFounderNodes(hopChain, options.resolveMemberUidByName)) {
-    addPerson(out, founder);
+    if (!out.has(founder.personKey)) out.set(founder.personKey, founder);
   }
 
   for (const node of hopChain.routeNodes ?? []) {
@@ -337,67 +349,255 @@ export function extractPlPeopleFromHopChain(
 }
 
 export function buildSocialOverlapCacheKey(input: {
-  targetSet: string;
-  targetInvestorId: string;
-  rank: number;
+  investorId: string;
   plPersonKey: string;
 }): string {
-  return `${input.targetSet}|${input.targetInvestorId}|rank:${input.rank}|pl:${input.plPersonKey}`;
+  return `pair:investor:${input.investorId}|pl:${input.plPersonKey}`;
 }
 
-function pickBestOverlap(entries: SocialOverlapEntry[]): SocialOverlapEntry | null {
-  if (entries.length === 0) return null;
-  const confidenceRank: Record<SocialOverlapConfidence, number> = {
-    high: 3,
-    medium: 2,
-    low: 1,
+/** Map hopChain.plConnector to the same personKey used in the overlap cache. */
+export function resolvePlConnectorPersonKey(
+  pl: HopChainPlConnector,
+  resolveMemberUidByName?: (name: string) => string | undefined,
+): string | null {
+  const name = asString(pl.name);
+  const memberUid =
+    asString(pl.memberUid) ?? (name ? resolveMemberUidByName?.(name) : undefined);
+  const investorId = pl.internalId != null ? String(pl.internalId) : undefined;
+
+  if (!investorId && !memberUid && !name) return null;
+
+  const identity: PersonIdentity = {
+    name: name ?? 'PL connector',
+    memberUid,
+    investorId,
   };
-  return [...entries].sort((a, b) => {
-    const pri = KIND_PRIORITY[a.kind] - KIND_PRIORITY[b.kind];
-    if (pri !== 0) return pri;
-    const conf = confidenceRank[b.confidence] - confidenceRank[a.confidence];
-    if (conf !== 0) return conf;
-    const aLen = a.overlapYears ? (a.overlapYears.end ?? CURRENT_YEAR) - a.overlapYears.start : 0;
-    const bLen = b.overlapYears ? (b.overlapYears.end ?? CURRENT_YEAR) - b.overlapYears.start : 0;
-    return bLen - aLen;
-  })[0];
+  return resolvePersonKey(identity);
 }
 
 /**
- * Lookup best overlap for a path row after hopChain is finalized.
- * `targetInvestorId` + `rank` must match the pathfinder dump identity (graph firm id + dump rank),
- * not the person-grain investor id or re-sorted seed rank written to the DB.
+ * Collect all founder + PL-connector overlaps for a path (display + max bonus).
+ */
+export function lookupAllSocialOverlapsForPath(
+  cache: SocialOverlapCache,
+  input: {
+    investorId: string;
+    hopChain: PathHopChain;
+    resolveMemberUidByName?: (name: string) => string | undefined;
+  },
+): SocialOverlapEntry[] {
+  const out: SocialOverlapEntry[] = [];
+  const seen = new Set<string>();
+
+  const push = (hit: SocialOverlapEntry | null | undefined) => {
+    if (!hit) return;
+    const dedupe = `${hit.plPersonKey}|${hit.kind}|${hit.label}`;
+    if (seen.has(dedupe)) return;
+    seen.add(dedupe);
+    out.push(hit);
+  };
+
+  for (const founder of extractFounderNodes(input.hopChain, input.resolveMemberUidByName)) {
+    const key = buildSocialOverlapCacheKey({
+      investorId: input.investorId,
+      plPersonKey: founder.personKey,
+    });
+    push(cache[key]);
+  }
+
+  if (input.hopChain.plConnector) {
+    push(
+      lookupSocialOverlapForPair(cache, {
+        investorId: input.investorId,
+        plConnector: input.hopChain.plConnector,
+        resolveMemberUidByName: input.resolveMemberUidByName,
+      }),
+    );
+  }
+
+  return out;
+}
+
+/**
+ * Lookup overlap for founders on the path first, then hopChain.plConnector.
+ * Prefer {@link lookupAllSocialOverlapsForPath} when scoring/attribution need all hits.
  */
 export function lookupSocialOverlapForPath(
   cache: SocialOverlapCache,
   input: {
-    targetSet: string;
-    targetInvestorId: string;
-    rank: number;
+    investorId: string;
     hopChain: PathHopChain;
-    targetPersonKeys: Set<string>;
     resolveMemberUidByName?: (name: string) => string | undefined;
   },
 ): SocialOverlapEntry | null {
-  const plPeople = extractPlPeopleFromHopChain(input.hopChain, input.targetPersonKeys, {
-    resolveMemberUidByName: input.resolveMemberUidByName,
-  });
-
-  const hits: SocialOverlapEntry[] = [];
-  for (const plPerson of plPeople) {
-    const key = buildSocialOverlapCacheKey({
-      targetSet: input.targetSet,
-      targetInvestorId: input.targetInvestorId,
-      rank: input.rank,
-      plPersonKey: plPerson.personKey,
-    });
-    const entry = cache[key];
-    if (entry) hits.push(entry);
-  }
-
-  return pickBestOverlap(hits);
+  return lookupAllSocialOverlapsForPath(cache, input)[0] ?? null;
 }
 
+/** All cache overlaps for one investor (any PL person). */
+export function lookupAllSocialOverlapsForInvestor(
+  cache: SocialOverlapCache,
+  investorId: string,
+): SocialOverlapEntry[] {
+  return Object.values(cache).filter((e) => e.investorId === investorId);
+}
+
+/**
+ * Lookup overlap for an investor × PL connector pair after hopChain.plConnector is grafted.
+ */
+export function lookupSocialOverlapForPair(
+  cache: SocialOverlapCache,
+  input: {
+    investorId: string;
+    plConnector: HopChainPlConnector;
+    resolveMemberUidByName?: (name: string) => string | undefined;
+  },
+): SocialOverlapEntry | null {
+  const plPersonKey = resolvePlConnectorPersonKey(
+    input.plConnector,
+    input.resolveMemberUidByName,
+  );
+  if (!plPersonKey) return null;
+
+  const key = buildSocialOverlapCacheKey({
+    investorId: input.investorId,
+    plPersonKey,
+  });
+  return cache[key] ?? null;
+}
+
+/** True when overlap is verified concurrent work or verified overlapping school years. */
+export function isVerifiedSocialOverlap(overlap: SocialOverlapEntry): boolean {
+  if (overlap.kind === 'concurrent_employment') return true;
+  if (overlap.kind === 'same_school' && overlap.overlapYears != null) return true;
+  return false;
+}
+
+/** Per-person LinkedIn bonus from a single overlap entry (no 1st-degree tier yet). */
+export function linkedInBonusForOverlap(overlap: SocialOverlapEntry): number {
+  return isVerifiedSocialOverlap(overlap) ? LINKEDIN_BONUS_VERIFIED : LINKEDIN_BONUS_UNVERIFIED;
+}
+
+/**
+ * Best single LinkedIn bonus across people on the path (max, no stacking).
+ * Groups by plPersonKey; each person contributes their best overlap bonus.
+ */
+export function linkedInBonusForOverlaps(overlaps: SocialOverlapEntry[]): number {
+  if (overlaps.length === 0) return 0;
+  const bestByPerson = new Map<string, number>();
+  for (const overlap of overlaps) {
+    const bonus = linkedInBonusForOverlap(overlap);
+    const prev = bestByPerson.get(overlap.plPersonKey) ?? 0;
+    if (bonus > prev) bestByPerson.set(overlap.plPersonKey, bonus);
+  }
+  let max = 0;
+  for (const bonus of bestByPerson.values()) {
+    if (bonus > max) max = bonus;
+  }
+  return max;
+}
+
+export function applyLinkedInPathWarmth(pathScore: number, overlaps: SocialOverlapEntry[]): number {
+  const bonus = linkedInBonusForOverlaps(overlaps);
+  return Math.min(PATH_WARMTH_SCORE_CAP, pathScore + bonus);
+}
+
+const EMAIL_KINDS = new Set(['first_email', 'last_email']);
+
+export interface AffinityAttributionConnector {
+  name: string;
+  strength?: number | null;
+  recencyDays?: number | null;
+  evidenceKind?: string | null;
+  attributionSource?: string | null;
+}
+
+function humanizeRecencyDays(days: number | null | undefined): string | null {
+  if (days == null || !Number.isFinite(days)) return null;
+  if (days <= 1) return 'today';
+  if (days < 14) return `${days} days ago`;
+  if (days < 60) return `~${Math.round(days / 7)} weeks ago`;
+  if (days < 365) return `~${Math.round(days / 30)} months ago`;
+  return `~${Math.round(days / 365)} years ago`;
+}
+
+/**
+ * Ticket-style Affinity line, e.g. "Brad Holden last emailed ~4 months ago (tie 0.10)".
+ * Returns null when there is nothing useful to say.
+ */
+export function buildAffinityAttributionText(
+  connector: AffinityAttributionConnector | null | undefined,
+): string | null {
+  if (!connector?.name) return null;
+
+  const rec = humanizeRecencyDays(connector.recencyDays ?? null);
+  const src = connector.attributionSource;
+
+  let base: string;
+  if (src === 'keyContact') {
+    base = `${connector.name} is the CRM relationship owner`;
+  } else if (src === 'lastEmail' || (connector.evidenceKind && EMAIL_KINDS.has(connector.evidenceKind))) {
+    base = rec ? `${connector.name} last emailed ${rec}` : `${connector.name} last emailed`;
+  } else if (src === 'lastContact') {
+    base = rec ? `${connector.name} last contacted ${rec}` : `${connector.name} last contacted`;
+  } else if (rec) {
+    const verb =
+      connector.evidenceKind && EMAIL_KINDS.has(connector.evidenceKind) ? 'last emailed' : 'last touched';
+    base = `${connector.name} ${verb} ${rec}`;
+  } else {
+    base = connector.name;
+  }
+
+  if (connector.strength != null && Number.isFinite(connector.strength)) {
+    return `${base} (tie ${connector.strength.toFixed(2)})`;
+  }
+  return base.trim() || null;
+}
+
+export function buildLinkedInAttributionLines(overlaps: SocialOverlapEntry[]): AttributionLine[] {
+  const lines: AttributionLine[] = [];
+  const seen = new Set<string>();
+  for (const overlap of overlaps) {
+    const label = overlap.label?.trim();
+    if (!label || seen.has(label)) continue;
+    seen.add(label);
+    lines.push({ source: 'LinkedIn', text: label });
+  }
+  return lines;
+}
+
+export function buildAttributionLines(input: {
+  affinityConnector?: AffinityAttributionConnector | null;
+  overlaps?: SocialOverlapEntry[];
+}): AttributionLine[] {
+  const lines: AttributionLine[] = [];
+  const affinityText = buildAffinityAttributionText(input.affinityConnector);
+  if (affinityText) {
+    lines.push({ source: 'Affinity', text: affinityText });
+  }
+  lines.push(...buildLinkedInAttributionLines(input.overlaps ?? []));
+  return lines;
+}
+
+/** Prefer the highest-bonus overlap for the PathfinderPath.socialOverlap column. */
+export function pickPrimarySocialOverlap(overlaps: SocialOverlapEntry[]): SocialOverlapEntry | null {
+  if (overlaps.length === 0) return null;
+  return [...overlaps].sort((a, b) => linkedInBonusForOverlap(b) - linkedInBonusForOverlap(a))[0] ?? null;
+}
+
+export function attachAttributionLinesToHopChain(
+  hopChain: Record<string, unknown>,
+  lines: AttributionLine[],
+): Record<string, unknown> {
+  const hc: Record<string, unknown> = { ...hopChain };
+  if (lines.length > 0) {
+    hc.attributionLines = lines;
+  } else {
+    delete hc.attributionLines;
+  }
+  return hc;
+}
+
+/** @deprecated Prefer attributionLines; kept for callers that still need a flat explanation append. */
 export function appendOverlapToHopChain(
   hopChain: Record<string, unknown>,
   overlap: SocialOverlapEntry,
@@ -409,10 +609,186 @@ export function appendOverlapToHopChain(
   return hc;
 }
 
+/** @deprecated Replaced by {@link applyLinkedInPathWarmth} (LAB-2108 additive model). */
 export function applySocialOverlapScoreBump(
   score: number,
   overlap: SocialOverlapEntry | null,
 ): number {
-  if (!overlap?.affectsScore) return score;
-  return Math.min(SOCIAL_OVERLAP_SCORE_CAP, score * SOCIAL_OVERLAP_SCORE_MULTIPLIER);
+  if (!overlap) return score;
+  return applyLinkedInPathWarmth(score, [overlap]);
+}
+
+export interface LinkedInOnlyPathShape {
+  targetInvestorId: string;
+  connectorType: string;
+  hops: number;
+  caliber: string | null;
+  caliberConfidence: number | null;
+  proximityCode: string;
+  score: number;
+  hopChain: Record<string, unknown>;
+  socialOverlap: SocialOverlapEntry;
+}
+
+function founderV8IdFromPersonKey(plPersonKey: string): string | null {
+  if (!plPersonKey.startsWith('founder:')) return null;
+  return plPersonKey.slice('founder:'.length);
+}
+
+function plConnectorFromOverlap(overlap: SocialOverlapEntry): HopChainPlConnector | null {
+  if (!overlap.plPersonKey.startsWith('investor:')) return null;
+  const id = overlap.plPersonKey.slice('investor:'.length);
+  const internalId = /^\d+$/.test(id) ? Number(id) : undefined;
+  return {
+    name: overlap.plName,
+    ...(internalId != null ? { internalId } : {}),
+  };
+}
+
+/**
+ * Overlap evidenceUrls are [investorProfile, plPersonProfile]. Prefer the PL-side URL
+ * for founder/PL-connector contact cards.
+ */
+export function plPersonLinkedInFromOverlap(overlap: SocialOverlapEntry): string | undefined {
+  const urls = overlap.evidenceUrls ?? [];
+  const plUrl = urls[1] ?? urls.find((u) => /linkedin\.com\/in\//i.test(u));
+  return typeof plUrl === 'string' && plUrl.trim() ? plUrl.trim() : undefined;
+}
+
+/**
+ * Synthetic 1-hop warm path from LinkedIn education/experience overlap when no
+ * graph/Affinity path exists. Connector type: F for founders, PL for venture leads.
+ */
+export function buildLinkedInOnlyPath(input: {
+  targetInvestorId: string;
+  overlap: SocialOverlapEntry;
+  caliber?: string | null;
+  caliberConfidence?: number | null;
+}): LinkedInOnlyPathShape {
+  const { targetInvestorId, overlap } = input;
+  const caliber = input.caliber ?? 'B';
+  const caliberConfidence = input.caliberConfidence ?? 0.4;
+  const founderId = founderV8IdFromPersonKey(overlap.plPersonKey);
+  const isFounder = founderId != null;
+  // Founder LinkedIn-only = PL org → founder → investor (same shape as graph F paths).
+  // Direct PL+1 only when the overlap person is a PL venture-lead connector.
+  const connectorType = isFounder ? 'F' : 'PL';
+  const hops = isFounder ? 2 : 1;
+  const proximityCode = `${connectorType}+${hops}${caliber}`;
+  const pathScore = 0;
+  // Seed applies linkedInBonus via applyPathAttributionAndWarmth; keep base at 0 here.
+  const score = pathScore;
+  const attributionLines = buildLinkedInAttributionLines([overlap]);
+  const plLinkedIn = plPersonLinkedInFromOverlap(overlap);
+
+  const plConnector = isFounder ? undefined : plConnectorFromOverlap(overlap);
+  const nodes = isFounder
+    ? [
+        { id: 'PL', label: 'Protocol Labs', type: 'org' },
+        { id: founderId, label: overlap.plName, type: 'org' },
+        { id: targetInvestorId, label: 'Investor', type: 'person' },
+      ]
+    : [
+        { id: 'PL', label: 'Protocol Labs', type: 'org' },
+        { id: targetInvestorId, label: 'Investor', type: 'person' },
+      ];
+  const edges = isFounder
+    ? [
+        { from: 'PL', to: founderId, connectorType: 'F', provenance: 'linkedin-overlap' },
+        {
+          from: founderId,
+          to: targetInvestorId,
+          connectorType: 'F',
+          probability: score,
+          provenance: 'linkedin-overlap',
+        },
+      ]
+    : [
+        {
+          from: 'PL',
+          to: targetInvestorId,
+          connectorType: 'PL',
+          probability: score,
+          evidence: overlap.kind,
+          provenance: 'linkedin-overlap',
+        },
+      ];
+
+  return {
+    targetInvestorId,
+    connectorType,
+    hops,
+    caliber,
+    caliberConfidence,
+    proximityCode,
+    score,
+    socialOverlap: overlap,
+    hopChain: {
+      nodes,
+      edges,
+      explanation: '',
+      attributionLines,
+      ...(plConnector ? { plConnector } : {}),
+      ...(isFounder
+        ? {
+            contact: {
+              name: overlap.plName,
+              role: 'Founder',
+              source: 'linkedin-overlap',
+              ...(plLinkedIn ? { linkedin: plLinkedIn } : {}),
+            },
+          }
+        : {}),
+    },
+  };
+}
+
+/**
+ * Pick the best LinkedIn-only candidate for an investor (highest bonus, then label).
+ */
+export function pickBestLinkedInOnlyOverlap(overlaps: SocialOverlapEntry[]): SocialOverlapEntry | null {
+  if (overlaps.length === 0) return null;
+  return [...overlaps].sort((a, b) => {
+    const db = linkedInBonusForOverlap(b) - linkedInBonusForOverlap(a);
+    if (db !== 0) return db;
+    return a.label.localeCompare(b.label);
+  })[0] ?? null;
+}
+
+/**
+ * Attach attribution lines + additive LinkedIn warmth for a seeded path.
+ * Does not mutate explanation (Affinity/LinkedIn stay out of the narrative blob).
+ */
+export function applyPathAttributionAndWarmth(input: {
+  hopChain: Record<string, unknown>;
+  pathScore: number;
+  affinityConnector?: AffinityAttributionConnector | null;
+  overlaps: SocialOverlapEntry[];
+}): {
+  hopChain: Record<string, unknown>;
+  score: number;
+  primaryOverlap: SocialOverlapEntry | null;
+} {
+  const lines = buildAttributionLines({
+    affinityConnector: input.affinityConnector,
+    overlaps: input.overlaps,
+  });
+  let hopChain = attachAttributionLinesToHopChain(input.hopChain, lines);
+  const primaryOverlap = pickPrimarySocialOverlap(input.overlaps);
+  const contact = hopChain.contact as { name?: string; linkedin?: string } | undefined;
+  const plLinkedIn = primaryOverlap ? plPersonLinkedInFromOverlap(primaryOverlap) : undefined;
+  if (
+    contact &&
+    plLinkedIn &&
+    !contact.linkedin &&
+    contact.name &&
+    normName(contact.name) === normName(primaryOverlap!.plName)
+  ) {
+    hopChain = { ...hopChain, contact: { ...contact, linkedin: plLinkedIn } };
+  }
+  return {
+    hopChain,
+    score: applyLinkedInPathWarmth(input.pathScore, input.overlaps),
+    primaryOverlap,
+  };
 }

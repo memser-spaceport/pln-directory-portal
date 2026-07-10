@@ -1,0 +1,305 @@
+// PL Design System — Typography Tokens
+// Two-layer architecture:
+//   Layer 1: --type-* custom properties  (this file — loaded globally via styles/globals.scss)
+//   Layer 2: SCSS mixins                 (tokens/_typography-mixins.scss — forwarded via styles/mixins.scss)
+//
+// Keeping CSS output (Layer 1) and mixin definitions (Layer 2) in separate
+// files prevents :root {} blocks leaking into CSS Module files, which
+// Next.js rejects as impure selectors.
+//
+// Font: Inter (all weights). Sizes in rem (base 16px).
+// letterSpacing in rem: original px ÷ 16.
+//
+// Figma source: Design-System-Foundations | Protocol Labs
+//   node-id=17338-174007 (Typography page)
+//
+// Categories: Display · Heading (3xl–sm) · Body (xl–xs)
+//             Label (2xs–2xl) · Underline (2xl–xs)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FONT FAMILY & WEIGHT PRIMITIVES
+// ─────────────────────────────────────────────────────────────────────────────
+
+:root {
+  // var(--font-inter) is injected by next/font/local in layout.tsx (public/fonts/InterVariable.woff2).
+  // Falls back to system stack when running outside Next.js (Storybook, pure CSS consumers).
+  --font-family-primary: var(--font-inter, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  --font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --font-weight-regular:  400;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:     700;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER 1 — TYPE SCALE CUSTOM PROPERTIES
+// Naming: --type-{category}-{size}-{variant}-{property}
+// All values verified against Figma Foundations file (May 2026).
+// ─────────────────────────────────────────────────────────────────────────────
+
+:root {
+  // ─── Display ─────────────────────────────────────────────────────────────
+  // Figma: Display/default · Display/strong — 96px / lh 110 / ls -2.5px
+  --type-display-default-font-size:      6rem;
+  --type-display-default-line-height:    6.875rem;
+  --type-display-default-font-weight:    500;
+  --type-display-default-letter-spacing: -0.15625rem;
+  --type-display-strong-font-size:       6rem;
+  --type-display-strong-line-height:     6.875rem;
+  --type-display-strong-font-weight:     600;
+  --type-display-strong-letter-spacing:  -0.15625rem;
+
+  // ─── Heading 3xl ─────────────────────────────────────────────────────────
+  // Figma: Heading/3xLarge — 64px / lh 78 / ls -2.3px
+  --type-heading-3xl-default-font-size:      4rem;
+  --type-heading-3xl-default-line-height:    4.875rem;
+  --type-heading-3xl-default-font-weight:    500;
+  --type-heading-3xl-default-letter-spacing: -0.14375rem;
+  --type-heading-3xl-strong-font-size:       4rem;
+  --type-heading-3xl-strong-line-height:     4.875rem;
+  --type-heading-3xl-strong-font-weight:     600;
+  --type-heading-3xl-strong-letter-spacing:  -0.14375rem;
+
+  // ─── Heading 2xl ─────────────────────────────────────────────────────────
+  // Figma: Heading/2xLarge — 56px / lh 66 / ls -1.75px
+  --type-heading-2xl-default-font-size:      3.5rem;
+  --type-heading-2xl-default-line-height:    4.125rem;
+  --type-heading-2xl-default-font-weight:    500;
+  --type-heading-2xl-default-letter-spacing: -0.109375rem;
+  --type-heading-2xl-strong-font-size:       3.5rem;
+  --type-heading-2xl-strong-line-height:     4.125rem;
+  --type-heading-2xl-strong-font-weight:     600;
+  --type-heading-2xl-strong-letter-spacing:  -0.109375rem;
+
+  // ─── Heading lg ──────────────────────────────────────────────────────────
+  // Figma: Heading/Large — 40px / lh 48 / ls -1.5px
+  --type-heading-lg-default-font-size:      2.5rem;
+  --type-heading-lg-default-line-height:    3rem;
+  --type-heading-lg-default-font-weight:    500;
+  --type-heading-lg-default-letter-spacing: -0.09375rem;
+  --type-heading-lg-strong-font-size:       2.5rem;
+  --type-heading-lg-strong-line-height:     3rem;
+  --type-heading-lg-strong-font-weight:     600;
+  --type-heading-lg-strong-letter-spacing:  -0.09375rem;
+
+  // ─── Heading md ──────────────────────────────────────────────────────────
+  // Figma: Heading/Medium — 32px / lh 42 / ls -0.75px
+  --type-heading-md-default-font-size:      2rem;
+  --type-heading-md-default-line-height:    2.625rem;
+  --type-heading-md-default-font-weight:    500;
+  --type-heading-md-default-letter-spacing: -0.046875rem;
+  --type-heading-md-strong-font-size:       2rem;
+  --type-heading-md-strong-line-height:     2.625rem;
+  --type-heading-md-strong-font-weight:     600;
+  --type-heading-md-strong-letter-spacing:  -0.046875rem;
+
+  // ─── Heading sm ──────────────────────────────────────────────────────────
+  // Figma: Heading/Small — 24px / lh 34 / ls -0.4px
+  --type-heading-sm-default-font-size:      1.5rem;
+  --type-heading-sm-default-line-height:    2.125rem;
+  --type-heading-sm-default-font-weight:    500;
+  --type-heading-sm-default-letter-spacing: -0.025rem;
+  --type-heading-sm-strong-font-size:       1.5rem;
+  --type-heading-sm-strong-line-height:     2.125rem;
+  --type-heading-sm-strong-font-weight:     600;
+  --type-heading-sm-strong-letter-spacing:  -0.025rem;
+
+  // ─── Body xl ─────────────────────────────────────────────────────────────
+  // Figma: Body/xLarge — 20px / lh 27 / ls -0.3px
+  --type-body-xl-default-font-size:      1.25rem;
+  --type-body-xl-default-line-height:    1.6875rem;
+  --type-body-xl-default-font-weight:    400;
+  --type-body-xl-default-letter-spacing: -0.01875rem;
+  --type-body-xl-strong-font-size:       1.25rem;
+  --type-body-xl-strong-line-height:     1.6875rem;
+  --type-body-xl-strong-font-weight:     600;
+  --type-body-xl-strong-letter-spacing:  -0.01875rem;
+
+  // ─── Body lg ─────────────────────────────────────────────────────────────
+  // Figma: Body/Large — 18px / lh 24 / ls -0.4px
+  --type-body-lg-default-font-size:      1.125rem;
+  --type-body-lg-default-line-height:    1.5rem;
+  --type-body-lg-default-font-weight:    400;
+  --type-body-lg-default-letter-spacing: -0.025rem;
+  --type-body-lg-strong-font-size:       1.125rem;
+  --type-body-lg-strong-line-height:     1.5rem;
+  --type-body-lg-strong-font-weight:     600;
+  --type-body-lg-strong-letter-spacing:  -0.025rem;
+
+  // ─── Body md ─────────────────────────────────────────────────────────────
+  // Figma: Body/Medium — 16px / lh 24 / ls -0.3px
+  --type-body-md-default-font-size:      1rem;
+  --type-body-md-default-line-height:    1.5rem;
+  --type-body-md-default-font-weight:    400;
+  --type-body-md-default-letter-spacing: -0.01875rem;
+  --type-body-md-strong-font-size:       1rem;
+  --type-body-md-strong-line-height:     1.5rem;
+  --type-body-md-strong-font-weight:     600;
+  --type-body-md-strong-letter-spacing:  -0.01875rem;
+
+  // ─── Body sm ─────────────────────────────────────────────────────────────
+  // Figma: Body/Small — 14px / lh 22 / ls -0.2px
+  --type-body-sm-default-font-size:      0.875rem;
+  --type-body-sm-default-line-height:    1.375rem;
+  --type-body-sm-default-font-weight:    400;
+  --type-body-sm-default-letter-spacing: -0.0125rem;
+  --type-body-sm-strong-font-size:       0.875rem;
+  --type-body-sm-strong-line-height:     1.375rem;
+  --type-body-sm-strong-font-weight:     600;
+  --type-body-sm-strong-letter-spacing:  -0.0125rem;
+
+  // ─── Body xs ─────────────────────────────────────────────────────────────
+  // Figma: Body/xSmall — 12px / lh 18 / ls -0.2px
+  --type-body-xs-default-font-size:      0.75rem;
+  --type-body-xs-default-line-height:    1.125rem;
+  --type-body-xs-default-font-weight:    400;
+  --type-body-xs-default-letter-spacing: -0.0125rem;
+  --type-body-xs-strong-font-size:       0.75rem;
+  --type-body-xs-strong-line-height:     1.125rem;
+  --type-body-xs-strong-font-weight:     600;
+  --type-body-xs-strong-letter-spacing:  -0.0125rem;
+
+  // ─── Label 2xs ───────────────────────────────────────────────────────────
+  // Figma: Label/2xsmall — 10px / lh 14 / ls -0.2px
+  --type-label-2xs-default-font-size:      0.625rem;
+  --type-label-2xs-default-line-height:    0.875rem;
+  --type-label-2xs-default-font-weight:    400;
+  --type-label-2xs-default-letter-spacing: -0.0125rem;
+  --type-label-2xs-strong-font-size:       0.625rem;
+  --type-label-2xs-strong-line-height:     0.875rem;
+  --type-label-2xs-strong-font-weight:     500;
+  --type-label-2xs-strong-letter-spacing:  -0.0125rem;
+
+  // ─── Label xs ────────────────────────────────────────────────────────────
+  // Figma: Label/xSmall — 12px / lh 16 / ls -0.2px
+  --type-label-xs-default-font-size:      0.75rem;
+  --type-label-xs-default-line-height:    1rem;
+  --type-label-xs-default-font-weight:    400;
+  --type-label-xs-default-letter-spacing: -0.0125rem;
+  --type-label-xs-strong-font-size:       0.75rem;
+  --type-label-xs-strong-line-height:     1rem;
+  --type-label-xs-strong-font-weight:     500;
+  --type-label-xs-strong-letter-spacing:  -0.0125rem;
+
+  // ─── Label sm ────────────────────────────────────────────────────────────
+  // Figma: Label/Small — 14px / lh 20 / ls -0.2px
+  --type-label-sm-default-font-size:      0.875rem;
+  --type-label-sm-default-line-height:    1.25rem;
+  --type-label-sm-default-font-weight:    400;
+  --type-label-sm-default-letter-spacing: -0.0125rem;
+  --type-label-sm-strong-font-size:       0.875rem;
+  --type-label-sm-strong-line-height:     1.25rem;
+  --type-label-sm-strong-font-weight:     500;
+  --type-label-sm-strong-letter-spacing:  -0.0125rem;
+
+  // ─── Label md ────────────────────────────────────────────────────────────
+  // Figma: Label/Medium — 16px / lh 24 / ls -0.3px
+  --type-label-md-default-font-size:      1rem;
+  --type-label-md-default-line-height:    1.5rem;
+  --type-label-md-default-font-weight:    400;
+  --type-label-md-default-letter-spacing: -0.01875rem;
+  --type-label-md-strong-font-size:       1rem;
+  --type-label-md-strong-line-height:     1.5rem;
+  --type-label-md-strong-font-weight:     500;
+  --type-label-md-strong-letter-spacing:  -0.01875rem;
+
+  // ─── Label lg ────────────────────────────────────────────────────────────
+  // Figma: Label/Large — 18px / lh 24 / ls -0.4px
+  --type-label-lg-default-font-size:      1.125rem;
+  --type-label-lg-default-line-height:    1.5rem;
+  --type-label-lg-default-font-weight:    400;
+  --type-label-lg-default-letter-spacing: -0.025rem;
+  --type-label-lg-strong-font-size:       1.125rem;
+  --type-label-lg-strong-line-height:     1.5rem;
+  --type-label-lg-strong-font-weight:     500;
+  --type-label-lg-strong-letter-spacing:  -0.025rem;
+
+  // ─── Label xl ────────────────────────────────────────────────────────────
+  // Figma: Label/xLarge — 20px / lh 27 / ls -0.4px
+  --type-label-xl-default-font-size:      1.25rem;
+  --type-label-xl-default-line-height:    1.6875rem;
+  --type-label-xl-default-font-weight:    400;
+  --type-label-xl-default-letter-spacing: -0.025rem;
+  --type-label-xl-strong-font-size:       1.25rem;
+  --type-label-xl-strong-line-height:     1.6875rem;
+  --type-label-xl-strong-font-weight:     500;
+  --type-label-xl-strong-letter-spacing:  -0.025rem;
+
+  // ─── Label 2xl ───────────────────────────────────────────────────────────
+  // Figma: Label/2xLarge — 24px / lh 32 / ls -0.4px
+  --type-label-2xl-default-font-size:      1.5rem;
+  --type-label-2xl-default-line-height:    2rem;
+  --type-label-2xl-default-font-weight:    400;
+  --type-label-2xl-default-letter-spacing: -0.025rem;
+  --type-label-2xl-strong-font-size:       1.5rem;
+  --type-label-2xl-strong-line-height:     2rem;
+  --type-label-2xl-strong-font-weight:     500;
+  --type-label-2xl-strong-letter-spacing:  -0.025rem;
+
+  // ─── Underline 2xl ───────────────────────────────────────────────────────
+  // Figma: Underline/2xLarge — 24px / lh 32 / ls -0.5px
+  --type-underline-2xl-default-font-size:      1.5rem;
+  --type-underline-2xl-default-line-height:    2rem;
+  --type-underline-2xl-default-font-weight:    400;
+  --type-underline-2xl-default-letter-spacing: -0.03125rem;
+  --type-underline-2xl-strong-font-size:       1.5rem;
+  --type-underline-2xl-strong-line-height:     2rem;
+  --type-underline-2xl-strong-font-weight:     500;
+  --type-underline-2xl-strong-letter-spacing:  -0.03125rem;
+
+  // ─── Underline xl ────────────────────────────────────────────────────────
+  // Figma: Underline/xLarge — 20px / lh 27 / ls -0.3px
+  --type-underline-xl-default-font-size:      1.25rem;
+  --type-underline-xl-default-line-height:    1.6875rem;
+  --type-underline-xl-default-font-weight:    400;
+  --type-underline-xl-default-letter-spacing: -0.01875rem;
+  --type-underline-xl-strong-font-size:       1.25rem;
+  --type-underline-xl-strong-line-height:     1.6875rem;
+  --type-underline-xl-strong-font-weight:     500;
+  --type-underline-xl-strong-letter-spacing:  -0.01875rem;
+
+  // ─── Underline lg ────────────────────────────────────────────────────────
+  // Figma: Underline/Large — 18px / lh 24 / ls -0.3px
+  --type-underline-lg-default-font-size:      1.125rem;
+  --type-underline-lg-default-line-height:    1.5rem;
+  --type-underline-lg-default-font-weight:    400;
+  --type-underline-lg-default-letter-spacing: -0.01875rem;
+  --type-underline-lg-strong-font-size:       1.125rem;
+  --type-underline-lg-strong-line-height:     1.5rem;
+  --type-underline-lg-strong-font-weight:     500;
+  --type-underline-lg-strong-letter-spacing:  -0.01875rem;
+
+  // ─── Underline md ────────────────────────────────────────────────────────
+  // Figma: Underline/Medium — 16px / lh 24 / ls -0.3px
+  --type-underline-md-default-font-size:      1rem;
+  --type-underline-md-default-line-height:    1.5rem;
+  --type-underline-md-default-font-weight:    400;
+  --type-underline-md-default-letter-spacing: -0.01875rem;
+  --type-underline-md-strong-font-size:       1rem;
+  --type-underline-md-strong-line-height:     1.5rem;
+  --type-underline-md-strong-font-weight:     500;
+  --type-underline-md-strong-letter-spacing:  -0.01875rem;
+
+  // ─── Underline sm ────────────────────────────────────────────────────────
+  // Figma: Underline/Small — 14px / lh 20 / ls -0.2px
+  --type-underline-sm-default-font-size:      0.875rem;
+  --type-underline-sm-default-line-height:    1.25rem;
+  --type-underline-sm-default-font-weight:    400;
+  --type-underline-sm-default-letter-spacing: -0.0125rem;
+  --type-underline-sm-strong-font-size:       0.875rem;
+  --type-underline-sm-strong-line-height:     1.25rem;
+  --type-underline-sm-strong-font-weight:     500;
+  --type-underline-sm-strong-letter-spacing:  -0.0125rem;
+
+  // ─── Underline xs ────────────────────────────────────────────────────────
+  // Figma: Underline/xSmall — 12px / lh 16 / ls -0.2px
+  --type-underline-xs-default-font-size:      0.75rem;
+  --type-underline-xs-default-line-height:    1rem;
+  --type-underline-xs-default-font-weight:    400;
+  --type-underline-xs-default-letter-spacing: -0.0125rem;
+  --type-underline-xs-strong-font-size:       0.75rem;
+  --type-underline-xs-strong-line-height:     1rem;
+  --type-underline-xs-strong-font-weight:     500;
+  --type-underline-xs-strong-letter-spacing:  -0.0125rem;
+}

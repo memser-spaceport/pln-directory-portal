@@ -246,6 +246,7 @@ model Member {
   roadmapItemPins           RoadmapItemPin[]        @relation("roadmapItemPinner")
   roadmapObjectivesCreated  RoadmapObjective[]      @relation("roadmapObjectiveCreatedBy")
   roadmapSubmissionDraft    RoadmapSubmissionDraft? @relation("roadmapSubmissionDraftOwner")
+  teamNewsUpvotes           TeamNewsUpvote[]        @relation("MemberTeamNewsUpvotes")
 
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
   affinityPerson               AffinityPerson?
@@ -2286,11 +2287,29 @@ model TeamNewsItem {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
   forumLinks   TeamNewsForumLink[]
+  upvotes      TeamNewsUpvote[]
 
   @@index([teamUid])
   @@index([eventDate])
   @@index([eventType])
   @@index([teamUid, eventDate(sort: Desc)])
+}
+
+/// Per-member "I'm interested" signal on a team news item. One upvote per
+/// member per item (toggle on/off). Counts are aggregated at read time.
+model TeamNewsUpvote {
+  id          Int          @id @default(autoincrement())
+  uid         String       @unique @default(cuid())
+  newsItemUid String
+  newsItem    TeamNewsItem @relation(fields: [newsItemUid], references: [uid], onDelete: Cascade)
+  memberUid   String
+  member      Member       @relation("MemberTeamNewsUpvotes", fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+
+  @@unique([newsItemUid, memberUid])
+  @@index([newsItemUid])
+  @@index([memberUid])
+  @@index([createdAt])
 }
 
 /// Authoritative link between a TeamNewsItem and a forum (NodeBB) topic
@@ -2839,8 +2858,7 @@ model RoadmapItem {
 
   externalTrackerUrl String?
 
-  objectiveUid String?
-  objective    RoadmapObjective? @relation(fields: [objectiveUid], references: [uid])
+  objectives RoadmapItemObjective[]
 
   upvotes RoadmapItemUpvote[]
   pins    RoadmapItemPin[]
@@ -2852,7 +2870,6 @@ model RoadmapItem {
 
   @@index([stage, deletedAt])
   @@index([createdByUid])
-  @@index([objectiveUid])
 }
 
 model RoadmapItemUpvote {
@@ -2893,15 +2910,29 @@ model RoadmapItemPin {
 }
 
 model RoadmapObjective {
-  id           Int           @id @default(autoincrement())
-  uid          String        @unique @default(cuid())
-  title        String        @unique
-  order        Int           @unique @default(autoincrement())
+  id           Int                    @id @default(autoincrement())
+  uid          String                 @unique @default(cuid())
+  title        String                 @unique
+  order        Int                    @unique @default(autoincrement())
   createdByUid String?
-  createdBy    Member?       @relation("roadmapObjectiveCreatedBy", fields: [createdByUid], references: [uid])
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  items        RoadmapItem[]
+  createdBy    Member?                @relation("roadmapObjectiveCreatedBy", fields: [createdByUid], references: [uid])
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  items        RoadmapItemObjective[]
+}
+
+/// Many-to-many link between a roadmap item and its objectives (OKR chips).
+model RoadmapItemObjective {
+  id           Int              @id @default(autoincrement())
+  itemUid      String
+  item         RoadmapItem      @relation(fields: [itemUid], references: [uid], onDelete: Cascade)
+  objectiveUid String
+  objective    RoadmapObjective @relation(fields: [objectiveUid], references: [uid], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+
+  @@unique([itemUid, objectiveUid])
+  @@index([itemUid])
+  @@index([objectiveUid])
 }
 
 /// Server-persisted snapshot of a member's in-progress Gantry create/submit form, so
@@ -2921,7 +2952,7 @@ model RoadmapSubmissionDraft {
   tags                String[] @default([])
   type                String?
   stage               String?
-  objectiveUid        String?
+  objectiveUids       String[] @default([])
   newObjectiveTitle   String?
   showCreateObjective Boolean  @default(false)
 
@@ -2943,6 +2974,7 @@ model RoadmapSettings {
 
 enum AiAppStatus {
   IN_DEVELOPMENT
+  DRAFT // registered by the agent with required env vars; awaiting member secrets + deploy
   DEPLOYING
   READY
   ERROR
@@ -2968,6 +3000,14 @@ model AiApp {
   host         String?
   port         Int?
   deploymentId String?
+  /// S3 key of the last uploaded app bundle, kept so a member-triggered deploy
+  /// (draft flow) can redeploy without the agent re-uploading.
+  s3Key        String?
+  /// Env var NAMES the agent declared the app needs at runtime (draft flow).
+  requiredEnvVars String[]  @default([])
+  /// Env var NAMES the member has provided values for. Values are never stored
+  /// here — they go straight to the sandbox runner's secret store.
+  providedEnvVars String[]  @default([])
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -3040,6 +3080,8 @@ enum AiAppEventType {
   KIT_DOWNLOADED
   CONNECT_APPROVED
   CONNECT_DENIED
+  DRAFT_CREATED
+  SECRETS_UPDATED
   DEPLOY_STARTED
   DEPLOY_SUCCEEDED
   DEPLOY_FAILED

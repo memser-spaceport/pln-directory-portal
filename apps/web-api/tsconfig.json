@@ -16,5 +16,9 @@
     "target": "ES2021"
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
-  "exclude": ["node_modules", "setup-env.ts"]
+  "exclude": [
+    "node_modules",
+    "setup-env.ts",
+    "src/ai-apps/assets/pl-design-system"
+  ]
 }
