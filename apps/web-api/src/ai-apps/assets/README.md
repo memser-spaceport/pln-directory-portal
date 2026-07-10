@@ -20,7 +20,9 @@ Kit overlays that are copied into the bundle (or live beside it):
 - `guidelines.kit.md` — source for the kit's `guidelines.md`
 
 Registered as a build asset in `apps/web-api/project.json` so `nx build` copies
-it to `dist/apps/web-api/ai-apps/assets/pl-design-system/`.
+it to `dist/apps/web-api/ai-apps/assets/pl-design-system/`. Excluded from the
+web-api TypeScript project (`tsconfig*.json`) so React/TSX files are not compiled
+by the API build.
 
 Excluded from the bundle: showcase Next.js app (`src/`), `mockups/`, `figma/`,
 `node_modules`, agent skill folders from the DS repo (the kit ships one lean
