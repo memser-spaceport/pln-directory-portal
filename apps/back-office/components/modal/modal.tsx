@@ -1,5 +1,5 @@
 import { Dialog, Transition } from '@headlessui/react';
-import React, { ReactNode, Fragment, LegacyRef } from 'react';
+import React, { ReactNode, Fragment, LegacyRef, useEffect, useRef } from 'react';
 
 type ModalProps = {
   isOpen: boolean;
@@ -22,18 +22,13 @@ type ModalHeaderProps = {
   headerStyleClass?: string;
 };
 
-function ModalHeader({
-  title,
-  headerStyleClass,
-  image,
-  onClose,
-}: ModalHeaderProps) {
+function ModalHeader({ title, headerStyleClass, image, onClose }: ModalHeaderProps) {
   return (
     <>
       <img
-        className="stroke-3 absolute right-5 top-5 z-40 cursor-pointer bg-red"
+        className="stroke-3 bg-red absolute right-5 top-5 z-40 cursor-pointer"
         onClick={() => onClose()}
-        src='/assets/images/minus_white.svg'
+        src="/assets/images/minus_white.svg"
       />
       <div className={`${headerStyleClass} rounded-lg`}>
         {image && (
@@ -42,10 +37,7 @@ function ModalHeader({
           </div>
         )}
         {title && (
-          <Dialog.Title
-            as="h3"
-            className="text-lg font-medium leading-6 text-gray-900"
-          >
+          <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900">
             {title}
           </Dialog.Title>
         )}
@@ -69,14 +61,52 @@ function ModalFooter({ onClose }: ModalHeaderProps) {
   );
 }
 
-function Modal({
-  isOpen,
-  children,
-  onClose,
-  modalRef,
-  blurBackdrop,
-  modalClassName,
-}: ModalProps) {
+function Modal({ isOpen, children, onClose, modalRef, blurBackdrop, modalClassName }: ModalProps) {
+  const scrollYRef = useRef(0);
+  const scrollParentRef = useRef<Element | Window | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const findScrollParent = (): Element | Window => {
+      const candidates: Array<Element | null> = [
+        document.querySelector('main.overflow-y-auto'),
+        document.querySelector('main.app'),
+        document.scrollingElement,
+        document.documentElement,
+        document.body,
+      ];
+      for (const el of candidates) {
+        if (el && el.scrollHeight > el.clientHeight + 1) {
+          return el;
+        }
+      }
+      return window;
+    };
+
+    const scrollParent = findScrollParent();
+    scrollParentRef.current = scrollParent;
+    scrollYRef.current = scrollParent === window ? window.scrollY : (scrollParent as Element).scrollTop;
+
+    return () => {
+      const y = scrollYRef.current;
+      const parent = scrollParentRef.current;
+      const restore = () => {
+        if (!parent || parent === window) {
+          window.scrollTo(0, y);
+          return;
+        }
+        (parent as Element).scrollTop = y;
+      };
+      requestAnimationFrame(() => {
+        restore();
+        // Headless UI unlocks body scroll / restores focus after leave; restore again then.
+        window.setTimeout(restore, 0);
+        window.setTimeout(restore, 50);
+        window.setTimeout(restore, 150);
+      });
+    };
+  }, [isOpen]);
 
   return (
     <>

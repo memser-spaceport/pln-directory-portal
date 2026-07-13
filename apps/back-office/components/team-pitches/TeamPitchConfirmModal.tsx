@@ -10,6 +10,7 @@ type TeamPitchConfirmModalProps = {
   participantEmail?: string;
   details?: ReactNode;
   confirmLabel?: string;
+  confirmDisabled?: boolean;
   isPending?: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -23,6 +24,7 @@ export const TeamPitchConfirmModal: React.FC<TeamPitchConfirmModalProps> = ({
   participantEmail,
   details,
   confirmLabel = 'Confirm',
+  confirmDisabled = false,
   isPending = false,
   onClose,
   onConfirm,
@@ -66,10 +68,10 @@ export const TeamPitchConfirmModal: React.FC<TeamPitchConfirmModalProps> = ({
             <button
               type="button"
               onClick={onConfirm}
-              disabled={isPending}
+              disabled={isPending || confirmDisabled}
               className={clsx(
                 'inline-flex items-center rounded-lg border border-transparent px-4 py-2 text-sm font-medium text-white shadow-sm',
-                isPending ? 'cursor-not-allowed bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
+                isPending || confirmDisabled ? 'cursor-not-allowed bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
               )}
             >
               {isPending ? 'Please wait...' : confirmLabel}

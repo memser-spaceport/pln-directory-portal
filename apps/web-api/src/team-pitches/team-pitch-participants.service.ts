@@ -207,6 +207,69 @@ export class TeamPitchParticipantsService {
     });
   }
 
+  async removeParticipant(pitchUid: string, participantUid: string) {
+    const participant = await this.prisma.teamPitchParticipant.findFirst({
+      where: { uid: participantUid, teamPitchUid: pitchUid },
+    });
+    if (!participant) {
+      throw new NotFoundException('Participant not found');
+    }
+
+    await this.prisma.teamPitchParticipant.delete({
+      where: { uid: participantUid },
+    });
+
+    return { success: true };
+  }
+
+  async removeParticipantsBulk(pitchUid: string, participantUids: string[]) {
+    const pitch = await this.prisma.teamPitch.findUnique({ where: { uid: pitchUid } });
+    if (!pitch) {
+      throw new NotFoundException('Team pitch not found');
+    }
+
+    const uniqueUids = [...new Set(participantUids)];
+    const existing = await this.prisma.teamPitchParticipant.findMany({
+      where: { teamPitchUid: pitchUid, uid: { in: uniqueUids } },
+      select: { uid: true },
+    });
+    const existingUids = new Set(existing.map((p) => p.uid));
+
+    const rows: Array<{
+      participantUid: string;
+      status: 'removed' | 'skipped';
+      message?: string | null;
+    }> = [];
+
+    let removed = 0;
+    let skipped = 0;
+
+    for (const uid of uniqueUids) {
+      if (!existingUids.has(uid)) {
+        skipped++;
+        rows.push({
+          participantUid: uid,
+          status: 'skipped',
+          message: 'Participant not found on this spotlight',
+        });
+        continue;
+      }
+
+      await this.prisma.teamPitchParticipant.delete({ where: { uid } });
+      removed++;
+      rows.push({ participantUid: uid, status: 'removed' });
+    }
+
+    return {
+      summary: {
+        total: uniqueUids.length,
+        removed,
+        skipped,
+      },
+      rows,
+    };
+  }
+
   async sendInvestorInvite(pitchUid: string, participantUid: string) {
     const participant = await this.prisma.teamPitchParticipant.findFirst({
       where: { uid: participantUid, teamPitchUid: pitchUid },
@@ -225,6 +288,9 @@ export class TeamPitchParticipantsService {
     }
     if (participant.type !== 'INVESTOR') {
       throw new BadRequestException('Invite can only be sent to investors');
+    }
+    if (participant.access === 'RESTRICTED') {
+      throw new BadRequestException('Invite cannot be sent to investors with No Access');
     }
     if (!participant.member.email) {
       throw new BadRequestException('Investor has no email');
@@ -279,6 +345,113 @@ export class TeamPitchParticipantsService {
     });
 
     return { success: true };
+  }
+
+  async sendInvestorInvitesBulk(
+    pitchUid: string,
+    options: { includeAlreadyInvited?: boolean; participantUids?: string[] } = {}
+  ): Promise<{
+    summary: { totalEligible: number; sent: number; skipped: number; errors: number };
+    rows: Array<{
+      participantUid: string;
+      email: string | null;
+      name: string | null;
+      status: 'sent' | 'skipped' | 'error';
+      message?: string | null;
+    }>;
+  }> {
+    const includeAlreadyInvited = options.includeAlreadyInvited ?? false;
+    const selectedUids = options.participantUids?.length ? new Set(options.participantUids) : null;
+
+    const pitch = await this.prisma.teamPitch.findUnique({ where: { uid: pitchUid } });
+    if (!pitch) {
+      throw new NotFoundException('Team pitch not found');
+    }
+
+    const investors = await this.prisma.teamPitchParticipant.findMany({
+      where: {
+        teamPitchUid: pitchUid,
+        type: 'INVESTOR',
+        ...(selectedUids ? { uid: { in: [...selectedUids] } } : {}),
+      },
+      include: {
+        member: { select: { uid: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const summary = { totalEligible: 0, sent: 0, skipped: 0, errors: 0 };
+    const rows: Array<{
+      participantUid: string;
+      email: string | null;
+      name: string | null;
+      status: 'sent' | 'skipped' | 'error';
+      message?: string | null;
+    }> = [];
+
+    for (const investor of investors) {
+      const email = investor.member?.email ?? null;
+      const name = investor.member?.name ?? null;
+
+      if (investor.access === 'RESTRICTED') {
+        summary.skipped++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'skipped',
+          message: 'Investor has No Access',
+        });
+        continue;
+      }
+
+      if (!email) {
+        summary.skipped++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'skipped',
+          message: 'Investor has no email',
+        });
+        continue;
+      }
+
+      if (!includeAlreadyInvited && investor.inviteSentCount > 0) {
+        summary.skipped++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'skipped',
+          message: 'Invite already sent',
+        });
+        continue;
+      }
+
+      summary.totalEligible++;
+      try {
+        await this.sendInvestorInvite(pitchUid, investor.uid);
+        summary.sent++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'sent',
+        });
+      } catch (error) {
+        summary.errors++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Failed to send invite',
+        });
+      }
+    }
+
+    return { summary, rows };
   }
 
   async addInvestorParticipantsBulk(

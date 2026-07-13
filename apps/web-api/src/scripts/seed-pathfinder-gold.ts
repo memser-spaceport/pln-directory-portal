@@ -43,6 +43,7 @@ import {
   lookupAllSocialOverlapsForInvestor,
   mergeOrCreateLinkedInPathCandidates,
   shouldAttachAffinityToPath,
+  type LinkedInMergeCandidate,
   type PathHopChain,
   type SocialOverlapCache,
   type SocialOverlapEntry,
@@ -77,7 +78,7 @@ interface DumpPath {
   proximityCode: string;
   score: number;
   rank: number;
-  hopChain: unknown;
+  hopChain: Record<string, unknown>;
 }
 interface DumpSummary {
   investor_id: string;
@@ -257,12 +258,7 @@ async function seed() {
     const boost = Math.max(affinityBoost(rel?.bestConnector ?? null), backingWarmthBoost(priorBacking));
     let attachedHere = false;
 
-    type PathCandidate = DumpPath & {
-      score: number;
-      socialOverlap?: SocialOverlapEntry;
-      linkedInOverlaps?: SocialOverlapEntry[];
-      linkedInOnly?: boolean;
-    };
+    type PathCandidate = DumpPath & LinkedInMergeCandidate;
     const firmPaths = pathsByFirm.get(firmId) ?? [];
     let candidates: PathCandidate[] = firmPaths.map((p) => ({
       ...p,
