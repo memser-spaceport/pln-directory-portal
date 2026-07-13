@@ -11,6 +11,7 @@ import {
   CreateTeamPitchDto,
   GetTeamPitchParticipantsQueryDto,
   GetTeamPitchesQueryDto,
+  RemoveTeamPitchParticipantsBulkDto,
   SendTeamPitchInvitesBulkDto,
   UpdateTeamPitchDto,
   UpdateTeamPitchParticipantDto,
@@ -105,7 +106,15 @@ export class AdminTeamPitchController {
   async sendInvitesBulk(@Param('pitchUid') pitchUid: string, @Body() body: SendTeamPitchInvitesBulkDto) {
     return this.teamPitchParticipantsService.sendInvestorInvitesBulk(pitchUid, {
       includeAlreadyInvited: body.includeAlreadyInvited ?? false,
+      participantUids: body.participantUids,
     });
+  }
+
+  @Post(':pitchUid/participants/remove-bulk')
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async removeParticipantsBulk(@Param('pitchUid') pitchUid: string, @Body() body: RemoveTeamPitchParticipantsBulkDto) {
+    return this.teamPitchParticipantsService.removeParticipantsBulk(pitchUid, body.participantUids);
   }
 
   @Patch(':pitchUid/participants/:participantUid')
@@ -121,10 +130,7 @@ export class AdminTeamPitchController {
 
   @Delete(':pitchUid/participants/:participantUid')
   @NoCache()
-  async removeParticipant(
-    @Param('pitchUid') pitchUid: string,
-    @Param('participantUid') participantUid: string
-  ) {
+  async removeParticipant(@Param('pitchUid') pitchUid: string, @Param('participantUid') participantUid: string) {
     return this.teamPitchParticipantsService.removeParticipant(pitchUid, participantUid);
   }
 

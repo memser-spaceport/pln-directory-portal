@@ -222,6 +222,54 @@ export class TeamPitchParticipantsService {
     return { success: true };
   }
 
+  async removeParticipantsBulk(pitchUid: string, participantUids: string[]) {
+    const pitch = await this.prisma.teamPitch.findUnique({ where: { uid: pitchUid } });
+    if (!pitch) {
+      throw new NotFoundException('Team pitch not found');
+    }
+
+    const uniqueUids = [...new Set(participantUids)];
+    const existing = await this.prisma.teamPitchParticipant.findMany({
+      where: { teamPitchUid: pitchUid, uid: { in: uniqueUids } },
+      select: { uid: true },
+    });
+    const existingUids = new Set(existing.map((p) => p.uid));
+
+    const rows: Array<{
+      participantUid: string;
+      status: 'removed' | 'skipped';
+      message?: string | null;
+    }> = [];
+
+    let removed = 0;
+    let skipped = 0;
+
+    for (const uid of uniqueUids) {
+      if (!existingUids.has(uid)) {
+        skipped++;
+        rows.push({
+          participantUid: uid,
+          status: 'skipped',
+          message: 'Participant not found on this spotlight',
+        });
+        continue;
+      }
+
+      await this.prisma.teamPitchParticipant.delete({ where: { uid } });
+      removed++;
+      rows.push({ participantUid: uid, status: 'removed' });
+    }
+
+    return {
+      summary: {
+        total: uniqueUids.length,
+        removed,
+        skipped,
+      },
+      rows,
+    };
+  }
+
   async sendInvestorInvite(pitchUid: string, participantUid: string) {
     const participant = await this.prisma.teamPitchParticipant.findFirst({
       where: { uid: participantUid, teamPitchUid: pitchUid },
@@ -301,7 +349,7 @@ export class TeamPitchParticipantsService {
 
   async sendInvestorInvitesBulk(
     pitchUid: string,
-    options: { includeAlreadyInvited?: boolean } = {}
+    options: { includeAlreadyInvited?: boolean; participantUids?: string[] } = {}
   ): Promise<{
     summary: { totalEligible: number; sent: number; skipped: number; errors: number };
     rows: Array<{
@@ -313,6 +361,7 @@ export class TeamPitchParticipantsService {
     }>;
   }> {
     const includeAlreadyInvited = options.includeAlreadyInvited ?? false;
+    const selectedUids = options.participantUids?.length ? new Set(options.participantUids) : null;
 
     const pitch = await this.prisma.teamPitch.findUnique({ where: { uid: pitchUid } });
     if (!pitch) {
@@ -320,7 +369,11 @@ export class TeamPitchParticipantsService {
     }
 
     const investors = await this.prisma.teamPitchParticipant.findMany({
-      where: { teamPitchUid: pitchUid, type: 'INVESTOR' },
+      where: {
+        teamPitchUid: pitchUid,
+        type: 'INVESTOR',
+        ...(selectedUids ? { uid: { in: [...selectedUids] } } : {}),
+      },
       include: {
         member: { select: { uid: true, name: true, email: true } },
       },
