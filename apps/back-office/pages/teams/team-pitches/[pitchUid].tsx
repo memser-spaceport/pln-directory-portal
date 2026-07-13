@@ -166,20 +166,23 @@ const TeamPitchDetailPage = () => {
 
   const bulkInviteStats = useMemo(() => {
     const list = (participantsRaw ?? []) as Array<{
+      access?: string;
       inviteSentCount?: number;
       member?: { email?: string | null };
     }>;
-    const withEmail = list.filter((p) => !!p.member?.email);
-    const neverInvited = withEmail.filter((p) => (p.inviteSentCount ?? 0) === 0);
-    const alreadyInvited = withEmail.filter((p) => (p.inviteSentCount ?? 0) > 0);
+    const noAccess = list.filter((p) => p.access === 'RESTRICTED').length;
+    const eligible = list.filter((p) => p.access !== 'RESTRICTED' && !!p.member?.email);
+    const neverInvited = eligible.filter((p) => (p.inviteSentCount ?? 0) === 0);
+    const alreadyInvited = eligible.filter((p) => (p.inviteSentCount ?? 0) > 0);
     return {
-      withEmail: withEmail.length,
+      eligible: eligible.length,
       neverInvited: neverInvited.length,
       alreadyInvited: alreadyInvited.length,
+      noAccess,
     };
   }, [participantsRaw]);
 
-  const bulkInviteTargetCount = includeAlreadyInvited ? bulkInviteStats.withEmail : bulkInviteStats.neverInvited;
+  const bulkInviteTargetCount = includeAlreadyInvited ? bulkInviteStats.eligible : bulkInviteStats.neverInvited;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -439,7 +442,7 @@ const TeamPitchDetailPage = () => {
                           setIncludeAlreadyInvited(false);
                           setShowBulkInviteModal(true);
                         }}
-                        disabled={!bulkInviteStats.withEmail}
+                        disabled={!bulkInviteStats.eligible}
                         className="rounded-lg bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
                       >
                         Send Invites to All
@@ -671,22 +674,25 @@ const TeamPitchDetailPage = () => {
 
                       {activeTab === 'investors' && (
                         <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                          {canMutateTeamPitches && (
-                            <button
-                              type="button"
-                              className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                              onClick={() =>
-                                setPendingInvite({
-                                  uid: participant.uid,
-                                  name: participant.member?.name,
-                                  email: participant.member?.email,
-                                  isResend: participant.inviteSentCount > 0,
-                                })
-                              }
-                            >
-                              {participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
-                            </button>
-                          )}
+                          {canMutateTeamPitches &&
+                            (participant.access === 'RESTRICTED' ? (
+                              <span className="text-sm text-gray-400">No Access</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                                onClick={() =>
+                                  setPendingInvite({
+                                    uid: participant.uid,
+                                    name: participant.member?.name,
+                                    email: participant.member?.email,
+                                    isResend: participant.inviteSentCount > 0,
+                                  })
+                                }
+                              >
+                                {participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
+                              </button>
+                            ))}
                         </div>
                       )}
                     </div>
@@ -833,12 +839,12 @@ const TeamPitchDetailPage = () => {
           title="Send invites to all investors"
           message={
             includeAlreadyInvited
-              ? `Send the team spotlight invite email to all ${bulkInviteStats.withEmail} investors with an email address?`
+              ? `Send the team spotlight invite email to all ${bulkInviteStats.eligible} eligible investors?`
               : bulkInviteStats.neverInvited > 0
               ? `Send the team spotlight invite email to ${bulkInviteStats.neverInvited} investor${
                   bulkInviteStats.neverInvited === 1 ? '' : 's'
                 } who have not been invited yet?`
-              : 'Every investor with an email has already been invited. Enable the option below to resend.'
+              : 'Every eligible investor has already been invited. Enable the option below to resend.'
           }
           confirmLabel={`Send ${bulkInviteTargetCount} invite${bulkInviteTargetCount === 1 ? '' : 's'}`}
           confirmDisabled={bulkInviteTargetCount === 0}
@@ -852,7 +858,7 @@ const TeamPitchDetailPage = () => {
             <div className="space-y-3 text-sm text-gray-600">
               <ul className="list-disc space-y-1 pl-5">
                 <li>
-                  Investors with email: <span className="font-medium text-gray-900">{bulkInviteStats.withEmail}</span>
+                  Eligible investors: <span className="font-medium text-gray-900">{bulkInviteStats.eligible}</span>
                 </li>
                 <li>
                   Not yet invited: <span className="font-medium text-gray-900">{bulkInviteStats.neverInvited}</span>
@@ -860,7 +866,15 @@ const TeamPitchDetailPage = () => {
                 <li>
                   Already invited: <span className="font-medium text-gray-900">{bulkInviteStats.alreadyInvited}</span>
                 </li>
+                {bulkInviteStats.noAccess > 0 && (
+                  <li>
+                    Skipped (No Access): <span className="font-medium text-gray-900">{bulkInviteStats.noAccess}</span>
+                  </li>
+                )}
               </ul>
+              <p className="text-xs text-gray-500">
+                Investors marked No Access are never emailed, even when resending.
+              </p>
               <label className="flex cursor-pointer items-start gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-3">
                 <input
                   type="checkbox"

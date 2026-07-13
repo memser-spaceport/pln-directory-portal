@@ -226,6 +226,9 @@ export class TeamPitchParticipantsService {
     if (participant.type !== 'INVESTOR') {
       throw new BadRequestException('Invite can only be sent to investors');
     }
+    if (participant.access === 'RESTRICTED') {
+      throw new BadRequestException('Invite cannot be sent to investors with No Access');
+    }
     if (!participant.member.email) {
       throw new BadRequestException('Investor has no email');
     }
@@ -321,6 +324,18 @@ export class TeamPitchParticipantsService {
     for (const investor of investors) {
       const email = investor.member?.email ?? null;
       const name = investor.member?.name ?? null;
+
+      if (investor.access === 'RESTRICTED') {
+        summary.skipped++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'skipped',
+          message: 'Investor has No Access',
+        });
+        continue;
+      }
 
       if (!email) {
         summary.skipped++;
