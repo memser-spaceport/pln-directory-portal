@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { TeamPitchAdminAuthGuard } from '../guards/admin-auth.guard';
@@ -11,6 +11,7 @@ import {
   CreateTeamPitchDto,
   GetTeamPitchParticipantsQueryDto,
   GetTeamPitchesQueryDto,
+  RemoveTeamPitchParticipantsBulkDto,
   SendTeamPitchInvitesBulkDto,
   UpdateTeamPitchDto,
   UpdateTeamPitchParticipantDto,
@@ -105,7 +106,15 @@ export class AdminTeamPitchController {
   async sendInvitesBulk(@Param('pitchUid') pitchUid: string, @Body() body: SendTeamPitchInvitesBulkDto) {
     return this.teamPitchParticipantsService.sendInvestorInvitesBulk(pitchUid, {
       includeAlreadyInvited: body.includeAlreadyInvited ?? false,
+      participantUids: body.participantUids,
     });
+  }
+
+  @Post(':pitchUid/participants/remove-bulk')
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async removeParticipantsBulk(@Param('pitchUid') pitchUid: string, @Body() body: RemoveTeamPitchParticipantsBulkDto) {
+    return this.teamPitchParticipantsService.removeParticipantsBulk(pitchUid, body.participantUids);
   }
 
   @Patch(':pitchUid/participants/:participantUid')
@@ -117,6 +126,12 @@ export class AdminTeamPitchController {
     @Body() body: UpdateTeamPitchParticipantDto
   ) {
     return this.teamPitchParticipantsService.updateParticipant(pitchUid, participantUid, body);
+  }
+
+  @Delete(':pitchUid/participants/:participantUid')
+  @NoCache()
+  async removeParticipant(@Param('pitchUid') pitchUid: string, @Param('participantUid') participantUid: string) {
+    return this.teamPitchParticipantsService.removeParticipant(pitchUid, participantUid);
   }
 
   @Post(':pitchUid/participants/:participantUid/send-invite')

@@ -12,6 +12,8 @@ import { useUpdateTeamPitch } from '../../../hooks/team-pitches/useUpdateTeamPit
 import { useUpdateTeamPitchParticipant } from '../../../hooks/team-pitches/useUpdateTeamPitchParticipant';
 import { useSendTeamPitchInvite } from '../../../hooks/team-pitches/useSendTeamPitchInvite';
 import { useSendTeamPitchInvitesBulk } from '../../../hooks/team-pitches/useSendTeamPitchInvitesBulk';
+import { useRemoveTeamPitchParticipant } from '../../../hooks/team-pitches/useRemoveTeamPitchParticipant';
+import { useRemoveTeamPitchParticipantsBulk } from '../../../hooks/team-pitches/useRemoveTeamPitchParticipantsBulk';
 import { AddTeamPitchParticipantModal } from '../../../components/team-pitches/AddTeamPitchParticipantModal';
 import { UploadTeamPitchInvestorsModal } from '../../../components/team-pitches/UploadTeamPitchInvestorsModal';
 import { TeamPitchConfirmModal } from '../../../components/team-pitches/TeamPitchConfirmModal';
@@ -104,7 +106,10 @@ const TeamPitchDetailPage = () => {
     (PendingParticipantFields & { access: string }) | null
   >(null);
   const [pendingInvite, setPendingInvite] = useState<(PendingParticipantFields & { isResend: boolean }) | null>(null);
-  const [showBulkInviteModal, setShowBulkInviteModal] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState<PendingParticipantFields | null>(null);
+  const [selectedUids, setSelectedUids] = useState<string[]>([]);
+  const [bulkInviteMode, setBulkInviteMode] = useState<'all' | 'selected' | null>(null);
+  const [pendingSelectedRemove, setPendingSelectedRemove] = useState(false);
   const [includeAlreadyInvited, setIncludeAlreadyInvited] = useState(false);
 
   const typeMap = { investors: 'INVESTOR', founders: 'FOUNDER' } as const;
@@ -120,6 +125,8 @@ const TeamPitchDetailPage = () => {
   const updateParticipant = useUpdateTeamPitchParticipant();
   const sendInvite = useSendTeamPitchInvite();
   const sendInvitesBulk = useSendTeamPitchInvitesBulk();
+  const removeParticipant = useRemoveTeamPitchParticipant();
+  const removeParticipantsBulk = useRemoveTeamPitchParticipantsBulk();
 
   const [editFormData, setEditFormData] = useState({
     title: '',
@@ -153,6 +160,10 @@ const TeamPitchDetailPage = () => {
     }
   }, [pitch]);
 
+  useEffect(() => {
+    setSelectedUids([]);
+  }, [activeTab]);
+
   const participants = useMemo(() => {
     const list = participantsRaw ?? [];
     if (!searchTerm.trim()) return list;
@@ -163,6 +174,17 @@ const TeamPitchDetailPage = () => {
       return name.includes(q) || email.includes(q);
     });
   }, [participantsRaw, searchTerm]);
+
+  const selectedUidSet = useMemo(() => new Set(selectedUids), [selectedUids]);
+  const visibleUids = useMemo(() => participants.map((p: { uid: string }) => p.uid), [participants]);
+  const allVisibleSelected =
+    visibleUids.length > 0 && visibleUids.every((participantUid: string) => selectedUidSet.has(participantUid));
+  const someVisibleSelected = visibleUids.some((participantUid: string) => selectedUidSet.has(participantUid));
+
+  const selectedParticipants = useMemo(
+    () => participants.filter((p: { uid: string }) => selectedUidSet.has(p.uid)),
+    [participants, selectedUidSet]
+  );
 
   const bulkInviteStats = useMemo(() => {
     const list = (participantsRaw ?? []) as Array<{
@@ -182,7 +204,40 @@ const TeamPitchDetailPage = () => {
     };
   }, [participantsRaw]);
 
-  const bulkInviteTargetCount = includeAlreadyInvited ? bulkInviteStats.eligible : bulkInviteStats.neverInvited;
+  const selectedInviteStats = useMemo(() => {
+    const list = selectedParticipants as Array<{
+      access?: string;
+      inviteSentCount?: number;
+      member?: { email?: string | null };
+    }>;
+    const noAccess = list.filter((p) => p.access === 'RESTRICTED').length;
+    const eligible = list.filter((p) => p.access !== 'RESTRICTED' && !!p.member?.email);
+    const neverInvited = eligible.filter((p) => (p.inviteSentCount ?? 0) === 0);
+    const alreadyInvited = eligible.filter((p) => (p.inviteSentCount ?? 0) > 0);
+    return {
+      eligible: eligible.length,
+      neverInvited: neverInvited.length,
+      alreadyInvited: alreadyInvited.length,
+      noAccess,
+    };
+  }, [selectedParticipants]);
+
+  const activeInviteStats = bulkInviteMode === 'selected' ? selectedInviteStats : bulkInviteStats;
+  const bulkInviteTargetCount = includeAlreadyInvited ? activeInviteStats.eligible : activeInviteStats.neverInvited;
+
+  const toggleSelectAllVisible = () => {
+    if (allVisibleSelected) {
+      setSelectedUids((prev) => prev.filter((id) => !visibleUids.includes(id)));
+      return;
+    }
+    setSelectedUids((prev) => [...new Set([...prev, ...visibleUids])]);
+  };
+
+  const toggleSelectUid = (participantUid: string) => {
+    setSelectedUids((prev) =>
+      prev.includes(participantUid) ? prev.filter((id) => id !== participantUid) : [...prev, participantUid]
+    );
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -440,7 +495,7 @@ const TeamPitchDetailPage = () => {
                         type="button"
                         onClick={() => {
                           setIncludeAlreadyInvited(false);
-                          setShowBulkInviteModal(true);
+                          setBulkInviteMode('all');
                         }}
                         disabled={!bulkInviteStats.eligible}
                         className="rounded-lg bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
@@ -480,6 +535,38 @@ const TeamPitchDetailPage = () => {
                   className={clsx(s.input)}
                 />
               </div>
+
+              {canMutateTeamPitches && selectedUids.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+                  <span className="text-sm font-medium text-indigo-900">{selectedUids.length} selected</span>
+                  <button
+                    type="button"
+                    className="text-sm text-indigo-700 underline hover:text-indigo-900"
+                    onClick={() => setSelectedUids([])}
+                  >
+                    Clear
+                  </button>
+                  {activeTab === 'investors' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIncludeAlreadyInvited(true);
+                        setBulkInviteMode('selected');
+                      }}
+                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
+                    >
+                      Send Invite to Selected
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPendingSelectedRemove(true)}
+                    className="rounded-lg bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700"
+                  >
+                    Remove Selected
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -491,6 +578,20 @@ const TeamPitchDetailPage = () => {
             ) : (
               <div className={s.table}>
                 <div className={clsx(s.tableRow, s.tableHeader)}>
+                  {canMutateTeamPitches && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 48 }}>
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        checked={allVisibleSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected;
+                        }}
+                        onChange={toggleSelectAllVisible}
+                        aria-label="Select all visible participants"
+                      />
+                    </div>
+                  )}
                   <div className={clsx(s.headerCell, s.first, s.flexible)}>Member</div>
                   {(activeTab === 'investors' || activeTab === 'founders') && (
                     <div className={clsx(s.headerCell, s.flexible)}>Team</div>
@@ -511,11 +612,9 @@ const TeamPitchDetailPage = () => {
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>
                     Access
                   </div>
-                  {activeTab === 'investors' && (
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
-                      Invite
-                    </div>
-                  )}
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: activeTab === 'investors' ? 160 : 60 }}>
+                    Actions
+                  </div>
                 </div>
 
                 {participants.map((participant: any) => {
@@ -530,6 +629,19 @@ const TeamPitchDetailPage = () => {
 
                   return (
                     <div key={participant.uid} className={s.tableRow}>
+                      {canMutateTeamPitches && (
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 48 }}>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            checked={selectedUidSet.has(participant.uid)}
+                            onChange={() => toggleSelectUid(participant.uid)}
+                            aria-label={`Select ${
+                              participant.member?.name || participant.member?.email || 'participant'
+                            }`}
+                          />
+                        </div>
+                      )}
                       <div className={clsx(s.bodyCell, s.first, s.flexible)}>
                         <div className="flex items-center">
                           {participant.member?.profilePicture && (
@@ -672,29 +784,56 @@ const TeamPitchDetailPage = () => {
                         </select>
                       </div>
 
-                      {activeTab === 'investors' && (
-                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                          {canMutateTeamPitches &&
-                            (participant.access === 'RESTRICTED' ? (
-                              <span className="text-sm text-gray-400">No Access</span>
-                            ) : (
-                              <button
-                                type="button"
-                                className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                                onClick={() =>
-                                  setPendingInvite({
-                                    uid: participant.uid,
-                                    name: participant.member?.name,
-                                    email: participant.member?.email,
-                                    isResend: participant.inviteSentCount > 0,
-                                  })
-                                }
-                              >
-                                {participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
-                              </button>
-                            ))}
-                        </div>
-                      )}
+                      <div
+                        className={clsx(s.bodyCell, s.fixed)}
+                        style={{ width: activeTab === 'investors' ? 160 : 60 }}
+                      >
+                        {canMutateTeamPitches && (
+                          <div className="flex items-center gap-3">
+                            {activeTab === 'investors' &&
+                              (participant.access === 'RESTRICTED' ? (
+                                <span className="text-sm text-gray-400">No Access</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                                  onClick={() =>
+                                    setPendingInvite({
+                                      uid: participant.uid,
+                                      name: participant.member?.name,
+                                      email: participant.member?.email,
+                                      isResend: participant.inviteSentCount > 0,
+                                    })
+                                  }
+                                >
+                                  {participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
+                                </button>
+                              ))}
+                            <button
+                              type="button"
+                              className="rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-800"
+                              aria-label="Remove participant"
+                              title="Remove participant"
+                              onClick={() =>
+                                setPendingRemove({
+                                  uid: participant.uid,
+                                  name: participant.member?.name,
+                                  email: participant.member?.email,
+                                })
+                              }
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -835,40 +974,73 @@ const TeamPitchDetailPage = () => {
         />
 
         <TeamPitchConfirmModal
-          isOpen={showBulkInviteModal}
-          title="Send invites to all investors"
+          isOpen={!!pendingRemove}
+          title="Remove participant"
+          message="Remove this participant from the team spotlight? They will lose access. Their member profile will not be deleted."
+          participantName={pendingRemove?.name}
+          participantEmail={pendingRemove?.email}
+          confirmLabel="Remove"
+          isPending={removeParticipant.isPending}
+          onClose={() => setPendingRemove(null)}
+          onConfirm={async () => {
+            if (!authToken || !pendingRemove) return;
+            try {
+              await removeParticipant.mutateAsync({
+                authToken,
+                pitchUid: uid,
+                participantUid: pendingRemove.uid,
+              });
+              toast.success('Participant removed');
+              setPendingRemove(null);
+              refetchParticipants();
+            } catch {
+              toast.error('Failed to remove participant');
+            }
+          }}
+        />
+
+        <TeamPitchConfirmModal
+          isOpen={bulkInviteMode !== null}
+          title={bulkInviteMode === 'selected' ? 'Send invites to selected investors' : 'Send invites to all investors'}
           message={
             includeAlreadyInvited
-              ? `Send the team spotlight invite email to all ${bulkInviteStats.eligible} eligible investors?`
-              : bulkInviteStats.neverInvited > 0
-              ? `Send the team spotlight invite email to ${bulkInviteStats.neverInvited} investor${
-                  bulkInviteStats.neverInvited === 1 ? '' : 's'
+              ? `Send the team spotlight invite email to ${activeInviteStats.eligible} eligible investor${
+                  activeInviteStats.eligible === 1 ? '' : 's'
+                }${bulkInviteMode === 'selected' ? ' from your selection' : ''}?`
+              : activeInviteStats.neverInvited > 0
+              ? `Send the team spotlight invite email to ${activeInviteStats.neverInvited} investor${
+                  activeInviteStats.neverInvited === 1 ? '' : 's'
                 } who have not been invited yet?`
-              : 'Every eligible investor has already been invited. Enable the option below to resend.'
+              : 'Every eligible investor in this set has already been invited. Enable the option below to resend.'
           }
           confirmLabel={`Send ${bulkInviteTargetCount} invite${bulkInviteTargetCount === 1 ? '' : 's'}`}
           confirmDisabled={bulkInviteTargetCount === 0}
           isPending={sendInvitesBulk.isPending}
           onClose={() => {
             if (sendInvitesBulk.isPending) return;
-            setShowBulkInviteModal(false);
+            setBulkInviteMode(null);
             setIncludeAlreadyInvited(false);
           }}
           details={
             <div className="space-y-3 text-sm text-gray-600">
+              {bulkInviteMode === 'selected' && (
+                <p>
+                  Selected: <span className="font-medium text-gray-900">{selectedUids.length}</span>
+                </p>
+              )}
               <ul className="list-disc space-y-1 pl-5">
                 <li>
-                  Eligible investors: <span className="font-medium text-gray-900">{bulkInviteStats.eligible}</span>
+                  Eligible investors: <span className="font-medium text-gray-900">{activeInviteStats.eligible}</span>
                 </li>
                 <li>
-                  Not yet invited: <span className="font-medium text-gray-900">{bulkInviteStats.neverInvited}</span>
+                  Not yet invited: <span className="font-medium text-gray-900">{activeInviteStats.neverInvited}</span>
                 </li>
                 <li>
-                  Already invited: <span className="font-medium text-gray-900">{bulkInviteStats.alreadyInvited}</span>
+                  Already invited: <span className="font-medium text-gray-900">{activeInviteStats.alreadyInvited}</span>
                 </li>
-                {bulkInviteStats.noAccess > 0 && (
+                {activeInviteStats.noAccess > 0 && (
                   <li>
-                    Skipped (No Access): <span className="font-medium text-gray-900">{bulkInviteStats.noAccess}</span>
+                    Skipped (No Access): <span className="font-medium text-gray-900">{activeInviteStats.noAccess}</span>
                   </li>
                 )}
               </ul>
@@ -880,7 +1052,7 @@ const TeamPitchDetailPage = () => {
                   type="checkbox"
                   className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   checked={includeAlreadyInvited}
-                  disabled={sendInvitesBulk.isPending || bulkInviteStats.alreadyInvited === 0}
+                  disabled={sendInvitesBulk.isPending || activeInviteStats.alreadyInvited === 0}
                   onChange={(e) => setIncludeAlreadyInvited(e.target.checked)}
                 />
                 <span>
@@ -888,26 +1060,28 @@ const TeamPitchDetailPage = () => {
                     Also resend to investors who already received an invite
                   </span>
                   <span className="mt-0.5 block text-xs text-gray-500">
-                    Off by default — only people who have never been invited will get an email. Turn this on only if you
-                    intentionally want to email everyone again.
+                    {bulkInviteMode === 'selected'
+                      ? 'On by default for selected people — turn off to skip anyone already invited.'
+                      : 'Off by default — only people who have never been invited will get an email. Turn this on only if you intentionally want to email everyone again.'}
                   </span>
                 </span>
               </label>
-              {includeAlreadyInvited && bulkInviteStats.alreadyInvited > 0 && (
+              {includeAlreadyInvited && activeInviteStats.alreadyInvited > 0 && (
                 <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
-                  {bulkInviteStats.alreadyInvited} investor
-                  {bulkInviteStats.alreadyInvited === 1 ? '' : 's'} will receive another copy of the invite email.
+                  {activeInviteStats.alreadyInvited} investor
+                  {activeInviteStats.alreadyInvited === 1 ? '' : 's'} will receive another copy of the invite email.
                 </p>
               )}
             </div>
           }
           onConfirm={async () => {
-            if (!authToken || bulkInviteTargetCount === 0) return;
+            if (!authToken || bulkInviteTargetCount === 0 || !bulkInviteMode) return;
             try {
               const result = await sendInvitesBulk.mutateAsync({
                 authToken,
                 pitchUid: uid,
                 includeAlreadyInvited,
+                ...(bulkInviteMode === 'selected' ? { participantUids: selectedUids } : {}),
               });
               const { sent, skipped, errors } = result.summary;
               if (errors > 0) {
@@ -921,11 +1095,47 @@ const TeamPitchDetailPage = () => {
                   `Sent ${sent} invite${sent === 1 ? '' : 's'}${skipped > 0 ? ` (${skipped} skipped)` : ''}`
                 );
               }
-              setShowBulkInviteModal(false);
+              setBulkInviteMode(null);
               setIncludeAlreadyInvited(false);
+              if (bulkInviteMode === 'selected') setSelectedUids([]);
               refetchParticipants();
             } catch {
               toast.error('Failed to send invites');
+            }
+          }}
+        />
+
+        <TeamPitchConfirmModal
+          isOpen={pendingSelectedRemove}
+          title="Remove selected participants"
+          message={`Remove ${selectedUids.length} selected participant${
+            selectedUids.length === 1 ? '' : 's'
+          } from this team spotlight? They will lose access. Member profiles will not be deleted.`}
+          confirmLabel={`Remove ${selectedUids.length}`}
+          confirmDisabled={selectedUids.length === 0}
+          isPending={removeParticipantsBulk.isPending}
+          onClose={() => {
+            if (removeParticipantsBulk.isPending) return;
+            setPendingSelectedRemove(false);
+          }}
+          onConfirm={async () => {
+            if (!authToken || selectedUids.length === 0) return;
+            try {
+              const result = await removeParticipantsBulk.mutateAsync({
+                authToken,
+                pitchUid: uid,
+                participantUids: selectedUids,
+              });
+              toast.success(
+                `Removed ${result.summary.removed} participant${result.summary.removed === 1 ? '' : 's'}${
+                  result.summary.skipped > 0 ? ` (${result.summary.skipped} skipped)` : ''
+                }`
+              );
+              setPendingSelectedRemove(false);
+              setSelectedUids([]);
+              refetchParticipants();
+            } catch {
+              toast.error('Failed to remove participants');
             }
           }}
         />

@@ -3,39 +3,34 @@ import api from '../../utils/api';
 import { API_ROUTE } from '../../utils/constants';
 import { TeamPitchesQueryKeys } from './constants/queryKeys';
 
-export type SendTeamPitchInvitesBulkResponse = {
+export type RemoveTeamPitchParticipantsBulkResponse = {
   summary: {
-    totalEligible: number;
-    sent: number;
+    total: number;
+    removed: number;
     skipped: number;
-    errors: number;
   };
   rows: Array<{
     participantUid: string;
-    email: string | null;
-    name: string | null;
-    status: 'sent' | 'skipped' | 'error';
+    status: 'removed' | 'skipped';
     message?: string | null;
   }>;
 };
 
-export function useSendTeamPitchInvitesBulk() {
+export function useRemoveTeamPitchParticipantsBulk() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
       authToken,
       pitchUid,
-      includeAlreadyInvited,
       participantUids,
     }: {
       authToken: string;
       pitchUid: string;
-      includeAlreadyInvited: boolean;
-      participantUids?: string[];
-    }): Promise<SendTeamPitchInvitesBulkResponse> => {
+      participantUids: string[];
+    }): Promise<RemoveTeamPitchParticipantsBulkResponse> => {
       const res = await api.post(
-        `${API_ROUTE.ADMIN_TEAM_PITCHES}/${pitchUid}/participants/send-invites-bulk`,
-        { includeAlreadyInvited, ...(participantUids?.length ? { participantUids } : {}) },
+        `${API_ROUTE.ADMIN_TEAM_PITCHES}/${pitchUid}/participants/remove-bulk`,
+        { participantUids },
         { headers: { authorization: `Bearer ${authToken}` } }
       );
       return res.data;
