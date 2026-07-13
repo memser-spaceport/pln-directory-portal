@@ -109,7 +109,11 @@ export const UploadParticipantsModal: React.FC<UploadParticipantsModalProps> = (
     multiple: false,
   });
 
-  const downloadCSVTemplate = () => downloadInvestorCsvTemplate();
+  const downloadCSVTemplate = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    e?.preventDefault();
+    downloadInvestorCsvTemplate();
+  };
 
   const handleSubmit = async () => {
     if (!authToken || parsedParticipants.length === 0) return;
