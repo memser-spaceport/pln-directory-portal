@@ -514,12 +514,7 @@ const TeamPitchDetailPage = () => {
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>
                     Access
                   </div>
-                  {activeTab === 'investors' && (
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
-                      Invite
-                    </div>
-                  )}
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 100 }}>
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: activeTab === 'investors' ? 160 : 60 }}>
                     Actions
                   </div>
                 </div>
@@ -678,45 +673,54 @@ const TeamPitchDetailPage = () => {
                         </select>
                       </div>
 
-                      {activeTab === 'investors' && (
-                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
-                          {canMutateTeamPitches &&
-                            (participant.access === 'RESTRICTED' ? (
-                              <span className="text-sm text-gray-400">No Access</span>
-                            ) : (
-                              <button
-                                type="button"
-                                className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                                onClick={() =>
-                                  setPendingInvite({
-                                    uid: participant.uid,
-                                    name: participant.member?.name,
-                                    email: participant.member?.email,
-                                    isResend: participant.inviteSentCount > 0,
-                                  })
-                                }
-                              >
-                                {participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
-                              </button>
-                            ))}
-                        </div>
-                      )}
-
-                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 100 }}>
+                      <div
+                        className={clsx(s.bodyCell, s.fixed)}
+                        style={{ width: activeTab === 'investors' ? 160 : 60 }}
+                      >
                         {canMutateTeamPitches && (
-                          <button
-                            type="button"
-                            className="text-sm font-medium text-red-600 hover:text-red-800"
-                            onClick={() =>
-                              setPendingRemove({
-                                uid: participant.uid,
-                                name: participant.member?.name,
-                                email: participant.member?.email,
-                              })
-                            }
-                          >
-                            Remove
-                          </button>
+                          <div className="flex items-center gap-3">
+                            {activeTab === 'investors' &&
+                              (participant.access === 'RESTRICTED' ? (
+                                <span className="text-sm text-gray-400">No Access</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                                  onClick={() =>
+                                    setPendingInvite({
+                                      uid: participant.uid,
+                                      name: participant.member?.name,
+                                      email: participant.member?.email,
+                                      isResend: participant.inviteSentCount > 0,
+                                    })
+                                  }
+                                >
+                                  {participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
+                                </button>
+                              ))}
+                            <button
+                              type="button"
+                              className="rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-800"
+                              aria-label="Remove participant"
+                              title="Remove participant"
+                              onClick={() =>
+                                setPendingRemove({
+                                  uid: participant.uid,
+                                  name: participant.member?.name,
+                                  email: participant.member?.email,
+                                })
+                              }
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
