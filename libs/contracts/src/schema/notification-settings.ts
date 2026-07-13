@@ -45,6 +45,7 @@ export const UpdateParticipationSchema = z.object({
 export const UpdateForumSettingsSchema = z.object({
   forumDigestEnabled: z.boolean(),
   forumDigestFrequency: z.number(),
+  forumDigestForumEnabled: z.boolean().optional(),
   forumDigestNewsEnabled: z.boolean().optional(),
 });
 
