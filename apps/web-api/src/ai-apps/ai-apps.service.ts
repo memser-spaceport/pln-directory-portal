@@ -111,7 +111,13 @@ export class AiAppsService {
     }
     try {
       const res = await axios.get(app.url, { timeout: 8000, validateStatus: () => true, maxRedirects: 0 });
-      return { live: !!res.status && !GATEWAY_TIMEOUT_STATUSES.includes(res.status) };
+      // 404 counts as DOWN here: right after a first deploy the ingress serves
+      // 404 until the app's route/pod is ready, and the kit contract requires a
+      // usable `GET /` anyway — reporting live on 404 makes the detail page
+      // iframe a blank error document. (Unlike `verifyAppLive`, which keeps
+      // 404-counts-as-up because it only asks whether the *server* survived a
+      // gateway timeout during the deploy flow.)
+      return { live: !!res.status && res.status !== 404 && !GATEWAY_TIMEOUT_STATUSES.includes(res.status) };
     } catch {
       return { live: false };
     }

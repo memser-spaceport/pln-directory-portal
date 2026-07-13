@@ -11,6 +11,7 @@ import {
   CreateTeamPitchDto,
   GetTeamPitchParticipantsQueryDto,
   GetTeamPitchesQueryDto,
+  SendTeamPitchInvitesBulkDto,
   UpdateTeamPitchDto,
   UpdateTeamPitchParticipantDto,
 } from 'libs/contracts/src/schema/admin-team-pitch';
@@ -96,6 +97,15 @@ export class AdminTeamPitchController {
     @Body() body: AddTeamPitchParticipantsBulkDto
   ) {
     return this.teamPitchParticipantsService.addInvestorParticipantsBulk(pitchUid, body);
+  }
+
+  @Post(':pitchUid/participants/send-invites-bulk')
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async sendInvitesBulk(@Param('pitchUid') pitchUid: string, @Body() body: SendTeamPitchInvitesBulkDto) {
+    return this.teamPitchParticipantsService.sendInvestorInvitesBulk(pitchUid, {
+      includeAlreadyInvited: body.includeAlreadyInvited ?? false,
+    });
   }
 
   @Patch(':pitchUid/participants/:participantUid')

@@ -12,10 +12,7 @@ type SharedAttrKind = 'focusArea' | 'communityAffiliation' | 'industryTag';
 
 @Injectable()
 export class TeamNewsSuggestionsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly followsService: FollowsService
-  ) {}
+  constructor(private readonly prisma: PrismaService, private readonly followsService: FollowsService) {}
 
   /**
    * Personalized "Teams to follow" for the newsfeed sidebar.
@@ -107,6 +104,7 @@ export class TeamNewsSuggestionsService {
       select: {
         uid: true,
         name: true,
+        shortDescription: true,
         logo: { select: { url: true } },
         teamFocusAreas: { select: { ancestorArea: { select: { title: true } } } },
         communityAffiliations: { select: { title: true } },
@@ -140,6 +138,7 @@ export class TeamNewsSuggestionsService {
         uid: team.uid,
         name: team.name,
         logo: team.logo?.url ?? null,
+        shortDescription: team.shortDescription ?? null,
         reason: `${sharedAttr} · ${formatFollowerCount(followerCounts.get(team.uid) ?? 0)} followers`,
       })),
     };

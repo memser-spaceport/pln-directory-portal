@@ -40,10 +40,10 @@ import { loadPriorBackingMap } from './pl-investors-seed.util';
 import { applyPriorBackingToHopChain, backingWarmthBoost } from './prior-backing-warmth.util';
 import {
   applyPathAttributionAndWarmth,
-  buildLinkedInOnlyPath,
   lookupAllSocialOverlapsForInvestor,
-  lookupAllSocialOverlapsForPath,
-  pickBestLinkedInOnlyOverlap,
+  mergeOrCreateLinkedInPathCandidates,
+  shouldAttachAffinityToPath,
+  type LinkedInMergeCandidate,
   type PathHopChain,
   type SocialOverlapCache,
   type SocialOverlapEntry,
@@ -78,7 +78,7 @@ interface DumpPath {
   proximityCode: string;
   score: number;
   rank: number;
-  hopChain: unknown;
+  hopChain: Record<string, unknown>;
 }
 interface DumpSummary {
   investor_id: string;
@@ -258,9 +258,9 @@ async function seed() {
     const boost = Math.max(affinityBoost(rel?.bestConnector ?? null), backingWarmthBoost(priorBacking));
     let attachedHere = false;
 
-    type PathCandidate = DumpPath & { score: number; socialOverlap?: SocialOverlapEntry };
+    type PathCandidate = DumpPath & LinkedInMergeCandidate;
     const firmPaths = pathsByFirm.get(firmId) ?? [];
-    const candidates: PathCandidate[] = firmPaths.map((p) => ({
+    let candidates: PathCandidate[] = firmPaths.map((p) => ({
       ...p,
       score: blendGraphScore(p.score, boost),
     }));
@@ -279,19 +279,18 @@ async function seed() {
       candidates.push({ ...direct, rank: 0, score: blendGraphScore(direct.score, boost) } as PathCandidate);
     }
 
-    if (candidates.length === 0 && socialOverlapCache) {
-      const liOverlap = pickBestLinkedInOnlyOverlap(
+    const resolveMemberUidByName = (name: string) => membersByName.get(normalizePersonName(name));
+    if (socialOverlapCache) {
+      candidates = mergeOrCreateLinkedInPathCandidates(
+        candidates,
         lookupAllSocialOverlapsForInvestor(socialOverlapCache, targetInvestorId),
-      );
-      if (liOverlap) {
-        const liPath = buildLinkedInOnlyPath({
+        {
           targetInvestorId,
-          overlap: liOverlap,
-          caliber: 'B',
-          caliberConfidence: 0.4,
-        });
-        candidates.push({ ...liPath, rank: 0 } as PathCandidate);
-      }
+          caliber: firmPaths[0]?.caliber ?? 'B',
+          caliberConfidence: firmPaths[0]?.caliberConfidence ?? 0.4,
+          resolveMemberUidByName,
+        }
+      );
     }
 
     if (candidates.length === 0) return null;
@@ -305,30 +304,29 @@ async function seed() {
       if (rank === 1) rank1Code = p.proximityCode;
 
       let hopChain = JSON.parse(JSON.stringify(p.hopChain)) as Record<string, unknown>;
-      if (rel?.bestConnector) {
+      const attachAffinity = shouldAttachAffinityToPath({
+        linkedInOnly: p.linkedInOnly,
+        hopChain: hopChain as PathHopChain,
+        affinityConnector: rel?.bestConnector ?? null,
+        resolveMemberUidByName,
+      });
+      if (attachAffinity && rel?.bestConnector) {
         (hopChain as { plConnector?: unknown }).plConnector = rel.bestConnector;
         attachedHere = true;
       }
       hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops, memberContactIndex, teamIndex);
       hopChain = applyPriorBackingToHopChain(hopChain, priorBacking);
 
-      let overlaps: SocialOverlapEntry[] = [];
-      if (socialOverlapCache) {
-        overlaps = lookupAllSocialOverlapsForPath(socialOverlapCache, {
-          investorId: targetInvestorId,
-          hopChain: hopChain as PathHopChain,
-          resolveMemberUidByName: (name) => membersByName.get(normalizePersonName(name)),
-        });
-        if (overlaps.length === 0 && p.socialOverlap) {
-          overlaps = [p.socialOverlap];
-        }
-        if (overlaps.length > 0) pathsWithSocialOverlap += 1;
+      let overlaps: SocialOverlapEntry[] = p.linkedInOverlaps ?? [];
+      if (overlaps.length === 0 && p.socialOverlap) {
+        overlaps = [p.socialOverlap];
       }
+      if (overlaps.length > 0) pathsWithSocialOverlap += 1;
 
       const attributed = applyPathAttributionAndWarmth({
         hopChain,
         pathScore: p.score,
-        affinityConnector: rel?.bestConnector ?? null,
+        affinityConnector: attachAffinity ? rel?.bestConnector ?? null : null,
         overlaps,
       });
       hopChain = attributed.hopChain;
@@ -383,8 +381,7 @@ async function seed() {
     const relEntry = plConnectors.get(affinityId);
     const hasAffinityDirect = !!relEntry?.bestConnector && passesAffinityDirectThreshold(relEntry.bestConnector);
     const hasLinkedInOnly =
-      !!socialOverlapCache &&
-      lookupAllSocialOverlapsForInvestor(socialOverlapCache, affinityId).length > 0;
+      !!socialOverlapCache && lookupAllSocialOverlapsForInvestor(socialOverlapCache, affinityId).length > 0;
     const personHasPath = hasGraphPath || hasAffinityDirect || hasLinkedInOnly;
 
     const prest = prestige.get(norm(`${firstName} ${lastName}`)) ?? null;

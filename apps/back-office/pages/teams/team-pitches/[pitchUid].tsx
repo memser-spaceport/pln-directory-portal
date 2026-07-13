@@ -11,6 +11,7 @@ import { useTeamPitchParticipants } from '../../../hooks/team-pitches/useTeamPit
 import { useUpdateTeamPitch } from '../../../hooks/team-pitches/useUpdateTeamPitch';
 import { useUpdateTeamPitchParticipant } from '../../../hooks/team-pitches/useUpdateTeamPitchParticipant';
 import { useSendTeamPitchInvite } from '../../../hooks/team-pitches/useSendTeamPitchInvite';
+import { useSendTeamPitchInvitesBulk } from '../../../hooks/team-pitches/useSendTeamPitchInvitesBulk';
 import { AddTeamPitchParticipantModal } from '../../../components/team-pitches/AddTeamPitchParticipantModal';
 import { UploadTeamPitchInvestorsModal } from '../../../components/team-pitches/UploadTeamPitchInvestorsModal';
 import { TeamPitchConfirmModal } from '../../../components/team-pitches/TeamPitchConfirmModal';
@@ -103,6 +104,8 @@ const TeamPitchDetailPage = () => {
     (PendingParticipantFields & { access: string }) | null
   >(null);
   const [pendingInvite, setPendingInvite] = useState<(PendingParticipantFields & { isResend: boolean }) | null>(null);
+  const [showBulkInviteModal, setShowBulkInviteModal] = useState(false);
+  const [includeAlreadyInvited, setIncludeAlreadyInvited] = useState(false);
 
   const typeMap = { investors: 'INVESTOR', founders: 'FOUNDER' } as const;
 
@@ -116,6 +119,7 @@ const TeamPitchDetailPage = () => {
   const updatePitch = useUpdateTeamPitch();
   const updateParticipant = useUpdateTeamPitchParticipant();
   const sendInvite = useSendTeamPitchInvite();
+  const sendInvitesBulk = useSendTeamPitchInvitesBulk();
 
   const [editFormData, setEditFormData] = useState({
     title: '',
@@ -159,6 +163,23 @@ const TeamPitchDetailPage = () => {
       return name.includes(q) || email.includes(q);
     });
   }, [participantsRaw, searchTerm]);
+
+  const bulkInviteStats = useMemo(() => {
+    const list = (participantsRaw ?? []) as Array<{
+      inviteSentCount?: number;
+      member?: { email?: string | null };
+    }>;
+    const withEmail = list.filter((p) => !!p.member?.email);
+    const neverInvited = withEmail.filter((p) => (p.inviteSentCount ?? 0) === 0);
+    const alreadyInvited = withEmail.filter((p) => (p.inviteSentCount ?? 0) > 0);
+    return {
+      withEmail: withEmail.length,
+      neverInvited: neverInvited.length,
+      alreadyInvited: alreadyInvited.length,
+    };
+  }, [participantsRaw]);
+
+  const bulkInviteTargetCount = includeAlreadyInvited ? bulkInviteStats.withEmail : bulkInviteStats.neverInvited;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -366,8 +387,8 @@ const TeamPitchDetailPage = () => {
                   <div className={s.fieldValue}>{pitch.spotlightStatement || '—'}</div>
                 )}
                 <p className="mt-1 text-xs text-gray-500">
-                  Investor hero line: This Spotlight: {pitch.team?.name ?? 'Team'} — statement. Leave blank to show
-                  only the linked team name.
+                  Investor hero line: This Spotlight: {pitch.team?.name ?? 'Team'} — statement. Leave blank to show only
+                  the linked team name.
                 </p>
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
@@ -411,12 +432,25 @@ const TeamPitchDetailPage = () => {
                     </button>
                   )}
                   {canMutateTeamPitches && activeTab === 'investors' && (
-                    <button
-                      onClick={() => setShowUploadModal(true)}
-                      className="rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
-                    >
-                      Upload Investors CSV
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIncludeAlreadyInvited(false);
+                          setShowBulkInviteModal(true);
+                        }}
+                        disabled={!bulkInviteStats.withEmail}
+                        className="rounded-lg bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                      >
+                        Send Invites to All
+                      </button>
+                      <button
+                        onClick={() => setShowUploadModal(true)}
+                        className="rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
+                      >
+                        Upload Investors CSV
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -790,6 +824,94 @@ const TeamPitchDetailPage = () => {
               refetchParticipants();
             } catch {
               toast.error('Failed to send invite');
+            }
+          }}
+        />
+
+        <TeamPitchConfirmModal
+          isOpen={showBulkInviteModal}
+          title="Send invites to all investors"
+          message={
+            includeAlreadyInvited
+              ? `Send the team spotlight invite email to all ${bulkInviteStats.withEmail} investors with an email address?`
+              : bulkInviteStats.neverInvited > 0
+              ? `Send the team spotlight invite email to ${bulkInviteStats.neverInvited} investor${
+                  bulkInviteStats.neverInvited === 1 ? '' : 's'
+                } who have not been invited yet?`
+              : 'Every investor with an email has already been invited. Enable the option below to resend.'
+          }
+          confirmLabel={`Send ${bulkInviteTargetCount} invite${bulkInviteTargetCount === 1 ? '' : 's'}`}
+          confirmDisabled={bulkInviteTargetCount === 0}
+          isPending={sendInvitesBulk.isPending}
+          onClose={() => {
+            if (sendInvitesBulk.isPending) return;
+            setShowBulkInviteModal(false);
+            setIncludeAlreadyInvited(false);
+          }}
+          details={
+            <div className="space-y-3 text-sm text-gray-600">
+              <ul className="list-disc space-y-1 pl-5">
+                <li>
+                  Investors with email: <span className="font-medium text-gray-900">{bulkInviteStats.withEmail}</span>
+                </li>
+                <li>
+                  Not yet invited: <span className="font-medium text-gray-900">{bulkInviteStats.neverInvited}</span>
+                </li>
+                <li>
+                  Already invited: <span className="font-medium text-gray-900">{bulkInviteStats.alreadyInvited}</span>
+                </li>
+              </ul>
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-3">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  checked={includeAlreadyInvited}
+                  disabled={sendInvitesBulk.isPending || bulkInviteStats.alreadyInvited === 0}
+                  onChange={(e) => setIncludeAlreadyInvited(e.target.checked)}
+                />
+                <span>
+                  <span className="block font-medium text-gray-900">
+                    Also resend to investors who already received an invite
+                  </span>
+                  <span className="mt-0.5 block text-xs text-gray-500">
+                    Off by default — only people who have never been invited will get an email. Turn this on only if you
+                    intentionally want to email everyone again.
+                  </span>
+                </span>
+              </label>
+              {includeAlreadyInvited && bulkInviteStats.alreadyInvited > 0 && (
+                <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
+                  {bulkInviteStats.alreadyInvited} investor
+                  {bulkInviteStats.alreadyInvited === 1 ? '' : 's'} will receive another copy of the invite email.
+                </p>
+              )}
+            </div>
+          }
+          onConfirm={async () => {
+            if (!authToken || bulkInviteTargetCount === 0) return;
+            try {
+              const result = await sendInvitesBulk.mutateAsync({
+                authToken,
+                pitchUid: uid,
+                includeAlreadyInvited,
+              });
+              const { sent, skipped, errors } = result.summary;
+              if (errors > 0) {
+                toast.warning(
+                  `Sent ${sent} invite${sent === 1 ? '' : 's'}; ${errors} failed${
+                    skipped > 0 ? `, ${skipped} skipped` : ''
+                  }`
+                );
+              } else {
+                toast.success(
+                  `Sent ${sent} invite${sent === 1 ? '' : 's'}${skipped > 0 ? ` (${skipped} skipped)` : ''}`
+                );
+              }
+              setShowBulkInviteModal(false);
+              setIncludeAlreadyInvited(false);
+              refetchParticipants();
+            } catch {
+              toast.error('Failed to send invites');
             }
           }}
         />

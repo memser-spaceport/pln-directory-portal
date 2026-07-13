@@ -17,10 +17,14 @@ import {
   lookupAllSocialOverlapsForPath,
   lookupSocialOverlapForPath,
   lookupSocialOverlapForPair,
+  mergeOrCreateLinkedInPathCandidates,
+  pathMatchesPlPersonKey,
   pickBestLinkedInOnlyOverlap,
   resolveFounderPersonKey,
   resolvePlConnectorPersonKey,
   resolveTargetInvestorPersonKeys,
+  shouldAttachAffinityToPath,
+  type LinkedInMergeCandidate,
   type PathHopChain,
   type SocialOverlapEntry,
 } from './social-overlap-seed.util';
@@ -106,7 +110,7 @@ const HYDRATED_ALPHA_SQUARE: PathHopChain = {
 };
 
 function overlapEntry(
-  partial: Partial<SocialOverlapEntry> & Pick<SocialOverlapEntry, 'kind' | 'label' | 'plPersonKey'>,
+  partial: Partial<SocialOverlapEntry> & Pick<SocialOverlapEntry, 'kind' | 'label' | 'plPersonKey'>
 ): SocialOverlapEntry {
   return {
     investorId: '118269892',
@@ -124,16 +128,14 @@ describe('buildSocialOverlapCacheKey', () => {
       buildSocialOverlapCacheKey({
         investorId: '118269892',
         plPersonKey: 'investor:118239754',
-      }),
+      })
     ).toBe('pair:investor:118269892|pl:investor:118239754');
   });
 });
 
 describe('resolvePlConnectorPersonKey', () => {
   it('maps internalId to investor person key', () => {
-    expect(resolvePlConnectorPersonKey({ name: 'Lacey Wisdom', internalId: 118239754 })).toBe(
-      'investor:118239754',
-    );
+    expect(resolvePlConnectorPersonKey({ name: 'Lacey Wisdom', internalId: 118239754 })).toBe('investor:118239754');
   });
 });
 
@@ -167,7 +169,7 @@ describe('extractPlPeopleFromHopChain', () => {
     const exclude = resolveTargetInvestorPersonKeys(HYDRATED_ALPHA_SQUARE, 'lp_alpha_square');
     const people = extractPlPeopleFromHopChain(HYDRATED_ALPHA_SQUARE, exclude);
     expect(people.map((p) => p.personKey).sort()).toEqual(
-      ['investor:118269819', 'member:cldvol01g09b7u21ko3qjjv54', 'member:cldvo71g904plu21kruxzfekt'].sort(),
+      ['investor:118269819', 'member:cldvol01g09b7u21ko3qjjv54', 'member:cldvo71g904plu21kruxzfekt'].sort()
     );
     expect(people.find((p) => p.source === 'hopChain.plConnector')?.name).toBe('Brad Holden');
     expect(people.filter((p) => p.source === 'routeNodes.member')).toHaveLength(2);
@@ -180,7 +182,7 @@ describe('appendOverlapToHopChain', () => {
   it('appends overlap label as one sentence', () => {
     const out = appendOverlapToHopChain(
       { explanation: 'Existing note.' },
-      overlapEntry({ kind: 'concurrent_employment', label, plPersonKey: 'm:1' }),
+      overlapEntry({ kind: 'concurrent_employment', label, plPersonKey: 'm:1' })
     );
     expect(out.explanation).toBe(`Existing note. ${label}.`);
   });
@@ -189,7 +191,7 @@ describe('appendOverlapToHopChain', () => {
     const hopChain = { explanation: `Warm path. ${label}.` };
     const out = appendOverlapToHopChain(
       hopChain,
-      overlapEntry({ kind: 'concurrent_employment', label, plPersonKey: 'm:1' }),
+      overlapEntry({ kind: 'concurrent_employment', label, plPersonKey: 'm:1' })
     );
     expect(out.explanation).toBe(hopChain.explanation);
   });
@@ -198,13 +200,11 @@ describe('appendOverlapToHopChain', () => {
 describe('linkedInBonus', () => {
   it('gives +0.25 for verified concurrent employment', () => {
     expect(
-      linkedInBonusForOverlap(
-        overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }),
-      ),
+      linkedInBonusForOverlap(overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }))
     ).toBe(LINKEDIN_BONUS_VERIFIED);
-    expect(isVerifiedSocialOverlap(overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }))).toBe(
-      true,
-    );
+    expect(
+      isVerifiedSocialOverlap(overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }))
+    ).toBe(true);
   });
 
   it('gives +0.25 for same_school with overlapYears', () => {
@@ -216,26 +216,26 @@ describe('linkedInBonus', () => {
           plPersonKey: 'p:1',
           overlapYears: { start: 2010, end: 2012 },
           affectsScore: false,
-        }),
-      ),
+        })
+      )
     ).toBe(LINKEDIN_BONUS_VERIFIED);
   });
 
   it('gives +0.10 for unverified company/school', () => {
     expect(
       linkedInBonusForOverlap(
-        overlapEntry({ kind: 'same_company_unknown_dates', label: 'x', plPersonKey: 'p:1', affectsScore: false }),
-      ),
+        overlapEntry({ kind: 'same_company_unknown_dates', label: 'x', plPersonKey: 'p:1', affectsScore: false })
+      )
     ).toBe(LINKEDIN_BONUS_UNVERIFIED);
     expect(
       linkedInBonusForOverlap(
-        overlapEntry({ kind: 'same_school_unknown_dates', label: 'x', plPersonKey: 'p:1', affectsScore: false }),
-      ),
+        overlapEntry({ kind: 'same_school_unknown_dates', label: 'x', plPersonKey: 'p:1', affectsScore: false })
+      )
     ).toBe(LINKEDIN_BONUS_UNVERIFIED);
     expect(
       linkedInBonusForOverlap(
-        overlapEntry({ kind: 'same_school', label: 'no years', plPersonKey: 'p:1', affectsScore: false }),
-      ),
+        overlapEntry({ kind: 'same_school', label: 'no years', plPersonKey: 'p:1', affectsScore: false })
+      )
     ).toBe(LINKEDIN_BONUS_UNVERIFIED);
   });
 
@@ -258,18 +258,13 @@ describe('linkedInBonus', () => {
 
   it('caps pathWarmth at 1.0', () => {
     expect(
-      applyLinkedInPathWarmth(0.9, [
-        overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }),
-      ]),
+      applyLinkedInPathWarmth(0.9, [overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' })])
     ).toBe(1.0);
   });
 
   it('applySocialOverlapScoreBump uses additive model (compat wrapper)', () => {
     expect(
-      applySocialOverlapScoreBump(
-        0.5,
-        overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }),
-      ),
+      applySocialOverlapScoreBump(0.5, overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }))
     ).toBeCloseTo(0.75);
   });
 });
@@ -282,7 +277,7 @@ describe('attribution lines', () => {
         strength: 0.1,
         recencyDays: 120,
         evidenceKind: 'last_email',
-      }),
+      })
     ).toBe('Brad Holden last emailed ~4 months ago (tie 0.10)');
   });
 
@@ -338,10 +333,7 @@ describe('buildLinkedInOnlyPath', () => {
         plPersonKey: 'founder:f_emma_cui',
         plName: 'Emma Cui',
         affectsScore: false,
-        evidenceUrls: [
-          'https://www.linkedin.com/in/investor',
-          'https://www.linkedin.com/in/emma-cui',
-        ],
+        evidenceUrls: ['https://www.linkedin.com/in/investor', 'https://www.linkedin.com/in/emma-cui'],
       }),
     });
     expect(path.connectorType).toBe('F');
@@ -372,7 +364,7 @@ describe('buildLinkedInOnlyPath', () => {
     expect((path.hopChain as { plConnector?: { name: string } }).plConnector?.name).toBe('Lacey Wisdom');
   });
 
-  it('pickBestLinkedInOnlyOverlap prefers verified bonus', () => {
+  it('pickBestLinkedInOnlyOverlap prefers verified bonus within a set', () => {
     const best = pickBestLinkedInOnlyOverlap([
       overlapEntry({
         kind: 'same_school_unknown_dates',
@@ -387,6 +379,221 @@ describe('buildLinkedInOnlyPath', () => {
       }),
     ]);
     expect(best?.label).toBe('strong');
+  });
+});
+
+describe('mergeOrCreateLinkedInPathCandidates', () => {
+  const investorId = '118269892';
+
+  it('creates N LinkedIn-only paths for different people when no candidates exist', () => {
+    const overlaps = [
+      overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'Asta school',
+        plPersonKey: 'founder:f_asta_li',
+        plName: 'Asta Li',
+      }),
+      overlapEntry({
+        kind: 'same_company_unknown_dates',
+        label: 'Emma work',
+        plPersonKey: 'founder:f_emma_cui',
+        plName: 'Emma Cui',
+        affectsScore: false,
+      }),
+      overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'Lacey work',
+        plPersonKey: 'investor:118239754',
+        plName: 'Lacey Wisdom',
+      }),
+    ];
+
+    const out = mergeOrCreateLinkedInPathCandidates<LinkedInMergeCandidate>([], overlaps, {
+      targetInvestorId: investorId,
+    });
+    expect(out).toHaveLength(3);
+    expect(out.every((p) => p.linkedInOnly)).toBe(true);
+    expect(out.map((p) => p.socialOverlap?.plPersonKey).sort()).toEqual(
+      ['founder:f_asta_li', 'founder:f_emma_cui', 'investor:118239754'].sort()
+    );
+  });
+
+  it('keeps graph path for founder A and creates LinkedIn path for founder B', () => {
+    const graphA: LinkedInMergeCandidate = {
+      hopChain: RAW_SEQUOIA_F_PATH,
+      score: 0.6,
+    };
+    const overlaps = [
+      overlapEntry({
+        kind: 'same_school',
+        label: 'Asta overlap',
+        plPersonKey: 'founder:f_asta_li',
+        plName: 'Asta Li',
+      }),
+      overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'Emma overlap',
+        plPersonKey: 'founder:f_emma_cui',
+        plName: 'Emma Cui',
+      }),
+    ];
+
+    const out = mergeOrCreateLinkedInPathCandidates([graphA], overlaps, {
+      targetInvestorId: investorId,
+    });
+
+    expect(out).toHaveLength(2);
+    const merged = out.find((p) => !p.linkedInOnly);
+    const created = out.find((p) => p.linkedInOnly);
+    expect(merged?.linkedInOverlaps?.map((o) => o.label)).toEqual(['Asta overlap']);
+    expect(created?.socialOverlap?.plPersonKey).toBe('founder:f_emma_cui');
+  });
+
+  it('merges same founder/PL onto existing path (no extra path; overlaps attached)', () => {
+    const graphA: LinkedInMergeCandidate = {
+      hopChain: RAW_SEQUOIA_F_PATH,
+      score: 0.55,
+    };
+    const overlaps = [
+      overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'Asta school overlap',
+        plPersonKey: 'founder:f_asta_li',
+        plName: 'Asta Li',
+      }),
+      overlapEntry({
+        kind: 'same_company_unknown_dates',
+        label: 'Asta company overlap',
+        plPersonKey: 'founder:f_asta_li',
+        plName: 'Asta Li',
+        affectsScore: false,
+      }),
+    ];
+
+    const out = mergeOrCreateLinkedInPathCandidates([graphA], overlaps, {
+      targetInvestorId: investorId,
+    });
+
+    expect(out).toHaveLength(1);
+    expect(out[0].linkedInOnly).toBeFalsy();
+    expect(out[0].linkedInOverlaps?.map((o) => o.label).sort()).toEqual([
+      'Asta company overlap',
+      'Asta school overlap',
+    ]);
+
+    const attributed = applyPathAttributionAndWarmth({
+      hopChain: { ...(out[0].hopChain as Record<string, unknown>), explanation: 'Graph note.' },
+      pathScore: out[0].score,
+      overlaps: out[0].linkedInOverlaps ?? [],
+    });
+    expect(attributed.score).toBeCloseTo(0.55 + LINKEDIN_BONUS_VERIFIED);
+    expect(attributed.hopChain.attributionLines).toEqual(
+      expect.arrayContaining([
+        { source: 'LinkedIn', text: 'Asta school overlap' },
+        { source: 'LinkedIn', text: 'Asta company overlap' },
+      ])
+    );
+  });
+
+  it('keeps graph path and creates LinkedIn path for unmatched PL connector', () => {
+    const graphA: LinkedInMergeCandidate = {
+      hopChain: RAW_SEQUOIA_F_PATH,
+      score: 0.7,
+    };
+    const overlaps = [
+      overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'Brad LI',
+        plPersonKey: 'investor:118269819',
+        plName: 'Brad Holden',
+      }),
+    ];
+
+    const out = mergeOrCreateLinkedInPathCandidates([graphA], overlaps, {
+      targetInvestorId: investorId,
+    });
+
+    expect(out).toHaveLength(2);
+    expect(out.filter((p) => p.linkedInOnly)).toHaveLength(1);
+    expect(out.find((p) => p.linkedInOnly)?.socialOverlap?.plPersonKey).toBe('investor:118269819');
+    expect(out.find((p) => !p.linkedInOnly)?.linkedInOverlaps).toEqual([]);
+  });
+
+  it('merges PL-connector overlap onto Affinity-direct path with that connector', () => {
+    const affinityDirect: LinkedInMergeCandidate = {
+      hopChain: {
+        plConnector: { name: 'Brad Holden', internalId: 118269819 },
+      } as PathHopChain,
+      score: 0.4,
+    };
+    const overlaps = [
+      overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'Brad LI',
+        plPersonKey: 'investor:118269819',
+        plName: 'Brad Holden',
+      }),
+    ];
+
+    const out = mergeOrCreateLinkedInPathCandidates([affinityDirect], overlaps, {
+      targetInvestorId: investorId,
+    });
+
+    expect(out).toHaveLength(1);
+    expect(out[0].linkedInOnly).toBeFalsy();
+    expect(out[0].linkedInOverlaps?.[0].label).toBe('Brad LI');
+  });
+
+  it('pathMatchesPlPersonKey is exact key only', () => {
+    expect(pathMatchesPlPersonKey(RAW_SEQUOIA_F_PATH, 'founder:f_asta_li')).toBe(true);
+    expect(pathMatchesPlPersonKey(RAW_SEQUOIA_F_PATH, 'founder:f_emma_cui')).toBe(false);
+    expect(
+      pathMatchesPlPersonKey({ plConnector: { name: 'Brad Holden', internalId: 118269819 } }, 'investor:118269819')
+    ).toBe(true);
+  });
+
+  it('shouldAttachAffinityToPath skips LinkedIn-only for a different person', () => {
+    const liOnly = buildLinkedInOnlyPath({
+      targetInvestorId: investorId,
+      overlap: overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'Emma',
+        plPersonKey: 'founder:f_emma_cui',
+        plName: 'Emma Cui',
+      }),
+    });
+    expect(
+      shouldAttachAffinityToPath({
+        linkedInOnly: true,
+        hopChain: liOnly.hopChain as PathHopChain,
+        affinityConnector: { name: 'Brad Holden', internalId: 118269819 },
+      })
+    ).toBe(false);
+
+    const liBrad = buildLinkedInOnlyPath({
+      targetInvestorId: investorId,
+      overlap: overlapEntry({
+        kind: 'concurrent_employment',
+        label: 'Brad',
+        plPersonKey: 'investor:118269819',
+        plName: 'Brad Holden',
+      }),
+    });
+    expect(
+      shouldAttachAffinityToPath({
+        linkedInOnly: true,
+        hopChain: liBrad.hopChain as PathHopChain,
+        affinityConnector: { name: 'Brad Holden', internalId: 118269819 },
+      })
+    ).toBe(true);
+
+    expect(
+      shouldAttachAffinityToPath({
+        linkedInOnly: false,
+        hopChain: RAW_SEQUOIA_F_PATH,
+        affinityConnector: { name: 'Brad Holden', internalId: 118269819 },
+      })
+    ).toBe(true);
   });
 });
 
@@ -510,7 +717,7 @@ describe('lookupSocialOverlapForPair', () => {
       lookupSocialOverlapForPair(cache, {
         investorId: '118269892',
         plConnector: {},
-      }),
+      })
     ).toBeNull();
   });
 });

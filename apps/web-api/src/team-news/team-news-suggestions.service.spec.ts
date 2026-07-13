@@ -67,6 +67,7 @@ describe('TeamNewsSuggestionsService', () => {
         {
           uid: 'candidate-1',
           name: 'Banyan Storage',
+          shortDescription: 'Decentralized storage network',
           logo: { url: 'https://logo' },
           teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
           communityAffiliations: [],
@@ -83,6 +84,7 @@ describe('TeamNewsSuggestionsService', () => {
         uid: 'candidate-1',
         name: 'Banyan Storage',
         logo: 'https://logo',
+        shortDescription: 'Decentralized storage network',
         reason: 'Storage · 1.2k followers',
       },
     ]);
@@ -100,6 +102,42 @@ describe('TeamNewsSuggestionsService', () => {
     );
   });
 
+  it('returns null shortDescription when the team has none', async () => {
+    teamMemberRoleFindMany.mockResolvedValue([{ teamUid: 'seed-team' }]);
+    getFollowedTeamUids.mockResolvedValue(new Set());
+
+    teamFindMany
+      .mockResolvedValueOnce([
+        {
+          uid: 'seed-team',
+          teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+          communityAffiliations: [],
+          industryTags: [],
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          uid: 'candidate-1',
+          name: 'No Desc Team',
+          shortDescription: null,
+          logo: null,
+          teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+          communityAffiliations: [],
+          industryTags: [],
+        },
+      ]);
+
+    countFollowersByTeam.mockResolvedValue(new Map([['candidate-1', 10]]));
+
+    const result = await service.getFollowSuggestions('member-1');
+
+    expect(result.items[0]).toMatchObject({
+      uid: 'candidate-1',
+      shortDescription: null,
+      reason: 'Storage · 10 followers',
+    });
+  });
+
   it('respects the limit param', async () => {
     teamMemberRoleFindMany.mockResolvedValue([{ teamUid: 'seed-team' }]);
     getFollowedTeamUids.mockResolvedValue(new Set());
@@ -107,6 +145,7 @@ describe('TeamNewsSuggestionsService', () => {
     const candidates = Array.from({ length: 5 }, (_, i) => ({
       uid: `team-${i}`,
       name: `Team ${i}`,
+      shortDescription: null,
       logo: null,
       teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
       communityAffiliations: [],
@@ -139,6 +178,7 @@ describe('TeamNewsSuggestionsService', () => {
       {
         uid: 'team-a',
         name: 'Alpha',
+        shortDescription: null,
         logo: null,
         teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
         communityAffiliations: [],
@@ -147,6 +187,7 @@ describe('TeamNewsSuggestionsService', () => {
       {
         uid: 'team-b',
         name: 'Beta',
+        shortDescription: null,
         logo: null,
         teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
         communityAffiliations: [],
@@ -155,6 +196,7 @@ describe('TeamNewsSuggestionsService', () => {
       {
         uid: 'team-c',
         name: 'Gamma',
+        shortDescription: null,
         logo: null,
         teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
         communityAffiliations: [],
