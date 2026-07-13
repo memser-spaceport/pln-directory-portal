@@ -26,7 +26,7 @@ const headerAliases = {
   email: ['email', 'e-mail', 'email_address'],
   name: ['name', 'full_name', 'investor_name', 'participant_name'],
   twitter_handler: ['x', 'x_handle', 'twitter', 'twitter_handle', 'x_username', 'twitter_handler'],
-  linkedin_handler: ['linkedin', 'linkedin_handler', 'linkedin_url', 'linkedin_profile', 'linkedin_handler'],
+  linkedin_handler: ['linkedin', 'linkedin_handle', 'linkedin_handler', 'linkedin_url', 'linkedin_profile'],
   telegram_handler: ['telegram_handler', 'telegram', 'telegram_handle', 'tg'],
   role: ['role', 'organization_role', 'fund_role', 'organization/fund_role', 'team_role'],
   investment_type: ['type', 'investment_type', 'invest_type', 'investor_type', 'how_do_you_invest'],
