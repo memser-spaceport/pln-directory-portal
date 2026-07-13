@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -15,6 +16,8 @@ import { AwsService } from '../utils/aws/aws.service';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import {
+  AI_APPS_DEPLOY_STUCK_MINUTES,
+  AI_APPS_DEPLOY_STUCK_MS,
   AI_APPS_RUNNER_ENVIRONMENT,
   AI_APPS_RUNNER_TOKEN,
   AI_APPS_RUNNER_URL,
@@ -74,7 +77,7 @@ export class AiAppsService {
       where: { status: { not: 'DELETED' } },
       orderBy: { updatedAt: 'desc' },
     });
-    return this.withMember(apps);
+    return this.withMember(await Promise.all(apps.map((app) => this.settleStuckDeploy(app))));
   }
 
   /**
@@ -83,10 +86,11 @@ export class AiAppsService {
    * never has to compare member uids from a possibly stale login cookie.
    */
   async getApp(uid: string, requesterUid?: string): Promise<WithMember<AiApp> & { canManage?: boolean }> {
-    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    let app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
+    app = await this.settleStuckDeploy(app);
     const result = (await this.withMember([app]))[0];
     if (!requesterUid) {
       return result;
@@ -121,6 +125,47 @@ export class AiAppsService {
     } catch {
       return { live: false };
     }
+  }
+
+  /**
+   * A deploy that has sat in DEPLOYING beyond the stuck window is stuck: the
+   * deploy runs synchronously in the API process, so a legitimate one settles
+   * to READY/ERROR within minutes. Nothing touches the row between the flip to
+   * DEPLOYING and the settle, so `updatedAt` is exactly "deploy started at".
+   */
+  private isDeployStuck(app: Pick<AiApp, 'status' | 'updatedAt'>): boolean {
+    return app.status === 'DEPLOYING' && Date.now() - app.updatedAt.getTime() > AI_APPS_DEPLOY_STUCK_MS;
+  }
+
+  /**
+   * Lazily settles a stuck deploy on read: flips the row to ERROR with an
+   * explanatory note and records DEPLOY_FAILED, so the dashboard/detail page
+   * shows a clear failed state (and the owner can retry) instead of an app
+   * frozen in DEPLOYING forever. The update is conditioned on the row still
+   * being DEPLOYING — if the deploy somehow settles concurrently, its own
+   * READY/ERROR write wins and we return the fresh row.
+   */
+  private async settleStuckDeploy(app: AiApp): Promise<AiApp> {
+    if (!this.isDeployStuck(app)) {
+      return app;
+    }
+    const message =
+      `Deploy timed out: no result after ${AI_APPS_DEPLOY_STUCK_MINUTES} minutes — the deploy was interrupted ` +
+      'or the sandbox runner is unavailable. Retry the deploy once the runner is healthy.';
+    const { count } = await this.prisma.aiApp.updateMany({
+      where: { uid: app.uid, status: 'DEPLOYING' },
+      data: { status: 'ERROR', notes: message },
+    });
+    if (count > 0) {
+      this.logger.warn(`AI App deploy stuck for ${app.appId} (deploymentId=${app.deploymentId ?? 'n/a'}) — marked ERROR`);
+      await this.recordEvent('DEPLOY_FAILED', app.memberUid, {
+        appUid: app.uid,
+        appId: app.appId,
+        deploymentId: app.deploymentId ?? undefined,
+        message,
+      });
+    }
+    return (await this.prisma.aiApp.findUnique({ where: { uid: app.uid } })) ?? app;
   }
 
   /**
@@ -352,6 +397,12 @@ export class AiAppsService {
     }
     if (app.status === 'DELETED' || app.status === 'DELETING') {
       throw new BadRequestException('This app has been deleted');
+    }
+    // A fresh deploy in flight owns the app — block a second concurrent one.
+    // A STUCK deploy (past the window) is retryable: that's the manual recovery
+    // path when the runner hung or the API died mid-deploy.
+    if (app.status === 'DEPLOYING' && !this.isDeployStuck(app)) {
+      throw new ConflictException('A deploy is already in progress for this app — wait for it to finish, then retry.');
     }
     if (!app.s3Key || !app.deploymentId) {
       throw new BadRequestException('This app has no uploaded bundle yet — ask your AI agent to register it first');
