@@ -80,3 +80,30 @@ export class AddTeamPitchParticipantsBulkDto extends createZodDto(AddTeamPitchPa
 
 export { ResponseBulkParticipantsSchema as ResponseTeamPitchParticipantsBulkSchema };
 export class ResponseTeamPitchParticipantsBulkDto extends createZodDto(ResponseBulkParticipantsSchema) {}
+
+export const SendTeamPitchInvitesBulkSchema = z.object({
+  /** When false (default), only investors who have never been invited are emailed. */
+  includeAlreadyInvited: z.boolean().optional().default(false),
+});
+
+export class SendTeamPitchInvitesBulkDto extends createZodDto(SendTeamPitchInvitesBulkSchema) {}
+
+export const ResponseTeamPitchInvitesBulkSchema = z.object({
+  summary: z.object({
+    totalEligible: z.number(),
+    sent: z.number(),
+    skipped: z.number(),
+    errors: z.number(),
+  }),
+  rows: z.array(
+    z.object({
+      participantUid: z.string(),
+      email: z.string().nullable(),
+      name: z.string().nullable(),
+      status: z.enum(['sent', 'skipped', 'error']),
+      message: z.string().optional().nullable(),
+    })
+  ),
+});
+
+export class ResponseTeamPitchInvitesBulkDto extends createZodDto(ResponseTeamPitchInvitesBulkSchema) {}

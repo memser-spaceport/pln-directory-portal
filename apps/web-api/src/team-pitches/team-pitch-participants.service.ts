@@ -281,6 +281,96 @@ export class TeamPitchParticipantsService {
     return { success: true };
   }
 
+  async sendInvestorInvitesBulk(
+    pitchUid: string,
+    options: { includeAlreadyInvited?: boolean } = {}
+  ): Promise<{
+    summary: { totalEligible: number; sent: number; skipped: number; errors: number };
+    rows: Array<{
+      participantUid: string;
+      email: string | null;
+      name: string | null;
+      status: 'sent' | 'skipped' | 'error';
+      message?: string | null;
+    }>;
+  }> {
+    const includeAlreadyInvited = options.includeAlreadyInvited ?? false;
+
+    const pitch = await this.prisma.teamPitch.findUnique({ where: { uid: pitchUid } });
+    if (!pitch) {
+      throw new NotFoundException('Team pitch not found');
+    }
+
+    const investors = await this.prisma.teamPitchParticipant.findMany({
+      where: { teamPitchUid: pitchUid, type: 'INVESTOR' },
+      include: {
+        member: { select: { uid: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const summary = { totalEligible: 0, sent: 0, skipped: 0, errors: 0 };
+    const rows: Array<{
+      participantUid: string;
+      email: string | null;
+      name: string | null;
+      status: 'sent' | 'skipped' | 'error';
+      message?: string | null;
+    }> = [];
+
+    for (const investor of investors) {
+      const email = investor.member?.email ?? null;
+      const name = investor.member?.name ?? null;
+
+      if (!email) {
+        summary.skipped++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'skipped',
+          message: 'Investor has no email',
+        });
+        continue;
+      }
+
+      if (!includeAlreadyInvited && investor.inviteSentCount > 0) {
+        summary.skipped++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'skipped',
+          message: 'Invite already sent',
+        });
+        continue;
+      }
+
+      summary.totalEligible++;
+      try {
+        await this.sendInvestorInvite(pitchUid, investor.uid);
+        summary.sent++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'sent',
+        });
+      } catch (error) {
+        summary.errors++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Failed to send invite',
+        });
+      }
+    }
+
+    return { summary, rows };
+  }
+
   async addInvestorParticipantsBulk(
     pitchUid: string,
     data: {

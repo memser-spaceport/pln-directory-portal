@@ -78,7 +78,7 @@ interface DumpPath {
   proximityCode: string;
   score: number;
   rank: number;
-  hopChain: unknown;
+  hopChain: Record<string, unknown>;
 }
 interface DumpSummary {
   investor_id: string;
