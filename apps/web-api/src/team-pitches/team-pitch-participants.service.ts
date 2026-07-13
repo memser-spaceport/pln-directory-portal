@@ -207,6 +207,21 @@ export class TeamPitchParticipantsService {
     });
   }
 
+  async removeParticipant(pitchUid: string, participantUid: string) {
+    const participant = await this.prisma.teamPitchParticipant.findFirst({
+      where: { uid: participantUid, teamPitchUid: pitchUid },
+    });
+    if (!participant) {
+      throw new NotFoundException('Participant not found');
+    }
+
+    await this.prisma.teamPitchParticipant.delete({
+      where: { uid: participantUid },
+    });
+
+    return { success: true };
+  }
+
   async sendInvestorInvite(pitchUid: string, participantUid: string) {
     const participant = await this.prisma.teamPitchParticipant.findFirst({
       where: { uid: participantUid, teamPitchUid: pitchUid },

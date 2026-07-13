@@ -12,6 +12,7 @@ import { useUpdateTeamPitch } from '../../../hooks/team-pitches/useUpdateTeamPit
 import { useUpdateTeamPitchParticipant } from '../../../hooks/team-pitches/useUpdateTeamPitchParticipant';
 import { useSendTeamPitchInvite } from '../../../hooks/team-pitches/useSendTeamPitchInvite';
 import { useSendTeamPitchInvitesBulk } from '../../../hooks/team-pitches/useSendTeamPitchInvitesBulk';
+import { useRemoveTeamPitchParticipant } from '../../../hooks/team-pitches/useRemoveTeamPitchParticipant';
 import { AddTeamPitchParticipantModal } from '../../../components/team-pitches/AddTeamPitchParticipantModal';
 import { UploadTeamPitchInvestorsModal } from '../../../components/team-pitches/UploadTeamPitchInvestorsModal';
 import { TeamPitchConfirmModal } from '../../../components/team-pitches/TeamPitchConfirmModal';
@@ -104,6 +105,7 @@ const TeamPitchDetailPage = () => {
     (PendingParticipantFields & { access: string }) | null
   >(null);
   const [pendingInvite, setPendingInvite] = useState<(PendingParticipantFields & { isResend: boolean }) | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<PendingParticipantFields | null>(null);
   const [showBulkInviteModal, setShowBulkInviteModal] = useState(false);
   const [includeAlreadyInvited, setIncludeAlreadyInvited] = useState(false);
 
@@ -120,6 +122,7 @@ const TeamPitchDetailPage = () => {
   const updateParticipant = useUpdateTeamPitchParticipant();
   const sendInvite = useSendTeamPitchInvite();
   const sendInvitesBulk = useSendTeamPitchInvitesBulk();
+  const removeParticipant = useRemoveTeamPitchParticipant();
 
   const [editFormData, setEditFormData] = useState({
     title: '',
@@ -516,6 +519,9 @@ const TeamPitchDetailPage = () => {
                       Invite
                     </div>
                   )}
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: 100 }}>
+                    Actions
+                  </div>
                 </div>
 
                 {participants.map((participant: any) => {
@@ -695,6 +701,24 @@ const TeamPitchDetailPage = () => {
                             ))}
                         </div>
                       )}
+
+                      <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 100 }}>
+                        {canMutateTeamPitches && (
+                          <button
+                            type="button"
+                            className="text-sm font-medium text-red-600 hover:text-red-800"
+                            onClick={() =>
+                              setPendingRemove({
+                                uid: participant.uid,
+                                name: participant.member?.name,
+                                email: participant.member?.email,
+                              })
+                            }
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -830,6 +854,32 @@ const TeamPitchDetailPage = () => {
               refetchParticipants();
             } catch {
               toast.error('Failed to send invite');
+            }
+          }}
+        />
+
+        <TeamPitchConfirmModal
+          isOpen={!!pendingRemove}
+          title="Remove participant"
+          message="Remove this participant from the team spotlight? They will lose access. Their member profile will not be deleted."
+          participantName={pendingRemove?.name}
+          participantEmail={pendingRemove?.email}
+          confirmLabel="Remove"
+          isPending={removeParticipant.isPending}
+          onClose={() => setPendingRemove(null)}
+          onConfirm={async () => {
+            if (!authToken || !pendingRemove) return;
+            try {
+              await removeParticipant.mutateAsync({
+                authToken,
+                pitchUid: uid,
+                participantUid: pendingRemove.uid,
+              });
+              toast.success('Participant removed');
+              setPendingRemove(null);
+              refetchParticipants();
+            } catch {
+              toast.error('Failed to remove participant');
             }
           }}
         />

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { TeamPitchAdminAuthGuard } from '../guards/admin-auth.guard';
@@ -117,6 +117,15 @@ export class AdminTeamPitchController {
     @Body() body: UpdateTeamPitchParticipantDto
   ) {
     return this.teamPitchParticipantsService.updateParticipant(pitchUid, participantUid, body);
+  }
+
+  @Delete(':pitchUid/participants/:participantUid')
+  @NoCache()
+  async removeParticipant(
+    @Param('pitchUid') pitchUid: string,
+    @Param('participantUid') participantUid: string
+  ) {
+    return this.teamPitchParticipantsService.removeParticipant(pitchUid, participantUid);
   }
 
   @Post(':pitchUid/participants/:participantUid/send-invite')

@@ -19,8 +19,15 @@ const nextConfig = {
   },
   images: {
     // List remote domains that have access to Next.js Image Optimization API,
-    // to protect the app from malicious users
-    domains: ['loremflickr.com', 'files.plnetwork.io', AWS_S3_DOMAIN],
+    // to protect the app from malicious users.
+    // Include both env and known buckets so local/dev can render prod image URLs.
+    domains: [
+      'loremflickr.com',
+      'files.plnetwork.io',
+      AWS_S3_DOMAIN,
+      'pl-directory-images-dev.s3.us-west-1.amazonaws.com',
+      'pl-directory-images-prod.s3.us-west-1.amazonaws.com',
+    ].filter(Boolean),
     // Enable `dangerouslyAllowSVG` and `contentSecurityPolicy` to serve
     // SVG images using the default Image Optimization API
     dangerouslyAllowSVG: true,
