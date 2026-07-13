@@ -165,7 +165,7 @@ function identityFromContact(contact: HopChainContact, firm?: string | null): Pe
 
 function addPerson(
   out: Map<string, PlPathPerson>,
-  partial: Omit<PlPathPerson, 'personKey'> & { identity?: PersonIdentity },
+  partial: Omit<PlPathPerson, 'personKey'> & { identity?: PersonIdentity }
 ): void {
   const identity: PersonIdentity = partial.identity ?? {
     name: partial.name,
@@ -210,10 +210,7 @@ function collectTargetSideContacts(hopChain: PathHopChain): HopChainContact[] {
 }
 
 /** Collect personKeys for the target LP/investor so they can be excluded from PL-side people. */
-export function resolveTargetInvestorPersonKeys(
-  hopChain: PathHopChain,
-  targetInvestorId: string,
-): Set<string> {
+export function resolveTargetInvestorPersonKeys(hopChain: PathHopChain, targetInvestorId: string): Set<string> {
   const keys = new Set<string>();
 
   if (/^\d+$/.test(targetInvestorId)) {
@@ -221,10 +218,7 @@ export function resolveTargetInvestorPersonKeys(
   }
 
   for (const contact of collectTargetSideContacts(hopChain)) {
-    const identity = identityFromContact(
-      contact,
-      asString(contact.role) ?? hopChain.connectorTeam?.name ?? null,
-    );
+    const identity = identityFromContact(contact, asString(contact.role) ?? hopChain.connectorTeam?.name ?? null);
     if (!identity) continue;
     keys.add(resolvePersonKey(identity));
   }
@@ -255,7 +249,7 @@ export function hasFounderNodes(hopChain: PathHopChain): boolean {
 
 export function extractFounderNodes(
   hopChain: PathHopChain,
-  resolveMemberUidByName?: (name: string) => string | undefined,
+  resolveMemberUidByName?: (name: string) => string | undefined
 ): PlPathPerson[] {
   const founderIds = founderNodeIds(hopChain);
   if (founderIds.size === 0) return [];
@@ -281,7 +275,7 @@ export function extractFounderNodes(
 function addPlConnector(
   out: Map<string, PlPathPerson>,
   pl: HopChainPlConnector | null | undefined,
-  source: string,
+  source: string
 ): void {
   if (!pl?.name && !pl?.memberUid && pl?.internalId == null) return;
   const identity: PersonIdentity = {
@@ -310,7 +304,7 @@ export function memberNameIndexKey(name: string): string {
 export function extractPlPeopleFromHopChain(
   hopChain: PathHopChain,
   excludePersonKeys: Set<string> = new Set(),
-  options: { resolveMemberUidByName?: (name: string) => string | undefined } = {},
+  options: { resolveMemberUidByName?: (name: string) => string | undefined } = {}
 ): PlPathPerson[] {
   const out = new Map<string, PlPathPerson>();
 
@@ -348,21 +342,17 @@ export function extractPlPeopleFromHopChain(
   return [...out.values()].filter((p) => !excludePersonKeys.has(p.personKey));
 }
 
-export function buildSocialOverlapCacheKey(input: {
-  investorId: string;
-  plPersonKey: string;
-}): string {
+export function buildSocialOverlapCacheKey(input: { investorId: string; plPersonKey: string }): string {
   return `pair:investor:${input.investorId}|pl:${input.plPersonKey}`;
 }
 
 /** Map hopChain.plConnector to the same personKey used in the overlap cache. */
 export function resolvePlConnectorPersonKey(
   pl: HopChainPlConnector,
-  resolveMemberUidByName?: (name: string) => string | undefined,
+  resolveMemberUidByName?: (name: string) => string | undefined
 ): string | null {
   const name = asString(pl.name);
-  const memberUid =
-    asString(pl.memberUid) ?? (name ? resolveMemberUidByName?.(name) : undefined);
+  const memberUid = asString(pl.memberUid) ?? (name ? resolveMemberUidByName?.(name) : undefined);
   const investorId = pl.internalId != null ? String(pl.internalId) : undefined;
 
   if (!investorId && !memberUid && !name) return null;
@@ -384,7 +374,7 @@ export function lookupAllSocialOverlapsForPath(
     investorId: string;
     hopChain: PathHopChain;
     resolveMemberUidByName?: (name: string) => string | undefined;
-  },
+  }
 ): SocialOverlapEntry[] {
   const out: SocialOverlapEntry[] = [];
   const seen = new Set<string>();
@@ -411,7 +401,7 @@ export function lookupAllSocialOverlapsForPath(
         investorId: input.investorId,
         plConnector: input.hopChain.plConnector,
         resolveMemberUidByName: input.resolveMemberUidByName,
-      }),
+      })
     );
   }
 
@@ -428,7 +418,7 @@ export function lookupSocialOverlapForPath(
     investorId: string;
     hopChain: PathHopChain;
     resolveMemberUidByName?: (name: string) => string | undefined;
-  },
+  }
 ): SocialOverlapEntry | null {
   return lookupAllSocialOverlapsForPath(cache, input)[0] ?? null;
 }
@@ -436,7 +426,7 @@ export function lookupSocialOverlapForPath(
 /** All cache overlaps for one investor (any PL person). */
 export function lookupAllSocialOverlapsForInvestor(
   cache: SocialOverlapCache,
-  investorId: string,
+  investorId: string
 ): SocialOverlapEntry[] {
   return Object.values(cache).filter((e) => e.investorId === investorId);
 }
@@ -450,12 +440,9 @@ export function lookupSocialOverlapForPair(
     investorId: string;
     plConnector: HopChainPlConnector;
     resolveMemberUidByName?: (name: string) => string | undefined;
-  },
+  }
 ): SocialOverlapEntry | null {
-  const plPersonKey = resolvePlConnectorPersonKey(
-    input.plConnector,
-    input.resolveMemberUidByName,
-  );
+  const plPersonKey = resolvePlConnectorPersonKey(input.plConnector, input.resolveMemberUidByName);
   if (!plPersonKey) return null;
 
   const key = buildSocialOverlapCacheKey({
@@ -525,7 +512,7 @@ function humanizeRecencyDays(days: number | null | undefined): string | null {
  * Returns null when there is nothing useful to say.
  */
 export function buildAffinityAttributionText(
-  connector: AffinityAttributionConnector | null | undefined,
+  connector: AffinityAttributionConnector | null | undefined
 ): string | null {
   if (!connector?.name) return null;
 
@@ -540,8 +527,7 @@ export function buildAffinityAttributionText(
   } else if (src === 'lastContact') {
     base = rec ? `${connector.name} last contacted ${rec}` : `${connector.name} last contacted`;
   } else if (rec) {
-    const verb =
-      connector.evidenceKind && EMAIL_KINDS.has(connector.evidenceKind) ? 'last emailed' : 'last touched';
+    const verb = connector.evidenceKind && EMAIL_KINDS.has(connector.evidenceKind) ? 'last emailed' : 'last touched';
     base = `${connector.name} ${verb} ${rec}`;
   } else {
     base = connector.name;
@@ -586,7 +572,7 @@ export function pickPrimarySocialOverlap(overlaps: SocialOverlapEntry[]): Social
 
 export function attachAttributionLinesToHopChain(
   hopChain: Record<string, unknown>,
-  lines: AttributionLine[],
+  lines: AttributionLine[]
 ): Record<string, unknown> {
   const hc: Record<string, unknown> = { ...hopChain };
   if (lines.length > 0) {
@@ -600,7 +586,7 @@ export function attachAttributionLinesToHopChain(
 /** @deprecated Prefer attributionLines; kept for callers that still need a flat explanation append. */
 export function appendOverlapToHopChain(
   hopChain: Record<string, unknown>,
-  overlap: SocialOverlapEntry,
+  overlap: SocialOverlapEntry
 ): Record<string, unknown> {
   const hc: Record<string, unknown> = { ...hopChain };
   const existing = typeof hc.explanation === 'string' ? hc.explanation : '';
@@ -610,10 +596,7 @@ export function appendOverlapToHopChain(
 }
 
 /** @deprecated Replaced by {@link applyLinkedInPathWarmth} (LAB-2108 additive model). */
-export function applySocialOverlapScoreBump(
-  score: number,
-  overlap: SocialOverlapEntry | null,
-): number {
+export function applySocialOverlapScoreBump(score: number, overlap: SocialOverlapEntry | null): number {
   if (!overlap) return score;
   return applyLinkedInPathWarmth(score, [overlap]);
 }
@@ -744,15 +727,163 @@ export function buildLinkedInOnlyPath(input: {
 }
 
 /**
- * Pick the best LinkedIn-only candidate for an investor (highest bonus, then label).
+ * Best overlap within a set (highest bonus, then label).
+ * Used to pick the primary overlap for a single plPersonKey group — not investor-wide.
  */
 export function pickBestLinkedInOnlyOverlap(overlaps: SocialOverlapEntry[]): SocialOverlapEntry | null {
   if (overlaps.length === 0) return null;
-  return [...overlaps].sort((a, b) => {
-    const db = linkedInBonusForOverlap(b) - linkedInBonusForOverlap(a);
-    if (db !== 0) return db;
-    return a.label.localeCompare(b.label);
-  })[0] ?? null;
+  return (
+    [...overlaps].sort((a, b) => {
+      const db = linkedInBonusForOverlap(b) - linkedInBonusForOverlap(a);
+      if (db !== 0) return db;
+      return a.label.localeCompare(b.label);
+    })[0] ?? null
+  );
+}
+
+/** True when hopChain already represents this founder or PL connector (exact personKey). */
+export function pathMatchesPlPersonKey(
+  hopChain: PathHopChain,
+  plPersonKey: string,
+  resolveMemberUidByName?: (name: string) => string | undefined
+): boolean {
+  for (const founder of extractFounderNodes(hopChain, resolveMemberUidByName)) {
+    if (founder.personKey === plPersonKey) return true;
+  }
+  if (hopChain.plConnector) {
+    const key = resolvePlConnectorPersonKey(hopChain.plConnector, resolveMemberUidByName);
+    if (key === plPersonKey) return true;
+  }
+  return false;
+}
+
+export function groupSocialOverlapsByPlPersonKey(overlaps: SocialOverlapEntry[]): Map<string, SocialOverlapEntry[]> {
+  const map = new Map<string, SocialOverlapEntry[]>();
+  for (const overlap of overlaps) {
+    const list = map.get(overlap.plPersonKey) ?? [];
+    list.push(overlap);
+    map.set(overlap.plPersonKey, list);
+  }
+  return map;
+}
+
+function dedupeOverlaps(overlaps: SocialOverlapEntry[]): SocialOverlapEntry[] {
+  const out: SocialOverlapEntry[] = [];
+  const seen = new Set<string>();
+  for (const overlap of overlaps) {
+    const key = `${overlap.plPersonKey}|${overlap.kind}|${overlap.label}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(overlap);
+  }
+  return out;
+}
+
+export function findCandidateMatchingPlPersonKey<T extends { hopChain: PathHopChain | Record<string, unknown> }>(
+  candidates: T[],
+  plPersonKey: string,
+  resolveMemberUidByName?: (name: string) => string | undefined
+): number {
+  return candidates.findIndex((c) =>
+    pathMatchesPlPersonKey(c.hopChain as PathHopChain, plPersonKey, resolveMemberUidByName)
+  );
+}
+
+export type LinkedInMergeCandidate = {
+  hopChain: PathHopChain | Record<string, unknown>;
+  score: number;
+  socialOverlap?: SocialOverlapEntry;
+  /** Overlaps assigned at merge time — finalize must use these (no post-graft re-lookup). */
+  linkedInOverlaps?: SocialOverlapEntry[];
+  /** Synthetic LinkedIn-only path; Affinity graft/attribution only if same person. */
+  linkedInOnly?: boolean;
+};
+
+/**
+ * For each plPersonKey among investor overlaps:
+ * - matching founder/PL connector path → merge overlaps (score/attribution applied once in finalize)
+ * - no match → create a LinkedIn-only path (all unmatched people, not top-1)
+ *
+ * Multiple overlap kinds for the same person → one path with multiple LinkedIn attribution lines.
+ */
+export function mergeOrCreateLinkedInPathCandidates<T extends LinkedInMergeCandidate>(
+  candidates: T[],
+  overlaps: SocialOverlapEntry[],
+  input: {
+    targetInvestorId: string;
+    caliber?: string | null;
+    caliberConfidence?: number | null;
+    resolveMemberUidByName?: (name: string) => string | undefined;
+  }
+): T[] {
+  if (overlaps.length === 0) {
+    return candidates.map((c) => ({
+      ...c,
+      linkedInOverlaps: c.linkedInOverlaps ? [...c.linkedInOverlaps] : [],
+    }));
+  }
+
+  const result: T[] = candidates.map((c) => ({
+    ...c,
+    linkedInOverlaps: c.linkedInOverlaps ? [...c.linkedInOverlaps] : [],
+  }));
+
+  for (const [, personOverlaps] of groupSocialOverlapsByPlPersonKey(overlaps)) {
+    const plPersonKey = personOverlaps[0]?.plPersonKey;
+    if (!plPersonKey) continue;
+
+    const matchIdx = findCandidateMatchingPlPersonKey(result, plPersonKey, input.resolveMemberUidByName);
+
+    if (matchIdx >= 0) {
+      const matched = result[matchIdx];
+      const merged = dedupeOverlaps([...(matched.linkedInOverlaps ?? []), ...personOverlaps]);
+      result[matchIdx] = {
+        ...matched,
+        linkedInOverlaps: merged,
+        socialOverlap: pickPrimarySocialOverlap(merged) ?? matched.socialOverlap,
+      };
+      continue;
+    }
+
+    const primary = pickBestLinkedInOnlyOverlap(personOverlaps);
+    if (!primary) continue;
+
+    const liPath = buildLinkedInOnlyPath({
+      targetInvestorId: input.targetInvestorId,
+      overlap: primary,
+      caliber: input.caliber ?? 'B',
+      caliberConfidence: input.caliberConfidence ?? 0.4,
+    });
+
+    result.push({
+      ...(liPath as unknown as T),
+      linkedInOverlaps: dedupeOverlaps(personOverlaps),
+      linkedInOnly: true,
+      socialOverlap: primary,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Affinity plConnector graft / attribution:
+ * - graph + Affinity-direct paths: always (investor-level CRM, as today)
+ * - LinkedIn-only: only when the LI person is that same Affinity connector
+ */
+export function shouldAttachAffinityToPath(input: {
+  linkedInOnly?: boolean;
+  hopChain: PathHopChain;
+  affinityConnector?: HopChainPlConnector | null;
+  resolveMemberUidByName?: (name: string) => string | undefined;
+}): boolean {
+  if (!input.affinityConnector?.name && input.affinityConnector?.internalId == null) {
+    return false;
+  }
+  if (!input.linkedInOnly) return true;
+  const key = resolvePlConnectorPersonKey(input.affinityConnector, input.resolveMemberUidByName);
+  if (!key) return false;
+  return pathMatchesPlPersonKey(input.hopChain, key, input.resolveMemberUidByName);
 }
 
 /**

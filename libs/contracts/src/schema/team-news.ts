@@ -1,13 +1,6 @@
 import { z } from 'zod';
 
-export const NewsEventTypeSchema = z.enum([
-  'FUNDING',
-  'LAUNCH',
-  'PARTNERSHIP',
-  'ANNOUNCEMENT',
-  'MILESTONE',
-  'OTHER',
-]);
+export const NewsEventTypeSchema = z.enum(['FUNDING', 'LAUNCH', 'PARTNERSHIP', 'ANNOUNCEMENT', 'MILESTONE', 'OTHER']);
 
 export const NewsDiscoveryOutcomeSchema = z.enum(['OK', 'NO_WEBSITE', 'AGENT_FAILED']);
 
@@ -94,6 +87,7 @@ export const TeamNewsFollowSuggestionSchema = z.object({
   uid: z.string(),
   name: z.string(),
   logo: z.string().nullable(),
+  shortDescription: z.string().nullable(),
   // Display string, e.g. "Storage · 1.2k followers"
   reason: z.string(),
 });
@@ -310,7 +304,10 @@ export const TeamNewsRecentQueryParams = z.object({
   sinceCreatedAt: z.string().optional(),
   untilCreatedAt: z.string().optional(),
   limit: z
-    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1).max(100).optional())
+    .preprocess(
+      (v) => (v === undefined || v === '' ? undefined : Number(v)),
+      z.number().int().min(1).max(100).optional()
+    )
     .default(50),
 });
 
