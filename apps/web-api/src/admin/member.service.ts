@@ -27,7 +27,7 @@ import {
 import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { MembersHooksService } from '../members/members.hooks.service';
 import { ParticipantsRequest } from './members.dto';
-import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { FORUM_PERMISSIONS, MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { TeamsService } from '../teams/teams.service';
 
 @Injectable()
@@ -589,13 +589,9 @@ export class MemberService {
     tx: Prisma.TransactionClient = this.prisma
   ): Promise<Member> {
     try {
-      const createdMember = await tx.member.create({
+      return await tx.member.create({
         data: member,
       });
-      await this.notificationSettingsService.createForumNotificationSetting(createdMember.uid).catch((error) => {
-        this.logger.error(`Error creating forum notification setting for member ${createdMember.uid}: ${error}`);
-      });
-      return createdMember;
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -1755,6 +1751,7 @@ export class MemberService {
 
   async createMemberByAdmin(memberData: CreateMemberDto): Promise<Member> {
     let createdMember: any;
+    let hasForumAccess = false;
     await this.prisma.$transaction(async (tx) => {
       const aclPayload = memberData as CreateMemberDto & {
         roleCodes?: string[];
@@ -1844,6 +1841,8 @@ export class MemberService {
         actorUid: null,
       });
 
+      hasForumAccess = await this.memberHasPermissionCode(tx, createdMember.uid, FORUM_PERMISSIONS.READ);
+
       if ((memberData.memberState ?? MemberState.PENDING) === MemberState.APPROVED) {
         // Check if member has onboarding permission for targeted onboarding flow
         const hasOnboardingPermission = await this.memberHasOnboardingPermission(tx, createdMember.uid);
@@ -1860,6 +1859,17 @@ export class MemberService {
 
       await this.membersHooksService.postCreateActions(createdMember, memberData.email);
     });
+
+    // The digest is opt-in for members without forum access (LAB-2107,
+    // Option A): only members granted forum.read are auto-subscribed. Runs
+    // after the transaction so the access grants are committed and the HTTP
+    // call to the notification service can't roll back with the member.
+    if (hasForumAccess) {
+      await this.notificationSettingsService.createForumNotificationSetting(createdMember.uid).catch((error) => {
+        this.logger.error(`Error creating forum notification setting for member ${createdMember.uid}: ${error}`);
+      });
+    }
+
     return this.findMemberByUid(createdMember.uid);
   }
 
