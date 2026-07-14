@@ -291,7 +291,10 @@ The flow (full steps in the deploy skill):
 2. POST the app ZIP to the \`draftEndpoint\` from \`pln-app.config.json\` with a
    \`requiredEnvVars\` field listing the env var NAMES the app needs. This
    registers the app as a **draft** — nothing runs yet.
-3. Give the member the \`appPageUrl\` from the response: they open it in LabOS,
+3. **Immediately give the member the \`appPageUrl\` from the response — don't
+   wait to be asked.** A draft deploys nothing until they act, so without the
+   link they think the deploy is stuck. (This LabOS link is meant to be shared —
+   the deployment-URL privacy rule doesn't apply to it.) They open it in LabOS,
    enter the secret values, and click **Deploy** there. The deploy then runs
    with the stored secrets.
 4. To ship a code update later, register the draft again (same \`appId\`, fresh
@@ -324,7 +327,9 @@ follow "Apps that need secrets" above instead of deploying directly. In short:
    and runs the build — you do not need any cloud credentials.
 5. Tell the member the deploy succeeded and that they can open their app from the
    PL Infra → AI Apps dashboard. **Do NOT reveal the deployment URL, host, or port**
-   (see "Keep the deployment URL private" in the deploy skill).
+   (see "Keep the deployment URL private" in the deploy skill). That privacy rule
+   covers only the app's own \`<appId>\` address — LabOS links (\`connectUrl\`,
+   \`appPageUrl\`) must always be shared with the member.
 
 ## Deploy token
 There is **no long-lived token** in this kit. You obtain a short-lived deploy
@@ -636,12 +641,17 @@ curl -X POST "<draftEndpoint>" \\
 # → { "status": "DRAFT", "appPageUrl": "https://…/pl-infra/ai-apps/<uid>", "missingEnvVars": [ … ] }
 \`\`\`
 
-Then **tell the member, in your chat, in plain non-technical language** — e.g.
-*"Your app is registered. Open this link, paste your OpenAI API key into the form,
-and click Deploy — that page is the only safe place for your key."* Give them
-\`appPageUrl\`; they enter the values there and click **Deploy**. The deploy runs
-immediately with the stored secrets; the app then appears as usual on the AI Apps
-dashboard.
+**IMMEDIATELY give the member the \`appPageUrl\` link — this is the very next
+thing you do after the registration call returns, before anything else.** A
+draft deploys NOTHING by itself: until the member opens that link and clicks
+Deploy, they see no progress anywhere and will think the deployment is stuck.
+(\`appPageUrl\` is a LabOS page link — the "keep the deployment URL private" rule
+below does NOT apply to it; it exists to be shared.) Tell them in plain
+non-technical language — e.g. *"Your app is registered. Open this link, paste
+your OpenAI API key into the form, and click Deploy — that page is the only safe
+place for your key."* They enter the values there and click **Deploy**. The
+deploy runs immediately with the stored secrets; the app then appears as usual
+on the AI Apps dashboard.
 
 - **Never** ask the member to paste secret values into the chat, and never write
   them to a file — LabOS is the only place values are entered. If they paste a
@@ -654,12 +664,18 @@ dashboard.
   no agent involvement needed.
 
 ## Keep the deployment URL private
-Do not print, link, or otherwise tell the member the deployment URL, host, or port —
-in your messages, summaries, or saved files. The member opens their app through the
-PL Infra → AI Apps dashboard, which embeds it; they never need the raw URL. You may
-use the URL silently for the verification and health checks here, but it must not
-appear in anything you report back. (The config file stores only the \`appId\`, not the
-URL — keep it that way.)
+This rule covers ONLY the deployed app's own address — the URL/host/port on
+\`<appId>.${AI_APPS_APP_DOMAIN}\`. Do not print, link, or otherwise tell the member
+that URL, host, or port — in your messages, summaries, or saved files. The member
+opens their app through the PL Infra → AI Apps dashboard, which embeds it; they
+never need the raw URL. You may use the URL silently for the verification and
+health checks here, but it must not appear in anything you report back. (The
+config file stores only the \`appId\`, not the URL — keep it that way.)
+
+It does NOT cover the LabOS links — \`connectUrl\` (approval page) and
+\`appPageUrl\` (secrets + deploy page). Those are made to be opened by the member,
+and you MUST share them in chat whenever the flow produces one. Withholding
+\`appPageUrl\` strands a draft app: nothing deploys until the member opens it.
 
 ## If the upload times out (504) or seems to hang
 A slow build can exceed the gateway's request timeout, so the upload may return a
