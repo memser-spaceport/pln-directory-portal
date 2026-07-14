@@ -87,6 +87,51 @@ curl -X GET https://api.example.com/v1/demo-days
 
 ---
 
+### Get Demo Day by UID or Slug
+
+**Endpoint:** `GET /v1/demo-days/:demoDayUidOrSlug`
+
+**Access:** Public (optional auth via Bearer token)
+
+**Description:** Get demo day information and the caller's access level. For **COMPLETED** demo days, also returns a public `teams` list of participating teams (L0 / non-public teams excluded). For non-completed demo days, `teams` is an empty array.
+
+**Example:**
+```bash
+curl -X GET https://api.example.com/v1/demo-days/demo-day-2025 \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (Completed, guest or authenticated):**
+```json
+{
+  "access": "none",
+  "status": "COMPLETED",
+  "uid": "dd_123456",
+  "slugURL": "demo-day-2025",
+  "date": "2025-03-15T10:00:00Z",
+  "title": "Demo Day 2025",
+  "description": "Annual startup showcase",
+  "teamsCount": 2,
+  "investorsCount": 150,
+  "teams": [
+    {
+      "uid": "team_abc",
+      "name": "Example Team",
+      "shortDescription": "Building the future",
+      "logoUrl": "https://example.com/logo.png",
+      "isFollowing": false,
+      "newsCount": 3
+    }
+  ]
+}
+```
+
+- `isFollowing` is `true` only when the request is authenticated and the member follows that team; otherwise `false`.
+- `newsCount` is the number of `TeamNewsItem` rows for the team.
+- `teamsCount` matches `teams.length` for completed demo days.
+
+---
+
 ### Get Current Demo Day
 
 **Endpoint:** `GET /v1/demo-days/current`

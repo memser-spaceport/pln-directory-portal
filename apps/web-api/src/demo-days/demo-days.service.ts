@@ -30,6 +30,16 @@ import {
 import { MemberWithRoles } from '../utils/constants';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { MemberApprovalsService } from '../member-approvals/member-approvals.service';
+import { FollowsService } from '../follows/follows.service';
+
+type ParticipatingTeam = {
+  uid: string;
+  name: string;
+  shortDescription: string | null;
+  logoUrl: string | null;
+  isFollowing: boolean;
+  newsCount: number;
+};
 
 type ExpressInterestStats = {
   saved: number;
@@ -97,7 +107,8 @@ export class DemoDaysService {
     private readonly membersService: MembersService,
     private readonly pushNotificationsService: PushNotificationsService,
     private readonly notificationServiceClient: NotificationServiceClient,
-    private readonly memberApprovalsService: MemberApprovalsService
+    private readonly memberApprovalsService: MemberApprovalsService,
+    private readonly followsService: FollowsService
   ) {}
 
   /** Resolve member with effectivePermissionCodes from admin JWT (email or memberUid on token). */
@@ -191,6 +202,7 @@ export class DemoDaysService {
     supportEmail?: string | null;
     teamsCount?: number;
     investorsCount?: number;
+    teams: ParticipatingTeam[];
     isDemoDayAdmin?: boolean;
     isDemoDayReadOnlyAdmin?: boolean;
     isEarlyAccess?: boolean;
@@ -211,15 +223,22 @@ export class DemoDaysService {
         status: 'NONE',
         teamsCount: 0,
         investorsCount: 0,
+        teams: [],
         confidentialityAccepted: false,
         isPending: false,
       };
     }
 
-    const [investorsCount, teamsCount] = await Promise.all([
+    const isCompleted = demoDay.status === DemoDayStatus.COMPLETED;
+    const [investorsCount, teamsCount, teams] = await Promise.all([
       this.getQualifiedInvestorsCount(),
-      this.getTeamsCountForDemoDay(demoDay.uid),
+      isCompleted ? Promise.resolve(0) : this.getTeamsCountForDemoDay(demoDay.uid),
+      isCompleted
+        ? this.getParticipatingTeamsForCompletedDemoDay(demoDay.uid, memberEmail)
+        : Promise.resolve([] as ParticipatingTeam[]),
     ]);
+
+    const resolvedTeamsCount = isCompleted ? teams.length : teamsCount;
 
     // Handle unauthorized users
     if (!memberEmail) {
@@ -235,8 +254,9 @@ export class DemoDaysService {
         shortDescription: demoDay.shortDescription,
         approximateStartDate: demoDay.approximateStartDate,
         supportEmail: demoDay.supportEmail,
-        teamsCount: teamsCount,
+        teamsCount: resolvedTeamsCount,
         investorsCount: investorsCount,
+        teams,
         confidentialityAccepted: false,
         isPending: false,
         logoUrl: demoDay.logoUrl ?? null,
@@ -258,6 +278,9 @@ export class DemoDaysService {
         slugURL: demoDay.slugURL,
         status: this.getExternalDemoDayStatus(demoDay.status),
         host: demoDay.host,
+        teamsCount: resolvedTeamsCount,
+        investorsCount,
+        teams,
         isPending: false,
         logoUrl: demoDay.logoUrl ?? null,
         primaryColor: demoDay.primaryColor ?? '#1a45e6',
@@ -303,8 +326,9 @@ export class DemoDaysService {
           isDemoDayReadOnlyAdmin: false,
           confidentialityAccepted: p?.confidentialityAccepted ?? false,
           isPending: p?.status === DemoDayParticipantStatus.PENDING,
-          teamsCount,
+          teamsCount: resolvedTeamsCount,
           investorsCount,
+          teams,
           logoUrl: demoDay.logoUrl ?? null,
           primaryColor: demoDay.primaryColor ?? '#1a45e6',
           landingLogosEnabled: demoDay.landingLogosEnabled ?? true,
@@ -327,8 +351,9 @@ export class DemoDaysService {
         shortDescription: demoDay.shortDescription,
         approximateStartDate: demoDay.approximateStartDate,
         supportEmail: demoDay.supportEmail,
-        teamsCount,
+        teamsCount: resolvedTeamsCount,
         investorsCount,
+        teams,
         confidentialityAccepted: participant?.confidentialityAccepted ?? false,
         isPending: participant?.status === DemoDayParticipantStatus.PENDING,
         logoUrl: demoDay.logoUrl ?? null,
@@ -362,8 +387,9 @@ export class DemoDaysService {
       isDemoDayAdmin: participant.isDemoDayAdmin || hasMemberLevelAdminAccess,
       isDemoDayReadOnlyAdmin: participant.isDemoDayReadOnlyAdmin || false,
       confidentialityAccepted: participant.confidentialityAccepted,
-      teamsCount,
+      teamsCount: resolvedTeamsCount,
       investorsCount,
+      teams,
       isPending: false,
       logoUrl: demoDay.logoUrl ?? null,
       primaryColor: demoDay.primaryColor ?? '#1a45e6',
@@ -1956,6 +1982,7 @@ export class DemoDaysService {
         onePagerUploadUid: { not: null },
         videoUploadUid: { not: null },
         team: {
+          accessLevel: { not: 'L0' },
           demoDayParticipants: {
             some: {
               demoDayUid,
@@ -1967,6 +1994,60 @@ export class DemoDaysService {
         },
       },
     });
+  }
+
+  private async getParticipatingTeamsForCompletedDemoDay(
+    demoDayUid: string,
+    memberEmail: string | null
+  ): Promise<ParticipatingTeam[]> {
+    const profiles = await this.prisma.teamFundraisingProfile.findMany({
+      where: {
+        demoDayUid,
+        status: 'PUBLISHED',
+        onePagerUploadUid: { not: null },
+        videoUploadUid: { not: null },
+        team: {
+          accessLevel: { not: 'L0' },
+          demoDayParticipants: {
+            some: {
+              demoDayUid,
+              isDeleted: false,
+              status: 'ENABLED',
+              type: 'FOUNDER',
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        team: {
+          select: {
+            uid: true,
+            name: true,
+            shortDescription: true,
+            logo: { select: { url: true } },
+            _count: { select: { newsItems: true } },
+          },
+        },
+      },
+    });
+
+    let followedTeamUids = new Set<string>();
+    if (memberEmail) {
+      const member = await this.membersService.findMemberByEmail(memberEmail);
+      if (member) {
+        followedTeamUids = await this.followsService.getFollowedTeamUids(member.uid);
+      }
+    }
+
+    return profiles.map(({ team }) => ({
+      uid: team.uid,
+      name: team.name,
+      shortDescription: team.shortDescription ?? null,
+      logoUrl: team.logo?.url ?? null,
+      isFollowing: followedTeamUids.has(team.uid),
+      newsCount: team._count.newsItems,
+    }));
   }
 
   private async getMemberWithDemoDayParticipants(memberEmail: string, demoDayUid?: string) {
