@@ -43,6 +43,12 @@ export class ListMembersQueryDto {
   /** When `'true'`, keep members with a direct PL tie (no intermediary). */
   directOnly?: string;
 
+  /**
+   * Path data-source filter (LAB-2120): `affinity` | `linkedin`.
+   * Omit for all sources. Single-select; AND'd with connector + path-via groups.
+   */
+  pathSource?: string;
+
   page?: string;
   limit?: string;
 }
