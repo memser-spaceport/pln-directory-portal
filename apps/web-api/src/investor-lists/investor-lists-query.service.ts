@@ -5,7 +5,7 @@ import { InvestorDto, PaginatedInvestorsDto } from '../investor-outreach/dto/inv
 import { MemberByEmail, OverlapsByInvestorId, toInvestorDto } from '../investor-outreach/investor-outreach.mapper';
 import { INVESTOR_OUTREACH_SECTOR_TAGS, isAllowedStageFocus } from '../investor-outreach/investor-outreach.vocab';
 import { buildInvestorTextSearch } from '../investor-outreach/investor-text-search.util';
-import { connectorMatchClause } from '../pathfinder/connector-match.util';
+import { connectorMatchClause, type ConnectorMatchKind } from '../pathfinder/connector-match.util';
 import { pathKeywordMatchClause, tokenizeKeywordQuery } from '../pathfinder/path-keyword-search.util';
 import {
   hasPathViaFilters,
@@ -340,11 +340,12 @@ export class InvestorListsQueryService {
       .slice(0, MAX_CONNECTOR_LABELS);
     if (labels.length === 0 && containsLabels.length === 0) return null;
 
+    const kind = parseConnectorMatchKind(query.connectorMatchKind);
     const rows = await this.prisma.$queryRaw<{ targetInvestorId: string }[]>`
       SELECT DISTINCT p."targetInvestorId"
       FROM "PathfinderPath" p
       WHERE p."targetSet" = ${targetSet}
-        AND ${connectorMatchClause(labels, containsLabels)}`;
+        AND ${connectorMatchClause(labels, containsLabels, kind)}`;
     return rows.map((r) => r.targetInvestorId);
   }
 
@@ -664,6 +665,18 @@ function validateListMembersQuery(query: ListMembersQueryDto): void {
   if (connectorContains.length > MAX_CONNECTOR_LABELS) {
     throw new BadRequestException(`connectorLabelsContains must contain at most ${MAX_CONNECTOR_LABELS} labels`);
   }
+  if (query.connectorMatchKind != null && query.connectorMatchKind.trim() !== '') {
+    const kind = query.connectorMatchKind.trim().toLowerCase();
+    if (kind !== 'person' && kind !== 'org' && kind !== 'all') {
+      throw new BadRequestException(`connectorMatchKind must be one of: person, org, all`);
+    }
+  }
+}
+
+function parseConnectorMatchKind(raw: string | undefined): ConnectorMatchKind {
+  const kind = raw?.trim().toLowerCase();
+  if (kind === 'person' || kind === 'org' || kind === 'all') return kind;
+  return 'all';
 }
 
 function intersectIdSets(a: string[] | null, b: string[] | null): string[] | null {
