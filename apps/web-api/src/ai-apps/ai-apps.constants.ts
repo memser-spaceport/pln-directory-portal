@@ -37,6 +37,17 @@ export const AI_APPS_CONNECT_POLL_INTERVAL_SEC = 3;
 /** Max app ZIP size accepted by the deploy endpoint (50 MB). */
 export const AI_APPS_MAX_ZIP_BYTES = 50 * 1024 * 1024;
 
+/**
+ * How long an app may sit in DEPLOYING before the deploy counts as STUCK.
+ * Deploys run synchronously inside the API process (runner build + liveness
+ * verification + secrets injection), so a legitimate one settles to READY or
+ * ERROR within a few minutes — a DEPLOYING row older than this window means the
+ * process died mid-deploy or the runner hung, and the row would otherwise stay
+ * DEPLOYING forever. Stuck rows are settled to ERROR lazily on read.
+ */
+export const AI_APPS_DEPLOY_STUCK_MINUTES = Number(process.env.AI_APPS_DEPLOY_STUCK_MINUTES) || 15;
+export const AI_APPS_DEPLOY_STUCK_MS = AI_APPS_DEPLOY_STUCK_MINUTES * 60 * 1000;
+
 /** Sandbox runner base URL (override via env for other environments). */
 export const AI_APPS_RUNNER_URL = process.env.AI_APPS_RUNNER_URL || 'https://sandbox-runner.plnetwork.io';
 
