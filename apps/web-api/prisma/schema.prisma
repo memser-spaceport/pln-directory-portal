@@ -3012,6 +3012,12 @@ model AiApp {
   /// registration), as reported by the kit itself. Null = pre-1.4 kit (the
   /// field didn't exist yet) or a non-kit upload.
   kitVersion   String?
+  /// AI tool behind the last agent upload, copied server-side from the connect
+  /// session's self-reported `clientName` (e.g. "Claude Code").
+  agentClient  String?
+  /// Model the agent reported running on for the last upload (optional
+  /// self-reported multipart field, kits ≥1.4).
+  agentModel   String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 

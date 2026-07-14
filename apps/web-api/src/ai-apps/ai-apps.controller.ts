@@ -238,7 +238,7 @@ export class AiAppsController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AI_APPS_MAX_ZIP_BYTES } }))
   @UsePipes(ZodValidationPipe)
   async deploy(@Req() req: any, @Body() body: DeployAppDto, @UploadedFile() file: Express.Multer.File) {
-    return this.aiAppsService.deploy(req.aiAppMemberUid, body, file);
+    return this.aiAppsService.deploy(req.aiAppMemberUid, body, file, req.aiAppClientName);
   }
 
   /**
@@ -254,7 +254,7 @@ export class AiAppsController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AI_APPS_MAX_ZIP_BYTES } }))
   @UsePipes(ZodValidationPipe)
   async registerDraft(@Req() req: any, @Body() body: RegisterDraftDto, @UploadedFile() file: Express.Multer.File) {
-    return this.aiAppsService.registerDraft(req.aiAppMemberUid, body, file);
+    return this.aiAppsService.registerDraft(req.aiAppMemberUid, body, file, req.aiAppClientName);
   }
 
   /**

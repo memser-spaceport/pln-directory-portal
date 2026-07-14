@@ -151,20 +151,35 @@ describe('AiAppsService.registerDraft', () => {
     expect(result.missingEnvVars).toEqual(['SUPABASE_URL']);
   });
 
-  it('stores the reported kit version, and clears it when the kit sends none', async () => {
+  it('stores the upload metadata (kit version, agent client + model), clearing what is not sent', async () => {
     const { service, prisma } = buildService();
-    await service.registerDraft('creator-1', { ...DTO, kitVersion: '1.4' }, FILE);
+    await service.registerDraft(
+      'creator-1',
+      { ...DTO, kitVersion: '1.4', agentModel: 'claude-sonnet-4-5' },
+      FILE,
+      'Claude Code'
+    );
     expect(prisma.aiApp.upsert).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({ kitVersion: '1.4' }),
-        update: expect.objectContaining({ kitVersion: '1.4' }),
+        create: expect.objectContaining({
+          kitVersion: '1.4',
+          agentClient: 'Claude Code',
+          agentModel: 'claude-sonnet-4-5',
+        }),
+        update: expect.objectContaining({
+          kitVersion: '1.4',
+          agentClient: 'Claude Code',
+          agentModel: 'claude-sonnet-4-5',
+        }),
       })
     );
+    // An older kit / anonymous session sends none of it — stored values are
+    // cleared rather than left stale.
     await service.registerDraft('creator-1', DTO, FILE);
     expect(prisma.aiApp.upsert).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({ kitVersion: null }),
-        update: expect.objectContaining({ kitVersion: null }),
+        create: expect.objectContaining({ kitVersion: null, agentClient: null, agentModel: null }),
+        update: expect.objectContaining({ kitVersion: null, agentClient: null, agentModel: null }),
       })
     );
   });

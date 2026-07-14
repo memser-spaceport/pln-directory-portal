@@ -30,6 +30,12 @@ export const DeployAppSchema = z.object({
     .max(20)
     .regex(/^\d+(\.\d+){0,2}$/, 'kitVersion must look like 1.4 or 1.4.1')
     .optional(),
+  /**
+   * Model the agent reports running on (e.g. "claude-sonnet-4-5", "gpt-5").
+   * Free-form, self-reported, optional — stored for debugging. The agent's
+   * TOOL name isn't sent here; it comes from the connect session's clientName.
+   */
+  agentModel: z.string().trim().min(1).max(100).optional(),
 });
 
 export class DeployAppDto extends createZodDto(DeployAppSchema) {}

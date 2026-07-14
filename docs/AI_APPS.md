@@ -122,6 +122,8 @@ curl -X POST "$AI_APPS_DEPLOY_ENDPOINT" \
 
 `kitVersion` is optional (kits ≥1.4 send the value from their `pln-app.config.json`) and is stored on the app so we know which kit produced the last upload — older kits send nothing and the column goes/stays null. The same field exists on `POST /v1/ai-apps/draft`, and the `KIT_DOWNLOADED` audit event records the downloaded version in `message`.
 
+Two more debugging columns describe the agent behind the last upload, both self-reported: `agentClient` is copied **server-side** from the connect session's `clientName` (the deploy token is bound to the session, so no extra field is needed — the kit now tells agents to send their real tool name instead of a hardcoded "Claude Code"), and `agentModel` is an optional free-form multipart field (e.g. `claude-sonnet-4-5`) the kit tells the agent to include when it knows its model. Like `kitVersion`, they reflect the LAST upload and are cleared when a client sends nothing.
+
 The backend uploads the ZIP to `s3://<AI_APPS_S3_BUCKET>/apps/<appId>/<deploymentId>/app.zip`, then calls the runner with that `s3Key`. Response is the stored `AiApp` record (status `READY` with `url`/`host`/`port`, or `ERROR` with `notes`).
 
 **Deterministic URL:** the sandbox host is always `<appId>.<AI_APPS_APP_DOMAIN>` (env-configurable: `dev.plnetwork.io` on Dev, `prod.plnetwork.io` on Prod), so `url`/`httpUrl`/`host` are computed from `appId` and stored on the record **at deploy start** (status `DEPLOYING`) — the link exists before the runner finishes. For `appId` `test-hello-01` on Prod the URL is `https://test-hello-01.prod.plnetwork.io`.
@@ -233,6 +235,8 @@ model AiApp {
   requiredEnvVars String[]     // env var NAMES the agent declared (draft flow)
   providedEnvVars String[]     // NAMES the member gave values for — values live only on the runner
   kitVersion   String?         // starter-kit version behind the last agent upload (null = pre-1.4 kit)
+  agentClient  String?         // AI tool from the connect session's clientName (e.g. "Claude Code")
+  agentModel   String?         // model the agent reported for the last upload (self-reported)
   @@unique([memberUid, appId])
 }
 
@@ -372,7 +376,7 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 - `apps/web-api/prisma/migrations/20260625120000_ai_apps_delete/` — `DELETING`/`DELETED` + delete event enum values.
 - `apps/web-api/prisma/migrations/20260630120000_ai_apps_connect/` — connect session table + connect event values; drops `AiAppToken`.
 - `apps/web-api/prisma/migrations/20260707120000_ai_apps_draft_secrets/` — `DRAFT` status, `s3Key`/`requiredEnvVars`/`providedEnvVars`, draft/secrets event values.
-- `apps/web-api/prisma/migrations/20260714120000_ai_apps_kit_version/` — `kitVersion` column (starter-kit version behind the last agent upload).
+- `apps/web-api/prisma/migrations/20260714120000_ai_apps_upload_meta/` — `kitVersion`/`agentClient`/`agentModel` columns (self-reported metadata about the last agent upload).
 - LabOS UI (`pln-directory-portal-v2`): `app/pl-infra/ai-apps/connect/page.tsx` + `components/page/ai-apps/AiAppsConnectPage/` — the approval page; connect calls in `services/ai-apps/ai-apps.service.ts`.
 - `.claude/skills/ai-apps/SKILL.md` — agent guidance for working on this feature.
 

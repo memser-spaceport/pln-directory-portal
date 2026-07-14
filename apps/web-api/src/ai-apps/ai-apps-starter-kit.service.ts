@@ -173,6 +173,12 @@ its own). Each new deploy session just asks you to approve again.
 You are helping a Protocol Labs Network member build and deploy a small web app
 to the PLN sandbox. Follow these rules.
 
+**Skills note (non-Claude tools):** detailed how-to guides live as plain
+markdown under \`.claude/skills/<name>/SKILL.md\`. Claude Code discovers them
+automatically; if you are a different agent (Codex, Cursor, etc.), just READ
+the referenced file whenever these instructions say to "load a skill" — they
+are ordinary docs, not Claude-specific magic.
+
 ## Building the app
 - All application code lives in the \`app/\` directory.
 - \`app/\` must stay independently runnable: \`npm install && npm start\` serves it
@@ -522,12 +528,14 @@ the chat.
 2. **Get a deploy token via LabOS.** The kit has no token; obtain a short-lived one
    through the connect flow:
 
-   a. Start a session (no auth needed):
+   a. Start a session (no auth needed). Set \`clientName\` to YOUR actual tool
+      name (e.g. "Claude Code", "Cursor", "Codex CLI") — it is shown to the
+      member on the approval page and recorded with the deployed app:
 
    \`\`\`bash
    curl -sX POST "<connectEndpoint>" \\
      -H "Content-Type: application/json" \\
-     -d '{"clientName":"Claude Code"}'
+     -d '{"clientName":"<your tool name>"}'
    # → { "sessionId", "userCode", "connectUrl", "pollToken", "pollIntervalSec", "expiresAt" }
    \`\`\`
 
@@ -576,6 +584,7 @@ the chat.
      -F "description=<one line about the app>" \\
      -F "deploymentId=<unique id per deploy, e.g. a timestamp>" \\
      -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
+     -F "agentModel=<the model you are running on, e.g. claude-sonnet-4-5; omit the field if unknown>" \\
      -F "file=@app.zip;type=application/zip"
    \`\`\`
 
@@ -621,6 +630,7 @@ curl -X POST "<draftEndpoint>" \\
   -F "description=<one line about the app>" \\
   -F "deploymentId=<unique id per upload, e.g. a timestamp>" \\
   -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
+  -F "agentModel=<the model you are running on; omit the field if unknown>" \\
   -F 'requiredEnvVars=["OPENAI_API_KEY","SUPABASE_URL"]' \\
   -F "file=@app.zip;type=application/zip"
 # → { "status": "DRAFT", "appPageUrl": "https://…/pl-infra/ai-apps/<uid>", "missingEnvVars": [ … ] }

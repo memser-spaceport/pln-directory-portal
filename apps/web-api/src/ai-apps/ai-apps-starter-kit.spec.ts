@@ -36,11 +36,13 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(JSON.stringify(config)).not.toContain('plndeploy_');
   });
 
-  it('stamps the kit version into the config and tells the agent to send it on uploads', () => {
+  it('stamps the kit version into the config and tells the agent to send upload metadata', () => {
     const config = JSON.parse(entries.get('pln-app.config.json') as string);
     expect(config.kitVersion).toBe(AI_APPS_STARTER_KIT_VERSION);
     const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
     expect(deploySkill).toContain('kitVersion=');
+    expect(deploySkill).toContain('agentModel=');
+    expect(deploySkill).toContain('clientName');
   });
 
   it('points the agent at the member-context skill from CLAUDE.md/AGENTS.md', () => {

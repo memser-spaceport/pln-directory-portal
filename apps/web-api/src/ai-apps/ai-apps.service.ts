@@ -302,7 +302,12 @@ export class AiAppsService {
    * the deploy to the sandbox runner (keeping AWS creds + the runner token
    * server-side) and stores the result.
    */
-  async deploy(memberUid: string, dto: DeployAppDto, file: Express.Multer.File): Promise<WithMember<AiApp>> {
+  async deploy(
+    memberUid: string,
+    dto: DeployAppDto,
+    file: Express.Multer.File,
+    agentClient?: string | null
+  ): Promise<WithMember<AiApp>> {
     if (!file?.buffer?.length) {
       throw new BadGatewayException('Missing app ZIP file');
     }
@@ -330,6 +335,8 @@ export class AiAppsService {
         httpUrl,
         host,
         kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
       },
       update: {
         name: dto.name,
@@ -340,9 +347,11 @@ export class AiAppsService {
         url,
         httpUrl,
         host,
-        // Reflects the kit behind the LAST upload — cleared when an older kit
-        // (which sends nothing) redeploys, so it never claims a newer version.
+        // Upload metadata reflects the LAST upload — cleared when a client
+        // that sends nothing (older kit) redeploys, so it never goes stale.
         kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
         notes: null,
       },
     });
@@ -376,7 +385,8 @@ export class AiAppsService {
   async registerDraft(
     memberUid: string,
     dto: RegisterDraftDto,
-    file: Express.Multer.File
+    file: Express.Multer.File,
+    agentClient?: string | null
   ): Promise<WithMember<AiApp> & { appPageUrl: string; missingEnvVars: string[] }> {
     if (!file?.buffer?.length) {
       throw new BadRequestException('Missing app ZIP file');
@@ -411,6 +421,8 @@ export class AiAppsService {
         s3Key,
         requiredEnvVars: dto.requiredEnvVars,
         kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
       },
       update: {
         name: dto.name,
@@ -420,6 +432,8 @@ export class AiAppsService {
         s3Key,
         requiredEnvVars: dto.requiredEnvVars,
         kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
         notes: null,
       },
     });

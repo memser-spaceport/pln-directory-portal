@@ -7,7 +7,8 @@ import { AI_APP_TOKEN_HEADER } from '../ai-apps.constants';
  * the `x-app-token` header) that was minted when the member approved a connect
  * session. The token must belong to an APPROVED session and be unexpired. On
  * success it stamps the session's member uid onto the request as
- * `aiAppMemberUid`.
+ * `aiAppMemberUid`, plus the session's self-reported `clientName` as
+ * `aiAppClientName` (stored on the app for debugging).
  */
 @Injectable()
 export class AiAppTokenGuard implements CanActivate {
@@ -30,6 +31,7 @@ export class AiAppTokenGuard implements CanActivate {
     }
 
     req.aiAppMemberUid = session.memberUid;
+    req.aiAppClientName = session.clientName;
     await this.prisma.aiAppConnectSession.update({
       where: { uid: session.uid },
       data: { lastUsedAt: new Date() },
