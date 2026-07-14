@@ -475,11 +475,7 @@ export class RoadmapService {
 
     if (isPromoteTransition(existing.stage, to)) {
       await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_PROMOTED, actorUid, { itemUid: uid });
-    } else if (to === RoadmapStage.SHIPPED) {
-      if (!reachedShippedBefore) {
-        await this.notifyBackersShipped(row);
-      }
-    } else {
+    } else if (to !== RoadmapStage.SHIPPED) {
       await this.track(ROADMAP_ANALYTICS_EVENTS.ROADMAP_STATUS_CHANGED, actorUid, {
         itemUid: uid,
         from: existing.stage,
@@ -699,14 +695,30 @@ export class RoadmapService {
     );
   }
 
-  /** Trigger 4 — tell the original submitter their need shipped. */
-  private async notifyShipped(item: { uid: string; title: string; createdByUid: string }) {
-    await this.sendMemberNotification(
-      item.createdByUid,
-      ROADMAP_NOTIFICATION_COPY.needShipped(item.title),
-      item.uid,
-      ROADMAP_NOTIFICATION_TRIGGERS.NEED_SHIPPED
-    );
+  /**
+   * Broadcast that an item shipped to everyone with roadmap access. One permission-gated
+   * notification (same fan-out as new submissions). No authorUid — the submitter should
+   * see it too when they hold roadmap.view.
+   */
+  private async notifyShipped(item: { uid: string; title: string }) {
+    try {
+      await this.pushNotifications.create({
+        category: PushNotificationCategory.GANTRY,
+        ...ROADMAP_NOTIFICATION_COPY.needShipped(item.title),
+        link: itemDetailPath(item.uid),
+        isPublic: false,
+        requiredPermissions: [ROADMAP_PERMISSIONS.VIEW, ROADMAP_PERMISSIONS.ADMIN],
+        metadata: {
+          eventType: 'roadmap',
+          itemUid: item.uid,
+          trigger: ROADMAP_NOTIFICATION_TRIGGERS.NEED_SHIPPED,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Roadmap shipped notification failed for ${item.uid}: ${error instanceof Error ? error.message : error}`
+      );
+    }
   }
 
   /**
@@ -749,34 +761,6 @@ export class RoadmapService {
         ROADMAP_NOTIFICATION_COPY.boostReturned(item.title),
         item.uid,
         ROADMAP_NOTIFICATION_TRIGGERS.BOOST_RETURNED
-      );
-    }
-  }
-
-  /**
-   * PRD §7 trigger 3 — tell everyone who ever pinned the item (released pins included,
-   * deduped) that it shipped. The creator is excluded: they already get the dedicated
-   * need-shipped notification from notifyShipped.
-   */
-  private async notifyBackersShipped(item: { uid: string; title: string; createdByUid: string }) {
-    try {
-      const backers = await this.prisma.roadmapItemPin.findMany({
-        where: { itemUid: item.uid },
-        select: { memberUid: true },
-        distinct: ['memberUid'],
-      });
-      const recipients = backers.map((pin) => pin.memberUid).filter((memberUid) => memberUid !== item.createdByUid);
-      for (const memberUid of recipients) {
-        await this.sendMemberNotification(
-          memberUid,
-          ROADMAP_NOTIFICATION_COPY.backedItemShipped(item.title),
-          item.uid,
-          ROADMAP_NOTIFICATION_TRIGGERS.BACKED_ITEM_SHIPPED
-        );
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Roadmap backers-shipped notification failed for ${item.uid}: ${error instanceof Error ? error.message : error}`
       );
     }
   }

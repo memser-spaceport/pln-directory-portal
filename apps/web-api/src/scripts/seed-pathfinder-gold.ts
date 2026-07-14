@@ -23,6 +23,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { affinityBoost, blendGraphScore, comparePathsByWarmth } from './affinity-warmth-boost.util';
 import { buildAffinityDirectPath, passesAffinityDirectThreshold } from './affinity-direct-path.util';
 import { finalizePersonHopChain } from './path-route.util';
+import { isUnreachableFounderPath } from './unreachable-founder-path.util';
 import { loadMemberNameIndex, loadPortfolioFounderIndex, normalizePersonName } from './founder-member-resolve.util';
 import { loadMemberContactIndex } from './org-contact-resolve.util';
 import { loadDirectoryTeamIndex } from './org-team-resolve.util';
@@ -297,12 +298,9 @@ async function seed() {
 
     const sorted = [...candidates].sort(comparePathsByWarmth);
     let rank1Code: string | null = null;
+    let insertRank = 0;
 
-    for (let i = 0; i < sorted.length; i++) {
-      const p = sorted[i];
-      const rank = i + 1;
-      if (rank === 1) rank1Code = p.proximityCode;
-
+    for (const p of sorted) {
       let hopChain = JSON.parse(JSON.stringify(p.hopChain)) as Record<string, unknown>;
       const attachAffinity = shouldAttachAffinityToPath({
         linkedInOnly: p.linkedInOnly,
@@ -315,6 +313,17 @@ async function seed() {
         attachedHere = true;
       }
       hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops, memberContactIndex, teamIndex);
+
+      // Drop F-paths with no Directory founder and no PL connector person.
+      if (
+        isUnreachableFounderPath({
+          connectorType: p.connectorType,
+          hopChain: hopChain as PathHopChain,
+        })
+      ) {
+        continue;
+      }
+
       hopChain = applyPriorBackingToHopChain(hopChain, priorBacking);
 
       let overlaps: SocialOverlapEntry[] = p.linkedInOverlaps ?? [];
@@ -333,6 +342,9 @@ async function seed() {
       const score = attributed.score;
       const primaryOverlap = attributed.primaryOverlap;
 
+      insertRank += 1;
+      if (insertRank === 1) rank1Code = p.proximityCode;
+
       pathInserts.push({
         targetInvestorId,
         targetSet: TARGET_SET,
@@ -344,10 +356,11 @@ async function seed() {
         caliberConfidence: p.caliberConfidence,
         hopChain: hopChain as Prisma.InputJsonValue,
         ...(primaryOverlap ? { socialOverlap: primaryOverlap as unknown as Prisma.InputJsonValue } : {}),
-        rank,
+        rank: insertRank,
         ingestRunId: RUN_ID,
       });
     }
+    if (insertRank === 0) return null;
     if (attachedHere) personsWithConnector += 1;
     pathTargetsQueued.add(targetInvestorId);
     return rank1Code;
@@ -390,7 +403,8 @@ async function seed() {
 
     const { profile: affinityProfile, affinityData } = mapAffinityListEntry(ent, { memberResolver });
 
-    let bestProximityForRecord: string | null = personHasPath && best ? best.code : null;
+    let bestProximityForRecord: string | null = null;
+    let hasPathForRecord = false;
 
     const existing = byDedupeKey.get(dedupeKey) ?? byInvestorId.get(affinityId);
 
@@ -440,14 +454,17 @@ async function seed() {
     }
 
     if (personHasPath) {
-      reachable += 1;
       const rank1 = queuePaths(affinityId, best?.firmId ?? '', {
         firstName,
         lastName,
         memberUid: memberByEmail.get(dedupeKey),
         email: realEmail || undefined,
       });
-      if (rank1) bestProximityForRecord = rank1;
+      if (rank1) {
+        reachable += 1;
+        bestProximityForRecord = rank1;
+        hasPathForRecord = true;
+      }
     }
 
     const priorProfile = profileByInvestorId.get(affinityId);
@@ -467,7 +484,7 @@ async function seed() {
       engagementTier: '',
       enrichmentStatus: enrichment ? 'enriched' : 'pending',
       bestProximityCode: bestProximityForRecord,
-      hasPath: personHasPath,
+      hasPath: hasPathForRecord,
       ...(rawPayload || priorBacking
         ? {
             rawPayload: {
@@ -504,13 +521,13 @@ async function seed() {
   const alreadyHasPaths = new Set(pathCounts.map((c) => c.targetInvestorId));
   for (const d of dupPathCandidates) {
     if (pathTargetsQueued.has(d.investorId) || alreadyHasPaths.has(d.investorId)) continue;
+    const rank1 = queuePaths(d.investorId, d.firmId, {
+      firstName: d.firstName,
+      lastName: d.lastName,
+      memberUid: d.memberUid,
+    });
+    if (!rank1) continue;
     reachable += 1;
-    const rank1 =
-      queuePaths(d.investorId, d.firmId, {
-        firstName: d.firstName,
-        lastName: d.lastName,
-        memberUid: d.memberUid,
-      }) ?? d.bestCode;
     const pendingCreate = createByInvestorId.get(d.investorId);
     if (pendingCreate) {
       pendingCreate.bestProximityCode = rank1;

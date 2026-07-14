@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ConnectorMatchesDto, CrosswalkReviewQueryDto, ListPathfinderPathsQueryDto } from './dto/pathfinder.query.dto';
 import { connectorMatchClause } from './connector-match.util';
+import { collectMemberUidsNeedingImages, hydrateHopChainImages } from './hydrate-hopchain-images.util';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -83,8 +84,21 @@ export class PathfinderQueryService {
       correctionsByPathId.set(c.subjectId, list);
     }
 
+    const uidsNeedingImages = collectMemberUidsNeedingImages(paths.map((p) => p.hopChain));
+    const imagesByUid = new Map<string, string>();
+    if (uidsNeedingImages.length > 0) {
+      const members = await this.prisma.member.findMany({
+        where: { uid: { in: uidsNeedingImages } },
+        select: { uid: true, image: { select: { url: true } } },
+      });
+      for (const m of members) {
+        if (m.image?.url) imagesByUid.set(m.uid, m.image.url);
+      }
+    }
+
     const items = paths.map((p) => ({
       ...p,
+      hopChain: hydrateHopChainImages(p.hopChain, imagesByUid),
       corrections: correctionsByPathId.get(String(p.id)) ?? [],
     }));
     return { targetInvestorId, total: items.length, items };

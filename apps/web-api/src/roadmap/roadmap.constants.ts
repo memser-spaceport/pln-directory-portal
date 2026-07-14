@@ -110,10 +110,6 @@ export const ROADMAP_NOTIFICATION_COPY = {
     title: `Backlog: ${title}`,
     description: 'Your need was moved to the backlog.',
   }),
-  backedItemShipped: (title: string) => ({
-    title: `Just Shipped: ${title} 🎉`,
-    description: 'Something you boosted is now live.',
-  }),
   needShipped: (title: string) => ({
     title: `Just Shipped: ${title} 🎉`,
     description: "It's live now — go try it out.",

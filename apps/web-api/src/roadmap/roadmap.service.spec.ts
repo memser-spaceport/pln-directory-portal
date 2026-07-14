@@ -377,43 +377,44 @@ describe('RoadmapService', () => {
       });
     });
 
-    describe('shipped to backers', () => {
-      it('notifies every distinct member who ever pinned, excluding the creator', async () => {
+    describe('shipped broadcast', () => {
+      it('sends one permission-gated notification to roadmap viewers', async () => {
         prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.IN_PROGRESS));
         prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.SHIPPED));
-        // release query inside the tx finds nothing (pins already released at IN_PROGRESS),
-        // backers-ever query returns the full history
-        prisma.roadmapItemPin.findMany
-          .mockResolvedValueOnce([])
-          .mockResolvedValueOnce([{ memberUid: 'pinner-1' }, { memberUid: 'pinner-2' }, { memberUid: 'creator-1' }]);
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]);
 
         await service.transitionItem('item-1', { stage: 'SHIPPED' }, 'curator-1');
 
-        const shippedBackerCalls = pushNotifications.create.mock.calls.filter(
-          ([dto]: [any]) => dto.metadata?.trigger === 'backed_item_shipped'
+        expect(pushNotifications.create).toHaveBeenCalledTimes(1);
+        expect(pushNotifications.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: 'Just Shipped: Test 🎉',
+            description: "It's live now — go try it out.",
+            link: expect.stringContaining('/gantry/item-1'),
+            requiredPermissions: ['roadmap.view', 'roadmap.admin'],
+            isPublic: false,
+            metadata: expect.objectContaining({
+              eventType: 'roadmap',
+              itemUid: 'item-1',
+              trigger: 'need_shipped',
+            }),
+          })
         );
-        expect(shippedBackerCalls.map(([dto]: [any]) => dto.recipientUid)).toEqual(['pinner-1', 'pinner-2']);
-        expect(shippedBackerCalls[0][0]).toMatchObject({
-          title: 'Just Shipped: Test 🎉',
-          description: 'Something you boosted is now live.',
-        });
-
-        // the creator still gets their dedicated shipped notification
-        const creatorCalls = pushNotifications.create.mock.calls.filter(
-          ([dto]: [any]) => dto.recipientUid === 'creator-1'
+        expect(pushNotifications.create).toHaveBeenCalledWith(
+          expect.not.objectContaining({ recipientUid: expect.anything() })
         );
-        expect(creatorCalls).toHaveLength(1);
-        expect(creatorCalls[0][0]).toMatchObject({
-          title: 'Just Shipped: Test 🎉',
-          description: "It's live now — go try it out.",
-          metadata: expect.objectContaining({ trigger: 'need_shipped' }),
-        });
+        expect(pushNotifications.create).toHaveBeenCalledWith(
+          expect.not.objectContaining({ metadata: expect.objectContaining({ authorUid: expect.anything() }) })
+        );
+        expect(
+          pushNotifications.create.mock.calls.filter(([dto]: [any]) => dto.metadata?.trigger === 'backed_item_shipped')
+        ).toHaveLength(0);
       });
 
       it('does not re-fire boost-returned on IN_PROGRESS → SHIPPED (pins already released)', async () => {
         prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.IN_PROGRESS));
         prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.SHIPPED));
-        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ memberUid: 'pinner-1' }]);
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]);
 
         await service.transitionItem('item-1', { stage: 'SHIPPED' }, 'curator-1');
 
@@ -482,7 +483,7 @@ describe('RoadmapService', () => {
       it('notifies the first time an item ships', async () => {
         prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.IN_PROGRESS));
         prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.SHIPPED));
-        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ memberUid: 'pinner-1' }]);
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]);
 
         await service.transitionItem('item-1', { stage: 'SHIPPED' }, 'curator-1');
 
@@ -490,15 +491,15 @@ describe('RoadmapService', () => {
           'item-1',
           expect.arrayContaining(['need_shipped', 'backed_item_shipped'])
         );
-        expect(triggerCalls('backed_item_shipped')).toHaveLength(1);
         expect(triggerCalls('need_shipped')).toHaveLength(1);
+        expect(triggerCalls('backed_item_shipped')).toHaveLength(0);
       });
 
       it('does not re-notify Shipped when a Shipped notification already exists', async () => {
         pushNotifications.hasItemTriggerNotification.mockResolvedValue(true);
         prisma.roadmapItem.findFirst.mockResolvedValue(rowFor(RoadmapStage.IN_PROGRESS));
         prisma.roadmapItem.update.mockResolvedValue(rowFor(RoadmapStage.SHIPPED));
-        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ memberUid: 'pinner-1' }]);
+        prisma.roadmapItemPin.findMany.mockResolvedValueOnce([]);
 
         await service.transitionItem('item-1', { stage: 'SHIPPED' }, 'curator-1');
 
