@@ -53,6 +53,18 @@ describe('AiAppsStarterKitService buildZip', () => {
     }
   });
 
+  it('tells the agent to share appPageUrl immediately and scopes the URL-privacy rule', () => {
+    const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    // The draft flow must demand the LabOS link is handed over unprompted…
+    expect(deploySkill).toContain('IMMEDIATELY give the member the `appPageUrl`');
+    // …and the privacy rule must explicitly exempt the LabOS links, or agents
+    // over-generalize it and silently withhold appPageUrl (v1.3 field report).
+    expect(deploySkill).toContain('It does NOT cover the LabOS links');
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).toContain('LabOS links');
+    }
+  });
+
   it('documents the response shape and signed-out handling in the skill', () => {
     const skill = entries.get('.claude/skills/pln-member-context/SKILL.md') as string;
     expect(skill).toContain('/v1/ai-apps/me');
