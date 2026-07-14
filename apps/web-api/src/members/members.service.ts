@@ -2446,6 +2446,7 @@ export class MembersService {
       whereConditions.push({
         teamMemberRoles: {
           some: {
+            teamLead: true,
             team: {
               accessLevel: { not: 'L0' },
               communityAffiliations: { some: { title: PL_PORTFOLIO_COMMUNITY_AFFILIATION } },
