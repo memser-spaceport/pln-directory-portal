@@ -89,6 +89,7 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 |--------|-----------------------------------|------------------------------|-------------------|---------|
 | GET    | `/v1/ai-apps`                     | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | List apps with owner + status (excludes `DELETED`) |
 | GET    | `/v1/ai-apps/events`             | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Event log (audit feed); `?appUid=` to scope, `?limit=` (default 100, max 500) |
+| GET    | `/v1/ai-apps/me`                 | `UserAccessTokenValidateGuard`+`RbacGuard` (Bearer **or** `authToken` cookie) | `ai_apps.read`/`write` | Member context for deployed apps: the signed-in member's public identity (see below) |
 | GET    | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Single app detail |
 | GET    | `/v1/ai-apps/:uid/events`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Full event/status history for one app (404 if app missing) |
 | GET    | `/v1/ai-apps/:uid/live`          | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Liveness probe: one server-side reachability check of the app URL → `{ live }`; gateway timeouts AND 404 count as down (the ingress 404s until a first deploy's route is ready). The LabOS detail page polls it so the iframe never shows a raw gateway/404 error |
@@ -115,8 +116,13 @@ curl -X POST "$AI_APPS_DEPLOY_ENDPOINT" \
   -F "name=My Leaderboard" \
   -F "description=A small leaderboard demo" \
   -F "deploymentId=deploy-1718900000" \
+  -F "kitVersion=1.4" \
   -F "file=@app.zip;type=application/zip"
 ```
+
+`kitVersion` is optional (kits ≥1.4 send the value from their `pln-app.config.json`) and is stored on the app so we know which kit produced the last upload — older kits send nothing and the column goes/stays null. The same field exists on `POST /v1/ai-apps/draft`, and the `KIT_DOWNLOADED` audit event records the downloaded version in `message`.
+
+Two more debugging columns describe the agent behind the last upload, both self-reported: `agentClient` is copied **server-side** from the connect session's `clientName` (the deploy token is bound to the session, so no extra field is needed — the kit now tells agents to send their real tool name instead of a hardcoded "Claude Code"), and `agentModel` is an optional free-form multipart field (e.g. `claude-sonnet-4-5`) the kit tells the agent to include when it knows its model. Like `kitVersion`, they reflect the LAST upload and are cleared when a client sends nothing.
 
 The backend uploads the ZIP to `s3://<AI_APPS_S3_BUCKET>/apps/<appId>/<deploymentId>/app.zip`, then calls the runner with that `s3Key`. Response is the stored `AiApp` record (status `READY` with `url`/`host`/`port`, or `ERROR` with `notes`).
 
@@ -169,6 +175,47 @@ Header: x-runner-token: <server secret>
 
 Flow: set status `DELETING` + log `DELETE_STARTED` → call the runner → on success clear hosting fields, set status `DELETED`, log `DELETE_SUCCEEDED`; on failure set status `ERROR` (with `notes`), log `DELETE_FAILED`, and return `502`. The `AiApp` row is **kept** (status flips to `DELETED`) so the audit trail and event history survive. Response is the updated `AiApp` record.
 
+## Member context (signed-in user → deployed app)
+
+Deployed apps can personalize for the member using them (greet by name, tag
+feedback, adapt behavior). `GET /v1/ai-apps/me` returns the signed-in member's
+**public** directory identity:
+
+```json
+{
+  "member": {
+    "uid": "…", "name": "Ada Lovelace", "email": "ada@example.com",
+    "image": "https://…/ada.png", "officeHours": null,
+    "location": { "city": "London", "country": "United Kingdom", "continent": "Europe" },
+    "skills": ["Engineering"],
+    "teams": [{ "uid": "…", "name": "Protocol Labs", "role": "Engineer", "mainTeam": true, "teamLead": false }]
+  }
+}
+```
+
+How it works — no app-side login and no new token flow:
+
+- LabOS writes the login cookies (`authToken` etc.) with `domain=COOKIE_DOMAIN`,
+  a **parent** domain (e.g. `.plnetwork.io`), so they are sent on same-site
+  requests from a deployed app at `<appId>.<AI_APPS_APP_DOMAIN>` to this API.
+  The app's browser code just calls `fetch(meEndpoint, { credentials: 'include' })`.
+- Unlike the other dashboard endpoints, `/me` uses `UserAccessTokenValidateGuard`,
+  which accepts the token from the `Authorization: Bearer` header **or** the
+  `authToken` cookie (`extractTokenFromRequest`), then introspects it against the
+  auth service. `RbacGuard` enforces `ai_apps.read`.
+- Access outcomes: guest/signed-out → `401` (no token); signed-in member without
+  AI Apps access → `403`; otherwise the curated profile above. The kit instructs
+  apps to treat any non-200 as "not signed in" and keep working un-personalized.
+- CORS already covers app origins with credentials (the dev list matches
+  `*.dev.plnetwork.io`, the prod list `*.plnetwork.io`).
+- The response is assembled in `AiAppsService.getMemberContext` from curated
+  public fields only — extend **there** if apps may read more PLN data later
+  (the "light MCP" extension point); never point apps at internal endpoints.
+- The kit's `pln-app.config.json` carries the URL as `memberContextEndpoint`,
+  and `.claude/skills/pln-member-context/SKILL.md` tells the agent how to use it
+  (client-side fetch, handle 401/403/local-dev gracefully, personalization only —
+  never auth for sensitive actions, never store/log tokens).
+
 ## Data model
 
 ```prisma
@@ -187,6 +234,9 @@ model AiApp {
   s3Key        String?         // last uploaded bundle (lets a member redeploy a draft)
   requiredEnvVars String[]     // env var NAMES the agent declared (draft flow)
   providedEnvVars String[]     // NAMES the member gave values for — values live only on the runner
+  kitVersion   String?         // starter-kit version behind the last agent upload (null = pre-1.4 kit)
+  agentClient  String?         // AI tool from the connect session's clientName (e.g. "Claude Code")
+  agentModel   String?         // model the agent reported for the last upload (self-reported)
   @@unique([memberUid, appId])
 }
 
@@ -260,14 +310,15 @@ README.md                                      human quick-start
 CLAUDE.md / AGENTS.md                          agent build + deploy instructions
 .claude/skills/deploy-to-labs/SKILL.md         deploy skill (incl. connect flow)
 .claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
-pln-app.config.json                            connect + deploy endpoints (+ appId) — NO token
+.claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
+pln-app.config.json                            connect + deploy + member-context endpoints (+ appId) — NO token
 pl-design-system/                              curated PL Design System (files, not a nested zip)
 styles/pln-theme.css                           minimal CSS-variable fallback (plain-HTML apps)
 styles/FONTS.md                                Inter font guidance
 app/                                           minimal runnable Node/Express scaffold
 ```
 
-The kit deliberately exposes **no internal PLN APIs** — only the connect and deploy endpoints — and **no token**.
+The kit deliberately exposes **no internal PLN APIs** — only the connect, deploy, and member-context endpoints — and **no token**.
 
 ### Bundled PL Design System
 
@@ -308,8 +359,8 @@ The agent loads `.claude/skills/pl-design-system` for UI work and follows
 | `AI_APPS_RUNNER_TOKEN` | _(empty)_ | **Required** for real deploys; `x-runner-token` to the runner |
 | `AI_APPS_S3_BUCKET` | _(empty)_ | **Required** for real deploys; bucket the runner reads app bundles from (e.g. `sandbox-apps-pln-dev-013228333448`) |
 | `AI_APPS_APP_DOMAIN` | `prod.plnetwork.io` | Base domain deployed apps are served under (app URL = `https://<appId>.<domain>`); set `dev.plnetwork.io` on Dev, `prod.plnetwork.io` on Prod |
-| `AI_APPS_BASE_URL` | `https://api.plnetwork.io` | Public base URL of this API; the agent-facing endpoint URLs written into the kit (deploy/connect/draft) are derived from it as `<base>/v1/ai-apps/<endpoint>` |
-| `AI_APPS_DEPLOY_ENDPOINT` / `AI_APPS_CONNECT_ENDPOINT` / `AI_APPS_DRAFT_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional per-endpoint overrides; rarely needed |
+| `AI_APPS_BASE_URL` | `https://api.plnetwork.io` | Public base URL of this API; the agent-facing endpoint URLs written into the kit (deploy/connect/draft/member context) are derived from it as `<base>/v1/ai-apps/<endpoint>` |
+| `AI_APPS_DEPLOY_ENDPOINT` / `AI_APPS_CONNECT_ENDPOINT` / `AI_APPS_DRAFT_ENDPOINT` / `AI_APPS_ME_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional per-endpoint overrides; rarely needed |
 | `AI_APPS_PORTAL_URL` | `https://directory.plnetwork.io` | Base URL of the LabOS portal hosting the connect/approval page (used to build `connectUrl` and `appPageUrl`) |
 | `AI_APPS_RUNNER_PROJECT` | `default` | Project scope of the runner's secrets API (`/v1/projects/<project>/secrets`) |
 | `AI_APPS_RUNNER_ENVIRONMENT` | `prod` | Environment label for the runner secrets/deployments API. **Must match the environment the runner's `/deploy` build registers under** (its helm release is `<environment>-<appId>`; the legacy-compat build path registers as `sandbox`) — a mismatch makes the secrets-injection deploy collide with the build's release |
@@ -325,6 +376,7 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 - `apps/web-api/prisma/migrations/20260625120000_ai_apps_delete/` — `DELETING`/`DELETED` + delete event enum values.
 - `apps/web-api/prisma/migrations/20260630120000_ai_apps_connect/` — connect session table + connect event values; drops `AiAppToken`.
 - `apps/web-api/prisma/migrations/20260707120000_ai_apps_draft_secrets/` — `DRAFT` status, `s3Key`/`requiredEnvVars`/`providedEnvVars`, draft/secrets event values.
+- `apps/web-api/prisma/migrations/20260714120000_ai_apps_upload_meta/` — `kitVersion`/`agentClient`/`agentModel` columns (self-reported metadata about the last agent upload).
 - LabOS UI (`pln-directory-portal-v2`): `app/pl-infra/ai-apps/connect/page.tsx` + `components/page/ai-apps/AiAppsConnectPage/` — the approval page; connect calls in `services/ai-apps/ai-apps.service.ts`.
 - `.claude/skills/ai-apps/SKILL.md` — agent guidance for working on this feature.
 

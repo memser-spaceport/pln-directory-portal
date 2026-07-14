@@ -20,6 +20,22 @@ export const DeployAppSchema = z.object({
     .min(1)
     .max(100)
     .regex(/^[a-zA-Z0-9][a-zA-Z0-9-]*$/, 'deploymentId must be alphanumeric and hyphens'),
+  /**
+   * Starter-kit version the agent deployed with (from `pln-app.config.json`,
+   * sent by kits ≥1.4). Optional so older kits keep working; stored on the app
+   * for debugging.
+   */
+  kitVersion: z
+    .string()
+    .max(20)
+    .regex(/^\d+(\.\d+){0,2}$/, 'kitVersion must look like 1.4 or 1.4.1')
+    .optional(),
+  /**
+   * Model the agent reports running on (e.g. "claude-sonnet-4-5", "gpt-5").
+   * Free-form, self-reported, optional — stored for debugging. The agent's
+   * TOOL name isn't sent here; it comes from the connect session's clientName.
+   */
+  agentModel: z.string().trim().min(1).max(100).optional(),
 });
 
 export class DeployAppDto extends createZodDto(DeployAppSchema) {}

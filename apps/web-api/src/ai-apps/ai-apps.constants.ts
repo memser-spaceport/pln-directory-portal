@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.3';
+export const AI_APPS_STARTER_KIT_VERSION = '1.4';
 
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
@@ -112,6 +112,13 @@ export const AI_APPS_CONNECT_ENDPOINT =
  * secrets), written into the starter kit.
  */
 export const AI_APPS_DRAFT_ENDPOINT = process.env.AI_APPS_DRAFT_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/draft`;
+
+/**
+ * Public URL of THIS API's member-context endpoint (`GET /v1/ai-apps/me`),
+ * written into the starter kit so deployed apps know where to fetch the
+ * signed-in member's identity from.
+ */
+export const AI_APPS_ME_ENDPOINT = process.env.AI_APPS_ME_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/me`;
 
 /**
  * Base URL of the LabOS portal that hosts the connect page the member opens to

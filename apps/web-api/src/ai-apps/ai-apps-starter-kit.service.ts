@@ -8,6 +8,7 @@ import {
   AI_APPS_CONNECT_ENDPOINT,
   AI_APPS_DEPLOY_ENDPOINT,
   AI_APPS_DRAFT_ENDPOINT,
+  AI_APPS_ME_ENDPOINT,
   AI_APPS_STARTER_KIT_VERSION,
 } from './ai-apps.constants';
 
@@ -35,6 +36,7 @@ export class AiAppsStarterKitService {
     add('AGENTS.md', this.agentInstructions());
     add('.claude/skills/deploy-to-labs/SKILL.md', this.deploySkill());
     add('.claude/skills/pl-design-system/SKILL.md', this.designSystemSkill());
+    add('.claude/skills/pln-member-context/SKILL.md', this.memberContextSkill());
     add('pln-app.config.json', this.configJson());
     add('styles/pln-theme.css', this.themeCss());
     add('styles/FONTS.md', this.fontsDoc());
@@ -98,6 +100,7 @@ to the Protocol Labs Network sandbox with a single instruction.
 - \`CLAUDE.md\` / \`AGENTS.md\` — instructions your AI agent reads automatically.
 - \`.claude/skills/deploy-to-labs/\` — the deploy skill your agent uses.
 - \`.claude/skills/pl-design-system/\` — how to build on-brand UI with the PL Design System.
+- \`.claude/skills/pln-member-context/\` — how your app can know which PLN member is using it.
 - \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
 - \`pl-design-system/\` — the **PL Design System**: ready-made React components
   (Button, MemberCard, TeamCard, Table, Tabs, Badge, PageHeader, SearchInput,
@@ -141,6 +144,14 @@ for you:
 Secrets never go into the code, the chat, or the uploaded ZIP — they are stored
 securely on the sandbox and injected into your app when it runs.
 
+## Personalized apps (who's using it)
+Your app can know which PLN member opened it. When a signed-in member with AI
+Apps access uses your app, it can fetch their public directory profile — name,
+photo, teams, role, skills — to greet them, tag their feedback, or tailor what
+it shows. Just ask your agent, e.g. *"greet me by name and show my team when I
+open the app"*. Visitors who aren't signed in (or lack access) simply get the
+non-personalized version — your app keeps working for them.
+
 ## Embedding in the dashboard
 Your app is shown inside the AI Apps dashboard. Apps built with this kit display
 correctly out of the box, and your agent checks this for you on every deploy — so you
@@ -161,6 +172,12 @@ its own). Each new deploy session just asks you to approve again.
 
 You are helping a Protocol Labs Network member build and deploy a small web app
 to the PLN sandbox. Follow these rules.
+
+**Skills note (non-Claude tools):** detailed how-to guides live as plain
+markdown under \`.claude/skills/<name>/SKILL.md\`. Claude Code discovers them
+automatically; if you are a different agent (Codex, Cursor, etc.), just READ
+the referenced file whenever these instructions say to "load a skill" — they
+are ordinary docs, not Claude-specific magic.
 
 ## Building the app
 - All application code lives in the \`app/\` directory.
@@ -201,6 +218,21 @@ folder. Before any UI work, load the **pl-design-system** skill
     \`frame-ancestors 'none'\`.
   - The default scaffold sends neither header, so it already embeds fine — this
     only matters once you add \`helmet\`, a CSP, or other security headers.
+
+## Signed-in member context (personalization)
+The app can identify the PLN member using it. Load the **pln-member-context**
+skill (\`.claude/skills/pln-member-context/SKILL.md\`) before writing any code
+that needs the current user. In short: browser code calls the
+\`memberContextEndpoint\` from \`pln-app.config.json\` with
+\`fetch(url, { credentials: 'include' })\` — the LabOS session cookie (shared
+across the PLN parent domain) authenticates the request, and the response
+carries the member's public profile (uid, name, email, image, teams + roles,
+skills). Bake the endpoint URL into the app's frontend as a constant — the
+config file itself is not shipped inside \`app/\`.
+- Handle the signed-out case gracefully (401/403/local dev): show a friendly
+  note and keep the app usable without identity. Never hard-fail on it.
+- Personalization only: never gate sensitive/destructive actions on it, never
+  store or log tokens, and never forward member data to third parties.
 
 ## Migrating an existing app
 When the member already has an app and wants it on LabOS, you are *adapting their
@@ -302,8 +334,8 @@ hour and is tied to the member who approved the connect link. Never print it in
 logs, write it to a file, or commit it; if a deploy returns 401 (expired), just
 run the connect flow again to get a fresh one.
 
-Do not ask for or use any internal PLN APIs — only the connect and deploy
-endpoints in the config are available to you.
+Do not ask for or use any internal PLN APIs — only the connect, deploy, and
+member-context endpoints in the config are available to you.
 `;
   }
 
@@ -380,6 +412,87 @@ primitive, stop and tell the member: \`Missing canonical component: [name]\`.
 `;
   }
 
+  private memberContextSkill(): string {
+    return `---
+name: pln-member-context
+description: Get the signed-in PLN member's identity (name, teams, role, skills) inside a deployed AI App, for personalization and feedback. Use whenever the app should greet the user, tag content with who created it, or adapt to the member using it. Load before writing any code that needs to know who is using the app.
+---
+
+# PLN Member Context — who is using the app
+
+Deployed apps are opened by signed-in PLN members from the PL Infra → AI Apps
+dashboard. The LabOS login cookie is scoped to the parent PLN domain, so it
+automatically rides along on requests from the deployed app to the PLN API —
+the app can ask "who is using me?" without any login UI of its own.
+
+## The endpoint
+
+\`memberContextEndpoint\` in \`pln-app.config.json\`:
+
+\`\`\`
+GET ${AI_APPS_ME_ENDPOINT}
+\`\`\`
+
+Call it from **browser code** with cookies included. The config file is not
+shipped inside \`app/\`, so bake the URL into the frontend as a constant:
+
+\`\`\`js
+const MEMBER_CONTEXT_URL = '${AI_APPS_ME_ENDPOINT}';
+
+async function getMemberContext() {
+  try {
+    const res = await fetch(MEMBER_CONTEXT_URL, { credentials: 'include' });
+    if (!res.ok) return null; // 401 = not signed in, 403 = no AI Apps access
+    const { member } = await res.json();
+    return member;
+  } catch {
+    return null; // network/CORS error — treat as signed out
+  }
+}
+\`\`\`
+
+Response shape (\`member\`):
+
+\`\`\`json
+{
+  "uid": "…",
+  "name": "Ada Lovelace",
+  "email": "ada@example.com",
+  "image": "https://…/profile.png",
+  "officeHours": null,
+  "location": { "city": "London", "country": "United Kingdom", "continent": "Europe" },
+  "skills": ["Engineering", "Research"],
+  "teams": [
+    { "uid": "…", "name": "Protocol Labs", "role": "Engineer", "mainTeam": true, "teamLead": false }
+  ]
+}
+\`\`\`
+
+Fields may be \`null\`/empty, and new fields may be added over time — ignore
+anything you don't recognize.
+
+## Rules
+
+- **Always handle the signed-out case.** \`getMemberContext()\` returns \`null\`
+  when the visitor is not signed in, lacks AI Apps access, or when the app runs
+  locally (\`npm start\` — no PLN cookie on localhost). Show a friendly note like
+  *"Open this app from the LabOS → AI Apps dashboard to personalize it"* and keep
+  the rest of the app working. Never crash or block on missing identity.
+- **Personalization only, not authentication.** Use the identity to greet the
+  member, tag feedback/content with who wrote it, or tailor behavior. Do not
+  gate sensitive or destructive actions on it, and don't build your own
+  session/auth system on top.
+- Call it client-side. If you must know the member on your server, forward the
+  incoming request's \`authToken\` cookie value to the endpoint as an
+  \`Authorization: Bearer <token>\` header (strip any surrounding double quotes).
+  Never store or log the token, and never send it — or the member's data — to
+  any third-party service.
+- This is the only PLN member API available to apps. Don't call other internal
+  PLN endpoints; if the app needs more PLN data than this provides, tell the
+  member it isn't available yet.
+`;
+  }
+
   private deploySkill(): string {
     return `---
 name: deploy-to-labs
@@ -408,18 +521,21 @@ the chat.
 
 ## Steps
 1. Read \`pln-app.config.json\` to get \`connectEndpoint\`, \`deployEndpoint\`,
-   \`draftEndpoint\`, and (if present) a saved \`appId\`. If no \`appId\` exists yet,
-   pick a short, stable, lowercase slug (e.g. \`hello-board\`) and save it back to
-   the config.
+   \`draftEndpoint\`, the \`kitVersion\` (sent with every upload so PLN knows which
+   kit built the app), and (if present) a saved \`appId\`. If no \`appId\` exists
+   yet, pick a short, stable, lowercase slug (e.g. \`hello-board\`) and save it
+   back to the config. Never edit \`kitVersion\` by hand.
 2. **Get a deploy token via LabOS.** The kit has no token; obtain a short-lived one
    through the connect flow:
 
-   a. Start a session (no auth needed):
+   a. Start a session (no auth needed). Set \`clientName\` to YOUR actual tool
+      name (e.g. "Claude Code", "Cursor", "Codex CLI") — it is shown to the
+      member on the approval page and recorded with the deployed app:
 
    \`\`\`bash
    curl -sX POST "<connectEndpoint>" \\
      -H "Content-Type: application/json" \\
-     -d '{"clientName":"Claude Code"}'
+     -d '{"clientName":"<your tool name>"}'
    # → { "sessionId", "userCode", "connectUrl", "pollToken", "pollIntervalSec", "expiresAt" }
    \`\`\`
 
@@ -467,6 +583,8 @@ the chat.
      -F "name=<human-friendly app name>" \\
      -F "description=<one line about the app>" \\
      -F "deploymentId=<unique id per deploy, e.g. a timestamp>" \\
+     -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
+     -F "agentModel=<the model you are running on, e.g. claude-sonnet-4-5; omit the field if unknown>" \\
      -F "file=@app.zip;type=application/zip"
    \`\`\`
 
@@ -511,6 +629,8 @@ curl -X POST "<draftEndpoint>" \\
   -F "name=<human-friendly app name>" \\
   -F "description=<one line about the app>" \\
   -F "deploymentId=<unique id per upload, e.g. a timestamp>" \\
+  -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
+  -F "agentModel=<the model you are running on; omit the field if unknown>" \\
   -F 'requiredEnvVars=["OPENAI_API_KEY","SUPABASE_URL"]' \\
   -F "file=@app.zip;type=application/zip"
 # → { "status": "DRAFT", "appPageUrl": "https://…/pl-infra/ai-apps/<uid>", "missingEnvVars": [ … ] }
@@ -574,7 +694,9 @@ verification steps. Only re-deploy if it stays unreachable.
         connectEndpoint: AI_APPS_CONNECT_ENDPOINT,
         deployEndpoint: AI_APPS_DEPLOY_ENDPOINT,
         draftEndpoint: AI_APPS_DRAFT_ENDPOINT,
+        memberContextEndpoint: AI_APPS_ME_ENDPOINT,
         deployTokenHeader: AI_APP_TOKEN_HEADER,
+        kitVersion: AI_APPS_STARTER_KIT_VERSION,
         appId: '',
         notes:
           'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill).',

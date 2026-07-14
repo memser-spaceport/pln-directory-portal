@@ -96,6 +96,13 @@ describe('RegisterDraftSchema.requiredEnvVars', () => {
   it('rejects an empty list', () => {
     expect(() => RegisterDraftSchema.parse({ ...base, requiredEnvVars: '' })).toThrow();
   });
+
+  it('accepts an optional kitVersion and rejects a malformed one', () => {
+    const withVars = { ...base, requiredEnvVars: 'OPENAI_API_KEY' };
+    expect(RegisterDraftSchema.parse({ ...withVars, kitVersion: '1.4' }).kitVersion).toBe('1.4');
+    expect(RegisterDraftSchema.parse(withVars).kitVersion).toBeUndefined();
+    expect(() => RegisterDraftSchema.parse({ ...withVars, kitVersion: 'latest' })).toThrow();
+  });
 });
 
 describe('AiAppsService.registerDraft', () => {
@@ -142,6 +149,39 @@ describe('AiAppsService.registerDraft', () => {
     prisma.aiApp.upsert.mockResolvedValue({ ...APP, providedEnvVars: ['OPENAI_API_KEY'] });
     const result = await service.registerDraft('creator-1', DTO, FILE);
     expect(result.missingEnvVars).toEqual(['SUPABASE_URL']);
+  });
+
+  it('stores the upload metadata (kit version, agent client + model), clearing what is not sent', async () => {
+    const { service, prisma } = buildService();
+    await service.registerDraft(
+      'creator-1',
+      { ...DTO, kitVersion: '1.4', agentModel: 'claude-sonnet-4-5' },
+      FILE,
+      'Claude Code'
+    );
+    expect(prisma.aiApp.upsert).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          kitVersion: '1.4',
+          agentClient: 'Claude Code',
+          agentModel: 'claude-sonnet-4-5',
+        }),
+        update: expect.objectContaining({
+          kitVersion: '1.4',
+          agentClient: 'Claude Code',
+          agentModel: 'claude-sonnet-4-5',
+        }),
+      })
+    );
+    // An older kit / anonymous session sends none of it — stored values are
+    // cleared rather than left stale.
+    await service.registerDraft('creator-1', DTO, FILE);
+    expect(prisma.aiApp.upsert).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ kitVersion: null, agentClient: null, agentModel: null }),
+        update: expect.objectContaining({ kitVersion: null, agentClient: null, agentModel: null }),
+      })
+    );
   });
 });
 
