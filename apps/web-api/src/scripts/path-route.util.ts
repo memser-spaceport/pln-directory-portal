@@ -251,7 +251,40 @@ function correctFounderContactFromNodes(hc: LegacyHopChain): LegacyHopChain {
   };
 }
 
+function orgConnectorToRouteNode(org: {
+  name: string;
+  teamUid?: string;
+  logo?: string;
+  contacts?: RouteNodeContact[];
+}): RouteNode {
+  const contacts = org.contacts ?? [];
+  if (contacts.length > 0) {
+    const primary = contacts[0];
+    return {
+      label: primary.name,
+      orgName: org.name,
+      memberUid: primary.memberUid,
+      teamUid: org.teamUid,
+      logo: org.logo,
+      variant: primary.memberUid ? 'member' : 'external',
+      contacts,
+    };
+  }
+  return { label: org.name, teamUid: org.teamUid, logo: org.logo, variant: 'org' };
+}
+
 function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
+  // Prefer multi-bridge dumps after stripping PL org/connector prefixes.
+  if (hc.routeNodes && hc.routeNodes.length > 0) {
+    const stripped = stripPlConnectorFromBridge(stripLeadingPlOrg(hc.routeNodes), hc.plConnector?.name);
+    if (stripped.length > 1) {
+      return stripped;
+    }
+  }
+  if ((hc.orgConnectors?.length ?? 0) > 1) {
+    return hc.orgConnectors!.map(orgConnectorToRouteNode);
+  }
+
   const org = hc.orgConnectors?.[0] ?? hc.orgConnector;
   if (hc.contact && !connectorMatchesPlContact(hc.contact.name, hc.plConnector)) {
     const orgName = parseBridgeFromHopChain(hc) ?? hc.orgConnectors?.[0]?.name ?? hc.orgConnector?.name;
@@ -263,27 +296,16 @@ function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
         teamUid: hc.contact.teams?.[0]?.teamUid ?? org?.teamUid,
         logo: hc.contact.teams?.[0]?.logo ?? org?.logo,
         variant: hc.contact.memberUid ? 'member' : 'external',
-        contacts: orgName
-          ? [
-              {
-                name: hc.contact.name,
-                role: hc.contact.role,
-                email: hc.contact.email,
-                linkedin: hc.contact.linkedin,
-                memberUid: hc.contact.memberUid,
-                source: 'portfolio',
-              },
-            ]
-          : [
-              {
-                name: hc.contact.name,
-                role: hc.contact.role,
-                email: hc.contact.email,
-                linkedin: hc.contact.linkedin,
-                memberUid: hc.contact.memberUid,
-                source: 'portfolio',
-              },
-            ],
+        contacts: [
+          {
+            name: hc.contact.name,
+            role: hc.contact.role,
+            email: hc.contact.email,
+            linkedin: hc.contact.linkedin,
+            memberUid: hc.contact.memberUid,
+            source: 'portfolio',
+          },
+        ],
       },
     ];
   }
@@ -291,22 +313,7 @@ function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
     return stripPlConnectorFromBridge(stripLeadingPlOrg(hc.routeNodes), hc.plConnector?.name);
   }
   if (org) {
-    const contacts = org.contacts ?? [];
-    if (contacts.length > 0) {
-      const primary = contacts[0];
-      return [
-        {
-          label: primary.name,
-          orgName: org.name,
-          memberUid: primary.memberUid,
-          teamUid: org.teamUid,
-          logo: org.logo,
-          variant: primary.memberUid ? 'member' : 'external',
-          contacts,
-        },
-      ];
-    }
-    return [{ label: org.name, variant: 'org' }];
+    return [orgConnectorToRouteNode(org)];
   }
   return deriveConnectorRouteNodesFromLegacy(hc);
 }
