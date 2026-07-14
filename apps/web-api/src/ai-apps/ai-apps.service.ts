@@ -22,6 +22,7 @@ import {
   AI_APPS_RUNNER_TOKEN,
   AI_APPS_RUNNER_URL,
   AI_APPS_S3_BUCKET,
+  AI_APPS_STARTER_KIT_VERSION,
   buildAppHost,
   buildAppHttpUrl,
   buildAppPageUrl,
@@ -69,6 +70,55 @@ export class AiAppsService {
       ...(rest as Omit<T, 'memberUid'>),
       member: byUid.get(memberUid) ?? null,
     }));
+  }
+
+  /**
+   * Public identity of the signed-in member, served to deployed AI apps for
+   * personalization ("member context"). Returns curated public directory
+   * fields only — this is the extension point if apps may read more PLN data
+   * later (add fields/sections here rather than exposing internal endpoints).
+   */
+  async getMemberContext(memberUid: string) {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      select: {
+        uid: true,
+        name: true,
+        email: true,
+        officeHours: true,
+        image: { select: { url: true } },
+        location: { select: { city: true, country: true, continent: true } },
+        skills: { select: { title: true }, orderBy: { title: 'asc' } },
+        teamMemberRoles: {
+          select: {
+            role: true,
+            mainTeam: true,
+            teamLead: true,
+            team: { select: { uid: true, name: true } },
+          },
+          orderBy: { mainTeam: 'desc' },
+        },
+      },
+    });
+    if (!member) {
+      throw new NotFoundException(`Member not found: ${memberUid}`);
+    }
+    const { image, location, skills, teamMemberRoles, ...identity } = member;
+    return {
+      member: {
+        ...identity,
+        image: image?.url ?? null,
+        location: location ?? null,
+        skills: skills.map((skill) => skill.title),
+        teams: teamMemberRoles.map((tmr) => ({
+          uid: tmr.team.uid,
+          name: tmr.team.name,
+          role: tmr.role,
+          mainTeam: tmr.mainTeam,
+          teamLead: tmr.teamLead,
+        })),
+      },
+    };
   }
 
   /** Dashboard list — all non-deleted apps across PL Infra users, newest first, with owner info. */
@@ -157,7 +207,9 @@ export class AiAppsService {
       data: { status: 'ERROR', notes: message },
     });
     if (count > 0) {
-      this.logger.warn(`AI App deploy stuck for ${app.appId} (deploymentId=${app.deploymentId ?? 'n/a'}) — marked ERROR`);
+      this.logger.warn(
+        `AI App deploy stuck for ${app.appId} (deploymentId=${app.deploymentId ?? 'n/a'}) — marked ERROR`
+      );
       await this.recordEvent('DEPLOY_FAILED', app.memberUid, {
         appUid: app.uid,
         appId: app.appId,
@@ -184,9 +236,9 @@ export class AiAppsService {
     }
   }
 
-  /** Logs that a member downloaded the starter kit. */
+  /** Logs that a member downloaded the starter kit (and which version). */
   async logKitDownloaded(memberUid: string): Promise<void> {
-    await this.recordEvent('KIT_DOWNLOADED', memberUid);
+    await this.recordEvent('KIT_DOWNLOADED', memberUid, { message: `Starter kit v${AI_APPS_STARTER_KIT_VERSION}` });
   }
 
   /** Event log (audit feed) — newest first, optionally scoped to one app. */
@@ -277,6 +329,7 @@ export class AiAppsService {
         url,
         httpUrl,
         host,
+        kitVersion: dto.kitVersion ?? null,
       },
       update: {
         name: dto.name,
@@ -287,6 +340,9 @@ export class AiAppsService {
         url,
         httpUrl,
         host,
+        // Reflects the kit behind the LAST upload — cleared when an older kit
+        // (which sends nothing) redeploys, so it never claims a newer version.
+        kitVersion: dto.kitVersion ?? null,
         notes: null,
       },
     });
@@ -354,6 +410,7 @@ export class AiAppsService {
         deploymentId: dto.deploymentId,
         s3Key,
         requiredEnvVars: dto.requiredEnvVars,
+        kitVersion: dto.kitVersion ?? null,
       },
       update: {
         name: dto.name,
@@ -362,6 +419,7 @@ export class AiAppsService {
         deploymentId: dto.deploymentId,
         s3Key,
         requiredEnvVars: dto.requiredEnvVars,
+        kitVersion: dto.kitVersion ?? null,
         notes: null,
       },
     });

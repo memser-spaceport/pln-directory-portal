@@ -20,6 +20,7 @@ import { ZodValidationPipe } from '@abitia/zod-dto';
 import { Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RbacService } from '../rbac/rbac.service';
@@ -114,6 +115,24 @@ export class AiAppsController {
   @RequirePermissions(READ)
   async listEvents(@Query('appUid') appUid?: string, @Query('limit') limit?: string) {
     return this.aiAppsService.listEvents(appUid, limit ? Number(limit) : undefined);
+  }
+
+  /**
+   * Identity of the signed-in member ("member context"), consumed by deployed
+   * AI apps for personalization. Unlike the other dashboard reads, the guard
+   * here also accepts the LabOS `authToken` cookie — it is scoped to the parent
+   * domain, so it rides along on same-site requests from `<appId>.<domain>` and
+   * an app can simply `fetch(meEndpoint, { credentials: 'include' })`. Guests
+   * get 401 (no token), members without AI Apps access get 403. Declared before
+   * `:uid` so the literal path wins.
+   */
+  @NoCache()
+  @Get('me')
+  @UseGuards(UserAccessTokenValidateGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getMemberContext(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.getMemberContext(memberUid);
   }
 
   /** Single AI App detail (includes `canManage` for the requesting member). */

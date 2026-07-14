@@ -3008,6 +3008,10 @@ model AiApp {
   /// Env var NAMES the member has provided values for. Values are never stored
   /// here — they go straight to the sandbox runner's secret store.
   providedEnvVars String[]  @default([])
+  /// Starter-kit version that produced the last agent upload (deploy or draft
+  /// registration), as reported by the kit itself. Null = pre-1.4 kit (the
+  /// field didn't exist yet) or a non-kit upload.
+  kitVersion   String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
