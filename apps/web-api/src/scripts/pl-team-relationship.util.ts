@@ -333,7 +333,9 @@ export function resolveRosterFallbackConnector(
 
 /**
  * Prefer v1 bestConnector when it passes threshold; otherwise roster fallback.
- * v1 never overridden when passing.
+ * v1 never overridden when passing. Explicit weak v1 strength (< 0.3) is kept
+ * (no roster promote) so Affinity-direct paths are not created from weak ties
+ * alone (LAB-2108); roster still applies when v1 strength is null/absent.
  */
 export function mergePlTeamRelationship(
   v1: PlTeamRelationship,
@@ -343,6 +345,11 @@ export function mergePlTeamRelationship(
 ): PlTeamRelationship {
   const tagged = tagV1Connectors(v1);
   if (tagged.bestConnector && passesPlConnectorThreshold(tagged.bestConnector)) {
+    return tagged;
+  }
+
+  const v1Strength = tagged.bestConnector?.strength;
+  if (v1Strength != null && v1Strength < AFFINITY_DIRECT_STRENGTH_THRESHOLD) {
     return tagged;
   }
 

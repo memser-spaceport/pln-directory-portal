@@ -61,6 +61,44 @@ describe('path-route.util (seed)', () => {
       });
       expect(nodes.map((n) => n.label)).toEqual(['Brad Holden', 'Rauno Miljand']);
     });
+
+    it('strips founder bridge that matches investor by name (no PL org fallback)', () => {
+      const sam = buildInvestorRouteNode({ firstName: 'Sam', lastName: 'Altman' });
+      const nodes = buildFullRouteNodes({
+        bridgeNodes: [{ label: 'Sam Altman', variant: 'external' }],
+        plConnector: null,
+        investorNode: sam,
+        hops: 1,
+      });
+      expect(nodes.map((n) => n.label)).toEqual(['Sam Altman']);
+    });
+
+    it('strips founder bridge that matches investor by memberUid', () => {
+      const sam = buildInvestorRouteNode({
+        firstName: 'Sam',
+        lastName: 'Altman',
+        memberUid: 'uid-sam',
+      });
+      const nodes = buildFullRouteNodes({
+        bridgeNodes: [{ label: 'S. Altman', variant: 'member', memberUid: 'uid-sam' }],
+        plConnector: null,
+        investorNode: sam,
+        hops: 1,
+      });
+      expect(nodes.map((n) => n.label)).toEqual(['Sam Altman']);
+      expect(nodes[0].memberUid).toBe('uid-sam');
+    });
+
+    it('keeps PL connector when bridge person equals investor', () => {
+      const russell = buildInvestorRouteNode({ firstName: 'Russell', lastName: 'Glass' });
+      const nodes = buildFullRouteNodes({
+        bridgeNodes: [{ label: 'Russell Glass', variant: 'external' }],
+        plConnector: { name: 'Brad Holden' },
+        investorNode: russell,
+        hops: 1,
+      });
+      expect(nodes.map((n) => n.label)).toEqual(['Brad Holden', 'Russell Glass']);
+    });
   });
 
   describe('finalizePersonHopChain', () => {
@@ -97,6 +135,21 @@ describe('path-route.util (seed)', () => {
         memberUid: n.memberUid,
       }));
       expect(routeNodes).toEqual([{ label: 'Brad Holden' }, { label: 'Fred Wilson' }]);
+    });
+
+    it('founder=investor collapses to a single person hop (no Sam → Sam)', () => {
+      const out = finalizePersonHopChain(
+        {
+          routeNodes: [PROTOCOL_LABS_ORG_NODE, { label: 'Sam Altman', variant: 'external' }],
+          contact: { name: 'Sam Altman', role: 'Founder' },
+          hops: 1,
+        },
+        { firstName: 'Sam', lastName: 'Altman' },
+        undefined,
+        1
+      );
+      const routeNodes = (out.routeNodes as Array<{ label: string }>).map((n) => n.label);
+      expect(routeNodes).toEqual(['Sam Altman']);
     });
 
     it('case 1 affinity-direct ignores firm-grain Investor placeholder in nodes', () => {

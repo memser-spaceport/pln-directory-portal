@@ -64,6 +64,19 @@ function stripPlConnectorFromBridge(bridge: RouteNode[], connectorName?: string 
   return bridge.filter((n) => normalizePersonName(n.label) !== key);
 }
 
+/** True when both nodes are the same person (prefer memberUid, else normalized name). */
+function isSamePersonNode(a: RouteNode, b: RouteNode): boolean {
+  if (a.variant === 'org' || b.variant === 'org') return false;
+  if (a.memberUid && b.memberUid) return a.memberUid === b.memberUid;
+  return normalizePersonName(a.label) === normalizePersonName(b.label);
+}
+
+/** Drop bridge person nodes that are the investor terminus (founder = investor). */
+function stripInvestorFromBridge(bridge: RouteNode[], investor?: RouteNode): RouteNode[] {
+  if (!investor) return bridge;
+  return bridge.filter((n) => !isSamePersonNode(n, investor));
+}
+
 function connectorMatchesPlContact(contactName: string, plConnector?: PlConnectorInput | null): boolean {
   if (!plConnector?.name) return false;
   return normalizePersonName(contactName) === normalizePersonName(plConnector.name);
@@ -83,20 +96,27 @@ export function buildFullRouteNodes(input: {
   investorNode?: RouteNode;
   hops?: number;
 }): RouteNode[] {
-  const bridge = stripPlaceholderInvestor(
-    stripPlConnectorFromBridge(stripLeadingPlOrg(input.bridgeNodes), input.plConnector?.name)
+  const bridge = stripInvestorFromBridge(
+    stripPlaceholderInvestor(stripPlConnectorFromBridge(stripLeadingPlOrg(input.bridgeNodes), input.plConnector?.name)),
+    input.investorNode
   );
   // Direct (person) prefix only when a PL connector is grafted. Otherwise, if there is a
   // bridge (founder / VC / org), show Protocol Labs as the org door — including F+1
   // LinkedIn-only founder paths that have no PL venture-lead connector (LAB-2108).
+  // If the only bridge was the investor themselves, bridge is empty → no PL org prefix.
   const prefix: RouteNode[] = input.plConnector
     ? [plConnectorToRouteNode(input.plConnector, input.plConnectorMemberUid)]
     : bridge.length > 0
-      ? [PROTOCOL_LABS_ORG_NODE]
-      : [];
+    ? [PROTOCOL_LABS_ORG_NODE]
+    : [];
 
   const core = [...prefix, ...bridge];
-  return input.investorNode ? [...core, input.investorNode] : core;
+  if (!input.investorNode) return core;
+  // PL connector (or leftover core) may already be the investor — keep a single terminus.
+  while (core.length > 0 && isSamePersonNode(core[core.length - 1], input.investorNode)) {
+    core.pop();
+  }
+  return [...core, input.investorNode];
 }
 
 interface LegacyHopChainNode {
