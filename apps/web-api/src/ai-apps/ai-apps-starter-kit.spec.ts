@@ -49,7 +49,10 @@ describe('AiAppsStarterKitService buildZip', () => {
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {
       const content = entries.get(path) as string;
       expect(content).toContain('pln-member-context');
-      expect(content).toContain("credentials: 'include'");
+      // Bearer-from-cookie is the reliable transport; credentials:'include'
+      // alone breaks when the cookie domain doesn't cover the API host.
+      expect(content).toContain('Authorization: Bearer');
+      expect(content).toContain('NOT rely on');
     }
   });
 
@@ -68,7 +71,9 @@ describe('AiAppsStarterKitService buildZip', () => {
   it('documents the response shape and signed-out handling in the skill', () => {
     const skill = entries.get('.claude/skills/pln-member-context/SKILL.md') as string;
     expect(skill).toContain('/v1/ai-apps/me');
-    expect(skill).toContain("credentials: 'include'");
+    expect(skill).toContain('readAuthToken');
+    expect(skill).toContain('authToken=([^;]*)');
+    expect(skill).toContain('Bearer');
     expect(skill).toContain('signed-out');
     expect(skill).toContain('"teams"');
   });

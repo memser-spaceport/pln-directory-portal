@@ -196,9 +196,16 @@ feedback, adapt behavior). `GET /v1/ai-apps/me` returns the signed-in member's
 How it works — no app-side login and no new token flow:
 
 - LabOS writes the login cookies (`authToken` etc.) with `domain=COOKIE_DOMAIN`,
-  a **parent** domain (e.g. `.plnetwork.io`), so they are sent on same-site
-  requests from a deployed app at `<appId>.<AI_APPS_APP_DOMAIN>` to this API.
-  The app's browser code just calls `fetch(meEndpoint, { credentials: 'include' })`.
+  a shared parent domain (on Dev: `.dev.plnetwork.io`), so a deployed app at
+  `<appId>.<AI_APPS_APP_DOMAIN>` receives the cookie on its **own** origin. The
+  kit's snippet reads it from `document.cookie` (URL-decode + strip the JSON
+  quotes) and sends it to `/me` as `Authorization: Bearer`.
+- ⚠️ `credentials: 'include'` alone is NOT reliable: the cookie domain covers the
+  app hosts but not necessarily the API host (on Dev the API lives at
+  `dev-directory.plnetwork.io`, a **sibling** of `dev.plnetwork.io`, so the
+  browser never attaches the cookie → guaranteed 401 with only PostHog cookies
+  in the request). Bearer-from-cookie only requires the cookie to reach the app
+  host, which is exactly what `COOKIE_DOMAIN` guarantees.
 - Unlike the other dashboard endpoints, `/me` uses `UserAccessTokenValidateGuard`,
   which accepts the token from the `Authorization: Bearer` header **or** the
   `authToken` cookie (`extractTokenFromRequest`), then introspects it against the
