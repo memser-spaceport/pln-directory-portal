@@ -26,6 +26,11 @@ export class ListMembersQueryDto {
   connectorLabelsContains?: string;
 
   /**
+   * Connector lens field partition: `person` | `org`. Omit for legacy all-fields OR.
+   */
+  connectorMatchKind?: string;
+
+  /**
    * Path-via filters (warm-intros filter update): OR within this group, AND with
    * connectorLabels and investor-field filters. Exact match on PL-side first node.
    */

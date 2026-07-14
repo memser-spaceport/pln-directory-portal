@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ConnectorMatchesDto, CrosswalkReviewQueryDto, ListPathfinderPathsQueryDto } from './dto/pathfinder.query.dto';
-import { connectorMatchClause } from './connector-match.util';
+import { connectorMatchClause, type ConnectorMatchKind } from './connector-match.util';
 import { collectMemberUidsNeedingImages, hydrateHopChainImages } from './hydrate-hopchain-images.util';
 
 const DEFAULT_LIMIT = 50;
@@ -20,6 +20,13 @@ function parseLimit(value: string | undefined): number {
   const n = parseInt(value ?? String(DEFAULT_LIMIT), 10);
   if (!Number.isFinite(n) || n <= 0) return DEFAULT_LIMIT;
   return Math.min(n, MAX_LIMIT);
+}
+
+function parseConnectorMatchKind(raw: string | undefined): ConnectorMatchKind {
+  const kind = raw?.trim().toLowerCase();
+  if (kind == null || kind === '') return 'all';
+  if (kind === 'person' || kind === 'org' || kind === 'all') return kind;
+  throw new BadRequestException(`connector_match_kind must be one of: person, org, all`);
 }
 
 /**
@@ -131,6 +138,8 @@ export class PathfinderQueryService {
       throw new BadRequestException(`connector_labels_contains must contain at most ${MAX_CONNECTOR_LABELS} labels`);
     }
 
+    const kind = parseConnectorMatchKind(dto.connector_match_kind);
+
     // Match against hop-chain node labels OR the PL-team connector name — see
     // connectorMatchClause (single-sourced so this per-page batch and the
     // full-list members filter agree on what "connected" means).
@@ -138,7 +147,7 @@ export class PathfinderQueryService {
       SELECT DISTINCT p."targetInvestorId"
       FROM "PathfinderPath" p
       WHERE p."targetInvestorId" IN (${Prisma.join(ids)})
-        AND ${connectorMatchClause(labels, containsLabels)}`;
+        AND ${connectorMatchClause(labels, containsLabels, kind)}`;
 
     return { matchedIds: rows.map((r) => r.targetInvestorId) };
   }
