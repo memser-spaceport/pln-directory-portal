@@ -14,9 +14,14 @@
  *   2. For each person in the Affinity LP list (352080): create an
  *      InvestorOutreachRecord keyed by the Affinity entity id (investorId =
  *      canonicalId = affinity id), with name/email/firm + prestige enrichment by
- *      name, and write person-keyed PathfinderPath rows copied from the person's
- *      best firm (so WarmPathDetail resolves by investor_id = person).
+ *      name (enrichment overrides Affinity for display firm/title; Affinity orgs
+ *      still drive proximity/paths), and write person-keyed PathfinderPath rows
+ *      copied from the person's best firm (so WarmPathDetail resolves by
+ *      investor_id = person).
  *   3. Repoint + graph the neuro-lp list and set membership to the people.
+ *
+ * Re-run after deploying firm/title precedence so existing rows pick up
+ * enrichment-preferred display firm/title (e.g. Sam Altman → OpenAI / CEO).
  *
  * Crosswalk note: the record's investorId/canonicalId IS the Affinity id; the
  * affinity<->directory uid crosswalk table population is a separate follow-up
@@ -49,6 +54,7 @@ import {
 } from './affinity-roster-mapper.util';
 import { buildMergedPlConnectors, loadPlConnectorsFromFile } from './pl-relationship-seed.util';
 import { loadPrestigeByName, toEnrichment } from './prestige-seed.util';
+import { resolveInvestorFirmAndTitle } from './investor-firm-title-precedence.util';
 import { buildFirmByLabelIndex, lookupFirmProximity, type FirmProximity } from './firm-proximity-seed.util';
 import { loadPriorBackingMap } from './pl-investors-seed.util';
 import { applyPriorBackingToHopChain, backingWarmthBoost } from './prior-backing-warmth.util';
@@ -531,6 +537,13 @@ async function seed() {
     const mergedProfile = mergeProfileFields(priorProfile ?? {}, affinityProfile);
     const rawPayload = buildRawPayload(enrichment, affinityData, priorProfile?.rawPayload);
     const priorBacking = priorBackingByInvestor.get(affinityId);
+    // Display firm/title: prestige enrichment wins when it has a usable signal;
+    // Affinity Organizations still drive proximity/paths above (firmLabel / best).
+    const resolvedFirmTitle = resolveInvestorFirmAndTitle({
+      affinityFirm: firmLabel,
+      affinityTitle: mergedProfile.title,
+      enrichment: prest ? { firm: prest.firm, title: prest.title, bio: prest.bio } : undefined,
+    });
     const recordFields = {
       investorId: affinityId,
       canonicalId: affinityId,
@@ -539,8 +552,9 @@ async function seed() {
       email,
       additionalEmails,
       emailStatus: 'unverified',
-      firm: firmLabel,
+      firm: resolvedFirmTitle.firm,
       ...mergedProfile,
+      title: resolvedFirmTitle.title,
       engagementTier: '',
       enrichmentStatus: enrichment ? 'enriched' : 'pending',
       bestProximityCode: bestProximityForRecord,
