@@ -41,10 +41,21 @@ export const AI_APPS_MAX_ZIP_BYTES = 50 * 1024 * 1024;
 export const AI_APPS_MAX_PRD_BYTES = 1 * 1024 * 1024;
 
 /**
+ * Post-deploy liveness verification: when the runner call ends in a gateway
+ * timeout, the deploy flow polls the app URL before deciding READY vs ERROR.
+ * The window must cover the pod-up → domain-registration gap, which has been
+ * observed to take 1–5 minutes — 24 attempts every 8s (plus up to 10s per
+ * probe) covers ~6 minutes worst case.
+ */
+export const AI_APPS_VERIFY_ATTEMPTS = Number(process.env.AI_APPS_VERIFY_ATTEMPTS) || 24;
+export const AI_APPS_VERIFY_INTERVAL_MS = Number(process.env.AI_APPS_VERIFY_INTERVAL_MS) || 8000;
+
+/**
  * How long an app may sit in DEPLOYING before the deploy counts as STUCK.
  * Deploys run synchronously inside the API process (runner build + liveness
  * verification + secrets injection), so a legitimate one settles to READY or
- * ERROR within a few minutes — a DEPLOYING row older than this window means the
+ * ERROR within ~8 minutes worst case (edge timeout + the verify window above)
+ * — a DEPLOYING row older than this window means the
  * process died mid-deploy or the runner hung, and the row would otherwise stay
  * DEPLOYING forever. Stuck rows are settled to ERROR lazily on read.
  */
