@@ -46,9 +46,13 @@ export class RoadmapPinsService {
         select: { uid: true },
       });
       if (existingPin) {
-        if (body.note !== undefined) {
-          await tx.roadmapItemPin.update({ where: { uid: existingPin.uid }, data: { note: body.note ?? null } });
-        }
+        await tx.roadmapItemPin.update({
+          where: { uid: existingPin.uid },
+          data: {
+            ...(body.note !== undefined ? { note: body.note ?? null } : {}),
+            impact: body.impact,
+          },
+        });
         return;
       }
 
@@ -73,7 +77,7 @@ export class RoadmapPinsService {
       }
 
       await tx.roadmapItemPin.create({
-        data: { itemUid: uid, memberUid: actorUid, note: body.note ?? null },
+        data: { itemUid: uid, memberUid: actorUid, note: body.note ?? null, impact: body.impact },
       });
     });
 
@@ -95,7 +99,11 @@ export class RoadmapPinsService {
     return this.pinActionResponse(uid, actorUid);
   }
 
-  async updatePinNote(uid: string, note: string | null, actorUid: string) {
+  async updatePinNote(
+    uid: string,
+    body: { note?: string | null; impact?: number },
+    actorUid: string
+  ) {
     const pin = await this.prisma.roadmapItemPin.findFirst({
       where: { itemUid: uid, memberUid: actorUid, releasedAt: null },
       select: { uid: true },
@@ -103,7 +111,13 @@ export class RoadmapPinsService {
     if (!pin) {
       throw new NotFoundException(`No active pin on item ${uid}`);
     }
-    await this.prisma.roadmapItemPin.update({ where: { uid: pin.uid }, data: { note } });
+    await this.prisma.roadmapItemPin.update({
+      where: { uid: pin.uid },
+      data: {
+        ...(body.note !== undefined ? { note: body.note } : {}),
+        ...(body.impact !== undefined ? { impact: body.impact } : {}),
+      },
+    });
     await this.track(ROADMAP_ANALYTICS_EVENTS.PIN_NOTE_UPDATED, actorUid, { itemUid: uid });
     return this.pinActionResponse(uid, actorUid);
   }
@@ -142,7 +156,7 @@ export class RoadmapPinsService {
 
     const pins = await this.prisma.roadmapItemPin.findMany({
       where: { itemUid: uid },
-      select: { uid: true, note: true, createdAt: true, releasedAt: true, ...pinnerMemberSelect },
+      select: { uid: true, note: true, impact: true, createdAt: true, releasedAt: true, ...pinnerMemberSelect },
     });
 
     return {

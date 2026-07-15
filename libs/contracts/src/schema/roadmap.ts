@@ -57,9 +57,22 @@ export const RoadmapObjectiveRefSchema = z.object({
   order: z.number().int(),
 });
 
+/** Impact on company goals (1 = minor … 5 = critical). */
+export const ImpactLevelSchema = z.number().int().min(1).max(5);
+
+export const ImpactDistributionSchema = z.object({
+  1: z.number().int(),
+  2: z.number().int(),
+  3: z.number().int(),
+  4: z.number().int(),
+  5: z.number().int(),
+});
+
 export const RoadmapItemPinEntrySchema = z.object({
   uid: z.string(),
   note: z.string().nullable(),
+  /** Null for legacy pins created before impact ratings. */
+  impact: ImpactLevelSchema.nullable(),
   createdAt: z.string(),
   /** Non-null for historical pins auto-returned on a stage transition. */
   releasedAt: z.string().nullable(),
@@ -82,15 +95,24 @@ export const RoadmapItemSchema = z.object({
   promotedByUid: z.string().nullable(),
   declinedReason: z.string().nullable(),
   externalTrackerUrl: z.string().nullable(),
+  /** Author's expected impact at create time (1–5). Null on legacy items. */
+  authorImpact: ImpactLevelSchema.nullable(),
+  authorImpactReasoning: z.string().nullable(),
   objectives: z.array(RoadmapObjectiveRefSchema),
   /** @deprecated Always 0 — likes removed; use pinCount. Kept for API compat. */
   upvoteCount: z.number().int(),
-  /** @deprecated Always false — likes removed; use viewerHasPinned. Kept for API compat. */
+  /** @deprecated Always false — likes removed; use viewerHasUpvoted. Kept for API compat. */
   viewerHasUpvoted: z.boolean(),
   /** Active pins while the item is pinnable; frozen total (incl. released) otherwise. */
   pinCount: z.number().int(),
   viewerHasPinned: z.boolean(),
   viewerPinNote: z.string().nullable(),
+  /** Viewer's active pin impact; null if not pinned or legacy pin without impact. */
+  viewerImpact: ImpactLevelSchema.nullable(),
+  /** Community + author impact average; null when no ratings exist. */
+  avgImpact: z.number().nullable(),
+  impactCount: z.number().int(),
+  impactDistribution: ImpactDistributionSchema,
   /** Pinner identities + notes; only populated for curators, null for everyone else. */
   pins: z.array(RoadmapItemPinEntrySchema).nullable(),
   deletedAt: z.string().nullable(),
@@ -112,6 +134,9 @@ export const CreateRoadmapItemSchema = z.object({
   tags: z.array(z.string()).optional(),
   externalTrackerUrl: z.string().max(2000).optional().nullable(),
   stage: RoadmapStageSchema.optional(),
+  authorImpact: ImpactLevelSchema,
+  /** Required for non-curators; optional for curators (enforced in service). */
+  authorImpactReasoning: z.string().trim().max(2000).optional().nullable(),
 });
 
 export const UpdateRoadmapItemSchema = z.object({
@@ -143,14 +168,20 @@ export const RoadmapBuildButtonClickSchema = z.object({});
 // --- Priority signaling: pins ---
 
 export const PinRoadmapItemSchema = z.object({
+  impact: ImpactLevelSchema,
   note: z.string().trim().max(500).optional().nullable(),
   /** Run-out swap: unpin this item and pin the target atomically (net budget 0). */
   swapItemUid: z.string().optional().nullable(),
 });
 
-export const UpdatePinNoteSchema = z.object({
-  note: z.string().trim().max(500).nullable(),
-});
+export const UpdatePinNoteSchema = z
+  .object({
+    note: z.string().trim().max(500).nullable().optional(),
+    impact: ImpactLevelSchema.optional(),
+  })
+  .refine((body) => body.note !== undefined || body.impact !== undefined, {
+    message: 'At least one of note or impact is required',
+  });
 
 export const RoadmapPinBalanceSummarySchema = z.object({
   limit: z.number().int(),
