@@ -148,7 +148,7 @@ export class RoadmapController {
   async updateRoadmapPinNote(@Body() body: unknown, @Req() req: Request) {
     const member = await this.resolveMember(req);
     const parsed = UpdatePinNoteSchema.parse(body);
-    return this.roadmapPinsService.updatePinNote(req.params.uid, parsed.note, member.uid);
+    return this.roadmapPinsService.updatePinNote(req.params.uid, parsed, member.uid);
   }
 
   @Api(server.route.getMyRoadmapPinBalance)

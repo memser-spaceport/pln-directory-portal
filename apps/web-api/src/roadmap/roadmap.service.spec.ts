@@ -32,6 +32,8 @@ const baseItem = {
   promotedByUid: null,
   declinedReason: null,
   externalTrackerUrl: null,
+  authorImpact: null as number | null,
+  authorImpactReasoning: null as string | null,
   deletedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -147,6 +149,7 @@ describe('RoadmapService', () => {
         {
           uid: 'pin-old',
           note: 'old',
+          impact: 3,
           createdAt: new Date('2026-01-01'),
           releasedAt: new Date('2026-02-01'),
           member: { uid: 'm1', name: 'M1', image: null },
@@ -154,6 +157,7 @@ describe('RoadmapService', () => {
         {
           uid: 'pin-new',
           note: 'blocking',
+          impact: 5,
           createdAt: new Date('2026-03-01'),
           releasedAt: null,
           member: { uid: 'admin-1', name: 'Admin', image: { url: 'http://img' } },
@@ -163,11 +167,85 @@ describe('RoadmapService', () => {
       const result = await service.getItem('item-1', 'admin-1');
 
       expect(result.pins).toHaveLength(2);
-      expect(result.pins?.[0]).toMatchObject({ uid: 'pin-new', note: 'blocking', member: { name: 'Admin' } });
+      expect(result.pins?.[0]).toMatchObject({
+        uid: 'pin-new',
+        note: 'blocking',
+        impact: 5,
+        member: { name: 'Admin' },
+      });
       expect(result.pins?.[1].releasedAt).not.toBeNull();
       expect(result.pinCount).toBe(1); // active pins only (IDEA is pinnable)
       expect(result.viewerHasPinned).toBe(true); // admin-1 holds the active pin
       expect(result.viewerPinNote).toBe('blocking');
+      expect(result.viewerImpact).toBe(5);
+      // Released pin excluded while pinnable; only active impact 5
+      expect(result.impactCount).toBe(1);
+      expect(result.avgImpact).toBe(5);
+    });
+
+    it('includes author impact and excludes legacy null pin impact from aggregates', async () => {
+      prisma.roadmapItem.findFirst.mockResolvedValue({
+        ...row,
+        authorImpact: 4,
+        authorImpactReasoning: 'Moves operator toil',
+      });
+      prisma.roadmapItemPin.findMany.mockResolvedValue([
+        {
+          uid: 'pin-legacy',
+          note: null,
+          impact: null,
+          createdAt: new Date('2026-03-01'),
+          releasedAt: null,
+          member: { uid: 'm1', name: 'M1', image: null },
+        },
+        {
+          uid: 'pin-rated',
+          note: null,
+          impact: 2,
+          createdAt: new Date('2026-03-02'),
+          releasedAt: null,
+          member: { uid: 'm2', name: 'M2', image: null },
+        },
+      ]);
+      accessControl.getMemberAccess.mockResolvedValue({
+        effectivePermissions: ['roadmap.item.curate'],
+      });
+
+      const result = await service.getItem('item-1', 'admin-1');
+
+      expect(result.authorImpact).toBe(4);
+      expect(result.authorImpactReasoning).toBe('Moves operator toil');
+      expect(result.impactCount).toBe(2);
+      expect(result.avgImpact).toBe(3);
+      expect(result.impactDistribution).toEqual({ 1: 0, 2: 1, 3: 0, 4: 1, 5: 0 });
+    });
+
+    it('keeps released pin impact in aggregates when the stage is frozen', async () => {
+      prisma.roadmapItem.findFirst.mockResolvedValue({
+        ...row,
+        stage: RoadmapStage.IN_PROGRESS,
+        authorImpact: null,
+        _count: { pins: 1 },
+      });
+      prisma.roadmapItemPin.findMany.mockResolvedValue([
+        {
+          uid: 'pin-released',
+          note: null,
+          impact: 5,
+          createdAt: new Date('2026-03-01'),
+          releasedAt: new Date('2026-04-01'),
+          member: { uid: 'm1', name: 'M1', image: null },
+        },
+      ]);
+      accessControl.getMemberAccess.mockResolvedValue({
+        effectivePermissions: ['roadmap.item.curate'],
+      });
+
+      const result = await service.getItem('item-1', 'admin-1');
+
+      expect(result.pinCount).toBe(1);
+      expect(result.impactCount).toBe(1);
+      expect(result.avgImpact).toBe(5);
     });
 
     it('returns pins as null for non-curators', async () => {
@@ -256,11 +334,18 @@ describe('RoadmapService', () => {
     describe('new submission broadcast', () => {
       beforeEach(() => {
         accessControl.getMemberAccess.mockResolvedValue({ effectivePermissions: ['roadmap.idea.create'] });
-        prisma.roadmapItem.create.mockResolvedValue(rowFor(RoadmapStage.IDEA));
+        prisma.roadmapItem.create.mockResolvedValue({
+          ...rowFor(RoadmapStage.IDEA),
+          authorImpact: 4,
+          authorImpactReasoning: 'Cuts toil',
+        });
       });
 
       it('sends one permission-gated notification on IDEA submission', async () => {
-        await service.createItem({ title: 'Test', description: 'Desc' }, 'creator-1');
+        await service.createItem(
+          { title: 'Test', description: 'Desc', authorImpact: 4, authorImpactReasoning: 'Cuts toil' },
+          'creator-1'
+        );
 
         expect(pushNotifications.create).toHaveBeenCalledTimes(1);
         expect(pushNotifications.create).toHaveBeenCalledWith(
@@ -278,11 +363,42 @@ describe('RoadmapService', () => {
         );
       });
 
+      it('requires authorImpactReasoning for non-curators', async () => {
+        await expect(
+          service.createItem({ title: 'Test', description: 'Desc', authorImpact: 3 }, 'creator-1')
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(prisma.roadmapItem.create).not.toHaveBeenCalled();
+      });
+
+      it('allows curators to create without authorImpactReasoning', async () => {
+        accessControl.getMemberAccess.mockResolvedValue({ effectivePermissions: ['roadmap.item.curate'] });
+        prisma.roadmapItem.create.mockResolvedValue({
+          ...rowFor(RoadmapStage.PLANNED),
+          authorImpact: 5,
+          authorImpactReasoning: null,
+        });
+
+        await service.createItem({ title: 'Test', description: 'Desc', authorImpact: 5, stage: 'PLANNED' }, 'curator-1');
+
+        expect(prisma.roadmapItem.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ authorImpact: 5, authorImpactReasoning: null }),
+          })
+        );
+      });
+
       it('does not broadcast curator direct-creates into roadmap stages', async () => {
         accessControl.getMemberAccess.mockResolvedValue({ effectivePermissions: ['roadmap.item.curate'] });
-        prisma.roadmapItem.create.mockResolvedValue(rowFor(RoadmapStage.PLANNED));
+        prisma.roadmapItem.create.mockResolvedValue({
+          ...rowFor(RoadmapStage.PLANNED),
+          authorImpact: 4,
+          authorImpactReasoning: null,
+        });
 
-        await service.createItem({ title: 'Test', description: 'Desc', stage: 'PLANNED' }, 'curator-1');
+        await service.createItem(
+          { title: 'Test', description: 'Desc', stage: 'PLANNED', authorImpact: 4 },
+          'curator-1'
+        );
 
         expect(pushNotifications.create).not.toHaveBeenCalled();
       });
@@ -291,9 +407,16 @@ describe('RoadmapService', () => {
         'allows curators to direct-create into %s',
         async (stage) => {
           accessControl.getMemberAccess.mockResolvedValue({ effectivePermissions: ['roadmap.item.curate'] });
-          prisma.roadmapItem.create.mockResolvedValue(rowFor(stage as RoadmapStage));
+          prisma.roadmapItem.create.mockResolvedValue({
+            ...rowFor(stage as RoadmapStage),
+            authorImpact: 3,
+            authorImpactReasoning: null,
+          });
 
-          const result = await service.createItem({ title: 'Test', description: 'Desc', stage }, 'curator-1');
+          const result = await service.createItem(
+            { title: 'Test', description: 'Desc', stage, authorImpact: 3 },
+            'curator-1'
+          );
 
           expect(result.stage).toBe(stage);
           expect(prisma.roadmapItem.create).toHaveBeenCalledWith(
@@ -306,7 +429,10 @@ describe('RoadmapService', () => {
       it('does not fail the submission when the broadcast errors', async () => {
         pushNotifications.create.mockRejectedValue(new Error('ws down'));
 
-        const result = await service.createItem({ title: 'Test', description: 'Desc' }, 'creator-1');
+        const result = await service.createItem(
+          { title: 'Test', description: 'Desc', authorImpact: 4, authorImpactReasoning: 'Cuts toil' },
+          'creator-1'
+        );
 
         expect(result.uid).toBe('item-1');
       });
