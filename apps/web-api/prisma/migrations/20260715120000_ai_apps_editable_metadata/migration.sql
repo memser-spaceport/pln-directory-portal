@@ -1,0 +1,1 @@
+ALTER TABLE "AiApp" ADD COLUMN "prd" TEXT;

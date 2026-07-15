@@ -2984,42 +2984,44 @@ enum AiAppStatus {
 
 /// One vibe-coded sandbox app, lazy-created on first deploy by its owning member.
 model AiApp {
-  id           Int         @id @default(autoincrement())
-  uid          String      @unique @default(cuid())
+  id              Int         @id @default(autoincrement())
+  uid             String      @unique @default(cuid())
   /// Owning member (no FK relation to keep the POC isolated from the Member model).
-  memberUid    String
+  memberUid       String
   /// Business key supplied in the deploy payload; unique per owner.
-  appId        String
-  name         String
-  description  String?
-  status       AiAppStatus @default(IN_DEVELOPMENT)
-  notes        String?
+  appId           String
+  name            String
+  description     String?
+  /// Optional one-pager PRD. May contain Markdown or HTML.
+  prd             String?
+  status          AiAppStatus @default(IN_DEVELOPMENT)
+  notes           String?
   /// Hosting details returned by the sandbox runner on a successful deploy.
-  url          String?
-  httpUrl      String?
-  host         String?
-  port         Int?
-  deploymentId String?
+  url             String?
+  httpUrl         String?
+  host            String?
+  port            Int?
+  deploymentId    String?
   /// S3 key of the last uploaded app bundle, kept so a member-triggered deploy
   /// (draft flow) can redeploy without the agent re-uploading.
-  s3Key        String?
+  s3Key           String?
   /// Env var NAMES the agent declared the app needs at runtime (draft flow).
-  requiredEnvVars String[]  @default([])
+  requiredEnvVars String[]    @default([])
   /// Env var NAMES the member has provided values for. Values are never stored
   /// here — they go straight to the sandbox runner's secret store.
-  providedEnvVars String[]  @default([])
+  providedEnvVars String[]    @default([])
   /// Starter-kit version that produced the last agent upload (deploy or draft
   /// registration), as reported by the kit itself. Null = pre-1.4 kit (the
   /// field didn't exist yet) or a non-kit upload.
-  kitVersion   String?
+  kitVersion      String?
   /// AI tool behind the last agent upload, copied server-side from the connect
   /// session's self-reported `clientName` (e.g. "Claude Code").
-  agentClient  String?
+  agentClient     String?
   /// Model the agent reported running on for the last upload (optional
   /// self-reported multipart field, kits ≥1.4).
-  agentModel   String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  agentModel      String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   @@unique([memberUid, appId])
   @@index([memberUid])
