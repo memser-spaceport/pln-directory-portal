@@ -33,7 +33,7 @@
  */
 import { readFileSync } from 'fs';
 import { PrismaClient, Prisma } from '@prisma/client';
-import { affinityBoost, blendGraphScore, comparePathsByWarmth } from './affinity-warmth-boost.util';
+import { affinityBoost, blendGraphScore } from './affinity-warmth-boost.util';
 import { buildAffinityDirectPath, passesAffinityDirectThreshold } from './affinity-direct-path.util';
 import { finalizePersonHopChain } from './path-route.util';
 import { isUnreachableFounderPath } from './unreachable-founder-path.util';
@@ -54,6 +54,7 @@ import { loadPriorBackingMap } from './pl-investors-seed.util';
 import { applyPriorBackingToHopChain, backingWarmthBoost } from './prior-backing-warmth.util';
 import {
   applyPathAttributionAndWarmth,
+  comparePathCandidatesByFinalWarmth,
   lookupAllSocialOverlapsForInvestor,
   mergeOrCreateLinkedInPathCandidates,
   shouldAttachAffinityToPath,
@@ -342,7 +343,7 @@ async function seed() {
 
     if (candidates.length === 0) return null;
 
-    const sorted = [...candidates].sort(comparePathsByWarmth);
+    const sorted = [...candidates].sort(comparePathCandidatesByFinalWarmth);
 
     let rank1Code: string | null = null;
     let insertRank = 0;

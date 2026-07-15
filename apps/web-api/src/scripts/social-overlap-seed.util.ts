@@ -4,6 +4,8 @@
  * Logic mirrors enrichment path-pl-people-resolve + social-overlap (no cross-repo imports).
  */
 
+import { comparePathsByWarmth } from './affinity-warmth-boost.util';
+
 export type SocialOverlapKind =
   | 'concurrent_employment'
   | 'same_company_unknown_dates'
@@ -486,6 +488,44 @@ export function linkedInBonusForOverlaps(overlaps: SocialOverlapEntry[]): number
 export function applyLinkedInPathWarmth(pathScore: number, overlaps: SocialOverlapEntry[]): number {
   const bonus = linkedInBonusForOverlaps(overlaps);
   return Math.min(PATH_WARMTH_SCORE_CAP, pathScore + bonus);
+}
+
+/** Overlaps used for warmth — same resolution as seed finalize. */
+export function overlapsForPathWarmth(candidate: {
+  linkedInOverlaps?: SocialOverlapEntry[];
+  socialOverlap?: SocialOverlapEntry;
+}): SocialOverlapEntry[] {
+  if (candidate.linkedInOverlaps && candidate.linkedInOverlaps.length > 0) {
+    return candidate.linkedInOverlaps;
+  }
+  if (candidate.socialOverlap) return [candidate.socialOverlap];
+  return [];
+}
+
+/**
+ * Sort key for seed ranking: hops → pathWarmth (pathScore + linkedInBonus) → stable rank.
+ * Does not mutate base score — attribution still applies the bonus once at finalize.
+ */
+export function comparePathCandidatesByFinalWarmth(
+  a: {
+    hops: number;
+    score: number;
+    rank?: number;
+    linkedInOverlaps?: SocialOverlapEntry[];
+    socialOverlap?: SocialOverlapEntry;
+  },
+  b: {
+    hops: number;
+    score: number;
+    rank?: number;
+    linkedInOverlaps?: SocialOverlapEntry[];
+    socialOverlap?: SocialOverlapEntry;
+  }
+): number {
+  return comparePathsByWarmth(
+    { hops: a.hops, score: applyLinkedInPathWarmth(a.score, overlapsForPathWarmth(a)), rank: a.rank },
+    { hops: b.hops, score: applyLinkedInPathWarmth(b.score, overlapsForPathWarmth(b)), rank: b.rank }
+  );
 }
 
 const EMAIL_KINDS = new Set(['first_email', 'last_email']);
