@@ -2858,6 +2858,10 @@ model RoadmapItem {
 
   externalTrackerUrl String?
 
+  /// Author's expected impact on company goals at create time (1–5). Not a boost.
+  authorImpact          Int?
+  authorImpactReasoning String?
+
   objectives RoadmapItemObjective[]
 
   upvotes RoadmapItemUpvote[]
@@ -2901,6 +2905,8 @@ model RoadmapItemPin {
   memberUid  String
   member     Member      @relation("roadmapItemPinner", fields: [memberUid], references: [uid])
   note       String?
+  /// Impact on company goals (1–5). Null for legacy pins created before impact ratings.
+  impact     Int?
   releasedAt DateTime?
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -2963,7 +2969,7 @@ model RoadmapSubmissionDraft {
 /// Single-row table (id = 1) holding roadmap-wide configuration.
 model RoadmapSettings {
   id           Int      @id @default(1)
-  pinLimit     Int      @default(3)
+  pinLimit     Int      @default(10)
   updatedByUid String?
   updatedAt    DateTime @updatedAt
 }
