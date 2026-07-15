@@ -24,6 +24,8 @@ import {
   AI_APPS_RUNNER_URL,
   AI_APPS_S3_BUCKET,
   AI_APPS_STARTER_KIT_VERSION,
+  AI_APPS_VERIFY_ATTEMPTS,
+  AI_APPS_VERIFY_INTERVAL_MS,
   buildAppHost,
   buildAppHttpUrl,
   buildAppPageUrl,
@@ -33,11 +35,12 @@ import {
   buildRunnerSecretsUrl,
 } from './ai-apps.constants';
 
-/** Edge/gateway statuses that mean "the runner may still have finished" — verify, don't fail. */
-const GATEWAY_TIMEOUT_STATUSES = [408, 502, 503, 504, 521, 522, 523, 524];
-/** How long to wait for the app to come up after a runner timeout. */
-const VERIFY_ATTEMPTS = 8;
-const VERIFY_INTERVAL_MS = 8000;
+/**
+ * Edge/gateway statuses that mean "the app isn't reachable (yet)" — verify,
+ * don't fail. 530 is Cloudflare's origin-DNS error, served while the app's
+ * subdomain isn't registered yet.
+ */
+const GATEWAY_TIMEOUT_STATUSES = [408, 502, 503, 504, 521, 522, 523, 524, 530];
 
 interface RunnerDeployResponse {
   status?: string;
@@ -809,10 +812,11 @@ export class AiAppsService {
   /**
    * Polls the app URL until it responds (any non-gateway HTTP status means the
    * server is up — even a 404 from the app counts). Returns false if it never
-   * becomes reachable within the verification window.
+   * becomes reachable within the verification window (~6 min by default — must
+   * cover the pod-up → domain-registration gap, observed at 1–5 minutes).
    */
   private async verifyAppLive(url: string): Promise<boolean> {
-    for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= AI_APPS_VERIFY_ATTEMPTS; attempt++) {
       try {
         const res = await axios.get(url, { timeout: 10000, validateStatus: () => true, maxRedirects: 0 });
         if (res.status && !GATEWAY_TIMEOUT_STATUSES.includes(res.status)) {
@@ -821,8 +825,8 @@ export class AiAppsService {
       } catch {
         // Not reachable yet — keep polling.
       }
-      if (attempt < VERIFY_ATTEMPTS) {
-        await new Promise((resolve) => setTimeout(resolve, VERIFY_INTERVAL_MS));
+      if (attempt < AI_APPS_VERIFY_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, AI_APPS_VERIFY_INTERVAL_MS));
       }
     }
     return false;
