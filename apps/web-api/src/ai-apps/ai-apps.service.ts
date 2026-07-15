@@ -15,6 +15,7 @@ import { isDirectoryAdmin } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
+import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import {
   AI_APPS_DEPLOY_STUCK_MINUTES,
   AI_APPS_DEPLOY_STUCK_MS,
@@ -46,7 +47,7 @@ interface RunnerDeployResponse {
   port?: number;
 }
 
-type AiAppMember = { uid: string; name: string };
+type AiAppMember = { uid: string; name: string; image: string | null };
 
 /** Response shape across all AI Apps endpoints: `memberUid` replaced by `member`. */
 type WithMember<T extends { memberUid: string }> = Omit<T, 'memberUid'> & { member: AiAppMember | null };
@@ -62,10 +63,12 @@ export class AiAppsService {
     const members = memberUids.length
       ? await this.prisma.member.findMany({
           where: { uid: { in: memberUids } },
-          select: { uid: true, name: true },
+          select: { uid: true, name: true, image: { select: { url: true } } },
         })
       : [];
-    const byUid = new Map(members.map((m) => [m.uid, m]));
+    const byUid = new Map(
+      members.map(({ image, ...member }) => [member.uid, { ...member, image: image?.url ?? null }])
+    );
     return records.map(({ memberUid, ...rest }) => ({
       ...(rest as Omit<T, 'memberUid'>),
       member: byUid.get(memberUid) ?? null,
@@ -146,6 +149,92 @@ export class AiAppsService {
       return result;
     }
     return { ...result, canManage: await this.isCreatorOrDirectoryAdmin(requesterUid, app) };
+  }
+
+  /** Updates dashboard metadata only; this never invokes the sandbox runner or starts a deploy. */
+  async updateMetadata(
+    requesterUid: string,
+    uid: string,
+    dto: UpdateAppMetadataDto,
+    ownerOnly = false
+  ): Promise<WithMember<AiApp>> {
+    if (dto.name === undefined && dto.description === undefined && dto.prd === undefined) {
+      throw new BadRequestException('At least one of name, description, or prd must be provided');
+    }
+
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (ownerOnly && app.memberUid !== requesterUid) {
+      throw new ForbiddenException('The agent may edit only apps owned by its connected member');
+    }
+
+    const data: { name?: string; description?: string | null; prd?: string | null } = {};
+    if (dto.name !== undefined) data.name = dto.name.trim();
+    if (dto.description !== undefined) data.description = dto.description?.trim() || null;
+    if (dto.prd !== undefined) data.prd = dto.prd?.trim() || null;
+
+    const updated = await this.prisma.aiApp.update({ where: { uid }, data });
+    return (await this.withMember([updated]))[0];
+  }
+
+  /** Update metadata from JSON or multipart; a PRD file overrides body.prd. */
+  async updateMetadataWithOptionalPrdFile(
+    requesterUid: string,
+    uid: string,
+    dto: UpdateAppMetadataDto,
+    file?: Express.Multer.File
+  ): Promise<WithMember<AiApp>> {
+    if (!file) {
+      return this.updateMetadata(requesterUid, uid, dto);
+    }
+    if (dto.prd !== undefined) {
+      throw new BadRequestException('Send either prd text or a PRD file, not both');
+    }
+    const prd = this.extractPrdFileContent(file);
+    return this.updateMetadata(requesterUid, uid, { ...dto, prd } as UpdateAppMetadataDto);
+  }
+
+  /** File-only PRD upload used by POST /:uid/prd. */
+  async uploadPrd(requesterUid: string, uid: string, file: Express.Multer.File): Promise<WithMember<AiApp>> {
+    const prd = this.extractPrdFileContent(file);
+    return this.updateMetadata(requesterUid, uid, { prd } as UpdateAppMetadataDto);
+  }
+
+  /** Validate and read a UTF-8 Markdown/HTML PRD file. */
+  private extractPrdFileContent(file: Express.Multer.File): string {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('PRD file is required and must not be empty');
+    }
+
+    const filename = file.originalname || '';
+    const extension = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')).toLowerCase() : '';
+    const mimeType = (file.mimetype || '').toLowerCase();
+
+    const isMarkdown =
+      extension === '.md' ||
+      extension === '.markdown' ||
+      mimeType === 'text/markdown' ||
+      mimeType === 'text/x-markdown';
+    const isHtml =
+      extension === '.html' || extension === '.htm' || mimeType === 'text/html' || mimeType === 'application/xhtml+xml';
+
+    if (!isMarkdown && !isHtml) {
+      throw new BadRequestException('Unsupported PRD file type. Only .md, .markdown, .html, and .htm are allowed');
+    }
+    if (file.buffer.includes(0)) {
+      throw new BadRequestException('PRD file must contain UTF-8 text');
+    }
+
+    const prd = file.buffer.toString('utf8').trim();
+    if (!prd) {
+      throw new BadRequestException('PRD file is empty');
+    }
+    if (prd.length > 100000) {
+      throw new BadRequestException('Extracted PRD content must not exceed 100000 characters');
+    }
+    return prd;
   }
 
   /**

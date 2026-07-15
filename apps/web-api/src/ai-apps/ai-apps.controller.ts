@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Patch,
   Body,
   Query,
   Req,
@@ -35,7 +36,8 @@ import { DeployDraftDto } from './dto/deploy-draft.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
-import { AI_APPS_MAX_ZIP_BYTES, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
+import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
+import { AI_APPS_MAX_PRD_BYTES, AI_APPS_MAX_ZIP_BYTES, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
 const WRITE = { anyOf: [AI_APPS_PERMISSIONS.WRITE] };
@@ -143,6 +145,49 @@ export class AiAppsController {
   async getApp(@Param('uid') uid: string, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req).catch(() => undefined);
     return this.aiAppsService.getApp(uid, memberUid);
+  }
+
+  /**
+   * Edit app metadata without redeploying.
+   * Accepts either application/json or multipart/form-data. For multipart,
+   * `file` may contain a Markdown/HTML PRD while name/description remain optional.
+   */
+  @NoCache()
+  @Patch(':uid')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(WRITE)
+  @ApiConsumes('application/json', 'multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AI_APPS_MAX_PRD_BYTES } }))
+  @UsePipes(ZodValidationPipe)
+  async updateAppMetadata(
+    @Param('uid') uid: string,
+    @Body() body: UpdateAppMetadataDto,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.updateMetadataWithOptionalPrdFile(memberUid, uid, body, file);
+  }
+
+  /** Same metadata edit path for a connected member agent. */
+  @NoCache()
+  @Patch(':uid/agent')
+  @UseGuards(AiAppTokenGuard)
+  @UsePipes(ZodValidationPipe)
+  async updateAppMetadataFromAgent(@Param('uid') uid: string, @Body() body: UpdateAppMetadataDto, @Req() req: any) {
+    return this.aiAppsService.updateMetadata(req.aiAppMemberUid, uid, body, true);
+  }
+
+  /** Upload a Markdown or HTML PRD file from the dashboard without redeploying. */
+  @NoCache()
+  @Post(':uid/prd')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(WRITE)
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AI_APPS_MAX_PRD_BYTES } }))
+  async uploadAppPrd(@Param('uid') uid: string, @UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.uploadPrd(memberUid, uid, file);
   }
 
   /**

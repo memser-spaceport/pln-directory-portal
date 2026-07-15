@@ -37,6 +37,9 @@ export const AI_APPS_CONNECT_POLL_INTERVAL_SEC = 3;
 /** Max app ZIP size accepted by the deploy endpoint (50 MB). */
 export const AI_APPS_MAX_ZIP_BYTES = 50 * 1024 * 1024;
 
+/** Max Markdown/HTML one-pager PRD upload size (1 MB). */
+export const AI_APPS_MAX_PRD_BYTES = 1 * 1024 * 1024;
+
 /**
  * How long an app may sit in DEPLOYING before the deploy counts as STUCK.
  * Deploys run synchronously inside the API process (runner build + liveness
