@@ -238,9 +238,10 @@ code reads it from \`document.cookie\` (URL-decode + strip quotes) and calls the
 \`memberContextEndpoint\` from \`pln-app.config.json\` with
 \`Authorization: Bearer <token>\` — use the exact snippet from the skill, and do
 NOT rely on \`credentials: 'include'\` alone (the cookie may not reach the API
-host). The response carries the member's public profile (uid, name, email,
-image, teams + roles, skills). Bake the endpoint URL into the app's frontend as
-a constant — the config file itself is not shipped inside \`app/\`.
+host). The response carries the member's public profile (uid, name, image,
+teams + roles, skills — deliberately no email or other contact info). Bake the
+endpoint URL into the app's frontend as a constant — the config file itself is
+not shipped inside \`app/\`.
 - Handle the signed-out case gracefully (401/403/local dev): show a friendly
   note and keep the app usable without identity. Never hard-fail on it.
 - Personalization only: never gate sensitive/destructive actions on it, never
@@ -628,9 +629,7 @@ Response shape (\`member\`):
 {
   "uid": "…",
   "name": "Ada Lovelace",
-  "email": "ada@example.com",
   "image": "https://…/profile.png",
-  "officeHours": null,
   "location": { "city": "London", "country": "United Kingdom", "continent": "Europe" },
   "skills": ["Engineering", "Research"],
   "teams": [
@@ -640,7 +639,10 @@ Response shape (\`member\`):
 \`\`\`
 
 Fields may be \`null\`/empty, and new fields may be added over time — ignore
-anything you don't recognize.
+anything you don't recognize. The response deliberately contains **no contact
+info** (no email, no office-hours link) — don't build features that assume a
+way to reach the member, and don't ask them to type contact details in to
+compensate.
 
 ## Rules
 

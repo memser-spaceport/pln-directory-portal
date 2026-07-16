@@ -9,8 +9,6 @@ import { AiAppsService } from './ai-apps.service';
 const MEMBER = {
   uid: 'member-1',
   name: 'Ada Lovelace',
-  email: 'ada@example.com',
-  officeHours: null,
   image: { url: 'https://cdn.example.com/ada.png' },
   location: { city: 'London', country: 'United Kingdom', continent: 'Europe' },
   skills: [{ title: 'Engineering' }, { title: 'Research' }],
@@ -52,8 +50,6 @@ describe('AiAppsService getMemberContext', () => {
       member: {
         uid: 'member-1',
         name: 'Ada Lovelace',
-        email: 'ada@example.com',
-        officeHours: null,
         image: 'https://cdn.example.com/ada.png',
         location: { city: 'London', country: 'United Kingdom', continent: 'Europe' },
         skills: ['Engineering', 'Research'],
@@ -70,8 +66,6 @@ describe('AiAppsService getMemberContext', () => {
     prisma.member.findUnique.mockResolvedValue({
       uid: 'member-2',
       name: 'No Frills',
-      email: null,
-      officeHours: null,
       image: null,
       location: null,
       skills: [],
@@ -81,8 +75,6 @@ describe('AiAppsService getMemberContext', () => {
     expect(result.member).toEqual({
       uid: 'member-2',
       name: 'No Frills',
-      email: null,
-      officeHours: null,
       image: null,
       location: null,
       skills: [],
@@ -95,9 +87,19 @@ describe('AiAppsService getMemberContext', () => {
     await service.getMemberContext('member-1');
     const select = prisma.member.findUnique.mock.calls[0][0].select;
     expect(Object.keys(select).sort()).toEqual(
-      ['email', 'image', 'location', 'name', 'officeHours', 'skills', 'teamMemberRoles', 'uid'].sort()
+      ['image', 'location', 'name', 'skills', 'teamMemberRoles', 'uid'].sort()
     );
     const result = await service.getMemberContext('member-1');
     expect(result.member).not.toHaveProperty('teamMemberRoles');
+  });
+
+  it('never exposes contact info (email, office-hours link)', async () => {
+    const { service, prisma } = buildService();
+    const result = await service.getMemberContext('member-1');
+    const select = prisma.member.findUnique.mock.calls[0][0].select;
+    expect(select).not.toHaveProperty('email');
+    expect(select).not.toHaveProperty('officeHours');
+    expect(result.member).not.toHaveProperty('email');
+    expect(result.member).not.toHaveProperty('officeHours');
   });
 });

@@ -229,14 +229,15 @@ feedback, adapt behavior). `GET /v1/ai-apps/me` returns the signed-in member's
 ```json
 {
   "member": {
-    "uid": "…", "name": "Ada Lovelace", "email": "ada@example.com",
-    "image": "https://…/ada.png", "officeHours": null,
+    "uid": "…", "name": "Ada Lovelace", "image": "https://…/ada.png",
     "location": { "city": "London", "country": "United Kingdom", "continent": "Europe" },
     "skills": ["Engineering"],
     "teams": [{ "uid": "…", "name": "Protocol Labs", "role": "Engineer", "mainTeam": true, "teamLead": false }]
   }
 }
 ```
+
+The payload deliberately carries **no contact info** — no `email` and no `officeHours` link. Apps get an identity to personalize with, never a channel to reach the member.
 
 How it works — no app-side login and no new token flow:
 
