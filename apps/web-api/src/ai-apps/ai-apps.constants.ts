@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.4';
+export const AI_APPS_STARTER_KIT_VERSION = '1.5';
 
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
@@ -76,8 +76,7 @@ export const AI_APPS_S3_BUCKET = process.env.AI_APPS_S3_BUCKET || '';
  * already used for member images, so no new bucket policy/IAM permission is
  * required. AI_APPS_PRD_S3_BUCKET remains an optional override.
  */
-export const AI_APPS_PRD_S3_BUCKET =
-  process.env.AI_APPS_PRD_S3_BUCKET || AI_APPS_S3_BUCKET;
+export const AI_APPS_PRD_S3_BUCKET = process.env.AI_APPS_PRD_S3_BUCKET || AI_APPS_S3_BUCKET;
 
 /** Optional CDN/public base URL for PRDs, without a trailing slash. */
 export const AI_APPS_PRD_PUBLIC_BASE_URL = process.env.AI_APPS_PRD_PUBLIC_BASE_URL || '';
@@ -158,6 +157,15 @@ export const AI_APPS_DRAFT_ENDPOINT = process.env.AI_APPS_DRAFT_ENDPOINT || `${A
  * signed-in member's identity from.
  */
 export const AI_APPS_ME_ENDPOINT = process.env.AI_APPS_ME_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/me`;
+
+/**
+ * Public URL TEMPLATE of THIS API's agent metadata endpoint
+ * (`PATCH /v1/ai-apps/:uid/agent`), written into the starter kit. The agent
+ * replaces the literal `{appUid}` placeholder with the app's `uid` (returned by
+ * the deploy/draft response and saved in `pln-app.config.json`).
+ */
+export const AI_APPS_METADATA_ENDPOINT =
+  process.env.AI_APPS_METADATA_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent`;
 
 /**
  * Base URL of the LabOS portal that hosts the connect page the member opens to

@@ -227,9 +227,7 @@ export class AiAppsService {
   ): Promise<WithMember<AiApp>> {
     const extension = this.validatePrdFile(file);
     if (!AI_APPS_PRD_S3_BUCKET) {
-      throw new InternalServerErrorException(
-        'No PRD bucket configured (AI_APPS_PRD_S3_BUCKET or AI_APPS_S3_BUCKET)'
-      );
+      throw new InternalServerErrorException('No PRD bucket configured (AI_APPS_PRD_S3_BUCKET or AI_APPS_S3_BUCKET)');
     }
 
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
@@ -239,10 +237,7 @@ export class AiAppsService {
 
     const key = buildPrdS3Key(app.appId, extension, randomUUID());
     try {
-      const contentType =
-        extension === '.md'
-          ? 'text/markdown; charset=utf-8'
-          : 'text/html; charset=utf-8';
+      const contentType = extension === '.md' ? 'text/markdown; charset=utf-8' : 'text/html; charset=utf-8';
 
       await this.awsService.uploadFileToS3(
         {
@@ -267,9 +262,7 @@ export class AiAppsService {
     }
 
     const filename = file.originalname || '';
-    const rawExtension = filename.includes('.')
-      ? filename.slice(filename.lastIndexOf('.')).toLowerCase()
-      : '';
+    const rawExtension = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')).toLowerCase() : '';
 
     let extension: '.md' | '.html';
 
@@ -278,9 +271,7 @@ export class AiAppsService {
     } else if (rawExtension === '.html' || rawExtension === '.htm') {
       extension = '.html';
     } else {
-      throw new BadRequestException(
-        'Unsupported PRD file type. Only .md, .markdown, .html, and .htm are allowed'
-      );
+      throw new BadRequestException('Unsupported PRD file type. Only .md, .markdown, .html, and .htm are allowed');
     }
 
     if (file.buffer.includes(0)) {
