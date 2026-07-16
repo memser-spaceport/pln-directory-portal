@@ -71,6 +71,31 @@ export const AI_APPS_RUNNER_TOKEN = process.env.AI_APPS_RUNNER_TOKEN || '';
 /** S3 bucket the sandbox runner reads app bundles from. */
 export const AI_APPS_S3_BUCKET = process.env.AI_APPS_S3_BUCKET || '';
 
+/**
+ * Bucket for uploaded AI App PRDs. By default this reuses the image bucket
+ * already used for member images, so no new bucket policy/IAM permission is
+ * required. AI_APPS_PRD_S3_BUCKET remains an optional override.
+ */
+export const AI_APPS_PRD_S3_BUCKET =
+  process.env.AI_APPS_PRD_S3_BUCKET || AI_APPS_S3_BUCKET;
+
+/** Optional CDN/public base URL for PRDs, without a trailing slash. */
+export const AI_APPS_PRD_PUBLIC_BASE_URL = process.env.AI_APPS_PRD_PUBLIC_BASE_URL || '';
+
+/** Build a unique key while keeping the original Markdown/HTML extension. */
+export const buildPrdS3Key = (appId: string, extension: string, uniqueId: string): string =>
+  `ai-app-prds/${appId}/${uniqueId}${extension}`;
+
+/** Convert a stored PRD key to the URL returned under the existing `prd` field. */
+export const buildPrdPublicUrl = (key: string): string => {
+  const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+  if (AI_APPS_PRD_PUBLIC_BASE_URL) {
+    return `${AI_APPS_PRD_PUBLIC_BASE_URL.replace(/\/$/, '')}/${encodedKey}`;
+  }
+  const region = process.env.AWS_REGION || 'us-east-1';
+  return `https://${AI_APPS_PRD_S3_BUCKET}.s3.${region}.amazonaws.com/${encodedKey}`;
+};
+
 /** Project scope for the runner's secrets/deployments API (`/v1/projects/<project>/…`). */
 export const AI_APPS_RUNNER_PROJECT = process.env.AI_APPS_RUNNER_PROJECT || 'default';
 
