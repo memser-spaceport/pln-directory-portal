@@ -262,9 +262,6 @@ export class RoadmapService {
     }
 
     const reasoning = body.authorImpactReasoning?.trim() || null;
-    if (!access.canCurate && !reasoning) {
-      throw new BadRequestException('authorImpactReasoning is required when creating an item');
-    }
 
     const row = await this.prisma.roadmapItem.create({
       data: {
@@ -276,7 +273,7 @@ export class RoadmapService {
         tags: body.tags ?? [],
         externalTrackerUrl: body.externalTrackerUrl ?? null,
         stage,
-        authorImpact: body.authorImpact,
+        authorImpact: body.authorImpact ?? null,
         authorImpactReasoning: reasoning,
         createdByUid: actorUid,
         promotedAt: stage === RoadmapStage.PLANNED ? new Date() : null,
@@ -656,10 +653,7 @@ export class RoadmapService {
     pinsForImpact: Array<{ impact: number | null; releasedAt: Date | null }> = []
   ) {
     const pinnable = this.isPinnableStage(row.stage);
-    const impact = computeImpactAggregate([
-      row.authorImpact,
-      ...impactValuesFromPins(pinsForImpact, pinnable),
-    ]);
+    const impact = computeImpactAggregate([row.authorImpact, ...impactValuesFromPins(pinsForImpact, pinnable)]);
 
     return {
       uid: row.uid,

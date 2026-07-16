@@ -134,8 +134,7 @@ export const CreateRoadmapItemSchema = z.object({
   tags: z.array(z.string()).optional(),
   externalTrackerUrl: z.string().max(2000).optional().nullable(),
   stage: RoadmapStageSchema.optional(),
-  authorImpact: ImpactLevelSchema,
-  /** Required for non-curators; optional for curators (enforced in service). */
+  authorImpact: ImpactLevelSchema.optional().nullable(),
   authorImpactReasoning: z.string().trim().max(2000).optional().nullable(),
 });
 
@@ -168,7 +167,7 @@ export const RoadmapBuildButtonClickSchema = z.object({});
 // --- Priority signaling: pins ---
 
 export const PinRoadmapItemSchema = z.object({
-  impact: ImpactLevelSchema,
+  impact: ImpactLevelSchema.optional().nullable(),
   note: z.string().trim().max(500).optional().nullable(),
   /** Run-out swap: unpin this item and pin the target atomically (net budget 0). */
   swapItemUid: z.string().optional().nullable(),

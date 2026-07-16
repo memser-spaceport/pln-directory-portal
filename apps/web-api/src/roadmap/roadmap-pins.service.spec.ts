@@ -79,6 +79,16 @@ describe('RoadmapPinsService', () => {
       });
     });
 
+    it('creates a pin without impact when the rating is skipped', async () => {
+      prisma.roadmapItem.findFirst.mockResolvedValue(pinnableItem);
+
+      await service.pinItem('item-1', {}, 'member-1');
+
+      expect(prisma.roadmapItemPin.create).toHaveBeenCalledWith({
+        data: { itemUid: 'item-1', memberUid: 'member-1', note: null, impact: null },
+      });
+    });
+
     it('rejects with PIN_BALANCE_EXHAUSTED when the budget is spent', async () => {
       prisma.roadmapItem.findFirst.mockResolvedValue(pinnableItem);
       prisma.roadmapItemPin.count.mockResolvedValue(DEFAULT_PIN_LIMIT);
