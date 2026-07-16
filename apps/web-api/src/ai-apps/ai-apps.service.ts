@@ -9,6 +9,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
+import { randomUUID } from 'crypto';
 import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { isDirectoryAdmin } from '../utils/constants';
@@ -23,6 +24,7 @@ import {
   AI_APPS_RUNNER_TOKEN,
   AI_APPS_RUNNER_URL,
   AI_APPS_S3_BUCKET,
+  AI_APPS_PRD_S3_BUCKET,
   AI_APPS_STARTER_KIT_VERSION,
   AI_APPS_VERIFY_ATTEMPTS,
   AI_APPS_VERIFY_INTERVAL_MS,
@@ -31,6 +33,8 @@ import {
   buildAppPageUrl,
   buildAppS3Key,
   buildAppUrl,
+  buildPrdPublicUrl,
+  buildPrdS3Key,
   buildRunnerDeploymentsUrl,
   buildRunnerSecretsUrl,
 } from './ai-apps.constants';
@@ -72,10 +76,21 @@ export class AiAppsService {
     const byUid = new Map(
       members.map(({ image, ...member }) => [member.uid, { ...member, image: image?.url ?? null }])
     );
-    return records.map(({ memberUid, ...rest }) => ({
-      ...(rest as Omit<T, 'memberUid'>),
-      member: byUid.get(memberUid) ?? null,
-    }));
+    return records.map(({ memberUid, ...rest }) => {
+      const response = {
+        ...(rest as Omit<T, 'memberUid'>),
+        member: byUid.get(memberUid) ?? null,
+      } as WithMember<T>;
+
+      // The database stores only the S3 key. Keep the existing API contract by
+      // returning the public URL in the same `prd` field. Legacy inline PRD
+      // values remain untouched.
+      const responseWithPrd = response as WithMember<T> & { prd?: string | null };
+      if (typeof responseWithPrd.prd === 'string' && responseWithPrd.prd.startsWith('ai-app-prds/')) {
+        responseWithPrd.prd = buildPrdPublicUrl(responseWithPrd.prd);
+      }
+      return response;
+    });
   }
 
   /**
@@ -195,49 +210,84 @@ export class AiAppsService {
     if (dto.prd !== undefined) {
       throw new BadRequestException('Send either prd text or a PRD file, not both');
     }
-    const prd = this.extractPrdFileContent(file);
-    return this.updateMetadata(requesterUid, uid, { ...dto, prd } as UpdateAppMetadataDto);
+    return this.storePrdFile(requesterUid, uid, file, dto);
   }
 
   /** File-only PRD upload used by POST /:uid/prd. */
   async uploadPrd(requesterUid: string, uid: string, file: Express.Multer.File): Promise<WithMember<AiApp>> {
-    const prd = this.extractPrdFileContent(file);
-    return this.updateMetadata(requesterUid, uid, { prd } as UpdateAppMetadataDto);
+    return this.storePrdFile(requesterUid, uid, file, {} as UpdateAppMetadataDto);
   }
 
-  /** Validate and read a UTF-8 Markdown/HTML PRD file. */
-  private extractPrdFileContent(file: Express.Multer.File): string {
+  /** Validate a Markdown/HTML PRD file, upload it, and persist only its S3 key. */
+  private async storePrdFile(
+    requesterUid: string,
+    uid: string,
+    file: Express.Multer.File,
+    metadata: UpdateAppMetadataDto
+  ): Promise<WithMember<AiApp>> {
+    const extension = this.validatePrdFile(file);
+    if (!AI_APPS_PRD_S3_BUCKET) {
+      throw new InternalServerErrorException(
+        'No PRD bucket configured (AI_APPS_PRD_S3_BUCKET or AI_APPS_S3_BUCKET)'
+      );
+    }
+
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+
+    const key = buildPrdS3Key(app.appId, extension, randomUUID());
+    try {
+      const contentType =
+        extension === '.md'
+          ? 'text/markdown; charset=utf-8'
+          : 'text/html; charset=utf-8';
+
+      await this.awsService.uploadFileToS3(
+        {
+          buffer: file.buffer,
+          mimetype: contentType,
+        },
+        AI_APPS_PRD_S3_BUCKET,
+        key
+      );
+    } catch (error) {
+      this.logger.error(`AI App PRD upload failed for ${app.appId}: ${(error as Error).message}`);
+      throw new BadGatewayException('Failed to store the PRD file');
+    }
+
+    return this.updateMetadata(requesterUid, uid, { ...metadata, prd: key } as UpdateAppMetadataDto);
+  }
+
+  /** Validate a UTF-8 Markdown/HTML PRD file and return its normalized extension. */
+  private validatePrdFile(file: Express.Multer.File): '.md' | '.html' {
     if (!file?.buffer?.length) {
       throw new BadRequestException('PRD file is required and must not be empty');
     }
 
     const filename = file.originalname || '';
-    const extension = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')).toLowerCase() : '';
-    const mimeType = (file.mimetype || '').toLowerCase();
+    const rawExtension = filename.includes('.')
+      ? filename.slice(filename.lastIndexOf('.')).toLowerCase()
+      : '';
 
-    const isMarkdown =
-      extension === '.md' ||
-      extension === '.markdown' ||
-      mimeType === 'text/markdown' ||
-      mimeType === 'text/x-markdown';
-    const isHtml =
-      extension === '.html' || extension === '.htm' || mimeType === 'text/html' || mimeType === 'application/xhtml+xml';
+    let extension: '.md' | '.html';
 
-    if (!isMarkdown && !isHtml) {
-      throw new BadRequestException('Unsupported PRD file type. Only .md, .markdown, .html, and .htm are allowed');
+    if (rawExtension === '.md' || rawExtension === '.markdown') {
+      extension = '.md';
+    } else if (rawExtension === '.html' || rawExtension === '.htm') {
+      extension = '.html';
+    } else {
+      throw new BadRequestException(
+        'Unsupported PRD file type. Only .md, .markdown, .html, and .htm are allowed'
+      );
     }
+
     if (file.buffer.includes(0)) {
       throw new BadRequestException('PRD file must contain UTF-8 text');
     }
 
-    const prd = file.buffer.toString('utf8').trim();
-    if (!prd) {
-      throw new BadRequestException('PRD file is empty');
-    }
-    if (prd.length > 100000) {
-      throw new BadRequestException('Extracted PRD content must not exceed 100000 characters');
-    }
-    return prd;
+    return extension;
   }
 
   /**
