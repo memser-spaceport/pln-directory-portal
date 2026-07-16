@@ -12,6 +12,9 @@
  * Idempotent: purge prior gold run + its paths, create person records keyed by
  * Affinity id with person-keyed PathfinderPath rows copied from each person's best
  * firm, repoint + graph the gold-coinvestors list, set membership.
+ * Display firm/title prefer prestige enrichment when present; Affinity Organizations
+ * still drive proximity. Re-run after deploying firm/title precedence so existing
+ * rows pick up enrichment-preferred display values.
  *
  * Needs the gold runner dump (with firm_label) — regenerate via
  *   cd pln-data-enrichment/apps/data-enrichment && npx ts-node scripts/run-pathfinder-gold.ts
@@ -36,6 +39,7 @@ import {
   type MemberResolver,
 } from './affinity-roster-mapper.util';
 import { loadPrestigeByName, toEnrichment } from './prestige-seed.util';
+import { resolveInvestorFirmAndTitle } from './investor-firm-title-precedence.util';
 import { buildFirmByLabelIndex, lookupFirmProximity, type FirmProximity } from './firm-proximity-seed.util';
 import { loadPriorBackingMap } from './pl-investors-seed.util';
 import { applyPriorBackingToHopChain, backingWarmthBoost } from './prior-backing-warmth.util';
@@ -472,6 +476,13 @@ async function seed() {
     const mergedProfile = mergeProfileFields(priorProfile ?? {}, affinityProfile);
     const rawPayload = buildRawPayload(enrichment, affinityData, priorProfile?.rawPayload);
     const priorBacking = priorBackingByInvestor.get(affinityId);
+    // Display firm/title: prestige enrichment wins when it has a usable signal;
+    // Affinity Organizations still drive proximity/paths above (firmLabel / best).
+    const resolvedFirmTitle = resolveInvestorFirmAndTitle({
+      affinityFirm: firmLabel,
+      affinityTitle: mergedProfile.title,
+      enrichment: prest ? { firm: prest.firm, title: prest.title, bio: prest.bio } : undefined,
+    });
     const recordFields = {
       investorId: affinityId,
       canonicalId: affinityId,
@@ -480,8 +491,9 @@ async function seed() {
       email,
       additionalEmails,
       emailStatus: 'unverified',
-      firm: firmLabel,
+      firm: resolvedFirmTitle.firm,
       ...mergedProfile,
+      title: resolvedFirmTitle.title,
       engagementTier: '',
       enrichmentStatus: enrichment ? 'enriched' : 'pending',
       bestProximityCode: bestProximityForRecord,

@@ -5,6 +5,9 @@ import { readFileSync } from 'fs';
 
 export interface PrestigeEntry {
   name?: string;
+  /** Present when cache/query carries a firm; usually null in LP prestige cache today. */
+  firm?: string | null;
+  title?: string | null;
   aum?: string | null;
   notableInvestments?: string[] | null;
   bio?: string | null;
