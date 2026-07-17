@@ -22,6 +22,7 @@ describe('AiAppsStarterKitService buildZip', () => {
       'CLAUDE.md',
       'AGENTS.md',
       '.claude/skills/deploy-to-labs/SKILL.md',
+      '.claude/skills/app-metadata/SKILL.md',
       '.claude/skills/pl-design-system/SKILL.md',
       '.claude/skills/pln-member-context/SKILL.md',
       'pln-app.config.json',
@@ -65,6 +66,57 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).toContain('It does NOT cover the LabOS links');
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {
       expect(entries.get(path) as string).toContain('LabOS links');
+    }
+  });
+
+  it('writes the metadata endpoint template and display-metadata fields into the config', () => {
+    const config = JSON.parse(entries.get('pln-app.config.json') as string);
+    expect(config.metadataEndpoint).toContain('/v1/ai-apps/{appUid}/agent');
+    // Persisted so redeploys reuse the member-approved values and can address
+    // the metadata endpoint without re-running the propose flow.
+    expect(config.appUid).toBe('');
+    expect(config.appName).toBe('');
+    expect(config.appDescription).toBe('');
+  });
+
+  it('teaches the propose → approve → optional-PRD metadata flow', () => {
+    const metadataSkill = entries.get('.claude/skills/app-metadata/SKILL.md') as string;
+    // Nothing member-facing is saved without explicit approval…
+    expect(metadataSkill).toContain('Wait for explicit approval');
+    // …the PRD is offered, not imposed, and declining is a valid outcome…
+    expect(metadataSkill).toContain('If the member declines');
+    // …and saving goes through the deploy-free metadata endpoint.
+    expect(metadataSkill).toContain('PATCH');
+    expect(metadataSkill).toContain('{appUid}');
+    expect(metadataSkill).toContain('"prd": null');
+    expect(metadataSkill).toContain('no ZIP, no build');
+    // Markdown one-page brief with the product template sections…
+    expect(metadataSkill).toContain('prd.md');
+    expect(metadataSkill).toContain('Problem Statement');
+    expect(metadataSkill).toContain('Goals / OKR Impact');
+    expect(metadataSkill).toContain('Success Metrics');
+    expect(metadataSkill).toContain('Out of Scope');
+    // …synthesized from context, not a long questionnaire.
+    expect(metadataSkill).toContain('Synthesize what you already know');
+    expect(metadataSkill).toContain('Ask at most one or two questions');
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      const content = entries.get(path) as string;
+      expect(content).toContain('app-metadata');
+      expect(content).toContain('wait for explicit approval');
+      expect(content).toContain('one-pager PRD');
+      expect(content).toContain('Markdown one-page brief');
+    }
+  });
+
+  it('makes redeploys reuse approved metadata instead of re-proposing', () => {
+    const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    // The deploy form overwrites stored name/description, so redeploys must
+    // resend the saved values verbatim — not fresh drafts.
+    expect(deploySkill).toContain("saved values verbatim and don't re-ask");
+    expect(deploySkill).toContain('the approved appName from pln-app.config.json');
+    expect(deploySkill).toContain("Save the response's `uid` as `appUid`");
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).toContain('NOT re-run the propose-and-approve flow');
     }
   });
 

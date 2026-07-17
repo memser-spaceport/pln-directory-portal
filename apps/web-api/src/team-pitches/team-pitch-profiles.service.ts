@@ -70,7 +70,7 @@ export class TeamPitchProfilesService {
       }
     }
 
-    const teamProfile = await this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
+    const teamProfile = await this.buildTeamProfileCard(pitch.uid, pitch.teamUid, resolved);
 
     return {
       uid: pitch.uid,
@@ -94,7 +94,21 @@ export class TeamPitchProfilesService {
     };
   }
 
-  async buildTeamProfileCard(teamPitchUid: string, teamUid: string) {
+  canViewAnalyticsReportUrl(resolved: {
+    isPitchAdmin?: boolean;
+    participantType?: TeamPitchParticipantType | null;
+  }): boolean {
+    return !!resolved.isPitchAdmin || resolved.participantType === TeamPitchParticipantType.FOUNDER;
+  }
+
+  async buildTeamProfileCard(
+    teamPitchUid: string,
+    teamUid: string,
+    resolved?: {
+      isPitchAdmin?: boolean;
+      participantType?: TeamPitchParticipantType | null;
+    }
+  ) {
     const pitch = await this.prisma.teamPitch.findUnique({
       where: { uid: teamPitchUid },
       include: {
@@ -159,6 +173,8 @@ export class TeamPitchProfilesService {
       officeHours: participant.member.officeHours,
     }));
 
+    const includeAnalyticsReportUrl = resolved ? this.canViewAnalyticsReportUrl(resolved) : false;
+
     return {
       uid: pitch.profile.uid,
       teamPitchUid: pitch.uid,
@@ -170,11 +186,12 @@ export class TeamPitchProfilesService {
       videoUploadUid: pitch.profile.videoUploadUid,
       videoUpload: pitch.profile.videoUpload,
       description: pitch.profile.description,
+      ...(includeAnalyticsReportUrl && { analyticsReportUrl: pitch.profile.analyticsReportUrl }),
     };
   }
 
   async updateProfileDescription(memberEmail: string, slugOrUid: string, description: string | null) {
-    const { pitch } = await this.teamPitchesService.assertEditAccess(memberEmail, slugOrUid);
+    const { pitch, resolved } = await this.teamPitchesService.assertEditAccess(memberEmail, slugOrUid);
     const member = await this.prisma.member.findUnique({ where: { email: memberEmail } });
 
     await this.prisma.teamPitchProfile.update({
@@ -185,7 +202,7 @@ export class TeamPitchProfilesService {
       },
     });
 
-    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
+    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid, resolved);
   }
 
   async updateTeam(
@@ -200,7 +217,7 @@ export class TeamPitchProfilesService {
       logo?: string;
     }
   ) {
-    const { pitch } = await this.teamPitchesService.assertEditAccess(memberEmail, slugOrUid);
+    const { pitch, resolved } = await this.teamPitchesService.assertEditAccess(memberEmail, slugOrUid);
     const teamUid = pitch.teamUid;
 
     const updateData: Record<string, unknown> = {};
@@ -232,16 +249,15 @@ export class TeamPitchProfilesService {
       }
     });
 
-    return this.buildTeamProfileCard(pitch.uid, teamUid);
+    return this.buildTeamProfileCard(pitch.uid, teamUid, resolved);
   }
 
   private async getPitchForEdit(memberEmail: string, slugOrUid: string) {
-    const { pitch } = await this.teamPitchesService.assertEditAccess(memberEmail, slugOrUid);
-    return pitch;
+    return this.teamPitchesService.assertEditAccess(memberEmail, slugOrUid);
   }
 
   async updateOnePager(memberEmail: string, slugOrUid: string, onePagerUploadUid: string) {
-    const pitch = await this.getPitchForEdit(memberEmail, slugOrUid);
+    const { pitch, resolved } = await this.getPitchForEdit(memberEmail, slugOrUid);
     if (onePagerUploadUid) {
       const upload = await this.prisma.upload.findUnique({ where: { uid: onePagerUploadUid } });
       if (!upload || (upload.kind !== UploadKind.IMAGE && upload.kind !== UploadKind.SLIDE)) {
@@ -252,20 +268,20 @@ export class TeamPitchProfilesService {
       where: { teamPitchUid: pitch.uid },
       data: { onePagerUploadUid: onePagerUploadUid || null },
     });
-    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
+    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid, resolved);
   }
 
   async deleteOnePager(memberEmail: string, slugOrUid: string) {
-    const pitch = await this.getPitchForEdit(memberEmail, slugOrUid);
+    const { pitch, resolved } = await this.getPitchForEdit(memberEmail, slugOrUid);
     await this.prisma.teamPitchProfile.update({
       where: { teamPitchUid: pitch.uid },
       data: { onePagerUploadUid: null },
     });
-    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
+    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid, resolved);
   }
 
   async updateVideo(memberEmail: string, slugOrUid: string, videoUploadUid: string) {
-    const pitch = await this.getPitchForEdit(memberEmail, slugOrUid);
+    const { pitch, resolved } = await this.getPitchForEdit(memberEmail, slugOrUid);
     if (videoUploadUid) {
       const upload = await this.prisma.upload.findUnique({ where: { uid: videoUploadUid } });
       if (!upload || upload.kind !== UploadKind.VIDEO) {
@@ -276,16 +292,16 @@ export class TeamPitchProfilesService {
       where: { teamPitchUid: pitch.uid },
       data: { videoUploadUid: videoUploadUid || null },
     });
-    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
+    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid, resolved);
   }
 
   async deleteVideo(memberEmail: string, slugOrUid: string) {
-    const pitch = await this.getPitchForEdit(memberEmail, slugOrUid);
+    const { pitch, resolved } = await this.getPitchForEdit(memberEmail, slugOrUid);
     await this.prisma.teamPitchProfile.update({
       where: { teamPitchUid: pitch.uid },
       data: { videoUploadUid: null },
     });
-    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
+    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid, resolved);
   }
 
   async generateVideoUploadUrl(
@@ -331,13 +347,13 @@ export class TeamPitchProfilesService {
   }
 
   async confirmVideoUpload(memberEmail: string, slugOrUid: string, uploadUid: string) {
-    const pitch = await this.getPitchForEdit(memberEmail, slugOrUid);
+    const { pitch, resolved } = await this.getPitchForEdit(memberEmail, slugOrUid);
     const confirmedUpload = await this.uploadsService.confirmUpload(uploadUid);
     await this.prisma.teamPitchProfile.update({
       where: { teamPitchUid: pitch.uid },
       data: { videoUploadUid: confirmedUpload.uid },
     });
-    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
+    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid, resolved);
   }
 
   async generateOnePagerUploadUrl(
@@ -383,13 +399,13 @@ export class TeamPitchProfilesService {
   }
 
   async confirmOnePagerUpload(memberEmail: string, slugOrUid: string, uploadUid: string) {
-    const pitch = await this.getPitchForEdit(memberEmail, slugOrUid);
+    const { pitch, resolved } = await this.getPitchForEdit(memberEmail, slugOrUid);
     const confirmedUpload = await this.uploadsService.confirmUpload(uploadUid);
     await this.prisma.teamPitchProfile.update({
       where: { teamPitchUid: pitch.uid },
       data: { onePagerUploadUid: confirmedUpload.uid },
     });
-    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
+    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid, resolved);
   }
 
   async uploadOnePagerPreview(
@@ -398,7 +414,7 @@ export class TeamPitchProfilesService {
     previewImage: Express.Multer.File,
     previewImageSmall?: Express.Multer.File
   ) {
-    const pitch = await this.getPitchForEdit(memberEmail, slugOrUid);
+    const { pitch, resolved } = await this.getPitchForEdit(memberEmail, slugOrUid);
     const profile = await this.prisma.teamPitchProfile.findUnique({
       where: { teamPitchUid: pitch.uid },
       include: { onePagerUpload: true },
@@ -431,6 +447,6 @@ export class TeamPitchProfilesService {
       },
     });
 
-    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid);
+    return this.buildTeamProfileCard(pitch.uid, pitch.teamUid, resolved);
   }
 }

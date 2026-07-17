@@ -9,6 +9,7 @@ import {
   AI_APPS_DEPLOY_ENDPOINT,
   AI_APPS_DRAFT_ENDPOINT,
   AI_APPS_ME_ENDPOINT,
+  AI_APPS_METADATA_ENDPOINT,
   AI_APPS_STARTER_KIT_VERSION,
 } from './ai-apps.constants';
 
@@ -35,6 +36,7 @@ export class AiAppsStarterKitService {
     add('CLAUDE.md', this.agentInstructions());
     add('AGENTS.md', this.agentInstructions());
     add('.claude/skills/deploy-to-labs/SKILL.md', this.deploySkill());
+    add('.claude/skills/app-metadata/SKILL.md', this.metadataSkill());
     add('.claude/skills/pl-design-system/SKILL.md', this.designSystemSkill());
     add('.claude/skills/pln-member-context/SKILL.md', this.memberContextSkill());
     add('pln-app.config.json', this.configJson());
@@ -99,6 +101,8 @@ to the Protocol Labs Network sandbox with a single instruction.
 ## What's inside
 - \`CLAUDE.md\` / \`AGENTS.md\` — instructions your AI agent reads automatically.
 - \`.claude/skills/deploy-to-labs/\` — the deploy skill your agent uses.
+- \`.claude/skills/app-metadata/\` — how your agent names/describes your app and
+  adds an optional one-pager PRD (always with your approval).
 - \`.claude/skills/pl-design-system/\` — how to build on-brand UI with the PL Design System.
 - \`.claude/skills/pln-member-context/\` — how your app can know which PLN member is using it.
 - \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
@@ -119,11 +123,18 @@ to the Protocol Labs Network sandbox with a single instruction.
    - **Existing app:** copy your project's files into \`app/\`, then say "migrate this
      existing app and deploy it to LabOS". Your agent takes care of whatever setup is
      needed to run it there.
-3. When you're happy, say "deploy this app". The first time you deploy, your agent
-   will give you a LabOS link to open and approve — sign in and click **Approve**
-   to authorize the deploy. Your agent then ships the app to the PLN sandbox; the
-   first deploy can take a minute or two.
-4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it.
+3. When you're happy, say "deploy this app". Before the first deploy your agent
+   suggests a name and short description for your app — approve them or ask for
+   changes. The first time you deploy, your agent will also give you a LabOS
+   link to open and approve — sign in and click **Approve** to authorize the
+   deploy. Your agent then ships the app to the PLN sandbox; the first deploy
+   can take a minute or two.
+4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it. 
+   After the first deploy your agent offers an optional **one-pager PRD** — a
+   short product brief (why the app exists and what it does) shown with your
+   app; say yes and approve the draft, or skip it. You can rename your app,
+   edit its description, or change the PRD anytime — just ask your agent; no
+   redeploy needed.
 
 ## Apps that need an API key or password (secrets)
 Some apps need a secret to work — for example an app that talks to ChatGPT/OpenAI,
@@ -228,9 +239,10 @@ code reads it from \`document.cookie\` (URL-decode + strip quotes) and calls the
 \`memberContextEndpoint\` from \`pln-app.config.json\` with
 \`Authorization: Bearer <token>\` — use the exact snippet from the skill, and do
 NOT rely on \`credentials: 'include'\` alone (the cookie may not reach the API
-host). The response carries the member's public profile (uid, name, email,
-image, teams + roles, skills). Bake the endpoint URL into the app's frontend as
-a constant — the config file itself is not shipped inside \`app/\`.
+host). The response carries the member's public profile (uid, name, image,
+teams + roles, skills — deliberately no email or other contact info). Bake the
+endpoint URL into the app's frontend as a constant — the config file itself is
+not shipped inside \`app/\`.
 - Handle the signed-out case gracefully (401/403/local dev): show a friendly
   note and keep the app usable without identity. Never hard-fail on it.
 - Personalization only: never gate sensitive/destructive actions on it, never
@@ -308,26 +320,54 @@ The flow (full steps in the deploy skill):
 Never ask the member for secret values in the chat, and never write them to any
 file — LabOS is the only place they should be entered.
 
+## App name, description & one-pager PRD (display metadata)
+Every app has member-facing display metadata on the AI Apps dashboard: a
+**name**, a short **description**, and an optional **one-pager PRD**. The rules
+live in the **app-metadata** skill (\`.claude/skills/app-metadata/SKILL.md\`) —
+load it whenever metadata comes up. In short:
+- **Before the first deploy**: propose a human-friendly name + 1–2 sentence
+  description drawn from what the app does, present them to the member, and
+  **wait for explicit approval** (revise until they approve). Save the approved
+  values to \`appName\`/\`appDescription\` in \`pln-app.config.json\` and use them in
+  the deploy form.
+- **After the first successful deploy**: ask once whether the member wants a
+  one-pager PRD. If yes, generate a concise Markdown one-page brief (see the
+  app-metadata skill), get their approval, and save it via the
+  \`metadataEndpoint\` — **no new ZIP and no redeploy**. If they decline, carry
+  on without one.
+- **On redeploys**: reuse the saved \`appName\`/\`appDescription\` verbatim and do
+  NOT re-run the propose-and-approve flow (the deploy form overwrites stored
+  metadata, so fresh drafts would revert what the member approved). Only
+  re-propose when the member explicitly asks to change something.
+- **When the member asks to rename / edit the description / change the PRD** of
+  an existing app: same propose → approve → save flow, via \`metadataEndpoint\` —
+  metadata changes never require a redeploy.
+
 ## Deploying the app
 When the member asks you to deploy, use the **deploy-to-labs** skill in
 \`.claude/skills/deploy-to-labs/SKILL.md\`. If the app needs runtime secrets,
 follow "Apps that need secrets" above instead of deploying directly. In short:
-1. Read \`pln-app.config.json\` for the \`connectEndpoint\`, \`deployEndpoint\`, and
-   (if present) a saved \`appId\`.
-2. **Get a deploy token via LabOS (the connect flow).** There is no token in the
+1. Read \`pln-app.config.json\` for the \`connectEndpoint\`, \`deployEndpoint\`,
+   \`metadataEndpoint\`, and (if present) saved \`appId\`, \`appUid\`, \`appName\`, and
+   \`appDescription\`.
+2. **Settle the display metadata** ("App name, description & one-pager PRD"
+   above): first deploy → propose name/description and get the member's
+   approval; redeploy → reuse the saved values without re-asking.
+3. **Get a deploy token via LabOS (the connect flow).** There is no token in the
    kit. POST to \`connectEndpoint\` to start a connect session, give the member the
    returned \`connectUrl\` + confirmation \`userCode\` to open and approve in LabOS,
    then poll until you receive a short-lived \`deployToken\`. Full steps are in the
    deploy skill. Keep the token **in memory only** — never write it to
    \`pln-app.config.json\` or any file.
-3. Choose a stable, lowercase \`appId\` (e.g. \`my-leaderboard\`) and a fresh
+4. Choose a stable, lowercase \`appId\` (e.g. \`my-leaderboard\`) and a fresh
    \`deploymentId\` for each deploy.
-4. Zip the **contents** of \`app/\` (so the \`Dockerfile\` sits at the root of the ZIP),
+5. Zip the **contents** of \`app/\` (so the \`Dockerfile\` sits at the root of the ZIP),
    excluding \`node_modules\`, build output, and any secrets/\`.env\`/data dirs, then
    upload that ZIP to \`deployEndpoint\` as multipart/form-data with the
    \`deployToken\` in the \`${AI_APP_TOKEN_HEADER}\` header. The PLN backend stores it
    and runs the build — you do not need any cloud credentials.
-5. Tell the member the deploy succeeded and that they can open their app from the
+6. Save the \`uid\` from the response as \`appUid\` in \`pln-app.config.json\`, then
+   tell the member the deploy succeeded and that they can open their app from the
    PL Infra → AI Apps dashboard. **Do NOT reveal the deployment URL, host, or port**
    (see "Keep the deployment URL private" in the deploy skill). That privacy rule
    covers only the app's own \`<appId>\` address — LabOS links (\`connectUrl\`,
@@ -343,6 +383,183 @@ run the connect flow again to get a fresh one.
 
 Do not ask for or use any internal PLN APIs — only the connect, deploy, and
 member-context endpoints in the config are available to you.
+`;
+  }
+
+  private metadataSkill(): string {
+    return `---
+name: app-metadata
+description: Set or change the app's display name, short description, and optional one-pager PRD shown on the AI Apps dashboard. Use before the FIRST deploy (no approved name saved yet) and whenever the member asks to rename the app, edit its description, or add/update/remove its PRD. Metadata saves go through their own endpoint — no ZIP upload and no redeploy.
+---
+
+# App name, description & one-pager PRD
+
+The AI Apps dashboard shows each app's **name**, a short **description**, and —
+optionally — a **one-pager PRD** (a short product brief: why the app exists and
+what it is meant to do). These are member-facing: YOU draft them, the MEMBER
+approves them, and only then do you save them. Saving metadata never rebuilds
+or redeploys the app.
+
+## When to run this flow
+
+- **Before the first deploy** (no \`appName\` saved in \`pln-app.config.json\` yet):
+  do "Propose & approve" below, use the approved values in the deploy form, and
+  offer the one-pager PRD once the deploy succeeds.
+- **The member asks to change** the name, description, or PRD of an existing
+  app: same propose → approve → save flow, via the metadata endpoint.
+- **NOT on ordinary redeploys.** Reuse the approved \`appName\` /
+  \`appDescription\` from \`pln-app.config.json\` **verbatim** in the deploy form
+  and don't re-ask. A deploy overwrites the stored name/description with
+  whatever the form sends, so sending fresh drafts silently reverts metadata the
+  member already approved. The PRD is never touched by deploys — nothing to
+  re-send.
+
+## Propose & approve (name + description)
+
+1. Draft from what the app actually does (its code + the conversation):
+   - **Name** — 2–4 plain, human-friendly words (e.g. "Team Availability
+     Board"), max 200 chars. Not the \`appId\` slug, no version numbers.
+   - **Description** — 1–2 sentences: what it does and who it's for. Keep it
+     well under 2000 chars.
+2. Show both to the member and ask them to approve or revise.
+3. **Wait for explicit approval.** If they want changes, revise and re-present —
+   as many rounds as needed. Never upload a name or description the member has
+   not confirmed.
+4. After approval, write the values into \`pln-app.config.json\` (\`appName\`,
+   \`appDescription\`) so later redeploys reuse them without re-asking.
+
+## Offer the one-pager PRD (optional)
+
+Ask once, in plain words — e.g. *"Want me to add a one-pager PRD? It's a short
+brief explaining why the app exists and what it does — shown alongside your app
+on the dashboard."* If the member declines, you're done — deploys and updates
+work fine without a PRD.
+
+If they want one, produce a short, one-page **Markdown** brief. The author is
+usually a non-technical member who vibe-coded the app, so the brief explains
+**why** the app was built and **what** it is meant to do — not how it is
+engineered or tested.
+
+### How to write the brief
+
+1. Read back through the conversation (and the app) to understand what it does,
+   who it is for, and why it was built.
+2. **Synthesize what you already know.** Do NOT interview the member with a long
+   questionnaire. Ask at most one or two questions, and only when Goals / OKR
+   Impact or Success Metrics is genuinely missing and cannot be inferred —
+   otherwise mark that section "To be confirmed" rather than guessing.
+3. Write in plain language. Avoid jargon, framework names, and internal
+   engineering detail. If the member did not say something technical, do not
+   invent it.
+4. Fill in the template below. Keep the whole thing to roughly one page. Every
+   section should be a few sentences or a short list — this is a brief, not a
+   spec. Comfortably under 100,000 characters.
+5. Save the brief locally as \`prd.md\`, give the member a faithful summary in
+   chat, and get **explicit approval** — revise and re-present on feedback —
+   then upload it (below). Never upload an unapproved PRD.
+
+### One-pager template
+
+\`\`\`markdown
+# <App Name>
+
+_One-line description of what the app does._
+
+## Problem Statement
+
+The problem the app is meant to solve, from the user's perspective. What was
+hard, slow, or missing before this app existed.
+
+## Solution
+
+A brief executive summary of the app — a few lines describing what it is and
+how it addresses the problem above. High level, not a feature-by-feature
+breakdown (that comes next).
+
+## Key Features
+
+A short bulleted list of what the app can do — the main capabilities a user
+gets. Keep each to a line. This is the "what's in the box" section.
+
+## How to Use
+
+A simple, numbered walkthrough of how someone actually uses the app, start to
+finish. Written for a first-time user who has never seen it. Include where to
+find it, what to do, and what they will see. Skip anything technical — this is
+the "getting started" section.
+
+## Implementation Decisions
+
+Notable choices the builder made, described in plain terms — not code. For
+example: what data the app uses, what it deliberately keeps simple, any
+assumptions it makes, or anything a future editor should know. Skip this
+section if there is nothing meaningful to say.
+
+## Goals / OKR Impact
+
+The goal, objective, or OKR this app is meant to move, and how it contributes.
+If it supports a specific team or org OKR, name it. If none is confirmed yet,
+mark this "To be confirmed."
+
+## Success Metrics
+
+How you will know the app is working. A few concrete signals — usage, time
+saved, adoption, a number going up or down. Keep it to what can actually be
+observed.
+
+## Out of Scope
+
+What this app deliberately does NOT do, so expectations are clear. Useful for
+heading off "can it also…" questions later.
+\`\`\`
+
+## Saving via the metadata endpoint
+
+\`metadataEndpoint\` in \`pln-app.config.json\` is a URL **template** — replace the
+literal \`{appUid}\` with the app's \`uid\` (the \`uid\` field of the deploy/draft
+response, saved as \`appUid\` in the config after the first upload). Auth is the
+same short-lived deploy token used for deploys, in the \`${AI_APP_TOKEN_HEADER}\`
+header — for a metadata-only session (no deploy planned), run the connect flow
+from the deploy-to-labs skill to get one.
+
+Name/description only:
+
+\`\`\`bash
+curl -sX PATCH "<metadataEndpoint with {appUid} replaced>" \\
+  -H "${AI_APP_TOKEN_HEADER}: <deployToken>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"Team Availability Board","description":"See at a glance who on your team is free this week."}'
+\`\`\`
+
+With a PRD, build the JSON body in a file — the \`prd\` value is the whole
+Markdown document as one JSON string, so don't hand-escape it in the shell:
+
+\`\`\`bash
+node -e 'const fs=require("fs");fs.writeFileSync("body.json",JSON.stringify({prd:fs.readFileSync("prd.md","utf8")}))'
+curl -sX PATCH "<metadataEndpoint with {appUid} replaced>" \\
+  -H "${AI_APP_TOKEN_HEADER}: <deployToken>" \\
+  -H "Content-Type: application/json" \\
+  --data @body.json
+\`\`\`
+
+All three fields are optional — send only what changed. \`"prd": null\` removes
+the PRD, \`"description": null\` clears the description. The response is the
+updated app record; the dashboard reflects it immediately.
+
+## Rules
+
+- **Approval first, always.** Name, description, and PRD are what other PLN
+  members see — never save a draft the member hasn't explicitly approved.
+- **Metadata saves are instant and deploy-free**: no ZIP, no build, no downtime.
+  Never redeploy "to apply" a name/description/PRD change.
+- The endpoint edits only apps owned by the member who approved the token, and
+  404s before the first deploy/draft upload (the app record is created by the
+  first upload) — a brand-new app gets its approved name/description through
+  the deploy form, and its PRD right after via this endpoint.
+- Keep \`pln-app.config.json\` in sync: after any approved rename or description
+  change, update \`appName\`/\`appDescription\` there too.
+- The deploy token stays in memory only — never write it to the config or any
+  file (same rule as the deploy skill).
 `;
   }
 
@@ -482,9 +699,7 @@ Response shape (\`member\`):
 {
   "uid": "…",
   "name": "Ada Lovelace",
-  "email": "ada@example.com",
   "image": "https://…/profile.png",
-  "officeHours": null,
   "location": { "city": "London", "country": "United Kingdom", "continent": "Europe" },
   "skills": ["Engineering", "Research"],
   "teams": [
@@ -494,7 +709,10 @@ Response shape (\`member\`):
 \`\`\`
 
 Fields may be \`null\`/empty, and new fields may be added over time — ignore
-anything you don't recognize.
+anything you don't recognize. The response deliberately contains **no contact
+info** (no email, no office-hours link) — don't build features that assume a
+way to reach the member, and don't ask them to type contact details in to
+compensate.
 
 ## Rules
 
@@ -540,19 +758,30 @@ key (OpenAI/Anthropic, email/SMS, a database, a paid API)? A quick check:
 grep -rniE 'process\\.env\\.|os\\.environ|getenv' app --include='*.js' --include='*.ts' --include='*.py' | grep -viE 'PORT|NODE_ENV'
 \`\`\`
 
-If anything secret shows up (or you wrote code that needs a key), do steps 1–4 as
+If anything secret shows up (or you wrote code that needs a key), do steps 1–5 as
 written but then follow "**Apps that need secrets (draft flow)**" below instead of
-step 5 — you register a draft and the member deploys from LabOS after entering the
+step 6 — you register a draft and the member deploys from LabOS after entering the
 values there. Never deploy a secrets app directly and never accept key values in
 the chat.
 
 ## Steps
 1. Read \`pln-app.config.json\` to get \`connectEndpoint\`, \`deployEndpoint\`,
-   \`draftEndpoint\`, the \`kitVersion\` (sent with every upload so PLN knows which
-   kit built the app), and (if present) a saved \`appId\`. If no \`appId\` exists
-   yet, pick a short, stable, lowercase slug (e.g. \`hello-board\`) and save it
-   back to the config. Never edit \`kitVersion\` by hand.
-2. **Get a deploy token via LabOS.** The kit has no token; obtain a short-lived one
+   \`draftEndpoint\`, \`metadataEndpoint\`, the \`kitVersion\` (sent with every upload
+   so PLN knows which kit built the app), and (if present) saved \`appId\`,
+   \`appUid\`, \`appName\`, and \`appDescription\`. If no \`appId\` exists yet, pick a
+   short, stable, lowercase slug (e.g. \`hello-board\`) and save it back to the
+   config. Never edit \`kitVersion\` by hand.
+2. **Settle the display name & description.** If \`appName\` in the config is
+   empty (first deploy), load the **app-metadata** skill
+   (\`.claude/skills/app-metadata/SKILL.md\`): propose a human-friendly name and
+   a 1–2 sentence description, get the member's **explicit approval** (revise
+   until they approve), and save the approved values to \`appName\`/
+   \`appDescription\` in the config. If \`appName\` is already set, **reuse the
+   saved values verbatim and don't re-ask** — the deploy form overwrites the
+   stored metadata, so anything else would revert what the member approved.
+   Only re-run the propose flow when the member explicitly asks to change the
+   name or description.
+3. **Get a deploy token via LabOS.** The kit has no token; obtain a short-lived one
    through the connect flow:
 
    a. Start a session (no auth needed). Set \`clientName\` to YOUR actual tool
@@ -578,16 +807,16 @@ the chat.
    # pending  → keep polling
    # approved → { "status":"approved", "deployToken":"plndeploy_…", "deployTokenExpiresAt" }
    # denied   → the member lacks ai_apps.write; stop and tell them
-   # expired  → the link timed out; start a new session (step 2a)
+   # expired  → the link timed out; start a new session (step 3a)
    \`\`\`
 
    Hold \`deployToken\` **in memory only** — never write it to \`pln-app.config.json\`
    or any other file, and never print it.
-3. Make sure \`app/\` runs locally first (\`npm install && npm start\`, hit
+4. Make sure \`app/\` runs locally first (\`npm install && npm start\`, hit
    \`/health\`). For a migrated existing app, also confirm the migration checklist
    in \`AGENTS.md\` is satisfied (self-contained \`app/\`, fitting Dockerfile, binds
    \`0.0.0.0\`, no reliance on injected secrets).
-4. Zip the **contents** of \`app/\` so the \`Dockerfile\` sits at the ZIP root.
+5. Zip the **contents** of \`app/\` so the \`Dockerfile\` sits at the ZIP root.
    Exclude \`node_modules\`, build output, and — importantly — any secrets: real
    \`.env\` files, tokens/keys, and data dirs must never enter the ZIP (the backend
    stores it server-side).
@@ -599,34 +828,44 @@ the chat.
    unzip -l ../app.zip | grep -iE '\\.env|secret|credential|\\.pem|\\.key' && echo 'STOP: secret in zip' || echo 'ok'
    \`\`\`
 
-5. Upload the ZIP to the deploy endpoint as multipart/form-data, sending the
-   \`deployToken\` from step 2 in the \`${AI_APP_TOKEN_HEADER}\` header. The PLN backend
-   stores the ZIP and triggers the build — no cloud credentials are needed:
+6. Upload the ZIP to the deploy endpoint as multipart/form-data, sending the
+   \`deployToken\` from step 3 in the \`${AI_APP_TOKEN_HEADER}\` header. \`name\` and
+   \`description\` are the member-approved \`appName\`/\`appDescription\` from
+   \`pln-app.config.json\` (step 2) — send them verbatim. The PLN backend stores
+   the ZIP and triggers the build — no cloud credentials are needed:
 
    \`\`\`bash
    curl -X POST "<deployEndpoint>" \\
      -H "${AI_APP_TOKEN_HEADER}: <deployToken>" \\
      -F "appId=<your-app-id>" \\
-     -F "name=<human-friendly app name>" \\
-     -F "description=<one line about the app>" \\
+     -F "name=<the approved appName from pln-app.config.json>" \\
+     -F "description=<the approved appDescription from pln-app.config.json>" \\
      -F "deploymentId=<unique id per deploy, e.g. a timestamp>" \\
      -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
      -F "agentModel=<the model you are running on, e.g. claude-sonnet-4-5; omit the field if unknown>" \\
      -F "file=@app.zip;type=application/zip"
    \`\`\`
 
-6. On success the response contains the deployment URL and status:
+7. On success the response contains the app record with its deployment URL and
+   status:
 
    \`\`\`json
-   { "status": "READY", "url": "https://<appId>.${AI_APPS_APP_DOMAIN}", "host": "...", "port": 31001 }
+   { "uid": "cl…", "status": "READY", "url": "https://<appId>.${AI_APPS_APP_DOMAIN}", "host": "...", "port": 31001 }
    \`\`\`
 
-   Use this URL only for the internal checks below — **do not reveal it to the
-   member** (see "Keep the deployment URL private"). On \`READY\`, tell the member the
-   app is live and can be opened from the PL Infra → AI Apps dashboard. If \`status\`
-   is \`ERROR\`, surface \`notes\` (never the URL).
+   Save the response's \`uid\` as \`appUid\` in \`pln-app.config.json\` (it addresses
+   the metadata endpoint later). Use the URL only for the internal checks below —
+   **do not reveal it to the member** (see "Keep the deployment URL private").
+   On \`READY\`, tell the member the app is live and can be opened from the
+   PL Infra → AI Apps dashboard. If \`status\` is \`ERROR\`, surface \`notes\`
+   (never the URL).
 
-7. **Verify the app is iframe-embeddable** (internal check — do not surface the URL
+   **After the FIRST successful deploy**, offer the optional one-pager PRD —
+   see "Offer the one-pager PRD" in the app-metadata skill. If the member wants
+   one, generate it, get approval, and save it via \`metadataEndpoint\` — no
+   redeploy involved. Don't re-offer it on later redeploys.
+
+8. **Verify the app is iframe-embeddable** (internal check — do not surface the URL
    to the member). The dashboard shows it in an \`<iframe>\` from a sibling
    \`*.plnetwork.io\` subdomain; check the live response headers:
 
@@ -644,8 +883,9 @@ the chat.
    (see the framing rule in \`AGENTS.md\`) and redeploy before reporting success.
 
 ## Apps that need secrets (draft flow)
-When the app needs runtime secrets, replace the upload in step 5 with a **draft
-registration** — same multipart shape, posted to \`draftEndpoint\`, plus
+When the app needs runtime secrets, replace the upload in step 6 with a **draft
+registration** — same multipart shape (including the approved \`appName\`/
+\`appDescription\` from the config), posted to \`draftEndpoint\`, plus
 \`requiredEnvVars\` (the env var NAMES the app reads; JSON array or
 comma-separated). Nothing is deployed yet:
 
@@ -653,15 +893,18 @@ comma-separated). Nothing is deployed yet:
 curl -X POST "<draftEndpoint>" \\
   -H "${AI_APP_TOKEN_HEADER}: <deployToken>" \\
   -F "appId=<your-app-id>" \\
-  -F "name=<human-friendly app name>" \\
-  -F "description=<one line about the app>" \\
+  -F "name=<the approved appName from pln-app.config.json>" \\
+  -F "description=<the approved appDescription from pln-app.config.json>" \\
   -F "deploymentId=<unique id per upload, e.g. a timestamp>" \\
   -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
   -F "agentModel=<the model you are running on; omit the field if unknown>" \\
   -F 'requiredEnvVars=["OPENAI_API_KEY","SUPABASE_URL"]' \\
   -F "file=@app.zip;type=application/zip"
-# → { "status": "DRAFT", "appPageUrl": "https://…/pl-infra/ai-apps/<uid>", "missingEnvVars": [ … ] }
+# → { "uid": "cl…", "status": "DRAFT", "appPageUrl": "https://…/pl-infra/ai-apps/<uid>", "missingEnvVars": [ … ] }
 \`\`\`
+
+Save the response's \`uid\` as \`appUid\` in \`pln-app.config.json\`, same as a
+regular deploy.
 
 **IMMEDIATELY give the member the \`appPageUrl\` link — this is the very next
 thing you do after the registration call returns, before anything else.** A
@@ -716,6 +959,10 @@ verification steps. Only re-deploy if it stays unreachable.
 - Reuse the same \`appId\` to redeploy an existing app; use a new \`deploymentId\`
   each time. Derive the URL from the \`appId\` for your own checks, but treat it as
   sensitive (see "Keep the deployment URL private").
+- Redeploys resend the saved \`appName\`/\`appDescription\` verbatim and never
+  re-run the propose-and-approve flow. Renames, description edits, and PRD
+  changes go through the **app-metadata** skill (\`metadataEndpoint\`) — they
+  never require a redeploy, and a redeploy never touches the PRD.
 - The deploy token is short-lived (≈1 hour) and tied to the member who approved the
   connect link. Keep it in memory only — never save it to a file or print it. Within
   the window you can redeploy without reconnecting; once it expires (deploy returns
@@ -732,12 +979,16 @@ verification steps. Only re-deploy if it stays unreachable.
         connectEndpoint: AI_APPS_CONNECT_ENDPOINT,
         deployEndpoint: AI_APPS_DEPLOY_ENDPOINT,
         draftEndpoint: AI_APPS_DRAFT_ENDPOINT,
+        metadataEndpoint: AI_APPS_METADATA_ENDPOINT,
         memberContextEndpoint: AI_APPS_ME_ENDPOINT,
         deployTokenHeader: AI_APP_TOKEN_HEADER,
         kitVersion: AI_APPS_STARTER_KIT_VERSION,
         appId: '',
+        appUid: '',
+        appName: '',
+        appDescription: '',
         notes:
-          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill).',
+          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription hold the member-APPROVED display metadata (see .claude/skills/app-metadata) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint is a template where {appUid} is replaced with it. If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill).',
       },
       null,
       2

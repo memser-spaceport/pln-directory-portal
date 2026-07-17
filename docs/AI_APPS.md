@@ -8,8 +8,8 @@ PLN members "vibe-code" a small web app locally with an AI assistant (Claude Cod
 
 1. A member with `ai_apps.write` opens the AI Apps dashboard and downloads the **starter kit** ZIP. The kit carries **no token**.
 2. They unzip it into their AI coding tool and describe what to build. The agent edits files under `app/`, reusing the bundled **PL Design System** (`pl-design-system/`) for on-brand UI instead of hand-rolling components.
-3. When ready, the member says "deploy". The agent has no stored token, so it **starts a LabOS connect session**, gives the member a link + confirmation code to open and approve, then polls until it receives a **short-lived deploy token**.
-4. The agent packages `app/` and POSTs to our deploy endpoint with that short-lived token. The backend proxies the deploy to the sandbox runner, stores the result, and the app shows up on the dashboard with its live URL.
+3. When ready, the member says "deploy". Before the **first** deploy the agent proposes a human-friendly **name** and short **description** for the app and waits for the member to approve (or revise) them — kits ≥1.5, see "Editable metadata & one-pager PRD" below. The agent has no stored token, so it **starts a LabOS connect session**, gives the member a link + confirmation code to open and approve, then polls until it receives a **short-lived deploy token**.
+4. The agent packages `app/` and POSTs to our deploy endpoint with that short-lived token. The backend proxies the deploy to the sandbox runner, stores the result, and the app shows up on the dashboard with its live URL. After the first successful deploy the agent offers an optional **one-pager PRD**; if the member wants one, the agent drafts it, gets approval, and saves it through the metadata endpoint — no redeploy.
 5. **Apps that need runtime secrets** (API keys etc.) take a detour: instead of deploying, the agent registers a **draft** (same upload + the required env var *names*), then hands the member a LabOS link. The member enters the secret *values* there and clicks **Deploy** — see "Draft apps & runtime secrets" below.
 
 ## Architecture
@@ -93,6 +93,9 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | GET    | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Single app detail |
 | GET    | `/v1/ai-apps/:uid/events`        | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Full event/status history for one app (404 if app missing) |
 | GET    | `/v1/ai-apps/:uid/live`          | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Liveness probe: one server-side reachability check of the app URL → `{ live }`; gateway timeouts AND 404 count as down (the ingress 404s until a first deploy's route is ready). The LabOS detail page polls it so the iframe never shows a raw gateway/404 error |
+| PATCH  | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Edit display metadata (`name`/`description`/`prd`) without redeploying; JSON **or** multipart (`file` = Markdown/HTML PRD, stored in S3) |
+| POST   | `/v1/ai-apps/:uid/prd`           | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | File-only PRD upload from the LabOS dashboard (multipart `file`, `.md`/`.html`) — no redeploy |
+| PATCH  | `/v1/ai-apps/:uid/agent`         | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Agent metadata edit: JSON `{ name?, description?, prd? }`; how the starter kit saves approved names/descriptions and one-pager PRDs |
 | POST   | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Submit free-text feedback on an app (multiple entries per member allowed) |
 | GET    | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | All feedback for one app, newest first, with submitter info |
 | GET    | `/v1/ai-apps/starter-kit/download` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Stream the starter-kit ZIP (no token inside) |
@@ -116,9 +119,11 @@ curl -X POST "$AI_APPS_DEPLOY_ENDPOINT" \
   -F "name=My Leaderboard" \
   -F "description=A small leaderboard demo" \
   -F "deploymentId=deploy-1718900000" \
-  -F "kitVersion=1.4" \
+  -F "kitVersion=1.5" \
   -F "file=@app.zip;type=application/zip"
 ```
+
+`name`/`description` are member-facing: kits ≥1.5 send values the member explicitly approved (and resend the same values on redeploys — see "Editable metadata & one-pager PRD").
 
 `kitVersion` is optional (kits ≥1.4 send the value from their `pln-app.config.json`) and is stored on the app so we know which kit produced the last upload — older kits send nothing and the column goes/stays null. The same field exists on `POST /v1/ai-apps/draft`, and the `KIT_DOWNLOADED` audit event records the downloaded version in `message`.
 
@@ -177,6 +182,46 @@ Header: x-runner-token: <server secret>
 
 Flow: set status `DELETING` + log `DELETE_STARTED` → call the runner → on success clear hosting fields, set status `DELETED`, log `DELETE_SUCCEEDED`; on failure set status `ERROR` (with `notes`), log `DELETE_FAILED`, and return `502`. The `AiApp` row is **kept** (status flips to `DELETED`) so the audit trail and event history survive. Response is the updated `AiApp` record.
 
+## Editable metadata & one-pager PRD
+
+An app's display metadata — `name`, `description`, and an optional **one-pager PRD** (`prd`) — is editable **independently of deploys**: none of these endpoints upload a ZIP, invoke the sandbox runner, or change the app's status. Three routes (migration `20260715120000_ai_apps_editable_metadata` added the `prd` column):
+
+- **`PATCH /v1/ai-apps/:uid`** (member JWT, `ai_apps.write`) — accepts `application/json` (`{ name?, description?, prd? }`) **or** `multipart/form-data` where an optional `file` carries a Markdown/HTML PRD (then `prd` must not also be sent in the body). Used by the LabOS edit UI.
+- **`POST /v1/ai-apps/:uid/prd`** (member JWT, `ai_apps.write`) — file-only PRD upload for the dashboard.
+- **`PATCH /v1/ai-apps/:uid/agent`** (`AiAppTokenGuard`, `x-app-token` deploy token) — JSON-only agent variant used by starter kits ≥1.5; unlike the member routes it is restricted to apps **owned by the connected member** (403 otherwise).
+
+Validation: at least one field must be present; `name` 1–200 chars, `description` ≤4000 (nullable — `null` clears), `prd` ≤100,000 chars (nullable). PRD **files** must be `.md`/`.markdown`/`.html`/`.htm`, UTF-8 text (a NUL byte rejects), ≤1 MB (`AI_APPS_MAX_PRD_BYTES`). Both multipart routes are excluded from `ContentTypeMiddleware` in `app.module.ts`.
+
+**PRD storage:** an uploaded PRD *file* goes to S3 under `ai-app-prds/<appId>/<uuid><.md|.html>` in `AI_APPS_PRD_S3_BUCKET` (defaults to `AI_APPS_S3_BUCKET`), and only the S3 key is stored in `AiApp.prd`. On every read, `withMember` maps a `prd` value starting with `ai-app-prds/` to its public URL (`AI_APPS_PRD_PUBLIC_BASE_URL` if set, else the standard S3 URL) — so the API contract is simply "`prd` holds a URL or inline content". Inline `prd` *text* (the agent route, or JSON PATCH without a file) is stored verbatim in the DB and returned as-is.
+
+Agent example (name/description + inline Markdown one-pager):
+
+```bash
+curl -X PATCH "https://api.plnetwork.io/v1/ai-apps/<uid>/agent" \
+  -H "x-app-token: $DEPLOY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Team Availability Board","description":"See who on your team is free this week.","prd":"# Team Availability Board\n\n_See who is free this week._\n\n## Problem Statement\n…"}'
+```
+
+Dashboard PRD file upload (`.md` or `.html`):
+
+```bash
+curl -X POST "https://api.plnetwork.io/v1/ai-apps/<uid>/prd" \
+  -H "Authorization: Bearer $MEMBER_JWT" \
+  -F "file=@one-pager.md;type=text/markdown"
+```
+
+**Interplay with deploys:** every deploy/draft upload **overwrites** `name`/`description` with the multipart form values (the upsert has no "keep existing" path) — which is why kits ≥1.5 persist the member-approved values in `pln-app.config.json` and resend them verbatim on redeploys. Deploys never touch `prd`, so a one-pager survives any number of redeploys. Metadata edits are not audited (no `AiAppEvent` rows).
+
+### Starter kit flow (kits ≥1.5)
+
+The kit's `app-metadata` skill drives a propose → confirm → save workflow so the agent never publishes member-facing copy without approval:
+
+1. **First deploy** (no `appName` saved in `pln-app.config.json`): the agent drafts a human-friendly name + 1–2 sentence description from what the app does, presents them, and waits for **explicit approval** (revising as asked). Approved values are saved to `appName`/`appDescription` in the config and sent as the deploy form's `name`/`description`.
+2. **After the first successful deploy**: the agent asks once whether the member wants a one-pager PRD. If declined, nothing happens; if wanted, it synthesizes a concise Markdown one-page brief from the conversation (problem, solution, features, how to use, goals/OKR, success metrics, out of scope — see the kit's `app-metadata` skill), gets approval, and saves it via `PATCH …/:uid/agent` — no new ZIP, no redeploy. Dashboard uploads may still be `.md` or `.html`.
+3. **Redeploys**: the saved `appName`/`appDescription` are resent verbatim and the propose flow is **not** re-run (it would otherwise revert approved metadata, since deploys overwrite it).
+4. **Metadata changes on an existing app** (rename, description edit, PRD add/update/remove): same propose → confirm → save flow through the metadata endpoint, using the `appUid` the kit saved from the deploy/draft response (`metadataEndpoint` in the config is a template with a `{appUid}` placeholder). A metadata-only session still gets its short-lived token through the normal connect flow.
+
 ## Member context (signed-in user → deployed app)
 
 Deployed apps can personalize for the member using them (greet by name, tag
@@ -186,14 +231,15 @@ feedback, adapt behavior). `GET /v1/ai-apps/me` returns the signed-in member's
 ```json
 {
   "member": {
-    "uid": "…", "name": "Ada Lovelace", "email": "ada@example.com",
-    "image": "https://…/ada.png", "officeHours": null,
+    "uid": "…", "name": "Ada Lovelace", "image": "https://…/ada.png",
     "location": { "city": "London", "country": "United Kingdom", "continent": "Europe" },
     "skills": ["Engineering"],
     "teams": [{ "uid": "…", "name": "Protocol Labs", "role": "Engineer", "mainTeam": true, "teamLead": false }]
   }
 }
 ```
+
+The payload deliberately carries **no contact info** — no `email` and no `officeHours` link. Apps get an identity to personalize with, never a channel to reach the member.
 
 How it works — no app-side login and no new token flow:
 
@@ -236,6 +282,7 @@ model AiApp {
   appId        String          // business key, unique per owner
   name         String
   description  String?
+  prd          String?         // one-pager PRD: inline Markdown/HTML, or an S3 key (ai-app-prds/…) returned as a public URL
   status       AiAppStatus @default(IN_DEVELOPMENT)
   notes        String?         // error detail on failed deploys
   url / httpUrl / host / port  // hosting details from the runner
@@ -294,7 +341,7 @@ model AiAppEvent {            // append-only audit log — one row per event, ne
 
 Apps are **lazy-created on first deploy** — there is no registration form. (A draft registration counts: it upserts the same record with status `DRAFT`.)
 
-**Response shape:** every AI Apps endpoint (`list`, detail, `events`, and the `deploy` result) returns the owner as `member: { uid, name }` and omits the raw `memberUid` (the uid lives in `member.uid`, so it isn't duplicated). `memberUid` remains a column on the DB models above. The detail endpoint additionally returns `canManage` — whether the requesting member is the creator or a directory admin — computed server-side so the UI never compares member uids from a possibly stale login cookie.
+**Response shape:** every AI Apps endpoint (`list`, detail, `events`, and the `deploy` result) returns the owner as `member: { uid, name, image }` and omits the raw `memberUid` (the uid lives in `member.uid`, so it isn't duplicated). `memberUid` remains a column on the DB models above. The detail endpoint additionally returns `canManage` — whether the requesting member is the creator or a directory admin — computed server-side so the UI never compares member uids from a possibly stale login cookie.
 
 `AiApp.status` is the current-state snapshot for the dashboard; `AiAppEvent` is the immutable event flow. A row is appended on kit download (`KIT_DOWNLOADED`), on each connect approval/denial (`CONNECT_APPROVED` / `CONNECT_DENIED` — the `userCode` is recorded in `message`), at the start of every deploy (`DEPLOY_STARTED`) and its outcome (`DEPLOY_SUCCEEDED` / `DEPLOY_FAILED`), and likewise for deletes (`DELETE_STARTED` → `DELETE_SUCCEEDED` / `DELETE_FAILED`). Event logging never throws — a logging failure won't break a download, connect, deploy, or delete.
 
@@ -318,16 +365,18 @@ Design System is embedded as a curated folder (see below):
 README.md                                      human quick-start
 CLAUDE.md / AGENTS.md                          agent build + deploy instructions
 .claude/skills/deploy-to-labs/SKILL.md         deploy skill (incl. connect flow)
+.claude/skills/app-metadata/SKILL.md           propose → approve name/description + optional one-pager PRD (kits ≥1.5)
 .claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
 .claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
-pln-app.config.json                            connect + deploy + member-context endpoints (+ appId) — NO token
+pln-app.config.json                            connect/deploy/draft/metadata/member-context endpoints
+                                               (+ appId, appUid, approved appName/appDescription) — NO token
 pl-design-system/                              curated PL Design System (files, not a nested zip)
 styles/pln-theme.css                           minimal CSS-variable fallback (plain-HTML apps)
 styles/FONTS.md                                Inter font guidance
 app/                                           minimal runnable Node/Express scaffold
 ```
 
-The kit deliberately exposes **no internal PLN APIs** — only the connect, deploy, and member-context endpoints — and **no token**.
+The kit deliberately exposes **no internal PLN APIs** — only the connect, deploy, draft, metadata, and member-context endpoints — and **no token**.
 
 ### Bundled PL Design System
 
@@ -369,7 +418,9 @@ The agent loads `.claude/skills/pl-design-system` for UI work and follows
 | `AI_APPS_S3_BUCKET` | _(empty)_ | **Required** for real deploys; bucket the runner reads app bundles from (e.g. `sandbox-apps-pln-dev-013228333448`) |
 | `AI_APPS_APP_DOMAIN` | `prod.plnetwork.io` | Base domain deployed apps are served under (app URL = `https://<appId>.<domain>`); set `dev.plnetwork.io` on Dev, `prod.plnetwork.io` on Prod |
 | `AI_APPS_BASE_URL` | `https://api.plnetwork.io` | Public base URL of this API; the agent-facing endpoint URLs written into the kit (deploy/connect/draft/member context) are derived from it as `<base>/v1/ai-apps/<endpoint>` |
-| `AI_APPS_DEPLOY_ENDPOINT` / `AI_APPS_CONNECT_ENDPOINT` / `AI_APPS_DRAFT_ENDPOINT` / `AI_APPS_ME_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional per-endpoint overrides; rarely needed |
+| `AI_APPS_DEPLOY_ENDPOINT` / `AI_APPS_CONNECT_ENDPOINT` / `AI_APPS_DRAFT_ENDPOINT` / `AI_APPS_ME_ENDPOINT` / `AI_APPS_METADATA_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional per-endpoint overrides; rarely needed. The metadata endpoint is a template with a literal `{appUid}` placeholder the agent substitutes |
+| `AI_APPS_PRD_S3_BUCKET` | _`AI_APPS_S3_BUCKET`_ | Bucket for uploaded PRD files (`ai-app-prds/<appId>/<uuid>.<ext>`); defaults to the app-bundle bucket so no extra IAM is needed |
+| `AI_APPS_PRD_PUBLIC_BASE_URL` | _(empty)_ | Optional CDN/public base URL used when turning a stored PRD key into the URL returned in `prd`; falls back to the standard S3 URL |
 | `AI_APPS_PORTAL_URL` | `https://directory.plnetwork.io` | Base URL of the LabOS portal hosting the connect/approval page (used to build `connectUrl` and `appPageUrl`) |
 | `AI_APPS_RUNNER_PROJECT` | `default` | Project scope of the runner's secrets API (`/v1/projects/<project>/secrets`) |
 | `AI_APPS_RUNNER_ENVIRONMENT` | `prod` | Environment label for the runner secrets/deployments API. **Must match the environment the runner's `/deploy` build registers under** (its helm release is `<environment>-<appId>`; the legacy-compat build path registers as `sandbox`) — a mismatch makes the secrets-injection deploy collide with the build's release |
@@ -387,6 +438,7 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 - `apps/web-api/prisma/migrations/20260630120000_ai_apps_connect/` — connect session table + connect event values; drops `AiAppToken`.
 - `apps/web-api/prisma/migrations/20260707120000_ai_apps_draft_secrets/` — `DRAFT` status, `s3Key`/`requiredEnvVars`/`providedEnvVars`, draft/secrets event values.
 - `apps/web-api/prisma/migrations/20260714120000_ai_apps_upload_meta/` — `kitVersion`/`agentClient`/`agentModel` columns (self-reported metadata about the last agent upload).
+- `apps/web-api/prisma/migrations/20260715120000_ai_apps_editable_metadata/` — `prd` column (one-pager PRD).
 - LabOS UI (`pln-directory-portal-v2`): `app/pl-infra/ai-apps/connect/page.tsx` + `components/page/ai-apps/AiAppsConnectPage/` — the approval page; connect calls in `services/ai-apps/ai-apps.service.ts`.
 - `.claude/skills/ai-apps/SKILL.md` — agent guidance for working on this feature.
 

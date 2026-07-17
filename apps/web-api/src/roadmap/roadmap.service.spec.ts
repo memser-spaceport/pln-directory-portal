@@ -363,11 +363,20 @@ describe('RoadmapService', () => {
         );
       });
 
-      it('requires authorImpactReasoning for non-curators', async () => {
-        await expect(
-          service.createItem({ title: 'Test', description: 'Desc', authorImpact: 3 }, 'creator-1')
-        ).rejects.toBeInstanceOf(BadRequestException);
-        expect(prisma.roadmapItem.create).not.toHaveBeenCalled();
+      it('allows members to create without authorImpact or reasoning', async () => {
+        prisma.roadmapItem.create.mockResolvedValue({
+          ...rowFor(RoadmapStage.IDEA),
+          authorImpact: null,
+          authorImpactReasoning: null,
+        });
+
+        await service.createItem({ title: 'Test', description: 'Desc' }, 'creator-1');
+
+        expect(prisma.roadmapItem.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ authorImpact: null, authorImpactReasoning: null }),
+          })
+        );
       });
 
       it('allows curators to create without authorImpactReasoning', async () => {
@@ -378,7 +387,10 @@ describe('RoadmapService', () => {
           authorImpactReasoning: null,
         });
 
-        await service.createItem({ title: 'Test', description: 'Desc', authorImpact: 5, stage: 'PLANNED' }, 'curator-1');
+        await service.createItem(
+          { title: 'Test', description: 'Desc', authorImpact: 5, stage: 'PLANNED' },
+          'curator-1'
+        );
 
         expect(prisma.roadmapItem.create).toHaveBeenCalledWith(
           expect.objectContaining({

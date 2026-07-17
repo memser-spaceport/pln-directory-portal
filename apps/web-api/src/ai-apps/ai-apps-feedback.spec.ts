@@ -47,7 +47,7 @@ describe('AiAppsService feedback', () => {
 
     it('returns the submitter as `member` instead of raw memberUid', async () => {
       const { service, prisma } = buildService();
-      prisma.member.findMany.mockResolvedValue([{ uid: 'member-1', name: 'Ada' }]);
+      prisma.member.findMany.mockResolvedValue([{ uid: 'member-1', name: 'Ada', image: { url: 'https://…/ada.png' } }]);
       const result = await service.submitFeedback('member-1', 'app-1', 'hi');
       expect(result.member).toEqual({ uid: 'member-1', name: 'Ada', image: null });
       expect(result).not.toHaveProperty('memberUid');
@@ -86,7 +86,7 @@ describe('AiAppsService feedback', () => {
         { uid: 'fb-2', appUid: 'app-1', memberUid: 'member-2', text: 'later', createdAt: new Date(2) },
         { uid: 'fb-1', appUid: 'app-1', memberUid: 'member-1', text: 'earlier', createdAt: new Date(1) },
       ]);
-      prisma.member.findMany.mockResolvedValue([{ uid: 'member-2', name: 'Bea' }]);
+      prisma.member.findMany.mockResolvedValue([{ uid: 'member-2', name: 'Bea', image: null }]);
 
       const result = await service.listFeedback('creator-1', 'app-1');
       expect(prisma.aiAppFeedback.findMany).toHaveBeenCalledWith({
@@ -94,6 +94,7 @@ describe('AiAppsService feedback', () => {
         orderBy: { createdAt: 'desc' },
       });
       expect(result.map((f) => f.text)).toEqual(['later', 'earlier']);
+      // A member without a profile image resolves to image: null.
       expect(result[0].member).toEqual({ uid: 'member-2', name: 'Bea', image: null });
       // Unknown submitter resolves to null rather than leaking the uid.
       expect(result[1].member).toBeNull();

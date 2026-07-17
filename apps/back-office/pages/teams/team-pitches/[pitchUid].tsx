@@ -136,6 +136,7 @@ const TeamPitchDetailPage = () => {
     slug: '',
     status: 'DRAFT',
     supportEmail: '',
+    analyticsReportUrl: '',
   });
 
   useEffect(() => {
@@ -156,6 +157,7 @@ const TeamPitchDetailPage = () => {
         slug: pitch.slug,
         status: pitch.status,
         supportEmail: pitch.supportEmail,
+        analyticsReportUrl: pitch.analyticsReportUrl ?? '',
       });
     }
   }, [pitch]);
@@ -265,6 +267,7 @@ const TeamPitchDetailPage = () => {
         data: {
           ...editFormData,
           spotlightStatement: editFormData.spotlightStatement.trim() || null,
+          analyticsReportUrl: editFormData.analyticsReportUrl.trim() || null,
         },
       });
       toast.success('Team spotlight updated');
@@ -357,6 +360,7 @@ const TeamPitchDetailPage = () => {
                           slug: pitch.slug,
                           status: pitch.status,
                           supportEmail: pitch.supportEmail,
+                          analyticsReportUrl: pitch.analyticsReportUrl ?? '',
                         });
                       }}
                       className={s.editButton}
@@ -430,6 +434,35 @@ const TeamPitchDetailPage = () => {
                 ) : (
                   <div className={s.fieldValue}>{pitch.supportEmail}</div>
                 )}
+              </div>
+              <div className={clsx(s.overviewField, s.fullWidth)}>
+                <label className={s.fieldLabel}>Analytics Report URL</label>
+                {isEditing ? (
+                  <input
+                    type="url"
+                    value={editFormData.analyticsReportUrl}
+                    onChange={(e) => handleEditFormChange('analyticsReportUrl', e.target.value)}
+                    className={s.fieldInput}
+                    placeholder="https://..."
+                  />
+                ) : pitch.analyticsReportUrl ? (
+                  <div className={s.fieldValue}>
+                    <a
+                      href={pitch.analyticsReportUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-blue-600 hover:underline"
+                    >
+                      {pitch.analyticsReportUrl}
+                      <TeamExternalLinkIcon />
+                    </a>
+                  </div>
+                ) : (
+                  <div className={s.fieldValue}>—</div>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Visible as &quot;Spotlight Stats&quot; on the team card for founders and pitch admins only.
+                </p>
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>
                 <label className={s.fieldLabel}>Spotlight Statement</label>

@@ -50,7 +50,7 @@ export class RoadmapPinsService {
           where: { uid: existingPin.uid },
           data: {
             ...(body.note !== undefined ? { note: body.note ?? null } : {}),
-            impact: body.impact,
+            ...(body.impact !== undefined ? { impact: body.impact ?? null } : {}),
           },
         });
         return;
@@ -77,7 +77,7 @@ export class RoadmapPinsService {
       }
 
       await tx.roadmapItemPin.create({
-        data: { itemUid: uid, memberUid: actorUid, note: body.note ?? null, impact: body.impact },
+        data: { itemUid: uid, memberUid: actorUid, note: body.note ?? null, impact: body.impact ?? null },
       });
     });
 
@@ -99,11 +99,7 @@ export class RoadmapPinsService {
     return this.pinActionResponse(uid, actorUid);
   }
 
-  async updatePinNote(
-    uid: string,
-    body: { note?: string | null; impact?: number },
-    actorUid: string
-  ) {
+  async updatePinNote(uid: string, body: { note?: string | null; impact?: number }, actorUid: string) {
     const pin = await this.prisma.roadmapItemPin.findFirst({
       where: { itemUid: uid, memberUid: actorUid, releasedAt: null },
       select: { uid: true },

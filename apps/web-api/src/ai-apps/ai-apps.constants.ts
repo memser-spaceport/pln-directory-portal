@@ -170,6 +170,15 @@ export const AI_APPS_DRAFT_ENDPOINT = process.env.AI_APPS_DRAFT_ENDPOINT || `${A
 export const AI_APPS_ME_ENDPOINT = process.env.AI_APPS_ME_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/me`;
 
 /**
+ * Public URL TEMPLATE of THIS API's agent metadata endpoint
+ * (`PATCH /v1/ai-apps/:uid/agent`), written into the starter kit. The agent
+ * replaces the literal `{appUid}` placeholder with the app's `uid` (returned by
+ * the deploy/draft response and saved in `pln-app.config.json`).
+ */
+export const AI_APPS_METADATA_ENDPOINT =
+  process.env.AI_APPS_METADATA_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent`;
+
+/**
  * Base URL of the LabOS portal that hosts the connect page the member opens to
  * approve a session. Combined with the session uid to build the connect link.
  */

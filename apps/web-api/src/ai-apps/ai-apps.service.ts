@@ -100,6 +100,8 @@ export class AiAppsService {
    * personalization ("member context"). Returns curated public directory
    * fields only — this is the extension point if apps may read more PLN data
    * later (add fields/sections here rather than exposing internal endpoints).
+   * Deliberately NO contact info (email, office-hours link, …): apps
+   * personalize with the identity, they never get a channel to the member.
    */
   async getMemberContext(memberUid: string) {
     const member = await this.prisma.member.findUnique({
@@ -107,8 +109,6 @@ export class AiAppsService {
       select: {
         uid: true,
         name: true,
-        email: true,
-        officeHours: true,
         image: { select: { url: true } },
         location: { select: { city: true, country: true, continent: true } },
         skills: { select: { title: true }, orderBy: { title: 'asc' } },
