@@ -1418,20 +1418,21 @@ model TeamPitch {
 }
 
 model TeamPitchProfile {
-  id                Int                        @id @default(autoincrement())
-  uid               String                     @unique @default(cuid())
-  teamPitchUid      String                     @unique
-  teamPitch         TeamPitch                  @relation(fields: [teamPitchUid], references: [uid], onDelete: Cascade)
-  onePagerUploadUid String?
-  onePagerUpload    Upload?                    @relation("TPP_onePagerUpload", fields: [onePagerUploadUid], references: [uid])
-  videoUploadUid    String?
-  videoUpload       Upload?                    @relation("TPP_videoUpload", fields: [videoUploadUid], references: [uid])
-  description       String?
-  lastModifiedBy    String?
-  lastModifier      Member?                    @relation("TppLastModifiedBy", fields: [lastModifiedBy], references: [uid])
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
-  expressInterest   TeamPitchExpressInterest[]
+  id                 Int                        @id @default(autoincrement())
+  uid                String                     @unique @default(cuid())
+  teamPitchUid       String                     @unique
+  teamPitch          TeamPitch                  @relation(fields: [teamPitchUid], references: [uid], onDelete: Cascade)
+  onePagerUploadUid  String?
+  onePagerUpload     Upload?                    @relation("TPP_onePagerUpload", fields: [onePagerUploadUid], references: [uid])
+  videoUploadUid     String?
+  videoUpload        Upload?                    @relation("TPP_videoUpload", fields: [videoUploadUid], references: [uid])
+  description        String?
+  analyticsReportUrl String?
+  lastModifiedBy     String?
+  lastModifier       Member?                    @relation("TppLastModifiedBy", fields: [lastModifiedBy], references: [uid])
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  expressInterest    TeamPitchExpressInterest[]
 }
 
 model TeamPitchParticipant {

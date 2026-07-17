@@ -35,6 +35,7 @@ export const UpdateTeamPitchSchema = z.object({
     .regex(/^#[0-9A-Fa-f]{6}$/)
     .optional()
     .nullable(),
+  analyticsReportUrl: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
 });
 
 export class UpdateTeamPitchDto extends createZodDto(UpdateTeamPitchSchema) {}

@@ -74,6 +74,7 @@ export class AdminTeamPitchController {
       headerImageUid: body.headerImageUid,
       logoUid: body.logoUid,
       primaryColor: body.primaryColor,
+      analyticsReportUrl: body.analyticsReportUrl,
     });
   }
 

@@ -292,6 +292,7 @@ export class TeamPitchesService {
       publicUrl: `${webBase}/spotlight/${pitch.slug}`,
       logoUrl: pitch.logo?.url ?? null,
       headerImageUrl: pitch.headerImage?.url ?? null,
+      analyticsReportUrl: pitch.profile?.analyticsReportUrl ?? null,
     };
   }
 
@@ -308,6 +309,7 @@ export class TeamPitchesService {
       headerImageUid?: string | null;
       logoUid?: string | null;
       primaryColor?: string | null;
+      analyticsReportUrl?: string | null;
     }
   ) {
     const existing = await this.prisma.teamPitch.findUnique({ where: { uid: pitchUid } });
@@ -332,27 +334,40 @@ export class TeamPitchesService {
       }
     }
 
-    return this.prisma.teamPitch.update({
-      where: { uid: pitchUid },
-      data: {
-        title: data.title,
-        description: data.description,
-        spotlightFrequency: data.spotlightFrequency,
-        spotlightStatement: data.spotlightStatement,
-        slug,
-        status: data.status,
-        closedAt,
-        supportEmail: resolvedSupportEmail,
-        headerImageUid: data.headerImageUid,
-        logoUid: data.logoUid,
-        primaryColor: data.primaryColor ?? '#1a45e6',
-      },
-      include: {
-        team: { select: { uid: true, name: true } },
-        headerImage: { select: { uid: true, url: true } },
-        logo: { select: { uid: true, url: true } },
-        profile: true,
-      },
+    const { analyticsReportUrl, ...pitchData } = data;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (analyticsReportUrl !== undefined) {
+        await tx.teamPitchProfile.update({
+          where: { teamPitchUid: pitchUid },
+          data: {
+            analyticsReportUrl: analyticsReportUrl?.trim() ? analyticsReportUrl.trim() : null,
+          },
+        });
+      }
+
+      return tx.teamPitch.update({
+        where: { uid: pitchUid },
+        data: {
+          title: pitchData.title,
+          description: pitchData.description,
+          spotlightFrequency: pitchData.spotlightFrequency,
+          spotlightStatement: pitchData.spotlightStatement,
+          slug,
+          status: pitchData.status,
+          closedAt,
+          supportEmail: resolvedSupportEmail,
+          headerImageUid: pitchData.headerImageUid,
+          logoUid: pitchData.logoUid,
+          primaryColor: pitchData.primaryColor ?? '#1a45e6',
+        },
+        include: {
+          team: { select: { uid: true, name: true } },
+          headerImage: { select: { uid: true, url: true } },
+          logo: { select: { uid: true, url: true } },
+          profile: true,
+        },
+      });
     });
   }
 
