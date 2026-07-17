@@ -129,11 +129,12 @@ to the Protocol Labs Network sandbox with a single instruction.
    link to open and approve — sign in and click **Approve** to authorize the
    deploy. Your agent then ships the app to the PLN sandbox; the first deploy
    can take a minute or two.
-4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it.
+4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it. 
    After the first deploy your agent offers an optional **one-pager PRD** — a
-   short product page shown with your app; say yes and approve the draft, or
-   skip it. You can rename your app, edit its description, or change the PRD
-   anytime — just ask your agent; no redeploy needed.
+   short product brief (why the app exists and what it does) shown with your
+   app; say yes and approve the draft, or skip it. You can rename your app,
+   edit its description, or change the PRD anytime — just ask your agent; no
+   redeploy needed.
 
 ## Apps that need an API key or password (secrets)
 Some apps need a secret to work — for example an app that talks to ChatGPT/OpenAI,
@@ -330,9 +331,10 @@ load it whenever metadata comes up. In short:
   values to \`appName\`/\`appDescription\` in \`pln-app.config.json\` and use them in
   the deploy form.
 - **After the first successful deploy**: ask once whether the member wants a
-  one-pager PRD. If yes, generate a concise self-contained HTML one-pager, get
-  their approval, and save it via the \`metadataEndpoint\` — **no new ZIP and no
-  redeploy**. If they decline, carry on without one.
+  one-pager PRD. If yes, generate a concise Markdown one-page brief (see the
+  app-metadata skill), get their approval, and save it via the
+  \`metadataEndpoint\` — **no new ZIP and no redeploy**. If they decline, carry
+  on without one.
 - **On redeploys**: reuse the saved \`appName\`/\`appDescription\` verbatim and do
   NOT re-run the propose-and-approve flow (the deploy form overwrites stored
   metadata, so fresh drafts would revert what the member approved). Only
@@ -393,9 +395,10 @@ description: Set or change the app's display name, short description, and option
 # App name, description & one-pager PRD
 
 The AI Apps dashboard shows each app's **name**, a short **description**, and —
-optionally — a **one-pager PRD** (a small product page). These are member-facing:
-YOU draft them, the MEMBER approves them, and only then do you save them.
-Saving metadata never rebuilds or redeploys the app.
+optionally — a **one-pager PRD** (a short product brief: why the app exists and
+what it is meant to do). These are member-facing: YOU draft them, the MEMBER
+approves them, and only then do you save them. Saving metadata never rebuilds
+or redeploys the app.
 
 ## When to run this flow
 
@@ -428,20 +431,87 @@ Saving metadata never rebuilds or redeploys the app.
 ## Offer the one-pager PRD (optional)
 
 Ask once, in plain words — e.g. *"Want me to add a one-pager PRD? It's a short
-product page (what the app does, who it's for, key features) shown alongside
-your app on the dashboard."* If the member declines, you're done — deploys and
-updates work fine without a PRD.
+brief explaining why the app exists and what it does — shown alongside your app
+on the dashboard."* If the member declines, you're done — deploys and updates
+work fine without a PRD.
 
-If they want one:
+If they want one, produce a short, one-page **Markdown** brief. The author is
+usually a non-technical member who vibe-coded the app, so the brief explains
+**why** the app was built and **what** it is meant to do — not how it is
+engineered or tested.
 
-1. Generate a concise one-pager as a **single self-contained HTML document**:
-   inline CSS only, no external scripts/fonts/images, comfortably under 100,000
-   characters. Suggested sections: what it is, the problem it solves, who it's
-   for, key features, how to use it.
-2. Save it locally (e.g. \`prd.html\`) so the member can open and read it, and
-   give them a faithful summary in chat.
-3. Get explicit approval — revise and re-present on feedback — then upload it
-   (below). Never upload an unapproved PRD.
+### How to write the brief
+
+1. Read back through the conversation (and the app) to understand what it does,
+   who it is for, and why it was built.
+2. **Synthesize what you already know.** Do NOT interview the member with a long
+   questionnaire. Ask at most one or two questions, and only when Goals / OKR
+   Impact or Success Metrics is genuinely missing and cannot be inferred —
+   otherwise mark that section "To be confirmed" rather than guessing.
+3. Write in plain language. Avoid jargon, framework names, and internal
+   engineering detail. If the member did not say something technical, do not
+   invent it.
+4. Fill in the template below. Keep the whole thing to roughly one page. Every
+   section should be a few sentences or a short list — this is a brief, not a
+   spec. Comfortably under 100,000 characters.
+5. Save the brief locally as \`prd.md\`, give the member a faithful summary in
+   chat, and get **explicit approval** — revise and re-present on feedback —
+   then upload it (below). Never upload an unapproved PRD.
+
+### One-pager template
+
+\`\`\`markdown
+# <App Name>
+
+_One-line description of what the app does._
+
+## Problem Statement
+
+The problem the app is meant to solve, from the user's perspective. What was
+hard, slow, or missing before this app existed.
+
+## Solution
+
+A brief executive summary of the app — a few lines describing what it is and
+how it addresses the problem above. High level, not a feature-by-feature
+breakdown (that comes next).
+
+## Key Features
+
+A short bulleted list of what the app can do — the main capabilities a user
+gets. Keep each to a line. This is the "what's in the box" section.
+
+## How to Use
+
+A simple, numbered walkthrough of how someone actually uses the app, start to
+finish. Written for a first-time user who has never seen it. Include where to
+find it, what to do, and what they will see. Skip anything technical — this is
+the "getting started" section.
+
+## Implementation Decisions
+
+Notable choices the builder made, described in plain terms — not code. For
+example: what data the app uses, what it deliberately keeps simple, any
+assumptions it makes, or anything a future editor should know. Skip this
+section if there is nothing meaningful to say.
+
+## Goals / OKR Impact
+
+The goal, objective, or OKR this app is meant to move, and how it contributes.
+If it supports a specific team or org OKR, name it. If none is confirmed yet,
+mark this "To be confirmed."
+
+## Success Metrics
+
+How you will know the app is working. A few concrete signals — usage, time
+saved, adoption, a number going up or down. Keep it to what can actually be
+observed.
+
+## Out of Scope
+
+What this app deliberately does NOT do, so expectations are clear. Useful for
+heading off "can it also…" questions later.
+\`\`\`
 
 ## Saving via the metadata endpoint
 
@@ -461,11 +531,11 @@ curl -sX PATCH "<metadataEndpoint with {appUid} replaced>" \\
   -d '{"name":"Team Availability Board","description":"See at a glance who on your team is free this week."}'
 \`\`\`
 
-With a PRD, build the JSON body in a file — the \`prd\` value is the whole HTML
-document as one JSON string, so don't hand-escape it in the shell:
+With a PRD, build the JSON body in a file — the \`prd\` value is the whole
+Markdown document as one JSON string, so don't hand-escape it in the shell:
 
 \`\`\`bash
-node -e 'const fs=require("fs");fs.writeFileSync("body.json",JSON.stringify({prd:fs.readFileSync("prd.html","utf8")}))'
+node -e 'const fs=require("fs");fs.writeFileSync("body.json",JSON.stringify({prd:fs.readFileSync("prd.md","utf8")}))'
 curl -sX PATCH "<metadataEndpoint with {appUid} replaced>" \\
   -H "${AI_APP_TOKEN_HEADER}: <deployToken>" \\
   -H "Content-Type: application/json" \\

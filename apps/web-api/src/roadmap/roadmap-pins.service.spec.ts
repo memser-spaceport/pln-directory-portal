@@ -265,12 +265,12 @@ describe('RoadmapPinsService', () => {
       });
     });
 
-    it('defaults new settings rows to DEFAULT_PIN_LIMIT of 10', async () => {
-      expect(DEFAULT_PIN_LIMIT).toBe(10);
+    it('defaults new settings rows to DEFAULT_PIN_LIMIT of 5', async () => {
+      expect(DEFAULT_PIN_LIMIT).toBe(5);
       await service.getSettings();
       expect(prisma.roadmapSettings.upsert).toHaveBeenCalledWith({
         where: { id: 1 },
-        create: { id: 1, pinLimit: 10 },
+        create: { id: 1, pinLimit: 5 },
         update: {},
       });
     });

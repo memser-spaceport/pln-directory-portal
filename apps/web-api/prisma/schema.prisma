@@ -2969,7 +2969,7 @@ model RoadmapSubmissionDraft {
 /// Single-row table (id = 1) holding roadmap-wide configuration.
 model RoadmapSettings {
   id           Int      @id @default(1)
-  pinLimit     Int      @default(10)
+  pinLimit     Int      @default(5)
   updatedByUid String?
   updatedAt    DateTime @updatedAt
 }

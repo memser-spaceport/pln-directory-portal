@@ -66,7 +66,7 @@ export const PIN_RELEASING_STAGES: RoadmapStage[] = [
   RoadmapStage.DECLINED,
 ];
 
-export const DEFAULT_PIN_LIMIT = 10;
+export const DEFAULT_PIN_LIMIT = 5;
 
 /** Half-life used by the trending sort's time-decayed pin score. */
 export const TRENDING_HALF_LIFE_DAYS = 14;

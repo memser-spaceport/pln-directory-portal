@@ -90,11 +90,21 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(metadataSkill).toContain('{appUid}');
     expect(metadataSkill).toContain('"prd": null');
     expect(metadataSkill).toContain('no ZIP, no build');
+    // Markdown one-page brief with the product template sections…
+    expect(metadataSkill).toContain('prd.md');
+    expect(metadataSkill).toContain('Problem Statement');
+    expect(metadataSkill).toContain('Goals / OKR Impact');
+    expect(metadataSkill).toContain('Success Metrics');
+    expect(metadataSkill).toContain('Out of Scope');
+    // …synthesized from context, not a long questionnaire.
+    expect(metadataSkill).toContain('Synthesize what you already know');
+    expect(metadataSkill).toContain('Ask at most one or two questions');
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {
       const content = entries.get(path) as string;
       expect(content).toContain('app-metadata');
       expect(content).toContain('wait for explicit approval');
       expect(content).toContain('one-pager PRD');
+      expect(content).toContain('Markdown one-page brief');
     }
   });
 

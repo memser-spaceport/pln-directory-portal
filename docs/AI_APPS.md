@@ -192,21 +192,21 @@ Validation: at least one field must be present; `name` 1–200 chars, `descripti
 
 **PRD storage:** an uploaded PRD *file* goes to S3 under `ai-app-prds/<appId>/<uuid><.md|.html>` in `AI_APPS_PRD_S3_BUCKET` (defaults to `AI_APPS_S3_BUCKET`), and only the S3 key is stored in `AiApp.prd`. On every read, `withMember` maps a `prd` value starting with `ai-app-prds/` to its public URL (`AI_APPS_PRD_PUBLIC_BASE_URL` if set, else the standard S3 URL) — so the API contract is simply "`prd` holds a URL or inline content". Inline `prd` *text* (the agent route, or JSON PATCH without a file) is stored verbatim in the DB and returned as-is.
 
-Agent example (name/description + inline HTML one-pager):
+Agent example (name/description + inline Markdown one-pager):
 
 ```bash
 curl -X PATCH "https://api.plnetwork.io/v1/ai-apps/<uid>/agent" \
   -H "x-app-token: $DEPLOY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Team Availability Board","description":"See who on your team is free this week.","prd":"<!doctype html>…"}'
+  -d '{"name":"Team Availability Board","description":"See who on your team is free this week.","prd":"# Team Availability Board\n\n_See who is free this week._\n\n## Problem Statement\n…"}'
 ```
 
-Dashboard PRD file upload:
+Dashboard PRD file upload (`.md` or `.html`):
 
 ```bash
 curl -X POST "https://api.plnetwork.io/v1/ai-apps/<uid>/prd" \
   -H "Authorization: Bearer $MEMBER_JWT" \
-  -F "file=@one-pager.html;type=text/html"
+  -F "file=@one-pager.md;type=text/markdown"
 ```
 
 **Interplay with deploys:** every deploy/draft upload **overwrites** `name`/`description` with the multipart form values (the upsert has no "keep existing" path) — which is why kits ≥1.5 persist the member-approved values in `pln-app.config.json` and resend them verbatim on redeploys. Deploys never touch `prd`, so a one-pager survives any number of redeploys. Metadata edits are not audited (no `AiAppEvent` rows).
@@ -216,7 +216,7 @@ curl -X POST "https://api.plnetwork.io/v1/ai-apps/<uid>/prd" \
 The kit's `app-metadata` skill drives a propose → confirm → save workflow so the agent never publishes member-facing copy without approval:
 
 1. **First deploy** (no `appName` saved in `pln-app.config.json`): the agent drafts a human-friendly name + 1–2 sentence description from what the app does, presents them, and waits for **explicit approval** (revising as asked). Approved values are saved to `appName`/`appDescription` in the config and sent as the deploy form's `name`/`description`.
-2. **After the first successful deploy**: the agent asks once whether the member wants a one-pager PRD. If declined, nothing happens; if wanted, it generates a concise self-contained HTML one-pager, gets approval, and saves it via `PATCH …/:uid/agent` — no new ZIP, no redeploy.
+2. **After the first successful deploy**: the agent asks once whether the member wants a one-pager PRD. If declined, nothing happens; if wanted, it synthesizes a concise Markdown one-page brief from the conversation (problem, solution, features, how to use, goals/OKR, success metrics, out of scope — see the kit's `app-metadata` skill), gets approval, and saves it via `PATCH …/:uid/agent` — no new ZIP, no redeploy. Dashboard uploads may still be `.md` or `.html`.
 3. **Redeploys**: the saved `appName`/`appDescription` are resent verbatim and the propose flow is **not** re-run (it would otherwise revert approved metadata, since deploys overwrite it).
 4. **Metadata changes on an existing app** (rename, description edit, PRD add/update/remove): same propose → confirm → save flow through the metadata endpoint, using the `appUid` the kit saved from the deploy/draft response (`metadataEndpoint` in the config is a template with a `{appUid}` placeholder). A metadata-only session still gets its short-lived token through the normal connect flow.
 
