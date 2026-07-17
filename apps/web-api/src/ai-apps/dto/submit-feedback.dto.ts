@@ -6,7 +6,7 @@ import { z } from 'zod';
  * Free-text only; a member may submit multiple entries per app.
  */
 export const SubmitFeedbackSchema = z.object({
-  text: z.string().trim().min(1).max(4000),
+  text: z.string().trim().min(1).max(5000),
 });
 
 export class SubmitFeedbackDto extends createZodDto(SubmitFeedbackSchema) {}

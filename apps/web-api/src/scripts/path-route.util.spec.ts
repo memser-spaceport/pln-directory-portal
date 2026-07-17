@@ -61,6 +61,44 @@ describe('path-route.util (seed)', () => {
       });
       expect(nodes.map((n) => n.label)).toEqual(['Brad Holden', 'Rauno Miljand']);
     });
+
+    it('strips founder bridge that matches investor by name (no PL org fallback)', () => {
+      const sam = buildInvestorRouteNode({ firstName: 'Sam', lastName: 'Altman' });
+      const nodes = buildFullRouteNodes({
+        bridgeNodes: [{ label: 'Sam Altman', variant: 'external' }],
+        plConnector: null,
+        investorNode: sam,
+        hops: 1,
+      });
+      expect(nodes.map((n) => n.label)).toEqual(['Sam Altman']);
+    });
+
+    it('strips founder bridge that matches investor by memberUid', () => {
+      const sam = buildInvestorRouteNode({
+        firstName: 'Sam',
+        lastName: 'Altman',
+        memberUid: 'uid-sam',
+      });
+      const nodes = buildFullRouteNodes({
+        bridgeNodes: [{ label: 'S. Altman', variant: 'member', memberUid: 'uid-sam' }],
+        plConnector: null,
+        investorNode: sam,
+        hops: 1,
+      });
+      expect(nodes.map((n) => n.label)).toEqual(['Sam Altman']);
+      expect(nodes[0].memberUid).toBe('uid-sam');
+    });
+
+    it('keeps PL connector when bridge person equals investor', () => {
+      const russell = buildInvestorRouteNode({ firstName: 'Russell', lastName: 'Glass' });
+      const nodes = buildFullRouteNodes({
+        bridgeNodes: [{ label: 'Russell Glass', variant: 'external' }],
+        plConnector: { name: 'Brad Holden' },
+        investorNode: russell,
+        hops: 1,
+      });
+      expect(nodes.map((n) => n.label)).toEqual(['Brad Holden', 'Russell Glass']);
+    });
   });
 
   describe('finalizePersonHopChain', () => {
@@ -97,6 +135,21 @@ describe('path-route.util (seed)', () => {
         memberUid: n.memberUid,
       }));
       expect(routeNodes).toEqual([{ label: 'Brad Holden' }, { label: 'Fred Wilson' }]);
+    });
+
+    it('founder=investor collapses to a single person hop (no Sam → Sam)', () => {
+      const out = finalizePersonHopChain(
+        {
+          routeNodes: [PROTOCOL_LABS_ORG_NODE, { label: 'Sam Altman', variant: 'external' }],
+          contact: { name: 'Sam Altman', role: 'Founder' },
+          hops: 1,
+        },
+        { firstName: 'Sam', lastName: 'Altman' },
+        undefined,
+        1
+      );
+      const routeNodes = (out.routeNodes as Array<{ label: string }>).map((n) => n.label);
+      expect(routeNodes).toEqual(['Sam Altman']);
     });
 
     it('case 1 affinity-direct ignores firm-grain Investor placeholder in nodes', () => {
@@ -184,6 +237,75 @@ describe('path-route.util (seed)', () => {
       expect(routeNodes.map((n) => n.label)).toEqual(['Brad Holden', 'Jonathan King', 'Jacqueline Kwok']);
       expect(routeNodes[1].orgName).toBe('Coinbase');
       expect(routeNodes[1].memberUid).toBe('uid-jk');
+    });
+
+    it('VC+3 keeps all intermediary routeNodes (does not collapse via contact)', () => {
+      const out = finalizePersonHopChain(
+        {
+          contact: { name: 'Wei Dai', role: 'Contact', email: 'w@1kx.capital' },
+          orgConnectors: [
+            {
+              name: '1kx',
+              description: 'co-invested',
+              tags: ['Org connection'],
+              contacts: [{ name: 'Wei Dai', email: 'w@1kx.capital', role: 'Contact', source: 'gold_list' }],
+            },
+            {
+              name: 'A* Capital',
+              description: 'co-invested',
+              tags: ['Org connection', 'Person unknown'],
+              contacts: [],
+            },
+          ],
+          routeNodes: [
+            {
+              label: 'Wei Dai',
+              orgName: '1kx',
+              variant: 'external',
+              contacts: [{ name: 'Wei Dai', email: 'w@1kx.capital', source: 'gold_list' }],
+            },
+            { label: 'A* Capital', variant: 'org' },
+          ],
+          plConnector: { name: 'Brad Holden' },
+          hops: 3,
+        },
+        { firstName: 'Eugene', lastName: 'Chang' },
+        { portfolioTeams: new Map(), membersByName: new Map([['brad holden', 'uid-brad']]) },
+        3
+      );
+      const routeNodes = out.routeNodes as Array<{ label: string; orgName?: string; variant?: string }>;
+      expect(routeNodes.map((n) => n.label)).toEqual(['Brad Holden', 'Wei Dai', 'A* Capital', 'Eugene Chang']);
+      expect(routeNodes[1].orgName).toBe('1kx');
+      expect(routeNodes[2].variant).toBe('org');
+    });
+
+    it('VC+3 builds multi-bridge from orgConnectors when routeNodes absent', () => {
+      const out = finalizePersonHopChain(
+        {
+          contact: { name: 'Wei Dai', role: 'Contact', email: 'w@1kx.capital' },
+          orgConnectors: [
+            {
+              name: '1kx',
+              description: 'co-invested',
+              tags: ['Org connection'],
+              contacts: [{ name: 'Wei Dai', email: 'w@1kx.capital', role: 'Contact', source: 'gold_list' }],
+            },
+            {
+              name: 'A* Capital',
+              description: 'co-invested',
+              tags: ['Org connection', 'Person unknown'],
+              contacts: [],
+            },
+          ],
+          plConnector: { name: 'Brad Holden' },
+          hops: 3,
+        },
+        { firstName: 'Eugene', lastName: 'Chang' },
+        { portfolioTeams: new Map(), membersByName: new Map([['brad holden', 'uid-brad']]) },
+        3
+      );
+      const labels = (out.routeNodes as Array<{ label: string }>).map((n) => n.label);
+      expect(labels).toEqual(['Brad Holden', 'Wei Dai', 'A* Capital', 'Eugene Chang']);
     });
 
     it('VC org bridge resolves orgConnector.teamUid from Directory team index', () => {

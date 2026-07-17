@@ -160,18 +160,18 @@ the planned "pin"→"boost" wording swap is a one-file change. Links point at
 | --- | --- | --- |
 | New submission (IDEA only — curator direct-creates don't broadcast) | everyone holding `roadmap.view` or `roadmap.admin` (one permission-gated notification, not per-member fan-out; the submitter is excluded — `PushNotificationsService` hides GANTRY broadcasts from their `metadata.authorUid`) | New submission: {title} — Take a look — boost it if it matters to you. |
 | Item enters In Progress | each member whose pin was just auto-released (submitter excluded — they get the dedicated line below) | In Progress: {title} — Your boost budget is back — spend it on what matters next. |
-| Item ships | every member who ever pinned it (released pins included, deduped; creator excluded — they get the dedicated line below) | Just Shipped: {title} 🎉 — Something you boosted is now live. |
+| Item ships | everyone holding `roadmap.view` or `roadmap.admin` (one permission-gated notification with shared copy; submitter included — no `authorUid` exclusion) | Just Shipped: {title} 🎉 — It's live now — go try it out. |
 | Need planned | original submitter | Planned: {title} — Your need is on the roadmap. |
 | Need enters In Progress | original submitter | In Progress: {title} — Your submission is being worked on. We will notify you when it's shipped. |
 | Need backlogged | original submitter | Backlog: {title} — Your need was moved to the backlog. |
-| Need ships | original submitter | Just Shipped: {title} 🎉 — It's live now — go try it out. |
 | Need declined | original submitter | Declined: {title} — Reason: {reason} |
 
-The submitter is notified on every stage change of their need (the five "Need …"
-rows above) except moves back to Submitted, which are curator corrections and stay
-silent. Same-stage transitions never re-notify. Declines through the decline
-endpoint carry the curator's reason; a raw stage transition to DECLINED falls back
-to "No reason provided."
+The submitter is notified on every stage change of their need (planned / in
+progress / backlog / declined) except moves back to Submitted, which are curator
+corrections and stay silent. Shipping uses the shared viewer broadcast above
+instead of a submitter-only line. Same-stage transitions never re-notify.
+Declines through the decline endpoint carry the curator's reason; a raw stage
+transition to DECLINED falls back to "No reason provided."
 
 No double-fire on IN_PROGRESS → SHIPPED: pins are released exactly once (at
 IN_PROGRESS), so the boost-returned notification cannot repeat at SHIPPED. Moves to
@@ -181,17 +181,18 @@ submitter hears about those moves.
 
 **Committed stages notify exactly once.** Every "In Progress" notification (the
 submitter line *and* the boost-returned line) fires only the first time an item
-reaches In Progress, and every "Shipped" notification (submitter + backers) fires
-only the first time it ships. There is no extra state on the item: the service asks
-the bell whether a notification with that `metadata.itemUid` + `trigger` was already
-stored (`PushNotificationsService.hasItemTriggerNotification`), and an item that has
-already shipped also counts as having already been In Progress. So re-entry cannot
-re-notify: `Planned → In Progress → Planned → In Progress` sends one In Progress
-notification; `Planned → Shipped → In Progress` sends one Shipped notification and
-stays silent on the later In Progress; a second move into Shipped sends nothing.
-(Items committed/shipped before the notification feature existed carry no stored
-notification, so a future transition may notify once — acceptable, and avoids a
-backfill.)
+reaches In Progress, and the "Shipped" viewer broadcast fires only the first time
+it ships. There is no extra state on the item: the service asks the bell whether a
+notification with that `metadata.itemUid` + `trigger` was already stored
+(`PushNotificationsService.hasItemTriggerNotification`), and an item that has
+already shipped also counts as having already been In Progress. Historical
+`backed_item_shipped` rows still count as "already shipped" for dedupe. So
+re-entry cannot re-notify: `Planned → In Progress → Planned → In Progress` sends
+one In Progress notification; `Planned → Shipped → In Progress` sends one Shipped
+notification and stays silent on the later In Progress; a second move into Shipped
+sends nothing. (Items committed/shipped before the notification feature existed
+carry no stored notification, so a future transition may notify once — acceptable,
+and avoids a backfill.)
 
 For engineering conventions and invariants (budget state machine, attribution
 boundary, stage groups), see the **`gantry-boost-signaling`** Claude skill at

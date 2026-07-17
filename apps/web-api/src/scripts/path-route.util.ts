@@ -64,6 +64,19 @@ function stripPlConnectorFromBridge(bridge: RouteNode[], connectorName?: string 
   return bridge.filter((n) => normalizePersonName(n.label) !== key);
 }
 
+/** True when both nodes are the same person (prefer memberUid, else normalized name). */
+function isSamePersonNode(a: RouteNode, b: RouteNode): boolean {
+  if (a.variant === 'org' || b.variant === 'org') return false;
+  if (a.memberUid && b.memberUid) return a.memberUid === b.memberUid;
+  return normalizePersonName(a.label) === normalizePersonName(b.label);
+}
+
+/** Drop bridge person nodes that are the investor terminus (founder = investor). */
+function stripInvestorFromBridge(bridge: RouteNode[], investor?: RouteNode): RouteNode[] {
+  if (!investor) return bridge;
+  return bridge.filter((n) => !isSamePersonNode(n, investor));
+}
+
 function connectorMatchesPlContact(contactName: string, plConnector?: PlConnectorInput | null): boolean {
   if (!plConnector?.name) return false;
   return normalizePersonName(contactName) === normalizePersonName(plConnector.name);
@@ -83,20 +96,27 @@ export function buildFullRouteNodes(input: {
   investorNode?: RouteNode;
   hops?: number;
 }): RouteNode[] {
-  const bridge = stripPlaceholderInvestor(
-    stripPlConnectorFromBridge(stripLeadingPlOrg(input.bridgeNodes), input.plConnector?.name)
+  const bridge = stripInvestorFromBridge(
+    stripPlaceholderInvestor(stripPlConnectorFromBridge(stripLeadingPlOrg(input.bridgeNodes), input.plConnector?.name)),
+    input.investorNode
   );
   // Direct (person) prefix only when a PL connector is grafted. Otherwise, if there is a
   // bridge (founder / VC / org), show Protocol Labs as the org door — including F+1
   // LinkedIn-only founder paths that have no PL venture-lead connector (LAB-2108).
+  // If the only bridge was the investor themselves, bridge is empty → no PL org prefix.
   const prefix: RouteNode[] = input.plConnector
     ? [plConnectorToRouteNode(input.plConnector, input.plConnectorMemberUid)]
     : bridge.length > 0
-      ? [PROTOCOL_LABS_ORG_NODE]
-      : [];
+    ? [PROTOCOL_LABS_ORG_NODE]
+    : [];
 
   const core = [...prefix, ...bridge];
-  return input.investorNode ? [...core, input.investorNode] : core;
+  if (!input.investorNode) return core;
+  // PL connector (or leftover core) may already be the investor — keep a single terminus.
+  while (core.length > 0 && isSamePersonNode(core[core.length - 1], input.investorNode)) {
+    core.pop();
+  }
+  return [...core, input.investorNode];
 }
 
 interface LegacyHopChainNode {
@@ -231,7 +251,40 @@ function correctFounderContactFromNodes(hc: LegacyHopChain): LegacyHopChain {
   };
 }
 
+function orgConnectorToRouteNode(org: {
+  name: string;
+  teamUid?: string;
+  logo?: string;
+  contacts?: RouteNodeContact[];
+}): RouteNode {
+  const contacts = org.contacts ?? [];
+  if (contacts.length > 0) {
+    const primary = contacts[0];
+    return {
+      label: primary.name,
+      orgName: org.name,
+      memberUid: primary.memberUid,
+      teamUid: org.teamUid,
+      logo: org.logo,
+      variant: primary.memberUid ? 'member' : 'external',
+      contacts,
+    };
+  }
+  return { label: org.name, teamUid: org.teamUid, logo: org.logo, variant: 'org' };
+}
+
 function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
+  // Prefer multi-bridge dumps after stripping PL org/connector prefixes.
+  if (hc.routeNodes && hc.routeNodes.length > 0) {
+    const stripped = stripPlConnectorFromBridge(stripLeadingPlOrg(hc.routeNodes), hc.plConnector?.name);
+    if (stripped.length > 1) {
+      return stripped;
+    }
+  }
+  if ((hc.orgConnectors?.length ?? 0) > 1) {
+    return hc.orgConnectors!.map(orgConnectorToRouteNode);
+  }
+
   const org = hc.orgConnectors?.[0] ?? hc.orgConnector;
   if (hc.contact && !connectorMatchesPlContact(hc.contact.name, hc.plConnector)) {
     const orgName = parseBridgeFromHopChain(hc) ?? hc.orgConnectors?.[0]?.name ?? hc.orgConnector?.name;
@@ -243,27 +296,16 @@ function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
         teamUid: hc.contact.teams?.[0]?.teamUid ?? org?.teamUid,
         logo: hc.contact.teams?.[0]?.logo ?? org?.logo,
         variant: hc.contact.memberUid ? 'member' : 'external',
-        contacts: orgName
-          ? [
-              {
-                name: hc.contact.name,
-                role: hc.contact.role,
-                email: hc.contact.email,
-                linkedin: hc.contact.linkedin,
-                memberUid: hc.contact.memberUid,
-                source: 'portfolio',
-              },
-            ]
-          : [
-              {
-                name: hc.contact.name,
-                role: hc.contact.role,
-                email: hc.contact.email,
-                linkedin: hc.contact.linkedin,
-                memberUid: hc.contact.memberUid,
-                source: 'portfolio',
-              },
-            ],
+        contacts: [
+          {
+            name: hc.contact.name,
+            role: hc.contact.role,
+            email: hc.contact.email,
+            linkedin: hc.contact.linkedin,
+            memberUid: hc.contact.memberUid,
+            source: 'portfolio',
+          },
+        ],
       },
     ];
   }
@@ -271,22 +313,7 @@ function bridgeRouteNodes(hc: LegacyHopChain): RouteNode[] {
     return stripPlConnectorFromBridge(stripLeadingPlOrg(hc.routeNodes), hc.plConnector?.name);
   }
   if (org) {
-    const contacts = org.contacts ?? [];
-    if (contacts.length > 0) {
-      const primary = contacts[0];
-      return [
-        {
-          label: primary.name,
-          orgName: org.name,
-          memberUid: primary.memberUid,
-          teamUid: org.teamUid,
-          logo: org.logo,
-          variant: primary.memberUid ? 'member' : 'external',
-          contacts,
-        },
-      ];
-    }
-    return [{ label: org.name, variant: 'org' }];
+    return [orgConnectorToRouteNode(org)];
   }
   return deriveConnectorRouteNodesFromLegacy(hc);
 }

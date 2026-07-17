@@ -5,11 +5,84 @@ import { PrismaService } from '../shared/prisma.service';
 describe('PathfinderQueryService', () => {
   let service: PathfinderQueryService;
   const queryRaw = jest.fn();
-  const prismaMock = { $queryRaw: queryRaw } as unknown as PrismaService;
+  const transaction = jest.fn();
+  const memberFindMany = jest.fn();
+  const pathFindMany = jest.fn();
+  const correctionFindMany = jest.fn();
+  const prismaMock = {
+    $queryRaw: queryRaw,
+    $transaction: transaction,
+    member: { findMany: memberFindMany },
+    pathfinderPath: { findMany: pathFindMany },
+    pathfinderCorrection: { findMany: correctionFindMany },
+  } as unknown as PrismaService;
 
   beforeEach(() => {
     jest.clearAllMocks();
     service = new PathfinderQueryService(prismaMock);
+  });
+
+  describe('getPathsForTarget', () => {
+    it('hydrates missing imageUrl from Member.image.url', async () => {
+      transaction.mockResolvedValue([
+        [
+          {
+            id: 1,
+            targetInvestorId: 'inv-1',
+            hopChain: {
+              contact: { name: 'Alice', role: 'Founder', memberUid: 'uid-a' },
+              routeNodes: [{ label: 'Alice', variant: 'member', memberUid: 'uid-a' }],
+            },
+          },
+        ],
+        [],
+      ]);
+      memberFindMany.mockResolvedValue([{ uid: 'uid-a', image: { url: 'https://img/a.webp' } }]);
+
+      const result = await service.getPathsForTarget('inv-1');
+
+      expect(memberFindMany).toHaveBeenCalledWith({
+        where: { uid: { in: ['uid-a'] } },
+        select: { uid: true, image: { select: { url: true } } },
+      });
+      expect(result.items[0].hopChain).toEqual({
+        contact: { name: 'Alice', role: 'Founder', memberUid: 'uid-a', imageUrl: 'https://img/a.webp' },
+        routeNodes: [{ label: 'Alice', variant: 'member', memberUid: 'uid-a', imageUrl: 'https://img/a.webp' }],
+      });
+      expect(result.items[0].corrections).toEqual([]);
+    });
+
+    it('skips member lookup when every person already has imageUrl', async () => {
+      transaction.mockResolvedValue([
+        [
+          {
+            id: 2,
+            targetInvestorId: 'inv-2',
+            hopChain: {
+              contact: {
+                name: 'Alice',
+                role: 'Founder',
+                memberUid: 'uid-a',
+                imageUrl: 'https://img/kept.webp',
+              },
+            },
+          },
+        ],
+        [],
+      ]);
+
+      const result = await service.getPathsForTarget('inv-2');
+
+      expect(memberFindMany).not.toHaveBeenCalled();
+      expect(result.items[0].hopChain).toEqual({
+        contact: {
+          name: 'Alice',
+          role: 'Founder',
+          memberUid: 'uid-a',
+          imageUrl: 'https://img/kept.webp',
+        },
+      });
+    });
   });
 
   describe('connectorMatches', () => {

@@ -24,4 +24,6 @@ export class ConnectorMatchesDto {
   connector_labels?: string[];
   /** Substring match on hop-chain node labels (e.g. team name inside a longer label). */
   connector_labels_contains?: string[];
+  /** Field partition: `person` | `org`. Omit for legacy all-fields OR. */
+  connector_match_kind?: string;
 }

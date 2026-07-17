@@ -73,6 +73,7 @@ export interface PathContactPerson {
   linkedin?: string;
   telegram?: string;
   memberUid?: string;
+  imageUrl?: string;
   teams?: Array<{ name: string; teamUid?: string; logo?: string }>;
 }
 

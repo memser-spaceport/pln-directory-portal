@@ -26,6 +26,11 @@ export class ListMembersQueryDto {
   connectorLabelsContains?: string;
 
   /**
+   * Connector lens field partition: `person` | `org`. Omit for legacy all-fields OR.
+   */
+  connectorMatchKind?: string;
+
+  /**
    * Path-via filters (warm-intros filter update): OR within this group, AND with
    * connectorLabels and investor-field filters. Exact match on PL-side first node.
    */
@@ -42,6 +47,12 @@ export class ListMembersQueryDto {
 
   /** When `'true'`, keep members with a direct PL tie (no intermediary). */
   directOnly?: string;
+
+  /**
+   * Path data-source filter (LAB-2120): `affinity` | `linkedin`.
+   * Omit for all sources. Single-select; AND'd with connector + path-via groups.
+   */
+  pathSource?: string;
 
   page?: string;
   limit?: string;

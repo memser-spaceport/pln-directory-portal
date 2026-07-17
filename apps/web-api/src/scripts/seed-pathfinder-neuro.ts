@@ -14,9 +14,14 @@
  *   2. For each person in the Affinity LP list (352080): create an
  *      InvestorOutreachRecord keyed by the Affinity entity id (investorId =
  *      canonicalId = affinity id), with name/email/firm + prestige enrichment by
- *      name, and write person-keyed PathfinderPath rows copied from the person's
- *      best firm (so WarmPathDetail resolves by investor_id = person).
+ *      name (enrichment overrides Affinity for display firm/title; Affinity orgs
+ *      still drive proximity/paths), and write person-keyed PathfinderPath rows
+ *      copied from the person's best firm (so WarmPathDetail resolves by
+ *      investor_id = person).
  *   3. Repoint + graph the neuro-lp list and set membership to the people.
+ *
+ * Re-run after deploying firm/title precedence so existing rows pick up
+ * enrichment-preferred display firm/title (e.g. Sam Altman → OpenAI / CEO).
  *
  * Crosswalk note: the record's investorId/canonicalId IS the Affinity id; the
  * affinity<->directory uid crosswalk table population is a separate follow-up
@@ -33,9 +38,10 @@
  */
 import { readFileSync } from 'fs';
 import { PrismaClient, Prisma } from '@prisma/client';
-import { affinityBoost, blendGraphScore, comparePathsByWarmth } from './affinity-warmth-boost.util';
+import { affinityBoost, blendGraphScore } from './affinity-warmth-boost.util';
 import { buildAffinityDirectPath, passesAffinityDirectThreshold } from './affinity-direct-path.util';
 import { finalizePersonHopChain } from './path-route.util';
+import { isUnreachableFounderPath } from './unreachable-founder-path.util';
 import { loadMemberNameIndex, loadPortfolioFounderIndex, normalizePersonName } from './founder-member-resolve.util';
 import { loadMemberContactIndex } from './org-contact-resolve.util';
 import { loadDirectoryTeamIndex } from './org-team-resolve.util';
@@ -48,11 +54,13 @@ import {
 } from './affinity-roster-mapper.util';
 import { buildMergedPlConnectors, loadPlConnectorsFromFile } from './pl-relationship-seed.util';
 import { loadPrestigeByName, toEnrichment } from './prestige-seed.util';
+import { resolveInvestorFirmAndTitle } from './investor-firm-title-precedence.util';
 import { buildFirmByLabelIndex, lookupFirmProximity, type FirmProximity } from './firm-proximity-seed.util';
 import { loadPriorBackingMap } from './pl-investors-seed.util';
 import { applyPriorBackingToHopChain, backingWarmthBoost } from './prior-backing-warmth.util';
 import {
   applyPathAttributionAndWarmth,
+  comparePathCandidatesByFinalWarmth,
   lookupAllSocialOverlapsForInvestor,
   mergeOrCreateLinkedInPathCandidates,
   shouldAttachAffinityToPath,
@@ -341,14 +349,11 @@ async function seed() {
 
     if (candidates.length === 0) return null;
 
-    const sorted = [...candidates].sort(comparePathsByWarmth);
+    const sorted = [...candidates].sort(comparePathCandidatesByFinalWarmth);
 
     let rank1Code: string | null = null;
-    for (let i = 0; i < sorted.length; i++) {
-      const p = sorted[i];
-      const rank = i + 1;
-      if (rank === 1) rank1Code = p.proximityCode;
-
+    let insertRank = 0;
+    for (const p of sorted) {
       let hopChain = JSON.parse(JSON.stringify(p.hopChain)) as Record<string, unknown>;
       const attachAffinity = shouldAttachAffinityToPath({
         linkedInOnly: p.linkedInOnly,
@@ -361,6 +366,17 @@ async function seed() {
         attachedHere = true;
       }
       hopChain = finalizePersonHopChain(hopChain, person, founderIndexes, p.hops, memberContactIndex, teamIndex);
+
+      // Drop F-paths with no Directory founder and no PL connector person.
+      if (
+        isUnreachableFounderPath({
+          connectorType: p.connectorType,
+          hopChain: hopChain as PathHopChain,
+        })
+      ) {
+        continue;
+      }
+
       hopChain = applyPriorBackingToHopChain(hopChain, priorBacking);
 
       let overlaps: SocialOverlapEntry[] = p.linkedInOverlaps ?? [];
@@ -379,6 +395,9 @@ async function seed() {
       const score = attributed.score;
       const primaryOverlap = attributed.primaryOverlap;
 
+      insertRank += 1;
+      if (insertRank === 1) rank1Code = p.proximityCode;
+
       pathInserts.push({
         targetInvestorId,
         targetSet: TARGET_SET,
@@ -390,10 +409,11 @@ async function seed() {
         caliberConfidence: p.caliberConfidence,
         hopChain: hopChain as Prisma.InputJsonValue,
         ...(primaryOverlap ? { socialOverlap: primaryOverlap as unknown as Prisma.InputJsonValue } : {}),
-        rank,
+        rank: insertRank,
         ingestRunId: RUN_ID,
       });
     }
+    if (insertRank === 0) return null;
     if (attachedHere) personsWithConnector += 1;
     pathTargetsQueued.add(targetInvestorId);
     return rank1Code;
@@ -439,7 +459,8 @@ async function seed() {
 
     const { profile: affinityProfile, affinityData } = mapAffinityListEntry(ent, { memberResolver });
 
-    let bestProximityForRecord: string | null = personHasPath && best ? best.code : null;
+    let bestProximityForRecord: string | null = null;
+    let hasPathForRecord = false;
 
     // Match by dedupeKey (prod convention) — a person may already exist via the
     // Gold list (same Affinity id) or the wider investor DB (same email).
@@ -496,14 +517,17 @@ async function seed() {
     }
 
     if (personHasPath) {
-      reachable += 1;
       const rank1 = queuePaths(affinityId, best?.firmId ?? '', {
         firstName,
         lastName,
         memberUid: memberByEmail.get(dedupeKey),
         email: realEmail || undefined,
       });
-      if (rank1) bestProximityForRecord = rank1;
+      if (rank1) {
+        reachable += 1;
+        bestProximityForRecord = rank1;
+        hasPathForRecord = true;
+      }
     }
 
     // Same Affinity id (re-run / Gold-shared person) or brand new. On update,
@@ -513,6 +537,13 @@ async function seed() {
     const mergedProfile = mergeProfileFields(priorProfile ?? {}, affinityProfile);
     const rawPayload = buildRawPayload(enrichment, affinityData, priorProfile?.rawPayload);
     const priorBacking = priorBackingByInvestor.get(affinityId);
+    // Display firm/title: prestige enrichment wins when it has a usable signal;
+    // Affinity Organizations still drive proximity/paths above (firmLabel / best).
+    const resolvedFirmTitle = resolveInvestorFirmAndTitle({
+      affinityFirm: firmLabel,
+      affinityTitle: mergedProfile.title,
+      enrichment: prest ? { firm: prest.firm, title: prest.title, bio: prest.bio } : undefined,
+    });
     const recordFields = {
       investorId: affinityId,
       canonicalId: affinityId,
@@ -521,12 +552,13 @@ async function seed() {
       email,
       additionalEmails,
       emailStatus: 'unverified',
-      firm: firmLabel,
+      firm: resolvedFirmTitle.firm,
       ...mergedProfile,
+      title: resolvedFirmTitle.title,
       engagementTier: '',
       enrichmentStatus: enrichment ? 'enriched' : 'pending',
       bestProximityCode: bestProximityForRecord,
-      hasPath: personHasPath,
+      hasPath: hasPathForRecord,
       ...(rawPayload || priorBacking
         ? {
             rawPayload: {
@@ -566,13 +598,13 @@ async function seed() {
   const alreadyHasPaths = new Set(pathCounts.map((c) => c.targetInvestorId));
   for (const d of dupPathCandidates) {
     if (pathTargetsQueued.has(d.investorId) || alreadyHasPaths.has(d.investorId)) continue;
+    const rank1 = queuePaths(d.investorId, d.firmId, {
+      firstName: d.firstName,
+      lastName: d.lastName,
+      memberUid: d.memberUid,
+    });
+    if (!rank1) continue;
     reachable += 1;
-    const rank1 =
-      queuePaths(d.investorId, d.firmId, {
-        firstName: d.firstName,
-        lastName: d.lastName,
-        memberUid: d.memberUid,
-      }) ?? d.bestCode;
     const pendingCreate = createByInvestorId.get(d.investorId);
     if (pendingCreate) {
       pendingCreate.bestProximityCode = rank1;

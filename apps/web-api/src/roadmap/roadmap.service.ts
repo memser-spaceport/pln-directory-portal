@@ -26,7 +26,13 @@ import {
   TRENDING_HALF_LIFE_DAYS,
   itemDetailPath,
 } from './roadmap.constants';
-import { AdminPinDto, AdminPinRow, toAdminPinList } from './roadmap-pin.util';
+import {
+  AdminPinDto,
+  AdminPinRow,
+  computeImpactAggregate,
+  impactValuesFromPins,
+  toAdminPinList,
+} from './roadmap-pin.util';
 import { assertTransitionAllowed, isDeclineTransition, isIdeaStage, isPromoteTransition } from './roadmap-stage.util';
 
 type CreateBody = z.infer<typeof CreateRoadmapItemSchema>;
@@ -56,6 +62,7 @@ const itemInclude: Prisma.RoadmapItemInclude = {
 const adminPinSelect = {
   uid: true,
   note: true,
+  impact: true,
   createdAt: true,
   releasedAt: true,
   member: { select: { uid: true, name: true, image: { select: { url: true } } } },
@@ -77,6 +84,8 @@ interface RoadmapItemRow {
   promotedByUid: string | null;
   declinedReason: string | null;
   externalTrackerUrl: string | null;
+  authorImpact: number | null;
+  authorImpactReasoning: string | null;
   objectives: { objective: { uid: string; title: string; order: number } }[];
   deletedAt: Date | null;
   createdAt: Date;
@@ -87,10 +96,16 @@ interface RoadmapItemRow {
 interface ViewerPinState {
   viewerHasPinned: boolean;
   viewerPinNote: string | null;
+  viewerImpact: number | null;
   activePinCount: number;
 }
 
-const EMPTY_PIN_STATE: ViewerPinState = { viewerHasPinned: false, viewerPinNote: null, activePinCount: 0 };
+const EMPTY_PIN_STATE: ViewerPinState = {
+  viewerHasPinned: false,
+  viewerPinNote: null,
+  viewerImpact: null,
+  activePinCount: 0,
+};
 
 @Injectable()
 export class RoadmapService {
@@ -136,33 +151,48 @@ export class RoadmapService {
       where,
       include: {
         ...itemInclude,
-        pins: { where: { memberUid: viewerUid, releasedAt: null }, select: { note: true }, take: 1 },
+        pins: {
+          where: { memberUid: viewerUid, releasedAt: null },
+          select: { note: true, impact: true },
+          take: 1,
+        },
       },
-    })) as unknown as (RoadmapItemRow & { pins: { note: string | null }[] })[];
+    })) as unknown as (RoadmapItemRow & { pins: { note: string | null; impact: number | null }[] })[];
 
-    // Curators get the full pinner lists embedded; everyone else only needs active-pin
-    // timestamps for counts and trending scores.
-    let activePins: { itemUid: string; createdAt: Date }[];
+    // Load all pins once: curators get member details; everyone needs impact for aggregates.
+    const fullPins = await this.prisma.roadmapItemPin.findMany({
+      where: { itemUid: { in: rows.map((row) => row.uid) } },
+      select: access.canCurate
+        ? { itemUid: true, ...adminPinSelect }
+        : { itemUid: true, impact: true, releasedAt: true, createdAt: true },
+    });
+
     let adminPinsByItem: Map<string, AdminPinRow[]> | null = null;
+    const pinsByItem = new Map<string, Array<{ impact: number | null; releasedAt: Date | null }>>();
     if (access.canCurate) {
-      const fullPins = await this.prisma.roadmapItemPin.findMany({
-        where: { itemUid: { in: rows.map((row) => row.uid) } },
-        select: { itemUid: true, ...adminPinSelect },
-      });
       adminPinsByItem = new Map();
-      for (const pin of fullPins) {
+      for (const pin of fullPins as Array<AdminPinRow & { itemUid: string }>) {
         const list = adminPinsByItem.get(pin.itemUid) ?? [];
         list.push(pin);
         adminPinsByItem.set(pin.itemUid, list);
+        const impactList = pinsByItem.get(pin.itemUid) ?? [];
+        impactList.push(pin);
+        pinsByItem.set(pin.itemUid, impactList);
       }
-      activePins = fullPins.filter((pin) => !pin.releasedAt);
     } else {
-      activePins = await this.prisma.roadmapItemPin.findMany({
-        where: { itemUid: { in: rows.map((row) => row.uid) }, releasedAt: null },
-        select: { itemUid: true, createdAt: true },
-      });
+      for (const pin of fullPins as Array<{
+        itemUid: string;
+        impact: number | null;
+        releasedAt: Date | null;
+        createdAt: Date;
+      }>) {
+        const list = pinsByItem.get(pin.itemUid) ?? [];
+        list.push(pin);
+        pinsByItem.set(pin.itemUid, list);
+      }
     }
 
+    const activePins = fullPins.filter((pin) => !pin.releasedAt);
     const activePinCounts = new Map<string, number>();
     const trendingScores = new Map<string, number>();
     const now = Date.now();
@@ -204,9 +234,11 @@ export class RoadmapService {
           {
             viewerHasPinned: row.pins.length > 0,
             viewerPinNote: row.pins[0]?.note ?? null,
+            viewerImpact: row.pins[0]?.impact ?? null,
             activePinCount: activePinCounts.get(row.uid) ?? 0,
           },
-          adminPinsByItem ? toAdminPinList(adminPinsByItem.get(row.uid) ?? []) : null
+          adminPinsByItem ? toAdminPinList(adminPinsByItem.get(row.uid) ?? []) : null,
+          pinsByItem.get(row.uid) ?? []
         )
       ),
       total: sorted.length,
@@ -229,6 +261,8 @@ export class RoadmapService {
       stage = body.stage as RoadmapStage;
     }
 
+    const reasoning = body.authorImpactReasoning?.trim() || null;
+
     const row = await this.prisma.roadmapItem.create({
       data: {
         title: body.title,
@@ -239,6 +273,8 @@ export class RoadmapService {
         tags: body.tags ?? [],
         externalTrackerUrl: body.externalTrackerUrl ?? null,
         stage,
+        authorImpact: body.authorImpact ?? null,
+        authorImpactReasoning: reasoning,
         createdByUid: actorUid,
         promotedAt: stage === RoadmapStage.PLANNED ? new Date() : null,
         promotedByUid: stage === RoadmapStage.PLANNED ? actorUid : null,
@@ -257,7 +293,7 @@ export class RoadmapService {
       await this.notifyNewSubmission(row, actorUid);
     }
 
-    return this.toDto(row as unknown as RoadmapItemRow, actorUid, EMPTY_PIN_STATE, access.canCurate ? [] : null);
+    return this.toDto(row as unknown as RoadmapItemRow, actorUid, EMPTY_PIN_STATE, access.canCurate ? [] : null, []);
   }
 
   async updateItem(uid: string, body: UpdateBody, actorUid: string) {
@@ -340,7 +376,7 @@ export class RoadmapService {
 
     await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_ARCHIVED, actorUid, { itemUid: uid });
     await this.trackPinsReleased(uid, actorUid, releasedPins, 'archived');
-    return this.toDto(row as unknown as RoadmapItemRow, actorUid, EMPTY_PIN_STATE);
+    return this.toDto(row as unknown as RoadmapItemRow, actorUid, EMPTY_PIN_STATE, null, []);
   }
 
   async promoteItem(uid: string, actorUid: string) {
@@ -475,11 +511,7 @@ export class RoadmapService {
 
     if (isPromoteTransition(existing.stage, to)) {
       await this.track(ROADMAP_ANALYTICS_EVENTS.IDEA_PROMOTED, actorUid, { itemUid: uid });
-    } else if (to === RoadmapStage.SHIPPED) {
-      if (!reachedShippedBefore) {
-        await this.notifyBackersShipped(row);
-      }
-    } else {
+    } else if (to !== RoadmapStage.SHIPPED) {
       await this.track(ROADMAP_ANALYTICS_EVENTS.ROADMAP_STATUS_CHANGED, actorUid, {
         itemUid: uid,
         from: existing.stage,
@@ -580,28 +612,36 @@ export class RoadmapService {
         {
           viewerHasPinned: !!viewerPin,
           viewerPinNote: viewerPin?.note ?? null,
+          viewerImpact: viewerPin?.impact ?? null,
           activePinCount: activePins.length,
         },
-        toAdminPinList(pins)
+        toAdminPinList(pins),
+        pins
       );
     }
 
-    const [viewerPin, activePinCount] = await Promise.all([
+    const [viewerPin, pins] = await Promise.all([
       this.prisma.roadmapItemPin.findFirst({
         where: { itemUid: row.uid, memberUid: viewerUid, releasedAt: null },
-        select: { note: true },
+        select: { note: true, impact: true },
       }),
-      this.prisma.roadmapItemPin.count({ where: { itemUid: row.uid, releasedAt: null } }),
+      this.prisma.roadmapItemPin.findMany({
+        where: { itemUid: row.uid },
+        select: { impact: true, releasedAt: true },
+      }),
     ]);
+    const activePinCount = pins.filter((pin) => !pin.releasedAt).length;
     return this.toDto(
       row,
       viewerUid,
       {
         viewerHasPinned: !!viewerPin,
         viewerPinNote: viewerPin?.note ?? null,
+        viewerImpact: viewerPin?.impact ?? null,
         activePinCount,
       },
-      null
+      null,
+      pins
     );
   }
 
@@ -609,8 +649,12 @@ export class RoadmapService {
     row: RoadmapItemRow,
     _viewerUid: string,
     pinState: ViewerPinState,
-    adminPins: AdminPinDto[] | null = null
+    adminPins: AdminPinDto[] | null = null,
+    pinsForImpact: Array<{ impact: number | null; releasedAt: Date | null }> = []
   ) {
+    const pinnable = this.isPinnableStage(row.stage);
+    const impact = computeImpactAggregate([row.authorImpact, ...impactValuesFromPins(pinsForImpact, pinnable)]);
+
     return {
       uid: row.uid,
       title: row.title,
@@ -631,6 +675,8 @@ export class RoadmapService {
       promotedByUid: row.promotedByUid,
       declinedReason: row.declinedReason,
       externalTrackerUrl: row.externalTrackerUrl,
+      authorImpact: row.authorImpact,
+      authorImpactReasoning: row.authorImpactReasoning,
       objectives: row.objectives.map((link) => ({
         uid: link.objective.uid,
         title: link.objective.title,
@@ -638,9 +684,13 @@ export class RoadmapService {
       })),
       upvoteCount: 0,
       viewerHasUpvoted: false,
-      pinCount: this.isPinnableStage(row.stage) ? pinState.activePinCount : row._count.pins,
+      pinCount: pinnable ? pinState.activePinCount : row._count.pins,
       viewerHasPinned: pinState.viewerHasPinned,
       viewerPinNote: pinState.viewerPinNote,
+      viewerImpact: pinState.viewerImpact,
+      avgImpact: impact.avgImpact,
+      impactCount: impact.impactCount,
+      impactDistribution: impact.impactDistribution,
       pins: adminPins,
       deletedAt: row.deletedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
@@ -699,14 +749,30 @@ export class RoadmapService {
     );
   }
 
-  /** Trigger 4 — tell the original submitter their need shipped. */
-  private async notifyShipped(item: { uid: string; title: string; createdByUid: string }) {
-    await this.sendMemberNotification(
-      item.createdByUid,
-      ROADMAP_NOTIFICATION_COPY.needShipped(item.title),
-      item.uid,
-      ROADMAP_NOTIFICATION_TRIGGERS.NEED_SHIPPED
-    );
+  /**
+   * Broadcast that an item shipped to everyone with roadmap access. One permission-gated
+   * notification (same fan-out as new submissions). No authorUid — the submitter should
+   * see it too when they hold roadmap.view.
+   */
+  private async notifyShipped(item: { uid: string; title: string }) {
+    try {
+      await this.pushNotifications.create({
+        category: PushNotificationCategory.GANTRY,
+        ...ROADMAP_NOTIFICATION_COPY.needShipped(item.title),
+        link: itemDetailPath(item.uid),
+        isPublic: false,
+        requiredPermissions: [ROADMAP_PERMISSIONS.VIEW, ROADMAP_PERMISSIONS.ADMIN],
+        metadata: {
+          eventType: 'roadmap',
+          itemUid: item.uid,
+          trigger: ROADMAP_NOTIFICATION_TRIGGERS.NEED_SHIPPED,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Roadmap shipped notification failed for ${item.uid}: ${error instanceof Error ? error.message : error}`
+      );
+    }
   }
 
   /**
@@ -749,34 +815,6 @@ export class RoadmapService {
         ROADMAP_NOTIFICATION_COPY.boostReturned(item.title),
         item.uid,
         ROADMAP_NOTIFICATION_TRIGGERS.BOOST_RETURNED
-      );
-    }
-  }
-
-  /**
-   * PRD §7 trigger 3 — tell everyone who ever pinned the item (released pins included,
-   * deduped) that it shipped. The creator is excluded: they already get the dedicated
-   * need-shipped notification from notifyShipped.
-   */
-  private async notifyBackersShipped(item: { uid: string; title: string; createdByUid: string }) {
-    try {
-      const backers = await this.prisma.roadmapItemPin.findMany({
-        where: { itemUid: item.uid },
-        select: { memberUid: true },
-        distinct: ['memberUid'],
-      });
-      const recipients = backers.map((pin) => pin.memberUid).filter((memberUid) => memberUid !== item.createdByUid);
-      for (const memberUid of recipients) {
-        await this.sendMemberNotification(
-          memberUid,
-          ROADMAP_NOTIFICATION_COPY.backedItemShipped(item.title),
-          item.uid,
-          ROADMAP_NOTIFICATION_TRIGGERS.BACKED_ITEM_SHIPPED
-        );
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Roadmap backers-shipped notification failed for ${item.uid}: ${error instanceof Error ? error.message : error}`
       );
     }
   }

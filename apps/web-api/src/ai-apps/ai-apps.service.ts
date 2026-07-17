@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -8,31 +9,42 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
+import { randomUUID } from 'crypto';
 import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { isDirectoryAdmin } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
+import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import {
+  AI_APPS_DEPLOY_STUCK_MINUTES,
+  AI_APPS_DEPLOY_STUCK_MS,
   AI_APPS_RUNNER_ENVIRONMENT,
   AI_APPS_RUNNER_TOKEN,
   AI_APPS_RUNNER_URL,
   AI_APPS_S3_BUCKET,
+  AI_APPS_PRD_S3_BUCKET,
+  AI_APPS_STARTER_KIT_VERSION,
+  AI_APPS_VERIFY_ATTEMPTS,
+  AI_APPS_VERIFY_INTERVAL_MS,
   buildAppHost,
   buildAppHttpUrl,
   buildAppPageUrl,
   buildAppS3Key,
   buildAppUrl,
+  buildPrdPublicUrl,
+  buildPrdS3Key,
   buildRunnerDeploymentsUrl,
   buildRunnerSecretsUrl,
 } from './ai-apps.constants';
 
-/** Edge/gateway statuses that mean "the runner may still have finished" — verify, don't fail. */
-const GATEWAY_TIMEOUT_STATUSES = [408, 502, 503, 504, 521, 522, 523, 524];
-/** How long to wait for the app to come up after a runner timeout. */
-const VERIFY_ATTEMPTS = 8;
-const VERIFY_INTERVAL_MS = 8000;
+/**
+ * Edge/gateway statuses that mean "the app isn't reachable (yet)" — verify,
+ * don't fail. 530 is Cloudflare's origin-DNS error, served while the app's
+ * subdomain isn't registered yet.
+ */
+const GATEWAY_TIMEOUT_STATUSES = [408, 502, 503, 504, 521, 522, 523, 524, 530];
 
 interface RunnerDeployResponse {
   status?: string;
@@ -42,7 +54,7 @@ interface RunnerDeployResponse {
   port?: number;
 }
 
-type AiAppMember = { uid: string; name: string };
+type AiAppMember = { uid: string; name: string; image: string | null };
 
 /** Response shape across all AI Apps endpoints: `memberUid` replaced by `member`. */
 type WithMember<T extends { memberUid: string }> = Omit<T, 'memberUid'> & { member: AiAppMember | null };
@@ -58,14 +70,76 @@ export class AiAppsService {
     const members = memberUids.length
       ? await this.prisma.member.findMany({
           where: { uid: { in: memberUids } },
-          select: { uid: true, name: true },
+          select: { uid: true, name: true, image: { select: { url: true } } },
         })
       : [];
-    const byUid = new Map(members.map((m) => [m.uid, m]));
-    return records.map(({ memberUid, ...rest }) => ({
-      ...(rest as Omit<T, 'memberUid'>),
-      member: byUid.get(memberUid) ?? null,
-    }));
+    const byUid = new Map(
+      members.map(({ image, ...member }) => [member.uid, { ...member, image: image?.url ?? null }])
+    );
+    return records.map(({ memberUid, ...rest }) => {
+      const response = {
+        ...(rest as Omit<T, 'memberUid'>),
+        member: byUid.get(memberUid) ?? null,
+      } as WithMember<T>;
+
+      // The database stores only the S3 key. Keep the existing API contract by
+      // returning the public URL in the same `prd` field. Legacy inline PRD
+      // values remain untouched.
+      const responseWithPrd = response as WithMember<T> & { prd?: string | null };
+      if (typeof responseWithPrd.prd === 'string' && responseWithPrd.prd.startsWith('ai-app-prds/')) {
+        responseWithPrd.prd = buildPrdPublicUrl(responseWithPrd.prd);
+      }
+      return response;
+    });
+  }
+
+  /**
+   * Public identity of the signed-in member, served to deployed AI apps for
+   * personalization ("member context"). Returns curated public directory
+   * fields only — this is the extension point if apps may read more PLN data
+   * later (add fields/sections here rather than exposing internal endpoints).
+   * Deliberately NO contact info (email, office-hours link, …): apps
+   * personalize with the identity, they never get a channel to the member.
+   */
+  async getMemberContext(memberUid: string) {
+    const member = await this.prisma.member.findUnique({
+      where: { uid: memberUid },
+      select: {
+        uid: true,
+        name: true,
+        image: { select: { url: true } },
+        location: { select: { city: true, country: true, continent: true } },
+        skills: { select: { title: true }, orderBy: { title: 'asc' } },
+        teamMemberRoles: {
+          select: {
+            role: true,
+            mainTeam: true,
+            teamLead: true,
+            team: { select: { uid: true, name: true } },
+          },
+          orderBy: { mainTeam: 'desc' },
+        },
+      },
+    });
+    if (!member) {
+      throw new NotFoundException(`Member not found: ${memberUid}`);
+    }
+    const { image, location, skills, teamMemberRoles, ...identity } = member;
+    return {
+      member: {
+        ...identity,
+        image: image?.url ?? null,
+        location: location ?? null,
+        skills: skills.map((skill) => skill.title),
+        teams: teamMemberRoles.map((tmr) => ({
+          uid: tmr.team.uid,
+          name: tmr.team.name,
+          role: tmr.role,
+          mainTeam: tmr.mainTeam,
+          teamLead: tmr.teamLead,
+        })),
+      },
+    };
   }
 
   /** Dashboard list — all non-deleted apps across PL Infra users, newest first, with owner info. */
@@ -74,7 +148,7 @@ export class AiAppsService {
       where: { status: { not: 'DELETED' } },
       orderBy: { updatedAt: 'desc' },
     });
-    return this.withMember(apps);
+    return this.withMember(await Promise.all(apps.map((app) => this.settleStuckDeploy(app))));
   }
 
   /**
@@ -83,15 +157,128 @@ export class AiAppsService {
    * never has to compare member uids from a possibly stale login cookie.
    */
   async getApp(uid: string, requesterUid?: string): Promise<WithMember<AiApp> & { canManage?: boolean }> {
-    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    let app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
     }
+    app = await this.settleStuckDeploy(app);
     const result = (await this.withMember([app]))[0];
     if (!requesterUid) {
       return result;
     }
     return { ...result, canManage: await this.isCreatorOrDirectoryAdmin(requesterUid, app) };
+  }
+
+  /** Updates dashboard metadata only; this never invokes the sandbox runner or starts a deploy. */
+  async updateMetadata(
+    requesterUid: string,
+    uid: string,
+    dto: UpdateAppMetadataDto,
+    ownerOnly = false
+  ): Promise<WithMember<AiApp>> {
+    if (dto.name === undefined && dto.description === undefined && dto.prd === undefined) {
+      throw new BadRequestException('At least one of name, description, or prd must be provided');
+    }
+
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (ownerOnly && app.memberUid !== requesterUid) {
+      throw new ForbiddenException('The agent may edit only apps owned by its connected member');
+    }
+
+    const data: { name?: string; description?: string | null; prd?: string | null } = {};
+    if (dto.name !== undefined) data.name = dto.name.trim();
+    if (dto.description !== undefined) data.description = dto.description?.trim() || null;
+    if (dto.prd !== undefined) data.prd = dto.prd?.trim() || null;
+
+    const updated = await this.prisma.aiApp.update({ where: { uid }, data });
+    return (await this.withMember([updated]))[0];
+  }
+
+  /** Update metadata from JSON or multipart; a PRD file overrides body.prd. */
+  async updateMetadataWithOptionalPrdFile(
+    requesterUid: string,
+    uid: string,
+    dto: UpdateAppMetadataDto,
+    file?: Express.Multer.File
+  ): Promise<WithMember<AiApp>> {
+    if (!file) {
+      return this.updateMetadata(requesterUid, uid, dto);
+    }
+    if (dto.prd !== undefined) {
+      throw new BadRequestException('Send either prd text or a PRD file, not both');
+    }
+    return this.storePrdFile(requesterUid, uid, file, dto);
+  }
+
+  /** File-only PRD upload used by POST /:uid/prd. */
+  async uploadPrd(requesterUid: string, uid: string, file: Express.Multer.File): Promise<WithMember<AiApp>> {
+    return this.storePrdFile(requesterUid, uid, file, {} as UpdateAppMetadataDto);
+  }
+
+  /** Validate a Markdown/HTML PRD file, upload it, and persist only its S3 key. */
+  private async storePrdFile(
+    requesterUid: string,
+    uid: string,
+    file: Express.Multer.File,
+    metadata: UpdateAppMetadataDto
+  ): Promise<WithMember<AiApp>> {
+    const extension = this.validatePrdFile(file);
+    if (!AI_APPS_PRD_S3_BUCKET) {
+      throw new InternalServerErrorException('No PRD bucket configured (AI_APPS_PRD_S3_BUCKET or AI_APPS_S3_BUCKET)');
+    }
+
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+
+    const key = buildPrdS3Key(app.appId, extension, randomUUID());
+    try {
+      const contentType = extension === '.md' ? 'text/markdown; charset=utf-8' : 'text/html; charset=utf-8';
+
+      await this.awsService.uploadFileToS3(
+        {
+          buffer: file.buffer,
+          mimetype: contentType,
+        },
+        AI_APPS_PRD_S3_BUCKET,
+        key
+      );
+    } catch (error) {
+      this.logger.error(`AI App PRD upload failed for ${app.appId}: ${(error as Error).message}`);
+      throw new BadGatewayException('Failed to store the PRD file');
+    }
+
+    return this.updateMetadata(requesterUid, uid, { ...metadata, prd: key } as UpdateAppMetadataDto);
+  }
+
+  /** Validate a UTF-8 Markdown/HTML PRD file and return its normalized extension. */
+  private validatePrdFile(file: Express.Multer.File): '.md' | '.html' {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('PRD file is required and must not be empty');
+    }
+
+    const filename = file.originalname || '';
+    const rawExtension = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')).toLowerCase() : '';
+
+    let extension: '.md' | '.html';
+
+    if (rawExtension === '.md' || rawExtension === '.markdown') {
+      extension = '.md';
+    } else if (rawExtension === '.html' || rawExtension === '.htm') {
+      extension = '.html';
+    } else {
+      throw new BadRequestException('Unsupported PRD file type. Only .md, .markdown, .html, and .htm are allowed');
+    }
+
+    if (file.buffer.includes(0)) {
+      throw new BadRequestException('PRD file must contain UTF-8 text');
+    }
+
+    return extension;
   }
 
   /**
@@ -124,6 +311,49 @@ export class AiAppsService {
   }
 
   /**
+   * A deploy that has sat in DEPLOYING beyond the stuck window is stuck: the
+   * deploy runs synchronously in the API process, so a legitimate one settles
+   * to READY/ERROR within minutes. Nothing touches the row between the flip to
+   * DEPLOYING and the settle, so `updatedAt` is exactly "deploy started at".
+   */
+  private isDeployStuck(app: Pick<AiApp, 'status' | 'updatedAt'>): boolean {
+    return app.status === 'DEPLOYING' && Date.now() - app.updatedAt.getTime() > AI_APPS_DEPLOY_STUCK_MS;
+  }
+
+  /**
+   * Lazily settles a stuck deploy on read: flips the row to ERROR with an
+   * explanatory note and records DEPLOY_FAILED, so the dashboard/detail page
+   * shows a clear failed state (and the owner can retry) instead of an app
+   * frozen in DEPLOYING forever. The update is conditioned on the row still
+   * being DEPLOYING — if the deploy somehow settles concurrently, its own
+   * READY/ERROR write wins and we return the fresh row.
+   */
+  private async settleStuckDeploy(app: AiApp): Promise<AiApp> {
+    if (!this.isDeployStuck(app)) {
+      return app;
+    }
+    const message =
+      `Deploy timed out: no result after ${AI_APPS_DEPLOY_STUCK_MINUTES} minutes — the deploy was interrupted ` +
+      'or the sandbox runner is unavailable. Retry the deploy once the runner is healthy.';
+    const { count } = await this.prisma.aiApp.updateMany({
+      where: { uid: app.uid, status: 'DEPLOYING' },
+      data: { status: 'ERROR', notes: message },
+    });
+    if (count > 0) {
+      this.logger.warn(
+        `AI App deploy stuck for ${app.appId} (deploymentId=${app.deploymentId ?? 'n/a'}) — marked ERROR`
+      );
+      await this.recordEvent('DEPLOY_FAILED', app.memberUid, {
+        appUid: app.uid,
+        appId: app.appId,
+        deploymentId: app.deploymentId ?? undefined,
+        message,
+      });
+    }
+    return (await this.prisma.aiApp.findUnique({ where: { uid: app.uid } })) ?? app;
+  }
+
+  /**
    * Append an event to the audit log. Never throws — event logging must not
    * break the primary flow (download/deploy).
    */
@@ -139,9 +369,9 @@ export class AiAppsService {
     }
   }
 
-  /** Logs that a member downloaded the starter kit. */
+  /** Logs that a member downloaded the starter kit (and which version). */
   async logKitDownloaded(memberUid: string): Promise<void> {
-    await this.recordEvent('KIT_DOWNLOADED', memberUid);
+    await this.recordEvent('KIT_DOWNLOADED', memberUid, { message: `Starter kit v${AI_APPS_STARTER_KIT_VERSION}` });
   }
 
   /** Event log (audit feed) — newest first, optionally scoped to one app. */
@@ -205,7 +435,12 @@ export class AiAppsService {
    * the deploy to the sandbox runner (keeping AWS creds + the runner token
    * server-side) and stores the result.
    */
-  async deploy(memberUid: string, dto: DeployAppDto, file: Express.Multer.File): Promise<WithMember<AiApp>> {
+  async deploy(
+    memberUid: string,
+    dto: DeployAppDto,
+    file: Express.Multer.File,
+    agentClient?: string | null
+  ): Promise<WithMember<AiApp>> {
     if (!file?.buffer?.length) {
       throw new BadGatewayException('Missing app ZIP file');
     }
@@ -232,6 +467,9 @@ export class AiAppsService {
         url,
         httpUrl,
         host,
+        kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
       },
       update: {
         name: dto.name,
@@ -242,6 +480,11 @@ export class AiAppsService {
         url,
         httpUrl,
         host,
+        // Upload metadata reflects the LAST upload — cleared when a client
+        // that sends nothing (older kit) redeploys, so it never goes stale.
+        kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
         notes: null,
       },
     });
@@ -275,7 +518,8 @@ export class AiAppsService {
   async registerDraft(
     memberUid: string,
     dto: RegisterDraftDto,
-    file: Express.Multer.File
+    file: Express.Multer.File,
+    agentClient?: string | null
   ): Promise<WithMember<AiApp> & { appPageUrl: string; missingEnvVars: string[] }> {
     if (!file?.buffer?.length) {
       throw new BadRequestException('Missing app ZIP file');
@@ -309,6 +553,9 @@ export class AiAppsService {
         deploymentId: dto.deploymentId,
         s3Key,
         requiredEnvVars: dto.requiredEnvVars,
+        kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
       },
       update: {
         name: dto.name,
@@ -317,6 +564,9 @@ export class AiAppsService {
         deploymentId: dto.deploymentId,
         s3Key,
         requiredEnvVars: dto.requiredEnvVars,
+        kitVersion: dto.kitVersion ?? null,
+        agentClient: agentClient ?? null,
+        agentModel: dto.agentModel ?? null,
         notes: null,
       },
     });
@@ -352,6 +602,12 @@ export class AiAppsService {
     }
     if (app.status === 'DELETED' || app.status === 'DELETING') {
       throw new BadRequestException('This app has been deleted');
+    }
+    // A fresh deploy in flight owns the app — block a second concurrent one.
+    // A STUCK deploy (past the window) is retryable: that's the manual recovery
+    // path when the runner hung or the API died mid-deploy.
+    if (app.status === 'DEPLOYING' && !this.isDeployStuck(app)) {
+      throw new ConflictException('A deploy is already in progress for this app — wait for it to finish, then retry.');
     }
     if (!app.s3Key || !app.deploymentId) {
       throw new BadRequestException('This app has no uploaded bundle yet — ask your AI agent to register it first');
@@ -597,10 +853,11 @@ export class AiAppsService {
   /**
    * Polls the app URL until it responds (any non-gateway HTTP status means the
    * server is up — even a 404 from the app counts). Returns false if it never
-   * becomes reachable within the verification window.
+   * becomes reachable within the verification window (~6 min by default — must
+   * cover the pod-up → domain-registration gap, observed at 1–5 minutes).
    */
   private async verifyAppLive(url: string): Promise<boolean> {
-    for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= AI_APPS_VERIFY_ATTEMPTS; attempt++) {
       try {
         const res = await axios.get(url, { timeout: 10000, validateStatus: () => true, maxRedirects: 0 });
         if (res.status && !GATEWAY_TIMEOUT_STATUSES.includes(res.status)) {
@@ -609,8 +866,8 @@ export class AiAppsService {
       } catch {
         // Not reachable yet — keep polling.
       }
-      if (attempt < VERIFY_ATTEMPTS) {
-        await new Promise((resolve) => setTimeout(resolve, VERIFY_INTERVAL_MS));
+      if (attempt < AI_APPS_VERIFY_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, AI_APPS_VERIFY_INTERVAL_MS));
       }
     }
     return false;

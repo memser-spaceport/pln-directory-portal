@@ -109,6 +109,12 @@ export interface InvestorDto {
   /** Rank-1 people-first route chips for the warm-intros table. */
   bestRouteNodes?: PathHopNodeDto[];
 
+  /**
+   * Distinct path attribution sources across all paths in the list's targetSet
+   * (Affinity / LinkedIn). Empty/omitted when none.
+   */
+  pathSourceTags?: ('Affinity' | 'LinkedIn')[];
+
   /** Aggregated background + sources; null until enriched. */
   enrichment: InvestorEnrichmentDto | null;
 

@@ -5,7 +5,7 @@ import { InvestorDto, PaginatedInvestorsDto } from '../investor-outreach/dto/inv
 import { MemberByEmail, OverlapsByInvestorId, toInvestorDto } from '../investor-outreach/investor-outreach.mapper';
 import { INVESTOR_OUTREACH_SECTOR_TAGS, isAllowedStageFocus } from '../investor-outreach/investor-outreach.vocab';
 import { buildInvestorTextSearch } from '../investor-outreach/investor-text-search.util';
-import { connectorMatchClause } from '../pathfinder/connector-match.util';
+import { connectorMatchClause, type ConnectorMatchKind } from '../pathfinder/connector-match.util';
 import { pathKeywordMatchClause, tokenizeKeywordQuery } from '../pathfinder/path-keyword-search.util';
 import {
   hasPathViaFilters,
@@ -13,6 +13,12 @@ import {
   pathViaMatchClause,
   type PathViaFilterInput,
 } from '../pathfinder/path-via-match.util';
+import {
+  hasPathSourceFilter,
+  parsePathSource,
+  pathSourceMatchClause,
+  type PathSourceTag,
+} from '../pathfinder/path-source-match.util';
 import { parseRouteNodesFromHopChain } from '../pathfinder/route-node-display.util';
 import { compareWarmIntroMembers } from './warm-intro-list-sort.util';
 import { InvestorListDto, InvestorListsResponseDto } from './dto/investor-list.dto';
@@ -41,6 +47,7 @@ interface PathDisplayFields {
   bestRouteNodes?: PathHopNodeDto[];
   bestRouteScore?: number | null;
   pathCount?: number | null;
+  pathSourceTags?: PathSourceTag[];
 }
 
 @Injectable()
@@ -236,7 +243,7 @@ export class InvestorListsQueryService {
     const out = new Map<string, PathDisplayFields>();
     if (!investorIds.length) return out;
 
-    const [rank1Paths, pathCounts] = await Promise.all([
+    const [rank1Paths, pathCounts, sourceTagRows] = await Promise.all([
       this.prisma.pathfinderPath.findMany({
         where: { targetSet, targetInvestorId: { in: investorIds }, rank: 1 },
         select: { targetInvestorId: true, score: true, hopChain: true },
@@ -246,16 +253,59 @@ export class InvestorListsQueryService {
         where: { targetSet, targetInvestorId: { in: investorIds } },
         _count: { _all: true },
       }),
+      this.prisma.$queryRaw<{ targetInvestorId: string; source: string }[]>`
+        SELECT DISTINCT p."targetInvestorId", line->>'source' AS source
+        FROM "PathfinderPath" p
+        CROSS JOIN LATERAL jsonb_array_elements(
+          CASE
+            WHEN jsonb_typeof(p."hopChain"->'attributionLines') = 'array'
+            THEN p."hopChain"->'attributionLines'
+            ELSE '[]'::jsonb
+          END
+        ) AS line
+        WHERE p."targetSet" = ${targetSet}
+          AND p."targetInvestorId" IN (${Prisma.join(investorIds)})
+          AND line->>'source' IN ('Affinity', 'LinkedIn')
+        UNION
+        SELECT DISTINCT p."targetInvestorId", 'LinkedIn' AS source
+        FROM "PathfinderPath" p
+        WHERE p."targetSet" = ${targetSet}
+          AND p."targetInvestorId" IN (${Prisma.join(investorIds)})
+          AND p."socialOverlap" IS NOT NULL`,
     ]);
 
     const countByInvestorId = new Map(pathCounts.map((row) => [row.targetInvestorId, row._count._all]));
+    const tagsByInvestorId = new Map<string, Set<PathSourceTag>>();
+    for (const row of sourceTagRows) {
+      if (row.source !== 'Affinity' && row.source !== 'LinkedIn') continue;
+      const set = tagsByInvestorId.get(row.targetInvestorId) ?? new Set<PathSourceTag>();
+      set.add(row.source);
+      tagsByInvestorId.set(row.targetInvestorId, set);
+    }
+
+    const orderedTags = (set: Set<PathSourceTag> | undefined): PathSourceTag[] | undefined => {
+      if (!set?.size) return undefined;
+      const tags: PathSourceTag[] = [];
+      if (set.has('Affinity')) tags.push('Affinity');
+      if (set.has('LinkedIn')) tags.push('LinkedIn');
+      return tags;
+    };
+
+    for (const id of investorIds) {
+      out.set(id, {
+        pathCount: countByInvestorId.get(id) ?? null,
+        pathSourceTags: orderedTags(tagsByInvestorId.get(id)),
+      });
+    }
 
     for (const p of rank1Paths) {
       const nodes = parseRouteNodesFromHopChain(p.hopChain);
+      const existing = out.get(p.targetInvestorId) ?? {};
       out.set(p.targetInvestorId, {
+        ...existing,
         bestRouteNodes: nodes.length > 0 ? nodes : undefined,
         bestRouteScore: p.score,
-        pathCount: countByInvestorId.get(p.targetInvestorId) ?? null,
+        pathCount: countByInvestorId.get(p.targetInvestorId) ?? existing.pathCount ?? null,
       });
     }
 
@@ -263,13 +313,14 @@ export class InvestorListsQueryService {
   }
 
   /**
-   * Intersect connector-lens and path-via match sets (AND between groups).
-   * Returns `null` when neither group is active.
+   * Intersect connector-lens, path-via, and path-source match sets (AND between groups).
+   * Returns `null` when no group is active.
    */
   private async resolvePathFilterMatchIds(targetSet: string, query: ListMembersQueryDto): Promise<string[] | null> {
     const connectorIds = await this.resolveConnectorMatchIds(targetSet, query);
     const pathViaIds = await this.resolvePathViaMatchIds(targetSet, query);
-    return intersectIdSets(connectorIds, pathViaIds);
+    const pathSourceIds = await this.resolvePathSourceMatchIds(targetSet, query);
+    return intersectIdSets(intersectIdSets(connectorIds, pathViaIds), pathSourceIds);
   }
 
   /**
@@ -289,11 +340,12 @@ export class InvestorListsQueryService {
       .slice(0, MAX_CONNECTOR_LABELS);
     if (labels.length === 0 && containsLabels.length === 0) return null;
 
+    const kind = parseConnectorMatchKind(query.connectorMatchKind);
     const rows = await this.prisma.$queryRaw<{ targetInvestorId: string }[]>`
       SELECT DISTINCT p."targetInvestorId"
       FROM "PathfinderPath" p
       WHERE p."targetSet" = ${targetSet}
-        AND ${connectorMatchClause(labels, containsLabels)}`;
+        AND ${connectorMatchClause(labels, containsLabels, kind)}`;
     return rows.map((r) => r.targetInvestorId);
   }
 
@@ -307,6 +359,19 @@ export class InvestorListsQueryService {
       FROM "PathfinderPath" p
       WHERE p."targetSet" = ${targetSet}
         AND ${pathViaMatchClause(input)}`;
+    return rows.map((r) => r.targetInvestorId);
+  }
+
+  /** Path data-source filter (Affinity / LinkedIn). Single-select. */
+  private async resolvePathSourceMatchIds(targetSet: string, query: ListMembersQueryDto): Promise<string[] | null> {
+    const source = parsePathSource(query.pathSource);
+    if (!hasPathSourceFilter(source)) return null;
+
+    const rows = await this.prisma.$queryRaw<{ targetInvestorId: string }[]>`
+      SELECT DISTINCT p."targetInvestorId"
+      FROM "PathfinderPath" p
+      WHERE p."targetSet" = ${targetSet}
+        AND ${pathSourceMatchClause(source)}`;
     return rows.map((r) => r.targetInvestorId);
   }
 
@@ -577,6 +642,9 @@ function parsePathViaFilters(query: ListMembersQueryDto): PathViaFilterInput {
 }
 
 function validateListMembersQuery(query: ListMembersQueryDto): void {
+  if (query.pathSource != null && query.pathSource.trim() !== '' && parsePathSource(query.pathSource) === null) {
+    throw new BadRequestException(`pathSource must be one of: affinity, linkedin`);
+  }
   const plMembers = parseCsv(query.plMembers);
   if (plMembers.length > MAX_PATH_VIA_VALUES) {
     throw new BadRequestException(`plMembers must contain at most ${MAX_PATH_VIA_VALUES} values`);
@@ -597,6 +665,18 @@ function validateListMembersQuery(query: ListMembersQueryDto): void {
   if (connectorContains.length > MAX_CONNECTOR_LABELS) {
     throw new BadRequestException(`connectorLabelsContains must contain at most ${MAX_CONNECTOR_LABELS} labels`);
   }
+  if (query.connectorMatchKind != null && query.connectorMatchKind.trim() !== '') {
+    const kind = query.connectorMatchKind.trim().toLowerCase();
+    if (kind !== 'person' && kind !== 'org' && kind !== 'all') {
+      throw new BadRequestException(`connectorMatchKind must be one of: person, org, all`);
+    }
+  }
+}
+
+function parseConnectorMatchKind(raw: string | undefined): ConnectorMatchKind {
+  const kind = raw?.trim().toLowerCase();
+  if (kind === 'person' || kind === 'org' || kind === 'all') return kind;
+  return 'all';
 }
 
 function intersectIdSets(a: string[] | null, b: string[] | null): string[] | null {

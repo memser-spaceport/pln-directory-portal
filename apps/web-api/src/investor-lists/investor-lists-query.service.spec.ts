@@ -141,6 +141,7 @@ describe('InvestorListsQueryService', () => {
     beforeEach(() => {
       investorListFindUnique.mockResolvedValue(graphedList);
       investorOutreachRecordCount.mockResolvedValue(2);
+      queryRaw.mockResolvedValue([]);
     });
 
     it('sorts direct 1-hop members before warmer 2-hop members', async () => {
@@ -234,6 +235,62 @@ describe('InvestorListsQueryService', () => {
           }),
         })
       );
+    });
+
+    it('filters members by pathSource and intersects with path-via', async () => {
+      queryRaw
+        .mockResolvedValueOnce([{ targetInvestorId: '101' }, { targetInvestorId: '102' }])
+        .mockResolvedValueOnce([{ targetInvestorId: '102' }, { targetInvestorId: '103' }]);
+      investorOutreachRecordCount.mockResolvedValue(0);
+      investorOutreachRecordFindMany.mockResolvedValue([]);
+
+      await service.listMembers(1, {
+        directOnly: 'true',
+        pathSource: 'linkedin',
+      });
+
+      expect(queryRaw).toHaveBeenCalledTimes(2);
+      expect(investorOutreachRecordFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                investorId: { in: ['102'] },
+              }),
+            ]),
+          }),
+        })
+      );
+    });
+
+    it('rejects invalid pathSource', async () => {
+      await expect(service.listMembers(1, { pathSource: 'twitter' })).rejects.toBeInstanceOf(BadRequestException);
+      expect(queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('attaches pathSourceTags from attribution aggregate', async () => {
+      const warm = record('118282344', 'Gil', 'VC+2A', true);
+      investorOutreachRecordFindMany.mockResolvedValue([warm]);
+      pathfinderPathFindMany
+        .mockResolvedValueOnce([{ targetInvestorId: '118282344', proximityCode: 'VC+2A', hops: 2, score: 0.146 }])
+        .mockResolvedValueOnce([
+          {
+            targetInvestorId: '118282344',
+            score: 0.146,
+            hopChain: {
+              routeNodes: [{ label: 'Coatue', variant: 'org' }],
+            },
+          },
+        ]);
+      pathfinderPathGroupBy.mockResolvedValue([{ targetInvestorId: '118282344', _count: { _all: 2 } }]);
+      queryRaw.mockResolvedValueOnce([
+        { targetInvestorId: '118282344', source: 'Affinity' },
+        { targetInvestorId: '118282344', source: 'LinkedIn' },
+      ]);
+
+      const result = await service.listMembers(1, { limit: '10' });
+
+      expect(result.items[0].pathSourceTags).toEqual(['Affinity', 'LinkedIn']);
     });
 
     it('extends q with founder path keyword matches', async () => {

@@ -212,6 +212,8 @@ export class AppModule {
         { path: 'v1/uploads', method: RequestMethod.POST },
         { path: 'v1/ai-apps/deploy', method: RequestMethod.POST },
         { path: 'v1/ai-apps/draft', method: RequestMethod.POST },
+        { path: 'v1/ai-apps/:uid', method: RequestMethod.PATCH },
+        { path: 'v1/ai-apps/:uid/prd', method: RequestMethod.POST },
         { path: 'v1/demo-days/current/fundraising-profile/one-pager', method: RequestMethod.PUT },
         { path: 'v1/demo-days/current/fundraising-profile/video', method: RequestMethod.PUT },
         { path: 'v1/admin/demo-days/current/teams/:teamUid/fundraising-profile/one-pager', method: RequestMethod.PUT },

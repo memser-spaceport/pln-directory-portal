@@ -66,7 +66,7 @@ export const PIN_RELEASING_STAGES: RoadmapStage[] = [
   RoadmapStage.DECLINED,
 ];
 
-export const DEFAULT_PIN_LIMIT = 3;
+export const DEFAULT_PIN_LIMIT = 5;
 
 /** Half-life used by the trending sort's time-decayed pin score. */
 export const TRENDING_HALF_LIFE_DAYS = 14;
@@ -109,10 +109,6 @@ export const ROADMAP_NOTIFICATION_COPY = {
   needBacklogged: (title: string) => ({
     title: `Backlog: ${title}`,
     description: 'Your need was moved to the backlog.',
-  }),
-  backedItemShipped: (title: string) => ({
-    title: `Just Shipped: ${title} 🎉`,
-    description: 'Something you boosted is now live.',
   }),
   needShipped: (title: string) => ({
     title: `Just Shipped: ${title} 🎉`,

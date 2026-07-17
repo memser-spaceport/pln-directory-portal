@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.3';
+export const AI_APPS_STARTER_KIT_VERSION = '1.4';
 
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
@@ -37,6 +37,31 @@ export const AI_APPS_CONNECT_POLL_INTERVAL_SEC = 3;
 /** Max app ZIP size accepted by the deploy endpoint (50 MB). */
 export const AI_APPS_MAX_ZIP_BYTES = 50 * 1024 * 1024;
 
+/** Max Markdown/HTML one-pager PRD upload size (1 MB). */
+export const AI_APPS_MAX_PRD_BYTES = 1 * 1024 * 1024;
+
+/**
+ * Post-deploy liveness verification: when the runner call ends in a gateway
+ * timeout, the deploy flow polls the app URL before deciding READY vs ERROR.
+ * The window must cover the pod-up → domain-registration gap, which has been
+ * observed to take 1–5 minutes — 24 attempts every 8s (plus up to 10s per
+ * probe) covers ~6 minutes worst case.
+ */
+export const AI_APPS_VERIFY_ATTEMPTS = Number(process.env.AI_APPS_VERIFY_ATTEMPTS) || 24;
+export const AI_APPS_VERIFY_INTERVAL_MS = Number(process.env.AI_APPS_VERIFY_INTERVAL_MS) || 8000;
+
+/**
+ * How long an app may sit in DEPLOYING before the deploy counts as STUCK.
+ * Deploys run synchronously inside the API process (runner build + liveness
+ * verification + secrets injection), so a legitimate one settles to READY or
+ * ERROR within ~8 minutes worst case (edge timeout + the verify window above)
+ * — a DEPLOYING row older than this window means the
+ * process died mid-deploy or the runner hung, and the row would otherwise stay
+ * DEPLOYING forever. Stuck rows are settled to ERROR lazily on read.
+ */
+export const AI_APPS_DEPLOY_STUCK_MINUTES = Number(process.env.AI_APPS_DEPLOY_STUCK_MINUTES) || 15;
+export const AI_APPS_DEPLOY_STUCK_MS = AI_APPS_DEPLOY_STUCK_MINUTES * 60 * 1000;
+
 /** Sandbox runner base URL (override via env for other environments). */
 export const AI_APPS_RUNNER_URL = process.env.AI_APPS_RUNNER_URL || 'https://sandbox-runner.plnetwork.io';
 
@@ -45,6 +70,30 @@ export const AI_APPS_RUNNER_TOKEN = process.env.AI_APPS_RUNNER_TOKEN || '';
 
 /** S3 bucket the sandbox runner reads app bundles from. */
 export const AI_APPS_S3_BUCKET = process.env.AI_APPS_S3_BUCKET || '';
+
+/**
+ * Bucket for uploaded AI App PRDs. By default this reuses the image bucket
+ * already used for member images, so no new bucket policy/IAM permission is
+ * required. AI_APPS_PRD_S3_BUCKET remains an optional override.
+ */
+export const AI_APPS_PRD_S3_BUCKET = process.env.AI_APPS_PRD_S3_BUCKET || AI_APPS_S3_BUCKET;
+
+/** Optional CDN/public base URL for PRDs, without a trailing slash. */
+export const AI_APPS_PRD_PUBLIC_BASE_URL = process.env.AI_APPS_PRD_PUBLIC_BASE_URL || '';
+
+/** Build a unique key while keeping the original Markdown/HTML extension. */
+export const buildPrdS3Key = (appId: string, extension: string, uniqueId: string): string =>
+  `ai-app-prds/${appId}/${uniqueId}${extension}`;
+
+/** Convert a stored PRD key to the URL returned under the existing `prd` field. */
+export const buildPrdPublicUrl = (key: string): string => {
+  const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+  if (AI_APPS_PRD_PUBLIC_BASE_URL) {
+    return `${AI_APPS_PRD_PUBLIC_BASE_URL.replace(/\/$/, '')}/${encodedKey}`;
+  }
+  const region = process.env.AWS_REGION || 'us-east-1';
+  return `https://${AI_APPS_PRD_S3_BUCKET}.s3.${region}.amazonaws.com/${encodedKey}`;
+};
 
 /** Project scope for the runner's secrets/deployments API (`/v1/projects/<project>/…`). */
 export const AI_APPS_RUNNER_PROJECT = process.env.AI_APPS_RUNNER_PROJECT || 'default';
@@ -101,6 +150,22 @@ export const AI_APPS_CONNECT_ENDPOINT =
  * secrets), written into the starter kit.
  */
 export const AI_APPS_DRAFT_ENDPOINT = process.env.AI_APPS_DRAFT_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/draft`;
+
+/**
+ * Public URL of THIS API's member-context endpoint (`GET /v1/ai-apps/me`),
+ * written into the starter kit so deployed apps know where to fetch the
+ * signed-in member's identity from.
+ */
+export const AI_APPS_ME_ENDPOINT = process.env.AI_APPS_ME_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/me`;
+
+/**
+ * Public URL TEMPLATE of THIS API's agent metadata endpoint
+ * (`PATCH /v1/ai-apps/:uid/agent`), written into the starter kit. The agent
+ * replaces the literal `{appUid}` placeholder with the app's `uid` (returned by
+ * the deploy/draft response and saved in `pln-app.config.json`).
+ */
+export const AI_APPS_METADATA_ENDPOINT =
+  process.env.AI_APPS_METADATA_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent`;
 
 /**
  * Base URL of the LabOS portal that hosts the connect page the member opens to

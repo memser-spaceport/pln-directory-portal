@@ -17,6 +17,7 @@ import { DemoDayNotificationsJob } from './demo-day-notifications.job';
 import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
 import { MemberApprovalsModule } from '../member-approvals/member-approvals.module';
 import { InvestorsModule } from '../investors/investors.module';
+import { FollowsModule } from '../follows/follows.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { InvestorsModule } from '../investors/investors.module';
     forwardRef(() => PushNotificationsModule),
     TeamEnrichmentModule,
     InvestorsModule,
+    FollowsModule,
   ],
   controllers: [DemoDaysController, DemoDaySubscriptionsController],
   providers: [

@@ -7,6 +7,7 @@ import {
   buildAttributionLines,
   buildLinkedInOnlyPath,
   buildSocialOverlapCacheKey,
+  comparePathCandidatesByFinalWarmth,
   extractFounderNodes,
   extractPlPeopleFromHopChain,
   isVerifiedSocialOverlap,
@@ -266,6 +267,40 @@ describe('linkedInBonus', () => {
     expect(
       applySocialOverlapScoreBump(0.5, overlapEntry({ kind: 'concurrent_employment', label: 'x', plPersonKey: 'p:1' }))
     ).toBeCloseTo(0.75);
+  });
+});
+
+describe('comparePathCandidatesByFinalWarmth', () => {
+  it('ranks LinkedIn bonus path above higher pre-bonus graph score at equal hops', () => {
+    const vcNoLi = {
+      hops: 2,
+      score: 0.05,
+      rank: 1,
+      proximityCode: 'VC+2B',
+    };
+    const founderWithLi = {
+      hops: 2,
+      score: 0,
+      rank: 2,
+      proximityCode: 'F+2B',
+      linkedInOverlaps: [
+        overlapEntry({
+          kind: 'same_company_unknown_dates',
+          label: 'same company',
+          plPersonKey: 'founder:f_a',
+          affectsScore: false,
+        }),
+      ],
+    };
+
+    expect(applyLinkedInPathWarmth(founderWithLi.score, founderWithLi.linkedInOverlaps)).toBe(
+      LINKEDIN_BONUS_UNVERIFIED
+    );
+    expect(applyLinkedInPathWarmth(vcNoLi.score, [])).toBe(0.05);
+
+    const sorted = [vcNoLi, founderWithLi].sort(comparePathCandidatesByFinalWarmth);
+    expect(sorted[0]).toBe(founderWithLi);
+    expect(sorted[1]).toBe(vcNoLi);
   });
 });
 
