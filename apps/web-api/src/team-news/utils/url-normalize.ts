@@ -9,7 +9,7 @@ export function normalizeSourceUrl(input: string): string {
     const u = new URL(trimmed);
     u.hash = '';
     u.search = '';
-    u.hostname = u.hostname.toLowerCase();
+    u.hostname = u.hostname.toLowerCase().replace(/^www\./, '');
     let result = u.toString();
     if (result.endsWith('/') && u.pathname !== '/') {
       result = result.slice(0, -1);

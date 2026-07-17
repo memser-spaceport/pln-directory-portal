@@ -10,6 +10,7 @@ import type {
 } from 'libs/contracts/src/schema/team-news';
 import { computeCanonicalKey } from './utils/canonical-key';
 import { extractDomain } from './utils/url-normalize';
+import { isDuplicateNewsStory } from './utils/news-dedup';
 
 // The directory's own definition of "recent" for the denormalized
 // `TeamNewsEnrichment.recentNewsCount`. Independent of producer policy —
@@ -338,14 +339,30 @@ export class TeamNewsService {
       rawPayload: (item.rawPayload as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     };
 
-    const existing = await this.prisma.teamNewsItem.findUnique({
+    const exactExisting = await this.prisma.teamNewsItem.findUnique({
       where: { canonicalKey },
       select: { id: true },
     });
 
+    const nearbyItems = exactExisting
+      ? []
+      : await this.prisma.teamNewsItem.findMany({
+          where: {
+            teamUid: item.teamUid,
+            eventDate: {
+              gte: new Date(eventDate.getTime() - 3 * 24 * 60 * 60 * 1000),
+              lte: new Date(eventDate.getTime() + 3 * 24 * 60 * 60 * 1000),
+            },
+          },
+          select: { id: true, sourceUrl: true, title: true, summary: true },
+        });
+
+    const semanticExisting = nearbyItems.find((candidate) => isDuplicateNewsStory(item, candidate));
+    const existing = exactExisting ?? semanticExisting;
+
     if (existing) {
       await this.prisma.teamNewsItem.update({
-        where: { canonicalKey },
+        where: { id: existing.id },
         data: {
           eventType: data.eventType,
           eventDate,
