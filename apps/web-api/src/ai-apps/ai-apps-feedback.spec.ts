@@ -49,7 +49,8 @@ describe('AiAppsService feedback', () => {
       const { service, prisma } = buildService();
       prisma.member.findMany.mockResolvedValue([{ uid: 'member-1', name: 'Ada', image: { url: 'https://…/ada.png' } }]);
       const result = await service.submitFeedback('member-1', 'app-1', 'hi');
-      expect(result.member).toEqual({ uid: 'member-1', name: 'Ada', image: null });
+      // The Prisma image relation is flattened to its plain URL.
+      expect(result.member).toEqual({ uid: 'member-1', name: 'Ada', image: 'https://…/ada.png' });
       expect(result).not.toHaveProperty('memberUid');
     });
   });
