@@ -51,11 +51,22 @@ export const AI_APPS_VERIFY_ATTEMPTS = Number(process.env.AI_APPS_VERIFY_ATTEMPT
 export const AI_APPS_VERIFY_INTERVAL_MS = Number(process.env.AI_APPS_VERIFY_INTERVAL_MS) || 8000;
 
 /**
+ * Secrets-injection retry while the Helm release is locked: when the runner's
+ * `/deploy` build outlives the gateway timeout, its Helm upgrade is often still
+ * running when the injection deployment fires, and the runner 409s with
+ * `helm_release_locked`. The lock clears as soon as that upgrade finishes
+ * (observed under ~2 minutes), so wait and retry instead of failing the deploy.
+ * 8 retries every 15s covers ~2 minutes.
+ */
+export const AI_APPS_HELM_LOCK_RETRIES = Number(process.env.AI_APPS_HELM_LOCK_RETRIES) || 8;
+export const AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS = Number(process.env.AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS) || 15000;
+
+/**
  * How long an app may sit in DEPLOYING before the deploy counts as STUCK.
  * Deploys run synchronously inside the API process (runner build + liveness
  * verification + secrets injection), so a legitimate one settles to READY or
- * ERROR within ~8 minutes worst case (edge timeout + the verify window above)
- * — a DEPLOYING row older than this window means the
+ * ERROR within ~10 minutes worst case (edge timeout + the verify window and
+ * helm-lock retry budget above) — a DEPLOYING row older than this window means the
  * process died mid-deploy or the runner hung, and the row would otherwise stay
  * DEPLOYING forever. Stuck rows are settled to ERROR lazily on read.
  */
