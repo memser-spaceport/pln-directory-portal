@@ -106,7 +106,7 @@
     "@types/cache-manager": "^4.0.2",
     "@types/cache-manager-redis-store": "^2.0.1",
     "@types/showdown": "^2.0.3",
-    "adm-zip": "^0.5.10",
+    "adm-zip": "^0.6.0",
     "ai": "^4.0.19",
     "autoprefixer": "^10.4.4",
     "aws-sdk": "^2.1692.0",
