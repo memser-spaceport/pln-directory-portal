@@ -10,10 +10,13 @@ jest.mock('axios', () => ({
 }));
 
 // The constants module reads env vars at import time; pin the bucket so the
-// upload paths are exercised regardless of the test environment.
+// upload paths are exercised regardless of the test environment, and make the
+// helm-lock retries instant and small so the retry tests stay fast.
 jest.mock('./ai-apps.constants', () => ({
   ...jest.requireActual('./ai-apps.constants'),
   AI_APPS_S3_BUCKET: 'test-bucket',
+  AI_APPS_HELM_LOCK_RETRIES: 2,
+  AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS: 0,
 }));
 
 import axios from 'axios';
@@ -51,6 +54,21 @@ function buildService(app: Record<string, any> | null = APP) {
   };
   const aws = { uploadFileToS3: jest.fn().mockResolvedValue(undefined) };
   return { service: new AiAppsService(prisma as any, aws as any), prisma, aws };
+}
+
+/** The runner's 409 when another Helm operation still holds the release. */
+function helmLockError() {
+  return Object.assign(new Error('conflict'), {
+    isAxiosError: true,
+    response: {
+      status: 409,
+      data: {
+        status: 'failed',
+        error: 'helm_release_locked',
+        message: 'Helm release "demo" is already being modified',
+      },
+    },
+  });
 }
 
 /** Route runner calls by URL: secrets store, build, and secrets-deploy all answer 200 by default. */
@@ -271,6 +289,51 @@ describe('AiAppsService.deployDraft', () => {
     expect(mockedAxios.post.mock.calls[0][0]).toContain('/deploy');
     expect(mockedAxios.post.mock.calls[1][0]).toContain('/deployments');
     expect(eventTypes(prisma)).toEqual(['DEPLOY_STARTED', 'DEPLOY_SUCCEEDED']);
+  });
+
+  it('retries the secrets injection while the Helm release is locked, then succeeds', async () => {
+    const { service, prisma } = buildService({ ...APP, providedEnvVars: ['OPENAI_API_KEY', 'SUPABASE_URL'] });
+    mockedAxios.get.mockResolvedValue({ status: 200, data: { apps: [{ app_id: 'demo', image: 'img' }] } });
+    // The /deploy build's own Helm upgrade can still be running when the
+    // injection fires (typical after an edge 504) — the runner 409s until it
+    // finishes.
+    let injectAttempts = 0;
+    mockedAxios.post.mockImplementation((url: string) => {
+      if (url.includes('/deployments')) {
+        injectAttempts++;
+        return injectAttempts === 1
+          ? Promise.reject(helmLockError())
+          : Promise.resolve({ status: 200, data: { status: 'success' } });
+      }
+      return Promise.resolve({ status: 200, data: { port: 31001 } });
+    });
+
+    const result = await service.deployDraft('creator-1', 'app-1', undefined);
+
+    expect(injectAttempts).toBe(2);
+    expect(eventTypes(prisma)).toEqual(['DEPLOY_STARTED', 'DEPLOY_SUCCEEDED']);
+    expect(result.status).toBe('READY');
+  });
+
+  it('marks the app ERROR when the Helm lock never clears within the retry budget', async () => {
+    const { service, prisma } = buildService({ ...APP, providedEnvVars: ['OPENAI_API_KEY', 'SUPABASE_URL'] });
+    mockedAxios.get.mockResolvedValue({ status: 200, data: { apps: [{ app_id: 'demo', image: 'img' }] } });
+    mockedAxios.post.mockImplementation((url: string) =>
+      url.includes('/deployments')
+        ? Promise.reject(helmLockError())
+        : Promise.resolve({ status: 200, data: { port: 31001 } })
+    );
+
+    await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toBeInstanceOf(BadGatewayException);
+
+    // Initial attempt + the mocked AI_APPS_HELM_LOCK_RETRIES (2).
+    expect(mockedAxios.post.mock.calls.filter(([url]) => url.includes('/deployments'))).toHaveLength(3);
+    expect(prisma.aiApp.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'ERROR', notes: expect.stringContaining('Secrets injection failed') }),
+      })
+    );
+    expect(eventTypes(prisma)).toEqual(['DEPLOY_STARTED', 'DEPLOY_FAILED']);
   });
 
   it('marks the app ERROR when the secrets injection fails after the build', async () => {

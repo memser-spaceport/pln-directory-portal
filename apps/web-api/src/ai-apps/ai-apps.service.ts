@@ -20,6 +20,8 @@ import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import {
   AI_APPS_DEPLOY_STUCK_MINUTES,
   AI_APPS_DEPLOY_STUCK_MS,
+  AI_APPS_HELM_LOCK_RETRIES,
+  AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS,
   AI_APPS_RUNNER_ENVIRONMENT,
   AI_APPS_RUNNER_TOKEN,
   AI_APPS_RUNNER_URL,
@@ -767,27 +769,49 @@ export class AiAppsService {
       throw new Error(`runner /apps has no image for ${appId}`);
     }
 
-    try {
-      this.logger.log(
-        `Runner secrets-deploy request for ${appId}: POST ${buildRunnerDeploymentsUrl()} ` +
-          `(image=${image}, secretNames=${secretNames.join(', ')})`
-      );
-      const response = await axios.post(
-        buildRunnerDeploymentsUrl(),
-        { appId, environment: AI_APPS_RUNNER_ENVIRONMENT, image, secretNames },
-        { headers }
-      );
-      this.logRunnerResponse('secrets-deploy', appId, response.status, response.data);
-    } catch (error) {
-      this.logRunnerError('secrets-deploy', appId, error);
-      // Same edge-timeout caveat as the build: verify before declaring failure.
-      if (this.isUncertainRunnerError(error) && (await this.verifyAppLive(appUrl))) {
-        this.logger.warn(`Secrets deploy timed out for ${appId} but the app is reachable — continuing`);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        this.logger.log(
+          `Runner secrets-deploy request for ${appId}: POST ${buildRunnerDeploymentsUrl()} ` +
+            `(image=${image}, secretNames=${secretNames.join(', ')})`
+        );
+        const response = await axios.post(
+          buildRunnerDeploymentsUrl(),
+          { appId, environment: AI_APPS_RUNNER_ENVIRONMENT, image, secretNames },
+          { headers }
+        );
+        this.logRunnerResponse('secrets-deploy', appId, response.status, response.data);
         return;
+      } catch (error) {
+        this.logRunnerError('secrets-deploy', appId, error);
+        // 409 helm_release_locked: another Helm operation (typically the /deploy
+        // build's own upgrade, still finishing after a gateway timeout) holds
+        // the release. The lock clears when it completes — wait and retry.
+        if (this.isHelmReleaseLocked(error) && attempt < AI_APPS_HELM_LOCK_RETRIES) {
+          this.logger.warn(
+            `Helm release locked for ${appId}; retrying secrets deploy in ${AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS}ms ` +
+              `(attempt ${attempt + 1}/${AI_APPS_HELM_LOCK_RETRIES})`
+          );
+          await new Promise((resolve) => setTimeout(resolve, AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS));
+          continue;
+        }
+        // Same edge-timeout caveat as the build: verify before declaring failure.
+        if (this.isUncertainRunnerError(error) && (await this.verifyAppLive(appUrl))) {
+          this.logger.warn(`Secrets deploy timed out for ${appId} but the app is reachable — continuing`);
+          return;
+        }
+        const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+        throw new Error(`runner deployments call failed (status=${status ?? 'n/a'})`);
       }
-      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-      throw new Error(`runner deployments call failed (status=${status ?? 'n/a'})`);
     }
+  }
+
+  /** True when the runner refused the deployment because the Helm release is mid-modification. */
+  private isHelmReleaseLocked(error: unknown): boolean {
+    if (!axios.isAxiosError(error) || error.response?.status !== 409) {
+      return false;
+    }
+    return this.safeStringify(error.response.data).includes('helm_release_locked');
   }
 
   /** Marks a failed deploy: status ERROR with the trimmed message + DEPLOY_FAILED event. */
