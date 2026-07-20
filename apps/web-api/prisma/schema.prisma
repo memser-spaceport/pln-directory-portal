@@ -2282,6 +2282,7 @@ model TeamNewsItem {
   title        String
   summary      String?
   sourceUrl    String
+  sourceUrls   String[]            @default([])
   sourceDomain String?
   tags         String[]            @default([])
   rawPayload   Json?

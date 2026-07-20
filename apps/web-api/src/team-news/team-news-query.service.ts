@@ -545,6 +545,7 @@ export class TeamNewsQueryService {
       title: string;
       summary: string | null;
       sourceUrl: string;
+      sourceUrls: string[];
       sourceDomain: string | null;
       tags: string[];
       createdAt: Date;
@@ -561,7 +562,10 @@ export class TeamNewsQueryService {
     discussion: TeamNewsDiscussion | undefined,
     followedTeamUids: Set<string> = new Set(),
     upvotes: UpvoteStamp = { counts: new Map(), viewerUpvoted: new Set() }
-  ): TeamNewsItemDto {
+  ): TeamNewsItemDto & {
+    sourceUrls: string[];
+    sources: Array<{ url: string; domain: string | null }>;
+  } {
     const focusAreas: string[] = [];
     const subFocusAreas: string[] = [];
     for (const tfa of row.team.teamFocusAreas) {
@@ -581,6 +585,19 @@ export class TeamNewsQueryService {
       title: row.title,
       summary: row.summary,
       sourceUrl: row.sourceUrl,
+      sourceUrls: row.sourceUrls.length > 0 ? row.sourceUrls : [row.sourceUrl],
+      sources: (row.sourceUrls.length > 0 ? row.sourceUrls : [row.sourceUrl]).map(
+        (url) => ({
+          url,
+          domain: (() => {
+            try {
+              return new URL(url).hostname.replace(/^www\./, '');
+            } catch {
+              return null;
+            }
+          })(),
+        })
+      ),
       sourceDomain: row.sourceDomain,
       tags: row.tags,
       focusAreas: [...new Set(focusAreas)],
