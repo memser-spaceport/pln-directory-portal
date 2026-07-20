@@ -19,6 +19,7 @@ import { useRemoveTeamPitchParticipantsBulk } from '../../../hooks/team-pitches/
 import { AddTeamPitchParticipantModal } from '../../../components/team-pitches/AddTeamPitchParticipantModal';
 import { UploadTeamPitchInvestorsModal } from '../../../components/team-pitches/UploadTeamPitchInvestorsModal';
 import { TeamPitchConfirmModal } from '../../../components/team-pitches/TeamPitchConfirmModal';
+import { EditEmailTemplateVariablesModal } from '../../../components/team-pitches/EditEmailTemplateVariablesModal';
 import { RichText } from '../../../components/common/rich-text';
 import { WEB_UI_BASE_URL } from '../../../utils/constants';
 import { toast } from 'react-toastify';
@@ -32,6 +33,11 @@ const formatFollowUpDate = (iso: string | null | undefined) => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+};
+
+const formatTemplateVariablesPreview = (vars: Record<string, string> | null | undefined) => {
+  if (!vars || Object.keys(vars).length === 0) return null;
+  return JSON.stringify(vars);
 };
 
 const ACCESS_OPTIONS = ['VIEW', 'VIEW_ADMIN', 'EDIT', 'RESTRICTED'] as const;
@@ -125,6 +131,12 @@ const TeamPitchDetailPage = () => {
   const [pendingSelectedRemove, setPendingSelectedRemove] = useState(false);
   const [includeAlreadyInvited, setIncludeAlreadyInvited] = useState(false);
   const [includeAlreadyFollowedUp, setIncludeAlreadyFollowedUp] = useState(false);
+  const [editingTemplateVars, setEditingTemplateVars] = useState<{
+    uid: string;
+    name?: string;
+    email?: string;
+    emailTemplateVariables?: Record<string, string> | null;
+  } | null>(null);
 
   const typeMap = { investors: 'INVESTOR', founders: 'FOUNDER' } as const;
 
@@ -724,6 +736,11 @@ const TeamPitchDetailPage = () => {
                       Follow-up
                     </div>
                   )}
+                  {activeTab === 'investors' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 180 }}>
+                      Template vars
+                    </div>
+                  )}
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Type
                   </div>
@@ -869,6 +886,35 @@ const TeamPitchDetailPage = () => {
                           ) : (
                             <span className="text-sm text-gray-400">—</span>
                           )}
+                        </div>
+                      )}
+
+                      {activeTab === 'investors' && (
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 180 }}>
+                          {(() => {
+                            const preview = formatTemplateVariablesPreview(participant.emailTemplateVariables);
+                            return (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingTemplateVars({
+                                    uid: participant.uid,
+                                    name: participant.member?.name,
+                                    email: participant.member?.email,
+                                    emailTemplateVariables: participant.emailTemplateVariables,
+                                  })
+                                }
+                                className={
+                                  preview
+                                    ? 'block w-full truncate text-left text-sm text-blue-600 hover:text-blue-800'
+                                    : 'text-sm text-gray-400 hover:text-blue-600'
+                                }
+                                title={preview ?? undefined}
+                              >
+                                {preview ?? '—'}
+                              </button>
+                            );
+                          })()}
                         </div>
                       )}
 
@@ -1030,6 +1076,17 @@ const TeamPitchDetailPage = () => {
             refetchParticipants();
           }}
           pitchUid={uid}
+        />
+
+        <EditEmailTemplateVariablesModal
+          isOpen={!!editingTemplateVars}
+          onClose={() => setEditingTemplateVars(null)}
+          pitchUid={uid}
+          participantUid={editingTemplateVars?.uid ?? ''}
+          participantName={editingTemplateVars?.name}
+          participantEmail={editingTemplateVars?.email}
+          emailTemplateVariables={editingTemplateVars?.emailTemplateVariables}
+          canEdit={canMutateTeamPitches}
         />
 
         <TeamPitchConfirmModal

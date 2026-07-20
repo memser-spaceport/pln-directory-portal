@@ -37,3 +37,17 @@ export function resolveTeamPitchClosedAt(pitch: {
 
   return (pitch.closedAt ?? pitch.updatedAt).toISOString();
 }
+
+export function asStringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  const result: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof entry === 'string') {
+      result[key] = entry;
+    }
+  }
+  return result;
+}

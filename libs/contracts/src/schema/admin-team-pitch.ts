@@ -56,6 +56,7 @@ export class AddTeamPitchParticipantDto extends createZodDto(AddTeamPitchPartici
 export const UpdateTeamPitchParticipantSchema = z.object({
   type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']).optional(),
   access: z.enum(['VIEW', 'VIEW_ADMIN', 'EDIT', 'RESTRICTED']).optional(),
+  emailTemplateVariables: z.record(z.string(), z.string()).nullable().optional(),
 });
 
 export class UpdateTeamPitchParticipantDto extends createZodDto(UpdateTeamPitchParticipantSchema) {}

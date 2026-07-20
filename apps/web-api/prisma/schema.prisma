@@ -1451,6 +1451,7 @@ model TeamPitchParticipant {
   inviteSentCount         Int                        @default(0)
   followUpSentAt          DateTime?
   followUpSentCount       Int                        @default(0)
+  emailTemplateVariables  Json? // Record<string, string>
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
 

@@ -3,7 +3,7 @@ import { MemberApprovalState, Prisma, Team, TeamPitchParticipantType } from '@pr
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { upsertPolicyAssignmentByCode } from '../demo-days/demo-day-investor-policy.util';
-import { defaultAccessForParticipantType } from './team-pitch.utils';
+import { defaultAccessForParticipantType, asStringRecord } from './team-pitch.utils';
 import { InvestorBulkProvisionService } from '../investors/investor-bulk-provision.service';
 import { InvestorBulkRowResult, InvestorBulkSummary } from '../investors/investor-bulk.types';
 import { AuthService } from '../auth/auth.service';
@@ -69,6 +69,7 @@ export class TeamPitchParticipantsService {
       inviteSentCount: p.inviteSentCount,
       followUpSentAt: p.followUpSentAt?.toISOString() ?? null,
       followUpSentCount: p.followUpSentCount,
+      emailTemplateVariables: asStringRecord(p.emailTemplateVariables),
       team: p.team,
       member: p.member
         ? {
@@ -179,7 +180,11 @@ export class TeamPitchParticipantsService {
   async updateParticipant(
     pitchUid: string,
     participantUid: string,
-    data: { type?: TeamPitchParticipantType; access?: 'VIEW' | 'VIEW_ADMIN' | 'EDIT' | 'RESTRICTED' }
+    data: {
+      type?: TeamPitchParticipantType;
+      access?: 'VIEW' | 'VIEW_ADMIN' | 'EDIT' | 'RESTRICTED';
+      emailTemplateVariables?: Record<string, string> | null;
+    }
   ) {
     const participant = await this.prisma.teamPitchParticipant.findFirst({
       where: { uid: participantUid, teamPitchUid: pitchUid },
@@ -207,6 +212,9 @@ export class TeamPitchParticipantsService {
         type,
         access,
         teamUid,
+        ...(data.emailTemplateVariables !== undefined
+          ? { emailTemplateVariables: data.emailTemplateVariables === null ? Prisma.DbNull : data.emailTemplateVariables }
+          : {}),
       },
       include: {
         member: { select: { uid: true, name: true, email: true } },
@@ -320,6 +328,7 @@ export class TeamPitchParticipantsService {
       },
       deliveryPayload: {
         body: {
+          ...asStringRecord(participant.emailTemplateVariables),
           investorName: participant.member.name || '',
           investorEmail: participant.member.email,
           pitchTitle: participant.teamPitch.title,
@@ -505,6 +514,7 @@ export class TeamPitchParticipantsService {
       },
       deliveryPayload: {
         body: {
+          ...asStringRecord(participant.emailTemplateVariables),
           investorName: participant.member.name || '',
           investorEmail: participant.member.email,
           pitchTitle: participant.teamPitch.title,
