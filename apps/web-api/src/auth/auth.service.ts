@@ -92,23 +92,73 @@ export class AuthService implements OnModuleInit {
   }
 
   async getTokenAndUserInfo(tokenRequest) {
-    // 1. Ask auth-service (dev-auth) to exchange the external token for internal tokens
     const { id_token, access_token, refresh_token } = await this.getAuthTokens(tokenRequest);
+    return this.mapAuthTokensToMemberSession(id_token, access_token, refresh_token);
+  }
 
-    // 2. Decode id_token to extract email + externalId (Privy DID or equivalent)
+  /**
+   * Issues a short-lived login JWT from auth-service for an existing Directory member.
+   * Fails if no member exists for the email.
+   */
+  async issueLoginToken(email: string, expiresIn = 604800): Promise<string> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const member = await this.membersService.findMemberByEmail(normalizedEmail);
+    if (!member || member.deletedAt) {
+      throw new BadRequestException('Member not found for this email');
+    }
+
+    const clientToken = await this.getClientToken();
+    try {
+      const resp = await this.authCall('issue_login_token', () =>
+        axios.post(
+          `${process.env.AUTH_API_URL}/auth/login-token`,
+          { email: normalizedEmail, expiresIn },
+          { headers: { Authorization: `Bearer ${clientToken}` } }
+        )
+      );
+      if (!resp.data?.token) {
+        throw new InternalServerErrorException('Auth service did not return a login token');
+      }
+      return resp.data.token as string;
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      this.handleAuthErrors(error);
+      throw error;
+    }
+  }
+
+  /**
+   * Redeems a login token via auth-service and maps to a Directory member session.
+   */
+  async redeemLoginToken(token: string) {
+    let authTokens;
+    try {
+      const resp = await this.authCall('redeem_login_token', () =>
+        axios.post(`${process.env.AUTH_API_URL}/auth/login-token/redeem`, { token })
+      );
+      authTokens = resp.data;
+    } catch (error) {
+      this.handleAuthErrors(error);
+      throw error;
+    }
+
+    const { id_token, access_token, refresh_token } = authTokens;
+    return this.mapAuthTokensToMemberSession(id_token, access_token, refresh_token);
+  }
+
+  private async mapAuthTokensToMemberSession(id_token: string, access_token: string, refresh_token: string) {
     const decoded: any = await this.decodeAuthIdToken(id_token);
 
     const email: string | null = decoded?.email ?? null;
-    // externalId is usually Privy DID; if not present explicitly, fall back to `sub`
     const externalId: string | null = decoded?.externalId ?? decoded?.sub ?? null;
 
-    this.logger.info(`AuthService.getTokenAndUserInfo → Decoded id_token: email=${email}, externalId=${externalId}`);
+    this.logger.info(`AuthService.mapAuthTokensToMemberSession → email=${email}, externalId=${externalId}`);
 
-    // 3. If there is no email, we cannot safely attach the login to any member.
-    //    In this case we fall back to the "account linking" flow (OTP, etc.)
     if (!email) {
       this.logger.info(
-        `AuthService.getTokenAndUserInfo → No email in id_token for externalId=${externalId}. Starting account linking flow.`
+        `AuthService.mapAuthTokensToMemberSession → No email in id_token for externalId=${externalId}. Starting account linking flow.`
       );
       return {
         accessToken: access_token,
@@ -118,16 +168,12 @@ export class AuthService implements OnModuleInit {
       };
     }
 
-    // ---------------------------------------------
-    // 4. Try to find a member by externalId (Privy DID)
-    // ---------------------------------------------
     let foundUser = externalId != null ? await this.membersService.findMemberByExternalId(externalId) : null;
 
     if (foundUser) {
-      // Soft-deleted member should never be allowed to log in
       if (foundUser.deletedAt) {
         this.logger.error(
-          `AuthService.getTokenAndUserInfo → Login attempt for deleted member [uid=${foundUser.uid}, email=${
+          `AuthService.mapAuthTokensToMemberSession → Login attempt for deleted member [uid=${foundUser.uid}, email=${
             foundUser.email
           }]. Reason: ${foundUser.deletionReason || 'not specified'}`
         );
@@ -136,10 +182,9 @@ export class AuthService implements OnModuleInit {
 
       if (foundUser.email === email) {
         this.logger.info(
-          `AuthService.getTokenAndUserInfo → Member found by externalId=${externalId} and email matches. uid=${foundUser.uid}`
+          `AuthService.mapAuthTokensToMemberSession → Member found by externalId=${externalId} and email matches. uid=${foundUser.uid}`
         );
 
-        // Run demo-day upgrade logic if necessary
         const approvedUser = await this.checkApproveOnLoginMember(foundUser);
         const upgradedUser = await this.checkAndUpgradeDemoDayParticipant(approvedUser);
 
@@ -152,9 +197,8 @@ export class AuthService implements OnModuleInit {
           accessToken: access_token,
         };
       } else {
-        // Same externalId but email changed – keep existing frontend semantics
         this.logger.error(
-          `AuthService.getTokenAndUserInfo → Email mismatch for uid=${foundUser.uid}. stored=${foundUser.email}, token=${email}`
+          `AuthService.mapAuthTokensToMemberSession → Email mismatch for uid=${foundUser.uid}. stored=${foundUser.email}, token=${email}`
         );
         return {
           isEmailChanged: true,
@@ -162,16 +206,12 @@ export class AuthService implements OnModuleInit {
       }
     }
 
-    // ---------------------------------------------
-    // 5. No member for this externalId → try to find by email
-    // ---------------------------------------------
     foundUser = await this.membersService.findMemberByEmail(email);
 
     if (foundUser) {
-      // Soft-deleted member should never be allowed to log in
       if (foundUser.deletedAt) {
         this.logger.error(
-          `AuthService.getTokenAndUserInfo → Login attempt for deleted member [uid=${foundUser.uid}, email=${
+          `AuthService.mapAuthTokensToMemberSession → Login attempt for deleted member [uid=${foundUser.uid}, email=${
             foundUser.email
           }]. Reason: ${foundUser.deletionReason || 'not specified'}`
         );
@@ -179,25 +219,22 @@ export class AuthService implements OnModuleInit {
       }
 
       if (foundUser.externalId) {
-        // Member already has some externalId, but auth token comes with a different one.
-        // Preserve previous behavior – ask frontend to resolve the conflict.
         this.logger.error(
-          `AuthService.getTokenAndUserInfo → Member [uid=${foundUser.uid}, email=${foundUser.email}] already has externalId=${foundUser.externalId}, new externalId=${externalId}`
+          `AuthService.mapAuthTokensToMemberSession → Member [uid=${foundUser.uid}, email=${foundUser.email}] already has externalId=${foundUser.externalId}, new externalId=${externalId}`
         );
         return {
           isDeleteAccount: true,
         };
       } else {
-        // Attach externalId (Privy DID) to existing member
         this.logger.info(
-          `AuthService.getTokenAndUserInfo → Attaching externalId=${externalId} to existing member with email=${email}`
+          `AuthService.mapAuthTokensToMemberSession → Attaching externalId=${externalId} to existing member with email=${email}`
         );
 
         if (externalId) {
           await this.membersService.updateExternalIdByEmail(email, externalId);
         } else {
           this.logger.info(
-            `AuthService.getTokenAndUserInfo → externalId is null while trying to attach it to member with email=${email}`
+            `AuthService.mapAuthTokensToMemberSession → externalId is null while trying to attach it to member with email=${email}`
           );
         }
 
@@ -214,54 +251,8 @@ export class AuthService implements OnModuleInit {
       }
     }
 
-    // ---------------------------------------------
-    // 6. No member by externalId and no member by email → first SSO login
-    //    → create a new member automatically from SSO data.
-    // ---------------------------------------------
-    // this.logger.info(
-    //   `AuthService.getTokenAndUserInfo → No member found for externalId=${externalId} or email=${email}. Creating new member from SSO login.`,
-    // );
-    //
-    // // 6.1. Create raw member record
-    // await this.membersService.createMemberFromSso({
-    //   email,
-    //   externalId,
-    // });
-    //
-    // // 6.2. Reload member with full relations so that memberToUserInfo doesn't crash
-    // let newUser =
-    //   externalId != null
-    //     ? await this.membersService.findMemberByExternalId(externalId)
-    //     : await this.membersService.findMemberByEmail(email);
-    //
-    // if (!newUser) {
-    //   // This should not normally happen, but better to log loudly if something goes wrong
-    //   this.logger.error(
-    //     `AuthService.getTokenAndUserInfo → Newly created SSO member not found when reloading. email=${email}, externalId=${externalId}`,
-    //   );
-    //   throw new NotFoundException('Member with ');
-    // }
-    //
-    // const upgradedNewUser = await this.checkAndUpgradeDemoDayParticipant(newUser);
-    // await this.trackLoginEvent(upgradedNewUser);
-    //
-    // this.logger.info(
-    //   `AuthService.getTokenAndUserInfo → New member created from SSO. uid=${upgradedNewUser.uid}, email=${upgradedNewUser.email}`,
-    // );
-    //
-    // return {
-    //   userInfo: this.memberToUserInfo(upgradedNewUser),
-    //   refreshToken: refresh_token,
-    //   idToken: id_token,
-    //   accessToken: access_token,
-    // };
-
-    // ---------------------------------------------
-    // 6 No member by externalId and no member by email → do NOT create a member.
-    //          Return 404 so frontend can trigger onboarding / registration flow.
-    // ---------------------------------------------
     this.logger.error(
-      `AuthService.getTokenAndUserInfo → No member found for externalId=${externalId} or email=${email}`
+      `AuthService.mapAuthTokensToMemberSession → No member found for externalId=${externalId} or email=${email}`
     );
 
     throw new NotFoundException('Member not found for provided SSO credentials.');
