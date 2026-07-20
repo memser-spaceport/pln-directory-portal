@@ -132,6 +132,19 @@ export class TeamNewsEnrichmentService {
           title: item.title,
           summary: item.summary,
           sourceUrl: item.sourceUrl,
+          sourceUrls: item.sourceUrls.length > 0 ? item.sourceUrls : [item.sourceUrl],
+          sources: (item.sourceUrls.length > 0 ? item.sourceUrls : [item.sourceUrl]).map(
+            (url) => ({
+              url,
+              domain: (() => {
+                try {
+                  return new URL(url).hostname.replace(/^www\./, '');
+                } catch {
+                  return null;
+                }
+              })(),
+            })
+          ),
           sourceDomain: item.sourceDomain,
           tags: item.tags,
           focusAreas: [...new Set(focusAreas)],
