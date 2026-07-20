@@ -3,7 +3,7 @@ import { MemberApprovalState, Prisma, Team, TeamPitchParticipantType } from '@pr
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { upsertPolicyAssignmentByCode } from '../demo-days/demo-day-investor-policy.util';
-import { defaultAccessForParticipantType } from './team-pitch.utils';
+import { defaultAccessForParticipantType, asStringRecord, resolveTeamPitchSenderEmail } from './team-pitch.utils';
 import { InvestorBulkProvisionService } from '../investors/investor-bulk-provision.service';
 import { InvestorBulkRowResult, InvestorBulkSummary } from '../investors/investor-bulk.types';
 import { AuthService } from '../auth/auth.service';
@@ -69,6 +69,7 @@ export class TeamPitchParticipantsService {
       inviteSentCount: p.inviteSentCount,
       followUpSentAt: p.followUpSentAt?.toISOString() ?? null,
       followUpSentCount: p.followUpSentCount,
+      emailTemplateVariables: asStringRecord(p.emailTemplateVariables),
       team: p.team,
       member: p.member
         ? {
@@ -179,7 +180,11 @@ export class TeamPitchParticipantsService {
   async updateParticipant(
     pitchUid: string,
     participantUid: string,
-    data: { type?: TeamPitchParticipantType; access?: 'VIEW' | 'VIEW_ADMIN' | 'EDIT' | 'RESTRICTED' }
+    data: {
+      type?: TeamPitchParticipantType;
+      access?: 'VIEW' | 'VIEW_ADMIN' | 'EDIT' | 'RESTRICTED';
+      emailTemplateVariables?: Record<string, string> | null;
+    }
   ) {
     const participant = await this.prisma.teamPitchParticipant.findFirst({
       where: { uid: participantUid, teamPitchUid: pitchUid },
@@ -207,6 +212,12 @@ export class TeamPitchParticipantsService {
         type,
         access,
         teamUid,
+        ...(data.emailTemplateVariables !== undefined
+          ? {
+              emailTemplateVariables:
+                data.emailTemplateVariables === null ? Prisma.DbNull : data.emailTemplateVariables,
+            }
+          : {}),
       },
       include: {
         member: { select: { uid: true, name: true, email: true } },
@@ -308,18 +319,20 @@ export class TeamPitchParticipantsService {
     const pitchLink = `${webBase}/spotlight/${participant.teamPitch.slug}?prefillEmail=${encodeURIComponent(
       participant.member.email
     )}&loginToken=${encodeURIComponent(loginToken)}`;
+    const senderEmail = resolveTeamPitchSenderEmail(participant.teamPitch.senderEmail);
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
       deliveryChannel: 'EMAIL',
       templateName: 'TEAM_PITCH_INVESTOR_INVITE_EMAIL',
       recipientsInfo: {
-        from: process.env.DEMO_DAY_EMAIL,
+        from: senderEmail,
         to: [participant.member.email],
-        bcc: process.env.DEMO_DAY_EMAIL ? [process.env.DEMO_DAY_EMAIL] : [],
+        bcc: senderEmail ? [senderEmail] : [],
       },
       deliveryPayload: {
         body: {
+          ...asStringRecord(participant.emailTemplateVariables),
           investorName: participant.member.name || '',
           investorEmail: participant.member.email,
           pitchTitle: participant.teamPitch.title,
@@ -493,18 +506,20 @@ export class TeamPitchParticipantsService {
     const pitchLink = `${webBase}/spotlight/${participant.teamPitch.slug}?prefillEmail=${encodeURIComponent(
       participant.member.email
     )}&loginToken=${encodeURIComponent(loginToken)}`;
+    const senderEmail = resolveTeamPitchSenderEmail(participant.teamPitch.senderEmail);
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
       deliveryChannel: 'EMAIL',
       templateName: 'TEAM_PITCH_INVESTOR_FOLLOWUP_EMAIL',
       recipientsInfo: {
-        from: process.env.DEMO_DAY_EMAIL,
+        from: senderEmail,
         to: [participant.member.email],
-        bcc: process.env.DEMO_DAY_EMAIL ? [process.env.DEMO_DAY_EMAIL] : [],
+        bcc: senderEmail ? [senderEmail] : [],
       },
       deliveryPayload: {
         body: {
+          ...asStringRecord(participant.emailTemplateVariables),
           investorName: participant.member.name || '',
           investorEmail: participant.member.email,
           pitchTitle: participant.teamPitch.title,

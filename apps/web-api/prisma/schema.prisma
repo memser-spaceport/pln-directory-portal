@@ -1402,6 +1402,7 @@ model TeamPitch {
   status             TeamPitchStatus            @default(DRAFT)
   closedAt           DateTime?
   supportEmail       String
+  senderEmail        String?
   headerImageUid     String?
   headerImage        Image?                     @relation("TeamPitchHeaderImage", fields: [headerImageUid], references: [uid])
   logoUid            String?
@@ -1451,6 +1452,7 @@ model TeamPitchParticipant {
   inviteSentCount         Int                        @default(0)
   followUpSentAt          DateTime?
   followUpSentCount       Int                        @default(0)
+  emailTemplateVariables  Json? // Record<string, string>
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
 

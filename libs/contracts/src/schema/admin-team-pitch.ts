@@ -9,6 +9,7 @@ export const CreateTeamPitchSchema = z.object({
   slug: z.string().min(1).optional(),
   status: z.enum(['DRAFT', 'OPEN', 'CLOSED']).optional(),
   supportEmail: z.string().email().optional().nullable(),
+  senderEmail: z.string().email().optional().nullable(),
   headerImageUid: z.string().optional().nullable(),
   logoUid: z.string().optional().nullable(),
   primaryColor: z
@@ -28,6 +29,7 @@ export const UpdateTeamPitchSchema = z.object({
   slug: z.string().min(1).optional(),
   status: z.enum(['DRAFT', 'OPEN', 'CLOSED']).optional(),
   supportEmail: z.string().email().optional().nullable(),
+  senderEmail: z.string().email().optional().nullable(),
   headerImageUid: z.string().optional().nullable(),
   logoUid: z.string().optional().nullable(),
   primaryColor: z
@@ -56,6 +58,7 @@ export class AddTeamPitchParticipantDto extends createZodDto(AddTeamPitchPartici
 export const UpdateTeamPitchParticipantSchema = z.object({
   type: z.enum(['INVESTOR', 'FOUNDER', 'SUPPORT']).optional(),
   access: z.enum(['VIEW', 'VIEW_ADMIN', 'EDIT', 'RESTRICTED']).optional(),
+  emailTemplateVariables: z.record(z.string(), z.string()).nullable().optional(),
 });
 
 export class UpdateTeamPitchParticipantDto extends createZodDto(UpdateTeamPitchParticipantSchema) {}
