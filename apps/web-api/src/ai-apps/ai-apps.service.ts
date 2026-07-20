@@ -313,6 +313,21 @@ export class AiAppsService {
   }
 
   /**
+   * Blocks a second concurrent deploy for the same app. A fresh (non-stuck)
+   * DEPLOYING app is owned by an in-flight deploy, so any new deploy/registration
+   * for it is rejected until that one settles (success or failure). A STUCK
+   * deploy (past the window) is deliberately NOT blocked — that's the manual
+   * recovery path when the runner hung or the API died mid-deploy.
+   */
+  private assertNoDeployInProgress(app: Pick<AiApp, 'status' | 'updatedAt'>): void {
+    if (app.status === 'DEPLOYING' && !this.isDeployStuck(app)) {
+      throw new ConflictException(
+        'A deploy is already in progress for this app — wait for it to finish, then try again.'
+      );
+    }
+  }
+
+  /**
    * A deploy that has sat in DEPLOYING beyond the stuck window is stuck: the
    * deploy runs synchronously in the API process, so a legitimate one settles
    * to READY/ERROR within minutes. Nothing touches the row between the flip to
@@ -450,6 +465,16 @@ export class AiAppsService {
       throw new InternalServerErrorException('AI_APPS_S3_BUCKET is not configured');
     }
 
+    // Block a second concurrent deploy: if a deploy is already in flight for this
+    // app (from another agent run or a member-triggered deploy), reject before we
+    // overwrite its bundle/status. First-ever deploys have no row yet, so skip.
+    const existing = await this.prisma.aiApp.findUnique({
+      where: { memberUid_appId: { memberUid, appId: dto.appId } },
+    });
+    if (existing) {
+      this.assertNoDeployInProgress(existing);
+    }
+
     const s3Key = buildAppS3Key(dto.appId, dto.deploymentId);
     // The sandbox host is deterministic from appId, so set the link up front.
     const host = buildAppHost(dto.appId);
@@ -530,6 +555,15 @@ export class AiAppsService {
       throw new InternalServerErrorException('AI_APPS_S3_BUCKET is not configured');
     }
 
+    // Don't clobber an in-flight deploy's bundle/status by re-registering the app
+    // as a DRAFT while it's mid-deploy.
+    const existing = await this.prisma.aiApp.findUnique({
+      where: { memberUid_appId: { memberUid, appId: dto.appId } },
+    });
+    if (existing) {
+      this.assertNoDeployInProgress(existing);
+    }
+
     const s3Key = buildAppS3Key(dto.appId, dto.deploymentId);
     try {
       await this.awsService.uploadFileToS3(
@@ -605,12 +639,7 @@ export class AiAppsService {
     if (app.status === 'DELETED' || app.status === 'DELETING') {
       throw new BadRequestException('This app has been deleted');
     }
-    // A fresh deploy in flight owns the app — block a second concurrent one.
-    // A STUCK deploy (past the window) is retryable: that's the manual recovery
-    // path when the runner hung or the API died mid-deploy.
-    if (app.status === 'DEPLOYING' && !this.isDeployStuck(app)) {
-      throw new ConflictException('A deploy is already in progress for this app — wait for it to finish, then retry.');
-    }
+    this.assertNoDeployInProgress(app);
     if (!app.s3Key || !app.deploymentId) {
       throw new BadRequestException('This app has no uploaded bundle yet — ask your AI agent to register it first');
     }
