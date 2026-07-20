@@ -195,3 +195,20 @@ export const buildConnectUrl = (sessionUid: string): string =>
  */
 export const buildAppPageUrl = (appUid: string): string =>
   `${AI_APPS_PORTAL_URL}/pl-infra/ai-apps/${encodeURIComponent(appUid)}`;
+
+/**
+ * The LabOS "Deployment settings" deep link for one AI App — opens the
+ * update-secrets-and-redeploy modal directly on the app page. Shared with the
+ * member when they want to change a stored secret (or redeploy) later.
+ */
+export const buildAppSettingsUrl = (appUid: string): string =>
+  `${buildAppPageUrl(appUid)}?settings=deployment`;
+
+/**
+ * Public URL TEMPLATE of the LabOS "Deployment settings" deep link, written
+ * into the starter kit. The agent replaces the literal `{appUid}` placeholder
+ * with the app's `uid` (saved as `appUid` in `pln-app.config.json`) to hand the
+ * member a link that opens the update-secrets-and-redeploy modal.
+ */
+export const AI_APPS_APP_SETTINGS_ENDPOINT =
+  process.env.AI_APPS_APP_SETTINGS_ENDPOINT || `${AI_APPS_PORTAL_URL}/pl-infra/ai-apps/{appUid}?settings=deployment`;

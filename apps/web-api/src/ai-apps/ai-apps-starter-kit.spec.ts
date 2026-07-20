@@ -79,6 +79,14 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(config.appDescription).toBe('');
   });
 
+  it('writes the Deployment settings deep-link template into the config', () => {
+    const config = JSON.parse(entries.get('pln-app.config.json') as string);
+    // A {appUid} template the agent can fill to hand the member a link that
+    // opens the update-secrets-and-redeploy modal on the app page.
+    expect(config.appSettingsUrl).toContain('/pl-infra/ai-apps/{appUid}');
+    expect(config.appSettingsUrl).toContain('settings=deployment');
+  });
+
   it('teaches the propose → approve → optional-PRD metadata flow', () => {
     const metadataSkill = entries.get('.claude/skills/app-metadata/SKILL.md') as string;
     // Nothing member-facing is saved without explicit approval…
