@@ -28,6 +28,7 @@ import {
   SendOtpRequestDto,
   TokenRequestDto,
   VerifyOtpRequestDto,
+  RedeemLoginTokenRequestDto,
 } from 'libs/contracts/src/schema/auth';
 
 @Controller('v1/auth')
@@ -74,6 +75,13 @@ export class AuthController {
   @UsePipes(ZodValidationPipe)
   async getToken(@Body() tokenRequest: TokenRequestDto) {
     return await this.authService.getTokenAndUserInfo(tokenRequest);
+  }
+
+  @Post('login-token/redeem')
+  @NoCache()
+  @UsePipes(ZodValidationPipe)
+  async redeemLoginToken(@Body() body: RedeemLoginTokenRequestDto) {
+    return await this.authService.redeemLoginToken(body.token);
   }
 
   @Post('accounts/external/:id')

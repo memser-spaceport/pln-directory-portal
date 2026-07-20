@@ -10,6 +10,7 @@ import type {
 } from 'libs/contracts/src/schema/team-news';
 import { computeCanonicalKey } from './utils/canonical-key';
 import { extractDomain, normalizeSourceUrl } from './utils/url-normalize';
+import { isDuplicateNewsStory } from './utils/news-dedup';
 
 // The directory's own definition of "recent" for the denormalized
 // `TeamNewsEnrichment.recentNewsCount`. Independent of producer policy —
@@ -43,49 +44,6 @@ interface CreatedTeamNews {
 }
 
 const STORY_MATCH_WINDOW_DAYS = 7;
-const STORY_STOP_WORDS = new Set([
-  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'in',
-  'is', 'it', 'of', 'on', 'or', 'that', 'the', 'their', 'this', 'to', 'with',
-]);
-
-function normalizeStoryText(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/https?:\/\/\S+/g, ' ')
-    .replace(/[^a-z0-9$]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
-}
-
-function storyTokens(value: string): Set<string> {
-  return new Set(
-    normalizeStoryText(value)
-      .split(' ')
-      .filter((token) => token.length > 2 && !STORY_STOP_WORDS.has(token))
-  );
-}
-
-function isSameStoryText(left: string, right: string): boolean {
-  const leftText = normalizeStoryText(left);
-  const rightText = normalizeStoryText(right);
-  if (!leftText || !rightText) return false;
-  if (leftText === rightText) return true;
-
-  const leftTokens = storyTokens(leftText);
-  const rightTokens = storyTokens(rightText);
-  if (leftTokens.size === 0 || rightTokens.size === 0) return false;
-
-  let overlap = 0;
-  for (const token of leftTokens) {
-    if (rightTokens.has(token)) overlap++;
-  }
-
-  const union = new Set([...leftTokens, ...rightTokens]).size;
-  const jaccard = union > 0 ? overlap / union : 0;
-  const containment = overlap / Math.min(leftTokens.size, rightTokens.size);
-
-  return jaccard >= 0.38 && containment >= 0.55;
-}
 
 @Injectable()
 export class TeamNewsService {
@@ -366,70 +324,19 @@ export class TeamNewsService {
   /**
    * Returns true if a new row was inserted, false if an existing row was updated.
    */
-  private async upsertNewsItem(item: TeamNewsIngestItem, eventDate: Date): Promise<boolean> {
+  private async upsertNewsItem(
+    item: TeamNewsIngestItem,
+    eventDate: Date
+  ): Promise<boolean> {
     const normalizedIncomingUrl = normalizeSourceUrl(item.sourceUrl);
     const sourceDomain = extractDomain(item.sourceUrl);
-    const windowMs = STORY_MATCH_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-    const incomingText = `${item.title} ${item.summary ?? ''}`;
 
-    const nearby = await this.prisma.teamNewsItem.findMany({
-      where: {
-        teamUid: item.teamUid,
-        eventDate: {
-          gte: new Date(eventDate.getTime() - windowMs),
-          lte: new Date(eventDate.getTime() + windowMs),
-        },
-      },
-      orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
-      select: {
-        id: true,
-        title: true,
-        summary: true,
-        sourceUrl: true,
-        sourceUrls: true,
-        tags: true,
-      },
-    });
+    const canonicalKey = computeCanonicalKey(
+      item.teamUid,
+      item.sourceUrl,
+      eventDate
+    );
 
-    const sameUrl = nearby.find((row) => {
-      const urls = row.sourceUrls.length > 0 ? row.sourceUrls : [row.sourceUrl];
-      return urls.some((url) => normalizeSourceUrl(url) === normalizedIncomingUrl);
-    });
-
-    const sameStory =
-      sameUrl ??
-      nearby.find((row) =>
-        isSameStoryText(incomingText, `${row.title} ${row.summary ?? ''}`)
-      );
-
-    if (sameStory) {
-      const currentUrls =
-        sameStory.sourceUrls.length > 0
-          ? sameStory.sourceUrls
-          : [sameStory.sourceUrl];
-
-      const sourceUrls = [
-        ...currentUrls,
-        ...(currentUrls.some(
-          (url) => normalizeSourceUrl(url) === normalizedIncomingUrl
-        )
-          ? []
-          : [item.sourceUrl]),
-      ];
-
-      await this.prisma.teamNewsItem.update({
-        where: { id: sameStory.id },
-        data: {
-          sourceUrls,
-          tags: [...new Set([...sameStory.tags, ...item.tags])],
-          rawPayload:
-            (item.rawPayload as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-        },
-      });
-      return false;
-    }
-
-    const canonicalKey = computeCanonicalKey(item.teamUid, item.sourceUrl, eventDate);
     const data: Prisma.TeamNewsItemUncheckedCreateInput = {
       teamUid: item.teamUid,
       canonicalKey,
@@ -441,27 +348,100 @@ export class TeamNewsService {
       sourceUrls: [item.sourceUrl],
       sourceDomain,
       tags: item.tags,
-      rawPayload: (item.rawPayload as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+      rawPayload:
+        (item.rawPayload as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     };
 
-    const existing = await this.prisma.teamNewsItem.findUnique({
+    /*
+     * Exact canonical-key match remains the fastest/idempotent path for
+     * replaying the same item.
+     */
+    const exactExisting = await this.prisma.teamNewsItem.findUnique({
       where: { canonicalKey },
-      select: { id: true, sourceUrl: true, sourceUrls: true, tags: true },
+      select: {
+        id: true,
+        sourceUrl: true,
+        sourceUrls: true,
+        title: true,
+        summary: true,
+        tags: true,
+      },
     });
+
+    /*
+     * Different publishers may report the same event on nearby dates.
+     * This is an event-date window, not a restriction relative to today.
+     */
+    const windowMs =
+      STORY_MATCH_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+    const nearbyItems = exactExisting
+      ? []
+      : await this.prisma.teamNewsItem.findMany({
+        where: {
+          teamUid: item.teamUid,
+          eventDate: {
+            gte: new Date(eventDate.getTime() - windowMs),
+            lte: new Date(eventDate.getTime() + windowMs),
+          },
+        },
+        orderBy: [
+          { eventDate: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        select: {
+          id: true,
+          sourceUrl: true,
+          sourceUrls: true,
+          title: true,
+          summary: true,
+          tags: true,
+        },
+      });
+
+    /*
+     * Check all stored source URLs first. This supports both migrated rows
+     * and rows that have already accumulated multiple sources.
+     */
+    const sameSourceExisting = nearbyItems.find((candidate) => {
+      const urls =
+        candidate.sourceUrls.length > 0
+          ? candidate.sourceUrls
+          : [candidate.sourceUrl];
+
+      return urls.some(
+        (url) =>
+          normalizeSourceUrl(url) === normalizedIncomingUrl
+      );
+    });
+
+    /*
+     * If the source is new, check whether it is another article about the
+     * same story. The shared develop utility remains the single semantic
+     * dedup implementation.
+     */
+    const semanticExisting =
+      sameSourceExisting ??
+      nearbyItems.find((candidate) =>
+        isDuplicateNewsStory(item, candidate)
+      );
+
+    const existing = exactExisting ?? semanticExisting;
 
     if (existing) {
       const currentUrls =
         existing.sourceUrls.length > 0
           ? existing.sourceUrls
           : [existing.sourceUrl];
-      const sourceUrls = [
-        ...currentUrls,
-        ...(currentUrls.some(
-          (url) => normalizeSourceUrl(url) === normalizedIncomingUrl
-        )
-          ? []
-          : [item.sourceUrl]),
-      ];
+
+      const alreadyStored = currentUrls.some(
+        (url) =>
+          normalizeSourceUrl(url) === normalizedIncomingUrl
+      );
+
+      const sourceUrls = alreadyStored
+        ? currentUrls
+        : [...currentUrls, item.sourceUrl];
 
       await this.prisma.teamNewsItem.update({
         where: { id: existing.id },
@@ -471,6 +451,7 @@ export class TeamNewsService {
           rawPayload: data.rawPayload,
         },
       });
+
       return false;
     }
 

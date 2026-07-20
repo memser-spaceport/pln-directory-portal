@@ -12,6 +12,8 @@ import { useUpdateTeamPitch } from '../../../hooks/team-pitches/useUpdateTeamPit
 import { useUpdateTeamPitchParticipant } from '../../../hooks/team-pitches/useUpdateTeamPitchParticipant';
 import { useSendTeamPitchInvite } from '../../../hooks/team-pitches/useSendTeamPitchInvite';
 import { useSendTeamPitchInvitesBulk } from '../../../hooks/team-pitches/useSendTeamPitchInvitesBulk';
+import { useSendTeamPitchFollowUp } from '../../../hooks/team-pitches/useSendTeamPitchFollowUp';
+import { useSendTeamPitchFollowUpsBulk } from '../../../hooks/team-pitches/useSendTeamPitchFollowUpsBulk';
 import { useRemoveTeamPitchParticipant } from '../../../hooks/team-pitches/useRemoveTeamPitchParticipant';
 import { useRemoveTeamPitchParticipantsBulk } from '../../../hooks/team-pitches/useRemoveTeamPitchParticipantsBulk';
 import { AddTeamPitchParticipantModal } from '../../../components/team-pitches/AddTeamPitchParticipantModal';
@@ -24,6 +26,13 @@ import { toast } from 'react-toastify';
 import s from '../../demo-days/styles.module.scss';
 
 const RichTextEditor = dynamic(() => import('../../../components/common/rich-text-editor'), { ssr: false });
+
+const formatFollowUpDate = (iso: string | null | undefined) => {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+};
 
 const ACCESS_OPTIONS = ['VIEW', 'VIEW_ADMIN', 'EDIT', 'RESTRICTED'] as const;
 
@@ -106,11 +115,16 @@ const TeamPitchDetailPage = () => {
     (PendingParticipantFields & { access: string }) | null
   >(null);
   const [pendingInvite, setPendingInvite] = useState<(PendingParticipantFields & { isResend: boolean }) | null>(null);
+  const [pendingFollowUp, setPendingFollowUp] = useState<(PendingParticipantFields & { isResend: boolean }) | null>(
+    null
+  );
   const [pendingRemove, setPendingRemove] = useState<PendingParticipantFields | null>(null);
   const [selectedUids, setSelectedUids] = useState<string[]>([]);
   const [bulkInviteMode, setBulkInviteMode] = useState<'all' | 'selected' | null>(null);
+  const [bulkFollowUpMode, setBulkFollowUpMode] = useState<'all' | 'selected' | null>(null);
   const [pendingSelectedRemove, setPendingSelectedRemove] = useState(false);
   const [includeAlreadyInvited, setIncludeAlreadyInvited] = useState(false);
+  const [includeAlreadyFollowedUp, setIncludeAlreadyFollowedUp] = useState(false);
 
   const typeMap = { investors: 'INVESTOR', founders: 'FOUNDER' } as const;
 
@@ -125,6 +139,8 @@ const TeamPitchDetailPage = () => {
   const updateParticipant = useUpdateTeamPitchParticipant();
   const sendInvite = useSendTeamPitchInvite();
   const sendInvitesBulk = useSendTeamPitchInvitesBulk();
+  const sendFollowUp = useSendTeamPitchFollowUp();
+  const sendFollowUpsBulk = useSendTeamPitchFollowUpsBulk();
   const removeParticipant = useRemoveTeamPitchParticipant();
   const removeParticipantsBulk = useRemoveTeamPitchParticipantsBulk();
 
@@ -226,6 +242,47 @@ const TeamPitchDetailPage = () => {
 
   const activeInviteStats = bulkInviteMode === 'selected' ? selectedInviteStats : bulkInviteStats;
   const bulkInviteTargetCount = includeAlreadyInvited ? activeInviteStats.eligible : activeInviteStats.neverInvited;
+
+  const bulkFollowUpStats = useMemo(() => {
+    const list = (participantsRaw ?? []) as Array<{
+      access?: string;
+      followUpSentCount?: number;
+      member?: { email?: string | null };
+    }>;
+    const noAccess = list.filter((p) => p.access === 'RESTRICTED').length;
+    const eligible = list.filter((p) => p.access !== 'RESTRICTED' && !!p.member?.email);
+    const neverFollowedUp = eligible.filter((p) => (p.followUpSentCount ?? 0) === 0);
+    const alreadyFollowedUp = eligible.filter((p) => (p.followUpSentCount ?? 0) > 0);
+    return {
+      eligible: eligible.length,
+      neverFollowedUp: neverFollowedUp.length,
+      alreadyFollowedUp: alreadyFollowedUp.length,
+      noAccess,
+    };
+  }, [participantsRaw]);
+
+  const selectedFollowUpStats = useMemo(() => {
+    const list = selectedParticipants as Array<{
+      access?: string;
+      followUpSentCount?: number;
+      member?: { email?: string | null };
+    }>;
+    const noAccess = list.filter((p) => p.access === 'RESTRICTED').length;
+    const eligible = list.filter((p) => p.access !== 'RESTRICTED' && !!p.member?.email);
+    const neverFollowedUp = eligible.filter((p) => (p.followUpSentCount ?? 0) === 0);
+    const alreadyFollowedUp = eligible.filter((p) => (p.followUpSentCount ?? 0) > 0);
+    return {
+      eligible: eligible.length,
+      neverFollowedUp: neverFollowedUp.length,
+      alreadyFollowedUp: alreadyFollowedUp.length,
+      noAccess,
+    };
+  }, [selectedParticipants]);
+
+  const activeFollowUpStats = bulkFollowUpMode === 'selected' ? selectedFollowUpStats : bulkFollowUpStats;
+  const bulkFollowUpTargetCount = includeAlreadyFollowedUp
+    ? activeFollowUpStats.eligible
+    : activeFollowUpStats.neverFollowedUp;
 
   const toggleSelectAllVisible = () => {
     if (allVisibleSelected) {
@@ -536,6 +593,17 @@ const TeamPitchDetailPage = () => {
                         Send Invites to All
                       </button>
                       <button
+                        type="button"
+                        onClick={() => {
+                          setIncludeAlreadyFollowedUp(false);
+                          setBulkFollowUpMode('all');
+                        }}
+                        disabled={!bulkFollowUpStats.eligible}
+                        className="rounded-lg bg-violet-600 px-4 py-2 text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                      >
+                        Send Follow-ups to All
+                      </button>
+                      <button
                         onClick={() => setShowUploadModal(true)}
                         className="rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
                       >
@@ -580,16 +648,28 @@ const TeamPitchDetailPage = () => {
                     Clear
                   </button>
                   {activeTab === 'investors' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIncludeAlreadyInvited(true);
-                        setBulkInviteMode('selected');
-                      }}
-                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
-                    >
-                      Send Invite to Selected
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIncludeAlreadyInvited(true);
+                          setBulkInviteMode('selected');
+                        }}
+                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
+                      >
+                        Send Invite to Selected
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIncludeAlreadyFollowedUp(true);
+                          setBulkFollowUpMode('selected');
+                        }}
+                        className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm text-white hover:bg-violet-700"
+                      >
+                        Send Follow-up to Selected
+                      </button>
+                    </>
                   )}
                   <button
                     type="button"
@@ -639,13 +719,18 @@ const TeamPitchDetailPage = () => {
                       Invite Accepted
                     </div>
                   )}
+                  {activeTab === 'investors' && (
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 140 }}>
+                      Follow-up
+                    </div>
+                  )}
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
                     Type
                   </div>
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>
                     Access
                   </div>
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: activeTab === 'investors' ? 160 : 60 }}>
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: activeTab === 'investors' ? 110 : 60 }}>
                     Actions
                   </div>
                 </div>
@@ -770,6 +855,23 @@ const TeamPitchDetailPage = () => {
                         </div>
                       )}
 
+                      {activeTab === 'investors' && (
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 140 }}>
+                          {(participant.followUpSentCount ?? 0) > 0 ? (
+                            <div className="text-sm text-gray-700">
+                              <div>{participant.followUpSentCount} sent</div>
+                              {formatFollowUpDate(participant.followUpSentAt) && (
+                                <div className="text-xs text-gray-500">
+                                  {formatFollowUpDate(participant.followUpSentAt)}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">—</span>
+                          )}
+                        </div>
+                      )}
+
                       <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
                         <select
                           value={participant.type}
@@ -819,28 +921,66 @@ const TeamPitchDetailPage = () => {
 
                       <div
                         className={clsx(s.bodyCell, s.fixed)}
-                        style={{ width: activeTab === 'investors' ? 160 : 60 }}
+                        style={{ width: activeTab === 'investors' ? 110 : 60 }}
                       >
                         {canMutateTeamPitches && (
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1">
                             {activeTab === 'investors' &&
                               (participant.access === 'RESTRICTED' ? (
                                 <span className="text-sm text-gray-400">No Access</span>
                               ) : (
-                                <button
-                                  type="button"
-                                  className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                                  onClick={() =>
-                                    setPendingInvite({
-                                      uid: participant.uid,
-                                      name: participant.member?.name,
-                                      email: participant.member?.email,
-                                      isResend: participant.inviteSentCount > 0,
-                                    })
-                                  }
-                                >
-                                  {participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    className="rounded p-1 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+                                    aria-label={participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
+                                    title={participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
+                                    onClick={() =>
+                                      setPendingInvite({
+                                        uid: participant.uid,
+                                        name: participant.member?.name,
+                                        email: participant.member?.email,
+                                        isResend: participant.inviteSentCount > 0,
+                                      })
+                                    }
+                                  >
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                      />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="rounded p-1 text-violet-600 hover:bg-violet-50 hover:text-violet-800"
+                                    aria-label={
+                                      (participant.followUpSentCount ?? 0) > 0 ? 'Resend Follow-up' : 'Send Follow-up'
+                                    }
+                                    title={
+                                      (participant.followUpSentCount ?? 0) > 0 ? 'Resend Follow-up' : 'Send Follow-up'
+                                    }
+                                    onClick={() =>
+                                      setPendingFollowUp({
+                                        uid: participant.uid,
+                                        name: participant.member?.name,
+                                        email: participant.member?.email,
+                                        isResend: (participant.followUpSentCount ?? 0) > 0,
+                                      })
+                                    }
+                                  >
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                                      />
+                                    </svg>
+                                  </button>
+                                </>
                               ))}
                             <button
                               type="button"
@@ -1007,6 +1147,60 @@ const TeamPitchDetailPage = () => {
         />
 
         <TeamPitchConfirmModal
+          isOpen={!!pendingFollowUp}
+          title={pendingFollowUp?.isResend ? 'Resend investor follow-up' : 'Send investor follow-up'}
+          message={
+            pendingFollowUp?.isResend
+              ? 'Resend the team spotlight investor follow-up email to this participant?'
+              : 'Send the team spotlight investor follow-up email to this participant?'
+          }
+          participantName={pendingFollowUp?.name}
+          participantEmail={pendingFollowUp?.email}
+          confirmLabel={pendingFollowUp?.isResend ? 'Resend' : 'Send'}
+          isPending={sendFollowUp.isPending}
+          onClose={() => setPendingFollowUp(null)}
+          details={
+            pitch ? (
+              <div className="space-y-2 text-sm text-gray-600">
+                <p className="font-medium text-gray-700">Email that will be sent:</p>
+                <ul className="list-disc space-y-1 pl-5">
+                  <li>
+                    <span className="font-medium">Team spotlight investor follow-up</span> — a reminder to review{' '}
+                    <span className="font-medium">{pitch.title}</span>
+                  </li>
+                  <li>A link to the spotlight page on the directory, with their email pre-filled for sign-in</li>
+                  <li>
+                    Context for <span className="font-medium">{pitch.team?.name ?? 'the team'}</span> and support
+                    contact ({pitch.supportEmail})
+                  </li>
+                  <li>Delivered to their inbox via email (not in-app notification)</li>
+                </ul>
+                {pendingFollowUp?.isResend && (
+                  <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
+                    This investor has received a follow-up before; they will receive a new copy of the follow-up email.
+                  </p>
+                )}
+              </div>
+            ) : null
+          }
+          onConfirm={async () => {
+            if (!authToken || !pendingFollowUp) return;
+            try {
+              await sendFollowUp.mutateAsync({
+                authToken,
+                pitchUid: uid,
+                participantUid: pendingFollowUp.uid,
+              });
+              toast.success(pendingFollowUp.isResend ? 'Follow-up resent' : 'Follow-up sent');
+              setPendingFollowUp(null);
+              refetchParticipants();
+            } catch {
+              toast.error('Failed to send follow-up');
+            }
+          }}
+        />
+
+        <TeamPitchConfirmModal
           isOpen={!!pendingRemove}
           title="Remove participant"
           message="Remove this participant from the team spotlight? They will lose access. Their member profile will not be deleted."
@@ -1134,6 +1328,120 @@ const TeamPitchDetailPage = () => {
               refetchParticipants();
             } catch {
               toast.error('Failed to send invites');
+            }
+          }}
+        />
+
+        <TeamPitchConfirmModal
+          isOpen={bulkFollowUpMode !== null}
+          title={
+            bulkFollowUpMode === 'selected'
+              ? 'Send follow-ups to selected investors'
+              : 'Send follow-ups to all investors'
+          }
+          message={
+            includeAlreadyFollowedUp
+              ? `Send the team spotlight follow-up email to ${activeFollowUpStats.eligible} eligible investor${
+                  activeFollowUpStats.eligible === 1 ? '' : 's'
+                }${bulkFollowUpMode === 'selected' ? ' from your selection' : ''}?`
+              : activeFollowUpStats.neverFollowedUp > 0
+              ? `Send the team spotlight follow-up email to ${activeFollowUpStats.neverFollowedUp} investor${
+                  activeFollowUpStats.neverFollowedUp === 1 ? '' : 's'
+                } who have not received a follow-up yet?`
+              : 'Every eligible investor in this set has already received a follow-up. Enable the option below to resend.'
+          }
+          confirmLabel={`Send ${bulkFollowUpTargetCount} follow-up${bulkFollowUpTargetCount === 1 ? '' : 's'}`}
+          confirmDisabled={bulkFollowUpTargetCount === 0}
+          isPending={sendFollowUpsBulk.isPending}
+          onClose={() => {
+            if (sendFollowUpsBulk.isPending) return;
+            setBulkFollowUpMode(null);
+            setIncludeAlreadyFollowedUp(false);
+          }}
+          details={
+            <div className="space-y-3 text-sm text-gray-600">
+              {bulkFollowUpMode === 'selected' && (
+                <p>
+                  Selected: <span className="font-medium text-gray-900">{selectedUids.length}</span>
+                </p>
+              )}
+              <ul className="list-disc space-y-1 pl-5">
+                <li>
+                  Eligible investors: <span className="font-medium text-gray-900">{activeFollowUpStats.eligible}</span>
+                </li>
+                <li>
+                  Not yet followed up:{' '}
+                  <span className="font-medium text-gray-900">{activeFollowUpStats.neverFollowedUp}</span>
+                </li>
+                <li>
+                  Already followed up:{' '}
+                  <span className="font-medium text-gray-900">{activeFollowUpStats.alreadyFollowedUp}</span>
+                </li>
+                {activeFollowUpStats.noAccess > 0 && (
+                  <li>
+                    Skipped (No Access):{' '}
+                    <span className="font-medium text-gray-900">{activeFollowUpStats.noAccess}</span>
+                  </li>
+                )}
+              </ul>
+              <p className="text-xs text-gray-500">
+                Investors marked No Access are never emailed, even when resending.
+              </p>
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-3">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                  checked={includeAlreadyFollowedUp}
+                  disabled={sendFollowUpsBulk.isPending || activeFollowUpStats.alreadyFollowedUp === 0}
+                  onChange={(e) => setIncludeAlreadyFollowedUp(e.target.checked)}
+                />
+                <span>
+                  <span className="block font-medium text-gray-900">
+                    Also resend to investors who already received a follow-up
+                  </span>
+                  <span className="mt-0.5 block text-xs text-gray-500">
+                    {bulkFollowUpMode === 'selected'
+                      ? 'On by default for selected people — turn off to skip anyone already followed up.'
+                      : 'Off by default — only people who have never received a follow-up will get an email. Turn this on only if you intentionally want to email everyone again.'}
+                  </span>
+                </span>
+              </label>
+              {includeAlreadyFollowedUp && activeFollowUpStats.alreadyFollowedUp > 0 && (
+                <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
+                  {activeFollowUpStats.alreadyFollowedUp} investor
+                  {activeFollowUpStats.alreadyFollowedUp === 1 ? '' : 's'} will receive another copy of the follow-up
+                  email.
+                </p>
+              )}
+            </div>
+          }
+          onConfirm={async () => {
+            if (!authToken || bulkFollowUpTargetCount === 0 || !bulkFollowUpMode) return;
+            try {
+              const result = await sendFollowUpsBulk.mutateAsync({
+                authToken,
+                pitchUid: uid,
+                includeAlreadyFollowedUp,
+                ...(bulkFollowUpMode === 'selected' ? { participantUids: selectedUids } : {}),
+              });
+              const { sent, skipped, errors } = result.summary;
+              if (errors > 0) {
+                toast.warning(
+                  `Sent ${sent} follow-up${sent === 1 ? '' : 's'}; ${errors} failed${
+                    skipped > 0 ? `, ${skipped} skipped` : ''
+                  }`
+                );
+              } else {
+                toast.success(
+                  `Sent ${sent} follow-up${sent === 1 ? '' : 's'}${skipped > 0 ? ` (${skipped} skipped)` : ''}`
+                );
+              }
+              setBulkFollowUpMode(null);
+              setIncludeAlreadyFollowedUp(false);
+              if (bulkFollowUpMode === 'selected') setSelectedUids([]);
+              refetchParticipants();
+            } catch {
+              toast.error('Failed to send follow-ups');
             }
           }}
         />
