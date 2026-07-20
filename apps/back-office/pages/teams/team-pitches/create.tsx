@@ -30,6 +30,7 @@ const CreateTeamPitchPage = () => {
     slug: '',
     status: 'DRAFT',
     supportEmail: '',
+    senderEmail: '',
   });
 
   useEffect(() => {
@@ -80,7 +81,14 @@ const CreateTeamPitchPage = () => {
     e.preventDefault();
     if (!authToken) return;
     try {
-      const created = await createMutation.mutateAsync({ authToken, data: form });
+      const created = await createMutation.mutateAsync({
+        authToken,
+        data: {
+          ...form,
+          supportEmail: form.supportEmail.trim() || null,
+          senderEmail: form.senderEmail.trim() || null,
+        },
+      });
       router.push(`/teams/team-pitches/${created.uid}`);
     } catch {
       alert('Failed to create team spotlight. Please try again.');
@@ -259,6 +267,21 @@ const CreateTeamPitchPage = () => {
                 className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Leave blank to use default support email"
               />
+            </div>
+
+            <div>
+              <label htmlFor="senderEmail" className="mb-2 block text-sm font-medium text-gray-700">
+                Sender Email
+              </label>
+              <input
+                type="email"
+                id="senderEmail"
+                value={form.senderEmail}
+                onChange={(e) => setForm((f) => ({ ...f, senderEmail: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Leave blank to use system default"
+              />
+              <p className="mt-1 text-xs text-gray-500">From address used for investor invite and follow-up emails.</p>
             </div>
 
             <div className="flex justify-end space-x-4">

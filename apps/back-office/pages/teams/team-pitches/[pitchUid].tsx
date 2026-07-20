@@ -164,6 +164,7 @@ const TeamPitchDetailPage = () => {
     slug: '',
     status: 'DRAFT',
     supportEmail: '',
+    senderEmail: '',
     analyticsReportUrl: '',
   });
 
@@ -185,6 +186,7 @@ const TeamPitchDetailPage = () => {
         slug: pitch.slug,
         status: pitch.status,
         supportEmail: pitch.supportEmail,
+        senderEmail: pitch.senderEmail ?? '',
         analyticsReportUrl: pitch.analyticsReportUrl ?? '',
       });
     }
@@ -335,6 +337,8 @@ const TeamPitchDetailPage = () => {
         pitchUid: uid,
         data: {
           ...editFormData,
+          supportEmail: editFormData.supportEmail.trim() || null,
+          senderEmail: editFormData.senderEmail.trim() || null,
           spotlightStatement: editFormData.spotlightStatement.trim() || null,
           analyticsReportUrl: editFormData.analyticsReportUrl.trim() || null,
         },
@@ -429,6 +433,7 @@ const TeamPitchDetailPage = () => {
                           slug: pitch.slug,
                           status: pitch.status,
                           supportEmail: pitch.supportEmail,
+                          senderEmail: pitch.senderEmail ?? '',
                           analyticsReportUrl: pitch.analyticsReportUrl ?? '',
                         });
                       }}
@@ -502,6 +507,20 @@ const TeamPitchDetailPage = () => {
                   />
                 ) : (
                   <div className={s.fieldValue}>{pitch.supportEmail}</div>
+                )}
+              </div>
+              <div className={s.overviewField}>
+                <label className={s.fieldLabel}>Sender Email</label>
+                {isEditing ? (
+                  <input
+                    type="email"
+                    value={editFormData.senderEmail}
+                    onChange={(e) => handleEditFormChange('senderEmail', e.target.value)}
+                    className={s.fieldInput}
+                    placeholder="Leave blank to use system default"
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{pitch.senderEmail || 'System default'}</div>
                 )}
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>

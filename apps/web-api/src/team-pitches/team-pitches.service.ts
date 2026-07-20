@@ -2,7 +2,12 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Prisma, TeamPitchParticipantAccess, TeamPitchParticipantType, TeamPitchStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { ADMIN_PERMISSIONS, TEAM_PITCH_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
-import { resolveTeamPitchSupportEmail, resolveTeamPitchClosedAt, toKebabSlug } from './team-pitch.utils';
+import {
+  resolveTeamPitchSupportEmail,
+  resolveTeamPitchSenderEmail,
+  resolveTeamPitchClosedAt,
+  toKebabSlug,
+} from './team-pitch.utils';
 
 export type TeamPitchAccessLevel = 'restricted' | 'view' | 'edit';
 
@@ -131,6 +136,7 @@ export class TeamPitchesService {
       spotlightFrequency: pitch.spotlightFrequency,
       spotlightStatement: pitch.spotlightStatement,
       supportEmail: pitch.supportEmail,
+      senderEmail: pitch.senderEmail,
       logoUrl: pitch.logo?.url ?? null,
       primaryColor: pitch.primaryColor,
       headerImageUrl: pitch.headerImage?.url ?? null,
@@ -204,6 +210,7 @@ export class TeamPitchesService {
       description: p.description,
       status: p.status,
       supportEmail: p.supportEmail,
+      senderEmail: p.senderEmail,
       primaryColor: p.primaryColor,
       createdAt: p.createdAt.toISOString(),
       team: p.team,
@@ -218,6 +225,7 @@ export class TeamPitchesService {
     slug?: string;
     status?: TeamPitchStatus;
     supportEmail?: string | null;
+    senderEmail?: string | null;
     headerImageUid?: string | null;
     logoUid?: string | null;
     primaryColor?: string | null;
@@ -236,6 +244,7 @@ export class TeamPitchesService {
     });
 
     const supportEmail = resolveTeamPitchSupportEmail(data.supportEmail);
+    const senderEmail = resolveTeamPitchSenderEmail(data.senderEmail);
 
     const pitch = await this.prisma.teamPitch.create({
       data: {
@@ -246,6 +255,7 @@ export class TeamPitchesService {
         status: data.status ?? TeamPitchStatus.DRAFT,
         closedAt: data.status === TeamPitchStatus.CLOSED ? new Date() : undefined,
         supportEmail,
+        senderEmail,
         headerImageUid: data.headerImageUid ?? undefined,
         logoUid: data.logoUid ?? undefined,
         primaryColor: data.primaryColor ?? '#1a45e6',
@@ -306,6 +316,7 @@ export class TeamPitchesService {
       slug?: string;
       status?: TeamPitchStatus;
       supportEmail?: string | null;
+      senderEmail?: string | null;
       headerImageUid?: string | null;
       logoUid?: string | null;
       primaryColor?: string | null;
@@ -324,6 +335,8 @@ export class TeamPitchesService {
 
     const resolvedSupportEmail =
       data.supportEmail !== undefined ? resolveTeamPitchSupportEmail(data.supportEmail) : undefined;
+    const resolvedSenderEmail =
+      data.senderEmail !== undefined ? resolveTeamPitchSenderEmail(data.senderEmail) : undefined;
 
     let closedAt: Date | null | undefined;
     if (data.status !== undefined) {
@@ -357,6 +370,7 @@ export class TeamPitchesService {
           status: pitchData.status,
           closedAt,
           supportEmail: resolvedSupportEmail,
+          senderEmail: resolvedSenderEmail,
           headerImageUid: pitchData.headerImageUid,
           logoUid: pitchData.logoUid,
           primaryColor: pitchData.primaryColor ?? '#1a45e6',

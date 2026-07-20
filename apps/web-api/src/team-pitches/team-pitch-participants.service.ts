@@ -3,7 +3,7 @@ import { MemberApprovalState, Prisma, Team, TeamPitchParticipantType } from '@pr
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { upsertPolicyAssignmentByCode } from '../demo-days/demo-day-investor-policy.util';
-import { defaultAccessForParticipantType, asStringRecord } from './team-pitch.utils';
+import { defaultAccessForParticipantType, asStringRecord, resolveTeamPitchSenderEmail } from './team-pitch.utils';
 import { InvestorBulkProvisionService } from '../investors/investor-bulk-provision.service';
 import { InvestorBulkRowResult, InvestorBulkSummary } from '../investors/investor-bulk.types';
 import { AuthService } from '../auth/auth.service';
@@ -213,7 +213,10 @@ export class TeamPitchParticipantsService {
         access,
         teamUid,
         ...(data.emailTemplateVariables !== undefined
-          ? { emailTemplateVariables: data.emailTemplateVariables === null ? Prisma.DbNull : data.emailTemplateVariables }
+          ? {
+              emailTemplateVariables:
+                data.emailTemplateVariables === null ? Prisma.DbNull : data.emailTemplateVariables,
+            }
           : {}),
       },
       include: {
@@ -316,15 +319,16 @@ export class TeamPitchParticipantsService {
     const pitchLink = `${webBase}/spotlight/${participant.teamPitch.slug}?prefillEmail=${encodeURIComponent(
       participant.member.email
     )}&loginToken=${encodeURIComponent(loginToken)}`;
+    const senderEmail = resolveTeamPitchSenderEmail(participant.teamPitch.senderEmail);
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
       deliveryChannel: 'EMAIL',
       templateName: 'TEAM_PITCH_INVESTOR_INVITE_EMAIL',
       recipientsInfo: {
-        from: process.env.DEMO_DAY_EMAIL,
+        from: senderEmail,
         to: [participant.member.email],
-        bcc: process.env.DEMO_DAY_EMAIL ? [process.env.DEMO_DAY_EMAIL] : [],
+        bcc: senderEmail ? [senderEmail] : [],
       },
       deliveryPayload: {
         body: {
@@ -502,15 +506,16 @@ export class TeamPitchParticipantsService {
     const pitchLink = `${webBase}/spotlight/${participant.teamPitch.slug}?prefillEmail=${encodeURIComponent(
       participant.member.email
     )}&loginToken=${encodeURIComponent(loginToken)}`;
+    const senderEmail = resolveTeamPitchSenderEmail(participant.teamPitch.senderEmail);
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
       deliveryChannel: 'EMAIL',
       templateName: 'TEAM_PITCH_INVESTOR_FOLLOWUP_EMAIL',
       recipientsInfo: {
-        from: process.env.DEMO_DAY_EMAIL,
+        from: senderEmail,
         to: [participant.member.email],
-        bcc: process.env.DEMO_DAY_EMAIL ? [process.env.DEMO_DAY_EMAIL] : [],
+        bcc: senderEmail ? [senderEmail] : [],
       },
       deliveryPayload: {
         body: {

@@ -11,6 +11,18 @@ export function resolveTeamPitchSupportEmail(supportEmail?: string | null): stri
   );
 }
 
+/** From-address for invite/follow-up emails. Falls back to DEMO_DAY_EMAIL (current default). */
+export function resolveTeamPitchSenderEmail(senderEmail?: string | null): string {
+  const trimmed = senderEmail?.trim();
+  if (trimmed) {
+    return trimmed;
+  }
+
+  return (
+    process.env.DEMO_DAY_EMAIL?.trim() || process.env.LABOS_SUPPORT_EMAIL?.trim() || DEFAULT_TEAM_PITCH_SUPPORT_EMAIL
+  );
+}
+
 export function toKebabSlug(value: string): string {
   return value
     .trim()
