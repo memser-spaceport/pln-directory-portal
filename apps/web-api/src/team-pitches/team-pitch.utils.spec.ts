@@ -1,4 +1,9 @@
-import { DEFAULT_TEAM_PITCH_SUPPORT_EMAIL, resolveTeamPitchSupportEmail, resolveTeamPitchClosedAt } from './team-pitch.utils';
+import {
+  DEFAULT_TEAM_PITCH_SUPPORT_EMAIL,
+  resolveTeamPitchSupportEmail,
+  resolveTeamPitchSenderEmail,
+  resolveTeamPitchClosedAt,
+} from './team-pitch.utils';
 
 describe('resolveTeamPitchSupportEmail', () => {
   const originalLabosSupportEmail = process.env.LABOS_SUPPORT_EMAIL;
@@ -46,6 +51,51 @@ describe('resolveTeamPitchSupportEmail', () => {
     delete process.env.DEMO_DAY_EMAIL;
 
     expect(resolveTeamPitchSupportEmail('')).toBe(DEFAULT_TEAM_PITCH_SUPPORT_EMAIL);
+  });
+});
+
+describe('resolveTeamPitchSenderEmail', () => {
+  const originalLabosSupportEmail = process.env.LABOS_SUPPORT_EMAIL;
+  const originalDemoDayEmail = process.env.DEMO_DAY_EMAIL;
+
+  afterEach(() => {
+    if (originalLabosSupportEmail === undefined) {
+      delete process.env.LABOS_SUPPORT_EMAIL;
+    } else {
+      process.env.LABOS_SUPPORT_EMAIL = originalLabosSupportEmail;
+    }
+
+    if (originalDemoDayEmail === undefined) {
+      delete process.env.DEMO_DAY_EMAIL;
+    } else {
+      process.env.DEMO_DAY_EMAIL = originalDemoDayEmail;
+    }
+  });
+
+  it('returns the provided email when set', () => {
+    expect(resolveTeamPitchSenderEmail('sender@example.com')).toBe('sender@example.com');
+  });
+
+  it('falls back to DEMO_DAY_EMAIL when input is blank', () => {
+    process.env.DEMO_DAY_EMAIL = 'demoday@example.com';
+    delete process.env.LABOS_SUPPORT_EMAIL;
+
+    expect(resolveTeamPitchSenderEmail('')).toBe('demoday@example.com');
+    expect(resolveTeamPitchSenderEmail()).toBe('demoday@example.com');
+  });
+
+  it('falls back to LABOS_SUPPORT_EMAIL when DEMO_DAY_EMAIL is unset', () => {
+    delete process.env.DEMO_DAY_EMAIL;
+    process.env.LABOS_SUPPORT_EMAIL = 'labos@example.com';
+
+    expect(resolveTeamPitchSenderEmail(null)).toBe('labos@example.com');
+  });
+
+  it('falls back to the default when env vars are unset', () => {
+    delete process.env.DEMO_DAY_EMAIL;
+    delete process.env.LABOS_SUPPORT_EMAIL;
+
+    expect(resolveTeamPitchSenderEmail('')).toBe(DEFAULT_TEAM_PITCH_SUPPORT_EMAIL);
   });
 });
 

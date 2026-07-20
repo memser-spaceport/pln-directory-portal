@@ -6,6 +6,7 @@ export const DEAL_CATEGORIES = [
   'Security & Audits',
   'AI & Developer Tools',
   'Finance',
+  'Company Operations',
 ] as const;
 
 export const DEAL_CATEGORY_OPTIONS = DEAL_CATEGORIES.map((cat) => ({ value: cat, label: cat }));

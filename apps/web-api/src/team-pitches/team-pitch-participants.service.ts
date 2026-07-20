@@ -3,15 +3,20 @@ import { MemberApprovalState, Prisma, Team, TeamPitchParticipantType } from '@pr
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { upsertPolicyAssignmentByCode } from '../demo-days/demo-day-investor-policy.util';
-import { defaultAccessForParticipantType } from './team-pitch.utils';
+import { defaultAccessForParticipantType, asStringRecord, resolveTeamPitchSenderEmail } from './team-pitch.utils';
 import { InvestorBulkProvisionService } from '../investors/investor-bulk-provision.service';
 import { InvestorBulkRowResult, InvestorBulkSummary } from '../investors/investor-bulk.types';
+import { AuthService } from '../auth/auth.service';
+
+const LOGIN_TOKEN_TTL_SECONDS = 604800; // 7 days
+
 @Injectable()
 export class TeamPitchParticipantsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationServiceClient: NotificationServiceClient,
-    private readonly investorBulkProvisionService: InvestorBulkProvisionService
+    private readonly investorBulkProvisionService: InvestorBulkProvisionService,
+    private readonly authService: AuthService
   ) {}
 
   async listParticipants(pitchUid: string, type?: TeamPitchParticipantType) {
@@ -62,6 +67,9 @@ export class TeamPitchParticipantsService {
       confidentialityAccepted: p.confidentialityAccepted,
       inviteSentAt: p.inviteSentAt?.toISOString() ?? null,
       inviteSentCount: p.inviteSentCount,
+      followUpSentAt: p.followUpSentAt?.toISOString() ?? null,
+      followUpSentCount: p.followUpSentCount,
+      emailTemplateVariables: asStringRecord(p.emailTemplateVariables),
       team: p.team,
       member: p.member
         ? {
@@ -172,7 +180,11 @@ export class TeamPitchParticipantsService {
   async updateParticipant(
     pitchUid: string,
     participantUid: string,
-    data: { type?: TeamPitchParticipantType; access?: 'VIEW' | 'VIEW_ADMIN' | 'EDIT' | 'RESTRICTED' }
+    data: {
+      type?: TeamPitchParticipantType;
+      access?: 'VIEW' | 'VIEW_ADMIN' | 'EDIT' | 'RESTRICTED';
+      emailTemplateVariables?: Record<string, string> | null;
+    }
   ) {
     const participant = await this.prisma.teamPitchParticipant.findFirst({
       where: { uid: participantUid, teamPitchUid: pitchUid },
@@ -200,6 +212,12 @@ export class TeamPitchParticipantsService {
         type,
         access,
         teamUid,
+        ...(data.emailTemplateVariables !== undefined
+          ? {
+              emailTemplateVariables:
+                data.emailTemplateVariables === null ? Prisma.DbNull : data.emailTemplateVariables,
+            }
+          : {}),
       },
       include: {
         member: { select: { uid: true, name: true, email: true } },
@@ -297,21 +315,24 @@ export class TeamPitchParticipantsService {
     }
 
     const webBase = process.env.WEB_UI_BASE_URL || '';
+    const loginToken = await this.authService.issueLoginToken(participant.member.email, LOGIN_TOKEN_TTL_SECONDS);
     const pitchLink = `${webBase}/spotlight/${participant.teamPitch.slug}?prefillEmail=${encodeURIComponent(
       participant.member.email
-    )}`;
+    )}&loginToken=${encodeURIComponent(loginToken)}`;
+    const senderEmail = resolveTeamPitchSenderEmail(participant.teamPitch.senderEmail);
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
       deliveryChannel: 'EMAIL',
       templateName: 'TEAM_PITCH_INVESTOR_INVITE_EMAIL',
       recipientsInfo: {
-        from: process.env.DEMO_DAY_EMAIL,
+        from: senderEmail,
         to: [participant.member.email],
-        bcc: process.env.DEMO_DAY_EMAIL ? [process.env.DEMO_DAY_EMAIL] : [],
+        bcc: senderEmail ? [senderEmail] : [],
       },
       deliveryPayload: {
         body: {
+          ...asStringRecord(participant.emailTemplateVariables),
           investorName: participant.member.name || '',
           investorEmail: participant.member.email,
           pitchTitle: participant.teamPitch.title,
@@ -447,6 +468,193 @@ export class TeamPitchParticipantsService {
           name,
           status: 'error',
           message: error instanceof Error ? error.message : 'Failed to send invite',
+        });
+      }
+    }
+
+    return { summary, rows };
+  }
+
+  async sendInvestorFollowUp(pitchUid: string, participantUid: string) {
+    const participant = await this.prisma.teamPitchParticipant.findFirst({
+      where: { uid: participantUid, teamPitchUid: pitchUid },
+      include: {
+        member: { select: { uid: true, name: true, email: true } },
+        teamPitch: {
+          include: {
+            team: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    if (!participant) {
+      throw new NotFoundException('Participant not found');
+    }
+    if (participant.type !== 'INVESTOR') {
+      throw new BadRequestException('Follow-up can only be sent to investors');
+    }
+    if (participant.access === 'RESTRICTED') {
+      throw new BadRequestException('Follow-up cannot be sent to investors with No Access');
+    }
+    if (!participant.member.email) {
+      throw new BadRequestException('Investor has no email');
+    }
+
+    const webBase = process.env.WEB_UI_BASE_URL || '';
+    const loginToken = await this.authService.issueLoginToken(participant.member.email, LOGIN_TOKEN_TTL_SECONDS);
+    const pitchLink = `${webBase}/spotlight/${participant.teamPitch.slug}?prefillEmail=${encodeURIComponent(
+      participant.member.email
+    )}&loginToken=${encodeURIComponent(loginToken)}`;
+    const senderEmail = resolveTeamPitchSenderEmail(participant.teamPitch.senderEmail);
+
+    await this.notificationServiceClient.sendNotification({
+      isPriority: true,
+      deliveryChannel: 'EMAIL',
+      templateName: 'TEAM_PITCH_INVESTOR_FOLLOWUP_EMAIL',
+      recipientsInfo: {
+        from: senderEmail,
+        to: [participant.member.email],
+        bcc: senderEmail ? [senderEmail] : [],
+      },
+      deliveryPayload: {
+        body: {
+          ...asStringRecord(participant.emailTemplateVariables),
+          investorName: participant.member.name || '',
+          investorEmail: participant.member.email,
+          pitchTitle: participant.teamPitch.title,
+          pitchSlug: participant.teamPitch.slug,
+          pitchLink,
+          teamName: participant.teamPitch.team.name,
+          supportEmail: participant.teamPitch.supportEmail,
+        },
+      },
+      entityType: 'TEAM_PITCH',
+      actionType: 'INVESTOR_FOLLOWUP',
+      sourceMeta: {
+        activityId: participant.teamPitch.uid,
+        activityType: 'TEAM_PITCH',
+        activityUserId: participant.member.uid,
+        activityUserName: participant.member.name,
+      },
+      targetMeta: {
+        emailId: participant.member.email,
+        userId: participant.member.uid,
+        userName: participant.member.name,
+      },
+    });
+
+    await this.prisma.teamPitchParticipant.update({
+      where: { uid: participantUid },
+      data: {
+        followUpSentAt: new Date(),
+        followUpSentCount: { increment: 1 },
+      },
+    });
+
+    return { success: true };
+  }
+
+  async sendInvestorFollowUpsBulk(
+    pitchUid: string,
+    options: { includeAlreadyFollowedUp?: boolean; participantUids?: string[] } = {}
+  ): Promise<{
+    summary: { totalEligible: number; sent: number; skipped: number; errors: number };
+    rows: Array<{
+      participantUid: string;
+      email: string | null;
+      name: string | null;
+      status: 'sent' | 'skipped' | 'error';
+      message?: string | null;
+    }>;
+  }> {
+    const includeAlreadyFollowedUp = options.includeAlreadyFollowedUp ?? false;
+    const selectedUids = options.participantUids?.length ? new Set(options.participantUids) : null;
+
+    const pitch = await this.prisma.teamPitch.findUnique({ where: { uid: pitchUid } });
+    if (!pitch) {
+      throw new NotFoundException('Team pitch not found');
+    }
+
+    const investors = await this.prisma.teamPitchParticipant.findMany({
+      where: {
+        teamPitchUid: pitchUid,
+        type: 'INVESTOR',
+        ...(selectedUids ? { uid: { in: [...selectedUids] } } : {}),
+      },
+      include: {
+        member: { select: { uid: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const summary = { totalEligible: 0, sent: 0, skipped: 0, errors: 0 };
+    const rows: Array<{
+      participantUid: string;
+      email: string | null;
+      name: string | null;
+      status: 'sent' | 'skipped' | 'error';
+      message?: string | null;
+    }> = [];
+
+    for (const investor of investors) {
+      const email = investor.member?.email ?? null;
+      const name = investor.member?.name ?? null;
+
+      if (investor.access === 'RESTRICTED') {
+        summary.skipped++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'skipped',
+          message: 'Investor has No Access',
+        });
+        continue;
+      }
+
+      if (!email) {
+        summary.skipped++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'skipped',
+          message: 'Investor has no email',
+        });
+        continue;
+      }
+
+      if (!includeAlreadyFollowedUp && investor.followUpSentCount > 0) {
+        summary.skipped++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'skipped',
+          message: 'Follow-up already sent',
+        });
+        continue;
+      }
+
+      summary.totalEligible++;
+      try {
+        await this.sendInvestorFollowUp(pitchUid, investor.uid);
+        summary.sent++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'sent',
+        });
+      } catch (error) {
+        summary.errors++;
+        rows.push({
+          participantUid: investor.uid,
+          email,
+          name,
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Failed to send follow-up',
         });
       }
     }

@@ -6,6 +6,10 @@
   max-width: 1343px;
   margin: 0 auto;
   min-height: calc(100dvh - 80px);
+
+  &.wide {
+    max-width: 1680px;
+  }
 }
 
 .header {

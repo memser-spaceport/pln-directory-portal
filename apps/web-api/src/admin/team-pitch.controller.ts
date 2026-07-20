@@ -12,6 +12,7 @@ import {
   GetTeamPitchParticipantsQueryDto,
   GetTeamPitchesQueryDto,
   RemoveTeamPitchParticipantsBulkDto,
+  SendTeamPitchFollowUpsBulkDto,
   SendTeamPitchInvitesBulkDto,
   UpdateTeamPitchDto,
   UpdateTeamPitchParticipantDto,
@@ -47,6 +48,7 @@ export class AdminTeamPitchController {
       slug: body.slug,
       status: body.status as TeamPitchStatus | undefined,
       supportEmail: body.supportEmail,
+      senderEmail: body.senderEmail,
       headerImageUid: body.headerImageUid,
       logoUid: body.logoUid,
       primaryColor: body.primaryColor,
@@ -71,6 +73,7 @@ export class AdminTeamPitchController {
       slug: body.slug,
       status: body.status as TeamPitchStatus | undefined,
       supportEmail: body.supportEmail,
+      senderEmail: body.senderEmail,
       headerImageUid: body.headerImageUid,
       logoUid: body.logoUid,
       primaryColor: body.primaryColor,
@@ -111,6 +114,16 @@ export class AdminTeamPitchController {
     });
   }
 
+  @Post(':pitchUid/participants/send-follow-ups-bulk')
+  @UsePipes(ZodValidationPipe)
+  @NoCache()
+  async sendFollowUpsBulk(@Param('pitchUid') pitchUid: string, @Body() body: SendTeamPitchFollowUpsBulkDto) {
+    return this.teamPitchParticipantsService.sendInvestorFollowUpsBulk(pitchUid, {
+      includeAlreadyFollowedUp: body.includeAlreadyFollowedUp ?? false,
+      participantUids: body.participantUids,
+    });
+  }
+
   @Post(':pitchUid/participants/remove-bulk')
   @UsePipes(ZodValidationPipe)
   @NoCache()
@@ -139,5 +152,11 @@ export class AdminTeamPitchController {
   @NoCache()
   async sendInvite(@Param('pitchUid') pitchUid: string, @Param('participantUid') participantUid: string) {
     return this.teamPitchParticipantsService.sendInvestorInvite(pitchUid, participantUid);
+  }
+
+  @Post(':pitchUid/participants/:participantUid/send-follow-up')
+  @NoCache()
+  async sendFollowUp(@Param('pitchUid') pitchUid: string, @Param('participantUid') participantUid: string) {
+    return this.teamPitchParticipantsService.sendInvestorFollowUp(pitchUid, participantUid);
   }
 }

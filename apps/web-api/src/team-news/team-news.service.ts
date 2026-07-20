@@ -9,7 +9,8 @@ import type {
   TeamNewsForumLinkDto,
 } from 'libs/contracts/src/schema/team-news';
 import { computeCanonicalKey } from './utils/canonical-key';
-import { extractDomain } from './utils/url-normalize';
+import { extractDomain, normalizeSourceUrl } from './utils/url-normalize';
+import { isDuplicateNewsStory } from './utils/news-dedup';
 
 // The directory's own definition of "recent" for the denormalized
 // `TeamNewsEnrichment.recentNewsCount`. Independent of producer policy —
@@ -41,6 +42,8 @@ interface CreatedTeamNews {
   latestTitle: string;
   latestEventDate: Date;
 }
+
+const STORY_MATCH_WINDOW_DAYS = 7;
 
 @Injectable()
 export class TeamNewsService {
@@ -321,9 +324,18 @@ export class TeamNewsService {
   /**
    * Returns true if a new row was inserted, false if an existing row was updated.
    */
-  private async upsertNewsItem(item: TeamNewsIngestItem, eventDate: Date): Promise<boolean> {
-    const canonicalKey = computeCanonicalKey(item.teamUid, item.sourceUrl, eventDate);
+  private async upsertNewsItem(
+    item: TeamNewsIngestItem,
+    eventDate: Date
+  ): Promise<boolean> {
+    const normalizedIncomingUrl = normalizeSourceUrl(item.sourceUrl);
     const sourceDomain = extractDomain(item.sourceUrl);
+
+    const canonicalKey = computeCanonicalKey(
+      item.teamUid,
+      item.sourceUrl,
+      eventDate
+    );
 
     const data: Prisma.TeamNewsItemUncheckedCreateInput = {
       teamUid: item.teamUid,
@@ -333,30 +345,113 @@ export class TeamNewsService {
       title: item.title,
       summary: item.summary ?? null,
       sourceUrl: item.sourceUrl,
+      sourceUrls: [item.sourceUrl],
       sourceDomain,
       tags: item.tags,
-      rawPayload: (item.rawPayload as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+      rawPayload:
+        (item.rawPayload as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     };
 
-    const existing = await this.prisma.teamNewsItem.findUnique({
+    /*
+     * Exact canonical-key match remains the fastest/idempotent path for
+     * replaying the same item.
+     */
+    const exactExisting = await this.prisma.teamNewsItem.findUnique({
       where: { canonicalKey },
-      select: { id: true },
+      select: {
+        id: true,
+        sourceUrl: true,
+        sourceUrls: true,
+        title: true,
+        summary: true,
+        tags: true,
+      },
     });
 
+    /*
+     * Different publishers may report the same event on nearby dates.
+     * This is an event-date window, not a restriction relative to today.
+     */
+    const windowMs =
+      STORY_MATCH_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+    const nearbyItems = exactExisting
+      ? []
+      : await this.prisma.teamNewsItem.findMany({
+        where: {
+          teamUid: item.teamUid,
+          eventDate: {
+            gte: new Date(eventDate.getTime() - windowMs),
+            lte: new Date(eventDate.getTime() + windowMs),
+          },
+        },
+        orderBy: [
+          { eventDate: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        select: {
+          id: true,
+          sourceUrl: true,
+          sourceUrls: true,
+          title: true,
+          summary: true,
+          tags: true,
+        },
+      });
+
+    /*
+     * Check all stored source URLs first. This supports both migrated rows
+     * and rows that have already accumulated multiple sources.
+     */
+    const sameSourceExisting = nearbyItems.find((candidate) => {
+      const urls =
+        candidate.sourceUrls.length > 0
+          ? candidate.sourceUrls
+          : [candidate.sourceUrl];
+
+      return urls.some(
+        (url) =>
+          normalizeSourceUrl(url) === normalizedIncomingUrl
+      );
+    });
+
+    /*
+     * If the source is new, check whether it is another article about the
+     * same story. The shared develop utility remains the single semantic
+     * dedup implementation.
+     */
+    const semanticExisting =
+      sameSourceExisting ??
+      nearbyItems.find((candidate) =>
+        isDuplicateNewsStory(item, candidate)
+      );
+
+    const existing = exactExisting ?? semanticExisting;
+
     if (existing) {
+      const currentUrls =
+        existing.sourceUrls.length > 0
+          ? existing.sourceUrls
+          : [existing.sourceUrl];
+
+      const alreadyStored = currentUrls.some(
+        (url) =>
+          normalizeSourceUrl(url) === normalizedIncomingUrl
+      );
+
+      const sourceUrls = alreadyStored
+        ? currentUrls
+        : [...currentUrls, item.sourceUrl];
+
       await this.prisma.teamNewsItem.update({
-        where: { canonicalKey },
+        where: { id: existing.id },
         data: {
-          eventType: data.eventType,
-          eventDate,
-          title: data.title,
-          summary: data.summary,
-          sourceUrl: data.sourceUrl,
-          sourceDomain: data.sourceDomain,
-          tags: data.tags,
+          sourceUrls,
+          tags: [...new Set([...existing.tags, ...item.tags])],
           rawPayload: data.rawPayload,
         },
       });
+
       return false;
     }
 

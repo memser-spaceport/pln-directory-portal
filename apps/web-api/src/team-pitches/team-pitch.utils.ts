@@ -11,6 +11,18 @@ export function resolveTeamPitchSupportEmail(supportEmail?: string | null): stri
   );
 }
 
+/** From-address for invite/follow-up emails. Falls back to DEMO_DAY_EMAIL (current default). */
+export function resolveTeamPitchSenderEmail(senderEmail?: string | null): string {
+  const trimmed = senderEmail?.trim();
+  if (trimmed) {
+    return trimmed;
+  }
+
+  return (
+    process.env.DEMO_DAY_EMAIL?.trim() || process.env.LABOS_SUPPORT_EMAIL?.trim() || DEFAULT_TEAM_PITCH_SUPPORT_EMAIL
+  );
+}
+
 export function toKebabSlug(value: string): string {
   return value
     .trim()
@@ -36,4 +48,18 @@ export function resolveTeamPitchClosedAt(pitch: {
   }
 
   return (pitch.closedAt ?? pitch.updatedAt).toISOString();
+}
+
+export function asStringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  const result: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof entry === 'string') {
+      result[key] = entry;
+    }
+  }
+  return result;
 }
