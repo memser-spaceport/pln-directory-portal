@@ -111,6 +111,18 @@ export const ResponseTeamPitchInvitesBulkSchema = z.object({
 
 export class ResponseTeamPitchInvitesBulkDto extends createZodDto(ResponseTeamPitchInvitesBulkSchema) {}
 
+export const SendTeamPitchFollowUpsBulkSchema = z.object({
+  /** When false (default), only investors who have never received a follow-up are emailed. */
+  includeAlreadyFollowedUp: z.boolean().optional().default(false),
+  /** When provided, only these participant UIDs are considered. */
+  participantUids: z.array(z.string().min(1)).min(1).optional(),
+});
+
+export class SendTeamPitchFollowUpsBulkDto extends createZodDto(SendTeamPitchFollowUpsBulkSchema) {}
+
+export const ResponseTeamPitchFollowUpsBulkSchema = ResponseTeamPitchInvitesBulkSchema;
+export class ResponseTeamPitchFollowUpsBulkDto extends createZodDto(ResponseTeamPitchFollowUpsBulkSchema) {}
+
 export const RemoveTeamPitchParticipantsBulkSchema = z.object({
   participantUids: z.array(z.string().min(1)).min(1).max(200),
 });
