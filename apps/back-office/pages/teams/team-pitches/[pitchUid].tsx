@@ -730,7 +730,7 @@ const TeamPitchDetailPage = () => {
                   <div className={clsx(s.headerCell, s.fixed)} style={{ width: 220 }}>
                     Access
                   </div>
-                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: activeTab === 'investors' ? 220 : 60 }}>
+                  <div className={clsx(s.headerCell, s.fixed)} style={{ width: activeTab === 'investors' ? 110 : 60 }}>
                     Actions
                   </div>
                 </div>
@@ -921,10 +921,10 @@ const TeamPitchDetailPage = () => {
 
                       <div
                         className={clsx(s.bodyCell, s.fixed)}
-                        style={{ width: activeTab === 'investors' ? 220 : 60 }}
+                        style={{ width: activeTab === 'investors' ? 110 : 60 }}
                       >
                         {canMutateTeamPitches && (
-                          <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1">
                             {activeTab === 'investors' &&
                               (participant.access === 'RESTRICTED' ? (
                                 <span className="text-sm text-gray-400">No Access</span>
@@ -932,7 +932,9 @@ const TeamPitchDetailPage = () => {
                                 <>
                                   <button
                                     type="button"
-                                    className="text-left text-sm font-medium text-blue-600 hover:text-blue-800"
+                                    className="rounded p-1 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+                                    aria-label={participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
+                                    title={participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
                                     onClick={() =>
                                       setPendingInvite({
                                         uid: participant.uid,
@@ -942,11 +944,24 @@ const TeamPitchDetailPage = () => {
                                       })
                                     }
                                   >
-                                    {participant.inviteSentCount > 0 ? 'Resend Invite' : 'Send Invite'}
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                      />
+                                    </svg>
                                   </button>
                                   <button
                                     type="button"
-                                    className="text-left text-sm font-medium text-violet-600 hover:text-violet-800"
+                                    className="rounded p-1 text-violet-600 hover:bg-violet-50 hover:text-violet-800"
+                                    aria-label={
+                                      (participant.followUpSentCount ?? 0) > 0 ? 'Resend Follow-up' : 'Send Follow-up'
+                                    }
+                                    title={
+                                      (participant.followUpSentCount ?? 0) > 0 ? 'Resend Follow-up' : 'Send Follow-up'
+                                    }
                                     onClick={() =>
                                       setPendingFollowUp({
                                         uid: participant.uid,
@@ -956,13 +971,20 @@ const TeamPitchDetailPage = () => {
                                       })
                                     }
                                   >
-                                    {(participant.followUpSentCount ?? 0) > 0 ? 'Resend Follow-up' : 'Send Follow-up'}
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                                      />
+                                    </svg>
                                   </button>
                                 </>
                               ))}
                             <button
                               type="button"
-                              className="w-fit rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-800"
+                              className="rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-800"
                               aria-label="Remove participant"
                               title="Remove participant"
                               onClick={() =>
