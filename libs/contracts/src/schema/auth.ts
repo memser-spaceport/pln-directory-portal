@@ -63,6 +63,10 @@ const AuthLinkIssueReportSchema = z.object({
   email: z.string(),
 });
 
+const RedeemLoginTokenRequestSchema = z.object({
+  token: z.string().min(1),
+});
+
 export class AuthRequestDto extends createZodDto(AuthRequestSchema) {}
 export class SendOtpRequestDto extends createZodDto(SendOtpRequestSchema) {}
 export class ResendOtpRequestDto extends createZodDto(ResendOtpRequestSchema) {}
@@ -70,3 +74,4 @@ export class VerifyOtpRequestDto extends createZodDto(VerifyOtpRequestSchema) {}
 export class TokenRequestDto extends createZodDto(TokenRequestSchema) {}
 export class DeleteUserAccountDto extends createZodDto(DeleteUserAccountSchema) {}
 export class AuthLinkIssueReportDto extends createZodDto(AuthLinkIssueReportSchema) {}
+export class RedeemLoginTokenRequestDto extends createZodDto(RedeemLoginTokenRequestSchema) {}

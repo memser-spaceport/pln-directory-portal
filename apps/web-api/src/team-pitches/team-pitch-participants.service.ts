@@ -6,12 +6,17 @@ import { upsertPolicyAssignmentByCode } from '../demo-days/demo-day-investor-pol
 import { defaultAccessForParticipantType } from './team-pitch.utils';
 import { InvestorBulkProvisionService } from '../investors/investor-bulk-provision.service';
 import { InvestorBulkRowResult, InvestorBulkSummary } from '../investors/investor-bulk.types';
+import { AuthService } from '../auth/auth.service';
+
+const LOGIN_TOKEN_TTL_SECONDS = 604800; // 7 days
+
 @Injectable()
 export class TeamPitchParticipantsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationServiceClient: NotificationServiceClient,
-    private readonly investorBulkProvisionService: InvestorBulkProvisionService
+    private readonly investorBulkProvisionService: InvestorBulkProvisionService,
+    private readonly authService: AuthService
   ) {}
 
   async listParticipants(pitchUid: string, type?: TeamPitchParticipantType) {
@@ -297,9 +302,10 @@ export class TeamPitchParticipantsService {
     }
 
     const webBase = process.env.WEB_UI_BASE_URL || '';
+    const loginToken = await this.authService.issueLoginToken(participant.member.email, LOGIN_TOKEN_TTL_SECONDS);
     const pitchLink = `${webBase}/spotlight/${participant.teamPitch.slug}?prefillEmail=${encodeURIComponent(
       participant.member.email
-    )}`;
+    )}&loginToken=${encodeURIComponent(loginToken)}`;
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
