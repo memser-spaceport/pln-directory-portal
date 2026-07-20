@@ -358,7 +358,7 @@ const TeamPitchDetailPage = () => {
   if (pitchLoading) {
     return (
       <ApprovalLayout>
-        <div className={s.root}>
+        <div className={clsx(s.root, s.wide)}>
           <div className={s.loadingState}>Loading team spotlight details...</div>
         </div>
       </ApprovalLayout>
@@ -368,7 +368,7 @@ const TeamPitchDetailPage = () => {
   if (!pitch) {
     return (
       <ApprovalLayout>
-        <div className={s.root}>
+        <div className={clsx(s.root, s.wide)}>
           <div className={s.emptyState}>
             <div>Team spotlight not found</div>
             <button onClick={() => router.push('/teams/team-pitches')} className={clsx(s.editButton, s.primary)}>
@@ -382,7 +382,7 @@ const TeamPitchDetailPage = () => {
 
   return (
     <ApprovalLayout>
-      <div className={s.root}>
+      <div className={clsx(s.root, s.wide)}>
         <div className={s.backButton}>
           <button onClick={() => router.push('/teams/team-pitches')} className="mb-4 text-blue-600 hover:text-blue-800">
             ← Back to Team Spotlights
@@ -741,12 +741,12 @@ const TeamPitchDetailPage = () => {
                     <div className={clsx(s.headerCell, s.flexible)}>Team</div>
                   )}
                   {activeTab === 'investors' && (
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 200 }}>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 120 }}>
                       Investor Type
                     </div>
                   )}
                   {activeTab === 'investors' && (
-                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 150 }}>
+                    <div className={clsx(s.headerCell, s.fixed)} style={{ width: 90 }}>
                       Invite Accepted
                     </div>
                   )}
@@ -847,7 +847,7 @@ const TeamPitchDetailPage = () => {
                       )}
 
                       {activeTab === 'investors' && (
-                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 200 }}>
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 120 }}>
                           {investorTypeConfig ? (
                             <span
                               className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${investorTypeConfig.bgColor} ${investorTypeConfig.textColor}`}
@@ -863,7 +863,7 @@ const TeamPitchDetailPage = () => {
                       )}
 
                       {activeTab === 'investors' && (
-                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 150 }}>
+                        <div className={clsx(s.bodyCell, s.fixed)} style={{ width: 90 }}>
                           {inviteAccepted ? (
                             <svg
                               className="mx-auto h-5 w-5 text-green-500"
@@ -930,7 +930,7 @@ const TeamPitchDetailPage = () => {
                                 }
                                 title={preview ?? undefined}
                               >
-                                {preview ?? '—'}
+                                {preview ?? 'no data'}
                               </button>
                             );
                           })()}
