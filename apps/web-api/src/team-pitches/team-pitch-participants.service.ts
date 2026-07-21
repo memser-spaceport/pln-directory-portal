@@ -519,6 +519,7 @@ export class TeamPitchParticipantsService {
         from: senderEmail,
         to: [participant.member.email],
         bcc: senderEmail ? [senderEmail] : [],
+        replyTo: 'remi@plrs.xyz',
       },
       deliveryPayload: {
         body: {
