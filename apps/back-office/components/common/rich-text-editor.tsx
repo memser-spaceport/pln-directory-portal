@@ -1,10 +1,10 @@
 'use client';
 
 import React, { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
-import ReactQuill from 'react-quill';
+import ReactQuill from 'react-quill-new';
 import clsx from 'clsx';
 
-import 'react-quill/dist/quill.snow.css';
+import 'react-quill-new/dist/quill.snow.css';
 
 import s from './rich-text-editor.module.scss';
 

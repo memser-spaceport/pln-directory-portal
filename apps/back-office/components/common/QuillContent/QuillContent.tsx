@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import 'react-quill/dist/quill.snow.css';
+import 'react-quill-new/dist/quill.snow.css';
 
 import s from './QuillContent.module.scss';
 

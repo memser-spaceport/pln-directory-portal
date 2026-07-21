@@ -40,7 +40,6 @@
     "schema": "apps/web-api/prisma/schema.prisma"
   },
   "dependencies": {
-    "uuid": "^9.0.0",
     "@abitia/zod-dto": "^0.4.0",
     "@ai-sdk/anthropic": "1.2.12",
     "@ai-sdk/google": "1.2.22",
@@ -165,7 +164,7 @@
     "react-dropzone": "^14.3.8",
     "react-google-recaptcha-v3": "^1.10.1",
     "react-hook-form": "^7.59.0",
-    "react-quill": "^2.0.0",
+    "react-quill-new": "^3.8.3",
     "react-responsive-carousel": "^3.2.23",
     "react-select": "^5.10.1",
     "react-toastify": "^9.1.2",
@@ -182,6 +181,7 @@
     "tailwindcss": "^3.0.23",
     "text-clipper": "^2.2.0",
     "tslib": "^2.0.0",
+    "uuid": "^9.0.0",
     "web3.storage": "4.5.5",
     "winston": "^3.9.0",
     "winston-cloudwatch": "^6.1.1",
