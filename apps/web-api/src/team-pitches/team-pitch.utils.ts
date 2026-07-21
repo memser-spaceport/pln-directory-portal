@@ -23,6 +23,25 @@ export function resolveTeamPitchSenderEmail(senderEmail?: string | null): string
   );
 }
 
+/** Optional trimmed string; blank becomes null. Undefined stays undefined (for partial updates). */
+export function normalizeOptionalTrimmed(value?: string | null): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+/** RFC 5322 From header; includes display name when set (e.g. "Remi Antczak" <remi@plnetwork.io>). */
+export function formatTeamPitchFromHeader(senderEmail: string, displayName?: string | null): string {
+  const email = senderEmail.trim();
+  const name = displayName?.trim();
+  if (!name) {
+    return email;
+  }
+  return `"${name.replace(/"/g, '')}" <${email}>`;
+}
+
 export function toKebabSlug(value: string): string {
   return value
     .trim()

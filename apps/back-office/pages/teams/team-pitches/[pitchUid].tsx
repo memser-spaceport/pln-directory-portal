@@ -165,6 +165,8 @@ const TeamPitchDetailPage = () => {
     status: 'DRAFT',
     supportEmail: '',
     senderEmail: '',
+    senderName: '',
+    replyToEmail: '',
     analyticsReportUrl: '',
   });
 
@@ -187,6 +189,8 @@ const TeamPitchDetailPage = () => {
         status: pitch.status,
         supportEmail: pitch.supportEmail,
         senderEmail: pitch.senderEmail ?? '',
+        senderName: pitch.senderName ?? '',
+        replyToEmail: pitch.replyToEmail ?? '',
         analyticsReportUrl: pitch.analyticsReportUrl ?? '',
       });
     }
@@ -339,6 +343,8 @@ const TeamPitchDetailPage = () => {
           ...editFormData,
           supportEmail: editFormData.supportEmail.trim() || null,
           senderEmail: editFormData.senderEmail.trim() || null,
+          senderName: editFormData.senderName.trim() || null,
+          replyToEmail: editFormData.replyToEmail.trim() || null,
           spotlightStatement: editFormData.spotlightStatement.trim() || null,
           analyticsReportUrl: editFormData.analyticsReportUrl.trim() || null,
         },
@@ -434,6 +440,8 @@ const TeamPitchDetailPage = () => {
                           status: pitch.status,
                           supportEmail: pitch.supportEmail,
                           senderEmail: pitch.senderEmail ?? '',
+                          senderName: pitch.senderName ?? '',
+                          replyToEmail: pitch.replyToEmail ?? '',
                           analyticsReportUrl: pitch.analyticsReportUrl ?? '',
                         });
                       }}
@@ -521,6 +529,34 @@ const TeamPitchDetailPage = () => {
                   />
                 ) : (
                   <div className={s.fieldValue}>{pitch.senderEmail || 'System default'}</div>
+                )}
+              </div>
+              <div className={s.overviewField}>
+                <label className={s.fieldLabel}>Sender Name</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editFormData.senderName}
+                    onChange={(e) => handleEditFormChange('senderName', e.target.value)}
+                    className={s.fieldInput}
+                    placeholder="e.g. Remi Antczak"
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{pitch.senderName || '—'}</div>
+                )}
+              </div>
+              <div className={s.overviewField}>
+                <label className={s.fieldLabel}>Reply-To Email</label>
+                {isEditing ? (
+                  <input
+                    type="email"
+                    value={editFormData.replyToEmail}
+                    onChange={(e) => handleEditFormChange('replyToEmail', e.target.value)}
+                    className={s.fieldInput}
+                    placeholder="Optional reply-to address"
+                  />
+                ) : (
+                  <div className={s.fieldValue}>{pitch.replyToEmail || '—'}</div>
                 )}
               </div>
               <div className={clsx(s.overviewField, s.fullWidth)}>

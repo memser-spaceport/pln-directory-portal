@@ -3,7 +3,12 @@ import { MemberApprovalState, Prisma, Team, TeamPitchParticipantType } from '@pr
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { upsertPolicyAssignmentByCode } from '../demo-days/demo-day-investor-policy.util';
-import { defaultAccessForParticipantType, asStringRecord, resolveTeamPitchSenderEmail } from './team-pitch.utils';
+import {
+  defaultAccessForParticipantType,
+  asStringRecord,
+  resolveTeamPitchSenderEmail,
+  formatTeamPitchFromHeader,
+} from './team-pitch.utils';
 import { InvestorBulkProvisionService } from '../investors/investor-bulk-provision.service';
 import { InvestorBulkRowResult, InvestorBulkSummary } from '../investors/investor-bulk.types';
 import { AuthService } from '../auth/auth.service';
@@ -320,15 +325,17 @@ export class TeamPitchParticipantsService {
       participant.member.email
     )}&loginToken=${encodeURIComponent(loginToken)}`;
     const senderEmail = resolveTeamPitchSenderEmail(participant.teamPitch.senderEmail);
+    const replyTo = participant.teamPitch.replyToEmail?.trim() || undefined;
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
       deliveryChannel: 'EMAIL',
       templateName: 'TEAM_PITCH_INVESTOR_INVITE_EMAIL',
       recipientsInfo: {
-        from: senderEmail,
+        from: formatTeamPitchFromHeader(senderEmail, participant.teamPitch.senderName),
         to: [participant.member.email],
         bcc: senderEmail ? [senderEmail] : [],
+        ...(replyTo ? { replyTo } : {}),
       },
       deliveryPayload: {
         body: {
@@ -507,6 +514,7 @@ export class TeamPitchParticipantsService {
       participant.member.email
     )}&loginToken=${encodeURIComponent(loginToken)}`;
     const senderEmail = resolveTeamPitchSenderEmail(participant.teamPitch.senderEmail);
+    const replyTo = participant.teamPitch.replyToEmail?.trim() || undefined;
     const trimmedName = (participant.member.name || '').trim();
     const firstName =
       trimmedName.split(/\s+/).filter(Boolean)[0] || (participant.member.email || '').split('@')[0] || 'there';
@@ -516,9 +524,10 @@ export class TeamPitchParticipantsService {
       deliveryChannel: 'EMAIL',
       templateName: 'TEAM_PITCH_INVESTOR_FOLLOWUP_EMAIL',
       recipientsInfo: {
-        from: senderEmail,
+        from: formatTeamPitchFromHeader(senderEmail, participant.teamPitch.senderName),
         to: [participant.member.email],
         bcc: senderEmail ? [senderEmail] : [],
+        ...(replyTo ? { replyTo } : {}),
       },
       deliveryPayload: {
         body: {
