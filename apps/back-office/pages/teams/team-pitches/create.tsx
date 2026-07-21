@@ -31,6 +31,8 @@ const CreateTeamPitchPage = () => {
     status: 'DRAFT',
     supportEmail: '',
     senderEmail: '',
+    senderName: '',
+    replyToEmail: '',
   });
 
   useEffect(() => {
@@ -87,6 +89,8 @@ const CreateTeamPitchPage = () => {
           ...form,
           supportEmail: form.supportEmail.trim() || null,
           senderEmail: form.senderEmail.trim() || null,
+          senderName: form.senderName.trim() || null,
+          replyToEmail: form.replyToEmail.trim() || null,
         },
       });
       router.push(`/teams/team-pitches/${created.uid}`);
@@ -282,6 +286,35 @@ const CreateTeamPitchPage = () => {
                 placeholder="Leave blank to use system default"
               />
               <p className="mt-1 text-xs text-gray-500">From address used for investor invite and follow-up emails.</p>
+            </div>
+
+            <div>
+              <label htmlFor="senderName" className="mb-2 block text-sm font-medium text-gray-700">
+                Sender Name
+              </label>
+              <input
+                type="text"
+                id="senderName"
+                value={form.senderName}
+                onChange={(e) => setForm((f) => ({ ...f, senderName: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. Remi Antczak"
+              />
+              <p className="mt-1 text-xs text-gray-500">Display name shown in the inbox From field.</p>
+            </div>
+
+            <div>
+              <label htmlFor="replyToEmail" className="mb-2 block text-sm font-medium text-gray-700">
+                Reply-To Email
+              </label>
+              <input
+                type="email"
+                id="replyToEmail"
+                value={form.replyToEmail}
+                onChange={(e) => setForm((f) => ({ ...f, replyToEmail: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Optional reply-to address"
+              />
             </div>
 
             <div className="flex justify-end space-x-4">

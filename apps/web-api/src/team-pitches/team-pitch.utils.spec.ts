@@ -3,6 +3,8 @@ import {
   resolveTeamPitchSupportEmail,
   resolveTeamPitchSenderEmail,
   resolveTeamPitchClosedAt,
+  formatTeamPitchFromHeader,
+  normalizeOptionalTrimmed,
 } from './team-pitch.utils';
 
 describe('resolveTeamPitchSupportEmail', () => {
@@ -130,5 +132,33 @@ describe('resolveTeamPitchClosedAt', () => {
         updatedAt,
       })
     ).toBe(updatedAt.toISOString());
+  });
+});
+
+describe('formatTeamPitchFromHeader', () => {
+  it('returns bare email when display name is missing', () => {
+    expect(formatTeamPitchFromHeader('remi@plnetwork.io')).toBe('remi@plnetwork.io');
+    expect(formatTeamPitchFromHeader('remi@plnetwork.io', null)).toBe('remi@plnetwork.io');
+    expect(formatTeamPitchFromHeader('remi@plnetwork.io', '  ')).toBe('remi@plnetwork.io');
+  });
+
+  it('formats display name with email', () => {
+    expect(formatTeamPitchFromHeader('remi@plnetwork.io', 'Remi Antczak')).toBe('"Remi Antczak" <remi@plnetwork.io>');
+  });
+});
+
+describe('normalizeOptionalTrimmed', () => {
+  it('returns undefined when input is undefined', () => {
+    expect(normalizeOptionalTrimmed(undefined)).toBeUndefined();
+  });
+
+  it('returns null for blank values', () => {
+    expect(normalizeOptionalTrimmed(null)).toBeNull();
+    expect(normalizeOptionalTrimmed('')).toBeNull();
+    expect(normalizeOptionalTrimmed('  ')).toBeNull();
+  });
+
+  it('trims non-empty values', () => {
+    expect(normalizeOptionalTrimmed('  Remi Antczak  ')).toBe('Remi Antczak');
   });
 });
