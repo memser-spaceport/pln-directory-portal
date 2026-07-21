@@ -100,7 +100,7 @@ export class AuthService implements OnModuleInit {
    * Issues a short-lived login JWT from auth-service for an existing Directory member.
    * Fails if no member exists for the email.
    */
-  async issueLoginToken(email: string, expiresIn = 604800): Promise<string> {
+  async issueLoginToken(email: string, expiresIn = 864000): Promise<string> {
     const normalizedEmail = email.trim().toLowerCase();
     const member = await this.membersService.findMemberByEmail(normalizedEmail);
     if (!member || member.deletedAt) {
@@ -145,10 +145,16 @@ export class AuthService implements OnModuleInit {
     }
 
     const { id_token, access_token, refresh_token } = authTokens;
-    return this.mapAuthTokensToMemberSession(id_token, access_token, refresh_token);
+    return this.mapAuthTokensToMemberSession(id_token, access_token, refresh_token, { isAutoLogin: true });
   }
 
-  private async mapAuthTokensToMemberSession(id_token: string, access_token: string, refresh_token: string) {
+  private async mapAuthTokensToMemberSession(
+    id_token: string,
+    access_token: string,
+    refresh_token: string,
+    opts: { isAutoLogin?: boolean } = {}
+  ) {
+    const { isAutoLogin = false } = opts;
     const decoded: any = await this.decodeAuthIdToken(id_token);
 
     const email: string | null = decoded?.email ?? null;
@@ -188,7 +194,7 @@ export class AuthService implements OnModuleInit {
         const approvedUser = await this.checkApproveOnLoginMember(foundUser);
         const upgradedUser = await this.checkAndUpgradeDemoDayParticipant(approvedUser);
 
-        await this.trackLoginEvent(upgradedUser);
+        await this.trackLoginEvent(upgradedUser, { isAutoLogin });
 
         return {
           userInfo: this.memberToUserInfo(upgradedUser),
@@ -240,7 +246,7 @@ export class AuthService implements OnModuleInit {
 
         const approvedUser = await this.checkApproveOnLoginMember(foundUser);
         const upgradedUser = await this.checkAndUpgradeDemoDayParticipant(approvedUser);
-        await this.trackLoginEvent(upgradedUser);
+        await this.trackLoginEvent(upgradedUser, { isAutoLogin });
 
         return {
           userInfo: this.memberToUserInfo(upgradedUser),
@@ -378,7 +384,7 @@ export class AuthService implements OnModuleInit {
    * Track login event
    * @param foundUser
    */
-  private async trackLoginEvent(foundUser) {
+  private async trackLoginEvent(foundUser, opts: { isAutoLogin?: boolean } = {}) {
     return await this.analyticsService.trackEvent({
       name: foundUser.externalId ? ANALYTICS_EVENTS.AUTH.USER_LOGIN : ANALYTICS_EVENTS.AUTH.USER_FIRST_LOGIN,
       distinctId: foundUser.uid,
@@ -386,6 +392,7 @@ export class AuthService implements OnModuleInit {
         uid: foundUser.uid,
         email: foundUser.email,
         name: foundUser.name,
+        isAutoLogin: opts.isAutoLogin ?? false,
       },
     });
   }
