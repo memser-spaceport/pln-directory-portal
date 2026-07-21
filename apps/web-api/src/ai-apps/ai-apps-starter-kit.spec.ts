@@ -23,6 +23,7 @@ describe('AiAppsStarterKitService buildZip', () => {
       'AGENTS.md',
       '.claude/skills/deploy-to-labs/SKILL.md',
       '.claude/skills/app-metadata/SKILL.md',
+      '.claude/skills/app-logs/SKILL.md',
       '.claude/skills/pl-design-system/SKILL.md',
       '.claude/skills/pln-member-context/SKILL.md',
       'pln-app.config.json',
@@ -126,6 +127,29 @@ describe('AiAppsStarterKitService buildZip', () => {
     for (const path of ['CLAUDE.md', 'AGENTS.md']) {
       expect(entries.get(path) as string).toContain('NOT re-run the propose-and-approve flow');
     }
+  });
+
+  it('writes the log endpoint templates into the config and teaches the logs flow', () => {
+    const config = JSON.parse(entries.get('pln-app.config.json') as string);
+    expect(config.buildLogsEndpoint).toContain('/v1/ai-apps/{appUid}/logs/build');
+    expect(config.runtimeLogsEndpoint).toContain('/v1/ai-apps/{appUid}/logs/runtime');
+
+    const logsSkill = entries.get('.claude/skills/app-logs/SKILL.md') as string;
+    expect(logsSkill).toContain('buildLogsEndpoint');
+    expect(logsSkill).toContain('runtimeLogsEndpoint');
+    expect(logsSkill).toContain('sinceMinutes');
+    // CloudWatch quirk: an empty events page with a nextToken is NOT "no logs".
+    expect(logsSkill).toContain('nextToken');
+    expect(logsSkill).toContain('empty first page does NOT mean there are no logs');
+    // The URL-privacy rule extends to quoted log lines.
+    expect(logsSkill).toContain("don't surface the URL");
+
+    // The agent instructions and the deploy skill's failure paths point at it.
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).toContain('app-logs');
+    }
+    const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    expect(deploySkill).toContain('app-logs');
   });
 
   it('documents the response shape and signed-out handling in the skill', () => {

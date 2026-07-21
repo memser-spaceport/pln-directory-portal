@@ -18,6 +18,7 @@ import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import {
+  AiAppLogPhase,
   AI_APPS_DEPLOY_STUCK_MINUTES,
   AI_APPS_DEPLOY_STUCK_MS,
   AI_APPS_HELM_LOCK_RETRIES,
@@ -38,6 +39,7 @@ import {
   buildPrdPublicUrl,
   buildPrdS3Key,
   buildRunnerDeploymentsUrl,
+  buildRunnerLogsUrl,
   buildRunnerSecretsUrl,
 } from './ai-apps.constants';
 
@@ -309,6 +311,48 @@ export class AiAppsService {
       return { live: !!res.status && res.status !== 404 && !GATEWAY_TIMEOUT_STATUSES.includes(res.status) };
     } catch {
       return { live: false };
+    }
+  }
+
+  /**
+   * CloudWatch logs for one app + phase, proxied verbatim from the sandbox
+   * runner (`GET /v1/apps/<appId>/<phase>/logs`) so the runner token stays
+   * server-side. Called by the connected member's agent (deploy-token auth) to
+   * debug failed builds and runtime errors — owner-only, like the agent
+   * metadata route. The response envelope (`events`, `nextToken`, `logGroup`,
+   * …) is the runner's own; CloudWatch may return an empty `events` page WITH
+   * a `nextToken`, so pagination is the caller's job.
+   */
+  async getAgentLogs(
+    requesterUid: string,
+    uid: string,
+    phase: AiAppLogPhase,
+    query: { limit?: number; sinceMinutes?: number; nextToken?: string }
+  ): Promise<unknown> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (app.memberUid !== requesterUid) {
+      throw new ForbiddenException('The agent may read logs only for apps owned by its connected member');
+    }
+
+    const params: Record<string, string | number> = {};
+    if (query.limit !== undefined) params.limit = query.limit;
+    if (query.sinceMinutes !== undefined) params.sinceMinutes = query.sinceMinutes;
+    if (query.nextToken !== undefined) params.nextToken = query.nextToken;
+
+    try {
+      const response = await axios.get(buildRunnerLogsUrl(app.appId, phase), {
+        headers: { 'x-runner-token': AI_APPS_RUNNER_TOKEN },
+        params,
+        timeout: 30000,
+      });
+      this.logger.log(`Runner ${phase}-logs response for ${app.appId}: status=${response.status}`);
+      return response.data;
+    } catch (error) {
+      this.logRunnerError(`${phase}-logs`, app.appId, error);
+      throw new BadGatewayException(`Failed to fetch ${phase} logs from the sandbox runner`);
     }
   }
 
