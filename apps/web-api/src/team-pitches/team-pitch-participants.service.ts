@@ -8,7 +8,7 @@ import { InvestorBulkProvisionService } from '../investors/investor-bulk-provisi
 import { InvestorBulkRowResult, InvestorBulkSummary } from '../investors/investor-bulk.types';
 import { AuthService } from '../auth/auth.service';
 
-const LOGIN_TOKEN_TTL_SECONDS = 604800; // 7 days
+const LOGIN_TOKEN_TTL_SECONDS = 864000; // 10 days
 
 @Injectable()
 export class TeamPitchParticipantsService {
@@ -507,6 +507,9 @@ export class TeamPitchParticipantsService {
       participant.member.email
     )}&loginToken=${encodeURIComponent(loginToken)}`;
     const senderEmail = resolveTeamPitchSenderEmail(participant.teamPitch.senderEmail);
+    const trimmedName = (participant.member.name || '').trim();
+    const firstName =
+      trimmedName.split(/\s+/).filter(Boolean)[0] || (participant.member.email || '').split('@')[0] || 'there';
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
@@ -520,7 +523,8 @@ export class TeamPitchParticipantsService {
       deliveryPayload: {
         body: {
           ...asStringRecord(participant.emailTemplateVariables),
-          investorName: participant.member.name || '',
+          firstName,
+          investorName: trimmedName || firstName,
           investorEmail: participant.member.email,
           pitchTitle: participant.teamPitch.title,
           pitchSlug: participant.teamPitch.slug,
