@@ -5,6 +5,7 @@ import { join } from 'path';
 import {
   AI_APP_TOKEN_HEADER,
   AI_APPS_APP_DOMAIN,
+  AI_APPS_APP_SETTINGS_ENDPOINT,
   AI_APPS_CONNECT_ENDPOINT,
   AI_APPS_DEPLOY_ENDPOINT,
   AI_APPS_DRAFT_ENDPOINT,
@@ -149,8 +150,10 @@ for you:
 3. When it's time to deploy, your agent registers the app as a **draft** and gives
    you a LabOS link. Open it, enter your key(s) in the form there, and click
    **Deploy** — that page is the only place your secrets should ever go.
-4. Updating a key later? Open your app's page in LabOS (PL Infra → AI Apps → your
-   app), click **Update secrets & redeploy**, enter the new value, and Deploy.
+4. Updating a key later? On the PL Infra → AI Apps dashboard, open the **⋯ menu**
+   on your app's card (it's also on the app's own page) and choose **Deployment
+   settings** — click **Replace** on the value you want to change, enter the new
+   one, and click **Redeploy**.
 
 Secrets never go into the code, the chat, or the uploaded ZIP — they are stored
 securely on the sandbox and injected into your app when it runs.
@@ -314,8 +317,12 @@ The flow (full steps in the deploy skill):
 4. To ship a code update later, register the draft again (same \`appId\`, fresh
    \`deploymentId\`) — already-stored secret values stay valid; the member just
    clicks Deploy again in LabOS.
-5. To change a key later, the member doesn't need you at all: on the app's LabOS
-   page they click **Update secrets & redeploy**, enter the new value, and Deploy.
+5. To change a key later, the member doesn't need you at all: on the PL Infra →
+   AI Apps dashboard they open the **⋯ menu** on the app's card and choose
+   **Deployment settings**, click **Replace** on the value, enter the new one,
+   and click **Redeploy**. If they ask you for a direct link, build it from
+   \`appSettingsUrl\` in \`pln-app.config.json\` (replace \`{appUid}\` with the saved
+   \`appUid\`) — it opens that modal for them.
 
 Never ask the member for secret values in the chat, and never write them to any
 file — LabOS is the only place they should be entered.
@@ -926,7 +933,10 @@ on the AI Apps dashboard.
   \`deploymentId\`, updated \`requiredEnvVars\` if they changed) and send the member
   back to \`appPageUrl\` to click Deploy. Stored secret values remain valid.
 - The member can also update secret values and redeploy entirely from LabOS —
-  no agent involvement needed.
+  no agent involvement needed: on the AI Apps dashboard they open the **⋯ menu**
+  on the app's card and choose **Deployment settings**. If they want a direct
+  link, hand them \`appSettingsUrl\` from \`pln-app.config.json\` with \`{appUid}\`
+  replaced by the saved \`appUid\` — it opens that modal straight away.
 
 ## Keep the deployment URL private
 This rule covers ONLY the deployed app's own address — the URL/host/port on
@@ -980,6 +990,7 @@ verification steps. Only re-deploy if it stays unreachable.
         deployEndpoint: AI_APPS_DEPLOY_ENDPOINT,
         draftEndpoint: AI_APPS_DRAFT_ENDPOINT,
         metadataEndpoint: AI_APPS_METADATA_ENDPOINT,
+        appSettingsUrl: AI_APPS_APP_SETTINGS_ENDPOINT,
         memberContextEndpoint: AI_APPS_ME_ENDPOINT,
         deployTokenHeader: AI_APP_TOKEN_HEADER,
         kitVersion: AI_APPS_STARTER_KIT_VERSION,
@@ -988,7 +999,7 @@ verification steps. Only re-deploy if it stays unreachable.
         appName: '',
         appDescription: '',
         notes:
-          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription hold the member-APPROVED display metadata (see .claude/skills/app-metadata) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint is a template where {appUid} is replaced with it. If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill).',
+          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription hold the member-APPROVED display metadata (see .claude/skills/app-metadata) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill).',
       },
       null,
       2
