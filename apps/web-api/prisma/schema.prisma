@@ -1403,6 +1403,8 @@ model TeamPitch {
   closedAt           DateTime?
   supportEmail       String
   senderEmail        String?
+  senderName         String?
+  replyToEmail       String?
   headerImageUid     String?
   headerImage        Image?                     @relation("TeamPitchHeaderImage", fields: [headerImageUid], references: [uid])
   logoUid            String?

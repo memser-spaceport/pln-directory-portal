@@ -6,6 +6,7 @@ import {
   resolveTeamPitchSupportEmail,
   resolveTeamPitchSenderEmail,
   resolveTeamPitchClosedAt,
+  normalizeOptionalTrimmed,
   toKebabSlug,
 } from './team-pitch.utils';
 
@@ -137,6 +138,8 @@ export class TeamPitchesService {
       spotlightStatement: pitch.spotlightStatement,
       supportEmail: pitch.supportEmail,
       senderEmail: pitch.senderEmail,
+      senderName: pitch.senderName,
+      replyToEmail: pitch.replyToEmail,
       logoUrl: pitch.logo?.url ?? null,
       primaryColor: pitch.primaryColor,
       headerImageUrl: pitch.headerImage?.url ?? null,
@@ -211,6 +214,8 @@ export class TeamPitchesService {
       status: p.status,
       supportEmail: p.supportEmail,
       senderEmail: p.senderEmail,
+      senderName: p.senderName,
+      replyToEmail: p.replyToEmail,
       primaryColor: p.primaryColor,
       createdAt: p.createdAt.toISOString(),
       team: p.team,
@@ -226,6 +231,8 @@ export class TeamPitchesService {
     status?: TeamPitchStatus;
     supportEmail?: string | null;
     senderEmail?: string | null;
+    senderName?: string | null;
+    replyToEmail?: string | null;
     headerImageUid?: string | null;
     logoUid?: string | null;
     primaryColor?: string | null;
@@ -245,6 +252,8 @@ export class TeamPitchesService {
 
     const supportEmail = resolveTeamPitchSupportEmail(data.supportEmail);
     const senderEmail = resolveTeamPitchSenderEmail(data.senderEmail);
+    const senderName = normalizeOptionalTrimmed(data.senderName) ?? null;
+    const replyToEmail = normalizeOptionalTrimmed(data.replyToEmail) ?? null;
 
     const pitch = await this.prisma.teamPitch.create({
       data: {
@@ -256,6 +265,8 @@ export class TeamPitchesService {
         closedAt: data.status === TeamPitchStatus.CLOSED ? new Date() : undefined,
         supportEmail,
         senderEmail,
+        senderName,
+        replyToEmail,
         headerImageUid: data.headerImageUid ?? undefined,
         logoUid: data.logoUid ?? undefined,
         primaryColor: data.primaryColor ?? '#1a45e6',
@@ -317,6 +328,8 @@ export class TeamPitchesService {
       status?: TeamPitchStatus;
       supportEmail?: string | null;
       senderEmail?: string | null;
+      senderName?: string | null;
+      replyToEmail?: string | null;
       headerImageUid?: string | null;
       logoUid?: string | null;
       primaryColor?: string | null;
@@ -337,6 +350,8 @@ export class TeamPitchesService {
       data.supportEmail !== undefined ? resolveTeamPitchSupportEmail(data.supportEmail) : undefined;
     const resolvedSenderEmail =
       data.senderEmail !== undefined ? resolveTeamPitchSenderEmail(data.senderEmail) : undefined;
+    const resolvedSenderName = normalizeOptionalTrimmed(data.senderName);
+    const resolvedReplyToEmail = normalizeOptionalTrimmed(data.replyToEmail);
 
     let closedAt: Date | null | undefined;
     if (data.status !== undefined) {
@@ -371,6 +386,8 @@ export class TeamPitchesService {
           closedAt,
           supportEmail: resolvedSupportEmail,
           senderEmail: resolvedSenderEmail,
+          senderName: resolvedSenderName,
+          replyToEmail: resolvedReplyToEmail,
           headerImageUid: pitchData.headerImageUid,
           logoUid: pitchData.logoUid,
           primaryColor: pitchData.primaryColor ?? '#1a45e6',
