@@ -96,6 +96,8 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | PATCH  | `/v1/ai-apps/:uid`               | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Edit display metadata (`name`/`description`/`prd`) without redeploying; JSON **or** multipart (`file` = Markdown/HTML PRD, stored in S3) |
 | POST   | `/v1/ai-apps/:uid/prd`           | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | File-only PRD upload from the LabOS dashboard (multipart `file`, `.md`/`.html`) — no redeploy |
 | PATCH  | `/v1/ai-apps/:uid/agent`         | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Agent metadata edit: JSON `{ name?, description?, prd? }`; how the starter kit saves approved names/descriptions and one-pager PRDs |
+| GET    | `/v1/ai-apps/:uid/logs/build`    | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Build logs (Docker/Kaniko image build, latest successful build deployment), proxied from the runner's CloudWatch endpoint; `?limit=`, `?sinceMinutes=`, `?nextToken=` |
+| GET    | `/v1/ai-apps/:uid/logs/runtime`  | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Runtime logs (running app pod stdout/stderr, latest successful runtime deployment), same query params |
 | POST   | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Submit free-text feedback on an app (multiple entries per member allowed) |
 | GET    | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | All feedback for one app, newest first, with submitter info |
 | GET    | `/v1/ai-apps/starter-kit/download` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Stream the starter-kit ZIP (no token inside) |
@@ -223,6 +225,46 @@ The kit's `app-metadata` skill drives a propose → confirm → save workflow so
 2. **After the first successful deploy**: the agent asks once whether the member wants a one-pager PRD. If declined, nothing happens; if wanted, it synthesizes a concise Markdown one-page brief from the conversation (problem, solution, features, how to use, goals/OKR, success metrics, out of scope — see the kit's `app-metadata` skill), gets approval, and saves it via `PATCH …/:uid/agent` — no new ZIP, no redeploy. Dashboard uploads may still be `.md` or `.html`.
 3. **Redeploys**: the saved `appName`/`appDescription` are resent verbatim and the propose flow is **not** re-run (it would otherwise revert approved metadata, since deploys overwrite it).
 4. **Metadata changes on an existing app** (rename, description edit, PRD add/update/remove): same propose → confirm → save flow through the metadata endpoint, using the `appUid` the kit saved from the deploy/draft response (`metadataEndpoint` in the config is a template with a `{appUid}` placeholder). A metadata-only session still gets its short-lived token through the normal connect flow.
+
+## Build & runtime logs (agent debugging)
+
+The deployment orchestrator (sandbox runner) keeps two CloudWatch-backed log
+streams per app, and the backend proxies them to the connected member's agent
+so it can debug failed deploys and runtime errors itself:
+
+- **Build logs** — `GET /v1/ai-apps/:uid/logs/build` → runner
+  `GET /v1/apps/<appId>/build/logs`: output of the image build (Kaniko / build
+  preparation), taken from the **latest successful build deployment**.
+- **Runtime logs** — `GET /v1/ai-apps/:uid/logs/runtime` → runner
+  `GET /v1/apps/<appId>/runtime/logs`: stdout + stderr of the running app pod
+  (plus the auth-check/auth-proxy sidecars), taken from the **latest successful
+  runtime deployment**.
+
+Auth is the short-lived deploy token (`AiAppTokenGuard`, `x-app-token`), and —
+like the agent metadata route — the app must be **owned by the connected
+member** (403 otherwise; 404 for unknown/`DELETED` apps). The runner token
+stays server-side; the runner's response envelope is returned verbatim:
+
+```bash
+curl -sS "https://api.plnetwork.io/v1/ai-apps/<uid>/logs/runtime?limit=100&sinceMinutes=60" \
+  -H "x-app-token: plndeploy_…"
+# → { "appId", "deploymentId", "phase", "source": "cloudwatch", "logGroup",
+#     "events": [{ "timestamp", "message" }, …], "nextToken" }
+```
+
+Query params (all optional, validated as positive integers where numeric):
+`limit` (events per page), `sinceMinutes` (look-back window, e.g. 60 / 1440 /
+10080), `nextToken` (CloudWatch pagination cursor). **CloudWatch may return an
+empty `events` page that still carries a `nextToken`** — clients must follow
+the cursor a few pages before concluding a window has no logs (the kit's
+`app-logs` skill teaches the agent this). Availability is bounded by the
+CloudWatch retention policy of the environment's log group (pre-prod
+`/eks/preprod-pods`, prod `/eks/prod-pln/workloads`). Log reads are not
+audited (no `AiAppEvent`).
+
+The starter kit (≥1.5) ships `buildLogsEndpoint` / `runtimeLogsEndpoint` as
+`{appUid}` templates in `pln-app.config.json` plus the `app-logs` skill; the
+deploy skill points at it from its `ERROR`-status and timeout paths.
 
 ## Member context (signed-in user → deployed app)
 
@@ -368,9 +410,10 @@ README.md                                      human quick-start
 CLAUDE.md / AGENTS.md                          agent build + deploy instructions
 .claude/skills/deploy-to-labs/SKILL.md         deploy skill (incl. connect flow)
 .claude/skills/app-metadata/SKILL.md           propose → approve name/description + optional one-pager PRD (kits ≥1.5)
+.claude/skills/app-logs/SKILL.md               fetch build/runtime logs to debug failed deploys + runtime errors (kits ≥1.5)
 .claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
 .claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
-pln-app.config.json                            connect/deploy/draft/metadata/member-context endpoints
+pln-app.config.json                            connect/deploy/draft/metadata/logs/member-context endpoints
                                                (+ appId, appUid, approved appName/appDescription) — NO token
 pl-design-system/                              curated PL Design System (files, not a nested zip)
 styles/pln-theme.css                           minimal CSS-variable fallback (plain-HTML apps)
@@ -378,7 +421,7 @@ styles/FONTS.md                                Inter font guidance
 app/                                           minimal runnable Node/Express scaffold
 ```
 
-The kit deliberately exposes **no internal PLN APIs** — only the connect, deploy, draft, metadata, and member-context endpoints — and **no token**.
+The kit deliberately exposes **no internal PLN APIs** — only the connect, deploy, draft, metadata, logs, and member-context endpoints — and **no token**.
 
 ### Bundled PL Design System
 
@@ -420,7 +463,7 @@ The agent loads `.claude/skills/pl-design-system` for UI work and follows
 | `AI_APPS_S3_BUCKET` | _(empty)_ | **Required** for real deploys; bucket the runner reads app bundles from (e.g. `sandbox-apps-pln-dev-013228333448`) |
 | `AI_APPS_APP_DOMAIN` | `prod.plnetwork.io` | Base domain deployed apps are served under (app URL = `https://<appId>.<domain>`); set `dev.plnetwork.io` on Dev, `prod.plnetwork.io` on Prod |
 | `AI_APPS_BASE_URL` | `https://api.plnetwork.io` | Public base URL of this API; the agent-facing endpoint URLs written into the kit (deploy/connect/draft/member context) are derived from it as `<base>/v1/ai-apps/<endpoint>` |
-| `AI_APPS_DEPLOY_ENDPOINT` / `AI_APPS_CONNECT_ENDPOINT` / `AI_APPS_DRAFT_ENDPOINT` / `AI_APPS_ME_ENDPOINT` / `AI_APPS_METADATA_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional per-endpoint overrides; rarely needed. The metadata endpoint is a template with a literal `{appUid}` placeholder the agent substitutes |
+| `AI_APPS_DEPLOY_ENDPOINT` / `AI_APPS_CONNECT_ENDPOINT` / `AI_APPS_DRAFT_ENDPOINT` / `AI_APPS_ME_ENDPOINT` / `AI_APPS_METADATA_ENDPOINT` / `AI_APPS_BUILD_LOGS_ENDPOINT` / `AI_APPS_RUNTIME_LOGS_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional per-endpoint overrides; rarely needed. The metadata and logs endpoints are templates with a literal `{appUid}` placeholder the agent substitutes |
 | `AI_APPS_PRD_S3_BUCKET` | _`AI_APPS_S3_BUCKET`_ | Bucket for uploaded PRD files (`ai-app-prds/<appId>/<uuid>.<ext>`); defaults to the app-bundle bucket so no extra IAM is needed |
 | `AI_APPS_PRD_PUBLIC_BASE_URL` | _(empty)_ | Optional CDN/public base URL used when turning a stored PRD key into the URL returned in `prd`; falls back to the standard S3 URL |
 | `AI_APPS_PORTAL_URL` | `https://directory.plnetwork.io` | Base URL of the LabOS portal hosting the connect/approval page (used to build `connectUrl` and `appPageUrl`) |

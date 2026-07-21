@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.4';
+export const AI_APPS_STARTER_KIT_VERSION = '1.5';
 
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
@@ -124,6 +124,19 @@ export const buildRunnerSecretsUrl = (): string =>
 export const buildRunnerDeploymentsUrl = (): string =>
   `${AI_APPS_RUNNER_URL}/v1/projects/${AI_APPS_RUNNER_PROJECT}/deployments`;
 
+/** Log phases the runner serves from CloudWatch: the image build (Kaniko) vs the running app pod. */
+export type AiAppLogPhase = 'build' | 'runtime';
+
+/**
+ * Runner endpoint serving an app's CloudWatch logs for one phase
+ * (`GET /v1/apps/<appId>/build/logs` or `…/runtime/logs`). Build logs come from
+ * the latest successful build deployment, runtime logs from the latest
+ * successful runtime deployment; availability is bounded by the CloudWatch
+ * retention policy of the environment's log group.
+ */
+export const buildRunnerLogsUrl = (appId: string, phase: AiAppLogPhase): string =>
+  `${AI_APPS_RUNNER_URL}/v1/apps/${encodeURIComponent(appId)}/${phase}/logs`;
+
 /** Build the S3 key for an app bundle: apps/<appId>/<deploymentId>/app.zip */
 export const buildAppS3Key = (appId: string, deploymentId: string): string => `apps/${appId}/${deploymentId}/app.zip`;
 
@@ -179,6 +192,17 @@ export const AI_APPS_METADATA_ENDPOINT =
   process.env.AI_APPS_METADATA_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent`;
 
 /**
+ * Public URL TEMPLATES of THIS API's agent log endpoints
+ * (`GET /v1/ai-apps/:uid/logs/build` and `…/logs/runtime`), written into the
+ * starter kit. The agent replaces the literal `{appUid}` placeholder with the
+ * app's `uid` (saved as `appUid` in `pln-app.config.json`).
+ */
+export const AI_APPS_BUILD_LOGS_ENDPOINT =
+  process.env.AI_APPS_BUILD_LOGS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/logs/build`;
+export const AI_APPS_RUNTIME_LOGS_ENDPOINT =
+  process.env.AI_APPS_RUNTIME_LOGS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/logs/runtime`;
+
+/**
  * Base URL of the LabOS portal that hosts the connect page the member opens to
  * approve a session. Combined with the session uid to build the connect link.
  */
@@ -201,8 +225,7 @@ export const buildAppPageUrl = (appUid: string): string =>
  * update-secrets-and-redeploy modal directly on the app page. Shared with the
  * member when they want to change a stored secret (or redeploy) later.
  */
-export const buildAppSettingsUrl = (appUid: string): string =>
-  `${buildAppPageUrl(appUid)}?settings=deployment`;
+export const buildAppSettingsUrl = (appUid: string): string => `${buildAppPageUrl(appUid)}?settings=deployment`;
 
 /**
  * Public URL TEMPLATE of the LabOS "Deployment settings" deep link, written
