@@ -62,7 +62,20 @@ describe('warm-intros-v2-enrich.util', () => {
         sectors: ['crypto', 'public-goods'],
         affinityPersonId: '149762491',
         memberUid: null,
+        imageUrl: null,
       });
+    });
+
+    it('passes through imageUrl when set', () => {
+      const summary = toInvestorSummary('inv1', {
+        uid: 'inv1',
+        personKey: 'k',
+        canonicalName: 'Jane',
+        memberUid: 'm1',
+        imageUrl: 'https://cdn.example/jane.png',
+      });
+      expect(summary.imageUrl).toBe('https://cdn.example/jane.png');
+      expect(summary.memberUid).toBe('m1');
     });
   });
 

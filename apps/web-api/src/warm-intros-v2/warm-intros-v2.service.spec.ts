@@ -18,6 +18,7 @@ describe('WarmIntrosV2Service', () => {
   const pathCount = jest.fn();
 
   const masterProfileFindMany = jest.fn();
+  const memberFindMany = jest.fn();
 
   const transaction = jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn({
@@ -43,6 +44,9 @@ describe('WarmIntrosV2Service', () => {
     },
     masterProfile: {
       findMany: masterProfileFindMany,
+    },
+    member: {
+      findMany: memberFindMany,
     },
   } as unknown as PrismaService;
 
@@ -98,6 +102,7 @@ describe('WarmIntrosV2Service', () => {
     jest.clearAllMocks();
     service = new WarmIntrosV2Service(prismaMock);
     masterProfileFindMany.mockResolvedValue([investorProfile, connectorProfile]);
+    memberFindMany.mockResolvedValue([]);
     pathCount.mockResolvedValue(1);
   });
 
@@ -462,35 +467,48 @@ describe('WarmIntrosV2Service', () => {
   });
 
   describe('listFacets', () => {
-    it('aggregates connectors and sectors', async () => {
+    it('lists all pl_internal connectors (not only best) + sectors', async () => {
       pathFindMany.mockResolvedValue([
         { targetProfileUid: 'inv1', bestConnectorProfileUid: 'from1' },
         { targetProfileUid: 'inv2', bestConnectorProfileUid: 'from1' },
       ]);
-      masterProfileFindMany.mockResolvedValue([
-        investorProfile,
-        connectorProfile,
-        {
-          uid: 'inv2',
-          personKey: 'k2',
-          canonicalName: 'Alice',
-          emails: [],
-          investorMeta: { sectors: ['crypto', 'ai'] },
-          currentOrg: null,
-          currentTitle: null,
-          affinityPersonId: null,
-          memberUid: null,
-        },
-      ]);
+      // 1st call: pl_internal roster; 2nd: investor profiles for sectors
+      masterProfileFindMany
+        .mockResolvedValueOnce([
+          { uid: 'from1', canonicalName: 'Juan Benet' },
+          { uid: 'from2', canonicalName: 'Lacey Wisdom' },
+          { uid: 'from3', canonicalName: 'Marc Johnson' },
+        ])
+        .mockResolvedValueOnce([
+          investorProfile,
+          {
+            uid: 'inv2',
+            personKey: 'k2',
+            canonicalName: 'Alice',
+            emails: [],
+            investorMeta: { sectors: ['crypto', 'ai'] },
+            currentOrg: null,
+            currentTitle: null,
+            affinityPersonId: null,
+            memberUid: null,
+          },
+        ]);
 
       const result = await service.listFacets({ targetSet: 'neuro-fund-i' });
-      expect(result.connectors).toEqual([{ profileUid: 'from1', name: 'Juan Benet', pathCount: 2 }]);
+      expect(result.connectors).toEqual([
+        { profileUid: 'from1', name: 'Juan Benet', pathCount: 2 },
+        { profileUid: 'from2', name: 'Lacey Wisdom', pathCount: 0 },
+        { profileUid: 'from3', name: 'Marc Johnson', pathCount: 0 },
+      ]);
       expect(result.sectors).toEqual(
         expect.arrayContaining([
           { value: 'crypto', count: 2 },
           { value: 'public-goods', count: 1 },
           { value: 'ai', count: 1 },
         ])
+      );
+      expect(masterProfileFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { types: { has: 'pl_internal' } } })
       );
     });
   });
