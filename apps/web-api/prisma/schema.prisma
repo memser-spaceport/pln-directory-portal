@@ -2705,6 +2705,82 @@ model MasterProfile {
   @@index([investorOutreachId])
 }
 
+/// Warm Intros v2 connection edge; iteration 1 = `pl_direct`.
+/// Profile uids are plain strings (no FKs) so ingest order is unconstrained — same as MasterProfile.
+model ConnectionEdge {
+  uid String @id @default(cuid())
+
+  /// PL connector MasterProfile.uid.
+  fromProfileUid String
+  /// Investor MasterProfile.uid.
+  toProfileUid   String
+  /// e.g. `pl_direct` (iteration 1).
+  relationKind   String @db.VarChar(32)
+
+  /// 0..1 edge strength.
+  score      Float
+  /// 0..1 model/hint confidence.
+  confidence Float
+  /// `llm` | `hybrid`.
+  method     String @db.VarChar(16)
+
+  /// Array of { description, sourceType, sourceLink? }.
+  reasons   Json
+  /// Affinity + sharedEntities snapshot used for the pairing call.
+  hintsUsed Json?
+
+  provider      String? @db.VarChar(32)
+  model         String? @db.VarChar(64)
+  promptVersion String? @db.VarChar(64)
+  runId         String? @db.VarChar(64)
+  /// Hash of pairing inputs for this edge.
+  contentHash   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fromProfileUid, toProfileUid, relationKind])
+  @@index([toProfileUid])
+  @@index([fromProfileUid])
+  @@index([runId])
+  @@index([relationKind])
+}
+
+/// Materialized warm path for API/UI; derived from ConnectionEdges.
+/// Profile uids are plain strings (no FKs) so ingest order is unconstrained.
+model WarmPathV2 {
+  uid String @id @default(cuid())
+
+  /// Investor MasterProfile.uid.
+  targetProfileUid String
+  /// e.g. `neuro-fund-i` | `gold-co-investors`.
+  targetSet        String @db.VarChar(120)
+
+  /// 1 = best.
+  rank     Int
+  score    Float
+  /// `1` in iteration 1.
+  hopCount Int
+  /// Nodes + reasons + summaries.
+  hopChain Json
+
+  bestConnectorProfileUid       String?
+  /// string[] of alternate connector MasterProfile.uids.
+  alternateConnectorProfileUids Json?
+
+  runId      String?  @db.VarChar(64)
+  computedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([targetProfileUid, targetSet, rank])
+  @@index([targetProfileUid])
+  @@index([targetSet])
+  @@index([targetProfileUid, rank])
+  @@index([runId])
+}
+
 /// Investor Lists — a curated target set of investors (a "list"). Proximity is computed per list
 /// (PathfinderPath.targetSet == an InvestorList.targetSet). The 5,000+ InvestorOutreachRecord DB is the
 /// universe; lists are curated subsets. v1: "Neuro Fund I LP Pipeline" (graphed) + "Gold PLC Co-Investors".
