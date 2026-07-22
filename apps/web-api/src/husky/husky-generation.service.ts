@@ -5,14 +5,13 @@ import { openai } from '@ai-sdk/openai';
 import * as countries from 'i18n-iso-countries';
 
 import {
-  HUSKY_AUTO_BIO_SYSTEM_PROMPT,
   HUSKY_SKILLS_GENERATION_SYSTEM_PROMPT,
-  HUSKY_AUTO_BIO_DATABASE_ONLY_PROMPT,
   HUSKY_RECOMMENDATION_REASON_SYSTEM_PROMPT,
   HUSKY_BIO_DISCLAIMER,
 } from '../utils/ai-prompts';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberWithRelations, RecommendationFactors } from '../recommendations/recommendations.engine';
+import { generateMemberBioText, resolveMemberPronouns } from './member-bio.util';
 
 @Injectable()
 export class HuskyGenerationService {
@@ -51,58 +50,15 @@ export class HuskyGenerationService {
       throw new NotFoundException('Member not found');
     }
 
-    // Check if we have enough identifying information to safely use web search
-    const hasEnoughIdentifyingInfo = this.hasEnoughIdentifyingInfo(member);
+    // Free signals only (stored profile data / CRM) — no paid lookups. When
+    // nothing conclusive is found the prompt forbids guessing and falls back
+    // to first name + they/them.
+    const pronouns = await resolveMemberPronouns(this.prisma, member);
+    this.logger.info(
+      `Pronouns for member ${memberEmail}: ${pronouns ? `${pronouns.pronouns} (${pronouns.source})` : 'unknown'}`
+    );
 
-    const prompt = `
-      Profile:
-      - Name: ${member.name}
-      - Email: ${member.email || ''}
-      - GitHub: ${member.githubHandler || ''}
-      - LinkedIn: ${member.linkedinHandler || ''}
-      - Twitter: ${member.twitterHandler || ''}
-      - Discord: ${member.discordHandler || ''}
-      - Telegram: ${member.telegramHandler || ''}
-      - Location: ${member.location ? `${member.location.city || ''}, ${member.location.country || ''}` : ''}
-      - Skills: ${member.skills?.map((skill) => skill.title).join(', ') || ''}
-      - Team Roles: ${member.teamMemberRoles
-        .map((role) => `${role.role} at ${role.team.name}${role.teamLead ? ' (Team Lead)' : ''}`)
-        .join(', ')}
-      - Project Contributions: ${member.projectContributions
-        .map(
-          (contribution) =>
-            `${contribution.role || 'Contributor'} for ${contribution.project?.name || 'Unknown Project'}`
-        )
-        .join(', ')}
-      - Professional Experience: ${member.experiences
-        .map(
-          (exp) =>
-            `${exp.title} at ${exp.company}${exp.location ? ` in ${exp.location}` : ''} (${exp.startDate} - ${
-              exp.endDate || 'Present'
-            })`
-        )
-        .join('\n')}
-      - Additional Details: ${member.moreDetails || ''}
-      - LinkedIn Details: ${member.linkedInDetails ? JSON.stringify(member.linkedInDetails) : ''}
-    `;
-
-    const generateTextOptions: any = {
-      model: openai.responses(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
-      prompt,
-      temperature: 0.7,
-    };
-
-    if (hasEnoughIdentifyingInfo) {
-      // Use web search with strict verification
-      generateTextOptions.system = HUSKY_AUTO_BIO_SYSTEM_PROMPT;
-      generateTextOptions.tools = this.buildUserLocation(member);
-      generateTextOptions.toolChoice = { type: 'tool', toolName: 'web_search_preview' };
-    } else {
-      // Use database-only prompt without web search
-      generateTextOptions.system = HUSKY_AUTO_BIO_DATABASE_ONLY_PROMPT;
-    }
-
-    const { text: bio } = await generateText(generateTextOptions);
+    const bio = await generateMemberBioText(member, { pronouns });
 
     // Append AI disclaimer to the bio
     const bioWithDisclaimer = `${bio}${HUSKY_BIO_DISCLAIMER}`;

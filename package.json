@@ -24,6 +24,7 @@
     "api:seed-pathfinder-neuro": "ts-node --transpile-only apps/web-api/src/scripts/seed-pathfinder-neuro.ts",
     "api:seed-pathfinder-gold": "ts-node --transpile-only apps/web-api/src/scripts/seed-pathfinder-gold.ts",
     "api:backfill-investor-additional-emails": "ts-node apps/web-api/src/scripts/backfill-investor-additional-emails.ts",
+    "api:refresh-ai-member-bios": "ts-node --transpile-only apps/web-api/src/scripts/refresh-ai-member-bios.ts",
     "api:export-spotlight-investor-login-links": "ts-node apps/web-api/src/scripts/export-spotlight-investor-login-links.ts",
     "api:set-spotlight-sector-hooks": "ts-node apps/web-api/src/scripts/set-spotlight-sector-hooks.ts",
     "check:local": "npx nx workspace-lint && npx nx format:check && npx nx affected --target=lint && npx nx affected --target=test --ci --code-coverage && npx nx affected --target=build",
