@@ -75,6 +75,7 @@ import { FollowsModule } from './follows/follows.module';
 import { InvestorOutreachModule } from './investor-outreach/investor-outreach.module';
 import { PathfinderModule } from './pathfinder/pathfinder.module';
 import { MasterProfileModule } from './master-profile/master-profile.module';
+import { WarmIntrosV2Module } from './warm-intros-v2/warm-intros-v2.module';
 import { InvestorListsModule } from './investor-lists/investor-lists.module';
 import { FounderSourcingModule } from './founder-sourcing/founder-sourcing.module';
 import { AffinityModule } from './affinity/affinity.module';
@@ -175,6 +176,7 @@ import { AiAppsModule } from './ai-apps/ai-apps.module';
     InvestorOutreachModule,
     PathfinderModule,
     MasterProfileModule,
+    WarmIntrosV2Module,
     InvestorListsModule,
     FounderSourcingModule,
     AffinityModule,
