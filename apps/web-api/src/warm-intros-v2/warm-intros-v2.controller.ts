@@ -9,6 +9,7 @@ import { ADMIN_PERMISSIONS } from '../access-control-v2/access-control-v2.consta
 import {
   GetWarmPathsByInvestorQueryDto,
   ListConnectionEdgesQueryDto,
+  ListWarmIntrosV2FacetsQueryDto,
   ListWarmPathsV2QueryDto,
 } from './dto/ingest-warm-intros-v2.dto';
 import { WarmIntrosV2Service } from './warm-intros-v2.service';
@@ -32,6 +33,14 @@ export class WarmIntrosV2Controller {
   @RequirePermissions(VIEW_PERMS)
   async listPaths(@Query() query: ListWarmPathsV2QueryDto) {
     return this.warmIntrosV2Service.listPaths(query);
+  }
+
+  /** Must be registered before `paths/:investorProfileUid`. */
+  @NoCache()
+  @Get('facets')
+  @RequirePermissions(VIEW_PERMS)
+  async listFacets(@Query() query: ListWarmIntrosV2FacetsQueryDto) {
+    return this.warmIntrosV2Service.listFacets(query);
   }
 
   @NoCache()

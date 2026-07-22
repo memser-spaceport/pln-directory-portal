@@ -70,9 +70,20 @@ export class ListWarmPathsV2QueryDto {
   rank?: string;
   limit?: string;
   offset?: string;
+  /** Case-insensitive match on investor name or email (alias of `search`). */
+  q?: string;
+  /** Case-insensitive match on investor name or email (alias of `q`). */
+  search?: string;
+  /** Case-insensitive: investor sectors contains this value. */
+  sector?: string;
 }
 
 export class GetWarmPathsByInvestorQueryDto {
+  targetSet?: string;
+}
+
+export class ListWarmIntrosV2FacetsQueryDto {
+  /** Optional; when set, facets scoped to this targetSet. */
   targetSet?: string;
 }
 

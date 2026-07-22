@@ -8,15 +8,43 @@ import {
   IngestWarmIntrosV2Response,
   IngestWarmPathsV2Dto,
   ListConnectionEdgesQueryDto,
+  ListWarmIntrosV2FacetsQueryDto,
   ListWarmPathsV2QueryDto,
   WarmPathV2Input,
 } from './dto/ingest-warm-intros-v2.dto';
+import {
+  buildPathSummary,
+  enrichHopChainNames,
+  matchesSearch,
+  matchesSector,
+  MasterProfileEnrichRow,
+  parseInvestorSectors,
+  toConnectorSummary,
+  toInvestorSummary,
+} from './warm-intros-v2-enrich.util';
+import { computeWarmPathProximity } from './warm-intros-v2-proximity.util';
+
+type WarmPathRow = {
+  uid: string;
+  targetProfileUid: string;
+  targetSet: string;
+  rank: number;
+  score: number;
+  hopCount: number;
+  hopChain: unknown;
+  bestConnectorProfileUid: string | null;
+  alternateConnectorProfileUids: unknown;
+  runId: string | null;
+  computedAt: Date;
+};
 
 /**
  * ConnectionEdge + WarmPathV2 write + read. Ingest upserts by unique keys; no pairing logic.
  *
  * Edge upsert: (fromProfileUid, toProfileUid, relationKind)
  * Path upsert: (targetProfileUid, targetSet, rank) — pure upsert, no deletes.
+ *
+ * Read APIs denormalize MasterProfile + compute proximityCode/caliber/scorePercent for FE.
  */
 @Injectable()
 export class WarmIntrosV2Service {
@@ -214,6 +242,9 @@ export class WarmIntrosV2Service {
 
     const limit = Math.min(Math.max(parseInt(query.limit ?? '50', 10) || 50, 1), 200);
     const offset = Math.max(parseInt(query.offset ?? '0', 10) || 0, 0);
+    const search = (query.search ?? query.q)?.trim() || null;
+    const sector = query.sector?.trim() || null;
+    const needsPostFilter = Boolean(search || sector);
 
     const where: Prisma.WarmPathV2WhereInput = { rank };
     if (targetSet) where.targetSet = targetSet;
@@ -225,13 +256,28 @@ export class WarmIntrosV2Service {
       ];
     }
 
-    const paths = await this.prisma.warmPathV2.findMany({
+    // Search/sector need MasterProfile join — load candidates then filter (v2 scale ~1–2k).
+    const paths = (await this.prisma.warmPathV2.findMany({
       where,
-      take: limit,
-      skip: offset,
+      ...(needsPostFilter ? {} : { take: limit, skip: offset }),
       orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
-    });
-    return { paths };
+    })) as WarmPathRow[];
+
+    const profilesByUid = await this.loadProfilesForPaths(paths);
+    let enriched = paths.map((p) => this.enrichPath(p, profilesByUid, false));
+
+    if (search) {
+      enriched = enriched.filter((row) => matchesSearch(row.investor, search));
+    }
+    if (sector) {
+      enriched = enriched.filter((row) => matchesSector(row.investor, sector));
+    }
+
+    const total = needsPostFilter ? enriched.length : await this.prisma.warmPathV2.count({ where });
+
+    const page = needsPostFilter ? enriched.slice(offset, offset + limit) : enriched;
+
+    return { paths: page, total };
   }
 
   async getPathsByInvestor(investorProfileUid: string, query: GetWarmPathsByInvestorQueryDto) {
@@ -243,11 +289,79 @@ export class WarmIntrosV2Service {
     const where: Prisma.WarmPathV2WhereInput = { targetProfileUid: uid };
     if (targetSet) where.targetSet = targetSet;
 
-    const paths = await this.prisma.warmPathV2.findMany({
+    const paths = (await this.prisma.warmPathV2.findMany({
       where,
       orderBy: [{ targetSet: 'asc' }, { rank: 'asc' }],
-    });
-    return { paths };
+    })) as WarmPathRow[];
+
+    const profilesByUid = await this.loadProfilesForPaths(paths);
+    const enriched = paths.map((p) => this.enrichPath(p, profilesByUid, true));
+
+    return {
+      paths: enriched,
+      investor: toInvestorSummary(uid, profilesByUid.get(uid)),
+    };
+  }
+
+  /**
+   * Facets for FE filters: distinct best connectors + investor sectors for rank=1 paths.
+   */
+  async listFacets(query: ListWarmIntrosV2FacetsQueryDto) {
+    const targetSet = query.targetSet?.trim() || null;
+    const where: Prisma.WarmPathV2WhereInput = { rank: 1 };
+    if (targetSet) where.targetSet = targetSet;
+
+    const paths = (await this.prisma.warmPathV2.findMany({
+      where,
+      select: {
+        targetProfileUid: true,
+        bestConnectorProfileUid: true,
+      },
+    })) as Array<{ targetProfileUid: string; bestConnectorProfileUid: string | null }>;
+
+    const uids = new Set<string>();
+    for (const p of paths) {
+      uids.add(p.targetProfileUid);
+      if (p.bestConnectorProfileUid) uids.add(p.bestConnectorProfileUid);
+    }
+    const profilesByUid = await this.loadProfilesByUids([...uids]);
+
+    const connectorCounts = new Map<string, number>();
+    for (const p of paths) {
+      const cid = p.bestConnectorProfileUid;
+      if (!cid) continue;
+      connectorCounts.set(cid, (connectorCounts.get(cid) ?? 0) + 1);
+    }
+
+    const connectors = [...connectorCounts.entries()]
+      .map(([profileUid, pathCount]) => {
+        const profile = profilesByUid.get(profileUid);
+        return {
+          profileUid,
+          name: profile?.canonicalName || profileUid,
+          pathCount,
+        };
+      })
+      .sort((a, b) => b.pathCount - a.pathCount || a.name.localeCompare(b.name));
+
+    const sectorCounts = new Map<string, { value: string; count: number }>();
+    for (const p of paths) {
+      const investor = profilesByUid.get(p.targetProfileUid);
+      const sectors = parseInvestorSectors(investor?.investorMeta);
+      const seen = new Set<string>();
+      for (const s of sectors) {
+        const key = s.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const existing = sectorCounts.get(key);
+        if (existing) existing.count += 1;
+        else sectorCounts.set(key, { value: s, count: 1 });
+      }
+    }
+
+    const sectors = [...sectorCounts.values()].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+
+    return { connectors, sectors };
   }
 
   async listEdges(query: ListConnectionEdgesQueryDto) {
@@ -267,6 +381,86 @@ export class WarmIntrosV2Service {
       orderBy: { updatedAt: 'desc' },
     });
     return { edges };
+  }
+
+  private enrichPath(path: WarmPathRow, profilesByUid: Map<string, MasterProfileEnrichRow>, enrichHopNames: boolean) {
+    const proximity = computeWarmPathProximity({
+      score: path.score,
+      hopCount: path.hopCount,
+      hopChain: path.hopChain,
+    });
+
+    const hopChain = enrichHopNames ? enrichHopChainNames(path.hopChain, profilesByUid) : path.hopChain;
+
+    return {
+      uid: path.uid,
+      targetProfileUid: path.targetProfileUid,
+      targetSet: path.targetSet,
+      rank: path.rank,
+      score: path.score,
+      hopCount: path.hopCount,
+      hopChain,
+      bestConnectorProfileUid: path.bestConnectorProfileUid,
+      alternateConnectorProfileUids: path.alternateConnectorProfileUids,
+      runId: path.runId,
+      computedAt: path.computedAt,
+      proximityCode: proximity.proximityCode,
+      caliber: proximity.caliber,
+      scorePercent: proximity.scorePercent,
+      scoreBand: proximity.scoreBand,
+      investor: toInvestorSummary(path.targetProfileUid, profilesByUid.get(path.targetProfileUid)),
+      bestConnector: toConnectorSummary(
+        path.bestConnectorProfileUid,
+        path.bestConnectorProfileUid ? profilesByUid.get(path.bestConnectorProfileUid) : undefined
+      ),
+      pathSummary: buildPathSummary(path.hopChain, path.alternateConnectorProfileUids),
+    };
+  }
+
+  private async loadProfilesForPaths(paths: WarmPathRow[]): Promise<Map<string, MasterProfileEnrichRow>> {
+    const uids = new Set<string>();
+    for (const p of paths) {
+      uids.add(p.targetProfileUid);
+      if (p.bestConnectorProfileUid) uids.add(p.bestConnectorProfileUid);
+      // hopChain hop uids (optional enrich)
+      const chain = p.hopChain;
+      if (chain && typeof chain === 'object' && !Array.isArray(chain)) {
+        const hops = (chain as Record<string, unknown>).hops;
+        if (Array.isArray(hops)) {
+          for (const hop of hops) {
+            if (hop && typeof hop === 'object' && typeof (hop as Record<string, unknown>).profileUid === 'string') {
+              uids.add(String((hop as Record<string, unknown>).profileUid));
+            }
+          }
+        }
+      }
+    }
+    return this.loadProfilesByUids([...uids]);
+  }
+
+  private async loadProfilesByUids(uids: string[]): Promise<Map<string, MasterProfileEnrichRow>> {
+    const map = new Map<string, MasterProfileEnrichRow>();
+    if (uids.length === 0) return map;
+
+    const rows = await this.prisma.masterProfile.findMany({
+      where: { uid: { in: uids } },
+      select: {
+        uid: true,
+        personKey: true,
+        canonicalName: true,
+        emails: true,
+        currentOrg: true,
+        currentTitle: true,
+        investorMeta: true,
+        affinityPersonId: true,
+        memberUid: true,
+      },
+    });
+
+    for (const row of rows) {
+      map.set(row.uid, row as MasterProfileEnrichRow);
+    }
+    return map;
   }
 
   private toEdgeUpsertData(
