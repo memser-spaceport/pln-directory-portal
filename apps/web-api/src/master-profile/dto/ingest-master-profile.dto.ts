@@ -57,4 +57,12 @@ export class ListMasterProfilesQueryDto {
   /** Filter profiles whose `types` array contains this value. */
   type?: string;
   limit?: string;
+  /** Pagination offset for type / all list queries. */
+  offset?: string;
+}
+
+/** Service batch lookup body: POST /v1/service/master-profiles/lookup */
+export interface LookupMasterProfilesDto {
+  personKeys?: string[];
+  affinityPersonIds?: string[];
 }

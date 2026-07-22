@@ -5,6 +5,7 @@ import {
   IngestMasterProfileDto,
   IngestMasterProfileResponse,
   ListMasterProfilesQueryDto,
+  LookupMasterProfilesDto,
   MasterProfileInput,
 } from './dto/ingest-master-profile.dto';
 
@@ -117,14 +118,46 @@ export class MasterProfileService {
       return { profile };
     }
 
-    const limit = Math.min(Math.max(parseInt(query.limit ?? '20', 10) || 20, 1), 100);
+    const limit = Math.min(Math.max(parseInt(query.limit ?? '20', 10) || 20, 1), 500);
+    const offset = Math.max(parseInt(query.offset ?? '0', 10) || 0, 0);
     const where: Prisma.MasterProfileWhereInput = {};
     if (type) where.types = { has: type };
 
     const profiles = await this.prisma.masterProfile.findMany({
       where,
       take: limit,
-      orderBy: { updatedAt: 'desc' },
+      skip: offset,
+      orderBy: [{ personKey: 'asc' }],
+    });
+    return { profiles, limit, offset };
+  }
+
+  /**
+   * Batch lookup by personKeys and/or affinityPersonIds (service pairing jobs).
+   * Returns all matches; missing keys are omitted (no 404).
+   */
+  async lookupBatch(dto: LookupMasterProfilesDto) {
+    const personKeys = Array.isArray(dto.personKeys)
+      ? [...new Set(dto.personKeys.map((k) => String(k ?? '').trim()).filter(Boolean))]
+      : [];
+    const affinityPersonIds = Array.isArray(dto.affinityPersonIds)
+      ? [...new Set(dto.affinityPersonIds.map((k) => String(k ?? '').trim()).filter(Boolean))]
+      : [];
+
+    if (personKeys.length === 0 && affinityPersonIds.length === 0) {
+      throw new BadRequestException('personKeys or affinityPersonIds is required');
+    }
+    if (personKeys.length + affinityPersonIds.length > 500) {
+      throw new BadRequestException('lookup batch too large (max 500 ids total)');
+    }
+
+    const or: Prisma.MasterProfileWhereInput[] = [];
+    if (personKeys.length) or.push({ personKey: { in: personKeys } });
+    if (affinityPersonIds.length) or.push({ affinityPersonId: { in: affinityPersonIds } });
+
+    const profiles = await this.prisma.masterProfile.findMany({
+      where: { OR: or },
+      orderBy: { personKey: 'asc' },
     });
     return { profiles };
   }

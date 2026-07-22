@@ -101,15 +101,33 @@ describe('MasterProfileService', () => {
       });
     });
 
-    it('lists by type with limit', async () => {
+    it('lists by type with limit and offset', async () => {
       findMany.mockResolvedValue([{ uid: 'u1' }]);
-      await expect(service.lookup({ type: 'pl_internal', limit: '5' })).resolves.toEqual({
+      await expect(service.lookup({ type: 'pl_internal', limit: '5', offset: '10' })).resolves.toEqual({
         profiles: [{ uid: 'u1' }],
+        limit: 5,
+        offset: 10,
       });
       expect(findMany).toHaveBeenCalledWith({
         where: { types: { has: 'pl_internal' } },
         take: 5,
-        orderBy: { updatedAt: 'desc' },
+        skip: 10,
+        orderBy: [{ personKey: 'asc' }],
+      });
+    });
+  });
+
+  describe('lookupBatch', () => {
+    it('finds by personKeys / affinityPersonIds', async () => {
+      findMany.mockResolvedValue([{ uid: 'u1', personKey: 'k1' }]);
+      await expect(service.lookupBatch({ personKeys: ['k1'], affinityPersonIds: ['99'] })).resolves.toEqual({
+        profiles: [{ uid: 'u1', personKey: 'k1' }],
+      });
+      expect(findMany).toHaveBeenCalledWith({
+        where: {
+          OR: [{ personKey: { in: ['k1'] } }, { affinityPersonId: { in: ['99'] } }],
+        },
+        orderBy: { personKey: 'asc' },
       });
     });
   });
