@@ -304,7 +304,11 @@ export class WarmIntrosV2Service {
   }
 
   /**
-   * Facets for FE filters: distinct best connectors + investor sectors for rank=1 paths.
+   * Facets for FE filters:
+   * - connectors: ALL MasterProfiles with type `pl_internal` (so the PL member
+   *   dropdown always lists the full roster, not only people who are currently
+   *   someone’s best connector), with pathCount = how often they are best on rank=1.
+   * - sectors: aggregated from investors on rank=1 paths.
    */
   async listFacets(query: ListWarmIntrosV2FacetsQueryDto) {
     const targetSet = query.targetSet?.trim() || null;
@@ -319,13 +323,6 @@ export class WarmIntrosV2Service {
       },
     })) as Array<{ targetProfileUid: string; bestConnectorProfileUid: string | null }>;
 
-    const uids = new Set<string>();
-    for (const p of paths) {
-      uids.add(p.targetProfileUid);
-      if (p.bestConnectorProfileUid) uids.add(p.bestConnectorProfileUid);
-    }
-    const profilesByUid = await this.loadProfilesByUids([...uids]);
-
     const connectorCounts = new Map<string, number>();
     for (const p of paths) {
       const cid = p.bestConnectorProfileUid;
@@ -333,16 +330,22 @@ export class WarmIntrosV2Service {
       connectorCounts.set(cid, (connectorCounts.get(cid) ?? 0) + 1);
     }
 
-    const connectors = [...connectorCounts.entries()]
-      .map(([profileUid, pathCount]) => {
-        const profile = profilesByUid.get(profileUid);
-        return {
-          profileUid,
-          name: profile?.canonicalName || profileUid,
-          pathCount,
-        };
-      })
+    const plConnectors = await this.prisma.masterProfile.findMany({
+      where: { types: { has: 'pl_internal' } },
+      select: { uid: true, canonicalName: true },
+      orderBy: { canonicalName: 'asc' },
+    });
+
+    const connectors = plConnectors
+      .map((c) => ({
+        profileUid: c.uid,
+        name: c.canonicalName || c.uid,
+        pathCount: connectorCounts.get(c.uid) ?? 0,
+      }))
       .sort((a, b) => b.pathCount - a.pathCount || a.name.localeCompare(b.name));
+
+    const investorUids = [...new Set(paths.map((p) => p.targetProfileUid))];
+    const profilesByUid = await this.loadProfilesByUids(investorUids);
 
     const sectorCounts = new Map<string, { value: string; count: number }>();
     for (const p of paths) {
@@ -458,9 +461,37 @@ export class WarmIntrosV2Service {
     });
 
     for (const row of rows) {
-      map.set(row.uid, row as MasterProfileEnrichRow);
+      map.set(row.uid, { ...(row as MasterProfileEnrichRow), imageUrl: null });
     }
+
+    await this.attachMemberImageUrls(map);
     return map;
+  }
+
+  /** Resolve Directory Member.image.url onto profiles that have memberUid. */
+  private async attachMemberImageUrls(map: Map<string, MasterProfileEnrichRow>): Promise<void> {
+    const memberUids = [
+      ...new Set(
+        [...map.values()]
+          .map((p) => p.memberUid?.trim())
+          .filter((uid): uid is string => !!uid)
+      ),
+    ];
+    if (memberUids.length === 0) return;
+
+    const members = await this.prisma.member.findMany({
+      where: { uid: { in: memberUids } },
+      select: { uid: true, image: { select: { url: true } } },
+    });
+    const urlByMemberUid = new Map<string, string | null>();
+    for (const m of members) {
+      urlByMemberUid.set(m.uid, m.image?.url ?? null);
+    }
+    for (const profile of map.values()) {
+      const memberUid = profile.memberUid?.trim();
+      if (!memberUid) continue;
+      profile.imageUrl = urlByMemberUid.get(memberUid) ?? null;
+    }
   }
 
   private toEdgeUpsertData(

@@ -13,6 +13,8 @@ export type EnrichedInvestorSummary = {
   sectors: string[];
   affinityPersonId: string | null;
   memberUid: string | null;
+  /** Directory Member image URL when memberUid is linked. */
+  imageUrl: string | null;
 };
 
 export type EnrichedConnectorSummary = {
@@ -21,6 +23,8 @@ export type EnrichedConnectorSummary = {
   name: string;
   currentOrg: string | null;
   currentTitle: string | null;
+  memberUid: string | null;
+  imageUrl: string | null;
 };
 
 export type PathSummary = {
@@ -39,6 +43,8 @@ export type MasterProfileEnrichRow = {
   investorMeta?: unknown;
   affinityPersonId?: string | null;
   memberUid?: string | null;
+  /** Filled by service when Member.image is resolved. */
+  imageUrl?: string | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -112,6 +118,7 @@ export function toInvestorSummary(
       sectors: [],
       affinityPersonId: null,
       memberUid: null,
+      imageUrl: null,
     };
   }
   return {
@@ -124,6 +131,7 @@ export function toInvestorSummary(
     sectors: parseInvestorSectors(profile.investorMeta),
     affinityPersonId: profile.affinityPersonId ?? null,
     memberUid: profile.memberUid ?? null,
+    imageUrl: profile.imageUrl ?? null,
   };
 }
 
@@ -139,6 +147,8 @@ export function toConnectorSummary(
       name: profileUid,
       currentOrg: null,
       currentTitle: null,
+      memberUid: null,
+      imageUrl: null,
     };
   }
   return {
@@ -147,6 +157,8 @@ export function toConnectorSummary(
     name: profile.canonicalName || profileUid,
     currentOrg: profile.currentOrg ?? null,
     currentTitle: profile.currentTitle ?? null,
+    memberUid: profile.memberUid ?? null,
+    imageUrl: profile.imageUrl ?? null,
   };
 }
 
