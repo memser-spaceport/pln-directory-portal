@@ -1,5 +1,6 @@
 import {
   buildPathSummary,
+  enrichHopChainNames,
   matchesSearch,
   matchesSector,
   parseInvestorSectors,
@@ -92,6 +93,57 @@ describe('warm-intros-v2-enrich.util', () => {
       ).toEqual({
         explanation: 'Shared Protocol Labs history',
         alternateCount: 2,
+      });
+    });
+  });
+
+  describe('enrichHopChainNames', () => {
+    it('fills name, memberUid, and imageUrl on hops and alternates', () => {
+      const profiles = new Map([
+        [
+          'juan',
+          {
+            uid: 'juan',
+            personKey: 'k1',
+            canonicalName: 'Juan Benet',
+            memberUid: 'm-juan',
+            imageUrl: 'https://cdn.example/juan.png',
+          },
+        ],
+        [
+          'brad',
+          {
+            uid: 'brad',
+            personKey: 'k2',
+            canonicalName: 'Brad Holden',
+            memberUid: 'm-brad',
+            imageUrl: 'https://cdn.example/brad.png',
+          },
+        ],
+      ]);
+
+      const enriched = enrichHopChainNames(
+        {
+          hops: [{ profileUid: 'juan', role: 'pl_connector' }],
+          alternates: [{ profileUid: 'brad', score: 0.5 }],
+        },
+        profiles
+      ) as {
+        hops: Array<Record<string, unknown>>;
+        alternates: Array<Record<string, unknown>>;
+      };
+
+      expect(enriched.hops[0]).toMatchObject({
+        profileUid: 'juan',
+        name: 'Juan Benet',
+        memberUid: 'm-juan',
+        imageUrl: 'https://cdn.example/juan.png',
+      });
+      expect(enriched.alternates[0]).toMatchObject({
+        profileUid: 'brad',
+        name: 'Brad Holden',
+        memberUid: 'm-brad',
+        imageUrl: 'https://cdn.example/brad.png',
       });
     });
   });

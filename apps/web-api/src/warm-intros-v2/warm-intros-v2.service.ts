@@ -425,14 +425,20 @@ export class WarmIntrosV2Service {
     for (const p of paths) {
       uids.add(p.targetProfileUid);
       if (p.bestConnectorProfileUid) uids.add(p.bestConnectorProfileUid);
-      // hopChain hop uids (optional enrich)
+      if (Array.isArray(p.alternateConnectorProfileUids)) {
+        for (const uid of p.alternateConnectorProfileUids) {
+          if (typeof uid === 'string' && uid.trim()) uids.add(uid.trim());
+        }
+      }
       const chain = p.hopChain;
       if (chain && typeof chain === 'object' && !Array.isArray(chain)) {
-        const hops = (chain as Record<string, unknown>).hops;
-        if (Array.isArray(hops)) {
-          for (const hop of hops) {
-            if (hop && typeof hop === 'object' && typeof (hop as Record<string, unknown>).profileUid === 'string') {
-              uids.add(String((hop as Record<string, unknown>).profileUid));
+        const rec = chain as Record<string, unknown>;
+        for (const key of ['hops', 'alternates'] as const) {
+          const nodes = rec[key];
+          if (!Array.isArray(nodes)) continue;
+          for (const node of nodes) {
+            if (node && typeof node === 'object' && typeof (node as Record<string, unknown>).profileUid === 'string') {
+              uids.add(String((node as Record<string, unknown>).profileUid));
             }
           }
         }
@@ -471,11 +477,7 @@ export class WarmIntrosV2Service {
   /** Resolve Directory Member.image.url onto profiles that have memberUid. */
   private async attachMemberImageUrls(map: Map<string, MasterProfileEnrichRow>): Promise<void> {
     const memberUids = [
-      ...new Set(
-        [...map.values()]
-          .map((p) => p.memberUid?.trim())
-          .filter((uid): uid is string => !!uid)
-      ),
+      ...new Set([...map.values()].map((p) => p.memberUid?.trim()).filter((uid): uid is string => !!uid)),
     ];
     if (memberUids.length === 0) return;
 

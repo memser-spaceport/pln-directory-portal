@@ -213,25 +213,30 @@ export function buildPathSummary(hopChain: unknown, alternateConnectorProfileUid
 }
 
 /**
- * Optionally fill missing name on hopChain hop nodes from MasterProfile map.
+ * Fill hop + alternate nodes with name / memberUid / imageUrl from MasterProfile map.
  */
 export function enrichHopChainNames(hopChain: unknown, profilesByUid: Map<string, MasterProfileEnrichRow>): unknown {
   const chain = asRecord(hopChain);
-  if (!chain || !Array.isArray(chain.hops)) return hopChain;
+  if (!chain) return hopChain;
 
-  const hops = chain.hops.map((hop) => {
-    const hopRec = asRecord(hop);
-    if (!hopRec) return hop;
+  const enrichNode = (node: unknown): unknown => {
+    const hopRec = asRecord(node);
+    if (!hopRec) return node;
     const uid = typeof hopRec.profileUid === 'string' ? hopRec.profileUid : null;
-    if (!uid) return hop;
-    const hasName = typeof hopRec.name === 'string' && hopRec.name.trim() !== '';
-    if (hasName) return hop;
+    if (!uid) return node;
     const profile = profilesByUid.get(uid);
-    if (!profile?.canonicalName) return hop;
-    return { ...hopRec, name: profile.canonicalName };
-  });
+    const next: Record<string, unknown> = { ...hopRec };
+    const hasName = typeof hopRec.name === 'string' && hopRec.name.trim() !== '';
+    if (!hasName && profile?.canonicalName) next.name = profile.canonicalName;
+    if (profile?.memberUid != null) next.memberUid = profile.memberUid;
+    if (profile?.imageUrl !== undefined) next.imageUrl = profile.imageUrl;
+    return next;
+  };
 
-  return { ...chain, hops };
+  const hops = Array.isArray(chain.hops) ? chain.hops.map(enrichNode) : chain.hops;
+  const alternates = Array.isArray(chain.alternates) ? chain.alternates.map(enrichNode) : chain.alternates;
+
+  return { ...chain, hops, alternates };
 }
 
 export function matchesSearch(investor: EnrichedInvestorSummary, search: string): boolean {
