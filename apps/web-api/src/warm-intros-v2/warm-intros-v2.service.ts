@@ -393,7 +393,9 @@ export class WarmIntrosV2Service {
       hopChain: path.hopChain,
     });
 
-    const hopChain = enrichHopNames ? enrichHopChainNames(path.hopChain, profilesByUid) : path.hopChain;
+    const hopChain = enrichHopNames
+      ? enrichHopChainNames(path.hopChain, profilesByUid, path.hopCount)
+      : path.hopChain;
 
     return {
       uid: path.uid,

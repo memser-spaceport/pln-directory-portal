@@ -3,6 +3,8 @@
  * Pure helpers — tolerant of Sourced wrappers / loose Json shapes.
  */
 
+import { computeWarmPathProximity } from './warm-intros-v2-proximity.util';
+
 export type EnrichedInvestorSummary = {
   profileUid: string;
   personKey: string;
@@ -214,16 +216,21 @@ export function buildPathSummary(hopChain: unknown, alternateConnectorProfileUid
 
 /**
  * Fill hop + alternate nodes with name / memberUid / imageUrl from MasterProfile map.
+ * Alternates also get proximityCode / caliber / scorePercent / scoreBand (same rules as rank-1 path).
  */
-export function enrichHopChainNames(hopChain: unknown, profilesByUid: Map<string, MasterProfileEnrichRow>): unknown {
+export function enrichHopChainNames(
+  hopChain: unknown,
+  profilesByUid: Map<string, MasterProfileEnrichRow>,
+  hopCount: number = 1
+): unknown {
   const chain = asRecord(hopChain);
   if (!chain) return hopChain;
 
-  const enrichNode = (node: unknown): unknown => {
+  const enrichProfileFields = (node: unknown): Record<string, unknown> | null => {
     const hopRec = asRecord(node);
-    if (!hopRec) return node;
+    if (!hopRec) return null;
     const uid = typeof hopRec.profileUid === 'string' ? hopRec.profileUid : null;
-    if (!uid) return node;
+    if (!uid) return hopRec;
     const profile = profilesByUid.get(uid);
     const next: Record<string, unknown> = { ...hopRec };
     const hasName = typeof hopRec.name === 'string' && hopRec.name.trim() !== '';
@@ -233,8 +240,27 @@ export function enrichHopChainNames(hopChain: unknown, profilesByUid: Map<string
     return next;
   };
 
-  const hops = Array.isArray(chain.hops) ? chain.hops.map(enrichNode) : chain.hops;
-  const alternates = Array.isArray(chain.alternates) ? chain.alternates.map(enrichNode) : chain.alternates;
+  const enrichAlternate = (node: unknown): unknown => {
+    const next = enrichProfileFields(node);
+    if (!next) return node;
+    const score = typeof next.score === 'number' ? next.score : 0;
+    const proximity = computeWarmPathProximity({
+      score,
+      hopCount,
+      hopChain: chain,
+      relationKind: typeof chain.relationKind === 'string' ? chain.relationKind : null,
+    });
+    next.proximityCode = proximity.proximityCode;
+    next.caliber = proximity.caliber;
+    next.scorePercent = proximity.scorePercent;
+    next.scoreBand = proximity.scoreBand;
+    return next;
+  };
+
+  const hops = Array.isArray(chain.hops)
+    ? chain.hops.map((n) => enrichProfileFields(n) ?? n)
+    : chain.hops;
+  const alternates = Array.isArray(chain.alternates) ? chain.alternates.map(enrichAlternate) : chain.alternates;
 
   return { ...chain, hops, alternates };
 }

@@ -124,10 +124,12 @@ describe('warm-intros-v2-enrich.util', () => {
 
       const enriched = enrichHopChainNames(
         {
+          relationKind: 'pl_direct',
           hops: [{ profileUid: 'juan', role: 'pl_connector' }],
-          alternates: [{ profileUid: 'brad', score: 0.5 }],
+          alternates: [{ profileUid: 'brad', score: 0.68 }],
         },
-        profiles
+        profiles,
+        1
       ) as {
         hops: Array<Record<string, unknown>>;
         alternates: Array<Record<string, unknown>>;
@@ -144,6 +146,29 @@ describe('warm-intros-v2-enrich.util', () => {
         name: 'Brad Holden',
         memberUid: 'm-brad',
         imageUrl: 'https://cdn.example/brad.png',
+        proximityCode: 'PL+1A',
+        caliber: 'A',
+        scorePercent: 68,
+        scoreBand: 'green',
+      });
+    });
+
+    it('assigns B caliber proximity for lower alternate scores', () => {
+      const enriched = enrichHopChainNames(
+        {
+          relationKind: 'pl_direct',
+          hops: [],
+          alternates: [{ profileUid: 'lacey', name: 'Lacey', score: 0.35 }],
+        },
+        new Map(),
+        1
+      ) as { alternates: Array<Record<string, unknown>> };
+
+      expect(enriched.alternates[0]).toMatchObject({
+        proximityCode: 'PL+1B',
+        caliber: 'B',
+        scorePercent: 35,
+        scoreBand: 'yellow',
       });
     });
   });
