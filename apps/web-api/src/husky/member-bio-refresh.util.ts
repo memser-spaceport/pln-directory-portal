@@ -13,10 +13,9 @@ import {
 import { HUSKY_BIO_DISCLAIMER } from '../utils/ai-prompts';
 
 /**
- * Core of the AI-bio refresh shared by the CLI script
- * (scripts/refresh-ai-member-bios.ts) and the admin endpoint
- * (MemberBioRefreshService). Takes a plain PrismaClient so both a standalone
- * ts-node process and the Nest-injected PrismaService can drive it.
+ * Core of the AI-bio refresh driven by the admin endpoint
+ * (MemberBioRefreshService → POST /v1/admin/members/ai-bios/refresh).
+ * Takes a plain PrismaClient so a standalone script could also drive it.
  */
 
 // Matches the visible text of HUSKY_BIO_DISCLAIMER without depending on its

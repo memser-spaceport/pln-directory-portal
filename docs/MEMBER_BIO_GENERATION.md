@@ -3,7 +3,7 @@
 ## Overview
 
 Automated AI generation of member bios, part of the **Husky** assistant.
-A signed-in member can generate their own bio on demand; admins can bulk-refresh every previously AI-generated bio; a CLI script does the same for manual one-time runs.
+A signed-in member can generate their own bio on demand; admins can bulk-refresh every previously AI-generated bio via admin endpoints.
 
 The pipeline was rebuilt around **gender accuracy**: historical bios were generated from a prompt that said "use appropriate gender pronouns (He/She)" with no gender data supplied, so the model guessed from the member's name — and guessed "She" for a large share of members. The current pipeline resolves pronouns from verified signals **before** generating and forbids the model from guessing.
 
@@ -21,13 +21,12 @@ The rules are enforced in both bio system prompts (`HUSKY_AUTO_BIO_SYSTEM_PROMPT
 | File | Role |
 | --- | --- |
 | `apps/web-api/src/husky/member-bio.util.ts` | Core: pronoun scanning/mapping, free-signal resolution, profile prompt builder, `generateMemberBioText` (OpenAI call) |
-| `apps/web-api/src/husky/member-bio-refresh.util.ts` | Bulk refresh runner shared by the admin endpoint and the CLI script; `AI_BIO_MARKER`; the paid scrape ladder |
+| `apps/web-api/src/husky/member-bio-refresh.util.ts` | Bulk refresh runner; `AI_BIO_MARKER`; the paid scrape ladder |
 | `apps/web-api/src/husky/member-bio-refresh.service.ts` | Admin-facing service: status, dry-run, fire-and-forget apply run |
 | `apps/web-api/src/husky/member-scrapingdog.service.ts` | Member-scoped ScrapingDog client (LinkedIn person + X profile). Separate from the team-enrichment ScrapingDog client on purpose |
 | `apps/web-api/src/husky/husky-generation.service.ts` | Self-service generation (`generateMemberBio`), plus skills/recommendation generators |
 | `apps/web-api/src/husky/husky-generation.controller.ts` | `GET /v1/husky/generation/bio` (member generates their own bio) |
 | `apps/web-api/src/admin/member.controller.ts` | Admin endpoints `ai-bios/status` + `ai-bios/refresh` |
-| `apps/web-api/src/scripts/refresh-ai-member-bios.ts` | CLI wrapper (`yarn api:refresh-ai-member-bios`) |
 | `apps/web-api/src/utils/ai-prompts.ts` | Bio system prompts + `HUSKY_BIO_DISCLAIMER` |
 
 ## Storage model
@@ -99,19 +98,9 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: applicati
 
 Body options: `dryRun` (default **true**), `limit`, `emails: string[]`, `noScrape`. A dry run resolves free-signal pronouns per member and reports who would need scraping — it makes no OpenAI or ScrapingDog calls. The apply run's re-entrancy guard (`isRunning`) is **in-memory per pod**; with multiple replicas another pod could start a second run. Acceptable for a manually-triggered maintenance job — same trade-off the team-enrichment status endpoint documents.
 
-### CLI script (manual one-time runs)
+> A CLI wrapper (`yarn api:refresh-ai-member-bios`) existed briefly but was removed in favor of the endpoints — `runMemberBioRefresh` takes a plain `PrismaClient`, so a standalone script can be recreated in minutes if ever needed.
 
-```bash
-yarn api:refresh-ai-member-bios                       # dry-run (default): report only, zero paid calls
-yarn api:refresh-ai-member-bios -- --apply            # regenerate & save
-yarn api:refresh-ai-member-bios -- --apply --limit 20
-yarn api:refresh-ai-member-bios -- --apply --email a@b.c --email c@d.e
-yarn api:refresh-ai-member-bios -- --apply --no-scrape
-```
-
-Thin wrapper over the same `runMemberBioRefresh` runner. Always prints the **total** count of members whose bio contains the AI marker, regardless of `--limit`/`--email` filters.
-
-### Runner semantics (shared)
+### Runner semantics
 
 - Selects members `WHERE bio LIKE '%Bio is AI generated%'` (plus optional email filter / limit), ordered by `createdAt`.
 - Per member: free ladder → (apply mode only) paid ladder → generate → save `bio + HUSKY_BIO_DISCLAIMER`.
