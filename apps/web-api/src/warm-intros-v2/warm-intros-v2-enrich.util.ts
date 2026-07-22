@@ -175,6 +175,18 @@ function reasonDescription(reason: unknown): string | null {
   return null;
 }
 
+function pickPrimaryReasonDescription(reasons: unknown[]): string | null {
+  let fallback: string | null = null;
+  for (const r of reasons) {
+    const d = reasonDescription(r);
+    if (!d) continue;
+    const rec = asRecord(r);
+    if (rec && rec.sourceType === 'webVerify') return d;
+    if (!fallback) fallback = d;
+  }
+  return fallback;
+}
+
 /**
  * Best explanation + alternate count from hopChain / alternateConnectorProfileUids.
  */
@@ -193,19 +205,13 @@ export function buildPathSummary(hopChain: unknown, alternateConnectorProfileUid
     }
 
     const reasons = Array.isArray(chain.reasons) ? chain.reasons : [];
-    for (const r of reasons) {
-      explanation = reasonDescription(r);
-      if (explanation) break;
-    }
+    explanation = pickPrimaryReasonDescription(reasons);
 
     if (!explanation && Array.isArray(chain.hops)) {
       for (const hop of chain.hops) {
         const hopRec = asRecord(hop);
         if (!hopRec || !Array.isArray(hopRec.reasons)) continue;
-        for (const r of hopRec.reasons) {
-          explanation = reasonDescription(r);
-          if (explanation) break;
-        }
+        explanation = pickPrimaryReasonDescription(hopRec.reasons);
         if (explanation) break;
       }
     }

@@ -95,6 +95,23 @@ describe('warm-intros-v2-enrich.util', () => {
         alternateCount: 2,
       });
     });
+
+    it('prefers webVerify reason over earlier pairing reasons', () => {
+      expect(
+        buildPathSummary(
+          {
+            reasons: [
+              { description: 'Shared alma mater: Stanford', sourceType: 'commonSchool' },
+              {
+                description: 'Both listed as Numerai partners/supporters',
+                sourceType: 'webVerify',
+              },
+            ],
+          },
+          []
+        ).explanation
+      ).toBe('Both listed as Numerai partners/supporters');
+    });
   });
 
   describe('enrichHopChainNames', () => {
