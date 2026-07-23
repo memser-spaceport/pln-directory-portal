@@ -214,6 +214,55 @@ export class AiAppsController {
     });
   }
 
+  /**
+   * Build logs for a signed-in member from the LabOS dashboard (member JWT +
+   * `ai_apps.read`), gated to the app's creator OR a directory admin — so an
+   * admin can debug any app's logs without a deploy token. Same query params
+   * and verbatim runner envelope as the agent route.
+   */
+  @NoCache()
+  @Get(':uid/build-logs')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getMemberBuildLogs(
+    @Param('uid') uid: string,
+    @Req() req: any,
+    @Query('limit') limit?: string,
+    @Query('sinceMinutes') sinceMinutes?: string,
+    @Query('nextToken') nextToken?: string
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.getMemberLogs(memberUid, uid, 'build', {
+      limit: this.parsePositiveInt('limit', limit),
+      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+      nextToken,
+    });
+  }
+
+  /**
+   * Runtime logs for a signed-in member from the LabOS dashboard (member JWT +
+   * `ai_apps.read`), gated to the app's creator OR a directory admin. Same
+   * query params and verbatim runner envelope as the agent route.
+   */
+  @NoCache()
+  @Get(':uid/runtime-logs')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getMemberRuntimeLogs(
+    @Param('uid') uid: string,
+    @Req() req: any,
+    @Query('limit') limit?: string,
+    @Query('sinceMinutes') sinceMinutes?: string,
+    @Query('nextToken') nextToken?: string
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.getMemberLogs(memberUid, uid, 'runtime', {
+      limit: this.parsePositiveInt('limit', limit),
+      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+      nextToken,
+    });
+  }
+
   /** Same metadata edit path for a connected member agent. */
   @NoCache()
   @Patch(':uid/agent')
