@@ -2287,6 +2287,7 @@ model TeamNewsItem {
   eventDate    DateTime
   title        String
   summary      String?
+  contentHtml  String?
   sourceUrl    String
   sourceUrls   String[]            @default([])
   sourceDomain String?
