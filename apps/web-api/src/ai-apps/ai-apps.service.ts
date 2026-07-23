@@ -315,13 +315,10 @@ export class AiAppsService {
   }
 
   /**
-   * CloudWatch logs for one app + phase, proxied verbatim from the sandbox
-   * runner (`GET /v1/apps/<appId>/<phase>/logs`) so the runner token stays
-   * server-side. Called by the connected member's agent (deploy-token auth) to
-   * debug failed builds and runtime errors — owner-only, like the agent
-   * metadata route. The response envelope (`events`, `nextToken`, `logGroup`,
-   * …) is the runner's own; CloudWatch may return an empty `events` page WITH
-   * a `nextToken`, so pagination is the caller's job.
+   * CloudWatch logs for one app + phase for the connected member's agent
+   * (deploy-token auth) to debug failed builds and runtime errors — owner-only,
+   * like the agent metadata route. Delegates the runner proxy to
+   * `fetchRunnerLogs`.
    */
   async getAgentLogs(
     requesterUid: string,
@@ -336,7 +333,43 @@ export class AiAppsService {
     if (app.memberUid !== requesterUid) {
       throw new ForbiddenException('The agent may read logs only for apps owned by its connected member');
     }
+    return this.fetchRunnerLogs(app, phase, query);
+  }
 
+  /**
+   * Same runner logs for a signed-in member from the LabOS dashboard (member
+   * JWT + `ai_apps.read`), but gated to the app's creator OR a directory admin
+   * — so an admin can debug any app's build/runtime logs without holding a
+   * deploy token. The stricter agent route stays owner-only.
+   */
+  async getMemberLogs(
+    requesterUid: string,
+    uid: string,
+    phase: AiAppLogPhase,
+    query: { limit?: number; sinceMinutes?: number; nextToken?: string }
+  ): Promise<unknown> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can view logs');
+    }
+    return this.fetchRunnerLogs(app, phase, query);
+  }
+
+  /**
+   * Proxies one app + phase's CloudWatch logs verbatim from the sandbox runner
+   * (`GET /v1/apps/<appId>/<phase>/logs`), keeping the runner token server-side.
+   * The response envelope (`events`, `nextToken`, `logGroup`, …) is the runner's
+   * own; CloudWatch may return an empty `events` page WITH a `nextToken`, so
+   * pagination is the caller's job. Access checks are the caller's job.
+   */
+  private async fetchRunnerLogs(
+    app: Pick<AiApp, 'appId'>,
+    phase: AiAppLogPhase,
+    query: { limit?: number; sinceMinutes?: number; nextToken?: string }
+  ): Promise<unknown> {
     const params: Record<string, string | number> = {};
     if (query.limit !== undefined) params.limit = query.limit;
     if (query.sinceMinutes !== undefined) params.sinceMinutes = query.sinceMinutes;
