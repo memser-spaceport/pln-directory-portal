@@ -35,9 +35,9 @@ export class AppController {
       }
       return {}
     } catch(error) {
-      return { 
-        url: `${process.env.WEB_UI_BASE_URL}/internal-error`, 
-        statusCode: 302 
+      return {
+        url: `${process.env.WEB_UI_BASE_URL}/internal-error`,
+        statusCode: 302
       };
     }
   }
@@ -63,6 +63,20 @@ export class AppController {
       message: "Hello from feature environment",
       environment: process.env.ENVIRONMENT ?? 'unknown',
       feature: process.env.FEATURE_ENV ?? process.env.FEATURE_NAME ?? 'local',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Public endpoint used to verify environment variables
+   * supplied during Feature Environment deployment.
+   * No authentication guard is applied.
+   */
+  @Get('/feature-config')
+  featureEnvironmentConfig() {
+    return {
+      featureEnvironment: process.env.FEATURE_ENV ?? 'not-configured',
+      demoMessage: process.env.FEATURE_DEMO_MESSAGE ?? 'not-configured',
       timestamp: new Date().toISOString(),
     };
   }
