@@ -36,14 +36,19 @@ export class AiProviderService {
   /**
    * Resolves the effective provider for a given feature.
    * Checks for a feature-specific override env var (e.g., TEAM_ENRICHMENT_AI_PROVIDER),
-   * then falls back to the global AI_PROVIDER.
+   * then the feature's own fallback (for features pinned to a specific
+   * provider regardless of the global setting, e.g. Husky generation), then
+   * the global AI_PROVIDER.
    */
-  private resolveProvider(featureProviderEnvVar?: string): AiProviderType {
+  private resolveProvider(featureProviderEnvVar?: string, fallbackProvider?: AiProviderType): AiProviderType {
     if (featureProviderEnvVar) {
       const override = process.env[featureProviderEnvVar] as AiProviderType | undefined;
       if (override && VALID_PROVIDERS.has(override)) {
         return override;
       }
+    }
+    if (fallbackProvider && VALID_PROVIDERS.has(fallbackProvider)) {
+      return fallbackProvider;
     }
     return this.defaultProvider;
   }
@@ -59,8 +64,11 @@ export class AiProviderService {
    * @param featureProviderEnvVar - optional env var name for feature-specific provider override
    * @param options - additional options (e.g., enable search grounding for Gemini)
    */
-  getResponsesModel(featureProviderEnvVar?: string, options?: { useSearchGrounding?: boolean }): LanguageModel {
-    const provider = this.resolveProvider(featureProviderEnvVar);
+  getResponsesModel(
+    featureProviderEnvVar?: string,
+    options?: { useSearchGrounding?: boolean; fallbackProvider?: AiProviderType }
+  ): LanguageModel {
+    const provider = this.resolveProvider(featureProviderEnvVar, options?.fallbackProvider);
 
     if (provider === 'gemini') {
       const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
@@ -94,9 +102,10 @@ export class AiProviderService {
       searchContextSize?: 'low' | 'medium' | 'high';
       userLocation?: { type: 'approximate'; city?: string; country?: string };
       anthropicMaxUses?: number;
+      fallbackProvider?: AiProviderType;
     }
   ): Record<string, any> {
-    const provider = this.resolveProvider(featureProviderEnvVar);
+    const provider = this.resolveProvider(featureProviderEnvVar, options?.fallbackProvider);
 
     if (provider === 'gemini') {
       return {};
@@ -133,8 +142,8 @@ export class AiProviderService {
   /**
    * Returns the resolved model name string (e.g., "gpt-4o", "gemini-2.5-flash", "claude-sonnet-4-6").
    */
-  getModelName(featureProviderEnvVar?: string): string {
-    const provider = this.resolveProvider(featureProviderEnvVar);
+  getModelName(featureProviderEnvVar?: string, fallbackProvider?: AiProviderType): string {
+    const provider = this.resolveProvider(featureProviderEnvVar, fallbackProvider);
 
     if (provider === 'gemini') {
       return process.env.GEMINI_MODEL || 'gemini-2.5-flash';

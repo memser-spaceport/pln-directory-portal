@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
 import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
 
 import { ZodValidationPipe } from '@abitia/zod-dto';
@@ -13,10 +13,14 @@ import { Member } from '@prisma/client';
 import { MemberService } from './member.service';
 import { UpdateMemberRolesDto } from './dto/update-member-roles.dto';
 import { UpdateMemberRolesAndHostsDto } from './dto/update-member-roles-and-hosts.dto';
+import { MemberBioRefreshService } from '../husky/member-bio-refresh.service';
 
 @Controller('v1/admin/members')
 export class MemberController {
-  constructor(private readonly memberService: MemberService) {}
+  constructor(
+    private readonly memberService: MemberService,
+    private readonly memberBioRefreshService: MemberBioRefreshService
+  ) {}
 
   @Get()
   @UseGuards(DemoDayAdminAuthGuard)
@@ -31,6 +35,41 @@ export class MemberController {
   @NoCache()
   async getMemberStateCounts(): Promise<MemberStateCounts> {
     return this.memberService.getMemberStateCounts();
+  }
+
+  /**
+   * Count of members whose bio carries the AI-generated disclaimer, plus the
+   * in-flight/last bio-refresh run. Cheap; poll this while a refresh runs.
+   */
+  @Get('ai-bios/status')
+  @UseGuards(AdminAuthGuard)
+  @NoCache()
+  async getAiBioRefreshStatus() {
+    return this.memberBioRefreshService.getStatus();
+  }
+
+  /**
+   * Refreshes AI-generated member bios with correct gender handling.
+   * Defaults to dryRun (report only, zero paid calls) — pass dryRun: false to
+   * regenerate and save. An apply run executes in the background; progress is
+   * polled via GET ai-bios/status.
+   */
+  @Post('ai-bios/refresh')
+  @UseGuards(AdminAuthGuard)
+  @NoCache()
+  async triggerAiBioRefresh(
+    @Body() body: { dryRun?: boolean; limit?: number; emails?: string[]; noScrape?: boolean }
+  ) {
+    const limit = body?.limit != null ? Number(body.limit) : null;
+    if (limit != null && (!Number.isInteger(limit) || limit <= 0)) {
+      throw new BadRequestException('limit must be a positive integer');
+    }
+    return this.memberBioRefreshService.trigger({
+      dryRun: body?.dryRun !== false,
+      limit,
+      emails: Array.isArray(body?.emails) ? body.emails : undefined,
+      noScrape: body?.noScrape === true,
+    });
   }
 
   @Get(':uid')
