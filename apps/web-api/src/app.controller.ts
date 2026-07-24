@@ -52,4 +52,18 @@ export class AppController {
       token: req.csrfToken(),
     };
   }
+
+  /** FEATURE_ENV_DEMO:feature-demo
+   * Public endpoint used to demonstrate feature environments.
+   * No authentication guard is applied.
+   */
+  @Get("/feature-demo")
+  featureEnvDemo_feature_demo() {
+    return {
+      message: "Hello from feature environment",
+      environment: process.env.ENVIRONMENT ?? 'unknown',
+      feature: process.env.FEATURE_ENV ?? process.env.FEATURE_NAME ?? 'local',
+      timestamp: new Date().toISOString(),
+    };
+  }
 }
