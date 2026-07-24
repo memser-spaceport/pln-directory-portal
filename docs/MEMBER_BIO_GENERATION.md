@@ -43,10 +43,23 @@ The rules are enforced in both bio system prompts (`HUSKY_AUTO_BIO_SYSTEM_PROMPT
 
 1. Builds the profile prompt: name, **Known Pronouns**, handles, location, skills, team roles, project contributions, `MemberExperience` rows, `moreDetails`, `linkedInDetails` JSON, and (refresh only) a *"verified data fetched from the member's own social profiles"* block with anything ScrapingDog returned.
 2. Picks the system prompt by `hasEnoughIdentifyingInfo` (≥3 of: name, any social handle, team roles, location, experience):
-   - enough → `HUSKY_AUTO_BIO_SYSTEM_PROMPT` + OpenAI `web_search_preview` tool (search context `high`, user-location hint from the member's city/country);
-   - not enough → `HUSKY_AUTO_BIO_DATABASE_ONLY_PROMPT`, no web search (prevents misattribution when the member is not uniquely identifiable).
-3. Model: `openai.responses(OPENAI_LLM_MODEL)`, temperature 0.7. An empty response means "not enough data for a meaningful bio" — callers keep the existing bio in that case.
+   - enough → `HUSKY_AUTO_BIO_SYSTEM_PROMPT` + the provider's web-search mechanism (OpenAI: `web_search_preview` tool with search context `high` + user-location hint, forced via `toolChoice`; Gemini: model-level search grounding; Anthropic: no live search through the current SDK — see provider notes);
+   - not enough → `HUSKY_AUTO_BIO_DATABASE_ONLY_PROMPT`, no web search / grounding (prevents misattribution when the member is not uniquely identifiable).
+3. Model/provider come from the shared `AiProviderService` (temperature 0.7). An empty response means "not enough data for a meaningful bio" — callers keep the existing bio in that case.
 4. Callers append `HUSKY_BIO_DISCLAIMER` before saving/returning.
+
+## AI provider selection
+
+All Husky generation calls (bio, skills suggestions, recommendation reasons) resolve their provider through `AiProviderService`, same per-feature pattern as team enrichment (`TEAM_ENRICHMENT_AI_PROVIDER` vs `TEAM_ENRICHMENT_JUDGE_AI_PROVIDER`):
+
+- **`HUSKY_GENERATION_AI_PROVIDER`** = `openai` | `gemini` | `anthropic` — feature override.
+- When unset, the fallback is **pinned to `gemini`** — deliberately NOT the global `AI_PROVIDER`. Constants: `HUSKY_GENERATION_PROVIDER_ENV_VAR` / `HUSKY_GENERATION_FALLBACK_PROVIDER` in `member-bio.util.ts`.
+- The model per provider comes from the provider-level vars: `OPENAI_LLM_MODEL` / `GEMINI_MODEL` / `CLAUDE_MODEL`.
+
+Provider notes for bio quality:
+
+- **Gemini**: web verification runs via model-level search grounding — no `userLocation` hint, no `searchContextSize`, no forced tool call. Spot-check a few members (`{"dryRun": false, "limit": 3}`) before a bulk refresh on Gemini.
+- **Anthropic**: the current `@ai-sdk/anthropic` version does not translate the web-search tool, so bios would be generated without live search — not recommended for the web-search path until the SDK is upgraded.
 
 ## Pronoun resolution ladder (cost-tiered)
 
@@ -110,11 +123,13 @@ Body options: `dryRun` (default **true**), `limit`, `emails: string[]`, `noScrap
 
 ## Environment variables
 
-| Variable | Purpose |
-| --- | --- |
-| `OPENAI_LLM_MODEL` | Model for `generateText` (bio, skills, recommendations) |
-| `OPENAI_API_KEY` | OpenAI auth (via `@ai-sdk/openai`) |
-| `SCRAPINGDOG_API_KEY` | Enables the paid scrape ladder; when unset, scraping is skipped and unknown-pronoun members fall back to name-only bios |
+| Variable | Purpose                                                                                                                                   |
+| --- |-------------------------------------------------------------------------------------------------------------------------------------------|
+| `HUSKY_GENERATION_AI_PROVIDER` | Provider for all Husky generation (`openai` \| `gemini` \| `anthropic`); unset = `gemini` (pinned fallback, ignores global `AI_PROVIDER`) |
+| `OPENAI_LLM_MODEL` / `OPENAI_API_KEY` | Model + auth when the provider is openai                                                                                                  |
+| `GEMINI_MODEL` (+ Google API key env used by `@ai-sdk/google`) | Model + auth when the provider is gemini                                                                                                  |
+| `CLAUDE_MODEL` / `CLAUDE_API_KEY` (or `ANTHROPIC_*`) | Model + auth when the provider is anthropic                                                                                               |
+| `SCRAPINGDOG_API_KEY` | Enables the paid scrape ladder; when unset, scraping is skipped and unknown-pronoun members fall back to name-only bios                   |
 
 ## Testing
 

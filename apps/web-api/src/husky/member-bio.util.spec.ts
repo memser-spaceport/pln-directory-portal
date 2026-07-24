@@ -1,10 +1,12 @@
-// The `ai` / `@ai-sdk/openai` packages ship untranspiled ESM that this jest
+// The `ai` / `@ai-sdk/*` packages ship untranspiled ESM that this jest
 // config can't parse; the functions under test never reach them, so stub the
 // module boundary instead of widening transformIgnorePatterns for everyone.
 jest.mock('ai', () => ({ generateText: jest.fn() }));
 jest.mock('@ai-sdk/openai', () => ({
   openai: Object.assign(jest.fn(), { responses: jest.fn(), tools: { webSearchPreview: jest.fn() } }),
 }));
+jest.mock('@ai-sdk/google', () => ({ google: jest.fn() }));
+jest.mock('@ai-sdk/anthropic', () => ({ anthropic: jest.fn(), createAnthropic: jest.fn() }));
 
 import { PrismaClient } from '@prisma/client';
 import {

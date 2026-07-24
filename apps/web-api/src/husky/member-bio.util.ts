@@ -1,12 +1,28 @@
-import { generateText, LanguageModel } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
 import * as countries from 'i18n-iso-countries';
 import { PrismaClient } from '@prisma/client';
 import { HUSKY_AUTO_BIO_SYSTEM_PROMPT, HUSKY_AUTO_BIO_DATABASE_ONLY_PROMPT } from '../utils/ai-prompts';
+import { AiProviderService, AiProviderType } from '../shared/ai-provider.service';
 
 import('i18n-iso-countries/langs/en.json').then((en) => {
   countries.registerLocale(en);
 });
+
+/**
+ * Provider selection for ALL Husky generation calls (bio, skills, recommendation reasons)
+ * Set HUSKY_GENERATION_AI_PROVIDER=gemini|anthropic|openai to switch.
+ */
+export const HUSKY_GENERATION_PROVIDER_ENV_VAR = 'HUSKY_GENERATION_AI_PROVIDER';
+export const HUSKY_GENERATION_FALLBACK_PROVIDER: AiProviderType = 'gemini';
+
+// AiProviderService has no constructor dependencies; a lazy module-level
+// instance lets this plain util (and standalone scripts) share the exact
+// provider-resolution logic Nest services get via DI.
+let sharedAiProvider: AiProviderService | null = null;
+export function getHuskyAiProvider(): AiProviderService {
+  if (!sharedAiProvider) sharedAiProvider = new AiProviderService();
+  return sharedAiProvider;
+}
 
 export type MemberPronouns = 'he/him' | 'she/her' | 'they/them';
 
@@ -168,7 +184,12 @@ export function hasEnoughIdentifyingInfo(member: any): boolean {
   return identifyingFactors.length >= 3;
 }
 
-export function buildWebSearchTools(member: any) {
+/**
+ * Approximate user-location hint for the web-search tool, derived from the
+ * member's city/country (country converted to an Alpha-2 code). Only OpenAI's
+ * web_search_preview consumes it; other providers ignore the option.
+ */
+export function buildUserLocation(member: any): { type: 'approximate'; city?: string; country?: string } | undefined {
   let countryCode: string | undefined = undefined;
   if (member.location?.country) {
     // Check if it's already a 2-letter Alpha-2 code
@@ -180,24 +201,13 @@ export function buildWebSearchTools(member: any) {
     }
   }
 
-  return {
-    web_search_preview: openai.tools.webSearchPreview({
-      searchContextSize: 'high',
-      userLocation:
-        member.location?.city && countryCode
-          ? {
-              type: 'approximate',
-              city: member.location.city,
-              country: countryCode,
-            }
-          : member.location?.city
-          ? {
-              type: 'approximate',
-              city: member.location.city,
-            }
-          : undefined,
-    }),
-  };
+  if (member.location?.city && countryCode) {
+    return { type: 'approximate', city: member.location.city, country: countryCode };
+  }
+  if (member.location?.city) {
+    return { type: 'approximate', city: member.location.city };
+  }
+  return undefined;
 }
 
 /**
@@ -206,17 +216,36 @@ export function buildWebSearchTools(member: any) {
  * there is not enough data) — callers append the AI disclaimer.
  */
 export async function generateMemberBioText(member: any, options: MemberBioOptions = {}): Promise<string> {
+  const aiProvider = getHuskyAiProvider();
+  const useWebSearch = hasEnoughIdentifyingInfo(member);
+
   const generateTextOptions: any = {
-    model: openai.responses(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
+    model: aiProvider.getResponsesModel(HUSKY_GENERATION_PROVIDER_ENV_VAR, {
+      // Gemini grounds at the model level; only enable it on the web-search
+      // path so the database-only prompt stays genuinely offline.
+      useSearchGrounding: useWebSearch,
+      fallbackProvider: HUSKY_GENERATION_FALLBACK_PROVIDER,
+    }),
     prompt: buildMemberBioPrompt(member, options),
     temperature: 0.7,
   };
 
-  if (hasEnoughIdentifyingInfo(member)) {
+  if (useWebSearch) {
     // Use web search with strict verification
     generateTextOptions.system = HUSKY_AUTO_BIO_SYSTEM_PROMPT;
-    generateTextOptions.tools = buildWebSearchTools(member);
-    generateTextOptions.toolChoice = { type: 'tool', toolName: 'web_search_preview' };
+    const tools = aiProvider.getWebSearchTool(HUSKY_GENERATION_PROVIDER_ENV_VAR, {
+      searchContextSize: 'high',
+      userLocation: buildUserLocation(member),
+      fallbackProvider: HUSKY_GENERATION_FALLBACK_PROVIDER,
+    });
+    if (Object.keys(tools).length > 0) {
+      generateTextOptions.tools = tools;
+    }
+    // Forcing the tool call is an OpenAI Responses-API concept; the
+    // web_search_preview key is only present on the OpenAI tool bundle.
+    if (tools.web_search_preview) {
+      generateTextOptions.toolChoice = { type: 'tool', toolName: 'web_search_preview' };
+    }
   } else {
     // Use database-only prompt without web search
     generateTextOptions.system = HUSKY_AUTO_BIO_DATABASE_ONLY_PROMPT;

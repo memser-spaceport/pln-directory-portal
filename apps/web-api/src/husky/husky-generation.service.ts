@@ -1,8 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { LogService } from '../shared/log.service';
-import { generateText, LanguageModel } from 'ai';
-import { openai } from '@ai-sdk/openai';
-import * as countries from 'i18n-iso-countries';
+import { generateText } from 'ai';
 
 import {
   HUSKY_SKILLS_GENERATION_SYSTEM_PROMPT,
@@ -10,17 +8,20 @@ import {
   HUSKY_BIO_DISCLAIMER,
 } from '../utils/ai-prompts';
 import { PrismaService } from '../shared/prisma.service';
+import { AiProviderService } from '../shared/ai-provider.service';
 import { MemberWithRelations, RecommendationFactors } from '../recommendations/recommendations.engine';
-import { generateMemberBioText, resolveMemberPronouns } from './member-bio.util';
+import {
+  buildUserLocation,
+  generateMemberBioText,
+  hasEnoughIdentifyingInfo,
+  resolveMemberPronouns,
+  HUSKY_GENERATION_FALLBACK_PROVIDER,
+  HUSKY_GENERATION_PROVIDER_ENV_VAR,
+} from './member-bio.util';
 
 @Injectable()
 export class HuskyGenerationService {
-  constructor(private logger: LogService, private prisma: PrismaService) {
-    // Load country data for English
-    import('i18n-iso-countries/langs/en.json').then((en) => {
-      countries.registerLocale(en);
-    });
-  }
+  constructor(private logger: LogService, private prisma: PrismaService, private aiProvider: AiProviderService) {}
 
   async generateMemberBio(memberEmail: string): Promise<{ bio: string }> {
     this.logger.info(`Generating bio for member ${memberEmail}`);
@@ -95,7 +96,7 @@ export class HuskyGenerationService {
     }
 
     // Check if we have enough identifying information to safely use web search
-    const hasEnoughIdentifyingInfo = this.hasEnoughIdentifyingInfo(member);
+    const useWebSearch = hasEnoughIdentifyingInfo(member);
 
     // Get all available skills from the database
     const availableSkills = await this.prisma.skill.findMany({
@@ -135,7 +136,10 @@ export class HuskyGenerationService {
     `;
 
     const generateTextOptions: any = {
-      model: openai.responses(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
+      model: this.aiProvider.getResponsesModel(HUSKY_GENERATION_PROVIDER_ENV_VAR, {
+        useSearchGrounding: useWebSearch,
+        fallbackProvider: HUSKY_GENERATION_FALLBACK_PROVIDER,
+      }),
       system: HUSKY_SKILLS_GENERATION_SYSTEM_PROMPT.replace(
         '{{availableSkills}}',
         JSON.stringify(availableSkills.map((s) => s.title))
@@ -144,10 +148,20 @@ export class HuskyGenerationService {
       temperature: 0.7,
     };
 
-    if (hasEnoughIdentifyingInfo) {
+    if (useWebSearch) {
       // Use web search with strict verification
-      generateTextOptions.tools = this.buildUserLocation(member);
-      generateTextOptions.toolChoice = { type: 'tool', toolName: 'web_search_preview' };
+      const tools = this.aiProvider.getWebSearchTool(HUSKY_GENERATION_PROVIDER_ENV_VAR, {
+        searchContextSize: 'high',
+        userLocation: buildUserLocation(member),
+        fallbackProvider: HUSKY_GENERATION_FALLBACK_PROVIDER,
+      });
+      if (Object.keys(tools).length > 0) {
+        generateTextOptions.tools = tools;
+      }
+      // Forced tool call is OpenAI-only; the key exists only on its tool bundle.
+      if (tools.web_search_preview) {
+        generateTextOptions.toolChoice = { type: 'tool', toolName: 'web_search_preview' };
+      }
     }
 
     const { text: skillsText } = await generateText(generateTextOptions);
@@ -204,7 +218,12 @@ export class HuskyGenerationService {
     `;
 
     const generateTextOptions: any = {
-      model: openai.responses(process.env.OPENAI_LLM_MODEL || '') as LanguageModel,
+      // No web search on this path — recommendation reasons are derived purely
+      // from the profile data already in the prompt.
+      model: this.aiProvider.getResponsesModel(HUSKY_GENERATION_PROVIDER_ENV_VAR, {
+        useSearchGrounding: false,
+        fallbackProvider: HUSKY_GENERATION_FALLBACK_PROVIDER,
+      }),
       system: HUSKY_RECOMMENDATION_REASON_SYSTEM_PROMPT,
       prompt,
       temperature: 0.7,
@@ -221,49 +240,4 @@ export class HuskyGenerationService {
     }
   }
 
-  private hasEnoughIdentifyingInfo(member: any): boolean {
-    // Check if we have enough unique identifying information
-    const hasUniqueName = member.name && member.name.trim().length > 0;
-    const hasSocialMedia = member.githubHandler || member.linkedinHandler || member.twitterHandler;
-    const hasTeamInfo = member.teamMemberRoles && member.teamMemberRoles.length > 0;
-    const hasLocation = member.location && (member.location.city || member.location.country);
-    const hasExperience = member.experiences && member.experiences.length > 0;
-
-    // Need at least 3 pieces of identifying information to safely use web search
-    const identifyingFactors = [hasUniqueName, hasSocialMedia, hasTeamInfo, hasLocation, hasExperience].filter(Boolean);
-
-    return identifyingFactors.length >= 3;
-  }
-
-  private buildUserLocation(member: any) {
-    let countryCode: string | undefined = undefined;
-    if (member.location?.country) {
-      // Check if it's already a 2-letter Alpha-2 code
-      if (member.location.country.length === 2 && countries.isValid(member.location.country)) {
-        countryCode = member.location.country.toUpperCase();
-      } else {
-        // Try to convert country name to Alpha-2 code
-        countryCode = countries.getAlpha2Code(member.location.country, 'en');
-      }
-    }
-
-    return {
-      web_search_preview: openai.tools.webSearchPreview({
-        searchContextSize: 'high',
-        userLocation:
-          member.location?.city && countryCode
-            ? {
-                type: 'approximate',
-                city: member.location.city,
-                country: countryCode,
-              }
-            : member.location?.city
-            ? {
-                type: 'approximate',
-                city: member.location.city,
-              }
-            : undefined,
-      }),
-    };
-  }
 }
