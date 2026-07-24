@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.4';
+export const AI_APPS_STARTER_KIT_VERSION = '1.5';
 
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
@@ -124,6 +124,44 @@ export const buildRunnerSecretsUrl = (): string =>
 export const buildRunnerDeploymentsUrl = (): string =>
   `${AI_APPS_RUNNER_URL}/v1/projects/${AI_APPS_RUNNER_PROJECT}/deployments`;
 
+/** Log phases the runner serves from CloudWatch: the image build (Kaniko) vs the running app pod. */
+export type AiAppLogPhase = 'build' | 'runtime';
+
+/**
+ * Runner endpoint serving an app's CloudWatch logs for one phase
+ * (`GET /v1/apps/<appId>/build/logs` or `…/runtime/logs`). Build logs come from
+ * the latest successful build deployment, runtime logs from the latest
+ * successful runtime deployment; availability is bounded by the CloudWatch
+ * retention policy of the environment's log group.
+ */
+export const buildRunnerLogsUrl = (appId: string, phase: AiAppLogPhase): string =>
+  `${AI_APPS_RUNNER_URL}/v1/apps/${encodeURIComponent(appId)}/${phase}/logs`;
+
+/**
+ * `order=desc` member log reads. The runner (and CloudWatch behind it) pages
+ * FORWARD from the window start, so the newest-first view the dashboard wants
+ * is assembled here: walk the runner's pages server-side, retain only the
+ * newest lines, and serve descending slices with an offset cursor. These
+ * bounds cap one walk; if a window can't be walked within them the service
+ * narrows the window (the tail survives narrowing — it's the end of any
+ * window that reaches "now") before giving up.
+ */
+export const AI_APPS_LOGS_DESC_RETAIN = 5000;
+export const AI_APPS_LOGS_DESC_RUNNER_LIMIT = 2000;
+export const AI_APPS_LOGS_DESC_MAX_RUNNER_CALLS = 30;
+export const AI_APPS_LOGS_DESC_TIME_BUDGET_MS = 20_000;
+/** Divisors applied to the requested window when a walk blows the budget. */
+export const AI_APPS_LOGS_DESC_NARROWINGS = [4, 16];
+/** Fallback page size / hard cap for one desc response. */
+export const AI_APPS_LOGS_DESC_DEFAULT_LIMIT = 500;
+export const AI_APPS_LOGS_DESC_MAX_LIMIT = 2000;
+/**
+ * Completed walks are cached per instance so a reader scrolling through
+ * history doesn't re-walk the runner for every page. Short TTL — logs move.
+ */
+export const AI_APPS_LOGS_DESC_CACHE_TTL_MS = 15_000;
+export const AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES = 30;
+
 /** Build the S3 key for an app bundle: apps/<appId>/<deploymentId>/app.zip */
 export const buildAppS3Key = (appId: string, deploymentId: string): string => `apps/${appId}/${deploymentId}/app.zip`;
 
@@ -179,6 +217,17 @@ export const AI_APPS_METADATA_ENDPOINT =
   process.env.AI_APPS_METADATA_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/agent`;
 
 /**
+ * Public URL TEMPLATES of THIS API's agent log endpoints
+ * (`GET /v1/ai-apps/:uid/logs/build` and `…/logs/runtime`), written into the
+ * starter kit. The agent replaces the literal `{appUid}` placeholder with the
+ * app's `uid` (saved as `appUid` in `pln-app.config.json`).
+ */
+export const AI_APPS_BUILD_LOGS_ENDPOINT =
+  process.env.AI_APPS_BUILD_LOGS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/logs/build`;
+export const AI_APPS_RUNTIME_LOGS_ENDPOINT =
+  process.env.AI_APPS_RUNTIME_LOGS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/logs/runtime`;
+
+/**
  * Base URL of the LabOS portal that hosts the connect page the member opens to
  * approve a session. Combined with the session uid to build the connect link.
  */
@@ -195,3 +244,19 @@ export const buildConnectUrl = (sessionUid: string): string =>
  */
 export const buildAppPageUrl = (appUid: string): string =>
   `${AI_APPS_PORTAL_URL}/pl-infra/ai-apps/${encodeURIComponent(appUid)}`;
+
+/**
+ * The LabOS "Deployment settings" deep link for one AI App — opens the
+ * update-secrets-and-redeploy modal directly on the app page. Shared with the
+ * member when they want to change a stored secret (or redeploy) later.
+ */
+export const buildAppSettingsUrl = (appUid: string): string => `${buildAppPageUrl(appUid)}?settings=deployment`;
+
+/**
+ * Public URL TEMPLATE of the LabOS "Deployment settings" deep link, written
+ * into the starter kit. The agent replaces the literal `{appUid}` placeholder
+ * with the app's `uid` (saved as `appUid` in `pln-app.config.json`) to hand the
+ * member a link that opens the update-secrets-and-redeploy modal.
+ */
+export const AI_APPS_APP_SETTINGS_ENDPOINT =
+  process.env.AI_APPS_APP_SETTINGS_ENDPOINT || `${AI_APPS_PORTAL_URL}/pl-infra/ai-apps/{appUid}?settings=deployment`;

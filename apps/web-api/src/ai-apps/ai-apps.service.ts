@@ -18,10 +18,20 @@ import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import {
+  AiAppLogPhase,
   AI_APPS_DEPLOY_STUCK_MINUTES,
   AI_APPS_DEPLOY_STUCK_MS,
   AI_APPS_HELM_LOCK_RETRIES,
   AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS,
+  AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES,
+  AI_APPS_LOGS_DESC_CACHE_TTL_MS,
+  AI_APPS_LOGS_DESC_DEFAULT_LIMIT,
+  AI_APPS_LOGS_DESC_MAX_LIMIT,
+  AI_APPS_LOGS_DESC_MAX_RUNNER_CALLS,
+  AI_APPS_LOGS_DESC_NARROWINGS,
+  AI_APPS_LOGS_DESC_RETAIN,
+  AI_APPS_LOGS_DESC_RUNNER_LIMIT,
+  AI_APPS_LOGS_DESC_TIME_BUDGET_MS,
   AI_APPS_RUNNER_ENVIRONMENT,
   AI_APPS_RUNNER_TOKEN,
   AI_APPS_RUNNER_URL,
@@ -38,6 +48,7 @@ import {
   buildPrdPublicUrl,
   buildPrdS3Key,
   buildRunnerDeploymentsUrl,
+  buildRunnerLogsUrl,
   buildRunnerSecretsUrl,
 } from './ai-apps.constants';
 
@@ -309,6 +320,258 @@ export class AiAppsService {
       return { live: !!res.status && res.status !== 404 && !GATEWAY_TIMEOUT_STATUSES.includes(res.status) };
     } catch {
       return { live: false };
+    }
+  }
+
+  /**
+   * CloudWatch logs for one app + phase for the connected member's agent
+   * (deploy-token auth) to debug failed builds and runtime errors — owner-only,
+   * like the agent metadata route. Delegates the runner proxy to
+   * `fetchRunnerLogs`.
+   */
+  async getAgentLogs(
+    requesterUid: string,
+    uid: string,
+    phase: AiAppLogPhase,
+    query: { limit?: number; sinceMinutes?: number; nextToken?: string }
+  ): Promise<unknown> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (app.memberUid !== requesterUid) {
+      throw new ForbiddenException('The agent may read logs only for apps owned by its connected member');
+    }
+    return this.fetchRunnerLogs(app, phase, query);
+  }
+
+  /**
+   * Same runner logs for a signed-in member from the LabOS dashboard (member
+   * JWT + `ai_apps.read`), but gated to the app's creator OR a directory admin
+   * — so an admin can debug any app's build/runtime logs without holding a
+   * deploy token. The stricter agent route stays owner-only.
+   */
+  async getMemberLogs(
+    requesterUid: string,
+    uid: string,
+    phase: AiAppLogPhase,
+    query: { limit?: number; sinceMinutes?: number; nextToken?: string }
+  ): Promise<unknown> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can view logs');
+    }
+    return this.fetchRunnerLogs(app, phase, query);
+  }
+
+  /**
+   * Newest-first member log reads (`order=desc`) — what the dashboard's
+   * deployment-logs modal shows. The runner (CloudWatch behind it) only pages
+   * FORWARD from the window start, so the tail is assembled here: walk every
+   * runner page server-side keeping the newest AI_APPS_LOGS_DESC_RETAIN lines,
+   * then serve descending slices. The opaque nextToken encodes an offset from
+   * the newest line plus the window the walk used, so "load earlier" pages
+   * read a consistent slice of history. Unlike the forward routes, the
+   * response here is allowlisted to `{ events, nextToken }` with numeric
+   * epoch-ms timestamps (the runner has been seen sending strings).
+   */
+  async getMemberLogsDesc(
+    requesterUid: string,
+    uid: string,
+    phase: AiAppLogPhase,
+    query: { limit?: number; sinceMinutes?: number; nextToken?: string }
+  ): Promise<{ events: { timestamp: number; message: string }[]; nextToken?: string }> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid } });
+    if (!app || app.status === 'DELETED') {
+      throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can view logs');
+    }
+
+    const limit = Math.min(Math.max(query.limit ?? AI_APPS_LOGS_DESC_DEFAULT_LIMIT, 1), AI_APPS_LOGS_DESC_MAX_LIMIT);
+    const cursor = this.decodeDescCursor(query.nextToken);
+    // A cursor pins the window its first page walked; later pages must read
+    // the same slice of history (and hit the same cache entry).
+    let windowMinutes = cursor ? cursor.w : query.sinceMinutes;
+
+    let walk = await this.walkRunnerLogsTail(app, phase, windowMinutes);
+    if (!walk.complete && !cursor && query.sinceMinutes !== undefined) {
+      // The window is too chatty to walk in one budget. Narrowing keeps the
+      // tail — it's the end of any window that reaches "now" — so retry with
+      // progressively smaller windows before giving up.
+      for (const divisor of AI_APPS_LOGS_DESC_NARROWINGS) {
+        windowMinutes = Math.max(1, Math.floor(query.sinceMinutes / divisor));
+        walk = await this.walkRunnerLogsTail(app, phase, windowMinutes);
+        if (walk.complete) break;
+      }
+    }
+    if (!walk.complete) {
+      throw new BadGatewayException(
+        'Log volume is too large to assemble a newest-first view — retry with a narrower sinceMinutes window'
+      );
+    }
+
+    const all = walk.events; // ascending, at most AI_APPS_LOGS_DESC_RETAIN newest lines
+    const offset = cursor?.o ?? 0;
+    const end = Math.max(0, all.length - offset);
+    const start = Math.max(0, end - limit);
+    const events = all.slice(start, end).reverse(); // newest-first within the page
+    const hasEarlier = start > 0;
+
+    return {
+      events,
+      nextToken: hasEarlier ? this.encodeDescCursor({ o: offset + events.length, w: windowMinutes }) : undefined,
+    };
+  }
+
+  /**
+   * Walk the runner's forward pages to the end of the stream, keeping only the
+   * newest lines (ascending). `complete: false` means a bound tripped before
+   * the end — the buffer then holds the OLDEST part of the window and must
+   * never be served as "newest", so the caller narrows or fails.
+   */
+  private async walkRunnerLogsTail(
+    app: Pick<AiApp, 'appId'>,
+    phase: AiAppLogPhase,
+    sinceMinutes: number | undefined
+  ): Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }> {
+    const cacheKey = `${app.appId}:${phase}:${sinceMinutes ?? 'all'}`;
+    const cached = this.readLogsTailCache(cacheKey);
+    if (cached) {
+      return { events: cached, complete: true };
+    }
+
+    const startedAt = Date.now();
+    let token: string | undefined;
+    let buffer: { timestamp: number; message: string }[] = [];
+
+    for (let call = 0; call < AI_APPS_LOGS_DESC_MAX_RUNNER_CALLS; call++) {
+      const body = (await this.fetchRunnerLogs(app, phase, {
+        limit: AI_APPS_LOGS_DESC_RUNNER_LIMIT,
+        sinceMinutes,
+        nextToken: token,
+      })) as { events?: unknown; nextToken?: unknown } | null;
+
+      const pageEvents = Array.isArray(body?.events) ? body!.events : [];
+      for (const raw of pageEvents) {
+        const entry = raw as { timestamp?: unknown; message?: unknown };
+        if (typeof entry?.message !== 'string') continue;
+        buffer.push({ timestamp: this.toEpochMs(entry.timestamp), message: entry.message });
+      }
+      // The walk is chronological, so trimming the front keeps the newest.
+      if (buffer.length > AI_APPS_LOGS_DESC_RETAIN * 2) {
+        buffer.sort((a, b) => a.timestamp - b.timestamp);
+        buffer = buffer.slice(-AI_APPS_LOGS_DESC_RETAIN);
+      }
+
+      const next = typeof body?.nextToken === 'string' ? body.nextToken : undefined;
+      // CloudWatch never nulls the token at end-of-stream; the real end is no
+      // token or the token we just sent echoed back.
+      if (!next || next === token) {
+        buffer.sort((a, b) => a.timestamp - b.timestamp);
+        const events = buffer.slice(-AI_APPS_LOGS_DESC_RETAIN);
+        this.writeLogsTailCache(cacheKey, events);
+        return { events, complete: true };
+      }
+      token = next;
+
+      if (Date.now() - startedAt > AI_APPS_LOGS_DESC_TIME_BUDGET_MS) {
+        return { events: [], complete: false };
+      }
+    }
+
+    return { events: [], complete: false };
+  }
+
+  /** Runner timestamps arrive as numbers, ISO strings, or numeric strings; anything else sorts as 0. */
+  private toEpochMs(value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value !== '') {
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed)) return parsed;
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) return numeric;
+    }
+    return 0;
+  }
+
+  private encodeDescCursor(cursor: { o: number; w?: number }): string {
+    return Buffer.from(JSON.stringify(cursor)).toString('base64url');
+  }
+
+  private decodeDescCursor(token: string | undefined): { o: number; w?: number } | undefined {
+    if (token === undefined) return undefined;
+    try {
+      const parsed = JSON.parse(Buffer.from(token, 'base64url').toString('utf8'));
+      const offset = parsed?.o;
+      const window = parsed?.w;
+      if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0) throw new Error('bad offset');
+      if (window !== undefined && (typeof window !== 'number' || !Number.isInteger(window) || window < 1)) {
+        throw new Error('bad window');
+      }
+      return { o: offset, w: window };
+    } catch {
+      throw new BadRequestException('Invalid nextToken for order=desc — use the token from a previous desc response');
+    }
+  }
+
+  /** Per-instance cache of completed tail walks, so scrolling history doesn't re-walk the runner per page. */
+  private readonly logsTailCache = new Map<
+    string,
+    { expiresAt: number; events: { timestamp: number; message: string }[] }
+  >();
+
+  private readLogsTailCache(key: string): { timestamp: number; message: string }[] | null {
+    const entry = this.logsTailCache.get(key);
+    if (!entry) return null;
+    if (entry.expiresAt < Date.now()) {
+      this.logsTailCache.delete(key);
+      return null;
+    }
+    return entry.events;
+  }
+
+  private writeLogsTailCache(key: string, events: { timestamp: number; message: string }[]): void {
+    if (this.logsTailCache.size >= AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES) {
+      // Maps iterate in insertion order — dropping the first key is a cheap FIFO.
+      const oldest = this.logsTailCache.keys().next().value;
+      if (oldest !== undefined) this.logsTailCache.delete(oldest);
+    }
+    this.logsTailCache.set(key, { expiresAt: Date.now() + AI_APPS_LOGS_DESC_CACHE_TTL_MS, events });
+  }
+
+  /**
+   * Proxies one app + phase's CloudWatch logs verbatim from the sandbox runner
+   * (`GET /v1/apps/<appId>/<phase>/logs`), keeping the runner token server-side.
+   * The response envelope (`events`, `nextToken`, `logGroup`, …) is the runner's
+   * own; CloudWatch may return an empty `events` page WITH a `nextToken`, so
+   * pagination is the caller's job. Access checks are the caller's job.
+   */
+  private async fetchRunnerLogs(
+    app: Pick<AiApp, 'appId'>,
+    phase: AiAppLogPhase,
+    query: { limit?: number; sinceMinutes?: number; nextToken?: string }
+  ): Promise<unknown> {
+    const params: Record<string, string | number> = {};
+    if (query.limit !== undefined) params.limit = query.limit;
+    if (query.sinceMinutes !== undefined) params.sinceMinutes = query.sinceMinutes;
+    if (query.nextToken !== undefined) params.nextToken = query.nextToken;
+
+    try {
+      const response = await axios.get(buildRunnerLogsUrl(app.appId, phase), {
+        headers: { 'x-runner-token': AI_APPS_RUNNER_TOKEN },
+        params,
+        timeout: 30000,
+      });
+      this.logger.log(`Runner ${phase}-logs response for ${app.appId}: status=${response.status}`);
+      return response.data;
+    } catch (error) {
+      this.logRunnerError(`${phase}-logs`, app.appId, error);
+      throw new BadGatewayException(`Failed to fetch ${phase} logs from the sandbox runner`);
     }
   }
 

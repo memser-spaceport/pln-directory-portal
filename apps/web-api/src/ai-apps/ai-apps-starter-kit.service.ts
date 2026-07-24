@@ -5,11 +5,14 @@ import { join } from 'path';
 import {
   AI_APP_TOKEN_HEADER,
   AI_APPS_APP_DOMAIN,
+  AI_APPS_APP_SETTINGS_ENDPOINT,
+  AI_APPS_BUILD_LOGS_ENDPOINT,
   AI_APPS_CONNECT_ENDPOINT,
   AI_APPS_DEPLOY_ENDPOINT,
   AI_APPS_DRAFT_ENDPOINT,
   AI_APPS_ME_ENDPOINT,
   AI_APPS_METADATA_ENDPOINT,
+  AI_APPS_RUNTIME_LOGS_ENDPOINT,
   AI_APPS_STARTER_KIT_VERSION,
 } from './ai-apps.constants';
 
@@ -37,6 +40,7 @@ export class AiAppsStarterKitService {
     add('AGENTS.md', this.agentInstructions());
     add('.claude/skills/deploy-to-labs/SKILL.md', this.deploySkill());
     add('.claude/skills/app-metadata/SKILL.md', this.metadataSkill());
+    add('.claude/skills/app-logs/SKILL.md', this.logsSkill());
     add('.claude/skills/pl-design-system/SKILL.md', this.designSystemSkill());
     add('.claude/skills/pln-member-context/SKILL.md', this.memberContextSkill());
     add('pln-app.config.json', this.configJson());
@@ -103,6 +107,8 @@ to the Protocol Labs Network sandbox with a single instruction.
 - \`.claude/skills/deploy-to-labs/\` — the deploy skill your agent uses.
 - \`.claude/skills/app-metadata/\` — how your agent names/describes your app and
   adds an optional one-pager PRD (always with your approval).
+- \`.claude/skills/app-logs/\` — how your agent reads your app's build and
+  runtime logs to diagnose failed deploys and runtime errors.
 - \`.claude/skills/pl-design-system/\` — how to build on-brand UI with the PL Design System.
 - \`.claude/skills/pln-member-context/\` — how your app can know which PLN member is using it.
 - \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
@@ -149,8 +155,10 @@ for you:
 3. When it's time to deploy, your agent registers the app as a **draft** and gives
    you a LabOS link. Open it, enter your key(s) in the form there, and click
    **Deploy** — that page is the only place your secrets should ever go.
-4. Updating a key later? Open your app's page in LabOS (PL Infra → AI Apps → your
-   app), click **Update secrets & redeploy**, enter the new value, and Deploy.
+4. Updating a key later? On the PL Infra → AI Apps dashboard, open the **⋯ menu**
+   on your app's card (it's also on the app's own page) and choose **Deployment
+   settings** — click **Replace** on the value you want to change, enter the new
+   one, and click **Redeploy**.
 
 Secrets never go into the code, the chat, or the uploaded ZIP — they are stored
 securely on the sandbox and injected into your app when it runs.
@@ -162,6 +170,13 @@ photo, teams, role, skills — to greet them, tag their feedback, or tailor what
 it shows. Just ask your agent, e.g. *"greet me by name and show my team when I
 open the app"*. Visitors who aren't signed in (or lack access) simply get the
 non-personalized version — your app keeps working for them.
+
+## When something breaks
+If a deploy fails or your app misbehaves after deploying, just tell your agent —
+e.g. *"the deploy failed, what happened?"* or *"the app shows an error, check the
+logs"*. Your agent can read your app's **build logs** (what happened while the
+app was being built) and **runtime logs** (what the running app printed),
+diagnose the problem, and fix it — you never need to dig through logs yourself.
 
 ## Embedding in the dashboard
 Your app is shown inside the AI Apps dashboard. Apps built with this kit display
@@ -314,8 +329,12 @@ The flow (full steps in the deploy skill):
 4. To ship a code update later, register the draft again (same \`appId\`, fresh
    \`deploymentId\`) — already-stored secret values stay valid; the member just
    clicks Deploy again in LabOS.
-5. To change a key later, the member doesn't need you at all: on the app's LabOS
-   page they click **Update secrets & redeploy**, enter the new value, and Deploy.
+5. To change a key later, the member doesn't need you at all: on the PL Infra →
+   AI Apps dashboard they open the **⋯ menu** on the app's card and choose
+   **Deployment settings**, click **Replace** on the value, enter the new one,
+   and click **Redeploy**. If they ask you for a direct link, build it from
+   \`appSettingsUrl\` in \`pln-app.config.json\` (replace \`{appUid}\` with the saved
+   \`appUid\`) — it opens that modal for them.
 
 Never ask the member for secret values in the chat, and never write them to any
 file — LabOS is the only place they should be entered.
@@ -372,6 +391,16 @@ follow "Apps that need secrets" above instead of deploying directly. In short:
    (see "Keep the deployment URL private" in the deploy skill). That privacy rule
    covers only the app's own \`<appId>\` address — LabOS links (\`connectUrl\`,
    \`appPageUrl\`) must always be shared with the member.
+
+## Debugging a deployed app (build & runtime logs)
+When a deploy fails (status \`ERROR\`), the deployed app crashes or misbehaves,
+or the member asks what their app is doing, load the **app-logs** skill
+(\`.claude/skills/app-logs/SKILL.md\`). In short: \`buildLogsEndpoint\` and
+\`runtimeLogsEndpoint\` in \`pln-app.config.json\` (\`{appUid}\` templates, deploy-token
+auth) serve the app's CloudWatch logs — **build** logs for image-build failures,
+**runtime** logs for the running app's stdout/stderr. Fetch them yourself,
+diagnose, explain in plain words, fix, and redeploy — don't ask the member to
+find logs.
 
 ## Deploy token
 There is **no long-lived token** in this kit. You obtain a short-lived deploy
@@ -560,6 +589,107 @@ updated app record; the dashboard reflects it immediately.
   change, update \`appName\`/\`appDescription\` there too.
 - The deploy token stays in memory only — never write it to the config or any
   file (same rule as the deploy skill).
+`;
+  }
+
+  private logsSkill(): string {
+    return `---
+name: app-logs
+description: Fetch the deployed app's build logs (Docker/Kaniko image build output) and runtime logs (the running app's stdout/stderr) from the PLN sandbox. Use whenever a deploy fails or returns status ERROR, the deployed app crashes / misbehaves / shows a 5xx, or the member asks what their app is doing ("get the logs", "why is it broken?"). Requires a deploy token from the connect flow.
+---
+
+# App logs — build & runtime
+
+The PLN sandbox keeps two log streams per app in CloudWatch, and you can fetch
+both through the PLN API:
+
+- **Build logs** — the output of the image build (Docker/Kaniko) from the latest
+  successful build. Read these when a **deploy fails** or the build seems wrong
+  (missing dependency, compile error, bad Dockerfile step).
+- **Runtime logs** — stdout + stderr of the running app pod from the latest
+  successful runtime deployment. Read these when the **deployed app errors,
+  crashes, or misbehaves** (5xx from the app, feature not working, silent
+  failures).
+
+## Endpoints
+
+\`buildLogsEndpoint\` and \`runtimeLogsEndpoint\` in \`pln-app.config.json\` are URL
+**templates** — replace the literal \`{appUid}\` with the app's \`uid\` (saved as
+\`appUid\` in the config after the first deploy/draft upload). Auth is the same
+short-lived deploy token used for deploys, in the \`${AI_APP_TOKEN_HEADER}\`
+header — if you don't hold a live one, run the connect flow from the
+deploy-to-labs skill first.
+
+Query parameters (all optional):
+
+- \`limit\` — max number of log events per page.
+- \`sinceMinutes\` — time window looking back from now (e.g. \`60\` = last hour,
+  \`1440\` = last 24 h, \`10080\` = last 7 days).
+- \`nextToken\` — pagination cursor from the previous response.
+
+\`\`\`bash
+# Runtime logs for the last hour
+curl -sS "<runtimeLogsEndpoint with {appUid} replaced>?limit=100&sinceMinutes=60" \\
+  -H "${AI_APP_TOKEN_HEADER}: <deployToken>"
+
+# Build logs for the last 24 hours
+curl -sS "<buildLogsEndpoint with {appUid} replaced>?limit=100&sinceMinutes=1440" \\
+  -H "${AI_APP_TOKEN_HEADER}: <deployToken>"
+\`\`\`
+
+Response shape (log events are CloudWatch events, oldest first):
+
+\`\`\`json
+{
+  "appId": "my-app",
+  "deploymentId": "deploy-…",
+  "phase": "runtime",
+  "source": "cloudwatch",
+  "logGroup": "/eks/…",
+  "events": [ { "timestamp": 1786000000000, "message": "app listening on 3000" } ],
+  "nextToken": "…"
+}
+\`\`\`
+
+## Pagination — empty pages are normal
+
+CloudWatch may return an **empty \`events\` page that still carries a
+\`nextToken\`**. An empty first page does NOT mean there are no logs — keep
+following \`nextToken\` (URL-encode it) for a few pages before concluding the
+window has nothing:
+
+\`\`\`bash
+curl -sS "<logs endpoint>?limit=100&sinceMinutes=1440&nextToken=<url-encoded token>" \\
+  -H "${AI_APP_TOKEN_HEADER}: <deployToken>"
+\`\`\`
+
+Stop when a page repeats the same \`nextToken\` or you've seen enough. Log
+availability is bounded by the CloudWatch retention policy — very old deploys
+may have no logs left.
+
+## How to use them when debugging
+
+1. **Deploy returned ERROR / the build failed** → fetch **build** logs
+   (\`sinceMinutes\` covering the deploy attempt, e.g. 60) and look for the
+   failing Dockerfile step, npm/compile error, or missing file. Fix and redeploy.
+2. **App is deployed but broken** (blank page, 5xx, feature not working) →
+   fetch **runtime** logs for the last 30–60 min, reproduce the issue (reload
+   the app), then fetch again and diff for new errors/stack traces.
+3. Summarize what you found for the member in plain words ("the build failed
+   because a package is missing"), fix it, and redeploy. Don't dump raw logs on
+   a non-technical member unless they ask.
+
+## Rules
+
+- Owner-only: the token's member must own the app (403 otherwise), and the app
+  must have been uploaded at least once (404 before that).
+- The privacy rule from the deploy skill applies: log lines may contain the
+  app's own URL/host — keep using them internally, don't surface the URL to
+  the member.
+- Never paste secret values that may appear in logs back into the chat or any
+  file; if you spot one in a log line, tell the member to rotate it via
+  Deployment settings.
+- The deploy token stays in memory only — same handling as deploys.
 `;
   }
 
@@ -858,7 +988,9 @@ the chat.
    **do not reveal it to the member** (see "Keep the deployment URL private").
    On \`READY\`, tell the member the app is live and can be opened from the
    PL Infra → AI Apps dashboard. If \`status\` is \`ERROR\`, surface \`notes\`
-   (never the URL).
+   (never the URL) — and when \`notes\` alone doesn't explain the failure, fetch
+   the **build logs** via the app-logs skill (\`.claude/skills/app-logs/SKILL.md\`)
+   to find the real error before retrying.
 
    **After the FIRST successful deploy**, offer the optional one-pager PRD —
    see "Offer the one-pager PRD" in the app-metadata skill. If the member wants
@@ -926,7 +1058,10 @@ on the AI Apps dashboard.
   \`deploymentId\`, updated \`requiredEnvVars\` if they changed) and send the member
   back to \`appPageUrl\` to click Deploy. Stored secret values remain valid.
 - The member can also update secret values and redeploy entirely from LabOS —
-  no agent involvement needed.
+  no agent involvement needed: on the AI Apps dashboard they open the **⋯ menu**
+  on the app's card and choose **Deployment settings**. If they want a direct
+  link, hand them \`appSettingsUrl\` from \`pln-app.config.json\` with \`{appUid}\`
+  replaced by the saved \`appUid\` — it opens that modal straight away.
 
 ## Keep the deployment URL private
 This rule covers ONLY the deployed app's own address — the URL/host/port on
@@ -953,7 +1088,17 @@ curl -sS -m 20 -o /dev/null -w '%{http_code}\\n' "https://<appId>.${AI_APPS_APP_
 \`\`\`
 
 If it returns \`200\` within a minute or two, the deploy worked — proceed to the
-verification steps. Only re-deploy if it stays unreachable.
+verification steps. Only re-deploy if it stays unreachable — and before
+re-deploying, check the **build logs** (app-logs skill) to see whether and why
+the build actually failed.
+
+## Debugging with logs
+Build and runtime logs are available through the app-logs skill
+(\`.claude/skills/app-logs/SKILL.md\`): \`buildLogsEndpoint\` /
+\`runtimeLogsEndpoint\` from \`pln-app.config.json\` with the same deploy token.
+Use build logs for failed builds/deploys and runtime logs when the deployed app
+errors or misbehaves. Log lines may include the app's URL/host — the
+"Keep the deployment URL private" rule applies to anything you quote from them.
 
 ## Notes
 - Reuse the same \`appId\` to redeploy an existing app; use a new \`deploymentId\`
@@ -980,6 +1125,9 @@ verification steps. Only re-deploy if it stays unreachable.
         deployEndpoint: AI_APPS_DEPLOY_ENDPOINT,
         draftEndpoint: AI_APPS_DRAFT_ENDPOINT,
         metadataEndpoint: AI_APPS_METADATA_ENDPOINT,
+        buildLogsEndpoint: AI_APPS_BUILD_LOGS_ENDPOINT,
+        runtimeLogsEndpoint: AI_APPS_RUNTIME_LOGS_ENDPOINT,
+        appSettingsUrl: AI_APPS_APP_SETTINGS_ENDPOINT,
         memberContextEndpoint: AI_APPS_ME_ENDPOINT,
         deployTokenHeader: AI_APP_TOKEN_HEADER,
         kitVersion: AI_APPS_STARTER_KIT_VERSION,
@@ -988,7 +1136,7 @@ verification steps. Only re-deploy if it stays unreachable.
         appName: '',
         appDescription: '',
         notes:
-          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription hold the member-APPROVED display metadata (see .claude/skills/app-metadata) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint is a template where {appUid} is replaced with it. If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill).',
+          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription hold the member-APPROVED display metadata (see .claude/skills/app-metadata) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint, buildLogsEndpoint, runtimeLogsEndpoint, and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy; the logs endpoints serve the build and runtime logs — see .claude/skills/app-logs). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill).',
       },
       null,
       2

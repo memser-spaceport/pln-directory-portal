@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Delete,
   ForbiddenException,
@@ -169,6 +170,118 @@ export class AiAppsController {
     return this.aiAppsService.updateMetadataWithOptionalPrdFile(memberUid, uid, body, file);
   }
 
+  /**
+   * Build logs for the agent (deploy-token auth, owner-only): the CloudWatch
+   * output of the app's image build (Kaniko), proxied from the sandbox runner.
+   * Supports `limit`, `sinceMinutes` (time window), and `nextToken` (pagination).
+   */
+  @NoCache()
+  @Get(':uid/logs/build')
+  @UseGuards(AiAppTokenGuard)
+  async getBuildLogs(
+    @Param('uid') uid: string,
+    @Req() req: any,
+    @Query('limit') limit?: string,
+    @Query('sinceMinutes') sinceMinutes?: string,
+    @Query('nextToken') nextToken?: string
+  ) {
+    return this.aiAppsService.getAgentLogs(req.aiAppMemberUid, uid, 'build', {
+      limit: this.parsePositiveInt('limit', limit),
+      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+      nextToken,
+    });
+  }
+
+  /**
+   * Runtime logs for the agent (deploy-token auth, owner-only): the CloudWatch
+   * output of the running app pod (stdout + stderr), proxied from the sandbox
+   * runner. Same query parameters as the build logs.
+   */
+  @NoCache()
+  @Get(':uid/logs/runtime')
+  @UseGuards(AiAppTokenGuard)
+  async getRuntimeLogs(
+    @Param('uid') uid: string,
+    @Req() req: any,
+    @Query('limit') limit?: string,
+    @Query('sinceMinutes') sinceMinutes?: string,
+    @Query('nextToken') nextToken?: string
+  ) {
+    return this.aiAppsService.getAgentLogs(req.aiAppMemberUid, uid, 'runtime', {
+      limit: this.parsePositiveInt('limit', limit),
+      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+      nextToken,
+    });
+  }
+
+  /**
+   * Build logs for a signed-in member from the LabOS dashboard (member JWT +
+   * `ai_apps.read`), gated to the app's creator OR a directory admin — so an
+   * admin can debug any app's logs without a deploy token.
+   *
+   * `order=desc` returns a newest-first view (assembled server-side — the
+   * runner only pages forward) with an allowlisted `{events, nextToken}` body
+   * whose nextToken walks EARLIER into history. Without it, same query params
+   * and verbatim runner envelope as the agent route.
+   */
+  @NoCache()
+  @Get(':uid/build-logs')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getMemberBuildLogs(
+    @Param('uid') uid: string,
+    @Req() req: any,
+    @Query('limit') limit?: string,
+    @Query('sinceMinutes') sinceMinutes?: string,
+    @Query('nextToken') nextToken?: string,
+    @Query('order') order?: string
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    const query = {
+      limit: this.parsePositiveInt('limit', limit),
+      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+      nextToken,
+    };
+    return this.parseLogOrder(order) === 'desc'
+      ? this.aiAppsService.getMemberLogsDesc(memberUid, uid, 'build', query)
+      : this.aiAppsService.getMemberLogs(memberUid, uid, 'build', query);
+  }
+
+  /**
+   * Runtime logs for a signed-in member from the LabOS dashboard (member JWT +
+   * `ai_apps.read`), gated to the app's creator OR a directory admin. Same
+   * `order=desc` behavior as the build route.
+   */
+  @NoCache()
+  @Get(':uid/runtime-logs')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getMemberRuntimeLogs(
+    @Param('uid') uid: string,
+    @Req() req: any,
+    @Query('limit') limit?: string,
+    @Query('sinceMinutes') sinceMinutes?: string,
+    @Query('nextToken') nextToken?: string,
+    @Query('order') order?: string
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    const query = {
+      limit: this.parsePositiveInt('limit', limit),
+      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+      nextToken,
+    };
+    return this.parseLogOrder(order) === 'desc'
+      ? this.aiAppsService.getMemberLogsDesc(memberUid, uid, 'runtime', query)
+      : this.aiAppsService.getMemberLogs(memberUid, uid, 'runtime', query);
+  }
+
+  /** 'asc' (default) = verbatim runner passthrough; 'desc' = server-assembled newest-first view. */
+  private parseLogOrder(order: string | undefined): 'asc' | 'desc' {
+    if (order === undefined || order === 'asc') return 'asc';
+    if (order === 'desc') return 'desc';
+    throw new BadRequestException(`order must be 'asc' or 'desc', got: ${order}`);
+  }
+
   /** Same metadata edit path for a connected member agent. */
   @NoCache()
   @Patch(':uid/agent')
@@ -316,6 +429,18 @@ export class AiAppsController {
   async deployDraft(@Param('uid') uid: string, @Body() body: DeployDraftDto, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.aiAppsService.deployDraft(memberUid, uid, body.secrets);
+  }
+
+  /** Parse an optional numeric query param, 400ing on anything but a positive integer. */
+  private parsePositiveInt(name: string, value?: string): number | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new BadRequestException(`${name} must be a positive integer`);
+    }
+    return parsed;
   }
 
   private async resolveMemberUid(req: any): Promise<string> {

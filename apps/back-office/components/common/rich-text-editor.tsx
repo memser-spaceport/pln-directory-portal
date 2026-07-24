@@ -1,10 +1,10 @@
 'use client';
 
 import React, { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
-import ReactQuill from 'react-quill';
+import ReactQuill, { Quill } from 'react-quill-new';
 import clsx from 'clsx';
 
-import 'react-quill/dist/quill.snow.css';
+import 'react-quill-new/dist/quill.snow.css';
 
 import s from './rich-text-editor.module.scss';
 
@@ -79,6 +79,36 @@ const RichTextEditor = forwardRef<ReactQuill, Props>((props, ref) => {
         handlers: {
           link: handleLink,
         },
+      },
+      clipboard: {
+        matchers: [
+          [
+            Node.TEXT_NODE,
+            (node: Text, delta: any) => {
+              const urlRegex = /https?:\/\/[^\s<]+/g;
+              const text = node.data;
+              if (urlRegex.test(text)) {
+                const Delta = Quill.import('delta');
+                const newDelta = new Delta();
+                let lastIndex = 0;
+                urlRegex.lastIndex = 0;
+                let match;
+                while ((match = urlRegex.exec(text)) !== null) {
+                  if (match.index > lastIndex) {
+                    newDelta.insert(text.slice(lastIndex, match.index));
+                  }
+                  newDelta.insert(match[0], { link: match[0] });
+                  lastIndex = match.index + match[0].length;
+                }
+                if (lastIndex < text.length) {
+                  newDelta.insert(text.slice(lastIndex));
+                }
+                return newDelta;
+              }
+              return delta;
+            },
+          ],
+        ],
       },
     };
   }, [handleLink]);

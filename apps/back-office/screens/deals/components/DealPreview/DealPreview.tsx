@@ -99,7 +99,7 @@ export const DealPreview = ({ data, logoPreviewUrl, isPublishing, publishDisable
 
         <section className={s.section}>
           <h3 className={s.sectionTitle}>Redemption Instructions</h3>
-          <QuillContent html={data.redemptionInstructions || ''} className={s.redemptionInstructionsBody} />
+          <QuillContent html={data.redemptionInstructions || ''} className={s.richText} />
         </section>
       </div>
 

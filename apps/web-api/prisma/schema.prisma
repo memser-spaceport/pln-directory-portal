@@ -2287,6 +2287,7 @@ model TeamNewsItem {
   eventDate    DateTime
   title        String
   summary      String?
+  contentHtml  String?
   sourceUrl    String
   sourceUrls   String[]            @default([])
   sourceDomain String?
@@ -2654,6 +2655,131 @@ model PathfinderCorrection {
   @@index([field])
   @@index([appliedAt])
   @@index([targetInvestorId])
+}
+
+/// Warm Intros v2 — unified person profile (PL-internal / founder / investor) with provenance.
+/// Structured Json fields (emails, phones, socials, experience, …) use Sourced<T> wrappers where
+/// applicable (see warm_intros_v2_spec.md); there is no separate Provenance table.
+/// Link ids are plain nullable strings (no FKs) so ingest order is unconstrained.
+model MasterProfile {
+  uid String @id @default(cuid())
+
+  /// Stable merge key (email / LinkedIn / Affinity id / memberUid / name+org fallback).
+  personKey String @unique
+
+  /// pl_internal | founder | investor (multi-type allowed).
+  types String[] @default([])
+
+  canonicalName String
+
+  memberUid          String?
+  affinityPersonId   String?
+  investorOutreachId String?
+
+  emails          Json?
+  phones          Json?
+  socials         Json?
+  organizations   Json?
+  experience      Json?
+  education       Json?
+  investorMeta    Json?
+  funds           Json?
+  investedIn      Json?
+  locations       Json?
+  listMemberships Json?
+  raw             Json?
+  sourceSnapshots Json?
+
+  currentOrg   String?
+  currentTitle String?
+  bio          String? @db.Text
+
+  contentHash       String?
+  enrichmentVersion String?
+  enrichedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([memberUid])
+  @@index([affinityPersonId])
+  @@index([investorOutreachId])
+}
+
+/// Warm Intros v2 connection edge; iteration 1 = `pl_direct`.
+/// Profile uids are plain strings (no FKs) so ingest order is unconstrained — same as MasterProfile.
+model ConnectionEdge {
+  uid String @id @default(cuid())
+
+  /// PL connector MasterProfile.uid.
+  fromProfileUid String
+  /// Investor MasterProfile.uid.
+  toProfileUid   String
+  /// e.g. `pl_direct` (iteration 1).
+  relationKind   String @db.VarChar(32)
+
+  /// 0..1 edge strength.
+  score      Float
+  /// 0..1 model/hint confidence.
+  confidence Float
+  /// `llm` | `hybrid`.
+  method     String @db.VarChar(16)
+
+  /// Array of { description, sourceType, sourceLink? }.
+  reasons   Json
+  /// Affinity + sharedEntities snapshot used for the pairing call.
+  hintsUsed Json?
+
+  provider      String? @db.VarChar(32)
+  model         String? @db.VarChar(64)
+  promptVersion String? @db.VarChar(64)
+  runId         String? @db.VarChar(64)
+  /// Hash of pairing inputs for this edge.
+  contentHash   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fromProfileUid, toProfileUid, relationKind])
+  @@index([toProfileUid])
+  @@index([fromProfileUid])
+  @@index([runId])
+  @@index([relationKind])
+}
+
+/// Materialized warm path for API/UI; derived from ConnectionEdges.
+/// Profile uids are plain strings (no FKs) so ingest order is unconstrained.
+model WarmPathV2 {
+  uid String @id @default(cuid())
+
+  /// Investor MasterProfile.uid.
+  targetProfileUid String
+  /// e.g. `neuro-fund-i` | `gold-co-investors`.
+  targetSet        String @db.VarChar(120)
+
+  /// 1 = best.
+  rank     Int
+  score    Float
+  /// `1` in iteration 1.
+  hopCount Int
+  /// Nodes + reasons + summaries.
+  hopChain Json
+
+  bestConnectorProfileUid       String?
+  /// string[] of alternate connector MasterProfile.uids.
+  alternateConnectorProfileUids Json?
+
+  runId      String?  @db.VarChar(64)
+  computedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([targetProfileUid, targetSet, rank])
+  @@index([targetProfileUid])
+  @@index([targetSet])
+  @@index([targetProfileUid, rank])
+  @@index([runId])
 }
 
 /// Investor Lists — a curated target set of investors (a "list"). Proximity is computed per list
