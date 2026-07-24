@@ -137,6 +137,31 @@ export type AiAppLogPhase = 'build' | 'runtime';
 export const buildRunnerLogsUrl = (appId: string, phase: AiAppLogPhase): string =>
   `${AI_APPS_RUNNER_URL}/v1/apps/${encodeURIComponent(appId)}/${phase}/logs`;
 
+/**
+ * `order=desc` member log reads. The runner (and CloudWatch behind it) pages
+ * FORWARD from the window start, so the newest-first view the dashboard wants
+ * is assembled here: walk the runner's pages server-side, retain only the
+ * newest lines, and serve descending slices with an offset cursor. These
+ * bounds cap one walk; if a window can't be walked within them the service
+ * narrows the window (the tail survives narrowing — it's the end of any
+ * window that reaches "now") before giving up.
+ */
+export const AI_APPS_LOGS_DESC_RETAIN = 5000;
+export const AI_APPS_LOGS_DESC_RUNNER_LIMIT = 2000;
+export const AI_APPS_LOGS_DESC_MAX_RUNNER_CALLS = 30;
+export const AI_APPS_LOGS_DESC_TIME_BUDGET_MS = 20_000;
+/** Divisors applied to the requested window when a walk blows the budget. */
+export const AI_APPS_LOGS_DESC_NARROWINGS = [4, 16];
+/** Fallback page size / hard cap for one desc response. */
+export const AI_APPS_LOGS_DESC_DEFAULT_LIMIT = 500;
+export const AI_APPS_LOGS_DESC_MAX_LIMIT = 2000;
+/**
+ * Completed walks are cached per instance so a reader scrolling through
+ * history doesn't re-walk the runner for every page. Short TTL — logs move.
+ */
+export const AI_APPS_LOGS_DESC_CACHE_TTL_MS = 15_000;
+export const AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES = 30;
+
 /** Build the S3 key for an app bundle: apps/<appId>/<deploymentId>/app.zip */
 export const buildAppS3Key = (appId: string, deploymentId: string): string => `apps/${appId}/${deploymentId}/app.zip`;
 

@@ -98,6 +98,8 @@ The `deployToken` is held in agent memory only and never written into the kit, s
 | PATCH  | `/v1/ai-apps/:uid/agent`         | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Agent metadata edit: JSON `{ name?, description?, prd? }`; how the starter kit saves approved names/descriptions and one-pager PRDs |
 | GET    | `/v1/ai-apps/:uid/logs/build`    | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Build logs (Docker/Kaniko image build, latest successful build deployment), proxied from the runner's CloudWatch endpoint; `?limit=`, `?sinceMinutes=`, `?nextToken=` |
 | GET    | `/v1/ai-apps/:uid/logs/runtime`  | `AiAppTokenGuard` (`x-app-token`) | — (token = member, **owner only**) | Runtime logs (running app pod stdout/stderr, latest successful runtime deployment), same query params |
+| GET    | `/v1/ai-apps/:uid/build-logs`    | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Dashboard build logs (member JWT): same runner logs as `/logs/build` for the app's creator OR a directory admin — debug any app from LabOS without a deploy token; same query params |
+| GET    | `/v1/ai-apps/:uid/runtime-logs`  | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | Dashboard runtime logs (member JWT): same runner logs as `/logs/runtime` for the app's creator OR a directory admin; same query params |
 | POST   | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` | Submit free-text feedback on an app (multiple entries per member allowed) |
 | GET    | `/v1/ai-apps/:uid/feedback`      | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.read`/`write` + creator/directory-admin (checked in service) | All feedback for one app, newest first, with submitter info |
 | GET    | `/v1/ai-apps/starter-kit/download` | `UserTokenCheckGuard`+`RbacGuard` | `ai_apps.write`   | Stream the starter-kit ZIP (no token inside) |
@@ -226,11 +228,12 @@ The kit's `app-metadata` skill drives a propose → confirm → save workflow so
 3. **Redeploys**: the saved `appName`/`appDescription` are resent verbatim and the propose flow is **not** re-run (it would otherwise revert approved metadata, since deploys overwrite it).
 4. **Metadata changes on an existing app** (rename, description edit, PRD add/update/remove): same propose → confirm → save flow through the metadata endpoint, using the `appUid` the kit saved from the deploy/draft response (`metadataEndpoint` in the config is a template with a `{appUid}` placeholder). A metadata-only session still gets its short-lived token through the normal connect flow.
 
-## Build & runtime logs (agent debugging)
+## Build & runtime logs (agent + dashboard debugging)
 
 The deployment orchestrator (sandbox runner) keeps two CloudWatch-backed log
-streams per app, and the backend proxies them to the connected member's agent
-so it can debug failed deploys and runtime errors itself:
+streams per app, and the backend proxies them both to the connected member's
+agent (deploy token) and to a signed-in member on the LabOS dashboard (member
+JWT) so failed deploys and runtime errors can be debugged from either place:
 
 - **Build logs** — `GET /v1/ai-apps/:uid/logs/build` → runner
   `GET /v1/apps/<appId>/build/logs`: output of the image build (Kaniko / build
@@ -250,6 +253,23 @@ curl -sS "https://api.plnetwork.io/v1/ai-apps/<uid>/logs/runtime?limit=100&since
   -H "x-app-token: plndeploy_…"
 # → { "appId", "deploymentId", "phase", "source": "cloudwatch", "logGroup",
 #     "events": [{ "timestamp", "message" }, …], "nextToken" }
+```
+
+**Dashboard variants (member JWT, admin access):** the two agent routes above
+require a deploy token, which a human debugging from LabOS doesn't hold. The
+same runner logs are therefore also exposed for a signed-in member at
+`GET /v1/ai-apps/:uid/build-logs` and `GET /v1/ai-apps/:uid/runtime-logs`
+(`UserTokenCheckGuard` + `RbacGuard`, `ai_apps.read`). These are gated in the
+service to the app's **creator OR a directory admin** (the same owner+admin
+pattern as feedback listing and member deploy — `isCreatorOrDirectoryAdmin`),
+so a directory admin can debug **any** app's logs from the dashboard without a
+deploy token. Same query params and verbatim runner envelope; the two
+`/logs/*` agent routes stay strict owner-only. Both paths share one private
+`fetchRunnerLogs(app, phase, query)` proxy after their own access check.
+
+```bash
+curl -sS "https://api.plnetwork.io/v1/ai-apps/<uid>/runtime-logs?limit=100&sinceMinutes=60" \
+  -H "Authorization: Bearer $MEMBER_JWT"
 ```
 
 Query params (all optional, validated as positive integers where numeric):

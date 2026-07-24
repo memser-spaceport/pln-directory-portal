@@ -131,6 +131,7 @@ export class TeamNewsEnrichmentService {
           eventDate: item.eventDate.toISOString(),
           title: item.title,
           summary: item.summary,
+          contentHtml: item.contentHtml,
           sourceUrl: item.sourceUrl,
           sourceUrls: item.sourceUrls.length > 0 ? item.sourceUrls : [item.sourceUrl],
           sources: (item.sourceUrls.length > 0 ? item.sourceUrls : [item.sourceUrl]).map(

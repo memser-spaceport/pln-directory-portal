@@ -544,6 +544,7 @@ export class TeamNewsQueryService {
       eventDate: Date;
       title: string;
       summary: string | null;
+      contentHtml: string | null;
       sourceUrl: string;
       sourceUrls: string[];
       sourceDomain: string | null;
@@ -584,6 +585,7 @@ export class TeamNewsQueryService {
       eventDate: row.eventDate.toISOString(),
       title: row.title,
       summary: row.summary,
+      contentHtml: row.contentHtml,
       sourceUrl: row.sourceUrl,
       sourceUrls: row.sourceUrls.length > 0 ? row.sourceUrls : [row.sourceUrl],
       sources: (row.sourceUrls.length > 0 ? row.sourceUrls : [row.sourceUrl]).map(

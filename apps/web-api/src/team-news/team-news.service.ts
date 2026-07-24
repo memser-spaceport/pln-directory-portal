@@ -344,6 +344,7 @@ export class TeamNewsService {
       eventDate,
       title: item.title,
       summary: item.summary ?? null,
+      contentHtml: item.contentHtml ?? null,
       sourceUrl: item.sourceUrl,
       sourceUrls: [item.sourceUrl],
       sourceDomain,
@@ -364,6 +365,7 @@ export class TeamNewsService {
         sourceUrls: true,
         title: true,
         summary: true,
+        contentHtml: true,
         tags: true,
       },
     });
@@ -395,6 +397,7 @@ export class TeamNewsService {
           sourceUrls: true,
           title: true,
           summary: true,
+          contentHtml: true,
           tags: true,
         },
       });
@@ -448,6 +451,8 @@ export class TeamNewsService {
         data: {
           sourceUrls,
           tags: [...new Set([...existing.tags, ...item.tags])],
+          // Do not erase richer HTML when an older producer replays an item.
+          contentHtml: item.contentHtml ?? existing.contentHtml,
           rawPayload: data.rawPayload,
         },
       });

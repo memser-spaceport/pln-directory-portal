@@ -214,6 +214,74 @@ export class AiAppsController {
     });
   }
 
+  /**
+   * Build logs for a signed-in member from the LabOS dashboard (member JWT +
+   * `ai_apps.read`), gated to the app's creator OR a directory admin — so an
+   * admin can debug any app's logs without a deploy token.
+   *
+   * `order=desc` returns a newest-first view (assembled server-side — the
+   * runner only pages forward) with an allowlisted `{events, nextToken}` body
+   * whose nextToken walks EARLIER into history. Without it, same query params
+   * and verbatim runner envelope as the agent route.
+   */
+  @NoCache()
+  @Get(':uid/build-logs')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getMemberBuildLogs(
+    @Param('uid') uid: string,
+    @Req() req: any,
+    @Query('limit') limit?: string,
+    @Query('sinceMinutes') sinceMinutes?: string,
+    @Query('nextToken') nextToken?: string,
+    @Query('order') order?: string
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    const query = {
+      limit: this.parsePositiveInt('limit', limit),
+      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+      nextToken,
+    };
+    return this.parseLogOrder(order) === 'desc'
+      ? this.aiAppsService.getMemberLogsDesc(memberUid, uid, 'build', query)
+      : this.aiAppsService.getMemberLogs(memberUid, uid, 'build', query);
+  }
+
+  /**
+   * Runtime logs for a signed-in member from the LabOS dashboard (member JWT +
+   * `ai_apps.read`), gated to the app's creator OR a directory admin. Same
+   * `order=desc` behavior as the build route.
+   */
+  @NoCache()
+  @Get(':uid/runtime-logs')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getMemberRuntimeLogs(
+    @Param('uid') uid: string,
+    @Req() req: any,
+    @Query('limit') limit?: string,
+    @Query('sinceMinutes') sinceMinutes?: string,
+    @Query('nextToken') nextToken?: string,
+    @Query('order') order?: string
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    const query = {
+      limit: this.parsePositiveInt('limit', limit),
+      sinceMinutes: this.parsePositiveInt('sinceMinutes', sinceMinutes),
+      nextToken,
+    };
+    return this.parseLogOrder(order) === 'desc'
+      ? this.aiAppsService.getMemberLogsDesc(memberUid, uid, 'runtime', query)
+      : this.aiAppsService.getMemberLogs(memberUid, uid, 'runtime', query);
+  }
+
+  /** 'asc' (default) = verbatim runner passthrough; 'desc' = server-assembled newest-first view. */
+  private parseLogOrder(order: string | undefined): 'asc' | 'desc' {
+    if (order === undefined || order === 'asc') return 'asc';
+    if (order === 'desc') return 'desc';
+    throw new BadRequestException(`order must be 'asc' or 'desc', got: ${order}`);
+  }
+
   /** Same metadata edit path for a connected member agent. */
   @NoCache()
   @Patch(':uid/agent')
