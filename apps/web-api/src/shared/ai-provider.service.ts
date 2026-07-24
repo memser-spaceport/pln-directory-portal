@@ -36,9 +36,9 @@ export class AiProviderService {
   /**
    * Resolves the effective provider for a given feature.
    * Checks for a feature-specific override env var (e.g., TEAM_ENRICHMENT_AI_PROVIDER),
-   * then the feature's own fallback (for features whose historical behavior is
-   * pinned to a specific provider, e.g. Husky generation → openai), then the
-   * global AI_PROVIDER.
+   * then the feature's own fallback (for features pinned to a specific
+   * provider regardless of the global setting, e.g. Husky generation), then
+   * the global AI_PROVIDER.
    */
   private resolveProvider(featureProviderEnvVar?: string, fallbackProvider?: AiProviderType): AiProviderType {
     if (featureProviderEnvVar) {

@@ -20,7 +20,7 @@ The rules are enforced in both bio system prompts (`HUSKY_AUTO_BIO_SYSTEM_PROMPT
 
 | File | Role |
 | --- | --- |
-| `apps/web-api/src/husky/member-bio.util.ts` | Core: pronoun scanning/mapping, free-signal resolution, profile prompt builder, `generateMemberBioText` (OpenAI call) |
+| `apps/web-api/src/husky/member-bio.util.ts` | Core: pronoun scanning/mapping, free-signal resolution, profile prompt builder, `generateMemberBioText` (AI call via `AiProviderService`) |
 | `apps/web-api/src/husky/member-bio-refresh.util.ts` | Bulk refresh runner; `AI_BIO_MARKER`; the paid scrape ladder |
 | `apps/web-api/src/husky/member-bio-refresh.service.ts` | Admin-facing service: status, dry-run, fire-and-forget apply run |
 | `apps/web-api/src/husky/member-scrapingdog.service.ts` | Member-scoped ScrapingDog client (LinkedIn person + X profile). Separate from the team-enrichment ScrapingDog client on purpose |
@@ -109,7 +109,7 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: applicati
   -d '{"dryRun": false, "limit": 20, "noScrape": false}' "$WEB_API_BASE_URL/v1/admin/members/ai-bios/refresh"
 ```
 
-Body options: `dryRun` (default **true**), `limit`, `emails: string[]`, `noScrape`. A dry run resolves free-signal pronouns per member and reports who would need scraping — it makes no OpenAI or ScrapingDog calls. The apply run's re-entrancy guard (`isRunning`) is **in-memory per pod**; with multiple replicas another pod could start a second run. Acceptable for a manually-triggered maintenance job — same trade-off the team-enrichment status endpoint documents.
+Body options: `dryRun` (default **true**), `limit`, `emails: string[]`, `noScrape`. A dry run resolves free-signal pronouns per member and reports who would need scraping — it makes no AI or ScrapingDog calls. The apply run's re-entrancy guard (`isRunning`) is **in-memory per pod**; with multiple replicas another pod could start a second run. Acceptable for a manually-triggered maintenance job — same trade-off the team-enrichment status endpoint documents.
 
 > A CLI wrapper (`yarn api:refresh-ai-member-bios`) existed briefly but was removed in favor of the endpoints — `runMemberBioRefresh` takes a plain `PrismaClient`, so a standalone script can be recreated in minutes if ever needed.
 
@@ -127,7 +127,7 @@ Body options: `dryRun` (default **true**), `limit`, `emails: string[]`, `noScrap
 | --- |-------------------------------------------------------------------------------------------------------------------------------------------|
 | `HUSKY_GENERATION_AI_PROVIDER` | Provider for all Husky generation (`openai` \| `gemini` \| `anthropic`); unset = `gemini` (pinned fallback, ignores global `AI_PROVIDER`) |
 | `OPENAI_LLM_MODEL` / `OPENAI_API_KEY` | Model + auth when the provider is openai                                                                                                  |
-| `GEMINI_MODEL` (+ Google API key env used by `@ai-sdk/google`) | Model + auth when the provider is gemini                                                                                                  |
+| `GEMINI_MODEL` / `GOOGLE_GENERATIVE_AI_API_KEY` | Model + auth when the provider is gemini — the key is REQUIRED since gemini is the default provider                                       |
 | `CLAUDE_MODEL` / `CLAUDE_API_KEY` (or `ANTHROPIC_*`) | Model + auth when the provider is anthropic                                                                                               |
 | `SCRAPINGDOG_API_KEY` | Enables the paid scrape ladder; when unset, scraping is skipped and unknown-pronoun members fall back to name-only bios                   |
 

@@ -11,8 +11,9 @@ import { AiProviderService } from './ai-provider.service';
 /**
  * Locks the provider-resolution precedence: feature env var > per-feature
  * fallback > global AI_PROVIDER > 'gemini'. The per-feature fallback is what
- * keeps Husky generation pinned to OpenAI when HUSKY_GENERATION_AI_PROVIDER
- * is unset — a regression here silently flips its provider on deploy.
+ * pins Husky generation to HUSKY_GENERATION_FALLBACK_PROVIDER when
+ * HUSKY_GENERATION_AI_PROVIDER is unset, independent of AI_PROVIDER — a
+ * regression here silently changes its provider on deploy.
  */
 describe('AiProviderService provider resolution', () => {
   const FEATURE_VAR = 'TESTFEATURE_AI_PROVIDER';
