@@ -4,6 +4,7 @@ import {
   matchesSearch,
   matchesSector,
   parseInvestorSectors,
+  parseKnownListSlugs,
   toInvestorSummary,
   unwrapPrimaryEmail,
 } from './warm-intros-v2-enrich.util';
@@ -39,6 +40,30 @@ describe('warm-intros-v2-enrich.util', () => {
     });
   });
 
+  describe('parseKnownListSlugs', () => {
+    it('extracts known cohort slugs in stable order', () => {
+      expect(
+        parseKnownListSlugs([
+          { listSlug: 'gold-co-investors' },
+          { listSlug: 'neuro-fund-i' },
+          { listSlug: 'other-list' },
+        ])
+      ).toEqual(['neuro-fund-i', 'gold-co-investors']);
+    });
+
+    it('dedupes and accepts slug alias', () => {
+      expect(
+        parseKnownListSlugs([{ listSlug: 'neuro-fund-i' }, { slug: 'neuro-fund-i' }, { listSlug: 'gold-co-investors' }])
+      ).toEqual(['neuro-fund-i', 'gold-co-investors']);
+    });
+
+    it('returns empty for missing/invalid', () => {
+      expect(parseKnownListSlugs(null)).toEqual([]);
+      expect(parseKnownListSlugs([])).toEqual([]);
+      expect(parseKnownListSlugs([{ listName: 'Neuro' }])).toEqual([]);
+    });
+  });
+
   describe('toInvestorSummary', () => {
     it('maps investor email from Sourced[] fixture', () => {
       const summary = toInvestorSummary('inv1', {
@@ -51,6 +76,7 @@ describe('warm-intros-v2-enrich.util', () => {
         investorMeta: { sectors: ['crypto', 'public-goods'] },
         affinityPersonId: '149762491',
         memberUid: null,
+        listMemberships: [{ listSlug: 'neuro-fund-i' }, { listSlug: 'gold-co-investors' }],
       });
 
       expect(summary).toEqual({
@@ -64,6 +90,7 @@ describe('warm-intros-v2-enrich.util', () => {
         affinityPersonId: '149762491',
         memberUid: null,
         imageUrl: null,
+        listSlugs: ['neuro-fund-i', 'gold-co-investors'],
       });
     });
 
@@ -77,6 +104,7 @@ describe('warm-intros-v2-enrich.util', () => {
       });
       expect(summary.imageUrl).toBe('https://cdn.example/jane.png');
       expect(summary.memberUid).toBe('m1');
+      expect(summary.listSlugs).toEqual([]);
     });
   });
 

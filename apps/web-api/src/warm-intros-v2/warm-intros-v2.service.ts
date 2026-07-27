@@ -393,9 +393,7 @@ export class WarmIntrosV2Service {
       hopChain: path.hopChain,
     });
 
-    const hopChain = enrichHopNames
-      ? enrichHopChainNames(path.hopChain, profilesByUid, path.hopCount)
-      : path.hopChain;
+    const hopChain = enrichHopNames ? enrichHopChainNames(path.hopChain, profilesByUid, path.hopCount) : path.hopChain;
 
     return {
       uid: path.uid,
@@ -465,6 +463,7 @@ export class WarmIntrosV2Service {
         investorMeta: true,
         affinityPersonId: true,
         memberUid: true,
+        listMemberships: true,
       },
     });
 

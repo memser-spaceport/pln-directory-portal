@@ -5,6 +5,11 @@
 
 import { computeWarmPathProximity } from './warm-intros-v2-proximity.util';
 
+/** Known Warm Intros v2 cohort targetSet slugs (stable order). */
+export const KNOWN_LIST_SLUGS = ['neuro-fund-i', 'gold-co-investors'] as const;
+export type KnownListSlug = (typeof KNOWN_LIST_SLUGS)[number];
+const KNOWN_LIST_SLUG_SET = new Set<string>(KNOWN_LIST_SLUGS);
+
 export type EnrichedInvestorSummary = {
   profileUid: string;
   personKey: string;
@@ -17,6 +22,8 @@ export type EnrichedInvestorSummary = {
   memberUid: string | null;
   /** Directory Member image URL when memberUid is linked. */
   imageUrl: string | null;
+  /** Known cohort list slugs from MasterProfile.listMemberships. */
+  listSlugs: KnownListSlug[];
 };
 
 export type EnrichedConnectorSummary = {
@@ -45,6 +52,7 @@ export type MasterProfileEnrichRow = {
   investorMeta?: unknown;
   affinityPersonId?: string | null;
   memberUid?: string | null;
+  listMemberships?: unknown;
   /** Filled by service when Member.image is resolved. */
   imageUrl?: string | null;
 };
@@ -67,6 +75,25 @@ export function unwrapPrimaryEmail(emails: unknown): string | null {
     if (typeof value === 'string' && value.trim()) return value.trim();
   }
   return null;
+}
+
+/**
+ * Extract known cohort list slugs from MasterProfile.listMemberships.
+ * Order: neuro-fund-i then gold-co-investors. Deduped.
+ */
+export function parseKnownListSlugs(listMemberships: unknown): KnownListSlug[] {
+  if (!Array.isArray(listMemberships)) return [];
+  const found = new Set<string>();
+  for (const item of listMemberships) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    const slug =
+      (typeof rec.listSlug === 'string' && rec.listSlug.trim()) ||
+      (typeof rec.slug === 'string' && rec.slug.trim()) ||
+      '';
+    if (slug && KNOWN_LIST_SLUG_SET.has(slug)) found.add(slug);
+  }
+  return KNOWN_LIST_SLUGS.filter((s) => found.has(s));
 }
 
 /**
@@ -121,6 +148,7 @@ export function toInvestorSummary(
       affinityPersonId: null,
       memberUid: null,
       imageUrl: null,
+      listSlugs: [],
     };
   }
   return {
@@ -134,6 +162,7 @@ export function toInvestorSummary(
     affinityPersonId: profile.affinityPersonId ?? null,
     memberUid: profile.memberUid ?? null,
     imageUrl: profile.imageUrl ?? null,
+    listSlugs: parseKnownListSlugs(profile.listMemberships),
   };
 }
 
