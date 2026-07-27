@@ -318,7 +318,56 @@ describe('WarmIntrosV2Service', () => {
   });
 
   describe('listPaths', () => {
-    it('defaults rank=1, enriches investor email from Sourced[], returns total', async () => {
+    it('defaults rank=1 and minScore=0.2, enriches investor email from Sourced[], returns total', async () => {
+      pathFindMany.mockResolvedValue([pathRow]);
+      pathCount.mockResolvedValue(1);
+
+      const result = await service.listPaths({
+        targetSet: 'neuro-fund-i',
+        connectorProfileUid: 'from1',
+        limit: '10',
+        offset: '0',
+      });
+
+      expect(pathFindMany).toHaveBeenCalledWith({
+        where: {
+          rank: 1,
+          targetSet: 'neuro-fund-i',
+          score: { gte: 0.2 },
+          OR: [{ bestConnectorProfileUid: 'from1' }, { alternateConnectorProfileUids: { array_contains: 'from1' } }],
+        },
+        take: 10,
+        skip: 0,
+        orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
+      });
+      expect(masterProfileFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { uid: { in: expect.arrayContaining(['inv1', 'from1']) } },
+        })
+      );
+
+      expect(result.total).toBe(1);
+      expect(result.paths).toHaveLength(1);
+      expect(result.paths[0]).toMatchObject({
+        uid: 'p1',
+        proximityCode: 'PL+1A',
+        caliber: 'A',
+        scorePercent: 70,
+        scoreBand: 'green',
+        investor: {
+          profileUid: 'inv1',
+          name: 'Vitalik Buterin',
+          email: 'vitalik@ethereum.org',
+          sectors: ['crypto', 'public-goods'],
+        },
+        bestConnector: {
+          profileUid: 'from1',
+          name: 'Juan Benet',
+        },
+      });
+    });
+
+    it('honors explicit minScore override', async () => {
       pathFindMany.mockResolvedValue([pathRow]);
       pathCount.mockResolvedValue(1);
 
@@ -406,7 +455,7 @@ describe('WarmIntrosV2Service', () => {
       // Post-filter path: no take/skip on findMany
       expect(pathFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { rank: 1 },
+          where: { rank: 1, score: { gte: 0.2 } },
           orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
         })
       );
@@ -452,7 +501,7 @@ describe('WarmIntrosV2Service', () => {
         investor: expect.objectContaining({ profileUid: 'inv1', name: 'inv1' }),
       });
       expect(pathFindMany).toHaveBeenCalledWith({
-        where: { targetProfileUid: 'inv1' },
+        where: { targetProfileUid: 'inv1', score: { gte: 0.2 } },
         orderBy: [{ targetSet: 'asc' }, { rank: 'asc' }],
       });
     });
@@ -495,6 +544,11 @@ describe('WarmIntrosV2Service', () => {
         ]);
 
       const result = await service.listFacets({ targetSet: 'neuro-fund-i' });
+      expect(pathFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { rank: 1, targetSet: 'neuro-fund-i', score: { gte: 0.2 } },
+        })
+      );
       expect(result.connectors).toEqual([
         { profileUid: 'from1', name: 'Juan Benet', pathCount: 2 },
         { profileUid: 'from2', name: 'Lacey Wisdom', pathCount: 0 },

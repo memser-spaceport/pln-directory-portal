@@ -13,6 +13,7 @@ import {
   WarmPathV2Input,
 } from './dto/ingest-warm-intros-v2.dto';
 import {
+  alternateUidsFromHopChain,
   buildPathSummary,
   enrichHopChainNames,
   matchesSearch,
@@ -22,7 +23,7 @@ import {
   toConnectorSummary,
   toInvestorSummary,
 } from './warm-intros-v2-enrich.util';
-import { computeWarmPathProximity } from './warm-intros-v2-proximity.util';
+import { computeWarmPathProximity, WARM_INTROS_V2_MIN_SCORE } from './warm-intros-v2-proximity.util';
 
 type WarmPathRow = {
   uid: string;
@@ -229,8 +230,8 @@ export class WarmIntrosV2Service {
     const targetSet = query.targetSet?.trim() || null;
     const connectorProfileUid = query.connectorProfileUid?.trim() || null;
     const minScoreRaw = query.minScore?.trim();
-    const minScore = minScoreRaw !== undefined && minScoreRaw !== '' ? Number(minScoreRaw) : null;
-    if (minScore !== null && !Number.isFinite(minScore)) {
+    const minScore = minScoreRaw !== undefined && minScoreRaw !== '' ? Number(minScoreRaw) : WARM_INTROS_V2_MIN_SCORE;
+    if (!Number.isFinite(minScore)) {
       throw new BadRequestException('minScore must be a finite number');
     }
 
@@ -246,9 +247,8 @@ export class WarmIntrosV2Service {
     const sector = query.sector?.trim() || null;
     const needsPostFilter = Boolean(search || sector);
 
-    const where: Prisma.WarmPathV2WhereInput = { rank };
+    const where: Prisma.WarmPathV2WhereInput = { rank, score: { gte: minScore } };
     if (targetSet) where.targetSet = targetSet;
-    if (minScore !== null) where.score = { gte: minScore };
     if (connectorProfileUid) {
       where.OR = [
         { bestConnectorProfileUid: connectorProfileUid },
@@ -286,7 +286,10 @@ export class WarmIntrosV2Service {
       throw new BadRequestException('investorProfileUid is required');
     }
     const targetSet = query.targetSet?.trim() || null;
-    const where: Prisma.WarmPathV2WhereInput = { targetProfileUid: uid };
+    const where: Prisma.WarmPathV2WhereInput = {
+      targetProfileUid: uid,
+      score: { gte: WARM_INTROS_V2_MIN_SCORE },
+    };
     if (targetSet) where.targetSet = targetSet;
 
     const paths = (await this.prisma.warmPathV2.findMany({
@@ -312,7 +315,7 @@ export class WarmIntrosV2Service {
    */
   async listFacets(query: ListWarmIntrosV2FacetsQueryDto) {
     const targetSet = query.targetSet?.trim() || null;
-    const where: Prisma.WarmPathV2WhereInput = { rank: 1 };
+    const where: Prisma.WarmPathV2WhereInput = { rank: 1, score: { gte: WARM_INTROS_V2_MIN_SCORE } };
     if (targetSet) where.targetSet = targetSet;
 
     const paths = (await this.prisma.warmPathV2.findMany({
@@ -394,6 +397,9 @@ export class WarmIntrosV2Service {
     });
 
     const hopChain = enrichHopNames ? enrichHopChainNames(path.hopChain, profilesByUid, path.hopCount) : path.hopChain;
+    const alternateConnectorProfileUids = enrichHopNames
+      ? alternateUidsFromHopChain(hopChain)
+      : path.alternateConnectorProfileUids;
 
     return {
       uid: path.uid,
@@ -404,7 +410,7 @@ export class WarmIntrosV2Service {
       hopCount: path.hopCount,
       hopChain,
       bestConnectorProfileUid: path.bestConnectorProfileUid,
-      alternateConnectorProfileUids: path.alternateConnectorProfileUids,
+      alternateConnectorProfileUids,
       runId: path.runId,
       computedAt: path.computedAt,
       proximityCode: proximity.proximityCode,
@@ -416,7 +422,7 @@ export class WarmIntrosV2Service {
         path.bestConnectorProfileUid,
         path.bestConnectorProfileUid ? profilesByUid.get(path.bestConnectorProfileUid) : undefined
       ),
-      pathSummary: buildPathSummary(path.hopChain, path.alternateConnectorProfileUids),
+      pathSummary: buildPathSummary(hopChain, alternateConnectorProfileUids),
     };
   }
 

@@ -216,6 +216,24 @@ describe('warm-intros-v2-enrich.util', () => {
         scoreBand: 'yellow',
       });
     });
+
+    it('drops alternates below the 20% min score', () => {
+      const enriched = enrichHopChainNames(
+        {
+          relationKind: 'pl_direct',
+          hops: [],
+          alternates: [
+            { profileUid: 'keep', name: 'Keep', score: 0.2 },
+            { profileUid: 'drop', name: 'Drop', score: 0.19 },
+          ],
+        },
+        new Map(),
+        1
+      ) as { alternates: Array<Record<string, unknown>> };
+
+      expect(enriched.alternates).toHaveLength(1);
+      expect(enriched.alternates[0]).toMatchObject({ profileUid: 'keep', scorePercent: 20 });
+    });
   });
 
   describe('matchesSearch / matchesSector', () => {
