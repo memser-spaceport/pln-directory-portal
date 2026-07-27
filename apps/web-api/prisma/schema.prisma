@@ -247,6 +247,8 @@ model Member {
   roadmapObjectivesCreated  RoadmapObjective[]      @relation("roadmapObjectiveCreatedBy")
   roadmapSubmissionDraft    RoadmapSubmissionDraft? @relation("roadmapSubmissionDraftOwner")
   teamNewsUpvotes           TeamNewsUpvote[]        @relation("MemberTeamNewsUpvotes")
+  feedComments              FeedComment[]           @relation("MemberFeedComments")
+  feedForumPostLikes        FeedForumPostLike[]     @relation("MemberFeedForumPostLikes")
 
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
   affinityPerson               AffinityPerson?
@@ -2338,6 +2340,50 @@ model TeamNewsForumLink {
 
   @@unique([newsItemUid, forumTopicId])
   @@index([newsItemUid])
+}
+
+enum FeedItemType {
+  NEWS
+  FORUM_POST
+}
+
+/// Feed-only comment on a TeamNewsItem or a NodeBB-backed forum-post feed
+/// item. Never synced to NodeBB even for FORUM_POST — these are unrelated
+/// to NodeBB's own reply system. itemUid is a soft reference (news uid or
+/// `fp_<tid>`), not a hard FK, since it can point at two different source
+/// types. itemType is redundant with the `fp_` prefix but kept explicit for
+/// query clarity/indexing, matching Follow.entityType. authorUid IS a hard
+/// FK since the author is always a real directory member.
+model FeedComment {
+  id        Int          @id @default(autoincrement())
+  uid       String       @unique @default(cuid())
+  itemType  FeedItemType
+  itemUid   String
+  text      String
+  authorUid String
+  author    Member       @relation("MemberFeedComments", fields: [authorUid], references: [uid], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([itemType, itemUid, createdAt])
+  @@index([authorUid])
+}
+
+/// Directory-portal-native like on a forum-post feed item — NOT a proxy for
+/// NodeBB's own upvote/downvote (NodeBB has no native "like"). forumPostUid
+/// is a soft reference (`fp_<tid>`, no local table for forum posts).
+/// memberUid IS a hard FK since the liker is always a real directory member.
+model FeedForumPostLike {
+  id           Int      @id @default(autoincrement())
+  uid          String   @unique @default(cuid())
+  forumPostUid String
+  memberUid    String
+  member       Member   @relation("MemberFeedForumPostLikes", fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([forumPostUid, memberUid])
+  @@index([forumPostUid])
+  @@index([memberUid])
 }
 
 model TeamNewsEnrichment {
