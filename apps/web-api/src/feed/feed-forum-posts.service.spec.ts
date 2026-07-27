@@ -52,7 +52,6 @@ describe('FeedForumPostsService', () => {
       title: 'Hello & welcome',
       body: 'Body one Body two',
       author: topic.author,
-      focusAreas: ['General'],
       category: 'General',
       createdAt: new Date(1700000000000).toISOString(),
       forumTopicUrl: topic.forumTopicUrl,

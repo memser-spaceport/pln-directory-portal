@@ -16,7 +16,6 @@ export const FeedForumPostSchema = z.object({
   title: z.string(),
   body: z.string(),
   author: FeedForumPostAuthorSchema,
-  focusAreas: z.array(z.string()),
   category: z.string(),
   createdAt: z.string(),
   forumTopicUrl: z.string().nullable(),

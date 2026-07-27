@@ -42,9 +42,7 @@ Real, already-synced fields read off each topic (nothing here is invented — se
 
 `title`/`body` are run through `stripHtmlToPlainText` (`apps/web-api/src/utils/html-to-text.ts`) before being returned — NodeBB content can contain rendered HTML, and `sanitize-html` alone isn't enough (it re-escapes `&`/`<`/`>` in its output and inserts no whitespace at stripped block-tag boundaries), so this wraps it with an entity-decode pass and a block-boundary-to-space pass.
 
-### `focusAreas` — a deliberate simplification
-
-Team news items derive `focusAreas` from `Team.teamFocusAreas`. Forum posts have no such link — a NodeBB topic isn't tied to a team. The real production NodeBB categories (`Intros`, `Talent`, `Launch`, `General`) are generic forum sections, not domain topics, so there's no meaningful mapping onto the five news focus-area tab titles (`Digital Human Rights`, `Economies & Governance`, etc.). Per product decision, a forum post's `focusAreas` is just `[categoryName]` verbatim — e.g. `["General"]`. It will only ever match a news focus-area tab by coincidence; in practice these posts mostly surface under "All".
+Forum posts have no `focusAreas` field — unlike team news items (which derive it from `Team.teamFocusAreas`), a NodeBB topic isn't tied to a team, and the real production NodeBB categories (`Intros`, `Talent`, `Launch`, `General`) are generic forum sections with no meaningful mapping onto the five news focus-area tab titles (`Digital Human Rights`, `Economies & Governance`, etc.). Don't add one back without a concrete, non-coincidental source for it — see the `category` field above for the one real per-topic classification NodeBB actually provides.
 
 ## Data model
 
@@ -132,7 +130,6 @@ curl "http://localhost:3000/v1/feed/forum-posts?limit=5" \
         "avatarUrl": null,
         "role": "role 1"
       },
-      "focusAreas": ["General"],
       "category": "General",
       "createdAt": "2026-07-07T09:51:35.910Z",
       "forumTopicUrl": "https://plnetwork.io/forum/topics/7/188",

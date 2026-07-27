@@ -42,7 +42,6 @@ export class FeedForumPostsService {
       title: stripHtmlToPlainText(topic.title),
       body: stripHtmlToPlainText(topic.bodyHtml),
       author: topic.author,
-      focusAreas: topic.categoryName ? [topic.categoryName] : [],
       category: topic.categoryName,
       createdAt: new Date(topic.timestamp).toISOString(),
       forumTopicUrl: topic.forumTopicUrl,

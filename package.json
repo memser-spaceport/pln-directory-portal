@@ -19,6 +19,7 @@
     "api:import-job-openings": "ts-node apps/web-api/src/scripts/import-job-openings.ts",
     "api:export-directory-linkedin": "ts-node apps/web-api/src/scripts/export-directory-linkedin.ts",
     "api:seed-team-news": "ts-node apps/web-api/src/scripts/seed-team-news.ts",
+    "api:seed-feed": "ts-node apps/web-api/src/scripts/seed-feed.ts",
     "api:seed-pathfinder-demo": "ts-node apps/web-api/src/scripts/seed-pathfinder-demo.ts",
     "api:seed-investor-lists": "ts-node apps/web-api/src/scripts/seed-investor-lists.ts",
     "api:seed-pathfinder-neuro": "ts-node --transpile-only apps/web-api/src/scripts/seed-pathfinder-neuro.ts",
