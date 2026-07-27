@@ -20,7 +20,20 @@ import { HUSKY_BIO_DISCLAIMER } from '../utils/ai-prompts';
 
 // Matches the visible text of HUSKY_BIO_DISCLAIMER without depending on its
 // exact HTML wrapping, so older disclaimer variants are still caught.
-export const AI_BIO_MARKER = 'Bio is AI generated';
+// Three space encodings: the generator emits plain spaces, but the profile
+// rich-text editor (Quill) rewrites spaces on save — as the `&nbsp;` entity
+// or the raw U+00A0 character — so a bio saved through the editor would
+// otherwise stop matching (same nbsp issue the DealPreview fix addressed).
+export const AI_BIO_MARKERS = [
+  'Bio is AI generated',
+  'Bio&nbsp;is&nbsp;AI&nbsp;generated',
+  'Bio\u00A0is\u00A0AI\u00A0generated',
+];
+
+/** Prisma where-fragment matching any AI-disclaimer variant in Member.bio. */
+export function aiBioWhere() {
+  return { OR: AI_BIO_MARKERS.map((marker) => ({ bio: { contains: marker } })) };
+}
 
 export interface BioRefreshOptions {
   /** false = dry-run: report only, zero paid calls. */
@@ -60,7 +73,7 @@ export interface BioRefreshRunResult {
 }
 
 export function countAiGeneratedBios(prisma: PrismaClient): Promise<number> {
-  return prisma.member.count({ where: { bio: { contains: AI_BIO_MARKER } } });
+  return prisma.member.count({ where: aiBioWhere() });
 }
 
 function formatTwitterContext(profile: ScrapingDogMemberXProfile): string {
@@ -145,7 +158,7 @@ export async function runMemberBioRefresh(
 
   const members = await prisma.member.findMany({
     where: {
-      bio: { contains: AI_BIO_MARKER },
+      ...aiBioWhere(),
       ...(options.emails && options.emails.length > 0 ? { email: { in: options.emails } } : {}),
     },
     include: {

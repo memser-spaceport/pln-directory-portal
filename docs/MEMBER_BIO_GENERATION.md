@@ -33,7 +33,7 @@ The rules are enforced in both bio system prompts (`HUSKY_AUTO_BIO_SYSTEM_PROMPT
 
 - The bio lives on **`Member.bio`** (`String?`). There is **no structured "AI-generated" flag** — the only marker is the disclaimer HTML appended to every generated bio:
   - `HUSKY_BIO_DISCLAIMER` = `<p><em>Bio is AI generated & may not be accurate.</em></p>`
-  - Bulk refresh identifies AI bios by substring match on the visible text (`AI_BIO_MARKER = 'Bio is AI generated'`), deliberately not the full HTML so older disclaimer variants still match.
+  - Bulk refresh identifies AI bios by substring match on the visible text (`AI_BIO_MARKERS`), deliberately not the full HTML so older disclaimer variants still match. Three space encodings are matched — plain, `&nbsp;` entity, and raw U+00A0 — because the profile rich-text editor (Quill) rewrites spaces to non-breaking ones when the member saves the returned bio.
 - Generation itself does not persist: the self-service endpoint returns `{ bio }` and the front-end saves it via the normal member-update path. The bulk refresh writes `Member.bio` directly.
 - **Caveat:** if a member manually edited their bio but kept the disclaimer text, a bulk refresh will overwrite that edit — the disclaimer is the only AI marker that exists.
 
@@ -115,7 +115,7 @@ Body options: `dryRun` (default **true**), `limit`, `emails: string[]`, `noScrap
 
 ### Runner semantics
 
-- Selects members `WHERE bio LIKE '%Bio is AI generated%'` (plus optional email filter / limit), ordered by `createdAt`.
+- Selects members whose bio contains any `AI_BIO_MARKERS` variant (plus optional email filter / limit), ordered by `createdAt`.
 - Per member: free ladder → (apply mode only) paid ladder → generate → save `bio + HUSKY_BIO_DISCLAIMER`.
 - Empty generation keeps the existing bio (counted as `emptyGeneration`).
 - Per-member errors are caught and counted; the run continues.
