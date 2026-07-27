@@ -157,9 +157,15 @@ export const AI_APPS_LOGS_DESC_DEFAULT_LIMIT = 500;
 export const AI_APPS_LOGS_DESC_MAX_LIMIT = 2000;
 /**
  * Completed walks are cached per instance so a reader scrolling through
- * history doesn't re-walk the runner for every page. Short TTL — logs move.
+ * history doesn't re-walk the runner for every page. An entry is FRESH for the
+ * short TTL (logs move), then serve-stale up to the stale bound: a stale read
+ * answers instantly from the cached walk while ONE background walk revalidates
+ * — so the multi-second cold walk is paid once per window, not on every modal
+ * open. Deploys drop the app's entries (see dropLogsTailCache) so a stale copy
+ * never outlives the deployment it captured.
  */
 export const AI_APPS_LOGS_DESC_CACHE_TTL_MS = 15_000;
+export const AI_APPS_LOGS_DESC_CACHE_STALE_TTL_MS = 120_000;
 export const AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES = 30;
 
 /** Build the S3 key for an app bundle: apps/<appId>/<deploymentId>/app.zip */

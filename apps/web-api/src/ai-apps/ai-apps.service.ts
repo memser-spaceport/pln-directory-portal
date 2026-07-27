@@ -24,6 +24,7 @@ import {
   AI_APPS_HELM_LOCK_RETRIES,
   AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS,
   AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES,
+  AI_APPS_LOGS_DESC_CACHE_STALE_TTL_MS,
   AI_APPS_LOGS_DESC_CACHE_TTL_MS,
   AI_APPS_LOGS_DESC_DEFAULT_LIMIT,
   AI_APPS_LOGS_DESC_MAX_LIMIT,
@@ -433,18 +434,63 @@ export class AiAppsService {
    * newest lines (ascending). `complete: false` means a bound tripped before
    * the end — the buffer then holds the OLDEST part of the window and must
    * never be served as "newest", so the caller narrows or fails.
+   *
+   * The cold walk is sequential runner→CloudWatch paging and can take many
+   * seconds even over a sparse window (empty pages still carry tokens that
+   * must be chased to the true end), so reads are cached and coalesced:
+   * - FRESH cache entry → answered from cache.
+   * - STALE-but-recent entry → ALSO answered from cache instantly, while one
+   *   background walk revalidates it (stale-while-revalidate).
+   * - miss → concurrent identical requests share a single in-flight walk
+   *   instead of each paging the runner through the same chain.
    */
-  private async walkRunnerLogsTail(
+  private walkRunnerLogsTail(
     app: Pick<AiApp, 'appId'>,
     phase: AiAppLogPhase,
     sinceMinutes: number | undefined
   ): Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }> {
     const cacheKey = `${app.appId}:${phase}:${sinceMinutes ?? 'all'}`;
-    const cached = this.readLogsTailCache(cacheKey);
-    if (cached) {
-      return { events: cached, complete: true };
+    const entry = this.logsTailCache.get(cacheKey);
+    const now = Date.now();
+    if (entry && entry.evictAt <= now) {
+      this.logsTailCache.delete(cacheKey);
+    } else if (entry) {
+      if (entry.staleAt <= now) {
+        // Revalidation failure only logs — the stale copy stays valid until
+        // evictAt, and the read after that pays the cold walk (and its error).
+        this.startLogsTailWalk(app, phase, sinceMinutes, cacheKey).catch((error) => {
+          this.logger.warn(
+            `Background ${phase}-logs revalidation failed for ${app.appId}: ${(error as Error).message}`
+          );
+        });
+      }
+      return Promise.resolve({ events: entry.events, complete: true });
     }
+    return this.startLogsTailWalk(app, phase, sinceMinutes, cacheKey);
+  }
 
+  /** One walk per key at a time: concurrent identical requests await the same promise. */
+  private startLogsTailWalk(
+    app: Pick<AiApp, 'appId'>,
+    phase: AiAppLogPhase,
+    sinceMinutes: number | undefined,
+    cacheKey: string
+  ): Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }> {
+    const inFlight = this.logsTailWalks.get(cacheKey);
+    if (inFlight) return inFlight;
+    const walk = this.runLogsTailWalk(app, phase, sinceMinutes, cacheKey).finally(() => {
+      this.logsTailWalks.delete(cacheKey);
+    });
+    this.logsTailWalks.set(cacheKey, walk);
+    return walk;
+  }
+
+  private async runLogsTailWalk(
+    app: Pick<AiApp, 'appId'>,
+    phase: AiAppLogPhase,
+    sinceMinutes: number | undefined,
+    cacheKey: string
+  ): Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }> {
     const startedAt = Date.now();
     let token: string | undefined;
     let buffer: { timestamp: number; message: string }[] = [];
@@ -474,7 +520,7 @@ export class AiAppsService {
       if (!next || next === token) {
         buffer.sort((a, b) => a.timestamp - b.timestamp);
         const events = buffer.slice(-AI_APPS_LOGS_DESC_RETAIN);
-        this.writeLogsTailCache(cacheKey, events);
+        this.writeLogsTailCache(cacheKey, app.appId, startedAt, events);
         return { events, complete: true };
       }
       token = next;
@@ -522,26 +568,51 @@ export class AiAppsService {
   /** Per-instance cache of completed tail walks, so scrolling history doesn't re-walk the runner per page. */
   private readonly logsTailCache = new Map<
     string,
-    { expiresAt: number; events: { timestamp: number; message: string }[] }
+    { staleAt: number; evictAt: number; events: { timestamp: number; message: string }[] }
   >();
 
-  private readLogsTailCache(key: string): { timestamp: number; message: string }[] | null {
-    const entry = this.logsTailCache.get(key);
-    if (!entry) return null;
-    if (entry.expiresAt < Date.now()) {
-      this.logsTailCache.delete(key);
-      return null;
-    }
-    return entry.events;
-  }
+  /** In-flight walks by cache key — concurrent identical requests share one runner walk. */
+  private readonly logsTailWalks = new Map<
+    string,
+    Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }>
+  >();
 
-  private writeLogsTailCache(key: string, events: { timestamp: number; message: string }[]): void {
-    if (this.logsTailCache.size >= AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES) {
+  /** When each app's walks were last invalidated by a deploy — see writeLogsTailCache. */
+  private readonly logsTailDroppedAt = new Map<string, number>();
+
+  private writeLogsTailCache(
+    key: string,
+    appId: string,
+    walkStartedAt: number,
+    events: { timestamp: number; message: string }[]
+  ): void {
+    // A walk that began before the app's last deploy captured the PREVIOUS
+    // deployment's stream — never cache it (returning it once is fine; the
+    // next read re-walks fresh).
+    if ((this.logsTailDroppedAt.get(appId) ?? 0) > walkStartedAt) return;
+    if (!this.logsTailCache.has(key) && this.logsTailCache.size >= AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES) {
       // Maps iterate in insertion order — dropping the first key is a cheap FIFO.
       const oldest = this.logsTailCache.keys().next().value;
       if (oldest !== undefined) this.logsTailCache.delete(oldest);
     }
-    this.logsTailCache.set(key, { expiresAt: Date.now() + AI_APPS_LOGS_DESC_CACHE_TTL_MS, events });
+    const now = Date.now();
+    this.logsTailCache.set(key, {
+      staleAt: now + AI_APPS_LOGS_DESC_CACHE_TTL_MS,
+      evictAt: now + AI_APPS_LOGS_DESC_CACHE_STALE_TTL_MS,
+      events,
+    });
+  }
+
+  /**
+   * A new deploy invalidates every cached walk for the app — serve-stale must
+   * never show the previous deployment's lines to someone watching the new one.
+   */
+  private dropLogsTailCache(appId: string): void {
+    this.logsTailDroppedAt.set(appId, Date.now());
+    const prefix = `${appId}:`;
+    for (const key of this.logsTailCache.keys()) {
+      if (key.startsWith(prefix)) this.logsTailCache.delete(key);
+    }
   }
 
   /**
@@ -980,6 +1051,7 @@ export class AiAppsService {
       where: { uid: app.uid },
       data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null },
     });
+    this.dropLogsTailCache(app.appId);
 
     const eventContext = { appUid: app.uid, appId: app.appId, deploymentId };
 
