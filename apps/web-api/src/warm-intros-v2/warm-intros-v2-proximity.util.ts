@@ -6,7 +6,12 @@
  *
  * Caliber: "A" if score >= 0.60, else "B" when score > 0; null if score ≤ 0.
  * proximityCode: `{family}+{hopCount}{caliber}` e.g. PL+1A.
+ *
+ * Paths / alternates below WARM_INTROS_V2_MIN_SCORE are excluded from read APIs.
  */
+
+/** Minimum path/alternate score (0–1) shown in list, detail, and facets (= 20%). */
+export const WARM_INTROS_V2_MIN_SCORE = 0.2;
 
 export type WarmPathCaliber = 'A' | 'B';
 export type WarmPathScoreBand = 'green' | 'yellow' | 'red' | 'none';

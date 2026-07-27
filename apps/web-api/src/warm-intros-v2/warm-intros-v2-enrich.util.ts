@@ -3,7 +3,12 @@
  * Pure helpers — tolerant of Sourced wrappers / loose Json shapes.
  */
 
-import { computeWarmPathProximity } from './warm-intros-v2-proximity.util';
+import { computeWarmPathProximity, WARM_INTROS_V2_MIN_SCORE } from './warm-intros-v2-proximity.util';
+
+/** Known Warm Intros v2 cohort targetSet slugs (stable order). */
+export const KNOWN_LIST_SLUGS = ['neuro-fund-i', 'gold-co-investors'] as const;
+export type KnownListSlug = typeof KNOWN_LIST_SLUGS[number];
+const KNOWN_LIST_SLUG_SET = new Set<string>(KNOWN_LIST_SLUGS);
 
 export type EnrichedInvestorSummary = {
   profileUid: string;
@@ -17,6 +22,8 @@ export type EnrichedInvestorSummary = {
   memberUid: string | null;
   /** Directory Member image URL when memberUid is linked. */
   imageUrl: string | null;
+  /** Known cohort list slugs from MasterProfile.listMemberships. */
+  listSlugs: KnownListSlug[];
 };
 
 export type EnrichedConnectorSummary = {
@@ -45,6 +52,7 @@ export type MasterProfileEnrichRow = {
   investorMeta?: unknown;
   affinityPersonId?: string | null;
   memberUid?: string | null;
+  listMemberships?: unknown;
   /** Filled by service when Member.image is resolved. */
   imageUrl?: string | null;
 };
@@ -67,6 +75,25 @@ export function unwrapPrimaryEmail(emails: unknown): string | null {
     if (typeof value === 'string' && value.trim()) return value.trim();
   }
   return null;
+}
+
+/**
+ * Extract known cohort list slugs from MasterProfile.listMemberships.
+ * Order: neuro-fund-i then gold-co-investors. Deduped.
+ */
+export function parseKnownListSlugs(listMemberships: unknown): KnownListSlug[] {
+  if (!Array.isArray(listMemberships)) return [];
+  const found = new Set<string>();
+  for (const item of listMemberships) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    const slug =
+      (typeof rec.listSlug === 'string' && rec.listSlug.trim()) ||
+      (typeof rec.slug === 'string' && rec.slug.trim()) ||
+      '';
+    if (slug && KNOWN_LIST_SLUG_SET.has(slug)) found.add(slug);
+  }
+  return KNOWN_LIST_SLUGS.filter((s) => found.has(s));
 }
 
 /**
@@ -121,6 +148,7 @@ export function toInvestorSummary(
       affinityPersonId: null,
       memberUid: null,
       imageUrl: null,
+      listSlugs: [],
     };
   }
   return {
@@ -134,6 +162,7 @@ export function toInvestorSummary(
     affinityPersonId: profile.affinityPersonId ?? null,
     memberUid: profile.memberUid ?? null,
     imageUrl: profile.imageUrl ?? null,
+    listSlugs: parseKnownListSlugs(profile.listMemberships),
   };
 }
 
@@ -223,11 +252,12 @@ export function buildPathSummary(hopChain: unknown, alternateConnectorProfileUid
 /**
  * Fill hop + alternate nodes with name / memberUid / imageUrl from MasterProfile map.
  * Alternates also get proximityCode / caliber / scorePercent / scoreBand (same rules as rank-1 path).
+ * Alternates with score < {@link WARM_INTROS_V2_MIN_SCORE} are dropped.
  */
 export function enrichHopChainNames(
   hopChain: unknown,
   profilesByUid: Map<string, MasterProfileEnrichRow>,
-  hopCount: number = 1
+  hopCount = 1
 ): unknown {
   const chain = asRecord(hopChain);
   if (!chain) return hopChain;
@@ -246,10 +276,11 @@ export function enrichHopChainNames(
     return next;
   };
 
-  const enrichAlternate = (node: unknown): unknown => {
+  const enrichAlternate = (node: unknown): Record<string, unknown> | null => {
     const next = enrichProfileFields(node);
-    if (!next) return node;
+    if (!next) return null;
     const score = typeof next.score === 'number' ? next.score : 0;
+    if (score < WARM_INTROS_V2_MIN_SCORE) return null;
     const proximity = computeWarmPathProximity({
       score,
       hopCount,
@@ -263,12 +294,25 @@ export function enrichHopChainNames(
     return next;
   };
 
-  const hops = Array.isArray(chain.hops)
-    ? chain.hops.map((n) => enrichProfileFields(n) ?? n)
-    : chain.hops;
-  const alternates = Array.isArray(chain.alternates) ? chain.alternates.map(enrichAlternate) : chain.alternates;
+  const hops = Array.isArray(chain.hops) ? chain.hops.map((n) => enrichProfileFields(n) ?? n) : chain.hops;
+  const alternates = Array.isArray(chain.alternates)
+    ? chain.alternates.map(enrichAlternate).filter((a): a is Record<string, unknown> => a != null)
+    : chain.alternates;
 
   return { ...chain, hops, alternates };
+}
+
+/** Profile uids from hopChain.alternates after min-score filtering. */
+export function alternateUidsFromHopChain(hopChain: unknown): string[] {
+  const chain = asRecord(hopChain);
+  if (!chain || !Array.isArray(chain.alternates)) return [];
+  const uids: string[] = [];
+  for (const alt of chain.alternates) {
+    const rec = asRecord(alt);
+    const uid = typeof rec?.profileUid === 'string' ? rec.profileUid.trim() : '';
+    if (uid) uids.push(uid);
+  }
+  return uids;
 }
 
 export function matchesSearch(investor: EnrichedInvestorSummary, search: string): boolean {
