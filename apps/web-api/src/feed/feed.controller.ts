@@ -1,6 +1,16 @@
-import { Body, Controller, ForbiddenException, Logger, Param, Req, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Logger,
+  Param,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Api, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
+import { ZodError, ZodType } from 'zod';
 import { apiFeed } from 'libs/contracts/src/lib/contract-feed';
 import {
   CreateFeedCommentRequestSchema,
@@ -36,7 +46,7 @@ export class FeedController {
   @NoCache()
   @UseGuards(UserTokenCheckGuard)
   async getFeedForumPosts(@Req() req: Request & { userEmail?: string }) {
-    const params = FeedForumPostsQueryParams.parse(req.query);
+    const params = this.parse(FeedForumPostsQueryParams, req.query);
 
     const canReadForum = await this.hasForumReadPermission(req.userEmail);
     if (!canReadForum) {
@@ -52,7 +62,7 @@ export class FeedController {
   @Api(server.route.getFeedCommentCounts)
   @NoCache()
   async getFeedCommentCounts(@Body() body: unknown) {
-    const { uids } = FeedCommentCountsRequestSchema.parse(body);
+    const { uids } = this.parse(FeedCommentCountsRequestSchema, body);
     return this.feedCommentsService.getCommentCounts(uids);
   }
 
@@ -60,7 +70,7 @@ export class FeedController {
   @NoCache()
   @UseGuards(UserTokenCheckGuard)
   async getFeedComments(@Req() req: Request & { userEmail?: string }) {
-    const { itemUid } = FeedCommentsQueryParams.parse(req.query);
+    const { itemUid } = this.parse(FeedCommentsQueryParams, req.query);
     const member = req.userEmail ? await this.membersService.findMemberByEmail(req.userEmail) : null;
     return this.feedCommentsService.listComments(itemUid, member?.uid);
   }
@@ -68,7 +78,7 @@ export class FeedController {
   @Api(server.route.createFeedComment)
   @UseGuards(UserTokenValidation)
   async createFeedComment(@Req() req: Request & { userEmail?: string }, @Body() body: unknown) {
-    const validated = CreateFeedCommentRequestSchema.parse(body);
+    const validated = this.parse(CreateFeedCommentRequestSchema, body);
     const member = await this.resolveMember(req);
     return this.feedCommentsService.createComment(member.uid, validated);
   }
@@ -92,6 +102,22 @@ export class FeedController {
   async unlikeFeedForumPost(@Param('uid') uid: string, @Req() req: Request & { userEmail?: string }) {
     const member = await this.resolveMember(req);
     return this.feedLikesService.unlike(member.uid, uid);
+  }
+
+  // Schema.parse() throws a raw ZodError, which the global exception filter
+  // doesn't recognize as an HttpException — it falls through to a generic
+  // 500 instead of a 400. Route every contract-schema parse through here so
+  // invalid input (e.g. empty text, which the app-wide empty-string-to-null
+  // interceptor turns into `null` before this runs) surfaces as a proper 400.
+  private parse<T>(schema: ZodType<T, any, any>, data: unknown): T {
+    try {
+      return schema.parse(data);
+    } catch (err) {
+      if (err instanceof ZodError) {
+        throw new BadRequestException(err.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; '));
+      }
+      throw err;
+    }
   }
 
   private async hasForumReadPermission(userEmail?: string): Promise<boolean> {

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 export interface NodeBBTopicAuthor {
   memberUid: string | null;
@@ -22,6 +22,7 @@ export interface NodeBBRecentTopic {
 
 @Injectable()
 export class ProtosphereApiClient {
+  private readonly logger = new Logger(ProtosphereApiClient.name);
   private forumApiUrl: string;
 
   constructor() {
@@ -41,13 +42,22 @@ export class ProtosphereApiClient {
   /**
    * GET /api/recent — public, unauthenticated (NodeBB's own PUBLIC_GET_ALLOWLIST
    * carve-out), so this is a plain guest-level read, no per-caller auth needed.
+   *
+   * NodeBB being unreachable shouldn't 500 the whole newsfeed — degrade to an
+   * empty list and log a warning, same "don't error, just omit" philosophy as
+   * the forum-access gate in feed.controller.ts.
    */
   async getRecentTopics(opts: { page?: number } = {}): Promise<NodeBBRecentTopic[]> {
-    const response = await axios.get(`${this.forumApiUrl}/api/recent`, {
-      params: opts.page ? { page: opts.page } : undefined,
-    });
-    const topics = Array.isArray(response.data?.topics) ? response.data.topics : [];
-    return topics.map((topic: any) => this.mapRecentTopic(topic));
+    try {
+      const response = await axios.get(`${this.forumApiUrl}/api/recent`, {
+        params: opts.page ? { page: opts.page } : undefined,
+      });
+      const topics = Array.isArray(response.data?.topics) ? response.data.topics : [];
+      return topics.map((topic: any) => this.mapRecentTopic(topic));
+    } catch (err) {
+      this.logger.warn(`getRecentTopics: could not reach ${this.forumApiUrl}/api/recent — ${(err as Error).message}`);
+      return [];
+    }
   }
 
   private mapRecentTopic(topic: any): NodeBBRecentTopic {
