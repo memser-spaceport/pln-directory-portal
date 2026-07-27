@@ -200,6 +200,109 @@ describe('AiAppsService.getMemberLogsDesc', () => {
     expect(mockedAxios.get).toHaveBeenCalledTimes(1);
   });
 
+  it('coalesces concurrent cold reads into one runner walk', async () => {
+    const service = buildService();
+    let release!: (value: unknown) => void;
+    mockedAxios.get.mockReturnValue(new Promise((resolve) => (release = resolve)) as any);
+
+    const first = service.getMemberLogsDesc('creator-1', 'app-1', 'runtime', { limit: 5, sinceMinutes: 60 });
+    const second = service.getMemberLogsDesc('creator-1', 'app-1', 'runtime', { limit: 5, sinceMinutes: 60 });
+    // Let both requests get past the access checks and reach the walk.
+    await new Promise((resolve) => setImmediate(resolve));
+    release({ status: 200, data: { events: [{ timestamp: 1, message: 'only' }] } });
+
+    const [r1, r2] = await Promise.all([first, second]);
+    expect(r1.events.map((e) => e.message)).toEqual(['only']);
+    expect(r2.events.map((e) => e.message)).toEqual(['only']);
+    expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('serves a stale walk instantly and revalidates in the background', async () => {
+    const service = buildService();
+    let now = 1_000_000;
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+    try {
+      mockedAxios.get.mockResolvedValue({ status: 200, data: { events: [{ timestamp: 1, message: 'v1' }] } });
+      const p1 = await service.getMemberLogsDesc('creator-1', 'app-1', 'runtime', { limit: 5, sinceMinutes: 60 });
+      expect(p1.events.map((e) => e.message)).toEqual(['v1']);
+
+      // Past the 15s fresh TTL, inside the 2min stale bound.
+      now += 16_000;
+      mockedAxios.get.mockResolvedValue({ status: 200, data: { events: [{ timestamp: 2, message: 'v2' }] } });
+      const p2 = await service.getMemberLogsDesc('creator-1', 'app-1', 'runtime', { limit: 5, sinceMinutes: 60 });
+      // The stale copy answers instantly…
+      expect(p2.events.map((e) => e.message)).toEqual(['v1']);
+      // …while one background walk revalidates the cache.
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+
+      const p3 = await service.getMemberLogsDesc('creator-1', 'app-1', 'runtime', { limit: 5, sinceMinutes: 60 });
+      expect(p3.events.map((e) => e.message)).toEqual(['v2']);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('re-walks cold once the stale bound passes', async () => {
+    const service = buildService();
+    let now = 1_000_000;
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+    try {
+      mockedAxios.get.mockResolvedValue({ status: 200, data: { events: [{ timestamp: 1, message: 'v1' }] } });
+      await service.getMemberLogsDesc('creator-1', 'app-1', 'runtime', { limit: 5, sinceMinutes: 60 });
+
+      now += 121_000;
+      mockedAxios.get.mockResolvedValue({ status: 200, data: { events: [{ timestamp: 2, message: 'v2' }] } });
+      const result = await service.getMemberLogsDesc('creator-1', 'app-1', 'runtime', { limit: 5, sinceMinutes: 60 });
+      // Evicted — the read blocks on a fresh walk instead of serving the old copy.
+      expect(result.events.map((e) => e.message)).toEqual(['v2']);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('a deploy drops cached walks so serve-stale never spans deployments', async () => {
+    const service = buildService();
+    mockedAxios.get.mockResolvedValue({ status: 200, data: { events: [{ timestamp: 1, message: 'pre' }] } });
+    await service.getMemberLogsDesc('creator-1', 'app-1', 'build', { limit: 5 });
+    expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+
+    (service as any).dropLogsTailCache('demo');
+
+    mockedAxios.get.mockResolvedValue({ status: 200, data: { events: [{ timestamp: 2, message: 'post' }] } });
+    const result = await service.getMemberLogsDesc('creator-1', 'app-1', 'build', { limit: 5 });
+    expect(result.events.map((e) => e.message)).toEqual(['post']);
+    expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('a walk that started before a deploy is served but never cached', async () => {
+    const service = buildService();
+    let now = 1_000_000;
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+    try {
+      let release!: (value: unknown) => void;
+      mockedAxios.get.mockReturnValueOnce(new Promise((resolve) => (release = resolve)) as any);
+      const inFlight = service.getMemberLogsDesc('creator-1', 'app-1', 'build', { limit: 5 });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      now += 1_000;
+      (service as any).dropLogsTailCache('demo');
+      release({ status: 200, data: { events: [{ timestamp: 1, message: 'pre-deploy' }] } });
+      const result = await inFlight;
+      expect(result.events.map((e) => e.message)).toEqual(['pre-deploy']);
+
+      // The pre-deploy walk must not have been cached: the next read walks fresh.
+      mockedAxios.get.mockResolvedValue({ status: 200, data: { events: [{ timestamp: 2, message: 'post-deploy' }] } });
+      const next = await service.getMemberLogsDesc('creator-1', 'app-1', 'build', { limit: 5 });
+      expect(next.events.map((e) => e.message)).toEqual(['post-deploy']);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   it('400s on a malformed desc cursor', async () => {
     await expect(
       buildService().getMemberLogsDesc('creator-1', 'app-1', 'build', { nextToken: 'not-a-cursor' })
