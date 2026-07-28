@@ -18,7 +18,7 @@ import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
-const POPULAR_WINDOW_DAYS = 7;
+const POPULAR_WINDOW_DAYS = 14;
 const POPULAR_MIN_UPVOTES = 2;
 
 type UpvoteStamp = {
@@ -383,7 +383,7 @@ export class TeamNewsQueryService {
   }
 
   /**
-   * "Popular this week" rail: news with eventDate in the last 7 days and at
+   * "Popular this week" rail: news with eventDate in the last 14 days and at
    * least 2 upvotes, ranked by upvote count. Empty when nothing qualifies.
    */
   async getPopular(query: TeamNewsPopularQuery): Promise<TeamNewsPopularResponse> {
