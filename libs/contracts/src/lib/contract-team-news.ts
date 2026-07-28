@@ -75,7 +75,7 @@ export const apiTeamNews = contract.router({
     responses: {
       200: TeamNewsPopularResponseSchema,
     },
-    summary: 'Most-upvoted team news from the last 7 days (popular this week rail)',
+    summary: 'Most-upvoted team news from the last 14 days (popular this week rail)',
   },
   getTeamNewsByTeam: {
     method: 'GET',
