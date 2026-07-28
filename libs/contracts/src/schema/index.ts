@@ -45,3 +45,4 @@ export * from './team-job-enrichment';
 export * from './team-news';
 export * from './roadmap';
 export * from './follow';
+export * from './feed';
