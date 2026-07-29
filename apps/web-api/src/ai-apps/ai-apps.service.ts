@@ -73,6 +73,25 @@ type AiAppMember = { uid: string; name: string; image: string | null };
 /** Response shape across all AI Apps endpoints: `memberUid` replaced by `member`. */
 type WithMember<T extends { memberUid: string }> = Omit<T, 'memberUid'> & { member: AiAppMember | null };
 
+/** What is actually serving traffic — independent of whether the LATEST deploy succeeded. */
+type AiAppServing = 'latest' | 'previous' | 'none';
+
+/**
+ * Deploy-outcome block on app responses (contract shared with the frontend).
+ * `failureReason`/`failureStream` are manager-only: the runner's failure text
+ * can carry stack fragments, image names, and internal hostnames.
+ */
+interface AiAppDeploymentInfo {
+  serving: AiAppServing;
+  failureReason?: string;
+  failureStream?: 'build' | 'runtime';
+}
+
+/** App responses: raw failure columns replaced by the requester-gated `deployment` block. */
+type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStream'> & {
+  deployment: AiAppDeploymentInfo;
+};
+
 @Injectable()
 export class AiAppsService {
   private readonly logger = new Logger(AiAppsService.name);
@@ -156,13 +175,45 @@ export class AiAppsService {
     };
   }
 
+  /**
+   * The requester-gated response shape: the raw `failureStream` column never
+   * leaves the API, `notes` is nulled for non-managers (runner failure text is
+   * internal), and both reappear inside `deployment` for managers.
+   * `deployment.serving` goes to everyone — it's derived state, not detail:
+   * 'latest' = the current build serves; 'previous' = it last shipped
+   * successfully at `lastDeployedAt` and the runner keeps the old release
+   * serving through a failed rollout; 'none' = never shipped (strict — the
+   * only writer of `lastDeployedAt` is markReady).
+   */
+  private toApiApp<T extends AiApp>(app: WithMember<T>, isManager: boolean): ApiAiApp<T> {
+    const { failureStream, ...rest } = app;
+    const serving: AiAppServing = app.status === 'READY' ? 'latest' : app.lastDeployedAt ? 'previous' : 'none';
+    const deployment: AiAppDeploymentInfo = { serving };
+    if (isManager) {
+      if (app.notes) {
+        deployment.failureReason = app.notes;
+      }
+      if (failureStream === 'build' || failureStream === 'runtime') {
+        deployment.failureStream = failureStream;
+      }
+    }
+    return { ...rest, notes: isManager ? app.notes : null, deployment };
+  }
+
   /** Dashboard list — all non-deleted apps across PL Infra users, newest first, with owner info. */
-  async listApps(): Promise<Array<WithMember<AiApp>>> {
+  async listApps(requesterUid?: string): Promise<Array<ApiAiApp<AiApp>>> {
     const apps = await this.prisma.aiApp.findMany({
       where: { status: { not: 'DELETED' } },
       orderBy: { updatedAt: 'desc' },
     });
-    return this.withMember(await Promise.all(apps.map((app) => this.settleStuckDeploy(app))));
+    const settled = await Promise.all(apps.map((app) => this.settleStuckDeploy(app)));
+    // One admin lookup for the requester, then a per-row creator compare —
+    // never a per-row query.
+    const isAdmin = !!requesterUid && (await this.isRequesterDirectoryAdmin(requesterUid));
+    const withMembers = await this.withMember(settled);
+    return withMembers.map((app, index) =>
+      this.toApiApp(app, isAdmin || (!!requesterUid && settled[index].memberUid === requesterUid))
+    );
   }
 
   /**
@@ -170,7 +221,7 @@ export class AiAppsService {
    * `canManage` (creator or directory admin) — computed server-side so the UI
    * never has to compare member uids from a possibly stale login cookie.
    */
-  async getApp(uid: string, requesterUid?: string): Promise<WithMember<AiApp> & { canManage?: boolean }> {
+  async getApp(uid: string, requesterUid?: string): Promise<ApiAiApp<AiApp> & { canManage?: boolean }> {
     let app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -178,9 +229,10 @@ export class AiAppsService {
     app = await this.settleStuckDeploy(app);
     const result = (await this.withMember([app]))[0];
     if (!requesterUid) {
-      return result;
+      return this.toApiApp(result, false);
     }
-    return { ...result, canManage: await this.isCreatorOrDirectoryAdmin(requesterUid, app) };
+    const canManage = await this.isCreatorOrDirectoryAdmin(requesterUid, app);
+    return { ...this.toApiApp(result, canManage), canManage };
   }
 
   /** Updates dashboard metadata only; this never invokes the sandbox runner or starts a deploy. */
@@ -189,7 +241,7 @@ export class AiAppsService {
     uid: string,
     dto: UpdateAppMetadataDto,
     ownerOnly = false
-  ): Promise<WithMember<AiApp>> {
+  ): Promise<ApiAiApp<AiApp>> {
     if (dto.name === undefined && dto.description === undefined && dto.prd === undefined) {
       throw new BadRequestException('At least one of name, description, or prd must be provided');
     }
@@ -208,7 +260,7 @@ export class AiAppsService {
     if (dto.prd !== undefined) data.prd = dto.prd?.trim() || null;
 
     const updated = await this.prisma.aiApp.update({ where: { uid }, data });
-    return (await this.withMember([updated]))[0];
+    return this.toApiApp((await this.withMember([updated]))[0], true);
   }
 
   /** Update metadata from JSON or multipart; a PRD file overrides body.prd. */
@@ -217,7 +269,7 @@ export class AiAppsService {
     uid: string,
     dto: UpdateAppMetadataDto,
     file?: Express.Multer.File
-  ): Promise<WithMember<AiApp>> {
+  ): Promise<ApiAiApp<AiApp>> {
     if (!file) {
       return this.updateMetadata(requesterUid, uid, dto);
     }
@@ -228,7 +280,7 @@ export class AiAppsService {
   }
 
   /** File-only PRD upload used by POST /:uid/prd. */
-  async uploadPrd(requesterUid: string, uid: string, file: Express.Multer.File): Promise<WithMember<AiApp>> {
+  async uploadPrd(requesterUid: string, uid: string, file: Express.Multer.File): Promise<ApiAiApp<AiApp>> {
     return this.storePrdFile(requesterUid, uid, file, {} as UpdateAppMetadataDto);
   }
 
@@ -238,7 +290,7 @@ export class AiAppsService {
     uid: string,
     file: Express.Multer.File,
     metadata: UpdateAppMetadataDto
-  ): Promise<WithMember<AiApp>> {
+  ): Promise<ApiAiApp<AiApp>> {
     const extension = this.validatePrdFile(file);
     if (!AI_APPS_PRD_S3_BUCKET) {
       throw new InternalServerErrorException('No PRD bucket configured (AI_APPS_PRD_S3_BUCKET or AI_APPS_S3_BUCKET)');
@@ -688,7 +740,9 @@ export class AiAppsService {
       'or the sandbox runner is unavailable. Retry the deploy once the runner is healthy.';
     const { count } = await this.prisma.aiApp.updateMany({
       where: { uid: app.uid, status: 'DEPLOYING' },
-      data: { status: 'ERROR', notes: message },
+      // failureStream stays null: an interrupted deploy's failing phase is
+      // genuinely unknown (and a stale value from an older failure must not leak).
+      data: { status: 'ERROR', notes: message, failureStream: null },
     });
     if (count > 0) {
       this.logger.warn(
@@ -774,6 +828,11 @@ export class AiAppsService {
     if (app.memberUid === requesterUid) {
       return true;
     }
+    return this.isRequesterDirectoryAdmin(requesterUid);
+  }
+
+  /** Requester-only admin check — computed once and reused per row on list responses. */
+  private async isRequesterDirectoryAdmin(requesterUid: string): Promise<boolean> {
     const requester = await this.prisma.member.findUnique({
       where: { uid: requesterUid },
       select: { memberRoles: { select: { name: true } } },
@@ -791,7 +850,7 @@ export class AiAppsService {
     dto: DeployAppDto,
     file: Express.Multer.File,
     agentClient?: string | null
-  ): Promise<WithMember<AiApp>> {
+  ): Promise<ApiAiApp<AiApp>> {
     if (!file?.buffer?.length) {
       throw new BadGatewayException('Missing app ZIP file');
     }
@@ -861,7 +920,8 @@ export class AiAppsService {
       );
     } catch (error) {
       const message = `Deploy failed: ${(error as Error).message}`;
-      await this.failDeploy(app.uid, memberUid, eventContext, message);
+      // Bundle never reached storage — nothing was built, a build-log story.
+      await this.failDeploy(app.uid, memberUid, eventContext, message, 'build');
       throw new BadGatewayException('Failed to store the app bundle');
     }
 
@@ -881,7 +941,7 @@ export class AiAppsService {
     dto: RegisterDraftDto,
     file: Express.Multer.File,
     agentClient?: string | null
-  ): Promise<WithMember<AiApp> & { appPageUrl: string; missingEnvVars: string[] }> {
+  ): Promise<ApiAiApp<AiApp> & { appPageUrl: string; missingEnvVars: string[] }> {
     if (!file?.buffer?.length) {
       throw new BadRequestException('Missing app ZIP file');
     }
@@ -950,7 +1010,7 @@ export class AiAppsService {
 
     const provided = new Set(app.providedEnvVars);
     return {
-      ...(await this.withMember([app]))[0],
+      ...this.toApiApp((await this.withMember([app]))[0], true),
       appPageUrl: buildAppPageUrl(app.uid),
       missingEnvVars: app.requiredEnvVars.filter((name) => !provided.has(name)),
     };
@@ -962,7 +1022,7 @@ export class AiAppsService {
    * (merge/upsert — values never touch our DB), validates every required env
    * var has a value, then redeploys the stored bundle.
    */
-  async deployDraft(requesterUid: string, uid: string, secrets?: Record<string, string>): Promise<WithMember<AiApp>> {
+  async deployDraft(requesterUid: string, uid: string, secrets?: Record<string, string>): Promise<ApiAiApp<AiApp>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -1043,13 +1103,13 @@ export class AiAppsService {
     deploymentId: string,
     s3Key: string,
     secretNames: string[] = []
-  ): Promise<WithMember<AiApp>> {
+  ): Promise<ApiAiApp<AiApp>> {
     const host = buildAppHost(app.appId);
     const url = buildAppUrl(app.appId);
     const httpUrl = buildAppHttpUrl(app.appId);
     await this.prisma.aiApp.update({
       where: { uid: app.uid },
-      data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null },
+      data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null, failureStream: null },
     });
     this.dropLogsTailCache(app.appId);
 
@@ -1058,10 +1118,12 @@ export class AiAppsService {
     const markReady = async (port: number | null) => {
       const updated = await this.prisma.aiApp.update({
         where: { uid: app.uid },
-        data: { status: 'READY', url, httpUrl, host, port, notes: null },
+        // The ONLY writer of lastDeployedAt — it must strictly mean "last
+        // successful ship" (deployment.serving derives 'none' from its absence).
+        data: { status: 'READY', url, httpUrl, host, port, notes: null, failureStream: null, lastDeployedAt: new Date() },
       });
       await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
-      return (await this.withMember([updated]))[0];
+      return this.toApiApp((await this.withMember([updated]))[0], true);
     };
 
     let port: number | null = null;
@@ -1076,8 +1138,20 @@ export class AiAppsService {
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
       this.logRunnerResponse('deploy', app.appId, response.status, response.data);
+      // The runner sometimes reports failure inside a 2xx body (see
+      // logRunnerResponse) — treating that as success would mark a dead deploy
+      // READY and corrupt lastDeployedAt/serving.
+      if (typeof response.data?.status === 'string' && response.data.status.toLowerCase() === 'failed') {
+        const message = `Runner reported failure: ${this.safeStringify(response.data)}`;
+        this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
+        await this.failDeploy(app.uid, memberUid, eventContext, message, 'build');
+        throw new BadGatewayException('Failed to deploy app to the sandbox runner');
+      }
       port = response.data.port ?? null;
     } catch (error) {
+      if (error instanceof BadGatewayException) {
+        throw error;
+      }
       this.logRunnerError('deploy', app.appId, error);
       const message = axios.isAxiosError(error)
         ? `Runner error: ${error.response?.status ?? ''} ${JSON.stringify(error.response?.data ?? error.message)}`
@@ -1086,14 +1160,18 @@ export class AiAppsService {
       // A gateway timeout (Cloudflare 504/524, etc.) or no response doesn't mean the
       // deploy failed — the long-running build often completes on the origin. Verify
       // by checking whether the app is actually reachable before declaring failure.
+      const uncertain = this.isUncertainRunnerError(error);
       let survivedTimeout = false;
-      if (this.isUncertainRunnerError(error)) {
+      if (uncertain) {
         this.logger.warn(`Runner timed out for ${app.appId}; verifying app at ${url}. (${message})`);
         survivedTimeout = await this.verifyAppLive(url);
       }
       if (!survivedTimeout) {
         this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
-        await this.failDeploy(app.uid, memberUid, eventContext, message);
+        // A hard runner error is a build-phase failure; a timeout with the app
+        // never becoming reachable is genuinely unknown (build may have hung OR
+        // the pod may have crashed) — leave the stream unclassified.
+        await this.failDeploy(app.uid, memberUid, eventContext, message, uncertain ? null : 'build');
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       this.logger.log(`AI App ${app.appId} is live despite runner timeout — continuing`);
@@ -1108,7 +1186,8 @@ export class AiAppsService {
       } catch (error) {
         const message = `Secrets injection failed: ${(error as Error).message}`;
         this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
-        await this.failDeploy(app.uid, memberUid, eventContext, message);
+        // The image already built — injecting/starting it is a runtime story.
+        await this.failDeploy(app.uid, memberUid, eventContext, message, 'runtime');
         throw new BadGatewayException('Failed to inject secrets on the sandbox runner');
       }
     }
@@ -1178,16 +1257,24 @@ export class AiAppsService {
     return this.safeStringify(error.response.data).includes('helm_release_locked');
   }
 
-  /** Marks a failed deploy: status ERROR with the trimmed message + DEPLOY_FAILED event. */
+  /**
+   * Marks a failed deploy: status ERROR with the trimmed message + DEPLOY_FAILED
+   * event. `failureStream` says which log stream holds the failure ('build' |
+   * 'runtime'), classified by the caller from where in the deploy flow the
+   * failure was caught — the runner's log endpoints only cover the latest
+   * SUCCESSFUL phase, so this cannot be derived after the fact. Null = unknown.
+   * `lastDeployedAt` is deliberately untouched: a failed deploy never moves it.
+   */
   private async failDeploy(
     appUid: string,
     memberUid: string,
     eventContext: { appUid: string; appId: string; deploymentId: string },
-    message: string
+    message: string,
+    failureStream: 'build' | 'runtime' | null = null
   ): Promise<void> {
     await this.prisma.aiApp.update({
       where: { uid: appUid },
-      data: { status: 'ERROR', notes: message.slice(0, 2000) },
+      data: { status: 'ERROR', notes: message.slice(0, 2000), failureStream },
     });
     await this.recordEvent('DEPLOY_FAILED', memberUid, { ...eventContext, message: message.slice(0, 2000) });
   }
@@ -1266,7 +1353,7 @@ export class AiAppsService {
    * the delete events. The row is kept (status flips to `DELETED`) so the audit
    * trail survives. `memberUid` is the member performing the deletion.
    */
-  async deleteApp(memberUid: string, uid: string): Promise<WithMember<AiApp>> {
+  async deleteApp(memberUid: string, uid: string): Promise<ApiAiApp<AiApp>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -1288,7 +1375,7 @@ export class AiAppsService {
         data: { status: 'DELETED', url: null, httpUrl: null, host: null, port: null, notes: null },
       });
       await this.recordEvent('DELETE_SUCCEEDED', memberUid, eventContext);
-      return (await this.withMember([updated]))[0];
+      return this.toApiApp((await this.withMember([updated]))[0], true);
     } catch (error) {
       this.logRunnerError('delete', app.appId, error);
       const message = axios.isAxiosError(error)
