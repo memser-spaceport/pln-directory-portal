@@ -357,6 +357,8 @@ model AiApp {
   kitVersion   String?         // starter-kit version behind the last agent upload (null = pre-1.4 kit)
   agentClient  String?         // AI tool from the connect session's clientName (e.g. "Claude Code")
   agentModel   String?         // model the agent reported for the last upload (self-reported)
+  lastDeployedAt DateTime?     // last SUCCESSFUL ship (written only by markReady; null = never shipped)
+  failureStream  String?       // 'build' | 'runtime' — which log stream holds the LATEST deploy failure (null = unknown)
   @@unique([memberUid, appId])
 }
 
@@ -406,6 +408,18 @@ model AiAppEvent {            // append-only audit log — one row per event, ne
 Apps are **lazy-created on first deploy** — there is no registration form. (A draft registration counts: it upserts the same record with status `DRAFT`.)
 
 **Response shape:** every AI Apps endpoint (`list`, detail, `events`, and the `deploy` result) returns the owner as `member: { uid, name, image }` and omits the raw `memberUid` (the uid lives in `member.uid`, so it isn't duplicated). `memberUid` remains a column on the DB models above. The detail endpoint additionally returns `canManage` — whether the requesting member is the creator or a directory admin — computed server-side so the UI never compares member uids from a possibly stale login cookie.
+
+**Deployment block & failure-detail gating:** every app response (list, detail, deploy/metadata/delete results) replaces the raw `failureStream` column with a `deployment` object:
+
+```jsonc
+"deployment": {
+  "serving": "latest" | "previous" | "none",  // everyone: what actually serves traffic
+  "failureReason": "…",                        // managers only — equals `notes` (runner failure text)
+  "failureStream": "build" | "runtime"        // managers only — which log tab holds the failure
+}
+```
+
+`serving` is derived, never stored: `READY` → `latest`; otherwise `lastDeployedAt` set → `previous` (the app shipped before, and the runner keeps the old release serving through a failed rollout), else `none` (never shipped — strict, since `markReady` is `lastDeployedAt`'s only writer, and a failed deploy never touches it). "Manager" = the app's creator or a directory admin; the list endpoint resolves the requester (like detail) and gates per row with a single admin lookup. Non-managers also get `notes: null` — the runner's failure text can carry stack fragments, image names, and internal hostnames, and the dashboard deliberately shows visitors a completely normal card for failed apps. `failureStream` is classified at failure time from the deploy control flow (S3/bundle and hard runner errors → `build`; secrets-injection failures → `runtime`; timeouts where the app never came up and stuck-deploy settles → `null`), because the runner's log endpoints only cover the latest *successful* phase. A runner 2xx whose body carries `status: "failed"` is treated as a deploy failure (it used to be silently treated as success).
 
 `AiApp.status` is the current-state snapshot for the dashboard; `AiAppEvent` is the immutable event flow. A row is appended on kit download (`KIT_DOWNLOADED`), on each connect approval/denial (`CONNECT_APPROVED` / `CONNECT_DENIED` — the `userCode` is recorded in `message`), at the start of every deploy (`DEPLOY_STARTED`) and its outcome (`DEPLOY_SUCCEEDED` / `DEPLOY_FAILED`), and likewise for deletes (`DELETE_STARTED` → `DELETE_SUCCEEDED` / `DELETE_FAILED`). Event logging never throws — a logging failure won't break a download, connect, deploy, or delete.
 

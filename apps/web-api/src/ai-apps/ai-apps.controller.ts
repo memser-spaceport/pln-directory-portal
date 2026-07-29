@@ -98,13 +98,19 @@ export class AiAppsController {
     return this.connectService.approve(uid, memberUid);
   }
 
-  /** Dashboard list of all AI Apps with their deploy status. */
+  /**
+   * Dashboard list of all AI Apps with their deploy status. The requester is
+   * resolved (like the detail route) so failure details (`notes`,
+   * `deployment.failureReason`/`failureStream`) can be included only on apps
+   * the requester manages — everyone else gets `deployment.serving` alone.
+   */
   @NoCache()
   @Get()
   @UseGuards(UserTokenCheckGuard, RbacGuard)
   @RequirePermissions(READ)
-  async listApps() {
-    return this.aiAppsService.listApps();
+  async listApps(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req).catch(() => undefined);
+    return this.aiAppsService.listApps(memberUid);
   }
 
   /**

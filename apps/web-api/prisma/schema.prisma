@@ -3206,6 +3206,16 @@ model AiApp {
   /// Model the agent reported running on for the last upload (optional
   /// self-reported multipart field, kits ≥1.4).
   agentModel      String?
+  /// When the app last deployed SUCCESSFULLY (written only by markReady).
+  /// Null = never shipped — this is what makes `deployment.serving: 'none'`
+  /// a strict "never deployed" claim, and it survives failed deploys (which
+  /// bump `updatedAt` but must not move this).
+  lastDeployedAt  DateTime?
+  /// Which log stream held the LATEST deploy failure: 'build' | 'runtime'.
+  /// Classified at failure time from the deploy control flow (runner logs only
+  /// cover the last successful phase, so it can't be derived after the fact).
+  /// Null when unknown (e.g. stuck-deploy settle); cleared on success.
+  failureStream   String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
