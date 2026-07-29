@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { FeedCommentsService } from './feed-comments.service';
 
@@ -7,6 +7,7 @@ describe('FeedCommentsService', () => {
 
   const teamNewsItemFindUnique = jest.fn();
   const feedCommentFindMany = jest.fn();
+  const feedCommentFindFirst = jest.fn();
   const feedCommentFindUnique = jest.fn();
   const feedCommentCreate = jest.fn();
   const feedCommentDelete = jest.fn();
@@ -16,6 +17,7 @@ describe('FeedCommentsService', () => {
     teamNewsItem: { findUnique: teamNewsItemFindUnique },
     feedComment: {
       findMany: feedCommentFindMany,
+      findFirst: feedCommentFindFirst,
       findUnique: feedCommentFindUnique,
       create: feedCommentCreate,
       delete: feedCommentDelete,
@@ -35,55 +37,79 @@ describe('FeedCommentsService', () => {
     it('rejects a comment on a missing news item', async () => {
       teamNewsItemFindUnique.mockResolvedValue(null);
 
-      await expect(service.createComment('author-1', { itemUid: 'news-missing', text: 'hi' })).rejects.toBeInstanceOf(
-        NotFoundException
-      );
+      await expect(
+        service.createComment('author-1', { newsItemUid: 'news-missing', text: 'hi' })
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(feedCommentCreate).not.toHaveBeenCalled();
     });
 
-    it('creates a NEWS comment when itemUid does not start with fp_', async () => {
+    it('creates a top-level comment on a news item', async () => {
       feedCommentCreate.mockResolvedValue({
         uid: 'c1',
-        itemUid: 'news-1',
+        newsItemUid: 'news-1',
+        parentUid: null,
         text: 'hi',
         authorUid: 'author-1',
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
         author: authorInclude,
       });
 
-      const result = await service.createComment('author-1', { itemUid: 'news-1', text: 'hi' });
+      const result = await service.createComment('author-1', { newsItemUid: 'news-1', text: 'hi' });
 
       expect(feedCommentCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { itemType: 'NEWS', itemUid: 'news-1', text: 'hi', authorUid: 'author-1' } })
+        expect.objectContaining({
+          data: { newsItemUid: 'news-1', parentUid: null, text: 'hi', authorUid: 'author-1' },
+        })
       );
       expect(result).toEqual({
         uid: 'c1',
-        itemUid: 'news-1',
+        newsItemUid: 'news-1',
+        parentUid: null,
         text: 'hi',
         author: { uid: 'author-1', name: 'Ada Lovelace', avatarUrl: 'https://img/ada.png' },
         createdAt: '2026-01-01T00:00:00.000Z',
         isOwn: true,
+        replies: [],
       });
     });
 
-    it('creates a FORUM_POST comment without validating a local news item', async () => {
+    it('creates a reply when parentUid points at an existing comment on the same news item', async () => {
+      feedCommentFindFirst.mockResolvedValue({ uid: 'c1' });
       feedCommentCreate.mockResolvedValue({
         uid: 'c2',
-        itemUid: 'fp_42',
-        text: 'nice post',
+        newsItemUid: 'news-1',
+        parentUid: 'c1',
+        text: 'a reply',
         authorUid: 'author-1',
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
         author: authorInclude,
       });
 
-      await service.createComment('author-1', { itemUid: 'fp_42', text: 'nice post' });
+      const result = await service.createComment('author-1', {
+        newsItemUid: 'news-1',
+        parentUid: 'c1',
+        text: 'a reply',
+      });
 
-      expect(teamNewsItemFindUnique).not.toHaveBeenCalled();
+      expect(feedCommentFindFirst).toHaveBeenCalledWith({
+        where: { uid: 'c1', newsItemUid: 'news-1' },
+        select: { uid: true },
+      });
       expect(feedCommentCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: { itemType: 'FORUM_POST', itemUid: 'fp_42', text: 'nice post', authorUid: 'author-1' },
+          data: { newsItemUid: 'news-1', parentUid: 'c1', text: 'a reply', authorUid: 'author-1' },
         })
       );
+      expect(result.parentUid).toBe('c1');
+    });
+
+    it('rejects a reply whose parentUid does not belong to the news item', async () => {
+      feedCommentFindFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createComment('author-1', { newsItemUid: 'news-1', parentUid: 'missing', text: 'a reply' })
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(feedCommentCreate).not.toHaveBeenCalled();
     });
   });
 
@@ -92,7 +118,8 @@ describe('FeedCommentsService', () => {
       feedCommentFindMany.mockResolvedValue([
         {
           uid: 'c1',
-          itemUid: 'fp_42',
+          newsItemUid: 'news-1',
+          parentUid: null,
           text: 'mine',
           authorUid: 'author-1',
           createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -100,7 +127,8 @@ describe('FeedCommentsService', () => {
         },
         {
           uid: 'c2',
-          itemUid: 'fp_42',
+          newsItemUid: 'news-1',
+          parentUid: null,
           text: 'someone else',
           authorUid: 'author-2',
           createdAt: new Date('2026-01-02T00:00:00.000Z'),
@@ -108,11 +136,52 @@ describe('FeedCommentsService', () => {
         },
       ]);
 
-      const result = await service.listComments('fp_42', 'author-1');
+      const result = await service.listComments('news-1', 'author-1');
 
       expect(result.items[0].isOwn).toBe(true);
       expect(result.items[1].isOwn).toBe(false);
       expect(result.items[1].author.avatarUrl).toBeNull();
+    });
+
+    it('nests replies under their parent at unlimited depth', async () => {
+      feedCommentFindMany.mockResolvedValue([
+        {
+          uid: 'root',
+          newsItemUid: 'news-1',
+          parentUid: null,
+          text: 'root comment',
+          authorUid: 'author-1',
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          author: authorInclude,
+        },
+        {
+          uid: 'child',
+          newsItemUid: 'news-1',
+          parentUid: 'root',
+          text: 'first reply',
+          authorUid: 'author-2',
+          createdAt: new Date('2026-01-02T00:00:00.000Z'),
+          author: { uid: 'author-2', name: 'Bob', image: null },
+        },
+        {
+          uid: 'grandchild',
+          newsItemUid: 'news-1',
+          parentUid: 'child',
+          text: 'reply to the reply',
+          authorUid: 'author-1',
+          createdAt: new Date('2026-01-03T00:00:00.000Z'),
+          author: authorInclude,
+        },
+      ]);
+
+      const result = await service.listComments('news-1');
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].uid).toBe('root');
+      expect(result.items[0].replies).toHaveLength(1);
+      expect(result.items[0].replies[0].uid).toBe('child');
+      expect(result.items[0].replies[0].replies).toHaveLength(1);
+      expect(result.items[0].replies[0].replies[0].uid).toBe('grandchild');
     });
   });
 
@@ -146,10 +215,10 @@ describe('FeedCommentsService', () => {
       expect(await service.loadCommentCounts([])).toEqual(new Map());
       expect(feedCommentGroupBy).not.toHaveBeenCalled();
 
-      feedCommentGroupBy.mockResolvedValue([{ itemUid: 'fp_1', _count: { _all: 3 } }]);
-      const result = await service.getCommentCounts(['fp_1', 'fp_2']);
+      feedCommentGroupBy.mockResolvedValue([{ newsItemUid: 'news-1', _count: { _all: 3 } }]);
+      const result = await service.getCommentCounts(['news-1', 'news-2']);
 
-      expect(result).toEqual({ counts: { fp_1: 3 } });
+      expect(result).toEqual({ counts: { 'news-1': 3 } });
     });
   });
 });

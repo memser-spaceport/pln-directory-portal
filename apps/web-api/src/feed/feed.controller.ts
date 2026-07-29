@@ -55,8 +55,7 @@ export class FeedController {
       return { items: [] };
     }
 
-    const member = req.userEmail ? await this.membersService.findMemberByEmail(req.userEmail) : null;
-    return this.feedForumPostsService.listForumPosts(params, member?.uid);
+    return this.feedForumPostsService.listForumPosts(params);
   }
 
   @Api(server.route.getFeedCommentCounts)
@@ -70,9 +69,9 @@ export class FeedController {
   @NoCache()
   @UseGuards(UserTokenCheckGuard)
   async getFeedComments(@Req() req: Request & { userEmail?: string }) {
-    const { itemUid } = this.parse(FeedCommentsQueryParams, req.query);
+    const { newsItemUid } = this.parse(FeedCommentsQueryParams, req.query);
     const member = req.userEmail ? await this.membersService.findMemberByEmail(req.userEmail) : null;
-    return this.feedCommentsService.listComments(itemUid, member?.uid);
+    return this.feedCommentsService.listComments(newsItemUid, member?.uid);
   }
 
   @Api(server.route.createFeedComment)
@@ -90,16 +89,16 @@ export class FeedController {
     return this.feedCommentsService.deleteComment(member.uid, commentUid);
   }
 
-  @Api(server.route.likeFeedForumPost)
+  @Api(server.route.likeFeedNewsItem)
   @UseGuards(UserTokenValidation)
-  async likeFeedForumPost(@Param('uid') uid: string, @Req() req: Request & { userEmail?: string }) {
+  async likeFeedNewsItem(@Param('uid') uid: string, @Req() req: Request & { userEmail?: string }) {
     const member = await this.resolveMember(req);
     return this.feedLikesService.like(member.uid, uid);
   }
 
-  @Api(server.route.unlikeFeedForumPost)
+  @Api(server.route.unlikeFeedNewsItem)
   @UseGuards(UserTokenValidation)
-  async unlikeFeedForumPost(@Param('uid') uid: string, @Req() req: Request & { userEmail?: string }) {
+  async unlikeFeedNewsItem(@Param('uid') uid: string, @Req() req: Request & { userEmail?: string }) {
     const member = await this.resolveMember(req);
     return this.feedLikesService.unlike(member.uid, uid);
   }

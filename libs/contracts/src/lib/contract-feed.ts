@@ -8,7 +8,7 @@ import {
   FeedCommentSchema,
   FeedCommentsQueryParams,
   FeedCommentsResponseSchema,
-  FeedForumPostLikeStatusSchema,
+  FeedNewsLikeStatusSchema,
   FeedForumPostsQueryParams,
   FeedForumPostsResponseSchema,
 } from '../schema/feed';
@@ -33,7 +33,7 @@ export const apiFeed = contract.router({
     responses: {
       200: FeedCommentCountsResponseSchema,
     },
-    summary: 'Batch comment counts for a list of feed item uids (news items or forum posts)',
+    summary: 'Batch comment counts for a list of news item uids (includes replies at any depth)',
   },
   getFeedComments: {
     method: 'GET',
@@ -42,7 +42,7 @@ export const apiFeed = contract.router({
     responses: {
       200: FeedCommentsResponseSchema,
     },
-    summary: 'List comments for one feed item',
+    summary: 'List comments (threaded, unlimited depth) for one news item',
   },
   createFeedComment: {
     method: 'POST',
@@ -51,7 +51,7 @@ export const apiFeed = contract.router({
     responses: {
       201: FeedCommentSchema,
     },
-    summary: 'Add a comment to a feed item (any signed-in member)',
+    summary: 'Add a comment or reply (via parentUid) to a news item (any signed-in member)',
   },
   deleteFeedComment: {
     method: 'DELETE',
@@ -61,26 +61,26 @@ export const apiFeed = contract.router({
     responses: {
       200: DeleteFeedCommentResponseSchema,
     },
-    summary: 'Delete your own feed comment',
+    summary: 'Delete your own feed comment (cascades to its replies)',
   },
-  likeFeedForumPost: {
+  likeFeedNewsItem: {
     method: 'POST',
-    path: `${getAPIVersionAsPath('1')}/feed/forum-posts/:uid/like`,
+    path: `${getAPIVersionAsPath('1')}/feed/news/:uid/like`,
     pathParams: z.object({ uid: z.string() }),
     body: z.object({}).optional(),
     responses: {
-      200: FeedForumPostLikeStatusSchema,
+      200: FeedNewsLikeStatusSchema,
     },
-    summary: 'Like a forum-post feed item (idempotent)',
+    summary: 'Like a Feed News item (idempotent)',
   },
-  unlikeFeedForumPost: {
+  unlikeFeedNewsItem: {
     method: 'DELETE',
-    path: `${getAPIVersionAsPath('1')}/feed/forum-posts/:uid/like`,
+    path: `${getAPIVersionAsPath('1')}/feed/news/:uid/like`,
     pathParams: z.object({ uid: z.string() }),
     body: z.object({}).optional(),
     responses: {
-      200: FeedForumPostLikeStatusSchema,
+      200: FeedNewsLikeStatusSchema,
     },
-    summary: 'Unlike a forum-post feed item (idempotent)',
+    summary: 'Unlike a Feed News item (idempotent)',
   },
 });

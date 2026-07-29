@@ -15,6 +15,7 @@ export interface NodeBBRecentTopic {
   title: string;
   timestamp: number;
   postcount: number;
+  upvotes: number;
   bodyHtml: string;
   author: NodeBBTopicAuthor;
   forumTopicUrl: string | null;
@@ -73,6 +74,7 @@ export class ProtosphereApiClient {
       title: topic.titleRaw ?? topic.title ?? '',
       timestamp: Number(topic.timestamp) || Date.now(),
       postcount: Number(topic.postcount) || 0,
+      upvotes: Number(topic.upvotes) || 0,
       bodyHtml: topic.teaser?.content ?? '',
       author: {
         memberUid: user.memberUid ?? null,
