@@ -281,11 +281,18 @@ export function enrichHopChainNames(
     if (!next) return null;
     const score = typeof next.score === 'number' ? next.score : 0;
     if (score < WARM_INTROS_V2_MIN_SCORE) return null;
+    const altRelationKind =
+      typeof next.relationKind === 'string' && next.relationKind.trim()
+        ? String(next.relationKind).trim()
+        : typeof chain.relationKind === 'string'
+        ? chain.relationKind
+        : null;
+    const altHopCount = altRelationKind === 'founder_bridge' || altRelationKind === 'coinvestor_bridge' ? 2 : hopCount;
     const proximity = computeWarmPathProximity({
       score,
-      hopCount,
+      hopCount: altHopCount,
       hopChain: chain,
-      relationKind: typeof chain.relationKind === 'string' ? chain.relationKind : null,
+      relationKind: altRelationKind,
     });
     next.proximityCode = proximity.proximityCode;
     next.caliber = proximity.caliber;

@@ -264,7 +264,9 @@ export class WarmIntrosV2Service {
     })) as WarmPathRow[];
 
     const profilesByUid = await this.loadProfilesForPaths(paths);
-    let enriched = paths.map((p) => this.enrichPath(p, profilesByUid, false));
+    let enriched = paths
+      .map((p) => this.enrichPath(p, profilesByUid, false))
+      .filter((row) => row.bestConnectorProfileUid !== row.targetProfileUid);
 
     if (search) {
       enriched = enriched.filter((row) => matchesSearch(row.investor, search));
@@ -298,7 +300,9 @@ export class WarmIntrosV2Service {
     })) as WarmPathRow[];
 
     const profilesByUid = await this.loadProfilesForPaths(paths);
-    const enriched = paths.map((p) => this.enrichPath(p, profilesByUid, true));
+    const enriched = paths
+      .map((p) => this.enrichPath(p, profilesByUid, true))
+      .filter((row) => row.bestConnectorProfileUid !== row.targetProfileUid);
 
     return {
       paths: enriched,
