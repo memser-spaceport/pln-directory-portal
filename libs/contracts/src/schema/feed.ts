@@ -1,45 +1,5 @@
 import { z } from 'zod';
 
-// ── Forum posts ──────────────────────────────────────────────────────────
-// Forum topics surfaced in the newsfeed. Sourced live from NodeBB (never
-// stored locally); only forum-access callers receive non-empty items.
-
-export const FeedForumPostAuthorSchema = z.object({
-  memberUid: z.string().nullable(),
-  name: z.string(),
-  avatarUrl: z.string().nullable(),
-  role: z.string().nullable(),
-});
-
-export const FeedForumPostSchema = z.object({
-  uid: z.string(),
-  title: z.string(),
-  body: z.string(),
-  author: FeedForumPostAuthorSchema,
-  category: z.string(),
-  createdAt: z.string(),
-  forumTopicUrl: z.string().nullable(),
-  // All three are read straight off NodeBB's own topic data (real reply count / real upvotes)
-  commentCount: z.number().int().min(0),
-  likeCount: z.number().int().min(0),
-  viewerHasLiked: z.boolean(),
-});
-
-export const FeedForumPostsResponseSchema = z.object({
-  items: z.array(FeedForumPostSchema),
-});
-
-export const FeedForumPostsQueryParams = z.object({
-  limit: z
-    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1).max(100))
-    .optional()
-    .default(20),
-  page: z
-    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(0))
-    .optional()
-    .default(0),
-});
-
 // ── Feed comments (Feed News only)
 export const FeedCommentAuthorSchema = z.object({
   uid: z.string(),
@@ -106,10 +66,6 @@ export const FeedNewsLikeStatusSchema = z.object({
   viewerHasLiked: z.boolean(),
 });
 
-export type FeedForumPostAuthor = z.infer<typeof FeedForumPostAuthorSchema>;
-export type FeedForumPost = z.infer<typeof FeedForumPostSchema>;
-export type FeedForumPostsResponse = z.infer<typeof FeedForumPostsResponseSchema>;
-export type FeedForumPostsQuery = z.infer<typeof FeedForumPostsQueryParams>;
 export type FeedCommentAuthor = z.infer<typeof FeedCommentAuthorSchema>;
 export type FeedCommentsQuery = z.infer<typeof FeedCommentsQueryParams>;
 export type FeedCommentsResponse = z.infer<typeof FeedCommentsResponseSchema>;

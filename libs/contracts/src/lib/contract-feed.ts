@@ -9,23 +9,12 @@ import {
   FeedCommentsQueryParams,
   FeedCommentsResponseSchema,
   FeedNewsLikeStatusSchema,
-  FeedForumPostsQueryParams,
-  FeedForumPostsResponseSchema,
 } from '../schema/feed';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
 const contract = initContract();
 
 export const apiFeed = contract.router({
-  getFeedForumPosts: {
-    method: 'GET',
-    path: `${getAPIVersionAsPath('1')}/feed/forum-posts`,
-    query: FeedForumPostsQueryParams,
-    responses: {
-      200: FeedForumPostsResponseSchema,
-    },
-    summary: 'Recent forum topics for the newsfeed (empty items for callers without forum access)',
-  },
   getFeedCommentCounts: {
     method: 'POST',
     path: `${getAPIVersionAsPath('1')}/feed/comments/counts`,

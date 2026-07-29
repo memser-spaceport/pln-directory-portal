@@ -1,51 +1,30 @@
-# Newsfeed: Forum Posts, Comments & Likes
+# Newsfeed: Feed Comments & Likes
 
-> Status: **Shipped.** Forum posts are read-through from NodeBB (never stored locally). Comments and likes are directory-native, Feed-News-only, and never synced to NodeBB.
+> Status: **Shipped.** Forum posts are no longer proxied by this backend — see "Forum posts moved to the frontend" below. Comments and likes are directory-native, Feed-News-only, and never synced to NodeBB.
 
-Lets the home newsfeed surface **forum/discussion posts** (NodeBB topics) alongside team news, and lets any signed-in member **comment on** (with unlimited-depth replies) and **like** a **Feed News item** inline, without leaving the feed.
+Lets any signed-in member **comment on** (with unlimited-depth replies) and **like** a **Feed News item** inline on the home newsfeed, without leaving the feed.
 
-Two things are easy to conflate and aren't the same:
-
-- **Forum posts** (`GET /v1/feed/forum-posts`) are a **read-through view of NodeBB**. Nothing about a forum post is stored in Postgres; every request re-fetches the current topic list from NodeBB's own public API. `commentCount`/`likeCount` on a forum-post card are NodeBB's own real numbers (`postcount`/`upvotes`) — there is no local comment or like feature on forum posts at all.
 - **Comments and likes** are **100% directory-native**, stored only in this app's DB, and only ever attach to a `TeamNewsItem`. A comment is *not* a NodeBB reply, and a like is *not* a NodeBB upvote — NodeBB has no "like" concept at all, only upvote/downvote, and this feature doesn't touch that.
+- There is no local comment/like feature on **forum posts** — see below for why, and where forum posts live now.
+
+## Forum posts moved to the frontend
+
+Forum/discussion post cards (NodeBB topics surfaced alongside team news on Home) used to be a read-through proxy in this backend (`GET /v1/feed/forum-posts`, backed by `ProtosphereApiClient.getRecentTopics()`). That endpoint has been **removed**. The frontend (`pln-directory-portal-v2`) now calls NodeBB directly for forum posts, using the same `FORUM_API_URL`/`CUSTOM_FORUM_AUTH_TOKEN` convention its existing `services/forum/hooks/*` already use for the standalone `/forum` pages — see `services/feed/feed.service.ts` there.
+
+This backend has no forum-posts code left:
+- `apps/web-api/src/feed/feed-forum-posts.service.ts` — deleted.
+- `apps/web-api/src/forum/protosphere-api.client.ts` — stripped down to `isGroupMember()` only (used by the unrelated `GET /v1/forum/check-group-access` endpoint, which predates and is independent of forum posts — see `apps/web-api/src/forum/forum.controller.ts`).
+- `libs/contracts/src/schema/feed.ts` / `contract-feed.ts` — the `FeedForumPost*` schemas and `getFeedForumPosts` route are gone.
+
+Don't re-add a backend forum-posts proxy without a new product decision — the frontend already talks to NodeBB directly for the `/forum` pages, so a backend passthrough for the newsfeed cards was redundant.
 
 ### Why forum posts have no local comment/like feature
 
-Earlier versions of this feature let `FeedComment`/`FeedForumPostLike` attach to either a news item or a synthetic `fp_<tid>` forum-post uid. That was reverted: **forum content belongs entirely to NodeBB's own DB, and this app's DB must never hold a shadow copy of it** — not the posts, and not comments/likes on them either. A Home forum-post card and the real Forum thread (`forum/topics/:cid/:tid`) can look like the same post, which makes it tempting to add a comment or like feature that shows up on Home; **that would require writing through to NodeBB's own authenticated write API** (e.g. `POST {FORUM_API_URL}/api/v3/topics/:tid` with `{ content, toPid? }`, forwarding the member's own bearer token — NodeBB's JWT middleware logs them in automatically) and reading its real reply thread (`GET {FORUM_API_URL}/api/topic/:tid`). That's a materially larger, separate integration and a new product decision, not something this feature does.
-
-- The `category` field is the raw NodeBB category name (`General`/`Launch`/`Talent`/`Intros`), passed straight through. If a mockup shows a fixed badge like "DISCUSSION" instead, that's a frontend display choice — not something the backend derives or should change.
-- Author "role" is NodeBB's `teamRole` only (e.g. "Founder"), with no team/company name attached (e.g. no "@ Lattice Compute" suffix) — confirmed, not an oversight.
-
-## Why forum posts aren't stored locally
-
-Forum content lives in Protocol Labs' NodeBB fork, not in this app's database. There's no indexer anywhere that copies NodeBB topics into Postgres (or into OpenSearch, despite a `forum_thread` index being *queried* elsewhere in this codebase — nothing writes to it). The one already-sanctioned way to read topic data without a NodeBB login is NodeBB's own public, unauthenticated REST surface, carved out specifically for this in NodeBB's `jwt-auth.js` (`PUBLIC_GET_ALLOWLIST`):
-
-- `GET {FORUM_API_URL}/api/recent` — the endpoint this feature calls. Returns recent topics with title, category (`{cid, name, ...}`), the topic-starter's user object, and topic-level counters (`postcount`, `upvotes`) already embedded — no per-topic follow-up request needed.
-- `GET {FORUM_API_URL}/api/topic/:tid` — full topic detail, including the real reply thread with `toPid` parent chains (not currently called; a future NodeBB-write-proxy feature would use this to render real replies).
-
-Real, already-synced fields read off each topic (nothing here is invented — see `apps/web-api/src/forum/protosphere-api.client.ts`):
-
-| Feed field | NodeBB source |
-|---|---|
-| `title` | `topic.titleRaw` (fallback `topic.title`) |
-| `body` | `topic.teaser.content` (the topic's latest/main post snippet) |
-| `category` | `topic.category.name` |
-| `author.memberUid` | `topic.user.memberUid` — synced custom field, the join key back to `Member.uid` |
-| `author.name` | `topic.user.displayname` (fallback `username`) |
-| `author.avatarUrl` | `topic.user.picture` |
-| `author.role` | `topic.user.teamRole` |
-| `createdAt` | `topic.timestamp` |
-| `commentCount` | `topic.postcount - 1` (postcount includes the topic's own opening post) |
-| `likeCount` | `topic.upvotes` |
-| `viewerHasLiked` | always `false` — `/api/recent` is guest-level and carries no per-viewer vote state |
-
-`title`/`body` are run through `stripHtmlToPlainText` (`apps/web-api/src/utils/html-to-text.ts`) before being returned — NodeBB content can contain rendered HTML, and `sanitize-html` alone isn't enough (it re-escapes `&`/`<`/`>` in its output and inserts no whitespace at stripped block-tag boundaries), so this wraps it with an entity-decode pass and a block-boundary-to-space pass.
-
-Forum posts have no `focusAreas` field — unlike team news items (which derive it from `Team.teamFocusAreas`), a NodeBB topic isn't tied to a team, and the real production NodeBB categories (`Intros`, `Talent`, `Launch`, `General`) are generic forum sections with no meaningful mapping onto the five news focus-area tab titles (`Digital Human Rights`, `Economies & Governance`, etc.). Don't add one back without a concrete, non-coincidental source for it — see the `category` field above for the one real per-topic classification NodeBB actually provides.
+Earlier versions of this feature let `FeedComment`/`FeedForumPostLike` attach to either a news item or a synthetic `fp_<tid>` forum-post uid. That was reverted: **forum content belongs entirely to NodeBB's own DB, and this app's DB must never hold a shadow copy of it** — not the posts, and not comments/likes on them either. Writing a real comment/like on a forum post would mean writing through to NodeBB's own authenticated write API (e.g. `POST {FORUM_API_URL}/api/v3/topics/:tid` with `{ content, toPid? }`, forwarding the member's own bearer token) and reading its real reply thread (`GET {FORUM_API_URL}/api/topic/:tid`). That's a materially larger, separate integration and a new product decision — and as of now, the frontend reply/comment UI for this isn't built either, so it isn't attempted anywhere, backend or frontend.
 
 ## Data model
 
-Only Feed News comments and likes are persisted, both with a real, hard FK to `TeamNewsItem` (no forum-post soft reference anymore):
+Only Feed News comments and likes are persisted, both with a real, hard FK to `TeamNewsItem` (no forum-post soft reference):
 
 ```prisma
 model FeedComment {
@@ -83,7 +62,7 @@ model FeedNewsLike {
 ```
 
 - **Replies are unlimited-depth**, self-referencing via `parentUid` — same parent/child shape as `ArticleComment`/`ArticleCommentLike` (there's no configured cap there either, so this doesn't introduce one). Deleting a comment cascades to all of its replies at any depth (`onDelete: Cascade` on `parentUid`).
-- **`newsItemUid` is a real, hard FK** to `TeamNewsItem` now (not a soft reference) — there's only one item type left, so the earlier `Follow`-style polymorphism (`itemType` enum + soft `itemUid`) was removed as dead weight.
+- **`newsItemUid` is a real, hard FK** to `TeamNewsItem` — there's only one item type these tables ever attach to, so the earlier `Follow`-style polymorphism (`itemType` enum + soft `itemUid`) was removed as dead weight.
 - **`authorUid` / `memberUid`** are hard FKs — the actor is always a real directory member, so these cascade-delete with the member (same as `ArticleComment.authorUid`).
 - **`FeedNewsLike` is distinct from `TeamNewsUpvote`** — the latter is an older, unrelated per-team "I'm interested" feature used elsewhere (see `docs/` for team-news); this is the Home-feed-native like.
 - **`@@unique([newsItemUid, memberUid])`** makes like/unlike idempotent, same as `TeamNewsUpvote`.
@@ -94,7 +73,6 @@ Migration: `apps/web-api/prisma/migrations/20260729120000_feed_comments_and_like
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET | `/v1/feed/forum-posts` | `UserTokenCheckGuard` (optional) | Live NodeBB topics. Returns `{ items: [] }` — not a 403 — for anonymous callers or signed-in members without `forum.read`. |
 | POST | `/v1/feed/comments/counts` | none | Batch comment counts (including replies) for a list of news item uids. |
 | GET | `/v1/feed/comments` | `UserTokenCheckGuard` (optional) | Threaded comments for one news item; anonymous callers get `isOwn: false` on every comment. |
 | POST | `/v1/feed/comments` | `UserTokenValidation` (required) | Any signed-in member — no forum-access requirement. Pass `parentUid` to reply. |
@@ -105,51 +83,6 @@ Migration: `apps/web-api/prisma/migrations/20260729120000_feed_comments_and_like
 Contracts: `libs/contracts/src/lib/contract-feed.ts` + `libs/contracts/src/schema/feed.ts`. Implementation: `apps/web-api/src/feed/`.
 
 Examples below use a member access token (`-H "Authorization: Bearer $TOKEN"`).
-
-### List forum posts for the feed
-
-`GET /v1/feed/forum-posts?limit=20&page=0`
-
-`limit` defaults to `20` (max `100`); `page` defaults to `0` and is passed straight through to NodeBB's own paging. Requires the caller to hold the `forum.read` permission (`AccessControlV2Service`, same gate `search.controller.ts` uses elsewhere) — checked via the caller's email, catching any error and treating it as "no access" rather than throwing.
-
-```bash
-curl "http://localhost:3000/v1/feed/forum-posts?limit=5" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-```json
-{
-  "items": [
-    {
-      "uid": "fp_188",
-      "title": "Payy publishes deep-dive on React Native + Rust bridge for wallet math",
-      "body": "Payy publishes deep-dive on React Native + Rust bridge for wallet math",
-      "author": {
-        "memberUid": "cmpxsx1l900r7n54fh7dxyd79",
-        "name": "self registered 1",
-        "avatarUrl": null,
-        "role": "role 1"
-      },
-      "category": "General",
-      "createdAt": "2026-07-07T09:51:35.910Z",
-      "forumTopicUrl": "https://plnetwork.io/forum/topics/7/188",
-      "commentCount": 4,
-      "likeCount": 5,
-      "viewerHasLiked": false
-    }
-  ]
-}
-```
-
-A caller without `forum.read` (or an anonymous request):
-
-```bash
-curl "http://localhost:3000/v1/feed/forum-posts"
-```
-
-```json
-{ "items": [] }
-```
 
 ### Batch comment counts
 

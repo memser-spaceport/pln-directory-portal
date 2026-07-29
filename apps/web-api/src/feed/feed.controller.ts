@@ -16,15 +16,11 @@ import {
   CreateFeedCommentRequestSchema,
   FeedCommentCountsRequestSchema,
   FeedCommentsQueryParams,
-  FeedForumPostsQueryParams,
 } from 'libs/contracts/src/schema/feed';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { MembersService } from '../members/members.service';
-import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
-import { FORUM_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
-import { FeedForumPostsService } from './feed-forum-posts.service';
 import { FeedCommentsService } from './feed-comments.service';
 import { FeedLikesService } from './feed-likes.service';
 
@@ -35,28 +31,10 @@ export class FeedController {
   private readonly logger = new Logger(FeedController.name);
 
   constructor(
-    private readonly feedForumPostsService: FeedForumPostsService,
     private readonly feedCommentsService: FeedCommentsService,
     private readonly feedLikesService: FeedLikesService,
-    private readonly membersService: MembersService,
-    private readonly accessControl: AccessControlV2Service
+    private readonly membersService: MembersService
   ) {}
-
-  @Api(server.route.getFeedForumPosts)
-  @NoCache()
-  @UseGuards(UserTokenCheckGuard)
-  async getFeedForumPosts(@Req() req: Request & { userEmail?: string }) {
-    const params = this.parse(FeedForumPostsQueryParams, req.query);
-
-    const canReadForum = await this.hasForumReadPermission(req.userEmail);
-    if (!canReadForum) {
-      // Degrade gracefully — omit forum posts entirely rather than 403,
-      // matching search.controller.ts's handling of gated forum content.
-      return { items: [] };
-    }
-
-    return this.feedForumPostsService.listForumPosts(params);
-  }
 
   @Api(server.route.getFeedCommentCounts)
   @NoCache()
@@ -116,16 +94,6 @@ export class FeedController {
         throw new BadRequestException(err.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; '));
       }
       throw err;
-    }
-  }
-
-  private async hasForumReadPermission(userEmail?: string): Promise<boolean> {
-    if (!userEmail) return false;
-    try {
-      const { allowed } = await this.accessControl.hasPermissionByEmail(userEmail, FORUM_PERMISSIONS.READ);
-      return allowed;
-    } catch {
-      return false;
     }
   }
 
