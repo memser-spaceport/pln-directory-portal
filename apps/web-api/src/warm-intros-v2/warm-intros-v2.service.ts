@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import {
@@ -13,6 +13,15 @@ import {
   WarmPathV2Input,
 } from './dto/ingest-warm-intros-v2.dto';
 import {
+  ClearWarmPathReferDto,
+  FeedbackActor,
+  ListWarmPathFeedbackQueryDto,
+  MyWarmPathFeedback,
+  UpsertWarmPathFeedbackDto,
+  WarmPathCanRefer,
+  WarmPathFeedbackSummary,
+} from './dto/warm-path-feedback.dto';
+import {
   alternateUidsFromHopChain,
   buildPathSummary,
   enrichHopChainNames,
@@ -24,6 +33,9 @@ import {
   toInvestorSummary,
 } from './warm-intros-v2-enrich.util';
 import { computeWarmPathProximity, WARM_INTROS_V2_MIN_SCORE } from './warm-intros-v2-proximity.util';
+
+const FEEDBACK_NOTE_MAX = 600;
+const FEEDBACK_SUMMARY_RECENT_CAP = 5;
 
 type WarmPathRow = {
   uid: string;
@@ -282,7 +294,11 @@ export class WarmIntrosV2Service {
     return { paths: page, total };
   }
 
-  async getPathsByInvestor(investorProfileUid: string, query: GetWarmPathsByInvestorQueryDto) {
+  async getPathsByInvestor(
+    investorProfileUid: string,
+    query: GetWarmPathsByInvestorQueryDto,
+    opts: { actor?: FeedbackActor | null; includeFeedbackSummary?: boolean } = {}
+  ) {
     const uid = investorProfileUid?.trim();
     if (!uid) {
       throw new BadRequestException('investorProfileUid is required');
@@ -304,10 +320,209 @@ export class WarmIntrosV2Service {
       .map((p) => this.enrichPath(p, profilesByUid, true))
       .filter((row) => row.bestConnectorProfileUid !== row.targetProfileUid);
 
+    const withFeedback = await this.attachPathFeedback(enriched, opts.actor ?? null, !!opts.includeFeedbackSummary);
+
     return {
-      paths: enriched,
+      paths: withFeedback,
       investor: toInvestorSummary(uid, profilesByUid.get(uid)),
     };
+  }
+
+  async upsertPathFeedback(warmPathUid: string, dto: UpsertWarmPathFeedbackDto, actor: FeedbackActor) {
+    const pathUid = warmPathUid?.trim();
+    if (!pathUid) throw new BadRequestException('warmPathUid is required');
+
+    const connectorProfileUid = dto.connectorProfileUid?.trim();
+    if (!connectorProfileUid) throw new BadRequestException('connectorProfileUid is required');
+
+    const actorUid = actor.uid?.trim() || null;
+    if (!actorUid) throw new BadRequestException('actor identity is required');
+
+    const hasCanRefer = Object.prototype.hasOwnProperty.call(dto, 'canRefer');
+    const hasNote = Object.prototype.hasOwnProperty.call(dto, 'note');
+    if (!hasCanRefer && !hasNote) {
+      throw new BadRequestException('at least one of canRefer or note is required');
+    }
+
+    let canRefer: WarmPathCanRefer | null | undefined;
+    if (hasCanRefer) {
+      if (dto.canRefer === null || dto.canRefer === undefined) {
+        canRefer = null;
+      } else if (dto.canRefer === 'yes' || dto.canRefer === 'no') {
+        canRefer = dto.canRefer;
+      } else {
+        throw new BadRequestException(`canRefer must be 'yes', 'no', or null`);
+      }
+    }
+
+    let note: string | null | undefined;
+    if (hasNote) {
+      if (dto.note === null || dto.note === undefined) {
+        note = null;
+      } else if (typeof dto.note !== 'string') {
+        throw new BadRequestException('note must be a string or null');
+      } else {
+        const trimmed = dto.note.trim();
+        if (trimmed.length > FEEDBACK_NOTE_MAX) {
+          throw new BadRequestException(`note must be <= ${FEEDBACK_NOTE_MAX} characters`);
+        }
+        note = trimmed.length === 0 ? null : trimmed;
+      }
+    }
+
+    const path = await this.prisma.warmPathV2.findUnique({
+      where: { uid: pathUid },
+      select: {
+        uid: true,
+        targetProfileUid: true,
+        targetSet: true,
+        bestConnectorProfileUid: true,
+        alternateConnectorProfileUids: true,
+        hopChain: true,
+      },
+    });
+    if (!path) throw new NotFoundException(`WarmPathV2 not found: ${pathUid}`);
+    this.assertConnectorOnPath(path, connectorProfileUid);
+
+    const existing = await this.prisma.warmPathV2Feedback.findUnique({
+      where: {
+        warmPathUid_connectorProfileUid_actorUid: {
+          warmPathUid: pathUid,
+          connectorProfileUid,
+          actorUid,
+        },
+      },
+    });
+
+    const nextCanRefer = hasCanRefer ? (canRefer as WarmPathCanRefer | null) : existing?.canRefer ?? null;
+    const nextNote = hasNote ? (note as string | null) : existing?.note ?? null;
+
+    if (nextCanRefer == null && (nextNote == null || nextNote === '')) {
+      if (existing) {
+        await this.prisma.warmPathV2Feedback.delete({ where: { uid: existing.uid } });
+        return { deleted: true as const };
+      }
+      return { deleted: true as const };
+    }
+
+    const data = {
+      targetProfileUid: path.targetProfileUid,
+      targetSet: path.targetSet,
+      canRefer: nextCanRefer,
+      note: nextNote,
+      actorEmail: actor.email?.trim() || null,
+    };
+
+    if (existing) {
+      const row = await this.prisma.warmPathV2Feedback.update({
+        where: { uid: existing.uid },
+        data,
+      });
+      return this.toFeedbackDto(row);
+    }
+
+    const row = await this.prisma.warmPathV2Feedback.create({
+      data: {
+        warmPathUid: pathUid,
+        connectorProfileUid,
+        actorUid,
+        ...data,
+      },
+    });
+    return this.toFeedbackDto(row);
+  }
+
+  async clearPathRefer(warmPathUid: string, dto: ClearWarmPathReferDto, actor: FeedbackActor) {
+    return this.upsertPathFeedback(
+      warmPathUid,
+      { connectorProfileUid: dto.connectorProfileUid, canRefer: null },
+      actor
+    );
+  }
+
+  async listPathFeedback(query: ListWarmPathFeedbackQueryDto) {
+    const limit = Math.min(Math.max(parseInt(query.limit ?? '50', 10) || 50, 1), 200);
+    const offset = Math.max(parseInt(query.offset ?? '0', 10) || 0, 0);
+    const targetProfileUid = query.targetProfileUid?.trim() || null;
+    const q = query.q?.trim() || null;
+
+    const where: Prisma.WarmPathV2FeedbackWhereInput = {};
+    if (targetProfileUid) where.targetProfileUid = targetProfileUid;
+    if (q) {
+      where.OR = [{ actorEmail: { contains: q, mode: 'insensitive' } }, { note: { contains: q, mode: 'insensitive' } }];
+    }
+
+    const [total, rows] = await Promise.all([
+      this.prisma.warmPathV2Feedback.count({ where }),
+      this.prisma.warmPathV2Feedback.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+    ]);
+
+    const pathUids = [...new Set(rows.map((r) => r.warmPathUid))];
+    const connectorUids = [...new Set(rows.map((r) => r.connectorProfileUid))];
+    const investorUids = [...new Set(rows.map((r) => r.targetProfileUid))];
+
+    type PathLite = {
+      uid: string;
+      score: number;
+      hopCount: number;
+      hopChain: unknown;
+      bestConnectorProfileUid: string | null;
+    };
+
+    const [paths, profilesByUid] = await Promise.all([
+      pathUids.length
+        ? (this.prisma.warmPathV2.findMany({
+            where: { uid: { in: pathUids } },
+            select: {
+              uid: true,
+              score: true,
+              hopCount: true,
+              hopChain: true,
+              bestConnectorProfileUid: true,
+            },
+          }) as Promise<PathLite[]>)
+        : Promise.resolve([] as PathLite[]),
+      this.loadProfilesByUids([...new Set([...connectorUids, ...investorUids])]),
+    ]);
+
+    const pathByUid = new Map<string, PathLite>(paths.map((p) => [p.uid, p] as const));
+
+    const items = rows.map((r) => {
+      const path = pathByUid.get(r.warmPathUid);
+      const proximity = path
+        ? computeWarmPathProximity({
+            score: path.score,
+            hopCount: path.hopCount,
+            hopChain: path.hopChain,
+          })
+        : null;
+      return {
+        uid: r.uid,
+        warmPathUid: r.warmPathUid,
+        targetProfileUid: r.targetProfileUid,
+        targetSet: r.targetSet,
+        connectorProfileUid: r.connectorProfileUid,
+        canRefer: (r.canRefer as WarmPathCanRefer | null) ?? null,
+        note: r.note,
+        actorUid: r.actorUid,
+        actorEmail: r.actorEmail,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+        investor: toInvestorSummary(r.targetProfileUid, profilesByUid.get(r.targetProfileUid)),
+        connector: toConnectorSummary(r.connectorProfileUid, profilesByUid.get(r.connectorProfileUid)),
+        proximityCode: proximity?.proximityCode ?? null,
+        scorePercent: proximity?.scorePercent ?? null,
+        scoreBand: proximity?.scoreBand ?? null,
+        isBestConnector: path?.bestConnectorProfileUid === r.connectorProfileUid,
+      };
+    });
+
+    return { items, total, limit, offset };
   }
 
   /**
@@ -391,6 +606,173 @@ export class WarmIntrosV2Service {
       orderBy: { updatedAt: 'desc' },
     });
     return { edges };
+  }
+
+  private async attachPathFeedback<
+    T extends {
+      uid: string;
+      bestConnectorProfileUid: string | null;
+      alternateConnectorProfileUids: unknown;
+      hopChain: unknown;
+    }
+  >(
+    paths: T[],
+    actor: FeedbackActor | null,
+    includeSummary: boolean
+  ): Promise<
+    Array<
+      T & {
+        myFeedbackByConnector?: Record<string, MyWarmPathFeedback>;
+        feedbackSummaryByConnector?: Record<string, WarmPathFeedbackSummary>;
+      }
+    >
+  > {
+    if (paths.length === 0) return paths;
+
+    const warmPathUids = paths.map((p) => p.uid);
+    const actorUid = actor?.uid?.trim() || null;
+
+    const [mine, allForSummary] = await Promise.all([
+      actorUid
+        ? this.prisma.warmPathV2Feedback.findMany({
+            where: { warmPathUid: { in: warmPathUids }, actorUid },
+          })
+        : Promise.resolve([]),
+      includeSummary
+        ? this.prisma.warmPathV2Feedback.findMany({
+            where: { warmPathUid: { in: warmPathUids } },
+            orderBy: { updatedAt: 'desc' },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const mineByPath = new Map<string, typeof mine>();
+    for (const row of mine) {
+      const list = mineByPath.get(row.warmPathUid) ?? [];
+      list.push(row);
+      mineByPath.set(row.warmPathUid, list);
+    }
+
+    const summaryByPath = new Map<string, typeof allForSummary>();
+    for (const row of allForSummary) {
+      const list = summaryByPath.get(row.warmPathUid) ?? [];
+      list.push(row);
+      summaryByPath.set(row.warmPathUid, list);
+    }
+
+    return paths.map((path) => {
+      const connectorUids = this.connectorUidsOnPath(path);
+      const myFeedbackByConnector: Record<string, MyWarmPathFeedback> = {};
+      for (const row of mineByPath.get(path.uid) ?? []) {
+        if (!connectorUids.has(row.connectorProfileUid)) continue;
+        myFeedbackByConnector[row.connectorProfileUid] = {
+          canRefer: (row.canRefer as WarmPathCanRefer | null) ?? null,
+          note: row.note,
+          updatedAt: row.updatedAt.toISOString(),
+        };
+      }
+
+      const out: T & {
+        myFeedbackByConnector?: Record<string, MyWarmPathFeedback>;
+        feedbackSummaryByConnector?: Record<string, WarmPathFeedbackSummary>;
+      } = { ...path };
+
+      if (Object.keys(myFeedbackByConnector).length > 0) {
+        out.myFeedbackByConnector = myFeedbackByConnector;
+      }
+
+      if (includeSummary) {
+        const feedbackSummaryByConnector: Record<string, WarmPathFeedbackSummary> = {};
+        const rows = summaryByPath.get(path.uid) ?? [];
+        for (const connectorUid of connectorUids) {
+          const forConnector = rows.filter((r) => r.connectorProfileUid === connectorUid);
+          if (forConnector.length === 0) continue;
+          let yesCount = 0;
+          let noCount = 0;
+          let noteCount = 0;
+          for (const r of forConnector) {
+            if (r.canRefer === 'yes') yesCount += 1;
+            else if (r.canRefer === 'no') noCount += 1;
+            if (r.note && r.note.trim()) noteCount += 1;
+          }
+          feedbackSummaryByConnector[connectorUid] = {
+            yesCount,
+            noCount,
+            noteCount,
+            recent: forConnector.slice(0, FEEDBACK_SUMMARY_RECENT_CAP).map((r) => ({
+              actorEmail: r.actorEmail,
+              canRefer: (r.canRefer as WarmPathCanRefer | null) ?? null,
+              note: r.note,
+              updatedAt: r.updatedAt.toISOString(),
+            })),
+          };
+        }
+        if (Object.keys(feedbackSummaryByConnector).length > 0) {
+          out.feedbackSummaryByConnector = feedbackSummaryByConnector;
+        }
+      }
+
+      return out;
+    });
+  }
+
+  private connectorUidsOnPath(path: {
+    bestConnectorProfileUid: string | null;
+    alternateConnectorProfileUids: unknown;
+    hopChain: unknown;
+  }): Set<string> {
+    const uids = new Set<string>();
+    if (path.bestConnectorProfileUid) uids.add(path.bestConnectorProfileUid);
+    if (Array.isArray(path.alternateConnectorProfileUids)) {
+      for (const uid of path.alternateConnectorProfileUids) {
+        if (typeof uid === 'string' && uid.trim()) uids.add(uid.trim());
+      }
+    }
+    for (const uid of alternateUidsFromHopChain(path.hopChain)) {
+      if (uid) uids.add(uid);
+    }
+    return uids;
+  }
+
+  private assertConnectorOnPath(
+    path: {
+      bestConnectorProfileUid: string | null;
+      alternateConnectorProfileUids: unknown;
+      hopChain: unknown;
+    },
+    connectorProfileUid: string
+  ) {
+    if (!this.connectorUidsOnPath(path).has(connectorProfileUid)) {
+      throw new BadRequestException(`connectorProfileUid is not on this path: ${connectorProfileUid}`);
+    }
+  }
+
+  private toFeedbackDto(row: {
+    uid: string;
+    warmPathUid: string;
+    targetProfileUid: string;
+    targetSet: string;
+    connectorProfileUid: string;
+    canRefer: string | null;
+    note: string | null;
+    actorUid: string | null;
+    actorEmail: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      uid: row.uid,
+      warmPathUid: row.warmPathUid,
+      targetProfileUid: row.targetProfileUid,
+      targetSet: row.targetSet,
+      connectorProfileUid: row.connectorProfileUid,
+      canRefer: (row.canRefer as WarmPathCanRefer | null) ?? null,
+      note: row.note,
+      actorUid: row.actorUid,
+      actorEmail: row.actorEmail,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
   }
 
   private enrichPath(path: WarmPathRow, profilesByUid: Map<string, MasterProfileEnrichRow>, enrichHopNames: boolean) {

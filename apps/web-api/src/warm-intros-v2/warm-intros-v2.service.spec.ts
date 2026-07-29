@@ -20,6 +20,13 @@ describe('WarmIntrosV2Service', () => {
   const masterProfileFindMany = jest.fn();
   const memberFindMany = jest.fn();
 
+  const feedbackFindUnique = jest.fn();
+  const feedbackFindMany = jest.fn();
+  const feedbackCreate = jest.fn();
+  const feedbackUpdate = jest.fn();
+  const feedbackDelete = jest.fn();
+  const feedbackCount = jest.fn();
+
   const transaction = jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn({
       connectionEdge: { findUnique: edgeFindUnique, create: edgeCreate, update: edgeUpdate },
@@ -41,6 +48,14 @@ describe('WarmIntrosV2Service', () => {
       update: pathUpdate,
       findMany: pathFindMany,
       count: pathCount,
+    },
+    warmPathV2Feedback: {
+      findUnique: feedbackFindUnique,
+      findMany: feedbackFindMany,
+      create: feedbackCreate,
+      update: feedbackUpdate,
+      delete: feedbackDelete,
+      count: feedbackCount,
     },
     masterProfile: {
       findMany: masterProfileFindMany,
@@ -104,6 +119,7 @@ describe('WarmIntrosV2Service', () => {
     masterProfileFindMany.mockResolvedValue([investorProfile, connectorProfile]);
     memberFindMany.mockResolvedValue([]);
     pathCount.mockResolvedValue(1);
+    feedbackFindMany.mockResolvedValue([]);
   });
 
   describe('ingestEdges', () => {
@@ -508,10 +524,117 @@ describe('WarmIntrosV2Service', () => {
 
     it('enriches detail paths with proximity + investor summary', async () => {
       pathFindMany.mockResolvedValue([pathRow]);
+      feedbackFindMany.mockResolvedValue([]);
       const result = await service.getPathsByInvestor('inv1', {});
       expect(result.investor.email).toBe('vitalik@ethereum.org');
       expect(result.paths[0].proximityCode).toBe('PL+1A');
       expect(result.paths[0].bestConnector?.name).toBe('Juan Benet');
+    });
+
+    it('attaches myFeedback and feedbackSummary when requested', async () => {
+      pathFindMany.mockResolvedValue([pathRow]);
+      feedbackFindMany
+        .mockResolvedValueOnce([
+          {
+            warmPathUid: 'p1',
+            connectorProfileUid: 'from1',
+            canRefer: 'yes',
+            note: 'Solid',
+            updatedAt: new Date('2026-07-28T00:00:00.000Z'),
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            warmPathUid: 'p1',
+            connectorProfileUid: 'from1',
+            canRefer: 'yes',
+            note: 'Solid',
+            actorEmail: 'a@pl.com',
+            updatedAt: new Date('2026-07-28T00:00:00.000Z'),
+          },
+          {
+            warmPathUid: 'p1',
+            connectorProfileUid: 'from1',
+            canRefer: 'no',
+            note: null,
+            actorEmail: 'b@pl.com',
+            updatedAt: new Date('2026-07-27T00:00:00.000Z'),
+          },
+        ]);
+
+      const result = await service.getPathsByInvestor(
+        'inv1',
+        {},
+        {
+          actor: { uid: 'member-1', email: 'a@pl.com' },
+          includeFeedbackSummary: true,
+        }
+      );
+
+      expect(result.paths[0].myFeedbackByConnector).toEqual({
+        from1: {
+          canRefer: 'yes',
+          note: 'Solid',
+          updatedAt: '2026-07-28T00:00:00.000Z',
+        },
+      });
+      expect(result.paths[0].feedbackSummaryByConnector?.from1).toEqual(
+        expect.objectContaining({ yesCount: 1, noCount: 1, noteCount: 1 })
+      );
+    });
+  });
+
+  describe('upsertPathFeedback', () => {
+    it('creates feedback for a connector on the path', async () => {
+      pathFindUnique.mockResolvedValue({
+        uid: 'p1',
+        targetProfileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+        bestConnectorProfileUid: 'from1',
+        alternateConnectorProfileUids: ['from2'],
+        hopChain,
+      });
+      feedbackFindUnique.mockResolvedValue(null);
+      feedbackCreate.mockResolvedValue({
+        uid: 'f1',
+        warmPathUid: 'p1',
+        targetProfileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+        connectorProfileUid: 'from1',
+        canRefer: 'yes',
+        note: null,
+        actorUid: 'member-1',
+        actorEmail: 'a@pl.com',
+        createdAt: new Date('2026-07-28T00:00:00.000Z'),
+        updatedAt: new Date('2026-07-28T00:00:00.000Z'),
+      });
+
+      await expect(
+        service.upsertPathFeedback(
+          'p1',
+          { connectorProfileUid: 'from1', canRefer: 'yes' },
+          { uid: 'member-1', email: 'a@pl.com' }
+        )
+      ).resolves.toEqual(expect.objectContaining({ uid: 'f1', canRefer: 'yes', connectorProfileUid: 'from1' }));
+      expect(feedbackCreate).toHaveBeenCalled();
+    });
+
+    it('rejects connector not on path', async () => {
+      pathFindUnique.mockResolvedValue({
+        uid: 'p1',
+        targetProfileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+        bestConnectorProfileUid: 'from1',
+        alternateConnectorProfileUids: [],
+        hopChain,
+      });
+      await expect(
+        service.upsertPathFeedback(
+          'p1',
+          { connectorProfileUid: 'unknown', canRefer: 'yes' },
+          { uid: 'member-1', email: 'a@pl.com' }
+        )
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 

@@ -2828,6 +2828,38 @@ model WarmPathV2 {
   @@index([runId])
 }
 
+/// Warm Intros v2 — per-user "Can you refer?" + free-text feedback on a path variant.
+/// One row per (warmPathUid, connectorProfileUid, actorUid). Alternates use the
+/// rank-1 WarmPathV2.uid + the alternate connector's profile uid.
+model WarmPathV2Feedback {
+  uid String @id @default(cuid())
+
+  /// WarmPathV2.uid (stable across upsert-by-rank).
+  warmPathUid         String
+  /// Denormalized investor MasterProfile.uid for queue / investor scoping.
+  targetProfileUid    String
+  /// Denormalized cohort slug (neuro-fund-i | gold-co-investors). 
+  targetSet           String @db.VarChar(120)
+  /// Best connector or alternate connector MasterProfile.uid.
+  connectorProfileUid String
+
+  /// `yes` | `no` | null (null = refer unanswered / cleared; note-only allowed).
+  canRefer String? @db.VarChar(8)
+  /// Free-text "Give feedback" note (max 600).
+  note     String? @db.VarChar(600)
+
+  actorUid   String? @db.VarChar(64)
+  actorEmail String? @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([warmPathUid, connectorProfileUid, actorUid])
+  @@index([targetProfileUid])
+  @@index([warmPathUid])
+  @@index([updatedAt])
+}
+
 /// Investor Lists — a curated target set of investors (a "list"). Proximity is computed per list
 /// (PathfinderPath.targetSet == an InvestorList.targetSet). The 5,000+ InvestorOutreachRecord DB is the
 /// universe; lists are curated subsets. v1: "Neuro Fund I LP Pipeline" (graphed) + "Gold PLC Co-Investors".
