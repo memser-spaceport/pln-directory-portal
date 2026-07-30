@@ -11,6 +11,7 @@ import { TeamNewsQueryService } from './team-news-query.service';
 import { TeamNewsEnrichmentService } from './team-news-enrichment.service';
 import { TeamNewsUpvotesService } from './team-news-upvotes.service';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
+import { TeamNewsTrendingSeedService } from './team-news-trending-seed.service';
 
 @Module({
   imports: [SharedModule, forwardRef(() => MembersModule), AccessControlV2Module, PushNotificationsModule, FollowsModule],
@@ -21,6 +22,7 @@ import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
     TeamNewsEnrichmentService,
     TeamNewsUpvotesService,
     TeamNewsSuggestionsService,
+    TeamNewsTrendingSeedService,
   ],
   exports: [TeamNewsService, TeamNewsQueryService, TeamNewsEnrichmentService],
 })
