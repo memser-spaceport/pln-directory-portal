@@ -26,8 +26,8 @@ const FILE = { buffer: Buffer.from('zip'), mimetype: 'application/zip' } as Expr
  * Stateful prisma mock: unlike the simpler per-call mocks elsewhere, this one
  * accumulates writes across calls so a single deploy's several `update()`s
  * (DEPLOYING → READY) and a later, separate `deployDraft()` see the same
- * persisted row — needed to prove `databaseEnabled`/`databaseType` survive
- * between calls the way the real DB would.
+ * persisted row — needed to prove the `database` column survives between
+ * calls the way the real DB would.
  */
 function buildService(initial: Record<string, any> | null = null) {
   let row: Record<string, any> | null = initial ? { ...initial } : null;
@@ -152,8 +152,7 @@ describe('agent-driven database provisioning', () => {
       deploymentId: 'd1',
       requiredEnvVars: [],
       providedEnvVars: [],
-      databaseEnabled: true,
-      databaseType: 'postgres',
+      database: { enabled: true, type: 'postgres' },
       updatedAt: new Date(),
     };
     const { service } = buildService(existing);
@@ -179,8 +178,7 @@ describe('agent-driven database provisioning', () => {
       deploymentId: 'd1',
       requiredEnvVars: [],
       providedEnvVars: [],
-      databaseEnabled: true,
-      databaseType: 'postgres',
+      database: { enabled: true, type: 'postgres' },
       updatedAt: new Date(),
     };
     const { service } = buildService(existing);

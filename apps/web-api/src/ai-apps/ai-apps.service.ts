@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
-import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback } from '@prisma/client';
+import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { isDirectoryAdmin } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
@@ -101,7 +101,8 @@ interface AiAppDeploymentInfo {
 /**
  * Database block on app responses: everyone sees whether a database was
  * requested; connection metadata (never the password) appears once the
- * Deployment Orchestrator reports it provisioned.
+ * Deployment Orchestrator reports it provisioned. Also the exact shape stored
+ * in the `AiApp.database` JSON column — no separate storage/response shapes.
  */
 interface AiAppDatabaseInfo {
   enabled: boolean;
@@ -113,18 +114,8 @@ interface AiAppDatabaseInfo {
   credentialsInjected?: boolean | null;
 }
 
-/** Raw `AiApp` database columns replaced by the `database` block below. */
-type RawDatabaseColumns =
-  | 'databaseEnabled'
-  | 'databaseType'
-  | 'databaseHost'
-  | 'databasePort'
-  | 'databaseName'
-  | 'databaseUser'
-  | 'databaseCredentialsInjected';
-
-/** App responses: raw failure/database columns replaced by requester-facing `deployment`/`database` blocks. */
-type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStream' | RawDatabaseColumns> & {
+/** App responses: the raw `failureStream`/`database` columns replaced by requester-facing `deployment`/`database` blocks. */
+type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStream' | 'database'> & {
   deployment: AiAppDeploymentInfo;
   database: AiAppDatabaseInfo;
 };
@@ -223,17 +214,7 @@ export class AiAppsService {
    * only writer of `lastDeployedAt` is markReady).
    */
   private toApiApp<T extends AiApp>(app: WithMember<T>, isManager: boolean): ApiAiApp<T> {
-    const {
-      failureStream,
-      databaseEnabled,
-      databaseType,
-      databaseHost,
-      databasePort,
-      databaseName,
-      databaseUser,
-      databaseCredentialsInjected,
-      ...rest
-    } = app;
+    const { failureStream, database: storedDatabase, ...rest } = app;
     const serving: AiAppServing = app.status === 'READY' ? 'latest' : app.lastDeployedAt ? 'previous' : 'none';
     const deployment: AiAppDeploymentInfo = { serving };
     if (isManager) {
@@ -244,15 +225,8 @@ export class AiAppsService {
         deployment.failureStream = failureStream;
       }
     }
-    const database: AiAppDatabaseInfo = { enabled: databaseEnabled };
-    if (databaseEnabled) {
-      database.type = databaseType;
-      database.host = databaseHost;
-      database.port = databasePort;
-      database.name = databaseName;
-      database.user = databaseUser;
-      database.credentialsInjected = databaseCredentialsInjected;
-    }
+    const parsedDatabase = storedDatabase as AiAppDatabaseInfo | null;
+    const database: AiAppDatabaseInfo = parsedDatabase?.enabled ? parsedDatabase : { enabled: false };
     return { ...rest, notes: isManager ? app.notes : null, deployment, database };
   }
 
@@ -946,8 +920,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
-        databaseEnabled: !!dto.database,
-        databaseType: dto.database?.type ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
       },
       update: {
         name: dto.name,
@@ -965,8 +938,7 @@ export class AiAppsService {
         agentModel: dto.agentModel ?? null,
         // Same "reflects the last upload" rule applies to database provisioning
         // — the kit resends `database` on every deploy once the member opts in.
-        databaseEnabled: !!dto.database,
-        databaseType: dto.database?.type ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
         notes: null,
       },
     });
@@ -1048,8 +1020,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
-        databaseEnabled: !!dto.database,
-        databaseType: dto.database?.type ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
       },
       update: {
         name: dto.name,
@@ -1061,8 +1032,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
-        databaseEnabled: !!dto.database,
-        databaseType: dto.database?.type ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
         notes: null,
       },
     });
@@ -1165,7 +1135,7 @@ export class AiAppsService {
    */
   private async proxyDeploy(
     memberUid: string,
-    app: Pick<AiApp, 'uid' | 'appId' | 'databaseEnabled' | 'databaseType'>,
+    app: Pick<AiApp, 'uid' | 'appId' | 'database'>,
     deploymentId: string,
     s3Key: string,
     secretNames: string[] = []
@@ -1173,6 +1143,7 @@ export class AiAppsService {
     const host = buildAppHost(app.appId);
     const url = buildAppUrl(app.appId);
     const httpUrl = buildAppHttpUrl(app.appId);
+    const requestedDatabase = app.database as AiAppDatabaseInfo | null;
     await this.prisma.aiApp.update({
       where: { uid: app.uid },
       data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null, failureStream: null },
@@ -1196,15 +1167,20 @@ export class AiAppsService {
           failureStream: null,
           lastDeployedAt: new Date(),
           // Non-sensitive connection metadata the orchestrator reports once it
-          // provisions the database. Never the password — that lives only in
-          // the app's injected runtime env vars.
-          ...(databaseInfo
+          // provisions the database, merged into the same JSON blob we asked
+          // it to provision from. Never the password — that lives only in the
+          // app's injected runtime env vars.
+          ...(databaseInfo && requestedDatabase?.enabled
             ? {
-                databaseHost: databaseInfo.host ?? null,
-                databasePort: databaseInfo.port ?? null,
-                databaseName: databaseInfo.name ?? null,
-                databaseUser: databaseInfo.user ?? null,
-                databaseCredentialsInjected: databaseInfo.credentialsInjected ?? null,
+                database: {
+                  enabled: true,
+                  type: requestedDatabase.type ?? null,
+                  host: databaseInfo.host ?? null,
+                  port: databaseInfo.port ?? null,
+                  name: databaseInfo.name ?? null,
+                  user: databaseInfo.user ?? null,
+                  credentialsInjected: databaseInfo.credentialsInjected ?? null,
+                },
               }
             : {}),
         },
@@ -1218,7 +1194,9 @@ export class AiAppsService {
     try {
       this.logger.log(
         `Runner deploy request for ${app.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
-          `(deploymentId=${deploymentId}, s3Key=${s3Key}${app.databaseEnabled ? `, database=${app.databaseType}` : ''})`
+          `(deploymentId=${deploymentId}, s3Key=${s3Key}${
+            requestedDatabase?.enabled ? `, database=${requestedDatabase.type}` : ''
+          })`
       );
       const response = await axios.post<RunnerDeployResponse>(
         `${AI_APPS_RUNNER_URL}/deploy`,
@@ -1229,7 +1207,7 @@ export class AiAppsService {
           // The app never generates credentials or creates the database
           // itself — this just asks the Deployment Orchestrator to provision
           // one and inject connection env vars into the runtime.
-          ...(app.databaseEnabled ? { database: { enabled: true, type: app.databaseType } } : {}),
+          ...(requestedDatabase?.enabled ? { database: { enabled: true, type: requestedDatabase.type } } : {}),
         },
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );

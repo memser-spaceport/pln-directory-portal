@@ -160,7 +160,7 @@ Non-technical builders often get stuck the moment their app needs a backend — 
 
 A member who already has their own database skips this field entirely and supplies their connection string as a regular runtime secret through the **draft flow** below (e.g. a required env var named `DATABASE_URL`) — provisioning is an opt-in convenience, never a requirement.
 
-`postgres` is the only supported `type` today. `databaseEnabled`/`databaseType` reflect the **last** deploy/draft upload, the same "reflects the last upload" rule `kitVersion`/`agentModel` follow — a call that omits `database` turns provisioning off for that call, so kits persist the member's choice in `pln-app.config.json` and resend it on every redeploy (member-triggered redeploys from the LabOS Deployment settings modal reuse whatever was last stored, with no agent involved). Every app response carries the non-sensitive result in a `database` block:
+`postgres` is the only supported `type` today. The `AiApp.database` column — a single JSON blob shaped exactly like the response block below — reflects the **last** deploy/draft upload, the same "reflects the last upload" rule `kitVersion`/`agentModel` follow: a call that omits `database` sets the column to `NULL` (provisioning off) for that call, so kits persist the member's choice in `pln-app.config.json` and resend it on every redeploy (member-triggered redeploys from the LabOS Deployment settings modal reuse whatever was last stored, with no agent involved). Every app response carries the non-sensitive result in a `database` block:
 
 ```jsonc
 "database": {
@@ -387,10 +387,9 @@ model AiApp {
   agentModel   String?         // model the agent reported for the last upload (self-reported)
   lastDeployedAt DateTime?     // last SUCCESSFUL ship (written only by markReady; null = never shipped)
   failureStream  String?       // 'build' | 'runtime' — which log stream holds the LATEST deploy failure (null = unknown)
-  databaseEnabled Boolean @default(false)  // database requested on the LAST deploy/draft upload (kitVersion-style: reflects last upload)
-  databaseType    String?       // e.g. "postgres"; null when not enabled
-  databaseHost / databasePort / databaseName / databaseUser  // non-sensitive connection metadata from the runner — never the password
-  databaseCredentialsInjected Boolean?
+  database        Json?         // { enabled, type, host?, port?, name?, user?, credentialsInjected? } — one JSON blob,
+                                 // reflects the LAST deploy/draft upload (kitVersion-style); null = not requested.
+                                 // Non-sensitive connection metadata only — the password is never stored.
   @@unique([memberUid, appId])
 }
 
@@ -551,7 +550,7 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 - `apps/web-api/prisma/migrations/20260707120000_ai_apps_draft_secrets/` — `DRAFT` status, `s3Key`/`requiredEnvVars`/`providedEnvVars`, draft/secrets event values.
 - `apps/web-api/prisma/migrations/20260714120000_ai_apps_upload_meta/` — `kitVersion`/`agentClient`/`agentModel` columns (self-reported metadata about the last agent upload).
 - `apps/web-api/prisma/migrations/20260715120000_ai_apps_editable_metadata/` — `prd` column (one-pager PRD).
-- `apps/web-api/prisma/migrations/20260730120000_ai_apps_database_provisioning/` — `databaseEnabled`/`databaseType` + non-sensitive connection metadata columns (agent-driven database provisioning).
+- `apps/web-api/prisma/migrations/20260730120000_ai_apps_database_provisioning/` — single `database` JSON column: provisioning request + non-sensitive connection metadata (agent-driven database provisioning).
 - LabOS UI (`pln-directory-portal-v2`): `app/pl-infra/ai-apps/connect/page.tsx` + `components/page/ai-apps/AiAppsConnectPage/` — the approval page; connect calls in `services/ai-apps/ai-apps.service.ts`.
 - `.claude/skills/ai-apps/SKILL.md` — agent guidance for working on this feature.
 
