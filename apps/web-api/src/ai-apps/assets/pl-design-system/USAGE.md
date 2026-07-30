@@ -1,57 +1,68 @@
 # Using the PL Design System
 
-This folder is the **PL Design System** — canonical React components and design
+This folder is the **PL Design System** — React components and semantic design
 tokens for Protocol Labs Network apps. Use it instead of hand-rolling UI.
 
-- `components/` — React components (`.tsx` + SCSS modules + types). See
-  `components/component-catalog.md`. Specs live in `components/primitives/` and
-  `components/product/`.
-- `tokens/` — SCSS → CSS custom properties (colors, type, spacing, radius, shadows).
-- `styles/` — `globals.scss` (reset + tokens + `@font-face`), `media.scss`, `mixins.scss`.
-- `public/fonts/` — self-hosted Inter variable font (`InterVariable.woff2`).
-- `patterns/`, `examples/` — layout patterns and page-level reference compositions.
+- `components/` — React components (Tailwind utilities). Import from the barrel
+  (`components/index.ts`) or a specific file.
+- `tokens/` — CSS custom properties (`tokens.css`) + Tailwind v4 theme bridge
+  (`tailwind-theme.css`) + typed JS mirror (`tokens.ts`).
+- `lib/cn.ts` — class joiner (`tailwind-merge`).
 - `guidelines.md` — hard rules. Read before generating UI.
+- `README.md` — foundations, component table, and full page-recipe snippets.
 
 ## Hard rules
 
-- **Never recreate** buttons, cards, inputs, badges, tables, tabs, dropdowns, or
-  sidebars — import from `components/`.
-- **Never hardcode** colors, type, spacing, radius, or shadows — use tokens
-  (`var(--background-brand-default)`, `var(--spacing-md)`, `var(--radius-md)`, …).
-- Aesthetic: structured · calm · technical · minimal. Avoid gradients, glow, and
-  heavy decorative shadows.
+- **Never recreate** buttons, cards, inputs, badges, tables, tabs, menus, or
+  page shells — import from `components/`.
+- **Semantic tokens only.** Use classes like `bg-surface`, `text-secondary`,
+  `border-border`, `shadow-card`. Never primitives (`bg-pl-slate-*`), raw hex,
+  or Tailwind palette utilities (`slate-*`, `bg-white`).
+- Prefer `EntityCard` for listings. Tag = category; Badge = fact about an entity.
+- Aesthetic: structured · calm · technical · minimal.
 
-## Consuming it in your app (Next.js 14)
+## Consuming it in your app (Next.js + Tailwind v4)
 
 Only the contents of `app/` are deployed. Keep this folder **inside** the app:
 
-1. **Copy this folder into the app**, e.g. `app/pl-design-system/` — keep the
-   structure intact (SCSS uses relative `@use '../../styles/…'`). Exclude it from
-   TypeScript checking:
-   ```jsonc
-   { "exclude": ["node_modules", "pl-design-system"] }
-   ```
+1. **Copy this folder into the app**, e.g. `app/pl-design-system/`.
 2. **Install peer dependencies** in `app/`:
    ```bash
-   npm install react react-dom next sass clsx @phosphor-icons/react framer-motion \
-     @radix-ui/react-accordion @radix-ui/react-checkbox @radix-ui/react-dialog \
-     @radix-ui/react-dropdown-menu @radix-ui/react-popover @radix-ui/react-select \
-     @radix-ui/react-separator @radix-ui/react-slider @radix-ui/react-switch \
-     @radix-ui/react-tabs @radix-ui/react-tooltip @radix-ui/react-progress \
-     @radix-ui/react-context-menu @radix-ui/react-avatar
+   npm install react react-dom next tailwindcss@^4 @tailwindcss/postcss tailwind-merge
    ```
-3. **Load tokens + reset + font once.** In the App Router root layout:
+3. **Wire PostCSS** (`postcss.config.mjs`):
+   ```js
+   export default { plugins: { '@tailwindcss/postcss': {} } };
+   ```
+4. **Load Tailwind + tokens once.** In the App Router root CSS (e.g. `app/globals.css`):
+   ```css
+   @import "tailwindcss";
+   @source "../pl-design-system/components";
+   @import "../pl-design-system/tokens/tokens.css";
+   @import "../pl-design-system/tokens/tailwind-theme.css";
+   ```
+   `@source` is required so utilities used inside vendored components are generated.
+5. **Load Inter** (the design system expects it; no font files are bundled):
    ```tsx
-   import '../pl-design-system/styles/globals.scss';
+   // app/layout.tsx
+   import { Inter } from 'next/font/google';
+   const inter = Inter({ subsets: ['latin'] });
+   // apply inter.className on <body>
    ```
-   Copy `pl-design-system/public/fonts` to the app's `public/fonts` so Inter resolves.
-4. **Import components** from their folder (the barrel re-exports only a subset):
+6. **Import components** from the barrel (or a specific file):
    ```tsx
-   import { MemberCard } from '../pl-design-system/components/MemberCard';
-   import { PageHeader } from '../pl-design-system/components/PageHeader';
-   import { Button } from '../pl-design-system/components/Button';
+   import {
+     Button,
+     EntityCard,
+     PageShell,
+     PageHeader,
+     ListGrid,
+     TagList,
+   } from '../pl-design-system/components';
    ```
-5. **Layout glue** uses tokens directly, e.g. `padding: var(--spacing-xl)`.
+7. **Layout glue** uses semantic utilities, e.g. `className="bg-canvas text-primary gap-4"`.
+
+Page shapes: see `guidelines.md` and the recipes in `README.md` (list / detail / campaign).
 
 ## Deploy contract reminders
 

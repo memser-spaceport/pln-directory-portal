@@ -506,6 +506,61 @@ describe('WarmIntrosV2Service', () => {
       expect(result.total).toBe(1);
       expect(result.paths[0].investor.sectors).toContain('crypto');
     });
+
+    it('collapses multi-list investor to one row when targetSet is omitted (All)', async () => {
+      const goldPath = {
+        ...pathRow,
+        uid: 'p-gold',
+        targetSet: 'gold-co-investors',
+        score: 0.65,
+      };
+      // Score-desc order as Prisma returns: neuro (0.7) before gold (0.65).
+      pathFindMany.mockResolvedValue([pathRow, goldPath]);
+
+      const result = await service.listPaths({ limit: '50', offset: '0' });
+
+      expect(pathFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { rank: 1, score: { gte: 0.2 } },
+          orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
+        })
+      );
+      expect(pathFindMany.mock.calls[0][0].take).toBeUndefined();
+      expect(pathCount).not.toHaveBeenCalled();
+      expect(result.total).toBe(1);
+      expect(result.paths).toHaveLength(1);
+      expect(result.paths[0]).toMatchObject({
+        uid: 'p1',
+        targetProfileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+        score: 0.7,
+      });
+    });
+
+    it('does not collapse when targetSet is scoped to one list', async () => {
+      pathFindMany.mockResolvedValue([pathRow]);
+      pathCount.mockResolvedValue(1);
+
+      const result = await service.listPaths({
+        targetSet: 'neuro-fund-i',
+        limit: '50',
+        offset: '0',
+      });
+
+      expect(pathFindMany).toHaveBeenCalledWith({
+        where: { rank: 1, targetSet: 'neuro-fund-i', score: { gte: 0.2 } },
+        take: 50,
+        skip: 0,
+        orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
+      });
+      expect(pathCount).toHaveBeenCalledWith({
+        where: { rank: 1, targetSet: 'neuro-fund-i', score: { gte: 0.2 } },
+      });
+      expect(result.total).toBe(1);
+      expect(result.paths).toHaveLength(1);
+      expect(result.paths[0].uid).toBe('p1');
+      expect(result.paths[0].targetSet).toBe('neuro-fund-i');
+    });
   });
 
   describe('getPathsByInvestor', () => {

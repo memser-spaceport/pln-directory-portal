@@ -1,0 +1,407 @@
+/* =============================================================================
+   PL Network Directory — Design Tokens
+   -----------------------------------------------------------------------------
+   Derived from browser captures of 7 production/dev pages (see ../AUDIT.md).
+   Tokens are named by ROLE. The captured apps named them by capture order
+   (--color-001, --clr-17), which is why the same hex appears under a different
+   name on every page. Never reintroduce ordinal names.
+
+   Layer 1 (--pl-*)  : primitives. Raw values. Do not use directly in components.
+   Layer 2 (semantic): role tokens. This is what components consume.
+   ========================================================================== */
+
+:root {
+  /* ---------------------------------------------------------------------
+     LAYER 1 — PRIMITIVES
+     ------------------------------------------------------------------ */
+
+  /* Brand blue.
+     The captures contained 7 near-identical blues. They collapse to this
+     scale; --pl-blue-600 is the brand primary (appeared as `primary` on
+     6 of 7 pages), --pl-blue-500 is the interactive/link blue. */
+  --pl-blue-100: #e8edff;
+  --pl-blue-200: #aebfff;
+  --pl-blue-400: #427dff;
+  --pl-blue-500: #156ff7;
+  --pl-blue-600: #1b4dff;
+  --pl-blue-700: #0f3cd9;
+  --pl-blue-25: #f2f5ff; /* Figma: the availability-pill fill on Member Card */
+  --pl-blue-50: #e8edff; /* Figma action/background/brand/light_hover */
+  --pl-blue-800: #1158c4;
+  --pl-blue-900: #1849a9;
+
+  /* Neutrals — Tailwind `slate`. This is the canonical ramp.
+     The product also leaked Tailwind `gray` onto 3 pages; gray is being
+     retired, see AUDIT.md "Two neutral ramps". */
+  --pl-slate-50: #f8fafc;
+  --pl-slate-100: #f1f5f9;
+  --pl-slate-200: #e2e8f0;
+  --pl-slate-250: #d7dfe9; /* Figma action/foreground/neutral/disable */
+  --pl-slate-300: #cbd5e1;
+  --pl-slate-400: #94a3b8;
+  --pl-slate-500: #64748b;
+  --pl-slate-600: #475569;
+  --pl-slate-700: #334155;
+  /* Figma `background/neutral/emphasis` and `action/foreground/neutral/active` —
+     the dark-tooltip fill and the selected-tab label. */
+  --pl-slate-750: #3d4a5c;
+  /* Figma `action/background/neutral/normal` — the dark neutral button fill. */
+  --pl-slate-800: #2d3643;
+  --pl-slate-900: #0f172a;
+  --pl-white: #ffffff;
+  --pl-black: #000000;
+
+  /* Accents — used for status dots, category marks and highlights. */
+  /* Action status ramps — Figma `action/background/{success,warning,error}/*`.
+     Each tone has a base (the Fill background) and a darker step used both for
+     the Fill hover and as the Light/Border foreground. */
+  --pl-green-500: #11a75c;
+  --pl-green-600: #0a9952;
+  --pl-amber-500: #f59e0b;
+  --pl-amber-600: #d97706;
+  --pl-red-500: #ff3838;
+  --pl-red-600: #e92215;
+  /* Brand focus fill — Figma `action/background/brand/focus`. */
+  --pl-blue-450: #4a72ff;
+
+  --pl-teal-500: #44d5bb;
+  --pl-violet-600: #5925dc;
+  --pl-green-700: #027a48;
+
+  /* Alpha primitives. Captured as rgba(15,23,42,a) = slate-900 alpha,
+     and rgba(27,56,96,a) = a navy tint used for borders/accent fills. */
+  --pl-alpha-slate-04: rgba(15, 23, 42, 0.04);
+  --pl-alpha-slate-06: rgba(15, 23, 42, 0.06);
+  --pl-alpha-slate-08: rgba(15, 23, 42, 0.08);
+  --pl-alpha-slate-12: rgba(15, 23, 42, 0.12);
+  --pl-alpha-slate-16: rgba(15, 23, 42, 0.16);
+  --pl-alpha-navy-06: rgba(27, 56, 96, 0.06);
+  --pl-alpha-navy-12: rgba(27, 56, 96, 0.12);
+  --pl-alpha-navy-24: rgba(27, 56, 96, 0.24);
+  --pl-alpha-brand-02: rgba(27, 77, 255, 0.02); /* Figma transparent/brand/2% */
+  --pl-alpha-blue-06: rgba(27, 77, 255, 0.06);
+  --pl-alpha-blue-16: rgba(27, 77, 255, 0.16);
+  --pl-alpha-blue-25: rgba(21, 111, 247, 0.25);
+  --pl-alpha-white-06: rgba(255, 255, 255, 0.06);
+  --pl-alpha-white-32: rgba(255, 255, 255, 0.32);
+  /* Neutral alphas on the ink colour — Figma `transparent/dark/*`. Drive the
+     non-brand button shadows and the neutral Light fill. */
+  --pl-alpha-dark-02: rgba(14, 15, 17, 0.02);
+  --pl-alpha-dark-04: rgba(14, 15, 17, 0.04);
+  --pl-alpha-dark-06: rgba(14, 15, 17, 0.06);
+  --pl-alpha-dark-08: rgba(14, 15, 17, 0.08);
+  --pl-alpha-dark-12: rgba(14, 15, 17, 0.12);
+  --pl-alpha-dark-16: rgba(14, 15, 17, 0.16);
+  /* Light-style tints — Figma action/background/<tone>/light_normal. */
+  --pl-alpha-success-12: rgba(10, 153, 82, 0.12);
+  --pl-alpha-warning-16: rgba(245, 158, 11, 0.16);
+  --pl-alpha-error-08: rgba(233, 34, 21, 0.08);
+  /* Data-gradient stops — Figma gradient style `Gradients/2 Color/17`,
+     the fill on the progress bar and the sparkline. */
+  --pl-sky-400: #45d8ff;
+  --pl-blue-650: #005bea;
+  /* Avatar tints. Figma `avatar/custom background/*` — the fill behind a
+     portrait, and the fallback fill when there is no portrait. Deliberately
+     desaturated: they sit behind a face and must not compete with it. */
+  --pl-avatar-tint-1: #afbaca; /* slate    */
+  --pl-avatar-tint-2: #cef2e7; /* mint     */
+  --pl-avatar-tint-3: #aacddc; /* sky      */
+  --pl-avatar-tint-4: #ffd8b4; /* peach    */
+  --pl-avatar-tint-5: #d0cff2; /* lilac    */
+  --pl-avatar-tint-6: #ffefb8; /* butter   */
+  --pl-avatar-tint-7: #c6caff; /* periwinkle */
+  --pl-avatar-tint-8: #ffe5bb; /* sand     */
+  --pl-avatar-tint-9: #d7dfe9; /* mist     */
+
+  --pl-transparent: rgba(0, 0, 0, 0);
+
+  /* ---------------------------------------------------------------------
+     LAYER 2 — SEMANTIC ROLES  (components consume ONLY these)
+     ------------------------------------------------------------------ */
+
+  /* Surfaces. The app is a light, slate-tinted UI: the page is slate-100
+     and cards sit on top of it in white. Do not invert this. */
+  --pl-bg-canvas: var(--pl-slate-100);
+  --pl-bg-surface: var(--pl-white);
+  --pl-bg-surface-sunken: var(--pl-slate-200);
+  --pl-bg-surface-subtle: var(--pl-slate-50);
+  --pl-bg-hover: var(--pl-slate-50);
+  --pl-bg-selected: var(--pl-alpha-blue-06);
+  /* Dark inverse surface — tooltips, and anything that must read as "on top of"
+     rather than "part of" the page. Figma `background/neutral/emphasis`. */
+  --pl-bg-emphasis: var(--pl-slate-750);
+  /* Brand surfaces. Figma `background/brand/default` and the light hover step. */
+  --pl-bg-brand: var(--pl-blue-600);
+  --pl-bg-brand-subtle: var(--pl-blue-50);
+  --pl-bg-brand-faint: var(--pl-alpha-brand-02);
+  --pl-bg-scrim: rgba(0, 0, 0, 0.3);
+
+  /* Text. `--pl-text-primary` was captured as pure #000 but every heading
+     actually rendered #0A0C11; the system standardises on slate-900. */
+  --pl-text-primary: var(--pl-slate-900);
+  --pl-text-secondary: var(--pl-slate-600);
+  --pl-text-tertiary: var(--pl-slate-500);
+  --pl-text-inverse: var(--pl-white);
+  --pl-text-link: var(--pl-blue-500);
+  --pl-text-brand: var(--pl-blue-600);
+  /* One step darker than secondary. Figma `action/foreground/neutral/active` —
+     the label of a selected tab. */
+  --pl-text-emphasis: var(--pl-slate-750);
+  /* Figma `foreground/neutral/quaternary` #afbaca. Decorative only — 2.1:1 on
+     white, so never body text. Placeholder glyphs, empty-state art, dividers.
+     Figma's `tertiary` (#8897ae) is NOT adopted: at 3.0:1 it fails WCAG AA for
+     the meta text it is used on, and --pl-text-tertiary stays at the accessible
+     #64748b (4.76:1). See Colors.stories.tsx ContrastCheck. */
+  --pl-text-quaternary: #afbaca;
+  --pl-text-disabled: var(--pl-slate-400);
+  /* Figma `action/foreground/neutral/disable`. Deliberately near-invisible;
+     used only where the disabled state must recede completely, e.g. a
+     disabled table column header. Fails contrast by design. */
+  --pl-text-disabled-subtle: var(--pl-slate-250);
+  /* Delta/trend foregrounds. Figma `foreground/success/primary`; the negative
+     direction is not in the Figma set and extrapolates from the error ramp. */
+  --pl-text-success: var(--pl-green-600);
+  --pl-text-danger: var(--pl-red-600);
+
+
+  /* Borders. */
+  --pl-border-default: var(--pl-slate-300);
+  --pl-border-subtle: var(--pl-slate-200);
+  --pl-border-strong: var(--pl-slate-400);
+  --pl-border-brand: var(--pl-blue-600);
+  --pl-border-focus: var(--pl-blue-500);
+  /* Figma `border/brand/subtle`. The outline on a brand-tinted chip. */
+  --pl-border-brand-subtle: var(--pl-blue-200);
+  /* Figma `border/neutral/muted` #1b38603d — one step stronger than the table
+     rule. The hairline on a light tooltip and on a floating panel. */
+  --pl-border-muted: var(--pl-alpha-navy-24);
+  /* Figma `border/neutral/xsubtle` and `border/brand/xsubtle` — the two faintest
+     outlines, for dividers inside an already-bordered surface. */
+  --pl-border-faint: var(--pl-alpha-navy-06);
+  --pl-border-brand-faint: var(--pl-blue-50);
+
+  /* Interactive — primary action. */
+  --pl-action-primary-bg: var(--pl-blue-600);
+  --pl-action-primary-bg-hover: var(--pl-blue-700);
+  --pl-action-primary-fg: var(--pl-white);
+
+  /* Primary action, remaining states — Figma `action/background/brand/*`.
+     `active` resolves to the same colour as `normal`: the pressed feel comes
+     from the shadow dropping to shadow-card, not from a colour change. */
+  --pl-action-primary-bg-active: var(--pl-blue-600);
+  --pl-action-primary-bg-focus: var(--pl-blue-450);
+  --pl-action-primary-bg-disabled: var(--pl-blue-200);
+  /* Ring drawn around a focused filled button — Figma `border/brand/subtle`. */
+  --pl-action-ring: var(--pl-blue-200);
+
+  /* Status action tones. `bg` is the Fill background, `bg-hover` its hover,
+     `fg` the Light/Border foreground, `light-bg` the Light tint. */
+  --pl-action-success-bg: var(--pl-green-500);
+  --pl-action-success-bg-hover: var(--pl-green-600);
+  --pl-action-success-fg: var(--pl-green-600);
+  --pl-action-success-light-bg: var(--pl-alpha-success-12);
+  --pl-action-warning-bg: var(--pl-amber-500);
+  --pl-action-warning-bg-hover: var(--pl-amber-600);
+  --pl-action-warning-fg: var(--pl-amber-600);
+  --pl-action-warning-light-bg: var(--pl-alpha-warning-16);
+  --pl-action-error-bg: var(--pl-red-500);
+  --pl-action-error-bg-hover: var(--pl-red-600);
+  --pl-action-error-fg: var(--pl-red-500);
+  --pl-action-error-light-bg: var(--pl-alpha-error-08);
+  /* Neutral Light fill — Figma `action/background/neutral/light_normal`. */
+  --pl-action-neutral-light-bg: var(--pl-alpha-dark-04);
+
+  /* Interactive — secondary / ghost. */
+  --pl-action-secondary-bg: var(--pl-bg-surface);
+  --pl-action-secondary-bg-hover: var(--pl-slate-50);
+  --pl-action-secondary-fg: var(--pl-text-secondary);
+  --pl-action-secondary-border: var(--pl-border-default);
+
+  /* Status. Only success was observable in the captures; the remaining
+     three are defined here so status UI stops being invented per page. */
+  --pl-status-success: var(--pl-green-700);
+  --pl-status-info: var(--pl-blue-500);
+  --pl-status-warning: #b54708;
+  --pl-status-danger: #b42318;
+  --pl-status-neutral: var(--pl-slate-400);
+  /* Tabular data. Figma `Table Cell` component set, node 14938:8436, whose
+     axes are Type x Background x State.
+
+     `Background` is the row base: White, or the Light-gray zebra tint.
+     `State` does not layer on top of that base in Figma — it replaces it, with
+     the same two values for both backgrounds. That is why hover on a zebra row
+     reads as a slight LIGHTENING (4% ink -> 2% ink) while hover on a white row
+     darkens. Reproduced as authored; see Table.mdx. */
+  --pl-table-row-bg: var(--pl-bg-surface);
+  --pl-table-row-bg-zebra: var(--pl-alpha-dark-04);
+  --pl-table-row-bg-hover: var(--pl-alpha-dark-02);
+  --pl-table-row-bg-active: var(--pl-alpha-dark-06);
+  --pl-table-row-bg-selected: var(--pl-bg-selected);
+  /* Figma `border/neutral/subtle` #1b38601f. The row rule, not --pl-border-subtle:
+     it is a navy alpha so it survives on both the white and the zebra base. */
+  --pl-table-border: var(--pl-alpha-navy-12);
+  /* Figma `background/neutral/soft-surface` #f9fafb. */
+  --pl-table-head-bg: var(--pl-bg-surface-subtle);
+
+  /* Data visualisation inside cells — progress bars, sparklines, ratings. */
+  --pl-data-track: var(--pl-slate-100);
+  --pl-data-line: var(--pl-blue-600);
+  --pl-data-rating: var(--pl-amber-500);
+  /* Figma gradient style `Member Card Gradient` — the cover band behind a
+     portrait. Vertical, white to slate-200. */
+  --pl-gradient-cover: linear-gradient(
+    180deg,
+    var(--pl-white) 0%,
+    var(--pl-slate-200) 100%
+  );
+  --pl-gradient-data: linear-gradient(
+    76.4deg,
+    var(--pl-blue-650) 17.5%,
+    var(--pl-sky-400) 100%
+  );
+
+
+  /* Focus ring — captures showed UA default outlines (5px auto #101010).
+     That is an accessibility regression; this is the replacement. */
+  --pl-focus-ring: 0 0 0 2px var(--pl-bg-surface), 0 0 0 4px var(--pl-blue-500);
+
+  /* ---------------------------------------------------------------------
+     TYPOGRAPHY
+     Inter across all 7 pages. Two real bugs were captured and are fixed
+     here: `body` fell back to a system stack, and the search input was
+     hardcoded to Arial. See AUDIT.md.
+     ------------------------------------------------------------------ */
+  --pl-font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+
+  /* Type scale. 13.3333px appeared on all 7 pages — that is the UA default
+     for unstyled <button>/<input>, not a design decision. It is excluded. */
+  --pl-text-3xs: 0.625rem; /* 10px — Figma Label/2xsmall, the tightest chip */
+  --pl-text-2xs: 0.6875rem; /* 11px — badge counts */
+  --pl-text-xs: 0.75rem; /* 12px — meta rows, captions */
+  --pl-text-sm: 0.8125rem; /* 13px — dense labels */
+  --pl-text-base: 0.875rem; /* 14px — DEFAULT body/UI */
+  --pl-text-md: 1rem; /* 16px — emphasised body */
+  --pl-text-lg: 1.125rem; /* 18px — card titles */
+  --pl-text-xl: 1.25rem; /* 20px — section titles */
+  --pl-text-2xl: 1.5rem; /* 24px — page titles */
+  --pl-text-3xl: 2rem; /* 32px — hero */
+
+  --pl-leading-tight: 1rem; /* 16px */
+  --pl-leading-snug: 1.125rem; /* 18px */
+  --pl-leading-normal: 1.25rem; /* 20px */
+  --pl-leading-relaxed: 1.5rem; /* 24px */
+  --pl-leading-loose: 2.625rem; /* 42px — Figma Heading/Medium/strong */
+
+  --pl-weight-regular: 400;
+  --pl-weight-medium: 500;
+  --pl-weight-semibold: 600;
+
+  /* Letter-spacing. The product tightens optical tracking at every size;
+     -0.2px on body and -0.4px on titles were near-universal. */
+  /* Figma Heading/Medium/strong. Large type needs tighter tracking than titles. */
+  --pl-tracking-display: -0.75px;
+  --pl-tracking-title: -0.4px;
+  --pl-tracking-body: -0.2px;
+  --pl-tracking-tight: -0.1px;
+
+  /* ---------------------------------------------------------------------
+     SPACING — 4px grid.
+     Captured ramp included 5, 9, 10, 14, 15, 25, 30, 38px. Those are drift;
+     the grid below is the target. Nearest-legal mapping is in AUDIT.md.
+     ------------------------------------------------------------------ */
+  --pl-space-0: 0;
+  --pl-space-1: 0.25rem; /* 4px */
+  --pl-space-2: 0.5rem; /* 8px */
+  --pl-space-3: 0.75rem; /* 12px */
+  --pl-space-4: 1rem; /* 16px */
+  --pl-space-5: 1.25rem; /* 20px */
+  --pl-space-6: 1.5rem; /* 24px */
+  --pl-space-8: 2rem; /* 32px */
+  --pl-space-10: 2.5rem; /* 40px */
+  --pl-space-15: 3.75rem; /* 60px */
+  --pl-space-20: 5rem; /* 80px */
+  /* Half-step. Legitimate: used for tag/badge vertical padding. */
+  --pl-space-0-5: 0.125rem; /* 2px */
+  --pl-space-1-5: 0.375rem; /* 6px */
+  --pl-space-2-5: 0.625rem; /* 10px — Figma spacing/xs */
+
+  /* ---------------------------------------------------------------------
+     RADII — pills were captured three ways (100px / 9999px / 26px / 50%).
+     Use --pl-radius-pill for all of them.
+     ------------------------------------------------------------------ */
+  --pl-radius-sm: 4px;
+  --pl-radius-md: 6px;
+  --pl-radius-lg: 8px;
+  /* Figma `corner radius/lg` = 10px. Our radius names sit one step below
+     Figma's (Figma md 8 = our lg 8), so this step had no name and was previously
+     rounded up to 12px on the two largest buttons. Named by value to avoid
+     renaming the whole scale. */
+  --pl-radius-10: 10px;
+  --pl-radius-xl: 12px;
+  --pl-radius-2xl: 16px;
+  --pl-radius-3xl: 24px;
+  --pl-radius-pill: 9999px;
+  --pl-radius-circle: 50%;
+
+  /* ---------------------------------------------------------------------
+     ELEVATION — only two real shadows exist in the product. Keep it that way.
+     ------------------------------------------------------------------ */
+  --pl-shadow-card: 0 1px 2px 0 rgba(14, 15, 17, 0.06);
+  --pl-shadow-raised: 0 0 1px 0 rgba(15, 23, 42, 0.12),
+    0 4px 4px 0 rgba(15, 23, 42, 0.04);
+  --pl-shadow-navbar: 0 1px 4px 0 var(--pl-slate-200);
+  /* Primary-action fill. Figma effect style `Button/primary/fill`. */
+  --pl-shadow-action: 0 1px 5px 0 var(--pl-alpha-blue-16),
+    inset 0 4px 6px 0 var(--pl-alpha-white-06),
+    inset 0 1px 3px 0 var(--pl-alpha-white-32);
+  /* Non-brand filled buttons — Figma effect style `Button/regular/fill`. */
+  --pl-shadow-action-regular: 0 1px 5px 0 var(--pl-alpha-dark-16),
+    inset 0 4px 6px 0 var(--pl-alpha-dark-04),
+    inset 0 1px 3px 0 var(--pl-alpha-dark-08);
+  /* Bordered buttons — Figma effect style `Button/secondary/border`. */
+  --pl-shadow-action-border: 0 1px 2px 0 var(--pl-alpha-dark-08),
+    inset 0 -2px 8px 0 var(--pl-alpha-dark-02);
+  /* Light-style buttons — Figma effect style `Button/regular/light`. */
+  --pl-shadow-action-light: inset 0 -2px 4px 0 var(--pl-alpha-dark-02);
+  /* Brand Light buttons. Figma effect style `Button/primay/light` (the typo is
+     Figma's). The neutral Light shadow above uses dark ink; this one uses brand,
+     which is why a primary Light button glows rather than dents. */
+  --pl-shadow-action-light-brand: inset 0 -1px 4px 0 var(--pl-alpha-brand-08);
+  /* Focus elevation — Figma effect style `Shadow/md`. */
+  /* Figma effect style `Shadow/md`. Used for keyboard focus on a button and for
+     the raised selected tab in the Fill style — the same effect, so one token. */
+  --pl-shadow-md: 0 2px 4px -1px var(--pl-alpha-dark-06),
+    0 4px 6px -1px var(--pl-alpha-dark-12);
+  --pl-shadow-action-focus: var(--pl-shadow-md);
+  /* Figma effect style `Shadow/lg`. Tooltips and other small floating layers.
+     `--pl-shadow-overlay` (Shadow/xl) is for full panels; this is one step down. */
+  --pl-shadow-lg: 0 4px 6px -2px var(--pl-alpha-dark-06),
+    0 10px 15px -3px var(--pl-alpha-dark-12);
+  /* Floating layers — menus, popovers. Figma effect style `Shadow/xl`. */
+  --pl-shadow-overlay: 0 20px 65px -5px rgba(14, 15, 17, 0.06),
+    0 10px 20px -5px rgba(14, 15, 17, 0.06);
+
+  /* ---------------------------------------------------------------------
+     LAYOUT
+     ------------------------------------------------------------------ */
+  --pl-navbar-height: 5rem; /* 80px desktop */
+  --pl-navbar-height-compact: 3.5rem; /* 56px below lg */
+  --pl-container-max: 90rem; /* 1440px */
+  --pl-sidebar-width: 18.5rem; /* 296px — Figma filter rail */
+  --pl-control-height: 2.5rem; /* 40px — buttons, inputs, nav items */
+  --pl-control-height-sm: 2rem; /* 32px */
+
+  --pl-z-base: 1;
+  --pl-z-sticky: 5;
+  --pl-z-dropdown: 50;
+  --pl-z-modal: 100;
+  /* Above the modal: a tooltip on a control inside a dialog must still show. */
+  --pl-z-tooltip: 150;
+  /* Above everything: a toast reports on the thing that is covering the page. */
+  --pl-z-toast: 200;
+}
+
+/* Breakpoints are declared for reference; use the Tailwind theme in
+   tailwind-theme.css so they are available as variants.
+   lg: 1025px is the real desktop/mobile switch used by the navbar. */

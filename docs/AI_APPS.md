@@ -494,22 +494,25 @@ The kit deliberately exposes **no internal PLN APIs** — only the connect, depl
 ### Bundled PL Design System
 
 Members no longer hand-roll UI. The kit ships the curated **PL Design System** as
-a ready-to-use `pl-design-system/` folder (no nested zip for the agent to unpack):
+a ready-to-use `pl-design-system/` folder (no nested zip for the agent to unpack).
+Source is a slimmed copy of `pl-network-design-system` (`@plnetwork/design-system`):
+React + Tailwind v4, semantic tokens only.
 
 ```
 pl-design-system/
-  USAGE.md                 how to consume the system in a Next.js 14 app
-  guidelines.md            design rules (retrieval order, token usage, do/don't)
-  components/              React components (.tsx + SCSS modules + types)
-                           primitives (Button, Input, Badge, Tabs, Table,
-                           Pagination, SearchInput, …) and product components
-                           (MemberCard, TeamCard, PageHeader, Sidebar, NavBar, …)
-                           plus per-component specs in primitives/ and product/
-  tokens/                  SCSS design tokens → CSS custom properties
-  styles/                  globals.scss (reset + tokens + @font-face), media, mixins
-  public/fonts/            self-hosted Inter variable font (woff2)
-  patterns/ examples/      layout patterns + page-level reference compositions
+  USAGE.md                 how to consume in a Next.js + Tailwind v4 app
+  guidelines.md            design rules (semantic tokens, page recipes, do/don't)
+  README.md                foundations + full page-recipe snippets
+  components/              React components (.tsx) + public barrel index.ts
+                           (Button, EntityCard, PageShell, Tag, Badge, Table,
+                           Tabs, FilterPanel, Modal, Drawer, MemberCard, …)
+  tokens/                  tokens.css + tailwind-theme.css + tokens.ts
+  lib/cn.ts                tailwind-merge class joiner
 ```
+
+Agents copy the folder into `app/pl-design-system/`, wire Tailwind with
+`@source "../pl-design-system/components"`, and import components relatively.
+No font files are bundled — Inter is loaded via `next/font` or CDN.
 
 The curated tree lives at `apps/web-api/src/ai-apps/assets/pl-design-system/`
 (kit overlays: `USAGE.md`, `guidelines.kit.md`). It is registered as a build
@@ -519,8 +522,9 @@ asset in `apps/web-api/project.json`, so `nx build` copies it to
 ever missing at runtime, the kit still downloads — just without the design
 system (a warning is logged).
 
-The agent loads `.claude/skills/pl-design-system` for UI work and follows
-`AGENTS.md` / `CLAUDE.md` for deploy, secrets, and iframe rules.
+Excluded from the kit: Storybook, foundations/pages stories, GAP/AUDIT docs,
+and the DS package.json. The agent loads `.claude/skills/pl-design-system` for
+UI work and follows `AGENTS.md` / `CLAUDE.md` for deploy, secrets, and iframe rules.
 
 ## Configuration (env)
 

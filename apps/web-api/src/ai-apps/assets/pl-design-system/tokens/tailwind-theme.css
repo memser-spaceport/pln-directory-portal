@@ -1,0 +1,180 @@
+/* =============================================================================
+   Tailwind v4 theme bridge.
+   Import AFTER tokens.css so `bg-surface`, `text-secondary`, `rounded-pill`
+   etc. resolve to the semantic tokens. Keeping `@theme inline` preserves the
+   var() reference, so themes stay swappable at runtime.
+
+     @import "./tokens.css";
+     @import "./tailwind-theme.css";
+   ========================================================================== */
+
+@theme inline {
+  /* --- colors: semantic only. Primitives are intentionally NOT exposed as
+         utilities, so `bg-pl-blue-600` is impossible and `bg-brand` is the
+         only way to paint a brand surface. --- */
+  --color-canvas: var(--pl-bg-canvas);
+  --color-surface: var(--pl-bg-surface);
+  --color-surface-sunken: var(--pl-bg-surface-sunken);
+  --color-surface-subtle: var(--pl-bg-surface-subtle);
+  --color-hover: var(--pl-bg-hover);
+  --color-selected: var(--pl-bg-selected);
+  --color-emphasis: var(--pl-bg-emphasis);
+  --color-brand-surface: var(--pl-bg-brand);
+  --color-brand-subtle: var(--pl-bg-brand-subtle);
+  --color-brand-faint: var(--pl-bg-brand-faint);
+  --color-scrim: var(--pl-bg-scrim);
+
+  --color-primary: var(--pl-text-primary);
+  --color-secondary: var(--pl-text-secondary);
+  --color-tertiary: var(--pl-text-tertiary);
+  --color-inverse: var(--pl-text-inverse);
+  --color-link: var(--pl-text-link);
+  --color-brand: var(--pl-text-brand);
+  --color-disabled: var(--pl-text-disabled);
+  --color-disabled-subtle: var(--pl-text-disabled-subtle);
+  --color-quaternary: var(--pl-text-quaternary);
+
+  --color-border: var(--pl-border-default);
+  --color-border-subtle: var(--pl-border-subtle);
+  --color-border-strong: var(--pl-border-strong);
+  --color-border-brand: var(--pl-border-brand);
+  --color-border-brand-subtle: var(--pl-border-brand-subtle);
+  --color-border-muted: var(--pl-border-muted);
+  --color-border-faint: var(--pl-border-faint);
+  --color-border-brand-faint: var(--pl-border-brand-faint);
+
+  --color-action: var(--pl-action-primary-bg);
+  --color-action-hover: var(--pl-action-primary-bg-hover);
+  --color-action-fg: var(--pl-action-primary-fg);
+  --color-action-active: var(--pl-action-primary-bg-active);
+  --color-action-focus: var(--pl-action-primary-bg-focus);
+  --color-action-disabled: var(--pl-action-primary-bg-disabled);
+  --color-action-ring: var(--pl-action-ring);
+
+  --color-action-success: var(--pl-action-success-bg);
+  --color-action-success-hover: var(--pl-action-success-bg-hover);
+  --color-action-success-fg: var(--pl-action-success-fg);
+  --color-action-success-light: var(--pl-action-success-light-bg);
+  --color-action-warning: var(--pl-action-warning-bg);
+  --color-action-warning-hover: var(--pl-action-warning-bg-hover);
+  --color-action-warning-fg: var(--pl-action-warning-fg);
+  --color-action-warning-light: var(--pl-action-warning-light-bg);
+  --color-action-error: var(--pl-action-error-bg);
+  --color-action-error-hover: var(--pl-action-error-bg-hover);
+  --color-action-error-fg: var(--pl-action-error-fg);
+  --color-action-error-light: var(--pl-action-error-light-bg);
+  --color-action-neutral-light: var(--pl-action-neutral-light-bg);
+
+  --color-success: var(--pl-status-success);
+  --color-info: var(--pl-status-info);
+  --color-warning: var(--pl-status-warning);
+  --color-danger: var(--pl-status-danger);
+  --color-neutral: var(--pl-status-neutral);
+  /* tabular data + in-cell data viz */
+  --color-table-row: var(--pl-table-row-bg);
+  --color-table-zebra: var(--pl-table-row-bg-zebra);
+  --color-table-row-hover: var(--pl-table-row-bg-hover);
+  --color-table-row-active: var(--pl-table-row-bg-active);
+  --color-table-row-selected: var(--pl-table-row-bg-selected);
+  --color-table-border: var(--pl-table-border);
+  --color-table-head: var(--pl-table-head-bg);
+  --color-data-track: var(--pl-data-track);
+  --color-data-line: var(--pl-data-line);
+  --color-data-rating: var(--pl-data-rating);
+  --color-trend-up: var(--pl-text-success);
+  --color-trend-down: var(--pl-text-danger);
+
+
+  /* --- typography --- */
+  --font-sans: var(--pl-font-sans);
+
+  --text-2xs: var(--pl-text-2xs);
+  --text-3xs: var(--pl-text-3xs);
+  --text-xs: var(--pl-text-xs);
+  --text-sm: var(--pl-text-sm);
+  --text-base: var(--pl-text-base);
+  --text-md: var(--pl-text-md);
+  --text-lg: var(--pl-text-lg);
+  --text-xl: var(--pl-text-xl);
+  --text-2xl: var(--pl-text-2xl);
+  --text-3xl: var(--pl-text-3xl);
+
+  --font-weight-regular: var(--pl-weight-regular);
+  --font-weight-medium: var(--pl-weight-medium);
+  --font-weight-semibold: var(--pl-weight-semibold);
+
+  --tracking-title: var(--pl-tracking-title);
+  --tracking-display: var(--pl-tracking-display);
+  --tracking-body: var(--pl-tracking-body);
+  --tracking-tight: var(--pl-tracking-tight);
+
+  /* --- radii --- */
+  --radius-sm: var(--pl-radius-sm);
+  --radius-md: var(--pl-radius-md);
+  --radius-lg: var(--pl-radius-lg);
+  --radius-xl: var(--pl-radius-xl);
+  --radius-10: var(--pl-radius-10);
+  --radius-2xl: var(--pl-radius-2xl);
+  --radius-3xl: var(--pl-radius-3xl);
+  --radius-pill: var(--pl-radius-pill);
+
+  /* --- elevation --- */
+  --shadow-card: var(--pl-shadow-card);
+  --shadow-raised: var(--pl-shadow-raised);
+  --shadow-navbar: var(--pl-shadow-navbar);
+  --shadow-action: var(--pl-shadow-action);
+  --shadow-action-regular: var(--pl-shadow-action-regular);
+  --shadow-action-border: var(--pl-shadow-action-border);
+  --shadow-action-light: var(--pl-shadow-action-light);
+  --shadow-action-light-brand: var(--pl-shadow-action-light-brand);
+  --shadow-action-focus: var(--pl-shadow-action-focus);
+  --shadow-md: var(--pl-shadow-md);
+  --shadow-lg: var(--pl-shadow-lg);
+  --shadow-overlay: var(--pl-shadow-overlay);
+
+  /* --- breakpoints ---
+     lg:1025px is the desktop switch the navbar actually uses. md:572px and
+     2xl:1601px were both observed in the captured responsive rules. */
+  --breakpoint-sm: 375px;
+  --breakpoint-md: 572px;
+  --breakpoint-lg: 1025px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1601px;
+}
+
+/* Base layer. Fixes the two font bugs found in every capture:
+   body fell back to a system stack while Inter was loaded, and one input
+   was hardcoded to Arial. */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: var(--pl-font-sans);
+    font-size: var(--pl-text-base);
+    line-height: var(--pl-leading-normal);
+    letter-spacing: var(--pl-tracking-body);
+    color: var(--pl-text-primary);
+    background-color: var(--pl-bg-canvas);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Form controls must inherit the font — otherwise the browser falls back
+     to its 13.3333px default, which is how that size entered the captures. */
+  button,
+  input,
+  select,
+  textarea,
+  optgroup {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+  }
+
+  /* Replace the UA focus outline with the token ring. */
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--pl-focus-ring);
+  }
+}
