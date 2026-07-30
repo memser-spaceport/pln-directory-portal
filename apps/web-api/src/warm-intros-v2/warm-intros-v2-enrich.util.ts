@@ -269,8 +269,10 @@ export function enrichHopChainNames(
     if (!uid) return hopRec;
     const profile = profilesByUid.get(uid);
     const next: Record<string, unknown> = { ...hopRec };
-    const hasName = typeof hopRec.name === 'string' && hopRec.name.trim() !== '';
-    if (!hasName && profile?.canonicalName) next.name = profile.canonicalName;
+    const rawName = typeof hopRec.name === 'string' ? hopRec.name.trim() : '';
+    // Materialize sometimes stubs missing connectors with name === profileUid.
+    const needsName = !rawName || rawName === uid;
+    if (needsName && profile?.canonicalName) next.name = profile.canonicalName;
     if (profile?.memberUid != null) next.memberUid = profile.memberUid;
     if (profile?.imageUrl !== undefined) next.imageUrl = profile.imageUrl;
     return next;

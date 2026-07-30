@@ -198,6 +198,37 @@ describe('warm-intros-v2-enrich.util', () => {
       });
     });
 
+    it('overwrites hop name when it was incorrectly stored as the profileUid', () => {
+      const profiles = new Map([
+        [
+          'juan',
+          {
+            uid: 'juan',
+            personKey: 'k1',
+            canonicalName: 'Juan Benet',
+            memberUid: 'm-juan',
+            imageUrl: null,
+          },
+        ],
+      ]);
+
+      const enriched = enrichHopChainNames(
+        {
+          relationKind: 'pl_direct',
+          hops: [{ profileUid: 'juan', name: 'juan', role: 'pl_connector' }],
+          alternates: [{ profileUid: 'juan', name: 'juan', score: 0.9 }],
+        },
+        profiles,
+        1
+      ) as {
+        hops: Array<Record<string, unknown>>;
+        alternates: Array<Record<string, unknown>>;
+      };
+
+      expect(enriched.hops[0].name).toBe('Juan Benet');
+      expect(enriched.alternates[0].name).toBe('Juan Benet');
+    });
+
     it('assigns B caliber proximity for lower alternate scores', () => {
       const enriched = enrichHopChainNames(
         {

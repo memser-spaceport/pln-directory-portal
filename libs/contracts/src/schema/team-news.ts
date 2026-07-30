@@ -168,6 +168,8 @@ export const TeamNewsGroupedResponseSchema = z.object({
   windowDays: z.number().int(),
   generatedAt: z.string(),
   groups: z.array(TeamNewsFocusGroupSchema),
+  /** News from allowlisted teams with no focus-area group; home "All" tab only. */
+  allTabExtraItems: z.array(TeamNewsItemSchema).default([]),
 });
 
 export const TeamNewsFacetItemSchema = z.object({
