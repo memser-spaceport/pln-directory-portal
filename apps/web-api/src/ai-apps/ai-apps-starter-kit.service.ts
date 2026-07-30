@@ -144,9 +144,9 @@ to the Protocol Labs Network sandbox with a single instruction.
 
 ## Apps that need an API key or password (secrets)
 Some apps need a secret to work — for example an app that talks to ChatGPT/OpenAI,
-sends emails, or connects to a database needs an **API key** or password for that
-service. If yours does, the flow is slightly different, and your agent handles it
-for you:
+sends emails, or connects to your own database needs an **API key** or password
+for that service. If yours does, the flow is slightly different, and your agent
+handles it for you:
 
 1. Build your app as usual — just tell your agent what you want (e.g. "an app that
    summarizes news with ChatGPT"). It knows the app will need a key.
@@ -162,6 +162,23 @@ for you:
 
 Secrets never go into the code, the chat, or the uploaded ZIP — they are stored
 securely on the sandbox and injected into your app when it runs.
+
+## Apps that need a database
+Some apps need to remember information between visits — a to-do list, a
+leaderboard, a guestbook, anything with data that should still be there next
+time someone opens the app. If yours does, you don't need any technical
+know-how — your agent will ask which of these you want when it's time to deploy:
+
+1. **Let PLN set one up for you (recommended if you don't already have one).**
+   No accounts, no setup, nothing to configure — just tell your agent you'd
+   like one. Your app gets a working database automatically the moment it
+   deploys; you never touch a password or connection string.
+2. **Connect a database you already have.** Treat its connection details the
+   same as any other secret — see "Apps that need an API key or password"
+   above; you'll enter it on that same secure LabOS page.
+
+Either way, you never create the database or generate credentials yourself —
+your agent and PLN handle that part.
 
 ## Personalized apps (who's using it)
 Your app can know which PLN member opened it. When a signed-in member with AI
