@@ -193,4 +193,51 @@ describe('AiAppsStarterKitService buildZip', () => {
     // Routed through the same secure page as any other secret, not a new one.
     expect(readme).toContain('Apps that need an API key or password');
   });
+
+  it('ships the curated Tailwind design system (and not Storybook/GAP docs)', () => {
+    for (const path of [
+      'pl-design-system/USAGE.md',
+      'pl-design-system/guidelines.md',
+      'pl-design-system/README.md',
+      'pl-design-system/tokens/tokens.css',
+      'pl-design-system/tokens/tailwind-theme.css',
+      'pl-design-system/components/index.ts',
+      'pl-design-system/components/EntityCard.tsx',
+      'pl-design-system/lib/cn.ts',
+    ]) {
+      expect(entries.has(path)).toBe(true);
+    }
+    for (const path of entries.keys()) {
+      expect(path).not.toMatch(/\.stories\.tsx$/);
+      expect(path).not.toMatch(/GAP-/);
+      expect(path).not.toContain('AUDIT.md');
+      expect(path).not.toContain('.storybook/');
+      expect(path).not.toContain('globals.scss');
+    }
+  });
+
+  it('teaches semantic Tailwind tokens and EntityCard in the design-system skill', () => {
+    const skill = entries.get('.claude/skills/pl-design-system/SKILL.md') as string;
+    expect(skill).toContain('Semantic tokens only');
+    expect(skill).toContain('bg-surface');
+    expect(skill).toContain('EntityCard');
+    expect(skill).toContain('@source');
+    expect(skill).toContain('Tailwind v4');
+    expect(skill).not.toContain('Layer 3');
+    expect(skill).not.toContain('globals.scss');
+    expect(skill).not.toContain('SCSS');
+
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      const content = entries.get(path) as string;
+      expect(content).toContain('Semantic tokens only');
+      expect(content).toContain('bg-surface');
+      expect(content).not.toContain('globals.scss');
+      expect(content).not.toContain('var(--background-brand-default)');
+    }
+
+    const readme = entries.get('README.md') as string;
+    expect(readme).toContain('Tailwind v4');
+    expect(readme).toContain('EntityCard');
+    expect(readme).not.toContain('SCSS design tokens');
+  });
 });
