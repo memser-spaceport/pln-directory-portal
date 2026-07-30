@@ -51,6 +51,18 @@ type WarmPathRow = {
   computedAt: Date;
 };
 
+/** Keep first row per investor. Caller must pass score-desc ordered rows. */
+function collapsePathsByInvestor<T extends { targetProfileUid: string }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const row of rows) {
+    if (seen.has(row.targetProfileUid)) continue;
+    seen.add(row.targetProfileUid);
+    out.push(row);
+  }
+  return out;
+}
+
 /**
  * ConnectionEdge + WarmPathV2 write + read. Ingest upserts by unique keys; no pairing logic.
  *
@@ -258,6 +270,9 @@ export class WarmIntrosV2Service {
     const search = (query.search ?? query.q)?.trim() || null;
     const sector = query.sector?.trim() || null;
     const needsPostFilter = Boolean(search || sector);
+    // "All" returns one path per (investor, list); collapse to one row per investor.
+    const collapseByInvestor = !targetSet;
+    const loadThenPaginate = needsPostFilter || collapseByInvestor;
 
     const where: Prisma.WarmPathV2WhereInput = { rank, score: { gte: minScore } };
     if (targetSet) where.targetSet = targetSet;
@@ -268,10 +283,10 @@ export class WarmIntrosV2Service {
       ];
     }
 
-    // Search/sector need MasterProfile join — load candidates then filter (v2 scale ~1–2k).
+    // Search/sector/All collapse need full candidate set then slice (v2 scale ~1–2k).
     const paths = (await this.prisma.warmPathV2.findMany({
       where,
-      ...(needsPostFilter ? {} : { take: limit, skip: offset }),
+      ...(loadThenPaginate ? {} : { take: limit, skip: offset }),
       orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
     })) as WarmPathRow[];
 
@@ -286,10 +301,13 @@ export class WarmIntrosV2Service {
     if (sector) {
       enriched = enriched.filter((row) => matchesSector(row.investor, sector));
     }
+    if (collapseByInvestor) {
+      enriched = collapsePathsByInvestor(enriched);
+    }
 
-    const total = needsPostFilter ? enriched.length : await this.prisma.warmPathV2.count({ where });
+    const total = loadThenPaginate ? enriched.length : await this.prisma.warmPathV2.count({ where });
 
-    const page = needsPostFilter ? enriched.slice(offset, offset + limit) : enriched;
+    const page = loadThenPaginate ? enriched.slice(offset, offset + limit) : enriched;
 
     return { paths: page, total };
   }

@@ -112,7 +112,7 @@ export const TeamNewsPopularQueryParams = z.object({
 });
 
 export const SeedTeamNewsTrendingDtoSchema = z.object({
-  createdAfter: z.string().datetime(),
+  createdAfter: z.string(),
   limit: z.number().int().min(5).max(7).optional().default(7),
 });
 
