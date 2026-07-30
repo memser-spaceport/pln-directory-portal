@@ -3248,6 +3248,16 @@ model AiApp {
   /// cover the last successful phase, so it can't be derived after the fact).
   /// Null when unknown (e.g. stuck-deploy settle); cleared on success.
   failureStream   String?
+  /// Database provisioning requested on the LAST deploy/draft upload, plus
+  /// non-sensitive connection metadata once the Deployment Orchestrator
+  /// provisions it — an opt-in convenience for non-technical builders
+  /// (mirrors kitVersion/agentModel: reflects the last upload, null when a
+  /// call omits it). Shape: `{ enabled, type, host?, port?, name?, user?,
+  /// credentialsInjected? }` — mirrors the API response's `database` block
+  /// exactly. The password is never stored, only injected into the app's
+  /// runtime pod. A bring-your-own database is just a regular runtime secret
+  /// and isn't tracked here.
+  database        Json?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 

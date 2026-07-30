@@ -894,6 +894,31 @@ step 6 — you register a draft and the member deploys from LabOS after entering
 values there. Never deploy a secrets app directly and never accept key values in
 the chat.
 
+**Needs a database? Decide this too, BEFORE deploying.** Check whether the app
+talks to a database (an ORM/driver import, a \`DATABASE_URL\`/\`DB_*\` read, or
+code you wrote that needs one):
+
+\`\`\`bash
+grep -rniE "DATABASE_URL|postgres|pg\\.Pool|prisma|mongoose|mysql" app --include='*.js' --include='*.ts' --include='*.py' --include='*.json'
+\`\`\`
+
+If the app needs one, **ask the member which they want — don't assume**:
+
+- *"I can set up a database for you automatically — no accounts or setup on
+  your end. Or, if you already have your own database, you can connect that
+  instead. Which would you like?"*
+
+**They want PLN to provision one** (the easy path for non-technical members):
+follow "**Apps that want a provisioned database**" below — add the \`database\`
+field to your deploy/draft call, and the app gets ready-to-use connection env
+vars automatically. You never create the database or generate credentials
+yourself.
+
+**They want to bring their own**: this is just a runtime secret — add a
+connection env var name (e.g. \`DATABASE_URL\`) to \`requiredEnvVars\` and follow
+"**Apps that need secrets (draft flow)**" below; the member pastes their own
+connection string into the LabOS secrets page, same as an API key.
+
 ## Steps
 1. Read \`pln-app.config.json\` to get \`connectEndpoint\`, \`deployEndpoint\`,
    \`draftEndpoint\`, \`metadataEndpoint\`, the \`kitVersion\` (sent with every upload
@@ -973,8 +998,13 @@ the chat.
      -F "deploymentId=<unique id per deploy, e.g. a timestamp>" \\
      -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
      -F "agentModel=<the model you are running on, e.g. claude-sonnet-4-5; omit the field if unknown>" \\
+     -F 'database={"enabled":true,"type":"postgres"}' \\
      -F "file=@app.zip;type=application/zip"
    \`\`\`
+
+   Omit the \`database\` field entirely if the app doesn't need one, or the
+   member is bringing their own — see "Apps that want a provisioned database"
+   below for when to include it.
 
 7. On success the response contains the app record with its deployment URL and
    status:
@@ -1035,6 +1065,9 @@ curl -X POST "<draftEndpoint>" \\
 # → { "uid": "cl…", "status": "DRAFT", "appPageUrl": "https://…/pl-infra/ai-apps/<uid>", "missingEnvVars": [ … ] }
 \`\`\`
 
+An app can need secrets AND a provisioned database — add \`database\` (see
+"Apps that want a provisioned database" below) to this same draft call.
+
 Save the response's \`uid\` as \`appUid\` in \`pln-app.config.json\`, same as a
 regular deploy.
 
@@ -1062,6 +1095,49 @@ on the AI Apps dashboard.
   on the app's card and choose **Deployment settings**. If they want a direct
   link, hand them \`appSettingsUrl\` from \`pln-app.config.json\` with \`{appUid}\`
   replaced by the saved \`appUid\` — it opens that modal straight away.
+
+## Apps that want a provisioned database
+
+When the member asks PLN to provision a database (see "Needs a database?"
+above), add \`database\` to the SAME deploy or draft call from step 6 — it's
+one extra multipart field, not a separate request:
+
+\`\`\`bash
+-F 'database={"enabled":true,"type":"postgres"}'
+\`\`\`
+
+That's the entire contract. You never create the database, generate a
+username/password, or write any provisioning code — the Deployment
+Orchestrator provisions a dedicated Postgres database and user, and injects
+the connection details into the app's runtime as environment variables. Read
+them with your normal env-var access (\`process.env.DATABASE_URL\`,
+\`os.environ["DATABASE_URL"]\`, …) — never hardcode a connection string or ask
+the member for one:
+
+| Variable | Use it when… |
+|---|---|
+| \`DATABASE_URL\` | your framework/ORM takes a standard Postgres URL (\`postgresql://user:pass@host:5432/db\`) |
+| \`JDBC_DATABASE_URL\` | a Java/JDBC app (\`jdbc:postgresql://host:5432/db\`) |
+| \`DB_TYPE\`, \`DB_HOST\`, \`DB_PORT\`, \`DB_NAME\`, \`DB_USER\`, \`DB_PASSWORD\` | you need the individual parameters |
+
+The database user can only read/write its own database — it can't create
+other databases or roles, so don't write migration code that assumes
+superuser rights. \`CREATE TABLE\`/\`INSERT\`/etc. work normally.
+
+- **Once provisioned, keep sending \`database\` on every future deploy of this
+  app** (redeploys, code updates — every call from step 6), exactly like you
+  resend \`appName\`/\`appDescription\`. Save \`{"enabled":true,"type":"postgres"}\`
+  to \`pln-app.config.json\` (see the \`database\` key) the first time the member
+  opts in, and read it back on every later deploy instead of asking again.
+- Only ask the member once per app. If \`database\` is already set in the
+  config, don't re-run the "Needs a database?" prompt on redeploys.
+- This is entirely optional — if the member already has their own database,
+  don't send this field at all; treat their connection string as a regular
+  runtime secret instead (see "Apps that need secrets" above).
+- The response's \`database\` block (\`enabled\`, \`type\`, \`host\`, \`port\`, \`name\`,
+  \`user\`, \`credentialsInjected\`) is informational only — never the password —
+  and is not something you need to show the member; the app already has what
+  it needs via the injected env vars.
 
 ## Keep the deployment URL private
 This rule covers ONLY the deployed app's own address — the URL/host/port on
@@ -1115,6 +1191,9 @@ errors or misbehaves. Log lines may include the app's URL/host — the
 - Runtime secrets are supported only through the draft flow above — the sandbox
   injects exactly the env vars the member provided in LabOS. Non-secret config
   should ship sensible defaults — see the migration checklist in \`AGENTS.md\`.
+- Database provisioning is entirely optional and only for members who ask for
+  it — never send \`database\` unprompted, and never provision one just because
+  the app happens to touch a database driver without asking first.
 `;
   }
 
@@ -1135,8 +1214,9 @@ errors or misbehaves. Log lines may include the app's URL/host — the
         appUid: '',
         appName: '',
         appDescription: '',
+        database: null,
         notes:
-          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription hold the member-APPROVED display metadata (see .claude/skills/app-metadata) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint, buildLogsEndpoint, runtimeLogsEndpoint, and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy; the logs endpoints serve the build and runtime logs — see .claude/skills/app-logs). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill).',
+          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription hold the member-APPROVED display metadata (see .claude/skills/app-metadata) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint, buildLogsEndpoint, runtimeLogsEndpoint, and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy; the logs endpoints serve the build and runtime logs — see .claude/skills/app-logs). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill). database is null unless the member has opted into a PLN-provisioned database — once they do, set it to {"enabled":true,"type":"postgres"} and resend it verbatim on every deploy/draft call (see the deploy skill\'s "Apps that want a provisioned database"); a bring-your-own database is a regular runtime secret instead and never goes in this field.',
       },
       null,
       2

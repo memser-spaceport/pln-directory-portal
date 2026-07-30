@@ -123,9 +123,12 @@ curl -X POST "$AI_APPS_DEPLOY_ENDPOINT" \
   -F "name=My Leaderboard" \
   -F "description=A small leaderboard demo" \
   -F "deploymentId=deploy-1718900000" \
-  -F "kitVersion=1.5" \
+  -F "kitVersion=1.6" \
+  -F 'database={"enabled":true,"type":"postgres"}' \
   -F "file=@app.zip;type=application/zip"
 ```
+
+`database` is optional — see "Agent-driven database provisioning" below.
 
 `name`/`description` are member-facing: kits ≥1.5 send values the member explicitly approved (and resend the same values on redeploys — see "Editable metadata & one-pager PRD").
 
@@ -144,6 +147,31 @@ The backend uploads the ZIP to `s3://<AI_APPS_S3_BUCKET>/apps/<appId>/<deploymen
 **Helm-lock retry (secrets apps):** when a build survives such a timeout, its Helm upgrade is often still running when the follow-up secrets-injection deployment fires, and the runner answers `409` with `error: "helm_release_locked"` ("release is already being modified"). The backend treats that specific 409 as transient and retries the injection (`AI_APPS_HELM_LOCK_RETRIES` × `AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS`, default 8 × 15s ≈ 2 min, env-overridable) until the lock clears; only after the budget is exhausted (or on any other injection error) is the app marked `ERROR`.
 
 **Stuck deploys & manual retry:** deploys run synchronously inside the API process, so a legitimate one settles to `READY`/`ERROR` within minutes. An app still `DEPLOYING` after `AI_APPS_DEPLOY_STUCK_MINUTES` (default 15, env-overridable) is **stuck** — the API died mid-deploy or the runner hung — and is settled lazily on read: `GET /v1/ai-apps` and `GET /v1/ai-apps/:uid` flip such rows to `ERROR` with an explanatory `notes` and a `DEPLOY_FAILED` event (the update is conditioned on the row still being `DEPLOYING`, so a concurrently-settling deploy wins). The owner or a directory admin can then **retry** via the member deploy endpoint (`POST /v1/ai-apps/:uid/deploy`, empty body for apps without secrets) — it redeploys the bundle stored at `s3Key`, so it recovers from runner/backend outages without the agent re-uploading; if the app *itself* is broken the retry fails again with the runner error in `notes`, and the fix is to redeploy from the agent. While a **fresh** (non-stuck) deploy is in flight the endpoint returns `409` to prevent concurrent deploys. The LabOS detail page shows a status card for `ERROR` (error notes + Retry button for the creator/admin) and `DEPLOYING` (auto-refreshing progress), and the dashboard cards carry `Deploy failed` / `Deploying` badges.
+
+## Agent-driven database provisioning
+
+Non-technical builders often get stuck the moment their app needs a backend — they don't know what a database is, let alone how to provision one. Kits ≥1.6 let the agent offer a **PLN-provisioned database** as an alternative to bringing their own: the agent asks the member which they want, and if they want ours, it adds one extra field to the same deploy/draft call from "Deploy request" above:
+
+```jsonc
+"database": { "enabled": true, "type": "postgres" }
+```
+
+(As multipart, that's `-F 'database={"enabled":true,"type":"postgres"}'`.) The app never generates credentials or creates the database itself — the field just asks the sandbox runner (Deployment Orchestrator) to provision a dedicated Postgres database and non-admin user, and to inject the connection details into the app's runtime as environment variables: `DATABASE_URL`, `JDBC_DATABASE_URL`, and the individual parameters `DB_TYPE`/`DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD`. The app reads them the same way it would read any other env var — no code changes to *request* a database, just to *use* one.
+
+A member who already has their own database skips this field entirely and supplies their connection string as a regular runtime secret through the **draft flow** below (e.g. a required env var named `DATABASE_URL`) — provisioning is an opt-in convenience, never a requirement.
+
+`postgres` is the only supported `type` today. The `AiApp.database` column — a single JSON blob shaped exactly like the response block below — reflects the **last** deploy/draft upload, the same "reflects the last upload" rule `kitVersion`/`agentModel` follow: a call that omits `database` sets the column to `NULL` (provisioning off) for that call, so kits persist the member's choice in `pln-app.config.json` and resend it on every redeploy (member-triggered redeploys from the LabOS Deployment settings modal reuse whatever was last stored, with no agent involved). Every app response carries the non-sensitive result in a `database` block:
+
+```jsonc
+"database": {
+  "enabled": true,
+  "type": "postgres",
+  "host": "…", "port": 5432, "name": "db_demo", "user": "db_demo_user",
+  "credentialsInjected": true
+}
+```
+
+The password is never part of this contract — it only ever reaches the app's runtime environment, never our database or API responses. `enabled: false` (the default) means the app doesn't have — or hasn't asked for — a PLN-provisioned database; a bring-your-own database never sets this block, since it's just a secret.
 
 ## Draft apps & runtime secrets
 
@@ -359,6 +387,9 @@ model AiApp {
   agentModel   String?         // model the agent reported for the last upload (self-reported)
   lastDeployedAt DateTime?     // last SUCCESSFUL ship (written only by markReady; null = never shipped)
   failureStream  String?       // 'build' | 'runtime' — which log stream holds the LATEST deploy failure (null = unknown)
+  database        Json?         // { enabled, type, host?, port?, name?, user?, credentialsInjected? } — one JSON blob,
+                                 // reflects the LAST deploy/draft upload (kitVersion-style); null = not requested.
+                                 // Non-sensitive connection metadata only — the password is never stored.
   @@unique([memberUid, appId])
 }
 
@@ -442,13 +473,14 @@ Design System is embedded as a curated folder (see below):
 ```
 README.md                                      human quick-start
 CLAUDE.md / AGENTS.md                          agent build + deploy instructions
-.claude/skills/deploy-to-labs/SKILL.md         deploy skill (incl. connect flow)
+.claude/skills/deploy-to-labs/SKILL.md         deploy skill (incl. connect flow, secrets, database provisioning ≥1.6)
 .claude/skills/app-metadata/SKILL.md           propose → approve name/description + optional one-pager PRD (kits ≥1.5)
 .claude/skills/app-logs/SKILL.md               fetch build/runtime logs to debug failed deploys + runtime errors (kits ≥1.5)
 .claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
 .claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
 pln-app.config.json                            connect/deploy/draft/metadata/logs/member-context endpoints
-                                               (+ appId, appUid, approved appName/appDescription) — NO token
+                                               (+ appId, appUid, approved appName/appDescription,
+                                                database provisioning choice ≥1.6) — NO token
 pl-design-system/                              curated PL Design System (files, not a nested zip)
 styles/pln-theme.css                           minimal CSS-variable fallback (plain-HTML apps)
 styles/FONTS.md                                Inter font guidance
@@ -518,6 +550,7 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 - `apps/web-api/prisma/migrations/20260707120000_ai_apps_draft_secrets/` — `DRAFT` status, `s3Key`/`requiredEnvVars`/`providedEnvVars`, draft/secrets event values.
 - `apps/web-api/prisma/migrations/20260714120000_ai_apps_upload_meta/` — `kitVersion`/`agentClient`/`agentModel` columns (self-reported metadata about the last agent upload).
 - `apps/web-api/prisma/migrations/20260715120000_ai_apps_editable_metadata/` — `prd` column (one-pager PRD).
+- `apps/web-api/prisma/migrations/20260730120000_ai_apps_database_provisioning/` — single `database` JSON column: provisioning request + non-sensitive connection metadata (agent-driven database provisioning).
 - LabOS UI (`pln-directory-portal-v2`): `app/pl-infra/ai-apps/connect/page.tsx` + `components/page/ai-apps/AiAppsConnectPage/` — the approval page; connect calls in `services/ai-apps/ai-apps.service.ts`.
 - `.claude/skills/ai-apps/SKILL.md` — agent guidance for working on this feature.
 

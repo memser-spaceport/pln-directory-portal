@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
-import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback } from '@prisma/client';
+import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { isDirectoryAdmin } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
@@ -60,12 +60,23 @@ import {
  */
 const GATEWAY_TIMEOUT_STATUSES = [408, 502, 503, 504, 521, 522, 523, 524, 530];
 
+/** Non-sensitive database metadata the runner returns once it provisions one. Never a password. */
+interface RunnerDeployDatabaseInfo {
+  host?: string;
+  port?: number;
+  name?: string;
+  user?: string;
+  type?: string;
+  credentialsInjected?: boolean;
+}
+
 interface RunnerDeployResponse {
   status?: string;
   host?: string;
   url?: string;
   httpUrl?: string;
   port?: number;
+  database?: RunnerDeployDatabaseInfo;
 }
 
 type AiAppMember = { uid: string; name: string; image: string | null };
@@ -87,9 +98,26 @@ interface AiAppDeploymentInfo {
   failureStream?: 'build' | 'runtime';
 }
 
-/** App responses: raw failure columns replaced by the requester-gated `deployment` block. */
-type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStream'> & {
+/**
+ * Database block on app responses: everyone sees whether a database was
+ * requested; connection metadata (never the password) appears once the
+ * Deployment Orchestrator reports it provisioned. Also the exact shape stored
+ * in the `AiApp.database` JSON column — no separate storage/response shapes.
+ */
+interface AiAppDatabaseInfo {
+  enabled: boolean;
+  type?: string | null;
+  host?: string | null;
+  port?: number | null;
+  name?: string | null;
+  user?: string | null;
+  credentialsInjected?: boolean | null;
+}
+
+/** App responses: the raw `failureStream`/`database` columns replaced by requester-facing `deployment`/`database` blocks. */
+type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStream' | 'database'> & {
   deployment: AiAppDeploymentInfo;
+  database: AiAppDatabaseInfo;
 };
 
 @Injectable()
@@ -186,7 +214,7 @@ export class AiAppsService {
    * only writer of `lastDeployedAt` is markReady).
    */
   private toApiApp<T extends AiApp>(app: WithMember<T>, isManager: boolean): ApiAiApp<T> {
-    const { failureStream, ...rest } = app;
+    const { failureStream, database: storedDatabase, ...rest } = app;
     const serving: AiAppServing = app.status === 'READY' ? 'latest' : app.lastDeployedAt ? 'previous' : 'none';
     const deployment: AiAppDeploymentInfo = { serving };
     if (isManager) {
@@ -197,7 +225,9 @@ export class AiAppsService {
         deployment.failureStream = failureStream;
       }
     }
-    return { ...rest, notes: isManager ? app.notes : null, deployment };
+    const parsedDatabase = storedDatabase as AiAppDatabaseInfo | null;
+    const database: AiAppDatabaseInfo = parsedDatabase?.enabled ? parsedDatabase : { enabled: false };
+    return { ...rest, notes: isManager ? app.notes : null, deployment, database };
   }
 
   /** Dashboard list — all non-deleted apps across PL Infra users, newest first, with owner info. */
@@ -890,6 +920,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
       },
       update: {
         name: dto.name,
@@ -905,6 +936,9 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        // Same "reflects the last upload" rule applies to database provisioning
+        // — the kit resends `database` on every deploy once the member opts in.
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
         notes: null,
       },
     });
@@ -986,6 +1020,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
       },
       update: {
         name: dto.name,
@@ -997,6 +1032,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
         notes: null,
       },
     });
@@ -1099,7 +1135,7 @@ export class AiAppsService {
    */
   private async proxyDeploy(
     memberUid: string,
-    app: Pick<AiApp, 'uid' | 'appId'>,
+    app: Pick<AiApp, 'uid' | 'appId' | 'database'>,
     deploymentId: string,
     s3Key: string,
     secretNames: string[] = []
@@ -1107,6 +1143,7 @@ export class AiAppsService {
     const host = buildAppHost(app.appId);
     const url = buildAppUrl(app.appId);
     const httpUrl = buildAppHttpUrl(app.appId);
+    const requestedDatabase = app.database as AiAppDatabaseInfo | null;
     await this.prisma.aiApp.update({
       where: { uid: app.uid },
       data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null, failureStream: null },
@@ -1115,26 +1152,63 @@ export class AiAppsService {
 
     const eventContext = { appUid: app.uid, appId: app.appId, deploymentId };
 
-    const markReady = async (port: number | null) => {
+    const markReady = async (port: number | null, databaseInfo?: RunnerDeployDatabaseInfo) => {
       const updated = await this.prisma.aiApp.update({
         where: { uid: app.uid },
         // The ONLY writer of lastDeployedAt — it must strictly mean "last
         // successful ship" (deployment.serving derives 'none' from its absence).
-        data: { status: 'READY', url, httpUrl, host, port, notes: null, failureStream: null, lastDeployedAt: new Date() },
+        data: {
+          status: 'READY',
+          url,
+          httpUrl,
+          host,
+          port,
+          notes: null,
+          failureStream: null,
+          lastDeployedAt: new Date(),
+          // Non-sensitive connection metadata the orchestrator reports once it
+          // provisions the database, merged into the same JSON blob we asked
+          // it to provision from. Never the password — that lives only in the
+          // app's injected runtime env vars.
+          ...(databaseInfo && requestedDatabase?.enabled
+            ? {
+                database: {
+                  enabled: true,
+                  type: requestedDatabase.type ?? null,
+                  host: databaseInfo.host ?? null,
+                  port: databaseInfo.port ?? null,
+                  name: databaseInfo.name ?? null,
+                  user: databaseInfo.user ?? null,
+                  credentialsInjected: databaseInfo.credentialsInjected ?? null,
+                },
+              }
+            : {}),
+        },
       });
       await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
       return this.toApiApp((await this.withMember([updated]))[0], true);
     };
 
     let port: number | null = null;
+    let databaseInfo: RunnerDeployDatabaseInfo | undefined;
     try {
       this.logger.log(
         `Runner deploy request for ${app.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
-          `(deploymentId=${deploymentId}, s3Key=${s3Key})`
+          `(deploymentId=${deploymentId}, s3Key=${s3Key}${
+            requestedDatabase?.enabled ? `, database=${requestedDatabase.type}` : ''
+          })`
       );
       const response = await axios.post<RunnerDeployResponse>(
         `${AI_APPS_RUNNER_URL}/deploy`,
-        { appId: app.appId, deploymentId, s3Key },
+        {
+          appId: app.appId,
+          deploymentId,
+          s3Key,
+          // The app never generates credentials or creates the database
+          // itself — this just asks the Deployment Orchestrator to provision
+          // one and inject connection env vars into the runtime.
+          ...(requestedDatabase?.enabled ? { database: { enabled: true, type: requestedDatabase.type } } : {}),
+        },
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
       this.logRunnerResponse('deploy', app.appId, response.status, response.data);
@@ -1148,6 +1222,7 @@ export class AiAppsService {
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       port = response.data.port ?? null;
+      databaseInfo = response.data.database;
     } catch (error) {
       if (error instanceof BadGatewayException) {
         throw error;
@@ -1192,7 +1267,7 @@ export class AiAppsService {
       }
     }
 
-    return markReady(port);
+    return markReady(port, databaseInfo);
   }
 
   /**

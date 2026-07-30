@@ -161,4 +161,27 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(skill).toContain('signed-out');
     expect(skill).toContain('"teams"');
   });
+
+  it('teaches the agent to offer database provisioning as an alternative to BYO', () => {
+    const config = JSON.parse(entries.get('pln-app.config.json') as string);
+    // Absent by default; the agent sets it only after the member opts in, and
+    // persists it so redeploys don't have to ask again.
+    expect(config.database).toBeNull();
+
+    const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    // The choice belongs to the member, not the agent.
+    expect(deploySkill).toContain("don't assume");
+    expect(deploySkill).toContain('Needs a database?');
+    // The exact opt-in payload the backend expects.
+    expect(deploySkill).toContain('{"enabled":true,"type":"postgres"}');
+    // The app never generates its own credentials or creates the database.
+    expect(deploySkill).toContain('You never create the database');
+    // The ready-to-use env vars a provisioned database injects.
+    expect(deploySkill).toContain('DATABASE_URL');
+    expect(deploySkill).toContain('JDBC_DATABASE_URL');
+    expect(deploySkill).toContain('DB_PASSWORD');
+    // BYO is routed through the existing secrets flow, not a bespoke one.
+    expect(deploySkill).toContain('bring their own');
+    expect(deploySkill).toContain('this is just a runtime secret');
+  });
 });
