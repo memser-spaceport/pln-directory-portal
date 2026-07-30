@@ -330,7 +330,10 @@ describe('AiAppsService.deployDraft', () => {
     expect(mockedAxios.post.mock.calls.filter(([url]) => url.includes('/deployments'))).toHaveLength(3);
     expect(prisma.aiApp.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: 'ERROR', notes: expect.stringContaining('Secrets injection failed') }),
+        data: expect.objectContaining({
+          status: 'ERROR',
+          notes: expect.stringContaining('Runtime config injection failed'),
+        }),
       })
     );
     expect(eventTypes(prisma)).toEqual(['DEPLOY_STARTED', 'DEPLOY_FAILED']);
@@ -348,7 +351,10 @@ describe('AiAppsService.deployDraft', () => {
     await expect(service.deployDraft('creator-1', 'app-1', undefined)).rejects.toBeInstanceOf(BadGatewayException);
     expect(prisma.aiApp.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: 'ERROR', notes: expect.stringContaining('Secrets injection failed') }),
+        data: expect.objectContaining({
+          status: 'ERROR',
+          notes: expect.stringContaining('Runtime config injection failed'),
+        }),
       })
     );
     expect(eventTypes(prisma)).toEqual(['DEPLOY_STARTED', 'DEPLOY_FAILED']);

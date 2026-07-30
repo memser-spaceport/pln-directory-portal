@@ -53,6 +53,23 @@ function buildService(initial: Record<string, any> | null = null) {
   return { service: new AiAppsService(prisma as any, aws as any), prisma, aws, getRow: () => row };
 }
 
+/**
+ * The legacy `/deploy` build endpoint never injects env vars (for secrets or
+ * a database) — only `POST /v1/projects/<project>/deployments` does. So a
+ * database-enabled deploy makes THREE runner calls: build via `/deploy`,
+ * look up the built image via `GET /apps`, then inject via `/deployments`.
+ * This wires both mocks so tests can focus on the `database` field itself.
+ */
+function mockRunnerCalls(deploymentsResponseData: Record<string, any> = {}) {
+  mockedAxios.get.mockResolvedValue({ data: { apps: [{ app_id: 'demo', image: 'demo:latest' }] } });
+  mockedAxios.post.mockImplementation((url: string) => {
+    if (url.includes('/deployments')) {
+      return Promise.resolve({ status: 200, data: deploymentsResponseData });
+    }
+    return Promise.resolve({ status: 200, data: { port: 31001 } });
+  });
+}
+
 const DEPLOY_DTO = {
   appId: 'demo',
   name: 'Demo',
@@ -73,45 +90,47 @@ beforeEach(() => {
 });
 
 describe('agent-driven database provisioning', () => {
-  it('forwards {enabled, type} to the runner and reflects it in the response', async () => {
+  it('routes the database request through the secret-aware /deployments endpoint, not the legacy /deploy build', async () => {
     const { service } = buildService(null);
-    mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
+    mockRunnerCalls();
 
     const result = await service.deploy('creator-1', DEPLOY_DTO, FILE);
 
+    // The legacy build call never carries `database` — the runner ignores it there.
+    const deployCall = mockedAxios.post.mock.calls.find(([url]) => (url as string).includes('/deploy'));
+    expect(deployCall?.[1]).not.toHaveProperty('database');
+
+    // The secret-aware deployments endpoint is what actually injects it.
+    expect(mockedAxios.get).toHaveBeenCalledWith(expect.stringContaining('/apps'), expect.anything());
     expect(mockedAxios.post).toHaveBeenCalledWith(
-      expect.stringContaining('/deploy'),
+      expect.stringContaining('/v1/projects/default/deployments'),
       expect.objectContaining({ appId: 'demo', database: { enabled: true, type: 'postgres' } }),
       expect.anything()
     );
     expect(result.database).toEqual({ enabled: true, type: 'postgres' });
   });
 
-  it('omits the database field from the runner request when not requested', async () => {
+  it('never calls the deployments endpoint when no database (or secrets) were requested', async () => {
     const { service } = buildService(null);
-    mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
+    mockRunnerCalls();
 
     const result = await service.deploy('creator-1', DEPLOY_DTO_NO_DATABASE, FILE);
 
-    const [, body] = mockedAxios.post.mock.calls[0];
-    expect(body).not.toHaveProperty('database');
+    expect(mockedAxios.get).not.toHaveBeenCalled();
+    expect(mockedAxios.post).toHaveBeenCalledTimes(1);
     expect(result.database).toEqual({ enabled: false });
   });
 
   it('stores non-sensitive connection metadata the runner returns once it provisions the database', async () => {
     const { service } = buildService(null);
-    mockedAxios.post.mockResolvedValue({
-      status: 200,
-      data: {
-        port: 31001,
-        database: {
-          host: 'ai-rds.internal',
-          port: 5432,
-          name: 'db_demo',
-          user: 'db_demo_user',
-          type: 'postgres',
-          credentialsInjected: true,
-        },
+    mockRunnerCalls({
+      database: {
+        host: 'ai-rds.internal',
+        port: 5432,
+        name: 'db_demo',
+        user: 'db_demo_user',
+        type: 'postgres',
+        credentialsInjected: true,
       },
     });
 
@@ -133,12 +152,12 @@ describe('agent-driven database provisioning', () => {
 
   it('the application never has to generate credentials — only enabled+type is sent, never generated ourselves', async () => {
     const { service } = buildService(null);
-    mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
+    mockRunnerCalls();
 
     await service.deploy('creator-1', DEPLOY_DTO, FILE);
 
-    const [, body] = mockedAxios.post.mock.calls[0] as [string, Record<string, any>];
-    expect(body.database).toEqual({ enabled: true, type: 'postgres' });
+    const deploymentsCall = mockedAxios.post.mock.calls.find(([url]) => (url as string).includes('/deployments'));
+    expect((deploymentsCall?.[1] as Record<string, any>).database).toEqual({ enabled: true, type: 'postgres' });
   });
 
   it('a member-triggered redeploy keeps requesting the previously provisioned database without the agent resending it', async () => {
@@ -156,12 +175,12 @@ describe('agent-driven database provisioning', () => {
       updatedAt: new Date(),
     };
     const { service } = buildService(existing);
-    mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
+    mockRunnerCalls();
 
     await service.deployDraft('creator-1', 'app-1', undefined);
 
     expect(mockedAxios.post).toHaveBeenCalledWith(
-      expect.stringContaining('/deploy'),
+      expect.stringContaining('/v1/projects/default/deployments'),
       expect.objectContaining({ database: { enabled: true, type: 'postgres' } }),
       expect.anything()
     );
@@ -182,12 +201,12 @@ describe('agent-driven database provisioning', () => {
       updatedAt: new Date(),
     };
     const { service } = buildService(existing);
-    mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
+    mockRunnerCalls();
 
     const result = await service.deploy('creator-1', DEPLOY_DTO_NO_DATABASE, FILE);
 
-    const [, body] = mockedAxios.post.mock.calls[0];
-    expect(body).not.toHaveProperty('database');
+    expect(mockedAxios.get).not.toHaveBeenCalled();
+    expect(mockedAxios.post).toHaveBeenCalledTimes(1);
     expect(result.database).toEqual({ enabled: false });
   });
 });
