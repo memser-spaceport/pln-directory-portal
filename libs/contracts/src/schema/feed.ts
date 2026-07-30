@@ -18,18 +18,23 @@ export interface FeedComment {
   replies: FeedComment[];
 }
 
-export const FeedCommentSchema: z.ZodType<FeedComment> = z.lazy(() =>
-  z.object({
-    uid: z.string(),
-    newsItemUid: z.string(),
-    parentUid: z.string().nullable(),
-    text: z.string(),
-    author: FeedCommentAuthorSchema,
-    createdAt: z.string(),
-    isOwn: z.boolean(),
-    replies: z.array(FeedCommentSchema),
-  })
-);
+const baseFeedCommentSchema = z.object({
+  uid: z.string(),
+  newsItemUid: z.string(),
+  parentUid: z.string().nullable(),
+  text: z.string(),
+  author: FeedCommentAuthorSchema,
+  createdAt: z.string(),
+  isOwn: z.boolean(),
+});
+
+// Only the self-referential field is wrapped in z.lazy() — wrapping the whole
+// object (as z.lazy(() => z.object({...})) would) makes replies' element type
+// resolve before FeedCommentSchema finishes initializing, so TS infers it as
+// a wide, all-optional shape instead of FeedComment.
+export const FeedCommentSchema: z.ZodType<FeedComment> = baseFeedCommentSchema.extend({
+  replies: z.lazy(() => FeedCommentSchema.array()),
+});
 
 export const FeedCommentsQueryParams = z.object({
   newsItemUid: z.string().min(1),
