@@ -1,64 +1,45 @@
 import { z } from 'zod';
 
-// ── Forum posts ──────────────────────────────────────────────────────────
-// Forum topics surfaced in the newsfeed. Sourced live from NodeBB (never
-// stored locally); only forum-access callers receive non-empty items.
-
-export const FeedForumPostAuthorSchema = z.object({
-  memberUid: z.string().nullable(),
-  name: z.string(),
-  avatarUrl: z.string().nullable(),
-  role: z.string().nullable(),
-});
-
-export const FeedForumPostSchema = z.object({
-  uid: z.string(),
-  title: z.string(),
-  body: z.string(),
-  author: FeedForumPostAuthorSchema,
-  category: z.string(),
-  createdAt: z.string(),
-  forumTopicUrl: z.string().nullable(),
-  commentCount: z.number().int().min(0),
-  likeCount: z.number().int().min(0),
-  viewerHasLiked: z.boolean(),
-});
-
-export const FeedForumPostsResponseSchema = z.object({
-  items: z.array(FeedForumPostSchema),
-});
-
-export const FeedForumPostsQueryParams = z.object({
-  limit: z
-    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1).max(100))
-    .optional()
-    .default(20),
-  page: z
-    .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(0))
-    .optional()
-    .default(0),
-});
-
-// ── Feed comments (span both news items and forum posts) ────────────────
-// Comments are feed-only — never synced to NodeBB, even for forum posts.
-
+// ── Feed comments (Feed News only)
 export const FeedCommentAuthorSchema = z.object({
   uid: z.string(),
   name: z.string().nullable(),
   avatarUrl: z.string().nullable(),
 });
 
-export const FeedCommentSchema = z.object({
-  uid: z.string(),
-  itemUid: z.string(),
-  text: z.string(),
-  author: FeedCommentAuthorSchema,
-  createdAt: z.string(),
-  isOwn: z.boolean(),
-});
+export interface FeedComment {
+  uid: string;
+  newsItemUid: string;
+  parentUid: string | null;
+  text: string;
+  author: FeedCommentAuthor;
+  createdAt: string;
+  isOwn: boolean;
+  replies: FeedComment[];
+}
+
+// The `as z.ZodType<FeedComment>` cast (not a `:` annotation) is load-bearing:
+// with Zod 3.19's ZodObject.extend()/self-reference inference, a `:`-typed
+// assignment of this recursive shape widens to an all-properties-optional
+// `_type` and fails TS's assignability check (reproduced in the back-office
+// Next.js build, though not in apps/web-api's plain tsc run — the two
+// programs hit the same self-reference differently). `as` uses TS's more
+// permissive "comparable" check instead of "assignable to", which accepts it.
+export const FeedCommentSchema: z.ZodType<FeedComment> = z.lazy(() =>
+  z.object({
+    uid: z.string(),
+    newsItemUid: z.string(),
+    parentUid: z.string().nullable(),
+    text: z.string(),
+    author: FeedCommentAuthorSchema,
+    createdAt: z.string(),
+    isOwn: z.boolean(),
+    replies: z.array(FeedCommentSchema),
+  })
+) as z.ZodType<FeedComment>;
 
 export const FeedCommentsQueryParams = z.object({
-  itemUid: z.string().min(1),
+  newsItemUid: z.string().min(1),
 });
 
 export const FeedCommentsResponseSchema = z.object({
@@ -66,7 +47,8 @@ export const FeedCommentsResponseSchema = z.object({
 });
 
 export const CreateFeedCommentRequestSchema = z.object({
-  itemUid: z.string().min(1),
+  newsItemUid: z.string().min(1),
+  parentUid: z.string().min(1).optional(),
   text: z.string().trim().min(1).max(2000),
 });
 
@@ -74,7 +56,8 @@ export const FeedCommentCountsRequestSchema = z.object({
   uids: z.array(z.string()).min(1).max(200),
 });
 
-// Keyed by item uid; a uid absent from `counts` implies 0.
+// Keyed by news item uid; a uid absent from `counts` implies 0. Counts
+// include replies (every row under a news item, at any depth).
 export const FeedCommentCountsResponseSchema = z.object({
   counts: z.record(z.string(), z.number().int().min(0)),
 });
@@ -84,23 +67,17 @@ export const DeleteFeedCommentResponseSchema = z.object({
   deleted: z.boolean(),
 });
 
-// ── Forum post likes (directory-portal-native, not a NodeBB vote proxy) ──
-
-export const FeedForumPostLikeStatusSchema = z.object({
+// ── Feed news likes
+export const FeedNewsLikeStatusSchema = z.object({
   likeCount: z.number().int().min(0),
   viewerHasLiked: z.boolean(),
 });
 
-export type FeedForumPostAuthor = z.infer<typeof FeedForumPostAuthorSchema>;
-export type FeedForumPost = z.infer<typeof FeedForumPostSchema>;
-export type FeedForumPostsResponse = z.infer<typeof FeedForumPostsResponseSchema>;
-export type FeedForumPostsQuery = z.infer<typeof FeedForumPostsQueryParams>;
 export type FeedCommentAuthor = z.infer<typeof FeedCommentAuthorSchema>;
-export type FeedComment = z.infer<typeof FeedCommentSchema>;
 export type FeedCommentsQuery = z.infer<typeof FeedCommentsQueryParams>;
 export type FeedCommentsResponse = z.infer<typeof FeedCommentsResponseSchema>;
 export type CreateFeedCommentRequest = z.infer<typeof CreateFeedCommentRequestSchema>;
 export type FeedCommentCountsRequest = z.infer<typeof FeedCommentCountsRequestSchema>;
 export type FeedCommentCountsResponse = z.infer<typeof FeedCommentCountsResponseSchema>;
 export type DeleteFeedCommentResponse = z.infer<typeof DeleteFeedCommentResponseSchema>;
-export type FeedForumPostLikeStatus = z.infer<typeof FeedForumPostLikeStatusSchema>;
+export type FeedNewsLikeStatus = z.infer<typeof FeedNewsLikeStatusSchema>;

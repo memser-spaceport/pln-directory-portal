@@ -248,7 +248,7 @@ model Member {
   roadmapSubmissionDraft    RoadmapSubmissionDraft? @relation("roadmapSubmissionDraftOwner")
   teamNewsUpvotes           TeamNewsUpvote[]        @relation("MemberTeamNewsUpvotes")
   feedComments              FeedComment[]           @relation("MemberFeedComments")
-  feedForumPostLikes        FeedForumPostLike[]     @relation("MemberFeedForumPostLikes")
+  feedNewsLikes             FeedNewsLike[]          @relation("MemberFeedNewsLikes")
 
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
   affinityPerson               AffinityPerson?
@@ -2299,6 +2299,8 @@ model TeamNewsItem {
   updatedAt    DateTime            @updatedAt
   forumLinks   TeamNewsForumLink[]
   upvotes      TeamNewsUpvote[]
+  feedComments FeedComment[]
+  feedLikes    FeedNewsLike[]
 
   @@index([teamUid])
   @@index([eventDate])
@@ -2342,47 +2344,45 @@ model TeamNewsForumLink {
   @@index([newsItemUid])
 }
 
-enum FeedItemType {
-  NEWS
-  FORUM_POST
-}
-
-/// Feed-only comment on a TeamNewsItem or a NodeBB-backed forum-post feed
-/// item. Never synced to NodeBB even for FORUM_POST — these are unrelated
-/// to NodeBB's own reply system. itemUid is a soft reference (news uid or
-/// `fp_<tid>`), not a hard FK, since it can point at two different source
-/// types. itemType is redundant with the `fp_` prefix but kept explicit for
-/// query clarity/indexing, matching Follow.entityType. authorUid IS a hard
-/// FK since the author is always a real directory member.
+/// Feed-only comment on a TeamNewsItem, with unlimited-depth replies
+/// (parent/child, same shape as ArticleComment/ArticleCommentLike). Forum
+/// posts are never commentable through this table — forum data lives only
+/// in NodeBB's own DB, never in ours. authorUid IS a hard FK since the
+/// author is always a real directory member.
 model FeedComment {
-  id        Int          @id @default(autoincrement())
-  uid       String       @unique @default(cuid())
-  itemType  FeedItemType
-  itemUid   String
-  text      String
-  authorUid String
-  author    Member       @relation("MemberFeedComments", fields: [authorUid], references: [uid], onDelete: Cascade)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id          Int           @id @default(autoincrement())
+  uid         String        @unique @default(cuid())
+  newsItemUid String
+  newsItem    TeamNewsItem  @relation(fields: [newsItemUid], references: [uid], onDelete: Cascade)
+  parentUid   String?
+  parent      FeedComment?  @relation("FeedCommentReplies", fields: [parentUid], references: [uid], onDelete: Cascade)
+  replies     FeedComment[] @relation("FeedCommentReplies")
+  text        String
+  authorUid   String
+  author      Member        @relation("MemberFeedComments", fields: [authorUid], references: [uid], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
-  @@index([itemType, itemUid, createdAt])
+  @@index([newsItemUid, createdAt])
+  @@index([parentUid])
   @@index([authorUid])
 }
 
-/// Directory-portal-native like on a forum-post feed item — NOT a proxy for
-/// NodeBB's own upvote/downvote (NodeBB has no native "like"). forumPostUid
-/// is a soft reference (`fp_<tid>`, no local table for forum posts).
+/// Directory-portal-native like on a Feed News item — NOT a proxy for
+/// NodeBB's own upvote/downvote, and distinct from the older
+/// TeamNewsUpvote (that one predates the Feed and is used elsewhere).
 /// memberUid IS a hard FK since the liker is always a real directory member.
-model FeedForumPostLike {
-  id           Int      @id @default(autoincrement())
-  uid          String   @unique @default(cuid())
-  forumPostUid String
-  memberUid    String
-  member       Member   @relation("MemberFeedForumPostLikes", fields: [memberUid], references: [uid], onDelete: Cascade)
-  createdAt    DateTime @default(now())
+model FeedNewsLike {
+  id          Int          @id @default(autoincrement())
+  uid         String       @unique @default(cuid())
+  newsItemUid String
+  newsItem    TeamNewsItem @relation(fields: [newsItemUid], references: [uid], onDelete: Cascade)
+  memberUid   String
+  member      Member       @relation("MemberFeedNewsLikes", fields: [memberUid], references: [uid], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
 
-  @@unique([forumPostUid, memberUid])
-  @@index([forumPostUid])
+  @@unique([newsItemUid, memberUid])
+  @@index([newsItemUid])
   @@index([memberUid])
 }
 
