@@ -18,23 +18,25 @@ export interface FeedComment {
   replies: FeedComment[];
 }
 
-const baseFeedCommentSchema = z.object({
-  uid: z.string(),
-  newsItemUid: z.string(),
-  parentUid: z.string().nullable(),
-  text: z.string(),
-  author: FeedCommentAuthorSchema,
-  createdAt: z.string(),
-  isOwn: z.boolean(),
-});
-
-// Only the self-referential field is wrapped in z.lazy() — wrapping the whole
-// object (as z.lazy(() => z.object({...})) would) makes replies' element type
-// resolve before FeedCommentSchema finishes initializing, so TS infers it as
-// a wide, all-optional shape instead of FeedComment.
-export const FeedCommentSchema: z.ZodType<FeedComment> = baseFeedCommentSchema.extend({
-  replies: z.lazy(() => FeedCommentSchema.array()),
-});
+// The `as z.ZodType<FeedComment>` cast (not a `:` annotation) is load-bearing:
+// with Zod 3.19's ZodObject.extend()/self-reference inference, a `:`-typed
+// assignment of this recursive shape widens to an all-properties-optional
+// `_type` and fails TS's assignability check (reproduced in the back-office
+// Next.js build, though not in apps/web-api's plain tsc run — the two
+// programs hit the same self-reference differently). `as` uses TS's more
+// permissive "comparable" check instead of "assignable to", which accepts it.
+export const FeedCommentSchema: z.ZodType<FeedComment> = z.lazy(() =>
+  z.object({
+    uid: z.string(),
+    newsItemUid: z.string(),
+    parentUid: z.string().nullable(),
+    text: z.string(),
+    author: FeedCommentAuthorSchema,
+    createdAt: z.string(),
+    isOwn: z.boolean(),
+    replies: z.array(FeedCommentSchema),
+  })
+) as z.ZodType<FeedComment>;
 
 export const FeedCommentsQueryParams = z.object({
   newsItemUid: z.string().min(1),
