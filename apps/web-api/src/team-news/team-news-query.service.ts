@@ -15,7 +15,10 @@ import type {
   TeamNewsRecentResponse,
 } from 'libs/contracts/src/schema/team-news';
 import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
-import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
+import {
+  TEAM_NEWS_ALWAYS_INCLUDE_IN_ALL_TAB_TEAM_UIDS,
+  TEAM_NEWS_EXCLUDED_TEAM_NAMES,
+} from './team-news-public-list.config';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
@@ -280,14 +283,20 @@ export class TeamNewsQueryService {
     ]);
     const focusByTitle = new Map(focusAreas.map((fa) => [fa.title, fa]));
 
+    const alwaysIncludeInAllTab = new Set<string>(TEAM_NEWS_ALWAYS_INCLUDE_IN_ALL_TAB_TEAM_UIDS);
     const groups = new Map<string, TeamNewsItemDto[]>();
+    const allTabExtraItems: TeamNewsItemDto[] = [];
     for (const row of rows) {
       const dto = this.toDto(row, discussions.get(row.uid), followedTeamUids, upvotes);
-      if (dto.focusAreas.length === 0) continue;
+      let addedToGroup = false;
       for (const title of dto.focusAreas) {
         if (!focusByTitle.has(title)) continue;
         if (!groups.has(title)) groups.set(title, []);
         groups.get(title)!.push(dto);
+        addedToGroup = true;
+      }
+      if (!addedToGroup && alwaysIncludeInAllTab.has(dto.teamUid)) {
+        allTabExtraItems.push(dto);
       }
     }
 
@@ -297,6 +306,7 @@ export class TeamNewsQueryService {
       for (const items of groups.values()) {
         items.sort((a, b) => Number(b.isFollowed) - Number(a.isFollowed));
       }
+      allTabExtraItems.sort((a, b) => Number(b.isFollowed) - Number(a.isFollowed));
     }
 
     const orderedTitles = [
@@ -316,6 +326,7 @@ export class TeamNewsQueryService {
           items,
         };
       }),
+      allTabExtraItems,
     };
   }
 
@@ -369,10 +380,7 @@ export class TeamNewsQueryService {
     });
 
     const itemUids = rows.map((r) => r.uid);
-    const [discussions, upvotes] = await Promise.all([
-      this.loadDiscussions(itemUids),
-      this.loadUpvotes(itemUids),
-    ]);
+    const [discussions, upvotes] = await Promise.all([this.loadDiscussions(itemUids), this.loadUpvotes(itemUids)]);
 
     return {
       generatedAt: new Date().toISOString(),
@@ -588,18 +596,16 @@ export class TeamNewsQueryService {
       contentHtml: row.contentHtml,
       sourceUrl: row.sourceUrl,
       sourceUrls: row.sourceUrls.length > 0 ? row.sourceUrls : [row.sourceUrl],
-      sources: (row.sourceUrls.length > 0 ? row.sourceUrls : [row.sourceUrl]).map(
-        (url) => ({
-          url,
-          domain: (() => {
-            try {
-              return new URL(url).hostname.replace(/^www\./, '');
-            } catch {
-              return null;
-            }
-          })(),
-        })
-      ),
+      sources: (row.sourceUrls.length > 0 ? row.sourceUrls : [row.sourceUrl]).map((url) => ({
+        url,
+        domain: (() => {
+          try {
+            return new URL(url).hostname.replace(/^www\./, '');
+          } catch {
+            return null;
+          }
+        })(),
+      })),
       sourceDomain: row.sourceDomain,
       tags: row.tags,
       focusAreas: [...new Set(focusAreas)],
