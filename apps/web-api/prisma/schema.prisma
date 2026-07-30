@@ -3248,6 +3248,23 @@ model AiApp {
   /// cover the last successful phase, so it can't be derived after the fact).
   /// Null when unknown (e.g. stuck-deploy settle); cleared on success.
   failureStream   String?
+  /// Whether the LAST deploy/draft upload asked us to provision a database —
+  /// an opt-in convenience for non-technical builders (mirrors kitVersion/
+  /// agentModel: reflects the last upload, false when a call omits it). A
+  /// bring-your-own database is just a regular runtime secret and isn't
+  /// tracked here.
+  databaseEnabled Boolean     @default(false)
+  /// Requested database engine, e.g. "postgres". Null when not enabled.
+  databaseType    String?
+  /// Non-sensitive connection metadata returned by the Deployment
+  /// Orchestrator once it provisions the database. The password is never
+  /// returned to us or stored — only the app's runtime pod receives it via
+  /// injected environment variables.
+  databaseHost    String?
+  databasePort    Int?
+  databaseName    String?
+  databaseUser    String?
+  databaseCredentialsInjected Boolean?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 

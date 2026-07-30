@@ -60,12 +60,23 @@ import {
  */
 const GATEWAY_TIMEOUT_STATUSES = [408, 502, 503, 504, 521, 522, 523, 524, 530];
 
+/** Non-sensitive database metadata the runner returns once it provisions one. Never a password. */
+interface RunnerDeployDatabaseInfo {
+  host?: string;
+  port?: number;
+  name?: string;
+  user?: string;
+  type?: string;
+  credentialsInjected?: boolean;
+}
+
 interface RunnerDeployResponse {
   status?: string;
   host?: string;
   url?: string;
   httpUrl?: string;
   port?: number;
+  database?: RunnerDeployDatabaseInfo;
 }
 
 type AiAppMember = { uid: string; name: string; image: string | null };
@@ -87,9 +98,35 @@ interface AiAppDeploymentInfo {
   failureStream?: 'build' | 'runtime';
 }
 
-/** App responses: raw failure columns replaced by the requester-gated `deployment` block. */
-type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStream'> & {
+/**
+ * Database block on app responses: everyone sees whether a database was
+ * requested; connection metadata (never the password) appears once the
+ * Deployment Orchestrator reports it provisioned.
+ */
+interface AiAppDatabaseInfo {
+  enabled: boolean;
+  type?: string | null;
+  host?: string | null;
+  port?: number | null;
+  name?: string | null;
+  user?: string | null;
+  credentialsInjected?: boolean | null;
+}
+
+/** Raw `AiApp` database columns replaced by the `database` block below. */
+type RawDatabaseColumns =
+  | 'databaseEnabled'
+  | 'databaseType'
+  | 'databaseHost'
+  | 'databasePort'
+  | 'databaseName'
+  | 'databaseUser'
+  | 'databaseCredentialsInjected';
+
+/** App responses: raw failure/database columns replaced by requester-facing `deployment`/`database` blocks. */
+type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStream' | RawDatabaseColumns> & {
   deployment: AiAppDeploymentInfo;
+  database: AiAppDatabaseInfo;
 };
 
 @Injectable()
@@ -186,7 +223,17 @@ export class AiAppsService {
    * only writer of `lastDeployedAt` is markReady).
    */
   private toApiApp<T extends AiApp>(app: WithMember<T>, isManager: boolean): ApiAiApp<T> {
-    const { failureStream, ...rest } = app;
+    const {
+      failureStream,
+      databaseEnabled,
+      databaseType,
+      databaseHost,
+      databasePort,
+      databaseName,
+      databaseUser,
+      databaseCredentialsInjected,
+      ...rest
+    } = app;
     const serving: AiAppServing = app.status === 'READY' ? 'latest' : app.lastDeployedAt ? 'previous' : 'none';
     const deployment: AiAppDeploymentInfo = { serving };
     if (isManager) {
@@ -197,7 +244,16 @@ export class AiAppsService {
         deployment.failureStream = failureStream;
       }
     }
-    return { ...rest, notes: isManager ? app.notes : null, deployment };
+    const database: AiAppDatabaseInfo = { enabled: databaseEnabled };
+    if (databaseEnabled) {
+      database.type = databaseType;
+      database.host = databaseHost;
+      database.port = databasePort;
+      database.name = databaseName;
+      database.user = databaseUser;
+      database.credentialsInjected = databaseCredentialsInjected;
+    }
+    return { ...rest, notes: isManager ? app.notes : null, deployment, database };
   }
 
   /** Dashboard list — all non-deleted apps across PL Infra users, newest first, with owner info. */
@@ -890,6 +946,8 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        databaseEnabled: !!dto.database,
+        databaseType: dto.database?.type ?? null,
       },
       update: {
         name: dto.name,
@@ -905,6 +963,10 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        // Same "reflects the last upload" rule applies to database provisioning
+        // — the kit resends `database` on every deploy once the member opts in.
+        databaseEnabled: !!dto.database,
+        databaseType: dto.database?.type ?? null,
         notes: null,
       },
     });
@@ -986,6 +1048,8 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        databaseEnabled: !!dto.database,
+        databaseType: dto.database?.type ?? null,
       },
       update: {
         name: dto.name,
@@ -997,6 +1061,8 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        databaseEnabled: !!dto.database,
+        databaseType: dto.database?.type ?? null,
         notes: null,
       },
     });
@@ -1099,7 +1165,7 @@ export class AiAppsService {
    */
   private async proxyDeploy(
     memberUid: string,
-    app: Pick<AiApp, 'uid' | 'appId'>,
+    app: Pick<AiApp, 'uid' | 'appId' | 'databaseEnabled' | 'databaseType'>,
     deploymentId: string,
     s3Key: string,
     secretNames: string[] = []
@@ -1115,26 +1181,56 @@ export class AiAppsService {
 
     const eventContext = { appUid: app.uid, appId: app.appId, deploymentId };
 
-    const markReady = async (port: number | null) => {
+    const markReady = async (port: number | null, databaseInfo?: RunnerDeployDatabaseInfo) => {
       const updated = await this.prisma.aiApp.update({
         where: { uid: app.uid },
         // The ONLY writer of lastDeployedAt — it must strictly mean "last
         // successful ship" (deployment.serving derives 'none' from its absence).
-        data: { status: 'READY', url, httpUrl, host, port, notes: null, failureStream: null, lastDeployedAt: new Date() },
+        data: {
+          status: 'READY',
+          url,
+          httpUrl,
+          host,
+          port,
+          notes: null,
+          failureStream: null,
+          lastDeployedAt: new Date(),
+          // Non-sensitive connection metadata the orchestrator reports once it
+          // provisions the database. Never the password — that lives only in
+          // the app's injected runtime env vars.
+          ...(databaseInfo
+            ? {
+                databaseHost: databaseInfo.host ?? null,
+                databasePort: databaseInfo.port ?? null,
+                databaseName: databaseInfo.name ?? null,
+                databaseUser: databaseInfo.user ?? null,
+                databaseCredentialsInjected: databaseInfo.credentialsInjected ?? null,
+              }
+            : {}),
+        },
       });
       await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
       return this.toApiApp((await this.withMember([updated]))[0], true);
     };
 
     let port: number | null = null;
+    let databaseInfo: RunnerDeployDatabaseInfo | undefined;
     try {
       this.logger.log(
         `Runner deploy request for ${app.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
-          `(deploymentId=${deploymentId}, s3Key=${s3Key})`
+          `(deploymentId=${deploymentId}, s3Key=${s3Key}${app.databaseEnabled ? `, database=${app.databaseType}` : ''})`
       );
       const response = await axios.post<RunnerDeployResponse>(
         `${AI_APPS_RUNNER_URL}/deploy`,
-        { appId: app.appId, deploymentId, s3Key },
+        {
+          appId: app.appId,
+          deploymentId,
+          s3Key,
+          // The app never generates credentials or creates the database
+          // itself — this just asks the Deployment Orchestrator to provision
+          // one and inject connection env vars into the runtime.
+          ...(app.databaseEnabled ? { database: { enabled: true, type: app.databaseType } } : {}),
+        },
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
       this.logRunnerResponse('deploy', app.appId, response.status, response.data);
@@ -1148,6 +1244,7 @@ export class AiAppsService {
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       port = response.data.port ?? null;
+      databaseInfo = response.data.database;
     } catch (error) {
       if (error instanceof BadGatewayException) {
         throw error;
@@ -1192,7 +1289,7 @@ export class AiAppsService {
       }
     }
 
-    return markReady(port);
+    return markReady(port, databaseInfo);
   }
 
   /**
