@@ -184,4 +184,13 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).toContain('bring their own');
     expect(deploySkill).toContain('this is just a runtime secret');
   });
+
+  it('tells the human, in the README, that a database can be provisioned or brought their own', () => {
+    const readme = entries.get('README.md') as string;
+    expect(readme).toContain('## Apps that need a database');
+    expect(readme).toContain('Let PLN set one up for you');
+    expect(readme).toContain('Connect a database you already have');
+    // Routed through the same secure page as any other secret, not a new one.
+    expect(readme).toContain('Apps that need an API key or password');
+  });
 });
