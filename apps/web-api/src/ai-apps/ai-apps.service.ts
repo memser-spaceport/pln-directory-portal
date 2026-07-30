@@ -1200,15 +1200,7 @@ export class AiAppsService {
       );
       const response = await axios.post<RunnerDeployResponse>(
         `${AI_APPS_RUNNER_URL}/deploy`,
-        {
-          appId: app.appId,
-          deploymentId,
-          s3Key,
-          // The app never generates credentials or creates the database
-          // itself — this just asks the Deployment Orchestrator to provision
-          // one and inject connection env vars into the runtime.
-          ...(requestedDatabase?.enabled ? { database: { enabled: true, type: requestedDatabase.type } } : {}),
-        },
+        { appId: app.appId, deploymentId, s3Key },
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
       this.logRunnerResponse('deploy', app.appId, response.status, response.data);
@@ -1222,7 +1214,6 @@ export class AiAppsService {
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       port = response.data.port ?? null;
-      databaseInfo = response.data.database;
     } catch (error) {
       if (error instanceof BadGatewayException) {
         throw error;
@@ -1252,18 +1243,21 @@ export class AiAppsService {
       this.logger.log(`AI App ${app.appId} is live despite runner timeout — continuing`);
     }
 
-    // The build ran the app WITHOUT its secrets — redeploy the built image with
-    // the stored secret names injected. A secrets app that can't get its values
-    // must fail loudly rather than go READY in a broken state.
-    if (secretNames.length) {
+    // The build ran the app WITHOUT its secrets or database — redeploy the
+    // built image through the runner's secret-aware endpoint, which is the
+    // only one that actually injects env vars into the running pod (the
+    // legacy /deploy build never does, for either secrets or a database). A
+    // secrets/database app that can't get its values must fail loudly rather
+    // than go READY in a broken state.
+    if (secretNames.length || requestedDatabase?.enabled) {
       try {
-        await this.deployImageWithSecrets(app.appId, secretNames, url);
+        databaseInfo = await this.deployImageWithRuntimeConfig(app.appId, secretNames, url, requestedDatabase);
       } catch (error) {
-        const message = `Secrets injection failed: ${(error as Error).message}`;
+        const message = `Runtime config injection failed: ${(error as Error).message}`;
         this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
         // The image already built — injecting/starting it is a runtime story.
         await this.failDeploy(app.uid, memberUid, eventContext, message, 'runtime');
-        throw new BadGatewayException('Failed to inject secrets on the sandbox runner');
+        throw new BadGatewayException('Failed to inject secrets/database on the sandbox runner');
       }
     }
 
@@ -1271,11 +1265,19 @@ export class AiAppsService {
   }
 
   /**
-   * Redeploys an app's already-built image with the named stored secrets
-   * injected (`POST /v1/projects/<project>/deployments`). The image reference
-   * comes from the runner's own app registry (`GET /apps`).
+   * Redeploys an app's already-built image through the runner's secret-aware
+   * endpoint (`POST /v1/projects/<project>/deployments`) — the only one that
+   * actually injects env vars (secrets and/or a provisioned database) into
+   * the running pod; the legacy `/deploy` build endpoint injects neither. The
+   * image reference comes from the runner's own app registry (`GET /apps`).
+   * Returns the non-sensitive database metadata the runner reports, if any.
    */
-  private async deployImageWithSecrets(appId: string, secretNames: string[], appUrl: string): Promise<void> {
+  private async deployImageWithRuntimeConfig(
+    appId: string,
+    secretNames: string[],
+    appUrl: string,
+    database?: Pick<AiAppDatabaseInfo, 'enabled' | 'type'> | null
+  ): Promise<RunnerDeployDatabaseInfo | undefined> {
     const headers = { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN };
 
     const registry = await axios.get<{ apps?: Array<{ app_id?: string; image?: string }> }>(
@@ -1291,15 +1293,23 @@ export class AiAppsService {
       try {
         this.logger.log(
           `Runner secrets-deploy request for ${appId}: POST ${buildRunnerDeploymentsUrl()} ` +
-            `(image=${image}, secretNames=${secretNames.join(', ')})`
+            `(image=${image}, secretNames=${secretNames.join(', ')}${
+              database?.enabled ? `, database=${database.type}` : ''
+            })`
         );
-        const response = await axios.post(
+        const response = await axios.post<{ database?: RunnerDeployDatabaseInfo }>(
           buildRunnerDeploymentsUrl(),
-          { appId, environment: AI_APPS_RUNNER_ENVIRONMENT, image, secretNames },
+          {
+            appId,
+            environment: AI_APPS_RUNNER_ENVIRONMENT,
+            image,
+            secretNames,
+            ...(database?.enabled ? { database: { enabled: true, type: database.type } } : {}),
+          },
           { headers }
         );
         this.logRunnerResponse('secrets-deploy', appId, response.status, response.data);
-        return;
+        return response.data?.database;
       } catch (error) {
         this.logRunnerError('secrets-deploy', appId, error);
         // 409 helm_release_locked: another Helm operation (typically the /deploy
@@ -1316,7 +1326,7 @@ export class AiAppsService {
         // Same edge-timeout caveat as the build: verify before declaring failure.
         if (this.isUncertainRunnerError(error) && (await this.verifyAppLive(appUrl))) {
           this.logger.warn(`Secrets deploy timed out for ${appId} but the app is reachable — continuing`);
-          return;
+          return undefined;
         }
         const status = axios.isAxiosError(error) ? error.response?.status : undefined;
         throw new Error(`runner deployments call failed (status=${status ?? 'n/a'})`);
