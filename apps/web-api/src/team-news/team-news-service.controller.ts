@@ -4,6 +4,7 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
 import { TeamNewsService } from './team-news.service';
 import { TeamNewsEnrichmentService } from './team-news-enrichment.service';
+import { TeamNewsTrendingSeedService } from './team-news-trending-seed.service';
 import {
   BatchUpdateTeamNewsEnrichmentDto,
   IngestTeamNewsDto,
@@ -11,6 +12,8 @@ import {
 } from './dto/ingest-team-news.dto';
 import {
   BatchUpdateTeamNewsEnrichmentResponse,
+  SeedTeamNewsTrendingDtoSchema,
+  SeedTeamNewsTrendingResponse,
   TeamNewsPerTeamResponse,
   TeamsWithNewsEnrichmentResponse,
 } from 'libs/contracts/src/schema/team-news';
@@ -23,8 +26,21 @@ export class TeamNewsServiceController {
 
   constructor(
     private readonly teamNewsService: TeamNewsService,
-    private readonly enrichmentService: TeamNewsEnrichmentService
+    private readonly enrichmentService: TeamNewsEnrichmentService,
+    private readonly trendingSeedService: TeamNewsTrendingSeedService
   ) {}
+
+  @Post('team-news/seed-trending')
+  async seedTrending(@Body() body: unknown): Promise<SeedTeamNewsTrendingResponse> {
+    const parsed = SeedTeamNewsTrendingDtoSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten());
+    }
+    this.logger.log(
+      `Received team-news seed-trending: createdAfter=${parsed.data.createdAfter} limit=${parsed.data.limit}`
+    );
+    return this.trendingSeedService.seedTrending(parsed.data);
+  }
 
   @Post('team-news/ingest')
   async ingest(@Body() dto: IngestTeamNewsDto): Promise<IngestTeamNewsResponse> {

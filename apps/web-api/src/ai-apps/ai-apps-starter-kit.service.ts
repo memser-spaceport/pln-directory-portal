@@ -23,7 +23,7 @@ const DESIGN_SYSTEM_DIR = 'pl-design-system';
  * Builds the "AI Apps" starter kit ZIP a member downloads and unpacks into their
  * AI coding tool (Claude Code, Cursor, …). It carries deploy instructions for the
  * agent, a minimal runnable app scaffold, and the curated PL Design System (React
- * components + design tokens + usage guidelines) — but no deploy token and no PLN
+ * + Tailwind v4 components, semantic tokens, usage guidelines) — but no deploy token and no PLN
  * private API info. At deploy time the agent runs the LabOS connect flow to obtain
  * a short-lived deploy token.
  */
@@ -113,9 +113,9 @@ to the Protocol Labs Network sandbox with a single instruction.
 - \`.claude/skills/pln-member-context/\` — how your app can know which PLN member is using it.
 - \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
 - \`pl-design-system/\` — the **PL Design System**: ready-made React components
-  (Button, MemberCard, TeamCard, Table, Tabs, Badge, PageHeader, SearchInput,
-  Pagination, …), SCSS design tokens, the Inter font, and \`USAGE.md\` /
-  \`guidelines.md\`. Your agent uses these instead of hand-building UI.
+  (Button, EntityCard, PageShell, Table, Tabs, Tag, Badge, SearchInput, …),
+  Tailwind v4 semantic tokens, and \`USAGE.md\` / \`guidelines.md\`. Your agent
+  uses these instead of hand-building UI.
 - \`styles/\` — a tiny CSS-variable fallback (\`pln-theme.css\`) for plain-HTML apps
   that don't use React, plus font guidance.
 - \`app/\` — a minimal runnable Node app to start from (its \`server.js\`,
@@ -144,9 +144,9 @@ to the Protocol Labs Network sandbox with a single instruction.
 
 ## Apps that need an API key or password (secrets)
 Some apps need a secret to work — for example an app that talks to ChatGPT/OpenAI,
-sends emails, or connects to a database needs an **API key** or password for that
-service. If yours does, the flow is slightly different, and your agent handles it
-for you:
+sends emails, or connects to your own database needs an **API key** or password
+for that service. If yours does, the flow is slightly different, and your agent
+handles it for you:
 
 1. Build your app as usual — just tell your agent what you want (e.g. "an app that
    summarizes news with ChatGPT"). It knows the app will need a key.
@@ -162,6 +162,23 @@ for you:
 
 Secrets never go into the code, the chat, or the uploaded ZIP — they are stored
 securely on the sandbox and injected into your app when it runs.
+
+## Apps that need a database
+Some apps need to remember information between visits — a to-do list, a
+leaderboard, a guestbook, anything with data that should still be there next
+time someone opens the app. If yours does, you don't need any technical
+know-how — your agent will ask which of these you want when it's time to deploy:
+
+1. **Let PLN set one up for you (recommended if you don't already have one).**
+   No accounts, no setup, nothing to configure — just tell your agent you'd
+   like one. Your app gets a working database automatically the moment it
+   deploys; you never touch a password or connection string.
+2. **Connect a database you already have.** Treat its connection details the
+   same as any other secret — see "Apps that need an API key or password"
+   above; you'll enter it on that same secure LabOS page.
+
+Either way, you never create the database or generate credentials yourself —
+your agent and PLN handle that part.
 
 ## Personalized apps (who's using it)
 Your app can know which PLN member opened it. When a signed-in member with AI
@@ -222,12 +239,13 @@ folder. Before any UI work, load the **pl-design-system** skill
 \`pl-design-system/USAGE.md\` + \`pl-design-system/guidelines.md\`.
 
 - **Reuse** React components from \`pl-design-system/components/\` — do not recreate
-  buttons, cards, inputs, badges, tables, tabs, dropdowns, or sidebars.
-- **Use tokens only** from \`pl-design-system/tokens/\` (e.g.
-  \`var(--background-brand-default)\`, \`var(--spacing-md)\`). Never hardcode hex or
-  pixel font sizes.
-- For UI work, scaffold a **Next.js 14** app in \`app/\`, copy \`pl-design-system/\`
-  into \`app/\` so it ships on deploy, and consume it per \`USAGE.md\`. For a
+  buttons, cards, inputs, badges, tables, tabs, menus, or page shells.
+- **Semantic tokens only** via Tailwind utilities (e.g. \`bg-surface\`,
+  \`text-secondary\`, \`border-border\`, \`shadow-card\`). Never hardcode hex, use
+  palette utilities (\`slate-*\`), or reach for \`--pl-*\` primitives in app styles.
+- For UI work, scaffold a **Next.js** app with **Tailwind v4** in \`app/\`, copy
+  \`pl-design-system/\` into \`app/\` so it ships on deploy, and consume it per
+  \`USAGE.md\` (including \`@source\` for vendored components). For a
   non-React/plain-HTML app, \`styles/pln-theme.css\` is a minimal fallback — the
   React components are strongly preferred.
 - **Must be iframe-embeddable from \`*.plnetwork.io\`.** The app is shown inside the
@@ -696,7 +714,7 @@ may have no logs left.
   private designSystemSkill(): string {
     return `---
 name: pl-design-system
-description: Use whenever building or editing UI for a PLN AI App. Covers the bundled PL Design System — instantiate React components from pl-design-system/components, use design tokens only, layout patterns, and the LabOS consume steps in USAGE.md. Load before writing any JSX/TSX/SCSS for the app.
+description: Use whenever building or editing UI for a PLN AI App. Covers the bundled PL Design System — instantiate React components from pl-design-system/components, use semantic Tailwind tokens only, page recipes, and the LabOS consume steps in USAGE.md. Load before writing any JSX/TSX/CSS for the app.
 ---
 
 # PL Design System
@@ -707,27 +725,39 @@ Companion to \`AGENTS.md\`. Source of truth for on-brand UI in this kit.
 
 1. Read \`pl-design-system/guidelines.md\` (hard rules).
 2. Read \`pl-design-system/USAGE.md\` (how to wire it into \`app/\`).
-3. Check \`pl-design-system/components/component-catalog.md\` for the component you need.
+3. Check \`pl-design-system/components/index.ts\` for the component you need.
+4. For page shape, use the recipes in \`pl-design-system/README.md\` (list / detail / campaign).
 
 ## Hard rules
 
-- **Instantiate, never recreate.** Import from \`pl-design-system/components/<Name>\`.
-  Do not hand-roll Button, Input, Badge, Table, Tabs, Dropdown, Sidebar, cards, etc.
-- **Tokens only.** Colors / type / spacing / radius / shadows come from
-  \`pl-design-system/tokens/\` as CSS variables (\`var(--foreground-neutral-primary)\`,
-  \`var(--background-brand-default)\`, \`var(--spacing-md)\`, \`var(--radius-md)\`,
-  \`var(--shadow-xs)\`). Never hardcode hex, raw px type sizes, or Tailwind color utilities.
-- **Layer 3 only** in component/layout styles — never \`var(--global-color-*)\` or
-  \`var(--semantic-*)\`.
+- **Instantiate, never recreate.** Import from \`pl-design-system/components\` (barrel)
+  or \`pl-design-system/components/<Name>\`. Do not hand-roll Button, Input, Badge,
+  Table, Tabs, Menu, PageShell, cards, etc.
+- **Semantic tokens only.** Layout glue uses Tailwind utilities backed by the
+  theme bridge (\`bg-surface\`, \`text-secondary\`, \`border-border\`, \`shadow-card\`,
+  \`rounded-lg\`, \`gap-4\`). Never hardcode hex, palette utilities (\`slate-*\`,
+  \`bg-white\`), or \`--pl-*\` primitives in app styles.
+- Prefer **\`EntityCard\`** for listings. **Tag** = category; **Badge** = fact about
+  an entity.
 - Aesthetic: **structured · calm · technical · minimal**. No loud gradients, glow,
   heavy decorative shadows, or random accents.
 
-## Consume in \`app/\` (Next.js 14)
+## Consume in \`app/\` (Next.js + Tailwind v4)
 
 Only \`app/\` is deployed. Copy the kit's \`pl-design-system/\` into \`app/pl-design-system/\`,
-exclude it from \`tsconfig\` checking, install peer deps listed in \`USAGE.md\`, import
-\`styles/globals.scss\` once in the root layout, and copy \`public/fonts\` into the app's
-\`public/fonts\`. Import components from their folder (not only the barrel).
+install peer deps listed in \`USAGE.md\` (\`tailwindcss@^4\`, \`@tailwindcss/postcss\`,
+\`tailwind-merge\`, React, Next), and in root CSS:
+
+\`\`\`css
+@import "tailwindcss";
+@source "../pl-design-system/components";
+@import "../pl-design-system/tokens/tokens.css";
+@import "../pl-design-system/tokens/tailwind-theme.css";
+\`\`\`
+
+\`@source\` is required so utilities inside vendored components are generated.
+Load Inter via \`next/font/google\` (no font files are bundled). Import from the
+barrel: \`import { Button, EntityCard, PageShell } from '../pl-design-system/components'\`.
 
 Start script must honor \`PORT\` and bind \`0.0.0.0\`:
 \`"start": "next start -p \${PORT:-3000} -H 0.0.0.0"\`.
@@ -736,33 +766,28 @@ Start script must honor \`PORT\` and bind \`0.0.0.0\`:
 
 | Need | Reach for |
 |---|---|
-| Actions | \`Button\` |
-| Text entry | \`Input\`, \`Textarea\`, \`SearchInput\` |
-| Choice / toggle | \`Checkbox\`, \`Switch\`, \`Dropdown\`, \`Tabs\` |
-| Status / meta | \`Badge\`, \`Alert\`, \`Tooltip\`, \`EmptyState\` |
-| People / orgs | \`Avatar\`, \`MemberCard\` (dense), \`MemberProfileCard\` (hero), \`TeamCard\` |
-| Data | \`Table\`, \`Pagination\`, \`Progress\` |
-| Shell | \`NavBar\`, \`Sidebar\`, \`BottomNav\` (mobile), \`PageHeader\` |
-| Overlay | \`Drawer\` (modal / drawer / bottom-sheet patterns in \`patterns/overlay-patterns.md\`) |
-| Product cards | \`ForumPostCard\`, \`FocusAreaCard\`, \`OfficeHoursCard\`, \`CTACard\`, \`WelcomeCard\`, … |
+| Actions | \`Button\`, \`IconButton\` |
+| Text entry | \`Input\`, \`TextArea\`, \`SearchInput\`, \`Field\` |
+| Choice / toggle | \`Checkbox\`, \`Toggle\`, \`Select\` / \`Menu*\`, \`Tabs\` |
+| Status / meta | \`Badge\`, \`StatusDot\`, \`Tag\` / \`TagList\`, \`Alert\`, \`Tooltip\`, \`EmptyState\` |
+| People / orgs | \`Avatar\` / \`AvatarStack\`, \`MemberCard\`, \`EntityCard\` (listings) |
+| Data | \`Table*\`, \`Pagination\`, \`ProgressBar\`, \`ProgressCircle\`, \`Sparkline\`, \`Trend\` |
+| Shell | \`PageShell\`, \`PageHeader\`, \`ListGrid\`, \`Navbar\`, \`FilterPanel\` |
+| Overlay | \`Modal\`, \`Drawer\` |
+| Detail page | \`Card\`, \`MetaRow\`, \`DetailSection\`, \`Breadcrumbs\`, \`ContactList\` |
 
-Specs: \`components/primitives/*.md\`, \`components/product/*.md\`.
-Layouts: \`patterns/\`. Page structure reference only: \`examples/\`.
-
-**MemberCard vs MemberProfileCard:** many in a list → MemberCard; single hero subject → MemberProfileCard.
-
-**Surfaces:** cards use elevation (\`--shadow-xs\` / \`--shadow-sm\`), no border at rest. Form controls use \`--border-*\`.
+**Surfaces:** page \`bg-canvas\`, cards \`bg-surface\` + \`shadow-card\` (hover \`shadow-raised\`).
 
 ## Missing component
 
-Prefer composing existing components + tokens. If you would have to invent a new
-primitive, stop and tell the member: \`Missing canonical component: [name]\`.
+Prefer composing existing components + semantic tokens. If you would have to invent
+a new primitive, stop and tell the member: \`Missing canonical component: [name]\`.
 
 ## Sanity check
 
-- Every interactive control is an import from \`pl-design-system/components/\`
-- At most one primary Fill+Brand \`Button\` per section
-- No hardcoded colors/spacing; no \`X-Frame-Options\` on the app
+- Every interactive control is an import from \`pl-design-system/components\`
+- At most one primary \`Button\` per section
+- No hardcoded colors/spacing; no palette utilities; no \`X-Frame-Options\` on the app
 `;
   }
 
@@ -894,6 +919,31 @@ step 6 — you register a draft and the member deploys from LabOS after entering
 values there. Never deploy a secrets app directly and never accept key values in
 the chat.
 
+**Needs a database? Decide this too, BEFORE deploying.** Check whether the app
+talks to a database (an ORM/driver import, a \`DATABASE_URL\`/\`DB_*\` read, or
+code you wrote that needs one):
+
+\`\`\`bash
+grep -rniE "DATABASE_URL|postgres|pg\\.Pool|prisma|mongoose|mysql" app --include='*.js' --include='*.ts' --include='*.py' --include='*.json'
+\`\`\`
+
+If the app needs one, **ask the member which they want — don't assume**:
+
+- *"I can set up a database for you automatically — no accounts or setup on
+  your end. Or, if you already have your own database, you can connect that
+  instead. Which would you like?"*
+
+**They want PLN to provision one** (the easy path for non-technical members):
+follow "**Apps that want a provisioned database**" below — add the \`database\`
+field to your deploy/draft call, and the app gets ready-to-use connection env
+vars automatically. You never create the database or generate credentials
+yourself.
+
+**They want to bring their own**: this is just a runtime secret — add a
+connection env var name (e.g. \`DATABASE_URL\`) to \`requiredEnvVars\` and follow
+"**Apps that need secrets (draft flow)**" below; the member pastes their own
+connection string into the LabOS secrets page, same as an API key.
+
 ## Steps
 1. Read \`pln-app.config.json\` to get \`connectEndpoint\`, \`deployEndpoint\`,
    \`draftEndpoint\`, \`metadataEndpoint\`, the \`kitVersion\` (sent with every upload
@@ -973,8 +1023,13 @@ the chat.
      -F "deploymentId=<unique id per deploy, e.g. a timestamp>" \\
      -F "kitVersion=<the kitVersion from pln-app.config.json>" \\
      -F "agentModel=<the model you are running on, e.g. claude-sonnet-4-5; omit the field if unknown>" \\
+     -F 'database={"enabled":true,"type":"postgres"}' \\
      -F "file=@app.zip;type=application/zip"
    \`\`\`
+
+   Omit the \`database\` field entirely if the app doesn't need one, or the
+   member is bringing their own — see "Apps that want a provisioned database"
+   below for when to include it.
 
 7. On success the response contains the app record with its deployment URL and
    status:
@@ -1035,6 +1090,9 @@ curl -X POST "<draftEndpoint>" \\
 # → { "uid": "cl…", "status": "DRAFT", "appPageUrl": "https://…/pl-infra/ai-apps/<uid>", "missingEnvVars": [ … ] }
 \`\`\`
 
+An app can need secrets AND a provisioned database — add \`database\` (see
+"Apps that want a provisioned database" below) to this same draft call.
+
 Save the response's \`uid\` as \`appUid\` in \`pln-app.config.json\`, same as a
 regular deploy.
 
@@ -1062,6 +1120,49 @@ on the AI Apps dashboard.
   on the app's card and choose **Deployment settings**. If they want a direct
   link, hand them \`appSettingsUrl\` from \`pln-app.config.json\` with \`{appUid}\`
   replaced by the saved \`appUid\` — it opens that modal straight away.
+
+## Apps that want a provisioned database
+
+When the member asks PLN to provision a database (see "Needs a database?"
+above), add \`database\` to the SAME deploy or draft call from step 6 — it's
+one extra multipart field, not a separate request:
+
+\`\`\`bash
+-F 'database={"enabled":true,"type":"postgres"}'
+\`\`\`
+
+That's the entire contract. You never create the database, generate a
+username/password, or write any provisioning code — the Deployment
+Orchestrator provisions a dedicated Postgres database and user, and injects
+the connection details into the app's runtime as environment variables. Read
+them with your normal env-var access (\`process.env.DATABASE_URL\`,
+\`os.environ["DATABASE_URL"]\`, …) — never hardcode a connection string or ask
+the member for one:
+
+| Variable | Use it when… |
+|---|---|
+| \`DATABASE_URL\` | your framework/ORM takes a standard Postgres URL (\`postgresql://user:pass@host:5432/db\`) |
+| \`JDBC_DATABASE_URL\` | a Java/JDBC app (\`jdbc:postgresql://host:5432/db\`) |
+| \`DB_TYPE\`, \`DB_HOST\`, \`DB_PORT\`, \`DB_NAME\`, \`DB_USER\`, \`DB_PASSWORD\` | you need the individual parameters |
+
+The database user can only read/write its own database — it can't create
+other databases or roles, so don't write migration code that assumes
+superuser rights. \`CREATE TABLE\`/\`INSERT\`/etc. work normally.
+
+- **Once provisioned, keep sending \`database\` on every future deploy of this
+  app** (redeploys, code updates — every call from step 6), exactly like you
+  resend \`appName\`/\`appDescription\`. Save \`{"enabled":true,"type":"postgres"}\`
+  to \`pln-app.config.json\` (see the \`database\` key) the first time the member
+  opts in, and read it back on every later deploy instead of asking again.
+- Only ask the member once per app. If \`database\` is already set in the
+  config, don't re-run the "Needs a database?" prompt on redeploys.
+- This is entirely optional — if the member already has their own database,
+  don't send this field at all; treat their connection string as a regular
+  runtime secret instead (see "Apps that need secrets" above).
+- The response's \`database\` block (\`enabled\`, \`type\`, \`host\`, \`port\`, \`name\`,
+  \`user\`, \`credentialsInjected\`) is informational only — never the password —
+  and is not something you need to show the member; the app already has what
+  it needs via the injected env vars.
 
 ## Keep the deployment URL private
 This rule covers ONLY the deployed app's own address — the URL/host/port on
@@ -1115,6 +1216,9 @@ errors or misbehaves. Log lines may include the app's URL/host — the
 - Runtime secrets are supported only through the draft flow above — the sandbox
   injects exactly the env vars the member provided in LabOS. Non-secret config
   should ship sensible defaults — see the migration checklist in \`AGENTS.md\`.
+- Database provisioning is entirely optional and only for members who ask for
+  it — never send \`database\` unprompted, and never provision one just because
+  the app happens to touch a database driver without asking first.
 `;
   }
 
@@ -1135,8 +1239,9 @@ errors or misbehaves. Log lines may include the app's URL/host — the
         appUid: '',
         appName: '',
         appDescription: '',
+        database: null,
         notes:
-          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription hold the member-APPROVED display metadata (see .claude/skills/app-metadata) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint, buildLogsEndpoint, runtimeLogsEndpoint, and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy; the logs endpoints serve the build and runtime logs — see .claude/skills/app-logs). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill).',
+          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription hold the member-APPROVED display metadata (see .claude/skills/app-metadata) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint, buildLogsEndpoint, runtimeLogsEndpoint, and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy; the logs endpoints serve the build and runtime logs — see .claude/skills/app-logs). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill). database is null unless the member has opted into a PLN-provisioned database — once they do, set it to {"enabled":true,"type":"postgres"} and resend it verbatim on every deploy/draft call (see the deploy skill\'s "Apps that want a provisioned database"); a bring-your-own database is a regular runtime secret instead and never goes in this field.',
       },
       null,
       2
@@ -1145,22 +1250,24 @@ errors or misbehaves. Log lines may include the app's URL/host — the
 
   private themeCss(): string {
     return `:root {
-  /* Protocol Labs Network design tokens */
-  --pln-color-bg: #ffffff;
-  --pln-color-surface: #f1f5f9;
-  --pln-color-text: #0f172a;
+  /* Protocol Labs Network — aligned with pl-design-system semantic roles */
+  --pln-color-bg: #f1f5f9; /* canvas (slate-100) */
+  --pln-color-surface: #ffffff;
+  --pln-color-text: #0f172a; /* slate-900 */
   --pln-color-muted: #64748b;
-  --pln-color-primary: #156ff7;
-  --pln-color-primary-hover: #1d4ed8;
-  --pln-color-border: #cbd5e1;
+  --pln-color-primary: #1b4dff; /* brand action */
+  --pln-color-primary-hover: #0f3cd9;
+  --pln-color-link: #156ff7;
+  --pln-color-border: #cbd5e1; /* slate-300 */
   --pln-radius: 8px;
-  --pln-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-  --pln-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --pln-shadow: 0 1px 2px 0 rgba(14, 15, 17, 0.06);
+  --pln-font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 body {
   margin: 0;
   font-family: var(--pln-font-sans);
+  font-size: 14px;
   color: var(--pln-color-text);
   background: var(--pln-color-bg);
 }
@@ -1169,7 +1276,7 @@ body {
   background: var(--pln-color-primary);
   color: #fff;
   border: none;
-  border-radius: var(--pln-radius);
+  border-radius: 6px;
   padding: 10px 16px;
   font: inherit;
   cursor: pointer;
@@ -1178,30 +1285,30 @@ body {
 
 .pln-card {
   background: var(--pln-color-surface);
-  border: 1px solid var(--pln-color-border);
   border-radius: var(--pln-radius);
   box-shadow: var(--pln-shadow);
   padding: 16px;
 }
+
+a { color: var(--pln-color-link); }
 `;
   }
 
   private fontsDoc(): string {
     return `# PLN Fonts
 
-The PLN UI uses **Inter** as its primary typeface.
+The PLN UI uses **Inter** as its primary typeface (weights 400 / 500 / 600).
 
-**Building with the PL Design System (preferred)?** The Inter variable font is
-already self-hosted in \`pl-design-system/public/fonts/\` and wired up by
-\`pl-design-system/styles/globals.scss\` — see \`pl-design-system/USAGE.md\`. You
-don't need anything here.
+**Building with the PL Design System (preferred)?** No font files are bundled.
+Load Inter in the Next.js app via \`next/font/google\` (see
+\`pl-design-system/USAGE.md\`), or from the CDN below.
 
 **Plain-HTML / non-React app** using \`styles/pln-theme.css\`? Load Inter from the
 CDN in your \`<head>\`:
 
 \`\`\`html
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 \`\`\`
 
 Then rely on the \`--pln-font-sans\` variable from \`pln-theme.css\`.

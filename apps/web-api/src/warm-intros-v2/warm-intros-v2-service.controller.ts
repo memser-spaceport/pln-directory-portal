@@ -1,10 +1,11 @@
-import { Body, Controller, Logger, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ServiceAuthGuard } from '../guards/service-auth.guard';
 import {
   IngestConnectionEdgesDto,
   IngestWarmIntrosV2Response,
   IngestWarmPathsV2Dto,
+  ListConnectionEdgesQueryDto,
 } from './dto/ingest-warm-intros-v2.dto';
 import { WarmIntrosV2Service } from './warm-intros-v2.service';
 
@@ -26,6 +27,12 @@ export class WarmIntrosV2ServiceController {
       `Received warm-intros-v2 edge ingest: edges=${dto?.edges?.length ?? 0} runId=${dto?.runId ?? 'none'}`
     );
     return this.warmIntrosV2Service.ingestEdges(dto);
+  }
+
+  /** Used by bridge pairing to load existing pl_direct edges before mixed materialize. */
+  @Get('warm-intros-v2/edges')
+  async listEdges(@Query() query: ListConnectionEdgesQueryDto) {
+    return this.warmIntrosV2Service.listEdges(query);
   }
 
   @Post('warm-intros-v2/paths/ingest')

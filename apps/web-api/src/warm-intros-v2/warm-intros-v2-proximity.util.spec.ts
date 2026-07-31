@@ -86,5 +86,24 @@ describe('warm-intros-v2-proximity.util', () => {
         })
       ).toBe('PL');
     });
+
+    it('uses F / VC families for bridge relationKinds', () => {
+      expect(deriveConnectorFamily({ relationKind: 'founder_bridge' })).toBe('F');
+      expect(deriveConnectorFamily({ relationKind: 'coinvestor_bridge' })).toBe('VC');
+      expect(
+        computeWarmPathProximity({
+          score: 0.85,
+          hopCount: 2,
+          relationKind: 'founder_bridge',
+        }).proximityCode
+      ).toBe('F+2A');
+      expect(
+        computeWarmPathProximity({
+          score: 0.5,
+          hopCount: 2,
+          relationKind: 'coinvestor_bridge',
+        }).proximityCode
+      ).toBe('VC+2B');
+    });
   });
 });

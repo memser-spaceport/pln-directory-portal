@@ -6,7 +6,12 @@
  *
  * Caliber: "A" if score >= 0.60, else "B" when score > 0; null if score ≤ 0.
  * proximityCode: `{family}+{hopCount}{caliber}` e.g. PL+1A.
+ *
+ * Paths / alternates below WARM_INTROS_V2_MIN_SCORE are excluded from read APIs.
  */
+
+/** Minimum path/alternate score (0–1) shown in list, detail, and facets (= 20%). */
+export const WARM_INTROS_V2_MIN_SCORE = 0.2;
 
 export type WarmPathCaliber = 'A' | 'B';
 export type WarmPathScoreBand = 'green' | 'yellow' | 'red' | 'none';
@@ -21,7 +26,7 @@ export type WarmPathProximity = {
 
 /**
  * Derive connector family for proximity codes.
- * Iteration 1: PL-direct paths → `PL`.
+ * `pl_direct` → PL; `founder_bridge` → F; `coinvestor_bridge` → VC.
  */
 export function deriveConnectorFamily(input: { hopChain?: unknown; relationKind?: string | null }): string {
   const relationKind =
@@ -33,15 +38,22 @@ export function deriveConnectorFamily(input: { hopChain?: unknown; relationKind?
       ? String((input.hopChain as Record<string, unknown>).relationKind).trim()
       : '');
 
+  if (relationKind === 'founder_bridge') return 'F';
+  if (relationKind === 'coinvestor_bridge') return 'VC';
   if (relationKind === 'pl_direct') return 'PL';
 
   if (input.hopChain && typeof input.hopChain === 'object' && !Array.isArray(input.hopChain)) {
     const hops = (input.hopChain as Record<string, unknown>).hops;
-    if (
-      Array.isArray(hops) &&
-      hops.some((h) => h && typeof h === 'object' && (h as Record<string, unknown>).role === 'pl_connector')
-    ) {
-      return 'PL';
+    if (Array.isArray(hops)) {
+      if (hops.some((h) => h && typeof h === 'object' && (h as Record<string, unknown>).role === 'founder')) {
+        return 'F';
+      }
+      if (hops.some((h) => h && typeof h === 'object' && (h as Record<string, unknown>).role === 'co_investor')) {
+        return 'VC';
+      }
+      if (hops.some((h) => h && typeof h === 'object' && (h as Record<string, unknown>).role === 'pl_connector')) {
+        return 'PL';
+      }
     }
   }
 

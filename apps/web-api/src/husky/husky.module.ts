@@ -11,10 +11,12 @@ import { HuskyRevalidationService } from './husky-revalidation.service';
 import { HuskyAiToolsModule } from './tools/husky-ai-tools.module';
 import { HuskyGenerationService } from './husky-generation.service';
 import { HuskyGenerationController } from './husky-generation.controller';
+import { MemberBioRefreshService } from './member-bio-refresh.service';
+import { MemberScrapingDogService } from './member-scrapingdog.service';
 @Module({
   controllers: [HuskyChatsController, HuskyThreadsController, HuskyGenerationController],
-  providers: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, PrismaService, HuskyRevalidationService, HuskyGenerationService],
+  providers: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, PrismaService, HuskyRevalidationService, HuskyGenerationService, MemberBioRefreshService, MemberScrapingDogService],
   imports: [HuskyAiToolsModule],
-  exports: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, HuskyRevalidationService, HuskyGenerationService,],
+  exports: [HuskyService, HuskyAiService, RedisCacheDbService, QdrantVectorDbService, MongoPersistantDbService, HuskyRevalidationService, HuskyGenerationService, MemberBioRefreshService,],
 })
 export class HuskyModule {}

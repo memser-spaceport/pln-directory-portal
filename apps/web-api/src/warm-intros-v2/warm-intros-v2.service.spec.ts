@@ -20,6 +20,13 @@ describe('WarmIntrosV2Service', () => {
   const masterProfileFindMany = jest.fn();
   const memberFindMany = jest.fn();
 
+  const feedbackFindUnique = jest.fn();
+  const feedbackFindMany = jest.fn();
+  const feedbackCreate = jest.fn();
+  const feedbackUpdate = jest.fn();
+  const feedbackDelete = jest.fn();
+  const feedbackCount = jest.fn();
+
   const transaction = jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn({
       connectionEdge: { findUnique: edgeFindUnique, create: edgeCreate, update: edgeUpdate },
@@ -41,6 +48,14 @@ describe('WarmIntrosV2Service', () => {
       update: pathUpdate,
       findMany: pathFindMany,
       count: pathCount,
+    },
+    warmPathV2Feedback: {
+      findUnique: feedbackFindUnique,
+      findMany: feedbackFindMany,
+      create: feedbackCreate,
+      update: feedbackUpdate,
+      delete: feedbackDelete,
+      count: feedbackCount,
     },
     masterProfile: {
       findMany: masterProfileFindMany,
@@ -104,6 +119,7 @@ describe('WarmIntrosV2Service', () => {
     masterProfileFindMany.mockResolvedValue([investorProfile, connectorProfile]);
     memberFindMany.mockResolvedValue([]);
     pathCount.mockResolvedValue(1);
+    feedbackFindMany.mockResolvedValue([]);
   });
 
   describe('ingestEdges', () => {
@@ -318,7 +334,56 @@ describe('WarmIntrosV2Service', () => {
   });
 
   describe('listPaths', () => {
-    it('defaults rank=1, enriches investor email from Sourced[], returns total', async () => {
+    it('defaults rank=1 and minScore=0.2, enriches investor email from Sourced[], returns total', async () => {
+      pathFindMany.mockResolvedValue([pathRow]);
+      pathCount.mockResolvedValue(1);
+
+      const result = await service.listPaths({
+        targetSet: 'neuro-fund-i',
+        connectorProfileUid: 'from1',
+        limit: '10',
+        offset: '0',
+      });
+
+      expect(pathFindMany).toHaveBeenCalledWith({
+        where: {
+          rank: 1,
+          targetSet: 'neuro-fund-i',
+          score: { gte: 0.2 },
+          OR: [{ bestConnectorProfileUid: 'from1' }, { alternateConnectorProfileUids: { array_contains: 'from1' } }],
+        },
+        take: 10,
+        skip: 0,
+        orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
+      });
+      expect(masterProfileFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { uid: { in: expect.arrayContaining(['inv1', 'from1']) } },
+        })
+      );
+
+      expect(result.total).toBe(1);
+      expect(result.paths).toHaveLength(1);
+      expect(result.paths[0]).toMatchObject({
+        uid: 'p1',
+        proximityCode: 'PL+1A',
+        caliber: 'A',
+        scorePercent: 70,
+        scoreBand: 'green',
+        investor: {
+          profileUid: 'inv1',
+          name: 'Vitalik Buterin',
+          email: 'vitalik@ethereum.org',
+          sectors: ['crypto', 'public-goods'],
+        },
+        bestConnector: {
+          profileUid: 'from1',
+          name: 'Juan Benet',
+        },
+      });
+    });
+
+    it('honors explicit minScore override', async () => {
       pathFindMany.mockResolvedValue([pathRow]);
       pathCount.mockResolvedValue(1);
 
@@ -406,7 +471,7 @@ describe('WarmIntrosV2Service', () => {
       // Post-filter path: no take/skip on findMany
       expect(pathFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { rank: 1 },
+          where: { rank: 1, score: { gte: 0.2 } },
           orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
         })
       );
@@ -441,6 +506,61 @@ describe('WarmIntrosV2Service', () => {
       expect(result.total).toBe(1);
       expect(result.paths[0].investor.sectors).toContain('crypto');
     });
+
+    it('collapses multi-list investor to one row when targetSet is omitted (All)', async () => {
+      const goldPath = {
+        ...pathRow,
+        uid: 'p-gold',
+        targetSet: 'gold-co-investors',
+        score: 0.65,
+      };
+      // Score-desc order as Prisma returns: neuro (0.7) before gold (0.65).
+      pathFindMany.mockResolvedValue([pathRow, goldPath]);
+
+      const result = await service.listPaths({ limit: '50', offset: '0' });
+
+      expect(pathFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { rank: 1, score: { gte: 0.2 } },
+          orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
+        })
+      );
+      expect(pathFindMany.mock.calls[0][0].take).toBeUndefined();
+      expect(pathCount).not.toHaveBeenCalled();
+      expect(result.total).toBe(1);
+      expect(result.paths).toHaveLength(1);
+      expect(result.paths[0]).toMatchObject({
+        uid: 'p1',
+        targetProfileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+        score: 0.7,
+      });
+    });
+
+    it('does not collapse when targetSet is scoped to one list', async () => {
+      pathFindMany.mockResolvedValue([pathRow]);
+      pathCount.mockResolvedValue(1);
+
+      const result = await service.listPaths({
+        targetSet: 'neuro-fund-i',
+        limit: '50',
+        offset: '0',
+      });
+
+      expect(pathFindMany).toHaveBeenCalledWith({
+        where: { rank: 1, targetSet: 'neuro-fund-i', score: { gte: 0.2 } },
+        take: 50,
+        skip: 0,
+        orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
+      });
+      expect(pathCount).toHaveBeenCalledWith({
+        where: { rank: 1, targetSet: 'neuro-fund-i', score: { gte: 0.2 } },
+      });
+      expect(result.total).toBe(1);
+      expect(result.paths).toHaveLength(1);
+      expect(result.paths[0].uid).toBe('p1');
+      expect(result.paths[0].targetSet).toBe('neuro-fund-i');
+    });
   });
 
   describe('getPathsByInvestor', () => {
@@ -452,17 +572,124 @@ describe('WarmIntrosV2Service', () => {
         investor: expect.objectContaining({ profileUid: 'inv1', name: 'inv1' }),
       });
       expect(pathFindMany).toHaveBeenCalledWith({
-        where: { targetProfileUid: 'inv1' },
+        where: { targetProfileUid: 'inv1', score: { gte: 0.2 } },
         orderBy: [{ targetSet: 'asc' }, { rank: 'asc' }],
       });
     });
 
     it('enriches detail paths with proximity + investor summary', async () => {
       pathFindMany.mockResolvedValue([pathRow]);
+      feedbackFindMany.mockResolvedValue([]);
       const result = await service.getPathsByInvestor('inv1', {});
       expect(result.investor.email).toBe('vitalik@ethereum.org');
       expect(result.paths[0].proximityCode).toBe('PL+1A');
       expect(result.paths[0].bestConnector?.name).toBe('Juan Benet');
+    });
+
+    it('attaches myFeedback and feedbackSummary when requested', async () => {
+      pathFindMany.mockResolvedValue([pathRow]);
+      feedbackFindMany
+        .mockResolvedValueOnce([
+          {
+            warmPathUid: 'p1',
+            connectorProfileUid: 'from1',
+            canRefer: 'yes',
+            note: 'Solid',
+            updatedAt: new Date('2026-07-28T00:00:00.000Z'),
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            warmPathUid: 'p1',
+            connectorProfileUid: 'from1',
+            canRefer: 'yes',
+            note: 'Solid',
+            actorEmail: 'a@pl.com',
+            updatedAt: new Date('2026-07-28T00:00:00.000Z'),
+          },
+          {
+            warmPathUid: 'p1',
+            connectorProfileUid: 'from1',
+            canRefer: 'no',
+            note: null,
+            actorEmail: 'b@pl.com',
+            updatedAt: new Date('2026-07-27T00:00:00.000Z'),
+          },
+        ]);
+
+      const result = await service.getPathsByInvestor(
+        'inv1',
+        {},
+        {
+          actor: { uid: 'member-1', email: 'a@pl.com' },
+          includeFeedbackSummary: true,
+        }
+      );
+
+      expect(result.paths[0].myFeedbackByConnector).toEqual({
+        from1: {
+          canRefer: 'yes',
+          note: 'Solid',
+          updatedAt: '2026-07-28T00:00:00.000Z',
+        },
+      });
+      expect(result.paths[0].feedbackSummaryByConnector?.from1).toEqual(
+        expect.objectContaining({ yesCount: 1, noCount: 1, noteCount: 1 })
+      );
+    });
+  });
+
+  describe('upsertPathFeedback', () => {
+    it('creates feedback for a connector on the path', async () => {
+      pathFindUnique.mockResolvedValue({
+        uid: 'p1',
+        targetProfileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+        bestConnectorProfileUid: 'from1',
+        alternateConnectorProfileUids: ['from2'],
+        hopChain,
+      });
+      feedbackFindUnique.mockResolvedValue(null);
+      feedbackCreate.mockResolvedValue({
+        uid: 'f1',
+        warmPathUid: 'p1',
+        targetProfileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+        connectorProfileUid: 'from1',
+        canRefer: 'yes',
+        note: null,
+        actorUid: 'member-1',
+        actorEmail: 'a@pl.com',
+        createdAt: new Date('2026-07-28T00:00:00.000Z'),
+        updatedAt: new Date('2026-07-28T00:00:00.000Z'),
+      });
+
+      await expect(
+        service.upsertPathFeedback(
+          'p1',
+          { connectorProfileUid: 'from1', canRefer: 'yes' },
+          { uid: 'member-1', email: 'a@pl.com' }
+        )
+      ).resolves.toEqual(expect.objectContaining({ uid: 'f1', canRefer: 'yes', connectorProfileUid: 'from1' }));
+      expect(feedbackCreate).toHaveBeenCalled();
+    });
+
+    it('rejects connector not on path', async () => {
+      pathFindUnique.mockResolvedValue({
+        uid: 'p1',
+        targetProfileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+        bestConnectorProfileUid: 'from1',
+        alternateConnectorProfileUids: [],
+        hopChain,
+      });
+      await expect(
+        service.upsertPathFeedback(
+          'p1',
+          { connectorProfileUid: 'unknown', canRefer: 'yes' },
+          { uid: 'member-1', email: 'a@pl.com' }
+        )
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
@@ -495,6 +722,11 @@ describe('WarmIntrosV2Service', () => {
         ]);
 
       const result = await service.listFacets({ targetSet: 'neuro-fund-i' });
+      expect(pathFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { rank: 1, targetSet: 'neuro-fund-i', score: { gte: 0.2 } },
+        })
+      );
       expect(result.connectors).toEqual([
         { profileUid: 'from1', name: 'Juan Benet', pathCount: 2 },
         { profileUid: 'from2', name: 'Lacey Wisdom', pathCount: 0 },

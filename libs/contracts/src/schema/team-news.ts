@@ -108,7 +108,24 @@ export const TeamNewsPopularQueryParams = z.object({
   limit: z
     .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1).max(20))
     .optional()
-    .default(3),
+    .default(7),
+});
+
+export const SeedTeamNewsTrendingDtoSchema = z.object({
+  createdAfter: z.string(),
+  limit: z.number().int().min(5).max(7).optional().default(7),
+});
+
+export const SeedTeamNewsTrendingRankedItemSchema = z.object({
+  uid: z.string(),
+  rank: z.number().int().min(1),
+  upvoteCount: z.number().int().min(0),
+});
+
+export const SeedTeamNewsTrendingResponseSchema = z.object({
+  ranked: z.array(SeedTeamNewsTrendingRankedItemSchema),
+  protocolLabsIncluded: z.boolean(),
+  candidateCount: z.number().int().min(0),
 });
 
 export const TeamNewsPopularItemSchema = z.object({
@@ -168,6 +185,8 @@ export const TeamNewsGroupedResponseSchema = z.object({
   windowDays: z.number().int(),
   generatedAt: z.string(),
   groups: z.array(TeamNewsFocusGroupSchema),
+  /** News from allowlisted teams with no focus-area group; home "All" tab only. */
+  allTabExtraItems: z.array(TeamNewsItemSchema).default([]),
 });
 
 export const TeamNewsFacetItemSchema = z.object({
@@ -352,3 +371,5 @@ export type TeamNewsFollowSuggestionsResponse = z.infer<typeof TeamNewsFollowSug
 export type TeamNewsPopularQuery = z.infer<typeof TeamNewsPopularQueryParams>;
 export type TeamNewsPopularItem = z.infer<typeof TeamNewsPopularItemSchema>;
 export type TeamNewsPopularResponse = z.infer<typeof TeamNewsPopularResponseSchema>;
+export type SeedTeamNewsTrendingDto = z.infer<typeof SeedTeamNewsTrendingDtoSchema>;
+export type SeedTeamNewsTrendingResponse = z.infer<typeof SeedTeamNewsTrendingResponseSchema>;

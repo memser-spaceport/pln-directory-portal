@@ -1,8 +1,9 @@
 import axios from 'axios';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()
 export class ProtosphereApiClient {
+  private readonly logger = new Logger(ProtosphereApiClient.name);
   private forumApiUrl: string;
 
   constructor() {

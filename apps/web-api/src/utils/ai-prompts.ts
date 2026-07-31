@@ -703,7 +703,11 @@ Instructions:
    - Search for their name AND their specific projects/contributions
 
 2. Create a concise bio that:
-   - Uses third-person perspective with appropriate gender pronouns (He/She)
+   - Uses third-person perspective. Pronoun accuracy is CRITICAL:
+     - Use "he/him" or "she/her" ONLY when the profile's "Known Pronouns" field provides them, or when a verified source explicitly states the member's pronouns or gender (e.g., pronouns listed on their LinkedIn/X profile, or gendered pronouns used to describe this exact person in a verified source)
+     - Use "they/them" ONLY when the member explicitly declares they/them pronouns
+     - NEVER guess or infer gender from the member's name, photo, location, language, or role
+     - When pronouns are not explicitly verified, do NOT use any third-person pronouns (no he/she/they) — refer to the member by their first name and restructure sentences as needed
    - Focuses on current role and key expertise
    - Maintains professional tone
    - Avoids any source links or citations
@@ -737,10 +741,15 @@ Instructions:
    - If there's no role, team, skills, projects, or professional experience available
    - Return an empty response instead of creating a minimal or generic bio
 
-Example: 
+Example (gender explicitly verified as he/him):
 <p><strong>John Smith</strong> is a Senior Software Engineer specializing in cloud architecture and distributed systems.</p>
 <p>With expertise in <strong>AWS</strong> and <strong>microservices</strong>, he leads the development of scalable infrastructure solutions.</p>
 <p>Currently focused on <em>implementing AI-driven automation in cloud deployments</em>.</p>
+
+Example (pronouns not verified — no third-person pronouns, the first name is used instead):
+<p><strong>Jamie Lee</strong> is a Product Manager specializing in developer tooling and open-source ecosystems.</p>
+<p>With expertise in <strong>decentralized storage</strong>, Jamie drives adoption of community-led integrations.</p>
+<p>Currently focused on <em>scaling developer onboarding programs</em>.</p>
 
 Respond with the HTML-formatted bio only, no additional text, formatting, or code blocks. Return an empty response without html if insufficient profile data is available.
 `;
@@ -757,7 +766,11 @@ Instructions:
    - Do not attempt to create a bio with minimal information
 
 Bio Requirements:
-- Uses third-person perspective with appropriate gender pronouns (He/She)
+- Uses third-person perspective. Pronoun accuracy is CRITICAL:
+  - Use "he/him" or "she/her" ONLY when the profile's "Known Pronouns" field provides them, or when the profile data explicitly states the member's pronouns or gender
+  - Use "they/them" ONLY when the member explicitly declares they/them pronouns
+  - NEVER guess or infer gender from the member's name or any other profile detail
+  - When pronouns are not explicitly known, do NOT use any third-person pronouns (no he/she/they) — refer to the member by their first name and restructure sentences as needed
 - Focuses on current role and key expertise from the profile
 - Maintains professional tone
 - Uses only verified profile information
@@ -787,9 +800,9 @@ Insufficient Data Handling:
 - If the profile contains only basic information (e.g., just name) without role, team, skills, projects, or professional experience
 - Return an empty response instead of creating a minimal or generic bio
 
-Example: 
+Example (pronouns not known — the bio avoids he/she/they and uses the first name instead):
 <p><strong>John Smith</strong> is a Software Engineer with expertise in <strong>distributed systems</strong> and <strong>cloud architecture</strong>.</p>
-<p>Currently working as a <strong>Senior Developer</strong> at <strong>Tech Company</strong>, contributing to scalable infrastructure projects.</p>
+<p>Currently working as a <strong>Senior Developer</strong> at <strong>Tech Company</strong>, John contributes to scalable infrastructure projects.</p>
 <p>Focused on <em>building robust microservices and improving system reliability</em>.</p>
 
 Respond with the HTML-formatted bio only, no additional text, formatting, or code blocks. Return an empty response without html if insufficient profile data is available.

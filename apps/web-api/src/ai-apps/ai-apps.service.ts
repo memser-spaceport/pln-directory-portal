@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
-import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback } from '@prisma/client';
+import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { isDirectoryAdmin } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
@@ -24,6 +24,7 @@ import {
   AI_APPS_HELM_LOCK_RETRIES,
   AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS,
   AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES,
+  AI_APPS_LOGS_DESC_CACHE_STALE_TTL_MS,
   AI_APPS_LOGS_DESC_CACHE_TTL_MS,
   AI_APPS_LOGS_DESC_DEFAULT_LIMIT,
   AI_APPS_LOGS_DESC_MAX_LIMIT,
@@ -59,18 +60,65 @@ import {
  */
 const GATEWAY_TIMEOUT_STATUSES = [408, 502, 503, 504, 521, 522, 523, 524, 530];
 
+/** Non-sensitive database metadata the runner returns once it provisions one. Never a password. */
+interface RunnerDeployDatabaseInfo {
+  host?: string;
+  port?: number;
+  name?: string;
+  user?: string;
+  type?: string;
+  credentialsInjected?: boolean;
+}
+
 interface RunnerDeployResponse {
   status?: string;
   host?: string;
   url?: string;
   httpUrl?: string;
   port?: number;
+  database?: RunnerDeployDatabaseInfo;
 }
 
 type AiAppMember = { uid: string; name: string; image: string | null };
 
 /** Response shape across all AI Apps endpoints: `memberUid` replaced by `member`. */
 type WithMember<T extends { memberUid: string }> = Omit<T, 'memberUid'> & { member: AiAppMember | null };
+
+/** What is actually serving traffic — independent of whether the LATEST deploy succeeded. */
+type AiAppServing = 'latest' | 'previous' | 'none';
+
+/**
+ * Deploy-outcome block on app responses (contract shared with the frontend).
+ * `failureReason`/`failureStream` are manager-only: the runner's failure text
+ * can carry stack fragments, image names, and internal hostnames.
+ */
+interface AiAppDeploymentInfo {
+  serving: AiAppServing;
+  failureReason?: string;
+  failureStream?: 'build' | 'runtime';
+}
+
+/**
+ * Database block on app responses: everyone sees whether a database was
+ * requested; connection metadata (never the password) appears once the
+ * Deployment Orchestrator reports it provisioned. Also the exact shape stored
+ * in the `AiApp.database` JSON column — no separate storage/response shapes.
+ */
+interface AiAppDatabaseInfo {
+  enabled: boolean;
+  type?: string | null;
+  host?: string | null;
+  port?: number | null;
+  name?: string | null;
+  user?: string | null;
+  credentialsInjected?: boolean | null;
+}
+
+/** App responses: the raw `failureStream`/`database` columns replaced by requester-facing `deployment`/`database` blocks. */
+type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStream' | 'database'> & {
+  deployment: AiAppDeploymentInfo;
+  database: AiAppDatabaseInfo;
+};
 
 @Injectable()
 export class AiAppsService {
@@ -155,13 +203,47 @@ export class AiAppsService {
     };
   }
 
+  /**
+   * The requester-gated response shape: the raw `failureStream` column never
+   * leaves the API, `notes` is nulled for non-managers (runner failure text is
+   * internal), and both reappear inside `deployment` for managers.
+   * `deployment.serving` goes to everyone — it's derived state, not detail:
+   * 'latest' = the current build serves; 'previous' = it last shipped
+   * successfully at `lastDeployedAt` and the runner keeps the old release
+   * serving through a failed rollout; 'none' = never shipped (strict — the
+   * only writer of `lastDeployedAt` is markReady).
+   */
+  private toApiApp<T extends AiApp>(app: WithMember<T>, isManager: boolean): ApiAiApp<T> {
+    const { failureStream, database: storedDatabase, ...rest } = app;
+    const serving: AiAppServing = app.status === 'READY' ? 'latest' : app.lastDeployedAt ? 'previous' : 'none';
+    const deployment: AiAppDeploymentInfo = { serving };
+    if (isManager) {
+      if (app.notes) {
+        deployment.failureReason = app.notes;
+      }
+      if (failureStream === 'build' || failureStream === 'runtime') {
+        deployment.failureStream = failureStream;
+      }
+    }
+    const parsedDatabase = storedDatabase as AiAppDatabaseInfo | null;
+    const database: AiAppDatabaseInfo = parsedDatabase?.enabled ? parsedDatabase : { enabled: false };
+    return { ...rest, notes: isManager ? app.notes : null, deployment, database };
+  }
+
   /** Dashboard list — all non-deleted apps across PL Infra users, newest first, with owner info. */
-  async listApps(): Promise<Array<WithMember<AiApp>>> {
+  async listApps(requesterUid?: string): Promise<Array<ApiAiApp<AiApp>>> {
     const apps = await this.prisma.aiApp.findMany({
       where: { status: { not: 'DELETED' } },
       orderBy: { updatedAt: 'desc' },
     });
-    return this.withMember(await Promise.all(apps.map((app) => this.settleStuckDeploy(app))));
+    const settled = await Promise.all(apps.map((app) => this.settleStuckDeploy(app)));
+    // One admin lookup for the requester, then a per-row creator compare —
+    // never a per-row query.
+    const isAdmin = !!requesterUid && (await this.isRequesterDirectoryAdmin(requesterUid));
+    const withMembers = await this.withMember(settled);
+    return withMembers.map((app, index) =>
+      this.toApiApp(app, isAdmin || (!!requesterUid && settled[index].memberUid === requesterUid))
+    );
   }
 
   /**
@@ -169,7 +251,7 @@ export class AiAppsService {
    * `canManage` (creator or directory admin) — computed server-side so the UI
    * never has to compare member uids from a possibly stale login cookie.
    */
-  async getApp(uid: string, requesterUid?: string): Promise<WithMember<AiApp> & { canManage?: boolean }> {
+  async getApp(uid: string, requesterUid?: string): Promise<ApiAiApp<AiApp> & { canManage?: boolean }> {
     let app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -177,9 +259,10 @@ export class AiAppsService {
     app = await this.settleStuckDeploy(app);
     const result = (await this.withMember([app]))[0];
     if (!requesterUid) {
-      return result;
+      return this.toApiApp(result, false);
     }
-    return { ...result, canManage: await this.isCreatorOrDirectoryAdmin(requesterUid, app) };
+    const canManage = await this.isCreatorOrDirectoryAdmin(requesterUid, app);
+    return { ...this.toApiApp(result, canManage), canManage };
   }
 
   /** Updates dashboard metadata only; this never invokes the sandbox runner or starts a deploy. */
@@ -188,7 +271,7 @@ export class AiAppsService {
     uid: string,
     dto: UpdateAppMetadataDto,
     ownerOnly = false
-  ): Promise<WithMember<AiApp>> {
+  ): Promise<ApiAiApp<AiApp>> {
     if (dto.name === undefined && dto.description === undefined && dto.prd === undefined) {
       throw new BadRequestException('At least one of name, description, or prd must be provided');
     }
@@ -207,7 +290,7 @@ export class AiAppsService {
     if (dto.prd !== undefined) data.prd = dto.prd?.trim() || null;
 
     const updated = await this.prisma.aiApp.update({ where: { uid }, data });
-    return (await this.withMember([updated]))[0];
+    return this.toApiApp((await this.withMember([updated]))[0], true);
   }
 
   /** Update metadata from JSON or multipart; a PRD file overrides body.prd. */
@@ -216,7 +299,7 @@ export class AiAppsService {
     uid: string,
     dto: UpdateAppMetadataDto,
     file?: Express.Multer.File
-  ): Promise<WithMember<AiApp>> {
+  ): Promise<ApiAiApp<AiApp>> {
     if (!file) {
       return this.updateMetadata(requesterUid, uid, dto);
     }
@@ -227,7 +310,7 @@ export class AiAppsService {
   }
 
   /** File-only PRD upload used by POST /:uid/prd. */
-  async uploadPrd(requesterUid: string, uid: string, file: Express.Multer.File): Promise<WithMember<AiApp>> {
+  async uploadPrd(requesterUid: string, uid: string, file: Express.Multer.File): Promise<ApiAiApp<AiApp>> {
     return this.storePrdFile(requesterUid, uid, file, {} as UpdateAppMetadataDto);
   }
 
@@ -237,7 +320,7 @@ export class AiAppsService {
     uid: string,
     file: Express.Multer.File,
     metadata: UpdateAppMetadataDto
-  ): Promise<WithMember<AiApp>> {
+  ): Promise<ApiAiApp<AiApp>> {
     const extension = this.validatePrdFile(file);
     if (!AI_APPS_PRD_S3_BUCKET) {
       throw new InternalServerErrorException('No PRD bucket configured (AI_APPS_PRD_S3_BUCKET or AI_APPS_S3_BUCKET)');
@@ -433,18 +516,63 @@ export class AiAppsService {
    * newest lines (ascending). `complete: false` means a bound tripped before
    * the end — the buffer then holds the OLDEST part of the window and must
    * never be served as "newest", so the caller narrows or fails.
+   *
+   * The cold walk is sequential runner→CloudWatch paging and can take many
+   * seconds even over a sparse window (empty pages still carry tokens that
+   * must be chased to the true end), so reads are cached and coalesced:
+   * - FRESH cache entry → answered from cache.
+   * - STALE-but-recent entry → ALSO answered from cache instantly, while one
+   *   background walk revalidates it (stale-while-revalidate).
+   * - miss → concurrent identical requests share a single in-flight walk
+   *   instead of each paging the runner through the same chain.
    */
-  private async walkRunnerLogsTail(
+  private walkRunnerLogsTail(
     app: Pick<AiApp, 'appId'>,
     phase: AiAppLogPhase,
     sinceMinutes: number | undefined
   ): Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }> {
     const cacheKey = `${app.appId}:${phase}:${sinceMinutes ?? 'all'}`;
-    const cached = this.readLogsTailCache(cacheKey);
-    if (cached) {
-      return { events: cached, complete: true };
+    const entry = this.logsTailCache.get(cacheKey);
+    const now = Date.now();
+    if (entry && entry.evictAt <= now) {
+      this.logsTailCache.delete(cacheKey);
+    } else if (entry) {
+      if (entry.staleAt <= now) {
+        // Revalidation failure only logs — the stale copy stays valid until
+        // evictAt, and the read after that pays the cold walk (and its error).
+        this.startLogsTailWalk(app, phase, sinceMinutes, cacheKey).catch((error) => {
+          this.logger.warn(
+            `Background ${phase}-logs revalidation failed for ${app.appId}: ${(error as Error).message}`
+          );
+        });
+      }
+      return Promise.resolve({ events: entry.events, complete: true });
     }
+    return this.startLogsTailWalk(app, phase, sinceMinutes, cacheKey);
+  }
 
+  /** One walk per key at a time: concurrent identical requests await the same promise. */
+  private startLogsTailWalk(
+    app: Pick<AiApp, 'appId'>,
+    phase: AiAppLogPhase,
+    sinceMinutes: number | undefined,
+    cacheKey: string
+  ): Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }> {
+    const inFlight = this.logsTailWalks.get(cacheKey);
+    if (inFlight) return inFlight;
+    const walk = this.runLogsTailWalk(app, phase, sinceMinutes, cacheKey).finally(() => {
+      this.logsTailWalks.delete(cacheKey);
+    });
+    this.logsTailWalks.set(cacheKey, walk);
+    return walk;
+  }
+
+  private async runLogsTailWalk(
+    app: Pick<AiApp, 'appId'>,
+    phase: AiAppLogPhase,
+    sinceMinutes: number | undefined,
+    cacheKey: string
+  ): Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }> {
     const startedAt = Date.now();
     let token: string | undefined;
     let buffer: { timestamp: number; message: string }[] = [];
@@ -474,7 +602,7 @@ export class AiAppsService {
       if (!next || next === token) {
         buffer.sort((a, b) => a.timestamp - b.timestamp);
         const events = buffer.slice(-AI_APPS_LOGS_DESC_RETAIN);
-        this.writeLogsTailCache(cacheKey, events);
+        this.writeLogsTailCache(cacheKey, app.appId, startedAt, events);
         return { events, complete: true };
       }
       token = next;
@@ -522,26 +650,51 @@ export class AiAppsService {
   /** Per-instance cache of completed tail walks, so scrolling history doesn't re-walk the runner per page. */
   private readonly logsTailCache = new Map<
     string,
-    { expiresAt: number; events: { timestamp: number; message: string }[] }
+    { staleAt: number; evictAt: number; events: { timestamp: number; message: string }[] }
   >();
 
-  private readLogsTailCache(key: string): { timestamp: number; message: string }[] | null {
-    const entry = this.logsTailCache.get(key);
-    if (!entry) return null;
-    if (entry.expiresAt < Date.now()) {
-      this.logsTailCache.delete(key);
-      return null;
-    }
-    return entry.events;
-  }
+  /** In-flight walks by cache key — concurrent identical requests share one runner walk. */
+  private readonly logsTailWalks = new Map<
+    string,
+    Promise<{ events: { timestamp: number; message: string }[]; complete: boolean }>
+  >();
 
-  private writeLogsTailCache(key: string, events: { timestamp: number; message: string }[]): void {
-    if (this.logsTailCache.size >= AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES) {
+  /** When each app's walks were last invalidated by a deploy — see writeLogsTailCache. */
+  private readonly logsTailDroppedAt = new Map<string, number>();
+
+  private writeLogsTailCache(
+    key: string,
+    appId: string,
+    walkStartedAt: number,
+    events: { timestamp: number; message: string }[]
+  ): void {
+    // A walk that began before the app's last deploy captured the PREVIOUS
+    // deployment's stream — never cache it (returning it once is fine; the
+    // next read re-walks fresh).
+    if ((this.logsTailDroppedAt.get(appId) ?? 0) > walkStartedAt) return;
+    if (!this.logsTailCache.has(key) && this.logsTailCache.size >= AI_APPS_LOGS_DESC_CACHE_MAX_ENTRIES) {
       // Maps iterate in insertion order — dropping the first key is a cheap FIFO.
       const oldest = this.logsTailCache.keys().next().value;
       if (oldest !== undefined) this.logsTailCache.delete(oldest);
     }
-    this.logsTailCache.set(key, { expiresAt: Date.now() + AI_APPS_LOGS_DESC_CACHE_TTL_MS, events });
+    const now = Date.now();
+    this.logsTailCache.set(key, {
+      staleAt: now + AI_APPS_LOGS_DESC_CACHE_TTL_MS,
+      evictAt: now + AI_APPS_LOGS_DESC_CACHE_STALE_TTL_MS,
+      events,
+    });
+  }
+
+  /**
+   * A new deploy invalidates every cached walk for the app — serve-stale must
+   * never show the previous deployment's lines to someone watching the new one.
+   */
+  private dropLogsTailCache(appId: string): void {
+    this.logsTailDroppedAt.set(appId, Date.now());
+    const prefix = `${appId}:`;
+    for (const key of this.logsTailCache.keys()) {
+      if (key.startsWith(prefix)) this.logsTailCache.delete(key);
+    }
   }
 
   /**
@@ -617,7 +770,9 @@ export class AiAppsService {
       'or the sandbox runner is unavailable. Retry the deploy once the runner is healthy.';
     const { count } = await this.prisma.aiApp.updateMany({
       where: { uid: app.uid, status: 'DEPLOYING' },
-      data: { status: 'ERROR', notes: message },
+      // failureStream stays null: an interrupted deploy's failing phase is
+      // genuinely unknown (and a stale value from an older failure must not leak).
+      data: { status: 'ERROR', notes: message, failureStream: null },
     });
     if (count > 0) {
       this.logger.warn(
@@ -703,6 +858,11 @@ export class AiAppsService {
     if (app.memberUid === requesterUid) {
       return true;
     }
+    return this.isRequesterDirectoryAdmin(requesterUid);
+  }
+
+  /** Requester-only admin check — computed once and reused per row on list responses. */
+  private async isRequesterDirectoryAdmin(requesterUid: string): Promise<boolean> {
     const requester = await this.prisma.member.findUnique({
       where: { uid: requesterUid },
       select: { memberRoles: { select: { name: true } } },
@@ -720,7 +880,7 @@ export class AiAppsService {
     dto: DeployAppDto,
     file: Express.Multer.File,
     agentClient?: string | null
-  ): Promise<WithMember<AiApp>> {
+  ): Promise<ApiAiApp<AiApp>> {
     if (!file?.buffer?.length) {
       throw new BadGatewayException('Missing app ZIP file');
     }
@@ -760,6 +920,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
       },
       update: {
         name: dto.name,
@@ -775,6 +936,9 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        // Same "reflects the last upload" rule applies to database provisioning
+        // — the kit resends `database` on every deploy once the member opts in.
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
         notes: null,
       },
     });
@@ -790,7 +954,8 @@ export class AiAppsService {
       );
     } catch (error) {
       const message = `Deploy failed: ${(error as Error).message}`;
-      await this.failDeploy(app.uid, memberUid, eventContext, message);
+      // Bundle never reached storage — nothing was built, a build-log story.
+      await this.failDeploy(app.uid, memberUid, eventContext, message, 'build');
       throw new BadGatewayException('Failed to store the app bundle');
     }
 
@@ -810,7 +975,7 @@ export class AiAppsService {
     dto: RegisterDraftDto,
     file: Express.Multer.File,
     agentClient?: string | null
-  ): Promise<WithMember<AiApp> & { appPageUrl: string; missingEnvVars: string[] }> {
+  ): Promise<ApiAiApp<AiApp> & { appPageUrl: string; missingEnvVars: string[] }> {
     if (!file?.buffer?.length) {
       throw new BadRequestException('Missing app ZIP file');
     }
@@ -855,6 +1020,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
       },
       update: {
         name: dto.name,
@@ -866,6 +1032,7 @@ export class AiAppsService {
         kitVersion: dto.kitVersion ?? null,
         agentClient: agentClient ?? null,
         agentModel: dto.agentModel ?? null,
+        database: dto.database ? { enabled: true, type: dto.database.type } : Prisma.DbNull,
         notes: null,
       },
     });
@@ -879,7 +1046,7 @@ export class AiAppsService {
 
     const provided = new Set(app.providedEnvVars);
     return {
-      ...(await this.withMember([app]))[0],
+      ...this.toApiApp((await this.withMember([app]))[0], true),
       appPageUrl: buildAppPageUrl(app.uid),
       missingEnvVars: app.requiredEnvVars.filter((name) => !provided.has(name)),
     };
@@ -891,7 +1058,7 @@ export class AiAppsService {
    * (merge/upsert — values never touch our DB), validates every required env
    * var has a value, then redeploys the stored bundle.
    */
-  async deployDraft(requesterUid: string, uid: string, secrets?: Record<string, string>): Promise<WithMember<AiApp>> {
+  async deployDraft(requesterUid: string, uid: string, secrets?: Record<string, string>): Promise<ApiAiApp<AiApp>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -968,35 +1135,68 @@ export class AiAppsService {
    */
   private async proxyDeploy(
     memberUid: string,
-    app: Pick<AiApp, 'uid' | 'appId'>,
+    app: Pick<AiApp, 'uid' | 'appId' | 'database'>,
     deploymentId: string,
     s3Key: string,
     secretNames: string[] = []
-  ): Promise<WithMember<AiApp>> {
+  ): Promise<ApiAiApp<AiApp>> {
     const host = buildAppHost(app.appId);
     const url = buildAppUrl(app.appId);
     const httpUrl = buildAppHttpUrl(app.appId);
+    const requestedDatabase = app.database as AiAppDatabaseInfo | null;
     await this.prisma.aiApp.update({
       where: { uid: app.uid },
-      data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null },
+      data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null, failureStream: null },
     });
+    this.dropLogsTailCache(app.appId);
 
     const eventContext = { appUid: app.uid, appId: app.appId, deploymentId };
 
-    const markReady = async (port: number | null) => {
+    const markReady = async (port: number | null, databaseInfo?: RunnerDeployDatabaseInfo) => {
       const updated = await this.prisma.aiApp.update({
         where: { uid: app.uid },
-        data: { status: 'READY', url, httpUrl, host, port, notes: null },
+        // The ONLY writer of lastDeployedAt — it must strictly mean "last
+        // successful ship" (deployment.serving derives 'none' from its absence).
+        data: {
+          status: 'READY',
+          url,
+          httpUrl,
+          host,
+          port,
+          notes: null,
+          failureStream: null,
+          lastDeployedAt: new Date(),
+          // Non-sensitive connection metadata the orchestrator reports once it
+          // provisions the database, merged into the same JSON blob we asked
+          // it to provision from. Never the password — that lives only in the
+          // app's injected runtime env vars.
+          ...(databaseInfo && requestedDatabase?.enabled
+            ? {
+                database: {
+                  enabled: true,
+                  type: requestedDatabase.type ?? null,
+                  host: databaseInfo.host ?? null,
+                  port: databaseInfo.port ?? null,
+                  name: databaseInfo.name ?? null,
+                  user: databaseInfo.user ?? null,
+                  credentialsInjected: databaseInfo.credentialsInjected ?? null,
+                },
+              }
+            : {}),
+        },
       });
       await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
-      return (await this.withMember([updated]))[0];
+      return this.toApiApp((await this.withMember([updated]))[0], true);
     };
 
     let port: number | null = null;
+    let databaseInfo: RunnerDeployDatabaseInfo | undefined;
     try {
       this.logger.log(
         `Runner deploy request for ${app.appId}: POST ${AI_APPS_RUNNER_URL}/deploy ` +
-          `(deploymentId=${deploymentId}, s3Key=${s3Key})`
+          `(deploymentId=${deploymentId}, s3Key=${s3Key}${
+            requestedDatabase?.enabled ? `, database=${requestedDatabase.type}` : ''
+          })`
       );
       const response = await axios.post<RunnerDeployResponse>(
         `${AI_APPS_RUNNER_URL}/deploy`,
@@ -1004,8 +1204,20 @@ export class AiAppsService {
         { headers: { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN } }
       );
       this.logRunnerResponse('deploy', app.appId, response.status, response.data);
+      // The runner sometimes reports failure inside a 2xx body (see
+      // logRunnerResponse) — treating that as success would mark a dead deploy
+      // READY and corrupt lastDeployedAt/serving.
+      if (typeof response.data?.status === 'string' && response.data.status.toLowerCase() === 'failed') {
+        const message = `Runner reported failure: ${this.safeStringify(response.data)}`;
+        this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
+        await this.failDeploy(app.uid, memberUid, eventContext, message, 'build');
+        throw new BadGatewayException('Failed to deploy app to the sandbox runner');
+      }
       port = response.data.port ?? null;
     } catch (error) {
+      if (error instanceof BadGatewayException) {
+        throw error;
+      }
       this.logRunnerError('deploy', app.appId, error);
       const message = axios.isAxiosError(error)
         ? `Runner error: ${error.response?.status ?? ''} ${JSON.stringify(error.response?.data ?? error.message)}`
@@ -1014,42 +1226,58 @@ export class AiAppsService {
       // A gateway timeout (Cloudflare 504/524, etc.) or no response doesn't mean the
       // deploy failed — the long-running build often completes on the origin. Verify
       // by checking whether the app is actually reachable before declaring failure.
+      const uncertain = this.isUncertainRunnerError(error);
       let survivedTimeout = false;
-      if (this.isUncertainRunnerError(error)) {
+      if (uncertain) {
         this.logger.warn(`Runner timed out for ${app.appId}; verifying app at ${url}. (${message})`);
         survivedTimeout = await this.verifyAppLive(url);
       }
       if (!survivedTimeout) {
         this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
-        await this.failDeploy(app.uid, memberUid, eventContext, message);
+        // A hard runner error is a build-phase failure; a timeout with the app
+        // never becoming reachable is genuinely unknown (build may have hung OR
+        // the pod may have crashed) — leave the stream unclassified.
+        await this.failDeploy(app.uid, memberUid, eventContext, message, uncertain ? null : 'build');
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       this.logger.log(`AI App ${app.appId} is live despite runner timeout — continuing`);
     }
 
-    // The build ran the app WITHOUT its secrets — redeploy the built image with
-    // the stored secret names injected. A secrets app that can't get its values
-    // must fail loudly rather than go READY in a broken state.
-    if (secretNames.length) {
+    // The build ran the app WITHOUT its secrets or database — redeploy the
+    // built image through the runner's secret-aware endpoint, which is the
+    // only one that actually injects env vars into the running pod (the
+    // legacy /deploy build never does, for either secrets or a database). A
+    // secrets/database app that can't get its values must fail loudly rather
+    // than go READY in a broken state.
+    if (secretNames.length || requestedDatabase?.enabled) {
       try {
-        await this.deployImageWithSecrets(app.appId, secretNames, url);
+        databaseInfo = await this.deployImageWithRuntimeConfig(app.appId, secretNames, url, requestedDatabase);
       } catch (error) {
-        const message = `Secrets injection failed: ${(error as Error).message}`;
+        const message = `Runtime config injection failed: ${(error as Error).message}`;
         this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
-        await this.failDeploy(app.uid, memberUid, eventContext, message);
-        throw new BadGatewayException('Failed to inject secrets on the sandbox runner');
+        // The image already built — injecting/starting it is a runtime story.
+        await this.failDeploy(app.uid, memberUid, eventContext, message, 'runtime');
+        throw new BadGatewayException('Failed to inject secrets/database on the sandbox runner');
       }
     }
 
-    return markReady(port);
+    return markReady(port, databaseInfo);
   }
 
   /**
-   * Redeploys an app's already-built image with the named stored secrets
-   * injected (`POST /v1/projects/<project>/deployments`). The image reference
-   * comes from the runner's own app registry (`GET /apps`).
+   * Redeploys an app's already-built image through the runner's secret-aware
+   * endpoint (`POST /v1/projects/<project>/deployments`) — the only one that
+   * actually injects env vars (secrets and/or a provisioned database) into
+   * the running pod; the legacy `/deploy` build endpoint injects neither. The
+   * image reference comes from the runner's own app registry (`GET /apps`).
+   * Returns the non-sensitive database metadata the runner reports, if any.
    */
-  private async deployImageWithSecrets(appId: string, secretNames: string[], appUrl: string): Promise<void> {
+  private async deployImageWithRuntimeConfig(
+    appId: string,
+    secretNames: string[],
+    appUrl: string,
+    database?: Pick<AiAppDatabaseInfo, 'enabled' | 'type'> | null
+  ): Promise<RunnerDeployDatabaseInfo | undefined> {
     const headers = { 'Content-Type': 'application/json', 'x-runner-token': AI_APPS_RUNNER_TOKEN };
 
     const registry = await axios.get<{ apps?: Array<{ app_id?: string; image?: string }> }>(
@@ -1065,15 +1293,23 @@ export class AiAppsService {
       try {
         this.logger.log(
           `Runner secrets-deploy request for ${appId}: POST ${buildRunnerDeploymentsUrl()} ` +
-            `(image=${image}, secretNames=${secretNames.join(', ')})`
+            `(image=${image}, secretNames=${secretNames.join(', ')}${
+              database?.enabled ? `, database=${database.type}` : ''
+            })`
         );
-        const response = await axios.post(
+        const response = await axios.post<{ database?: RunnerDeployDatabaseInfo }>(
           buildRunnerDeploymentsUrl(),
-          { appId, environment: AI_APPS_RUNNER_ENVIRONMENT, image, secretNames },
+          {
+            appId,
+            environment: AI_APPS_RUNNER_ENVIRONMENT,
+            image,
+            secretNames,
+            ...(database?.enabled ? { database: { enabled: true, type: database.type } } : {}),
+          },
           { headers }
         );
         this.logRunnerResponse('secrets-deploy', appId, response.status, response.data);
-        return;
+        return response.data?.database;
       } catch (error) {
         this.logRunnerError('secrets-deploy', appId, error);
         // 409 helm_release_locked: another Helm operation (typically the /deploy
@@ -1090,7 +1326,7 @@ export class AiAppsService {
         // Same edge-timeout caveat as the build: verify before declaring failure.
         if (this.isUncertainRunnerError(error) && (await this.verifyAppLive(appUrl))) {
           this.logger.warn(`Secrets deploy timed out for ${appId} but the app is reachable — continuing`);
-          return;
+          return undefined;
         }
         const status = axios.isAxiosError(error) ? error.response?.status : undefined;
         throw new Error(`runner deployments call failed (status=${status ?? 'n/a'})`);
@@ -1106,16 +1342,24 @@ export class AiAppsService {
     return this.safeStringify(error.response.data).includes('helm_release_locked');
   }
 
-  /** Marks a failed deploy: status ERROR with the trimmed message + DEPLOY_FAILED event. */
+  /**
+   * Marks a failed deploy: status ERROR with the trimmed message + DEPLOY_FAILED
+   * event. `failureStream` says which log stream holds the failure ('build' |
+   * 'runtime'), classified by the caller from where in the deploy flow the
+   * failure was caught — the runner's log endpoints only cover the latest
+   * SUCCESSFUL phase, so this cannot be derived after the fact. Null = unknown.
+   * `lastDeployedAt` is deliberately untouched: a failed deploy never moves it.
+   */
   private async failDeploy(
     appUid: string,
     memberUid: string,
     eventContext: { appUid: string; appId: string; deploymentId: string },
-    message: string
+    message: string,
+    failureStream: 'build' | 'runtime' | null = null
   ): Promise<void> {
     await this.prisma.aiApp.update({
       where: { uid: appUid },
-      data: { status: 'ERROR', notes: message.slice(0, 2000) },
+      data: { status: 'ERROR', notes: message.slice(0, 2000), failureStream },
     });
     await this.recordEvent('DEPLOY_FAILED', memberUid, { ...eventContext, message: message.slice(0, 2000) });
   }
@@ -1194,7 +1438,7 @@ export class AiAppsService {
    * the delete events. The row is kept (status flips to `DELETED`) so the audit
    * trail survives. `memberUid` is the member performing the deletion.
    */
-  async deleteApp(memberUid: string, uid: string): Promise<WithMember<AiApp>> {
+  async deleteApp(memberUid: string, uid: string): Promise<ApiAiApp<AiApp>> {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
@@ -1216,7 +1460,7 @@ export class AiAppsService {
         data: { status: 'DELETED', url: null, httpUrl: null, host: null, port: null, notes: null },
       });
       await this.recordEvent('DELETE_SUCCEEDED', memberUid, eventContext);
-      return (await this.withMember([updated]))[0];
+      return this.toApiApp((await this.withMember([updated]))[0], true);
     } catch (error) {
       this.logRunnerError('delete', app.appId, error);
       const message = axios.isAxiosError(error)
