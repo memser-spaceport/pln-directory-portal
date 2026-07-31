@@ -135,7 +135,7 @@ to the Protocol Labs Network sandbox with a single instruction.
    link to open and approve — sign in and click **Approve** to authorize the
    deploy. Your agent then ships the app to the PLN sandbox; the first deploy
    can take a minute or two.
-4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it. 
+4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it.
    After the first deploy your agent offers an optional **one-pager PRD** — a
    short product brief (why the app exists and what it does) shown with your
    app; say yes and approve the draft, or skip it. You can rename your app,
@@ -1144,6 +1144,33 @@ the member for one:
 | \`DATABASE_URL\` | your framework/ORM takes a standard Postgres URL (\`postgresql://user:pass@host:5432/db\`) |
 | \`JDBC_DATABASE_URL\` | a Java/JDBC app (\`jdbc:postgresql://host:5432/db\`) |
 | \`DB_TYPE\`, \`DB_HOST\`, \`DB_PORT\`, \`DB_NAME\`, \`DB_USER\`, \`DB_PASSWORD\` | you need the individual parameters |
+
+**The database REQUIRES an encrypted (SSL/TLS) connection — plain connections
+are rejected.** None of the variables above include an \`sslmode\`/\`ssl\` flag, so
+you must turn SSL on yourself in whatever client/ORM you use, or the very first
+query fails with something like:
+
+\`\`\`
+no pg_hba.conf entry for host "...", user "...", database "...", no encryption
+\`\`\`
+
+That error means you connected without SSL — it doesn't mean your credentials
+are wrong, so don't waste time re-checking \`DB_PASSWORD\`. How to enable SSL
+depends on your stack (check which applies to your code):
+
+- **Node.js, \`pg\`** — appending \`?sslmode=require\` to the URL is NOT enough;
+  \`pg\` ignores that query param and needs the \`ssl\` option set explicitly:
+  \`new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })\`.
+- **Prisma** — append \`?sslmode=require\` to the URL you pass as \`DATABASE_URL\`
+  in its config (Prisma's Postgres connector does read this query param).
+- **Python, \`psycopg2\`/SQLAlchemy** — append \`?sslmode=require\` to the DSN, or
+  pass \`sslmode='require'\` explicitly if you're not building the DSN from
+  \`DATABASE_URL\` directly.
+- **Java/JDBC** — append \`?ssl=true&sslmode=require\` to \`JDBC_DATABASE_URL\`.
+- **Any other driver** — check its docs for the equivalent of \`sslmode=require\`;
+  when in doubt, prefer an option that disables strict certificate verification
+  (e.g. \`rejectUnauthorized: false\`, \`sslmode=require\` rather than \`verify-full\`)
+  since this is a managed RDS instance, not a certificate you provision yourself.
 
 The database user can only read/write its own database — it can't create
 other databases or roles, so don't write migration code that assumes
