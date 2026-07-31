@@ -185,6 +185,22 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(deploySkill).toContain('this is just a runtime secret');
   });
 
+  it('warns the agent the provisioned database requires SSL and how to enable it per stack (field-hit 2026-07-31)', () => {
+    const deploySkill = entries.get('.claude/skills/deploy-to-labs/SKILL.md') as string;
+    // The literal error the member hit in prod — matching on it lets the agent
+    // recognize the failure instantly instead of re-checking credentials.
+    expect(deploySkill).toContain('no encryption');
+    expect(deploySkill).toContain("doesn't mean");
+    // node-postgres is the most common stack for this kit and needs an
+    // explicit `ssl` option — appending sslmode to the URL alone is a no-op.
+    expect(deploySkill).toContain('ignores that query param');
+    expect(deploySkill).toContain('rejectUnauthorized: false');
+    // Other common stacks the kit's agent might be building in.
+    expect(deploySkill).toContain('Prisma');
+    expect(deploySkill).toContain('psycopg2');
+    expect(deploySkill).toContain('sslmode=require');
+  });
+
   it('tells the human, in the README, that a database can be provisioned or brought their own', () => {
     const readme = entries.get('README.md') as string;
     expect(readme).toContain('## Apps that need a database');
