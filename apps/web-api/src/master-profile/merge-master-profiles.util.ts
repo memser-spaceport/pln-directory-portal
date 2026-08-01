@@ -242,6 +242,195 @@ export function mergeMasterProfileFields(
   };
 }
 
+/**
+ * Same-person evidence for auto-dedupe of same-name MasterProfiles.
+ * Any single rule match is enough to union two profiles (see clusterSamePersons).
+ */
+const GENERIC_EMAIL_DOMAINS = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'yahoo.com',
+  'hotmail.com',
+  'outlook.com',
+  'live.com',
+  'msn.com',
+  'icloud.com',
+  'me.com',
+  'mac.com',
+  'aol.com',
+  'protonmail.com',
+  'proton.me',
+  'pm.me',
+  'mail.com',
+]);
+
+export type SamePersonEvidenceRow = {
+  uid: string;
+  personKey: string;
+  canonicalName: string;
+  memberUid: string | null;
+  affinityPersonId: string | null;
+  emails: unknown;
+  organizations: unknown;
+  currentOrg: string | null;
+};
+
+export type SamePersonCluster<T extends SamePersonEvidenceRow = SamePersonEvidenceRow> = {
+  rows: T[];
+  /** uid-pair → matched rules, for logging. */
+  reasons: Array<{ aUid: string; bUid: string; rules: string[] }>;
+};
+
+export function normalizePersonName(name: string | null | undefined): string {
+  return (name ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+const ORG_LEGAL_SUFFIX_RE = /\b(inc|llc|llp|ltd|corp|corporation|co|company|gmbh|sarl|sas|plc|lp|lllp)\b\.?/gi;
+
+/** Lowercase, strip punctuation + legal suffixes, collapse whitespace. */
+export function normalizeOrgName(org: string | null | undefined): string {
+  return (org ?? '')
+    .toLowerCase()
+    .replace(/[.,'"’‘()]/g, ' ')
+    .replace(ORG_LEGAL_SUFFIX_RE, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function emailDomainOf(value: string): string | null {
+  const at = value.lastIndexOf('@');
+  if (at < 0) return null;
+  const domain = value
+    .slice(at + 1)
+    .trim()
+    .toLowerCase();
+  if (!domain || GENERIC_EMAIL_DOMAINS.has(domain)) return null;
+  return domain;
+}
+
+/** Non-generic email domains from emails JSON (string[] or Sourced<string>[]). */
+export function extractEmailDomains(emails: unknown): Set<string> {
+  const out = new Set<string>();
+  if (!Array.isArray(emails)) return out;
+  for (const item of emails) {
+    const value =
+      typeof item === 'string'
+        ? item
+        : typeof (item as { value?: unknown })?.value === 'string'
+        ? (item as { value: string }).value ?? ''
+        : '';
+    const domain = emailDomainOf(value);
+    if (domain) out.add(domain);
+  }
+  return out;
+}
+
+/** Org part of a `nameorg:name|org` personKey (empty string otherwise). */
+function nameorgKeyOrg(personKey: string): string {
+  if (!personKey.startsWith('nameorg:')) return '';
+  const pipe = personKey.indexOf('|');
+  return pipe < 0 ? '' : personKey.slice(pipe + 1);
+}
+
+/** Normalized org names from currentOrg + organizations[].name + nameorg key org. */
+export function extractOrgNames(row: SamePersonEvidenceRow): Set<string> {
+  const out = new Set<string>();
+  const add = (value: string | null | undefined) => {
+    const n = normalizeOrgName(value);
+    if (n) out.add(n);
+  };
+  add(row.currentOrg);
+  add(nameorgKeyOrg(row.personKey));
+  if (Array.isArray(row.organizations)) {
+    for (const item of row.organizations) {
+      if (typeof item === 'string') add(item);
+      else add((item as { name?: unknown })?.name as string | undefined);
+    }
+  }
+  return out;
+}
+
+/** Rules matched between two same-name profiles; empty = not enough evidence. */
+export function samePersonRules(a: SamePersonEvidenceRow, b: SamePersonEvidenceRow): string[] {
+  const rules: string[] = [];
+
+  if (a.affinityPersonId && a.affinityPersonId === b.affinityPersonId) {
+    rules.push(`affinity:${a.affinityPersonId}`);
+  }
+  if (a.memberUid && a.memberUid === b.memberUid) {
+    rules.push(`member:${a.memberUid}`);
+  }
+
+  const domains = [...extractEmailDomains(a.emails)].filter((d) => extractEmailDomains(b.emails).has(d));
+  if (domains.length) rules.push(`emailDomain:${domains[0]}`);
+
+  const bOrgs = extractOrgNames(b);
+  const orgs = [...extractOrgNames(a)].filter((o) => bOrgs.has(o));
+  if (orgs.length) rules.push(`org:${orgs[0]}`);
+
+  return rules;
+}
+
+/**
+ * Union-find same-name rows into same-person clusters.
+ * Only clusters with >1 row are returned; rows with no evidence stay unclustered.
+ */
+export function clusterSamePersons<T extends SamePersonEvidenceRow>(rows: T[]): SamePersonCluster<T>[] {
+  const parent = rows.map((_, i) => i);
+  const find = (i: number): number => {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]];
+      i = parent[i];
+    }
+    return i;
+  };
+  const union = (i: number, j: number) => {
+    const ri = find(i);
+    const rj = find(j);
+    if (ri !== rj) parent[rj] = ri;
+  };
+
+  const reasons: SamePersonCluster<T>['reasons'] = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    for (let j = i + 1; j < rows.length; j += 1) {
+      const rules = samePersonRules(rows[i], rows[j]);
+      if (rules.length) {
+        union(i, j);
+        reasons.push({ aUid: rows[i].uid, bUid: rows[j].uid, rules });
+      }
+    }
+  }
+
+  const byRoot = new Map<number, T[]>();
+  rows.forEach((row, i) => {
+    const root = find(i);
+    const list = byRoot.get(root) ?? [];
+    list.push(row);
+    byRoot.set(root, list);
+  });
+
+  return [...byRoot.values()]
+    .filter((list) => list.length > 1)
+    .map((list) => {
+      const uids = new Set(list.map((r) => r.uid));
+      return {
+        rows: list,
+        reasons: reasons.filter((r) => uids.has(r.aUid) && uids.has(r.bUid)),
+      };
+    });
+}
+
+/** Canonical pick for auto-merge: strongest personKey, then most types, then uid. */
+export function pickAutoMergeCanonical<T extends SamePersonEvidenceRow & { types: string[] }>(rows: T[]): T {
+  return [...rows].sort((a, b) => {
+    const d = personKeyStrength(b.personKey) - personKeyStrength(a.personKey);
+    if (d !== 0) return d;
+    const t = (b.types?.length ?? 0) - (a.types?.length ?? 0);
+    if (t !== 0) return t;
+    return a.uid.localeCompare(b.uid);
+  })[0];
+}
+
 export function buildUidRemap(canonicalUid: string, duplicateUids: string[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const uid of duplicateUids) {

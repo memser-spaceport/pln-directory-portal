@@ -1,14 +1,21 @@
 import {
   buildUidRemap,
+  clusterSamePersons,
+  extractEmailDomains,
+  extractOrgNames,
   mergeMasterProfileFields,
+  normalizeOrgName,
   personKeyStrength,
+  pickAutoMergeCanonical,
   pickStrongestPersonKey,
   planEdgeRewire,
   planPathRewire,
   rewriteAlternateConnectorUids,
   rewriteHopChain,
+  samePersonRules,
   type ConnectionEdgeMergeRow,
   type MasterProfileMergeRow,
+  type SamePersonEvidenceRow,
   type WarmPathV2MergeRow,
 } from './merge-master-profiles.util';
 
@@ -251,5 +258,92 @@ describe('merge-master-profiles.util', () => {
         ])
       );
     });
+  });
+});
+
+describe('same-person evidence helpers', () => {
+  function evidenceRow(
+    partial: Partial<SamePersonEvidenceRow> & Pick<SamePersonEvidenceRow, 'uid' | 'personKey'>
+  ): SamePersonEvidenceRow {
+    return {
+      canonicalName: 'Sam Altman',
+      memberUid: null,
+      affinityPersonId: null,
+      emails: null,
+      organizations: null,
+      currentOrg: null,
+      ...partial,
+    };
+  }
+
+  it('normalizeOrgName strips legal suffixes and punctuation', () => {
+    expect(normalizeOrgName('Acme, Inc.')).toBe('acme');
+    expect(normalizeOrgName('Y Combinator')).toBe('y combinator');
+    expect(normalizeOrgName('  Crowe Horwath LLP ')).toBe('crowe horwath');
+  });
+
+  it('extractEmailDomains skips generic domains and Sourced wrappers', () => {
+    const domains = extractEmailDomains(['sam@samaltman.com', { value: 'pg@gmail.com' }, { value: 'not-an-email' }]);
+    expect([...domains]).toEqual(['samaltman.com']);
+  });
+
+  it('extractOrgNames unions currentOrg, organizations[].name, and nameorg key org', () => {
+    const orgs = extractOrgNames(
+      evidenceRow({
+        uid: 'a',
+        personKey: 'nameorg:sam altman|y combinator',
+        currentOrg: 'OpenAI',
+        organizations: [{ name: 'Hydrazine Capital' }, 'Apollo Projects', { role: 'x' }],
+      })
+    );
+    expect(orgs).toEqual(new Set(['openai', 'y combinator', 'hydrazine capital', 'apollo projects']));
+  });
+
+  it('samePersonRules matches affinity / member / domain / org', () => {
+    const a = evidenceRow({
+      uid: 'a',
+      personKey: 'email:sam@samaltman.com',
+      affinityPersonId: '245762872',
+      currentOrg: 'OpenAI',
+      emails: ['sam@samaltman.com'],
+    });
+    const b = evidenceRow({
+      uid: 'b',
+      personKey: 'nameorg:sam altman|y combinator',
+      affinityPersonId: '245762872',
+      organizations: [{ name: 'OpenAI' }],
+    });
+    expect(samePersonRules(a, b)).toEqual(
+      expect.arrayContaining([expect.stringContaining('affinity:'), expect.stringContaining('org:')])
+    );
+    expect(samePersonRules(a, evidenceRow({ uid: 'c', personKey: 'email:x@other.io' }))).toEqual([]);
+  });
+
+  it('clusterSamePersons unions transitively and keeps no-evidence rows out', () => {
+    const rows = [
+      evidenceRow({ uid: 'a', personKey: 'email:sam@samaltman.com', currentOrg: 'OpenAI' }),
+      evidenceRow({ uid: 'b', personKey: 'nameorg:sam altman|y combinator', currentOrg: 'OpenAI' }),
+      evidenceRow({
+        uid: 'c',
+        personKey: 'nameorg:sam altman|khosla ventures',
+        organizations: [{ name: 'Y Combinator' }],
+      }),
+      evidenceRow({ uid: 'd', personKey: 'email:other@unrelated.io' }),
+    ];
+    const clusters = clusterSamePersons(rows);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].rows.map((r) => r.uid).sort()).toEqual(['a', 'b', 'c']);
+    expect(clusters[0].reasons.length).toBeGreaterThan(0);
+  });
+
+  it('pickAutoMergeCanonical prefers strongest personKey then most types', () => {
+    const rows = [
+      {
+        ...evidenceRow({ uid: 'b', personKey: 'nameorg:sam altman|y combinator' }),
+        types: ['investor', 'co_investor'],
+      },
+      { ...evidenceRow({ uid: 'a', personKey: 'email:sam@samaltman.com' }), types: ['investor'] },
+    ];
+    expect(pickAutoMergeCanonical(rows).uid).toBe('a');
   });
 });
