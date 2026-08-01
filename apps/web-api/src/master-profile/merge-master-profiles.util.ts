@@ -20,6 +20,7 @@ export type MasterProfileMergeRow = {
   investorMeta: unknown;
   funds: unknown;
   investedIn: unknown;
+  coInvestments: unknown;
   locations: unknown;
   listMemberships: unknown;
   raw: unknown;
@@ -217,6 +218,7 @@ export function mergeMasterProfileFields(
     investorMeta: mergeJsonObjects(...duplicates.map((d) => d.investorMeta), canonical.investorMeta),
     funds: mergeJsonArrays(...all.map((p) => p.funds)),
     investedIn: mergeJsonArrays(...all.map((p) => p.investedIn)),
+    coInvestments: mergeJsonArrays(...all.map((p) => p.coInvestments)),
     locations: mergeJsonArrays(...all.map((p) => p.locations)),
     listMemberships: mergeJsonArrays(...all.map((p) => p.listMemberships)),
     raw: mergeJsonObjects(...duplicates.map((d) => d.raw), canonical.raw),

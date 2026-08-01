@@ -2731,6 +2731,8 @@ model MasterProfile {
   investorMeta    Json?
   funds           Json?
   investedIn      Json?
+  /// Proven PL co-investments only (teamUid + deal metadata); investedIn stays the broad evidence field.
+  coInvestments   Json?
   locations       Json?
   listMemberships Json?
   raw             Json?

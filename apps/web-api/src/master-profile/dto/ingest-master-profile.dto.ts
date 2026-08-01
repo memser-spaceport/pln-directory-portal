@@ -23,6 +23,8 @@ export interface MasterProfileInput {
   investorMeta?: unknown;
   funds?: unknown;
   investedIn?: unknown;
+  /** Proven PL co-investments (teamUid + deal metadata). */
+  coInvestments?: unknown;
   locations?: unknown;
   listMemberships?: unknown;
   raw?: unknown;

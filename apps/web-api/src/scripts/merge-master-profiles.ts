@@ -285,6 +285,7 @@ async function runMerge(canonicalUid: string, duplicateUids: string[], apply: bo
           investorMeta: (merged.investorMeta ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           funds: (merged.funds ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           investedIn: (merged.investedIn ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
+          coInvestments: (merged.coInvestments ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           locations: (merged.locations ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           listMemberships: (merged.listMemberships ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           raw: (merged.raw ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
