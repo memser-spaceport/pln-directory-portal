@@ -7,7 +7,7 @@ CREATE TABLE "JobReferral" (
     "referredMemberUid" TEXT NOT NULL,
     "toEmail" TEXT NOT NULL,
     "ccEmails" TEXT[] DEFAULT ARRAY[]::TEXT[],
-    "message" TEXT,
+    "note" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "JobReferral_pkey" PRIMARY KEY ("id")

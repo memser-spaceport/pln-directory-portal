@@ -2258,7 +2258,7 @@ model JobReferral {
   referred          Member     @relation("JobReferralReferred", fields: [referredMemberUid], references: [uid], onDelete: Cascade)
   toEmail           String
   ccEmails          String[]   @default([])
-  message           String?
+  note              String
   createdAt         DateTime   @default(now())
 
   @@index([jobOpeningUid])

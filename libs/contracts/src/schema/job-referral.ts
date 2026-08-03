@@ -13,10 +13,7 @@ export const JobReferralRecipientSchema = z
 export const CreateJobReferralSchema = z.object({
   referredMemberUid: z.string().min(1),
   recipients: z.array(JobReferralRecipientSchema).min(1).max(20),
-  // Short personal note about the candidate — the rest of the email (greeting,
-  // intro, sign-off) is composed by the JOB_BOARD_REFERRAL_EMAIL template from
-  // resolved names/roles/teams, so wording tweaks don't require a code change.
-  message: z.string().min(1).max(600).optional(),
+  note: z.string().min(1).max(5000),
 });
 
 export type CreateJobReferralInput = z.infer<typeof CreateJobReferralSchema>;
@@ -27,4 +24,23 @@ export const JobReferralResponseSchema = z.object({
   to: z.string().email(),
   cc: z.array(z.string().email()),
   sentAt: z.string(),
+});
+
+export const JobReferralDraftQuerySchema = z.object({
+  referredMemberUid: z.string().min(1),
+});
+
+// Pre-filled "Your note" text for the referral modal, plus the resolved facts
+// it was built from, so the UI doesn't need a second lookup to show them elsewhere.
+export const JobReferralDraftResponseSchema = z.object({
+  note: z.string(),
+  referrerName: z.string(),
+  referrerTitle: z.string().nullable(),
+  referrerCompany: z.string().nullable(),
+  referredName: z.string(),
+  referredTitle: z.string().nullable(),
+  referredCompany: z.string().nullable(),
+  roleTitle: z.string(),
+  teamName: z.string(),
+  applyUrl: z.string().nullable(),
 });

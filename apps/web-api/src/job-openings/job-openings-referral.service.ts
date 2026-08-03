@@ -5,9 +5,47 @@ import { NotificationServiceClient } from '../notifications/notification-service
 import { HIDDEN_JOB_OPENING_STATUSES } from './job-openings-query.service';
 
 const JOB_BOARD_REFERRAL_TEMPLATE = 'JOB_BOARD_REFERRAL_EMAIL';
+const MAX_BLURB_CHARS = 220;
 
 type ResolvedRecipient = { email: string; name: string | null };
 type MemberHeadline = { title: string | null; companyName: string | null };
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const noteToHtml = (note: string) =>
+  escapeHtml(note.trim())
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br/>')}</p>`)
+    .join('');
+
+// Turns a stored (possibly AI-generated, possibly HTML) Member.bio into a short,
+// plain-text sentence or two for the referral draft note. Not AI-summarized —
+// just the bio's own leading sentences, minus markup and the AI disclaimer.
+// See member-bio-generation skill for how Member.bio itself gets generated.
+function deriveReferralBlurb(bio: string | null): string | null {
+  if (!bio) return null;
+  const plain = bio
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/ /g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!plain) return null;
+
+  const sentences = plain.split(/(?<=[.!?])\s+/).filter((sentence) => !/AI generated/i.test(sentence));
+  let blurb = '';
+  for (const sentence of sentences) {
+    if (blurb.length + sentence.length > MAX_BLURB_CHARS) break;
+    blurb = blurb ? `${blurb} ${sentence}` : sentence;
+  }
+  return blurb || null;
+}
 
 @Injectable()
 export class JobOpeningsReferralService {
@@ -18,24 +56,11 @@ export class JobOpeningsReferralService {
 
   async referJob(jobUid: string, referrerEmail: string | undefined, input: CreateJobReferralInput) {
     const referrer = await this.resolveReferrer(referrerEmail);
-
-    const jobOpening = await this.prisma.jobOpening.findUnique({
-      where: { uid: jobUid },
-      select: {
-        uid: true,
-        roleTitle: true,
-        sourceLink: true,
-        status: true,
-        team: { select: { uid: true, name: true } },
-      },
-    });
-    if (!jobOpening || !jobOpening.team || HIDDEN_JOB_OPENING_STATUSES.includes(jobOpening.status)) {
-      throw new NotFoundException('Job opening not found');
-    }
+    const jobOpening = await this.resolveJobOpening(jobUid);
 
     const referred = await this.prisma.member.findUnique({
       where: { uid: input.referredMemberUid },
-      select: { uid: true, name: true, email: true, role: true, deletedAt: true },
+      select: { uid: true, name: true, email: true, deletedAt: true },
     });
     if (!referred || referred.deletedAt || !referred.email) {
       throw new BadRequestException('Referred member not found');
@@ -47,12 +72,7 @@ export class JobOpeningsReferralService {
       { email: referred.email, name: referred.name },
     ]);
 
-    const [referrerHeadline, referredHeadline] = await Promise.all([
-      this.resolveHeadline(referrer.uid, referrer.role),
-      this.resolveHeadline(referred.uid, referred.role),
-    ]);
-
-    const message = input.message?.trim() || null;
+    const note = input.note.trim();
     const applyUrl = jobOpening.sourceLink || null;
 
     await this.notificationServiceClient.sendNotification({
@@ -65,15 +85,11 @@ export class JobOpeningsReferralService {
       },
       deliveryPayload: {
         body: {
-          teamName: jobOpening.team.name,
-          roleTitle: jobOpening.roleTitle,
-          referredName: referred.name,
-          referredTitle: referredHeadline.title,
-          referredCompany: referredHeadline.companyName,
           referrerName: referrer.name,
-          referrerTitle: referrerHeadline.title,
-          referrerTeam: referrerHeadline.companyName,
-          message,
+          referredName: referred.name,
+          roleTitle: jobOpening.roleTitle,
+          teamName: jobOpening.team.name,
+          noteHtml: noteToHtml(note),
           applyUrl,
         },
       },
@@ -99,7 +115,7 @@ export class JobOpeningsReferralService {
         referredMemberUid: referred.uid,
         toEmail: to,
         ccEmails: cc,
-        message,
+        note,
       },
     });
 
@@ -112,35 +128,114 @@ export class JobOpeningsReferralService {
     };
   }
 
+  // Pre-filled "Your note" text for the referral modal. The candidate blurb
+  // comes from the referred member's existing Member.bio (see the
+  // member-bio-generation skill for how that's generated) — deliberately not
+  // an AI call made from here, so opening the modal stays instant and free.
+  async getReferralDraft(jobUid: string, referrerEmail: string | undefined, referredMemberUid: string) {
+    const referrer = await this.resolveReferrer(referrerEmail);
+    const jobOpening = await this.resolveJobOpening(jobUid);
+
+    const referred = await this.prisma.member.findUnique({
+      where: { uid: referredMemberUid },
+      select: { uid: true, name: true, bio: true, deletedAt: true },
+    });
+    if (!referred || referred.deletedAt) {
+      throw new BadRequestException('Referred member not found');
+    }
+
+    const [referrerHeadline, referredHeadline] = await Promise.all([
+      this.resolveHeadline(referrer.uid),
+      this.resolveHeadline(referred.uid),
+    ]);
+
+    const applyUrl = jobOpening.sourceLink || null;
+    const blurb = deriveReferralBlurb(referred.bio);
+
+    // A bio's own leading sentence already restates "X is TITLE at COMPANY"
+    // (that's how the Husky bio prompt is structured), so composing the same
+    // clause here would duplicate it. Only compose it as a fallback when
+    // there's no bio to draw from.
+    let aboutParagraph = blurb ?? '';
+    if (!aboutParagraph && referredHeadline.title) {
+      aboutParagraph = `${referred.name} is ${referredHeadline.title}`;
+      if (referredHeadline.companyName) aboutParagraph += ` at ${referredHeadline.companyName}`;
+      aboutParagraph += '.';
+    }
+
+    let signature = `— ${referrer.name}`;
+    if (referrerHeadline.title) signature += `, ${referrerHeadline.title}`;
+    if (referrerHeadline.companyName) signature += ` at ${referrerHeadline.companyName}`;
+
+    const paragraphs = [
+      `Hi ${jobOpening.team.name} team,\nI'd like to refer ${referred.name} for your ${jobOpening.roleTitle} role.`,
+      aboutParagraph,
+      `Happy to make the intro whenever you're ready.`,
+      signature,
+    ].filter((paragraph) => paragraph.length > 0);
+
+    return {
+      note: paragraphs.join('\n\n'),
+      referrerName: referrer.name,
+      referrerTitle: referrerHeadline.title,
+      referrerCompany: referrerHeadline.companyName,
+      referredName: referred.name,
+      referredTitle: referredHeadline.title,
+      referredCompany: referredHeadline.companyName,
+      roleTitle: jobOpening.roleTitle,
+      teamName: jobOpening.team.name,
+      applyUrl,
+    };
+  }
+
+  private async resolveJobOpening(jobUid: string) {
+    const jobOpening = await this.prisma.jobOpening.findUnique({
+      where: { uid: jobUid },
+      select: {
+        uid: true,
+        roleTitle: true,
+        sourceLink: true,
+        status: true,
+        team: { select: { uid: true, name: true } },
+      },
+    });
+    if (!jobOpening || !jobOpening.team || HIDDEN_JOB_OPENING_STATUSES.includes(jobOpening.status)) {
+      throw new NotFoundException('Job opening not found');
+    }
+    return { ...jobOpening, team: jobOpening.team };
+  }
+
+  // Title/company for the referral sentence. Prefers the member's main team
+  // role (e.g. "Staff Engineer" at "Filecoin Foundation"), falling back to
+  // any other team role, then to the member's own free-text `role` with no
+  // company. Draft-only — the POST /referrals payload doesn't depend on this.
+  private async resolveHeadline(memberUid: string): Promise<MemberHeadline> {
+    const [teamRole, member] = await Promise.all([
+      this.prisma.teamMemberRole.findFirst({
+        where: { memberUid },
+        orderBy: { mainTeam: 'desc' },
+        select: { role: true, team: { select: { name: true } } },
+      }),
+      this.prisma.member.findUnique({ where: { uid: memberUid }, select: { role: true } }),
+    ]);
+    if (teamRole) {
+      return { title: teamRole.role ?? member?.role ?? null, companyName: teamRole.team.name };
+    }
+    return { title: member?.role ?? null, companyName: null };
+  }
+
   private async resolveReferrer(email: string | undefined) {
     if (!email) {
       throw new UnauthorizedException('Authenticated email required');
     }
     const member = await this.prisma.member.findUnique({
       where: { email },
-      select: { uid: true, name: true, email: true, role: true, deletedAt: true },
+      select: { uid: true, name: true, email: true, deletedAt: true },
     });
     if (!member || member.deletedAt || !member.email) {
       throw new UnauthorizedException('Member not found');
     }
-    return { uid: member.uid, name: member.name, email: member.email, role: member.role };
-  }
-
-  // Title/company for the referral sentence. Prefers the member's main team
-  // role (e.g. "Staff Engineer" at "Filecoin Foundation"), falling back to
-  // any other team role, then to the member's own free-text `role` with no
-  // company. Kept server-side (rather than client-supplied) so the template
-  // always reflects current Directory data.
-  private async resolveHeadline(memberUid: string, fallbackTitle: string | null): Promise<MemberHeadline> {
-    const teamRole = await this.prisma.teamMemberRole.findFirst({
-      where: { memberUid },
-      orderBy: { mainTeam: 'desc' },
-      select: { role: true, team: { select: { name: true } } },
-    });
-    if (teamRole) {
-      return { title: teamRole.role ?? fallbackTitle, companyName: teamRole.team.name };
-    }
-    return { title: fallbackTitle, companyName: null };
+    return { uid: member.uid, name: member.name, email: member.email };
   }
 
   private async resolveRecipients(recipients: CreateJobReferralInput['recipients']): Promise<ResolvedRecipient[]> {

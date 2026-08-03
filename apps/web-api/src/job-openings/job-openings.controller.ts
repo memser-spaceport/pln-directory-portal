@@ -4,7 +4,7 @@ import { Request } from 'express';
 import { ZodError, ZodType } from 'zod';
 import { apiJobOpenings } from 'libs/contracts/src/lib/contract-job-openings';
 import { JobsListQueryParams } from 'libs/contracts/src/schema/job-opening';
-import { CreateJobReferralSchema } from 'libs/contracts/src/schema/job-referral';
+import { CreateJobReferralSchema, JobReferralDraftQuerySchema } from 'libs/contracts/src/schema/job-referral';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
 import { JobOpeningsQueryService } from './job-openings-query.service';
@@ -31,6 +31,14 @@ export class JobOpeningsController {
   async getJobFilters(@Req() request: Request) {
     const params = JobsListQueryParams.parse(request.query);
     return this.jobOpeningsQueryService.getFilters(params);
+  }
+
+  @Api(server.route.getReferralDraft)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async getReferralDraft(@Req() request: Request & { userEmail?: string }) {
+    const { referredMemberUid } = this.parse(JobReferralDraftQuerySchema, request.query);
+    return this.jobOpeningsReferralService.getReferralDraft(request.params.uid, request.userEmail, referredMemberUid);
   }
 
   @Api(server.route.referJob)
