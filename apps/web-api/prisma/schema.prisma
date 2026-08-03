@@ -240,6 +240,8 @@ model Member {
   memberApprovalEvents      MemberApprovalEvent[]   @relation("MemberApprovalEventMember")
   actedMemberApprovalEvents MemberApprovalEvent[]   @relation("MemberApprovalEventActor")
   jobAlerts                 JobAlert[]              @relation("MemberJobAlerts")
+  jobReferralsSent          JobReferral[]           @relation("JobReferralReferrer")
+  jobReferralsReceived      JobReferral[]           @relation("JobReferralReferred")
   roadmapItemsCreated       RoadmapItem[]           @relation("roadmapItemCreatedBy")
   roadmapItemsPromoted      RoadmapItem[]           @relation("roadmapItemPromotedBy")
   roadmapItemUpvotes        RoadmapItemUpvote[]     @relation("roadmapItemUpvoter")
@@ -2230,6 +2232,7 @@ model JobOpening {
   closedAt        DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+  referrals       JobReferral[]
 
   @@index([status])
   @@index([companyName])
@@ -2242,6 +2245,25 @@ model JobOpening {
   @@index([location], map: "job_opening_location_idx", type: Gin)
   @@index([workMode])
   @@index([updatedAt])
+}
+
+model JobReferral {
+  id                Int        @id @default(autoincrement())
+  uid               String     @unique @default(cuid())
+  jobOpeningUid     String
+  jobOpening        JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
+  referrerMemberUid String
+  referrer          Member     @relation("JobReferralReferrer", fields: [referrerMemberUid], references: [uid], onDelete: Cascade)
+  referredMemberUid String
+  referred          Member     @relation("JobReferralReferred", fields: [referredMemberUid], references: [uid], onDelete: Cascade)
+  toEmail           String
+  ccEmails          String[]   @default([])
+  note              String
+  createdAt         DateTime   @default(now())
+
+  @@index([jobOpeningUid])
+  @@index([referrerMemberUid])
+  @@index([referredMemberUid])
 }
 
 model TeamJobEnrichment {
