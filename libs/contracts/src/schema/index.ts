@@ -46,3 +46,4 @@ export * from './team-news';
 export * from './roadmap';
 export * from './follow';
 export * from './feed';
+export * from './feature-agent-demo';
