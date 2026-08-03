@@ -13,7 +13,10 @@ export const JobReferralRecipientSchema = z
 export const CreateJobReferralSchema = z.object({
   referredMemberUid: z.string().min(1),
   recipients: z.array(JobReferralRecipientSchema).min(1).max(20),
-  note: z.string().min(1).max(5000),
+  // Short personal note about the candidate — the rest of the email (greeting,
+  // intro, sign-off) is composed by the JOB_BOARD_REFERRAL_EMAIL template from
+  // resolved names/roles/teams, so wording tweaks don't require a code change.
+  message: z.string().min(1).max(600).optional(),
 });
 
 export type CreateJobReferralInput = z.infer<typeof CreateJobReferralSchema>;

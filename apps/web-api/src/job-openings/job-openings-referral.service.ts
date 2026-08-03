@@ -7,20 +7,7 @@ import { HIDDEN_JOB_OPENING_STATUSES } from './job-openings-query.service';
 const JOB_BOARD_REFERRAL_TEMPLATE = 'JOB_BOARD_REFERRAL_EMAIL';
 
 type ResolvedRecipient = { email: string; name: string | null };
-
-const escapeHtml = (value: string) =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-
-const noteToHtml = (note: string) =>
-  escapeHtml(note.trim())
-    .split(/\n{2,}/)
-    .map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br/>')}</p>`)
-    .join('');
+type MemberHeadline = { title: string | null; companyName: string | null };
 
 @Injectable()
 export class JobOpeningsReferralService {
@@ -48,7 +35,7 @@ export class JobOpeningsReferralService {
 
     const referred = await this.prisma.member.findUnique({
       where: { uid: input.referredMemberUid },
-      select: { uid: true, name: true, email: true, deletedAt: true },
+      select: { uid: true, name: true, email: true, role: true, deletedAt: true },
     });
     if (!referred || referred.deletedAt || !referred.email) {
       throw new BadRequestException('Referred member not found');
@@ -60,7 +47,12 @@ export class JobOpeningsReferralService {
       { email: referred.email, name: referred.name },
     ]);
 
-    const note = input.note.trim();
+    const [referrerHeadline, referredHeadline] = await Promise.all([
+      this.resolveHeadline(referrer.uid, referrer.role),
+      this.resolveHeadline(referred.uid, referred.role),
+    ]);
+
+    const message = input.message?.trim() || null;
     const applyUrl = jobOpening.sourceLink || null;
 
     await this.notificationServiceClient.sendNotification({
@@ -73,11 +65,15 @@ export class JobOpeningsReferralService {
       },
       deliveryPayload: {
         body: {
-          referrerName: referrer.name,
-          referredName: referred.name,
-          roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
-          noteHtml: noteToHtml(note),
+          roleTitle: jobOpening.roleTitle,
+          referredName: referred.name,
+          referredTitle: referredHeadline.title,
+          referredCompany: referredHeadline.companyName,
+          referrerName: referrer.name,
+          referrerTitle: referrerHeadline.title,
+          referrerTeam: referrerHeadline.companyName,
+          message,
           applyUrl,
         },
       },
@@ -103,7 +99,7 @@ export class JobOpeningsReferralService {
         referredMemberUid: referred.uid,
         toEmail: to,
         ccEmails: cc,
-        note,
+        message,
       },
     });
 
@@ -122,12 +118,29 @@ export class JobOpeningsReferralService {
     }
     const member = await this.prisma.member.findUnique({
       where: { email },
-      select: { uid: true, name: true, email: true, deletedAt: true },
+      select: { uid: true, name: true, email: true, role: true, deletedAt: true },
     });
     if (!member || member.deletedAt || !member.email) {
       throw new UnauthorizedException('Member not found');
     }
-    return { uid: member.uid, name: member.name, email: member.email };
+    return { uid: member.uid, name: member.name, email: member.email, role: member.role };
+  }
+
+  // Title/company for the referral sentence. Prefers the member's main team
+  // role (e.g. "Staff Engineer" at "Filecoin Foundation"), falling back to
+  // any other team role, then to the member's own free-text `role` with no
+  // company. Kept server-side (rather than client-supplied) so the template
+  // always reflects current Directory data.
+  private async resolveHeadline(memberUid: string, fallbackTitle: string | null): Promise<MemberHeadline> {
+    const teamRole = await this.prisma.teamMemberRole.findFirst({
+      where: { memberUid },
+      orderBy: { mainTeam: 'desc' },
+      select: { role: true, team: { select: { name: true } } },
+    });
+    if (teamRole) {
+      return { title: teamRole.role ?? fallbackTitle, companyName: teamRole.team.name };
+    }
+    return { title: fallbackTitle, companyName: null };
   }
 
   private async resolveRecipients(recipients: CreateJobReferralInput['recipients']): Promise<ResolvedRecipient[]> {
