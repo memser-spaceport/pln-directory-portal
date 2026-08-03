@@ -561,6 +561,120 @@ describe('WarmIntrosV2Service', () => {
       expect(result.paths[0].uid).toBe('p1');
       expect(result.paths[0].targetSet).toBe('neuro-fund-i');
     });
+
+    it('applies directOnly as hopCount=1 in Prisma where', async () => {
+      pathFindMany.mockResolvedValue([pathRow]);
+      pathCount.mockResolvedValue(1);
+
+      await service.listPaths({
+        targetSet: 'neuro-fund-i',
+        directOnly: 'true',
+        limit: '50',
+        offset: '0',
+      });
+
+      expect(pathFindMany).toHaveBeenCalledWith({
+        where: { rank: 1, targetSet: 'neuro-fund-i', score: { gte: 0.2 }, hopCount: 1 },
+        take: 50,
+        skip: 0,
+        orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
+      });
+    });
+
+    it('applies relationKind as hopChain JSON path filter', async () => {
+      pathFindMany.mockResolvedValue([pathRow]);
+      pathCount.mockResolvedValue(1);
+
+      await service.listPaths({
+        targetSet: 'neuro-fund-i',
+        relationKind: 'founder_bridge',
+        limit: '50',
+        offset: '0',
+      });
+
+      expect(pathFindMany).toHaveBeenCalledWith({
+        where: {
+          rank: 1,
+          targetSet: 'neuro-fund-i',
+          score: { gte: 0.2 },
+          hopChain: { path: ['relationKind'], equals: 'founder_bridge' },
+        },
+        take: 50,
+        skip: 0,
+        orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
+      });
+    });
+
+    it('rejects invalid relationKind', async () => {
+      await expect(service.listPaths({ relationKind: 'nope' })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('post-filters plBacker=true to investors with plBacking', async () => {
+      const other = {
+        ...pathRow,
+        uid: 'p2',
+        targetProfileUid: 'inv2',
+        score: 0.4,
+      };
+      pathFindMany.mockResolvedValue([pathRow, other]);
+      masterProfileFindMany.mockResolvedValue([
+        {
+          ...investorProfile,
+          plBacking: { backedProtocolLabs: true, backedFilecoin: false, matchKind: 'person' },
+        },
+        connectorProfile,
+        {
+          uid: 'inv2',
+          personKey: 'k2',
+          canonicalName: 'Alice Other',
+          emails: [],
+          currentOrg: null,
+          currentTitle: null,
+          investorMeta: null,
+          affinityPersonId: null,
+          memberUid: null,
+          plBacking: null,
+        },
+      ]);
+
+      const result = await service.listPaths({ plBacker: 'true', limit: '50' });
+      expect(result.total).toBe(1);
+      expect(result.paths).toHaveLength(1);
+      expect(result.paths[0].investor.profileUid).toBe('inv1');
+      expect(result.paths[0].investor.plBacking).toMatchObject({ backedProtocolLabs: true });
+      expect(pathFindMany.mock.calls[0][0].take).toBeUndefined();
+    });
+
+    it('enriches hop memberUid/imageUrl on list rows', async () => {
+      masterProfileFindMany.mockResolvedValue([
+        { ...investorProfile, memberUid: 'mem-inv' },
+        { ...connectorProfile, memberUid: 'mem-juan' },
+      ]);
+      memberFindMany.mockResolvedValue([
+        { uid: 'mem-juan', image: { url: 'https://cdn.example/juan.png' } },
+        { uid: 'mem-inv', image: { url: 'https://cdn.example/vitalik.png' } },
+      ]);
+      pathFindMany.mockResolvedValue([pathRow]);
+      pathCount.mockResolvedValue(1);
+
+      const result = await service.listPaths({
+        targetSet: 'neuro-fund-i',
+        limit: '50',
+        offset: '0',
+      });
+
+      const hops = (result.paths[0].hopChain as { hops: Array<Record<string, unknown>> }).hops;
+      expect(hops[0]).toMatchObject({
+        profileUid: 'from1',
+        memberUid: 'mem-juan',
+        imageUrl: 'https://cdn.example/juan.png',
+      });
+      expect(hops[1]).toMatchObject({
+        profileUid: 'inv1',
+        memberUid: 'mem-inv',
+        imageUrl: 'https://cdn.example/vitalik.png',
+      });
+    });
   });
 
   describe('getPathsByInvestor', () => {
@@ -758,7 +872,8 @@ describe('WarmIntrosV2Service', () => {
       expect(edgeFindMany).toHaveBeenCalledWith({
         where: { fromProfileUid: 'from1', relationKind: 'pl_direct' },
         take: 200,
-        orderBy: { updatedAt: 'desc' },
+        skip: 0,
+        orderBy: { uid: 'asc' },
       });
     });
   });

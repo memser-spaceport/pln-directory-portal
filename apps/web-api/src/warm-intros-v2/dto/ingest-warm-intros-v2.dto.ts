@@ -76,6 +76,12 @@ export class ListWarmPathsV2QueryDto {
   search?: string;
   /** Case-insensitive: investor sectors contains this value. */
   sector?: string;
+  /** Filter by hopChain.relationKind: `pl_direct` | `founder_bridge` | `coinvestor_bridge`. */
+  relationKind?: string;
+  /** When `true`, only paths with hopCount=1 (PL direct). */
+  directOnly?: string;
+  /** When `true`, only investors with MasterProfile.plBacking set. */
+  plBacker?: string;
 }
 
 export class GetWarmPathsByInvestorQueryDto {

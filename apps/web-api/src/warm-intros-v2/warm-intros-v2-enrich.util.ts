@@ -24,6 +24,8 @@ export type EnrichedInvestorSummary = {
   imageUrl: string | null;
   /** Known cohort list slugs from MasterProfile.listMemberships. */
   listSlugs: KnownListSlug[];
+  /** PL/FIL prior-backer flags when present on MasterProfile. */
+  plBacking: unknown | null;
 };
 
 export type EnrichedConnectorSummary = {
@@ -53,6 +55,7 @@ export type MasterProfileEnrichRow = {
   affinityPersonId?: string | null;
   memberUid?: string | null;
   listMemberships?: unknown;
+  plBacking?: unknown | null;
   /** Filled by service when Member.image is resolved. */
   imageUrl?: string | null;
 };
@@ -149,6 +152,7 @@ export function toInvestorSummary(
       memberUid: null,
       imageUrl: null,
       listSlugs: [],
+      plBacking: null,
     };
   }
   return {
@@ -163,6 +167,7 @@ export function toInvestorSummary(
     memberUid: profile.memberUid ?? null,
     imageUrl: profile.imageUrl ?? null,
     listSlugs: parseKnownListSlugs(profile.listMemberships),
+    plBacking: profile.plBacking ?? null,
   };
 }
 
@@ -336,4 +341,9 @@ export function matchesSector(investor: EnrichedInvestorSummary, sector: string)
   const needle = sector.trim().toLowerCase();
   if (!needle) return true;
   return investor.sectors.some((s) => s.toLowerCase() === needle || s.toLowerCase().includes(needle));
+}
+
+/** True when MasterProfile.plBacking is a non-null object (PL/FIL prior backer). */
+export function matchesPlBacker(investor: EnrichedInvestorSummary): boolean {
+  return investor.plBacking != null && typeof investor.plBacking === 'object';
 }
