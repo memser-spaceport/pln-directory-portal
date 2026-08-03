@@ -1,6 +1,7 @@
 import {
   buildPathSummary,
   enrichHopChainNames,
+  matchesPlBacker,
   matchesSearch,
   matchesSector,
   parseInvestorSectors,
@@ -91,6 +92,7 @@ describe('warm-intros-v2-enrich.util', () => {
         memberUid: null,
         imageUrl: null,
         listSlugs: ['neuro-fund-i', 'gold-co-investors'],
+        plBacking: null,
       });
     });
 
@@ -290,6 +292,29 @@ describe('warm-intros-v2-enrich.util', () => {
       expect(matchesSector(investor, 'crypto')).toBe(true);
       expect(matchesSector(investor, 'AI')).toBe(true);
       expect(matchesSector(investor, 'biotech')).toBe(false);
+    });
+  });
+
+  describe('matchesPlBacker', () => {
+    it('is true when plBacking is a non-null object', () => {
+      const investor = toInvestorSummary('inv1', {
+        uid: 'inv1',
+        personKey: 'k',
+        canonicalName: 'Ada',
+        plBacking: { backedProtocolLabs: true, backedFilecoin: false, matchKind: 'person' },
+      });
+      expect(matchesPlBacker(investor)).toBe(true);
+    });
+
+    it('is false when plBacking is null/missing', () => {
+      const investor = toInvestorSummary('inv1', {
+        uid: 'inv1',
+        personKey: 'k',
+        canonicalName: 'Ada',
+        plBacking: null,
+      });
+      expect(matchesPlBacker(investor)).toBe(false);
+      expect(matchesPlBacker(toInvestorSummary('inv2', null))).toBe(false);
     });
   });
 });
