@@ -2731,6 +2731,10 @@ model MasterProfile {
   investorMeta    Json?
   funds           Json?
   investedIn      Json?
+  /// Proven PL co-investments only (teamUid + deal metadata); investedIn stays the broad evidence field.
+  coInvestments   Json?
+  /// PL/FIL prior-backer flags from Affinity list 166215 (backedProtocolLabs / backedFilecoin / matchKind / firm).
+  plBacking       Json?
   locations       Json?
   listMemberships Json?
   raw             Json?

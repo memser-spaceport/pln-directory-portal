@@ -92,4 +92,5 @@ export class ListConnectionEdgesQueryDto {
   toProfileUid?: string;
   relationKind?: string;
   limit?: string;
+  offset?: string;
 }

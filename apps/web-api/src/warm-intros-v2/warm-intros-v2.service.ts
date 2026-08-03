@@ -612,6 +612,7 @@ export class WarmIntrosV2Service {
     const toProfileUid = query.toProfileUid?.trim() || null;
     const relationKind = query.relationKind?.trim() || null;
     const limit = Math.min(Math.max(parseInt(query.limit ?? '50', 10) || 50, 1), 200);
+    const offset = Math.max(parseInt(query.offset ?? '0', 10) || 0, 0);
 
     const where: Prisma.ConnectionEdgeWhereInput = {};
     if (fromProfileUid) where.fromProfileUid = fromProfileUid;
@@ -621,7 +622,9 @@ export class WarmIntrosV2Service {
     const edges = await this.prisma.connectionEdge.findMany({
       where,
       take: limit,
-      orderBy: { updatedAt: 'desc' },
+      skip: offset,
+      // Stable order so offset pagination is deterministic.
+      orderBy: { uid: 'asc' },
     });
     return { edges };
   }
