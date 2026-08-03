@@ -13,7 +13,7 @@ const TOP_LEVEL_FOCUS_AREAS = [
 
 const TOP_LEVEL_ORDER = new Map(TOP_LEVEL_FOCUS_AREAS.map((title, i) => [title, i]));
 
-const HIDDEN_JOB_OPENING_STATUSES: JobOpeningStatus[] = [
+export const HIDDEN_JOB_OPENING_STATUSES: JobOpeningStatus[] = [
   JobOpeningStatus.STALE,
   JobOpeningStatus.CLOSED_DUPLICATE,
   JobOpeningStatus.CLOSED_INCORRECT_SIGNAL,
