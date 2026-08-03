@@ -19,8 +19,11 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import {
   buildUidRemap,
+  clusterSamePersons,
   mergeMasterProfileFields,
+  normalizePersonName,
   personKeyStrength,
+  pickAutoMergeCanonical,
   planEdgeRewire,
   planPathRewire,
   type MasterProfileMergeRow,
@@ -190,6 +193,8 @@ function toMergeRow(p: {
   investorMeta: unknown;
   funds: unknown;
   investedIn: unknown;
+  coInvestments: unknown;
+  plBacking: unknown;
   locations: unknown;
   listMemberships: unknown;
   raw: unknown;
@@ -282,6 +287,8 @@ async function runMerge(canonicalUid: string, duplicateUids: string[], apply: bo
           investorMeta: (merged.investorMeta ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           funds: (merged.funds ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           investedIn: (merged.investedIn ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
+          coInvestments: (merged.coInvestments ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
+          plBacking: (merged.plBacking ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           locations: (merged.locations ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           listMemberships: (merged.listMemberships ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           raw: (merged.raw ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
@@ -353,9 +360,70 @@ async function runMerge(canonicalUid: string, duplicateUids: string[], apply: bo
   console.log('Applied merge.');
 }
 
+/**
+ * Auto-dedupe: group all profiles by normalized name, union rows sharing
+ * same-person evidence (affinity id / memberUid / email domain / org overlap),
+ * then merge each cluster (dry-run unless --apply).
+ */
+async function runAutoMerge(apply: boolean): Promise<void> {
+  const profiles = await prisma.masterProfile.findMany({
+    select: {
+      uid: true,
+      personKey: true,
+      canonicalName: true,
+      memberUid: true,
+      affinityPersonId: true,
+      emails: true,
+      organizations: true,
+      currentOrg: true,
+      types: true,
+    },
+  });
+
+  const byName = new Map<string, typeof profiles>();
+  for (const p of profiles) {
+    const key = normalizePersonName(p.canonicalName);
+    if (!key) continue;
+    const list = byName.get(key) ?? [];
+    list.push(p);
+    byName.set(key, list);
+  }
+
+  const nameClusters = [...byName.entries()].filter(([, list]) => list.length > 1);
+  console.log(`Name-duplicate clusters: ${nameClusters.length}`);
+
+  let mergeGroups = 0;
+  let skippedNames = 0;
+  for (const [name, rows] of nameClusters) {
+    const clusters = clusterSamePersons(rows);
+    if (clusters.length === 0) {
+      skippedNames += 1;
+      console.log(`\nSKIP "${name}" (${rows.length} rows, no shared evidence):`);
+      for (const r of rows) {
+        console.log(`  ${r.uid}  ${r.personKey}  org=${r.currentOrg ?? '—'}`);
+      }
+      continue;
+    }
+    for (const cluster of clusters) {
+      mergeGroups += 1;
+      const canonical = pickAutoMergeCanonical(cluster.rows);
+      const duplicates = cluster.rows.filter((r) => r.uid !== canonical.uid).map((r) => r.uid);
+      console.log(`\nMERGE "${name}" (${cluster.rows.length} rows)`);
+      for (const r of cluster.reasons) {
+        console.log(`  evidence ${r.aUid} ↔ ${r.bUid}: ${r.rules.join(', ')}`);
+      }
+      await runMerge(canonical.uid, duplicates, apply);
+    }
+  }
+
+  console.log(`\nAuto-merge summary: ${mergeGroups} merge group(s), ${skippedNames} name(s) skipped (no evidence).`);
+  if (!apply) console.log('Dry run — pass --apply to write.');
+}
+
 async function main(): Promise<void> {
   const find = argValue('--find');
   const nameDupes = hasFlag('--name-dupes');
+  const auto = hasFlag('--auto');
   const canonical = argValue('--canonical');
   const duplicatesRaw = argValue('--duplicates');
   const apply = hasFlag('--apply');
@@ -366,6 +434,10 @@ async function main(): Promise<void> {
   }
   if (nameDupes) {
     await reportNameDupes();
+    return;
+  }
+  if (auto) {
+    await runAutoMerge(apply);
     return;
   }
   if (canonical && duplicatesRaw) {
@@ -383,6 +455,7 @@ async function main(): Promise<void> {
   console.log(`Usage:
   --find "Marc Andreessen"
   --name-dupes
+  --auto [--apply]
   --canonical <uid> --duplicates <uid[,uid]> [--apply]`);
   process.exit(1);
 }

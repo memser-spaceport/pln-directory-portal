@@ -23,6 +23,10 @@ export interface MasterProfileInput {
   investorMeta?: unknown;
   funds?: unknown;
   investedIn?: unknown;
+  /** Proven PL co-investments (teamUid + deal metadata). */
+  coInvestments?: unknown;
+  /** PL/FIL prior-backer flags (Affinity list 166215): backedProtocolLabs / backedFilecoin / matchKind / firmName. */
+  plBacking?: unknown;
   locations?: unknown;
   listMemberships?: unknown;
   raw?: unknown;

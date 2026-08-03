@@ -25,6 +25,7 @@ import {
   alternateUidsFromHopChain,
   buildPathSummary,
   enrichHopChainNames,
+  matchesPlBacker,
   matchesSearch,
   matchesSector,
   MasterProfileEnrichRow,
@@ -36,6 +37,7 @@ import { computeWarmPathProximity, WARM_INTROS_V2_MIN_SCORE } from './warm-intro
 
 const FEEDBACK_NOTE_MAX = 600;
 const FEEDBACK_SUMMARY_RECENT_CAP = 5;
+const PATH_RELATION_KINDS = new Set(['pl_direct', 'founder_bridge', 'coinvestor_bridge']);
 
 type WarmPathRow = {
   uid: string;
@@ -269,13 +271,25 @@ export class WarmIntrosV2Service {
     const offset = Math.max(parseInt(query.offset ?? '0', 10) || 0, 0);
     const search = (query.search ?? query.q)?.trim() || null;
     const sector = query.sector?.trim() || null;
-    const needsPostFilter = Boolean(search || sector);
+    const relationKindRaw = query.relationKind?.trim() || null;
+    if (relationKindRaw && !PATH_RELATION_KINDS.has(relationKindRaw)) {
+      throw new BadRequestException(
+        `relationKind must be one of: ${[...PATH_RELATION_KINDS].join(', ')}`
+      );
+    }
+    const directOnly = query.directOnly?.trim().toLowerCase() === 'true';
+    const plBacker = query.plBacker?.trim().toLowerCase() === 'true';
+    const needsPostFilter = Boolean(search || sector || plBacker);
     // "All" returns one path per (investor, list); collapse to one row per investor.
     const collapseByInvestor = !targetSet;
     const loadThenPaginate = needsPostFilter || collapseByInvestor;
 
     const where: Prisma.WarmPathV2WhereInput = { rank, score: { gte: minScore } };
     if (targetSet) where.targetSet = targetSet;
+    if (directOnly) where.hopCount = 1;
+    if (relationKindRaw) {
+      where.hopChain = { path: ['relationKind'], equals: relationKindRaw };
+    }
     if (connectorProfileUid) {
       where.OR = [
         { bestConnectorProfileUid: connectorProfileUid },
@@ -283,7 +297,7 @@ export class WarmIntrosV2Service {
       ];
     }
 
-    // Search/sector/All collapse need full candidate set then slice (v2 scale ~1–2k).
+    // Search/sector/plBacker/All collapse need full candidate set then slice (v2 scale ~1–2k).
     const paths = (await this.prisma.warmPathV2.findMany({
       where,
       ...(loadThenPaginate ? {} : { take: limit, skip: offset }),
@@ -291,8 +305,9 @@ export class WarmIntrosV2Service {
     })) as WarmPathRow[];
 
     const profilesByUid = await this.loadProfilesForPaths(paths);
+    // Enrich hop names/memberUid/imageUrl on list rows (same as detail) so FE can show directory badges.
     let enriched = paths
-      .map((p) => this.enrichPath(p, profilesByUid, false))
+      .map((p) => this.enrichPath(p, profilesByUid, true))
       .filter((row) => row.bestConnectorProfileUid !== row.targetProfileUid);
 
     if (search) {
@@ -300,6 +315,9 @@ export class WarmIntrosV2Service {
     }
     if (sector) {
       enriched = enriched.filter((row) => matchesSector(row.investor, sector));
+    }
+    if (plBacker) {
+      enriched = enriched.filter((row) => matchesPlBacker(row.investor));
     }
     if (collapseByInvestor) {
       enriched = collapsePathsByInvestor(enriched);
@@ -612,6 +630,7 @@ export class WarmIntrosV2Service {
     const toProfileUid = query.toProfileUid?.trim() || null;
     const relationKind = query.relationKind?.trim() || null;
     const limit = Math.min(Math.max(parseInt(query.limit ?? '50', 10) || 50, 1), 200);
+    const offset = Math.max(parseInt(query.offset ?? '0', 10) || 0, 0);
 
     const where: Prisma.ConnectionEdgeWhereInput = {};
     if (fromProfileUid) where.fromProfileUid = fromProfileUid;
@@ -621,7 +640,9 @@ export class WarmIntrosV2Service {
     const edges = await this.prisma.connectionEdge.findMany({
       where,
       take: limit,
-      orderBy: { updatedAt: 'desc' },
+      skip: offset,
+      // Stable order so offset pagination is deterministic.
+      orderBy: { uid: 'asc' },
     });
     return { edges };
   }
@@ -874,6 +895,7 @@ export class WarmIntrosV2Service {
         affinityPersonId: true,
         memberUid: true,
         listMemberships: true,
+        plBacking: true,
       },
     });
 
