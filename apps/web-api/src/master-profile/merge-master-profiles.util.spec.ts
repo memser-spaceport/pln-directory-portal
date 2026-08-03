@@ -38,6 +38,7 @@ function profile(
     funds: null,
     investedIn: null,
     coInvestments: null,
+    plBacking: null,
     locations: null,
     listMemberships: null,
     raw: null,

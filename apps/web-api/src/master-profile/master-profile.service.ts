@@ -179,6 +179,7 @@ export class MasterProfileService {
       funds: this.jsonOrNull(profile.funds),
       investedIn: this.jsonOrNull(profile.investedIn),
       coInvestments: this.jsonOrNull(profile.coInvestments),
+      plBacking: this.jsonOrNull(profile.plBacking),
       locations: this.jsonOrNull(profile.locations),
       listMemberships: this.jsonOrNull(profile.listMemberships),
       raw: this.jsonOrNull(profile.raw),

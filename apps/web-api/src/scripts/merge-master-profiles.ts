@@ -193,6 +193,8 @@ function toMergeRow(p: {
   investorMeta: unknown;
   funds: unknown;
   investedIn: unknown;
+  coInvestments: unknown;
+  plBacking: unknown;
   locations: unknown;
   listMemberships: unknown;
   raw: unknown;
@@ -286,6 +288,7 @@ async function runMerge(canonicalUid: string, duplicateUids: string[], apply: bo
           funds: (merged.funds ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           investedIn: (merged.investedIn ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           coInvestments: (merged.coInvestments ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
+          plBacking: (merged.plBacking ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           locations: (merged.locations ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           listMemberships: (merged.listMemberships ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
           raw: (merged.raw ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,

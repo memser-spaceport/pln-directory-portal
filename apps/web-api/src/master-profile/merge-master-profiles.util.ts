@@ -21,6 +21,7 @@ export type MasterProfileMergeRow = {
   funds: unknown;
   investedIn: unknown;
   coInvestments: unknown;
+  plBacking: unknown;
   locations: unknown;
   listMemberships: unknown;
   raw: unknown;
@@ -219,6 +220,7 @@ export function mergeMasterProfileFields(
     funds: mergeJsonArrays(...all.map((p) => p.funds)),
     investedIn: mergeJsonArrays(...all.map((p) => p.investedIn)),
     coInvestments: mergeJsonArrays(...all.map((p) => p.coInvestments)),
+    plBacking: mergeJsonObjects(...duplicates.map((d) => d.plBacking), canonical.plBacking),
     locations: mergeJsonArrays(...all.map((p) => p.locations)),
     listMemberships: mergeJsonArrays(...all.map((p) => p.listMemberships)),
     raw: mergeJsonObjects(...duplicates.map((d) => d.raw), canonical.raw),
