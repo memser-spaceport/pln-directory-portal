@@ -1,7 +1,7 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma.service';
 import { WebSocketService } from '../websocket/websocket.service';
-import { Prisma, PushNotificationCategory } from '@prisma/client';
+import { Prisma, PrismaPromise, PushNotificationCategory } from '@prisma/client';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { PLEventGuestsService } from '../pl-events/pl-event-guests.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
@@ -931,23 +931,11 @@ export class PushNotificationsService {
    * - Permission-based: insert read status for unread permission-based notifications user has access to
    */
   async markAllAsRead(memberUid: string) {
-    // NOTE: Access level notifications are deprecated in favor of permission-based notifications
-    // Get user's access level
-    // const member = await this.prisma.member.findFirst({
-    //   where: { uid: memberUid },
-    //   select: { accessLevel: true },
-    // });
-    // const userAccessLevel = member?.accessLevel;
+    // NOTE: Access level notifications are deprecated in favor of permission-based
+    // notifications and are intentionally not handled here.
 
-    // Mark all private notifications as read
-    await this.prisma.pushNotification.updateMany({
-      where: {
-        recipientUid: memberUid,
-        isPublic: false,
-        isRead: false,
-      },
-      data: { isRead: true },
-    });
+    // All reads and permission checks happen BEFORE the transaction:
+    // hasPermission is a service call, not a query, so it cannot ride inside one.
 
     // Get all public notifications not yet read by this user
     const unreadPublicNotifications = await this.prisma.pushNotification.findMany({
@@ -960,46 +948,7 @@ export class PushNotificationsService {
       select: { id: true },
     });
 
-    // Create read status for all unread public notifications
-    if (unreadPublicNotifications.length > 0) {
-      await this.prisma.pushNotificationReadStatus.createMany({
-        data: unreadPublicNotifications.map((n) => ({
-          notificationId: n.id,
-          memberUid,
-        })),
-        skipDuplicates: true,
-      });
-    }
-
-    // NOTE: Access level notifications are deprecated
-    // Get all access level notifications not yet read by this user
-    // if (userAccessLevel) {
-    //   const unreadAccessLevelNotifications = await this.prisma.pushNotification.findMany({
-    //     where: {
-    //       accessLevels: { has: userAccessLevel },
-    //       isPublic: false,
-    //       recipientUid: null,
-    //       readStatuses: {
-    //         none: { memberUid },
-    //       },
-    //     },
-    //     select: { id: true },
-    //   });
-    //
-    //   // Create read status for all unread access level notifications
-    //   if (unreadAccessLevelNotifications.length > 0) {
-    //     await this.prisma.pushNotificationReadStatus.createMany({
-    //       data: unreadAccessLevelNotifications.map((n) => ({
-    //         notificationId: n.id,
-    //         memberUid,
-    //       })),
-    //       skipDuplicates: true,
-    //     });
-    //   }
-    // }
-
     // Get all permission-based notifications not yet read by this user
-    // Filter to only those the user has permissions for
     const unreadPermissionBasedNotifications = await this.prisma.pushNotification.findMany({
       where: {
         requiredPermissions: { isEmpty: false },
@@ -1013,30 +962,78 @@ export class PushNotificationsService {
       select: { id: true, requiredPermissions: true },
     });
 
-    // Filter notifications by requiredPermissions and mark as read
-    const permissionBasedIdsToMark: number[] = [];
-    for (const notification of unreadPermissionBasedNotifications) {
-      const hasPermission = await this.userHasAnyPermission(memberUid, notification.requiredPermissions);
-      if (hasPermission) {
-        permissionBasedIdsToMark.push(notification.id);
-      }
+    // Resolve each DISTINCT permission code once, instead of re-checking the
+    // same codes notification by notification — many gated notifications share
+    // a handful of codes. Same ANY-of semantics as userHasAnyPermission.
+    const grantedByCode = await this.resolvePermissionCodes(
+      memberUid,
+      unreadPermissionBasedNotifications.flatMap((n) => n.requiredPermissions)
+    );
+    const permissionBasedIdsToMark = unreadPermissionBasedNotifications
+      .filter((n) => n.requiredPermissions.some((code) => grantedByCode.get(code)))
+      .map((n) => n.id);
+
+    // One transaction for all three write shapes, so a mid-flight failure can
+    // never leave a partially-marked set behind a clean-looking response.
+    // skipDuplicates absorbs a read status created between snapshot and commit.
+    const writes: PrismaPromise<unknown>[] = [
+      // Private notifications: flip isRead directly
+      this.prisma.pushNotification.updateMany({
+        where: {
+          recipientUid: memberUid,
+          isPublic: false,
+          isRead: false,
+        },
+        data: { isRead: true },
+      }),
+    ];
+
+    if (unreadPublicNotifications.length > 0) {
+      writes.push(
+        this.prisma.pushNotificationReadStatus.createMany({
+          data: unreadPublicNotifications.map((n) => ({
+            notificationId: n.id,
+            memberUid,
+          })),
+          skipDuplicates: true,
+        })
+      );
     }
 
-    // Create read status for unread permission-based notifications user has access to
     if (permissionBasedIdsToMark.length > 0) {
-      await this.prisma.pushNotificationReadStatus.createMany({
-        data: permissionBasedIdsToMark.map((id) => ({
-          notificationId: id,
-          memberUid,
-        })),
-        skipDuplicates: true,
-      });
+      writes.push(
+        this.prisma.pushNotificationReadStatus.createMany({
+          data: permissionBasedIdsToMark.map((id) => ({
+            notificationId: id,
+            memberUid,
+          })),
+          skipDuplicates: true,
+        })
+      );
     }
 
-    // Notify via WebSocket
+    await this.prisma.$transaction(writes);
+
+    // Notify via WebSocket — only after the writes committed, so other tabs are
+    // never told "all read" by a request that then failed.
     await this.webSocketService.notifyCount(memberUid, { unreadCount: 0 });
 
     return { success: true };
+  }
+
+  /**
+   * Resolve a set of permission codes to whether this member holds each one.
+   * One hasPermission call per distinct code, in parallel.
+   */
+  private async resolvePermissionCodes(memberUid: string, permissionCodes: string[]): Promise<Map<string, boolean>> {
+    const distinctCodes = [...new Set(permissionCodes)];
+    const entries = await Promise.all(
+      distinctCodes.map(async (code) => {
+        const result = await this.accessControlV2Service.hasPermission(memberUid, code);
+        return [code, result.allowed] as const;
+      })
+    );
+    return new Map(entries);
   }
 
   /**
