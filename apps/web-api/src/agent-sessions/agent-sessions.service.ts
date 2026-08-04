@@ -53,6 +53,20 @@ export class AgentSessionsService {
     });
   }
 
+  async deployFeatureEnv(id: string, force = false) {
+    return this.proxyPost(
+      `/v1/tasks/${encodeURIComponent(id)}/deploy-feature-env`,
+      {},
+      { force: force ? 'true' : 'false' },
+    );
+  }
+
+  async deleteFeatureEnv(id: string, force = false) {
+    return this.proxyDelete(`/v1/tasks/${encodeURIComponent(id)}/feature-env`, {
+      force: force ? 'true' : 'false',
+    });
+  }
+
   private async proxyGet(path: string, params?: Record<string, unknown>) {
     try {
       const response = await this.client.get(path, { params });
@@ -62,12 +76,25 @@ export class AgentSessionsService {
     }
   }
 
-  private async proxyPost(path: string, body: Record<string, unknown>) {
+  private async proxyPost(
+    path: string,
+    body: Record<string, unknown>,
+    params?: Record<string, unknown>,
+  ) {
     try {
-      const response = await this.client.post(path, body);
+      const response = await this.client.post(path, body, { params });
       return response.data;
     } catch (error) {
       this.rethrowUpstream(error, 'POST', path);
+    }
+  }
+
+  private async proxyDelete(path: string, params?: Record<string, unknown>) {
+    try {
+      const response = await this.client.delete(path, { params });
+      return response.data;
+    } catch (error) {
+      this.rethrowUpstream(error, 'DELETE', path);
     }
   }
 

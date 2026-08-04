@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Param,
@@ -52,6 +53,20 @@ export class AgentSessionsController {
   @RequirePermissions(VIEW)
   async getProgress(@Param('id') id: string) {
     return this.agentSessionsService.getProgress(id);
+  }
+
+  @NoCache()
+  @Post(':id/feature-env')
+  @RequirePermissions(ADMIN)
+  async deployFeatureEnv(@Param('id') id: string, @Query('force') force?: string) {
+    return this.agentSessionsService.deployFeatureEnv(id, force === 'true');
+  }
+
+  @NoCache()
+  @Delete(':id/feature-env')
+  @RequirePermissions(ADMIN)
+  async deleteFeatureEnv(@Param('id') id: string, @Query('force') force?: string) {
+    return this.agentSessionsService.deleteFeatureEnv(id, force === 'true');
   }
 
   @NoCache()
