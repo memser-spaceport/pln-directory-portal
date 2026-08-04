@@ -55,6 +55,18 @@ export const AI_APPS_PERMISSIONS = {
   WRITE: 'ai_apps.write',
 } as const;
 
+// ── Agent Sessions (PL Infra / code-fix-orchestrator) ────────────────────
+
+export const CODE_AGENT_SESSIONS_PERMISSIONS = {
+  /** View Agent Sessions list, detail, status, PR and feature-env URLs */
+  VIEW: 'code_agent_sessions.view',
+  /** Create Agent Sessions (implies view) */
+  ADMIN: 'code_agent_sessions.admin',
+} as const;
+
+/** Fine-grained grants that `code_agent_sessions.admin` expands into. */
+export const CODE_AGENT_SESSIONS_ADMIN_GRANTS = [CODE_AGENT_SESSIONS_PERMISSIONS.VIEW] as const;
+
 // ── Members ─────────────────────────────────────────────────────────────
 
 export const MEMBER_PERMISSIONS = {
@@ -166,6 +178,7 @@ export const ROADMAP_ADMIN_GRANTS = [
  */
 export const PERMISSION_GRANT_EXPANSIONS: Record<string, readonly string[]> = {
   [ROADMAP_PERMISSIONS.ADMIN]: ROADMAP_ADMIN_GRANTS,
+  [CODE_AGENT_SESSIONS_PERMISSIONS.ADMIN]: CODE_AGENT_SESSIONS_ADMIN_GRANTS,
 };
 
 /** Expand a set of permission codes, resolving any aggregate grants. */
@@ -214,6 +227,10 @@ export const ALL_PERMISSION_CODES = [
   // AI Apps
   AI_APPS_PERMISSIONS.READ,
   AI_APPS_PERMISSIONS.WRITE,
+
+  // Agent Sessions
+  CODE_AGENT_SESSIONS_PERMISSIONS.VIEW,
+  CODE_AGENT_SESSIONS_PERMISSIONS.ADMIN,
 
   // Demo Day
   DEMODAY_PERMISSIONS.REPORT_LINK_READ,

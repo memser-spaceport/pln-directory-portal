@@ -82,6 +82,7 @@ import { FounderSourcingModule } from './founder-sourcing/founder-sourcing.modul
 import { AffinityModule } from './affinity/affinity.module';
 import { RoadmapModule } from './roadmap/roadmap.module';
 import { AiAppsModule } from './ai-apps/ai-apps.module';
+import { AgentSessionsModule } from './agent-sessions/agent-sessions.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -184,6 +185,7 @@ import { AiAppsModule } from './ai-apps/ai-apps.module';
     AffinityModule,
     RoadmapModule,
     AiAppsModule,
+    AgentSessionsModule,
   ],
   providers: [
     {
