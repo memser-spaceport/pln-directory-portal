@@ -2302,27 +2302,28 @@ enum NewsDiscoveryOutcome {
 }
 
 model TeamNewsItem {
-  id           Int                 @id @default(autoincrement())
-  uid          String              @unique @default(cuid())
-  teamUid      String
-  team         Team                @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
-  canonicalKey String              @unique
-  eventType    NewsEventType       @default(OTHER)
-  eventDate    DateTime
-  title        String
-  summary      String?
-  contentHtml  String?
-  sourceUrl    String
-  sourceUrls   String[]            @default([])
-  sourceDomain String?
-  tags         String[]            @default([])
-  rawPayload   Json?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  forumLinks   TeamNewsForumLink[]
-  upvotes      TeamNewsUpvote[]
-  feedComments FeedComment[]
-  feedLikes    FeedNewsLike[]
+  id               Int                 @id @default(autoincrement())
+  uid              String              @unique @default(cuid())
+  teamUid          String
+  team             Team                @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
+  canonicalKey     String              @unique
+  eventType        NewsEventType       @default(OTHER)
+  eventDate        DateTime
+  title            String
+  summary          String?
+  contentHtml      String?
+  sourceUrl        String
+  sourceUrls       String[]            @default([])
+  sourceDomain     String?
+  tags             String[]            @default([])
+  rawPayload       Json?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  forumLinks       TeamNewsForumLink[]
+  upvotes          TeamNewsUpvote[]
+  feedComments     FeedComment[]
+  feedLikes        FeedNewsLike[]
+  networkOverviews NetworkOverview[]
 
   @@index([teamUid])
   @@index([eventDate])
@@ -2422,6 +2423,43 @@ model TeamNewsEnrichment {
 
   @@index([teamUid])
   @@index([lastDiscoveryOutcome])
+}
+
+enum NetworkOverviewStatus {
+  READY
+  FAILED
+}
+
+/// Gemini-generated Perplexity-style network digest for the home feed top card.
+/// Append-only; public API returns the latest READY row.
+model NetworkOverview {
+  id                  Int                   @id @default(autoincrement())
+  uid                 String                @unique @default(cuid())
+  generatedAt         DateTime              @default(now())
+  windowDays          Int                   @default(14)
+  periodStart         DateTime
+  periodEnd           DateTime
+  featuredNewsItemUid String?
+  featuredNewsItem    TeamNewsItem?         @relation(fields: [featuredNewsItemUid], references: [uid], onDelete: SetNull)
+  featuredTitle       String?
+  featuredSummary     String?
+  featuredImageUrl    String?
+  featuredSourceUrl   String?
+  featuredTeamName    String?
+  leadParagraph       String                @default("")
+  topStories          Json                  @default("[]")
+  generalUpdates      Json                  @default("[]")
+  model               String?
+  sourceRunId         String?
+  rawPayload          Json?
+  status              NetworkOverviewStatus @default(READY)
+  errorMessage        String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([generatedAt])
+  @@index([status])
+  @@index([status, generatedAt(sort: Desc)])
 }
 
 model JobAlert {

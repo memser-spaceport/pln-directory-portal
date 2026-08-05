@@ -71,6 +71,7 @@ import { ArticleRequestsModule } from './article-requests/article-requests.modul
 import { JobOpeningsModule } from './job-openings/job-openings.module';
 import { JobAlertsModule } from './job-alerts/job-alerts.module';
 import { TeamNewsModule } from './team-news/team-news.module';
+import { NetworkOverviewModule } from './network-overview/network-overview.module';
 import { FeedModule } from './feed/feed.module';
 import { FollowsModule } from './follows/follows.module';
 import { InvestorOutreachModule } from './investor-outreach/investor-outreach.module';
@@ -174,6 +175,7 @@ import { AgentSessionsModule } from './agent-sessions/agent-sessions.module';
     JobOpeningsModule,
     JobAlertsModule,
     TeamNewsModule,
+    NetworkOverviewModule,
     FeedModule,
     FollowsModule,
     InvestorOutreachModule,
