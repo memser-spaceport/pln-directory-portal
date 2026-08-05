@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { JobOpeningStatus, Prisma } from '@prisma/client';
 import type { JobsListQuery } from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
+import { buildJobOpeningDateWhere } from './job-opening-date.where';
 
 const TOP_LEVEL_FOCUS_AREAS = [
   'Digital Human Rights',
@@ -77,6 +78,11 @@ export class JobOpeningsQueryService {
           },
         },
       });
+    }
+
+    const dateWhere = buildJobOpeningDateWhere(query);
+    if (dateWhere) {
+      and.push(dateWhere);
     }
 
     return {

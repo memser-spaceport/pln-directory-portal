@@ -45,6 +45,29 @@ interface CreatedTeamNews {
 
 const STORY_MATCH_WINDOW_DAYS = 7;
 
+function uniqueSourceUrls(...urlLists: Array<string | string[] | null | undefined>): string[] {
+  const unique: string[] = [];
+  const seen = new Set<string>();
+
+  for (const list of urlLists) {
+    const values = Array.isArray(list) ? list : list ? [list] : [];
+    for (const value of values) {
+      if (typeof value !== 'string' || !value.trim()) continue;
+      const normalized = normalizeSourceUrl(value);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      unique.push(value.trim());
+    }
+  }
+
+  return unique;
+}
+
+function storedSourceUrls(item: { sourceUrl?: string | null; sourceUrls?: string[] | null }): string[] {
+  const urls = item.sourceUrls && item.sourceUrls.length > 0 ? item.sourceUrls : item.sourceUrl ? [item.sourceUrl] : [];
+  return uniqueSourceUrls(urls);
+}
+
 @Injectable()
 export class TeamNewsService {
   private readonly logger = new Logger(TeamNewsService.name);
@@ -266,9 +289,7 @@ export class TeamNewsService {
    * `teamUids` is expected pre-sorted by latest event date (see notifyRun).
    * A team logo is attached only when the whole run is about one team.
    */
-  private async buildRunCopy(
-    teamUids: string[]
-  ): Promise<{ title: string; description: string; image?: string }> {
+  private async buildRunCopy(teamUids: string[]): Promise<{ title: string; description: string; image?: string }> {
     // Only the spelled-out names need fetching; the rest collapse into "+N more".
     const sampleUids = teamUids.slice(0, TEAM_NEWS_NAMED_TEAMS);
     const teams = await this.prisma.team.findMany({
@@ -324,18 +345,13 @@ export class TeamNewsService {
   /**
    * Returns true if a new row was inserted, false if an existing row was updated.
    */
-  private async upsertNewsItem(
-    item: TeamNewsIngestItem,
-    eventDate: Date
-  ): Promise<boolean> {
-    const normalizedIncomingUrl = normalizeSourceUrl(item.sourceUrl);
-    const sourceDomain = extractDomain(item.sourceUrl);
+  private async upsertNewsItem(item: TeamNewsIngestItem, eventDate: Date): Promise<boolean> {
+    const incomingUrls = uniqueSourceUrls(item.sourceUrl, item.sourceUrls);
+    const primarySourceUrl = incomingUrls[0] ?? item.sourceUrl;
+    const normalizedIncomingUrls = new Set(incomingUrls.map((url) => normalizeSourceUrl(url)).filter(Boolean));
+    const sourceDomain = extractDomain(primarySourceUrl);
 
-    const canonicalKey = computeCanonicalKey(
-      item.teamUid,
-      item.sourceUrl,
-      eventDate
-    );
+    const canonicalKey = computeCanonicalKey(item.teamUid, primarySourceUrl, eventDate);
 
     const data: Prisma.TeamNewsItemUncheckedCreateInput = {
       teamUid: item.teamUid,
@@ -345,12 +361,11 @@ export class TeamNewsService {
       title: item.title,
       summary: item.summary ?? null,
       contentHtml: item.contentHtml ?? null,
-      sourceUrl: item.sourceUrl,
-      sourceUrls: [item.sourceUrl],
+      sourceUrl: primarySourceUrl,
+      sourceUrls: incomingUrls,
       sourceDomain,
       tags: item.tags,
-      rawPayload:
-        (item.rawPayload as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+      rawPayload: (item.rawPayload as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     };
 
     /*
@@ -374,48 +389,37 @@ export class TeamNewsService {
      * Different publishers may report the same event on nearby dates.
      * This is an event-date window, not a restriction relative to today.
      */
-    const windowMs =
-      STORY_MATCH_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const windowMs = STORY_MATCH_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
     const nearbyItems = exactExisting
       ? []
       : await this.prisma.teamNewsItem.findMany({
-        where: {
-          teamUid: item.teamUid,
-          eventDate: {
-            gte: new Date(eventDate.getTime() - windowMs),
-            lte: new Date(eventDate.getTime() + windowMs),
+          where: {
+            teamUid: item.teamUid,
+            eventDate: {
+              gte: new Date(eventDate.getTime() - windowMs),
+              lte: new Date(eventDate.getTime() + windowMs),
+            },
           },
-        },
-        orderBy: [
-          { eventDate: 'desc' },
-          { createdAt: 'desc' },
-        ],
-        select: {
-          id: true,
-          sourceUrl: true,
-          sourceUrls: true,
-          title: true,
-          summary: true,
-          contentHtml: true,
-          tags: true,
-        },
-      });
+          orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
+          select: {
+            id: true,
+            sourceUrl: true,
+            sourceUrls: true,
+            title: true,
+            summary: true,
+            contentHtml: true,
+            tags: true,
+          },
+        });
 
     /*
-     * Check all stored source URLs first. This supports both migrated rows
-     * and rows that have already accumulated multiple sources.
+     * Check all stored source URLs against every incoming URL. This supports
+     * multi-source ingest payloads and rows that already accumulated sources.
      */
     const sameSourceExisting = nearbyItems.find((candidate) => {
-      const urls =
-        candidate.sourceUrls.length > 0
-          ? candidate.sourceUrls
-          : [candidate.sourceUrl];
-
-      return urls.some(
-        (url) =>
-          normalizeSourceUrl(url) === normalizedIncomingUrl
-      );
+      const urls = storedSourceUrls(candidate);
+      return urls.some((url) => normalizedIncomingUrls.has(normalizeSourceUrl(url)));
     });
 
     /*
@@ -424,27 +428,12 @@ export class TeamNewsService {
      * dedup implementation.
      */
     const semanticExisting =
-      sameSourceExisting ??
-      nearbyItems.find((candidate) =>
-        isDuplicateNewsStory(item, candidate)
-      );
+      sameSourceExisting ?? nearbyItems.find((candidate) => isDuplicateNewsStory(item, candidate));
 
     const existing = exactExisting ?? semanticExisting;
 
     if (existing) {
-      const currentUrls =
-        existing.sourceUrls.length > 0
-          ? existing.sourceUrls
-          : [existing.sourceUrl];
-
-      const alreadyStored = currentUrls.some(
-        (url) =>
-          normalizeSourceUrl(url) === normalizedIncomingUrl
-      );
-
-      const sourceUrls = alreadyStored
-        ? currentUrls
-        : [...currentUrls, item.sourceUrl];
+      const sourceUrls = uniqueSourceUrls(storedSourceUrls(existing), incomingUrls);
 
       await this.prisma.teamNewsItem.update({
         where: { id: existing.id },

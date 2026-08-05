@@ -23,6 +23,14 @@ export const JobsListQueryParams = z.object({
   workMode: ListParam,
   q: z.string().optional(),
   sort: z.enum(['newest', 'company_az', 'company_za']).optional().default('newest'),
+  // Optional feed/list date window. Omitted = no date filter (existing jobs page).
+  since: z.string().optional(),
+  windowDays: z
+    .preprocess(
+      (v) => (v === undefined || v === '' ? undefined : Number(v)),
+      z.number().int().min(1).max(365).optional()
+    )
+    .optional(),
   page: z
     .preprocess((v) => (v === undefined || v === '' ? undefined : Number(v)), z.number().int().min(1))
     .optional()

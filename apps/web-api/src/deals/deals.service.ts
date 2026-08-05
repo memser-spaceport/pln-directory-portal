@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException, UnauthorizedExceptio
 import { DealIssueStatus, DealStatus, DealSubmissionStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
+import { resolveDateWindowCutoff } from '../shared/date-window';
 import {
   ListDealIssuesQueryDto,
   ListDealsQueryDto,
@@ -16,7 +17,10 @@ import { RBAC_PERMISSION_CODES } from '../rbac/rbac.constants';
 
 @Injectable()
 export class DealsService {
-  constructor(private readonly prisma: PrismaService, private readonly accessControlV2Service: AccessControlV2Service) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly accessControlV2Service: AccessControlV2Service
+  ) {}
 
   private async resolveMemberByEmail(userEmail: string) {
     if (!userEmail) {
@@ -71,10 +75,13 @@ export class DealsService {
   }
 
   private buildDealWhere(query: ListDealsQueryDto, status?: DealStatus): Prisma.DealWhereInput {
+    const cutoff = resolveDateWindowCutoff(query);
+
     return {
       ...(status ? { status } : {}),
       ...(query?.category ? { category: query.category } : {}),
       ...(query?.audience ? { audience: query.audience } : {}),
+      ...(cutoff ? { createdAt: { gte: cutoff } } : {}),
       ...(query?.search
         ? {
             OR: [
@@ -174,10 +181,7 @@ export class DealsService {
       return true;
     }
 
-    const { allowed } = await this.accessControlV2Service.hasPermission(
-      memberUid,
-      RBAC_PERMISSION_CODES.DEALS_VIEW,
-    );
+    const { allowed } = await this.accessControlV2Service.hasPermission(memberUid, RBAC_PERMISSION_CODES.DEALS_VIEW);
 
     return allowed;
   }

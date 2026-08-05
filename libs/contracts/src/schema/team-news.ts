@@ -209,6 +209,7 @@ export const TeamNewsIngestItemSchema = z.object({
   summary: z.string().optional(),
   contentHtml: z.string().nullable().optional(),
   sourceUrl: z.string().min(1),
+  sourceUrls: z.array(z.string().min(1)).optional(),
   eventType: NewsEventTypeSchema,
   tags: z.array(z.string()),
   rawPayload: z.unknown().optional(),
