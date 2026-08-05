@@ -687,7 +687,11 @@ export class WarmIntrosV2Service {
 
     const sectors = [...sectorCounts.values()].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 
-    return { connectors, sectors, kinds, bridges };
+    const plBackerCount = investorUids.filter((uid) =>
+      matchesPlBacker(toInvestorSummary(uid, profilesByUid.get(uid)))
+    ).length;
+
+    return { connectors, sectors, kinds, bridges, plBackerCount };
   }
 
   async listEdges(query: ListConnectionEdgesQueryDto) {

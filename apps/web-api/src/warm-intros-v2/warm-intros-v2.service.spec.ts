@@ -958,6 +958,7 @@ describe('WarmIntrosV2Service', () => {
           { value: 'ai', count: 1 },
         ])
       );
+      expect(result.plBackerCount).toBe(0);
       expect(masterProfileFindMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { types: { has: 'pl_internal' } } })
       );
@@ -970,6 +971,22 @@ describe('WarmIntrosV2Service', () => {
       const result = await service.listFacets({});
       expect(result.kinds).toEqual([{ value: 'pl_direct', count: 1 }]);
       expect(result.bridges).toEqual([]);
+    });
+
+    it('counts investors with plBacking set', async () => {
+      pathFindMany.mockResolvedValue([
+        { targetProfileUid: 'inv1', bestConnectorProfileUid: 'from1', hopChain: { relationKind: 'pl_direct' } },
+        { targetProfileUid: 'inv2', bestConnectorProfileUid: 'from1', hopChain: { relationKind: 'pl_direct' } },
+      ]);
+      masterProfileFindMany
+        .mockResolvedValueOnce([]) // pl_internal roster
+        .mockResolvedValueOnce([
+          { ...investorProfile, plBacking: { backedProtocolLabs: true, backedFilecoin: false, matchKind: 'person' } },
+          { uid: 'inv2', personKey: 'k2', canonicalName: 'Alice', plBacking: null },
+        ]);
+
+      const result = await service.listFacets({ targetSet: 'neuro-fund-i' });
+      expect(result.plBackerCount).toBe(1);
     });
   });
 
