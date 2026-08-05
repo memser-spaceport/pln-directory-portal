@@ -23,13 +23,19 @@ import {
 } from './dto/warm-path-feedback.dto';
 import {
   alternateUidsFromHopChain,
+  asRecord,
+  bridgeProfileUidFromHopChain,
   buildPathSummary,
   enrichHopChainNames,
+  matchesBridgeUid,
+  matchesConnectorUid,
   matchesPlBacker,
+  matchesRelationKind,
   matchesSearch,
   matchesSector,
   MasterProfileEnrichRow,
   parseInvestorSectors,
+  relationKindFromHopChain,
   toConnectorSummary,
   toInvestorSummary,
 } from './warm-intros-v2-enrich.util';
@@ -38,6 +44,15 @@ import { computeWarmPathProximity, WARM_INTROS_V2_MIN_SCORE } from './warm-intro
 const FEEDBACK_NOTE_MAX = 600;
 const FEEDBACK_SUMMARY_RECENT_CAP = 5;
 const PATH_RELATION_KINDS = new Set(['pl_direct', 'founder_bridge', 'coinvestor_bridge']);
+
+/** Comma-separated query param → trimmed, non-empty values. */
+function parseCommaList(raw: string | undefined | null): string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+}
 
 type WarmPathRow = {
   uid: string;
@@ -254,7 +269,7 @@ export class WarmIntrosV2Service {
 
   async listPaths(query: ListWarmPathsV2QueryDto) {
     const targetSet = query.targetSet?.trim() || null;
-    const connectorProfileUid = query.connectorProfileUid?.trim() || null;
+    const connectorProfileUids = parseCommaList(query.connectorProfileUid);
     const minScoreRaw = query.minScore?.trim();
     const minScore = minScoreRaw !== undefined && minScoreRaw !== '' ? Number(minScoreRaw) : WARM_INTROS_V2_MIN_SCORE;
     if (!Number.isFinite(minScore)) {
@@ -270,34 +285,48 @@ export class WarmIntrosV2Service {
     const limit = Math.min(Math.max(parseInt(query.limit ?? '50', 10) || 50, 1), 200);
     const offset = Math.max(parseInt(query.offset ?? '0', 10) || 0, 0);
     const search = (query.search ?? query.q)?.trim() || null;
-    const sector = query.sector?.trim() || null;
-    const relationKindRaw = query.relationKind?.trim() || null;
-    if (relationKindRaw && !PATH_RELATION_KINDS.has(relationKindRaw)) {
-      throw new BadRequestException(
-        `relationKind must be one of: ${[...PATH_RELATION_KINDS].join(', ')}`
-      );
+    const sectors = parseCommaList(query.sector);
+    const relationKinds = parseCommaList(query.relationKind);
+    for (const kind of relationKinds) {
+      if (!PATH_RELATION_KINDS.has(kind)) {
+        throw new BadRequestException(`relationKind must be one of: ${[...PATH_RELATION_KINDS].join(', ')}`);
+      }
     }
+    const bridgeProfileUids = parseCommaList(query.bridgeProfileUid);
     const directOnly = query.directOnly?.trim().toLowerCase() === 'true';
+    // directOnly is a shorthand for relationKind=pl_direct — folded in so callers don't
+    // have to pick one spelling for the same filter.
+    const effectiveRelationKinds = directOnly && relationKinds.length === 0 ? ['pl_direct'] : relationKinds;
     const plBacker = query.plBacker?.trim().toLowerCase() === 'true';
-    const needsPostFilter = Boolean(search || sector || plBacker);
+    const needsPostFilter = Boolean(
+      search ||
+        sectors.length ||
+        plBacker ||
+        bridgeProfileUids.length ||
+        effectiveRelationKinds.length > 1 ||
+        connectorProfileUids.length > 1
+    );
     // "All" returns one path per (investor, list); collapse to one row per investor.
     const collapseByInvestor = !targetSet;
     const loadThenPaginate = needsPostFilter || collapseByInvestor;
 
     const where: Prisma.WarmPathV2WhereInput = { rank, score: { gte: minScore } };
     if (targetSet) where.targetSet = targetSet;
-    if (directOnly) where.hopCount = 1;
-    if (relationKindRaw) {
-      where.hopChain = { path: ['relationKind'], equals: relationKindRaw };
+    // A single value stays an indexed/JSON-path where-clause; 2+ values (or a
+    // bridge-person filter, which has no queryable column at all) fall through to
+    // the post-filter below over the full candidate set.
+    if (effectiveRelationKinds.length === 1) {
+      where.hopChain = { path: ['relationKind'], equals: effectiveRelationKinds[0] };
     }
-    if (connectorProfileUid) {
+    if (connectorProfileUids.length === 1) {
       where.OR = [
-        { bestConnectorProfileUid: connectorProfileUid },
-        { alternateConnectorProfileUids: { array_contains: connectorProfileUid } },
+        { bestConnectorProfileUid: connectorProfileUids[0] },
+        { alternateConnectorProfileUids: { array_contains: connectorProfileUids[0] } },
       ];
     }
 
-    // Search/sector/plBacker/All collapse need full candidate set then slice (v2 scale ~1–2k).
+    // Search/sector/plBacker/bridge/multi-value path-via/All collapse need full candidate
+    // set then slice (v2 scale ~1–2k).
     const paths = (await this.prisma.warmPathV2.findMany({
       where,
       ...(loadThenPaginate ? {} : { take: limit, skip: offset }),
@@ -313,11 +342,21 @@ export class WarmIntrosV2Service {
     if (search) {
       enriched = enriched.filter((row) => matchesSearch(row.investor, search));
     }
-    if (sector) {
-      enriched = enriched.filter((row) => matchesSector(row.investor, sector));
+    if (sectors.length) {
+      enriched = enriched.filter((row) => sectors.some((sec) => matchesSector(row.investor, sec)));
     }
     if (plBacker) {
       enriched = enriched.filter((row) => matchesPlBacker(row.investor));
+    }
+    // Only post-filter what the where-clause above didn't already narrow.
+    if (effectiveRelationKinds.length > 1) {
+      enriched = enriched.filter((row) => matchesRelationKind(row.hopChain, effectiveRelationKinds));
+    }
+    if (connectorProfileUids.length > 1) {
+      enriched = enriched.filter((row) => matchesConnectorUid(row, connectorProfileUids));
+    }
+    if (bridgeProfileUids.length) {
+      enriched = enriched.filter((row) => matchesBridgeUid(row.hopChain, bridgeProfileUids));
     }
     if (collapseByInvestor) {
       enriched = collapsePathsByInvestor(enriched);
@@ -578,14 +617,26 @@ export class WarmIntrosV2Service {
       select: {
         targetProfileUid: true,
         bestConnectorProfileUid: true,
+        hopChain: true,
       },
-    })) as Array<{ targetProfileUid: string; bestConnectorProfileUid: string | null }>;
+    })) as Array<{ targetProfileUid: string; bestConnectorProfileUid: string | null; hopChain: unknown }>;
 
     const connectorCounts = new Map<string, number>();
+    // Path-shape counts: every path always carries a relationKind (pl_direct included, not
+    // just the bridge kinds), so this is a straight tally, not a bridge-only special case.
+    const kindCounts = new Map<string, number>();
+    // Bridge-person counts: the middle hop of a founder/coinvestor bridge chain.
+    const bridgeCounts = new Map<string, number>();
+
     for (const p of paths) {
       const cid = p.bestConnectorProfileUid;
-      if (!cid) continue;
-      connectorCounts.set(cid, (connectorCounts.get(cid) ?? 0) + 1);
+      if (cid) connectorCounts.set(cid, (connectorCounts.get(cid) ?? 0) + 1);
+
+      const relationKind = relationKindFromHopChain(p.hopChain);
+      kindCounts.set(relationKind, (kindCounts.get(relationKind) ?? 0) + 1);
+
+      const bridgeUid = bridgeProfileUidFromHopChain(p.hopChain);
+      if (bridgeUid) bridgeCounts.set(bridgeUid, (bridgeCounts.get(bridgeUid) ?? 0) + 1);
     }
 
     const plConnectors = await this.prisma.masterProfile.findMany({
@@ -599,6 +650,20 @@ export class WarmIntrosV2Service {
         profileUid: c.uid,
         name: c.canonicalName || c.uid,
         pathCount: connectorCounts.get(c.uid) ?? 0,
+      }))
+      .sort((a, b) => b.pathCount - a.pathCount || a.name.localeCompare(b.name));
+
+    const kinds = [...kindCounts.entries()]
+      .filter(([kind]) => PATH_RELATION_KINDS.has(kind))
+      .map(([value, count]) => ({ value: value as 'pl_direct' | 'founder_bridge' | 'coinvestor_bridge', count }));
+
+    const bridgeUids = [...bridgeCounts.keys()];
+    const bridgeProfiles = await this.loadProfilesByUids(bridgeUids);
+    const bridges = bridgeUids
+      .map((uid) => ({
+        profileUid: uid,
+        name: bridgeProfiles.get(uid)?.canonicalName || uid,
+        pathCount: bridgeCounts.get(uid) ?? 0,
       }))
       .sort((a, b) => b.pathCount - a.pathCount || a.name.localeCompare(b.name));
 
@@ -622,7 +687,7 @@ export class WarmIntrosV2Service {
 
     const sectors = [...sectorCounts.values()].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 
-    return { connectors, sectors };
+    return { connectors, sectors, kinds, bridges };
   }
 
   async listEdges(query: ListConnectionEdgesQueryDto) {
@@ -896,6 +961,7 @@ export class WarmIntrosV2Service {
         memberUid: true,
         listMemberships: true,
         plBacking: true,
+        coInvestments: true,
       },
     });
 
