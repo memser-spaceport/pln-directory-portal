@@ -93,6 +93,7 @@ describe('warm-intros-v2-enrich.util', () => {
         imageUrl: null,
         listSlugs: ['neuro-fund-i', 'gold-co-investors'],
         plBacking: null,
+        coInvestmentsCount: 0,
       });
     });
 
@@ -107,6 +108,24 @@ describe('warm-intros-v2-enrich.util', () => {
       expect(summary.imageUrl).toBe('https://cdn.example/jane.png');
       expect(summary.memberUid).toBe('m1');
       expect(summary.listSlugs).toEqual([]);
+    });
+
+    it('counts coInvestments length, treating non-arrays as zero', () => {
+      expect(
+        toInvestorSummary('inv1', {
+          uid: 'inv1',
+          personKey: 'k',
+          canonicalName: 'Jane',
+          coInvestments: [{ teamUid: 't1' }, { teamUid: 't2' }],
+        }).coInvestmentsCount
+      ).toBe(2);
+
+      expect(
+        toInvestorSummary('inv1', { uid: 'inv1', personKey: 'k', canonicalName: 'Jane', coInvestments: null })
+          .coInvestmentsCount
+      ).toBe(0);
+
+      expect(toInvestorSummary('inv1', null).coInvestmentsCount).toBe(0);
     });
   });
 

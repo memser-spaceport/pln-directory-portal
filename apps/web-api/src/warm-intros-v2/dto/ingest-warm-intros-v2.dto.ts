@@ -63,7 +63,7 @@ export interface IngestWarmIntrosV2Response {
 export class ListWarmPathsV2QueryDto {
   /** `neuro-fund-i` | `gold-co-investors` */
   targetSet?: string;
-  /** Paths where bestConnector OR alternates include this uid. */
+  /** Paths where bestConnector OR alternates include this uid. Comma-separated for OR-of-many. */
   connectorProfileUid?: string;
   minScore?: string;
   /** Default `1` (best path only for list view). */
@@ -74,10 +74,12 @@ export class ListWarmPathsV2QueryDto {
   q?: string;
   /** Case-insensitive match on investor name or email (alias of `q`). */
   search?: string;
-  /** Case-insensitive: investor sectors contains this value. */
+  /** Case-insensitive: investor sectors contains this value. Comma-separated for OR-of-many. */
   sector?: string;
-  /** Filter by hopChain.relationKind: `pl_direct` | `founder_bridge` | `coinvestor_bridge`. */
+  /** Filter by hopChain.relationKind: `pl_direct` | `founder_bridge` | `coinvestor_bridge`. Comma-separated for OR-of-many. */
   relationKind?: string;
+  /** Filter by the middle hop of a founder/coinvestor bridge path. Comma-separated for OR-of-many. */
+  bridgeProfileUid?: string;
   /** When `true`, only paths with hopCount=1 (PL direct). */
   directOnly?: string;
   /** When `true`, only investors with MasterProfile.plBacking set. */

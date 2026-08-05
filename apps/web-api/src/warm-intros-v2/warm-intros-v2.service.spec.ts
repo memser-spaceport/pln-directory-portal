@@ -562,7 +562,7 @@ describe('WarmIntrosV2Service', () => {
       expect(result.paths[0].targetSet).toBe('neuro-fund-i');
     });
 
-    it('applies directOnly as hopCount=1 in Prisma where', async () => {
+    it('applies directOnly as a relationKind=pl_direct hopChain filter (folded in, single-value fast path)', async () => {
       pathFindMany.mockResolvedValue([pathRow]);
       pathCount.mockResolvedValue(1);
 
@@ -574,11 +574,93 @@ describe('WarmIntrosV2Service', () => {
       });
 
       expect(pathFindMany).toHaveBeenCalledWith({
-        where: { rank: 1, targetSet: 'neuro-fund-i', score: { gte: 0.2 }, hopCount: 1 },
+        where: {
+          rank: 1,
+          targetSet: 'neuro-fund-i',
+          score: { gte: 0.2 },
+          hopChain: { path: ['relationKind'], equals: 'pl_direct' },
+        },
         take: 50,
         skip: 0,
         orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
       });
+    });
+
+    it('directOnly is ignored once an explicit relationKind is given (relationKind wins)', async () => {
+      pathFindMany.mockResolvedValue([pathRow]);
+      pathCount.mockResolvedValue(1);
+
+      await service.listPaths({
+        targetSet: 'neuro-fund-i',
+        directOnly: 'true',
+        relationKind: 'founder_bridge',
+        limit: '50',
+        offset: '0',
+      });
+
+      expect(pathFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ hopChain: { path: ['relationKind'], equals: 'founder_bridge' } }),
+        })
+      );
+    });
+
+    it('OR-matches multiple relationKind values via post-filter over the full candidate set', async () => {
+      const bridgeRow = {
+        ...pathRow,
+        uid: 'p2',
+        targetProfileUid: 'inv2',
+        hopChain: {
+          relationKind: 'founder_bridge',
+          hops: [
+            { profileUid: 'from1', name: 'Juan Benet', role: 'pl_connector' },
+            { profileUid: 'bridge1', name: 'Bridget Founder', role: 'founder' },
+            { profileUid: 'inv2', name: 'Alice', role: 'investor' },
+          ],
+        },
+      };
+      pathFindMany.mockResolvedValue([pathRow, bridgeRow]);
+      masterProfileFindMany.mockResolvedValue([investorProfile, connectorProfile]);
+
+      const result = await service.listPaths({
+        targetSet: 'neuro-fund-i',
+        relationKind: 'pl_direct,founder_bridge',
+        limit: '50',
+        offset: '0',
+      });
+
+      // 2+ values drop the where-clause fast path — no hopChain key in the query.
+      expect(pathFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.not.objectContaining({ hopChain: expect.anything() }) })
+      );
+      expect(result.paths.map((p) => p.uid)).toEqual(['p1', 'p2']);
+    });
+
+    it('filters by bridgeProfileUid via post-filter (no queryable column exists)', async () => {
+      const bridgeRow = {
+        ...pathRow,
+        uid: 'p2',
+        targetProfileUid: 'inv2',
+        hopChain: {
+          relationKind: 'founder_bridge',
+          hops: [
+            { profileUid: 'from1', name: 'Juan Benet', role: 'pl_connector' },
+            { profileUid: 'bridge1', name: 'Bridget Founder', role: 'founder' },
+            { profileUid: 'inv2', name: 'Alice', role: 'investor' },
+          ],
+        },
+      };
+      pathFindMany.mockResolvedValue([pathRow, bridgeRow]);
+      masterProfileFindMany.mockResolvedValue([investorProfile, connectorProfile]);
+
+      const result = await service.listPaths({
+        targetSet: 'neuro-fund-i',
+        bridgeProfileUid: 'bridge1',
+        limit: '50',
+        offset: '0',
+      });
+
+      expect(result.paths.map((p) => p.uid)).toEqual(['p2']);
     });
 
     it('applies relationKind as hopChain JSON path filter', async () => {
@@ -808,18 +890,34 @@ describe('WarmIntrosV2Service', () => {
   });
 
   describe('listFacets', () => {
-    it('lists all pl_internal connectors (not only best) + sectors', async () => {
+    it('lists all pl_internal connectors (not only best) + sectors + path-kind + bridge-person counts', async () => {
       pathFindMany.mockResolvedValue([
-        { targetProfileUid: 'inv1', bestConnectorProfileUid: 'from1' },
-        { targetProfileUid: 'inv2', bestConnectorProfileUid: 'from1' },
+        {
+          targetProfileUid: 'inv1',
+          bestConnectorProfileUid: 'from1',
+          hopChain: { relationKind: 'pl_direct' },
+        },
+        {
+          targetProfileUid: 'inv2',
+          bestConnectorProfileUid: 'from1',
+          hopChain: {
+            relationKind: 'founder_bridge',
+            hops: [
+              { profileUid: 'from1', role: 'pl_connector' },
+              { profileUid: 'bridge1', role: 'founder' },
+              { profileUid: 'inv2', role: 'investor' },
+            ],
+          },
+        },
       ]);
-      // 1st call: pl_internal roster; 2nd: investor profiles for sectors
+      // 1st call: pl_internal roster; 2nd: bridge-person profiles; 3rd: investor profiles for sectors
       masterProfileFindMany
         .mockResolvedValueOnce([
           { uid: 'from1', canonicalName: 'Juan Benet' },
           { uid: 'from2', canonicalName: 'Lacey Wisdom' },
           { uid: 'from3', canonicalName: 'Marc Johnson' },
         ])
+        .mockResolvedValueOnce([{ uid: 'bridge1', canonicalName: 'Bridget Founder' }])
         .mockResolvedValueOnce([
           investorProfile,
           {
@@ -846,6 +944,13 @@ describe('WarmIntrosV2Service', () => {
         { profileUid: 'from2', name: 'Lacey Wisdom', pathCount: 0 },
         { profileUid: 'from3', name: 'Marc Johnson', pathCount: 0 },
       ]);
+      expect(result.kinds).toEqual(
+        expect.arrayContaining([
+          { value: 'pl_direct', count: 1 },
+          { value: 'founder_bridge', count: 1 },
+        ])
+      );
+      expect(result.bridges).toEqual([{ profileUid: 'bridge1', name: 'Bridget Founder', pathCount: 1 }]);
       expect(result.sectors).toEqual(
         expect.arrayContaining([
           { value: 'crypto', count: 2 },
@@ -853,9 +958,35 @@ describe('WarmIntrosV2Service', () => {
           { value: 'ai', count: 1 },
         ])
       );
+      expect(result.plBackerCount).toBe(0);
       expect(masterProfileFindMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { types: { has: 'pl_internal' } } })
       );
+    });
+
+    it('falls back to pl_direct and no bridges when hopChain has no relationKind', async () => {
+      pathFindMany.mockResolvedValue([{ targetProfileUid: 'inv1', bestConnectorProfileUid: 'from1', hopChain: null }]);
+      masterProfileFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+      const result = await service.listFacets({});
+      expect(result.kinds).toEqual([{ value: 'pl_direct', count: 1 }]);
+      expect(result.bridges).toEqual([]);
+    });
+
+    it('counts investors with plBacking set', async () => {
+      pathFindMany.mockResolvedValue([
+        { targetProfileUid: 'inv1', bestConnectorProfileUid: 'from1', hopChain: { relationKind: 'pl_direct' } },
+        { targetProfileUid: 'inv2', bestConnectorProfileUid: 'from1', hopChain: { relationKind: 'pl_direct' } },
+      ]);
+      masterProfileFindMany
+        .mockResolvedValueOnce([]) // pl_internal roster
+        .mockResolvedValueOnce([
+          { ...investorProfile, plBacking: { backedProtocolLabs: true, backedFilecoin: false, matchKind: 'person' } },
+          { uid: 'inv2', personKey: 'k2', canonicalName: 'Alice', plBacking: null },
+        ]);
+
+      const result = await service.listFacets({ targetSet: 'neuro-fund-i' });
+      expect(result.plBackerCount).toBe(1);
     });
   });
 
