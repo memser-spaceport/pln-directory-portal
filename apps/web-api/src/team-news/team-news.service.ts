@@ -9,8 +9,20 @@ import type {
   TeamNewsForumLinkDto,
 } from 'libs/contracts/src/schema/team-news';
 import { computeCanonicalKey } from './utils/canonical-key';
-import { extractDomain, normalizeSourceUrl } from './utils/url-normalize';
+import { extractDomain, normalizeSourceUrl, urlSearchVariants } from './utils/url-normalize';
 import { isDuplicateNewsStory } from './utils/news-dedup';
+
+type ExistingNewsRow = {
+  id: number;
+  teamUid?: string;
+  sourceUrl: string;
+  sourceUrls: string[];
+  title: string;
+  summary: string | null;
+  contentHtml: string | null;
+  tags: string[];
+  eventDate?: Date;
+};
 
 // The directory's own definition of "recent" for the denormalized
 // `TeamNewsEnrichment.recentNewsCount`. Independent of producer policy —
@@ -343,6 +355,64 @@ export class TeamNewsService {
   }
 
   /**
+   * Find any existing news row (any team) whose sourceUrl/sourceUrls overlap
+   * the incoming normalized URLs after variant expansion.
+   */
+  private async findByAnySourceUrl(incomingUrls: string[]): Promise<ExistingNewsRow | null> {
+    const searchUrls = urlSearchVariants(incomingUrls);
+    if (searchUrls.length === 0) return null;
+
+    const normalizedIncoming = new Set(
+      incomingUrls.map((url) => normalizeSourceUrl(url)).filter(Boolean)
+    );
+
+    const candidates = await this.prisma.teamNewsItem.findMany({
+      where: {
+        OR: [{ sourceUrl: { in: searchUrls } }, { sourceUrls: { hasSome: searchUrls } }],
+      },
+      orderBy: [{ createdAt: 'asc' }],
+      select: {
+        id: true,
+        teamUid: true,
+        sourceUrl: true,
+        sourceUrls: true,
+        title: true,
+        summary: true,
+        contentHtml: true,
+        tags: true,
+        eventDate: true,
+      },
+      take: 25,
+    });
+
+    return (
+      candidates.find((candidate) =>
+        storedSourceUrls(candidate).some((url) => normalizedIncoming.has(normalizeSourceUrl(url)))
+      ) ?? null
+    );
+  }
+
+  private async mergeIntoExisting(
+    existing: ExistingNewsRow,
+    item: TeamNewsIngestItem,
+    incomingUrls: string[],
+    rawPayload: Prisma.TeamNewsItemUpdateInput['rawPayload']
+  ): Promise<void> {
+    const sourceUrls = uniqueSourceUrls(storedSourceUrls(existing), incomingUrls);
+
+    await this.prisma.teamNewsItem.update({
+      where: { id: existing.id },
+      data: {
+        sourceUrls,
+        tags: [...new Set([...existing.tags, ...item.tags])],
+        // Do not erase richer HTML when an older producer replays an item.
+        contentHtml: item.contentHtml ?? existing.contentHtml,
+        rawPayload,
+      },
+    });
+  }
+
+  /**
    * Returns true if a new row was inserted, false if an existing row was updated.
    */
   private async upsertNewsItem(item: TeamNewsIngestItem, eventDate: Date): Promise<boolean> {
@@ -376,14 +446,37 @@ export class TeamNewsService {
       where: { canonicalKey },
       select: {
         id: true,
+        teamUid: true,
         sourceUrl: true,
         sourceUrls: true,
         title: true,
         summary: true,
         contentHtml: true,
         tags: true,
+        eventDate: true,
       },
     });
+
+    if (exactExisting) {
+      await this.mergeIntoExisting(exactExisting, item, incomingUrls, data.rawPayload);
+      return false;
+    }
+
+    /*
+     * Cross-team policy: if any incoming URL already exists on another team's
+     * row, merge sourceUrls into that row and do not create a duplicate.
+     */
+    const globalExisting = await this.findByAnySourceUrl(incomingUrls);
+    if (globalExisting) {
+      if (globalExisting.teamUid && globalExisting.teamUid !== item.teamUid) {
+        this.logger.log(
+          `crossTeamUrlMerge: merging into team=${globalExisting.teamUid} id=${globalExisting.id} ` +
+            `from team=${item.teamUid} urls=${incomingUrls.length}`
+        );
+      }
+      await this.mergeIntoExisting(globalExisting, item, incomingUrls, data.rawPayload);
+      return false;
+    }
 
     /*
      * Different publishers may report the same event on nearby dates.
@@ -391,27 +484,27 @@ export class TeamNewsService {
      */
     const windowMs = STORY_MATCH_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
-    const nearbyItems = exactExisting
-      ? []
-      : await this.prisma.teamNewsItem.findMany({
-          where: {
-            teamUid: item.teamUid,
-            eventDate: {
-              gte: new Date(eventDate.getTime() - windowMs),
-              lte: new Date(eventDate.getTime() + windowMs),
-            },
-          },
-          orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
-          select: {
-            id: true,
-            sourceUrl: true,
-            sourceUrls: true,
-            title: true,
-            summary: true,
-            contentHtml: true,
-            tags: true,
-          },
-        });
+    const nearbyItems = await this.prisma.teamNewsItem.findMany({
+      where: {
+        teamUid: item.teamUid,
+        eventDate: {
+          gte: new Date(eventDate.getTime() - windowMs),
+          lte: new Date(eventDate.getTime() + windowMs),
+        },
+      },
+      orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
+      select: {
+        id: true,
+        teamUid: true,
+        sourceUrl: true,
+        sourceUrls: true,
+        title: true,
+        summary: true,
+        contentHtml: true,
+        tags: true,
+        eventDate: true,
+      },
+    });
 
     /*
      * Check all stored source URLs against every incoming URL. This supports
@@ -428,24 +521,16 @@ export class TeamNewsService {
      * dedup implementation.
      */
     const semanticExisting =
-      sameSourceExisting ?? nearbyItems.find((candidate) => isDuplicateNewsStory(item, candidate));
+      sameSourceExisting ??
+      nearbyItems.find((candidate) =>
+        isDuplicateNewsStory(
+          { ...item, eventDate },
+          { ...candidate, eventDate: candidate.eventDate }
+        )
+      );
 
-    const existing = exactExisting ?? semanticExisting;
-
-    if (existing) {
-      const sourceUrls = uniqueSourceUrls(storedSourceUrls(existing), incomingUrls);
-
-      await this.prisma.teamNewsItem.update({
-        where: { id: existing.id },
-        data: {
-          sourceUrls,
-          tags: [...new Set([...existing.tags, ...item.tags])],
-          // Do not erase richer HTML when an older producer replays an item.
-          contentHtml: item.contentHtml ?? existing.contentHtml,
-          rawPayload: data.rawPayload,
-        },
-      });
-
+    if (semanticExisting) {
+      await this.mergeIntoExisting(semanticExisting, item, incomingUrls, data.rawPayload);
       return false;
     }
 

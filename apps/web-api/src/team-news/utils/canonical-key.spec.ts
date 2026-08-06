@@ -10,9 +10,9 @@ describe('computeCanonicalKey', () => {
     expect(key).toBe(computeCanonicalKey(teamUid, 'https://example.com/post', date));
   });
 
-  it('treats different query strings on the same article as the same key', () => {
-    const a = computeCanonicalKey(teamUid, 'https://example.com/x?utm=tw', date);
-    const b = computeCanonicalKey(teamUid, 'https://example.com/x?utm=fb', date);
+  it('treats different tracking query strings on the same article as the same key', () => {
+    const a = computeCanonicalKey(teamUid, 'https://example.com/x?utm_source=tw', date);
+    const b = computeCanonicalKey(teamUid, 'https://example.com/x?utm_source=fb', date);
     expect(a).toBe(b);
   });
 

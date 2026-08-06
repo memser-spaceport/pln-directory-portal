@@ -202,4 +202,59 @@ describe('isDuplicateNewsStory', () => {
       )
     ).toBe(false);
   });
+
+  it('deduplicates gov.uk publication path variants for the same report', () => {
+    expect(
+      isDuplicateNewsStory(
+        {
+          sourceUrl:
+            'https://www.gov.uk/government/publications/aria-annual-report-and-accounts-2025-to-2026',
+          title: 'ARIA publishes 2025–26 annual report and accounts',
+          summary: 'The agency published its annual report covering 2025 to 2026.',
+        },
+        {
+          sourceUrl:
+            'https://www.gov.uk/government/publications/aria-annual-report-and-accounts-2025-to-2026/aria-annual-report-and-accounts-2025-to-2026--2',
+          title: 'ARIA annual report and accounts 2025 to 2026 released',
+          summary: 'Full accounts and annual report for the 2025–26 period are now online.',
+        }
+      )
+    ).toBe(true);
+  });
+
+  it('deduplicates same-day annual report titles even when URLs differ', () => {
+    expect(
+      isDuplicateNewsStory(
+        {
+          sourceUrl: 'https://aria.org.uk/news/annual-report-2025',
+          title: 'ARIA publishes 2025–26 annual report and accounts',
+          summary: 'The agency published its statutory annual report.',
+          eventDate: '2026-07-15T00:00:00.000Z',
+        },
+        {
+          sourceUrl: 'https://press.example.com/aria-accounts',
+          title: 'ARIA 2025 to 2026 annual report and accounts now available',
+          summary: 'Coverage of the newly published annual report and accounts.',
+          eventDate: '2026-07-15T12:00:00.000Z',
+        }
+      )
+    ).toBe(true);
+  });
+
+  it('does not treat different YouTube videos as the same story by URL alone', () => {
+    expect(
+      isDuplicateNewsStory(
+        {
+          sourceUrl: 'https://www.youtube.com/watch?v=aaaaaaaaaaa',
+          title: 'Talk A about networking',
+          summary: 'First talk covers networking research.',
+        },
+        {
+          sourceUrl: 'https://www.youtube.com/watch?v=bbbbbbbbbbb',
+          title: 'Talk B about cryptography',
+          summary: 'Second talk covers cryptography research.',
+        }
+      )
+    ).toBe(false);
+  });
 });

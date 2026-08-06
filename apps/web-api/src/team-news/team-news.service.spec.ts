@@ -396,12 +396,14 @@ describe('TeamNewsService.ingestTeamNews multi-source', () => {
 
     prisma.teamNewsItem.findUnique.mockResolvedValue({
       id: 7,
+      teamUid: 't1',
       sourceUrl: youtube,
       sourceUrls: [youtube],
       title: 'Existing title',
       summary: 'Existing summary',
       contentHtml: '<p>Existing</p>',
       tags: [],
+      eventDate: new Date('2026-06-10T00:00:00.000Z'),
     });
 
     const result = await service.ingestTeamNews({
@@ -423,5 +425,50 @@ describe('TeamNewsService.ingestTeamNews multi-source', () => {
       }),
     });
     expect(prisma.teamNewsItem.findMany).not.toHaveBeenCalled();
+  });
+
+  it('merges into an existing row on another team when source URLs overlap', async () => {
+    const youtube = 'https://www.youtube.com/watch?v=knM7yHFH67o';
+    const plrd = 'https://www.plrd.org/talks/jbp-allison-duettmann';
+
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null);
+    // Global URL lookup returns Foresight's existing row.
+    prisma.teamNewsItem.findMany.mockResolvedValue([
+      {
+        id: 99,
+        teamUid: 't2',
+        sourceUrl: youtube,
+        sourceUrls: [youtube],
+        title: 'Juan Benet Podcast with Allison Duettmann',
+        summary: 'Cryonics and uploading',
+        contentHtml: '<p>Existing</p>',
+        tags: ['podcast'],
+        eventDate: new Date('2026-06-10T00:00:00.000Z'),
+      },
+    ]);
+
+    const result = await service.ingestTeamNews({
+      runId: 'run-cross-team',
+      items: [
+        ingestItem({
+          teamUid: 't1',
+          sourceUrl: youtube,
+          sourceUrls: [youtube, plrd],
+          title: 'Juan Benet Podcast with Allison Duettmann',
+          tags: ['talk'],
+        }),
+      ],
+    });
+
+    expect(result.created).toBe(0);
+    expect(result.updated).toBe(1);
+    expect(prisma.teamNewsItem.create).not.toHaveBeenCalled();
+    expect(prisma.teamNewsItem.update).toHaveBeenCalledWith({
+      where: { id: 99 },
+      data: expect.objectContaining({
+        sourceUrls: [youtube, plrd],
+        tags: ['podcast', 'talk'],
+      }),
+    });
   });
 });
