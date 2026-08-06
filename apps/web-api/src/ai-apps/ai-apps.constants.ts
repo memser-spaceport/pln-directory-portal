@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.6';
+export const AI_APPS_STARTER_KIT_VERSION = '1.7';
 
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
@@ -136,6 +136,15 @@ export type AiAppLogPhase = 'build' | 'runtime';
  */
 export const buildRunnerLogsUrl = (appId: string, phase: AiAppLogPhase): string =>
   `${AI_APPS_RUNNER_URL}/v1/apps/${encodeURIComponent(appId)}/${phase}/logs`;
+
+/**
+ * Runner endpoint serving a live (no history) CPU/memory snapshot for an
+ * app's pod alongside the configured resource limits (`GET
+ * /v1/apps/<appId>/metrics`). Admin-only on our side — see
+ * `AiAppsService.getMetrics`.
+ */
+export const buildRunnerMetricsUrl = (appId: string): string =>
+  `${AI_APPS_RUNNER_URL}/v1/apps/${encodeURIComponent(appId)}/metrics`;
 
 /**
  * `order=desc` member log reads. The runner (and CloudWatch behind it) pages

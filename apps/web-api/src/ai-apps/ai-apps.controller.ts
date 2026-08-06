@@ -360,6 +360,20 @@ export class AiAppsController {
   }
 
   /**
+   * Live CPU/memory snapshot (no history) for one app vs its configured
+   * resource limits — capacity-planning visibility for PL Infra, restricted
+   * to directory admins (checked in the service).
+   */
+  @NoCache()
+  @Get(':uid/metrics')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async getMetrics(@Param('uid') uid: string, @Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.getMetrics(memberUid, uid);
+  }
+
+  /**
    * Delete an app: tears it down on the sandbox runner, marks it `DELETED`, and
    * records the delete events. Requires `ai_apps.write`.
    */

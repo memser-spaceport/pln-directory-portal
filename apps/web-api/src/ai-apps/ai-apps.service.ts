@@ -50,6 +50,7 @@ import {
   buildPrdS3Key,
   buildRunnerDeploymentsUrl,
   buildRunnerLogsUrl,
+  buildRunnerMetricsUrl,
   buildRunnerSecretsUrl,
 } from './ai-apps.constants';
 
@@ -729,6 +730,35 @@ export class AiAppsService {
   }
 
   /**
+   * Admin-only live metrics snapshot (no history) for one app: current
+   * per-container CPU/memory from the runner (metrics-server) alongside the
+   * configured resource limits, so PL Infra can sanity-check the limits
+   * against real usage. Restricted to directory admins — unlike the log
+   * routes (creator-or-admin), this is capacity planning, not member-facing
+   * debugging.
+   */
+  async getMetrics(requesterUid: string, appUid: string): Promise<unknown> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app) {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    if (!(await this.isRequesterDirectoryAdmin(requesterUid))) {
+      throw new ForbiddenException('Only a directory admin can view app metrics');
+    }
+
+    try {
+      const response = await axios.get(buildRunnerMetricsUrl(app.appId), {
+        headers: { 'x-runner-token': AI_APPS_RUNNER_TOKEN },
+        timeout: 15000,
+      });
+      return response.data;
+    } catch (error) {
+      this.logRunnerError('metrics', app.appId, error);
+      throw new BadGatewayException('Failed to fetch metrics from the sandbox runner');
+    }
+  }
+
+  /**
    * Blocks a second concurrent deploy for the same app. A fresh (non-stuck)
    * DEPLOYING app is owned by an in-flight deploy, so any new deploy/registration
    * for it is rejected until that one settles (success or failure). A STUCK
@@ -1219,8 +1249,17 @@ export class AiAppsService {
         throw error;
       }
       this.logRunnerError('deploy', app.appId, error);
+      // Prefer the runner's own classified message (e.g. container_oom_killed's
+      // actionable text) verbatim over the full JSON body, so `notes` reads as
+      // a clear error instead of an escaped JSON blob.
+      const runnerErrorText =
+        axios.isAxiosError(error) && typeof error.response?.data?.error === 'string'
+          ? error.response.data.error
+          : undefined;
       const message = axios.isAxiosError(error)
-        ? `Runner error: ${error.response?.status ?? ''} ${JSON.stringify(error.response?.data ?? error.message)}`
+        ? `Runner error: ${error.response?.status ?? ''} ${
+            runnerErrorText ?? JSON.stringify(error.response?.data ?? error.message)
+          }`
         : `Deploy failed: ${(error as Error).message}`;
 
       // A gateway timeout (Cloudflare 504/524, etc.) or no response doesn't mean the
@@ -1329,7 +1368,13 @@ export class AiAppsService {
           return undefined;
         }
         const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-        throw new Error(`runner deployments call failed (status=${status ?? 'n/a'})`);
+        // Prefer the runner's classified message (e.g. container_oom_killed's
+        // actionable text) over a bare status code, same as the build-phase path.
+        const runnerMessage =
+          axios.isAxiosError(error) && typeof error.response?.data?.message === 'string'
+            ? error.response.data.message
+            : undefined;
+        throw new Error(runnerMessage ?? `runner deployments call failed (status=${status ?? 'n/a'})`);
       }
     }
   }

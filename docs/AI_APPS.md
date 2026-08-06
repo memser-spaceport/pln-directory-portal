@@ -318,6 +318,70 @@ The starter kit (≥1.5) ships `buildLogsEndpoint` / `runtimeLogsEndpoint` as
 `{appUid}` templates in `pln-app.config.json` plus the `app-logs` skill; the
 deploy skill points at it from its `ERROR`-status and timeout paths.
 
+## Resource limits (build & runtime)
+
+The `deployment-orchestrator` repo sets a fixed CPU/memory envelope on every
+build and every deployed app — the caller (this backend, the agent, the
+member) never chooses it. Sized from live prod usage across the sandbox
+fleet (21 running app pods, 2026-08-06): median ~87Mi memory / 1m CPU
+(near-idle), max observed 310Mi / 54m. Nodes are EC2 (`m6i.large`, not
+Fargate) with `cluster-autoscaler` active, so **requests drive AWS cost**
+(scheduling/scale-up) and are kept low, while **limits** are a free-standing
+safety ceiling sized above the real max with margin.
+
+**Runtime, per app pod** (`charts/app` in the orchestrator repo):
+
+| Container | CPU request | CPU limit | Mem request | Mem limit |
+|---|---|---|---|---|
+| `app` (member's code) | 30m | 300m | 64Mi | 384Mi |
+| `auth-check` (sidecar) | 10m | 100m | 32Mi | 96Mi |
+| `auth-proxy` (sidecar) | 5m | 50m | 16Mi | 32Mi |
+
+**Build, per Kaniko Job** (estimated — no measured data survives a completed
+Job):
+
+| Container | CPU request | CPU limit | Mem request | Mem limit |
+|---|---|---|---|---|
+| `prepare` | 25m | 150m | 32Mi | 128Mi |
+| `kaniko` | 250m | 1000m | 512Mi | 2Gi |
+
+**CPU limits throttle** (cgroups CFS throttling — the process just runs
+slower). **Memory limits are hard**: exceeding one OOM-kills the container.
+Two error codes make that failure mode explicit instead of a generic
+timeout/crash message, both originating in the orchestrator and surfaced
+verbatim into `AiApp.notes` (see `proxyDeploy`'s error handling in
+`ai-apps.service.ts`, which prefers the runner's classified `message`/`error`
+field over the raw JSON body):
+
+- **Runtime**: `classifyKubernetesDiagnostics` (`src/k8s-diagnostics.ts`)
+  returns `container_oom_killed` when a container's `terminated.reason` is
+  `OOMKilled`, ahead of the generic `container_crash_loop` classification.
+- **Build**: `buildAndPushImage` (`src/sandbox.ts`) inspects the failed
+  build Job's pod for an `OOMKilled` container status and throws a message
+  naming the container + its configured memory limit, ahead of the generic
+  build-log error.
+
+The starter kit (≥1.7) documents this budget in `AGENTS.md`/`CLAUDE.md`
+("Resource limits" section — design guidance: avoid large in-memory
+caches/datasets, stream over buffer, avoid extra worker
+threads/processes, avoid heavy in-process ML/image/video work, keep the
+build lean) and teaches the deploy/app-logs skills to recognize
+`OOMKilled`/exceeded-limit messages and reduce memory footprint instead of
+blindly retrying.
+
+**Live metrics (no history)**: `GET /v1/ai-apps/:uid/metrics` — admin-only
+(`isRequesterDirectoryAdmin`, capacity planning rather than member-facing
+debugging), proxies the orchestrator's `GET /v1/apps/:appId/metrics`
+(`kubectl top pod --containers` via metrics-server) with the server-side
+runner token. Returns current per-container CPU/memory alongside the
+configured limits — a live snapshot only, no polling or storage, so the
+limits above can be sanity-checked against real apps over time.
+
+```bash
+curl -sS "https://api.plnetwork.io/v1/ai-apps/<uid>/metrics" \
+  -H "Authorization: Bearer $ADMIN_JWT"
+```
+
 ## Member context (signed-in user → deployed app)
 
 Deployed apps can personalize for the member using them (greet by name, tag
