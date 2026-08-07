@@ -7,6 +7,10 @@ export class ListDealsQueryDto {
   category?: string;
   audience?: string;
   sort?: 'alphabetical' | 'mostRecent' = 'mostRecent';
+  /** Optional absolute ISO cutoff; wins over windowDays when parseable. */
+  since?: string;
+  /** Optional rolling window in days. Omitted = no date filter. */
+  windowDays?: number;
 }
 
 export class UpsertDealDto {

@@ -307,6 +307,34 @@ not the scaffold's shape or language.
 5. **Verify before deploying:** \`cd app && npm install && npm start\` (or the app's
    equivalent), then confirm \`GET /health\` is 200 and \`GET /\` renders.
 
+## Resource limits (design within budget)
+Every deployed app runs under a fixed CPU/memory envelope, and every image
+build runs under its own — these are a fixed platform default, not something
+you request. Design and build with them in mind so a deploy doesn't fail:
+
+- **Runtime** (the running app container): **384Mi memory limit**, 300m CPU
+  limit.
+- **Build** (the Docker image build): **2Gi memory limit**, 1 CPU limit.
+
+CPU limits only throttle — the app/build just runs slower under load.
+**Memory limits are hard**: exceeding one gets the process OOM-killed (the
+running app crash-loops; the build fails). Design choices that fit
+comfortably within this budget:
+- Avoid large in-memory caches or datasets — read from disk/network on
+  demand, or bound any cache to a small max size (LRU).
+- Prefer streaming responses over buffering entire payloads in memory.
+- Don't spawn extra worker threads/processes for background work — a single
+  event loop or a small pool is plenty at this scale.
+- Avoid heavy in-process ML/image/video processing — call an external API
+  instead of bundling a large model or native library.
+- Keep the build lean: trim \`devDependencies\` that end up in the Docker
+  build context, disable production source maps, and don't bundle large
+  static datasets into the image.
+
+If a deploy fails with \`notes\` mentioning "OOM-killed" or "exceeded its
+memory limit", that's this budget — see the deploy skill's step 7 for what
+to do next.
+
 ## Apps that need secrets (API keys, tokens, …)
 The member is usually **not a developer** — they will never say "environment
 variable" or "secret". It is YOUR job to recognize when the app needs one and to
@@ -693,6 +721,11 @@ may have no logs left.
 2. **App is deployed but broken** (blank page, 5xx, feature not working) →
    fetch **runtime** logs for the last 30–60 min, reproduce the issue (reload
    the app), then fetch again and diff for new errors/stack traces.
+3. **\`OOMKilled\` or exit code 137 in either log stream** means the build or
+   the running app exceeded its memory limit (see "Resource limits" in
+   \`AGENTS.md\`) — this isn't a code bug to trace, it's a memory-footprint
+   problem. Reduce memory usage (fewer parallel build workers, disable
+   source maps, avoid large in-memory caches/datasets) and redeploy.
 3. Summarize what you found for the member in plain words ("the build failed
    because a package is missing"), fix it, and redeploy. Don't dump raw logs on
    a non-technical member unless they ask.
@@ -1046,6 +1079,15 @@ connection string into the LabOS secrets page, same as an API key.
    (never the URL) — and when \`notes\` alone doesn't explain the failure, fetch
    the **build logs** via the app-logs skill (\`.claude/skills/app-logs/SKILL.md\`)
    to find the real error before retrying.
+
+   **If \`notes\` mentions "OOM-killed" or "exceeded its memory limit"**, the
+   deploy hit the platform's fixed resource budget (see "Resource limits" in
+   \`AGENTS.md\`) — a build that ran out of memory during \`npm install\`/bundling,
+   or a running app that leaked/allocated past its runtime limit. Don't just
+   retry: reduce the memory footprint first (fewer parallel build workers,
+   disable source maps, avoid bundling large datasets, drop large in-memory
+   caches at runtime) and redeploy. Only ask PL Infra for a higher limit if
+   the app has a genuine, explainable need that can't be designed around.
 
    **After the FIRST successful deploy**, offer the optional one-pager PRD —
    see "Offer the one-pager PRD" in the app-metadata skill. If the member wants

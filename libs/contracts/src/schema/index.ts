@@ -43,6 +43,7 @@ export * from './job-opening';
 export * from './job-alert';
 export * from './team-job-enrichment';
 export * from './team-news';
+export * from './network-overview';
 export * from './roadmap';
 export * from './follow';
 export * from './feed';

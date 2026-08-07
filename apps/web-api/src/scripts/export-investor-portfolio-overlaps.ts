@@ -65,8 +65,20 @@ function displayName(firstName: string | null, lastName: string | null, email: s
   return local || email;
 }
 
+function describeDatabaseUrl(url: string | undefined): string {
+  if (!url?.trim()) return '(DATABASE_URL unset)';
+  try {
+    const u = new URL(url);
+    const db = (u.pathname || '/').replace(/^\//, '') || '(none)';
+    return `${u.hostname}:${u.port || '5432'}/${db}`;
+  } catch {
+    return '(unparseable DATABASE_URL)';
+  }
+}
+
 async function main(): Promise<void> {
   const outPath = parseOutPath();
+  console.log(`Exporting InvestorPortfolioOverlap from ${describeDatabaseUrl(process.env.DATABASE_URL)}`);
 
   const rows = await prisma.investorOutreachRecord.findMany({
     where: { portfolioOverlaps: { some: {} } },

@@ -71,6 +71,7 @@ import { ArticleRequestsModule } from './article-requests/article-requests.modul
 import { JobOpeningsModule } from './job-openings/job-openings.module';
 import { JobAlertsModule } from './job-alerts/job-alerts.module';
 import { TeamNewsModule } from './team-news/team-news.module';
+import { NetworkOverviewModule } from './network-overview/network-overview.module';
 import { FeedModule } from './feed/feed.module';
 import { FollowsModule } from './follows/follows.module';
 import { InvestorOutreachModule } from './investor-outreach/investor-outreach.module';
@@ -82,6 +83,7 @@ import { FounderSourcingModule } from './founder-sourcing/founder-sourcing.modul
 import { AffinityModule } from './affinity/affinity.module';
 import { RoadmapModule } from './roadmap/roadmap.module';
 import { AiAppsModule } from './ai-apps/ai-apps.module';
+import { AgentSessionsModule } from './agent-sessions/agent-sessions.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -173,6 +175,7 @@ import { AiAppsModule } from './ai-apps/ai-apps.module';
     JobOpeningsModule,
     JobAlertsModule,
     TeamNewsModule,
+    NetworkOverviewModule,
     FeedModule,
     FollowsModule,
     InvestorOutreachModule,
@@ -184,6 +187,7 @@ import { AiAppsModule } from './ai-apps/ai-apps.module';
     AffinityModule,
     RoadmapModule,
     AiAppsModule,
+    AgentSessionsModule,
   ],
   providers: [
     {

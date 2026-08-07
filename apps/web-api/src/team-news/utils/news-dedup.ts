@@ -1,4 +1,4 @@
-import { normalizeSourceUrl } from './url-normalize';
+import { extractDomain, extractPublicationSlug, normalizeSourceUrl } from './url-normalize';
 
 /**
  * These words occur frequently in news copy but carry little information
@@ -159,6 +159,38 @@ interface StoryInput {
   sourceUrl: string;
   title: string;
   summary?: string | null;
+  eventDate?: Date | string | null;
+}
+
+const REPORT_TITLE_MARKERS = ['annual report', 'accounts'];
+
+function sameCalendarDay(
+  left: Date | string | null | undefined,
+  right: Date | string | null | undefined
+): boolean {
+  if (!left || !right) return false;
+  const leftDate = left instanceof Date ? left : new Date(left);
+  const rightDate = right instanceof Date ? right : new Date(right);
+  if (Number.isNaN(leftDate.getTime()) || Number.isNaN(rightDate.getTime())) {
+    return false;
+  }
+  return leftDate.toISOString().slice(0, 10) === rightDate.toISOString().slice(0, 10);
+}
+
+function isReportStyleTitle(title: string): boolean {
+  const normalized = normalizeNewsText(title);
+  return REPORT_TITLE_MARKERS.some((marker) => normalized.includes(marker));
+}
+
+function sharesPublicationSlug(leftUrl: string, rightUrl: string): boolean {
+  const leftSlug = extractPublicationSlug(leftUrl);
+  const rightSlug = extractPublicationSlug(rightUrl);
+  if (!leftSlug || !rightSlug || leftSlug !== rightSlug) {
+    return false;
+  }
+  const leftDomain = extractDomain(leftUrl);
+  const rightDomain = extractDomain(rightUrl);
+  return Boolean(leftDomain && rightDomain && leftDomain === rightDomain);
 }
 
 export function normalizeNewsText(value: string): string {
@@ -330,6 +362,11 @@ export function isDuplicateNewsStory(
     return true;
   }
 
+  // Same gov.uk (or similar) publication under different page paths.
+  if (sharesPublicationSlug(left.sourceUrl, right.sourceUrl)) {
+    return true;
+  }
+
   if (
     hasConflictingRelationshipTargets(
       left.title,
@@ -348,6 +385,20 @@ export function isDuplicateNewsStory(
     `${left.title} ${left.summary ?? ''}`,
     `${right.title} ${right.summary ?? ''}`
   );
+
+  /*
+   * Report-style titles on the same calendar day (e.g. ARIA annual report /
+   * accounts variants) are treated as one story even when URL slug parsing
+   * misses a host-specific path shape.
+   */
+  if (
+    sameCalendarDay(left.eventDate, right.eventDate) &&
+    isReportStyleTitle(left.title) &&
+    isReportStyleTitle(right.title) &&
+    title.overlap >= 4
+  ) {
+    return true;
+  }
 
   /*
    * Rule 1: titles are almost the same after normalization.

@@ -26,6 +26,8 @@ export type EnrichedInvestorSummary = {
   listSlugs: KnownListSlug[];
   /** PL/FIL prior-backer flags when present on MasterProfile. */
   plBacking: unknown | null;
+  /** Length of MasterProfile.coInvestments, for row-level display without fetching the full detail record. */
+  coInvestmentsCount: number;
 };
 
 export type EnrichedConnectorSummary = {
@@ -56,11 +58,16 @@ export type MasterProfileEnrichRow = {
   memberUid?: string | null;
   listMemberships?: unknown;
   plBacking?: unknown | null;
+  coInvestments?: unknown;
   /** Filled by service when Member.image is resolved. */
   imageUrl?: string | null;
 };
 
-function asRecord(value: unknown): Record<string, unknown> | null {
+function coInvestmentsCount(coInvestments: unknown): number {
+  return Array.isArray(coInvestments) ? coInvestments.length : 0;
+}
+
+export function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
 }
@@ -153,6 +160,7 @@ export function toInvestorSummary(
       imageUrl: null,
       listSlugs: [],
       plBacking: null,
+      coInvestmentsCount: 0,
     };
   }
   return {
@@ -168,6 +176,7 @@ export function toInvestorSummary(
     imageUrl: profile.imageUrl ?? null,
     listSlugs: parseKnownListSlugs(profile.listMemberships),
     plBacking: profile.plBacking ?? null,
+    coInvestmentsCount: coInvestmentsCount(profile.coInvestments),
   };
 }
 
@@ -346,4 +355,51 @@ export function matchesSector(investor: EnrichedInvestorSummary, sector: string)
 /** True when MasterProfile.plBacking is a non-null object (PL/FIL prior backer). */
 export function matchesPlBacker(investor: EnrichedInvestorSummary): boolean {
   return investor.plBacking != null && typeof investor.plBacking === 'object';
+}
+
+/** hopChain.relationKind, defaulted to `pl_direct` — every path carries one, not just bridges. */
+export function relationKindFromHopChain(hopChain: unknown): string {
+  const chain = asRecord(hopChain);
+  return typeof chain?.relationKind === 'string' && chain.relationKind ? chain.relationKind : 'pl_direct';
+}
+
+/**
+ * The middle hop of a founder/coinvestor bridge chain. hops is
+ * [connector, ...bridge(s), investor] (enrichHopChainNames keeps the investor as the
+ * trailing node), so the bridge sits at length-2 regardless of what precedes it.
+ * `null` for a direct path — there is no bridge to name.
+ */
+export function bridgeProfileUidFromHopChain(hopChain: unknown): string | null {
+  const chain = asRecord(hopChain);
+  if (!chain) return null;
+  const kind = relationKindFromHopChain(hopChain);
+  if (kind !== 'founder_bridge' && kind !== 'coinvestor_bridge') return null;
+  const hops = Array.isArray(chain.hops) ? chain.hops : [];
+  const bridgeNode = hops.length >= 2 ? asRecord(hops[hops.length - 2]) : null;
+  const uid = typeof bridgeNode?.profileUid === 'string' ? bridgeNode.profileUid.trim() : '';
+  return uid || null;
+}
+
+/** Empty `kinds` matches everything — an absent filter, not a filter matching nothing. */
+export function matchesRelationKind(hopChain: unknown, kinds: string[]): boolean {
+  if (kinds.length === 0) return true;
+  return kinds.includes(relationKindFromHopChain(hopChain));
+}
+
+/** Empty `uids` matches everything — an absent filter, not a filter matching nothing. */
+export function matchesConnectorUid(
+  row: { bestConnectorProfileUid: string | null; alternateConnectorProfileUids: unknown },
+  uids: string[]
+): boolean {
+  if (uids.length === 0) return true;
+  if (row.bestConnectorProfileUid && uids.includes(row.bestConnectorProfileUid)) return true;
+  const alternates = Array.isArray(row.alternateConnectorProfileUids) ? row.alternateConnectorProfileUids : [];
+  return alternates.some((uid) => typeof uid === 'string' && uids.includes(uid));
+}
+
+/** Empty `uids` matches everything — an absent filter, not a filter matching nothing. */
+export function matchesBridgeUid(hopChain: unknown, uids: string[]): boolean {
+  if (uids.length === 0) return true;
+  const bridgeUid = bridgeProfileUidFromHopChain(hopChain);
+  return !!bridgeUid && uids.includes(bridgeUid);
 }

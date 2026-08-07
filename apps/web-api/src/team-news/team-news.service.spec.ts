@@ -41,7 +41,7 @@ describe('TeamNewsService.createForumLink', () => {
     prisma = buildPrismaMock();
     service = new TeamNewsService(
       prisma as unknown as PrismaService,
-      buildPushMock() as unknown as PushNotificationsService,
+      buildPushMock() as unknown as PushNotificationsService
     );
   });
 
@@ -51,8 +51,8 @@ describe('TeamNewsService.createForumLink', () => {
       service.createForumLink(
         'news-missing',
         { forumTopicId: 42, forumTopicSlug: '42/x', forumTopicUrl: '/forum/topics/1/42' },
-        'member-1',
-      ),
+        'member-1'
+      )
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.teamNewsForumLink.upsert).not.toHaveBeenCalled();
   });
@@ -65,7 +65,7 @@ describe('TeamNewsService.createForumLink', () => {
     const result = await service.createForumLink(
       'news-1',
       { forumTopicId: 42, forumTopicSlug: '42/some-slug', forumTopicUrl: '/forum/topics/1/42' },
-      'member-1',
+      'member-1'
     );
 
     expect(result.created).toBe(true);
@@ -82,7 +82,7 @@ describe('TeamNewsService.createForumLink', () => {
     const result = await service.createForumLink(
       'news-1',
       { forumTopicId: 42, forumTopicSlug: '42/x', forumTopicUrl: '/forum/topics/1/42' },
-      'member-1',
+      'member-1'
     );
 
     expect(result.created).toBe(false);
@@ -97,7 +97,7 @@ describe('TeamNewsService.createForumLink', () => {
     await service.createForumLink(
       'news-1',
       { forumTopicId: 99, forumTopicSlug: '99/x', forumTopicUrl: '/forum/topics/1/99' },
-      'member-7',
+      'member-7'
     );
 
     expect(prisma.teamNewsForumLink.upsert).toHaveBeenCalledWith(
@@ -108,7 +108,7 @@ describe('TeamNewsService.createForumLink', () => {
           createdByUid: 'member-7',
         }),
         update: {},
-      }),
+      })
     );
   });
 
@@ -120,7 +120,7 @@ describe('TeamNewsService.createForumLink', () => {
     const result = await service.createForumLink(
       'news-1',
       { forumTopicId: 42, forumTopicSlug: '42/x', forumTopicUrl: '/forum/topics/1/42' },
-      null,
+      null
     );
 
     expect(result.link.createdByUid).toBeNull();
@@ -129,7 +129,13 @@ describe('TeamNewsService.createForumLink', () => {
 
 type IngestPrismaMock = {
   team: { findMany: jest.Mock };
-  teamNewsItem: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock; count: jest.Mock };
+  teamNewsItem: {
+    findUnique: jest.Mock;
+    findMany: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    count: jest.Mock;
+  };
   teamNewsEnrichment: { upsert: jest.Mock };
   pushNotification: { findFirst: jest.Mock; update: jest.Mock };
 };
@@ -143,6 +149,7 @@ const buildIngestPrismaMock = (): IngestPrismaMock => ({
   },
   teamNewsItem: {
     findUnique: jest.fn(),
+    findMany: jest.fn().mockResolvedValue([]),
     create: jest.fn().mockResolvedValue({}),
     update: jest.fn().mockResolvedValue({}),
     count: jest.fn().mockResolvedValue(1),
@@ -169,10 +176,7 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
   beforeEach(() => {
     prisma = buildIngestPrismaMock();
     push = buildPushMock();
-    service = new TeamNewsService(
-      prisma as unknown as PrismaService,
-      push as unknown as PushNotificationsService,
-    );
+    service = new TeamNewsService(prisma as unknown as PrismaService, push as unknown as PushNotificationsService);
   });
 
   it('emits ONE run notification summarising all teams in the batch', async () => {
@@ -226,7 +230,12 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
 
     // 6 items for one team — run size no longer affects the title.
     const items = Array.from({ length: 6 }, (_, i) =>
-      ingestItem({ teamUid: 't1', title: `item ${i}`, sourceUrl: `https://x/${i}`, eventDate: `2026-06-${10 + i}T00:00:00.000Z` })
+      ingestItem({
+        teamUid: 't1',
+        title: `item ${i}`,
+        sourceUrl: `https://x/${i}`,
+        eventDate: `2026-06-${10 + i}T00:00:00.000Z`,
+      })
     );
 
     await service.ingestTeamNews({ runId: 'run-big', items });
@@ -273,7 +282,15 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
   });
 
   it('does not notify when items only update existing rows', async () => {
-    prisma.teamNewsItem.findUnique.mockResolvedValue({ id: 1 }); // every item already exists
+    prisma.teamNewsItem.findUnique.mockResolvedValue({
+      id: 1,
+      sourceUrl: 'https://news.example.com/a',
+      sourceUrls: ['https://news.example.com/a'],
+      title: 'ARIA raised a seed round',
+      summary: null,
+      contentHtml: null,
+      tags: [],
+    });
 
     await service.ingestTeamNews({ runId: 'run-4', items: [ingestItem()] });
 
@@ -290,5 +307,168 @@ describe('TeamNewsService.ingestTeamNews notifications', () => {
 
     expect(result.created).toBe(1);
     expect(result.ingested).toBe(1);
+  });
+});
+
+describe('TeamNewsService.ingestTeamNews multi-source', () => {
+  let service: TeamNewsService;
+  let prisma: IngestPrismaMock;
+
+  beforeEach(() => {
+    prisma = buildIngestPrismaMock();
+    service = new TeamNewsService(
+      prisma as unknown as PrismaService,
+      buildPushMock() as unknown as PushNotificationsService
+    );
+  });
+
+  it('creates a row with all sourceUrls from the ingest payload', async () => {
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null);
+
+    const youtube = 'https://www.youtube.com/watch?v=knM7yHFH67o';
+    const plrd = 'https://www.plrd.org/talks/jbp-allison-duettmann';
+
+    const result = await service.ingestTeamNews({
+      runId: 'run-multi-create',
+      items: [
+        ingestItem({
+          sourceUrl: plrd,
+          sourceUrls: [plrd, youtube],
+          title: 'Juan Benet Podcast with Allison Duettmann',
+        }),
+      ],
+    });
+
+    expect(result.created).toBe(1);
+    expect(prisma.teamNewsItem.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        sourceUrl: plrd,
+        sourceUrls: [plrd, youtube],
+      }),
+    });
+  });
+
+  it('appends new sourceUrls when matching an existing story by URL', async () => {
+    const youtube = 'https://www.youtube.com/watch?v=knM7yHFH67o';
+    const plrd = 'https://www.plrd.org/talks/jbp-allison-duettmann';
+
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null);
+    prisma.teamNewsItem.findMany.mockResolvedValue([
+      {
+        id: 42,
+        sourceUrl: youtube,
+        sourceUrls: [youtube],
+        title: 'Juan Benet Podcast with Allison Duettmann',
+        summary: 'Cryonics and uploading',
+        contentHtml: '<p>Existing</p>',
+        tags: ['podcast'],
+      },
+    ]);
+
+    const result = await service.ingestTeamNews({
+      runId: 'run-multi-append',
+      items: [
+        ingestItem({
+          sourceUrl: plrd,
+          sourceUrls: [plrd, youtube],
+          title: 'Juan Benet Podcast with Allison Duettmann',
+          summary: 'Cryonics and uploading',
+          tags: ['talk'],
+        }),
+      ],
+    });
+
+    expect(result.created).toBe(0);
+    expect(result.updated).toBe(1);
+    expect(prisma.teamNewsItem.create).not.toHaveBeenCalled();
+    expect(prisma.teamNewsItem.update).toHaveBeenCalledWith({
+      where: { id: 42 },
+      data: expect.objectContaining({
+        sourceUrls: [youtube, plrd],
+        tags: ['podcast', 'talk'],
+      }),
+    });
+  });
+
+  it('unions sourceUrls on exact canonical-key replay', async () => {
+    const youtube = 'https://www.youtube.com/watch?v=knM7yHFH67o';
+    const plrd = 'https://www.plrd.org/talks/jbp-allison-duettmann';
+
+    prisma.teamNewsItem.findUnique.mockResolvedValue({
+      id: 7,
+      teamUid: 't1',
+      sourceUrl: youtube,
+      sourceUrls: [youtube],
+      title: 'Existing title',
+      summary: 'Existing summary',
+      contentHtml: '<p>Existing</p>',
+      tags: [],
+      eventDate: new Date('2026-06-10T00:00:00.000Z'),
+    });
+
+    const result = await service.ingestTeamNews({
+      runId: 'run-multi-exact',
+      items: [
+        ingestItem({
+          sourceUrl: youtube,
+          sourceUrls: [youtube, plrd],
+          title: 'Should not overwrite title',
+        }),
+      ],
+    });
+
+    expect(result.updated).toBe(1);
+    expect(prisma.teamNewsItem.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: expect.objectContaining({
+        sourceUrls: [youtube, plrd],
+      }),
+    });
+    expect(prisma.teamNewsItem.findMany).not.toHaveBeenCalled();
+  });
+
+  it('merges into an existing row on another team when source URLs overlap', async () => {
+    const youtube = 'https://www.youtube.com/watch?v=knM7yHFH67o';
+    const plrd = 'https://www.plrd.org/talks/jbp-allison-duettmann';
+
+    prisma.teamNewsItem.findUnique.mockResolvedValue(null);
+    // Global URL lookup returns Foresight's existing row.
+    prisma.teamNewsItem.findMany.mockResolvedValue([
+      {
+        id: 99,
+        teamUid: 't2',
+        sourceUrl: youtube,
+        sourceUrls: [youtube],
+        title: 'Juan Benet Podcast with Allison Duettmann',
+        summary: 'Cryonics and uploading',
+        contentHtml: '<p>Existing</p>',
+        tags: ['podcast'],
+        eventDate: new Date('2026-06-10T00:00:00.000Z'),
+      },
+    ]);
+
+    const result = await service.ingestTeamNews({
+      runId: 'run-cross-team',
+      items: [
+        ingestItem({
+          teamUid: 't1',
+          sourceUrl: youtube,
+          sourceUrls: [youtube, plrd],
+          title: 'Juan Benet Podcast with Allison Duettmann',
+          tags: ['talk'],
+        }),
+      ],
+    });
+
+    expect(result.created).toBe(0);
+    expect(result.updated).toBe(1);
+    expect(prisma.teamNewsItem.create).not.toHaveBeenCalled();
+    expect(prisma.teamNewsItem.update).toHaveBeenCalledWith({
+      where: { id: 99 },
+      data: expect.objectContaining({
+        sourceUrls: [youtube, plrd],
+        tags: ['podcast', 'talk'],
+      }),
+    });
   });
 });
