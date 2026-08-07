@@ -158,7 +158,7 @@ export class TeamsController {
     // when anonymous). Optional auth via UserTokenCheckGuard keeps this public.
     await this.stampIsFollowed(result.teams, request['userEmail']);
     if (!request['userEmail']) {
-      for (const team of result.teams) {
+      for (const team of result.teams as any[]) {
         const roles = team?.teamMemberRoles;
         if (Array.isArray(roles)) {
           for (const role of roles) {
