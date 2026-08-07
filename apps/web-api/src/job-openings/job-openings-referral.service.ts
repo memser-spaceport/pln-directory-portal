@@ -170,7 +170,6 @@ export class JobOpeningsReferralService {
     const paragraphs = [
       `Hi ${jobOpening.team.name} team,\nI'd like to refer ${referred.name} for your ${jobOpening.roleTitle} role.`,
       aboutParagraph,
-      `Happy to make the intro whenever you're ready.`,
       signature,
     ].filter((paragraph) => paragraph.length > 0);
 

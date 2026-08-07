@@ -79,8 +79,6 @@ const policies: PolicySeed[] = [
       'demoday.stats.read',
       'team_pitch.admin',
       'deals.read',
-      'code_agent_sessions.view',
-      'code_agent_sessions.admin',
       'forum.read',
       'forum.write',
       'oh.supply.read',
