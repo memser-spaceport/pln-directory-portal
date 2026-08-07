@@ -41,11 +41,18 @@ import { UserTokenValidation } from '../guards/user-token-validation.guard';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { AuthGuard } from '../guards/auth.guard';
 import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
+import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { ServiceAuthGuard } from '../guards/service-auth.guard';
 import { LogService } from '../shared/log.service';
 import { ParticipantsReqValidationPipe } from '../pipes/participant-request-validation.pipe';
 import { IsVerifiedMemberInterceptor } from '../interceptors/verified-member.interceptor';
 import { isEmpty } from 'lodash';
 import { QueryCache } from '../decorators/query-cache.decorator';
+import {
+  isRequestAuthenticated,
+  sanitizeMemberContactsForViewer,
+  sanitizeMembersContactsForViewer,
+} from './member-contact-sanitizer';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -69,6 +76,7 @@ export class MemberController {
   @Api(server.route.getMembers)
   @ApiQueryFromZod(MemberQueryParams)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema.array())
+  @UseGuards(OptionalUserTokenCheckGuard)
   @UseInterceptors(IsVerifiedMemberInterceptor)
   @NoCache()
   async findAll(@Req() request: Request) {
@@ -103,7 +111,12 @@ export class MemberController {
         },
       });
     }
-    return await this.membersService.findAll(builtQuery);
+    const result = await this.membersService.findAll(builtQuery);
+    const isAuthenticated = isRequestAuthenticated(request as any);
+    return {
+      ...result,
+      members: sanitizeMembersContactsForViewer(result.members, isAuthenticated),
+    };
   }
 
   /**
@@ -114,7 +127,7 @@ export class MemberController {
    * @returns Array of simplified member data
    */
   @Api(server.route.getMembersByIds)
-  @UseInterceptors(IsVerifiedMemberInterceptor)
+  @UseGuards(ServiceAuthGuard)
   @NoCache()
   async findMembersByIds(@ApiDecorator() { body }: RouteShape['getMembersByIds']) {
     return await this.membersService.findMembersByIds(body.memberIds);
@@ -207,6 +220,7 @@ export class MemberController {
   @ApiNotFoundResponse(NOT_FOUND_GLOBAL_RESPONSE_SCHEMA)
   @ApiOkResponseFromZod(ResponseMemberWithRelationsSchema)
   @ApiQueryFromZod(MemberDetailQueryParams)
+  @UseGuards(OptionalUserTokenCheckGuard)
   @NoCache()
   async findOne(@Req() request: Request, @ApiDecorator() { params: { uid } }: RouteShape['getMember']) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
@@ -219,7 +233,7 @@ export class MemberController {
       throw new NotFoundException('Member not found');
     }
 
-    return member;
+    return sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any));
   }
 
   /**
@@ -454,9 +468,10 @@ export class MemberController {
    * @returns Member details with related data
    */
   @Api(server.route.getMemberByExternalId)
+  @UseGuards(OptionalUserTokenCheckGuard)
   @UseInterceptors(IsVerifiedMemberInterceptor)
   @NoCache()
-  async getMemberByExternalId(@Param('externalId') externalId: string) {
+  async getMemberByExternalId(@Req() request: Request, @Param('externalId') externalId: string) {
     const member = await this.membersService.findByExternalId(externalId);
 
     if (!member) {
@@ -464,7 +479,7 @@ export class MemberController {
       throw new NotFoundException('Member not found');
     }
 
-    return member;
+    return sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any));
   }
 
   /**
@@ -475,6 +490,7 @@ export class MemberController {
    * @returns Array of member records with selected fields
    */
   @Api(server.route.getMembersBulk)
+  @UseGuards(ServiceAuthGuard)
   @UsePipes(ZodValidationPipe)
   @NoCache()
   async getMembersBulk(@Body() body: MembersForNodebbRequestDto) {
