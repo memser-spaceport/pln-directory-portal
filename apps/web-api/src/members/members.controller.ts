@@ -391,13 +391,17 @@ export class MemberController {
    */
   @Api(server.route.searchMembers)
   @ApiQueryFromZod(MemberFilterQueryParams.optional())
+  @UseGuards(OptionalUserTokenCheckGuard)
   @UseInterceptors(IsVerifiedMemberInterceptor)
   @NoCache()
   // @QueryCache()
   // @CacheTTL(1) // 5 minutes
   async searchMembers(@Req() request: Request) {
     const params = request.query as unknown as z.infer<typeof MemberFilterQueryParams>;
-    return await this.membersService.searchMembers(params || {});
+    const result = await this.membersService.searchMembers(params || {});
+    const isAuthenticated = isRequestAuthenticated(request as any);
+    const members = result?.members ? sanitizeMembersContactsForViewer(result.members, isAuthenticated) : result;
+    return result?.members ? { ...result, members } : members;
   }
 
   /**

@@ -45,6 +45,8 @@ import { PLEventGuestsService } from './pl-event-guests.service';
 import { isEmpty } from 'lodash';
 import { AdminAuthGuard } from '../guards/admin-auth.guard';
 import { InternalAuthGuard } from '../guards/auth.guard';
+import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { sanitizeMemberContactsForViewer } from '../members/member-contact-sanitizer';
 import { TeamsService } from '../teams/teams.service';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RequirePermissions } from '../rbac/rbac.decorator';
@@ -251,9 +253,20 @@ export class PLEventsController {
   }
 
   @Api(server.route.getAllPLEventGuests)
+  @UseGuards(OptionalUserTokenCheckGuard)
   @NoCache()
-  async getAllPLEventGuest() {
-    return await this.eventGuestService.getAllPLEventGuest();
+  async getAllPLEventGuest(@Req() request: Request) {
+    const guests = await this.eventGuestService.getAllPLEventGuest();
+    if (request['userEmail']) {
+      return guests;
+    }
+    return (guests ?? []).map((guest: any) => ({
+      ...guest,
+      member: guest?.member
+        ? sanitizeMemberContactsForViewer({ ...guest.member, officeHours: undefined }, false)
+        : guest?.member,
+      info: guest?.info ? { ...guest.info, telegramId: null, officeHours: null } : guest?.info,
+    }));
   }
 
   @Api(server.route.getPLEventGuestTopics)

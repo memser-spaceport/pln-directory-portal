@@ -42,7 +42,7 @@ export class AsksController {
     return this.askService.findOne(uid, {
       team: true,
       project: true,
-      closedBy: true,
+      closedBy: { select: { uid: true, name: true, image: true } } as any,
     });
   }
 
