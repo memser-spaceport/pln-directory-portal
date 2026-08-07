@@ -4,6 +4,7 @@ import { TeamsService } from '../teams/teams.service';
 import { PLEventsService } from '../pl-events/pl-events.service';
 import { ProjectsService } from '../projects/projects.service';
 import { PLEventLocationsService } from '../pl-events/pl-event-locations.service';
+import { sanitizeMembersContactsForViewer } from '../members/member-contact-sanitizer';
 @Injectable()
 export class HomeService {
   constructor(
@@ -16,25 +17,27 @@ export class HomeService {
 
   async fetchAllFeaturedData(loggedInMember) {
     try {
-      return {
-        members: await this.memberService.findAllFiltered(
-          {
-            where: { isFeatured: true },
-            include: {
-              image: true,
-              location: true,
-              skills: true,
-              teamMemberRoles: {
-                include: {
-                  team: {
-                    include: { logo: true },
-                  },
+      const isAuthenticated = !!loggedInMember?.email;
+      const members = await this.memberService.findAllFiltered(
+        {
+          where: { isFeatured: true },
+          include: {
+            image: true,
+            location: true,
+            skills: true,
+            teamMemberRoles: {
+              include: {
+                team: {
+                  include: { logo: true },
                 },
               },
             },
           },
-          loggedInMember?.email
-        ),
+        },
+        loggedInMember?.email
+      );
+      return {
+        members: isAuthenticated ? members : sanitizeMembersContactsForViewer(members as any, false),
         teams: await this.teamsService.findAll({
           where: { isFeatured: true },
           include: { logo: true },
@@ -59,7 +62,7 @@ export class HomeService {
    * @returns Array of projects and teams.
    */
   async fetchTeamsAndProjects(queryParams) {
-    let result: any[] = [];
+    const result: any[] = [];
     const entities: string[] = queryParams.include?.split(',');
     if (entities.includes('teams')) {
       const resultantTeams = await this.fetchTeamsBySearchTerm(queryParams.name);
