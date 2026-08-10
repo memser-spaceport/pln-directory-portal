@@ -8,6 +8,7 @@ import { HuskyGenerationService } from '../husky/husky-generation.service';
 import { HUSKY_BIO_DISCLAIMER } from '../utils/ai-prompts';
 import { buildMemberEnrichmentEligibilityFilter } from './member-enrichment-eligibility-filter';
 import { matchTeamFromCompanyName } from './member-enrichment-team-match.util';
+import { buildMemberExperienceInputs } from './member-enrichment-experience.util';
 import {
   EnrichmentStatus,
   FieldEnrichmentStatus,
@@ -76,7 +77,7 @@ const FOUNDER_OR_LEAD_FILTER: Prisma.MemberWhereInput = {
   },
 };
 
-/** Mirrors Team's 18-field OR-check: at least one of the four gap-fillable fields is empty. */
+/** Mirrors Team's 18-field OR-check: at least one of the gap-fillable fields is empty. */
 const HAS_GAP_FILTER: Prisma.MemberWhereInput = {
   OR: [
     { bio: null },
@@ -85,6 +86,7 @@ const HAS_GAP_FILTER: Prisma.MemberWhereInput = {
     { email: '' },
     { skills: { none: {} } },
     { teamMemberRoles: { none: { mainTeam: true } } },
+    { experiences: { none: {} } },
   ],
 };
 
@@ -344,7 +346,33 @@ export class MemberEnrichmentService {
         stampPreexisting('primaryTeamRole');
       }
 
-      // 4. bio — reuses generateMemberBioText unchanged, feeding it the ScrapingDog
+      // 4. workHistory — persist the member's full LinkedIn experience list to
+      // MemberExperience. Whole-list gap check (mirrors bio/email/skills): only
+      // runs when the member has zero rows, and every parseable entry is inserted
+      // in one pass — no merge with a partial existing history.
+      if (member.experiences.length === 0) {
+        const experienceInputs = personProfile?.experiences?.length
+          ? buildMemberExperienceInputs(personProfile.experiences, member.uid)
+          : [];
+        if (experienceInputs.length > 0) {
+          for (const input of experienceInputs) {
+            try {
+              await this.prisma.memberExperience.create({ data: input });
+            } catch (error) {
+              this.logger.warn(
+                `Failed to insert MemberExperience for ${member.uid} (${input.company}): ${error.message}`
+              );
+            }
+          }
+          stamp('workHistory', FieldEnrichmentStatus.Enriched, EnrichmentSource.LinkedinExperience);
+        } else {
+          stamp('workHistory', FieldEnrichmentStatus.CannotEnrich, undefined, 'no usable LinkedIn experience data');
+        }
+      } else {
+        stampPreexisting('workHistory');
+      }
+
+      // 5. bio — reuses generateMemberBioText unchanged, feeding it the ScrapingDog
       // payload from step 1 as scrapedContext (no second scrape).
       if (!member.bio) {
         const pronouns = await resolveMemberPronouns(this.prisma as any, member);
@@ -362,7 +390,7 @@ export class MemberEnrichmentService {
         stampPreexisting('bio');
       }
 
-      // 5. skills — reuses HuskyGenerationService.generateMemberSkills unchanged; needs
+      // 6. skills — reuses HuskyGenerationService.generateMemberSkills unchanged; needs
       // an email (original or just-filled in step 2).
       if (member.skills.length === 0) {
         if (emailForSkills) {

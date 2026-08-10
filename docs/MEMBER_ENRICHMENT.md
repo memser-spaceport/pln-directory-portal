@@ -3,10 +3,10 @@
 ## Overview
 
 Automated, periodic gap-filling for Directory member profiles: **primary team/role**,
-**bio**, **email**, and **skills**. Sourced from the member's own LinkedIn (or, when no
-LinkedIn handle is on file, X/Twitter) profile via ScrapingDog, plus a free CRM lookup for
-email. A daily marking cron finds newly-eligible members; an hourly cron processes the
-pending queue.
+**work history**, **bio**, **email**, and **skills**. Sourced from the member's own
+LinkedIn (or, when no LinkedIn handle is on file, X/Twitter) profile via ScrapingDog, plus
+a free CRM lookup for email. A daily marking cron finds newly-eligible members; an hourly
+cron processes the pending queue.
 
 **Fill-gaps-only, no exceptions.** Every field is only written when it is currently empty.
 A pre-existing value — set by the member, an admin, or a prior import — is never
@@ -20,8 +20,8 @@ self-reported identity (their own LinkedIn profile), not a public company identi
 might misattribute — the same reasoning that already lets `member-bio.util.ts` and
 `husky-generation.service.ts` write bios/skills directly to `Member` with no judge stage
 (see [`MEMBER_BIO_GENERATION.md`](./MEMBER_BIO_GENERATION.md)). So `MemberEnrichment` is a
-lean, state-only sidecar — accepted values go straight to `Member`, `TeamMemberRole`, and
-`Skill`.
+lean, state-only sidecar — accepted values go straight to `Member`, `TeamMemberRole`,
+`MemberExperience`, and `Skill`.
 
 ## Storage model
 
@@ -48,6 +48,7 @@ model MemberEnrichment {
 | Field | Canonical home | Fill source | "Gap" means |
 | --- | --- | --- | --- |
 | primary team/role | `TeamMemberRole.mainTeam` (+ `role`) | LinkedIn `experience[0]` (most-recent-first) matched to an existing `Team` | member has no `TeamMemberRole` row with `mainTeam: true` |
+| work history | `MemberExperience` (one row per position) | every entry in LinkedIn `experience[]` with a parseable start date | member has zero `MemberExperience` rows |
 | bio | `Member.bio` | `generateMemberBioText` (reused, unchanged) | `Member.bio` is empty |
 | email | `Member.email` | `AffinityPerson.primaryEmail` via `MasterProfile` | `Member.email` is empty |
 | skills | `Member.skills` (m2m) | `HuskyGenerationService.generateMemberSkills` (reused, unchanged) | `Member.skills` is empty |
@@ -62,7 +63,7 @@ interface MemberDataEnrichment {
   enrichedAt?: string;      // ISO
   enrichedBy?: string;      // 'system-cron' | admin email
   errorMessage?: string;
-  fieldsMeta: Partial<Record<'primaryTeamRole' | 'bio' | 'email' | 'skills', {
+  fieldsMeta: Partial<Record<'primaryTeamRole' | 'workHistory' | 'bio' | 'email' | 'skills', {
     status: 'Enriched' | 'ChangedByUser' | 'CannotEnrich';
     source?: 'linkedin-experience' | 'linkedin-profile' | 'x-profile' | 'affinity-crm' | 'ai';
     lastModifiedAt?: string;  // ISO
@@ -118,9 +119,17 @@ Per member, **one** ScrapingDog call total:
    Match found: if the member already has a `TeamMemberRole` row for that team, its
    `mainTeam` is flipped to `true` (role filled only if currently empty); otherwise a new
    `TeamMemberRole` row is created.
-4. **bio** — if empty, `resolveMemberPronouns` + `generateMemberBioText` (unchanged),
+4. **workHistory** — if the member has zero `MemberExperience` rows, every entry in the
+   LinkedIn `experience[]` list is converted to a `MemberExperience` row
+   (`member-enrichment-experience.util.ts`). Whole-list gap check, same as bio/email/skills
+   — a member with even one existing row (self-reported or from a prior import) is left
+   alone entirely; there is no merge/dedup against a partial history. An entry with no
+   parseable `starts_at` (e.g. "Oct 2024") is skipped rather than guessed; a missing/
+   unparseable `ends_at` (including "Present") maps to `isCurrent: true`. Zero parseable
+   entries (or no LinkedIn data at all) → `CannotEnrich`.
+5. **bio** — if empty, `resolveMemberPronouns` + `generateMemberBioText` (unchanged),
    passing the ScrapingDog payload from step 1 as `scrapedContext` — no second scrape.
-5. **skills** — if empty and the member now has an email (original or step-2-filled),
+6. **skills** — if empty and the member now has an email (original or step-2-filled),
    `HuskyGenerationService.generateMemberSkills` (unchanged); the returned skills are
    `connect`ed to `Member.skills`.
 
@@ -177,6 +186,7 @@ apps/web-api/src/member-enrichment/
   member-enrichment.types.ts                    # EnrichmentStatus, FieldEnrichmentStatus, EnrichmentSource, MemberDataEnrichment
   member-enrichment-eligibility-filter.ts        # investor / fund-team / priority-team OR filter
   member-enrichment-team-match.util.ts           # LinkedIn-experience company name → existing Team
+  member-enrichment-experience.util.ts           # LinkedIn experience[] → MemberExperience create inputs
   member-enrichment.service.ts                   # marking, pending-queue, the enrichment pipeline itself
   member-enrichment.job.ts                       # marking + enrichment @Cron jobs
   member-enrichment.module.ts                    # imports HuskyModule for MemberScrapingDogService / HuskyGenerationService
@@ -195,6 +205,7 @@ per-field pipeline orchestration) with no real network calls:
 ```bash
 yarn nx run web-api:test --testFile=apps/web-api/src/member-enrichment/member-enrichment-eligibility-filter.spec.ts
 yarn nx run web-api:test --testFile=apps/web-api/src/member-enrichment/member-enrichment-team-match.util.spec.ts
+yarn nx run web-api:test --testFile=apps/web-api/src/member-enrichment/member-enrichment-experience.util.spec.ts
 yarn nx run web-api:test --testFile=apps/web-api/src/member-enrichment/member-enrichment.service.spec.ts
 ```
 

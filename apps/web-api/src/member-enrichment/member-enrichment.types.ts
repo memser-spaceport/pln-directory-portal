@@ -24,8 +24,8 @@ export enum EnrichmentSource {
   AI = 'ai',
 }
 
-/** The four gap-fillable member fields this pipeline can enrich. */
-export const MEMBER_ENRICHABLE_FIELDS = ['primaryTeamRole', 'bio', 'email', 'skills'] as const;
+/** The gap-fillable member fields this pipeline can enrich. */
+export const MEMBER_ENRICHABLE_FIELDS = ['primaryTeamRole', 'workHistory', 'bio', 'email', 'skills'] as const;
 export type MemberEnrichableField = typeof MEMBER_ENRICHABLE_FIELDS[number];
 
 export interface MemberFieldEnrichmentMeta {

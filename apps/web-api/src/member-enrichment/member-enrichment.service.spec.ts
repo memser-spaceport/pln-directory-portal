@@ -68,6 +68,7 @@ function buildPrismaMock(member: any) {
     masterProfile: { findFirst: jest.fn().mockResolvedValue(null) },
     affinityPerson: { findUnique: jest.fn().mockResolvedValue(null) },
     teamMemberRole: { update: jest.fn().mockResolvedValue({}), create: jest.fn().mockResolvedValue({}) },
+    memberExperience: { create: jest.fn().mockResolvedValue({}) },
     $executeRaw: jest.fn().mockResolvedValue(0),
   };
 }
@@ -297,6 +298,128 @@ describe('MemberEnrichmentService', () => {
       expect(savedMeta.update.dataEnrichment.fieldsMeta.primaryTeamRole.status).toBe(
         FieldEnrichmentStatus.CannotEnrich
       );
+    });
+
+    it('backfills MemberExperience from every parseable LinkedIn position when the member has none', async () => {
+      const member = buildMember({
+        linkedinHandler: 'jane-doe',
+        bio: 'existing bio',
+        email: 'jane@example.com',
+        skills: [{ uid: 's1', title: 'X' }],
+        experiences: [],
+      });
+      const prisma = buildPrismaMock(member);
+      const scrapingDog = buildScrapingDogMock({
+        fetchPersonProfile: jest.fn().mockResolvedValue({
+          kind: 'ok',
+          profile: {
+            fullName: 'Jane Doe',
+            headline: null,
+            about: null,
+            location: null,
+            education: [],
+            experiences: [
+              {
+                title: 'CTO',
+                company: 'Acme Robotics',
+                location: null,
+                duration: null,
+                summary: 'Ran engineering.',
+                startsAt: 'Oct 2024',
+                endsAt: 'Present',
+              },
+              {
+                title: 'Engineer',
+                company: 'Beta Corp',
+                location: null,
+                duration: null,
+                summary: null,
+                startsAt: null,
+                endsAt: null,
+              },
+            ],
+          },
+        }),
+      });
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        scrapingDog as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      // Only the entry with a parseable start date is inserted.
+      expect(prisma.memberExperience.create).toHaveBeenCalledTimes(1);
+      expect(prisma.memberExperience.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          title: 'CTO',
+          company: 'Acme Robotics',
+          isCurrent: true,
+          endDate: null,
+          memberUid: member.uid,
+        }),
+      });
+      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.workHistory.status).toBe(FieldEnrichmentStatus.Enriched);
+    });
+
+    it('never touches MemberExperience when the member already has any rows', async () => {
+      const member = buildMember({
+        linkedinHandler: 'jane-doe',
+        bio: 'existing bio',
+        email: 'jane@example.com',
+        skills: [{ uid: 's1', title: 'X' }],
+        experiences: [{ uid: 'exp-1', title: 'Old role', company: 'Old Co' }],
+      });
+      const prisma = buildPrismaMock(member);
+      const scrapingDog = buildScrapingDogMock({
+        fetchPersonProfile: jest.fn().mockResolvedValue({
+          kind: 'ok',
+          profile: {
+            fullName: 'Jane Doe',
+            headline: null,
+            about: null,
+            location: null,
+            education: [],
+            experiences: [
+              { title: 'CTO', company: 'Acme Robotics', location: null, duration: null, summary: null, startsAt: 'Oct 2024', endsAt: 'Present' },
+            ],
+          },
+        }),
+      });
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        scrapingDog as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(prisma.memberExperience.create).not.toHaveBeenCalled();
+      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.workHistory.status).toBe(FieldEnrichmentStatus.ChangedByUser);
+    });
+
+    it('marks workHistory CannotEnrich when there is no usable LinkedIn experience data', async () => {
+      const member = buildMember({
+        bio: 'existing bio',
+        email: 'jane@example.com',
+        skills: [{ uid: 's1', title: 'X' }],
+        experiences: [],
+      });
+      const prisma = buildPrismaMock(member);
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        buildScrapingDogMock({ isConfigured: jest.fn().mockReturnValue(false) }) as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(prisma.memberExperience.create).not.toHaveBeenCalled();
+      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.workHistory.status).toBe(FieldEnrichmentStatus.CannotEnrich);
     });
 
     it('fills email from AffinityPerson via MasterProfile when missing, and skips on a conflicting existing member', async () => {
