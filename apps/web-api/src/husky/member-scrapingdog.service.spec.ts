@@ -115,6 +115,8 @@ describe('MemberScrapingDogService', () => {
           location: null,
           duration: '6 years',
           summary: 'Backend services.',
+          startsAt: 'Jan 2020',
+          endsAt: 'Present',
         },
       ]);
       expect(profile.education).toEqual(['Odessa State Polytechnic University — Master, Computer Science']);
@@ -126,6 +128,8 @@ describe('MemberScrapingDogService', () => {
         experience: [{ position: 'CTO', company_name: 'Beta', starts_at: 'Jan 2020', ends_at: '' }],
       });
       expect(profile.experiences[0].duration).toBe('Jan 2020 - Present');
+      expect(profile.experiences[0].startsAt).toBe('Jan 2020');
+      expect(profile.experiences[0].endsAt).toBeNull();
     });
 
     it('tolerates key drift (title/company variants) and skips empty entries', () => {
@@ -136,7 +140,7 @@ describe('MemberScrapingDogService', () => {
       });
       expect(profile.fullName).toBe('Jane Doe');
       expect(profile.experiences).toEqual([
-        { title: 'Advisor', company: 'Beta', location: null, duration: '2y', summary: null },
+        { title: 'Advisor', company: 'Beta', location: null, duration: '2y', summary: null, startsAt: null, endsAt: null },
       ]);
       expect(profile.education).toEqual([]);
     });

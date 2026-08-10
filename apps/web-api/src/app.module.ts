@@ -65,6 +65,7 @@ import { ContactSupportModule } from './contact-support/contact-support.module';
 import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { TeamEnrichmentModule } from './team-enrichment/team-enrichment.module';
+import { MemberEnrichmentModule } from './member-enrichment/member-enrichment.module';
 import { DealsModule } from './deals/deals.module';
 import { DealRequestsModule } from './deal-requests/deal-requests.module';
 import { ArticleRequestsModule } from './article-requests/article-requests.module';
@@ -169,6 +170,7 @@ import { AgentSessionsModule } from './agent-sessions/agent-sessions.module';
     PushNotificationsModule,
     WebSocketModule,
     TeamEnrichmentModule,
+    MemberEnrichmentModule,
     DealsModule,
     DealRequestsModule,
     ArticleRequestsModule,
