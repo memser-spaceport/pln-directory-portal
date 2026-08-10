@@ -77,6 +77,9 @@ export const TeamNewsItemSchema = z.object({
   // True when the authenticated caller has upvoted this item. Always false
   // for anonymous requests.
   viewerHasUpvoted: z.boolean(),
+  // 1 = Top Stories lead, 2–3 = runners-up; null when not featured.
+  // Set by seed-trending; independent of upvoteCount.
+  editorialRank: z.number().int().min(1).max(3).nullable(),
 });
 
 export const TeamNewsUpvoteStatusSchema = z.object({
@@ -113,7 +116,8 @@ export const TeamNewsPopularQueryParams = z.object({
 
 export const SeedTeamNewsTrendingDtoSchema = z.object({
   createdAfter: z.string(),
-  limit: z.number().int().min(5).max(7).optional().default(7),
+  // Synthetic-like count for Popular this week (fixed at 5).
+  limit: z.number().int().min(5).max(5).optional().default(5),
 });
 
 export const SeedTeamNewsTrendingRankedItemSchema = z.object({
@@ -122,8 +126,14 @@ export const SeedTeamNewsTrendingRankedItemSchema = z.object({
   upvoteCount: z.number().int().min(0),
 });
 
+export const SeedTeamNewsTrendingEditorialItemSchema = z.object({
+  uid: z.string(),
+  rank: z.number().int().min(1).max(3),
+});
+
 export const SeedTeamNewsTrendingResponseSchema = z.object({
   ranked: z.array(SeedTeamNewsTrendingRankedItemSchema),
+  editorial: z.array(SeedTeamNewsTrendingEditorialItemSchema),
   protocolLabsIncluded: z.boolean(),
   candidateCount: z.number().int().min(0),
 });

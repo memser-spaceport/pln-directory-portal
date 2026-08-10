@@ -1,20 +1,17 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { generateObject } from 'ai';
 import { z } from 'zod';
-import type {
-  SeedTeamNewsTrendingDto,
-  SeedTeamNewsTrendingResponse,
-} from 'libs/contracts/src/schema/team-news';
+import type { SeedTeamNewsTrendingDto, SeedTeamNewsTrendingResponse } from 'libs/contracts/src/schema/team-news';
 import { PrismaService } from '../shared/prisma.service';
 import { AiProviderService } from '../shared/ai-provider.service';
-import {
-  PROTOCOL_LABS_TEAM_UID,
-  TEAM_NEWS_EXCLUDED_TEAM_NAMES,
-} from './team-news-public-list.config';
+import { PROTOCOL_LABS_TEAM_UID, TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 import {
   clampTrendingLimit,
+  EDITORIAL_RANK_LIMIT,
+  enforceDisjoint,
   forceIncludeProtocolLabs,
   likesForRank,
+  TRENDING_LIKED_LIMIT,
   TRENDING_SEED_BOT_COUNT,
   TRENDING_SEED_EXTERNAL_ID_PREFIX,
 } from './team-news-trending-seed.util';
@@ -23,7 +20,8 @@ const POPULAR_WINDOW_DAYS = 14;
 const PROVIDER_ENV_VAR = 'TEAM_NEWS_TRENDING_AI_PROVIDER';
 
 const LlmRankingSchema = z.object({
-  rankedUids: z.array(z.string()).min(1).max(7),
+  likedUids: z.array(z.string()).max(TRENDING_LIKED_LIMIT),
+  editorialUids: z.array(z.string()).max(EDITORIAL_RANK_LIMIT),
 });
 
 type CandidateRow = {
@@ -36,26 +34,28 @@ type CandidateRow = {
   team: { name: string };
 };
 
+type LlmPickResult = {
+  likedUids: string[];
+  editorialUids: string[];
+};
+
 @Injectable()
 export class TeamNewsTrendingSeedService {
   private readonly logger = new Logger(TeamNewsTrendingSeedService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly aiProvider: AiProviderService
-  ) {}
+  constructor(private readonly prisma: PrismaService, private readonly aiProvider: AiProviderService) {}
 
   async seedTrending(dto: SeedTeamNewsTrendingDto): Promise<SeedTeamNewsTrendingResponse> {
     const createdAfter = new Date(dto.createdAfter);
     if (Number.isNaN(createdAfter.getTime())) {
       throw new BadRequestException('createdAfter must be a valid ISO datetime');
     }
-    const limit = clampTrendingLimit(dto.limit);
+    const likedLimit = clampTrendingLimit(dto.limit);
 
     const candidates = await this.loadCandidates(createdAfter);
     if (candidates.length === 0) {
       this.logger.log(`seed-trending: no candidates after ${dto.createdAfter}; skipping`);
-      return { ranked: [], protocolLabsIncluded: false, candidateCount: 0 };
+      return { ranked: [], editorial: [], protocolLabsIncluded: false, candidateCount: 0 };
     }
 
     const plCandidate =
@@ -67,24 +67,42 @@ export class TeamNewsTrendingSeedService {
       pool.push(plCandidate);
     }
 
-    const llmRanked = await this.rankWithLlm(pool, limit);
+    const { likedUids: llmLiked, editorialUids: llmEditorial } = await this.rankWithLlm(
+      pool,
+      likedLimit,
+      EDITORIAL_RANK_LIMIT
+    );
+
+    const known = new Set(pool.map((c) => c.uid));
+    let editorialUids = this.sanitizeUids(llmEditorial, known, EDITORIAL_RANK_LIMIT);
+    let likedUids = enforceDisjoint(this.sanitizeUids(llmLiked, known, likedLimit), editorialUids);
+
+    editorialUids = this.padFromPool(editorialUids, pool, EDITORIAL_RANK_LIMIT, new Set(likedUids));
+    likedUids = this.padFromPool(likedUids, pool, likedLimit, new Set(editorialUids));
+
     const plUidInPool = plCandidate?.uid ?? null;
-    const finalUids = forceIncludeProtocolLabs(llmRanked, plUidInPool, limit);
+    // Force-include PL on the liked list only when it is not already editorial.
+    const plForLiked = plUidInPool && !editorialUids.includes(plUidInPool) ? plUidInPool : null;
+    likedUids = forceIncludeProtocolLabs(likedUids, plForLiked, likedLimit);
+    likedUids = enforceDisjoint(likedUids, editorialUids);
+    likedUids = this.padFromPool(likedUids, pool, likedLimit, new Set(editorialUids));
 
     const botMemberUids = await this.ensureSeedBotMembers();
     await this.clearSeedUpvotes(botMemberUids);
-    const ranked = await this.applySeedUpvotes(finalUids, botMemberUids);
+    await this.clearEditorialRanks();
+    const editorial = await this.applyEditorialRanks(editorialUids);
+    const ranked = await this.applySeedUpvotes(likedUids, botMemberUids);
 
-    const protocolLabsIncluded = finalUids.some((uid) => {
+    const protocolLabsIncluded = likedUids.some((uid) => {
       const row = pool.find((c) => c.uid === uid);
       return row?.teamUid === PROTOCOL_LABS_TEAM_UID;
     });
 
     this.logger.log(
-      `seed-trending: candidates=${pool.length} ranked=${ranked.length} protocolLabsIncluded=${protocolLabsIncluded}`
+      `seed-trending: candidates=${pool.length} liked=${ranked.length} editorial=${editorial.length} protocolLabsIncluded=${protocolLabsIncluded}`
     );
 
-    return { ranked, protocolLabsIncluded, candidateCount: pool.length };
+    return { ranked, editorial, protocolLabsIncluded, candidateCount: pool.length };
   }
 
   private excludedTeamWhere() {
@@ -135,7 +153,11 @@ export class TeamNewsTrendingSeedService {
     });
   }
 
-  private async rankWithLlm(candidates: CandidateRow[], limit: number): Promise<string[]> {
+  private async rankWithLlm(
+    candidates: CandidateRow[],
+    likedLimit: number,
+    editorialLimit: number
+  ): Promise<LlmPickResult> {
     const catalog = candidates.map((c) => ({
       uid: c.uid,
       teamName: c.team.name,
@@ -147,36 +169,65 @@ export class TeamNewsTrendingSeedService {
       isProtocolLabs: c.teamUid === PROTOCOL_LABS_TEAM_UID,
     }));
 
-    const known = new Set(candidates.map((c) => c.uid));
-    const targetCount = Math.min(limit, candidates.length);
+    const editorialTarget = Math.min(editorialLimit, candidates.length);
+    const likedTarget = Math.min(likedLimit, Math.max(0, candidates.length - editorialTarget));
 
     try {
       const { object } = await generateObject({
         model: this.aiProvider.getResponsesModel(PROVIDER_ENV_VAR, { useSearchGrounding: false }),
         schema: LlmRankingSchema,
-        system: `You rank team news for a Protocol Labs Network home-page "Popular / trending" rail.
-Pick the ${targetCount} most newsworthy and interesting items (between 5 and 7 when enough candidates exist).
-Prefer diversity of teams and event types. When a Protocol Labs item is present, include it somewhere in the list (not necessarily #1).
-Return only UIDs from the provided catalog, ordered best-first.`,
-        prompt: `Catalog (JSON):\n${JSON.stringify(catalog, null, 2)}\n\nReturn rankedUids with exactly ${targetCount} UIDs when possible.`,
+        system: `You curate team news for a Protocol Labs Network home page with two distinct surfaces.
+
+1) editorialUids (${editorialTarget}): the most important / newsworthy items for the "Top stories" band — editorial significance, not popularity. Ordered best-first (rank 1 = lead story).
+
+2) likedUids (${likedTarget}): items for "Popular this week" — interesting / engaging stories that deserve synthetic community interest. Prefer diversity of teams and event types. When a Protocol Labs item is present and not already in editorialUids, include it somewhere in likedUids (not necessarily #1).
+
+HARD RULE: likedUids and editorialUids must be disjoint — no UID in both lists. Editorial importance ≠ popularity; do not put the same story on both lists.
+Return only UIDs from the provided catalog.`,
+        prompt: `Catalog (JSON):\n${JSON.stringify(
+          catalog,
+          null,
+          2
+        )}\n\nReturn editorialUids with up to ${editorialTarget} UIDs and likedUids with up to ${likedTarget} UIDs. Sets must be disjoint.`,
         temperature: 0.4,
       });
 
-      const filtered = object.rankedUids.filter((uid) => known.has(uid));
-      if (filtered.length > 0) {
-        return filtered.slice(0, limit);
-      }
-      this.logger.warn('seed-trending: LLM returned no valid UIDs; falling back to eventDate order');
+      return {
+        likedUids: object.likedUids ?? [],
+        editorialUids: object.editorialUids ?? [],
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`seed-trending: LLM ranking failed: ${message}`);
+      return { likedUids: [], editorialUids: [] };
     }
+  }
 
-    return candidates
-      .slice()
-      .sort((a, b) => b.eventDate.getTime() - a.eventDate.getTime())
-      .map((c) => c.uid)
-      .slice(0, limit);
+  private sanitizeUids(uids: string[], known: Set<string>, limit: number): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const uid of uids) {
+      if (!known.has(uid) || seen.has(uid)) continue;
+      seen.add(uid);
+      out.push(uid);
+      if (out.length >= limit) break;
+    }
+    return out;
+  }
+
+  /** Pad short lists from pool by eventDate desc, skipping reserved UIDs. */
+  private padFromPool(uids: string[], pool: CandidateRow[], limit: number, reserved: Set<string>): string[] {
+    if (uids.length >= limit) return uids.slice(0, limit);
+    const used = new Set([...uids, ...reserved]);
+    const sorted = pool.slice().sort((a, b) => b.eventDate.getTime() - a.eventDate.getTime());
+    const next = [...uids];
+    for (const c of sorted) {
+      if (used.has(c.uid)) continue;
+      next.push(c.uid);
+      used.add(c.uid);
+      if (next.length >= limit) break;
+    }
+    return next.slice(0, limit);
   }
 
   /** Idempotently ensure a pool of internal bot members for synthetic upvotes. */
@@ -216,6 +267,28 @@ Return only UIDs from the provided catalog, ordered best-first.`,
     await this.prisma.teamNewsUpvote.deleteMany({
       where: { memberUid: { in: botMemberUids } },
     });
+  }
+
+  /** Clear all editorial ranks so each seed run fully replaces Top Stories. */
+  private async clearEditorialRanks(): Promise<void> {
+    await this.prisma.teamNewsItem.updateMany({
+      where: { editorialRank: { not: null } },
+      data: { editorialRank: null },
+    });
+  }
+
+  private async applyEditorialRanks(editorialUids: string[]): Promise<SeedTeamNewsTrendingResponse['editorial']> {
+    const editorial: SeedTeamNewsTrendingResponse['editorial'] = [];
+    for (let i = 0; i < editorialUids.length; i++) {
+      const rank = i + 1;
+      const uid = editorialUids[i];
+      await this.prisma.teamNewsItem.update({
+        where: { uid },
+        data: { editorialRank: rank },
+      });
+      editorial.push({ uid, rank });
+    }
+    return editorial;
   }
 
   private async applySeedUpvotes(

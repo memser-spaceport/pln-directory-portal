@@ -557,6 +557,7 @@ export class TeamNewsQueryService {
       sourceUrls: string[];
       sourceDomain: string | null;
       tags: string[];
+      editorialRank: number | null;
       createdAt: Date;
       team: {
         uid: string;
@@ -615,6 +616,7 @@ export class TeamNewsQueryService {
       isFollowed: followedTeamUids.has(row.teamUid),
       upvoteCount: upvotes.counts.get(row.uid) ?? 0,
       viewerHasUpvoted: upvotes.viewerUpvoted.has(row.uid),
+      editorialRank: row.editorialRank ?? null,
     };
   }
 }
