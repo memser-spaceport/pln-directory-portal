@@ -12,9 +12,16 @@ import { TeamNewsEnrichmentService } from './team-news-enrichment.service';
 import { TeamNewsUpvotesService } from './team-news-upvotes.service';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 import { TeamNewsTrendingSeedService } from './team-news-trending-seed.service';
+import { TeamNewsImpressionsService } from './team-news-impressions.service';
 
 @Module({
-  imports: [SharedModule, forwardRef(() => MembersModule), AccessControlV2Module, PushNotificationsModule, FollowsModule],
+  imports: [
+    SharedModule,
+    forwardRef(() => MembersModule),
+    AccessControlV2Module,
+    PushNotificationsModule,
+    FollowsModule,
+  ],
   controllers: [TeamNewsController, TeamNewsServiceController],
   providers: [
     TeamNewsService,
@@ -23,6 +30,7 @@ import { TeamNewsTrendingSeedService } from './team-news-trending-seed.service';
     TeamNewsUpvotesService,
     TeamNewsSuggestionsService,
     TeamNewsTrendingSeedService,
+    TeamNewsImpressionsService,
   ],
   exports: [TeamNewsService, TeamNewsQueryService, TeamNewsEnrichmentService],
 })

@@ -140,6 +140,83 @@ describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
   });
 });
 
+describe('TeamNewsQueryService — viewCount', () => {
+  let service: TeamNewsQueryService;
+
+  const teamFindUnique = jest.fn();
+  const teamNewsItemFindMany = jest.fn();
+  const teamNewsItemCount = jest.fn();
+  const teamNewsForumLinkFindMany = jest.fn();
+  const teamNewsUpvoteGroupBy = jest.fn();
+  const teamNewsUpvoteFindMany = jest.fn();
+
+  const makeRow = (overrides: Record<string, unknown> = {}) => ({
+    uid: 'news-1',
+    teamUid: 'team-1',
+    eventType: 'FUNDING',
+    eventDate: new Date('2026-06-01T00:00:00.000Z'),
+    title: 'Raised Series A',
+    summary: 'Funding round closed',
+    contentHtml: null,
+    sourceUrl: 'https://example.com/news',
+    sourceUrls: ['https://example.com/news'],
+    sourceDomain: 'example.com',
+    tags: ['funding'],
+    editorialRank: null,
+    createdAt: new Date('2026-06-02T00:00:00.000Z'),
+    team: {
+      uid: 'team-1',
+      name: 'Acme Labs',
+      logo: null,
+      teamFocusAreas: [],
+    },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    teamFindUnique.mockResolvedValue({ uid: 'team-1', name: 'Acme Labs' });
+    teamNewsItemCount.mockResolvedValue(1);
+    teamNewsForumLinkFindMany.mockResolvedValue([]);
+    teamNewsUpvoteGroupBy.mockResolvedValue([]);
+    teamNewsUpvoteFindMany.mockResolvedValue([]);
+
+    // teamNewsItem.findMany is called twice per request: once for the paginated
+    // rows (full include), once inside loadViewCounts (select: uid + viewCount).
+    // Branch on the `select` shape to serve each caller its own fixture.
+    teamNewsItemFindMany.mockImplementation((args: { select?: { viewCount?: boolean } }) => {
+      if (args?.select?.viewCount) {
+        return Promise.resolve([{ uid: 'news-1', viewCount: 42 }]);
+      }
+      return Promise.resolve([makeRow()]);
+    });
+
+    service = new TeamNewsQueryService({
+      team: { findUnique: teamFindUnique },
+      teamNewsItem: { findMany: teamNewsItemFindMany, count: teamNewsItemCount },
+      teamNewsForumLink: { findMany: teamNewsForumLinkFindMany },
+      teamNewsUpvote: { groupBy: teamNewsUpvoteGroupBy, findMany: teamNewsUpvoteFindMany },
+    } as unknown as PrismaService);
+  });
+
+  it('stamps viewCount from loadViewCounts onto the DTO', async () => {
+    const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
+
+    expect(result.items[0]).toEqual(expect.objectContaining({ uid: 'news-1', viewCount: 42 }));
+  });
+
+  it('defaults viewCount to 0 for an item with no impressions yet', async () => {
+    teamNewsItemFindMany.mockImplementation((args: { select?: { viewCount?: boolean } }) => {
+      if (args?.select?.viewCount) return Promise.resolve([]);
+      return Promise.resolve([makeRow()]);
+    });
+
+    const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
+
+    expect(result.items[0]).toEqual(expect.objectContaining({ uid: 'news-1', viewCount: 0 }));
+  });
+});
+
 describe('TeamNewsQueryService.getPopular', () => {
   let service: TeamNewsQueryService;
   const teamNewsItemFindMany = jest.fn();
