@@ -4,16 +4,20 @@ export function randomIntInclusive(min: number, max: number, rng: () => number =
   return min + Math.floor(rng() * (max - min + 1));
 }
 
-/** Rank (1-based) → inclusive synthetic like count range. */
+/** Rank (1-based) → inclusive synthetic like count range. First 5 used for Popular. */
 export const TRENDING_LIKE_RANGES: ReadonlyArray<readonly [number, number]> = [
   [9, 10], // rank 1
   [7, 9], // rank 2
   [6, 8], // rank 3
   [5, 7], // rank 4
   [4, 6], // rank 5
-  [3, 5], // rank 6
-  [2, 4], // rank 7
 ];
+
+/** Fixed count of synthetic-liked items for Popular this week. */
+export const TRENDING_LIKED_LIMIT = 5;
+
+/** Fixed count of editorial Top Stories picks. */
+export const EDITORIAL_RANK_LIMIT = 3;
 
 /** Max likes needed for rank 1 — size of the bot member pool. */
 export const TRENDING_SEED_BOT_COUNT = 10;
@@ -56,8 +60,17 @@ export function forceIncludeProtocolLabs(
   return next.slice(0, limit);
 }
 
-/** Clamp requested trending limit to 5–7. */
+/** Clamp requested trending (liked) limit to exactly TRENDING_LIKED_LIMIT (5). */
 export function clampTrendingLimit(limit: number | undefined): number {
-  const n = limit ?? 7;
-  return Math.min(7, Math.max(5, Math.floor(n)));
+  const n = limit ?? TRENDING_LIKED_LIMIT;
+  return Math.min(TRENDING_LIKED_LIMIT, Math.max(TRENDING_LIKED_LIMIT, Math.floor(n)));
+}
+
+/**
+ * Remove any editorial UIDs from the liked list so Popular and Top Stories stay disjoint.
+ * Editorial wins on conflict.
+ */
+export function enforceDisjoint(likedUids: string[], editorialUids: string[]): string[] {
+  const editorial = new Set(editorialUids);
+  return likedUids.filter((uid) => !editorial.has(uid));
 }

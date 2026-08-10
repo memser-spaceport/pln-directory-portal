@@ -43,6 +43,7 @@ import { TeamMembershipSourceReadAuthGuard } from '../guards/admin-auth.guard';
 import { QueryCache } from '../decorators/query-cache.decorator';
 import { UpdateTeamAccessLevelDto } from './dto/teams.dto';
 import { ParticipantsRequest } from './dto/members.dto';
+import { sanitizeMemberContactsForViewer } from '../members/member-contact-sanitizer';
 
 const server = initNestServer(apiTeam);
 type RouteShape = typeof server.routeShapes;
@@ -156,6 +157,18 @@ export class TeamsController {
     // Stamp `isFollowed` per team for the authenticated caller (false for all
     // when anonymous). Optional auth via UserTokenCheckGuard keeps this public.
     await this.stampIsFollowed(result.teams, request['userEmail']);
+    if (!request['userEmail']) {
+      for (const team of result.teams as any[]) {
+        const roles = team?.teamMemberRoles;
+        if (Array.isArray(roles)) {
+          for (const role of roles) {
+            if (role?.member) {
+              role.member = sanitizeMemberContactsForViewer(role.member, false);
+            }
+          }
+        }
+      }
+    }
     return result;
   }
 

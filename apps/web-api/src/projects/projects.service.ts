@@ -1,5 +1,11 @@
 /* eslint-disable prettier/prettier */
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { LogService } from '../shared/log.service';
 import { PrismaService } from '../shared/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -17,27 +23,29 @@ export class ProjectsService {
     private cacheService: CacheService,
     private askService: AskService,
     private huskyRevalidationService: HuskyRevalidationService
-  ) { }
+  ) {}
 
   async createProject(project: Prisma.ProjectUncheckedCreateInput, userEmail: string) {
     try {
       const member: any = await this.getMemberInfo(userEmail);
       const { contributingTeams, contributions, focusAreas }: any = project;
       project.createdBy = member.uid;
-      project['projectFocusAreas'] = { ...await this.createProjectWithFocusAreas(focusAreas, this.prisma) };
+      project['projectFocusAreas'] = { ...(await this.createProjectWithFocusAreas(focusAreas, this.prisma)) };
       delete project['focusAreas'];
       const result = await this.prisma.project.create({
         data: {
           ...project,
           contributingTeams: {
-            connect: contributingTeams?.map(team => { return { uid: team.uid } })
+            connect: contributingTeams?.map((team) => {
+              return { uid: team.uid };
+            }),
           },
           contributions: {
             create: contributions?.map((contribution) => {
               return contribution;
-            })
-          }
-        }
+            }),
+          },
+        },
       });
       await this.postCreateActions(result.uid);
       return result;
@@ -46,16 +54,16 @@ export class ProjectsService {
     }
   }
 
-  async updateProjectByUid(
-    uid: string,
-    project: Prisma.ProjectUncheckedUpdateInput,
-    userEmail: string
-  ) {
+  async updateProjectByUid(uid: string, project: Prisma.ProjectUncheckedUpdateInput, userEmail: string) {
     try {
       const member: any = await this.getMemberInfo(userEmail);
       const existingData: any = await this.getProjectByUid(uid);
-      const contributingTeamsUid = existingData?.contributingTeams?.map(team => team.uid) || [];
-      await this.isMemberAllowedToEdit(member, [existingData?.maintainingTeamUid, ...contributingTeamsUid], existingData);
+      const contributingTeamsUid = existingData?.contributingTeams?.map((team) => team.uid) || [];
+      await this.isMemberAllowedToEdit(
+        member,
+        [existingData?.maintainingTeamUid, ...contributingTeamsUid],
+        existingData
+      );
       const { contributingTeams, contributions, focusAreas }: any = project;
       const contributionsToCreate: any = [];
       const contributionUidsToDelete: any = [];
@@ -68,23 +76,28 @@ export class ProjectsService {
         }
       });
       return await this.prisma.$transaction(async (tx) => {
-        project['projectFocusAreas'] = { ...await this.updateProjectWithFocusAreas(uid, focusAreas, tx) };
+        project['projectFocusAreas'] = { ...(await this.updateProjectWithFocusAreas(uid, focusAreas, tx)) };
         delete project['focusAreas'];
         const result = await tx.project.update({
           where: {
-            uid
+            uid,
           },
           data: {
             ...project,
             contributingTeams: {
-              disconnect: contributingTeamsUid?.map(uid => { return { uid } }),
-              connect: contributingTeams?.map(team => { return { uid: team.uid } }) || []
+              disconnect: contributingTeamsUid?.map((uid) => {
+                return { uid };
+              }),
+              connect:
+                contributingTeams?.map((team) => {
+                  return { uid: team.uid };
+                }) || [],
             },
             contributions: {
               create: contributionsToCreate,
-              deleteMany: contributionUidsToDelete
-            }
-          }
+              deleteMany: contributionUidsToDelete,
+            },
+          },
         });
         await this.postUpdateActions(result.uid);
         return result;
@@ -117,7 +130,7 @@ export class ProjectsService {
             : ({
                 include: {
                   ...(queryOptions.include || {}),
-                  creator: true,
+                  creator: { select: { uid: true, name: true, image: true } },
                   logo: true,
                 },
               } as any)),
@@ -131,9 +144,7 @@ export class ProjectsService {
     }
   }
 
-  async getProjectByUid(
-    uid: string
-  ) {
+  async getProjectByUid(uid: string) {
     try {
       const project = await this.prisma.project.findUniqueOrThrow({
         where: { uid },
@@ -156,15 +167,15 @@ export class ProjectsService {
                       team: {
                         select: {
                           uid: true,
-                          name: true
-                        }
-                      }
-                    }
-                  }
-                }
+                          name: true,
+                        },
+                      },
+                    },
+                  },
+                },
               },
-              projectUid: true
-            }
+              projectUid: true,
+            },
           },
           creator: { select: { uid: true, name: true, image: true } },
           logo: true,
@@ -173,10 +184,10 @@ export class ProjectsService {
               focusArea: {
                 select: {
                   uid: true,
-                  title: true
-                }
-              }
-            }
+                  title: true,
+                },
+              },
+            },
           },
           asks: {
             select: {
@@ -184,10 +195,10 @@ export class ProjectsService {
               title: true,
               description: true,
               tags: true,
-              projectUid: true
-            }
-          }
-        }
+              projectUid: true,
+            },
+          },
+        },
       });
       project['projectFocusAreas'] = this.removeDuplicateFocusAreas(project?.projectFocusAreas);
       return project;
@@ -196,17 +207,14 @@ export class ProjectsService {
     }
   }
 
-  async removeProjectByUid(
-    uid: string,
-    userEmail: string
-  ) {
+  async removeProjectByUid(uid: string, userEmail: string) {
     const member: any = await this.getMemberInfo(userEmail);
     const existingData = await this.getProjectByUid(uid);
     await this.isMemberAllowedToDelete(member, existingData);
     try {
       const result = await this.prisma.project.update({
         where: { uid },
-        data: { isDeleted: true }
+        data: { isDeleted: true },
       });
       await this.postUpdateActions(result.uid);
       return result;
@@ -232,11 +240,11 @@ export class ProjectsService {
       throw new BadRequestException('Database field validation error on Project', error.message);
     }
     throw error;
-  };
+  }
 
   async getMemberInfo(memberEmail) {
-    return await this.memberService.findMemberByEmail(memberEmail)
-  };
+    return await this.memberService.findMemberByEmail(memberEmail);
+  }
 
   async isMemberAllowedToEdit(member, teams, project) {
     const res = await this.memberService.isMemberPartOfTeams(member, teams);
@@ -252,7 +260,9 @@ export class ProjectsService {
     if (res || member.uid === project.createdBy || this.memberService.checkIfAdminUser(member)) {
       return true;
     } else {
-      throw new ForbiddenException(`Member ${member.uid} isn't creator of the project ${project.uid} or leader of team ${project.maintainingTeamUid}`);
+      throw new ForbiddenException(
+        `Member ${member.uid} isn't creator of the project ${project.uid} or leader of team ${project.maintainingTeamUid}`
+      );
     }
   }
 
@@ -262,47 +272,47 @@ export class ProjectsService {
       const focusAreaHierarchies = await transaction.focusAreaHierarchy.findMany({
         where: {
           subFocusAreaUid: {
-            in: focusAreas.map(area => area.uid)
-          }
-        }
+            in: focusAreas.map((area) => area.uid),
+          },
+        },
       });
-      focusAreaHierarchies.map(areaHierarchy => {
+      focusAreaHierarchies.map((areaHierarchy) => {
         projectFocusAreas.push({
           focusAreaUid: areaHierarchy.subFocusAreaUid,
-          ancestorAreaUid: areaHierarchy.focusAreaUid
+          ancestorAreaUid: areaHierarchy.focusAreaUid,
         });
       });
-      focusAreas.map(area => {
+      focusAreas.map((area) => {
         projectFocusAreas.push({
           focusAreaUid: area.uid,
-          ancestorAreaUid: area.uid
+          ancestorAreaUid: area.uid,
         });
       });
       return {
         createMany: {
-          data: projectFocusAreas
-        }
-      }
+          data: projectFocusAreas,
+        },
+      };
     }
   }
 
   async isFocusAreaModified(projectId, focusAreas, transaction) {
     const projectFocusAreas = await transaction.projectFocusArea.findMany({
       where: {
-        projectUid: projectId
-      }
+        projectUid: projectId,
+      },
     });
-    const newFocusAreaUIds = focusAreas.map(area => area.uid);
-    const focusAreasUIds = [...new Set(projectFocusAreas.map(area => area.focusAreaUid))];
+    const newFocusAreaUIds = focusAreas.map((area) => area.uid);
+    const focusAreasUIds = [...new Set(projectFocusAreas.map((area) => area.focusAreaUid))];
 
     if (newFocusAreaUIds.length !== focusAreasUIds.length) {
       return true;
     }
 
     if (projectFocusAreas.length === 0 && focusAreas.length === 0) {
-      return false
+      return false;
     }
-    return !focusAreasUIds.every(area => newFocusAreaUIds.includes(area));
+    return !focusAreasUIds.every((area) => newFocusAreaUIds.includes(area));
   }
 
   async updateProjectWithFocusAreas(projectId, focusAreas, transaction) {
@@ -311,15 +321,15 @@ export class ProjectsService {
       if (focusAreas && focusAreas.length > 0) {
         await transaction.projectFocusArea.deleteMany({
           where: {
-            projectUid: projectId
-          }
+            projectUid: projectId,
+          },
         });
-        return await this.createProjectWithFocusAreas(focusAreas, transaction)
+        return await this.createProjectWithFocusAreas(focusAreas, transaction);
       } else {
         await transaction.projectFocusArea.deleteMany({
           where: {
-            projectUid: projectId
-          }
+            projectUid: projectId,
+          },
         });
       }
       return {};
@@ -333,19 +343,19 @@ export class ProjectsService {
           some: {
             ancestorArea: {
               title: {
-                in: focusAreas?.split(',')
-              }
-            }
-          }
-        }
-      }
+                in: focusAreas?.split(','),
+              },
+            },
+          },
+        },
+      };
     }
     return {};
   }
 
   removeDuplicateFocusAreas(focusAreas): any {
     const uniqueFocusAreas = {};
-    focusAreas.forEach(item => {
+    focusAreas.forEach((item) => {
       const uid = item.focusArea.uid;
       const title = item.focusArea.title;
       uniqueFocusAreas[uid] = { uid, title };
@@ -354,21 +364,19 @@ export class ProjectsService {
   }
 
   buildProjectFilter(query) {
-    const {
-      name,
-      lookingForFunding,
-      team
-    } = query;
-    const filter: any = [{
-      isDeleted: false
-    }];
+    const { name, lookingForFunding, team } = query;
+    const filter: any = [
+      {
+        isDeleted: false,
+      },
+    ];
     this.buildNameFilter(name, filter);
     this.buildFundingFilter(lookingForFunding, filter);
     this.buildMaintainingTeamFilter(team, filter);
     this.buildRecentProjectsFilter(query, filter);
     filter.push(this.buildTagFilter(query.tags));
     return {
-      AND: filter
+      AND: filter,
     };
   }
 
@@ -377,16 +385,16 @@ export class ProjectsService {
       filter.push({
         name: {
           contains: name,
-          mode: 'insensitive'
-        }
+          mode: 'insensitive',
+        },
       });
     }
   }
 
   buildFundingFilter(funding, filter) {
-    if (funding === "true") {
+    if (funding === 'true') {
       filter.push({
-        lookingForFunding: true
+        lookingForFunding: true,
       });
     }
   }
@@ -394,7 +402,7 @@ export class ProjectsService {
   buildMaintainingTeamFilter(team, filter) {
     if (team) {
       filter.push({
-        maintainingTeamUid: team
+        maintainingTeamUid: team,
       });
     }
   }
@@ -415,8 +423,8 @@ export class ProjectsService {
     const { isRecent } = queryParams;
     const recentFilter = {
       createdAt: {
-        gte: new Date(Date.now() - (parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000))
-      }
+        gte: new Date(Date.now() - parseInt(process.env.RECENT_RECORD_DURATION_IN_DAYS || '30') * 24 * 60 * 60 * 1000),
+      },
     };
     if (isRecent === 'true' && !filter) {
       return recentFilter;
@@ -427,28 +435,28 @@ export class ProjectsService {
     return {};
   }
 
-  buildAskTagFilter(queryParams){
+  buildAskTagFilter(queryParams) {
     const { askTags } = queryParams;
-    let tagFilter={}
-    if(askTags){
-      const tags = askTags.split(',')
-      tagFilter={
-        asks: { some: { tags: { hasSome: tags }, }, },
+    let tagFilter = {};
+    if (askTags) {
+      const tags = askTags.split(',');
+      tagFilter = {
+        asks: { some: { tags: { hasSome: tags } } },
       };
     }
-      return tagFilter;
-    }
+    return tagFilter;
+  }
 
-    buildTagFilter(tags){
-      let tagFilter={}
-      if(tags){
-        const filterValue = tags.split(',');
-        tagFilter={
-          tags: { hasSome : filterValue },
-        };
-      }
-        return tagFilter;
-      }
+  buildTagFilter(tags) {
+    let tagFilter = {};
+    if (tags) {
+      const filterValue = tags.split(',');
+      tagFilter = {
+        tags: { hasSome: filterValue },
+      };
+    }
+    return tagFilter;
+  }
 
   /**
    * Fetches team names that maintain atleast a single project.
@@ -460,18 +468,18 @@ export class ProjectsService {
       where: {
         maintainingProjects: {
           some: {},
-        }
+        },
       },
       select: {
         uid: true,
         name: true,
         logo: {
           select: {
-            url: true
-          }
-        }
-      }
-    })
+            url: true,
+          },
+        },
+      },
+    });
 
     const [askTags, tags] = await Promise.all([
       this.prisma.ask.findMany({
@@ -483,20 +491,19 @@ export class ProjectsService {
         },
       }),
       this.prisma.project.findMany({
-        where : queryParams.where,
+        where: queryParams.where,
         select: {
           tags: true,
         },
-      })
-    ])
+      }),
+    ]);
 
     return {
       askTags: this.askService.formatAskFilterResponse(askTags),
-      tags: this.aggregatePropertyCount(tags,'tags')
-    }
+      tags: this.aggregatePropertyCount(tags, 'tags'),
+    };
     // return { maintainedBy: maintainingTeams.map((team) => ({ uid: team.uid, name: team.name, logo: team.logo?.url })) };
   }
-
 
   /**
    * Aggregates the counts of a specified property from an array of objects.
@@ -531,13 +538,13 @@ export class ProjectsService {
     return Object.entries(propertyCounts).map(([value, count]) => ({ value, count }));
   }
 
-  async addEditProjectAsk(projectUid, requestorEmail, data){
+  async addEditProjectAsk(projectUid, requestorEmail, data) {
     let res;
-    try{
+    try {
       //checking if the member has edit access
       const member: any = await this.memberService.findMemberByEmail(requestorEmail);
       const existingData: any = await this.getProjectByUid(projectUid);
-      const contributingTeamsUid = existingData?.contributingTeams?.map(team => team.uid) || [];
+      const contributingTeamsUid = existingData?.contributingTeams?.map((team) => team.uid) || [];
       await this.isMemberAllowedToEdit(
         member,
         [existingData?.maintainingTeamUid, ...contributingTeamsUid],
@@ -559,7 +566,7 @@ export class ProjectsService {
             },
           });
         }
-      }else{
+      } else {
         //creating asks
         res = await this.prisma.ask.create({
           data: {
@@ -568,9 +575,9 @@ export class ProjectsService {
           },
         });
       }
-      await this.cacheService.reset({ service: 'projects'});
+      await this.cacheService.reset({ service: 'projects' });
       return res;
-    }catch(err){
+    } catch (err) {
       console.error(err);
       throw err;
     }

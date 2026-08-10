@@ -77,6 +77,13 @@ export const TeamNewsItemSchema = z.object({
   // True when the authenticated caller has upvoted this item. Always false
   // for anonymous requests.
   viewerHasUpvoted: z.boolean(),
+  // 1 = Top Stories lead, 2–3 = runners-up; null when not featured.
+  // Set by seed-trending; independent of upvoteCount.
+  editorialRank: z.number().int().min(1).max(3).nullable(),
+  // Raw feed-card impression count. Not deduplicated by user, session, or
+  // repeat viewing, and includes anonymous visitors. Incremented via
+  // POST /v1/team-news/impressions.
+  viewCount: z.number().int().min(0),
 });
 
 export const TeamNewsUpvoteStatusSchema = z.object({
@@ -113,7 +120,8 @@ export const TeamNewsPopularQueryParams = z.object({
 
 export const SeedTeamNewsTrendingDtoSchema = z.object({
   createdAfter: z.string(),
-  limit: z.number().int().min(5).max(7).optional().default(7),
+  // Synthetic-like count for Popular this week (fixed at 5).
+  limit: z.number().int().min(5).max(5).optional().default(5),
 });
 
 export const SeedTeamNewsTrendingRankedItemSchema = z.object({
@@ -122,8 +130,14 @@ export const SeedTeamNewsTrendingRankedItemSchema = z.object({
   upvoteCount: z.number().int().min(0),
 });
 
+export const SeedTeamNewsTrendingEditorialItemSchema = z.object({
+  uid: z.string(),
+  rank: z.number().int().min(1).max(3),
+});
+
 export const SeedTeamNewsTrendingResponseSchema = z.object({
   ranked: z.array(SeedTeamNewsTrendingRankedItemSchema),
+  editorial: z.array(SeedTeamNewsTrendingEditorialItemSchema),
   protocolLabsIncluded: z.boolean(),
   candidateCount: z.number().int().min(0),
 });
@@ -163,6 +177,18 @@ export const TeamNewsForumLinkSchema = z.object({
 export const CreateTeamNewsDiscussionResponseSchema = z.object({
   link: TeamNewsForumLinkSchema,
   created: z.boolean(),
+});
+
+// POST /v1/team-news/impressions — records feed-card impressions for a batch
+// of news items. Unauthenticated; every occurrence of a uid in the array
+// increments that item's viewCount by 1 (no dedup). Unknown uids are ignored.
+// Batch size capped at 200, matching POST /v1/feed/comments/counts.
+export const RecordTeamNewsImpressionsRequestSchema = z.object({
+  newsItemUids: z.array(z.string()).min(1).max(200),
+});
+
+export const RecordTeamNewsImpressionsResponseSchema = z.object({
+  success: z.literal(true),
 });
 
 export const TeamNewsListResponseSchema = z.object({

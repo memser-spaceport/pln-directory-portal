@@ -2337,6 +2337,12 @@ model TeamNewsItem {
   sourceDomain     String?
   tags             String[]            @default([])
   rawPayload       Json?
+  /// 1 = Top Stories lead, 2–3 = runners-up; null = not featured. Replaced each seed-trending run.
+  editorialRank    Int?
+  /// Raw impression count. Incremented once per feed-card impression via
+  /// POST /v1/team-news/impressions. Not deduplicated by user, session, or
+  /// repeat viewing — unlike upvotes/likes below.
+  viewCount        Int                 @default(0)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   forumLinks       TeamNewsForumLink[]
@@ -2348,6 +2354,7 @@ model TeamNewsItem {
   @@index([teamUid])
   @@index([eventDate])
   @@index([eventType])
+  @@index([editorialRank])
   @@index([teamUid, eventDate(sort: Desc)])
 }
 
