@@ -1,5 +1,18 @@
-import { buildMemberExperienceInputs, parseLinkedinDateString } from './member-enrichment-experience.util';
+import { buildMemberExperienceInputs, parseLinkedinDateString, selectMissingExperiences } from './member-enrichment-experience.util';
 import { ScrapingDogPersonProfile } from '../husky/member-scrapingdog.service';
+
+function experience(overrides: Partial<ScrapingDogPersonProfile['experiences'][number]> = {}) {
+  return {
+    title: 'Engineer',
+    company: 'Acme',
+    location: null,
+    duration: null,
+    summary: null,
+    startsAt: null,
+    endsAt: null,
+    ...overrides,
+  };
+}
 
 describe('parseLinkedinDateString', () => {
   it('parses "Mon YYYY"', () => {
@@ -106,5 +119,35 @@ describe('buildMemberExperienceInputs', () => {
     ];
 
     expect(buildMemberExperienceInputs(experiences, 'member-1')[0].title).toBe('');
+  });
+});
+
+describe('selectMissingExperiences', () => {
+  it('drops a candidate whose company exactly matches an existing row (case-insensitive)', () => {
+    const candidates = [experience({ company: 'acme  ' }), experience({ company: 'Beta Corp' })];
+
+    const missing = selectMissingExperiences(candidates, ['Acme']);
+
+    expect(missing).toEqual([experience({ company: 'Beta Corp' })]);
+  });
+
+  it('drops a candidate that shares a substantive token with an existing row', () => {
+    const candidates = [experience({ company: 'Acme Robotics Inc' })];
+
+    const missing = selectMissingExperiences(candidates, ['Acme Robotics']);
+
+    expect(missing).toEqual([]);
+  });
+
+  it('keeps every candidate when there are no existing companies', () => {
+    const candidates = [experience({ company: 'Acme' }), experience({ company: 'Beta Corp' })];
+
+    expect(selectMissingExperiences(candidates, [])).toEqual(candidates);
+  });
+
+  it('keeps a candidate with a null/empty company rather than false-matching it away', () => {
+    const candidates = [experience({ company: null })];
+
+    expect(selectMissingExperiences(candidates, ['Acme'])).toEqual(candidates);
   });
 });

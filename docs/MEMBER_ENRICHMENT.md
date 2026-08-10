@@ -48,7 +48,7 @@ model MemberEnrichment {
 | Field | Canonical home | Fill source | "Gap" means |
 | --- | --- | --- | --- |
 | primary team/role | `TeamMemberRole.mainTeam` (+ `role`) | LinkedIn `experience[0]` (most-recent-first) matched to an existing `Team` | member has no `TeamMemberRole` row with `mainTeam: true` |
-| work history | `MemberExperience` (one row per position) | every entry in LinkedIn `experience[]` with a parseable start date | member has zero `MemberExperience` rows |
+| work history | `MemberExperience` (one row per position) | every LinkedIn `experience[]` entry the member doesn't already have a row for | per-position: a LinkedIn entry with no matching existing row by company name |
 | bio | `Member.bio` | `generateMemberBioText` (reused, unchanged) | `Member.bio` is empty |
 | email | `Member.email` | `AffinityPerson.primaryEmail` via `MasterProfile` | `Member.email` is empty |
 | skills | `Member.skills` (m2m) | `HuskyGenerationService.generateMemberSkills` (reused, unchanged) | `Member.skills` is empty |
@@ -119,14 +119,20 @@ Per member, **one** ScrapingDog call total:
    Match found: if the member already has a `TeamMemberRole` row for that team, its
    `mainTeam` is flipped to `true` (role filled only if currently empty); otherwise a new
    `TeamMemberRole` row is created.
-4. **workHistory** — if the member has zero `MemberExperience` rows, every entry in the
-   LinkedIn `experience[]` list is converted to a `MemberExperience` row
-   (`member-enrichment-experience.util.ts`). Whole-list gap check, same as bio/email/skills
-   — a member with even one existing row (self-reported or from a prior import) is left
-   alone entirely; there is no merge/dedup against a partial history. An entry with no
-   parseable `starts_at` (e.g. "Oct 2024") is skipped rather than guessed; a missing/
-   unparseable `ends_at` (including "Present") maps to `isCurrent: true`. Zero parseable
-   entries (or no LinkedIn data at all) → `CannotEnrich`.
+4. **workHistory** — per-position gap-fill (`member-enrichment-experience.util.ts`):
+   every LinkedIn `experience[]` entry the member does **not** already have a
+   `MemberExperience` row for is inserted as a new row; entries that match an existing
+   row are left alone. Matching is by company name only — same conservative two-tier
+   doctrine as `primaryTeamRole`'s team matching (exact case-insensitive equality,
+   falling back to a shared substantive token) — so two separate stints at the same
+   company collapse to "already covered" rather than risk misreading an edit as a gap.
+   Existing rows are **never** updated, replaced, or deleted, only topped up — a
+   manually-added or admin-edited entry is always preserved. An entry with no parseable
+   `starts_at` (e.g. "Oct 2024") is skipped rather than guessed; a missing/unparseable
+   `ends_at` (including "Present") maps to `isCurrent: true`. Zero new rows to add, with
+   at least one existing row already on file → `ChangedByUser` (nothing needed doing).
+   Zero new rows and zero existing rows (no LinkedIn data at all, or no experience
+   section) → `CannotEnrich`.
 5. **bio** — if empty, `resolveMemberPronouns` + `generateMemberBioText` (unchanged),
    passing the ScrapingDog payload from step 1 as `scrapedContext` — no second scrape.
 6. **skills** — if empty and the member now has an email (original or step-2-filled),
@@ -186,7 +192,7 @@ apps/web-api/src/member-enrichment/
   member-enrichment.types.ts                    # EnrichmentStatus, FieldEnrichmentStatus, EnrichmentSource, MemberDataEnrichment
   member-enrichment-eligibility-filter.ts        # investor / fund-team / priority-team OR filter
   member-enrichment-team-match.util.ts           # LinkedIn-experience company name → existing Team
-  member-enrichment-experience.util.ts           # LinkedIn experience[] → MemberExperience create inputs
+  member-enrichment-experience.util.ts           # LinkedIn experience[] → missing-vs-existing diff → MemberExperience create inputs
   member-enrichment.service.ts                   # marking, pending-queue, the enrichment pipeline itself
   member-enrichment.job.ts                       # marking + enrichment @Cron jobs
   member-enrichment.module.ts                    # imports HuskyModule for MemberScrapingDogService / HuskyGenerationService

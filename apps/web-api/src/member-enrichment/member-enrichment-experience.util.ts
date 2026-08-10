@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { ScrapingDogPersonProfile } from '../husky/member-scrapingdog.service';
+import { namesShareSubstantiveToken } from '../team-enrichment/shared/text.util';
 
 const MONTH_INDEX: Record<string, number> = {
   jan: 0,
@@ -42,11 +43,40 @@ export function parseLinkedinDateString(value: string | null | undefined): Date 
   return null;
 }
 
+function companiesMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = a?.trim();
+  const right = b?.trim();
+  if (!left || !right) return false;
+  if (left.toLowerCase() === right.toLowerCase()) return true;
+  return namesShareSubstantiveToken(left, right);
+}
+
 /**
- * Converts ScrapingDog LinkedIn experiences into `MemberExperience` rows.
- * Fill-gaps-only semantics apply at the whole-list level (see doEnrichMember):
- * this only ever runs against a member with zero existing rows, so there is
- * no merge/dedup logic here — every parseable entry becomes a new row.
+ * Filters LinkedIn experiences down to the ones the member does NOT already have a
+ * `MemberExperience` row for, matched by company name — same conservative two-tier
+ * doctrine as `member-enrichment-team-match.util.ts`'s team matching (exact
+ * case-insensitive equality, falling back to a shared substantive token). This is
+ * what makes work-history enrichment a true per-position gap-fill: a member with 1
+ * self-reported role and 4 more on LinkedIn gets exactly those 4 added.
+ *
+ * Deliberately conservative: two separate stints at the same company collapse to
+ * "already covered" rather than risk misreading a title/date edit as a genuine gap.
+ * Existing rows are never read for anything but this company-name check — never
+ * updated, replaced, or deleted here.
+ */
+export function selectMissingExperiences(
+  candidates: ScrapingDogPersonProfile['experiences'],
+  existingCompanies: Array<string | null | undefined>
+): ScrapingDogPersonProfile['experiences'] {
+  return candidates.filter(
+    (candidate) => !existingCompanies.some((company) => companiesMatch(company, candidate.company))
+  );
+}
+
+/**
+ * Converts ScrapingDog LinkedIn experiences into `MemberExperience` create inputs.
+ * Callers pass only the already-filtered "missing" subset (see
+ * `selectMissingExperiences`) — this function itself has no dedup logic.
  *
  * Entries with no parseable `startsAt` are skipped — `MemberExperience.startDate`
  * is a required column and a guessed date would misrepresent the member's history.

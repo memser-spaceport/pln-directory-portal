@@ -8,7 +8,7 @@ import { HuskyGenerationService } from '../husky/husky-generation.service';
 import { HUSKY_BIO_DISCLAIMER } from '../utils/ai-prompts';
 import { buildMemberEnrichmentEligibilityFilter } from './member-enrichment-eligibility-filter';
 import { matchTeamFromCompanyName } from './member-enrichment-team-match.util';
-import { buildMemberExperienceInputs } from './member-enrichment-experience.util';
+import { buildMemberExperienceInputs, selectMissingExperiences } from './member-enrichment-experience.util';
 import {
   EnrichmentStatus,
   FieldEnrichmentStatus,
@@ -346,30 +346,36 @@ export class MemberEnrichmentService {
         stampPreexisting('primaryTeamRole');
       }
 
-      // 4. workHistory — persist the member's full LinkedIn experience list to
-      // MemberExperience. Whole-list gap check (mirrors bio/email/skills): only
-      // runs when the member has zero rows, and every parseable entry is inserted
-      // in one pass — no merge with a partial existing history.
-      if (member.experiences.length === 0) {
-        const experienceInputs = personProfile?.experiences?.length
-          ? buildMemberExperienceInputs(personProfile.experiences, member.uid)
-          : [];
-        if (experienceInputs.length > 0) {
-          for (const input of experienceInputs) {
-            try {
-              await this.prisma.memberExperience.create({ data: input });
-            } catch (error) {
-              this.logger.warn(
-                `Failed to insert MemberExperience for ${member.uid} (${input.company}): ${error.message}`
-              );
-            }
+      // 4. workHistory — per-position gap-fill: every LinkedIn experience the member
+      // doesn't already have a MemberExperience row for (matched by company name, see
+      // selectMissingExperiences) is inserted as a new row. Existing rows are never
+      // updated or removed, so a manually-added/edited entry is always preserved —
+      // this only ever tops up what's missing, never merges into or replaces it.
+      const missingExperiences = personProfile?.experiences?.length
+        ? selectMissingExperiences(
+            personProfile.experiences,
+            member.experiences.map((e) => e.company)
+          )
+        : [];
+      const experienceInputs = buildMemberExperienceInputs(missingExperiences, member.uid);
+      if (experienceInputs.length > 0) {
+        for (const input of experienceInputs) {
+          try {
+            await this.prisma.memberExperience.create({ data: input });
+          } catch (error) {
+            this.logger.warn(`Failed to insert MemberExperience for ${member.uid} (${input.company}): ${error.message}`);
           }
-          stamp('workHistory', FieldEnrichmentStatus.Enriched, EnrichmentSource.LinkedinExperience);
-        } else {
-          stamp('workHistory', FieldEnrichmentStatus.CannotEnrich, undefined, 'no usable LinkedIn experience data');
         }
-      } else {
+        stamp(
+          'workHistory',
+          FieldEnrichmentStatus.Enriched,
+          EnrichmentSource.LinkedinExperience,
+          `added ${experienceInputs.length} new position(s) from LinkedIn`
+        );
+      } else if (member.experiences.length > 0) {
         stampPreexisting('workHistory');
+      } else {
+        stamp('workHistory', FieldEnrichmentStatus.CannotEnrich, undefined, 'no usable LinkedIn experience data');
       }
 
       // 5. bio — reuses generateMemberBioText unchanged, feeding it the ScrapingDog
