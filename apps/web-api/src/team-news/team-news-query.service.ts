@@ -558,6 +558,7 @@ export class TeamNewsQueryService {
       sourceDomain: string | null;
       tags: string[];
       editorialRank: number | null;
+      viewCount: number;
       createdAt: Date;
       team: {
         uid: string;
@@ -617,6 +618,7 @@ export class TeamNewsQueryService {
       upvoteCount: upvotes.counts.get(row.uid) ?? 0,
       viewerHasUpvoted: upvotes.viewerUpvoted.has(row.uid),
       editorialRank: row.editorialRank ?? null,
+      viewCount: row.viewCount,
     };
   }
 }

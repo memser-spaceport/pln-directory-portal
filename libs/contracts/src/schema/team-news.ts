@@ -80,6 +80,10 @@ export const TeamNewsItemSchema = z.object({
   // 1 = Top Stories lead, 2–3 = runners-up; null when not featured.
   // Set by seed-trending; independent of upvoteCount.
   editorialRank: z.number().int().min(1).max(3).nullable(),
+  // Raw feed-card impression count. Not deduplicated by user, session, or
+  // repeat viewing, and includes anonymous visitors. Incremented via
+  // POST /v1/team-news/impressions.
+  viewCount: z.number().int().min(0),
 });
 
 export const TeamNewsUpvoteStatusSchema = z.object({
@@ -173,6 +177,18 @@ export const TeamNewsForumLinkSchema = z.object({
 export const CreateTeamNewsDiscussionResponseSchema = z.object({
   link: TeamNewsForumLinkSchema,
   created: z.boolean(),
+});
+
+// POST /v1/team-news/impressions — records feed-card impressions for a batch
+// of news items. Unauthenticated; every occurrence of a uid in the array
+// increments that item's viewCount by 1 (no dedup). Unknown uids are ignored.
+// Batch size capped at 200, matching POST /v1/feed/comments/counts.
+export const RecordTeamNewsImpressionsRequestSchema = z.object({
+  newsItemUids: z.array(z.string()).min(1).max(200),
+});
+
+export const RecordTeamNewsImpressionsResponseSchema = z.object({
+  success: z.literal(true),
 });
 
 export const TeamNewsListResponseSchema = z.object({

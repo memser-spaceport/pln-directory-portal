@@ -157,6 +157,7 @@ export class TeamNewsEnrichmentService {
           upvoteCount: 0,
           viewerHasUpvoted: false,
           editorialRank: item.editorialRank ?? null,
+          viewCount: item.viewCount,
         };
       }),
     };

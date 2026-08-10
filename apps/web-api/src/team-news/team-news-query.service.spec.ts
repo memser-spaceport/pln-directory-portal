@@ -32,6 +32,7 @@ describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
     sourceDomain: 'example.com',
     tags: ['funding'],
     editorialRank: null,
+    viewCount: 0,
     createdAt: new Date('2026-06-02T00:00:00.000Z'),
     team: {
       uid: 'team-1',
@@ -137,6 +138,77 @@ describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
         },
       })
     );
+  });
+});
+
+describe('TeamNewsQueryService — viewCount', () => {
+  let service: TeamNewsQueryService;
+
+  const teamFindUnique = jest.fn();
+  const teamNewsItemFindMany = jest.fn();
+  const teamNewsItemCount = jest.fn();
+  const teamNewsForumLinkFindMany = jest.fn();
+  const teamNewsUpvoteGroupBy = jest.fn();
+  const teamNewsUpvoteFindMany = jest.fn();
+
+  // viewCount is a plain scalar column on TeamNewsItem, so it's already present
+  // on the row returned by the primary (include-based) query — no separate
+  // batched loader/query needed, unlike discussions/upvotes which live in
+  // other tables.
+  const makeRow = (overrides: Record<string, unknown> = {}) => ({
+    uid: 'news-1',
+    teamUid: 'team-1',
+    eventType: 'FUNDING',
+    eventDate: new Date('2026-06-01T00:00:00.000Z'),
+    title: 'Raised Series A',
+    summary: 'Funding round closed',
+    contentHtml: null,
+    sourceUrl: 'https://example.com/news',
+    sourceUrls: ['https://example.com/news'],
+    sourceDomain: 'example.com',
+    tags: ['funding'],
+    editorialRank: null,
+    viewCount: 0,
+    createdAt: new Date('2026-06-02T00:00:00.000Z'),
+    team: {
+      uid: 'team-1',
+      name: 'Acme Labs',
+      logo: null,
+      teamFocusAreas: [],
+    },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    teamFindUnique.mockResolvedValue({ uid: 'team-1', name: 'Acme Labs' });
+    teamNewsItemCount.mockResolvedValue(1);
+    teamNewsForumLinkFindMany.mockResolvedValue([]);
+    teamNewsUpvoteGroupBy.mockResolvedValue([]);
+    teamNewsUpvoteFindMany.mockResolvedValue([]);
+    teamNewsItemFindMany.mockResolvedValue([makeRow()]);
+
+    service = new TeamNewsQueryService({
+      team: { findUnique: teamFindUnique },
+      teamNewsItem: { findMany: teamNewsItemFindMany, count: teamNewsItemCount },
+      teamNewsForumLink: { findMany: teamNewsForumLinkFindMany },
+      teamNewsUpvote: { groupBy: teamNewsUpvoteGroupBy, findMany: teamNewsUpvoteFindMany },
+    } as unknown as PrismaService);
+  });
+
+  it('stamps viewCount straight off the row onto the DTO, with a single teamNewsItem.findMany call', async () => {
+    teamNewsItemFindMany.mockResolvedValue([makeRow({ viewCount: 42 })]);
+
+    const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
+
+    expect(result.items[0]).toEqual(expect.objectContaining({ uid: 'news-1', viewCount: 42 }));
+    expect(teamNewsItemFindMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('defaults viewCount to 0 for an item with no impressions yet', async () => {
+    const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
+
+    expect(result.items[0]).toEqual(expect.objectContaining({ uid: 'news-1', viewCount: 0 }));
   });
 });
 
