@@ -124,16 +124,15 @@ export class TeamNewsQueryService {
         this.prisma.teamNewsItem.count({ where }),
       ]);
       const itemUids = rows.map((r) => r.uid);
-      const [discussions, upvotes, viewCounts] = await Promise.all([
+      const [discussions, upvotes] = await Promise.all([
         this.loadDiscussions(itemUids),
         this.loadUpvotes(itemUids, viewerMemberUid),
-        this.loadViewCounts(itemUids),
       ]);
       return {
         page: query.page,
         limit: query.limit,
         total,
-        items: rows.map((row) => this.toDto(row, discussions.get(row.uid), followedTeamUids, upvotes, viewCounts)),
+        items: rows.map((row) => this.toDto(row, discussions.get(row.uid), followedTeamUids, upvotes)),
       };
     }
 
@@ -174,16 +173,15 @@ export class TeamNewsQueryService {
     }
 
     const itemUids = rows.map((r) => r.uid);
-    const [discussions, upvotes, viewCounts] = await Promise.all([
+    const [discussions, upvotes] = await Promise.all([
       this.loadDiscussions(itemUids),
       this.loadUpvotes(itemUids, viewerMemberUid),
-      this.loadViewCounts(itemUids),
     ]);
     return {
       page: query.page,
       limit: query.limit,
       total,
-      items: rows.map((row) => this.toDto(row, discussions.get(row.uid), followedTeamUids, upvotes, viewCounts)),
+      items: rows.map((row) => this.toDto(row, discussions.get(row.uid), followedTeamUids, upvotes)),
     };
   }
 
@@ -238,10 +236,9 @@ export class TeamNewsQueryService {
     ]);
 
     const itemUids = rows.map((r) => r.uid);
-    const [discussions, upvotes, viewCounts] = await Promise.all([
+    const [discussions, upvotes] = await Promise.all([
       this.loadDiscussions(itemUids),
       this.loadUpvotes(itemUids, viewerMemberUid),
-      this.loadViewCounts(itemUids),
     ]);
 
     return {
@@ -250,7 +247,7 @@ export class TeamNewsQueryService {
       page: query.page,
       limit: query.limit,
       total,
-      items: rows.map((row) => this.toDto(row, discussions.get(row.uid), followedTeamUids, upvotes, viewCounts)),
+      items: rows.map((row) => this.toDto(row, discussions.get(row.uid), followedTeamUids, upvotes)),
     };
   }
 
@@ -276,14 +273,13 @@ export class TeamNewsQueryService {
     });
 
     const itemUids = rows.map((r) => r.uid);
-    const [focusAreas, discussions, upvotes, viewCounts] = await Promise.all([
+    const [focusAreas, discussions, upvotes] = await Promise.all([
       this.prisma.focusArea.findMany({
         where: { parentUid: null },
         select: { uid: true, title: true },
       }),
       this.loadDiscussions(itemUids),
       this.loadUpvotes(itemUids, viewerMemberUid),
-      this.loadViewCounts(itemUids),
     ]);
     const focusByTitle = new Map(focusAreas.map((fa) => [fa.title, fa]));
 
@@ -291,7 +287,7 @@ export class TeamNewsQueryService {
     const groups = new Map<string, TeamNewsItemDto[]>();
     const allTabExtraItems: TeamNewsItemDto[] = [];
     for (const row of rows) {
-      const dto = this.toDto(row, discussions.get(row.uid), followedTeamUids, upvotes, viewCounts);
+      const dto = this.toDto(row, discussions.get(row.uid), followedTeamUids, upvotes);
       let addedToGroup = false;
       for (const title of dto.focusAreas) {
         if (!focusByTitle.has(title)) continue;
@@ -384,17 +380,13 @@ export class TeamNewsQueryService {
     });
 
     const itemUids = rows.map((r) => r.uid);
-    const [discussions, upvotes, viewCounts] = await Promise.all([
-      this.loadDiscussions(itemUids),
-      this.loadUpvotes(itemUids),
-      this.loadViewCounts(itemUids),
-    ]);
+    const [discussions, upvotes] = await Promise.all([this.loadDiscussions(itemUids), this.loadUpvotes(itemUids)]);
 
     return {
       generatedAt: new Date().toISOString(),
       since: since.toISOString(),
       until: until.toISOString(),
-      items: rows.map((row) => this.toDto(row, discussions.get(row.uid), new Set(), upvotes, viewCounts)),
+      items: rows.map((row) => this.toDto(row, discussions.get(row.uid), new Set(), upvotes)),
     };
   }
 
@@ -552,19 +544,6 @@ export class TeamNewsQueryService {
     };
   }
 
-  /**
-   * Batch-load raw impression counts for a set of news items. Items absent
-   * from the map have zero impressions.
-   */
-  private async loadViewCounts(itemUids: string[]): Promise<Map<string, number>> {
-    if (itemUids.length === 0) return new Map();
-    const rows = await this.prisma.teamNewsItem.findMany({
-      where: { uid: { in: itemUids } },
-      select: { uid: true, viewCount: true },
-    });
-    return new Map(rows.map((r) => [r.uid, r.viewCount]));
-  }
-
   private toDto(
     row: {
       uid: string;
@@ -579,6 +558,7 @@ export class TeamNewsQueryService {
       sourceDomain: string | null;
       tags: string[];
       editorialRank: number | null;
+      viewCount: number;
       createdAt: Date;
       team: {
         uid: string;
@@ -592,8 +572,7 @@ export class TeamNewsQueryService {
     },
     discussion: TeamNewsDiscussion | undefined,
     followedTeamUids: Set<string> = new Set(),
-    upvotes: UpvoteStamp = { counts: new Map(), viewerUpvoted: new Set() },
-    viewCounts: Map<string, number> = new Map()
+    upvotes: UpvoteStamp = { counts: new Map(), viewerUpvoted: new Set() }
   ): TeamNewsItemDto & {
     sourceUrls: string[];
     sources: Array<{ url: string; domain: string | null }>;
@@ -639,7 +618,7 @@ export class TeamNewsQueryService {
       upvoteCount: upvotes.counts.get(row.uid) ?? 0,
       viewerHasUpvoted: upvotes.viewerUpvoted.has(row.uid),
       editorialRank: row.editorialRank ?? null,
-      viewCount: viewCounts.get(row.uid) ?? 0,
+      viewCount: row.viewCount,
     };
   }
 }

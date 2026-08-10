@@ -32,6 +32,7 @@ describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
     sourceDomain: 'example.com',
     tags: ['funding'],
     editorialRank: null,
+    viewCount: 0,
     createdAt: new Date('2026-06-02T00:00:00.000Z'),
     team: {
       uid: 'team-1',
@@ -150,6 +151,10 @@ describe('TeamNewsQueryService — viewCount', () => {
   const teamNewsUpvoteGroupBy = jest.fn();
   const teamNewsUpvoteFindMany = jest.fn();
 
+  // viewCount is a plain scalar column on TeamNewsItem, so it's already present
+  // on the row returned by the primary (include-based) query — no separate
+  // batched loader/query needed, unlike discussions/upvotes which live in
+  // other tables.
   const makeRow = (overrides: Record<string, unknown> = {}) => ({
     uid: 'news-1',
     teamUid: 'team-1',
@@ -163,6 +168,7 @@ describe('TeamNewsQueryService — viewCount', () => {
     sourceDomain: 'example.com',
     tags: ['funding'],
     editorialRank: null,
+    viewCount: 0,
     createdAt: new Date('2026-06-02T00:00:00.000Z'),
     team: {
       uid: 'team-1',
@@ -180,16 +186,7 @@ describe('TeamNewsQueryService — viewCount', () => {
     teamNewsForumLinkFindMany.mockResolvedValue([]);
     teamNewsUpvoteGroupBy.mockResolvedValue([]);
     teamNewsUpvoteFindMany.mockResolvedValue([]);
-
-    // teamNewsItem.findMany is called twice per request: once for the paginated
-    // rows (full include), once inside loadViewCounts (select: uid + viewCount).
-    // Branch on the `select` shape to serve each caller its own fixture.
-    teamNewsItemFindMany.mockImplementation((args: { select?: { viewCount?: boolean } }) => {
-      if (args?.select?.viewCount) {
-        return Promise.resolve([{ uid: 'news-1', viewCount: 42 }]);
-      }
-      return Promise.resolve([makeRow()]);
-    });
+    teamNewsItemFindMany.mockResolvedValue([makeRow()]);
 
     service = new TeamNewsQueryService({
       team: { findUnique: teamFindUnique },
@@ -199,18 +196,16 @@ describe('TeamNewsQueryService — viewCount', () => {
     } as unknown as PrismaService);
   });
 
-  it('stamps viewCount from loadViewCounts onto the DTO', async () => {
+  it('stamps viewCount straight off the row onto the DTO, with a single teamNewsItem.findMany call', async () => {
+    teamNewsItemFindMany.mockResolvedValue([makeRow({ viewCount: 42 })]);
+
     const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
 
     expect(result.items[0]).toEqual(expect.objectContaining({ uid: 'news-1', viewCount: 42 }));
+    expect(teamNewsItemFindMany).toHaveBeenCalledTimes(1);
   });
 
   it('defaults viewCount to 0 for an item with no impressions yet', async () => {
-    teamNewsItemFindMany.mockImplementation((args: { select?: { viewCount?: boolean } }) => {
-      if (args?.select?.viewCount) return Promise.resolve([]);
-      return Promise.resolve([makeRow()]);
-    });
-
     const result = await service.listTeamNewsByTeam('team-1', { page: 1, limit: 50 });
 
     expect(result.items[0]).toEqual(expect.objectContaining({ uid: 'news-1', viewCount: 0 }));

@@ -40,9 +40,11 @@ session, or repeat viewing, including anonymous visitors.
    called from a new unauthenticated `POST /v1/team-news/impressions` endpoint. Duplicate uids in a
    single batch each count (a card that scrolls in/out repeatedly within one buffering window
    increments once per occurrence).
-3. **Read path**: new `loadViewCounts(itemUids)` batched loader in `TeamNewsQueryService`, following
-   the exact shape of the existing `loadUpvotes`/`loadDiscussions` loaders, wired into `toDto` and
-   all 5 call sites.
+3. **Read path**: `viewCount` is read directly off the row in `toDto` — it's a plain scalar column
+   on `TeamNewsItem`, already present on every call site's primary query result, so (unlike
+   `loadUpvotes`/`loadDiscussions`, which need a second query into other tables) no batched loader
+   is needed. An earlier version of this PR added one anyway; code review caught the redundancy
+   (see "Post-review correction" below).
 
 ---
 
@@ -165,28 +167,26 @@ existing app-wide `ThrottlerModule` (`app.module.ts:94`, wired as a global `APP_
 already applies to every route without opt-in. No bespoke per-item/per-IP logic, per the brainstorm
 decision.
 
-### Read path — `loadViewCounts` + DTO wiring
+### Read path — DTO wiring
+
+**Post-review correction:** the first implementation added a `loadViewCounts(itemUids)` batched
+loader (same shape as `loadDiscussions`/`loadUpvotes`) and re-queried `teamNewsItem` a second time
+for `viewCount`. Code review (see PR #3325 review comment) caught that this was redundant:
+`viewCount` is a plain scalar column directly on `TeamNewsItem`, and every call site's primary
+query already fetches the full row via Prisma's `include`, which returns all scalar columns by
+default — unlike `discussion`/`upvotes`, which live in separate tables (`TeamNewsForumLink`,
+`TeamNewsUpvote`) and genuinely need a second batched query. `team-news-enrichment.service.ts`'s
+hand-built DTO already did this correctly (`viewCount: item.viewCount`, straight off the row).
+
+Final implementation: no `loadViewCounts` method. `toDto`'s `row` parameter type gained a
+`viewCount: number` field, and the DTO body reads it directly:
 
 ```ts
-// apps/web-api/src/team-news/team-news-query.service.ts
-private async loadViewCounts(itemUids: string[]): Promise<Map<string, number>> {
-  if (itemUids.length === 0) return new Map();
-  const rows = await this.prisma.teamNewsItem.findMany({
-    where: { uid: { in: itemUids } },
-    select: { uid: true, viewCount: true },
-  });
-  return new Map(rows.map((r) => [r.uid, r.viewCount]));
-}
+// toDto — team-news-query.service.ts
+viewCount: row.viewCount,
 ```
 
-Add to the `Promise.all([loadDiscussions(...), loadUpvotes(...)])` calls at lines 128-129, 177-178,
-240-241, 281-282, and 383, and thread the resulting map into `toDto` as a new 5th parameter,
-defaulting to `new Map()`:
-
-```ts
-// toDto — team-news-query.service.ts:547-621
-viewCount: viewCounts.get(row.uid) ?? 0,
-```
+No extra query, no extra `Promise.all` entry, no extra `toDto` parameter.
 
 ### Trending — untouched
 
@@ -226,11 +226,15 @@ wiring views into trending is explicitly out of scope per the brainstorm.
 
 **Files:** `apps/web-api/src/team-news/team-news-query.service.ts`
 
-- [x] Add `loadViewCounts`.
-- [x] Wire into all 5 `toDto`-producing call sites and the `toDto` signature itself.
+- [x] ~~Add `loadViewCounts`~~ — added, then removed per post-review correction above; `viewCount`
+      is read directly off the row already fetched by each call site's primary query instead.
+- [x] Add `viewCount: number` to `toDto`'s `row` parameter type; wire `viewCount: row.viewCount`
+      into the DTO body. No new `toDto` parameter, no new `Promise.all` entry at any of the 5 call
+      sites.
 - [x] (Discovered during implementation) `team-news-enrichment.service.ts`'s `getTeamNewsByTeam` also
       builds a `TeamNewsItemDto` by hand (service-to-service endpoint, doesn't use `toDto`) — added
-      `viewCount: item.viewCount` directly from the already-fetched row, no batch loader needed there.
+      `viewCount: item.viewCount` directly from the already-fetched row. This turned out to be the
+      correct pattern all along, and `toDto` was later brought in line with it (see above).
 
 ### Phase 5 — Tests
 
@@ -249,8 +253,9 @@ test file layout)
       to `RecordTeamNewsImpressionsRequestSchema.parse(...)`, both covered indirectly by the schema
       itself; a real regression check would need e2e/integration coverage, which this module doesn't
       have today.
-- [x] `loadViewCounts` / `toDto`: item with no impressions yet returns `viewCount: 0`; item with
-      recorded impressions stamps the correct count onto the DTO. (`team-news-query.service.spec.ts`)
+- [x] `toDto`: item with no impressions yet returns `viewCount: 0`; item with recorded impressions
+      stamps the correct count onto the DTO, read directly off the row with a single
+      `teamNewsItem.findMany` call (no redundant second query). (`team-news-query.service.spec.ts`)
 
 ---
 
@@ -296,7 +301,8 @@ surfaces a problem:
    alone.
 2. **Single-item / detail-view endpoint**: no `GET /v1/team-news/:uid` exists today (confirmed via
    `contract-team-news.ts`) — the feed already carries full item data, so no separate detail
-   endpoint needs `viewCount` added. If one is added later, it should reuse `loadViewCounts`.
+   endpoint needs `viewCount` added. If one is added later, it should read `viewCount` straight off
+   its own fetched row, same as everywhere else in this PR.
 3. **Team-visibility gating on the impressions endpoint**: none — since the endpoint is
    unauthenticated by design, any valid `newsItemUid` is accepted regardless of the item's team's
    follow/visibility state, consistent with the feed itself being publicly viewable.
@@ -315,7 +321,7 @@ surfaces a problem:
 | `apps/web-api/src/team-news/team-news-impressions.service.ts` | **Create** — `recordImpressions` |
 | `apps/web-api/src/team-news/team-news.controller.ts` | Modify — add `recordTeamNewsImpressions` endpoint (no guard) |
 | `apps/web-api/src/team-news/team-news.module.ts` | Modify — register `TeamNewsImpressionsService` |
-| `apps/web-api/src/team-news/team-news-query.service.ts` | Modify — add `loadViewCounts`, wire into 5 call sites + `toDto` |
+| `apps/web-api/src/team-news/team-news-query.service.ts` | Modify — `viewCount` read directly off the row in `toDto` (no batched loader; see post-review correction) |
 | `apps/web-api/src/team-news/team-news-impressions.service.spec.ts` | **Create** — tests for grouping, dedup-by-count, unknown uids, transaction wrapping |
 | `apps/web-api/src/team-news/team-news-query.service.spec.ts` | Modify — added `viewCount` stamping + default-to-0 tests |
 
