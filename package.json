@@ -8,7 +8,7 @@
   "scripts": {
     "prepare": "husky install",
     "start": "nx serve",
-    "build": "nx build",
+    "build": "node --stack-size=4000 --max-old-space-size=4096 node_modules/nx/bin/nx.js build",
     "test": "nx test",
     "start:api": "node --stack-size=4000 --max-old-space-size=4096 node_modules/nx/bin/nx.js serve web-api",
     "typecheck:api": "node --stack-size=4000 ./node_modules/typescript/bin/tsc -p apps/web-api/tsconfig.build.json --noEmit",
