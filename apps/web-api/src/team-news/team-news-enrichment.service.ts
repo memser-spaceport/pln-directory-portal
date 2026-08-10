@@ -134,18 +134,16 @@ export class TeamNewsEnrichmentService {
           contentHtml: item.contentHtml,
           sourceUrl: item.sourceUrl,
           sourceUrls: item.sourceUrls.length > 0 ? item.sourceUrls : [item.sourceUrl],
-          sources: (item.sourceUrls.length > 0 ? item.sourceUrls : [item.sourceUrl]).map(
-            (url) => ({
-              url,
-              domain: (() => {
-                try {
-                  return new URL(url).hostname.replace(/^www\./, '');
-                } catch {
-                  return null;
-                }
-              })(),
-            })
-          ),
+          sources: (item.sourceUrls.length > 0 ? item.sourceUrls : [item.sourceUrl]).map((url) => ({
+            url,
+            domain: (() => {
+              try {
+                return new URL(url).hostname.replace(/^www\./, '');
+              } catch {
+                return null;
+              }
+            })(),
+          })),
           sourceDomain: item.sourceDomain,
           tags: item.tags,
           focusAreas: [...new Set(focusAreas)],
@@ -158,6 +156,7 @@ export class TeamNewsEnrichmentService {
           isFollowed: false,
           upvoteCount: 0,
           viewerHasUpvoted: false,
+          editorialRank: item.editorialRank ?? null,
         };
       }),
     };

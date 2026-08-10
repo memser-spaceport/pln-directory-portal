@@ -1,9 +1,11 @@
 import {
   clampTrendingLimit,
+  enforceDisjoint,
   forceIncludeProtocolLabs,
   likesForRank,
   randomIntInclusive,
   TRENDING_LIKE_RANGES,
+  TRENDING_LIKED_LIMIT,
 } from './team-news-trending-seed.util';
 
 describe('team-news-trending-seed.util', () => {
@@ -34,7 +36,7 @@ describe('team-news-trending-seed.util', () => {
 
     it('throws for out-of-range rank', () => {
       expect(() => likesForRank(0)).toThrow(/out of range/);
-      expect(() => likesForRank(8)).toThrow(/out of range/);
+      expect(() => likesForRank(6)).toThrow(/out of range/);
     });
   });
 
@@ -62,15 +64,25 @@ describe('team-news-trending-seed.util', () => {
   });
 
   describe('clampTrendingLimit', () => {
-    it('defaults to 7', () => {
-      expect(clampTrendingLimit(undefined)).toBe(7);
+    it('defaults to 5', () => {
+      expect(clampTrendingLimit(undefined)).toBe(TRENDING_LIKED_LIMIT);
     });
 
-    it('clamps to 5–7', () => {
+    it('always returns 5', () => {
       expect(clampTrendingLimit(3)).toBe(5);
       expect(clampTrendingLimit(5)).toBe(5);
-      expect(clampTrendingLimit(6)).toBe(6);
-      expect(clampTrendingLimit(10)).toBe(7);
+      expect(clampTrendingLimit(6)).toBe(5);
+      expect(clampTrendingLimit(10)).toBe(5);
+    });
+  });
+
+  describe('enforceDisjoint', () => {
+    it('removes editorial uids from the liked list', () => {
+      expect(enforceDisjoint(['a', 'b', 'c', 'd'], ['b', 'd'])).toEqual(['a', 'c']);
+    });
+
+    it('returns liked unchanged when there is no overlap', () => {
+      expect(enforceDisjoint(['a', 'b'], ['c', 'd'])).toEqual(['a', 'b']);
     });
   });
 });

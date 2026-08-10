@@ -31,6 +31,7 @@ describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
     sourceUrls: ['https://example.com/news'],
     sourceDomain: 'example.com',
     tags: ['funding'],
+    editorialRank: null,
     createdAt: new Date('2026-06-02T00:00:00.000Z'),
     team: {
       uid: 'team-1',
