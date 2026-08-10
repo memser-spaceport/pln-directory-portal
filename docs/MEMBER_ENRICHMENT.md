@@ -5,7 +5,7 @@
 Automated, periodic gap-filling for Directory member profiles: **primary team/role**,
 **bio**, **email**, and **skills**. Sourced from the member's own LinkedIn (or, when no
 LinkedIn handle is on file, X/Twitter) profile via ScrapingDog, plus a free CRM lookup for
-email. A daily marking cron finds newly-eligible members; a 5-minute cron processes the
+email. A daily marking cron finds newly-eligible members; an hourly cron processes the
 pending queue.
 
 **Fill-gaps-only, no exceptions.** Every field is only written when it is currently empty.
@@ -135,7 +135,7 @@ Per member, **one** ScrapingDog call total:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `IS_MEMBER_ENRICHMENT_ENABLED` | `false` | gates both crons |
-| `MEMBER_ENRICHMENT_CRON` | `*/5 * * * *` | processes the pending queue |
+| `MEMBER_ENRICHMENT_CRON` | `0 * * * *` | processes the pending queue |
 | `MEMBER_ENRICHMENT_MARKING_CRON` | `0 1 * * *` | marks newly-eligible members |
 | `MEMBER_ENRICHMENT_BATCH_SIZE` | `20` | cap on members processed per enrichment tick — ScrapingDog person-profile calls are the expensive 50-100 credit tier, so this bounds worst-case spend per tick |
 | `MEMBER_ENRICHMENT_STUCK_TTL_MINUTES` | `180` | stale-`InProgress` self-heal (pod killed mid-run), same mechanism as `TEAM_ENRICHMENT_STUCK_TTL_MINUTES` |

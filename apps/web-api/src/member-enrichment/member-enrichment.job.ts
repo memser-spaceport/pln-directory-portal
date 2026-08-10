@@ -20,8 +20,8 @@ export class MemberEnrichmentJob {
     return this.isMarkingRunning;
   }
 
-  // Default: every 5 minutes, same cadence as team enrichment.
-  @Cron(process.env.MEMBER_ENRICHMENT_CRON || '*/5 * * * *', {
+  // Default: every hour.
+  @Cron(process.env.MEMBER_ENRICHMENT_CRON || '0 * * * *', {
     name: 'member-enrichment',
     timeZone: 'UTC',
   })
