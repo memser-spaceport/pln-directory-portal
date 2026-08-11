@@ -29,7 +29,7 @@ describe('FeatureAgentDemo (e2e)', () => {
       .expect(200);
 
     expect(response.body).toEqual({
-      message: 'Hello from autonomous coding agent',
+      message: 'Hello from autonomous coding agent v2',
       environment: 'staging',
       feature: 'agent-demo',
       timestamp: expect.any(String),

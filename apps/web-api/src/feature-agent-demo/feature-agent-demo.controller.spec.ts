@@ -28,7 +28,7 @@ describe('FeatureAgentDemoController', () => {
     const result = controller.getFeatureAgentDemo();
 
     expect(result).toMatchObject({
-      message: 'Hello from autonomous coding agent',
+      message: 'Hello from autonomous coding agent v2',
       environment: 'test',
       feature: 'agent-demo',
     });

@@ -11,7 +11,7 @@ export interface FeatureAgentDemoResponse {
 export class FeatureAgentDemoService {
   getDemoInfo(): FeatureAgentDemoResponse {
     return {
-      message: 'Hello from autonomous coding agent',
+      message: 'Hello from autonomous coding agent v2',
       environment: process.env.NODE_ENV || 'development',
       feature: 'agent-demo',
       timestamp: new Date().toISOString(),
