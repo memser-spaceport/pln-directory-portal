@@ -533,6 +533,40 @@ not by a separate permission.
 
 Both are seeded in migration `20260623120000_ai_apps` and attached to the **PL Infra Team** policy (`pl_infra_team_pl_internal`), and registered in `access-control-v2.constants.ts` + `access-control-v2.seed.ts`.
 
+## Deploy lifecycle bell notifications
+
+Two in-app (bell) notifications, both category `AI_APP` (added in migration
+`20260811120000_add_ai_app_notification_category`), distinguished by
+`metadata.trigger` — the same one-category-many-triggers convention the roadmap
+module uses for `GANTRY`. The category is deliberately generic (not
+`AI_APP_DEPLOY`) so future non-deploy AI Apps notifications can reuse it instead
+of growing a new category per event:
+
+- **First successful deploy** (`trigger: 'deploy_succeeded'`) — broadcast to everyone
+  holding `ai_apps.read` OR `ai_apps.write` (`PushNotificationsService.create`'s
+  `requiredPermissions` fan-out), including the app's own owner. Fired from
+  `proxyDeploy`'s `markReady` only when `app.lastDeployedAt` was `null` going into the
+  deploy — the only writer of `lastDeployedAt` is a successful deploy, so this is
+  exactly "first ship, not a redeploy/update".
+- **Deploy failure** (`trigger: 'deploy_failed'`) — private notification to the app's
+  **owner only** (`recipientUid: app.memberUid`), sent from every place a deploy can
+  fail: `failDeploy` (S3 upload failure, hard runner error, a 2xx body reporting
+  `status: "failed"`, a timeout the app never survives, secrets/database injection
+  failure) and `settleStuckDeploy` (a `DEPLOYING` row lazily settled to `ERROR` on
+  read). The recipient is always `app.memberUid`, never the acting member — a
+  directory admin retrying someone else's failed app must not receive the bell meant
+  for the owner.
+  - The notification body is deliberately generic ("open the app page for details and
+    to retry") — the runner's raw failure text can carry stack fragments and internal
+    hostnames, which are manager-only (see `AiAppDeploymentInfo.failureReason` above);
+    the owner sees the real reason on the linked app page, not in the bell body.
+
+Both link to the app's LabOS detail page (`/pl-infra/ai-apps/{appUid}`, a
+frontend-relative path — see `aiAppDetailPath` in `ai-apps.constants.ts`). Copy lives
+in `AI_APPS_NOTIFICATION_MESSAGES` (`ai-apps.constants.ts`) so a wording change is a
+one-file swap. Notification failures are logged and swallowed — never breaking the
+deploy itself.
+
 ## Starter kit ZIP
 
 Built by `AiAppsStarterKitService` — text files are generated in-memory; the PL
