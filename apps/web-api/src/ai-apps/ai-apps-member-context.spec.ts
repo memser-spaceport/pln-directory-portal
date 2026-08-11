@@ -4,6 +4,12 @@ import { NotFoundException } from '@nestjs/common';
 // path under test never calls it.
 jest.mock('axios', () => ({ isAxiosError: jest.fn(() => false) }));
 
+// The real module pulls in a transitive chain that breaks under ts-jest (an
+// ESM-only nestjs-zod import); mock it like roadmap.service.spec.ts does.
+jest.mock('../push-notifications/push-notifications.service', () => ({
+  PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
+}));
+
 import { AiAppsService } from './ai-apps.service';
 
 const MEMBER = {
@@ -33,7 +39,7 @@ function buildService(overrides: Record<string, any> = {}) {
     member: { findUnique: jest.fn().mockResolvedValue(MEMBER) },
     ...overrides,
   };
-  return { service: new AiAppsService(prisma as any, {} as any), prisma };
+  return { service: new AiAppsService(prisma as any, {} as any, { create: jest.fn() } as any), prisma };
 }
 
 describe('AiAppsService getMemberContext', () => {

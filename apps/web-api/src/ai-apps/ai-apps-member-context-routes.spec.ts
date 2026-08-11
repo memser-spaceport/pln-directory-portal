@@ -3,6 +3,12 @@
 // here never call it.
 jest.mock('axios', () => ({ isAxiosError: jest.fn(() => false) }));
 
+// The real module pulls in a transitive chain that breaks under ts-jest (an
+// ESM-only nestjs-zod import); mock it like roadmap.service.spec.ts does.
+jest.mock('../push-notifications/push-notifications.service', () => ({
+  PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
+}));
+
 import 'reflect-metadata';
 import { PATH_METADATA, METHOD_METADATA, GUARDS_METADATA } from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common';

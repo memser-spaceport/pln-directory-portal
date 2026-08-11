@@ -275,3 +275,40 @@ export const buildAppSettingsUrl = (appUid: string): string => `${buildAppPageUr
  */
 export const AI_APPS_APP_SETTINGS_ENDPOINT =
   process.env.AI_APPS_APP_SETTINGS_ENDPOINT || `${AI_APPS_PORTAL_URL}/pl-infra/ai-apps/{appUid}?settings=deployment`;
+
+// ── Deploy lifecycle bell notifications ───────────────────────────────────
+
+// Relative route — the notification bell resolves links against the frontend
+// origin (not AI_APPS_PORTAL_URL) and breaks on absolute URLs.
+export function aiAppDetailPath(appUid: string): string {
+  return `/pl-infra/ai-apps/${appUid}`;
+}
+
+/**
+ * `metadata.trigger` values stamped on each AI Apps bell notification —
+ * mirrors the roadmap module's convention for one category covering several
+ * distinct events.
+ */
+export const AI_APPS_NOTIFICATION_TRIGGERS = {
+  DEPLOY_SUCCEEDED: 'deploy_succeeded',
+  DEPLOY_FAILED: 'deploy_failed',
+} as const;
+
+/**
+ * All user-facing AI Apps deploy notification copy lives here so a wording
+ * change is a one-file swap.
+ */
+export const AI_APPS_NOTIFICATION_MESSAGES = {
+  deploySucceeded: (appName: string) => ({
+    title: `New app deployed: ${appName}`,
+    description: `${appName} just went live in AI Apps — check it out.`,
+  }),
+  deployFailed: (appName: string) => ({
+    title: `Deploy failed: ${appName}`,
+    // Deliberately generic: the runner's raw failure text can carry stack
+    // fragments/internal hostnames, which are manager-only (see
+    // AiAppDeploymentInfo.failureReason) — the owner sees the real reason on
+    // the app page this notification links to, not in the notification body.
+    description: 'Your app failed to deploy — open the app page for details and to retry.',
+  }),
+} as const;

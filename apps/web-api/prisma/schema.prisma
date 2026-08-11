@@ -1556,6 +1556,12 @@ enum PushNotificationCategory {
 
   // Team news — "News from the network" updates surfaced on /home
   TEAM_NEWS
+
+  // AI Apps (PL Infra) — currently the deploy lifecycle: first successful deploy
+  // (broadcast to AI Apps access holders) and deploy failure (app owner only).
+  // Kept generic (not AI_APP_DEPLOY) so future non-deploy AI Apps notifications
+  // can reuse it, distinguished by metadata.trigger.
+  AI_APP
 }
 
 // Push notifications for WebSocket delivery

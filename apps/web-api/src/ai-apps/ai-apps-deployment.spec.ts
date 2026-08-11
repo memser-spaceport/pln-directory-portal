@@ -18,6 +18,12 @@ jest.mock('./ai-apps.constants', () => ({
   AI_APPS_VERIFY_INTERVAL_MS: 0,
 }));
 
+// The real module pulls in a transitive chain that breaks under ts-jest (an
+// ESM-only nestjs-zod import); mock it like roadmap.service.spec.ts does.
+jest.mock('../push-notifications/push-notifications.service', () => ({
+  PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
+}));
+
 import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
 import { AI_APPS_DEPLOY_STUCK_MS } from './ai-apps.constants';
@@ -57,7 +63,13 @@ function buildService(app: Record<string, any> | null = APP) {
     },
   };
   const aws = { uploadFileToS3: jest.fn().mockResolvedValue(undefined) };
-  return { service: new AiAppsService(prisma as any, aws as any), prisma, aws };
+  const pushNotifications = { create: jest.fn().mockResolvedValue({}) };
+  return {
+    service: new AiAppsService(prisma as any, aws as any, pushNotifications as any),
+    prisma,
+    aws,
+    pushNotifications,
+  };
 }
 
 /** The `data` of the update() call that wrote status ERROR. */
@@ -173,7 +185,9 @@ describe('deploy outcome writes', () => {
 
     const result = await service.deployDraft('creator-1', 'app-1', undefined);
 
-    const readyWrite = prisma.aiApp.update.mock.calls.map(([{ data }]: any) => data).find((d: any) => d.status === 'READY');
+    const readyWrite = prisma.aiApp.update.mock.calls
+      .map(([{ data }]: any) => data)
+      .find((d: any) => d.status === 'READY');
     expect(readyWrite).toMatchObject({ notes: null, failureStream: null });
     expect(readyWrite.lastDeployedAt).toBeInstanceOf(Date);
     expect(result.deployment.serving).toBe('latest');
@@ -239,6 +253,71 @@ describe('deploy outcome writes', () => {
 
     expect(prisma.aiApp.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'ERROR', failureStream: null }) })
+    );
+  });
+});
+
+describe('deploy lifecycle bell notifications', () => {
+  it('a FIRST successful deploy (lastDeployedAt was null) broadcasts to AI Apps access holders', async () => {
+    const { service, pushNotifications } = buildService({ ...APP, status: 'DRAFT', lastDeployedAt: null });
+    mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
+
+    await service.deployDraft('creator-1', 'app-1', undefined);
+
+    expect(pushNotifications.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'AI_APP',
+        link: '/pl-infra/ai-apps/app-1',
+        requiredPermissions: ['ai_apps.read', 'ai_apps.write'],
+        metadata: expect.objectContaining({ appUid: 'app-1', trigger: 'deploy_succeeded' }),
+      })
+    );
+    expect(pushNotifications.create.mock.calls[0][0]).not.toHaveProperty('recipientUid');
+  });
+
+  it('a redeploy (lastDeployedAt already set) never re-fires the broadcast', async () => {
+    const { service, pushNotifications } = buildService({ ...APP, status: 'READY', lastDeployedAt: LAST_SHIP });
+    mockedAxios.post.mockResolvedValue({ status: 200, data: { port: 31001 } });
+
+    await service.deployDraft('creator-1', 'app-1', undefined);
+
+    expect(pushNotifications.create).not.toHaveBeenCalled();
+  });
+
+  it('a deploy failure notifies the app OWNER only, never the broader access-holder broadcast', async () => {
+    const { service, prisma, pushNotifications } = buildService({ ...APP, status: 'ERROR', memberUid: 'owner-1' });
+    // requesterUid is a directory admin acting on someone else's app — the
+    // notification must still target the app's owner, not the requester.
+    prisma.member.findUnique.mockResolvedValueOnce({ memberRoles: [{ name: 'DIRECTORYADMIN' }] });
+    mockedAxios.post.mockRejectedValue({ isAxiosError: true, response: { status: 500, data: 'kaniko error' } });
+
+    await expect(service.deployDraft('admin-1', 'app-1', undefined)).rejects.toThrow();
+
+    expect(pushNotifications.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'AI_APP',
+        link: '/pl-infra/ai-apps/app-1',
+        recipientUid: 'owner-1',
+        metadata: expect.objectContaining({ appUid: 'app-1', trigger: 'deploy_failed' }),
+      })
+    );
+    expect(pushNotifications.create.mock.calls[0][0]).not.toHaveProperty('requiredPermissions');
+  });
+
+  it('a stuck-deploy settle notifies the app owner of the failure', async () => {
+    const stuck = {
+      ...APP,
+      memberUid: 'owner-1',
+      status: 'DEPLOYING',
+      updatedAt: new Date(Date.now() - AI_APPS_DEPLOY_STUCK_MS - 60_000),
+    };
+    const { service, prisma, pushNotifications } = buildService(stuck);
+    prisma.aiApp.findUnique.mockResolvedValueOnce(stuck).mockResolvedValueOnce({ ...stuck, status: 'ERROR' });
+
+    await service.getApp('app-1');
+
+    expect(pushNotifications.create).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'AI_APP', recipientUid: 'owner-1' })
     );
   });
 });
