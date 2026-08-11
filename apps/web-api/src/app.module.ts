@@ -85,6 +85,7 @@ import { AffinityModule } from './affinity/affinity.module';
 import { RoadmapModule } from './roadmap/roadmap.module';
 import { AiAppsModule } from './ai-apps/ai-apps.module';
 import { AgentSessionsModule } from './agent-sessions/agent-sessions.module';
+import { FeatureAgentDemoModule } from './feature-agent-demo/feature-agent-demo.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -190,6 +191,7 @@ import { AgentSessionsModule } from './agent-sessions/agent-sessions.module';
     RoadmapModule,
     AiAppsModule,
     AgentSessionsModule,
+    FeatureAgentDemoModule,
   ],
   providers: [
     {
