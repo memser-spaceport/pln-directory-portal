@@ -42,4 +42,10 @@ describe('FeatureAgentDemoController', () => {
 
     expect(result.environment).toBe('development');
   });
+
+  it('should return the v2 message text', () => {
+    const result = controller.getFeatureAgentDemo();
+
+    expect(result.message).toBe('Hello from autonomous coding agent v2');
+  });
 });
