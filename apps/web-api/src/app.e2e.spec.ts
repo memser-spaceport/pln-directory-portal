@@ -24,6 +24,16 @@ describe('App', () => {
     await app.close();
   });
 
+  describe('when requesting the /feature-agent-demo endpoint', () => {
+    it('should return the public demo page with the expected greeting', async () => {
+      const response = await supertest(app.getHttpServer())
+        .get('/feature-agent-demo')
+        .expect(200);
+      expect(response.type).toBe('text/html');
+      expect(response.text).toContain('Hello from autonomous coding agent');
+    });
+  });
+
   describe('when requesting the /token endpoint', () => {
     it('should retrieve a CSRF token', async () => {
       const response = await supertest(app.getHttpServer())

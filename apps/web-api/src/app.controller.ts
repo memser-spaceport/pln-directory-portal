@@ -1,4 +1,4 @@
-import { Controller, Get, Redirect, Req, Res, UseInterceptors} from '@nestjs/common';
+import { Controller, Get, Header, Redirect, Req, Res, UseInterceptors} from '@nestjs/common';
 import { NoCache } from './decorators/no-cache.decorator';
 import { SentryInterceptor } from './interceptors/sentry.interceptor';
 import { generateOAuth2State } from '../src/utils/helper/helper';
@@ -40,6 +40,16 @@ export class AppController {
         statusCode: 302 
       };
     }
+  }
+
+  /*
+   ** Public demo page for the autonomous coding agent feature.
+   */
+  @Get('/feature-agent-demo')
+  @NoCache()
+  @Header('Content-Type', 'text/html')
+  getFeatureAgentDemo(): string {
+    return '<!DOCTYPE html><html><head><title>Feature Agent Demo</title></head><body>Hello from autonomous coding agent</body></html>';
   }
 
   /**
