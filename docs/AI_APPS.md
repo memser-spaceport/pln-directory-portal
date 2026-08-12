@@ -177,6 +177,12 @@ The password is never part of this contract — it only ever reaches the app's r
 
 **Runner routing (important):** the runner's legacy `/deploy` build endpoint never injects anything into the running pod — for secrets *or* a database — regardless of what's in the request body. Provisioning only actually happens through the same secret-aware endpoint the draft/secrets flow already uses, `POST <AI_APPS_RUNNER_URL>/v1/projects/<AI_APPS_RUNNER_PROJECT>/deployments` (see "Helm-lock retry" below). So `proxyDeploy` always builds via `/deploy` first, then — whenever `database.enabled` **or** the app has stored secrets — looks up the just-built image (`GET /apps`) and calls `/deployments` with `{ appId, environment, image, secretNames, database }`; that call's response is where the `database` metadata above actually comes from. This is the same call already made for secrets-only apps, just now also carrying `database` and returning it.
 
+## Migrating an existing database to PLN Postgres
+
+Apps deployed before database provisioning existed (or built with a member's own database on purpose) are still bring-their-own-DB — commonly Supabase. Kits ≥1.8 ship a `db-migration` skill (`.claude/skills/db-migration/SKILL.md` in the kit) that lets the agent move such an app onto a PLN-provisioned Postgres database: detect the current database/ORM (BaaS SDK, Prisma/Knex/Sequelize, raw driver) and any existing migrations, carry over or translate the schema into Postgres SQL, detect required Postgres extensions (`pgcrypto` for `gen_random_uuid()`, `uuid-ossp` for `uuid_generate_v4()`, …), replace the old client with a plain Postgres client behind the app's existing data-access interface, and write a plain-language report of anything provider-specific that can't come along (Supabase Auth/Storage/Realtime, RLS policies keyed on `auth.uid()`, Firebase/Firestore, etc.).
+
+This is **entirely client-side** — no backend or orchestrator change backs it. `deployment-orchestrator`'s `ensureApplicationDatabase` only provisions the role/database and injects env vars into the pod (see "Agent-driven database provisioning" above); it has no initContainer, Helm command/args override, or exec API for deployed apps, so nothing on the platform ever runs SQL against the new database. The skill's generated migrations therefore run from the app's **own** Docker image: a small runner (tracked via a `_pln_migrations` table for idempotency) wired into the Dockerfile's `CMD`/entrypoint applies pending `app/db/migrations/*.sql` files against the injected `DATABASE_URL` before the main process starts. The skill ends by handing off to the normal `database: {"enabled":true,"type":"postgres"}` deploy/draft contract above — it never calls the deploy/draft endpoints itself.
+
 ## Draft apps & runtime secrets
 
 Apps that read secrets from the environment (`OPENAI_API_KEY`, credentialed URLs, …) must never ship the values in the ZIP, and the agent must never see them. The **draft flow** splits responsibilities: the agent declares which env var *names* the app needs; the member supplies the *values* in LabOS; the backend forwards the values straight to the sandbox runner's secret store (they are **never persisted in our DB** — only the names are tracked, in `requiredEnvVars` / `providedEnvVars`).
@@ -580,6 +586,7 @@ CLAUDE.md / AGENTS.md                          agent build + deploy instructions
 .claude/skills/app-logs/SKILL.md               fetch build/runtime logs to debug failed deploys + runtime errors (kits ≥1.5)
 .claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
 .claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
+.claude/skills/db-migration/SKILL.md           migrate an existing DB onto PLN Postgres (kits ≥1.8)
 pln-app.config.json                            connect/deploy/draft/metadata/logs/member-context endpoints
                                                (+ appId, appUid, approved appName/appDescription,
                                                 database provisioning choice ≥1.6) — NO token
