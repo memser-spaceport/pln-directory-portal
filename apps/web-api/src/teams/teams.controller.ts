@@ -206,7 +206,7 @@ export class TeamsController {
     const builtQuery = builder.build(request.query);
     const team = await this.teamsService.findTeamByUid(uid, request.userEmail, builtQuery);
     await this.stampIsFollowed([team], request['userEmail']);
-    return team;
+    return sanitizeMemberContactsForViewer(team, Boolean(request['userEmail']));
   }
 
   @Api(server.route.modifyTeam)

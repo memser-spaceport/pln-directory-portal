@@ -10,6 +10,7 @@ const AUTOMCOMPLETE_MAX_LENGTH = 50;
 type FetchAllOptions = {
   strict?: boolean;
   canReadForum?: boolean;
+  isAuthenticated?: boolean;
   perIndexSize?: number; // default: MAX_SEARCH_RESULTS_PER_INDEX
   topN?: number; // default: 50 (controls result.top when no pagination)
   page?: number; // 1-based; optional combined pagination
@@ -28,6 +29,27 @@ export class SearchService {
       ...result,
       forumThreads: [],
       top: (result.top ?? []).filter((item) => item.index !== 'forumThreads'),
+    };
+  }
+
+  /** Nulls the office-hours booking link (top-level and inside the raw `source`) for anonymous callers. */
+  private redactOfficeHoursForAnonymous(result: SearchResult, isAuthenticated: boolean): SearchResult {
+    if (isAuthenticated) {
+      return result;
+    }
+    const redactItem = (item: any) => {
+      if (item && typeof item.officeHoursUrl !== 'undefined') {
+        item.officeHoursUrl = null;
+      }
+      if (item?.source && typeof item.source.officeHoursUrl !== 'undefined') {
+        item.source = { ...item.source, officeHoursUrl: null };
+      }
+      return item;
+    };
+    return {
+      ...result,
+      members: (result.members ?? []).map(redactItem),
+      top: (result.top ?? []).map((item) => (item.index === 'members' ? redactItem(item) : item)),
     };
   }
 
@@ -400,7 +422,8 @@ export class SearchService {
         ...result.forumThreads.slice(0, 5),
       ];
 
-      return options?.canReadForum ? result : this.removeForumResults(result);
+      const withForum = options?.canReadForum ? result : this.removeForumResults(result);
+      return this.redactOfficeHoursForAnonymous(withForum, Boolean(options?.isAuthenticated));
     } catch (e) {
       // Bubble up but record an overall error with a normalized type
       SearchMetrics.errors.inc({ source, section: 'all', strict, error_type: classifyError(e) });
@@ -414,7 +437,12 @@ export class SearchService {
    * Autocomplete using completion suggesters.
    * Forum: `forum_thread.name_suggest` is used to suggest thread titles/summaries.
    */
-  async autocompleteSearch(text: string, size = 5, canReadForum = true): Promise<SearchResult> {
+  async autocompleteSearch(
+    text: string,
+    size = 5,
+    canReadForum = true,
+    isAuthenticated = false
+  ): Promise<SearchResult> {
     const indices: Record<string, [string, string[]]> = {
       events: ['event', ['name_suggest', 'shortDescription_suggest', 'location_suggest']],
       projects: ['project', ['name_suggest', 'tagline_suggest', 'tags_suggest']],
@@ -565,7 +593,8 @@ export class SearchService {
         SearchMetrics.empty.inc({ source, section: 'all', strict });
       }
 
-      return canReadForum ? results : this.removeForumResults(results);
+      const withForum = canReadForum ? results : this.removeForumResults(results);
+      return this.redactOfficeHoursForAnonymous(withForum, isAuthenticated);
     } catch (e) {
       SearchMetrics.errors.inc({ source, section: 'all', strict, error_type: classifyError(e) });
       throw e;

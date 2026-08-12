@@ -16,6 +16,7 @@ import { MembersService } from '../members/members.service';
 import { PrismaQueryBuilder } from '../utils/prisma-query-builder';
 import { prismaQueryableFieldsFromZod } from '../utils/prisma-queryable-fields-from-zod';
 import { NoCache } from '../decorators/no-cache.decorator';
+import { isRequestAuthenticated, sanitizeMembersContactsForViewer } from '../members/member-contact-sanitizer';
 
 const server = initNestServer(apiMemberSubscriptions);
 type RouteShape = typeof server.routeShapes;
@@ -60,6 +61,7 @@ export class MemberSubscriptionController {
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
-    return await this.memberFollowService.getSubscriptions(builtQuery);
+    const subscriptions = await this.memberFollowService.getSubscriptions(builtQuery);
+    return sanitizeMembersContactsForViewer(subscriptions ?? [], isRequestAuthenticated(request));
   }
 }

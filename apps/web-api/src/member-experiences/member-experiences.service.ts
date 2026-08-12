@@ -153,7 +153,9 @@ export class MemberExperiencesService {
     try {
       const experiences = await this.prisma.memberExperience.findMany({
         include: {
-          member: true,
+          member: {
+            select: { uid: true, name: true, image: true },
+          },
         },
         where: {
           member: {

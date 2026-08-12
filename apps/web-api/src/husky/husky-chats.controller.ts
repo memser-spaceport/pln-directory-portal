@@ -28,9 +28,10 @@ export class HuskyChatsController {
     );
   }
 
+  @UseGuards(UserTokenCheckGuard)
   @Post('v1/husky/chat/contextual')
-  async huskyChatAssistant(@Body() body: HuskyChatDto, @Res() res: Response) {
-    const aiStreamingResponse = await this.huskyAiService.createContextualResponse({ ...body});
+  async huskyChatAssistant(@Body() body: HuskyChatDto, @Res() res: Response, @Req() req) {
+    const aiStreamingResponse = await this.huskyAiService.createContextualResponse({ ...body }, req.userEmail);
     aiStreamingResponse.pipeTextStreamToResponse(res);
     return;
   }
