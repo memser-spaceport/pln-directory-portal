@@ -21,8 +21,16 @@ const server = initNestServer(apiImages);
 type RouteShape = typeof server.routeShapes;
 
 /**
- * This controller is only used for testing purposes.
- * It is not used in the production app.
+ * Despite the name, this controller IS used in production:
+ * - apps/back-office uploads member/deal images here via a bare `fetch`
+ *   (utils/services/member.ts saveRegistrationImage) and via the token-attaching
+ *   `api` instance (components/teams/data-quality/EditModal.tsx) — neither sends
+ *   a member token the member-auth introspection guards accept.
+ * - An external events-service proxies public IRL event-logo uploads here.
+ * Do not add a member-auth guard (UserTokenValidation/UserTokenCheckGuard/etc.)
+ * without first giving those callers a credential they can actually send — the
+ * `Image` model itself holds no member PII (url/filename/dimensions only), so
+ * there's no anonymous-data-leak reason to gate it.
  */
 @Controller()
 export class ImagesController {

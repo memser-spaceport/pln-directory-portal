@@ -11,6 +11,8 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { ResponseProjectWithRelationsSchema } from 'libs/contracts/src/schema';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { UserTokenValidation } from '../guards/user-token-validation.guard';
+import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { isRequestAuthenticated, sanitizeMemberContactsForViewer } from '../members/member-contact-sanitizer';
 
 const server = initNestServer(apiProjects);
 type RouteShape = typeof server.routeShapes;
@@ -61,6 +63,7 @@ export class ProjectsController {
 
   @Api(server.route.getProjects)
   @ApiOkResponseFromZod(ResponseProjectWithRelationsSchema.array())
+  @UseGuards(OptionalUserTokenCheckGuard)
   async findAll(@Req() req) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseProjectWithRelationsSchema);
     const builder = new PrismaQueryBuilder(queryableFields);
@@ -81,18 +84,23 @@ export class ProjectsController {
         this.projectsService.buildTagFilter(tags),
       ],
     };
-    return this.projectsService.getProjects(builtQuery);
+    const result = await this.projectsService.getProjects(builtQuery);
+    return {
+      ...result,
+      projects: sanitizeMemberContactsForViewer(result?.projects, isRequestAuthenticated(req)),
+    };
   }
 
   @Api(server.route.getProject)
   @ApiParam({ name: 'uid', type: 'string' })
   @ApiOkResponseFromZod(ResponseProjectWithRelationsSchema)
-  async findOne(@ApiDecorator() { params: { uid } }: RouteShape['getProject']) {
+  @UseGuards(OptionalUserTokenCheckGuard)
+  async findOne(@Req() request, @ApiDecorator() { params: { uid } }: RouteShape['getProject']) {
     const project = await this.projectsService.getProjectByUid(uid);
     if (!project || project.isDeleted) {
       throw new NotFoundException(`Project not found with uid: ${uid}.`);
     }
-    return project;
+    return sanitizeMemberContactsForViewer(project, isRequestAuthenticated(request));
   }
 
   @Api(server.route.removeProject)

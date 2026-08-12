@@ -130,8 +130,20 @@ export class HuskyAiService {
     return stream;
   }
 
-  async createContextualResponse(chatInfo: HuskyChatInterface) {
+  async createContextualResponse(chatInfo: HuskyChatInterface, email = '') {
     const { question, chatSummary, threadId, chatId } = chatInfo;
+
+    // Anonymous chat threads (no email) are created on first message and stay writable
+    // by anyone holding the threadId; once a thread is tied to a member's email, only
+    // that member may keep writing to it.
+    const existingThread = await this.huskyPersistentDbService.findOneByKeyValue(
+      process.env.MONGO_THREADS_COLLECTION || 'threads',
+      'threadId',
+      threadId
+    );
+    if (existingThread?.email && existingThread.email !== email) {
+      throw new ForbiddenException('You are not authorized to write to this thread');
+    }
 
     // Update the chat summary if it is provided
     if (chatSummary) {
@@ -306,7 +318,7 @@ export class HuskyAiService {
     if (!thread) {
       throw new NotFoundException('Thread not found');
     }
-    if (email && thread?.email === email) {
+    if (thread?.email && thread.email !== email) {
       throw new ForbiddenException('You are not authorized to duplicate this thread');
     }
 
@@ -675,6 +687,10 @@ export class HuskyAiService {
 
     const [thread, summaryData] = await Promise.all([threadPromise, summaryPromise]);
     if (!thread) {
+      throw new NotFoundException('Thread not found');
+    }
+
+    if (thread?.email && thread.email !== email) {
       throw new NotFoundException('Thread not found');
     }
 

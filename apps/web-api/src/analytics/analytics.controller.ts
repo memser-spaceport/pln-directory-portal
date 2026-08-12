@@ -1,9 +1,10 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, UseGuards } from '@nestjs/common';
 
 import { Request } from 'express';
 import { AnalyticsService } from './service/analytics.service';
 import {AnalyticsReadService} from "./service/analytics.read.service";
 import { SkipThrottle } from '@nestjs/throttler';
+import { AdminAuthGuard } from '../guards/admin-auth.guard';
 
 class TrackEventDto {
   name!: string;
@@ -96,6 +97,7 @@ export class AnalyticsController {
    * If only PostHog/Console is enabled, this returns 200 with an empty set.
    */
   @Get('events/all')
+  @UseGuards(AdminAuthGuard)
   async getEvents(@Query() q: GetEventsQueryDto) {
     const rows = await this.analyticsReadService.getEvents(q);
     return {

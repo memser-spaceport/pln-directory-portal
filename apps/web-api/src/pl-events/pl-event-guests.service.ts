@@ -661,6 +661,9 @@ export class PLEventGuestsService {
       eventGuests = eventGuests.map((guest: any) => {
         delete guest.member.telegramHandler;
         delete guest.telegramId;
+        if (guest.member) {
+          guest.member.preferences = null;
+        }
         return guest;
       });
     }
@@ -674,15 +677,26 @@ export class PLEventGuestsService {
    * @returns The event guests array with office hours filtered for non-logged-in users.
    */
   restrictOfficeHours(eventGuests, isUserLoggedIn: boolean) {
-    if (eventGuests && isUserLoggedIn) {
-      eventGuests = eventGuests.map((guest: any) => {
-        if (!guest.officeHours) {
-          delete guest.member.officeHours;
+    if (!eventGuests) {
+      return eventGuests;
+    }
+    if (!isUserLoggedIn) {
+      // Anonymous callers never see office hours, whether at the member level
+      // or as a per-event override.
+      return eventGuests.map((guest: any) => {
+        if (guest.member) {
+          guest.member.officeHours = null;
         }
+        guest.officeHours = null;
         return guest;
       });
     }
-    return eventGuests;
+    return eventGuests.map((guest: any) => {
+      if (!guest.officeHours && guest.member) {
+        guest.member.officeHours = null;
+      }
+      return guest;
+    });
   }
 
   /**

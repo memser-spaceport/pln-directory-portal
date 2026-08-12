@@ -151,14 +151,22 @@ export class OfficeHoursController {
   // New endpoints
   @Api(server.route.checkAllOfficeHoursLinks)
   @UseGuards(UserTokenValidation)
-  async checkAllOfficeHoursLinks() {
+  async checkAllOfficeHoursLinks(@Req() request: Request) {
+    const requester: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    if (!requester || !this.memberService.checkIfAdminUser(requester)) {
+      throw new ForbiddenException(`Member isn't authorized to trigger a batch office hours link check`);
+    }
     return await this.interactionService.checkAllLinksBatch();
   }
 
   @Api(server.route.checkOfficeHoursLink)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
-  async checkOfficeHoursLink(@Body() body: any) {
+  async checkOfficeHoursLink(@Body() body: any, @Req() request: Request) {
+    const requester: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    if (!requester || !this.memberService.checkIfAdminUser(requester)) {
+      throw new ForbiddenException(`Member isn't authorized to check an arbitrary office hours link`);
+    }
     return await this.interactionService.checkProvidedLink(body.link);
   }
 
@@ -172,7 +180,14 @@ export class OfficeHoursController {
 
   @Api(server.route.checkMemberOfficeHoursLink)
   @UseGuards(UserTokenValidation)
-  async checkMemberOfficeHoursLink(@Param('uid') uid: string) {
+  async checkMemberOfficeHoursLink(@Param('uid') uid: string, @Req() request: Request) {
+    const requester: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    if (!requester) {
+      throw new NotFoundException(`Requester not found for ${request['userEmail']}`);
+    }
+    if (uid !== requester.uid && !this.memberService.checkIfAdminUser(requester)) {
+      throw new ForbiddenException(`Member isn't authorized to check another member's office hours link`);
+    }
     return await this.interactionService.checkAndUpdateMemberLink(uid);
   }
 }

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Controller,
+  ForbiddenException,
   Get,
   Header,
   Param,
@@ -75,9 +76,45 @@ export class UploadsController {
 
   @Get(':uid')
   @Header('Cache-Control', 'no-store')
-  async getOne(
-    @Param('uid') uid: string,
-  ) {
-    return this.uploads.getOne(uid);
+  async getOne(@Param('uid') uid: string, @Req() request: Request) {
+    const row: any = await this.uploads.getOne(uid);
+    const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
+    const isAllowed = await this.isAuthorizedForUpload(row, member);
+    if (!isAllowed) {
+      throw new ForbiddenException('Not authorized to access this upload');
+    }
+    return row;
+  }
+
+  private async isAuthorizedForUpload(upload: any, member: any): Promise<boolean> {
+    if (!member) return false;
+    if (this.memberService.checkIfAdminUser(member)) return true;
+    if (upload.uploaderUid && upload.uploaderUid === member.uid) return true;
+
+    switch (upload.scopeType) {
+      case 'MEMBER':
+        return upload.scopeUid === member.uid;
+      case 'TEAM': {
+        if (!upload.scopeUid) return false;
+        const isTeamMember = await this.prisma.teamMemberRole.count({
+          where: { teamUid: upload.scopeUid, memberUid: member.uid },
+        });
+        return Boolean(isTeamMember);
+      }
+      case 'PROJECT': {
+        if (!upload.scopeUid) return false;
+        const project = await this.prisma.project.findUnique({
+          where: { uid: upload.scopeUid },
+          select: { createdBy: true },
+        });
+        if (project?.createdBy === member.uid) return true;
+        const isContributor = await this.prisma.projectContribution.count({
+          where: { projectUid: upload.scopeUid, memberUid: member.uid },
+        });
+        return Boolean(isContributor);
+      }
+      default:
+        return false;
+    }
   }
 }
