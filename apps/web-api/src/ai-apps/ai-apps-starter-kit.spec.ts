@@ -26,6 +26,7 @@ describe('AiAppsStarterKitService buildZip', () => {
       '.claude/skills/app-logs/SKILL.md',
       '.claude/skills/pl-design-system/SKILL.md',
       '.claude/skills/pln-member-context/SKILL.md',
+      '.claude/skills/db-migration/SKILL.md',
       'pln-app.config.json',
     ]) {
       expect(entries.has(path)).toBe(true);
@@ -255,5 +256,36 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(readme).toContain('Tailwind v4');
     expect(readme).toContain('EntityCard');
     expect(readme).not.toContain('SCSS design tokens');
+  });
+
+  it('teaches the db-migration skill to detect, port, and report on an existing database', () => {
+    const skill = entries.get('.claude/skills/db-migration/SKILL.md') as string;
+    // Detection covers the common BaaS/ORM/driver signatures and existing migration folders.
+    expect(skill).toContain('@supabase/supabase-js');
+    expect(skill).toContain('supabase/migrations');
+    expect(skill).toContain('prisma/migrations');
+    // Provider-specific features must be reported, never silently dropped.
+    expect(skill).toContain('Supabase Auth, Storage, or Realtime');
+    expect(skill).toContain('auth.uid()');
+    expect(skill).toContain('db-migration-report.md');
+    // Extensions the generated SQL might need.
+    expect(skill).toContain('pgcrypto');
+    expect(skill).toContain('uuid-ossp');
+    expect(skill).toContain('CREATE EXTENSION IF NOT EXISTS');
+    // The platform has no migration hook — the app's own image must run it.
+    expect(skill).toContain('no platform-level migration step');
+    expect(skill).toContain('_pln_migrations');
+    // Never guesses credentials, and hands off to the existing provisioned-database contract.
+    expect(skill).toContain('Never provision or guess credentials');
+    expect(skill).toContain('{"enabled":true,"type":"postgres"}');
+    expect(skill).toContain('deploy-to-labs');
+
+    // AGENTS.md/CLAUDE.md and the README point the agent/member at it.
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).toContain('db-migration');
+    }
+    const readme = entries.get('README.md') as string;
+    expect(readme).toContain('db-migration');
+    expect(readme).toContain('move my database to PLN');
   });
 });

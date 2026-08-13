@@ -7,6 +7,7 @@ import {DbProvider} from "./provider/db.provider";
 import {HybridConsoleDbProvider} from "./provider/hybrid.provider";
 import {AnalyticsController} from "./analytics.controller";
 import {AnalyticsReadService} from "./service/analytics.read.service";
+import {JwtService} from "../utils/jwt/jwt.service";
 
 /**
  * Global analytics module that provides the AnalyticsService
@@ -22,7 +23,8 @@ import {AnalyticsReadService} from "./service/analytics.read.service";
     HybridConsoleDbProvider,
     AnalyticsService,
     PrismaService,
-    AnalyticsReadService
+    AnalyticsReadService,
+    JwtService
   ],
   exports: [AnalyticsService],
 })
