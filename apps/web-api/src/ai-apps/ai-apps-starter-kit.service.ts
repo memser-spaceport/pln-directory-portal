@@ -113,7 +113,8 @@ to the Protocol Labs Network sandbox with a single instruction.
 - \`.claude/skills/pl-design-system/\` — how to build on-brand UI with the PL Design System.
 - \`.claude/skills/pln-member-context/\` — how your app can know which PLN member is using it.
 - \`.claude/skills/db-migration/\` — for apps that already have their own database, how your
-  agent migrates it onto a PLN-provisioned Postgres database.
+  agent migrates it — structure and, by default, your existing data — onto a
+  PLN-provisioned Postgres database.
 - \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
 - \`pl-design-system/\` — the **PL Design System**: ready-made React components
   (Button, EntityCard, PageShell, Table, Tabs, Tag, Badge, SearchInput, …),
@@ -186,10 +187,13 @@ your agent and PLN handle that part.
 **Already have your own database and want to switch?** If you deployed before
 this feature existed (or brought your own on purpose) and would rather PLN
 manage it, just tell your agent — e.g. *"can we move my database to PLN's
-managed one?"*. Your agent looks at how your app is built, carries over your
-existing tables/data structure, and lets you know if anything about your
-current setup can't come along automatically (some database platforms offer
-extras — like their own login system — that don't transfer).
+managed one?"*. Your agent looks at how your app is built and carries over
+both your existing tables/structure **and your existing data** automatically —
+one migration, not two separate asks. If you'd rather start the new database
+empty (e.g. a throwaway test app), just say so. Either way, it lets you know
+if anything about your current setup can't come along automatically (some
+database platforms offer extras — like their own login system — that don't
+transfer).
 
 ## Personalized apps (who's using it)
 Your app can know which PLN member opened it. When a signed-in member with AI
@@ -324,8 +328,10 @@ Mongo, …) and wants to switch to a PLN-provisioned Postgres database instead, 
 the **db-migration** skill (\`.claude/skills/db-migration/SKILL.md\`) — do not
 improvise this by hand. It covers detecting the current setup, carrying over
 schema/migrations, spotting required Postgres extensions, and rewiring the app's
-data-access code, and it ends by handing off to the normal deploy flow above
-("Apps that want a provisioned database").
+data-access code. It copies the member's **existing data by default**, not just
+structure — one migration, not a separate ask for each half — skipping the
+data copy only if the member says to start empty. It ends by handing off to
+the normal deploy flow above ("Apps that want a provisioned database").
 
 ## Resource limits (design within budget)
 Every deployed app runs under a fixed CPU/memory envelope, and every image
@@ -1314,7 +1320,7 @@ errors or misbehaves. Log lines may include the app's URL/host — the
   private dbMigrationSkill(): string {
     return `---
 name: db-migration
-description: Migrate an app's existing database (its own Postgres, Supabase, MySQL, SQLite, Mongo, …) onto a PLN-provisioned Postgres database. Use whenever the member asks to migrate/move/switch their database to PLN's managed one, or whenever you notice during a deploy that the app talks to a non-PLN database and the member wants to stop maintaining it themselves. Ends by handing off to the normal deploy flow's "Apps that want a provisioned database" step — this skill never provisions anything or talks to the deploy endpoints itself.
+description: Migrate an app's existing database (its own Postgres, Supabase, MySQL, SQLite, Mongo, …) onto a PLN-provisioned Postgres database — schema and, by default, its existing data too, as one migration (skip the data half only if the member asks to start empty). Use whenever the member asks to migrate/move/switch their database to PLN's managed one, or whenever you notice during a deploy that the app talks to a non-PLN database and the member wants to stop maintaining it themselves. Ends by handing off to the normal deploy flow's "Apps that want a provisioned database" step — this skill never provisions anything or talks to the deploy endpoints itself.
 ---
 
 # Migrate an app's database to PLN Postgres
@@ -1463,13 +1469,39 @@ so the database engine is swappable behind it.
   SQL query (\`SELECT * FROM table WHERE col = $1\`, \`[value]\`) — never
   string-interpolate user-supplied values into SQL.
 
-## Step 6 — Wire a migration runner into the app's own startup
+## Step 6 — Wire a migration + data-copy runner into the app's own startup
 
 **There is no platform-level migration step.** Provisioning a database only
 injects connection env vars into the app's runtime — nothing on the PLN side
-ever runs SQL against it. The app itself must apply its own migrations, once,
-before it starts serving traffic. Add a small runner (a project's own script,
-not a new heavy dependency) that:
+ever runs SQL against it, and there's no exec/init-container hook to run
+anything else against it either. The app itself must apply its own schema
+**and copy its own data — one migration, done together, by default** — once,
+before it starts serving traffic.
+
+Before writing anything, tell the member plainly what's about to happen:
+this migration carries over both the **schema and the existing data**
+automatically — the data half doesn't need a separate approval, just say
+it's happening up front like any other part of the plan. Cover, in plain
+language:
+
+- It runs **once**, from inside the app's own container, the first time it
+  boots with both the old database's credentials and the new
+  \`DATABASE_URL\` present together.
+- It is a **snapshot copy, not live sync** — any row written to the old
+  database after the copy starts is not carried over. If the app takes live
+  writes, mention the short cutover window (pausing writes, or accepting a
+  follow-up top-up copy of just the newest rows may be needed).
+- It **never deletes or modifies the old database** — that stays exactly as
+  it is, as the fallback, until the member confirms the new one is good.
+- **If the member would rather start the new database empty** (a throwaway
+  dev/demo app, or they say so explicitly), skip the data half below and
+  build the schema-only runner — that's the one case where data copy doesn't
+  run.
+
+Add a small runner (a project's own script, not a new heavy dependency) that
+does both, in order:
+
+### 6a. Schema, always
 
 1. Connects using the same env vars and SSL setup as the app itself.
 2. Ensures a tracking table exists, e.g.:
@@ -1486,11 +1518,62 @@ not a new heavy dependency) that:
 4. Fails loudly (non-zero exit) if a migration errors, rather than starting the
    app against a half-migrated schema.
 
-Wire this to run **before** the main process starts — as the first command in
-the Dockerfile's \`CMD\`/entrypoint (e.g. \`CMD ["sh", "-c", "node db/migrate.js
-&& npm start"]\`), not as a separate deploy step, since none exists. Make sure
-it only runs migrations and exits — it must not itself bind to \`$PORT\` or the
-platform's health check will never see the real app come up.
+### 6b. Data, by default (skip only if the member asked to start empty)
+
+Runs immediately after 6a succeeds, against the **same** two connections: the
+old database (its existing client/driver and credentials — do not remove
+these from the app yet, see Step 8) as the source, and the new
+\`DATABASE_URL\` as the destination.
+
+1. Track progress per table, not just once, so a killed/OOM'd container can
+   resume instead of restarting the whole copy:
+   \`\`\`sql
+   CREATE TABLE IF NOT EXISTS _pln_data_copy (
+     table_name TEXT PRIMARY KEY,
+     rows_copied BIGINT NOT NULL DEFAULT 0,
+     completed_at TIMESTAMPTZ
+   );
+   \`\`\`
+2. Compute table order from the foreign keys in the migrations written in
+   Step 3 (parents before children) — copying a child table before its parent
+   trips every FK constraint. Skip any table already marked \`completed_at\`.
+3. For each remaining table, stream rows in batches (e.g. 500–1000 rows per
+   round-trip via keyset pagination on the primary key — never
+   \`SELECT *\` a whole table into memory) and \`INSERT ... ON CONFLICT (<pk>)
+   DO NOTHING\` into the destination. The \`ON CONFLICT DO NOTHING\` makes a
+   half-finished table safe to re-run, on top of the per-table tracking.
+   **Batch deliberately** — the runtime container has a **384Mi memory
+   limit** (see \`AGENTS.md\`'s resource limits), so loading a large table
+   whole risks an OOM kill mid-copy.
+4. Coerce types per row the same way Step 3 mapped them in DDL (e.g. a MySQL
+   \`TINYINT(1)\` source value becomes a Postgres \`boolean\`, MySQL/SQLite
+   date strings become \`timestamptz\`) — don't just pass values through
+   untyped and hope the driver guesses right.
+5. After a table finishes, compare source vs. destination row counts; only
+   write \`completed_at\` (and move on) if they match — a mismatch means it
+   stays unmarked so the **next boot retries it** rather than silently calling
+   an incomplete copy done.
+6. For any column backed by a Postgres sequence/identity (carried over from
+   an \`AUTO_INCREMENT\`/\`SERIAL\` source), reset the sequence after copying so
+   the app's next insert doesn't collide with a copied row:
+   \`\`\`sql
+   SELECT setval(pg_get_serial_sequence('<table>', '<col>'),
+                  COALESCE((SELECT MAX(<col>) FROM <table>), 1));
+   \`\`\`
+7. Log structured, greppable progress to stdout as it goes, e.g.
+   \`[db-migration] table=orders copied=4213/4213 status=complete\` — this is
+   how you (the agent) verify the copy after deploying, via the **app-logs**
+   skill's runtime logs, since nothing in this runner's output is visible
+   until then.
+
+Wire the whole thing (6a then, unless skipped, 6b) to run **before** the main
+process starts — as the first command in the Dockerfile's \`CMD\`/entrypoint
+(e.g. \`CMD ["sh", "-c", "node db/migrate.js && npm start"]\`), not as a
+separate deploy step, since none exists. Make sure it only runs migrations
+(and the data copy) and exits — it must not itself bind to \`$PORT\` or the
+platform's health check will never see the real app come up. If the data set
+is large enough that the copy could meaningfully delay startup, say so to the
+member plainly rather than silently shipping a slow first boot.
 
 ## Step 7 — Write the report
 
@@ -1506,6 +1589,11 @@ anywhere — it's for you and the member to read) summarizing, in plain language
   store; ask if this matters before deploying").
 - Whether the schema was reconstructed rather than copied from real migrations
   (Step 3's last bullet), if applicable.
+- **The data copy** (on by default — Step 6b): the per-table \`copied=X/Y\`
+  lines pulled from the runtime logs after the first deploy (Step 8), any
+  table that didn't reach \`status=complete\`, and a reminder that anything
+  written to the old database after the copy started was not carried over.
+  If the member asked to start empty instead, say that plainly here too.
 
 Summarize this for the member in plain, non-technical language — don't dump the
 raw file on them unless they ask to see it.
@@ -1515,34 +1603,51 @@ raw file on them unless they ask to see it.
 Once the code and migrations are ready:
 
 1. Confirm locally that the app still starts and passes its own smoke checks
-   with the migration runner wired in (you won't have a real \`DATABASE_URL\`
-   to test against locally unless the member has one — at minimum, confirm the
+   with the runner wired in (you won't have a real \`DATABASE_URL\` to test
+   against locally unless the member has one — at minimum, confirm the
    runner script has no syntax errors and the app still starts without it when
    no database is configured, if that was true before).
 2. Follow the **deploy-to-labs** skill's "Apps that want a provisioned
    database" section: add \`database: {"enabled":true,"type":"postgres"}\` to
    the deploy/draft call and save it to \`pln-app.config.json\`, exactly as if
    the member had asked for a database for the first time.
-3. If the app no longer needs any of its old BaaS secrets, drop them from
-   \`requiredEnvVars\` on the next draft registration (or deploy directly if no
-   secrets remain at all).
-4. The migration runner from Step 6 applies the schema automatically the
-   moment the newly-deployed container boots with its injected \`DATABASE_URL\`
-   — there is nothing further to trigger by hand.
+3. Unless the member asked to start empty, **keep the old database's
+   secret(s) registered** on this deploy — the 6b runner needs them one more
+   time. Only drop them from \`requiredEnvVars\` on a *later* draft/deploy,
+   once Step 7's report confirms every table reached \`status=complete\`.
+4. If the member asked to start empty and the app no longer needs any of its
+   old BaaS secrets, drop them from \`requiredEnvVars\` now (or deploy
+   directly if no secrets remain at all).
+5. The runner from Step 6 applies the schema — and, by default, copies the
+   data — automatically the moment the newly-deployed container boots with its
+   injected \`DATABASE_URL\` — there is nothing further to trigger by hand.
+6. Unless the member asked to start empty, pull the app's **runtime logs**
+   (the **app-logs** skill) after this deploy, read back the
+   \`[db-migration]\` lines, and fold the real per-table results into
+   \`db-migration-report.md\` (Step 7) before telling the member the
+   migration is done — don't declare success from the plan alone.
 
 ## Rules
 
 - Never invent or guess a connection string, username, or password — those
   only exist after a real deploy with \`database\` enabled, injected into the
-  app's own runtime.
+  app's own runtime, for either database.
 - Never silently drop a provider-specific feature — always land it in the
   report (Step 7), even if the member never asked about it.
 - Don't attempt this migration on a database the member hasn't confirmed they
   want to move — this skill is for when they've explicitly asked, or you've
   proposed it and they've agreed (same approval bar as any other destructive-
   feeling change to their app).
+- Data copy runs **by default** alongside the schema migration — don't treat
+  it as a separate ask requiring its own approval. Just tell the member
+  plainly, before deploying, that it's happening and what that means (Step
+  6). Skip it only when the member explicitly says to start empty.
 - Keep the old database's connection details intact until the member confirms
-  the new one works — don't delete the app's ability to fall back.
+  the new one works — don't delete the app's ability to fall back, and don't
+  remove them from the app's secrets while the default data copy hasn't yet
+  been confirmed complete (Step 8).
+- Never truncate, delete from, or write back to the **old** database from the
+  copy runner — it is read-only source material, full stop.
 `;
   }
 

@@ -288,4 +288,37 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(readme).toContain('db-migration');
     expect(readme).toContain('move my database to PLN');
   });
+
+  it('copies existing data by default alongside the schema, as one migration', () => {
+    const skill = entries.get('.claude/skills/db-migration/SKILL.md') as string;
+    // Data copy is the default path; starting empty is the one opt-out.
+    expect(skill).toContain('by default');
+    expect(skill).toContain("the data half doesn't need a separate approval");
+    expect(skill).toContain('rather start the new database empty');
+    expect(skill).toContain('snapshot copy, not live sync');
+    // Idempotent/resumable per-table tracking, mirroring the schema tracking table.
+    expect(skill).toContain('_pln_data_copy');
+    expect(skill).toContain('ON CONFLICT');
+    // FK-safe ordering, batching under the runtime memory limit, and sequence fixup.
+    expect(skill).toContain('parents before children');
+    expect(skill).toContain('384Mi memory');
+    expect(skill).toContain('setval(pg_get_serial_sequence');
+    // Progress is only observable after deploy, via the existing logs skill.
+    expect(skill).toContain('[db-migration]');
+    expect(skill).toContain('app-logs');
+    // Old credentials must survive long enough for the copy to run.
+    expect(skill).toContain('keep the old database');
+    expect(skill).toContain('Never truncate, delete from, or write back to the **old** database');
+    // Not a separate approval gate from the schema migration itself.
+    expect(skill).toContain("don't treat");
+    expect(skill).toContain('it as a separate ask requiring its own approval');
+
+    const readme = entries.get('README.md') as string;
+    expect(readme).toContain('and your existing data');
+    expect(readme).toContain('one migration, not two separate asks');
+
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).toContain('existing data by default');
+    }
+  });
 });
