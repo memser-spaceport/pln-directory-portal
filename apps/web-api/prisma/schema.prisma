@@ -2362,6 +2362,10 @@ model TeamNewsItem {
   @@index([eventType])
   @@index([editorialRank])
   @@index([teamUid, eventDate(sort: Desc)])
+  /// GET /v1/team-news/latest takes max(createdAt) to drive the app header's
+  /// "new news" dot, so it runs on effectively every page load by every user.
+  /// Without this it is a sequential scan on the hottest path in the app.
+  @@index([createdAt])
 }
 
 /// Per-member "I'm interested" signal on a team news item. One upvote per

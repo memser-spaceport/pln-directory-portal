@@ -13,6 +13,7 @@ import {
   TeamNewsListResponseSchema,
   TeamNewsPopularQueryParams,
   TeamNewsPopularResponseSchema,
+  TeamNewsLatestResponseSchema,
   TeamNewsRecentQueryParams,
   TeamNewsRecentResponseSchema,
   TeamNewsUpvoteStatusSchema,
@@ -59,6 +60,14 @@ export const apiTeamNews = contract.router({
       200: TeamNewsRecentResponseSchema,
     },
     summary: 'Recent network news across all teams (for the digest email)',
+  },
+  getTeamNewsLatest: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/team-news/latest`,
+    responses: {
+      200: TeamNewsLatestResponseSchema,
+    },
+    summary: 'Ingestion time of the newest visible news item (powers the Home button’s new-news dot)',
   },
   // Static paths before :newsItemUid routes so Nest matching stays unambiguous.
   getTeamNewsFollowSuggestions: {
