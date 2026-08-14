@@ -11,6 +11,7 @@ import type {
   TeamNewsListQuery,
   TeamNewsListResponse,
   TeamNewsPopularQuery,
+  TeamNewsLatestResponse,
   TeamNewsPopularResponse,
   TeamNewsRecentResponse,
 } from 'libs/contracts/src/schema/team-news';
@@ -40,6 +41,31 @@ const TOP_LEVEL_FOCUS_AREAS = [
 @Injectable()
 export class TeamNewsQueryService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * The excluded-team rule, in one place.
+   *
+   * It was spelled out separately in buildWhere and getRecentNews, and now has a
+   * third caller in getLatestCreatedAt — which is exactly where drift starts to
+   * hurt. The "new news" dot on the app header is driven by getLatestCreatedAt,
+   * so if it ever disagrees with what the feed actually lists, an excluded
+   * team's item lights the dot, the member opens /home, and finds nothing new.
+   * A couple of those and the indicator is dead to them.
+   */
+  private excludedTeamsWhere(): Prisma.TeamNewsItemWhereInput | null {
+    // `> 0` rather than `=== 0`: the list is `as const`, so its length is the
+    // literal 4 and TS rejects an equality check against 0 outright.
+    if (TEAM_NEWS_EXCLUDED_TEAM_NAMES.length > 0) {
+      return {
+        NOT: {
+          OR: TEAM_NEWS_EXCLUDED_TEAM_NAMES.map((name) => ({
+            team: { name: { equals: name, mode: 'insensitive' } },
+          })),
+        },
+      };
+    }
+    return null;
+  }
 
   private buildWhere(
     query: TeamNewsListQuery,
@@ -83,17 +109,39 @@ export class TeamNewsQueryService {
       });
     }
 
-    if (TEAM_NEWS_EXCLUDED_TEAM_NAMES.length > 0) {
-      and.push({
-        NOT: {
-          OR: TEAM_NEWS_EXCLUDED_TEAM_NAMES.map((name) => ({
-            team: { name: { equals: name, mode: 'insensitive' } },
-          })),
-        },
-      });
+    const excluded = this.excludedTeamsWhere();
+    if (excluded) {
+      and.push(excluded);
     }
 
     return and.length > 0 ? { AND: and } : {};
+  }
+
+  /**
+   * Ingestion time of the newest news item the public feed would show.
+   *
+   * Powers the "new news" dot on the app header's Home button: the client holds
+   * the last time it recorded a /home visit and compares.
+   *
+   * Deliberately NOT windowed. buildWhere applies `windowDays` (default 14),
+   * which answers "what should the feed LIST" — a different question from "is
+   * there anything newer than your last visit". Only the visibility rule
+   * (excluded teams) carries over, because the dot has to agree with the feed
+   * about what exists.
+   *
+   * `aggregate(_max)` rather than findFirst+orderBy: one value, no row
+   * materialised, and it is what the createdAt index is there for. This is
+   * called from the app header, so it runs on effectively every page load by
+   * every user — it has to stay cheap.
+   */
+  async getLatestCreatedAt(): Promise<TeamNewsLatestResponse> {
+    const excluded = this.excludedTeamsWhere();
+    const result = await this.prisma.teamNewsItem.aggregate({
+      _max: { createdAt: true },
+      ...(excluded ? { where: excluded } : {}),
+    });
+
+    return { latestAt: result._max.createdAt?.toISOString() ?? null };
   }
 
   async listTeamNews(
@@ -354,14 +402,11 @@ export class TeamNewsQueryService {
     const since = opts.sinceCreatedAt ?? new Date(until.getTime() - 24 * 60 * 60 * 1000);
     const limit = opts.limit ?? 50;
 
-    const where: Prisma.TeamNewsItemWhereInput = { createdAt: { gt: since, lte: until } };
-    if (TEAM_NEWS_EXCLUDED_TEAM_NAMES.length > 0) {
-      where.NOT = {
-        OR: TEAM_NEWS_EXCLUDED_TEAM_NAMES.map((name) => ({
-          team: { name: { equals: name, mode: 'insensitive' } },
-        })),
-      };
-    }
+    const excluded = this.excludedTeamsWhere();
+    const where: Prisma.TeamNewsItemWhereInput = {
+      createdAt: { gt: since, lte: until },
+      ...(excluded ?? {}),
+    };
 
     const rows = await this.prisma.teamNewsItem.findMany({
       where,

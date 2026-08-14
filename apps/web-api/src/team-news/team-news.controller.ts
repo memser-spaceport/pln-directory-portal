@@ -85,6 +85,19 @@ export class TeamNewsController {
     });
   }
 
+  // Drives the "new news" dot on the app header's Home button. No guard: the
+  // answer carries no viewer context, and /home is partly public.
+  //
+  // @NoCache() is load-bearing, not copied from its siblings — the global
+  // CacheModule ttl is 86400s (app.module.ts), and a day-stale timestamp would
+  // mean news landing on Monday lights the dot on Tuesday. If this endpoint's
+  // volume ever justifies caching, it needs its own short TTL, not the default.
+  @Api(server.route.getTeamNewsLatest)
+  @NoCache()
+  async getTeamNewsLatest() {
+    return this.teamNewsQueryService.getLatestCreatedAt();
+  }
+
   @Api(server.route.getTeamNewsFollowSuggestions)
   @NoCache()
   @UseGuards(UserTokenValidation)

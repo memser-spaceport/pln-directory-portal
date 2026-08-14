@@ -293,3 +293,63 @@ describe('TeamNewsQueryService.getPopular', () => {
     await expect(service.getPopular({ limit: 3 })).resolves.toEqual({ items: [] });
   });
 });
+
+describe('TeamNewsQueryService.getLatestCreatedAt', () => {
+  let service: TeamNewsQueryService;
+
+  const teamNewsItemAggregate = jest.fn();
+
+  const prismaMock = {
+    teamNewsItem: { aggregate: teamNewsItemAggregate },
+  } as unknown as PrismaService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new TeamNewsQueryService(prismaMock);
+  });
+
+  it('returns the newest ingestion time as an ISO string', async () => {
+    teamNewsItemAggregate.mockResolvedValue({ _max: { createdAt: new Date('2026-08-14T09:12:44.000Z') } });
+
+    await expect(service.getLatestCreatedAt()).resolves.toEqual({ latestAt: '2026-08-14T09:12:44.000Z' });
+  });
+
+  it('returns null when there is no visible news at all', async () => {
+    teamNewsItemAggregate.mockResolvedValue({ _max: { createdAt: null } });
+
+    // The client must read this as "nothing new", never "everything is new".
+    await expect(service.getLatestCreatedAt()).resolves.toEqual({ latestAt: null });
+  });
+
+  it('excludes the same teams the public feed hides', async () => {
+    teamNewsItemAggregate.mockResolvedValue({ _max: { createdAt: new Date('2026-08-14T00:00:00.000Z') } });
+
+    await service.getLatestCreatedAt();
+
+    // Without this the dot lights for news /home never lists, and the member
+    // clicks through to find nothing new.
+    expect(teamNewsItemAggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _max: { createdAt: true },
+        where: expect.objectContaining({
+          NOT: {
+            OR: expect.arrayContaining([
+              { team: { name: { equals: 'Nvidia', mode: 'insensitive' } } },
+              { team: { name: { equals: 'Anthropic', mode: 'insensitive' } } },
+            ]),
+          },
+        }),
+      })
+    );
+  });
+
+  it('does not apply the feed window — recency is not the same question as what the feed lists', async () => {
+    teamNewsItemAggregate.mockResolvedValue({ _max: { createdAt: new Date('2026-08-14T00:00:00.000Z') } });
+
+    await service.getLatestCreatedAt();
+
+    const where = teamNewsItemAggregate.mock.calls[0][0].where;
+    expect(where.eventDate).toBeUndefined();
+    expect(where.createdAt).toBeUndefined();
+  });
+});
