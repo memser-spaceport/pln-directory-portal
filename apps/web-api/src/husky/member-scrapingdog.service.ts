@@ -34,6 +34,11 @@ export interface ScrapingDogPersonProfile {
     location: string | null;
     duration: string | null;
     summary: string | null;
+    /** Raw "Mon YYYY" / "YYYY" strings, kept alongside `duration` so callers that need
+     *  actual dates (e.g. member-enrichment's MemberExperience backfill) don't have to
+     *  re-derive them from the human-readable `duration` text. */
+    startsAt: string | null;
+    endsAt: string | null;
   }>;
   education: string[];
 }
@@ -293,6 +298,8 @@ export class MemberScrapingDogService {
           location: pick(e.location),
           duration: pick(e.duration) ?? (startsAt ? `${startsAt} - ${endsAt || 'Present'}` : null),
           summary: pick(e.summary, e.description),
+          startsAt,
+          endsAt,
         });
       }
     }

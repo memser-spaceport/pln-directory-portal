@@ -76,14 +76,14 @@ export function countAiGeneratedBios(prisma: PrismaClient): Promise<number> {
   return prisma.member.count({ where: aiBioWhere() });
 }
 
-function formatTwitterContext(profile: ScrapingDogMemberXProfile): string {
+export function formatTwitterContext(profile: ScrapingDogMemberXProfile): string {
   const lines = [`- X profile (@${profile.username || 'unknown'}):`];
   if (profile.name) lines.push(`  - Display name: ${profile.name}`);
   if (profile.description) lines.push(`  - Bio: ${profile.description}`);
   return lines.join('\n');
 }
 
-function formatPersonContext(profile: ScrapingDogPersonProfile): string {
+export function formatPersonContext(profile: ScrapingDogPersonProfile): string {
   const lines = [`- LinkedIn profile (${profile.fullName || profile.publicIdentifier || 'unknown'}):`];
   if (profile.headline) lines.push(`  - Headline: ${profile.headline}`);
   if (profile.location) lines.push(`  - Location: ${profile.location}`);

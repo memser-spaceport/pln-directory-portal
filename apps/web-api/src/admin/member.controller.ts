@@ -1,4 +1,15 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common';
 import { AdminAuthGuard, DemoDayAdminAuthGuard } from '../guards/admin-auth.guard';
 
 import { ZodValidationPipe } from '@abitia/zod-dto';
@@ -14,12 +25,16 @@ import { MemberService } from './member.service';
 import { UpdateMemberRolesDto } from './dto/update-member-roles.dto';
 import { UpdateMemberRolesAndHostsDto } from './dto/update-member-roles-and-hosts.dto';
 import { MemberBioRefreshService } from '../husky/member-bio-refresh.service';
+import { MemberEnrichmentService } from '../member-enrichment/member-enrichment.service';
+import { MemberEnrichmentJob } from '../member-enrichment/member-enrichment.job';
 
 @Controller('v1/admin/members')
 export class MemberController {
   constructor(
     private readonly memberService: MemberService,
-    private readonly memberBioRefreshService: MemberBioRefreshService
+    private readonly memberBioRefreshService: MemberBioRefreshService,
+    private readonly memberEnrichmentService: MemberEnrichmentService,
+    private readonly memberEnrichmentJob: MemberEnrichmentJob
   ) {}
 
   @Get()
@@ -57,9 +72,7 @@ export class MemberController {
   @Post('ai-bios/refresh')
   @UseGuards(AdminAuthGuard)
   @NoCache()
-  async triggerAiBioRefresh(
-    @Body() body: { dryRun?: boolean; limit?: number; emails?: string[]; noScrape?: boolean }
-  ) {
+  async triggerAiBioRefresh(@Body() body: { dryRun?: boolean; limit?: number; emails?: string[]; noScrape?: boolean }) {
     const limit = body?.limit != null ? Number(body.limit) : null;
     if (limit != null && (!Number.isInteger(limit) || limit <= 0)) {
       throw new BadRequestException('limit must be a positive integer');
@@ -70,6 +83,54 @@ export class MemberController {
       emails: Array.isArray(body?.emails) ? body.emails : undefined,
       noScrape: body?.noScrape === true,
     });
+  }
+
+  /**
+   * Profile-enrichment cron status + pending/in-progress/enriched counts. Cheap;
+   * poll this while a trigger runs. See docs/MEMBER_ENRICHMENT.md.
+   */
+  @Get('profile-enrichment/status')
+  @UseGuards(AdminAuthGuard)
+  @NoCache()
+  async getProfileEnrichmentStatus() {
+    const counts = await this.memberEnrichmentService.getEnrichmentCounts();
+    return {
+      isMarkingRunning: this.memberEnrichmentJob.markingRunning,
+      isEnrichmentRunning: this.memberEnrichmentJob.enrichmentRunning,
+      ...counts,
+    };
+  }
+
+  /**
+   * Runs profile enrichment (primary team/role, bio, email, skills — gaps only) for a
+   * single member in the background. Returns immediately; poll profile-enrichment/status.
+   */
+  @Post(':uid/trigger-profile-enrichment')
+  @UseGuards(AdminAuthGuard)
+  @NoCache()
+  async triggerProfileEnrichment(@Param('uid') uid: string) {
+    return this.memberEnrichmentService.enrichMember(uid, 'manually');
+  }
+
+  /** Runs profile enrichment for every member currently marked pending. */
+  @Post('trigger-profile-enrichment')
+  @UseGuards(AdminAuthGuard)
+  @NoCache()
+  async triggerProfileEnrichmentForAllPending() {
+    return this.memberEnrichmentService.triggerEnrichmentForAllPending('manually');
+  }
+
+  /**
+   * Re-runs profile enrichment for a member even if already enriched. There is no
+   * candidate-column staging in this pipeline (unlike TeamEnrichment), so force always
+   * means the same thing: re-check each field's current DB emptiness and fill gaps —
+   * fields that already have a value are never overwritten, force or not.
+   */
+  @Post(':uid/trigger-force-profile-enrichment')
+  @UseGuards(AdminAuthGuard)
+  @NoCache()
+  async triggerForceProfileEnrichment(@Param('uid') uid: string) {
+    return this.memberEnrichmentService.forceEnrichMember(uid, 'manually');
   }
 
   @Get(':uid')

@@ -53,6 +53,20 @@ export class AgentSessionsService {
     });
   }
 
+  async listMessages(id: string, query: { afterId?: string; limit?: number }) {
+    return this.proxyGet(`/v1/tasks/${encodeURIComponent(id)}/messages`, {
+      afterId: query.afterId,
+      limit: query.limit,
+    });
+  }
+
+  // Returns 202 with { message, executionId, executionNumber, executionStatus,
+  // kubernetesJobName } — posting a message resumes the agent from the session's
+  // existing branch, so this starts a real run rather than just recording text.
+  async createMessage(id: string, message: string) {
+    return this.proxyPost(`/v1/tasks/${encodeURIComponent(id)}/messages`, { message });
+  }
+
   async deployFeatureEnv(id: string, force = false) {
     return this.proxyPost(
       `/v1/tasks/${encodeURIComponent(id)}/deploy-feature-env`,

@@ -5,6 +5,7 @@ import {
   HttpCode,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 
 import { LogoVerificationService } from './logo-verification.service';
@@ -16,8 +17,10 @@ import {
   VerifyLogoBatchRequestDto,
   VerifyLogoRequestDto,
 } from './logo-verification.types';
+import { ServiceAuthGuard } from '../guards/service-auth.guard';
 
 @Controller('team-enrichment')
+@UseGuards(ServiceAuthGuard)
 export class LogoVerificationController {
   constructor(
     private readonly logoVerificationService: LogoVerificationService

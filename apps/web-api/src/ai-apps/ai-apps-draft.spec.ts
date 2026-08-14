@@ -19,6 +19,12 @@ jest.mock('./ai-apps.constants', () => ({
   AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS: 0,
 }));
 
+// The real module pulls in a transitive chain that breaks under ts-jest (an
+// ESM-only nestjs-zod import); mock it like roadmap.service.spec.ts does.
+jest.mock('../push-notifications/push-notifications.service', () => ({
+  PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
+}));
+
 import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
 import { RegisterDraftSchema } from './dto/register-draft.dto';
@@ -53,7 +59,8 @@ function buildService(app: Record<string, any> | null = APP) {
     },
   };
   const aws = { uploadFileToS3: jest.fn().mockResolvedValue(undefined) };
-  return { service: new AiAppsService(prisma as any, aws as any), prisma, aws };
+  const pushNotifications = { create: jest.fn().mockResolvedValue({}) };
+  return { service: new AiAppsService(prisma as any, aws as any, pushNotifications as any), prisma, aws };
 }
 
 /** The runner's 409 when another Helm operation still holds the release. */

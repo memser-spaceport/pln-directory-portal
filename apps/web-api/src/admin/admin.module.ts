@@ -24,9 +24,10 @@ import { ParticipantsRequestModule } from '../participants-request/participants-
 import { TeamsModule } from '../teams/teams.module';
 import { AskModule } from '../asks/asks.module';
 import { TeamEnrichmentModule } from '../team-enrichment/team-enrichment.module';
-import {DealsModule} from "../deals/deals.module";
-import { DealRequestsModule } from "../deal-requests/deal-requests.module";
-import { RbacModule } from "../rbac/rbac.module";
+import { MemberEnrichmentModule } from '../member-enrichment/member-enrichment.module';
+import { DealsModule } from '../deals/deals.module';
+import { DealRequestsModule } from '../deal-requests/deal-requests.module';
+import { RbacModule } from '../rbac/rbac.module';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
 
 @Module({
@@ -47,10 +48,11 @@ import { AccessControlV2Module } from '../access-control-v2/access-control-v2.mo
     TeamPitchesModule,
     AnalyticsModule,
     TeamEnrichmentModule,
+    MemberEnrichmentModule,
     DealsModule,
     DealRequestsModule,
     RbacModule,
-    AccessControlV2Module
+    AccessControlV2Module,
   ],
   controllers: [
     AdminAuthController,

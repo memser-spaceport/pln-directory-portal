@@ -7,6 +7,7 @@ import { SearchService } from './search.service';
 import { ZodValidationPipe } from '@abitia/zod-dto';
 import { ResponseSearchResultDto, SearchQueryDto } from 'libs/contracts/src/schema/global-search';
 import { OptionalUserTokenCheckGuard } from '../guards/user-token-check.guard';
+import { isRequestAuthenticated } from '../members/member-contact-sanitizer';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { FORUM_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { Request } from 'express';
@@ -42,7 +43,11 @@ export class SearchController {
     @Query() query: SearchQueryDto
   ): Promise<ResponseSearchResultDto> {
     const canReadForum = await this.hasForumReadPermission(req);
-    return this.searchService.fetchAllIndices(query.q, { strict: query.strict, canReadForum });
+    return this.searchService.fetchAllIndices(query.q, {
+      strict: query.strict,
+      canReadForum,
+      isAuthenticated: isRequestAuthenticated(req as any),
+    });
   }
 
   @TsRest(apiSearch.autocompleteSearch)
@@ -53,6 +58,6 @@ export class SearchController {
     @Query() query: SearchQueryDto
   ): Promise<ResponseSearchResultDto> {
     const canReadForum = await this.hasForumReadPermission(req);
-    return this.searchService.autocompleteSearch(query.q, 5, canReadForum);
+    return this.searchService.autocompleteSearch(query.q, 5, canReadForum, isRequestAuthenticated(req as any));
   }
 }

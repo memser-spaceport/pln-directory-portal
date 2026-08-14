@@ -177,6 +177,14 @@ The password is never part of this contract — it only ever reaches the app's r
 
 **Runner routing (important):** the runner's legacy `/deploy` build endpoint never injects anything into the running pod — for secrets *or* a database — regardless of what's in the request body. Provisioning only actually happens through the same secret-aware endpoint the draft/secrets flow already uses, `POST <AI_APPS_RUNNER_URL>/v1/projects/<AI_APPS_RUNNER_PROJECT>/deployments` (see "Helm-lock retry" below). So `proxyDeploy` always builds via `/deploy` first, then — whenever `database.enabled` **or** the app has stored secrets — looks up the just-built image (`GET /apps`) and calls `/deployments` with `{ appId, environment, image, secretNames, database }`; that call's response is where the `database` metadata above actually comes from. This is the same call already made for secrets-only apps, just now also carrying `database` and returning it.
 
+## Migrating an existing database to PLN Postgres
+
+Apps deployed before database provisioning existed (or built with a member's own database on purpose) are still bring-their-own-DB — commonly Supabase. Kits ≥1.8 ship a `db-migration` skill (`.claude/skills/db-migration/SKILL.md` in the kit) that lets the agent move such an app onto a PLN-provisioned Postgres database: detect the current database/ORM (BaaS SDK, Prisma/Knex/Sequelize, raw driver) and any existing migrations, carry over or translate the schema into Postgres SQL, detect required Postgres extensions (`pgcrypto` for `gen_random_uuid()`, `uuid-ossp` for `uuid_generate_v4()`, …), replace the old client with a plain Postgres client behind the app's existing data-access interface, and write a plain-language report of anything provider-specific that can't come along (Supabase Auth/Storage/Realtime, RLS policies keyed on `auth.uid()`, Firebase/Firestore, etc.).
+
+The skill moves the **existing data along with the schema by default** — one migration, not a two-step "structure now, ask about data later" flow. The same runner that applies schema migrations also does a one-time, resumable, per-table row copy from the old database into the new one (batched/keyset-paginated to respect the runtime's 384Mi memory limit, `INSERT ... ON CONFLICT DO NOTHING` + a `_pln_data_copy` tracking table for idempotency/resume, FK-respecting table order derived from the migrations, sequence reset after each table, and structured `[db-migration]` stdout lines the agent reads back via the runtime-logs endpoint to confirm completion and fold into the member-facing report). The kit tells the agent to say so plainly up front — including that it's a snapshot, not a live sync, so rows written to the old database after the copy starts are not carried over — and to skip the data copy only if the member explicitly asks to start the new database empty. The old database's credentials must stay registered as secrets through the deploy that performs the copy — dropping them earlier (as the flow does once the app truly no longer needs them) would break the copy.
+
+This is **entirely client-side** — no backend or orchestrator change backs it. `deployment-orchestrator`'s `ensureApplicationDatabase` only provisions the role/database and injects env vars into the pod (see "Agent-driven database provisioning" above); it has no initContainer, Helm command/args override, or exec API for deployed apps, so nothing on the platform ever runs SQL — or a data copy — against the new database. The skill's generated migrations (and, by default, the data copy) therefore run from the app's **own** Docker image: a small runner (tracked via a `_pln_migrations` table for idempotency) wired into the Dockerfile's `CMD`/entrypoint applies pending `app/db/migrations/*.sql` files against the injected `DATABASE_URL` before the main process starts, then copies data using both the old database's still-registered credentials and the same `DATABASE_URL` (skipped only when the member asked to start empty). The skill ends by handing off to the normal `database: {"enabled":true,"type":"postgres"}` deploy/draft contract above — it never calls the deploy/draft endpoints itself.
+
 ## Draft apps & runtime secrets
 
 Apps that read secrets from the environment (`OPENAI_API_KEY`, credentialed URLs, …) must never ship the values in the ZIP, and the agent must never see them. The **draft flow** splits responsibilities: the agent declares which env var *names* the app needs; the member supplies the *values* in LabOS; the backend forwards the values straight to the sandbox runner's secret store (they are **never persisted in our DB** — only the names are tracked, in `requiredEnvVars` / `providedEnvVars`).
@@ -533,6 +541,40 @@ not by a separate permission.
 
 Both are seeded in migration `20260623120000_ai_apps` and attached to the **PL Infra Team** policy (`pl_infra_team_pl_internal`), and registered in `access-control-v2.constants.ts` + `access-control-v2.seed.ts`.
 
+## Deploy lifecycle bell notifications
+
+Two in-app (bell) notifications, both category `AI_APP` (added in migration
+`20260811120000_add_ai_app_notification_category`), distinguished by
+`metadata.trigger` — the same one-category-many-triggers convention the roadmap
+module uses for `GANTRY`. The category is deliberately generic (not
+`AI_APP_DEPLOY`) so future non-deploy AI Apps notifications can reuse it instead
+of growing a new category per event:
+
+- **First successful deploy** (`trigger: 'deploy_succeeded'`) — broadcast to everyone
+  holding `ai_apps.read` OR `ai_apps.write` (`PushNotificationsService.create`'s
+  `requiredPermissions` fan-out), including the app's own owner. Fired from
+  `proxyDeploy`'s `markReady` only when `app.lastDeployedAt` was `null` going into the
+  deploy — the only writer of `lastDeployedAt` is a successful deploy, so this is
+  exactly "first ship, not a redeploy/update".
+- **Deploy failure** (`trigger: 'deploy_failed'`) — private notification to the app's
+  **owner only** (`recipientUid: app.memberUid`), sent from every place a deploy can
+  fail: `failDeploy` (S3 upload failure, hard runner error, a 2xx body reporting
+  `status: "failed"`, a timeout the app never survives, secrets/database injection
+  failure) and `settleStuckDeploy` (a `DEPLOYING` row lazily settled to `ERROR` on
+  read). The recipient is always `app.memberUid`, never the acting member — a
+  directory admin retrying someone else's failed app must not receive the bell meant
+  for the owner.
+  - The notification body is deliberately generic ("open the app page for details and
+    to retry") — the runner's raw failure text can carry stack fragments and internal
+    hostnames, which are manager-only (see `AiAppDeploymentInfo.failureReason` above);
+    the owner sees the real reason on the linked app page, not in the bell body.
+
+Both link to the app's LabOS detail page (`/pl-infra/ai-apps/{appUid}`, a
+frontend-relative path — see `aiAppDetailPath` in `ai-apps.constants.ts`). Copy lives
+in `AI_APPS_NOTIFICATION_MESSAGES` (`ai-apps.constants.ts`) so a wording change is a
+one-file swap. Notification failures are logged and swallowed — never breaking the
+deploy itself.
+
 ## Starter kit ZIP
 
 Built by `AiAppsStarterKitService` — text files are generated in-memory; the PL
@@ -546,6 +588,7 @@ CLAUDE.md / AGENTS.md                          agent build + deploy instructions
 .claude/skills/app-logs/SKILL.md               fetch build/runtime logs to debug failed deploys + runtime errors (kits ≥1.5)
 .claude/skills/pl-design-system/SKILL.md       single UI skill (components + tokens)
 .claude/skills/pln-member-context/SKILL.md     how the app gets the signed-in member's identity
+.claude/skills/db-migration/SKILL.md           migrate an existing DB onto PLN Postgres — schema + data by default (kits ≥1.8)
 pln-app.config.json                            connect/deploy/draft/metadata/logs/member-context endpoints
                                                (+ appId, appUid, approved appName/appDescription,
                                                 database provisioning choice ≥1.6) — NO token

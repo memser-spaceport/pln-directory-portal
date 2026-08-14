@@ -270,6 +270,7 @@ POST /v1/admin/push-notifications/send
 | `NEW_FEATURE` | New-feature announcement (visible to all members regardless of join date) |
 | `GANTRY` | Gantry roadmap events — new submission, status change, boost returned, shipped (hidden from its own author) |
 | `TEAM_NEWS` | "News from the network" — ONE broadcast per ingest run summarising all teams' new news. See below. |
+| `AI_APP` | AI Apps (generic — see `metadata.trigger`). Currently: first successful deploy (broadcast to `ai_apps.read`/`.write` holders) or deploy failure (app owner only). See `docs/AI_APPS.md`. |
 
 ### Team News (`TEAM_NEWS`)
 

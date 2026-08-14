@@ -948,24 +948,6 @@ export class MembersService {
   }
 
   /**
-   * Retrieves a member's GitHub handler based on their UID.
-   *
-   * @param uid - The UID of the member.
-   * @returns The GitHub handler of the member or null if not found.
-   */
-  private async getMemberGitHubHandler(uid: string): Promise<string | null> {
-    try {
-      const member = await this.prisma.member.findUnique({
-        where: { uid },
-        select: { githubHandler: true },
-      });
-      return member?.githubHandler || null;
-    } catch (error) {
-      return this.handleErrors(error);
-    }
-  }
-
-  /**
    * Sends a request to the GitHub GraphQL API to fetch pinned repositories.
    *
    * @param githubHandler - The GitHub username of the member.
@@ -1047,7 +1029,14 @@ export class MembersService {
    * @returns An array of repositories (both pinned and recent), or an error response if something goes wrong.
    */
   async getGitProjects(uid: string) {
-    const githubHandler = await this.getMemberGitHubHandler(uid);
+    const member = await this.prisma.member.findUnique({
+      where: { uid },
+      select: { githubHandler: true, preferences: true },
+    });
+    if ((member?.preferences as any)?.showGithubProjects === false) {
+      return [];
+    }
+    const githubHandler = member?.githubHandler || null;
     if (!githubHandler) {
       return [];
     }

@@ -5,6 +5,12 @@ jest.mock('axios', () => ({
   isAxiosError: jest.fn((error: any) => !!error?.isAxiosError),
 }));
 
+// The real module pulls in a transitive chain that breaks under ts-jest (an
+// ESM-only nestjs-zod import); mock it like roadmap.service.spec.ts does.
+jest.mock('../push-notifications/push-notifications.service', () => ({
+  PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
+}));
+
 import 'reflect-metadata';
 import {
   BadGatewayException,
@@ -35,7 +41,7 @@ function buildService(app: Record<string, any> | null = APP) {
     aiAppEvent: { create: jest.fn().mockResolvedValue({}) },
     member: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null) },
   };
-  return new AiAppsService(prisma as any, {} as any);
+  return new AiAppsService(prisma as any, {} as any, { create: jest.fn() } as any);
 }
 
 describe('AiAppsService.getAgentLogs', () => {

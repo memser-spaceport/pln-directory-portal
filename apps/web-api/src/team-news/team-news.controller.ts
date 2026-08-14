@@ -4,6 +4,7 @@ import { Request } from 'express';
 import { apiTeamNews } from 'libs/contracts/src/lib/contract-team-news';
 import {
   CreateTeamNewsDiscussionRequestSchema,
+  RecordTeamNewsImpressionsRequestSchema,
   TeamNewsByTeamQueryParams,
   TeamNewsFollowSuggestionsQueryParams,
   TeamNewsListQueryParams,
@@ -21,6 +22,7 @@ import { TeamNewsQueryService } from './team-news-query.service';
 import { TeamNewsService } from './team-news.service';
 import { TeamNewsUpvotesService } from './team-news-upvotes.service';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
+import { TeamNewsImpressionsService } from './team-news-impressions.service';
 
 const server = initNestServer(apiTeamNews);
 
@@ -33,6 +35,7 @@ export class TeamNewsController {
     private readonly teamNewsService: TeamNewsService,
     private readonly teamNewsUpvotesService: TeamNewsUpvotesService,
     private readonly teamNewsSuggestionsService: TeamNewsSuggestionsService,
+    private readonly teamNewsImpressionsService: TeamNewsImpressionsService,
     private readonly membersService: MembersService,
     private readonly accessControl: AccessControlV2Service,
     private readonly followsService: FollowsService
@@ -80,6 +83,19 @@ export class TeamNewsController {
       untilCreatedAt: toDate(untilCreatedAt),
       limit,
     });
+  }
+
+  // Drives the "new news" dot on the app header's Home button. No guard: the
+  // answer carries no viewer context, and /home is partly public.
+  //
+  // @NoCache() is load-bearing, not copied from its siblings — the global
+  // CacheModule ttl is 86400s (app.module.ts), and a day-stale timestamp would
+  // mean news landing on Monday lights the dot on Tuesday. If this endpoint's
+  // volume ever justifies caching, it needs its own short TTL, not the default.
+  @Api(server.route.getTeamNewsLatest)
+  @NoCache()
+  async getTeamNewsLatest() {
+    return this.teamNewsQueryService.getLatestCreatedAt();
   }
 
   @Api(server.route.getTeamNewsFollowSuggestions)
@@ -150,6 +166,15 @@ export class TeamNewsController {
     }
 
     return this.teamNewsService.createForumLink(newsItemUid, validated, member.uid);
+  }
+
+  // Intentionally unauthenticated — anonymous feed-card impressions must
+  // count. Abuse protection is the existing app-wide ThrottlerGuard only.
+  @Api(server.route.recordTeamNewsImpressions)
+  async recordTeamNewsImpressions(@Body() body: unknown) {
+    const { newsItemUids } = RecordTeamNewsImpressionsRequestSchema.parse(body);
+    await this.teamNewsImpressionsService.recordImpressions(newsItemUids);
+    return { success: true as const };
   }
 
   private async resolveViewerContext(userEmail?: string): Promise<{ followed: Set<string>; memberUid?: string }> {

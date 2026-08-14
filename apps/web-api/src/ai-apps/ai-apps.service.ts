@@ -10,10 +10,12 @@ import {
 } from '@nestjs/common';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
-import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback, Prisma } from '@prisma/client';
+import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback, Prisma, PushNotificationCategory } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { isDirectoryAdmin } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
+import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
@@ -33,6 +35,8 @@ import {
   AI_APPS_LOGS_DESC_RETAIN,
   AI_APPS_LOGS_DESC_RUNNER_LIMIT,
   AI_APPS_LOGS_DESC_TIME_BUDGET_MS,
+  AI_APPS_NOTIFICATION_MESSAGES,
+  AI_APPS_NOTIFICATION_TRIGGERS,
   AI_APPS_RUNNER_ENVIRONMENT,
   AI_APPS_RUNNER_TOKEN,
   AI_APPS_RUNNER_URL,
@@ -41,6 +45,7 @@ import {
   AI_APPS_STARTER_KIT_VERSION,
   AI_APPS_VERIFY_ATTEMPTS,
   AI_APPS_VERIFY_INTERVAL_MS,
+  aiAppDetailPath,
   buildAppHost,
   buildAppHttpUrl,
   buildAppPageUrl,
@@ -125,7 +130,11 @@ type ApiAiApp<T extends { memberUid: string }> = Omit<WithMember<T>, 'failureStr
 export class AiAppsService {
   private readonly logger = new Logger(AiAppsService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly awsService: AwsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly awsService: AwsService,
+    private readonly pushNotifications: PushNotificationsService
+  ) {}
 
   private async withMember<T extends { memberUid: string }>(records: T[]): Promise<Array<WithMember<T>>> {
     const memberUids = Array.from(new Set(records.map((r) => r.memberUid)));
@@ -814,6 +823,7 @@ export class AiAppsService {
         deploymentId: app.deploymentId ?? undefined,
         message,
       });
+      await this.notifyDeployFailed(app);
     }
     return (await this.prisma.aiApp.findUnique({ where: { uid: app.uid } })) ?? app;
   }
@@ -985,7 +995,7 @@ export class AiAppsService {
     } catch (error) {
       const message = `Deploy failed: ${(error as Error).message}`;
       // Bundle never reached storage — nothing was built, a build-log story.
-      await this.failDeploy(app.uid, memberUid, eventContext, message, 'build');
+      await this.failDeploy(app, memberUid, eventContext, message, 'build');
       throw new BadGatewayException('Failed to store the app bundle');
     }
 
@@ -1165,7 +1175,7 @@ export class AiAppsService {
    */
   private async proxyDeploy(
     memberUid: string,
-    app: Pick<AiApp, 'uid' | 'appId' | 'database'>,
+    app: Pick<AiApp, 'uid' | 'appId' | 'name' | 'memberUid' | 'database' | 'lastDeployedAt'>,
     deploymentId: string,
     s3Key: string,
     secretNames: string[] = []
@@ -1174,6 +1184,11 @@ export class AiAppsService {
     const url = buildAppUrl(app.appId);
     const httpUrl = buildAppHttpUrl(app.appId);
     const requestedDatabase = app.database as AiAppDatabaseInfo | null;
+    // Snapshot taken before this deploy touches the row — `lastDeployedAt` is
+    // only ever set by a PRIOR successful deploy, so null here means this is
+    // the app's first ship (only then do we broadcast the deploy-succeeded
+    // notification; redeploys/updates stay silent per the PRD).
+    const isFirstDeploy = app.lastDeployedAt === null;
     await this.prisma.aiApp.update({
       where: { uid: app.uid },
       data: { status: 'DEPLOYING', deploymentId, s3Key, url, httpUrl, host, notes: null, failureStream: null },
@@ -1216,6 +1231,9 @@ export class AiAppsService {
         },
       });
       await this.recordEvent('DEPLOY_SUCCEEDED', memberUid, { ...eventContext, message: url });
+      if (isFirstDeploy) {
+        await this.notifyDeploySucceeded(app);
+      }
       return this.toApiApp((await this.withMember([updated]))[0], true);
     };
 
@@ -1240,7 +1258,7 @@ export class AiAppsService {
       if (typeof response.data?.status === 'string' && response.data.status.toLowerCase() === 'failed') {
         const message = `Runner reported failure: ${this.safeStringify(response.data)}`;
         this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
-        await this.failDeploy(app.uid, memberUid, eventContext, message, 'build');
+        await this.failDeploy(app, memberUid, eventContext, message, 'build');
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       port = response.data.port ?? null;
@@ -1276,7 +1294,7 @@ export class AiAppsService {
         // A hard runner error is a build-phase failure; a timeout with the app
         // never becoming reachable is genuinely unknown (build may have hung OR
         // the pod may have crashed) — leave the stream unclassified.
-        await this.failDeploy(app.uid, memberUid, eventContext, message, uncertain ? null : 'build');
+        await this.failDeploy(app, memberUid, eventContext, message, uncertain ? null : 'build');
         throw new BadGatewayException('Failed to deploy app to the sandbox runner');
       }
       this.logger.log(`AI App ${app.appId} is live despite runner timeout — continuing`);
@@ -1295,7 +1313,7 @@ export class AiAppsService {
         const message = `Runtime config injection failed: ${(error as Error).message}`;
         this.logger.error(`AI App deploy failed for ${app.appId}: ${message}`);
         // The image already built — injecting/starting it is a runtime story.
-        await this.failDeploy(app.uid, memberUid, eventContext, message, 'runtime');
+        await this.failDeploy(app, memberUid, eventContext, message, 'runtime');
         throw new BadGatewayException('Failed to inject secrets/database on the sandbox runner');
       }
     }
@@ -1394,19 +1412,72 @@ export class AiAppsService {
    * failure was caught — the runner's log endpoints only cover the latest
    * SUCCESSFUL phase, so this cannot be derived after the fact. Null = unknown.
    * `lastDeployedAt` is deliberately untouched: a failed deploy never moves it.
+   * `actorUid` is who triggered this deploy attempt (audited on DEPLOY_FAILED) —
+   * for a member-triggered redeploy that may be a directory admin, not the app
+   * owner, so the failure bell notification always goes to `app.memberUid`.
    */
   private async failDeploy(
-    appUid: string,
-    memberUid: string,
+    app: Pick<AiApp, 'uid' | 'name' | 'memberUid'>,
+    actorUid: string,
     eventContext: { appUid: string; appId: string; deploymentId: string },
     message: string,
     failureStream: 'build' | 'runtime' | null = null
   ): Promise<void> {
     await this.prisma.aiApp.update({
-      where: { uid: appUid },
+      where: { uid: app.uid },
       data: { status: 'ERROR', notes: message.slice(0, 2000), failureStream },
     });
-    await this.recordEvent('DEPLOY_FAILED', memberUid, { ...eventContext, message: message.slice(0, 2000) });
+    await this.recordEvent('DEPLOY_FAILED', actorUid, { ...eventContext, message: message.slice(0, 2000) });
+    await this.notifyDeployFailed(app);
+  }
+
+  /**
+   * Broadcasts that a new app just went live, to everyone with AI Apps access
+   * (read or write — either grants dashboard visibility). Fired only on an
+   * app's FIRST successful deploy (see `isFirstDeploy` in `proxyDeploy`); a
+   * later redeploy/update never re-fires this.
+   */
+  private async notifyDeploySucceeded(app: Pick<AiApp, 'uid' | 'name'>): Promise<void> {
+    try {
+      await this.pushNotifications.create({
+        category: PushNotificationCategory.AI_APP,
+        ...AI_APPS_NOTIFICATION_MESSAGES.deploySucceeded(app.name),
+        link: aiAppDetailPath(app.uid),
+        isPublic: false,
+        requiredPermissions: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE],
+        metadata: {
+          eventType: 'ai_app_deploy',
+          appUid: app.uid,
+          trigger: AI_APPS_NOTIFICATION_TRIGGERS.DEPLOY_SUCCEEDED,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `AI App deploy-succeeded notification failed for ${app.uid}: ${error instanceof Error ? error.message : error}`
+      );
+    }
+  }
+
+  /** Tells the app's owner (only) that their deploy failed — never a redeploy actor who isn't the owner. */
+  private async notifyDeployFailed(app: Pick<AiApp, 'uid' | 'name' | 'memberUid'>): Promise<void> {
+    try {
+      await this.pushNotifications.create({
+        category: PushNotificationCategory.AI_APP,
+        ...AI_APPS_NOTIFICATION_MESSAGES.deployFailed(app.name),
+        link: aiAppDetailPath(app.uid),
+        recipientUid: app.memberUid,
+        isPublic: false,
+        metadata: {
+          eventType: 'ai_app_deploy',
+          appUid: app.uid,
+          trigger: AI_APPS_NOTIFICATION_TRIGGERS.DEPLOY_FAILED,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `AI App deploy-failed notification failed for ${app.uid}: ${error instanceof Error ? error.message : error}`
+      );
+    }
   }
 
   /**

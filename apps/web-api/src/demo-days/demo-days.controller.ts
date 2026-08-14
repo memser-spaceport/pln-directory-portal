@@ -550,7 +550,7 @@ export class DemoDaysController {
     @Req() req,
     @Param('teamUid') teamUid: string
   ) {
-    return this.demoDaysService.getTeamAnalytics(teamUid, demoDayUidOrSlug);
+    return this.demoDaysService.getTeamAnalytics(teamUid, demoDayUidOrSlug, req.userEmail);
   }
 
   @Post(':demoDayUidOrSlug/feedback')

@@ -13,9 +13,12 @@ import {
   TeamNewsListResponseSchema,
   TeamNewsPopularQueryParams,
   TeamNewsPopularResponseSchema,
+  TeamNewsLatestResponseSchema,
   TeamNewsRecentQueryParams,
   TeamNewsRecentResponseSchema,
   TeamNewsUpvoteStatusSchema,
+  RecordTeamNewsImpressionsRequestSchema,
+  RecordTeamNewsImpressionsResponseSchema,
 } from '../schema/team-news';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -57,6 +60,14 @@ export const apiTeamNews = contract.router({
       200: TeamNewsRecentResponseSchema,
     },
     summary: 'Recent network news across all teams (for the digest email)',
+  },
+  getTeamNewsLatest: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/team-news/latest`,
+    responses: {
+      200: TeamNewsLatestResponseSchema,
+    },
+    summary: 'Ingestion time of the newest visible news item (powers the Home button’s new-news dot)',
   },
   // Static paths before :newsItemUid routes so Nest matching stays unambiguous.
   getTeamNewsFollowSuggestions: {
@@ -116,5 +127,14 @@ export const apiTeamNews = contract.router({
       201: CreateTeamNewsDiscussionResponseSchema,
     },
     summary: 'Record that a forum topic was created in response to a news item',
+  },
+  recordTeamNewsImpressions: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/team-news/impressions`,
+    body: RecordTeamNewsImpressionsRequestSchema,
+    responses: {
+      200: RecordTeamNewsImpressionsResponseSchema,
+    },
+    summary: 'Record feed-card impressions for a batch of news items (unauthenticated, not deduplicated)',
   },
 });

@@ -255,6 +255,8 @@ model Member {
   /// Read-only Affinity CRM sidecar (task 02). Optional 1:1 when linked.
   affinityPerson               AffinityPerson?
   affinityRelationshipOwnerFor AffinityPerson[] @relation("AffinityRelationshipOwner")
+
+  memberEnrichment MemberEnrichment?
 }
 
 model MemberApproval {
@@ -1554,6 +1556,12 @@ enum PushNotificationCategory {
 
   // Team news — "News from the network" updates surfaced on /home
   TEAM_NEWS
+
+  // AI Apps (PL Infra) — currently the deploy lifecycle: first successful deploy
+  // (broadcast to AI Apps access holders) and deploy failure (app owner only).
+  // Kept generic (not AI_APP_DEPLOY) so future non-deploy AI Apps notifications
+  // can reuse it, distinguished by metadata.trigger.
+  AI_APP
 }
 
 // Push notifications for WebSocket delivery
@@ -2114,6 +2122,24 @@ model TeamEnrichment {
   updatedAt DateTime @updatedAt
 }
 
+/// Member Profile Enrichment sidecar (state/metadata only — unlike TeamEnrichment,
+/// there is no candidate-column + judge stage here. Accepted values are written
+/// directly to Member / TeamMemberRole / Skill; see docs/MEMBER_ENRICHMENT.md.
+model MemberEnrichment {
+  id        Int    @id @default(autoincrement())
+  uid       String @unique @default(cuid())
+  memberUid String @unique
+  member    Member @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+
+  /// shouldEnrich, status, fieldsMeta (per-field status/source/confidence for
+  /// primaryTeamRole|bio|email|skills), scrapingDog snapshot (used/fetchedAt/source),
+  /// usage (ai cost for bio/skills calls), errorMessage, enrichedAt, enrichedBy.
+  dataEnrichment Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Policy {
   uid               String             @id @default(cuid())
   code              String             @unique
@@ -2319,6 +2345,10 @@ model TeamNewsItem {
   rawPayload       Json?
   /// 1 = Top Stories lead, 2–3 = runners-up; null = not featured. Replaced each seed-trending run.
   editorialRank    Int?
+  /// Raw impression count. Incremented once per feed-card impression via
+  /// POST /v1/team-news/impressions. Not deduplicated by user, session, or
+  /// repeat viewing — unlike upvotes/likes below.
+  viewCount        Int                 @default(0)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   forumLinks       TeamNewsForumLink[]
@@ -2332,6 +2362,10 @@ model TeamNewsItem {
   @@index([eventType])
   @@index([editorialRank])
   @@index([teamUid, eventDate(sort: Desc)])
+  /// GET /v1/team-news/latest takes max(createdAt) to drive the app header's
+  /// "new news" dot, so it runs on effectively every page load by every user.
+  /// Without this it is a sequential scan on the hottest path in the app.
+  @@index([createdAt])
 }
 
 /// Per-member "I'm interested" signal on a team news item. One upvote per

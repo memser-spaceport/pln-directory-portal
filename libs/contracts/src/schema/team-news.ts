@@ -80,6 +80,10 @@ export const TeamNewsItemSchema = z.object({
   // 1 = Top Stories lead, 2–3 = runners-up; null when not featured.
   // Set by seed-trending; independent of upvoteCount.
   editorialRank: z.number().int().min(1).max(3).nullable(),
+  // Raw feed-card impression count. Not deduplicated by user, session, or
+  // repeat viewing, and includes anonymous visitors. Incremented via
+  // POST /v1/team-news/impressions.
+  viewCount: z.number().int().min(0),
 });
 
 export const TeamNewsUpvoteStatusSchema = z.object({
@@ -173,6 +177,18 @@ export const TeamNewsForumLinkSchema = z.object({
 export const CreateTeamNewsDiscussionResponseSchema = z.object({
   link: TeamNewsForumLinkSchema,
   created: z.boolean(),
+});
+
+// POST /v1/team-news/impressions — records feed-card impressions for a batch
+// of news items. Unauthenticated; every occurrence of a uid in the array
+// increments that item's viewCount by 1 (no dedup). Unknown uids are ignored.
+// Batch size capped at 200, matching POST /v1/feed/comments/counts.
+export const RecordTeamNewsImpressionsRequestSchema = z.object({
+  newsItemUids: z.array(z.string()).min(1).max(200),
+});
+
+export const RecordTeamNewsImpressionsResponseSchema = z.object({
+  success: z.literal(true),
 });
 
 export const TeamNewsListResponseSchema = z.object({
@@ -351,6 +367,22 @@ export const TeamNewsRecentResponseSchema = z.object({
   items: z.array(TeamNewsItemSchema),
 });
 
+// GET /v1/team-news/latest — ingestion time of the newest news item the public
+// feed would show, and nothing else. Powers the "new news" dot on the app
+// header's Home button: the client compares this against the last time it
+// recorded a /home visit.
+//
+// Deliberately NOT TeamNewsRecentResponseSchema. The header renders on every
+// page in the app, so this is requested on effectively every page load by every
+// user, and shipping a full TeamNewsItem (contentHtml included) to answer
+// "anything new?" would be absurd at that call volume.
+//
+// `null` = no visible news item exists at all, which the client must treat as
+// "nothing new" rather than "everything is new".
+export const TeamNewsLatestResponseSchema = z.object({
+  latestAt: z.string().nullable(),
+});
+
 export type NewsEventType = z.infer<typeof NewsEventTypeSchema>;
 export type NewsDiscoveryOutcome = z.infer<typeof NewsDiscoveryOutcomeSchema>;
 export type TeamNewsItemDto = z.infer<typeof TeamNewsItemSchema>;
@@ -371,6 +403,7 @@ export type TeamNewsByTeamQuery = z.infer<typeof TeamNewsByTeamQueryParams>;
 export type TeamNewsByTeamResponse = z.infer<typeof TeamNewsByTeamResponseSchema>;
 export type TeamNewsRecentQuery = z.infer<typeof TeamNewsRecentQueryParams>;
 export type TeamNewsRecentResponse = z.infer<typeof TeamNewsRecentResponseSchema>;
+export type TeamNewsLatestResponse = z.infer<typeof TeamNewsLatestResponseSchema>;
 export type TeamNewsDiscussion = z.infer<typeof TeamNewsDiscussionSchema>;
 export type CreateTeamNewsDiscussionRequest = z.infer<typeof CreateTeamNewsDiscussionRequestSchema>;
 export type CreateTeamNewsDiscussionResponse = z.infer<typeof CreateTeamNewsDiscussionResponseSchema>;

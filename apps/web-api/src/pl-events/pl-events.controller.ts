@@ -197,9 +197,12 @@ export class PLEventsController {
   ) {
     const userEmail = request['userEmail'];
     const member: any = await this.memberService.findMemberByEmail(request['userEmail']);
-    const result = await this.memberService.checkIfAdminUser(member);
-    if (!result && body.membersAndEvents?.length === 0 && body.membersAndEvents[0]?.memberUid != member.uid) {
-      throw new ForbiddenException(`Member with email ${userEmail} is not admin`);
+    const isAdmin = await this.memberService.checkIfAdminUser(member);
+    const hasForeignEntry = (body.membersAndEvents ?? []).some((entry) => entry?.memberUid !== member.uid);
+    if (!isAdmin && hasForeignEntry) {
+      throw new ForbiddenException(
+        `Member with email ${userEmail} is not authorized to delete guests for other members`
+      );
     }
     return await this.eventGuestService.deletePLEventGuests(locationUid, body.membersAndEvents);
   }

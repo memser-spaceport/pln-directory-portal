@@ -292,6 +292,10 @@ export class MemberController {
       throw new NotFoundException(`Requestor not found for ${req.userEmail}`);
     }
 
+    if (uid !== requestor.uid && !requestor.isDirectoryAdmin) {
+      throw new ForbiddenException(`Member isn't authorized to update the role of another member`);
+    }
+
     if (typeof body.role !== 'string' || body.role.trim() === '') {
       throw new BadRequestException('role must be a non-empty string');
     }

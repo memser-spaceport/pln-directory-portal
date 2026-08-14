@@ -1162,8 +1162,43 @@ export class DemoDaysService {
     throw new NotFoundException('Demo day participant not found');
   }
 
-  async getTeamAnalytics(teamUid: string, demoDayUidOrSlug: string) {
+  async getTeamAnalytics(teamUid: string, demoDayUidOrSlug: string, callerEmail?: string) {
     const demoDay = await this.getDemoDayByUidOrSlug(demoDayUidOrSlug);
+
+    if (!callerEmail) {
+      throw new ForbiddenException('Authentication required to access team analytics');
+    }
+
+    const caller = await this.prisma.member.findUnique({
+      where: { email: callerEmail },
+      select: {
+        uid: true,
+        memberPermissionsV2: { select: { permission: { select: { code: true } } } },
+        policyAssignmentsV2: {
+          select: {
+            policy: { select: { policyPermissions: { select: { permission: { select: { code: true } } } } } },
+          },
+        },
+        demoDayParticipants: {
+          where: { demoDayUid: demoDay.uid, isDeleted: false },
+          select: { teamUid: true, type: true, status: true },
+        },
+      },
+    });
+
+    if (!caller) {
+      throw new NotFoundException('Member not found');
+    }
+
+    const permissionCodes = flattenPermissionCodesFromMemberRelations(caller);
+    const isAdmin = hasDemoDayAdminPermissionForHost({ effectivePermissionCodes: permissionCodes }, demoDay.host);
+    const isFounderOfTeam = caller.demoDayParticipants.some(
+      (p) => p.teamUid === teamUid && p.type === 'FOUNDER' && p.status === 'ENABLED'
+    );
+
+    if (!isAdmin && !isFounderOfTeam) {
+      throw new ForbiddenException("Only admins or this team's enabled founders can access this team's analytics");
+    }
 
     // Find the fundraising profile for this team
     const fundraisingProfile = await this.prisma.teamFundraisingProfile.findUnique({

@@ -21,6 +21,7 @@ import { RbacService } from '../rbac/rbac.service';
 import { CODE_AGENT_SESSIONS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { AgentSessionsService } from './agent-sessions.service';
 import { CreateAgentSessionDto } from './dto/create-agent-session.dto';
+import { SendAgentSessionMessageDto } from './dto/send-agent-session-message.dto';
 
 const VIEW = { anyOf: [CODE_AGENT_SESSIONS_PERMISSIONS.VIEW, CODE_AGENT_SESSIONS_PERMISSIONS.ADMIN] };
 const ADMIN = { anyOf: [CODE_AGENT_SESSIONS_PERMISSIONS.ADMIN] };
@@ -53,6 +54,26 @@ export class AgentSessionsController {
   @RequirePermissions(VIEW)
   async getProgress(@Param('id') id: string) {
     return this.agentSessionsService.getProgress(id);
+  }
+
+  @NoCache()
+  @Get(':id/messages')
+  @RequirePermissions(VIEW)
+  async listMessages(@Param('id') id: string, @Query('afterId') afterId?: string, @Query('limit') limit?: string) {
+    return this.agentSessionsService.listMessages(id, {
+      afterId,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  // ADMIN, not VIEW: posting a message starts a new agent execution against the
+  // session's branch — the same weight class as the feature-env actions below.
+  @NoCache()
+  @Post(':id/messages')
+  @RequirePermissions(ADMIN)
+  @UsePipes(ZodValidationPipe)
+  async createMessage(@Param('id') id: string, @Body() body: SendAgentSessionMessageDto) {
+    return this.agentSessionsService.createMessage(id, body.message);
   }
 
   @NoCache()

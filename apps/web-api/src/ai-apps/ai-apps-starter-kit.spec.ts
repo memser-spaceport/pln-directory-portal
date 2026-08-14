@@ -26,6 +26,7 @@ describe('AiAppsStarterKitService buildZip', () => {
       '.claude/skills/app-logs/SKILL.md',
       '.claude/skills/pl-design-system/SKILL.md',
       '.claude/skills/pln-member-context/SKILL.md',
+      '.claude/skills/db-migration/SKILL.md',
       'pln-app.config.json',
     ]) {
       expect(entries.has(path)).toBe(true);
@@ -255,5 +256,69 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(readme).toContain('Tailwind v4');
     expect(readme).toContain('EntityCard');
     expect(readme).not.toContain('SCSS design tokens');
+  });
+
+  it('teaches the db-migration skill to detect, port, and report on an existing database', () => {
+    const skill = entries.get('.claude/skills/db-migration/SKILL.md') as string;
+    // Detection covers the common BaaS/ORM/driver signatures and existing migration folders.
+    expect(skill).toContain('@supabase/supabase-js');
+    expect(skill).toContain('supabase/migrations');
+    expect(skill).toContain('prisma/migrations');
+    // Provider-specific features must be reported, never silently dropped.
+    expect(skill).toContain('Supabase Auth, Storage, or Realtime');
+    expect(skill).toContain('auth.uid()');
+    expect(skill).toContain('db-migration-report.md');
+    // Extensions the generated SQL might need.
+    expect(skill).toContain('pgcrypto');
+    expect(skill).toContain('uuid-ossp');
+    expect(skill).toContain('CREATE EXTENSION IF NOT EXISTS');
+    // The platform has no migration hook — the app's own image must run it.
+    expect(skill).toContain('no platform-level migration step');
+    expect(skill).toContain('_pln_migrations');
+    // Never guesses credentials, and hands off to the existing provisioned-database contract.
+    expect(skill).toContain('Never provision or guess credentials');
+    expect(skill).toContain('{"enabled":true,"type":"postgres"}');
+    expect(skill).toContain('deploy-to-labs');
+
+    // AGENTS.md/CLAUDE.md and the README point the agent/member at it.
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).toContain('db-migration');
+    }
+    const readme = entries.get('README.md') as string;
+    expect(readme).toContain('db-migration');
+    expect(readme).toContain('move my database to PLN');
+  });
+
+  it('copies existing data by default alongside the schema, as one migration', () => {
+    const skill = entries.get('.claude/skills/db-migration/SKILL.md') as string;
+    // Data copy is the default path; starting empty is the one opt-out.
+    expect(skill).toContain('by default');
+    expect(skill).toContain("the data half doesn't need a separate approval");
+    expect(skill).toContain('rather start the new database empty');
+    expect(skill).toContain('snapshot copy, not live sync');
+    // Idempotent/resumable per-table tracking, mirroring the schema tracking table.
+    expect(skill).toContain('_pln_data_copy');
+    expect(skill).toContain('ON CONFLICT');
+    // FK-safe ordering, batching under the runtime memory limit, and sequence fixup.
+    expect(skill).toContain('parents before children');
+    expect(skill).toContain('384Mi memory');
+    expect(skill).toContain('setval(pg_get_serial_sequence');
+    // Progress is only observable after deploy, via the existing logs skill.
+    expect(skill).toContain('[db-migration]');
+    expect(skill).toContain('app-logs');
+    // Old credentials must survive long enough for the copy to run.
+    expect(skill).toContain('keep the old database');
+    expect(skill).toContain('Never truncate, delete from, or write back to the **old** database');
+    // Not a separate approval gate from the schema migration itself.
+    expect(skill).toContain("don't treat");
+    expect(skill).toContain('it as a separate ask requiring its own approval');
+
+    const readme = entries.get('README.md') as string;
+    expect(readme).toContain('and your existing data');
+    expect(readme).toContain('one migration, not two separate asks');
+
+    for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+      expect(entries.get(path) as string).toContain('existing data by default');
+    }
   });
 });
