@@ -1,4 +1,5 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { PushNotificationCategory } from '@prisma/client';
 import type {
   CreateFeedCommentRequest,
   FeedComment,
@@ -7,6 +8,7 @@ import type {
   DeleteFeedCommentResponse,
 } from 'libs/contracts/src/schema/feed';
 import { PrismaService } from '../shared/prisma.service';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 
 type CommentRow = {
   uid: string;
@@ -20,7 +22,12 @@ type CommentRow = {
 
 @Injectable()
 export class FeedCommentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(FeedCommentsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pushNotificationsService: PushNotificationsService
+  ) {}
 
   /** Batch comment counts for a list of news item uids. Includes replies at any depth. */
   async getCommentCounts(uids: string[]): Promise<FeedCommentCountsResponse> {
@@ -59,7 +66,10 @@ export class FeedCommentsService {
   async createComment(memberUid: string, request: CreateFeedCommentRequest): Promise<FeedComment> {
     const { newsItemUid, parentUid, text } = request;
 
-    const newsItem = await this.prisma.teamNewsItem.findUnique({ where: { uid: newsItemUid }, select: { uid: true } });
+    const newsItem = await this.prisma.teamNewsItem.findUnique({
+      where: { uid: newsItemUid },
+      select: { uid: true, title: true },
+    });
     if (!newsItem) {
       throw new NotFoundException(`News item with uid ${newsItemUid} not found`);
     }
@@ -82,6 +92,8 @@ export class FeedCommentsService {
         },
       },
     });
+
+    await this.notifyMentionedMembers(comment, newsItem.title);
 
     return this.toDto(comment, memberUid);
   }
@@ -109,6 +121,57 @@ export class FeedCommentsService {
       _count: { _all: true },
     });
     return new Map(grouped.map((g) => [g.newsItemUid, g._count._all]));
+  }
+
+  private async notifyMentionedMembers(comment: CommentRow, newsTitle: string): Promise<void> {
+    const mentionedUids = this.extractMentionUids(comment.text).filter((uid) => uid !== comment.authorUid);
+    if (mentionedUids.length === 0) return;
+
+    const authorName = comment.author.name || 'Someone';
+    const title = `${authorName} mentioned you in "${newsTitle}"`;
+    const description = comment.text
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+
+    for (const recipientUid of mentionedUids) {
+      try {
+        await this.pushNotificationsService.create({
+          category: PushNotificationCategory.TEAM_NEWS,
+          title,
+          description,
+          link: `/home?news=${comment.newsItemUid}`,
+          recipientUid,
+          isPublic: false,
+          metadata: {
+            eventType: 'team_news_mention',
+            newsItemUid: comment.newsItemUid,
+            commentUid: comment.uid,
+            authorUid: comment.authorUid,
+            authorName,
+            authorPicture: comment.author.image?.url ?? null,
+          },
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to send news mention notification to ${recipientUid}: ${
+            error instanceof Error ? error.message : error
+          }`
+        );
+      }
+    }
+  }
+
+  private extractMentionUids(content: string): string[] {
+    const regex = /<a\b(?=[^>]*class="ql-mention")[^>]*data-uid="([^"]*)"[^>]*>/g;
+    const uids: string[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(content)) !== null) {
+      if (match[1] && !uids.includes(match[1])) {
+        uids.push(match[1]);
+      }
+    }
+    return uids;
   }
 
   private toDto(comment: CommentRow, viewerMemberUid?: string): FeedComment {

@@ -2,6 +2,10 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { PrismaService } from '../shared/prisma.service';
 import { FeedCommentsService } from './feed-comments.service';
 
+jest.mock('../push-notifications/push-notifications.service', () => ({
+  PushNotificationsService: class PushNotificationsService {},
+}));
+
 describe('FeedCommentsService', () => {
   let service: FeedCommentsService;
 
@@ -12,6 +16,7 @@ describe('FeedCommentsService', () => {
   const feedCommentCreate = jest.fn();
   const feedCommentDelete = jest.fn();
   const feedCommentGroupBy = jest.fn();
+  const pushCreate = jest.fn();
 
   const prismaMock = {
     teamNewsItem: { findUnique: teamNewsItemFindUnique },
@@ -29,8 +34,9 @@ describe('FeedCommentsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    teamNewsItemFindUnique.mockResolvedValue({ uid: 'news-1' });
-    service = new FeedCommentsService(prismaMock);
+    teamNewsItemFindUnique.mockResolvedValue({ uid: 'news-1', title: 'Protocol Labs ships X' });
+    pushCreate.mockResolvedValue({});
+    service = new FeedCommentsService(prismaMock, { create: pushCreate } as never);
   });
 
   describe('createComment', () => {
@@ -71,6 +77,7 @@ describe('FeedCommentsService', () => {
         isOwn: true,
         replies: [],
       });
+      expect(pushCreate).not.toHaveBeenCalled();
     });
 
     it('creates a reply when parentUid points at an existing comment on the same news item', async () => {
@@ -110,6 +117,75 @@ describe('FeedCommentsService', () => {
         service.createComment('author-1', { newsItemUid: 'news-1', parentUid: 'missing', text: 'a reply' })
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(feedCommentCreate).not.toHaveBeenCalled();
+    });
+
+    it('sends an in-app mention notification, including when data-uid precedes class', async () => {
+      feedCommentCreate.mockResolvedValue({
+        uid: 'c1',
+        newsItemUid: 'news-1',
+        parentUid: null,
+        text: '<p>hey <a data-uid="m_jane" href="/members/m_jane" class="ql-mention">@Jane</a></p>',
+        authorUid: 'author-1',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        author: authorInclude,
+      });
+
+      await service.createComment('author-1', {
+        newsItemUid: 'news-1',
+        text: '<p>hey <a data-uid="m_jane" href="/members/m_jane" class="ql-mention">@Jane</a></p>',
+      });
+
+      expect(pushCreate).toHaveBeenCalledTimes(1);
+      expect(pushCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: 'TEAM_NEWS',
+          recipientUid: 'm_jane',
+          isPublic: false,
+          link: '/home?news=news-1',
+          title: 'Ada Lovelace mentioned you in "Protocol Labs ships X"',
+          description: 'hey @Jane',
+          metadata: expect.objectContaining({ eventType: 'team_news_mention', commentUid: 'c1' }),
+        })
+      );
+    });
+
+    it('does not notify the comment author for a self-mention', async () => {
+      feedCommentCreate.mockResolvedValue({
+        uid: 'c1',
+        newsItemUid: 'news-1',
+        parentUid: null,
+        text: '<p><a class="ql-mention" data-uid="author-1">@Ada</a></p>',
+        authorUid: 'author-1',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        author: authorInclude,
+      });
+
+      await service.createComment('author-1', {
+        newsItemUid: 'news-1',
+        text: '<p><a class="ql-mention" data-uid="author-1">@Ada</a></p>',
+      });
+
+      expect(pushCreate).not.toHaveBeenCalled();
+    });
+
+    it('still returns the comment when a mention notification fails', async () => {
+      feedCommentCreate.mockResolvedValue({
+        uid: 'c1',
+        newsItemUid: 'news-1',
+        parentUid: null,
+        text: '<p><a class="ql-mention" data-uid="m_jane">@Jane</a></p>',
+        authorUid: 'author-1',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        author: authorInclude,
+      });
+      pushCreate.mockRejectedValue(new Error('ws down'));
+
+      const result = await service.createComment('author-1', {
+        newsItemUid: 'news-1',
+        text: '<p><a class="ql-mention" data-uid="m_jane">@Jane</a></p>',
+      });
+
+      expect(result.uid).toBe('c1');
     });
   });
 
