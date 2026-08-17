@@ -23,7 +23,9 @@ interface IMemberResponse {
   };
   teamMemberRoles: Array<{
     investmentTeam?: boolean;
-    team: {
+    teamUid?: string;
+    role?: string;
+    team?: {
       uid: string;
       name: string;
     };
@@ -39,30 +41,32 @@ interface IMemberResponse {
   officeHours?: string;
 }
 
-export const getMemberInfo = async (memberUid: string) => {
-  const { data } = await api.get(`/v1/members/${memberUid}`);
+export const getMemberInfo = async (memberUid: string, authToken?: string) => {
+  const { data } = await api.get(`/v1/admin/members/${memberUid}`, {
+    headers: authToken ? { authorization: `Bearer ${authToken}` } : undefined,
+  });
 
   if (!data) {
     return;
   }
 
-  const teamMemberRoles = data.teamMemberRoles.map((tm: any) => {
+  const teamMemberRoles = (data.teamMemberRoles ?? []).map((tm: any) => {
     return {
-      teamTitle: tm.team.name,
+      teamTitle: tm.team?.name ?? '',
       teamUid: tm.teamUid,
       role: tm.role,
       investmentTeam: tm.investmentTeam || false,
     };
   });
 
-  const skills = data.skills.map((sk: any) => {
+  const skills = (data.skills ?? []).map((sk: any) => {
     return {
       id: sk.uid,
       name: sk.title,
     };
   });
 
-  const projectContributions = data.projectContributions.map((pc: any) => {
+  const projectContributions = (data.projectContributions ?? []).map((pc: any) => {
     return {
       uid: pc.uid,
       role: pc?.role,
@@ -90,18 +94,18 @@ export const getMemberInfo = async (memberUid: string) => {
   return formatted;
 };
 
-async function fetcher(uid: string | undefined) {
+async function fetcher(uid: string | undefined, authToken?: string) {
   if (!uid) {
     return;
   }
 
-  return await getMemberInfo(uid);
+  return await getMemberInfo(uid, authToken);
 }
 
-export function useMember(uid: string | undefined, enabled = true) {
+export function useMember(uid: string | undefined, authToken?: string, enabled = true) {
   return useQuery({
     queryKey: [MembersQueryKeys.GET_MEMBER, uid],
-    queryFn: () => fetcher(uid),
+    queryFn: () => fetcher(uid, authToken),
     enabled: enabled && Boolean(uid),
   });
 }
