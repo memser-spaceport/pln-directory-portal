@@ -100,7 +100,7 @@ describe('FeedCommentsService', () => {
 
       expect(feedCommentFindFirst).toHaveBeenCalledWith({
         where: { uid: 'c1', newsItemUid: 'news-1' },
-        select: { uid: true },
+        select: { uid: true, authorUid: true },
       });
       expect(feedCommentCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -163,6 +163,86 @@ describe('FeedCommentsService', () => {
       await service.createComment('author-1', {
         newsItemUid: 'news-1',
         text: '<p><a class="ql-mention" data-uid="author-1">@Ada</a></p>',
+      });
+
+      expect(pushCreate).not.toHaveBeenCalled();
+    });
+
+    it('notifies the parent comment author when someone replies', async () => {
+      feedCommentFindFirst.mockResolvedValue({ uid: 'c1', authorUid: 'author-2' });
+      feedCommentCreate.mockResolvedValue({
+        uid: 'c2',
+        newsItemUid: 'news-1',
+        parentUid: 'c1',
+        text: '<p>a reply</p>',
+        authorUid: 'author-1',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        author: authorInclude,
+      });
+
+      await service.createComment('author-1', {
+        newsItemUid: 'news-1',
+        parentUid: 'c1',
+        text: '<p>a reply</p>',
+      });
+
+      expect(pushCreate).toHaveBeenCalledTimes(1);
+      expect(pushCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: 'TEAM_NEWS',
+          recipientUid: 'author-2',
+          isPublic: false,
+          link: '/home?news=news-1',
+          title: 'Ada Lovelace replied to your comment on "Protocol Labs ships X"',
+          description: 'a reply',
+          metadata: expect.objectContaining({ eventType: 'team_news_reply', commentUid: 'c2' }),
+        })
+      );
+    });
+
+    it('does not send a reply notification when the parent author was already mentioned', async () => {
+      feedCommentFindFirst.mockResolvedValue({ uid: 'c1', authorUid: 'm_jane' });
+      feedCommentCreate.mockResolvedValue({
+        uid: 'c2',
+        newsItemUid: 'news-1',
+        parentUid: 'c1',
+        text: '<p><a class="ql-mention" data-uid="m_jane">@Jane</a></p>',
+        authorUid: 'author-1',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        author: authorInclude,
+      });
+
+      await service.createComment('author-1', {
+        newsItemUid: 'news-1',
+        parentUid: 'c1',
+        text: '<p><a class="ql-mention" data-uid="m_jane">@Jane</a></p>',
+      });
+
+      expect(pushCreate).toHaveBeenCalledTimes(1);
+      expect(pushCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientUid: 'm_jane',
+          metadata: expect.objectContaining({ eventType: 'team_news_mention' }),
+        })
+      );
+    });
+
+    it('does not notify when replying to your own comment', async () => {
+      feedCommentFindFirst.mockResolvedValue({ uid: 'c1', authorUid: 'author-1' });
+      feedCommentCreate.mockResolvedValue({
+        uid: 'c2',
+        newsItemUid: 'news-1',
+        parentUid: 'c1',
+        text: '<p>a reply</p>',
+        authorUid: 'author-1',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        author: authorInclude,
+      });
+
+      await service.createComment('author-1', {
+        newsItemUid: 'news-1',
+        parentUid: 'c1',
+        text: '<p>a reply</p>',
       });
 
       expect(pushCreate).not.toHaveBeenCalled();
