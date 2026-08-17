@@ -51,7 +51,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
   const { mutateAsync } = useUpdateMember();
   const { data: policiesData } = usePoliciesList({ authToken });
   const { data: rbacRolesData } = useRbacRoles({ authToken });
-  const { data } = useMember(uid, open);
+  const { data } = useMember(uid, authToken, open);
   const { data: formOptions } = useMemberFormOptions(open);
 
   const onSubmit = useCallback(
