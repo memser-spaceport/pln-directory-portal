@@ -176,7 +176,7 @@ export class FeedCommentsService {
         category: PushNotificationCategory.TEAM_NEWS,
         title,
         description,
-        link: `/home?news=${comment.newsItemUid}`,
+        link: `/home?news=${comment.newsItemUid}&comment=${comment.uid}`,
         recipientUid,
         isPublic: false,
         metadata: {
