@@ -74,14 +74,16 @@ export class FeedCommentsService {
       throw new NotFoundException(`News item with uid ${newsItemUid} not found`);
     }
 
+    let parentAuthorUid: string | undefined;
     if (parentUid) {
       const parent = await this.prisma.feedComment.findFirst({
         where: { uid: parentUid, newsItemUid },
-        select: { uid: true },
+        select: { uid: true, authorUid: true },
       });
       if (!parent) {
         throw new BadRequestException('Parent comment not found for this news item');
       }
+      parentAuthorUid = parent.authorUid;
     }
 
     const comment = await this.prisma.feedComment.create({
@@ -93,7 +95,7 @@ export class FeedCommentsService {
       },
     });
 
-    await this.notifyMentionedMembers(comment, newsItem.title);
+    await this.notifyCommentRecipients(comment, newsItem.title, parentAuthorUid);
 
     return this.toDto(comment, memberUid);
   }
@@ -123,42 +125,75 @@ export class FeedCommentsService {
     return new Map(grouped.map((g) => [g.newsItemUid, g._count._all]));
   }
 
-  private async notifyMentionedMembers(comment: CommentRow, newsTitle: string): Promise<void> {
-    const mentionedUids = this.extractMentionUids(comment.text).filter((uid) => uid !== comment.authorUid);
-    if (mentionedUids.length === 0) return;
-
+  private async notifyCommentRecipients(
+    comment: CommentRow,
+    newsTitle: string,
+    parentAuthorUid?: string
+  ): Promise<void> {
     const authorName = comment.author.name || 'Someone';
-    const title = `${authorName} mentioned you in "${newsTitle}"`;
     const description = comment.text
       .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
       .trim();
+    const notified = new Set<string>();
 
+    const mentionedUids = this.extractMentionUids(comment.text).filter((uid) => uid !== comment.authorUid);
     for (const recipientUid of mentionedUids) {
-      try {
-        await this.pushNotificationsService.create({
-          category: PushNotificationCategory.TEAM_NEWS,
-          title,
-          description,
-          link: `/home?news=${comment.newsItemUid}`,
-          recipientUid,
-          isPublic: false,
-          metadata: {
-            eventType: 'team_news_mention',
-            newsItemUid: comment.newsItemUid,
-            commentUid: comment.uid,
-            authorUid: comment.authorUid,
-            authorName,
-            authorPicture: comment.author.image?.url ?? null,
-          },
-        });
-      } catch (error) {
-        this.logger.error(
-          `Failed to send news mention notification to ${recipientUid}: ${
-            error instanceof Error ? error.message : error
-          }`
-        );
-      }
+      notified.add(recipientUid);
+      await this.sendNewsCommentNotification({
+        recipientUid,
+        title: `${authorName} mentioned you in "${newsTitle}"`,
+        description,
+        comment,
+        authorName,
+        eventType: 'team_news_mention',
+      });
+    }
+
+    if (parentAuthorUid && parentAuthorUid !== comment.authorUid && !notified.has(parentAuthorUid)) {
+      await this.sendNewsCommentNotification({
+        recipientUid: parentAuthorUid,
+        title: `${authorName} replied to your comment on "${newsTitle}"`,
+        description,
+        comment,
+        authorName,
+        eventType: 'team_news_reply',
+      });
+    }
+  }
+
+  private async sendNewsCommentNotification(params: {
+    recipientUid: string;
+    title: string;
+    description: string;
+    comment: CommentRow;
+    authorName: string;
+    eventType: 'team_news_mention' | 'team_news_reply';
+  }): Promise<void> {
+    const { recipientUid, title, description, comment, authorName, eventType } = params;
+    try {
+      await this.pushNotificationsService.create({
+        category: PushNotificationCategory.TEAM_NEWS,
+        title,
+        description,
+        link: `/home?news=${comment.newsItemUid}`,
+        recipientUid,
+        isPublic: false,
+        metadata: {
+          eventType,
+          newsItemUid: comment.newsItemUid,
+          commentUid: comment.uid,
+          authorUid: comment.authorUid,
+          authorName,
+          authorPicture: comment.author.image?.url ?? null,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send ${eventType} notification to ${recipientUid}: ${
+          error instanceof Error ? error.message : error
+        }`
+      );
     }
   }
 
