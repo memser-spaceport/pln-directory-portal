@@ -80,6 +80,13 @@ function collapsePathsByInvestor<T extends { targetProfileUid: string }>(rows: T
   return out;
 }
 
+/** True if a connector is being credited with introducing someone to themselves. */
+function isSelfReferentialPath<T extends { targetProfileUid: string; bestConnectorProfileUid: string | null }>(
+  row: T
+): boolean {
+  return row.bestConnectorProfileUid === row.targetProfileUid;
+}
+
 /**
  * ConnectionEdge + WarmPathV2 write + read. Ingest upserts by unique keys; no pairing logic.
  *
@@ -330,14 +337,14 @@ export class WarmIntrosV2Service {
     const paths = (await this.prisma.warmPathV2.findMany({
       where,
       ...(loadThenPaginate ? {} : { take: limit, skip: offset }),
-      orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }],
+      orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }, { uid: 'asc' }],
     })) as WarmPathRow[];
 
     const profilesByUid = await this.loadProfilesForPaths(paths);
     // Enrich hop names/memberUid/imageUrl on list rows (same as detail) so FE can show directory badges.
     let enriched = paths
       .map((p) => this.enrichPath(p, profilesByUid, true))
-      .filter((row) => row.bestConnectorProfileUid !== row.targetProfileUid);
+      .filter((row) => !isSelfReferentialPath(row));
 
     if (search) {
       enriched = enriched.filter((row) => matchesSearch(row.investor, search));
@@ -619,7 +626,14 @@ export class WarmIntrosV2Service {
         bestConnectorProfileUid: true,
         hopChain: true,
       },
+      orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }, { uid: 'asc' }],
     })) as Array<{ targetProfileUid: string; bestConnectorProfileUid: string | null; hopChain: unknown }>;
+
+    // Mirror listPaths' row shaping so facet counts match what listPaths actually returns:
+    // drop self-referential rows unconditionally, then collapse to one row per investor
+    // when targetSet is "All" (unset), same as listPaths' collapseByInvestor.
+    const nonSelfPaths = paths.filter((p) => !isSelfReferentialPath(p));
+    const rows = targetSet ? nonSelfPaths : collapsePathsByInvestor(nonSelfPaths);
 
     const connectorCounts = new Map<string, number>();
     // Path-shape counts: every path always carries a relationKind (pl_direct included, not
@@ -628,7 +642,7 @@ export class WarmIntrosV2Service {
     // Bridge-person counts: the middle hop of a founder/coinvestor bridge chain.
     const bridgeCounts = new Map<string, number>();
 
-    for (const p of paths) {
+    for (const p of rows) {
       const cid = p.bestConnectorProfileUid;
       if (cid) connectorCounts.set(cid, (connectorCounts.get(cid) ?? 0) + 1);
 
@@ -667,11 +681,11 @@ export class WarmIntrosV2Service {
       }))
       .sort((a, b) => b.pathCount - a.pathCount || a.name.localeCompare(b.name));
 
-    const investorUids = [...new Set(paths.map((p) => p.targetProfileUid))];
+    const investorUids = [...new Set(rows.map((p) => p.targetProfileUid))];
     const profilesByUid = await this.loadProfilesByUids(investorUids);
 
     const sectorCounts = new Map<string, { value: string; count: number }>();
-    for (const p of paths) {
+    for (const p of rows) {
       const investor = profilesByUid.get(p.targetProfileUid);
       const sectors = parseInvestorSectors(investor?.investorMeta);
       const seen = new Set<string>();
