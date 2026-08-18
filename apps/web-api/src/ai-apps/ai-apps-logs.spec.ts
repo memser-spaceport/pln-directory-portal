@@ -10,6 +10,9 @@ jest.mock('axios', () => ({
 jest.mock('../push-notifications/push-notifications.service', () => ({
   PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
 }));
+jest.mock('../analytics/service/analytics.service', () => ({
+  AnalyticsService: jest.fn(),
+}));
 
 import 'reflect-metadata';
 import {
@@ -41,7 +44,7 @@ function buildService(app: Record<string, any> | null = APP) {
     aiAppEvent: { create: jest.fn().mockResolvedValue({}) },
     member: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null) },
   };
-  return new AiAppsService(prisma as any, {} as any, { create: jest.fn() } as any);
+  return new AiAppsService(prisma as any, {} as any, { create: jest.fn() } as any, { trackEvent: jest.fn() } as any);
 }
 
 describe('AiAppsService.getAgentLogs', () => {

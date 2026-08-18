@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AccessControlV2Module } from '../access-control-v2/access-control-v2.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { SharedModule } from '../shared/shared.module';
@@ -11,7 +12,7 @@ import { AiAppsStarterKitService } from './ai-apps-starter-kit.service';
 import { AiAppTokenGuard } from './guards/ai-app-token.guard';
 
 @Module({
-  imports: [SharedModule, RbacModule, AccessControlV2Module, PushNotificationsModule],
+  imports: [SharedModule, RbacModule, AccessControlV2Module, PushNotificationsModule, AnalyticsModule],
   controllers: [AiAppsController],
   providers: [AiAppsService, AiAppsConnectService, AiAppsStarterKitService, AiAppTokenGuard, AwsService],
   exports: [AiAppsService],

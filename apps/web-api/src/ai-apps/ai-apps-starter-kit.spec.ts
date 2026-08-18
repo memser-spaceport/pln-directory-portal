@@ -26,11 +26,26 @@ describe('AiAppsStarterKitService buildZip', () => {
       '.claude/skills/app-logs/SKILL.md',
       '.claude/skills/pl-design-system/SKILL.md',
       '.claude/skills/pln-member-context/SKILL.md',
+      '.claude/skills/app-analytics/SKILL.md',
       '.claude/skills/db-migration/SKILL.md',
       'pln-app.config.json',
     ]) {
       expect(entries.has(path)).toBe(true);
     }
+  });
+
+  it('writes the analytics endpoint into the config and skill, with no PostHog key or SDK', () => {
+    const config = JSON.parse(entries.get('pln-app.config.json') as string);
+    expect(config.analyticsEndpoint).toContain('/v1/ai-apps/track');
+    const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
+    expect(skill).toContain(config.analyticsEndpoint);
+    expect(skill).toContain('trackEvent');
+    expect(skill).toContain('No PII in properties');
+    expect(skill).toContain('fire-and-forget');
+    expect(skill).toContain('no PostHog key');
+    // No PostHog project key/SDK anywhere in the kit — only the endpoint URL.
+    expect(JSON.stringify(config)).not.toMatch(/posthog/i);
+    expect(skill).not.toMatch(/posthog[-_]?(key|token|sdk|js)/i);
   });
 
   it('writes the member-context endpoint into the config (and still no token)', () => {

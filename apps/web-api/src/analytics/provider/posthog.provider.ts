@@ -46,7 +46,7 @@ export class PostHogProvider implements IAnalyticsProvider {
         properties: {
           ...event.properties,
           timestamp: new Date().toISOString(),
-          source: ANALYTICS_SOURCE
+          source: event.properties?.source ?? ANALYTICS_SOURCE
         }
       });
       this.logger.debug(`Event tracked: ${event.name} for user: ${event.distinctId}`);

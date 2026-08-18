@@ -4,6 +4,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import {
   AI_APP_TOKEN_HEADER,
+  AI_APPS_ANALYTICS_ENDPOINT,
   AI_APPS_APP_DOMAIN,
   AI_APPS_APP_SETTINGS_ENDPOINT,
   AI_APPS_BUILD_LOGS_ENDPOINT,
@@ -43,6 +44,7 @@ export class AiAppsStarterKitService {
     add('.claude/skills/app-logs/SKILL.md', this.logsSkill());
     add('.claude/skills/pl-design-system/SKILL.md', this.designSystemSkill());
     add('.claude/skills/pln-member-context/SKILL.md', this.memberContextSkill());
+    add('.claude/skills/app-analytics/SKILL.md', this.analyticsSkill());
     add('.claude/skills/db-migration/SKILL.md', this.dbMigrationSkill());
     add('pln-app.config.json', this.configJson());
     add('styles/pln-theme.css', this.themeCss());
@@ -112,6 +114,8 @@ to the Protocol Labs Network sandbox with a single instruction.
   runtime logs to diagnose failed deploys and runtime errors.
 - \`.claude/skills/pl-design-system/\` — how to build on-brand UI with the PL Design System.
 - \`.claude/skills/pln-member-context/\` — how your app can know which PLN member is using it.
+- \`.claude/skills/app-analytics/\` — how your app can send its own usage events
+  (button clicks, feature usage) so you can see how people use it.
 - \`.claude/skills/db-migration/\` — for apps that already have their own database, how your
   agent migrates it — structure and, by default, your existing data — onto a
   PLN-provisioned Postgres database.
@@ -202,6 +206,13 @@ photo, teams, role, skills — to greet them, tag their feedback, or tailor what
 it shows. Just ask your agent, e.g. *"greet me by name and show my team when I
 open the app"*. Visitors who aren't signed in (or lack access) simply get the
 non-personalized version — your app keeps working for them.
+
+## Seeing how your app is used (analytics)
+Your app can track its own usage — which buttons get clicked, which features
+get used. Just ask your agent, e.g. *"add analytics for the export button"*.
+There's nothing to sign up for or configure: events show up automatically
+alongside your app's other activity. This is optional — skip it if you don't
+need it, and your app works exactly the same either way.
 
 ## When something breaks
 If a deploy fails or your app misbehaves after deploying, just tell your agent —
@@ -295,6 +306,17 @@ not shipped inside \`app/\`.
   note and keep the app usable without identity. Never hard-fail on it.
 - Personalization only: never gate sensitive/destructive actions on it, never
   store or log tokens, and never forward member data to third parties.
+
+## Product analytics (custom events)
+When the member wants to track usage (button clicks, feature usage), load the
+**app-analytics** skill (\`.claude/skills/app-analytics/SKILL.md\`) before
+adding any tracking code. In short: POST to \`analyticsEndpoint\` from
+\`pln-app.config.json\` with \`{ event, properties }\` — no deploy token, no
+PostHog SDK, no key of any kind. Attribution to this app (and to the signed-in
+member, when there is one) is resolved server-side; you only choose the event
+name (snake_case; the endpoint prefixes it) and behavioral properties. Never
+put PII in properties, always fire-and-forget (never block or fail the app on
+an analytics call), and treat it as fully optional.
 
 ## Migrating an existing app
 When the member already has an app and wants it on LabOS, you are *adapting their
@@ -949,6 +971,98 @@ compensate.
 - This is the only PLN member API available to apps. Don't call other internal
   PLN endpoints; if the app needs more PLN data than this provides, tell the
   member it isn't available yet.
+`;
+  }
+
+  private analyticsSkill(): string {
+    return `---
+name: app-analytics
+description: Send custom product-analytics events (button clicks, feature usage) from a deployed AI App to the PLN backend, which forwards them to the Directory PostHog project with server-enforced app attribution. Use whenever the member asks for usage tracking, event logging, or "analytics" in their app, or when it would help them see how the app is used. Optional — never required for a deploy to succeed.
+---
+
+# App analytics — custom events
+
+Deployed apps can emit their own product-analytics events (a button was
+clicked, a feature was used) so the member can see usage on the Directory
+PostHog project. There is no PostHog key or SDK in this kit — events go
+through the PLN backend, which resolves which app they belong to from the
+request itself and stamps identity, so the app never handles PostHog
+credentials or attribution.
+
+## The endpoint
+
+\`analyticsEndpoint\` in \`pln-app.config.json\`:
+
+\`\`\`
+POST ${AI_APPS_ANALYTICS_ENDPOINT}
+Content-Type: application/json
+{ "event": "clicked_export", "properties": { "format": "csv" } }
+\`\`\`
+
+No deploy token, no auth header required — but send the same \`authToken\`
+Bearer header as \`pln-member-context\` when you have it, so the event is
+attributed to the signed-in member instead of an anonymous visitor. The
+response is always empty (204), including when an event is silently dropped
+(unattributable origin, malformed payload, oversized properties) — don't
+treat any response as a signal of success or failure, just fire and forget.
+
+## The \`trackEvent\` helper
+
+Bake this into the app's frontend as-is (no config file is shipped inside
+\`app/\`, so inline the endpoint URL as a constant):
+
+\`\`\`js
+const ANALYTICS_URL = '${AI_APPS_ANALYTICS_ENDPOINT}';
+
+function readAuthToken() {
+  const match = document.cookie.match(/(?:^|;\\s*)authToken=([^;]*)/);
+  if (!match) return null;
+  const raw = decodeURIComponent(match[1]).replace(/^"|"$/g, '');
+  return raw || null;
+}
+
+function getAnonId() {
+  let id = localStorage.getItem('pln_anon_id');
+  if (!id) {
+    id = \`anon:\${crypto.randomUUID()}\`;
+    localStorage.setItem('pln_anon_id', id);
+  }
+  return id;
+}
+
+function trackEvent(name, properties = {}) {
+  const token = readAuthToken();
+  const body = JSON.stringify({ event: name, properties, anonId: token ? undefined : getAnonId() });
+  const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: \`Bearer \${token}\` } : {}) };
+  // Fire-and-forget: never await, never throw into the caller. keepalive lets
+  // the request survive a page navigation right after the call.
+  fetch(ANALYTICS_URL, { method: 'POST', headers, body, keepalive: true }).catch(() => {});
+}
+\`\`\`
+
+Usage: \`trackEvent('clicked_export', { format: 'csv' })\`.
+
+## Rules
+
+- **Event names**: snake_case, plain words describing the action (e.g.
+  \`clicked_export\`, \`created_item\`). The endpoint prefixes every name with
+  \`ai_app_\` server-side — don't add that prefix yourself, and don't rely on
+  the exact final name since normalization may adjust it.
+- **No PII in properties.** Never send the member's email, name, or any other
+  contact/identifying detail as a property — identity is attributed
+  automatically from the Bearer token, not from anything you send. Stick to
+  behavioral data: what was clicked, which feature, counts, durations.
+- **Never send \`$\`-prefixed properties** (PostHog-reserved) or your own
+  \`source\`/\`appId\`/\`appUid\`/\`appName\`/\`memberUid\` — the backend stamps
+  these itself and overwrites anything you send.
+- **Analytics is optional and must never break the app.** Always fire-and-forget
+  (don't \`await\` the call on a user action, don't throw on failure). If the
+  endpoint is unreachable, blocked, or drops the event, the app must keep
+  working exactly the same.
+- **Keep properties small** — object-shaped scalars only, no large blobs; the
+  backend caps and drops oversized payloads silently.
+- This is the only analytics transport available to apps — don't add a
+  PostHog SDK or any other analytics vendor directly.
 `;
   }
 
@@ -1662,6 +1776,7 @@ Once the code and migrations are ready:
         runtimeLogsEndpoint: AI_APPS_RUNTIME_LOGS_ENDPOINT,
         appSettingsUrl: AI_APPS_APP_SETTINGS_ENDPOINT,
         memberContextEndpoint: AI_APPS_ME_ENDPOINT,
+        analyticsEndpoint: AI_APPS_ANALYTICS_ENDPOINT,
         deployTokenHeader: AI_APP_TOKEN_HEADER,
         kitVersion: AI_APPS_STARTER_KIT_VERSION,
         appId: '',
@@ -1670,7 +1785,7 @@ Once the code and migrations are ready:
         appDescription: '',
         database: null,
         notes:
-          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription hold the member-APPROVED display metadata (see .claude/skills/app-metadata) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint, buildLogsEndpoint, runtimeLogsEndpoint, and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy; the logs endpoints serve the build and runtime logs — see .claude/skills/app-logs). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill). database is null unless the member has opted into a PLN-provisioned database — once they do, set it to {"enabled":true,"type":"postgres"} and resend it verbatim on every deploy/draft call (see the deploy skill\'s "Apps that want a provisioned database"); a bring-your-own database is a regular runtime secret instead and never goes in this field.',
+          'No token is stored here. At deploy time the agent runs the LabOS connect flow (see .claude/skills/deploy-to-labs) to get a short-lived deploy token. Set appId to a stable lowercase slug on first deploy and reuse it. appName/appDescription hold the member-APPROVED display metadata (see .claude/skills/app-metadata) — redeploys resend them verbatim. After the first deploy, save the response uid as appUid; metadataEndpoint, buildLogsEndpoint, runtimeLogsEndpoint, and appSettingsUrl are templates where {appUid} is replaced with it (appSettingsUrl opens the member-facing Deployment settings modal to update secrets & redeploy; the logs endpoints serve the build and runtime logs — see .claude/skills/app-logs). If the app needs runtime secrets, register it via draftEndpoint instead of deploying (see the deploy skill). database is null unless the member has opted into a PLN-provisioned database — once they do, set it to {"enabled":true,"type":"postgres"} and resend it verbatim on every deploy/draft call (see the deploy skill\'s "Apps that want a provisioned database"); a bring-your-own database is a regular runtime secret instead and never goes in this field. analyticsEndpoint takes custom product-analytics events (no auth required, no deploy token) — see .claude/skills/app-analytics.',
       },
       null,
       2
