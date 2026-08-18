@@ -52,6 +52,7 @@ export class MembersTool {
         { discordHandler: { contains: args.search, mode: 'insensitive' } },
         { twitterHandler: { contains: args.search, mode: 'insensitive' } },
         { linkedinHandler: { contains: args.search, mode: 'insensitive' } },
+        { blueskyHandler: { contains: args.search, mode: 'insensitive' } },
         { telegramHandler: { contains: args.search, mode: 'insensitive' } },
       ];
     }
@@ -110,6 +111,7 @@ export class MembersTool {
           member.discordHandler ? `Discord: ${member.discordHandler}` : null,
           member.twitterHandler ? `Twitter: ${member.twitterHandler}` : null,
           member.linkedinHandler ? `LinkedIn: ${member.linkedinHandler}` : null,
+          member.blueskyHandler ? `Bluesky: ${member.blueskyHandler}` : null,
           member.telegramHandler ? `Telegram: ${member.telegramHandler}` : null,
         ]
           .filter(Boolean)

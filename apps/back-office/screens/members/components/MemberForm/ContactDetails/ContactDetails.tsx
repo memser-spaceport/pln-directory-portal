@@ -13,7 +13,10 @@ export const ContactDetails = () => {
         <FormField name="github" label="Github" placeholder="Github" />
       </div>
       <div className="flex gap-4">
+        <FormField name="bluesky" label="Bluesky" placeholder="Bluesky" />
         <FormField name="telegram" label="Telegram" placeholder="Telegram" />
+      </div>
+      <div className="flex gap-4">
         <FormField name="officeHours" label="Office Hours Link" placeholder="Office Hours Link" />
       </div>
     </div>

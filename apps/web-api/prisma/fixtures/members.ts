@@ -39,6 +39,7 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
     discordHandler: faker.internet.userName(name),
     twitterHandler: faker.internet.userName(name),
     linkedinHandler: faker.internet.userName(name),
+    blueskyHandler: faker.internet.userName(name),
     telegramHandler: faker.internet.userName(name),
     telegramUid: faker.helpers.slugify(`uid-tele-${name.toLowerCase()}`),
     officeHours: faker.helpers.arrayElement([null, faker.internet.url()]),
