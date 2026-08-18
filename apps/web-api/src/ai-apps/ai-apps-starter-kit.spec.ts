@@ -48,6 +48,26 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(skill).not.toMatch(/posthog[-_]?(key|token|sdk|js)/i);
   });
 
+  it('makes baseline analytics automatic (opened/error/closed) and custom events opt-in', () => {
+    const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
+    // The baseline snippet: fired unconditionally on init, capped error volume,
+    // approximate session length via visibilitychange — not gated on a request.
+    expect(skill).toContain('initAppAnalytics');
+    expect(skill).toContain("trackEvent('opened')");
+    expect(skill).toContain('MAX_ERROR_EVENTS');
+    expect(skill).toContain('visibilitychange');
+    expect(skill).toContain('mandatory, not opt-in');
+    expect(skill).toContain('Custom events are opt-in');
+    expect(skill).toContain('autocapture');
+
+    const agentInstructions = entries.get('AGENTS.md') as string;
+    expect(agentInstructions).toContain('initAppAnalytics()');
+    expect(agentInstructions).toContain('not something you wait to be asked for');
+
+    const readme = entries.get('README.md') as string;
+    expect(readme).toContain('automatically reports basic usage');
+  });
+
   it('tells the agent this data has no member-facing dashboard yet (no overpromising)', () => {
     const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
     expect(skill).toContain('no usage dashboard for their own app today');
