@@ -25,6 +25,7 @@ interface MutationParams {
     linkedinHandler: string;
     discordHandler: string;
     twitterHandler: string;
+    blueskyHandler: string;
     telegramHandler: string;
     officeHours: string;
     githubHandler: string;

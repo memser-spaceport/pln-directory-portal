@@ -24,6 +24,7 @@ export const PreferenceSchema = z.object({
   showDiscord: z.boolean(),
   showGithubProjects: z.boolean(),
   showTwitter: z.boolean(),
+  showBluesky: z.boolean(),
   showSubscription: z.boolean(),
 });
 
@@ -56,6 +57,7 @@ export const MemberSchema = z.object({
   locationUid: z.string().nullable(),
   openToWork: z.boolean().nullish(),
   linkedinHandler: z.string().nullish(),
+  blueskyHandler: z.string().nullish(),
   repositories: GitHubRepositorySchema.array().optional(),
   preferences: PreferenceSchema.optional(),
   projectContributions: z.array(ProjectContributionSchema).optional(),
@@ -106,6 +108,7 @@ export const CreateMemberSchema = MemberSchema.pick({
   isFeatured: true,
   openToWork: true,
   linkedinHandler: true,
+  blueskyHandler: true,
   telegramHandler: true,
   isVerified: true,
   isUserConsent: true,

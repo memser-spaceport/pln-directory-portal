@@ -35,6 +35,7 @@ export const memberFormSchema = yup.object({
   linkedin: yup.string().defined(),
   discord: yup.string().defined(),
   twitter: yup.string().defined(),
+  bluesky: yup.string().defined(),
   github: yup.string().defined(),
   telegram: yup.string().defined(),
   officeHours: yup.string().defined(),
