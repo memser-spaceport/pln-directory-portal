@@ -3,11 +3,14 @@ import { isLoopbackRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
 import { pkceS256Challenge, verifyPkceS256 } from './mcp.crypto';
 import {
   compactMasterProfile,
+  compactOwnPathFeedback,
   compactWarmIntroInvestor,
   getMasterProfile,
   getWarmIntroInvestor,
+  getWarmPathFeedback,
   searchMasterProfiles,
   searchWarmIntroInvestors,
+  submitWarmPathFeedback,
   toolsForPermissions,
   warmIntroTools,
   WHOAMI_TOOL,
@@ -44,6 +47,8 @@ const WARM_INTRO_TOOL_NAMES = [
   'get_master_profile',
   'search_warm_intro_investors',
   'get_warm_intro_investor',
+  'submit_warm_path_feedback',
+  'get_warm_path_feedback',
 ];
 
 describe('toolsForPermissions', () => {
@@ -252,6 +257,122 @@ describe('getWarmIntroInvestor', () => {
     });
     await expect(
       getWarmIntroInvestor({ getPathsByInvestor } as unknown as WarmIntrosV2Service, { profileUid: 'missing' })
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+const mcpActor = {
+  memberUid: 'm1',
+  name: 'Ada',
+  email: 'ada@example.com',
+  permissions: new Set(['investor_db.view']),
+};
+
+describe('submitWarmPathFeedback', () => {
+  it('upserts note only for the MCP actor', async () => {
+    const upsertPathFeedback = jest.fn().mockResolvedValue({
+      uid: 'f1',
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      canRefer: 'yes',
+      note: 'Wrong path',
+      actorUid: 'm1',
+      actorEmail: 'ada@example.com',
+      updatedAt: '2026-07-28T00:00:00.000Z',
+    });
+    const result = await submitWarmPathFeedback({ upsertPathFeedback } as unknown as WarmIntrosV2Service, mcpActor, {
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: 'Wrong path',
+    });
+    expect(upsertPathFeedback).toHaveBeenCalledWith(
+      'p1',
+      { connectorProfileUid: 'from1', note: 'Wrong path' },
+      { uid: 'm1', email: 'ada@example.com' }
+    );
+    expect(result).toEqual({
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: 'Wrong path',
+      updatedAt: '2026-07-28T00:00:00.000Z',
+    });
+    expect(JSON.stringify(result)).not.toContain('canRefer');
+  });
+
+  it('clears the note when note is null', async () => {
+    const upsertPathFeedback = jest.fn().mockResolvedValue({ deleted: true });
+    const result = await submitWarmPathFeedback({ upsertPathFeedback } as unknown as WarmIntrosV2Service, mcpActor, {
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: null,
+    });
+    expect(upsertPathFeedback).toHaveBeenCalledWith(
+      'p1',
+      { connectorProfileUid: 'from1', note: null },
+      { uid: 'm1', email: 'ada@example.com' }
+    );
+    expect(result).toEqual({
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: null,
+      updatedAt: null,
+    });
+    expect(JSON.stringify(result)).not.toContain('canRefer');
+    expect(compactOwnPathFeedback('p1', 'from1', { deleted: true, canRefer: 'yes' })).toEqual({
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: null,
+      updatedAt: null,
+    });
+  });
+});
+
+describe('getWarmPathFeedback', () => {
+  it("returns this member's own note", async () => {
+    const payload = {
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: 'Wrong path',
+      updatedAt: '2026-07-28T00:00:00.000Z',
+    };
+    const getMyPathFeedback = jest.fn().mockResolvedValue(payload);
+    await expect(
+      getWarmPathFeedback({ getMyPathFeedback } as unknown as WarmIntrosV2Service, mcpActor, {
+        warmPathUid: 'p1',
+        connectorProfileUid: 'from1',
+      })
+    ).resolves.toEqual(payload);
+    expect(getMyPathFeedback).toHaveBeenCalledWith('p1', 'from1', { uid: 'm1', email: 'ada@example.com' });
+    expect(JSON.stringify(payload)).not.toContain('canRefer');
+  });
+
+  it('returns empty when this member has no note', async () => {
+    const getMyPathFeedback = jest.fn().mockResolvedValue({
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: null,
+      updatedAt: null,
+    });
+    await expect(
+      getWarmPathFeedback({ getMyPathFeedback } as unknown as WarmIntrosV2Service, mcpActor, {
+        warmPathUid: 'p1',
+        connectorProfileUid: 'from1',
+      })
+    ).resolves.toEqual({
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: null,
+      updatedAt: null,
+    });
+  });
+
+  it('propagates not-found', async () => {
+    const getMyPathFeedback = jest.fn().mockRejectedValue(new NotFoundException('WarmPathV2 not found: missing'));
+    await expect(
+      getWarmPathFeedback({ getMyPathFeedback } as unknown as WarmIntrosV2Service, mcpActor, {
+        warmPathUid: 'missing',
+        connectorProfileUid: 'from1',
+      })
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

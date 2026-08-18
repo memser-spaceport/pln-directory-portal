@@ -25,6 +25,7 @@ const MASTER_PROFILE_TYPES = ['pl_internal', 'investor', 'co_investor', 'founder
 const WARM_INTRO_TARGET_SETS = ['neuro-fund-i', 'gold-co-investors'] as const;
 const WARM_INTRO_RELATION_KINDS = ['pl_direct', 'founder_bridge', 'coinvestor_bridge'] as const;
 const MCP_LIST_LIMIT_MAX = 50;
+const FEEDBACK_NOTE_MAX = 600;
 
 export const WHOAMI_TOOL: McpToolDef = {
   name: 'whoami',
@@ -104,6 +105,37 @@ export function warmIntroTools(masterProfiles: MasterProfileService, warmIntros:
           .describe('Optional target list. Omit to return paths across all lists.'),
       },
       execute: async (_ctx, args) => getWarmIntroInvestor(warmIntros, args),
+    },
+    {
+      name: 'submit_warm_path_feedback',
+      description:
+        "Submit or update this user's correction note on a warm path (the path is wrong). Not for general path notes. Pass note: null to clear. Requires warmPathUid and connectorProfileUid from get_warm_intro_investor.",
+      visibility: 'investor_db',
+      inputSchema: {
+        warmPathUid: z.string().min(1).describe('Warm path uid from get_warm_intro_investor'),
+        connectorProfileUid: z
+          .string()
+          .min(1)
+          .describe('Connector master profile uid on that path (bestConnectorProfileUid or hop chain)'),
+        note: z
+          .union([z.string().max(FEEDBACK_NOTE_MAX), z.null()])
+          .describe("Correction note (max 600). Null clears this user's note on the path."),
+      },
+      execute: async (ctx, args) => submitWarmPathFeedback(warmIntros, ctx, args),
+    },
+    {
+      name: 'get_warm_path_feedback',
+      description:
+        "Return this user's own correction note on a warm path, or note: null if none. Does not return other people's feedback. Requires warmPathUid and connectorProfileUid from get_warm_intro_investor.",
+      visibility: 'investor_db',
+      inputSchema: {
+        warmPathUid: z.string().min(1).describe('Warm path uid from get_warm_intro_investor'),
+        connectorProfileUid: z
+          .string()
+          .min(1)
+          .describe('Connector master profile uid on that path (bestConnectorProfileUid or hop chain)'),
+      },
+      execute: async (ctx, args) => getWarmPathFeedback(warmIntros, ctx, args),
     },
   ];
 }
@@ -205,6 +237,59 @@ export async function getWarmIntroInvestor(
     throw new NotFoundException(`No warm paths found for investor: ${profileUid}`);
   }
   return result as unknown as Record<string, unknown>;
+}
+
+export function compactOwnPathFeedback(
+  warmPathUid: string,
+  connectorProfileUid: string,
+  result: Record<string, unknown>
+) {
+  if (result.deleted === true) {
+    return { warmPathUid, connectorProfileUid, note: null, updatedAt: null };
+  }
+  return {
+    warmPathUid,
+    connectorProfileUid,
+    note: typeof result.note === 'string' ? result.note : null,
+    updatedAt: typeof result.updatedAt === 'string' ? result.updatedAt : null,
+  };
+}
+
+function feedbackActor(ctx: McpActorContext) {
+  return { uid: ctx.memberUid, email: ctx.email };
+}
+
+function noteArg(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value === 'string') return value;
+  return null;
+}
+
+export async function submitWarmPathFeedback(
+  warmIntros: WarmIntrosV2Service,
+  ctx: McpActorContext,
+  args: Record<string, unknown> = {}
+): Promise<Record<string, unknown>> {
+  const warmPathUid = stringArg(args.warmPathUid) ?? '';
+  const connectorProfileUid = stringArg(args.connectorProfileUid) ?? '';
+  const result = await warmIntros.upsertPathFeedback(
+    warmPathUid,
+    { connectorProfileUid, note: noteArg(args.note) },
+    feedbackActor(ctx)
+  );
+  return compactOwnPathFeedback(warmPathUid, connectorProfileUid, result as unknown as Record<string, unknown>);
+}
+
+export async function getWarmPathFeedback(
+  warmIntros: WarmIntrosV2Service,
+  ctx: McpActorContext,
+  args: Record<string, unknown> = {}
+): Promise<Record<string, unknown>> {
+  return warmIntros.getMyPathFeedback(
+    stringArg(args.warmPathUid) ?? '',
+    stringArg(args.connectorProfileUid) ?? '',
+    feedbackActor(ctx)
+  );
 }
 
 function stringArg(value: unknown): string | undefined {

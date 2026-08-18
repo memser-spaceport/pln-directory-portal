@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { WarmIntrosV2Service } from './warm-intros-v2.service';
 import { PrismaService } from '../shared/prisma.service';
@@ -886,6 +886,49 @@ describe('WarmIntrosV2Service', () => {
           { uid: 'member-1', email: 'a@pl.com' }
         )
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('getMyPathFeedback', () => {
+    const pathOnDisk = {
+      uid: 'p1',
+      bestConnectorProfileUid: 'from1',
+      alternateConnectorProfileUids: ['from2'],
+      hopChain,
+    };
+
+    it('returns this actor note', async () => {
+      pathFindUnique.mockResolvedValue(pathOnDisk);
+      feedbackFindUnique.mockResolvedValue({
+        note: 'Wrong connector',
+        updatedAt: new Date('2026-07-28T00:00:00.000Z'),
+      });
+
+      await expect(service.getMyPathFeedback('p1', 'from1', { uid: 'member-1', email: 'a@pl.com' })).resolves.toEqual({
+        warmPathUid: 'p1',
+        connectorProfileUid: 'from1',
+        note: 'Wrong connector',
+        updatedAt: '2026-07-28T00:00:00.000Z',
+      });
+    });
+
+    it('returns empty when this actor has no note', async () => {
+      pathFindUnique.mockResolvedValue(pathOnDisk);
+      feedbackFindUnique.mockResolvedValue(null);
+
+      await expect(service.getMyPathFeedback('p1', 'from1', { uid: 'member-1', email: 'a@pl.com' })).resolves.toEqual({
+        warmPathUid: 'p1',
+        connectorProfileUid: 'from1',
+        note: null,
+        updatedAt: null,
+      });
+    });
+
+    it('throws not-found when the path is missing', async () => {
+      pathFindUnique.mockResolvedValue(null);
+      await expect(
+        service.getMyPathFeedback('missing', 'from1', { uid: 'member-1', email: 'a@pl.com' })
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

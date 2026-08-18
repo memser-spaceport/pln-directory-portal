@@ -1,4 +1,12 @@
-import { All, Controller, NotFoundException, Req, Res, UnauthorizedException } from '@nestjs/common';
+import {
+  All,
+  BadRequestException,
+  Controller,
+  NotFoundException,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -77,7 +85,7 @@ export class McpController {
             content: [{ type: 'text' as const, text: JSON.stringify(result) }],
           };
         } catch (error) {
-          if (error instanceof NotFoundException) {
+          if (error instanceof NotFoundException || error instanceof BadRequestException) {
             return {
               isError: true,
               content: [{ type: 'text' as const, text: String(error.message) }],

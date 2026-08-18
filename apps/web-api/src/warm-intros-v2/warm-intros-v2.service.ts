@@ -522,6 +522,46 @@ export class WarmIntrosV2Service {
     );
   }
 
+  async getMyPathFeedback(warmPathUid: string, connectorProfileUid: string, actor: FeedbackActor) {
+    const pathUid = warmPathUid?.trim();
+    if (!pathUid) throw new BadRequestException('warmPathUid is required');
+
+    const connectorUid = connectorProfileUid?.trim();
+    if (!connectorUid) throw new BadRequestException('connectorProfileUid is required');
+
+    const actorUid = actor.uid?.trim() || null;
+    if (!actorUid) throw new BadRequestException('actor identity is required');
+
+    const path = await this.prisma.warmPathV2.findUnique({
+      where: { uid: pathUid },
+      select: {
+        uid: true,
+        bestConnectorProfileUid: true,
+        alternateConnectorProfileUids: true,
+        hopChain: true,
+      },
+    });
+    if (!path) throw new NotFoundException(`WarmPathV2 not found: ${pathUid}`);
+    this.assertConnectorOnPath(path, connectorUid);
+
+    const row = await this.prisma.warmPathV2Feedback.findUnique({
+      where: {
+        warmPathUid_connectorProfileUid_actorUid: {
+          warmPathUid: pathUid,
+          connectorProfileUid: connectorUid,
+          actorUid,
+        },
+      },
+    });
+
+    return {
+      warmPathUid: pathUid,
+      connectorProfileUid: connectorUid,
+      note: row?.note ?? null,
+      updatedAt: row?.updatedAt.toISOString() ?? null,
+    };
+  }
+
   async listPathFeedback(query: ListWarmPathFeedbackQueryDto) {
     const limit = Math.min(Math.max(parseInt(query.limit ?? '50', 10) || 50, 1), 200);
     const offset = Math.max(parseInt(query.offset ?? '0', 10) || 0, 0);
