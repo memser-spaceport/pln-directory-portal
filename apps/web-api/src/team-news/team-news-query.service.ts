@@ -4,6 +4,7 @@ import { PrismaService } from '../shared/prisma.service';
 import type {
   TeamNewsByTeamQuery,
   TeamNewsByTeamResponse,
+  TeamNewsCountsResponse,
   TeamNewsDiscussion,
   TeamNewsFiltersResponse,
   TeamNewsGroupedResponse,
@@ -24,6 +25,19 @@ import {
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
 const POPULAR_MIN_UPVOTES = 2;
+
+/**
+ * The window behind the "N new posts" chip on the teams grid and the job board.
+ *
+ * Deliberately NOT `buildTeamNewsEventDateWhere`, which is the reuse this looks
+ * like it wants. That helper answers "what does the feed still show" — including
+ * its escape hatch for items up to TEAM_NEWS_DISCUSSION_WINDOW_DAYS old that
+ * carry a forum link. This answers "what did the team publish recently", which
+ * is a different question that happens to have the same answer at 30 days. Wire
+ * them together and the next change to the feed's visibility rules silently
+ * moves a number the feed does not own.
+ */
+const TEAM_NEWS_COUNT_WINDOW_DAYS = 30;
 
 type UpvoteStamp = {
   counts: Map<string, number>;
@@ -231,6 +245,49 @@ export class TeamNewsQueryService {
       total,
       items: rows.map((row) => this.toDto(row, discussions.get(row.uid), followedTeamUids, upvotes)),
     };
+  }
+
+  /**
+   * Recent post counts for a batch of teams — what the "N new posts" chip reads.
+   *
+   * Sits beside `listTeamNewsByTeam` on purpose: that method is what the chip
+   * OPENS, so the two have to be read together. Note they do not match, and are
+   * not meant to. The archive below applies no date window at all, so this count
+   * is always a strict subset of what the reader lands on — the chip promises 3
+   * and the modal shows those 3 at the top of everything the team ever published
+   * (it orders by eventDate desc). Promising less than you deliver is the safe
+   * direction; the reverse would be a lie on every card.
+   *
+   * The exclusion list IS applied here while the archive ignores it, which is the
+   * one deliberate asymmetry: the grid and the job board are public discovery
+   * surfaces of exactly the kind TEAM_NEWS_EXCLUDED_TEAM_NAMES governs, whereas
+   * a team's own profile is not. An excluded team gets no chip and keeps its
+   * profile news.
+   *
+   * Teams with nothing recent are absent from the map rather than zero — see
+   * TeamNewsCountsResponseSchema.
+   */
+  async getRecentCountsByTeam(teamUids: string[]): Promise<TeamNewsCountsResponse> {
+    if (teamUids.length === 0) {
+      return { counts: {} };
+    }
+
+    const cutoff = new Date(Date.now() - TEAM_NEWS_COUNT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const and: Prisma.TeamNewsItemWhereInput[] = [{ teamUid: { in: teamUids } }, { eventDate: { gte: cutoff } }];
+
+    const excluded = this.excludedTeamsWhere();
+    if (excluded) {
+      and.push(excluded);
+    }
+
+    // Covered by @@index([teamUid, eventDate(sort: Desc)]).
+    const grouped = await this.prisma.teamNewsItem.groupBy({
+      by: ['teamUid'],
+      where: { AND: and },
+      _count: { _all: true },
+    });
+
+    return { counts: Object.fromEntries(grouped.map((row) => [row.teamUid, row._count._all])) };
   }
 
   async listTeamNewsByTeam(

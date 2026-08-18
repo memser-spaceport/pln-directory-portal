@@ -19,6 +19,8 @@ import {
   TeamNewsUpvoteStatusSchema,
   RecordTeamNewsImpressionsRequestSchema,
   RecordTeamNewsImpressionsResponseSchema,
+  TeamNewsCountsRequestSchema,
+  TeamNewsCountsResponseSchema,
 } from '../schema/team-news';
 import { getAPIVersionAsPath } from '../utils/versioned-path';
 
@@ -87,6 +89,15 @@ export const apiTeamNews = contract.router({
       200: TeamNewsPopularResponseSchema,
     },
     summary: 'Most-upvoted team news from the last 14 days (popular this week rail)',
+  },
+  getTeamNewsCounts: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/team-news/counts`,
+    body: TeamNewsCountsRequestSchema,
+    responses: {
+      200: TeamNewsCountsResponseSchema,
+    },
+    summary: 'Recent (30-day) news post counts for a batch of teams (unauthenticated)',
   },
   getTeamNewsByTeam: {
     method: 'GET',
