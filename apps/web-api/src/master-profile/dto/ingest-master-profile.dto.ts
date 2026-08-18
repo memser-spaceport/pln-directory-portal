@@ -60,6 +60,12 @@ export class ListMasterProfilesQueryDto {
   investorOutreachId?: string;
   /** Filter profiles whose `types` array contains this value. */
   type?: string;
+  /** Case-insensitive substring on `canonicalName`. List queries only. */
+  name?: string;
+  /** Case-insensitive substring on stored emails JSON. List queries only. */
+  email?: string;
+  /** Case-insensitive substring on `currentOrg`. List queries only. */
+  currentOrg?: string;
   limit?: string;
   /** Pagination offset for type / all list queries. */
   offset?: string;

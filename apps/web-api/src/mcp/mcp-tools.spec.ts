@@ -1,6 +1,15 @@
+import { NotFoundException } from '@nestjs/common';
 import { isLoopbackRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
 import { pkceS256Challenge, verifyPkceS256 } from './mcp.crypto';
-import { toolsForPermissions, WHOAMI_TOOL, type McpToolDef } from './mcp-tools';
+import {
+  compactMasterProfile,
+  getMasterProfile,
+  searchMasterProfiles,
+  toolsForPermissions,
+  warmIntroTools,
+  WHOAMI_TOOL,
+} from './mcp-tools';
+import { MasterProfileService } from '../master-profile/master-profile.service';
 
 describe('mcp-redirect', () => {
   it('allows localhost and 127.0.0.1 only', () => {
@@ -26,15 +35,14 @@ describe('mcp.crypto PKCE', () => {
 });
 
 describe('toolsForPermissions', () => {
-  const warmIntro: McpToolDef = {
-    name: 'search_master_profiles',
-    description: 'later ticket',
-    visibility: 'investor_db',
-    execute: async () => ({}),
-  };
+  const masterProfiles = {
+    lookup: jest.fn(),
+    getByUid: jest.fn(),
+  } as unknown as MasterProfileService;
+  const catalog = [WHOAMI_TOOL, ...warmIntroTools(masterProfiles)];
 
   it('always includes whoami', async () => {
-    const tools = toolsForPermissions(new Set(), [WHOAMI_TOOL, warmIntro]);
+    const tools = toolsForPermissions(new Set(), catalog);
     expect(tools.map((t) => t.name)).toEqual(['whoami']);
     const result = await WHOAMI_TOOL.execute({
       memberUid: 'm1',
@@ -46,9 +54,85 @@ describe('toolsForPermissions', () => {
   });
 
   it('omits Warm Intro tools without investor_db.view', () => {
-    const without = toolsForPermissions(new Set(['mcp.connect']), [WHOAMI_TOOL, warmIntro]);
-    const withView = toolsForPermissions(new Set(['mcp.connect', 'investor_db.view']), [WHOAMI_TOOL, warmIntro]);
+    const without = toolsForPermissions(new Set(['mcp.connect']), catalog);
+    const withView = toolsForPermissions(new Set(['mcp.connect', 'investor_db.view']), catalog);
     expect(without.map((t) => t.name)).toEqual(['whoami']);
-    expect(withView.map((t) => t.name)).toEqual(['whoami', 'search_master_profiles']);
+    expect(withView.map((t) => t.name)).toEqual(['whoami', 'search_master_profiles', 'get_master_profile']);
+  });
+
+  it('shows Warm Intro tools with directory.admin.full', () => {
+    const tools = toolsForPermissions(new Set(['directory.admin.full']), catalog);
+    expect(tools.map((t) => t.name)).toEqual(['whoami', 'search_master_profiles', 'get_master_profile']);
+  });
+});
+
+describe('searchMasterProfiles', () => {
+  it('returns compact rows only', async () => {
+    const lookup = jest.fn().mockResolvedValue({
+      profiles: [
+        {
+          uid: 'u1',
+          canonicalName: 'Jane',
+          currentOrg: 'a16z',
+          currentTitle: 'Partner',
+          types: ['investor'],
+          raw: { secret: true },
+          sourceSnapshots: [{ a: 1 }],
+        },
+      ],
+      limit: 20,
+      offset: 0,
+    });
+    const result = await searchMasterProfiles({ lookup } as unknown as MasterProfileService, {
+      name: 'Jane',
+      currentOrg: 'a16z',
+    });
+    expect(lookup).toHaveBeenCalledWith({
+      name: 'Jane',
+      email: undefined,
+      type: undefined,
+      currentOrg: 'a16z',
+      limit: '20',
+      offset: '0',
+    });
+    expect(result).toEqual({
+      profiles: [
+        {
+          uid: 'u1',
+          canonicalName: 'Jane',
+          currentOrg: 'a16z',
+          currentTitle: 'Partner',
+          types: ['investor'],
+        },
+      ],
+      limit: 20,
+      offset: 0,
+    });
+    expect(JSON.stringify(result)).not.toContain('raw');
+    expect(compactMasterProfile({ uid: 'u1', canonicalName: 'Jane', raw: {} })).toEqual({
+      uid: 'u1',
+      canonicalName: 'Jane',
+      currentOrg: null,
+      currentTitle: null,
+      types: [],
+    });
+  });
+});
+
+describe('getMasterProfile', () => {
+  it('returns the full row from getByUid', async () => {
+    const profile = { uid: 'u1', canonicalName: 'Jane', raw: { secret: true } };
+    const getByUid = jest.fn().mockResolvedValue(profile);
+    await expect(getMasterProfile({ getByUid } as unknown as MasterProfileService, { uid: 'u1' })).resolves.toEqual(
+      profile
+    );
+    expect(getByUid).toHaveBeenCalledWith('u1');
+  });
+
+  it('propagates not-found', async () => {
+    const getByUid = jest.fn().mockRejectedValue(new NotFoundException('MasterProfile not found: missing'));
+    await expect(
+      getMasterProfile({ getByUid } as unknown as MasterProfileService, { uid: 'missing' })
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
