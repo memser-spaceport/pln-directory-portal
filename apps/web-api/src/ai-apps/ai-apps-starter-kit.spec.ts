@@ -48,6 +48,16 @@ describe('AiAppsStarterKitService buildZip', () => {
     expect(skill).not.toMatch(/posthog[-_]?(key|token|sdk|js)/i);
   });
 
+  it('tells the agent this data has no member-facing dashboard yet (no overpromising)', () => {
+    const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
+    expect(skill).toContain('no usage dashboard for their own app today');
+    expect(skill).not.toMatch(/so (the member|you) can see/i);
+    const agentInstructions = entries.get('AGENTS.md') as string;
+    expect(agentInstructions).toContain('not to the member');
+    const readme = entries.get('README.md') as string;
+    expect(readme).not.toMatch(/events show up automatically alongside your app/i);
+  });
+
   it('writes the member-context endpoint into the config (and still no token)', () => {
     const config = JSON.parse(entries.get('pln-app.config.json') as string);
     expect(config.memberContextEndpoint).toContain('/v1/ai-apps/me');

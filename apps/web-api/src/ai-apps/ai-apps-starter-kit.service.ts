@@ -115,7 +115,7 @@ to the Protocol Labs Network sandbox with a single instruction.
 - \`.claude/skills/pl-design-system/\` — how to build on-brand UI with the PL Design System.
 - \`.claude/skills/pln-member-context/\` — how your app can know which PLN member is using it.
 - \`.claude/skills/app-analytics/\` — how your app can send its own usage events
-  (button clicks, feature usage) so you can see how people use it.
+  (button clicks, feature usage) to help the PL team understand how AI Apps get used.
 - \`.claude/skills/db-migration/\` — for apps that already have their own database, how your
   agent migrates it — structure and, by default, your existing data — onto a
   PLN-provisioned Postgres database.
@@ -207,12 +207,14 @@ it shows. Just ask your agent, e.g. *"greet me by name and show my team when I
 open the app"*. Visitors who aren't signed in (or lack access) simply get the
 non-personalized version — your app keeps working for them.
 
-## Seeing how your app is used (analytics)
-Your app can track its own usage — which buttons get clicked, which features
-get used. Just ask your agent, e.g. *"add analytics for the export button"*.
-There's nothing to sign up for or configure: events show up automatically
-alongside your app's other activity. This is optional — skip it if you don't
-need it, and your app works exactly the same either way.
+## Usage tracking (helps the PL team, not a dashboard for you)
+Your app can send the PL team usage data — which buttons get clicked, which
+features get used — to help them understand how AI Apps get used across the
+program. Just ask your agent, e.g. *"add analytics for the export button"*.
+There's nothing to sign up for or configure. Note this data isn't shown back
+to you anywhere yet — there's no usage dashboard for your own app today. This
+is entirely optional — skip it if you don't need it, and your app works
+exactly the same either way.
 
 ## When something breaks
 If a deploy fails or your app misbehaves after deploying, just tell your agent —
@@ -316,7 +318,10 @@ PostHog SDK, no key of any kind. Attribution to this app (and to the signed-in
 member, when there is one) is resolved server-side; you only choose the event
 name (snake_case; the endpoint prefixes it) and behavioral properties. Never
 put PII in properties, always fire-and-forget (never block or fail the app on
-an analytics call), and treat it as fully optional.
+an analytics call), and treat it as fully optional. This data goes to the PL
+team for understanding usage across AI Apps, not to the member — there is no
+dashboard yet where the member can see their own app's events, so don't tell
+them they'll be able to view this data.
 
 ## Migrating an existing app
 When the member already has an app and wants it on LabOS, you are *adapting their
@@ -977,17 +982,22 @@ compensate.
   private analyticsSkill(): string {
     return `---
 name: app-analytics
-description: Send custom product-analytics events (button clicks, feature usage) from a deployed AI App to the PLN backend, which forwards them to the Directory PostHog project with server-enforced app attribution. Use whenever the member asks for usage tracking, event logging, or "analytics" in their app, or when it would help them see how the app is used. Optional — never required for a deploy to succeed.
+description: Send custom product-analytics events (button clicks, feature usage) from a deployed AI App to the PLN backend, which forwards them to the Directory PostHog project with server-enforced app attribution. Use whenever the member asks for usage tracking, event logging, or "analytics" in their app. This helps the PL team understand usage across AI Apps — there is no dashboard yet for the member to view their own app's events. Optional — never required for a deploy to succeed.
 ---
 
 # App analytics — custom events
 
 Deployed apps can emit their own product-analytics events (a button was
-clicked, a feature was used) so the member can see usage on the Directory
-PostHog project. There is no PostHog key or SDK in this kit — events go
-through the PLN backend, which resolves which app they belong to from the
-request itself and stamps identity, so the app never handles PostHog
-credentials or attribution.
+clicked, a feature was used) that feed the PL team's understanding of how AI
+Apps get used across the program. There is no PostHog key or SDK in this kit —
+events go through the PLN backend, which resolves which app they belong to
+from the request itself and stamps identity, so the app never handles
+PostHog credentials or attribution.
+
+**Set expectations correctly with the member:** this data is not shown back
+to them anywhere yet — there is no usage dashboard for their own app today.
+Don't tell them they'll be able to see clicks/usage themselves; frame it as
+helping the PL team improve AI Apps.
 
 ## The endpoint
 
