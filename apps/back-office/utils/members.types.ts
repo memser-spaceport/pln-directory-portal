@@ -58,6 +58,7 @@ export interface IFormValues {
   linkedinHandler: string;
   discordHandler: string;
   twitterHandler: string;
+  blueskyHandler: string;
   githubHandler: string;
   telegramHandler: string;
   officeHours: string;

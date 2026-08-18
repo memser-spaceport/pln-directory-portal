@@ -133,6 +133,7 @@ model Member {
   discordHandler                     String?
   twitterHandler                     String?
   linkedinHandler                    String?
+  blueskyHandler                     String?
   telegramHandler                    String?                           @unique
   telegramUid                        String?                           @unique
   officeHours                        String?
@@ -256,7 +257,8 @@ model Member {
   affinityPerson               AffinityPerson?
   affinityRelationshipOwnerFor AffinityPerson[] @relation("AffinityRelationshipOwner")
 
-  memberEnrichment MemberEnrichment?
+  memberEnrichment  MemberEnrichment?
+  mcpAuthorizations McpAuthorization[]
 }
 
 model MemberApproval {
@@ -3789,4 +3791,49 @@ model Follow {
   @@unique([memberUid, entityType, entityUid])
   @@index([entityType, entityUid])
   @@index([memberUid, entityType])
+}
+
+/// MCP OAuth dynamic client registration (RFC 7591). Public clients only.
+model McpOAuthClient {
+  clientId     String   @id
+  clientName   String
+  redirectUris String[]
+  createdAt    DateTime @default(now())
+}
+
+/// Per-member MCP grant shown on Settings → Connected Accounts.
+model McpAuthorization {
+  uid              String        @id @default(cuid())
+  memberUid        String
+  clientId         String
+  clientName       String
+  connectedAt      DateTime      @default(now())
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+  accessTokenHash  String?       @unique
+  refreshTokenHash String?       @unique
+  accessExpiresAt  DateTime?
+  member           Member        @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  authCodes        McpAuthCode[]
+
+  @@unique([memberUid, clientId])
+  @@index([memberUid, revokedAt])
+}
+
+/// Short-lived authorization codes (PKCE S256).
+model McpAuthCode {
+  uid              String           @id @default(cuid())
+  codeHash         String           @unique
+  codeChallenge    String
+  clientId         String
+  redirectUri      String
+  resource         String?
+  memberUid        String
+  authorizationUid String
+  expiresAt        DateTime
+  consumedAt       DateTime?
+  createdAt        DateTime         @default(now())
+  authorization    McpAuthorization @relation(fields: [authorizationUid], references: [uid], onDelete: Cascade)
+
+  @@index([expiresAt])
 }

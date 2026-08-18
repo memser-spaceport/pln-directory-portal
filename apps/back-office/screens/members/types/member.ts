@@ -52,6 +52,7 @@ export type TMemberForm = {
   linkedin: string;
   discord: string;
   twitter: string;
+  bluesky: string;
   github: string;
   telegram: string;
   officeHours: string;

@@ -7,6 +7,7 @@ export const MEMBER_CONTACT_FIELDS = [
   'telegramUid',
   'twitterHandler',
   'linkedinHandler',
+  'blueskyHandler',
   'officeHours',
 ] as const;
 

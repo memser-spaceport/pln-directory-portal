@@ -1166,6 +1166,7 @@ export class MembersService {
       'bio',
       'twitterHandler',
       'linkedinHandler',
+      'blueskyHandler',
       'telegramHandler',
       'officeHours',
       'moreDetails',
@@ -1723,6 +1724,7 @@ export class MembersService {
         discordHandler: true,
         linkedinHandler: true,
         twitterHandler: true,
+        blueskyHandler: true,
         preferences: true,
         isSubscribedToNewsletter: true,
       },
@@ -1749,6 +1751,7 @@ export class MembersService {
     preferences.discord = !!member.discordHandler;
     preferences.linkedin = !!member.linkedinHandler;
     preferences.twitter = !!member.twitterHandler;
+    preferences.bluesky = !!member.blueskyHandler;
     preferences.subscription = !!member.isSubscribedToNewsletter;
     return preferences;
   }

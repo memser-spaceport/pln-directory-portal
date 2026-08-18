@@ -1009,7 +1009,10 @@ connection string into the LabOS secrets page, same as an API key.
    so PLN knows which kit built the app), and (if present) saved \`appId\`,
    \`appUid\`, \`appName\`, and \`appDescription\`. If no \`appId\` exists yet, pick a
    short, stable, lowercase slug (e.g. \`hello-board\`) and save it back to the
-   config. Never edit \`kitVersion\` by hand.
+   config. \`appId\`s are **global across ALL PLN members** — the app's URL and
+   infrastructure are derived from it — so pick something distinctive; a generic
+   slug another member already claimed is rejected with \`409 Conflict\` at deploy
+   time (see step 7). Never edit \`kitVersion\` by hand.
 2. **Settle the display name & description.** If \`appName\` in the config is
    empty (first deploy), load the **app-metadata** skill
    (\`.claude/skills/app-metadata/SKILL.md\`): propose a human-friendly name and
@@ -1115,6 +1118,16 @@ connection string into the LabOS secrets page, same as an API key.
    caches at runtime) and redeploy. Only ask PL Infra for a higher limit if
    the app has a genuine, explainable need that can't be designed around.
 
+   **If the upload itself returns \`409 Conflict\`**, read the error message:
+   - *"already in use by another member's app"* — the \`appId\` is taken globally
+     by someone else. Pick a different, more distinctive slug (e.g. prefix it:
+     \`<team>-<app>\`), update \`appId\` in \`pln-app.config.json\`, and deploy again.
+     Don't retry the same \`appId\` — it won't free up unless that member deletes
+     their app.
+   - *"deploy is already in progress"* — a previous deploy for this app is still
+     running (possibly one the member triggered from LabOS). Wait a minute and
+     retry with the SAME \`appId\`.
+
    **After the FIRST successful deploy**, offer the optional one-pager PRD —
    see "Offer the one-pager PRD" in the app-metadata skill. If the member wants
    one, generate it, get approval, and save it via \`metadataEndpoint\` — no
@@ -1162,7 +1175,8 @@ An app can need secrets AND a provisioned database — add \`database\` (see
 "Apps that want a provisioned database" below) to this same draft call.
 
 Save the response's \`uid\` as \`appUid\` in \`pln-app.config.json\`, same as a
-regular deploy.
+regular deploy. A \`409 Conflict\` here means the same things as in step 7
+(appId taken by another member → pick a new one; deploy in progress → wait).
 
 **IMMEDIATELY give the member the \`appPageUrl\` link — this is the very next
 thing you do after the registration call returns, before anything else.** A

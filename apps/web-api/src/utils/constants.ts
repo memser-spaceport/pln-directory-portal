@@ -241,6 +241,7 @@ export const IGNORED_URLS_FOR_CONCEALID = [
   '/v1/husky/chat/analytical',
   '/v1/husky/chat/additional-info',
   '/husky/threads',
+  '/mcp',
 ];
 
 export const HUSKY_SOURCES = {

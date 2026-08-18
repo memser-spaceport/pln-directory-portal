@@ -901,6 +901,27 @@ export class AiAppsService {
     return this.isRequesterDirectoryAdmin(requesterUid);
   }
 
+  /**
+   * The sandbox runner namespaces everything by appId ALONE (helm release
+   * `<environment>-<appId>`, host `<appId>.<domain>`, secret store, provisioned
+   * database), while our rows are unique per (memberUid, appId) — so two members
+   * holding the same appId would share ONE physical deployment: each deploy
+   * overwrites the other's live app, and a delete tears the other's down. Block
+   * claiming an appId that is live under another member. A DELETED row releases
+   * the claim (its runner deployment is already torn down).
+   */
+  private async assertAppIdNotClaimedByAnotherMember(memberUid: string, appId: string): Promise<void> {
+    const claimedByOther = await this.prisma.aiApp.findFirst({
+      where: { appId, memberUid: { not: memberUid }, status: { not: 'DELETED' } },
+      select: { uid: true },
+    });
+    if (claimedByOther) {
+      throw new ConflictException(
+        `The appId "${appId}" is already in use by another member's app — pick a different appId`
+      );
+    }
+  }
+
   /** Requester-only admin check — computed once and reused per row on list responses. */
   private async isRequesterDirectoryAdmin(requesterUid: string): Promise<boolean> {
     const requester = await this.prisma.member.findUnique({
@@ -927,6 +948,8 @@ export class AiAppsService {
     if (!AI_APPS_S3_BUCKET) {
       throw new InternalServerErrorException('AI_APPS_S3_BUCKET is not configured');
     }
+
+    await this.assertAppIdNotClaimedByAnotherMember(memberUid, dto.appId);
 
     // Block a second concurrent deploy: if a deploy is already in flight for this
     // app (from another agent run or a member-triggered deploy), reject before we
@@ -1023,6 +1046,8 @@ export class AiAppsService {
       throw new InternalServerErrorException('AI_APPS_S3_BUCKET is not configured');
     }
 
+    await this.assertAppIdNotClaimedByAnotherMember(memberUid, dto.appId);
+
     // Don't clobber an in-flight deploy's bundle/status by re-registering the app
     // as a DRAFT while it's mid-deploy.
     const existing = await this.prisma.aiApp.findUnique({
@@ -1109,6 +1134,11 @@ export class AiAppsService {
     if (app.status === 'DELETED' || app.status === 'DELETING') {
       throw new BadRequestException('This app has been deleted');
     }
+    // Legacy duplicate rows (created before the claim guard existed) share one
+    // runner deployment — don't let a redeploy clobber the other member's live
+    // app. The claim belongs to the app's owner, not the requester (an admin
+    // may trigger the deploy on the creator's behalf).
+    await this.assertAppIdNotClaimedByAnotherMember(app.memberUid, app.appId);
     this.assertNoDeployInProgress(app);
     if (!app.s3Key || !app.deploymentId) {
       throw new BadRequestException('This app has no uploaded bundle yet — ask your AI agent to register it first');
@@ -1558,6 +1588,9 @@ export class AiAppsService {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(memberUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can delete this app');
     }
 
     const eventContext = { appUid: app.uid, appId: app.appId, deploymentId: app.deploymentId ?? undefined };
