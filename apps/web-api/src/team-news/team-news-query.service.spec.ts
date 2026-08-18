@@ -353,3 +353,129 @@ describe('TeamNewsQueryService.getLatestCreatedAt', () => {
     expect(where.createdAt).toBeUndefined();
   });
 });
+
+describe('TeamNewsQueryService.listGroupedByFocusArea', () => {
+  let service: TeamNewsQueryService;
+
+  const teamNewsItemFindMany = jest.fn();
+  const focusAreaFindMany = jest.fn();
+  const teamNewsForumLinkFindMany = jest.fn();
+  const teamNewsUpvoteGroupBy = jest.fn();
+  const teamNewsUpvoteFindMany = jest.fn();
+
+  const query = { focus: [], eventType: [], windowDays: 14, page: 1, limit: 50 };
+
+  const makeRow = (overrides: Record<string, unknown> = {}) => ({
+    uid: 'news-1',
+    teamUid: 'team-1',
+    eventType: 'FUNDING',
+    eventDate: new Date('2026-08-15T00:00:00.000Z'),
+    title: 'Raised Series A',
+    summary: 'Funding round closed',
+    contentHtml: null,
+    sourceUrl: 'https://example.com/news',
+    sourceUrls: ['https://example.com/news'],
+    sourceDomain: 'example.com',
+    tags: ['funding'],
+    editorialRank: null,
+    viewCount: 0,
+    createdAt: new Date('2026-08-16T00:00:00.000Z'),
+    team: {
+      uid: 'team-1',
+      name: 'Acme Labs',
+      logo: { url: 'https://example.com/logo.png' },
+      teamFocusAreas: [] as Array<{
+        focusArea: { title: string; parentUid: string | null };
+        ancestorArea: { title: string };
+      }>,
+    },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    focusAreaFindMany.mockResolvedValue([{ uid: 'fa-ai', title: 'AI & Robotics' }]);
+    teamNewsForumLinkFindMany.mockResolvedValue([]);
+    teamNewsUpvoteGroupBy.mockResolvedValue([]);
+    teamNewsUpvoteFindMany.mockResolvedValue([]);
+    service = new TeamNewsQueryService({
+      teamNewsItem: { findMany: teamNewsItemFindMany },
+      focusArea: { findMany: focusAreaFindMany },
+      teamNewsForumLink: { findMany: teamNewsForumLinkFindMany },
+      teamNewsUpvote: { groupBy: teamNewsUpvoteGroupBy, findMany: teamNewsUpvoteFindMany },
+    } as unknown as PrismaService);
+  });
+
+  it('puts an untagged editorial pick on All via allTabExtraItems', async () => {
+    teamNewsItemFindMany.mockResolvedValue([
+      makeRow({
+        uid: 'editorial-untagged',
+        teamUid: 'prime-intellect',
+        editorialRank: 3,
+        title: 'Open autonomous AI research',
+        team: {
+          uid: 'prime-intellect',
+          name: 'Prime Intellect AI',
+          logo: null,
+          teamFocusAreas: [],
+        },
+      }),
+    ]);
+
+    const result = await service.listGroupedByFocusArea(query);
+
+    expect(result.groups).toEqual([]);
+    expect(result.allTabExtraItems).toEqual([expect.objectContaining({ uid: 'editorial-untagged', editorialRank: 3 })]);
+  });
+
+  it('does not put an untagged non-editorial item on All', async () => {
+    teamNewsItemFindMany.mockResolvedValue([
+      makeRow({
+        uid: 'untagged-ordinary',
+        teamUid: 'no-focus-team',
+        editorialRank: null,
+        team: {
+          uid: 'no-focus-team',
+          name: 'No Focus Inc',
+          logo: null,
+          teamFocusAreas: [],
+        },
+      }),
+    ]);
+
+    const result = await service.listGroupedByFocusArea(query);
+
+    expect(result.groups).toEqual([]);
+    expect(result.allTabExtraItems).toEqual([]);
+  });
+
+  it('keeps a focused editorial pick in its group, not extras', async () => {
+    teamNewsItemFindMany.mockResolvedValue([
+      makeRow({
+        uid: 'editorial-focused',
+        editorialRank: 1,
+        team: {
+          uid: 'team-1',
+          name: 'Acme Labs',
+          logo: null,
+          teamFocusAreas: [
+            {
+              focusArea: { title: 'AI & Robotics', parentUid: null },
+              ancestorArea: { title: 'AI & Robotics' },
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const result = await service.listGroupedByFocusArea(query);
+
+    expect(result.allTabExtraItems).toEqual([]);
+    expect(result.groups).toEqual([
+      expect.objectContaining({
+        focusArea: { uid: 'fa-ai', title: 'AI & Robotics' },
+        items: [expect.objectContaining({ uid: 'editorial-focused', editorialRank: 1 })],
+      }),
+    ]);
+  });
+});

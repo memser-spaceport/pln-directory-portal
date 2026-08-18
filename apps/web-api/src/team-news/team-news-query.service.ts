@@ -343,7 +343,10 @@ export class TeamNewsQueryService {
         groups.get(title)!.push(dto);
         addedToGroup = true;
       }
-      if (!addedToGroup && alwaysIncludeInAllTab.has(dto.teamUid)) {
+      // Untagged teams are dropped from every tab unless allowlisted (Protocol
+      // Labs) or editorially ranked — Top Stories is computed client-side from
+      // the All-tab corpus, so a pick with no focus area would otherwise vanish.
+      if (!addedToGroup && (alwaysIncludeInAllTab.has(dto.teamUid) || dto.editorialRank != null)) {
         allTabExtraItems.push(dto);
       }
     }
