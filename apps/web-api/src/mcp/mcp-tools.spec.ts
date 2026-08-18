@@ -3,13 +3,17 @@ import { isLoopbackRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
 import { pkceS256Challenge, verifyPkceS256 } from './mcp.crypto';
 import {
   compactMasterProfile,
+  compactWarmIntroInvestor,
   getMasterProfile,
+  getWarmIntroInvestor,
   searchMasterProfiles,
+  searchWarmIntroInvestors,
   toolsForPermissions,
   warmIntroTools,
   WHOAMI_TOOL,
 } from './mcp-tools';
 import { MasterProfileService } from '../master-profile/master-profile.service';
+import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
 
 describe('mcp-redirect', () => {
   it('allows localhost and 127.0.0.1 only', () => {
@@ -34,12 +38,24 @@ describe('mcp.crypto PKCE', () => {
   });
 });
 
+const WARM_INTRO_TOOL_NAMES = [
+  'whoami',
+  'search_master_profiles',
+  'get_master_profile',
+  'search_warm_intro_investors',
+  'get_warm_intro_investor',
+];
+
 describe('toolsForPermissions', () => {
   const masterProfiles = {
     lookup: jest.fn(),
     getByUid: jest.fn(),
   } as unknown as MasterProfileService;
-  const catalog = [WHOAMI_TOOL, ...warmIntroTools(masterProfiles)];
+  const warmIntros = {
+    listPaths: jest.fn(),
+    getPathsByInvestor: jest.fn(),
+  } as unknown as WarmIntrosV2Service;
+  const catalog = [WHOAMI_TOOL, ...warmIntroTools(masterProfiles, warmIntros)];
 
   it('always includes whoami', async () => {
     const tools = toolsForPermissions(new Set(), catalog);
@@ -57,12 +73,12 @@ describe('toolsForPermissions', () => {
     const without = toolsForPermissions(new Set(['mcp.connect']), catalog);
     const withView = toolsForPermissions(new Set(['mcp.connect', 'investor_db.view']), catalog);
     expect(without.map((t) => t.name)).toEqual(['whoami']);
-    expect(withView.map((t) => t.name)).toEqual(['whoami', 'search_master_profiles', 'get_master_profile']);
+    expect(withView.map((t) => t.name)).toEqual(WARM_INTRO_TOOL_NAMES);
   });
 
   it('shows Warm Intro tools with directory.admin.full', () => {
     const tools = toolsForPermissions(new Set(['directory.admin.full']), catalog);
-    expect(tools.map((t) => t.name)).toEqual(['whoami', 'search_master_profiles', 'get_master_profile']);
+    expect(tools.map((t) => t.name)).toEqual(WARM_INTRO_TOOL_NAMES);
   });
 });
 
@@ -133,6 +149,109 @@ describe('getMasterProfile', () => {
     const getByUid = jest.fn().mockRejectedValue(new NotFoundException('MasterProfile not found: missing'));
     await expect(
       getMasterProfile({ getByUid } as unknown as MasterProfileService, { uid: 'missing' })
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+const listPathRow = {
+  uid: 'p1',
+  targetProfileUid: 'inv1',
+  targetSet: 'neuro-fund-i',
+  rank: 1,
+  score: 0.82,
+  hopCount: 1,
+  hopChain: { relationKind: 'pl_direct', hops: [] },
+  bestConnectorProfileUid: 'from1',
+  alternateConnectorProfileUids: ['alt1'],
+  scorePercent: 82,
+  scoreBand: 'green',
+  investor: {
+    profileUid: 'inv1',
+    name: 'Vitalik',
+    currentOrg: 'Ethereum',
+    email: 'vitalik@ethereum.org',
+  },
+  bestConnector: { profileUid: 'from1', name: 'Juan Benet', currentOrg: 'PL' },
+  pathSummary: { explanation: 'Direct PL intro', alternateCount: 1 },
+};
+
+describe('searchWarmIntroInvestors', () => {
+  it('returns compact rows only', async () => {
+    const listPaths = jest.fn().mockResolvedValue({ paths: [listPathRow], total: 1 });
+    const result = await searchWarmIntroInvestors({ listPaths } as unknown as WarmIntrosV2Service, {
+      search: 'vitalik',
+      targetSet: 'neuro-fund-i',
+      connectorProfileUid: 'from1',
+      sector: 'crypto',
+      relationKind: 'pl_direct',
+      bridgeProfileUid: 'bridge1',
+      plBacker: true,
+    });
+    expect(listPaths).toHaveBeenCalledWith({
+      targetSet: 'neuro-fund-i',
+      search: 'vitalik',
+      connectorProfileUid: 'from1',
+      sector: 'crypto',
+      relationKind: 'pl_direct',
+      bridgeProfileUid: 'bridge1',
+      plBacker: 'true',
+      limit: '20',
+      offset: '0',
+    });
+    expect(result).toEqual({
+      investors: [
+        {
+          profileUid: 'inv1',
+          name: 'Vitalik',
+          currentOrg: 'Ethereum',
+          score: 0.82,
+          scorePercent: 82,
+          scoreBand: 'green',
+          bestConnector: { profileUid: 'from1', name: 'Juan Benet' },
+          path: { explanation: 'Direct PL intro', hopCount: 1, relationKind: 'pl_direct' },
+          targetSet: 'neuro-fund-i',
+        },
+      ],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+    expect(JSON.stringify(result)).not.toContain('hopChain');
+    expect(JSON.stringify(result)).not.toContain('alternateConnectorProfileUids');
+    expect(compactWarmIntroInvestor({ targetProfileUid: 'inv1', hopChain: {}, pathSummary: {} })).toEqual({
+      profileUid: 'inv1',
+      name: null,
+      currentOrg: null,
+      score: undefined,
+      scorePercent: undefined,
+      scoreBand: null,
+      bestConnector: null,
+      path: { explanation: null, hopCount: undefined, relationKind: 'pl_direct' },
+      targetSet: undefined,
+    });
+  });
+});
+
+describe('getWarmIntroInvestor', () => {
+  it('returns investor summary plus all paths', async () => {
+    const payload = { investor: { profileUid: 'inv1', name: 'Vitalik' }, paths: [listPathRow] };
+    const getPathsByInvestor = jest.fn().mockResolvedValue(payload);
+    await expect(
+      getWarmIntroInvestor({ getPathsByInvestor } as unknown as WarmIntrosV2Service, {
+        profileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+      })
+    ).resolves.toEqual(payload);
+    expect(getPathsByInvestor).toHaveBeenCalledWith('inv1', { targetSet: 'neuro-fund-i' });
+  });
+
+  it('throws not-found when there are no warm paths', async () => {
+    const getPathsByInvestor = jest.fn().mockResolvedValue({
+      investor: { profileUid: 'missing', name: 'missing' },
+      paths: [],
+    });
+    await expect(
+      getWarmIntroInvestor({ getPathsByInvestor } as unknown as WarmIntrosV2Service, { profileUid: 'missing' })
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

@@ -7,6 +7,7 @@ import { NoCache } from '../decorators/no-cache.decorator';
 import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { MasterProfileService } from '../master-profile/master-profile.service';
+import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
 import { McpOAuthService } from './mcp-oauth.service';
 import { toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
 
@@ -17,7 +18,8 @@ export class McpController {
   constructor(
     private readonly oauth: McpOAuthService,
     private readonly accessControl: AccessControlV2Service,
-    private readonly masterProfiles: MasterProfileService
+    private readonly masterProfiles: MasterProfileService,
+    private readonly warmIntros: WarmIntrosV2Service
   ) {}
 
   @NoCache()
@@ -42,7 +44,10 @@ export class McpController {
 
     const access = await this.accessControl.getMemberAccess(actor.memberUid);
     const permissions = new Set(access.effectivePermissions ?? []);
-    const tools = toolsForPermissions(permissions, [WHOAMI_TOOL, ...warmIntroTools(this.masterProfiles)]);
+    const tools = toolsForPermissions(permissions, [
+      WHOAMI_TOOL,
+      ...warmIntroTools(this.masterProfiles, this.warmIntros),
+    ]);
 
     const server = new McpServer({ name: 'LabOS', version: '1.0.0' });
     const ctx = {
