@@ -17,6 +17,7 @@ export const RBAC_PERMISSION_CODES = {
   INVESTOR_DB_EDIT: 'investor_db.edit',
   FOUNDER_DB_VIEW: 'founder_db.view',
   FOUNDER_DB_EDIT: 'founder_db.edit',
+  MCP_CONNECT: 'mcp.connect',
 } as const;
 
 export const RBAC_SCOPES = {

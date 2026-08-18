@@ -67,6 +67,13 @@ export const CODE_AGENT_SESSIONS_PERMISSIONS = {
 /** Fine-grained grants that `code_agent_sessions.admin` expands into. */
 export const CODE_AGENT_SESSIONS_ADMIN_GRANTS = [CODE_AGENT_SESSIONS_PERMISSIONS.VIEW] as const;
 
+// ── MCP ──────────────────────────────────────────────────────────────────
+
+export const MCP_PERMISSIONS = {
+  /** Authorize an AI agent to act as the member via LabOS MCP */
+  CONNECT: 'mcp.connect',
+} as const;
+
 // ── Members ─────────────────────────────────────────────────────────────
 
 export const MEMBER_PERMISSIONS = {
@@ -231,6 +238,9 @@ export const ALL_PERMISSION_CODES = [
   // Agent Sessions
   CODE_AGENT_SESSIONS_PERMISSIONS.VIEW,
   CODE_AGENT_SESSIONS_PERMISSIONS.ADMIN,
+
+  // MCP
+  MCP_PERMISSIONS.CONNECT,
 
   // Demo Day
   DEMODAY_PERMISSIONS.REPORT_LINK_READ,

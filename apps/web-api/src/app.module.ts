@@ -85,6 +85,7 @@ import { AffinityModule } from './affinity/affinity.module';
 import { RoadmapModule } from './roadmap/roadmap.module';
 import { AiAppsModule } from './ai-apps/ai-apps.module';
 import { AgentSessionsModule } from './agent-sessions/agent-sessions.module';
+import { McpModule } from './mcp/mcp.module';
 
 @Module({
   controllers: [AppController, MetricsController],
@@ -190,6 +191,7 @@ import { AgentSessionsModule } from './agent-sessions/agent-sessions.module';
     RoadmapModule,
     AiAppsModule,
     AgentSessionsModule,
+    McpModule,
   ],
   providers: [
     {
@@ -247,7 +249,11 @@ export class AppModule {
         { path: 'v1/admin/teams/tiers/upload', method: RequestMethod.POST },
         { path: 'v1/team-pitches/:slugOrUid/profile/one-pager', method: RequestMethod.PUT },
         { path: 'v1/team-pitches/:slugOrUid/profile/one-pager/preview', method: RequestMethod.POST },
-        { path: 'v1/team-pitches/:slugOrUid/profile/video', method: RequestMethod.PUT }
+        { path: 'v1/team-pitches/:slugOrUid/profile/video', method: RequestMethod.PUT },
+        { path: 'oauth/token', method: RequestMethod.POST },
+        { path: 'oauth/revoke', method: RequestMethod.POST },
+        { path: 'register', method: RequestMethod.POST },
+        { path: 'mcp', method: RequestMethod.ALL }
       )
       .forRoutes(
         { path: '*', method: RequestMethod.POST },
