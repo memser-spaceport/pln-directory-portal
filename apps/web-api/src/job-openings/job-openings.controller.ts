@@ -3,12 +3,15 @@ import { Api, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
 import { ZodError, ZodType } from 'zod';
 import { apiJobOpenings } from 'libs/contracts/src/lib/contract-job-openings';
+import { CreateJobApplicationSchema, JobBoardSignUpSchema } from 'libs/contracts/src/schema/job-application';
 import { JobsListQueryParams } from 'libs/contracts/src/schema/job-opening';
 import { CreateJobReferralSchema, JobReferralDraftQuerySchema } from 'libs/contracts/src/schema/job-referral';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserAuthValidateGuard } from '../guards/user-auth-validate.guard';
+import { JobOpeningsApplicationService } from './job-openings-application.service';
 import { JobOpeningsQueryService } from './job-openings-query.service';
 import { JobOpeningsReferralService } from './job-openings-referral.service';
+import { JobOpeningsSignUpService } from './job-openings-sign-up.service';
 
 const server = initNestServer(apiJobOpenings);
 
@@ -16,7 +19,9 @@ const server = initNestServer(apiJobOpenings);
 export class JobOpeningsController {
   constructor(
     private readonly jobOpeningsQueryService: JobOpeningsQueryService,
-    private readonly jobOpeningsReferralService: JobOpeningsReferralService
+    private readonly jobOpeningsReferralService: JobOpeningsReferralService,
+    private readonly jobOpeningsApplicationService: JobOpeningsApplicationService,
+    private readonly jobOpeningsSignUpService: JobOpeningsSignUpService
   ) {}
 
   @Api(server.route.getJobs)
@@ -31,6 +36,28 @@ export class JobOpeningsController {
   async getJobFilters(@Req() request: Request) {
     const params = JobsListQueryParams.parse(request.query);
     return this.jobOpeningsQueryService.getFilters(params);
+  }
+
+  @Api(server.route.signUp)
+  @NoCache()
+  async signUp(@Req() request: Request) {
+    const input = this.parse(JobBoardSignUpSchema, request.body);
+    return this.jobOpeningsSignUpService.signUp(input);
+  }
+
+  @Api(server.route.getMyApplications)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async getMyApplications(@Req() request: Request & { userEmail?: string }) {
+    return this.jobOpeningsApplicationService.listMine(request.userEmail);
+  }
+
+  @Api(server.route.applyToJob)
+  @UseGuards(UserAuthValidateGuard)
+  @NoCache()
+  async applyToJob(@Req() request: Request & { userEmail?: string }) {
+    const input = this.parse(CreateJobApplicationSchema, request.body);
+    return this.jobOpeningsApplicationService.apply(request.params.uid, request.userEmail, input);
   }
 
   @Api(server.route.getReferralDraft)

@@ -189,6 +189,8 @@ model Member {
   linkedinProfile                    LinkedInProfile?
   accessLevel                        String?
   role                               String?
+  jobSearchStatus                    JobSearchStatus?
+  currentCompany                     String?
   isInvestor                         Boolean?
   scheduleMeetingCount               Int                               @default(0)
   createdAdjustments                 MemberInteractionAdjustment[]     @relation("AdjustmentCreatedBy")
@@ -243,6 +245,7 @@ model Member {
   jobAlerts                 JobAlert[]              @relation("MemberJobAlerts")
   jobReferralsSent          JobReferral[]           @relation("JobReferralReferrer")
   jobReferralsReceived      JobReferral[]           @relation("JobReferralReferred")
+  jobApplications           JobApplication[]
   roadmapItemsCreated       RoadmapItem[]           @relation("roadmapItemCreatedBy")
   roadmapItemsPromoted      RoadmapItem[]           @relation("roadmapItemPromotedBy")
   roadmapItemUpvotes        RoadmapItemUpvote[]     @relation("roadmapItemUpvoter")
@@ -2261,6 +2264,7 @@ model JobOpening {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   referrals       JobReferral[]
+  applications    JobApplication[]
 
   @@index([status])
   @@index([companyName])
@@ -2292,6 +2296,32 @@ model JobReferral {
   @@index([jobOpeningUid])
   @@index([referrerMemberUid])
   @@index([referredMemberUid])
+}
+
+enum JobSearchStatus {
+  ACTIVELY_LOOKING
+  OPEN_TO_RIGHT_ROLE
+  NOT_LOOKING
+
+  @@map("job_search_status")
+}
+
+model JobApplication {
+  id            Int        @id @default(autoincrement())
+  uid           String     @unique @default(cuid())
+  jobOpeningUid String
+  jobOpening    JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
+  memberUid     String
+  member        Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  coverLetter   String
+  profileSnapshot Json
+  toEmail       String
+  ccEmails      String[]   @default([])
+  createdAt     DateTime   @default(now())
+
+  @@unique([jobOpeningUid, memberUid])
+  @@index([memberUid])
+  @@index([jobOpeningUid])
 }
 
 model TeamJobEnrichment {
