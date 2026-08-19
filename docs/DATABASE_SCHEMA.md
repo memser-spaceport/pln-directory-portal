@@ -25,7 +25,7 @@
 - Purpose: Manages member profiles, their skills, roles, and interactions within the network
 - Key fields:
   - Basic info: name, email, image
-  - Social: githubHandler, discordHandler, twitterHandler, linkedinHandler, telegramHandler
+  - Social: githubHandler, discordHandler, twitterHandler, linkedinHandler, blueskyHandler, telegramHandler
   - Status: plnFriend, openToWork, isFeatured, isVerified
   - Preferences and details: bio, moreDetails, preferences
 - Relationships:

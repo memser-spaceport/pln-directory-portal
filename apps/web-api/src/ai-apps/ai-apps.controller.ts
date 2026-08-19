@@ -40,6 +40,7 @@ import { DeployDraftDto } from './dto/deploy-draft.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
+import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { TrackEventDto } from './dto/track-event.dto';
 import { AI_APPS_MAX_PRD_BYTES, AI_APPS_MAX_ZIP_BYTES, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
@@ -128,6 +129,20 @@ export class AiAppsController {
   @RequirePermissions(READ)
   async listEvents(@Query('appUid') appUid?: string, @Query('limit') limit?: string) {
     return this.aiAppsService.listEvents(appUid, limit ? Number(limit) : undefined);
+  }
+
+  /**
+   * All reviewable feedback for the caller, newest first, tagged with `appName`.
+   * Directory admins get every app; everyone else only apps they created.
+   * Declared before `:uid` so the literal path wins over the param route.
+   */
+  @NoCache()
+  @Get('feedback')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listAccessibleFeedback(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listAccessibleFeedback(memberUid);
   }
 
   /**
@@ -388,6 +403,26 @@ export class AiAppsController {
   }
 
   /**
+   * Set the shared review status on one feedback row. Restricted to the app's
+   * creator and directory admins (checked in the service). Any of NEW / VIEWED /
+   * IMPLEMENTED is always allowed.
+   */
+  @NoCache()
+  @Patch(':uid/feedback/:feedbackUid')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async updateFeedbackStatus(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Body() body: UpdateFeedbackStatusDto,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.updateFeedbackStatus(memberUid, uid, feedbackUid, body.status);
+  }
+
+  /**
    * Live CPU/memory snapshot (no history) for one app vs its configured
    * resource limits — capacity-planning visibility for PL Infra, restricted
    * to directory admins (checked in the service).
@@ -403,7 +438,8 @@ export class AiAppsController {
 
   /**
    * Delete an app: tears it down on the sandbox runner, marks it `DELETED`, and
-   * records the delete events. Requires `ai_apps.write`.
+   * records the delete events. Requires `ai_apps.write`; only the app's creator
+   * or a directory admin may delete (the service enforces it).
    */
   @NoCache()
   @Delete(':uid')

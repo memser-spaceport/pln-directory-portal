@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma, NewsEventType } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import type {
@@ -21,6 +21,7 @@ import {
   TEAM_NEWS_ALWAYS_INCLUDE_IN_ALL_TAB_TEAM_UIDS,
   TEAM_NEWS_EXCLUDED_TEAM_NAMES,
 } from './team-news-public-list.config';
+import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
@@ -54,7 +55,10 @@ const TOP_LEVEL_FOCUS_AREAS = [
 
 @Injectable()
 export class TeamNewsQueryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly suggestionsService?: TeamNewsSuggestionsService
+  ) {}
 
   /**
    * The excluded-team rule, in one place.
@@ -361,6 +365,11 @@ export class TeamNewsQueryService {
     followedTeamUids: Set<string> = new Set(),
     viewerMemberUid?: string
   ): Promise<TeamNewsGroupedResponse> {
+    const forYouPromise =
+      viewerMemberUid && this.suggestionsService
+        ? this.suggestionsService.getForYouTeamUids(viewerMemberUid)
+        : Promise.resolve([] as string[]);
+
     const where = this.buildWhere(query);
     const rows = await this.prisma.teamNewsItem.findMany({
       where,
@@ -378,13 +387,14 @@ export class TeamNewsQueryService {
     });
 
     const itemUids = rows.map((r) => r.uid);
-    const [focusAreas, discussions, upvotes] = await Promise.all([
+    const [focusAreas, discussions, upvotes, forYouTeamUids] = await Promise.all([
       this.prisma.focusArea.findMany({
         where: { parentUid: null },
         select: { uid: true, title: true },
       }),
       this.loadDiscussions(itemUids),
       this.loadUpvotes(itemUids, viewerMemberUid),
+      forYouPromise,
     ]);
     const focusByTitle = new Map(focusAreas.map((fa) => [fa.title, fa]));
 
@@ -435,6 +445,7 @@ export class TeamNewsQueryService {
         };
       }),
       allTabExtraItems,
+      forYouTeamUids,
     };
   }
 

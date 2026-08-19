@@ -44,6 +44,7 @@ const newDataMemberSchema = z.object({
   discordHandler: z.string().optional().nullable(),
   twitterHandler: z.string().optional().nullable(),
   linkedinHandler: z.string().optional().nullable(),
+  blueskyHandler: z.string().optional().nullable(),
   telegramHandler: z.string().optional().nullable(),
   officeHours: z.string().optional().nullable(),
   ohInterest: z.array(z.string()).optional().default([]),

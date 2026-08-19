@@ -101,6 +101,7 @@ export const AddMember = ({ className, authToken, onClick, showRbacSection = fal
           linkedinHandler: formData.linkedin,
           discordHandler: formData.discord,
           twitterHandler: formData.twitter,
+          blueskyHandler: formData.bluesky,
           telegramHandler: formData.telegram,
           officeHours: formData.officeHours,
           githubHandler: formData.github,

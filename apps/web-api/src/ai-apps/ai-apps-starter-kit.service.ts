@@ -100,7 +100,7 @@ export class AiAppsStarterKitService {
   }
 
   private readme(): string {
-    return `# PLN AI Apps — Starter Kit v${AI_APPS_STARTER_KIT_VERSION}
+    return `# PL AI Apps — Starter Kit v${AI_APPS_STARTER_KIT_VERSION}
 
 Welcome! This kit lets you vibe-code an app with your AI assistant and deploy it
 to the Protocol Labs Network sandbox with a single instruction.
@@ -113,13 +113,13 @@ to the Protocol Labs Network sandbox with a single instruction.
 - \`.claude/skills/app-logs/\` — how your agent reads your app's build and
   runtime logs to diagnose failed deploys and runtime errors.
 - \`.claude/skills/pl-design-system/\` — how to build on-brand UI with the PL Design System.
-- \`.claude/skills/pln-member-context/\` — how your app can know which PLN member is using it.
+- \`.claude/skills/pln-member-context/\` — how your app can know which PL member is using it.
 - \`.claude/skills/app-analytics/\` — baseline usage tracking (automatic on
   every app) plus optional custom events (button clicks, feature usage) to
   help the PL team understand how AI Apps get used.
 - \`.claude/skills/db-migration/\` — for apps that already have their own database, how your
   agent migrates it — structure and, by default, your existing data — onto a
-  PLN-provisioned Postgres database.
+  PL-provisioned Postgres database.
 - \`pln-app.config.json\` — the LabOS connect + deploy endpoints (no secrets).
 - \`pl-design-system/\` — the **PL Design System**: ready-made React components
   (Button, EntityCard, PageShell, Table, Tabs, Tag, Badge, SearchInput, …),
@@ -134,7 +134,7 @@ to the Protocol Labs Network sandbox with a single instruction.
 1. Unzip this folder and open it in Claude Code (or your AI tool of choice).
 2. Add your app to the \`app/\` folder:
    - **New app:** tell your agent what to build (e.g. "build a leaderboard page
-     using the PLN styles"). It works in \`app/\`.
+     using the PL styles"). It works in \`app/\`.
    - **Existing app:** copy your project's files into \`app/\`, then say "migrate this
      existing app and deploy it to LabOS". Your agent takes care of whatever setup is
      needed to run it there.
@@ -142,7 +142,7 @@ to the Protocol Labs Network sandbox with a single instruction.
    suggests a name and short description for your app — approve them or ask for
    changes. The first time you deploy, your agent will also give you a LabOS
    link to open and approve — sign in and click **Approve** to authorize the
-   deploy. Your agent then ships the app to the PLN sandbox; the first deploy
+   deploy. Your agent then ships the app to the PL sandbox; the first deploy
    can take a minute or two.
 4. Your app appears on the PL Infra → AI Apps dashboard, where you can open it.
    After the first deploy your agent offers an optional **one-pager PRD** — a
@@ -178,7 +178,7 @@ leaderboard, a guestbook, anything with data that should still be there next
 time someone opens the app. If yours does, you don't need any technical
 know-how — your agent will ask which of these you want when it's time to deploy:
 
-1. **Let PLN set one up for you (recommended if you don't already have one).**
+1. **Let PL set one up for you (recommended if you don't already have one).**
    No accounts, no setup, nothing to configure — just tell your agent you'd
    like one. Your app gets a working database automatically the moment it
    deploys; you never touch a password or connection string.
@@ -187,11 +187,11 @@ know-how — your agent will ask which of these you want when it's time to deplo
    above; you'll enter it on that same secure LabOS page.
 
 Either way, you never create the database or generate credentials yourself —
-your agent and PLN handle that part.
+your agent and PL handle that part.
 
 **Already have your own database and want to switch?** If you deployed before
-this feature existed (or brought your own on purpose) and would rather PLN
-manage it, just tell your agent — e.g. *"can we move my database to PLN's
+this feature existed (or brought your own on purpose) and would rather PL
+manage it, just tell your agent — e.g. *"can we move my database to PL's
 managed one?"*. Your agent looks at how your app is built and carries over
 both your existing tables/structure **and your existing data** automatically —
 one migration, not two separate asks. If you'd rather start the new database
@@ -201,7 +201,7 @@ database platforms offer extras — like their own login system — that don't
 transfer).
 
 ## Personalized apps (who's using it)
-Your app can know which PLN member opened it. When a signed-in member with AI
+Your app can know which PL member opened it. When a signed-in member with AI
 Apps access uses your app, it can fetch their public directory profile — name,
 photo, teams, role, skills — to greet them, tag their feedback, or tailor what
 it shows. Just ask your agent, e.g. *"greet me by name and show my team when I
@@ -703,7 +703,7 @@ updated app record; the dashboard reflects it immediately.
   private logsSkill(): string {
     return `---
 name: app-logs
-description: Fetch the deployed app's build logs (Docker/Kaniko image build output) and runtime logs (the running app's stdout/stderr) from the PLN sandbox. Use whenever a deploy fails or returns status ERROR, the deployed app crashes / misbehaves / shows a 5xx, or the member asks what their app is doing ("get the logs", "why is it broken?"). Requires a deploy token from the connect flow.
+description: Fetch the deployed app's build logs (Docker/Kaniko image build output) and runtime logs (the running app's stdout/stderr) from the PLN (or PL) sandbox. Use whenever a deploy fails or returns status ERROR, the deployed app crashes / misbehaves / shows a 5xx, or the member asks what their app is doing ("get the logs", "why is it broken?"). Requires a deploy token from the connect flow.
 ---
 
 # App logs — build & runtime
@@ -809,7 +809,7 @@ may have no logs left.
   private designSystemSkill(): string {
     return `---
 name: pl-design-system
-description: Use whenever building or editing UI for a PLN AI App. Covers the bundled PL Design System — instantiate React components from pl-design-system/components, use semantic Tailwind tokens only, page recipes, and the LabOS consume steps in USAGE.md. Load before writing any JSX/TSX/CSS for the app.
+description: Use whenever building or editing UI for a PLN (or PL) AI App. Covers the bundled PL Design System — instantiate React components from pl-design-system/components, use semantic Tailwind tokens only, page recipes, and the LabOS consume steps in USAGE.md. Load before writing any JSX/TSX/CSS for the app.
 ---
 
 # PL Design System
@@ -889,7 +889,7 @@ a new primitive, stop and tell the member: \`Missing canonical component: [name]
   private memberContextSkill(): string {
     return `---
 name: pln-member-context
-description: Get the signed-in PLN member's identity (name, teams, role, skills) inside a deployed AI App, for personalization and feedback. Use whenever the app should greet the user, tag content with who created it, or adapt to the member using it. Load before writing any code that needs to know who is using the app.
+description: Get the signed-in PLN (or PL) member's identity (name, teams, role, skills) inside a deployed AI App, for personalization and feedback. Use whenever the app should greet the user, tag content with who created it, or adapt to the member using it. Load before writing any code that needs to know who is using the app.
 ---
 
 # PLN Member Context — who is using the app
@@ -1202,7 +1202,10 @@ connection string into the LabOS secrets page, same as an API key.
    so PLN knows which kit built the app), and (if present) saved \`appId\`,
    \`appUid\`, \`appName\`, and \`appDescription\`. If no \`appId\` exists yet, pick a
    short, stable, lowercase slug (e.g. \`hello-board\`) and save it back to the
-   config. Never edit \`kitVersion\` by hand.
+   config. \`appId\`s are **global across ALL PLN members** — the app's URL and
+   infrastructure are derived from it — so pick something distinctive; a generic
+   slug another member already claimed is rejected with \`409 Conflict\` at deploy
+   time (see step 7). Never edit \`kitVersion\` by hand.
 2. **Settle the display name & description.** If \`appName\` in the config is
    empty (first deploy), load the **app-metadata** skill
    (\`.claude/skills/app-metadata/SKILL.md\`): propose a human-friendly name and
@@ -1308,6 +1311,16 @@ connection string into the LabOS secrets page, same as an API key.
    caches at runtime) and redeploy. Only ask PL Infra for a higher limit if
    the app has a genuine, explainable need that can't be designed around.
 
+   **If the upload itself returns \`409 Conflict\`**, read the error message:
+   - *"already in use by another member's app"* — the \`appId\` is taken globally
+     by someone else. Pick a different, more distinctive slug (e.g. prefix it:
+     \`<team>-<app>\`), update \`appId\` in \`pln-app.config.json\`, and deploy again.
+     Don't retry the same \`appId\` — it won't free up unless that member deletes
+     their app.
+   - *"deploy is already in progress"* — a previous deploy for this app is still
+     running (possibly one the member triggered from LabOS). Wait a minute and
+     retry with the SAME \`appId\`.
+
    **After the FIRST successful deploy**, offer the optional one-pager PRD —
    see "Offer the one-pager PRD" in the app-metadata skill. If the member wants
    one, generate it, get approval, and save it via \`metadataEndpoint\` — no
@@ -1355,7 +1368,8 @@ An app can need secrets AND a provisioned database — add \`database\` (see
 "Apps that want a provisioned database" below) to this same draft call.
 
 Save the response's \`uid\` as \`appUid\` in \`pln-app.config.json\`, same as a
-regular deploy.
+regular deploy. A \`409 Conflict\` here means the same things as in step 7
+(appId taken by another member → pick a new one; deploy in progress → wait).
 
 **IMMEDIATELY give the member the \`appPageUrl\` link — this is the very next
 thing you do after the registration call returns, before anything else.** A
@@ -1513,7 +1527,7 @@ errors or misbehaves. Log lines may include the app's URL/host — the
   private dbMigrationSkill(): string {
     return `---
 name: db-migration
-description: Migrate an app's existing database (its own Postgres, Supabase, MySQL, SQLite, Mongo, …) onto a PLN-provisioned Postgres database — schema and, by default, its existing data too, as one migration (skip the data half only if the member asks to start empty). Use whenever the member asks to migrate/move/switch their database to PLN's managed one, or whenever you notice during a deploy that the app talks to a non-PLN database and the member wants to stop maintaining it themselves. Ends by handing off to the normal deploy flow's "Apps that want a provisioned database" step — this skill never provisions anything or talks to the deploy endpoints itself.
+description: Migrate an app's existing database (its own Postgres, Supabase, MySQL, SQLite, Mongo, …) onto a PLN (or PL)-provisioned Postgres database — schema and, by default, its existing data too, as one migration (skip the data half only if the member asks to start empty). Use whenever the member asks to migrate/move/switch their database to PLN's (or PL's) managed one, or whenever you notice during a deploy that the app talks to a non-PLN/PL database and the member wants to stop maintaining it themselves. Ends by handing off to the normal deploy flow's "Apps that want a provisioned database" step — this skill never provisions anything or talks to the deploy endpoints itself.
 ---
 
 # Migrate an app's database to PLN Postgres

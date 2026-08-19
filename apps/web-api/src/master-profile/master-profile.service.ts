@@ -9,6 +9,10 @@ import {
   MasterProfileInput,
 } from './dto/ingest-master-profile.dto';
 
+function likeContains(value: string): string {
+  return `%${value.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+}
+
 /**
  * MasterProfile write + read. Ingest upserts by personKey; no enrichment logic.
  *
@@ -118,17 +122,25 @@ export class MasterProfileService {
       return { profile };
     }
 
+    const name = query.name?.trim() || null;
+    const email = query.email?.trim() || null;
+    const currentOrg = query.currentOrg?.trim() || null;
     const limit = Math.min(Math.max(parseInt(query.limit ?? '20', 10) || 20, 1), 500);
     const offset = Math.max(parseInt(query.offset ?? '0', 10) || 0, 0);
-    const where: Prisma.MasterProfileWhereInput = {};
-    if (type) where.types = { has: type };
 
-    const profiles = await this.prisma.masterProfile.findMany({
-      where,
-      take: limit,
-      skip: offset,
-      orderBy: [{ personKey: 'asc' }],
-    });
+    const conditions: Prisma.Sql[] = [];
+    if (type) conditions.push(Prisma.sql`${type} = ANY("types")`);
+    if (name) conditions.push(Prisma.sql`"canonicalName" ILIKE ${likeContains(name)}`);
+    if (currentOrg) conditions.push(Prisma.sql`"currentOrg" ILIKE ${likeContains(currentOrg)}`);
+    if (email) conditions.push(Prisma.sql`CAST("emails" AS TEXT) ILIKE ${likeContains(email)}`);
+
+    const whereSql = conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}` : Prisma.empty;
+    const profiles = await this.prisma.$queryRaw<unknown[]>`
+      SELECT * FROM "MasterProfile"
+      ${whereSql}
+      ORDER BY "personKey" ASC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
     return { profiles, limit, offset };
   }
 

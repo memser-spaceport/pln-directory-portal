@@ -10,7 +10,15 @@ import {
 } from '@nestjs/common';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
-import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback, Prisma, PushNotificationCategory } from '@prisma/client';
+import {
+  AiApp,
+  AiAppEvent,
+  AiAppEventType,
+  AiAppFeedback,
+  AiAppFeedbackStatus,
+  Prisma,
+  PushNotificationCategory,
+} from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { isDirectoryAdmin } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
@@ -1055,12 +1063,87 @@ export class AiAppsService {
     return this.withMember(feedback);
   }
 
+  /**
+   * All feedback the requester can review, newest first, tagged with `appName`.
+   * Directory admins see every non-deleted app; everyone else only apps they
+   * created. Skips deleted apps so the list matches the dashboard catalog.
+   */
+  async listAccessibleFeedback(
+    requesterUid: string
+  ): Promise<Array<WithMember<AiAppFeedback> & { appName: string }>> {
+    const isAdmin = await this.isRequesterDirectoryAdmin(requesterUid);
+    const apps = await this.prisma.aiApp.findMany({
+      where: isAdmin ? { status: { not: 'DELETED' } } : { memberUid: requesterUid, status: { not: 'DELETED' } },
+      select: { uid: true, name: true },
+    });
+    if (apps.length === 0) {
+      return [];
+    }
+    const appNameByUid = new Map(apps.map((app) => [app.uid, app.name]));
+    const feedback = await this.prisma.aiAppFeedback.findMany({
+      where: { appUid: { in: apps.map((app) => app.uid) } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const withMembers = await this.withMember(feedback);
+    return withMembers.map((row) => ({ ...row, appName: appNameByUid.get(row.appUid) ?? '' }));
+  }
+
+  /**
+   * Sets the shared review status on one feedback row. Any of NEW / VIEWED /
+   * IMPLEMENTED is always allowed (skips and backwards moves included). Restricted
+   * to the app's creator and directory admins; no notification is sent.
+   */
+  async updateFeedbackStatus(
+    requesterUid: string,
+    appUid: string,
+    feedbackUid: string,
+    status: AiAppFeedbackStatus
+  ): Promise<WithMember<AiAppFeedback>> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app) {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can update feedback status');
+    }
+    const feedback = await this.prisma.aiAppFeedback.findUnique({ where: { uid: feedbackUid } });
+    if (!feedback || feedback.appUid !== app.uid) {
+      throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
+    }
+    const updated = await this.prisma.aiAppFeedback.update({
+      where: { uid: feedbackUid },
+      data: { status },
+    });
+    return (await this.withMember([updated]))[0];
+  }
+
   /** True when the requester created the app or is a directory admin. */
   private async isCreatorOrDirectoryAdmin(requesterUid: string, app: Pick<AiApp, 'memberUid'>): Promise<boolean> {
     if (app.memberUid === requesterUid) {
       return true;
     }
     return this.isRequesterDirectoryAdmin(requesterUid);
+  }
+
+  /**
+   * The sandbox runner namespaces everything by appId ALONE (helm release
+   * `<environment>-<appId>`, host `<appId>.<domain>`, secret store, provisioned
+   * database), while our rows are unique per (memberUid, appId) — so two members
+   * holding the same appId would share ONE physical deployment: each deploy
+   * overwrites the other's live app, and a delete tears the other's down. Block
+   * claiming an appId that is live under another member. A DELETED row releases
+   * the claim (its runner deployment is already torn down).
+   */
+  private async assertAppIdNotClaimedByAnotherMember(memberUid: string, appId: string): Promise<void> {
+    const claimedByOther = await this.prisma.aiApp.findFirst({
+      where: { appId, memberUid: { not: memberUid }, status: { not: 'DELETED' } },
+      select: { uid: true },
+    });
+    if (claimedByOther) {
+      throw new ConflictException(
+        `The appId "${appId}" is already in use by another member's app — pick a different appId`
+      );
+    }
   }
 
   /** Requester-only admin check — computed once and reused per row on list responses. */
@@ -1089,6 +1172,8 @@ export class AiAppsService {
     if (!AI_APPS_S3_BUCKET) {
       throw new InternalServerErrorException('AI_APPS_S3_BUCKET is not configured');
     }
+
+    await this.assertAppIdNotClaimedByAnotherMember(memberUid, dto.appId);
 
     // Block a second concurrent deploy: if a deploy is already in flight for this
     // app (from another agent run or a member-triggered deploy), reject before we
@@ -1185,6 +1270,8 @@ export class AiAppsService {
       throw new InternalServerErrorException('AI_APPS_S3_BUCKET is not configured');
     }
 
+    await this.assertAppIdNotClaimedByAnotherMember(memberUid, dto.appId);
+
     // Don't clobber an in-flight deploy's bundle/status by re-registering the app
     // as a DRAFT while it's mid-deploy.
     const existing = await this.prisma.aiApp.findUnique({
@@ -1271,6 +1358,11 @@ export class AiAppsService {
     if (app.status === 'DELETED' || app.status === 'DELETING') {
       throw new BadRequestException('This app has been deleted');
     }
+    // Legacy duplicate rows (created before the claim guard existed) share one
+    // runner deployment — don't let a redeploy clobber the other member's live
+    // app. The claim belongs to the app's owner, not the requester (an admin
+    // may trigger the deploy on the creator's behalf).
+    await this.assertAppIdNotClaimedByAnotherMember(app.memberUid, app.appId);
     this.assertNoDeployInProgress(app);
     if (!app.s3Key || !app.deploymentId) {
       throw new BadRequestException('This app has no uploaded bundle yet — ask your AI agent to register it first');
@@ -1720,6 +1812,9 @@ export class AiAppsService {
     const app = await this.prisma.aiApp.findUnique({ where: { uid } });
     if (!app) {
       throw new NotFoundException(`AI App not found: ${uid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(memberUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can delete this app');
     }
 
     const eventContext = { appUid: app.uid, appId: app.appId, deploymentId: app.deploymentId ?? undefined };

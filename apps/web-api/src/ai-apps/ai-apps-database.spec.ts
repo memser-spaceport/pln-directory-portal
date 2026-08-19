@@ -43,6 +43,8 @@ function buildService(initial: Record<string, any> | null = null) {
   const prisma = {
     aiApp: {
       findUnique: jest.fn().mockImplementation(() => Promise.resolve(row ? { ...row } : null)),
+      // Cross-member appId claim check — no other member holds the appId by default.
+      findFirst: jest.fn().mockResolvedValue(null),
       upsert: jest.fn().mockImplementation(({ create, update }) => {
         row = row ? { ...row, ...update } : { uid: 'app-1', memberUid: 'creator-1', ...create };
         return Promise.resolve({ ...row });

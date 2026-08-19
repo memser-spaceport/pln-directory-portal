@@ -133,6 +133,7 @@ model Member {
   discordHandler                     String?
   twitterHandler                     String?
   linkedinHandler                    String?
+  blueskyHandler                     String?
   telegramHandler                    String?                           @unique
   telegramUid                        String?                           @unique
   officeHours                        String?
@@ -256,7 +257,8 @@ model Member {
   affinityPerson               AffinityPerson?
   affinityRelationshipOwnerFor AffinityPerson[] @relation("AffinityRelationshipOwner")
 
-  memberEnrichment MemberEnrichment?
+  memberEnrichment  MemberEnrichment?
+  mcpAuthorizations McpAuthorization[]
 }
 
 model MemberApproval {
@@ -2961,6 +2963,31 @@ model WarmPathV2Feedback {
   @@index([updatedAt])
 }
 
+/// Warm Intros v2 — per-user free-text note on a path (outreach status, next step, etc.).
+/// Separate from WarmPathV2Feedback.note, which is path-correction feedback.
+/// One row per (warmPathUid, connectorProfileUid, actorUid).
+model WarmPathV2Note {
+  uid String @id @default(cuid())
+
+  warmPathUid         String
+  targetProfileUid    String
+  targetSet           String @db.VarChar(120)
+  connectorProfileUid String
+
+  note String @db.VarChar(600)
+
+  actorUid   String? @db.VarChar(64)
+  actorEmail String? @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([warmPathUid, connectorProfileUid, actorUid])
+  @@index([targetProfileUid])
+  @@index([warmPathUid])
+  @@index([updatedAt])
+}
+
 /// Investor Lists — a curated target set of investors (a "list"). Proximity is computed per list
 /// (PathfinderPath.targetSet == an InvestorList.targetSet). The 5,000+ InvestorOutreachRecord DB is the
 /// universe; lists are curated subsets. v1: "Neuro Fund I LP Pipeline" (graphed) + "Gold PLC Co-Investors".
@@ -3356,7 +3383,7 @@ model AiApp {
   /// call omits it). Shape: `{ enabled, type, host?, port?, name?, user?,
   /// credentialsInjected? }` — mirrors the API response's `database` block
   /// exactly. The password is never stored, only injected into the app's
-  /// runtime pod. A bring-your-own database is just a regular runtime secret
+  /// runtime pod. A bring-your-own database is just a regular runtime secret 
   /// and isn't tracked here.
   database        Json?
   createdAt       DateTime    @default(now())
@@ -3367,18 +3394,26 @@ model AiApp {
   @@index([status])
 }
 
+enum AiAppFeedbackStatus {
+  NEW
+  VIEWED
+  IMPLEMENTED
+}
+
 /// Free-text feedback left by a PL Infra member on an app's detail page. A
 /// member may submit multiple entries per app. Readable only by the app's
-/// creator and directory admins (enforced in the service).
+/// creator and directory admins (enforced in the service). Status is shared
+/// across all viewers; only the creator or a directory admin may change it.
 model AiAppFeedback {
-  id        Int      @id @default(autoincrement())
-  uid       String   @unique @default(cuid())
+  id        Int                 @id @default(autoincrement())
+  uid       String              @unique @default(cuid())
   /// The app the feedback is about (AiApp.uid; no FK relation, matching the other POC tables).
   appUid    String
   /// The member who submitted the feedback.
   memberUid String
   text      String
-  createdAt DateTime @default(now())
+  status    AiAppFeedbackStatus @default(NEW)
+  createdAt DateTime            @default(now())
 
   @@index([appUid])
   @@index([memberUid])
@@ -3789,4 +3824,49 @@ model Follow {
   @@unique([memberUid, entityType, entityUid])
   @@index([entityType, entityUid])
   @@index([memberUid, entityType])
+}
+
+/// MCP OAuth dynamic client registration (RFC 7591). Public clients only.
+model McpOAuthClient {
+  clientId     String   @id
+  clientName   String
+  redirectUris String[]
+  createdAt    DateTime @default(now())
+}
+
+/// Per-member MCP grant shown on Settings → Connected Accounts.
+model McpAuthorization {
+  uid              String        @id @default(cuid())
+  memberUid        String
+  clientId         String
+  clientName       String
+  connectedAt      DateTime      @default(now())
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+  accessTokenHash  String?       @unique
+  refreshTokenHash String?       @unique
+  accessExpiresAt  DateTime?
+  member           Member        @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  authCodes        McpAuthCode[]
+
+  @@unique([memberUid, clientId])
+  @@index([memberUid, revokedAt])
+}
+
+/// Short-lived authorization codes (PKCE S256).
+model McpAuthCode {
+  uid              String           @id @default(cuid())
+  codeHash         String           @unique
+  codeChallenge    String
+  clientId         String
+  redirectUri      String
+  resource         String?
+  memberUid        String
+  authorizationUid String
+  expiresAt        DateTime
+  consumedAt       DateTime?
+  createdAt        DateTime         @default(now())
+  authorization    McpAuthorization @relation(fields: [authorizationUid], references: [uid], onDelete: Cascade)
+
+  @@index([expiresAt])
 }

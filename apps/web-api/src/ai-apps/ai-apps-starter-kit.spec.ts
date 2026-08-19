@@ -250,7 +250,7 @@ describe('AiAppsStarterKitService buildZip', () => {
   it('tells the human, in the README, that a database can be provisioned or brought their own', () => {
     const readme = entries.get('README.md') as string;
     expect(readme).toContain('## Apps that need a database');
-    expect(readme).toContain('Let PLN set one up for you');
+    expect(readme).toContain('Let PL set one up for you');
     expect(readme).toContain('Connect a database you already have');
     // Routed through the same secure page as any other secret, not a new one.
     expect(readme).toContain('Apps that need an API key or password');
@@ -331,7 +331,7 @@ describe('AiAppsStarterKitService buildZip', () => {
     }
     const readme = entries.get('README.md') as string;
     expect(readme).toContain('db-migration');
-    expect(readme).toContain('move my database to PLN');
+    expect(readme).toContain('move my database to PL');
   });
 
   it('copies existing data by default alongside the schema, as one migration', () => {

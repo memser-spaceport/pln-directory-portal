@@ -241,6 +241,7 @@ export const IGNORED_URLS_FOR_CONCEALID = [
   '/v1/husky/chat/analytical',
   '/v1/husky/chat/additional-info',
   '/husky/threads',
+  '/mcp',
 ];
 
 export const HUSKY_SOURCES = {
@@ -352,6 +353,9 @@ export const ANALYTICS_EVENTS = {
     // Landing page events
     LANDING_TEAM_CARD_CLICKED: 'demo-day-landing-team-card-clicked',
     LANDING_TEAM_WEBSITE_CLICKED: 'demo-day-landing-team-website-clicked',
+  },
+  MCP: {
+    TOOL_INVOKED: 'mcp-tool-invoked',
   },
 };
 

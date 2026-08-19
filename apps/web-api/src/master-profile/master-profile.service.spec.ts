@@ -1,7 +1,19 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { MasterProfileService } from './master-profile.service';
 import { PrismaService } from '../shared/prisma.service';
+
+function rawSqlValues(call: unknown[]): unknown[] {
+  const out: unknown[] = [];
+  for (const arg of call) {
+    if (arg && typeof arg === 'object' && Array.isArray((arg as Prisma.Sql).values)) {
+      out.push(...rawSqlValues((arg as Prisma.Sql).values));
+    } else if (typeof arg !== 'object' || arg === null) {
+      out.push(arg);
+    }
+  }
+  return out;
+}
 
 describe('MasterProfileService', () => {
   let service: MasterProfileService;
@@ -10,6 +22,7 @@ describe('MasterProfileService', () => {
   const update = jest.fn();
   const findFirst = jest.fn();
   const findMany = jest.fn();
+  const queryRaw = jest.fn();
   const transaction = jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn({
       masterProfile: { findUnique, create, update },
@@ -18,6 +31,7 @@ describe('MasterProfileService', () => {
 
   const prismaMock = {
     $transaction: transaction,
+    $queryRaw: queryRaw,
     masterProfile: { findUnique, findFirst, findMany, create, update },
   } as unknown as PrismaService;
 
@@ -99,21 +113,47 @@ describe('MasterProfileService', () => {
       await expect(service.lookup({ personKey: 'k1' })).resolves.toEqual({
         profile: { uid: 'u1', personKey: 'k1', types: ['investor'] },
       });
+      expect(queryRaw).not.toHaveBeenCalled();
     });
 
     it('lists by type with limit and offset', async () => {
-      findMany.mockResolvedValue([{ uid: 'u1' }]);
+      queryRaw.mockResolvedValue([{ uid: 'u1' }]);
       await expect(service.lookup({ type: 'pl_internal', limit: '5', offset: '10' })).resolves.toEqual({
         profiles: [{ uid: 'u1' }],
         limit: 5,
         offset: 10,
       });
-      expect(findMany).toHaveBeenCalledWith({
-        where: { types: { has: 'pl_internal' } },
-        take: 5,
-        skip: 10,
-        orderBy: [{ personKey: 'asc' }],
+      expect(findMany).not.toHaveBeenCalled();
+      expect(rawSqlValues(queryRaw.mock.calls[0])).toEqual(expect.arrayContaining(['pl_internal', 5, 10]));
+    });
+
+    it('ANDs name, email, org, and type on the list branch', async () => {
+      queryRaw.mockResolvedValue([]);
+      await expect(
+        service.lookup({ name: 'Jane', email: 'jane@a16z.com', currentOrg: 'a16z', type: 'investor' })
+      ).resolves.toEqual({ profiles: [], limit: 20, offset: 0 });
+      expect(findUnique).not.toHaveBeenCalled();
+      expect(rawSqlValues(queryRaw.mock.calls[0])).toEqual(
+        expect.arrayContaining(['%Jane%', '%jane@a16z.com%', '%a16z%', 'investor', 20, 0])
+      );
+    });
+
+    it('does not 404 when the list is empty', async () => {
+      queryRaw.mockResolvedValue([]);
+      await expect(service.lookup({ name: 'nobody' })).resolves.toEqual({
+        profiles: [],
+        limit: 20,
+        offset: 0,
       });
+    });
+  });
+
+  describe('getByUid', () => {
+    it('throws a clear not-found error', async () => {
+      findUnique.mockResolvedValue(null);
+      await expect(service.getByUid('missing')).rejects.toEqual(
+        new NotFoundException('MasterProfile not found: missing')
+      );
     });
   });
 

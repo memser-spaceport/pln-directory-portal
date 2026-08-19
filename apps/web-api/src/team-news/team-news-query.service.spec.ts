@@ -481,6 +481,26 @@ describe('TeamNewsQueryService.listGroupedByFocusArea', () => {
         items: [expect.objectContaining({ uid: 'editorial-focused', editorialRank: 1 })],
       }),
     ]);
+    expect(result.forYouTeamUids).toEqual([]);
+  });
+
+  it('attaches forYouTeamUids from suggestions when the viewer is known', async () => {
+    teamNewsItemFindMany.mockResolvedValue([]);
+    const getForYouTeamUids = jest.fn().mockResolvedValue(['seed-team', 'cand-1']);
+    service = new TeamNewsQueryService(
+      {
+        teamNewsItem: { findMany: teamNewsItemFindMany },
+        focusArea: { findMany: focusAreaFindMany },
+        teamNewsForumLink: { findMany: teamNewsForumLinkFindMany },
+        teamNewsUpvote: { groupBy: teamNewsUpvoteGroupBy, findMany: teamNewsUpvoteFindMany },
+      } as unknown as PrismaService,
+      { getForYouTeamUids } as never
+    );
+
+    const result = await service.listGroupedByFocusArea(query, new Set(), 'member-1');
+
+    expect(getForYouTeamUids).toHaveBeenCalledWith('member-1');
+    expect(result.forYouTeamUids).toEqual(['seed-team', 'cand-1']);
   });
 });
 
