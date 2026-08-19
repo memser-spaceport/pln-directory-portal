@@ -42,6 +42,25 @@ export const TeamSchema = z.object({
    * 1 = highest importance, 5 = lowest importance, 99 = NA (Not Assigned).
    */
   priority: z.number().int().nullish(),
+
+  /**
+   * Bluesky handle. Accepts `@handle`, a bare handle, or a bsky.app profile URL;
+   * stored/returned as the bare handle.
+   */
+  blueskyHandler: z.string().nullish(),
+  /**
+   * Crunchbase organization reference. Accepts an org slug, an `organization/slug`
+   * path, or a full crunchbase.com URL; stored/returned as the bare slug.
+   */
+  crunchbaseHandler: z.string().nullish(),
+  /** Founding year, as a 4-digit integer (e.g. 2014). */
+  dateFounded: z.number().int().gte(1000).lte(9999).nullish(),
+  /** Employee count (as a number) or a range label (e.g. "11-50"). Stored as text. */
+  teamSize: z.union([z.number(), z.string()]).nullish(),
+  /** Free-text place label, e.g. "San Francisco, United States". */
+  location: z.string().nullish(),
+  /** Defaults to ACTIVE for teams without a value. */
+  status: z.enum(['ACTIVE', 'INACTIVE']).nullish(),
 });
 
 export const CreateTeamSchema = TeamSchema.pick({
@@ -55,6 +74,12 @@ export const CreateTeamSchema = TeamSchema.pick({
   longDescription: true,
   plnFriend: true,
   fundingStageUid: true,
+  blueskyHandler: true,
+  crunchbaseHandler: true,
+  dateFounded: true,
+  teamSize: true,
+  location: true,
+  status: true,
 });
 
 export const ResponseTeamSchema = TeamSchema.omit({ id: true }).strict();
