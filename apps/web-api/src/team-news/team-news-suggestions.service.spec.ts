@@ -231,4 +231,75 @@ describe('TeamNewsSuggestionsService', () => {
 
     expect(first.items.map((i) => i.uid)).toEqual(second.items.map((i) => i.uid));
   });
+
+  describe('getForYouTeamUids', () => {
+    const seedTeam = {
+      uid: 'seed-team',
+      teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+      communityAffiliations: [],
+      industryTags: [],
+    };
+
+    const makeCandidate = (uid: string, name: string) => ({
+      uid,
+      name,
+      shortDescription: null,
+      logo: null,
+      teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+      communityAffiliations: [],
+      industryTags: [],
+    });
+
+    it('returns an empty list when the member has no team and no follows', async () => {
+      await expect(service.getForYouTeamUids('member-1')).resolves.toEqual([]);
+      expect(teamFindMany).not.toHaveBeenCalled();
+    });
+
+    it('includes memberships even when those teams are not followed', async () => {
+      teamMemberRoleFindMany.mockResolvedValue([{ teamUid: 'seed-team' }]);
+      getFollowedTeamUids.mockResolvedValue(new Set());
+      teamFindMany.mockResolvedValueOnce([seedTeam]).mockResolvedValueOnce([]);
+
+      await expect(service.getForYouTeamUids('member-1')).resolves.toEqual(['seed-team']);
+    });
+
+    it('unions memberships, follows, and matching candidates without a display cap', async () => {
+      teamMemberRoleFindMany.mockResolvedValue([{ teamUid: 'seed-team' }]);
+      getFollowedTeamUids.mockResolvedValue(new Set(['followed-team']));
+
+      const candidates = Array.from({ length: 25 }, (_, i) => makeCandidate(`cand-${i}`, `Cand ${i}`));
+      teamFindMany
+        .mockResolvedValueOnce([
+          seedTeam,
+          {
+            uid: 'followed-team',
+            teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+            communityAffiliations: [],
+            industryTags: [],
+          },
+        ])
+        .mockResolvedValueOnce(candidates);
+
+      const uids = await service.getForYouTeamUids('member-1');
+
+      expect(uids).toEqual(expect.arrayContaining(['seed-team', 'followed-team', 'cand-0', 'cand-24']));
+      expect(uids).toHaveLength(27);
+    });
+
+    it('still returns seed teams when they have no matching attributes', async () => {
+      teamMemberRoleFindMany.mockResolvedValue([{ teamUid: 'bare-team' }]);
+      getFollowedTeamUids.mockResolvedValue(new Set());
+      teamFindMany.mockResolvedValueOnce([
+        {
+          uid: 'bare-team',
+          teamFocusAreas: [],
+          communityAffiliations: [],
+          industryTags: [],
+        },
+      ]);
+
+      await expect(service.getForYouTeamUids('member-1')).resolves.toEqual(['bare-team']);
+      expect(teamFindMany).toHaveBeenCalledTimes(1);
+    });
+  });
 });
