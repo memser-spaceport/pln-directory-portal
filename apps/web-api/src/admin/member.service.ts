@@ -29,6 +29,11 @@ import { MembersHooksService } from '../members/members.hooks.service';
 import { ParticipantsRequest } from './members.dto';
 import { FORUM_PERMISSIONS, MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { TeamsService } from '../teams/teams.service';
+import {
+  assignJobSearchStatusFromInput,
+  toPrismaJobSearchStatus,
+  toWireJobSearchStatus,
+} from '../members/job-search-status';
 
 @Injectable()
 export class MemberService {
@@ -565,6 +570,7 @@ export class MemberService {
 
     return {
       ...safeMember,
+      jobSearchStatus: toWireJobSearchStatus(safeMember.jobSearchStatus),
       memberState: this.resolveMemberState(member.memberApproval?.state),
       permissions: directPermissions,
       permissionCodes: directPermissions.map((p) => p.code),
@@ -882,8 +888,10 @@ export class MemberService {
       'teamOrProjectURL',
       'aboutYou',
       'role',
+      'currentCompany',
     ];
     copyObj(memberData, member, directFields);
+    assignJobSearchStatusFromInput(memberData, member);
     member.email = member.email.toLowerCase().trim();
     member['image'] = memberData.imageUid
       ? { connect: { uid: memberData.imageUid } }
@@ -1542,6 +1550,9 @@ export class MemberService {
         email: true,
         isSubscribedToNewsletter: true,
         signUpSource: true,
+        role: true,
+        currentCompany: true,
+        jobSearchStatus: true,
         teamOrProjectURL: true,
         locationUid: true,
         location: {
@@ -1823,6 +1834,8 @@ export class MemberService {
           },
         },
         ...(investorProfileId && { investorProfileId }),
+        currentCompany: memberData.currentCompany ?? null,
+        jobSearchStatus: toPrismaJobSearchStatus(memberData.jobSearchStatus),
       };
 
       createdMember = await this.createMember(newMember, tx);
@@ -1876,11 +1889,15 @@ export class MemberService {
   }
 
   async updateMemberByAdmin(uid: string, dto: UpdateMemberDto): Promise<string> {
-    const { country, region, city, skills, teamMemberRoles, joinDate, investorProfile, memberState, ...rest } = dto;
+    const { country, region, city, skills, teamMemberRoles, joinDate, investorProfile, memberState, jobSearchStatus, ...rest } =
+      dto;
 
     const data: any = {
       ...rest,
     };
+    if (Object.prototype.hasOwnProperty.call(dto, 'jobSearchStatus')) {
+      data.jobSearchStatus = toPrismaJobSearchStatus(jobSearchStatus);
+    }
 
     // NEW: used later for post-transaction handling
     let existingMember: any;

@@ -6,6 +6,13 @@ import {
   JobsListResponseSchema,
 } from '../schema/job-opening';
 import {
+  CreateJobApplicationSchema,
+  JobApplicationListResponseSchema,
+  JobApplicationResponseSchema,
+  JobBoardSignUpResponseSchema,
+  JobBoardSignUpSchema,
+} from '../schema/job-application';
+import {
   CreateJobReferralSchema,
   JobReferralDraftQuerySchema,
   JobReferralDraftResponseSchema,
@@ -33,6 +40,33 @@ export const apiJobOpenings = contract.router({
       200: JobsFiltersResponseSchema,
     },
     summary: 'Facet counts for the Jobs list',
+  },
+  signUp: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/job-openings/sign-up`,
+    body: JobBoardSignUpSchema,
+    responses: {
+      201: JobBoardSignUpResponseSchema,
+    },
+    summary: 'Create a Directory member from Job Board sign-up',
+  },
+  getMyApplications: {
+    method: 'GET',
+    path: `${getAPIVersionAsPath('1')}/job-openings/applications`,
+    responses: {
+      200: JobApplicationListResponseSchema,
+    },
+    summary: "List the current member's Job Board applications",
+  },
+  applyToJob: {
+    method: 'POST',
+    path: `${getAPIVersionAsPath('1')}/job-openings/:uid/applications`,
+    pathParams: z.object({ uid: z.string() }),
+    body: CreateJobApplicationSchema,
+    responses: {
+      201: JobApplicationResponseSchema,
+    },
+    summary: 'Apply to a job opening in-app',
   },
   getReferralDraft: {
     method: 'GET',

@@ -40,6 +40,7 @@ export * from './demo-day-engagement-analytics';
 export * from './contact-support';
 export * from './community-affiliation';
 export * from './job-opening';
+export * from './job-application';
 export * from './job-alert';
 export * from './team-job-enrichment';
 export * from './team-news';

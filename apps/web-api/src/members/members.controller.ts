@@ -53,6 +53,7 @@ import {
   sanitizeMemberContactsForViewer,
   sanitizeMembersContactsForViewer,
 } from './member-contact-sanitizer';
+import { omitJobSearchStatus, presentJobSearchStatusForViewer } from './job-search-status';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -81,6 +82,7 @@ export class MemberController {
   @NoCache()
   async findAll(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
+    delete (queryableFields as { jobSearchStatus?: unknown }).jobSearchStatus;
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
@@ -145,6 +147,7 @@ export class MemberController {
   @NoCache()
   async getMemberRoleFilters(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
+    delete (queryableFields as { jobSearchStatus?: unknown }).jobSearchStatus;
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
@@ -181,6 +184,7 @@ export class MemberController {
   @NoCache()
   async getMembersFilter(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
+    delete (queryableFields as { jobSearchStatus?: unknown }).jobSearchStatus;
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
@@ -233,7 +237,11 @@ export class MemberController {
       throw new NotFoundException('Member not found');
     }
 
-    return sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any));
+    return this.withJobSearchStatusVisibility(
+      sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any)),
+      request as Request & { userEmail?: string },
+      uid
+    );
   }
 
   /**
@@ -487,7 +495,11 @@ export class MemberController {
       throw new NotFoundException('Member not found');
     }
 
-    return sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any));
+    return this.withJobSearchStatusVisibility(
+      sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any)),
+      request as Request & { userEmail?: string },
+      member.uid
+    );
   }
 
   /**
@@ -612,5 +624,19 @@ export class MemberController {
     }
 
     return await this.membersService.getMemberInvestorSetting(uid);
+  }
+
+  private async withJobSearchStatusVisibility<T extends Record<string, unknown>>(
+    member: T,
+    request: Request & { userEmail?: string },
+    memberUid: string
+  ): Promise<T> {
+    const email = request.userEmail;
+    if (!email) {
+      return omitJobSearchStatus({ ...member });
+    }
+    const requestor = await this.membersService.findMemberByEmail(email);
+    const canSee = requestor?.uid === memberUid || requestor?.isDirectoryAdmin === true;
+    return presentJobSearchStatusForViewer({ ...member }, canSee);
   }
 }
