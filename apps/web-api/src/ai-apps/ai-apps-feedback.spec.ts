@@ -10,6 +10,9 @@ jest.mock('axios', () => ({ isAxiosError: jest.fn(() => false) }));
 jest.mock('../push-notifications/push-notifications.service', () => ({
   PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
 }));
+jest.mock('../analytics/service/analytics.service', () => ({
+  AnalyticsService: jest.fn(),
+}));
 
 import { AiAppsService } from './ai-apps.service';
 
@@ -45,7 +48,15 @@ function buildService(overrides: Record<string, any> = {}) {
     },
     ...overrides,
   };
-  return { service: new AiAppsService(prisma as any, {} as any, { create: jest.fn() } as any), prisma };
+  return {
+    service: new AiAppsService(
+      prisma as any,
+      {} as any,
+      { create: jest.fn() } as any,
+      { trackEvent: jest.fn() } as any
+    ),
+    prisma,
+  };
 }
 
 describe('AiAppsService feedback', () => {

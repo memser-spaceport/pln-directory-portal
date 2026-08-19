@@ -22,6 +22,9 @@ jest.mock('./ai-apps.constants', () => ({
 jest.mock('../push-notifications/push-notifications.service', () => ({
   PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
 }));
+jest.mock('../analytics/service/analytics.service', () => ({
+  AnalyticsService: jest.fn(),
+}));
 
 import axios from 'axios';
 import { AiAppsService } from './ai-apps.service';
@@ -68,7 +71,12 @@ function buildService({
   };
   const aws = { uploadFileToS3: jest.fn().mockResolvedValue(undefined) };
   const pushNotifications = { create: jest.fn().mockResolvedValue({}) };
-  return { service: new AiAppsService(prisma as any, aws as any, pushNotifications as any), prisma, aws };
+  const analyticsService = { trackEvent: jest.fn().mockResolvedValue(undefined) };
+  return {
+    service: new AiAppsService(prisma as any, aws as any, pushNotifications as any, analyticsService as any),
+    prisma,
+    aws,
+  };
 }
 
 beforeEach(() => {

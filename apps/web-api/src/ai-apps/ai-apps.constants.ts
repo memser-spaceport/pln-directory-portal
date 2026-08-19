@@ -11,7 +11,7 @@
  */
 
 /** Starter kit version shown in the README, ZIP filename, and LabOS UI. Bump when the kit contents or flow change. */
-export const AI_APPS_STARTER_KIT_VERSION = '1.8';
+export const AI_APPS_STARTER_KIT_VERSION = '1.9';
 
 /** Header the AI agent sends with its short-lived deploy token. */
 export const AI_APP_TOKEN_HEADER = 'x-app-token';
@@ -241,6 +241,49 @@ export const AI_APPS_BUILD_LOGS_ENDPOINT =
   process.env.AI_APPS_BUILD_LOGS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/logs/build`;
 export const AI_APPS_RUNTIME_LOGS_ENDPOINT =
   process.env.AI_APPS_RUNTIME_LOGS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/{appUid}/logs/runtime`;
+
+/**
+ * Public URL of THIS API's custom-event analytics endpoint
+ * (`POST /v1/ai-apps/track`), written into the starter kit as
+ * `analyticsEndpoint` so a deployed app can emit product events that land in
+ * the Directory PostHog project with server-enforced attribution.
+ */
+export const AI_APPS_ANALYTICS_ENDPOINT =
+  process.env.AI_APPS_ANALYTICS_ENDPOINT || `${AI_APPS_BASE_URL}/v1/ai-apps/track`;
+
+/**
+ * Event-name hygiene for `POST /v1/ai-apps/track`: every event lands in the
+ * shared Directory PostHog project, so names are snake_case-normalized and
+ * forced under one prefix server-side — a vibe-coded app cannot pollute the
+ * shared namespace no matter what it sends.
+ */
+export const AI_APP_TRACK_EVENT_PREFIX = 'ai_app_';
+
+/** Lowercase, underscore-separated, and prefixed with `AI_APP_TRACK_EVENT_PREFIX` if not already. */
+export const normalizeAiAppEventName = (raw: string): string => {
+  const snake = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const base = snake || 'event';
+  return base.startsWith(AI_APP_TRACK_EVENT_PREFIX) ? base : `${AI_APP_TRACK_EVENT_PREFIX}${base}`;
+};
+
+/**
+ * Shape enforced for the anonymous distinct ID a guest app instance generates
+ * and persists in localStorage (see the `app-analytics` kit skill). Anything
+ * else is treated as malformed and dropped rather than forwarded as-is.
+ */
+export const AI_APP_ANON_ID_REGEX = /^anon:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Abuse/noise caps on `POST /v1/ai-apps/track`. Violating either one silently
+ * drops the request (still 204) rather than 400ing — an open, unauthenticated
+ * endpoint shouldn't give a scripted caller a signal about which check it hit.
+ */
+export const AI_APPS_TRACK_MAX_PROPERTIES_BYTES = 10 * 1024;
+export const AI_APPS_TRACK_MAX_BATCH_EVENTS = 20;
 
 /**
  * Base URL of the LabOS portal that hosts the connect page the member opens to

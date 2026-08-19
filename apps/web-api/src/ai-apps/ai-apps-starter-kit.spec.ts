@@ -26,11 +26,56 @@ describe('AiAppsStarterKitService buildZip', () => {
       '.claude/skills/app-logs/SKILL.md',
       '.claude/skills/pl-design-system/SKILL.md',
       '.claude/skills/pln-member-context/SKILL.md',
+      '.claude/skills/app-analytics/SKILL.md',
       '.claude/skills/db-migration/SKILL.md',
       'pln-app.config.json',
     ]) {
       expect(entries.has(path)).toBe(true);
     }
+  });
+
+  it('writes the analytics endpoint into the config and skill, with no PostHog key or SDK', () => {
+    const config = JSON.parse(entries.get('pln-app.config.json') as string);
+    expect(config.analyticsEndpoint).toContain('/v1/ai-apps/track');
+    const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
+    expect(skill).toContain(config.analyticsEndpoint);
+    expect(skill).toContain('trackEvent');
+    expect(skill).toContain('No PII in properties');
+    expect(skill).toContain('fire-and-forget');
+    expect(skill).toContain('no PostHog key');
+    // No PostHog project key/SDK anywhere in the kit — only the endpoint URL.
+    expect(JSON.stringify(config)).not.toMatch(/posthog/i);
+    expect(skill).not.toMatch(/posthog[-_]?(key|token|sdk|js)/i);
+  });
+
+  it('makes baseline analytics automatic (opened/error/closed) and custom events opt-in', () => {
+    const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
+    // The baseline snippet: fired unconditionally on init, capped error volume,
+    // approximate session length via visibilitychange — not gated on a request.
+    expect(skill).toContain('initAppAnalytics');
+    expect(skill).toContain("trackEvent('opened')");
+    expect(skill).toContain('MAX_ERROR_EVENTS');
+    expect(skill).toContain('visibilitychange');
+    expect(skill).toContain('mandatory, not opt-in');
+    expect(skill).toContain('Custom events are opt-in');
+    expect(skill).toContain('autocapture');
+
+    const agentInstructions = entries.get('AGENTS.md') as string;
+    expect(agentInstructions).toContain('initAppAnalytics()');
+    expect(agentInstructions).toContain('not something you wait to be asked for');
+
+    const readme = entries.get('README.md') as string;
+    expect(readme).toContain('automatically reports basic usage');
+  });
+
+  it('tells the agent this data has no member-facing dashboard yet (no overpromising)', () => {
+    const skill = entries.get('.claude/skills/app-analytics/SKILL.md') as string;
+    expect(skill).toContain('no usage dashboard for their own app today');
+    expect(skill).not.toMatch(/so (the member|you) can see/i);
+    const agentInstructions = entries.get('AGENTS.md') as string;
+    expect(agentInstructions).toContain('not to the member');
+    const readme = entries.get('README.md') as string;
+    expect(readme).not.toMatch(/events show up automatically alongside your app/i);
   });
 
   it('writes the member-context endpoint into the config (and still no token)', () => {

@@ -8,6 +8,9 @@ jest.mock('axios', () => ({ isAxiosError: jest.fn(() => false) }));
 jest.mock('../push-notifications/push-notifications.service', () => ({
   PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
 }));
+jest.mock('../analytics/service/analytics.service', () => ({
+  AnalyticsService: jest.fn(),
+}));
 
 import 'reflect-metadata';
 import { PATH_METADATA, METHOD_METADATA, GUARDS_METADATA } from '@nestjs/common/constants';
