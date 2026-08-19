@@ -2963,6 +2963,31 @@ model WarmPathV2Feedback {
   @@index([updatedAt])
 }
 
+/// Warm Intros v2 — per-user free-text note on a path (outreach status, next step, etc.).
+/// Separate from WarmPathV2Feedback.note, which is path-correction feedback.
+/// One row per (warmPathUid, connectorProfileUid, actorUid).
+model WarmPathV2Note {
+  uid String @id @default(cuid())
+
+  warmPathUid         String
+  targetProfileUid    String
+  targetSet           String @db.VarChar(120)
+  connectorProfileUid String
+
+  note String @db.VarChar(600)
+
+  actorUid   String? @db.VarChar(64)
+  actorEmail String? @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([warmPathUid, connectorProfileUid, actorUid])
+  @@index([targetProfileUid])
+  @@index([warmPathUid])
+  @@index([updatedAt])
+}
+
 /// Investor Lists — a curated target set of investors (a "list"). Proximity is computed per list
 /// (PathfinderPath.targetSet == an InvestorList.targetSet). The 5,000+ InvestorOutreachRecord DB is the
 /// universe; lists are curated subsets. v1: "Neuro Fund I LP Pipeline" (graphed) + "Gold PLC Co-Investors".

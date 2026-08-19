@@ -20,6 +20,7 @@ import {
   ListWarmPathFeedbackQueryDto,
   UpsertWarmPathFeedbackDto,
 } from './dto/warm-path-feedback.dto';
+import { UpsertWarmPathNoteDto } from './dto/warm-path-note.dto';
 import { WarmIntrosV2Service } from './warm-intros-v2.service';
 
 const VIEW_PERMS = {
@@ -109,6 +110,17 @@ export class WarmIntrosV2Controller {
     @Req() req: AuthedRequest
   ) {
     return this.warmIntrosV2Service.upsertPathFeedback(warmPathUid, dto, await this.resolveActor(req));
+  }
+
+  @NoCache()
+  @Put('paths/:warmPathUid/notes')
+  @RequirePermissions(VIEW_PERMS)
+  async upsertNote(
+    @Param('warmPathUid') warmPathUid: string,
+    @Body() dto: UpsertWarmPathNoteDto,
+    @Req() req: AuthedRequest
+  ) {
+    return this.warmIntrosV2Service.upsertPathNote(warmPathUid, dto, await this.resolveActor(req));
   }
 
   @NoCache()

@@ -1,4 +1,12 @@
-import { All, Controller, Req, Res, UnauthorizedException } from '@nestjs/common';
+import {
+  All,
+  BadRequestException,
+  Controller,
+  NotFoundException,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -6,14 +14,21 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { NoCache } from '../decorators/no-cache.decorator';
 import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
+import { MasterProfileService } from '../master-profile/master-profile.service';
+import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
 import { McpOAuthService } from './mcp-oauth.service';
-import { toolsForPermissions } from './mcp-tools';
+import { toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
 
 @ApiTags('MCP')
 @Controller('mcp')
 @SkipEmptyStringToNull()
 export class McpController {
-  constructor(private readonly oauth: McpOAuthService, private readonly accessControl: AccessControlV2Service) {}
+  constructor(
+    private readonly oauth: McpOAuthService,
+    private readonly accessControl: AccessControlV2Service,
+    private readonly masterProfiles: MasterProfileService,
+    private readonly warmIntros: WarmIntrosV2Service
+  ) {}
 
   @NoCache()
   @All()
@@ -37,25 +52,48 @@ export class McpController {
 
     const access = await this.accessControl.getMemberAccess(actor.memberUid);
     const permissions = new Set(access.effectivePermissions ?? []);
-    const tools = toolsForPermissions(permissions);
+    const tools = toolsForPermissions(permissions, [
+      WHOAMI_TOOL,
+      ...warmIntroTools(this.masterProfiles, this.warmIntros),
+    ]);
 
     const server = new McpServer({ name: 'LabOS', version: '1.0.0' });
+    const ctx = {
+      memberUid: actor.memberUid,
+      name: actor.name,
+      email: actor.email,
+      permissions,
+    };
     for (const tool of tools) {
-      server.registerTool(tool.name, { description: tool.description }, async () => ({
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(
-              await tool.execute({
-                memberUid: actor.memberUid,
-                name: actor.name,
-                email: actor.email,
-                permissions,
-              })
-            ),
-          },
-        ],
-      }));
+      const config: { description: string; inputSchema?: Record<string, unknown> } = {
+        description: tool.description,
+      };
+      if (tool.inputSchema) {
+        config.inputSchema = tool.inputSchema;
+      }
+      // MCP SDK registerTool generics blow up TS2589 when passed a union config.
+      (
+        server.registerTool as (
+          name: string,
+          cfg: typeof config,
+          cb: (args?: Record<string, unknown>) => unknown
+        ) => void
+      )(tool.name, config, async (args) => {
+        try {
+          const result = await tool.execute(ctx, args ?? {});
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+          };
+        } catch (error) {
+          if (error instanceof NotFoundException || error instanceof BadRequestException) {
+            return {
+              isError: true,
+              content: [{ type: 'text' as const, text: String(error.message) }],
+            };
+          }
+          throw error;
+        }
+      });
     }
 
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
