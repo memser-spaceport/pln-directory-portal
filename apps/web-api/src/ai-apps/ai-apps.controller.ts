@@ -128,6 +128,20 @@ export class AiAppsController {
   }
 
   /**
+   * All reviewable feedback for the caller, newest first, tagged with `appName`.
+   * Directory admins get every app; everyone else only apps they created.
+   * Declared before `:uid` so the literal path wins over the param route.
+   */
+  @NoCache()
+  @Get('feedback')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listAccessibleFeedback(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listAccessibleFeedback(memberUid);
+  }
+
+  /**
    * Identity of the signed-in member ("member context"), consumed by deployed
    * AI apps for personalization. Unlike the other dashboard reads, the guard
    * here also accepts the LabOS `authToken` cookie — it is scoped to the parent

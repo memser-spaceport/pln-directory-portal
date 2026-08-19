@@ -25,7 +25,10 @@ const FEEDBACK = {
 
 function buildService(overrides: Record<string, any> = {}) {
   const prisma = {
-    aiApp: { findUnique: jest.fn().mockResolvedValue(APP) },
+    aiApp: {
+      findUnique: jest.fn().mockResolvedValue(APP),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     aiAppFeedback: {
       create: jest
         .fn()
@@ -141,6 +144,62 @@ describe('AiAppsService feedback', () => {
       expect(result[0].member).toEqual({ uid: 'member-2', name: 'Bea', image: null });
       // Unknown submitter resolves to null rather than leaking the uid.
       expect(result[1].member).toBeNull();
+    });
+  });
+
+  describe('listAccessibleFeedback', () => {
+    it('returns an empty list when the requester owns no apps and is not an admin', async () => {
+      const { service, prisma } = buildService();
+      prisma.member.findUnique.mockResolvedValue({ memberRoles: [] });
+      await expect(service.listAccessibleFeedback('creator-1')).resolves.toEqual([]);
+      expect(prisma.aiApp.findMany).toHaveBeenCalledWith({
+        where: { memberUid: 'creator-1', status: { not: 'DELETED' } },
+        select: { uid: true, name: true },
+      });
+      expect(prisma.aiAppFeedback.findMany).not.toHaveBeenCalled();
+    });
+
+    it('returns feedback only for apps the requester created when not an admin', async () => {
+      const { service, prisma } = buildService();
+      prisma.member.findUnique.mockResolvedValue({ memberRoles: [] });
+      prisma.aiApp.findMany.mockResolvedValue([{ uid: 'app-1', name: 'Alpha' }]);
+      prisma.aiAppFeedback.findMany.mockResolvedValue([FEEDBACK]);
+
+      const result = await service.listAccessibleFeedback('creator-1');
+      expect(prisma.aiApp.findMany).toHaveBeenCalledWith({
+        where: { memberUid: 'creator-1', status: { not: 'DELETED' } },
+        select: { uid: true, name: true },
+      });
+      expect(prisma.aiAppFeedback.findMany).toHaveBeenCalledWith({
+        where: { appUid: { in: ['app-1'] } },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].appName).toBe('Alpha');
+    });
+
+    it('returns feedback across every non-deleted app for a directory admin', async () => {
+      const { service, prisma } = buildService();
+      prisma.member.findUnique.mockResolvedValue({ memberRoles: [{ name: 'DIRECTORYADMIN' }] });
+      prisma.aiApp.findMany.mockResolvedValue([
+        { uid: 'app-1', name: 'Alpha' },
+        { uid: 'app-2', name: 'Beta' },
+      ]);
+      prisma.aiAppFeedback.findMany.mockResolvedValue([
+        { ...FEEDBACK, uid: 'fb-2', appUid: 'app-2', text: 'later', createdAt: new Date(2) },
+        FEEDBACK,
+      ]);
+
+      const result = await service.listAccessibleFeedback('admin-1');
+      expect(prisma.aiApp.findMany).toHaveBeenCalledWith({
+        where: { status: { not: 'DELETED' } },
+        select: { uid: true, name: true },
+      });
+      expect(prisma.aiAppFeedback.findMany).toHaveBeenCalledWith({
+        where: { appUid: { in: ['app-1', 'app-2'] } },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(result.map((row) => row.appName)).toEqual(['Beta', 'Alpha']);
     });
   });
 

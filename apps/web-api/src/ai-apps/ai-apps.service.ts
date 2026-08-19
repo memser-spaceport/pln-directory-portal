@@ -902,6 +902,31 @@ export class AiAppsService {
   }
 
   /**
+   * All feedback the requester can review, newest first, tagged with `appName`.
+   * Directory admins see every non-deleted app; everyone else only apps they
+   * created. Skips deleted apps so the list matches the dashboard catalog.
+   */
+  async listAccessibleFeedback(
+    requesterUid: string
+  ): Promise<Array<WithMember<AiAppFeedback> & { appName: string }>> {
+    const isAdmin = await this.isRequesterDirectoryAdmin(requesterUid);
+    const apps = await this.prisma.aiApp.findMany({
+      where: isAdmin ? { status: { not: 'DELETED' } } : { memberUid: requesterUid, status: { not: 'DELETED' } },
+      select: { uid: true, name: true },
+    });
+    if (apps.length === 0) {
+      return [];
+    }
+    const appNameByUid = new Map(apps.map((app) => [app.uid, app.name]));
+    const feedback = await this.prisma.aiAppFeedback.findMany({
+      where: { appUid: { in: apps.map((app) => app.uid) } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const withMembers = await this.withMember(feedback);
+    return withMembers.map((row) => ({ ...row, appName: appNameByUid.get(row.appUid) ?? '' }));
+  }
+
+  /**
    * Sets the shared review status on one feedback row. Any of NEW / VIEWED /
    * IMPLEMENTED is always allowed (skips and backwards moves included). Restricted
    * to the app's creator and directory admins; no notification is sent.
