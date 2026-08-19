@@ -1,13 +1,14 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { MemberApprovalState, Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { toWireJobSearchStatus } from '../members/job-search-status';
 
 @Injectable()
 export class MemberApprovalsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(state?: 'PENDING' | 'APPROVED' | 'VERIFIED' | 'REJECTED') {
-    return this.prisma.memberApproval.findMany({
+    const rows = await this.prisma.memberApproval.findMany({
       where: state ? { state } : {},
       include: {
         member: {
@@ -16,6 +17,8 @@ export class MemberApprovalsService {
             name: true,
             email: true,
             role: true,
+            currentCompany: true,
+            jobSearchStatus: true,
             createdAt: true,
           },
         },
@@ -28,6 +31,8 @@ export class MemberApprovalsService {
       },
       orderBy: [{ state: 'asc' }, { requestedAt: 'desc' }],
     });
+
+    return rows.map((row) => this.withWireJobSearchStatus(row));
   }
 
   async get(memberUid: string) {
@@ -40,6 +45,8 @@ export class MemberApprovalsService {
             name: true,
             email: true,
             role: true,
+            currentCompany: true,
+            jobSearchStatus: true,
             createdAt: true,
           },
         },
@@ -59,7 +66,7 @@ export class MemberApprovalsService {
       throw new NotFoundException(`Member approval not found for memberUid: ${memberUid}`);
     }
 
-    return approval;
+    return this.withWireJobSearchStatus(approval);
   }
 
   async create(body: { memberUid: string; requestedByUid?: string | null; reason?: string }) {
@@ -221,5 +228,18 @@ export class MemberApprovalsService {
         `Member ${memberUid} is not approved. Policies and direct permissions can be assigned only to APPROVED or VERIFIED members.`
       );
     }
+  }
+
+  private withWireJobSearchStatus<T extends { member?: { jobSearchStatus?: unknown } | null }>(row: T): T {
+    if (!row.member) {
+      return row;
+    }
+    return {
+      ...row,
+      member: {
+        ...row.member,
+        jobSearchStatus: toWireJobSearchStatus(row.member.jobSearchStatus as never),
+      },
+    };
   }
 }

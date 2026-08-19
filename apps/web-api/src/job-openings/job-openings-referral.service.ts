@@ -1,28 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { CreateJobReferralInput } from 'libs/contracts/src/schema/job-referral';
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
-import { HIDDEN_JOB_OPENING_STATUSES } from './job-openings-query.service';
+import { noteToHtml } from './job-openings-email-html';
+import { resolveVisibleJobOpening } from './job-openings-resolve';
 
 const JOB_BOARD_REFERRAL_TEMPLATE = 'JOB_BOARD_REFERRAL_EMAIL';
 const MAX_BLURB_CHARS = 220;
 
 type ResolvedRecipient = { email: string; name: string | null };
 type MemberHeadline = { title: string | null; companyName: string | null };
-
-const escapeHtml = (value: string) =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-
-const noteToHtml = (note: string) =>
-  escapeHtml(note.trim())
-    .split(/\n{2,}/)
-    .map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br/>')}</p>`)
-    .join('');
 
 // Turns a stored (possibly AI-generated, possibly HTML) Member.bio into a short,
 // plain-text sentence or two for the referral draft note. Not AI-summarized —
@@ -56,7 +43,7 @@ export class JobOpeningsReferralService {
 
   async referJob(jobUid: string, referrerEmail: string | undefined, input: CreateJobReferralInput) {
     const referrer = await this.resolveReferrer(referrerEmail);
-    const jobOpening = await this.resolveJobOpening(jobUid);
+    const jobOpening = await resolveVisibleJobOpening(this.prisma, jobUid);
 
     const referred = await this.prisma.member.findUnique({
       where: { uid: input.referredMemberUid },
@@ -134,7 +121,7 @@ export class JobOpeningsReferralService {
   // an AI call made from here, so opening the modal stays instant and free.
   async getReferralDraft(jobUid: string, referrerEmail: string | undefined, referredMemberUid: string) {
     const referrer = await this.resolveReferrer(referrerEmail);
-    const jobOpening = await this.resolveJobOpening(jobUid);
+    const jobOpening = await resolveVisibleJobOpening(this.prisma, jobUid);
 
     const referred = await this.prisma.member.findUnique({
       where: { uid: referredMemberUid },
@@ -185,23 +172,6 @@ export class JobOpeningsReferralService {
       teamName: jobOpening.team.name,
       applyUrl,
     };
-  }
-
-  private async resolveJobOpening(jobUid: string) {
-    const jobOpening = await this.prisma.jobOpening.findUnique({
-      where: { uid: jobUid },
-      select: {
-        uid: true,
-        roleTitle: true,
-        sourceLink: true,
-        status: true,
-        team: { select: { uid: true, name: true } },
-      },
-    });
-    if (!jobOpening || !jobOpening.team || HIDDEN_JOB_OPENING_STATUSES.includes(jobOpening.status)) {
-      throw new NotFoundException('Job opening not found');
-    }
-    return { ...jobOpening, team: jobOpening.team };
   }
 
   // Title/company for the referral sentence. Prefers the member's main team
