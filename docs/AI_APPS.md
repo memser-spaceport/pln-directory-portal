@@ -441,6 +441,57 @@ How it works — no app-side login and no new token flow:
   (client-side fetch, handle 401/403/local-dev gracefully, personalization only —
   never auth for sensitive actions, never store/log tokens).
 
+## Product analytics for deployed apps
+
+Deployed apps can report usage into the **existing** "PLN Directory" PostHog
+project (no separate "AI Apps" project) via `POST /v1/ai-apps/track` — the
+only analytics transport the kit exposes; apps never hold a PostHog key or
+SDK. Decision context: sharing one project keeps things simple now (the main
+con — long event names — is solved by namespacing instead; access controls
+for AI-App-only data, if ever needed, land later via the data warehouse, not
+via a second PostHog project).
+
+- **No auth required** — guest usage counts. The route sits before the
+  `:uid` route so its literal path wins, and it always answers `204`,
+  including every drop path, so a scripted caller gets no signal about which
+  check it hit.
+- **Attribution is resolved server-side, never trusted from the app**:
+  `AiAppsService.resolveAppFromOrigin` maps the request's `Origin` header
+  (`<appId>.<AI_APPS_APP_DOMAIN>`) to the live `AiApp` row (most-recently-
+  deployed one if several members' apps share an `appId`), and stamps
+  `source: 'ai-app'`, `appId`, `appUid`, `appName` (+ `memberUid` when the
+  caller is signed in) onto every event's properties — this is the "standard
+  attribute" lexicon the PO asked for, done as PostHog properties rather than
+  a long `ai-apps-<app-name>-…` event-name prefix, so apps stay filterable by
+  app without bloating names.
+- **Identity**: a `Bearer` token (from the same cookie the member-context flow
+  reads) resolves to a `memberUid` via `AUTH_API_URL`'s introspect endpoint;
+  otherwise the app-generated `anon:<uuid>` (validated against
+  `AI_APP_ANON_ID_REGEX`) is the distinct ID. A missing/invalid/expired token
+  or an introspection failure silently falls back to anonymous — this path
+  must never throw or block the app.
+- **Event names** are normalized server-side (`normalizeAiAppEventName`):
+  lowercased, non-alphanumerics collapsed to `_`, then prefixed with
+  `ai_app_` if not already — a vibe-coded app cannot pollute the shared
+  namespace no matter what it sends.
+- **Sanitization & caps** (`sanitizeTrackProperties`): `$`-prefixed
+  (PostHog-reserved) and PII-shaped (`email`/`name`) keys are stripped, and
+  `memberUid` is always stripped from client-sent properties (even for
+  guests) so a spoofed value can't survive attribution stamping. Properties
+  over `AI_APPS_TRACK_MAX_PROPERTIES_BYTES` (10 KB) drop the whole event;
+  `events` batches over `AI_APPS_TRACK_MAX_BATCH_EVENTS` (20) drop the whole
+  request. All silent — same "no signal" rule as auth.
+- **Two tiers in the kit's `app-analytics` skill**: baseline events
+  (`opened`/`error`/`closed`) are wired into every app unconditionally during
+  scaffolding, the same as a `/health` endpoint; custom events (button
+  clicks, feature usage) are opt-in, added only when the member asks for
+  tracking on something specific.
+- Reuses the existing `AnalyticsService`/`PostHogProvider` (`POSTHOG_API_KEY`/
+  `POSTHOG_HOST`) already used for directory-side analytics — no new provider,
+  no new project.
+- There is no usage dashboard for members yet; this data is for the PL team
+  only. The kit tells agents to say so if asked, not to promise a dashboard.
+
 ## Data model
 
 ```prisma
@@ -653,8 +704,9 @@ UI work and follows `AGENTS.md` / `CLAUDE.md` for deploy, secrets, and iframe ru
 | `AI_APPS_RUNNER_PROJECT` | `default` | Project scope of the runner's secrets API (`/v1/projects/<project>/secrets`) |
 | `AI_APPS_RUNNER_ENVIRONMENT` | `prod` | Environment label for the runner secrets/deployments API. **Must match the environment the runner's `/deploy` build registers under** (its helm release is `<environment>-<appId>`; the legacy-compat build path registers as `sandbox`) — a mismatch makes the secrets-injection deploy collide with the build's release |
 | `AI_APPS_HELM_LOCK_RETRIES` / `AI_APPS_HELM_LOCK_RETRY_INTERVAL_MS` | `8` / `15000` | Retry budget when the secrets-injection deployment hits `409 helm_release_locked` (the build's own Helm upgrade still finishing after an edge timeout) — see "Helm-lock retry" above |
+| `AI_APPS_ANALYTICS_ENDPOINT` | _derived from `AI_APPS_BASE_URL`_ | Optional override for the `POST /v1/ai-apps/track` URL written into the kit as `analyticsEndpoint` — see "Product analytics for deployed apps" above |
 
-S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` credentials must also be present.
+S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` credentials must also be present. Product analytics reuses the existing `POSTHOG_API_KEY` / `POSTHOG_HOST` (see `AnalyticsService`) — no separate PostHog project or key.
 
 ## Code map
 
@@ -668,6 +720,7 @@ S3 uploads reuse the shared `AwsService`, so the standard `AWS_REGION` / `AWS_AC
 - `apps/web-api/prisma/migrations/20260714120000_ai_apps_upload_meta/` — `kitVersion`/`agentClient`/`agentModel` columns (self-reported metadata about the last agent upload).
 - `apps/web-api/prisma/migrations/20260715120000_ai_apps_editable_metadata/` — `prd` column (one-pager PRD).
 - `apps/web-api/prisma/migrations/20260730120000_ai_apps_database_provisioning/` — single `database` JSON column: provisioning request + non-sensitive connection metadata (agent-driven database provisioning).
+- `apps/web-api/src/ai-apps/dto/track-event.dto.ts` + `AiAppsService.trackAppEvent`/`resolveAppFromOrigin`/`sanitizeTrackProperties` — `POST /v1/ai-apps/track`, forwarding via the shared `AnalyticsService`/`PostHogProvider` (see "Product analytics for deployed apps" above). No dedicated migration — reuses the existing `AiApp` table for attribution lookups only.
 - LabOS UI (`pln-directory-portal-v2`): `app/pl-infra/ai-apps/connect/page.tsx` + `components/page/ai-apps/AiAppsConnectPage/` — the approval page; connect calls in `services/ai-apps/ai-apps.service.ts`.
 - `.claude/skills/ai-apps/SKILL.md` — agent guidance for working on this feature.
 

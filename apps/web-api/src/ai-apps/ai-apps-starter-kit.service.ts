@@ -1148,7 +1148,7 @@ Custom events reuse the same \`trackEvent\` helper: \`trackEvent('clicked_export
   private deploySkill(): string {
     return `---
 name: deploy-to-labs
-description: Deploy the app in ./app to the Protocol Labs Network sandbox. Use when the member asks to deploy, ship, or publish the app.
+description: Deploy the app in ./app to the Protocol Labs Network sandbox. Use when the member asks to deploy, ship, or publish the app — recognize this whether they say "PLN" or "PL" (both refer to the same network).
 ---
 
 # Deploy to PLN Labs
