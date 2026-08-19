@@ -10,6 +10,12 @@ export type TeamUpdatePayload = {
   linkedinHandler?: string;
   shortDescription?: string;
   longDescription?: string;
+  blueskyHandler?: string | null;
+  crunchbaseHandler?: string | null;
+  dateFounded?: number | null;
+  teamSize?: string | null;
+  location?: string | null;
+  status?: 'ACTIVE' | 'INACTIVE';
 };
 
 type MutationParams = {

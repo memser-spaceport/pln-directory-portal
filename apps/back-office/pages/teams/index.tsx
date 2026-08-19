@@ -23,6 +23,9 @@ type PendingTeamAccessLevelChange = {
 // Access levels we allow to set for teams
 type AccessLevel = 'L0' | 'L1';
 
+// Team active/inactive status
+type TeamStatus = 'ACTIVE' | 'INACTIVE';
+
 type TeamRow = {
   uid: string;
   name: string;
@@ -43,6 +46,12 @@ type TeamRow = {
    * This is what we display in UI going forward.
    */
   priority: number | null;
+  blueskyHandler?: string | null;
+  crunchbaseHandler?: string | null;
+  dateFounded?: number | null;
+  teamSize?: string | null;
+  location?: string | null;
+  status: TeamStatus;
   createdAt: string;
   updatedAt: string;
 };
@@ -251,6 +260,12 @@ const TeamsPage: React.FC = () => {
       // Prefer priority if present; otherwise derive it from tier.
       priority: team.priority ?? tierToPriority(team.tier),
       tier: team.tier,
+      blueskyHandler: team.blueskyHandler ?? '',
+      crunchbaseHandler: team.crunchbaseHandler ?? '',
+      dateFounded: team.dateFounded ?? null,
+      teamSize: team.teamSize ?? '',
+      location: team.location ?? '',
+      status: team.status ?? 'ACTIVE',
     });
   }
 
@@ -313,6 +328,12 @@ const TeamsPage: React.FC = () => {
         longDescription: editForm.longDescription ?? '',
         plnFriend: !!editForm.plnFriend,
         // isFund is intentionally NOT editable on the right panel now
+        blueskyHandler: (editForm.blueskyHandler ?? '').toString().trim() || null,
+        crunchbaseHandler: (editForm.crunchbaseHandler ?? '').toString().trim() || null,
+        dateFounded: editForm.dateFounded ? Number(editForm.dateFounded) : null,
+        teamSize: (editForm.teamSize ?? '').toString().trim() || null,
+        location: (editForm.location ?? '').toString().trim() || null,
+        status: editForm.status ?? 'ACTIVE',
       };
 
       // Always send priority.
@@ -341,6 +362,13 @@ const TeamsPage: React.FC = () => {
                 plnFriend: newData.plnFriend !== undefined ? newData.plnFriend : t.plnFriend,
                 tier: newData.tier !== undefined ? newData.tier : t.tier,
                 priority: newData.priority !== undefined ? newData.priority : t.priority,
+                blueskyHandler: newData.blueskyHandler !== undefined ? newData.blueskyHandler : t.blueskyHandler,
+                crunchbaseHandler:
+                  newData.crunchbaseHandler !== undefined ? newData.crunchbaseHandler : t.crunchbaseHandler,
+                dateFounded: newData.dateFounded !== undefined ? newData.dateFounded : t.dateFounded,
+                teamSize: newData.teamSize !== undefined ? newData.teamSize : t.teamSize,
+                location: newData.location !== undefined ? newData.location : t.location,
+                status: newData.status !== undefined ? newData.status : t.status,
               }
             : t
         )
@@ -388,6 +416,7 @@ const TeamsPage: React.FC = () => {
             <div className={clsx(s.tableRow, s.tableHeader)}>
               <div className={clsx(s.headerCell, s.first, s.teamNameColumn)}>Team</div>
               <div className={clsx(s.headerCell, s.accessLevelColumn)}>Access level</div>
+              <div className={clsx(s.headerCell, s.booleanColumn)}>Status</div>
               <div className={clsx(s.headerCell, s.booleanColumn)}>PLN friend</div>
               <div className={clsx(s.headerCell, s.booleanColumn)}>Is fund</div>
               <div className={clsx(s.headerCell, s.dateColumn)}>Created</div>
@@ -429,6 +458,9 @@ const TeamsPage: React.FC = () => {
                     />
                   </div>
 
+                  <div className={clsx(s.bodyCell, s.booleanColumn)}>
+                    {(team.status ?? 'ACTIVE') === 'ACTIVE' ? 'Active' : 'Inactive'}
+                  </div>
                   <div className={clsx(s.bodyCell, s.booleanColumn)}>{team.plnFriend ? 'Yes' : 'No'}</div>
                   <div className={clsx(s.bodyCell, s.booleanColumn)}>{team.isFund ? 'Yes' : 'No'}</div>
                   <div className={clsx(s.bodyCell, s.dateColumn)}>{new Date(team.createdAt).toLocaleDateString()}</div>
@@ -531,6 +563,71 @@ const TeamsPage: React.FC = () => {
                         />
                         <label className={s.checkboxLabel}>PLN friend</label>
                       </div>
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Status</label>
+                      <select
+                        className={s.formInput}
+                        value={editForm.status ?? 'ACTIVE'}
+                        onChange={(e) => onFieldChange('status' as any, e.target.value as any)}
+                      >
+                        <option value="ACTIVE">Active</option>
+                        <option value="INACTIVE">Inactive</option>
+                      </select>
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Location</label>
+                      <input
+                        className={s.formInput}
+                        value={editForm.location ?? ''}
+                        onChange={(e) => onFieldChange('location' as any, e.target.value as any)}
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Date founded</label>
+                      <input
+                        className={s.formInput}
+                        type="number"
+                        value={editForm.dateFounded ?? ''}
+                        onChange={(e) =>
+                          onFieldChange('dateFounded' as any, (e.target.value ? Number(e.target.value) : null) as any)
+                        }
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Team size</label>
+                      <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>
+                        Employee count (e.g. 50) or a range label (e.g. 11-50).
+                      </div>
+                      <input
+                        className={s.formInput}
+                        value={editForm.teamSize ?? ''}
+                        onChange={(e) => onFieldChange('teamSize' as any, e.target.value as any)}
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Bluesky handle</label>
+                      <input
+                        className={s.formInput}
+                        value={editForm.blueskyHandler ?? ''}
+                        onChange={(e) => onFieldChange('blueskyHandler' as any, e.target.value as any)}
+                        placeholder="e.g. @team.bsky.social"
+                      />
+                    </div>
+
+                    <div className={s.formField}>
+                      <label className={s.formLabel}>Crunchbase</label>
+                      <input
+                        className={s.formInput}
+                        value={editForm.crunchbaseHandler ?? ''}
+                        onChange={(e) => onFieldChange('crunchbaseHandler' as any, e.target.value as any)}
+                        placeholder="e.g. https://www.crunchbase.com/organization/slug"
+                      />
                     </div>
 
                     <div className={s.formField}>

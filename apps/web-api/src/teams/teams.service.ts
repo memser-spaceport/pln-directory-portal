@@ -11,7 +11,7 @@ import {
 import * as path from 'path';
 import { z } from 'zod';
 import { isEmpty } from 'lodash';
-import { AskStatus, Member, Prisma, Team } from '@prisma/client';
+import { AskStatus, Member, Prisma, Team, TeamStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
@@ -21,6 +21,7 @@ import { ForestAdminService } from '../utils/forest-admin/forest-admin.service';
 import { MembersService } from '../members/members.service';
 import { LogService } from '../shared/log.service';
 import { buildMultiRelationMapping, buildRelationMapping, copyObj } from '../utils/helper/helper';
+import { normalizeBlueskyHandler, normalizeCrunchbaseHandler } from './team-handle-normalizer';
 import { CacheService } from '../utils/cache/cache.service';
 import { AskService } from '../asks/asks.service';
 import { TeamsHooksService } from './teams.hooks.service';
@@ -75,6 +76,9 @@ export class TeamsService {
         // accessLevel: {
         //   not: 'L0',
         // },
+        status: {
+          not: TeamStatus.INACTIVE,
+        },
       };
 
       const [teams, teamsCount] = await Promise.all([
@@ -522,6 +526,12 @@ export class TeamsService {
       'twitterHandler',
       'linkedinHandler',
       'telegramHandler',
+      'blueskyHandler',
+      'crunchbaseHandler',
+      'dateFounded',
+      'teamSize',
+      'location',
+      'status',
       'officeHours',
       'shortDescription',
       'plnFriend',
@@ -534,6 +544,16 @@ export class TeamsService {
       'priority',
     ];
     copyObj(teamData, team, directFields);
+
+    if (team.blueskyHandler !== undefined) {
+      team.blueskyHandler = normalizeBlueskyHandler(team.blueskyHandler) ?? null;
+    }
+    if (team.crunchbaseHandler !== undefined) {
+      team.crunchbaseHandler = normalizeCrunchbaseHandler(team.crunchbaseHandler) ?? null;
+    }
+    if (team.teamSize !== undefined && team.teamSize !== null) {
+      team.teamSize = String(team.teamSize);
+    }
 
     // Keep tier <-> priority in sync on write paths.
     // Priority is the new canonical name. If both are provided and conflict, we prefer priority.
@@ -1706,10 +1726,13 @@ export class TeamsService {
     const limit = Math.min(Number(filters.limit) || 20, 100);
     const skip = (page - 1) * limit;
 
-    // Base where clause excluding L0 access level
+    // Base where clause excluding L0 access level and inactive teams
     const baseWhere: Prisma.TeamWhereInput = {
       accessLevel: {
         not: 'L0',
+      },
+      status: {
+        not: TeamStatus.INACTIVE,
       },
     };
 

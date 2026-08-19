@@ -141,7 +141,7 @@ export function EditModal({ team, authToken, onClose }: Props) {
 
     const changedData: TeamUpdatePayload = {};
     (Object.keys(form) as (keyof TeamUpdatePayload)[]).forEach((key) => {
-      if ((form[key] ?? '') !== (initialForm[key] ?? '')) changedData[key] = form[key];
+      if ((form[key] ?? '') !== (initialForm[key] ?? '')) (changedData as any)[key] = form[key];
     });
 
     if (Object.keys(changedData).length === 0 && fieldsToApprove.length === 0) {
