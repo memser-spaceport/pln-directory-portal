@@ -162,11 +162,7 @@ export class OfficeHoursController {
   @Api(server.route.checkOfficeHoursLink)
   @UsePipes(ZodValidationPipe)
   @UseGuards(UserTokenValidation)
-  async checkOfficeHoursLink(@Body() body: any, @Req() request: Request) {
-    const requester: any = await this.memberService.findMemberByEmail(request['userEmail']);
-    if (!requester || !this.memberService.checkIfAdminUser(requester)) {
-      throw new ForbiddenException(`Member isn't authorized to check an arbitrary office hours link`);
-    }
+  async checkOfficeHoursLink(@Body() body: any) {
     return await this.interactionService.checkProvidedLink(body.link);
   }
 

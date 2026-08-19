@@ -22,6 +22,7 @@ jest.mock('./ai-apps.constants', () => ({
 jest.mock('../push-notifications/push-notifications.service', () => ({
   PushNotificationsService: jest.fn().mockImplementation(() => ({ create: jest.fn() })),
 }));
+
 jest.mock('../analytics/service/analytics.service', () => ({
   AnalyticsService: jest.fn(),
 }));
