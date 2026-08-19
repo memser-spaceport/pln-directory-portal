@@ -137,6 +137,37 @@ export function warmIntroTools(masterProfiles: MasterProfileService, warmIntros:
       },
       execute: async (ctx, args) => getWarmPathFeedback(warmIntros, ctx, args),
     },
+    {
+      name: 'submit_warm_path_note',
+      description:
+        "Submit or update this user's note on a warm path (outreach status, next step, useful context). Not for reporting that the path is wrong — use submit_warm_path_feedback for that. Pass note: null to clear. Requires warmPathUid and connectorProfileUid from get_warm_intro_investor.",
+      visibility: 'investor_db',
+      inputSchema: {
+        warmPathUid: z.string().min(1).describe('Warm path uid from get_warm_intro_investor'),
+        connectorProfileUid: z
+          .string()
+          .min(1)
+          .describe('Connector master profile uid on that path (bestConnectorProfileUid or hop chain)'),
+        note: z
+          .union([z.string().max(FEEDBACK_NOTE_MAX), z.null()])
+          .describe("Path note (max 600). Null clears this user's note on the path."),
+      },
+      execute: async (ctx, args) => submitWarmPathNote(warmIntros, ctx, args),
+    },
+    {
+      name: 'get_warm_path_note',
+      description:
+        "Return this user's own note on a warm path, or note: null if none. Does not return other people's notes. Requires warmPathUid and connectorProfileUid from get_warm_intro_investor.",
+      visibility: 'investor_db',
+      inputSchema: {
+        warmPathUid: z.string().min(1).describe('Warm path uid from get_warm_intro_investor'),
+        connectorProfileUid: z
+          .string()
+          .min(1)
+          .describe('Connector master profile uid on that path (bestConnectorProfileUid or hop chain)'),
+      },
+      execute: async (ctx, args) => getWarmPathNote(warmIntros, ctx, args),
+    },
   ];
 }
 
@@ -286,6 +317,33 @@ export async function getWarmPathFeedback(
   args: Record<string, unknown> = {}
 ): Promise<Record<string, unknown>> {
   return warmIntros.getMyPathFeedback(
+    stringArg(args.warmPathUid) ?? '',
+    stringArg(args.connectorProfileUid) ?? '',
+    feedbackActor(ctx)
+  );
+}
+
+export async function submitWarmPathNote(
+  warmIntros: WarmIntrosV2Service,
+  ctx: McpActorContext,
+  args: Record<string, unknown> = {}
+): Promise<Record<string, unknown>> {
+  const warmPathUid = stringArg(args.warmPathUid) ?? '';
+  const connectorProfileUid = stringArg(args.connectorProfileUid) ?? '';
+  const result = await warmIntros.upsertPathNote(
+    warmPathUid,
+    { connectorProfileUid, note: noteArg(args.note) },
+    feedbackActor(ctx)
+  );
+  return compactOwnPathFeedback(warmPathUid, connectorProfileUid, result as unknown as Record<string, unknown>);
+}
+
+export async function getWarmPathNote(
+  warmIntros: WarmIntrosV2Service,
+  ctx: McpActorContext,
+  args: Record<string, unknown> = {}
+): Promise<Record<string, unknown>> {
+  return warmIntros.getMyPathNote(
     stringArg(args.warmPathUid) ?? '',
     stringArg(args.connectorProfileUid) ?? '',
     feedbackActor(ctx)

@@ -8,9 +8,11 @@ import {
   getMasterProfile,
   getWarmIntroInvestor,
   getWarmPathFeedback,
+  getWarmPathNote,
   searchMasterProfiles,
   searchWarmIntroInvestors,
   submitWarmPathFeedback,
+  submitWarmPathNote,
   toolsForPermissions,
   warmIntroTools,
   WHOAMI_TOOL,
@@ -49,6 +51,8 @@ const WARM_INTRO_TOOL_NAMES = [
   'get_warm_intro_investor',
   'submit_warm_path_feedback',
   'get_warm_path_feedback',
+  'submit_warm_path_note',
+  'get_warm_path_note',
 ];
 
 describe('toolsForPermissions', () => {
@@ -370,6 +374,105 @@ describe('getWarmPathFeedback', () => {
     const getMyPathFeedback = jest.fn().mockRejectedValue(new NotFoundException('WarmPathV2 not found: missing'));
     await expect(
       getWarmPathFeedback({ getMyPathFeedback } as unknown as WarmIntrosV2Service, mcpActor, {
+        warmPathUid: 'missing',
+        connectorProfileUid: 'from1',
+      })
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('submitWarmPathNote', () => {
+  it('upserts note only for the MCP actor', async () => {
+    const upsertPathNote = jest.fn().mockResolvedValue({
+      uid: 'n1',
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: 'Waiting on a reply',
+      actorUid: 'm1',
+      actorEmail: 'ada@example.com',
+      updatedAt: '2026-08-19T00:00:00.000Z',
+    });
+    const result = await submitWarmPathNote({ upsertPathNote } as unknown as WarmIntrosV2Service, mcpActor, {
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: 'Waiting on a reply',
+    });
+    expect(upsertPathNote).toHaveBeenCalledWith(
+      'p1',
+      { connectorProfileUid: 'from1', note: 'Waiting on a reply' },
+      { uid: 'm1', email: 'ada@example.com' }
+    );
+    expect(result).toEqual({
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: 'Waiting on a reply',
+      updatedAt: '2026-08-19T00:00:00.000Z',
+    });
+  });
+
+  it('clears the note when note is null', async () => {
+    const upsertPathNote = jest.fn().mockResolvedValue({ deleted: true });
+    const result = await submitWarmPathNote({ upsertPathNote } as unknown as WarmIntrosV2Service, mcpActor, {
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: null,
+    });
+    expect(upsertPathNote).toHaveBeenCalledWith(
+      'p1',
+      { connectorProfileUid: 'from1', note: null },
+      { uid: 'm1', email: 'ada@example.com' }
+    );
+    expect(result).toEqual({
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: null,
+      updatedAt: null,
+    });
+  });
+});
+
+describe('getWarmPathNote', () => {
+  it("returns this member's own note", async () => {
+    const payload = {
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: 'Waiting on a reply',
+      updatedAt: '2026-08-19T00:00:00.000Z',
+    };
+    const getMyPathNote = jest.fn().mockResolvedValue(payload);
+    await expect(
+      getWarmPathNote({ getMyPathNote } as unknown as WarmIntrosV2Service, mcpActor, {
+        warmPathUid: 'p1',
+        connectorProfileUid: 'from1',
+      })
+    ).resolves.toEqual(payload);
+    expect(getMyPathNote).toHaveBeenCalledWith('p1', 'from1', { uid: 'm1', email: 'ada@example.com' });
+  });
+
+  it('returns empty when this member has no note', async () => {
+    const getMyPathNote = jest.fn().mockResolvedValue({
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: null,
+      updatedAt: null,
+    });
+    await expect(
+      getWarmPathNote({ getMyPathNote } as unknown as WarmIntrosV2Service, mcpActor, {
+        warmPathUid: 'p1',
+        connectorProfileUid: 'from1',
+      })
+    ).resolves.toEqual({
+      warmPathUid: 'p1',
+      connectorProfileUid: 'from1',
+      note: null,
+      updatedAt: null,
+    });
+  });
+
+  it('propagates not-found', async () => {
+    const getMyPathNote = jest.fn().mockRejectedValue(new NotFoundException('WarmPathV2 not found: missing'));
+    await expect(
+      getWarmPathNote({ getMyPathNote } as unknown as WarmIntrosV2Service, mcpActor, {
         warmPathUid: 'missing',
         connectorProfileUid: 'from1',
       })

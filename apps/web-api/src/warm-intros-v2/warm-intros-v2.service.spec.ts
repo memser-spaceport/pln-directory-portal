@@ -27,6 +27,12 @@ describe('WarmIntrosV2Service', () => {
   const feedbackDelete = jest.fn();
   const feedbackCount = jest.fn();
 
+  const noteFindUnique = jest.fn();
+  const noteFindMany = jest.fn();
+  const noteCreate = jest.fn();
+  const noteUpdate = jest.fn();
+  const noteDelete = jest.fn();
+
   const transaction = jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn({
       connectionEdge: { findUnique: edgeFindUnique, create: edgeCreate, update: edgeUpdate },
@@ -56,6 +62,13 @@ describe('WarmIntrosV2Service', () => {
       update: feedbackUpdate,
       delete: feedbackDelete,
       count: feedbackCount,
+    },
+    warmPathV2Note: {
+      findUnique: noteFindUnique,
+      findMany: noteFindMany,
+      create: noteCreate,
+      update: noteUpdate,
+      delete: noteDelete,
     },
     masterProfile: {
       findMany: masterProfileFindMany,
@@ -120,6 +133,7 @@ describe('WarmIntrosV2Service', () => {
     memberFindMany.mockResolvedValue([]);
     pathCount.mockResolvedValue(1);
     feedbackFindMany.mockResolvedValue([]);
+    noteFindMany.mockResolvedValue([]);
   });
 
   describe('ingestEdges', () => {
@@ -833,6 +847,61 @@ describe('WarmIntrosV2Service', () => {
         expect.objectContaining({ yesCount: 1, noCount: 1, noteCount: 1 })
       );
     });
+
+    it('attaches myNote and others notes when requested', async () => {
+      pathFindMany.mockResolvedValue([pathRow]);
+      noteFindMany
+        .mockResolvedValueOnce([
+          {
+            warmPathUid: 'p1',
+            connectorProfileUid: 'from1',
+            actorUid: 'member-1',
+            note: 'Waiting on a reply',
+            updatedAt: new Date('2026-08-19T00:00:00.000Z'),
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            warmPathUid: 'p1',
+            connectorProfileUid: 'from1',
+            actorUid: 'member-1',
+            actorEmail: 'a@pl.com',
+            note: 'Waiting on a reply',
+            updatedAt: new Date('2026-08-19T00:00:00.000Z'),
+          },
+          {
+            warmPathUid: 'p1',
+            connectorProfileUid: 'from1',
+            actorUid: 'member-2',
+            actorEmail: 'b@pl.com',
+            note: 'Intro sent Tuesday',
+            updatedAt: new Date('2026-08-18T00:00:00.000Z'),
+          },
+        ]);
+
+      const result = await service.getPathsByInvestor(
+        'inv1',
+        {},
+        {
+          actor: { uid: 'member-1', email: 'a@pl.com' },
+          includeFeedbackSummary: true,
+        }
+      );
+
+      expect(result.paths[0].myNoteByConnector).toEqual({
+        from1: {
+          note: 'Waiting on a reply',
+          updatedAt: '2026-08-19T00:00:00.000Z',
+        },
+      });
+      expect(result.paths[0].notesByConnector?.from1).toEqual([
+        {
+          actorEmail: 'b@pl.com',
+          note: 'Intro sent Tuesday',
+          updatedAt: '2026-08-18T00:00:00.000Z',
+        },
+      ]);
+    });
   });
 
   describe('upsertPathFeedback', () => {
@@ -928,6 +997,143 @@ describe('WarmIntrosV2Service', () => {
       pathFindUnique.mockResolvedValue(null);
       await expect(
         service.getMyPathFeedback('missing', 'from1', { uid: 'member-1', email: 'a@pl.com' })
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('upsertPathNote', () => {
+    const pathOnDisk = {
+      uid: 'p1',
+      targetProfileUid: 'inv1',
+      targetSet: 'neuro-fund-i',
+      bestConnectorProfileUid: 'from1',
+      alternateConnectorProfileUids: ['from2'],
+      hopChain,
+    };
+
+    it('creates a note for a connector on the path', async () => {
+      pathFindUnique.mockResolvedValue(pathOnDisk);
+      noteFindUnique.mockResolvedValue(null);
+      noteCreate.mockResolvedValue({
+        uid: 'n1',
+        warmPathUid: 'p1',
+        targetProfileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+        connectorProfileUid: 'from1',
+        note: 'Waiting on a reply',
+        actorUid: 'member-1',
+        actorEmail: 'a@pl.com',
+        createdAt: new Date('2026-08-19T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-19T00:00:00.000Z'),
+      });
+
+      await expect(
+        service.upsertPathNote(
+          'p1',
+          { connectorProfileUid: 'from1', note: 'Waiting on a reply' },
+          { uid: 'member-1', email: 'a@pl.com' }
+        )
+      ).resolves.toEqual(
+        expect.objectContaining({ uid: 'n1', note: 'Waiting on a reply', connectorProfileUid: 'from1' })
+      );
+      expect(noteCreate).toHaveBeenCalled();
+    });
+
+    it('updates an existing note', async () => {
+      pathFindUnique.mockResolvedValue(pathOnDisk);
+      noteFindUnique.mockResolvedValue({ uid: 'n1' });
+      noteUpdate.mockResolvedValue({
+        uid: 'n1',
+        warmPathUid: 'p1',
+        targetProfileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+        connectorProfileUid: 'from1',
+        note: 'Intro sent',
+        actorUid: 'member-1',
+        actorEmail: 'a@pl.com',
+        createdAt: new Date('2026-08-19T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-19T01:00:00.000Z'),
+      });
+
+      await expect(
+        service.upsertPathNote(
+          'p1',
+          { connectorProfileUid: 'from1', note: 'Intro sent' },
+          { uid: 'member-1', email: 'a@pl.com' }
+        )
+      ).resolves.toEqual(expect.objectContaining({ uid: 'n1', note: 'Intro sent' }));
+      expect(noteUpdate).toHaveBeenCalled();
+    });
+
+    it('clears by deleting the row', async () => {
+      pathFindUnique.mockResolvedValue(pathOnDisk);
+      noteFindUnique.mockResolvedValue({ uid: 'n1' });
+      noteDelete.mockResolvedValue({});
+
+      await expect(
+        service.upsertPathNote(
+          'p1',
+          { connectorProfileUid: 'from1', note: null },
+          { uid: 'member-1', email: 'a@pl.com' }
+        )
+      ).resolves.toEqual({ deleted: true });
+      expect(noteDelete).toHaveBeenCalledWith({ where: { uid: 'n1' } });
+    });
+
+    it('rejects connector not on path', async () => {
+      pathFindUnique.mockResolvedValue({
+        ...pathOnDisk,
+        alternateConnectorProfileUids: [],
+      });
+      await expect(
+        service.upsertPathNote(
+          'p1',
+          { connectorProfileUid: 'unknown', note: 'hi' },
+          { uid: 'member-1', email: 'a@pl.com' }
+        )
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('getMyPathNote', () => {
+    const pathOnDisk = {
+      uid: 'p1',
+      bestConnectorProfileUid: 'from1',
+      alternateConnectorProfileUids: ['from2'],
+      hopChain,
+    };
+
+    it('returns this actor note', async () => {
+      pathFindUnique.mockResolvedValue(pathOnDisk);
+      noteFindUnique.mockResolvedValue({
+        note: 'Waiting on a reply',
+        updatedAt: new Date('2026-08-19T00:00:00.000Z'),
+      });
+
+      await expect(service.getMyPathNote('p1', 'from1', { uid: 'member-1', email: 'a@pl.com' })).resolves.toEqual({
+        warmPathUid: 'p1',
+        connectorProfileUid: 'from1',
+        note: 'Waiting on a reply',
+        updatedAt: '2026-08-19T00:00:00.000Z',
+      });
+    });
+
+    it('returns empty when this actor has no note', async () => {
+      pathFindUnique.mockResolvedValue(pathOnDisk);
+      noteFindUnique.mockResolvedValue(null);
+
+      await expect(service.getMyPathNote('p1', 'from1', { uid: 'member-1', email: 'a@pl.com' })).resolves.toEqual({
+        warmPathUid: 'p1',
+        connectorProfileUid: 'from1',
+        note: null,
+        updatedAt: null,
+      });
+    });
+
+    it('throws not-found when the path is missing', async () => {
+      pathFindUnique.mockResolvedValue(null);
+      await expect(
+        service.getMyPathNote('missing', 'from1', { uid: 'member-1', email: 'a@pl.com' })
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
