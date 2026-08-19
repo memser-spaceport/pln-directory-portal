@@ -90,6 +90,8 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
         ? 'Your application to join the Protocol Labs network was not approved. You may reapply in the future.'
         : null,
     investorProfileId: null,
+    jobSearchStatus: null,
+    currentCompany: null,
   };
 });
 
