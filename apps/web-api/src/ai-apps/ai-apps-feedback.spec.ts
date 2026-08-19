@@ -14,6 +14,14 @@ jest.mock('../push-notifications/push-notifications.service', () => ({
 import { AiAppsService } from './ai-apps.service';
 
 const APP = { uid: 'app-1', memberUid: 'creator-1', appId: 'demo' };
+const FEEDBACK = {
+  uid: 'fb-1',
+  appUid: 'app-1',
+  memberUid: 'member-1',
+  text: 'please add dark mode',
+  status: 'NEW',
+  createdAt: new Date(1),
+};
 
 function buildService(overrides: Record<string, any> = {}) {
   const prisma = {
@@ -21,8 +29,12 @@ function buildService(overrides: Record<string, any> = {}) {
     aiAppFeedback: {
       create: jest
         .fn()
-        .mockImplementation(({ data }) => Promise.resolve({ uid: 'fb-1', createdAt: new Date(0), ...data })),
+        .mockImplementation(({ data }) =>
+          Promise.resolve({ uid: 'fb-1', createdAt: new Date(0), status: 'NEW', ...data })
+        ),
       findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(FEEDBACK),
+      update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...FEEDBACK, ...data })),
     },
     member: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -49,6 +61,15 @@ describe('AiAppsService feedback', () => {
       expect(prisma.aiAppFeedback.create).toHaveBeenLastCalledWith({
         data: { appUid: 'app-1', memberUid: 'member-1', text: 'second' },
       });
+    });
+
+    it('defaults status to NEW without sending it in the create payload', async () => {
+      const { service, prisma } = buildService();
+      const result = await service.submitFeedback('member-1', 'app-1', 'hi');
+      expect(prisma.aiAppFeedback.create).toHaveBeenCalledWith({
+        data: { appUid: 'app-1', memberUid: 'member-1', text: 'hi' },
+      });
+      expect(result.status).toBe('NEW');
     });
 
     it('returns the submitter as `member` instead of raw memberUid', async () => {
@@ -87,11 +108,25 @@ describe('AiAppsService feedback', () => {
       await expect(service.listFeedback('viewer-1', 'app-1')).rejects.toBeInstanceOf(ForbiddenException);
     });
 
-    it('returns feedback newest first with submitter info', async () => {
+    it('returns feedback newest first with submitter info and status', async () => {
       const { service, prisma } = buildService();
       prisma.aiAppFeedback.findMany.mockResolvedValue([
-        { uid: 'fb-2', appUid: 'app-1', memberUid: 'member-2', text: 'later', createdAt: new Date(2) },
-        { uid: 'fb-1', appUid: 'app-1', memberUid: 'member-1', text: 'earlier', createdAt: new Date(1) },
+        {
+          uid: 'fb-2',
+          appUid: 'app-1',
+          memberUid: 'member-2',
+          text: 'later',
+          status: 'VIEWED',
+          createdAt: new Date(2),
+        },
+        {
+          uid: 'fb-1',
+          appUid: 'app-1',
+          memberUid: 'member-1',
+          text: 'earlier',
+          status: 'NEW',
+          createdAt: new Date(1),
+        },
       ]);
       prisma.member.findMany.mockResolvedValue([{ uid: 'member-2', name: 'Bea', image: null }]);
 
@@ -101,10 +136,81 @@ describe('AiAppsService feedback', () => {
         orderBy: { createdAt: 'desc' },
       });
       expect(result.map((f) => f.text)).toEqual(['later', 'earlier']);
+      expect(result.map((f) => f.status)).toEqual(['VIEWED', 'NEW']);
       // A member without a profile image resolves to image: null.
       expect(result[0].member).toEqual({ uid: 'member-2', name: 'Bea', image: null });
       // Unknown submitter resolves to null rather than leaking the uid.
       expect(result[1].member).toBeNull();
+    });
+  });
+
+  describe('updateFeedbackStatus', () => {
+    it('throws 404 when the app does not exist', async () => {
+      const { service, prisma } = buildService();
+      prisma.aiApp.findUnique.mockResolvedValue(null);
+      await expect(service.updateFeedbackStatus('creator-1', 'missing', 'fb-1', 'VIEWED')).rejects.toBeInstanceOf(
+        NotFoundException
+      );
+    });
+
+    it('throws 404 when the feedback does not exist', async () => {
+      const { service, prisma } = buildService();
+      prisma.aiAppFeedback.findUnique.mockResolvedValue(null);
+      await expect(service.updateFeedbackStatus('creator-1', 'app-1', 'missing', 'VIEWED')).rejects.toBeInstanceOf(
+        NotFoundException
+      );
+    });
+
+    it('throws 404 when the feedback belongs to a different app', async () => {
+      const { service, prisma } = buildService();
+      prisma.aiAppFeedback.findUnique.mockResolvedValue({ ...FEEDBACK, appUid: 'other-app' });
+      await expect(service.updateFeedbackStatus('creator-1', 'app-1', 'fb-1', 'VIEWED')).rejects.toBeInstanceOf(
+        NotFoundException
+      );
+      expect(prisma.aiAppFeedback.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a regular viewer who is neither creator nor admin', async () => {
+      const { service, prisma } = buildService();
+      prisma.member.findUnique.mockResolvedValue({ memberRoles: [] });
+      await expect(service.updateFeedbackStatus('viewer-1', 'app-1', 'fb-1', 'VIEWED')).rejects.toBeInstanceOf(
+        ForbiddenException
+      );
+      expect(prisma.aiAppFeedback.update).not.toHaveBeenCalled();
+    });
+
+    it('lets the app creator set status', async () => {
+      const { service, prisma } = buildService();
+      const result = await service.updateFeedbackStatus('creator-1', 'app-1', 'fb-1', 'VIEWED');
+      expect(prisma.aiAppFeedback.update).toHaveBeenCalledWith({
+        where: { uid: 'fb-1' },
+        data: { status: 'VIEWED' },
+      });
+      expect(result.status).toBe('VIEWED');
+    });
+
+    it('lets a directory admin set status', async () => {
+      const { service, prisma } = buildService();
+      prisma.member.findUnique.mockResolvedValue({ memberRoles: [{ name: 'DIRECTORYADMIN' }] });
+      const result = await service.updateFeedbackStatus('admin-1', 'app-1', 'fb-1', 'VIEWED');
+      expect(result.status).toBe('VIEWED');
+    });
+
+    it('allows skipping from NEW to IMPLEMENTED', async () => {
+      const { service } = buildService();
+      const result = await service.updateFeedbackStatus('creator-1', 'app-1', 'fb-1', 'IMPLEMENTED');
+      expect(result.status).toBe('IMPLEMENTED');
+    });
+
+    it('allows moving backwards from IMPLEMENTED to VIEWED', async () => {
+      const { service, prisma } = buildService();
+      prisma.aiAppFeedback.findUnique.mockResolvedValue({ ...FEEDBACK, status: 'IMPLEMENTED' });
+      const result = await service.updateFeedbackStatus('creator-1', 'app-1', 'fb-1', 'VIEWED');
+      expect(prisma.aiAppFeedback.update).toHaveBeenCalledWith({
+        where: { uid: 'fb-1' },
+        data: { status: 'VIEWED' },
+      });
+      expect(result.status).toBe('VIEWED');
     });
   });
 });

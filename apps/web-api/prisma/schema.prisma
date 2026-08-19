@@ -3383,7 +3383,7 @@ model AiApp {
   /// call omits it). Shape: `{ enabled, type, host?, port?, name?, user?,
   /// credentialsInjected? }` — mirrors the API response's `database` block
   /// exactly. The password is never stored, only injected into the app's
-  /// runtime pod. A bring-your-own database is just a regular runtime secret
+  /// runtime pod. A bring-your-own database is just a regular runtime secret 
   /// and isn't tracked here.
   database        Json?
   createdAt       DateTime    @default(now())
@@ -3394,18 +3394,26 @@ model AiApp {
   @@index([status])
 }
 
+enum AiAppFeedbackStatus {
+  NEW
+  VIEWED
+  IMPLEMENTED
+}
+
 /// Free-text feedback left by a PL Infra member on an app's detail page. A
 /// member may submit multiple entries per app. Readable only by the app's
-/// creator and directory admins (enforced in the service).
+/// creator and directory admins (enforced in the service). Status is shared
+/// across all viewers; only the creator or a directory admin may change it.
 model AiAppFeedback {
-  id        Int      @id @default(autoincrement())
-  uid       String   @unique @default(cuid())
+  id        Int                 @id @default(autoincrement())
+  uid       String              @unique @default(cuid())
   /// The app the feedback is about (AiApp.uid; no FK relation, matching the other POC tables).
   appUid    String
   /// The member who submitted the feedback.
   memberUid String
   text      String
-  createdAt DateTime @default(now())
+  status    AiAppFeedbackStatus @default(NEW)
+  createdAt DateTime            @default(now())
 
   @@index([appUid])
   @@index([memberUid])

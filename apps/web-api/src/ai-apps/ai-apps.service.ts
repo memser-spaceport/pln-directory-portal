@@ -10,7 +10,15 @@ import {
 } from '@nestjs/common';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
-import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback, Prisma, PushNotificationCategory } from '@prisma/client';
+import {
+  AiApp,
+  AiAppEvent,
+  AiAppEventType,
+  AiAppFeedback,
+  AiAppFeedbackStatus,
+  Prisma,
+  PushNotificationCategory,
+} from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { isDirectoryAdmin } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
@@ -891,6 +899,35 @@ export class AiAppsService {
       orderBy: { createdAt: 'desc' },
     });
     return this.withMember(feedback);
+  }
+
+  /**
+   * Sets the shared review status on one feedback row. Any of NEW / VIEWED /
+   * IMPLEMENTED is always allowed (skips and backwards moves included). Restricted
+   * to the app's creator and directory admins; no notification is sent.
+   */
+  async updateFeedbackStatus(
+    requesterUid: string,
+    appUid: string,
+    feedbackUid: string,
+    status: AiAppFeedbackStatus
+  ): Promise<WithMember<AiAppFeedback>> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app) {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can update feedback status');
+    }
+    const feedback = await this.prisma.aiAppFeedback.findUnique({ where: { uid: feedbackUid } });
+    if (!feedback || feedback.appUid !== app.uid) {
+      throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
+    }
+    const updated = await this.prisma.aiAppFeedback.update({
+      where: { uid: feedbackUid },
+      data: { status },
+    });
+    return (await this.withMember([updated]))[0];
   }
 
   /** True when the requester created the app or is a directory admin. */

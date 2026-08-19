@@ -37,6 +37,7 @@ import { DeployDraftDto } from './dto/deploy-draft.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
+import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import { AI_APPS_MAX_PRD_BYTES, AI_APPS_MAX_ZIP_BYTES, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
 
@@ -357,6 +358,26 @@ export class AiAppsController {
   async listFeedback(@Param('uid') uid: string, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.aiAppsService.listFeedback(memberUid, uid);
+  }
+
+  /**
+   * Set the shared review status on one feedback row. Restricted to the app's
+   * creator and directory admins (checked in the service). Any of NEW / VIEWED /
+   * IMPLEMENTED is always allowed.
+   */
+  @NoCache()
+  @Patch(':uid/feedback/:feedbackUid')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async updateFeedbackStatus(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Body() body: UpdateFeedbackStatusDto,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.updateFeedbackStatus(memberUid, uid, feedbackUid, body.status);
   }
 
   /**
