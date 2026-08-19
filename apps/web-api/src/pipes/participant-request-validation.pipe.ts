@@ -1,9 +1,4 @@
-import {
-  ArgumentMetadata,
-  BadRequestException,
-  Injectable,
-  PipeTransform,
-} from '@nestjs/common';
+import { ArgumentMetadata, BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 import {
   ParticipantRequestMemberSchema,
   ParticipantRequestTeamSchema,
@@ -33,6 +28,10 @@ export class ParticipantsReqValidationPipe implements PipeTransform {
     ) {
       body.uniqueIdentifier = body.uniqueIdentifier ?? body.newData.name;
       return body;
+    }
+
+    if (participantType === 'MEMBER') {
+      body.uniqueIdentifier = body.uniqueIdentifier ?? body.newData?.email;
     }
 
     try {
