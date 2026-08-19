@@ -43,6 +43,13 @@ export class JobOpeningsQueryService {
   private buildWhere(query: JobsListQuery, overrides: FacetOverrides = {}): Prisma.JobOpeningWhereInput {
     const and: Prisma.JobOpeningWhereInput[] = [];
 
+    // Pushed into `and` rather than set alongside the returned `teamUid: { not: null }`,
+    // which a second top-level key would overwrite. Not subject to a FacetOverride: the
+    // team scope isn't a facet, so it must survive even when counting facets.
+    if (query.teamUid) {
+      and.push({ teamUid: query.teamUid });
+    }
+
     if (!overrides.dropQ && query.q) {
       and.push({
         OR: [
