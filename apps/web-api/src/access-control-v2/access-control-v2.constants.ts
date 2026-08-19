@@ -149,6 +149,13 @@ export const TEAM_MEMBERSHIP_PERMISSIONS = {
 
 export const MEMBERSHIP_PERMISSIONS = TEAM_MEMBERSHIP_PERMISSIONS;
 
+// ── PLAA ─────────────────────────────────────────────────────────────────
+
+export const PLAA_PERMISSIONS = {
+  /** Access to PLAA */
+  ACCESS: 'plaa.access',
+} as const;
+
 // ── PL Advisors ───────────────────────────────────────────────────────────
 
 export const PL_ADVISORS_PERMISSIONS = {
@@ -286,6 +293,9 @@ export const ALL_PERMISSION_CODES = [
   // Membership
   TEAM_MEMBERSHIP_PERMISSIONS.SOURCE_READ,
   TEAM_MEMBERSHIP_PERMISSIONS.SOURCE_READ_LEGACY,
+
+  // PLAA
+  PLAA_PERMISSIONS.ACCESS,
 
   // PL Advisors
   PL_ADVISORS_PERMISSIONS.ACCESS,
