@@ -13,9 +13,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { SkipEmptyStringToNull } from '../decorators/skip-empty-string-to-null.decorator';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 import { AccessControlV2Service } from '../access-control-v2/services/access-control-v2.service';
 import { MasterProfileService } from '../master-profile/master-profile.service';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
+import { trackMcpToolInvocation } from './mcp-analytics';
 import { McpOAuthService } from './mcp-oauth.service';
 import { toolsForPermissions, WHOAMI_TOOL, warmIntroTools } from './mcp-tools';
 
@@ -27,7 +29,8 @@ export class McpController {
     private readonly oauth: McpOAuthService,
     private readonly accessControl: AccessControlV2Service,
     private readonly masterProfiles: MasterProfileService,
-    private readonly warmIntros: WarmIntrosV2Service
+    private readonly warmIntros: WarmIntrosV2Service,
+    private readonly analytics: AnalyticsService
   ) {}
 
   @NoCache()
@@ -63,6 +66,8 @@ export class McpController {
       name: actor.name,
       email: actor.email,
       permissions,
+      authorizationUid: actor.authorizationUid,
+      clientName: actor.clientName,
     };
     for (const tool of tools) {
       const config: { description: string; inputSchema?: Record<string, unknown> } = {
@@ -79,13 +84,29 @@ export class McpController {
           cb: (args?: Record<string, unknown>) => unknown
         ) => void
       )(tool.name, config, async (args) => {
+        const toolArgs = args ?? {};
         try {
-          const result = await tool.execute(ctx, args ?? {});
+          const result = await tool.execute(ctx, toolArgs);
+          trackMcpToolInvocation(this.analytics, actor, {
+            toolName: tool.name,
+            args: toolArgs,
+            result,
+            success: true,
+            isError: false,
+          });
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(result) }],
           };
         } catch (error) {
-          if (error instanceof NotFoundException || error instanceof BadRequestException) {
+          const isSoftError = error instanceof NotFoundException || error instanceof BadRequestException;
+          trackMcpToolInvocation(this.analytics, actor, {
+            toolName: tool.name,
+            args: toolArgs,
+            success: false,
+            isError: isSoftError,
+            error,
+          });
+          if (isSoftError) {
             return {
               isError: true,
               content: [{ type: 'text' as const, text: String(error.message) }],

@@ -11,6 +11,8 @@ export type McpActorContext = {
   name: string;
   email: string | null;
   permissions: Set<string>;
+  authorizationUid: string;
+  clientName: string;
 };
 
 export type McpToolDef = {

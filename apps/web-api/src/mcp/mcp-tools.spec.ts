@@ -74,6 +74,8 @@ describe('toolsForPermissions', () => {
       name: 'Ada',
       email: 'ada@example.com',
       permissions: new Set(),
+      authorizationUid: 'auth-1',
+      clientName: 'Claude Code',
     });
     expect(result).toEqual({ memberUid: 'm1', name: 'Ada', email: 'ada@example.com' });
   });
@@ -270,6 +272,8 @@ const mcpActor = {
   name: 'Ada',
   email: 'ada@example.com',
   permissions: new Set(['investor_db.view']),
+  authorizationUid: 'auth-1',
+  clientName: 'Claude Code',
 };
 
 describe('submitWarmPathFeedback', () => {

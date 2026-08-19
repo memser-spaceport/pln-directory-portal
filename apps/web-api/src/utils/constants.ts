@@ -354,6 +354,9 @@ export const ANALYTICS_EVENTS = {
     LANDING_TEAM_CARD_CLICKED: 'demo-day-landing-team-card-clicked',
     LANDING_TEAM_WEBSITE_CLICKED: 'demo-day-landing-team-website-clicked',
   },
+  MCP: {
+    TOOL_INVOKED: 'mcp-tool-invoked',
+  },
 };
 
 export const ANALYTICS_SOURCE = 'directory-backend';
