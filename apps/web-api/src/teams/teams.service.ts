@@ -11,7 +11,7 @@ import {
 import * as path from 'path';
 import { z } from 'zod';
 import { isEmpty } from 'lodash';
-import { AskStatus, Member, Prisma, Team } from '@prisma/client';
+import { AskStatus, Member, Prisma, Team, TeamStatus } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AirtableTeamSchema } from '../utils/airtable/schema/airtable-team.schema';
 import { FileMigrationService } from '../utils/file-migration/file-migration.service';
@@ -77,7 +77,7 @@ export class TeamsService {
         //   not: 'L0',
         // },
         status: {
-          not: 'INACTIVE',
+          not: TeamStatus.INACTIVE,
         },
       };
 
@@ -1732,7 +1732,7 @@ export class TeamsService {
         not: 'L0',
       },
       status: {
-        not: 'INACTIVE',
+        not: TeamStatus.INACTIVE,
       },
     };
 
