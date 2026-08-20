@@ -4,35 +4,12 @@ import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { noteToHtml } from './job-openings-email-html';
 import { resolveVisibleJobOpening } from './job-openings-resolve';
+import { deriveReferralBlurb } from './job-openings-referral-blurb';
 
 const JOB_BOARD_REFERRAL_TEMPLATE = 'JOB_BOARD_REFERRAL_EMAIL';
-const MAX_BLURB_CHARS = 220;
 
 type ResolvedRecipient = { email: string; name: string | null };
 type MemberHeadline = { title: string | null; companyName: string | null };
-
-// Turns a stored (possibly AI-generated, possibly HTML) Member.bio into a short,
-// plain-text sentence or two for the referral draft note. Not AI-summarized —
-// just the bio's own leading sentences, minus markup and the AI disclaimer.
-// See member-bio-generation skill for how Member.bio itself gets generated.
-function deriveReferralBlurb(bio: string | null): string | null {
-  if (!bio) return null;
-  const plain = bio
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/ /g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!plain) return null;
-
-  const sentences = plain.split(/(?<=[.!?])\s+/).filter((sentence) => !/AI generated/i.test(sentence));
-  let blurb = '';
-  for (const sentence of sentences) {
-    if (blurb.length + sentence.length > MAX_BLURB_CHARS) break;
-    blurb = blurb ? `${blurb} ${sentence}` : sentence;
-  }
-  return blurb || null;
-}
 
 @Injectable()
 export class JobOpeningsReferralService {
