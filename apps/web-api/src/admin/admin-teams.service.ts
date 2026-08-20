@@ -230,6 +230,11 @@ export class AdminTeamsService {
         linkedinHandler: true,
         shortDescription: true,
         longDescription: true,
+        blueskyHandler: true,
+        crunchbaseHandler: true,
+        dateFounded: true,
+        teamSize: true,
+        location: true,
         logo: { select: { url: true } },
       },
     });
