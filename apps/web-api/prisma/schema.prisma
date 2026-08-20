@@ -2111,6 +2111,11 @@ model TeamEnrichment {
   twitterHandler   String?
   linkedinHandler  String?
   telegramHandler  String?
+  blueskyHandler    String?
+  crunchbaseHandler String?
+  dateFounded       Int?
+  teamSize          String?
+  location          String?
   shortDescription String?
   longDescription  String?
   moreDetails      String?

@@ -163,7 +163,7 @@ Marking a team always upserts the `TeamEnrichment` row carrying `dataEnrichment.
 ### Path C — Automatic marking of eligible existing teams
 
 1. A cron job (`TEAM_ENRICHMENT_MARKING_CRON`) periodically scans for **eligible** teams that have never been enriched (no `TeamEnrichment` row exists). Eligibility is governed by `TEAM_ENRICHMENT_FILTER_PRIORITY` and `TEAM_ENRICHMENT_FILTER_IS_FUND` (see Environment Variables) — active filters compose with OR. For example `PRIORITY=1,2,3` + `IS_FUND=true` selects fund teams OR priority 1/2/3 teams. With both unset/empty, eligibility falls back to `isFund=true`.
-2. Teams must also have at least one empty enrichable scalar field on `Team` (website, blog, contactMethod, twitterHandler, linkedinHandler, telegramHandler, shortDescription, longDescription, moreDetails)
+2. Teams must also have at least one empty enrichable scalar field on `Team` (website, blog, contactMethod, twitterHandler, linkedinHandler, telegramHandler, blueskyHandler, crunchbaseHandler, dateFounded, teamSize, location, shortDescription, longDescription, moreDetails). Note: `status` is intentionally excluded from enrichment — it defaults to `ACTIVE` and is never actually empty, so it doesn't fit the gap model the rest of these fields use.
 3. Matching teams get a `TeamEnrichment` row with `dataEnrichment = { shouldEnrich: true, status: 'PendingEnrichment', ... }`
 4. The enrichment cron picks them up on its next run
 
@@ -259,7 +259,8 @@ For each Enriched field whose Stage 1 or Stage 2 verdict is `agrees` at `high` c
 
 | Field                                          | Promotion target                           |
 | ---------------------------------------------- | ------------------------------------------ |
-| scalar (website, blog, contactMethod, social handles, descriptions, moreDetails) | `Team.<field>`               |
+| scalar (website, blog, contactMethod, social handles incl. `blueskyHandler`/`crunchbaseHandler`, `teamSize`, `location`, descriptions, moreDetails) | `Team.<field>`               |
+| `dateFounded`                                  | `Team.dateFounded` (Int — bespoke, not part of the generic scalar loop since `TeamEnrichment.dateFounded` is also an Int) |
 | `industryTags`                                 | `Team.industryTags` M2M (titles → `IndustryTag` rows resolved at promotion) |
 | `investmentFocus`                              | `InvestorProfile.investmentFocus` (creating the profile if missing) |
 | `logo`                                         | **not promoted by the judge** — logo isn't judged. Stays on `TeamEnrichment.logoUid` until the logo-verification pipeline or an admin review handles it. |

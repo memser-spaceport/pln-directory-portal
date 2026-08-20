@@ -24,6 +24,15 @@ const TELEGRAM_HANDLE_BARE = /^[A-Za-z0-9_]{3,32}$/;
 // LinkedIn: `company/<slug>`, `school/<slug>`, `in/<slug>`, or bare `<slug>`.
 const LINKEDIN_SLUG = /^(?:company|school|in)\/[A-Za-z0-9_.-]{2,100}$|^[A-Za-z0-9_.-]{2,100}$/;
 
+// Bluesky handles are domain-shaped (e.g. "team.bsky.social" or a custom domain).
+const BLUESKY_HANDLE_BARE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,251}[A-Za-z0-9])?$/;
+
+// Crunchbase organization slug — lowercase-alnum-hyphen, matches normalizeCrunchbaseHandler's output shape.
+const CRUNCHBASE_SLUG = /^[A-Za-z0-9-]{1,255}$/;
+
+// Bare headcount ("50") or a range label ("11-50", "11–50").
+const TEAM_SIZE_SHAPE = /^\d{1,7}$|^\d{1,7}\s*[-–]\s*\d{1,7}$/;
+
 // Free-text fields where the AI is supposed to return PROSE about the team.
 const FREE_TEXT_FIELDS = new Set<FieldMetaKey>(['shortDescription', 'longDescription', 'moreDetails']);
 
@@ -102,6 +111,26 @@ export function isLikelyValueForField(field: FieldMetaKey, raw: string): boolean
       return TELEGRAM_HANDLE_BARE.test(handle);
     }
 
+    case 'blueskyHandler': {
+      const handle = extractHandleFromUrlOrPassthrough(
+        v.replace(/^@/, ''),
+        /^https?:\/\/(?:www\.)?bsky\.app\/profile\//i
+      );
+      return BLUESKY_HANDLE_BARE.test(handle);
+    }
+
+    case 'crunchbaseHandler': {
+      const isUrl = /^https?:\/\/(?:www\.)?crunchbase\.com\//i.test(v);
+      const slug = isUrl
+        ? v.replace(/^https?:\/\/(?:www\.)?crunchbase\.com\/(?:organization\/)?/i, '').replace(/\/+$/, '')
+        : v.replace(/^organization\//i, '').replace(/\/+$/, '');
+      return CRUNCHBASE_SLUG.test(slug);
+    }
+
+    case 'teamSize':
+      return TEAM_SIZE_SHAPE.test(v);
+
+    case 'location':
     case 'shortDescription':
     case 'longDescription':
     case 'moreDetails':

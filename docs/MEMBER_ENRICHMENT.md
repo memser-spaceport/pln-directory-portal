@@ -2,11 +2,13 @@
 
 ## Overview
 
-Automated, periodic gap-filling for Directory member profiles: **primary team/role**,
-**work history**, **bio**, **email**, and **skills**. Sourced from the member's own
-LinkedIn (or, when no LinkedIn handle is on file, X/Twitter) profile via ScrapingDog, plus
-a free CRM lookup for email. A daily marking cron finds newly-eligible members; an hourly
-cron processes the pending queue.
+Automated, periodic gap-filling for Directory member profiles: **social handles**
+(LinkedIn, Twitter/X, GitHub, Telegram, Bluesky), **primary team/role**, **work history**,
+**bio**, **email**, and **skills**. Sourced from the member's own LinkedIn (or, when no
+LinkedIn handle is on file, X/Twitter) profile via ScrapingDog, a free CRM lookup for
+email, and — only for social handles ScrapingDog can't source — a narrow, identity-gated
+AI web search. A daily marking cron finds newly-eligible members; an hourly cron processes
+the pending queue.
 
 **Fill-gaps-only, no exceptions.** Every field is only written when it is currently empty.
 A pre-existing value — set by the member, an admin, or a prior import — is never
@@ -15,13 +17,17 @@ for audit visibility.
 
 Modeled on [`TEAM_ENRICHMENT.md`](./TEAM_ENRICHMENT.md)'s marking-cron → enrichment-cron
 shape and eligibility-filter pattern, but **deliberately simpler**: there is no
-candidate-column + AI-judge second pass. The values here are the member's own
+candidate-column + AI-judge second pass. Most values here are the member's own
 self-reported identity (their own LinkedIn profile), not a public company identity an AI
 might misattribute — the same reasoning that already lets `member-bio.util.ts` and
 `husky-generation.service.ts` write bios/skills directly to `Member` with no judge stage
-(see [`MEMBER_BIO_GENERATION.md`](./MEMBER_BIO_GENERATION.md)). So `MemberEnrichment` is a
-lean, state-only sidecar — accepted values go straight to `Member`, `TeamMemberRole`,
-`MemberExperience`, and `Skill`.
+(see [`MEMBER_BIO_GENERATION.md`](./MEMBER_BIO_GENERATION.md)). The one exception is the
+social-handle AI web search (`member-enrichment-ai.service.ts`): since there's no
+second-pass judge to catch a wrong guess, that call self-gates instead — it only runs when
+the member has enough other identifying signal on file (`hasEnoughIdentifyingInfo`, same
+gate `member-bio.util.ts` uses for bio generation), and only accepts a result at
+`confidence: 'high'`. So `MemberEnrichment` is a lean, state-only sidecar — accepted values
+go straight to `Member`, `TeamMemberRole`, `MemberExperience`, and `Skill`.
 
 ## Storage model
 
@@ -47,6 +53,7 @@ model MemberEnrichment {
 
 | Field | Canonical home | Fill source | "Gap" means |
 | --- | --- | --- | --- |
+| `linkedinHandler`, `twitterHandler`, `githubHandler`, `telegramHandler`, `blueskyHandler` | `Member.<field>` | Identity-gated AI web search (`member-enrichment-ai.service.ts`), high-confidence only | field is empty. `discordHandler` is not attempted — no crawlable public profile to search |
 | primary team/role | `TeamMemberRole.mainTeam` (+ `role`) | LinkedIn `experience[0]` (most-recent-first) matched to an existing `Team` | member has no `TeamMemberRole` row with `mainTeam: true` |
 | work history | `MemberExperience` (one row per position) | every LinkedIn `experience[]` entry the member doesn't already have a row for | per-position: a LinkedIn entry with no matching existing row by company name |
 | bio | `Member.bio` | `generateMemberBioText` (reused, unchanged) | `Member.bio` is empty |
@@ -63,7 +70,10 @@ interface MemberDataEnrichment {
   enrichedAt?: string;      // ISO
   enrichedBy?: string;      // 'system-cron' | admin email
   errorMessage?: string;
-  fieldsMeta: Partial<Record<'primaryTeamRole' | 'workHistory' | 'bio' | 'email' | 'skills', {
+  fieldsMeta: Partial<Record<
+    | 'primaryTeamRole' | 'workHistory' | 'bio' | 'email' | 'skills'
+    | 'linkedinHandler' | 'twitterHandler' | 'githubHandler' | 'telegramHandler' | 'blueskyHandler',
+  {
     status: 'Enriched' | 'ChangedByUser' | 'CannotEnrich';
     source?: 'linkedin-experience' | 'linkedin-profile' | 'x-profile' | 'affinity-crm' | 'ai';
     lastModifiedAt?: string;  // ISO
@@ -102,11 +112,24 @@ consumes pending rows oldest-`createdAt`-first, so founders/leads are processed 
 
 ## Pipeline
 
-Per member, **one** ScrapingDog call total:
+Per member, **at most one** ScrapingDog call and **at most one** AI social-handle search call:
 
+0. **Social handles** (`linkedinHandler`, `twitterHandler`, `githubHandler`,
+   `telegramHandler`, `blueskyHandler`) — runs **before** the ScrapingDog fetch below, on
+   purpose: a handle discovered here (e.g. `linkedinHandler`) is written to the in-memory
+   member object immediately, so step 1's ScrapingDog fetch — and therefore bio,
+   work-history, and primaryTeamRole — can use it in this same run rather than waiting for
+   the next enrichment cycle. For every currently-empty handle field, a single
+   `MemberEnrichmentAiService.findMissingSocialHandles` call asks the model to find all of
+   them at once (one AI call, not one per field), passing along whatever handles/team/role/
+   location are already known as identity-verification context. The call is skipped
+   entirely when `hasEnoughIdentifyingInfo(member)` says there isn't enough signal to
+   search safely; per field, a result is only accepted at `confidence: 'high'` — anything
+   else is `CannotEnrich`. `discordHandler` is never requested (no crawlable public profile
+   to verify a match against).
 1. **Fetch** — `MemberScrapingDogService.fetchPersonProfile(linkedinHandler)` if the member
-   has a LinkedIn handle, else `fetchXProfile(...)` if they have an X/Twitter handle, else
-   skip (no source data at all).
+   has a LinkedIn handle (possibly one step 0 just found), else `fetchXProfile(...)` if they
+   have an X/Twitter handle, else skip (no source data at all).
 2. **email** (resolved first — skills needs it) — if empty, look up
    `AffinityPerson.primaryEmail` via `MasterProfile` (same join `resolveMemberPronouns`'s
    CRM branch already uses for gender, just a different field). Skipped if that email is
@@ -157,6 +180,7 @@ Per member, **one** ScrapingDog call total:
 | `MEMBER_ENRICHMENT_FILTER_PRIORITY` | `1,2,3` | eligibility — see above |
 | `MEMBER_ENRICHMENT_FILTER_IS_FUND` | `true` | eligibility — see above |
 | `SCRAPINGDOG_API_KEY` | — | shared with team enrichment / bio generation. When unset, ScrapingDog is skipped and only the email/skills-from-CRM paths can still fill gaps |
+| `HUSKY_GENERATION_AI_PROVIDER` | `gemini` | provider for the step-0 social-handle AI search — shared with bio generation, no dedicated env var |
 
 ## Admin endpoints
 
@@ -193,9 +217,10 @@ apps/web-api/src/member-enrichment/
   member-enrichment-eligibility-filter.ts        # investor / fund-team / priority-team OR filter
   member-enrichment-team-match.util.ts           # LinkedIn-experience company name → existing Team
   member-enrichment-experience.util.ts           # LinkedIn experience[] → missing-vs-existing diff → MemberExperience create inputs
+  member-enrichment-ai.service.ts                # identity-gated AI web search for missing social handles (step 0)
   member-enrichment.service.ts                   # marking, pending-queue, the enrichment pipeline itself
   member-enrichment.job.ts                       # marking + enrichment @Cron jobs
-  member-enrichment.module.ts                    # imports HuskyModule for MemberScrapingDogService / HuskyGenerationService
+  member-enrichment.module.ts                    # imports HuskyModule for MemberScrapingDogService / HuskyGenerationService (AiProviderService comes from the global SharedModule)
 ```
 
 Reused as-is from the Husky bio/skills pipeline (see `MEMBER_BIO_GENERATION.md`):
