@@ -149,6 +149,28 @@ describe('FeedCommentsService', () => {
       );
     });
 
+    it('decodes HTML entities in the notification description', async () => {
+      // Quill escapes quotes and ampersands on save, so the raw comment text carries
+      // entities that would otherwise reach the notification body literally.
+      const text =
+        '<p><a class="ql-mention" data-uid="m_jane">@Jane</a> said &quot;ship it&quot; &amp; she&#39;s right</p>';
+      feedCommentCreate.mockResolvedValue({
+        uid: 'c1',
+        newsItemUid: 'news-1',
+        parentUid: null,
+        text,
+        authorUid: 'author-1',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        author: authorInclude,
+      });
+
+      await service.createComment('author-1', { newsItemUid: 'news-1', text });
+
+      expect(pushCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ description: `@Jane said "ship it" & she's right` })
+      );
+    });
+
     it('does not notify the comment author for a self-mention', async () => {
       feedCommentCreate.mockResolvedValue({
         uid: 'c1',
