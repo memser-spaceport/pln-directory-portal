@@ -4,7 +4,7 @@
  */
 export const TEAM_NEWS_EXCLUDED_TEAM_NAMES = ['Nvidia', 'Anthropic', 'Red Hat', 'California Forever'] as const;
 
-/** Protocol Labs team UID — home All-tab include + trending seed force-include. */
+/** Protocol Labs team UID — home All-tab include, trending seed force-include, job board pin. */
 export const PROTOCOL_LABS_TEAM_UID = 'cldvnyxaf01ynu21k62uopjvg';
 
 /**
