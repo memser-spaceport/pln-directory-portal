@@ -53,7 +53,11 @@ import {
   sanitizeMemberContactsForViewer,
   sanitizeMembersContactsForViewer,
 } from './member-contact-sanitizer';
-import { omitJobSearchStatus, presentJobSearchStatusForViewer } from './job-search-status';
+import {
+  assignJobSearchStatusFromInput,
+  omitJobSearchStatus,
+  presentJobSearchStatusForViewer,
+} from './job-search-status';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -324,6 +328,22 @@ export class MemberController {
     if (!isEmpty(body.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
       throw new ForbiddenException(`Member isn't authorized to verify a member`);
     }
+    /**
+     * `updateMemberByUid` hands its body straight to `prisma.member.update`, so
+     * anything arriving on the wire has to already speak Prisma. Every other
+     * field on this route is a scalar and needs no translation; the job search
+     * status is an enum, and the values the API documents and returns
+     * ("open-to-right-role") are not the values the column stores
+     * (OPEN_TO_RIGHT_ROLE). Without this the write fails Prisma validation,
+     * even though the read path maps the other way perfectly — so the field
+     * could be read but never set.
+     *
+     * Mapped here rather than in the service because the service method is
+     * also called internally with values that are already Prisma enums, and
+     * `toPrismaJobSearchStatus` accepts only wire values. This is the wire
+     * boundary; that one isn't.
+     */
+    assignJobSearchStatusFromInput(body, body);
     return await this.membersService.updateMemberByUid(uid, body);
   }
 
