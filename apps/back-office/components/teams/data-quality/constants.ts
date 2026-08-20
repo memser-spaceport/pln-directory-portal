@@ -9,6 +9,11 @@ export const FIELD_KEYS: FieldKey[] = [
   'twitterHandler',
   'linkedinHandler',
   'blog',
+  'blueskyHandler',
+  'crunchbaseHandler',
+  'dateFounded',
+  'teamSize',
+  'location',
 ];
 
 export const FIELD_LABELS: Record<FieldKey, string> = {
@@ -20,6 +25,11 @@ export const FIELD_LABELS: Record<FieldKey, string> = {
   twitterHandler: 'Twitter',
   linkedinHandler: 'LinkedIn',
   blog: 'Blog',
+  blueskyHandler: 'Bluesky',
+  crunchbaseHandler: 'Crunchbase',
+  dateFounded: 'Date Founded',
+  teamSize: 'Team Size',
+  location: 'Location',
 };
 
 export const AI_SOURCES = ['ai', 'open-graph', 'scrapingdog'] as const;

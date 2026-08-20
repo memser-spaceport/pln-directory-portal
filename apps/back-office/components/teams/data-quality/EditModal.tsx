@@ -27,6 +27,11 @@ const MULTILINE: Partial<Record<EditableFieldKey, boolean>> = {
   longDescription: true,
 };
 
+// The form always holds strings (plain text inputs) — `dateFounded` is the one
+// `TeamUpdatePayload` field that isn't already a string, so it's overridden here
+// and converted back to `number | null` only when building the save payload.
+type TeamEditFormState = Omit<TeamUpdatePayload, 'dateFounded'> & { dateFounded?: string };
+
 /**
  * Pulls each field's CURRENT value off the live `Team` row (via teamDetail).
  * The input always reflects what's actually saved on Team — the AI candidate
@@ -37,10 +42,11 @@ const MULTILINE: Partial<Record<EditableFieldKey, boolean>> = {
  * that way a brand-new team whose Team.<field> is null still shows the AI
  * candidate in the input rather than an empty box.
  */
-function teamToForm(teamDetail: TeamDetail, enrichmentTeam: EnrichmentTeam): TeamUpdatePayload {
+function teamToForm(teamDetail: TeamDetail, enrichmentTeam: EnrichmentTeam): TeamEditFormState {
   const getContent = (key: EditableFieldKey): string => {
     const teamVal = teamDetail[key as keyof TeamDetail];
     if (typeof teamVal === 'string' && teamVal.trim() !== '') return teamVal;
+    if (typeof teamVal === 'number') return String(teamVal);
     const aiVal = pickAiSideValue(enrichmentTeam.fields[key]);
     return aiVal ?? '';
   };
@@ -53,6 +59,11 @@ function teamToForm(teamDetail: TeamDetail, enrichmentTeam: EnrichmentTeam): Tea
     linkedinHandler: getContent('linkedinHandler'),
     shortDescription: getContent('shortDescription'),
     longDescription: getContent('longDescription'),
+    blueskyHandler: getContent('blueskyHandler'),
+    crunchbaseHandler: getContent('crunchbaseHandler'),
+    dateFounded: getContent('dateFounded'),
+    teamSize: getContent('teamSize'),
+    location: getContent('location'),
   };
 }
 
@@ -89,8 +100,8 @@ function pickAiSideValue(entry: FieldEntry | undefined): string | null {
 }
 
 export function EditModal({ team, authToken, onClose }: Props) {
-  const [form, setForm] = useState<TeamUpdatePayload | null>(null);
-  const [initialForm, setInitialForm] = useState<TeamUpdatePayload | null>(null);
+  const [form, setForm] = useState<TeamEditFormState | null>(null);
+  const [initialForm, setInitialForm] = useState<TeamEditFormState | null>(null);
   const [confirmedFields, setConfirmedFields] = useState<Set<FieldKey>>(new Set());
   const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
   const isSavingRef = useRef(false);
@@ -140,8 +151,15 @@ export function EditModal({ team, authToken, onClose }: Props) {
     const fieldsToApprove = [...confirmedFields];
 
     const changedData: TeamUpdatePayload = {};
-    (Object.keys(form) as (keyof TeamUpdatePayload)[]).forEach((key) => {
-      if ((form[key] ?? '') !== (initialForm[key] ?? '')) (changedData as any)[key] = form[key];
+    (Object.keys(form) as (keyof TeamEditFormState)[]).forEach((key) => {
+      if ((form[key] ?? '') === (initialForm[key] ?? '')) return;
+      if (key === 'dateFounded') {
+        const trimmed = (form.dateFounded ?? '').trim();
+        const parsed = trimmed === '' ? null : Number.parseInt(trimmed, 10);
+        changedData.dateFounded = parsed !== null && Number.isNaN(parsed) ? null : parsed;
+        return;
+      }
+      (changedData as any)[key] = form[key];
     });
 
     if (Object.keys(changedData).length === 0 && fieldsToApprove.length === 0) {

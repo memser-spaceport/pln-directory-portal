@@ -11,6 +11,11 @@ export type TeamDetail = {
   linkedinHandler?: string | null;
   shortDescription?: string | null;
   longDescription?: string | null;
+  blueskyHandler?: string | null;
+  crunchbaseHandler?: string | null;
+  dateFounded?: number | null;
+  teamSize?: string | null;
+  location?: string | null;
   logo?: { url: string } | null;
 };
 
