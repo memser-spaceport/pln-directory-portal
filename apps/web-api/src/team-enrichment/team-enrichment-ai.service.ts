@@ -8,6 +8,7 @@ import { AITeamEnrichmentResponse, AIUsageEntry } from './team-enrichment.types'
 import { AiProviderService } from '../shared/ai-provider.service';
 import { buildUsageEntry, formatUsageLog } from './team-enrichment-cost';
 import { BROWSER_REQUEST_HEADERS, BROWSER_USER_AGENT } from './team-enrichment-http.util';
+import { normalizeBlueskyHandler, normalizeCrunchbaseHandler } from '../teams/team-handle-normalizer';
 
 export interface TeamEnrichmentAIResult {
   response: AITeamEnrichmentResponse;
@@ -19,6 +20,8 @@ export interface WebsiteSocialSignals {
   twitterHandler?: string;
   linkedinHandler?: string;
   telegramHandler?: string;
+  blueskyHandler?: string;
+  crunchbaseHandler?: string;
   contactEmail?: string;
   jsonLdOrgName?: string;
   /** `<meta property="og:site_name">` value, lightly trimmed. */
@@ -81,11 +84,21 @@ FIELDS TO POPULATE:
    - Partnerships or integrations
    NEVER leave this empty if any additional information was found. But if you found NO additional information, return null — do NOT write a sentence explaining that nothing was found.
 
-10. industryTags: Array of 2-6 SHORT industry/sector tags (1-3 words each) describing the industry or sector the company operates in.
+10. blueskyHandler: Bluesky handle without the leading @ (e.g., "teamname.bsky.social"). Only return a handle you actually found — never guess.
+
+11. crunchbaseHandler: Crunchbase organization slug (e.g., "protocol-labs") — the part of the URL after "crunchbase.com/organization/". Only return a slug you actually found on a real Crunchbase page.
+
+12. dateFounded: The 4-digit founding year ONLY (e.g., 2014) — never a full date, never a range. Return null if you cannot find a specific year.
+
+13. teamSize: Employee headcount, as a bare number (e.g., "50") or a range label exactly as reported (e.g., "11-50"). Return null if unknown.
+
+14. location: The primary HQ / operating location as a short free-text place label (e.g., "San Francisco, United States"). Return null if unknown.
+
+15. industryTags: Array of 2-6 SHORT industry/sector tags (1-3 words each) describing the industry or sector the company operates in.
    Examples: ["Blockchain", "DeFi", "AI", "Cloud Infrastructure", "Developer Tools", "Data Analytics", "Gaming", "NFT", "Privacy", "Fintech", "SaaS", "IoT", "Cybersecurity"]
    ALWAYS populate this field based on the company's domain.
 
-11. investmentFocus: Array of 3-8 SHORT TAGS (1-2 words each) describing what the company/fund focuses on or invests in.
+16. investmentFocus: Array of 3-8 SHORT TAGS (1-2 words each) describing what the company/fund focuses on or invests in.
    DERIVE these tags from:
    - The company's products/services
    - Technologies they use or build
@@ -124,6 +137,11 @@ SCHEMA (all keys required, types must match exactly):
   "linkedinHandler": string | null,
   "twitterHandler": string | null,
   "telegramHandler": string | null,
+  "blueskyHandler": string | null,
+  "crunchbaseHandler": string | null,
+  "dateFounded": number | null,
+  "teamSize": string | null,
+  "location": string | null,
   "shortDescription": string | null,
   "longDescription": string | null,
   "moreDetails": string | null,
@@ -348,6 +366,11 @@ Current Date: ${new Date().toISOString().split('T')[0]}
         linkedinHandler: this.sanitizeLinkedInHandler(parsed.linkedinHandler),
         twitterHandler: this.sanitizeHandle(parsed.twitterHandler),
         telegramHandler: this.sanitizeHandle(parsed.telegramHandler),
+        blueskyHandler: normalizeBlueskyHandler(parsed.blueskyHandler) ?? null,
+        crunchbaseHandler: normalizeCrunchbaseHandler(parsed.crunchbaseHandler) ?? null,
+        dateFounded: this.sanitizeFoundedYear(parsed.dateFounded),
+        teamSize: this.truncateString(parsed.teamSize, 50),
+        location: this.truncateString(parsed.location, 200),
         shortDescription: this.truncateString(parsed.shortDescription, 200),
         longDescription: this.truncateString(parsed.longDescription, 1000),
         moreDetails: parsed.moreDetails || null,
@@ -380,6 +403,11 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       linkedinHandler: null,
       twitterHandler: null,
       telegramHandler: null,
+      blueskyHandler: null,
+      crunchbaseHandler: null,
+      dateFounded: null,
+      teamSize: null,
+      location: null,
       shortDescription: null,
       longDescription: null,
       moreDetails: null,
@@ -531,6 +559,8 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       !result.twitterHandler &&
       !result.linkedinHandler &&
       !result.telegramHandler &&
+      !result.blueskyHandler &&
+      !result.crunchbaseHandler &&
       !result.contactEmail &&
       !result.ogSiteName &&
       !result.metaDescription &&
@@ -639,6 +669,28 @@ Current Date: ${new Date().toISOString().split('T')[0]}
       const RESERVED = ['share', 'joinchat'];
       if (/^[A-Za-z0-9_]{3,32}$/.test(handle) && !RESERVED.includes(handle.toLowerCase())) {
         result.telegramHandler = handle;
+      }
+    }
+
+    if (!result.blueskyHandler && host === 'bsky.app') {
+      // /profile/<handle>
+      const [kind, handle] = segments;
+      if (kind === 'profile' && handle) {
+        const decoded = decodeURIComponent(handle);
+        if (/^[a-zA-Z0-9._-]+$/.test(decoded)) {
+          result.blueskyHandler = decoded;
+        }
+      }
+    }
+
+    if (!result.crunchbaseHandler && host === 'crunchbase.com') {
+      // /organization/<slug>
+      const [kind, slug] = segments;
+      if (kind === 'organization' && slug) {
+        const decoded = decodeURIComponent(slug);
+        if (/^[a-zA-Z0-9-]+$/.test(decoded)) {
+          result.crunchbaseHandler = decoded;
+        }
       }
     }
   }
@@ -882,6 +934,21 @@ Current Date: ${new Date().toISOString().split('T')[0]}
   truncateString(str: string | null | undefined, maxLength: number): string | null {
     if (!str) return null;
     return str.length > maxLength ? str.substring(0, maxLength - 3) + '...' : str;
+  }
+
+  /**
+   * Accepts a 4-digit founding year as a number or numeric string; rejects full dates,
+   * ranges, and anything outside a plausible [1800, currentYear] window (the AI
+   * occasionally hallucinates a year in the future or an obviously-wrong one).
+   */
+  sanitizeFoundedYear(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+    const str = String(value).trim();
+    if (!/^\d{4}$/.test(str)) return null;
+    const year = Number.parseInt(str, 10);
+    const currentYear = new Date().getFullYear();
+    if (year < 1800 || year > currentYear) return null;
+    return year;
   }
 
   /**

@@ -395,7 +395,7 @@ export class TeamsService {
       // Track user changes to AI-enriched fields
       const changedEnrichableFieldValues: Record<string, unknown> = {};
       for (const key of Object.keys(team)) {
-        if (ENRICHABLE_TEAM_FIELDS.includes(key as any) && team[key] !== undefined) {
+        if ((ENRICHABLE_TEAM_FIELDS.includes(key as any) || key === 'dateFounded') && team[key] !== undefined) {
           changedEnrichableFieldValues[key] = team[key];
         }
       }

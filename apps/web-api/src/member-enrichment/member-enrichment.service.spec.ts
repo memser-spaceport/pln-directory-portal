@@ -13,6 +13,7 @@ jest.mock('@ai-sdk/anthropic', () => ({ anthropic: jest.fn(), createAnthropic: j
 import type { PrismaService } from '../shared/prisma.service';
 import type { MemberScrapingDogService } from '../husky/member-scrapingdog.service';
 import type { HuskyGenerationService } from '../husky/husky-generation.service';
+import type { MemberEnrichmentAiService } from './member-enrichment-ai.service';
 import { MemberEnrichmentService } from './member-enrichment.service';
 import { generateMemberBioText, resolveMemberPronouns } from '../husky/member-bio.util';
 import { matchTeamFromCompanyName } from './member-enrichment-team-match.util';
@@ -43,6 +44,7 @@ function buildMember(overrides: Partial<any> = {}) {
     githubHandler: null,
     discordHandler: null,
     telegramHandler: null,
+    blueskyHandler: null,
     isInvestor: true,
     skills: [],
     teamMemberRoles: [],
@@ -86,6 +88,10 @@ function buildHuskyMock(overrides: Partial<any> = {}) {
   return { generateMemberSkills: jest.fn().mockResolvedValue({ skills: [] }), ...overrides };
 }
 
+function buildMemberEnrichmentAiMock(overrides: Partial<any> = {}) {
+  return { findBlueskyHandle: jest.fn().mockResolvedValue({ handle: null }), ...overrides };
+}
+
 describe('MemberEnrichmentService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -115,7 +121,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         scrapingDog as unknown as MemberScrapingDogService,
-        husky as unknown as HuskyGenerationService
+        husky as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -135,7 +142,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         scrapingDog as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -163,7 +171,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         buildScrapingDogMock({ isConfigured: jest.fn().mockReturnValue(false) }) as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -203,7 +212,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         scrapingDog as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -248,7 +258,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         scrapingDog as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -287,7 +298,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         scrapingDog as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -344,7 +356,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         scrapingDog as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -394,7 +407,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         scrapingDog as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -437,7 +451,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         scrapingDog as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -458,7 +473,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         buildScrapingDogMock({ isConfigured: jest.fn().mockReturnValue(false) }) as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -480,7 +496,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         buildScrapingDogMock({ isConfigured: jest.fn().mockReturnValue(false) }) as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -501,7 +518,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         buildScrapingDogMock({ isConfigured: jest.fn().mockReturnValue(false) }) as unknown as MemberScrapingDogService,
-        husky as unknown as HuskyGenerationService
+        husky as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
@@ -509,6 +527,115 @@ describe('MemberEnrichmentService', () => {
       expect(husky.generateMemberSkills).not.toHaveBeenCalled();
       const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
       expect(savedMeta.update.dataEnrichment.fieldsMeta.skills.status).toBe(FieldEnrichmentStatus.CannotEnrich);
+    });
+
+    it('stamps a pre-existing blueskyHandler as ChangedByUser without calling the AI fallback', async () => {
+      const member = buildMember({ bio: 'x', email: 'jane@example.com', blueskyHandler: 'jane.bsky.social' });
+      const prisma = buildPrismaMock(member);
+      const ai = buildMemberEnrichmentAiMock();
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        buildScrapingDogMock({ isConfigured: jest.fn().mockReturnValue(false) }) as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        ai as unknown as MemberEnrichmentAiService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(ai.findBlueskyHandle).not.toHaveBeenCalled();
+      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.blueskyHandler.status).toBe(
+        FieldEnrichmentStatus.ChangedByUser
+      );
+    });
+
+    it('extracts blueskyHandler from the scraped LinkedIn about text without calling the AI fallback', async () => {
+      const member = buildMember({ linkedinHandler: 'jane-doe', bio: 'x', email: 'jane@example.com' });
+      const prisma = buildPrismaMock(member);
+      const scrapingDog = buildScrapingDogMock({
+        fetchPersonProfile: jest.fn().mockResolvedValue({
+          kind: 'ok',
+          profile: {
+            fullName: 'Jane Doe',
+            headline: null,
+            about: 'Also on Bluesky: https://bsky.app/profile/jane.bsky.social',
+            location: null,
+            experiences: [],
+            education: [],
+          },
+        }),
+      });
+      const ai = buildMemberEnrichmentAiMock();
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        scrapingDog as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        ai as unknown as MemberEnrichmentAiService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(ai.findBlueskyHandle).not.toHaveBeenCalled();
+      expect(prisma.member.update).toHaveBeenCalledWith({
+        where: { uid: member.uid },
+        data: { blueskyHandler: 'jane.bsky.social' },
+      });
+      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.blueskyHandler.status).toBe(FieldEnrichmentStatus.Enriched);
+    });
+
+    it('falls back to the AI web search when the scraped bio text has no Bluesky mention', async () => {
+      const member = buildMember({ linkedinHandler: 'jane-doe', bio: 'x', email: 'jane@example.com' });
+      const prisma = buildPrismaMock(member);
+      const scrapingDog = buildScrapingDogMock({
+        fetchPersonProfile: jest.fn().mockResolvedValue({
+          kind: 'ok',
+          profile: {
+            fullName: 'Jane Doe',
+            headline: null,
+            about: 'No socials mentioned here.',
+            location: null,
+            experiences: [],
+            education: [],
+          },
+        }),
+      });
+      const ai = buildMemberEnrichmentAiMock({
+        findBlueskyHandle: jest.fn().mockResolvedValue({ handle: 'jane.bsky.social' }),
+      });
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        scrapingDog as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        ai as unknown as MemberEnrichmentAiService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(ai.findBlueskyHandle).toHaveBeenCalledTimes(1);
+      expect(prisma.member.update).toHaveBeenCalledWith({
+        where: { uid: member.uid },
+        data: { blueskyHandler: 'jane.bsky.social' },
+      });
+      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.blueskyHandler.status).toBe(FieldEnrichmentStatus.Enriched);
+    });
+
+    it('marks blueskyHandler CannotEnrich when neither the bio scan nor the AI fallback find a handle', async () => {
+      const member = buildMember({ bio: 'x', email: 'jane@example.com' });
+      const prisma = buildPrismaMock(member);
+      const ai = buildMemberEnrichmentAiMock();
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        buildScrapingDogMock({ isConfigured: jest.fn().mockReturnValue(false) }) as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        ai as unknown as MemberEnrichmentAiService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.blueskyHandler.status).toBe(FieldEnrichmentStatus.CannotEnrich);
     });
   });
 
@@ -522,7 +649,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         buildScrapingDogMock() as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
 
       const result = await service.enrichMember(member.uid);
@@ -540,7 +668,8 @@ describe('MemberEnrichmentService', () => {
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         buildScrapingDogMock() as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService
       );
       const markSpy = jest.spyOn(service, 'markMemberForEnrichment').mockResolvedValue();
 

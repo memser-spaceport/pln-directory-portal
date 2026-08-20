@@ -64,6 +64,11 @@ type TeamRecord = {
   twitterHandler: string | null;
   linkedinHandler: string | null;
   telegramHandler: string | null;
+  blueskyHandler: string | null;
+  crunchbaseHandler: string | null;
+  dateFounded: number | null;
+  teamSize: string | null;
+  location: string | null;
   shortDescription: string | null;
   longDescription: string | null;
   moreDetails: string | null;
@@ -94,6 +99,11 @@ type TeamEnrichmentSnapshot = {
   twitterHandler: string | null;
   linkedinHandler: string | null;
   telegramHandler: string | null;
+  blueskyHandler: string | null;
+  crunchbaseHandler: string | null;
+  dateFounded: number | null;
+  teamSize: string | null;
+  location: string | null;
   shortDescription: string | null;
   longDescription: string | null;
   moreDetails: string | null;
@@ -133,6 +143,11 @@ const TEAM_RECORD_SELECT = {
   twitterHandler: true,
   linkedinHandler: true,
   telegramHandler: true,
+  blueskyHandler: true,
+  crunchbaseHandler: true,
+  dateFounded: true,
+  teamSize: true,
+  location: true,
   shortDescription: true,
   longDescription: true,
   moreDetails: true,
@@ -171,6 +186,11 @@ const TEAM_RECORD_SELECT = {
       twitterHandler: true,
       linkedinHandler: true,
       telegramHandler: true,
+      blueskyHandler: true,
+      crunchbaseHandler: true,
+      dateFounded: true,
+      teamSize: true,
+      location: true,
       shortDescription: true,
       longDescription: true,
       moreDetails: true,
@@ -1691,6 +1711,20 @@ export class TeamEnrichmentJudgeService {
         return preferEnrichmentSide
           ? team.teamEnrichment?.telegramHandler ?? team.telegramHandler
           : team.telegramHandler;
+      case 'blueskyHandler':
+        return preferEnrichmentSide ? team.teamEnrichment?.blueskyHandler ?? team.blueskyHandler : team.blueskyHandler;
+      case 'crunchbaseHandler':
+        return preferEnrichmentSide
+          ? team.teamEnrichment?.crunchbaseHandler ?? team.crunchbaseHandler
+          : team.crunchbaseHandler;
+      case 'dateFounded': {
+        const value = preferEnrichmentSide ? team.teamEnrichment?.dateFounded ?? team.dateFounded : team.dateFounded;
+        return value === null || value === undefined ? null : String(value);
+      }
+      case 'teamSize':
+        return preferEnrichmentSide ? team.teamEnrichment?.teamSize ?? team.teamSize : team.teamSize;
+      case 'location':
+        return preferEnrichmentSide ? team.teamEnrichment?.location ?? team.location : team.location;
       case 'shortDescription':
         return preferEnrichmentSide
           ? team.teamEnrichment?.shortDescription ?? team.shortDescription

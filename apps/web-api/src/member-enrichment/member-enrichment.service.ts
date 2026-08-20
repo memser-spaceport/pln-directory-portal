@@ -9,6 +9,8 @@ import { HUSKY_BIO_DISCLAIMER } from '../utils/ai-prompts';
 import { buildMemberEnrichmentEligibilityFilter } from './member-enrichment-eligibility-filter';
 import { matchTeamFromCompanyName } from './member-enrichment-team-match.util';
 import { buildMemberExperienceInputs, selectMissingExperiences } from './member-enrichment-experience.util';
+import { extractBlueskyHandleFromText } from './member-enrichment-bluesky.util';
+import { MemberEnrichmentAiService } from './member-enrichment-ai.service';
 import {
   EnrichmentStatus,
   FieldEnrichmentStatus,
@@ -31,6 +33,7 @@ const MEMBER_ENRICHMENT_SELECT: Prisma.MemberSelect = {
   githubHandler: true,
   discordHandler: true,
   telegramHandler: true,
+  blueskyHandler: true,
   isInvestor: true,
   skills: { select: { uid: true, title: true } },
   teamMemberRoles: {
@@ -54,6 +57,7 @@ type MemberForEnrichment = Prisma.MemberGetPayload<{
     githubHandler: true;
     discordHandler: true;
     telegramHandler: true;
+    blueskyHandler: true;
     isInvestor: true;
     skills: { select: { uid: true; title: true } };
     teamMemberRoles: {
@@ -97,7 +101,8 @@ export class MemberEnrichmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scrapingDog: MemberScrapingDogService,
-    private readonly huskyGeneration: HuskyGenerationService
+    private readonly huskyGeneration: HuskyGenerationService,
+    private readonly memberEnrichmentAi: MemberEnrichmentAiService
   ) {}
 
   async markMemberForEnrichment(memberUid: string): Promise<void> {
@@ -415,6 +420,32 @@ export class MemberEnrichmentService {
         }
       } else {
         stampPreexisting('skills');
+      }
+
+      // 7. blueskyHandler — ScrapingDog's LinkedIn/X profile scrape has no Bluesky field,
+      // so first try a free regex scan of the bio text already fetched in step 1, then
+      // (only if that finds nothing) a gated AI web-search fallback that only accepts
+      // a high-confidence, identity-verified match.
+      if (!member.blueskyHandler) {
+        const scannedHandle = extractBlueskyHandleFromText(scrapedContext);
+        if (scannedHandle) {
+          await this.prisma.member.update({ where: { uid: memberUid }, data: { blueskyHandler: scannedHandle } });
+          stamp(
+            'blueskyHandler',
+            FieldEnrichmentStatus.Enriched,
+            scrapingDogSource === 'x' ? EnrichmentSource.XProfile : EnrichmentSource.LinkedinProfile
+          );
+        } else {
+          const aiResult = await this.memberEnrichmentAi.findBlueskyHandle(member);
+          if (aiResult.handle) {
+            await this.prisma.member.update({ where: { uid: memberUid }, data: { blueskyHandler: aiResult.handle } });
+            stamp('blueskyHandler', FieldEnrichmentStatus.Enriched, EnrichmentSource.AI);
+          } else {
+            stamp('blueskyHandler', FieldEnrichmentStatus.CannotEnrich, undefined, 'no Bluesky handle found');
+          }
+        }
+      } else {
+        stampPreexisting('blueskyHandler');
       }
 
       const finalMeta: MemberDataEnrichment = {

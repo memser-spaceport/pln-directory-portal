@@ -11,6 +11,11 @@ export type EnrichmentCandidateRow = {
   twitterHandler: string | null;
   linkedinHandler: string | null;
   telegramHandler: string | null;
+  blueskyHandler: string | null;
+  crunchbaseHandler: string | null;
+  dateFounded: number | null;
+  teamSize: string | null;
+  location: string | null;
   shortDescription: string | null;
   longDescription: string | null;
   moreDetails: string | null;
@@ -37,6 +42,10 @@ export const PROMOTABLE_SCALAR_FIELDS: ReadonlySet<FieldMetaKey> = new Set<Field
   'twitterHandler',
   'linkedinHandler',
   'telegramHandler',
+  'blueskyHandler',
+  'crunchbaseHandler',
+  'teamSize',
+  'location',
   'shortDescription',
   'longDescription',
   'moreDetails',
@@ -107,6 +116,13 @@ export async function buildPromotionPayload(
       if (!enrichmentRow.logoUid) continue;
       teamUpdate.logo = { connect: { uid: enrichmentRow.logoUid } };
       promotedFields.push('logo');
+      continue;
+    }
+
+    if (key === 'dateFounded') {
+      if (enrichmentRow.dateFounded === null || enrichmentRow.dateFounded === undefined) continue;
+      teamUpdate.dateFounded = enrichmentRow.dateFounded;
+      promotedFields.push('dateFounded');
       continue;
     }
   }
