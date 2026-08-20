@@ -31,6 +31,10 @@ export const MEMBER_ENRICHABLE_FIELDS = [
   'bio',
   'email',
   'skills',
+  'linkedinHandler',
+  'twitterHandler',
+  'githubHandler',
+  'telegramHandler',
   'blueskyHandler',
 ] as const;
 export type MemberEnrichableField = typeof MEMBER_ENRICHABLE_FIELDS[number];

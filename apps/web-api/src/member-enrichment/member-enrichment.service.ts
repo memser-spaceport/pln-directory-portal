@@ -9,8 +9,11 @@ import { HUSKY_BIO_DISCLAIMER } from '../utils/ai-prompts';
 import { buildMemberEnrichmentEligibilityFilter } from './member-enrichment-eligibility-filter';
 import { matchTeamFromCompanyName } from './member-enrichment-team-match.util';
 import { buildMemberExperienceInputs, selectMissingExperiences } from './member-enrichment-experience.util';
-import { extractBlueskyHandleFromText } from './member-enrichment-bluesky.util';
-import { MemberEnrichmentAiService } from './member-enrichment-ai.service';
+import {
+  MEMBER_SOCIAL_HANDLE_FIELDS,
+  MemberEnrichmentAiService,
+  MemberSocialHandleField,
+} from './member-enrichment-ai.service';
 import {
   EnrichmentStatus,
   FieldEnrichmentStatus,
@@ -294,8 +297,33 @@ export class MemberEnrichmentService {
     let scrapingDogSource: 'linkedin' | 'x' | null = null;
 
     try {
+      // 0. Social handles (linkedin/twitter/github/telegram/bluesky) — filled BEFORE the
+      // ScrapingDog fetch below so a newly-discovered LinkedIn/X handle can also drive
+      // that fetch (and therefore bio/work-history/primaryTeamRole) in this same run.
+      // `discordHandler` is out of scope — no crawlable public profile to search.
+      const missingHandleFields = MEMBER_SOCIAL_HANDLE_FIELDS.filter((field) => !member[field]);
+      for (const field of MEMBER_SOCIAL_HANDLE_FIELDS) {
+        if (!missingHandleFields.includes(field)) stampPreexisting(field);
+      }
+      if (missingHandleFields.length > 0) {
+        const found = await this.memberEnrichmentAi.findMissingSocialHandles(member, missingHandleFields);
+        const foundFields = Object.keys(found) as MemberSocialHandleField[];
+        if (foundFields.length > 0) {
+          await this.prisma.member.update({ where: { uid: memberUid }, data: found });
+          for (const field of foundFields) {
+            (member as any)[field] = found[field];
+            stamp(field, FieldEnrichmentStatus.Enriched, EnrichmentSource.AI);
+          }
+        }
+        for (const field of missingHandleFields) {
+          if (!foundFields.includes(field)) {
+            stamp(field, FieldEnrichmentStatus.CannotEnrich, undefined, 'no handle found');
+          }
+        }
+      }
+
       // 1. Fetch ScrapingDog once — LinkedIn preferred, X fallback — reused across the
-      // primaryTeamRole match and the bio context below.
+      // primaryTeamRole match and the bio context below. May use a handle found in step 0.
       let personProfile: ScrapingDogPersonProfile | null = null;
       let scrapedContext: string | null = null;
 
@@ -420,32 +448,6 @@ export class MemberEnrichmentService {
         }
       } else {
         stampPreexisting('skills');
-      }
-
-      // 7. blueskyHandler — ScrapingDog's LinkedIn/X profile scrape has no Bluesky field,
-      // so first try a free regex scan of the bio text already fetched in step 1, then
-      // (only if that finds nothing) a gated AI web-search fallback that only accepts
-      // a high-confidence, identity-verified match.
-      if (!member.blueskyHandler) {
-        const scannedHandle = extractBlueskyHandleFromText(scrapedContext);
-        if (scannedHandle) {
-          await this.prisma.member.update({ where: { uid: memberUid }, data: { blueskyHandler: scannedHandle } });
-          stamp(
-            'blueskyHandler',
-            FieldEnrichmentStatus.Enriched,
-            scrapingDogSource === 'x' ? EnrichmentSource.XProfile : EnrichmentSource.LinkedinProfile
-          );
-        } else {
-          const aiResult = await this.memberEnrichmentAi.findBlueskyHandle(member);
-          if (aiResult.handle) {
-            await this.prisma.member.update({ where: { uid: memberUid }, data: { blueskyHandler: aiResult.handle } });
-            stamp('blueskyHandler', FieldEnrichmentStatus.Enriched, EnrichmentSource.AI);
-          } else {
-            stamp('blueskyHandler', FieldEnrichmentStatus.CannotEnrich, undefined, 'no Bluesky handle found');
-          }
-        }
-      } else {
-        stampPreexisting('blueskyHandler');
       }
 
       const finalMeta: MemberDataEnrichment = {

@@ -89,7 +89,7 @@ function buildHuskyMock(overrides: Partial<any> = {}) {
 }
 
 function buildMemberEnrichmentAiMock(overrides: Partial<any> = {}) {
-  return { findBlueskyHandle: jest.fn().mockResolvedValue({ handle: null }), ...overrides };
+  return { findMissingSocialHandles: jest.fn().mockResolvedValue({}), ...overrides };
 }
 
 describe('MemberEnrichmentService', () => {
@@ -529,99 +529,47 @@ describe('MemberEnrichmentService', () => {
       expect(savedMeta.update.dataEnrichment.fieldsMeta.skills.status).toBe(FieldEnrichmentStatus.CannotEnrich);
     });
 
-    it('stamps a pre-existing blueskyHandler as ChangedByUser without calling the AI fallback', async () => {
-      const member = buildMember({ bio: 'x', email: 'jane@example.com', blueskyHandler: 'jane.bsky.social' });
+    it('stamps pre-existing social handles as ChangedByUser without calling the AI lookup', async () => {
+      const member = buildMember({
+        bio: 'x',
+        email: 'jane@example.com',
+        linkedinHandler: 'jane-doe',
+        twitterHandler: 'janedoe',
+        githubHandler: 'janedoe',
+        telegramHandler: 'janedoe',
+        blueskyHandler: 'jane.bsky.social',
+      });
       const prisma = buildPrismaMock(member);
       const ai = buildMemberEnrichmentAiMock();
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
-        buildScrapingDogMock({ isConfigured: jest.fn().mockReturnValue(false) }) as unknown as MemberScrapingDogService,
+        buildScrapingDogMock({
+          fetchPersonProfile: jest.fn().mockResolvedValue({
+            kind: 'ok',
+            profile: {
+              fullName: 'Jane Doe',
+              headline: null,
+              about: null,
+              location: null,
+              experiences: [],
+              education: [],
+            },
+          }),
+        }) as unknown as MemberScrapingDogService,
         buildHuskyMock() as unknown as HuskyGenerationService,
         ai as unknown as MemberEnrichmentAiService
       );
 
       await (service as any).doEnrichMember(member.uid, 'test');
 
-      expect(ai.findBlueskyHandle).not.toHaveBeenCalled();
+      expect(ai.findMissingSocialHandles).not.toHaveBeenCalled();
       const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
-      expect(savedMeta.update.dataEnrichment.fieldsMeta.blueskyHandler.status).toBe(
-        FieldEnrichmentStatus.ChangedByUser
-      );
+      for (const field of ['linkedinHandler', 'twitterHandler', 'githubHandler', 'telegramHandler', 'blueskyHandler']) {
+        expect(savedMeta.update.dataEnrichment.fieldsMeta[field].status).toBe(FieldEnrichmentStatus.ChangedByUser);
+      }
     });
 
-    it('extracts blueskyHandler from the scraped LinkedIn about text without calling the AI fallback', async () => {
-      const member = buildMember({ linkedinHandler: 'jane-doe', bio: 'x', email: 'jane@example.com' });
-      const prisma = buildPrismaMock(member);
-      const scrapingDog = buildScrapingDogMock({
-        fetchPersonProfile: jest.fn().mockResolvedValue({
-          kind: 'ok',
-          profile: {
-            fullName: 'Jane Doe',
-            headline: null,
-            about: 'Also on Bluesky: https://bsky.app/profile/jane.bsky.social',
-            location: null,
-            experiences: [],
-            education: [],
-          },
-        }),
-      });
-      const ai = buildMemberEnrichmentAiMock();
-      const service = new MemberEnrichmentService(
-        prisma as unknown as PrismaService,
-        scrapingDog as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService,
-        ai as unknown as MemberEnrichmentAiService
-      );
-
-      await (service as any).doEnrichMember(member.uid, 'test');
-
-      expect(ai.findBlueskyHandle).not.toHaveBeenCalled();
-      expect(prisma.member.update).toHaveBeenCalledWith({
-        where: { uid: member.uid },
-        data: { blueskyHandler: 'jane.bsky.social' },
-      });
-      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
-      expect(savedMeta.update.dataEnrichment.fieldsMeta.blueskyHandler.status).toBe(FieldEnrichmentStatus.Enriched);
-    });
-
-    it('falls back to the AI web search when the scraped bio text has no Bluesky mention', async () => {
-      const member = buildMember({ linkedinHandler: 'jane-doe', bio: 'x', email: 'jane@example.com' });
-      const prisma = buildPrismaMock(member);
-      const scrapingDog = buildScrapingDogMock({
-        fetchPersonProfile: jest.fn().mockResolvedValue({
-          kind: 'ok',
-          profile: {
-            fullName: 'Jane Doe',
-            headline: null,
-            about: 'No socials mentioned here.',
-            location: null,
-            experiences: [],
-            education: [],
-          },
-        }),
-      });
-      const ai = buildMemberEnrichmentAiMock({
-        findBlueskyHandle: jest.fn().mockResolvedValue({ handle: 'jane.bsky.social' }),
-      });
-      const service = new MemberEnrichmentService(
-        prisma as unknown as PrismaService,
-        scrapingDog as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService,
-        ai as unknown as MemberEnrichmentAiService
-      );
-
-      await (service as any).doEnrichMember(member.uid, 'test');
-
-      expect(ai.findBlueskyHandle).toHaveBeenCalledTimes(1);
-      expect(prisma.member.update).toHaveBeenCalledWith({
-        where: { uid: member.uid },
-        data: { blueskyHandler: 'jane.bsky.social' },
-      });
-      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
-      expect(savedMeta.update.dataEnrichment.fieldsMeta.blueskyHandler.status).toBe(FieldEnrichmentStatus.Enriched);
-    });
-
-    it('marks blueskyHandler CannotEnrich when neither the bio scan nor the AI fallback find a handle', async () => {
+    it('never requests a discordHandler lookup (no crawlable public profile to search)', async () => {
       const member = buildMember({ bio: 'x', email: 'jane@example.com' });
       const prisma = buildPrismaMock(member);
       const ai = buildMemberEnrichmentAiMock();
@@ -634,8 +582,70 @@ describe('MemberEnrichmentService', () => {
 
       await (service as any).doEnrichMember(member.uid, 'test');
 
+      const [, requestedFields] = ai.findMissingSocialHandles.mock.calls[0];
+      expect(requestedFields).not.toContain('discordHandler');
       const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
-      expect(savedMeta.update.dataEnrichment.fieldsMeta.blueskyHandler.status).toBe(FieldEnrichmentStatus.CannotEnrich);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.discordHandler).toBeUndefined();
+    });
+
+    it('fills a missing linkedinHandler via AI BEFORE the ScrapingDog fetch, so that fetch uses the newly-found handle', async () => {
+      const member = buildMember({ linkedinHandler: null, twitterHandler: null, bio: 'x', email: 'jane@example.com' });
+      const prisma = buildPrismaMock(member);
+      const scrapingDog = buildScrapingDogMock({
+        fetchPersonProfile: jest.fn().mockResolvedValue({
+          kind: 'ok',
+          profile: {
+            fullName: 'Jane Doe',
+            headline: null,
+            about: null,
+            location: null,
+            experiences: [],
+            education: [],
+          },
+        }),
+      });
+      const ai = buildMemberEnrichmentAiMock({
+        findMissingSocialHandles: jest.fn().mockResolvedValue({ linkedinHandler: 'jane-doe' }),
+      });
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        scrapingDog as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        ai as unknown as MemberEnrichmentAiService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(prisma.member.update).toHaveBeenCalledWith({
+        where: { uid: member.uid },
+        data: { linkedinHandler: 'jane-doe' },
+      });
+      // Proves the reordered pipeline: ScrapingDog is called with the handle AI just found,
+      // not the (empty) value the member had on file at the start of the run.
+      expect(scrapingDog.fetchPersonProfile).toHaveBeenCalledWith('jane-doe');
+      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.linkedinHandler.status).toBe(FieldEnrichmentStatus.Enriched);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.linkedinHandler.source).toBe('ai');
+    });
+
+    it('marks still-missing social handles CannotEnrich when the AI lookup finds nothing', async () => {
+      const member = buildMember({ linkedinHandler: null, bio: 'x', email: 'jane@example.com' });
+      const prisma = buildPrismaMock(member);
+      const ai = buildMemberEnrichmentAiMock();
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        buildScrapingDogMock({ isConfigured: jest.fn().mockReturnValue(false) }) as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        ai as unknown as MemberEnrichmentAiService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(prisma.member.update).not.toHaveBeenCalled();
+      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
+      for (const field of ['linkedinHandler', 'twitterHandler', 'githubHandler', 'telegramHandler', 'blueskyHandler']) {
+        expect(savedMeta.update.dataEnrichment.fieldsMeta[field].status).toBe(FieldEnrichmentStatus.CannotEnrich);
+      }
     });
   });
 
