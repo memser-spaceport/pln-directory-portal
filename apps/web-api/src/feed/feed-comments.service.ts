@@ -9,6 +9,7 @@ import type {
 } from 'libs/contracts/src/schema/feed';
 import { PrismaService } from '../shared/prisma.service';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
+import { decodeHtmlEntities } from '../utils/html-entities';
 
 type CommentRow = {
   uid: string;
@@ -131,10 +132,10 @@ export class FeedCommentsService {
     parentAuthorUid?: string
   ): Promise<void> {
     const authorName = comment.author.name || 'Someone';
-    const description = comment.text
-      .replace(/<[^>]+>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .trim();
+    // Comment text is Quill HTML, so the notification body has to be flattened.
+    // Tags are dropped without a separator on purpose — Quill keeps the spaces
+    // between inline runs, so "hey <a>@Jane</a>" must stay "hey @Jane".
+    const description = decodeHtmlEntities(comment.text.replace(/<[^>]+>/g, '')).trim();
     const notified = new Set<string>();
 
     const mentionedUids = this.extractMentionUids(comment.text).filter((uid) => uid !== comment.authorUid);
