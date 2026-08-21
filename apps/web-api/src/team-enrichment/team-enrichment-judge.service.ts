@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import pLimit from 'p-limit';
 import { PrismaService } from '../shared/prisma.service';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
@@ -375,40 +376,114 @@ export class TeamEnrichmentJudgeService {
     return { status: 'started' };
   }
 
+  /**
+   * Max concurrent judge pipelines (each one a live outbound call to the AI
+   * provider, plus a ScrapingDog fetch) the bulk trigger paths will run at once.
+   * Without this cap, `forceJudgeAllEnrichedTeams`/`triggerJudgmentForAllPending`
+   * fired one unthrottled outbound call per eligible team simultaneously — at
+   * prod volume (900+ teams) this reliably starved the connection pool to
+   * api.anthropic.com ("Connect Timeout Error ... timeout: 10000ms"), and every
+   * failure landed as `FailedToJudge`, which still counts as "pending" — so the
+   * bulk trigger looked like it did nothing at all.
+   */
+  private getJudgeConcurrency(): number {
+    const raw = process.env.TEAM_ENRICHMENT_JUDGE_CONCURRENCY?.trim();
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 5;
+  }
+
+  /**
+   * Runs the judge pipeline for every prepared team uid, at most `getJudgeConcurrency()`
+   * at a time. A team queued behind hundreds of others in a throttled batch may not get
+   * its turn for minutes — so unlike a single fire-and-forget trigger, this re-loads each
+   * team FRESH from the DB right before judging it, rather than reusing the snapshot from
+   * whenever the batch was first assembled. Mirrors the freshness guarantee the old
+   * fire-and-forget-per-team loop got "for free" (it called `judgeTeam`, which does its own
+   * `loadTeamRecord` immediately before firing) — without it, a team whose candidate data
+   * changed mid-batch (a fresher enrichment run, an admin edit) would be judged, and
+   * possibly promoted to `Team.<field>`, against already-superseded data.
+   *
+   * Also re-checks `judgment.status === InProgress` after the fresh reload: if it's no
+   * longer InProgress (e.g. the stale-InProgress TTL reset it, or another trigger already
+   * completed it), this team is no longer this batch's to judge — skip rather than
+   * double-process.
+   */
+  private async runJudgmentBatchThrottled(teamUids: string[], judgedBy: string): Promise<void> {
+    const limit = pLimit(this.getJudgeConcurrency());
+    await Promise.all(
+      teamUids.map((teamUid) =>
+        limit(async () => {
+          const team = await this.loadTeamRecord(teamUid);
+          if (!team) return;
+          const meta = this.parseEnrichmentMeta(team.teamEnrichment?.dataEnrichment);
+          if (!meta || meta.judgment?.status !== JudgmentStatus.InProgress) return;
+          const judgableKeys = this.collectJudgableFieldKeys(team, meta.fieldsMeta ?? {});
+          if (judgableKeys.length === 0) return;
+          await this.runJudgmentPipeline(team, meta, judgableKeys, judgedBy).catch((err) => {
+            this.logger.error(`Background judgment failed for team ${teamUid}: ${err.message}`, err.stack);
+          });
+        })
+      )
+    );
+  }
+
+  /**
+   * Marks every still-eligible candidate `InProgress` up front (fast, DB-only),
+   * then hands the actual judge pipelines off to `runJudgmentBatchThrottled` as one
+   * background batch — bounding concurrency across the WHOLE batch, not just
+   * per-call. This is the shared prep step behind both bulk trigger methods below.
+   */
+  private async prepareAndRunJudgmentBatch(
+    teams: TeamRecord[],
+    judgedBy: string
+  ): Promise<{ started: number; skipped: number }> {
+    const prepared: string[] = [];
+    let skipped = 0;
+
+    for (const team of teams) {
+      const meta = this.parseEnrichmentMeta(team.teamEnrichment?.dataEnrichment);
+      if (!meta) {
+        skipped++;
+        continue;
+      }
+      const judgableKeys = this.collectJudgableFieldKeys(team, meta.fieldsMeta ?? {});
+      if (judgableKeys.length === 0) {
+        skipped++;
+        continue;
+      }
+      await this.writeJudgmentStatus(team.uid, meta, { status: JudgmentStatus.InProgress });
+      prepared.push(team.uid);
+    }
+
+    this.runJudgmentBatchThrottled(prepared, judgedBy).catch((err) => {
+      this.logger.error(`Judgment batch failed: ${err.message}`, err.stack);
+    });
+
+    return { started: prepared.length, skipped };
+  }
+
   async triggerJudgmentForAllPending(
     judgedBy = 'manually'
   ): Promise<{ total: number; started: number; skipped: number }> {
     const teams = await this.findTeamsPendingJudgment();
     this.logger.log(`Trigger judge all: found ${teams.length} teams pending judgment`);
-    let started = 0;
-    let skipped = 0;
-    for (const team of teams) {
-      const { status } = await this.judgeTeam(team.uid, judgedBy);
-      if (status === 'started') started++;
-      else skipped++;
-    }
+    const { started, skipped } = await this.prepareAndRunJudgmentBatch(teams, judgedBy);
     return { total: teams.length, started, skipped };
   }
 
   /**
    * Force re-judge of every eligible Enriched team, INCLUDING already-judged
    * ones — the bulk analog of `forceJudgeTeam`, mirroring
-   * `TeamEnrichmentService.forceEnrichAllCompletedTeams`. Each per-team judge is
-   * fire-and-forget (see `forceJudgeTeam`), so this kicks off the population in
-   * the background and returns counts immediately.
+   * `TeamEnrichmentService.forceEnrichAllCompletedTeams`. Runs in the background,
+   * throttled to `getJudgeConcurrency()` concurrent pipelines — see
+   * `runJudgmentBatchThrottled` for why the cap exists.
    */
   async forceJudgeAllEnrichedTeams(
     judgedBy = 'manually'
   ): Promise<{ total: number; started: number; skipped: number }> {
     const teams = await this.findTeamsForForceJudgment();
     this.logger.log(`Force judge all: found ${teams.length} enriched teams to re-judge`);
-    let started = 0;
-    let skipped = 0;
-    for (const team of teams) {
-      const { status } = await this.forceJudgeTeam(team.uid, judgedBy);
-      if (status === 'started') started++;
-      else skipped++;
-    }
+    const { started, skipped } = await this.prepareAndRunJudgmentBatch(teams, judgedBy);
     return { total: teams.length, started, skipped };
   }
 

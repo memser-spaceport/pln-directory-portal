@@ -35,28 +35,13 @@ export class TeamEnrichmentJudgeJob {
     this.logger.log('Starting team enrichment judge job');
 
     try {
-      const teams = await this.judgeService.findTeamsPendingJudgment();
-      this.logger.log(`Found ${teams.length} teams pending judgment`);
-
-      if (teams.length === 0) return;
-
-      let started = 0;
-      let skipped = 0;
-      let failed = 0;
-
-      for (const team of teams) {
-        try {
-          const { status } = await this.judgeService.judgeTeam(team.uid);
-          if (status === 'started') started++;
-          else skipped++;
-        } catch (error) {
-          this.logger.error(`Failed to judge team ${team.uid} (${team.name}): ${error.message}`, error.stack);
-          failed++;
-        }
-      }
-
+      // Delegates to the same throttled batch path the admin bulk-trigger endpoints
+      // use (`triggerJudgmentForAllPending` -> `prepareAndRunJudgmentBatch` ->
+      // `runJudgmentBatchThrottled`) so the daily cron can't blow past
+      // `TEAM_ENRICHMENT_JUDGE_CONCURRENCY` any more than a manual trigger can.
+      const { total, started, skipped } = await this.judgeService.triggerJudgmentForAllPending('system-cron');
       this.logger.log(
-        `Team enrichment judge job completed: ${started} started, ${skipped} skipped, ${failed} errored out of ${teams.length} total. ` +
+        `Team enrichment judge job: ${started} started, ${skipped} skipped out of ${total} pending. ` +
           `Per-team token usage + USD cost is logged separately as "Judge usage rollup" lines and persisted on TeamEnrichment.dataEnrichment.usage.`
       );
     } finally {
