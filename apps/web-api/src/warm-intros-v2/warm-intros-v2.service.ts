@@ -27,6 +27,7 @@ import {
   asRecord,
   bridgeProfileUidFromHopChain,
   buildPathSummary,
+  connectorUidsOnPath,
   enrichHopChainNames,
   matchesBridgeUid,
   matchesConnectorUid,
@@ -35,7 +36,6 @@ import {
   matchesSearch,
   matchesSector,
   MasterProfileEnrichRow,
-  parseInvestorSectors,
   relationKindFromHopChain,
   toConnectorSummary,
   toInvestorSummary,
@@ -68,6 +68,12 @@ type WarmPathRow = {
   runId: string | null;
   computedAt: Date;
 };
+
+/** The narrow row listFacets selects — everything a facet is derived from, nothing else. */
+type FacetPathRow = Pick<
+  WarmPathRow,
+  'targetProfileUid' | 'bestConnectorProfileUid' | 'alternateConnectorProfileUids' | 'hopChain'
+>;
 
 /** Keep first row per investor. Caller must pass score-desc ordered rows. */
 function collapsePathsByInvestor<T extends { targetProfileUid: string }>(rows: T[]): T[] {
@@ -311,7 +317,7 @@ export class WarmIntrosV2Service {
         sectors.length ||
         plBacker ||
         bridgeProfileUids.length ||
-        effectiveRelationKinds.length > 1 ||
+        effectiveRelationKinds.length > 0 ||
         connectorProfileUids.length > 1
     );
     // "All" returns one path per (investor, list); collapse to one row per investor.
@@ -320,12 +326,11 @@ export class WarmIntrosV2Service {
 
     const where: Prisma.WarmPathV2WhereInput = { rank, score: { gte: minScore } };
     if (targetSet) where.targetSet = targetSet;
-    // A single value stays an indexed/JSON-path where-clause; 2+ values (or a
-    // bridge-person filter, which has no queryable column at all) fall through to
-    // the post-filter below over the full candidate set.
-    if (effectiveRelationKinds.length === 1) {
-      where.hopChain = { path: ['relationKind'], equals: effectiveRelationKinds[0] };
-    }
+    // relationKind has no where-clause fast path, even for a single value: a JSON
+    // `equals` can't see a path whose hopChain omits relationKind, while everything
+    // else here — matchesRelationKind, the facet tally — reads a missing kind as
+    // pl_direct. Counting a path under "Direct" and then not returning it is exactly
+    // the bug this file keeps growing, so both sides go through one predicate.
     if (connectorProfileUids.length === 1) {
       where.OR = [
         { bestConnectorProfileUid: connectorProfileUids[0] },
@@ -357,7 +362,7 @@ export class WarmIntrosV2Service {
       enriched = enriched.filter((row) => matchesPlBacker(row.investor));
     }
     // Only post-filter what the where-clause above didn't already narrow.
-    if (effectiveRelationKinds.length > 1) {
+    if (effectiveRelationKinds.length > 0) {
       enriched = enriched.filter((row) => matchesRelationKind(row.hopChain, effectiveRelationKinds));
     }
     if (connectorProfileUids.length > 1) {
@@ -777,8 +782,12 @@ export class WarmIntrosV2Service {
    * Facets for FE filters:
    * - connectors: ALL MasterProfiles with type `pl_internal` (so the PL member
    *   dropdown always lists the full roster, not only people who are currently
-   *   someone’s best connector), with pathCount = how often they are best on rank=1.
+   *   someone’s best connector), with pathCount = how many paths they are on at rank=1.
    * - sectors: aggregated from investors on rank=1 paths.
+   *
+   * Every count here answers the same question listPaths answers — "how many rows come
+   * back if this is my only filter" — because a number shown next to a checkbox is a
+   * promise about what ticking it does.
    */
   async listFacets(query: ListWarmIntrosV2FacetsQueryDto) {
     const targetSet = query.targetSet?.trim() || null;
@@ -790,34 +799,53 @@ export class WarmIntrosV2Service {
       select: {
         targetProfileUid: true,
         bestConnectorProfileUid: true,
+        alternateConnectorProfileUids: true,
         hopChain: true,
       },
       orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }, { uid: 'asc' }],
-    })) as Array<{ targetProfileUid: string; bestConnectorProfileUid: string | null; hopChain: unknown }>;
+    })) as FacetPathRow[];
 
-    // Mirror listPaths' row shaping so facet counts match what listPaths actually returns:
-    // drop self-referential rows unconditionally, then collapse to one row per investor
-    // when targetSet is "All" (unset), same as listPaths' collapseByInvestor.
-    const nonSelfPaths = paths.filter((p) => !isSelfReferentialPath(p));
-    const rows = targetSet ? nonSelfPaths : collapsePathsByInvestor(nonSelfPaths);
+    // Self-referential rows are dropped unconditionally, exactly as listPaths does.
+    const rows = paths.filter((p) => !isSelfReferentialPath(p));
 
-    const connectorCounts = new Map<string, number>();
+    /**
+     * listPaths applies a filter and THEN collapses to one row per investor (only when
+     * targetSet is "All"). So a facet count is a row count under an explicit target set,
+     * and a distinct-investor count under "All" — collapsePathsByInvestor keeps exactly
+     * one row per investor, so the collapsed length IS the distinct-investor count.
+     * Keying the tally by uid or by targetProfileUid gets both from a single pass.
+     *
+     * Collapsing BEFORE tallying — as this used to — asks a different question, because
+     * the facet value is itself a filter: it drops every investor whose top-scoring row
+     * is not the one that matches, so the member who is second-best for someone is
+     * credited with 0 while listPaths happily returns that path.
+     *
+     * Under a target set every row counts once, so identity is just the row's position;
+     * a count must never quietly shrink because some field it keyed on was absent.
+     */
+    const rowKey = (p: FacetPathRow, i: number) => (targetSet ? `#${i}` : p.targetProfileUid);
+    const tally = (counts: Map<string, Set<string>>, key: string, p: FacetPathRow, i: number) => {
+      const seen = counts.get(key);
+      if (seen) seen.add(rowKey(p, i));
+      else counts.set(key, new Set([rowKey(p, i)]));
+    };
+
+    const connectorRows = new Map<string, Set<string>>();
     // Path-shape counts: every path always carries a relationKind (pl_direct included, not
     // just the bridge kinds), so this is a straight tally, not a bridge-only special case.
-    const kindCounts = new Map<string, number>();
+    const kindRows = new Map<string, Set<string>>();
     // Bridge-person counts: the middle hop of a founder/coinvestor bridge chain.
-    const bridgeCounts = new Map<string, number>();
+    const bridgeRows = new Map<string, Set<string>>();
 
-    for (const p of rows) {
-      const cid = p.bestConnectorProfileUid;
-      if (cid) connectorCounts.set(cid, (connectorCounts.get(cid) ?? 0) + 1);
+    rows.forEach((p, i) => {
+      // Best OR alternate — the same set listPaths filters on via matchesConnectorUid.
+      for (const uid of connectorUidsOnPath(p)) tally(connectorRows, uid, p, i);
 
-      const relationKind = relationKindFromHopChain(p.hopChain);
-      kindCounts.set(relationKind, (kindCounts.get(relationKind) ?? 0) + 1);
+      tally(kindRows, relationKindFromHopChain(p.hopChain), p, i);
 
       const bridgeUid = bridgeProfileUidFromHopChain(p.hopChain);
-      if (bridgeUid) bridgeCounts.set(bridgeUid, (bridgeCounts.get(bridgeUid) ?? 0) + 1);
-    }
+      if (bridgeUid) tally(bridgeRows, bridgeUid, p, i);
+    });
 
     const plConnectors = await this.prisma.masterProfile.findMany({
       where: { types: { has: 'pl_internal' } },
@@ -829,49 +857,69 @@ export class WarmIntrosV2Service {
       .map((c) => ({
         profileUid: c.uid,
         name: c.canonicalName || c.uid,
-        pathCount: connectorCounts.get(c.uid) ?? 0,
+        pathCount: connectorRows.get(c.uid)?.size ?? 0,
       }))
       .sort((a, b) => b.pathCount - a.pathCount || a.name.localeCompare(b.name));
 
-    const kinds = [...kindCounts.entries()]
+    const kinds = [...kindRows.entries()]
       .filter(([kind]) => PATH_RELATION_KINDS.has(kind))
-      .map(([value, count]) => ({ value: value as 'pl_direct' | 'founder_bridge' | 'coinvestor_bridge', count }));
+      .map(([value, matched]) => ({
+        value: value as 'pl_direct' | 'founder_bridge' | 'coinvestor_bridge',
+        count: matched.size,
+      }));
 
-    const bridgeUids = [...bridgeCounts.keys()];
+    const bridgeUids = [...bridgeRows.keys()];
     const bridgeProfiles = await this.loadProfilesByUids(bridgeUids);
     const bridges = bridgeUids
       .map((uid) => ({
         profileUid: uid,
         name: bridgeProfiles.get(uid)?.canonicalName || uid,
-        pathCount: bridgeCounts.get(uid) ?? 0,
+        pathCount: bridgeRows.get(uid)?.size ?? 0,
       }))
       .sort((a, b) => b.pathCount - a.pathCount || a.name.localeCompare(b.name));
 
     const investorUids = [...new Set(rows.map((p) => p.targetProfileUid))];
     const profilesByUid = await this.loadProfilesByUids(investorUids);
+    const investorsByUid = new Map(
+      investorUids.map((uid) => [uid, toInvestorSummary(uid, profilesByUid.get(uid))] as const)
+    );
 
-    const sectorCounts = new Map<string, { value: string; count: number }>();
-    for (const p of rows) {
-      const investor = profilesByUid.get(p.targetProfileUid);
-      const sectors = parseInvestorSectors(investor?.investorMeta);
-      const seen = new Set<string>();
-      for (const s of sectors) {
-        const key = s.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const existing = sectorCounts.get(key);
-        if (existing) existing.count += 1;
-        else sectorCounts.set(key, { value: s, count: 1 });
+    // The options offered: every distinct sector string on a matching investor. First
+    // spelling seen wins the display casing, and rows are score-desc, so it's stable.
+    const sectorValues = new Map<string, string>();
+    for (const uid of investorUids) {
+      for (const sector of investorsByUid.get(uid)?.sectors ?? []) {
+        const key = sector.toLowerCase();
+        if (!sectorValues.has(key)) sectorValues.set(key, sector);
       }
     }
 
-    const sectors = [...sectorCounts.values()].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+    /**
+     * Counted with matchesSector — the predicate listPaths filters with — rather than by
+     * tallying each investor's own sector strings. The two differ: matchesSector is a
+     * substring match, so "AI" also matches an investor whose only sector is "AI/ML"
+     * (and, less happily, "Retail"). Whatever that predicate does, the count says it.
+     */
+    const sectorRows = new Map<string, Set<string>>();
+    rows.forEach((p, i) => {
+      const investor = investorsByUid.get(p.targetProfileUid);
+      if (!investor) return;
+      for (const [key, value] of sectorValues) {
+        if (matchesSector(investor, value)) tally(sectorRows, key, p, i);
+      }
+    });
 
-    const plBackerCount = investorUids.filter((uid) =>
-      matchesPlBacker(toInvestorSummary(uid, profilesByUid.get(uid)))
-    ).length;
+    const sectors = [...sectorValues.entries()]
+      .map(([key, value]) => ({ value, count: sectorRows.get(key)?.size ?? 0 }))
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 
-    return { connectors, sectors, kinds, bridges, plBackerCount };
+    const plBackerRows = new Set<string>();
+    rows.forEach((p, i) => {
+      const investor = investorsByUid.get(p.targetProfileUid);
+      if (investor && matchesPlBacker(investor)) plBackerRows.add(rowKey(p, i));
+    });
+
+    return { connectors, sectors, kinds, bridges, plBackerCount: plBackerRows.size };
   }
 
   async listEdges(query: ListConnectionEdgesQueryDto) {

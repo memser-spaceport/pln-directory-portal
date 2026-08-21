@@ -386,15 +386,34 @@ export function matchesRelationKind(hopChain: unknown, kinds: string[]): boolean
   return kinds.includes(relationKindFromHopChain(hopChain));
 }
 
+/**
+ * Every PL member who can make this intro — the best connector plus any alternates.
+ *
+ * The single definition of "is this member on this path", shared by the filter
+ * (matchesConnectorUid) and the facet tally, so a count and its result set cannot
+ * answer that question differently.
+ */
+export function connectorUidsOnPath(row: {
+  bestConnectorProfileUid: string | null;
+  alternateConnectorProfileUids: unknown;
+}): string[] {
+  const uids = new Set<string>();
+  if (row.bestConnectorProfileUid) uids.add(row.bestConnectorProfileUid);
+  if (Array.isArray(row.alternateConnectorProfileUids)) {
+    for (const uid of row.alternateConnectorProfileUids) {
+      if (typeof uid === 'string' && uid.trim()) uids.add(uid.trim());
+    }
+  }
+  return [...uids];
+}
+
 /** Empty `uids` matches everything — an absent filter, not a filter matching nothing. */
 export function matchesConnectorUid(
   row: { bestConnectorProfileUid: string | null; alternateConnectorProfileUids: unknown },
   uids: string[]
 ): boolean {
   if (uids.length === 0) return true;
-  if (row.bestConnectorProfileUid && uids.includes(row.bestConnectorProfileUid)) return true;
-  const alternates = Array.isArray(row.alternateConnectorProfileUids) ? row.alternateConnectorProfileUids : [];
-  return alternates.some((uid) => typeof uid === 'string' && uids.includes(uid));
+  return connectorUidsOnPath(row).some((uid) => uids.includes(uid));
 }
 
 /** Empty `uids` matches everything — an absent filter, not a filter matching nothing. */
