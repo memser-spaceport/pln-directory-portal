@@ -576,35 +576,60 @@ describe('WarmIntrosV2Service', () => {
       expect(result.paths[0].targetSet).toBe('neuro-fund-i');
     });
 
-    it('applies directOnly as a relationKind=pl_direct hopChain filter (folded in, single-value fast path)', async () => {
-      pathFindMany.mockResolvedValue([pathRow]);
-      pathCount.mockResolvedValue(1);
+    it('applies directOnly as a relationKind=pl_direct post-filter (folded in)', async () => {
+      const bridgeRow = {
+        ...pathRow,
+        uid: 'p2',
+        targetProfileUid: 'inv2',
+        hopChain: { relationKind: 'founder_bridge' },
+      };
+      pathFindMany.mockResolvedValue([pathRow, bridgeRow]);
+      masterProfileFindMany.mockResolvedValue([investorProfile, connectorProfile]);
 
-      await service.listPaths({
+      const result = await service.listPaths({
         targetSet: 'neuro-fund-i',
         directOnly: 'true',
         limit: '50',
         offset: '0',
       });
 
+      // No hopChain narrowing in the query, for any number of values: a JSON `equals`
+      // can't see a path whose hopChain omits relationKind, but matchesRelationKind and
+      // the facet tally both read a missing kind as pl_direct. One predicate, one answer.
       expect(pathFindMany).toHaveBeenCalledWith({
-        where: {
-          rank: 1,
-          targetSet: 'neuro-fund-i',
-          score: { gte: 0.2 },
-          hopChain: { path: ['relationKind'], equals: 'pl_direct' },
-        },
-        take: 50,
-        skip: 0,
+        where: { rank: 1, targetSet: 'neuro-fund-i', score: { gte: 0.2 } },
         orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }, { uid: 'asc' }],
       });
+      expect(result.paths.map((p) => p.uid)).toEqual(['p1']);
+      expect(result.total).toBe(1);
+    });
+
+    it('returns a path whose hopChain has no relationKind under Direct, matching what the facet counts', async () => {
+      const kindlessRow = { ...pathRow, uid: 'p2', targetProfileUid: 'inv2', hopChain: { hops: [] } };
+      pathFindMany.mockResolvedValue([pathRow, kindlessRow]);
+      masterProfileFindMany.mockResolvedValue([investorProfile, connectorProfile]);
+
+      const result = await service.listPaths({
+        targetSet: 'neuro-fund-i',
+        relationKind: 'pl_direct',
+        limit: '50',
+        offset: '0',
+      });
+
+      expect(result.paths.map((p) => p.uid)).toEqual(['p1', 'p2']);
     });
 
     it('directOnly is ignored once an explicit relationKind is given (relationKind wins)', async () => {
-      pathFindMany.mockResolvedValue([pathRow]);
-      pathCount.mockResolvedValue(1);
+      const bridgeRow = {
+        ...pathRow,
+        uid: 'p2',
+        targetProfileUid: 'inv2',
+        hopChain: { relationKind: 'founder_bridge' },
+      };
+      pathFindMany.mockResolvedValue([pathRow, bridgeRow]);
+      masterProfileFindMany.mockResolvedValue([investorProfile, connectorProfile]);
 
-      await service.listPaths({
+      const result = await service.listPaths({
         targetSet: 'neuro-fund-i',
         directOnly: 'true',
         relationKind: 'founder_bridge',
@@ -612,11 +637,7 @@ describe('WarmIntrosV2Service', () => {
         offset: '0',
       });
 
-      expect(pathFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ hopChain: { path: ['relationKind'], equals: 'founder_bridge' } }),
-        })
-      );
+      expect(result.paths.map((p) => p.uid)).toEqual(['p2']);
     });
 
     it('OR-matches multiple relationKind values via post-filter over the full candidate set', async () => {
@@ -677,28 +698,27 @@ describe('WarmIntrosV2Service', () => {
       expect(result.paths.map((p) => p.uid)).toEqual(['p2']);
     });
 
-    it('applies relationKind as hopChain JSON path filter', async () => {
-      pathFindMany.mockResolvedValue([pathRow]);
-      pathCount.mockResolvedValue(1);
+    it('applies a single relationKind as a post-filter, not a hopChain JSON where-clause', async () => {
+      const bridgeRow = {
+        ...pathRow,
+        uid: 'p2',
+        targetProfileUid: 'inv2',
+        hopChain: { relationKind: 'founder_bridge' },
+      };
+      pathFindMany.mockResolvedValue([pathRow, bridgeRow]);
+      masterProfileFindMany.mockResolvedValue([investorProfile, connectorProfile]);
 
-      await service.listPaths({
+      const result = await service.listPaths({
         targetSet: 'neuro-fund-i',
         relationKind: 'founder_bridge',
         limit: '50',
         offset: '0',
       });
 
-      expect(pathFindMany).toHaveBeenCalledWith({
-        where: {
-          rank: 1,
-          targetSet: 'neuro-fund-i',
-          score: { gte: 0.2 },
-          hopChain: { path: ['relationKind'], equals: 'founder_bridge' },
-        },
-        take: 50,
-        skip: 0,
-        orderBy: [{ score: 'desc' }, { targetProfileUid: 'asc' }, { uid: 'asc' }],
-      });
+      expect(pathFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.not.objectContaining({ hopChain: expect.anything() }) })
+      );
+      expect(result.paths.map((p) => p.uid)).toEqual(['p2']);
     });
 
     it('rejects invalid relationKind', async () => {
@@ -1266,7 +1286,17 @@ describe('WarmIntrosV2Service', () => {
       );
     });
 
-    it('keeps only the higher-score row for a duplicate investor, across connectors/kinds/bridges/sectors', async () => {
+    /**
+     * Supersedes "keeps only the higher-score row for a duplicate investor", which asserted
+     * that a duplicate investor's LOSING row contributes to nothing — from1 counted 0, only
+     * founder_bridge counted. That mirrored listPaths' collapse but not its ORDER: listPaths
+     * filters and then collapses, so listPaths({connector: from1}) returns that row and
+     * listPaths({relationKind: pl_direct}) returns it too. The facet said 0 for both.
+     *
+     * The collapse only ever means "one row per investor" — it is not a claim that an
+     * investor is reachable one way. Both connectors and both kinds are real options here.
+     */
+    it('counts a duplicate investor under every connector and kind that can reach them (All)', async () => {
       // Score-desc + uid-asc order as Prisma would return per orderBy: the bridge row (from2) wins.
       pathFindMany.mockResolvedValue([
         {
@@ -1292,14 +1322,22 @@ describe('WarmIntrosV2Service', () => {
         .mockResolvedValueOnce([investorProfile]); // investor profiles for sectors
 
       const result = await service.listFacets({});
+      // Both connectors reach inv1 — one on the winning row, one on the losing row.
       expect(result.connectors).toEqual(
         expect.arrayContaining([
           { profileUid: 'from2', name: 'Lacey Wisdom', pathCount: 1 },
-          { profileUid: 'from1', name: 'Juan Benet', pathCount: 0 },
+          { profileUid: 'from1', name: 'Juan Benet', pathCount: 1 },
         ])
       );
-      expect(result.kinds).toEqual([{ value: 'founder_bridge', count: 1 }]);
+      // Likewise both shapes: inv1 is reachable directly AND via the founder bridge.
+      expect(result.kinds).toEqual(
+        expect.arrayContaining([
+          { value: 'founder_bridge', count: 1 },
+          { value: 'pl_direct', count: 1 },
+        ])
+      );
       expect(result.bridges).toEqual([{ profileUid: 'bridge1', name: 'Bridget Founder', pathCount: 1 }]);
+      // Sectors are a property of the investor, so the collapse still shows them once.
       expect(result.sectors).toEqual(
         expect.arrayContaining([
           { value: 'crypto', count: 1 },
@@ -1322,6 +1360,32 @@ describe('WarmIntrosV2Service', () => {
       expect(result.plBackerCount).toBe(0);
     });
 
+    it('counts a connector who is an alternate, not just the best, on a path', async () => {
+      pathFindMany.mockResolvedValue([
+        {
+          targetProfileUid: 'inv1',
+          bestConnectorProfileUid: 'from2',
+          alternateConnectorProfileUids: ['from1'],
+          hopChain: { relationKind: 'pl_direct' },
+        },
+      ]);
+      masterProfileFindMany
+        .mockResolvedValueOnce([
+          { uid: 'from1', canonicalName: 'Juan Benet' },
+          { uid: 'from2', canonicalName: 'Lacey Wisdom' },
+        ])
+        .mockResolvedValueOnce([investorProfile]);
+
+      const result = await service.listFacets({ targetSet: 'neuro-fund-i' });
+      // listPaths matches best OR alternate, so both members can make this intro.
+      expect(result.connectors).toEqual(
+        expect.arrayContaining([
+          { profileUid: 'from1', name: 'Juan Benet', pathCount: 1 },
+          { profileUid: 'from2', name: 'Lacey Wisdom', pathCount: 1 },
+        ])
+      );
+    });
+
     it('excludes self-referential paths even with an explicit targetSet (not just All)', async () => {
       pathFindMany.mockResolvedValue([
         { targetProfileUid: 'inv1', bestConnectorProfileUid: 'inv1', hopChain: { relationKind: 'pl_direct' } },
@@ -1332,6 +1396,175 @@ describe('WarmIntrosV2Service', () => {
       expect(result.connectors).toEqual([]);
       expect(result.sectors).toEqual([]);
       expect(result.plBackerCount).toBe(0);
+    });
+  });
+
+  /**
+   * The invariant, executable: for every option the dropdown offers, ticking it must
+   * return exactly as many rows as the number printed beside it.
+   *
+   * This is the guard the previous two rounds of this bug lacked. Each of them fixed the
+   * divergence that had been reported and left the others in place, because nothing
+   * checked the two methods against each other — only each against its own expectations.
+   * It fails on drift no matter which method drifts or how the two are factored.
+   */
+  describe('listFacets ↔ listPaths parity', () => {
+    // Deliberately shaped to trip every divergence this fix addresses: inv1 is reachable
+    // two ways across two lists (collapse order), inv2 only via an alternate connector,
+    // inv3 through a hopChain with no relationKind at all.
+    const PARITY_ROWS = [
+      {
+        uid: 'r1',
+        targetProfileUid: 'inv1',
+        targetSet: 'neuro-fund-i',
+        rank: 1,
+        score: 0.9,
+        hopCount: 2,
+        bestConnectorProfileUid: 'from2',
+        alternateConnectorProfileUids: [],
+        hopChain: {
+          relationKind: 'founder_bridge',
+          hops: [
+            { profileUid: 'from2', role: 'pl_connector' },
+            { profileUid: 'bridge1', role: 'founder' },
+            { profileUid: 'inv1', role: 'investor' },
+          ],
+        },
+        runId: 'run-1',
+        computedAt: new Date('2026-08-21T00:00:00.000Z'),
+      },
+      {
+        uid: 'r2',
+        targetProfileUid: 'inv1',
+        targetSet: 'gold-plc',
+        rank: 1,
+        score: 0.5,
+        hopCount: 1,
+        bestConnectorProfileUid: 'from1',
+        alternateConnectorProfileUids: [],
+        hopChain: { relationKind: 'pl_direct', hops: [] },
+        runId: 'run-1',
+        computedAt: new Date('2026-08-21T00:00:00.000Z'),
+      },
+      {
+        uid: 'r3',
+        targetProfileUid: 'inv2',
+        targetSet: 'neuro-fund-i',
+        rank: 1,
+        score: 0.8,
+        hopCount: 1,
+        bestConnectorProfileUid: 'from2',
+        alternateConnectorProfileUids: ['from1'],
+        hopChain: { relationKind: 'pl_direct', hops: [] },
+        runId: 'run-1',
+        computedAt: new Date('2026-08-21T00:00:00.000Z'),
+      },
+      {
+        uid: 'r4',
+        targetProfileUid: 'inv3',
+        targetSet: 'neuro-fund-i',
+        rank: 1,
+        score: 0.4,
+        hopCount: 1,
+        bestConnectorProfileUid: 'from1',
+        alternateConnectorProfileUids: [],
+        hopChain: { hops: [] }, // no relationKind — reads as pl_direct everywhere
+        runId: 'run-1',
+        computedAt: new Date('2026-08-21T00:00:00.000Z'),
+      },
+    ];
+
+    const PARITY_PROFILES = [
+      { ...investorProfile, uid: 'inv1', investorMeta: { sectors: ['Crypto'] } },
+      { ...investorProfile, uid: 'inv2', canonicalName: 'Alice', investorMeta: { sectors: ['AI/ML'] } },
+      {
+        ...investorProfile,
+        uid: 'inv3',
+        canonicalName: 'Bob',
+        investorMeta: { sectors: ['Retail'] },
+        plBacking: { backedProtocolLabs: true, matchKind: 'person' },
+      },
+      { uid: 'from1', canonicalName: 'Juan Benet', personKey: 'k-from1', emails: [] },
+      { uid: 'from2', canonicalName: 'Lacey Wisdom', personKey: 'k-from2', emails: [] },
+      { uid: 'bridge1', canonicalName: 'Bridget Founder', personKey: 'k-bridge1', emails: [] },
+    ];
+
+    /**
+     * Enough of a query engine to make the comparison honest. listPaths narrows a single
+     * connector in the WHERE clause rather than in JS, so a mock that ignores `where`
+     * would hand listPaths every row and the test would pass on a coincidence.
+     */
+    const applyWhere = (rows: typeof PARITY_ROWS, where: Record<string, any> = {}) =>
+      rows.filter((row) => {
+        if (where.rank !== undefined && row.rank !== where.rank) return false;
+        if (where.targetSet !== undefined && row.targetSet !== where.targetSet) return false;
+        if (where.score?.gte !== undefined && row.score < where.score.gte) return false;
+        if (Array.isArray(where.OR)) {
+          const matched = where.OR.some((clause: Record<string, any>) => {
+            if (clause.bestConnectorProfileUid) return row.bestConnectorProfileUid === clause.bestConnectorProfileUid;
+            const contains = clause.alternateConnectorProfileUids?.array_contains;
+            return contains ? (row.alternateConnectorProfileUids as string[]).includes(contains) : false;
+          });
+          if (!matched) return false;
+        }
+        return true;
+      });
+
+    beforeEach(() => {
+      pathFindMany.mockImplementation(({ where }: { where?: Record<string, unknown> }) =>
+        Promise.resolve(applyWhere(PARITY_ROWS, where))
+      );
+      pathCount.mockImplementation(({ where }: { where?: Record<string, unknown> }) =>
+        Promise.resolve(applyWhere(PARITY_ROWS, where).length)
+      );
+      // Keyed off the query, not the call order, so both methods can share one mock.
+      masterProfileFindMany.mockImplementation(({ where }: { where?: Record<string, any> }) => {
+        if (where?.types?.has === 'pl_internal') {
+          return Promise.resolve(PARITY_PROFILES.filter((p) => p.uid.startsWith('from')));
+        }
+        const uids: string[] = where?.uid?.in ?? [];
+        return Promise.resolve(PARITY_PROFILES.filter((p) => uids.includes(p.uid)));
+      });
+    });
+
+    it.each([undefined, 'neuro-fund-i'])('every facet count equals its filtered total (targetSet=%s)', async (
+      targetSet
+    ) => {
+      const facets = await service.listFacets({ targetSet });
+      const base = { targetSet, limit: '200', offset: '0' };
+
+      for (const connector of facets.connectors) {
+        const { total } = await service.listPaths({ ...base, connectorProfileUid: connector.profileUid });
+        expect({ member: connector.name, total }).toEqual({ member: connector.name, total: connector.pathCount });
+      }
+
+      for (const kind of facets.kinds) {
+        const { total } = await service.listPaths({ ...base, relationKind: kind.value });
+        expect({ kind: kind.value, total }).toEqual({ kind: kind.value, total: kind.count });
+      }
+
+      for (const bridge of facets.bridges) {
+        const { total } = await service.listPaths({ ...base, bridgeProfileUid: bridge.profileUid });
+        expect({ bridge: bridge.name, total }).toEqual({ bridge: bridge.name, total: bridge.pathCount });
+      }
+
+      for (const sector of facets.sectors) {
+        const { total } = await service.listPaths({ ...base, sector: sector.value });
+        expect({ sector: sector.value, total }).toEqual({ sector: sector.value, total: sector.count });
+      }
+
+      const { total: plBackerTotal } = await service.listPaths({ ...base, plBacker: 'true' });
+      expect(plBackerTotal).toBe(facets.plBackerCount);
+    });
+
+    it('counts the reported case: a member who is only ever an alternate still has a real count', async () => {
+      const facets = await service.listFacets({});
+      const juan = facets.connectors.find((c) => c.profileUid === 'from1');
+
+      // r2 (best) + r3 (alternate) + r4 (best), collapsed per investor → inv1, inv2, inv3.
+      expect(juan?.pathCount).toBe(3);
+      const { total } = await service.listPaths({ connectorProfileUid: 'from1', limit: '200', offset: '0' });
+      expect(total).toBe(3);
     });
   });
 
