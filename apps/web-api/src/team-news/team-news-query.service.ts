@@ -34,11 +34,10 @@ const POPULAR_MIN_UPVOTES = 2;
  * like it wants. That helper answers "what does the feed still show" — including
  * its escape hatch for items up to TEAM_NEWS_DISCUSSION_WINDOW_DAYS old that
  * carry a forum link. This answers "what did the team publish recently", which
- * is a different question that happens to have the same answer at 30 days. Wire
- * them together and the next change to the feed's visibility rules silently
- * moves a number the feed does not own.
+ * is a different question. Wire them together and the next change to the feed's
+ * visibility rules silently moves a number the feed does not own.
  */
-const TEAM_NEWS_COUNT_WINDOW_DAYS = 30;
+const TEAM_NEWS_COUNT_WINDOW_DAYS = 7;
 
 type UpvoteStamp = {
   counts: Map<string, number>;

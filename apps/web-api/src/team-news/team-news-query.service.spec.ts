@@ -513,11 +513,11 @@ describe('TeamNewsQueryService.getRecentCountsByTeam', () => {
     teamNewsItem: { groupBy: teamNewsItemGroupBy },
   } as unknown as PrismaService;
 
-  // Frozen so the 30-day cutoff is an exact, assertable Date rather than a
+  // Frozen so the 7-day cutoff is an exact, assertable Date rather than a
   // moving target — same trick team-news-event-date.where.spec.ts plays with
   // its NOW constant.
   const NOW = new Date('2026-08-18T12:00:00.000Z').getTime();
-  const CUTOFF = new Date(NOW - 30 * 24 * 60 * 60 * 1000);
+  const CUTOFF = new Date(NOW - 7 * 24 * 60 * 60 * 1000);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -537,7 +537,7 @@ describe('TeamNewsQueryService.getRecentCountsByTeam', () => {
     expect(teamNewsItemGroupBy).not.toHaveBeenCalled();
   });
 
-  it('groups by team over the 30-day window, excluding the public-list teams', async () => {
+  it('groups by team over the 7-day window, excluding the public-list teams', async () => {
     await service.getRecentCountsByTeam(['team-1', 'team-2']);
 
     expect(teamNewsItemGroupBy).toHaveBeenCalledWith({
