@@ -8,6 +8,8 @@ import { ResponseTeamMemberRoleSchema } from './team-member-role';
 import { ProjectContributionSchema, ResponseProjectContributionSchema } from './project-contribution';
 import { ResponseMemberExperienceSchema } from './member-experience';
 
+export const JobSearchStatusWireSchema = z.enum(['actively-looking', 'open-to-right-role', 'not-looking']);
+
 export const GitHubRepositorySchema = z.object({
   name: z.string(),
   description: z.string(),
@@ -24,6 +26,7 @@ export const PreferenceSchema = z.object({
   showDiscord: z.boolean(),
   showGithubProjects: z.boolean(),
   showTwitter: z.boolean(),
+  showBluesky: z.boolean(),
   showSubscription: z.boolean(),
 });
 
@@ -55,7 +58,9 @@ export const MemberSchema = z.object({
   updatedAt: z.string(),
   locationUid: z.string().nullable(),
   openToWork: z.boolean().nullish(),
+  currentCompany: z.string().nullish(),
   linkedinHandler: z.string().nullish(),
+  blueskyHandler: z.string().nullish(),
   repositories: GitHubRepositorySchema.array().optional(),
   preferences: PreferenceSchema.optional(),
   projectContributions: z.array(ProjectContributionSchema).optional(),
@@ -79,6 +84,7 @@ export const ResponseMemberWithRelationsSchema = ResponseMemberSchema.extend({
   projectContributions: ResponseProjectContributionSchema.array().optional(),
   experiences: ResponseMemberExperienceSchema.array().optional(),
   memberRoles: ResponseMemberRoleSchema.array().optional(),
+  jobSearchStatus: JobSearchStatusWireSchema.nullish(),
 });
 
 export const SimpleMemberSchema = ResponseMemberSchema.pick({
@@ -106,6 +112,7 @@ export const CreateMemberSchema = MemberSchema.pick({
   isFeatured: true,
   openToWork: true,
   linkedinHandler: true,
+  blueskyHandler: true,
   telegramHandler: true,
   isVerified: true,
   isUserConsent: true,

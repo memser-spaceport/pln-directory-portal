@@ -73,10 +73,13 @@ export const CreateMemberSchema = z.object({
   discordHandler: z.string().nullable(),
   twitterHandler: z.string().nullable(),
   linkedinHandler: z.string().nullable(),
+  blueskyHandler: z.string().nullable(),
   telegramHandler: z.string().nullable(),
   officeHours: z.string().nullable(),
   ohInterest: z.array(z.string()).default([]),
   ohHelpWith: z.array(z.string()).default([]),
+  currentCompany: z.string().nullable().optional(),
+  jobSearchStatus: z.enum(['actively-looking', 'open-to-right-role', 'not-looking']).nullable().optional(),
 
   investorProfile: z
     .object({
@@ -120,10 +123,13 @@ export const UpdateMemberSchema = z.object({
   discordHandler: z.string().optional().nullable(),
   twitterHandler: z.string().optional().nullable(),
   linkedinHandler: z.string().optional().nullable(),
+  blueskyHandler: z.string().optional().nullable(),
   telegramHandler: z.string().optional().nullable(),
   officeHours: z.string().optional().nullable(),
   ohInterest: z.array(z.string()).optional(),
   ohHelpWith: z.array(z.string()).optional(),
+  currentCompany: z.string().optional().nullable(),
+  jobSearchStatus: z.enum(['actively-looking', 'open-to-right-role', 'not-looking']).optional().nullable(),
 
   investorProfile: z
     .object({

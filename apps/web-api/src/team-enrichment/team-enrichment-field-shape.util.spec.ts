@@ -137,6 +137,68 @@ describe('isLikelyValueForField', () => {
     });
   });
 
+  describe('blueskyHandler', () => {
+    it('accepts bare handle (with or without @)', () => {
+      expect(isLikelyValueForField('blueskyHandler', 'team.bsky.social')).toBe(true);
+      expect(isLikelyValueForField('blueskyHandler', '@team.bsky.social')).toBe(true);
+      expect(isLikelyValueForField('blueskyHandler', 'customdomain.com')).toBe(true);
+    });
+
+    it('accepts a bsky.app profile URL', () => {
+      expect(isLikelyValueForField('blueskyHandler', 'https://bsky.app/profile/team.bsky.social')).toBe(true);
+    });
+
+    it('rejects free-text placeholders', () => {
+      expect(isLikelyValueForField('blueskyHandler', 'Coming soon!')).toBe(false);
+      expect(isLikelyValueForField('blueskyHandler', 'n/a')).toBe(false);
+    });
+  });
+
+  describe('crunchbaseHandler', () => {
+    it('accepts a bare slug', () => {
+      expect(isLikelyValueForField('crunchbaseHandler', 'protocol-labs')).toBe(true);
+    });
+
+    it('accepts organization/<slug> and a full crunchbase.com URL', () => {
+      expect(isLikelyValueForField('crunchbaseHandler', 'organization/protocol-labs')).toBe(true);
+      expect(isLikelyValueForField('crunchbaseHandler', 'https://www.crunchbase.com/organization/protocol-labs')).toBe(
+        true
+      );
+    });
+
+    it('rejects free-text placeholders', () => {
+      expect(isLikelyValueForField('crunchbaseHandler', 'Coming soon!')).toBe(false);
+      expect(isLikelyValueForField('crunchbaseHandler', 'n/a')).toBe(false);
+    });
+  });
+
+  describe('teamSize', () => {
+    it('accepts a bare headcount', () => {
+      expect(isLikelyValueForField('teamSize', '50')).toBe(true);
+    });
+
+    it('accepts a range label', () => {
+      expect(isLikelyValueForField('teamSize', '11-50')).toBe(true);
+      expect(isLikelyValueForField('teamSize', '11 - 50')).toBe(true);
+      expect(isLikelyValueForField('teamSize', '11–50')).toBe(true);
+    });
+
+    it('rejects free-text placeholders', () => {
+      expect(isLikelyValueForField('teamSize', 'Coming soon!')).toBe(false);
+      expect(isLikelyValueForField('teamSize', 'n/a')).toBe(false);
+    });
+  });
+
+  describe('location', () => {
+    it('accepts a free-text place label', () => {
+      expect(isLikelyValueForField('location', 'San Francisco, United States')).toBe(true);
+    });
+
+    it('rejects AI search-failure narration in place of a location', () => {
+      expect(isLikelyValueForField('location', 'I could not find the location for this entity.')).toBe(false);
+    });
+  });
+
   describe('free-text fields (descriptions)', () => {
     it('passes genuine prose', () => {
       expect(isLikelyValueForField('shortDescription', 'A short blurb about the company.')).toBe(true);

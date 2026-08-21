@@ -71,6 +71,19 @@ export default function AddMemberSocialForm(props) {
 
       <div className="inputfield pt-5">
         <InputField
+          label="Bluesky"
+          onChange={onChange}
+          name="blueskyHandler"
+          maxLength={200}
+          value={values.blueskyHandler}
+          disabled={!props.isEditEnabled}
+          className="custom-grey custom-outline-none border"
+          placeholder="e.g., @protocollabs.bsky.social"
+        />
+      </div>
+
+      <div className="inputfield pt-5">
+        <InputField
           label="Telegram"
           onChange={onChange}
           name="telegramHandler"

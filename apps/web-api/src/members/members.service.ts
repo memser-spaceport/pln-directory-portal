@@ -33,6 +33,7 @@ import { TeamsService } from '../teams/teams.service';
 import { ParticipantsRequest } from './members.dto';
 import { OpenSearchService } from '../opensearch/opensearch.service';
 import { MEMBER_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
+import { assignJobSearchStatusFromInput, omitJobSearchStatus } from './job-search-status';
 
 /**
  * Interface for member search match result (used by entity association)
@@ -114,10 +115,10 @@ export class MembersService {
         this.prisma.member.count({ where }),
       ]);
       const filteredMembers = members.map((member: any) => {
-        return {
+        return omitJobSearchStatus({
           ...member,
           teamMemberRoles: member.teamMemberRoles?.filter((role) => role?.team?.accessLevel !== 'L0'),
-        };
+        });
       });
 
       return { count: membersCount, members: filteredMembers };
@@ -170,7 +171,10 @@ export class MembersService {
         this.prisma.member.count({ where: queryOptions.where }),
       ]);
 
-      return { count: membersCount, members };
+      return {
+        count: membersCount,
+        members: members.map((member: any) => omitJobSearchStatus({ ...member })),
+      };
     } catch (error) {
       return this.handleErrors(error);
     }
@@ -1166,6 +1170,7 @@ export class MembersService {
       'bio',
       'twitterHandler',
       'linkedinHandler',
+      'blueskyHandler',
       'telegramHandler',
       'officeHours',
       'moreDetails',
@@ -1181,8 +1186,10 @@ export class MembersService {
       'teamOrProjectURL',
       'aboutYou',
       'role',
+      'currentCompany',
     ];
     copyObj(memberData, member, directFields);
+    assignJobSearchStatusFromInput(memberData, member);
     member.email = member.email.toLowerCase().trim();
     member['image'] = memberData.imageUid
       ? { connect: { uid: memberData.imageUid } }
@@ -1723,6 +1730,7 @@ export class MembersService {
         discordHandler: true,
         linkedinHandler: true,
         twitterHandler: true,
+        blueskyHandler: true,
         preferences: true,
         isSubscribedToNewsletter: true,
       },
@@ -1749,6 +1757,7 @@ export class MembersService {
     preferences.discord = !!member.discordHandler;
     preferences.linkedin = !!member.linkedinHandler;
     preferences.twitter = !!member.twitterHandler;
+    preferences.bluesky = !!member.blueskyHandler;
     preferences.subscription = !!member.isSubscribedToNewsletter;
     return preferences;
   }

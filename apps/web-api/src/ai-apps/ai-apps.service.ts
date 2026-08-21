@@ -10,17 +10,28 @@ import {
 } from '@nestjs/common';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
-import { AiApp, AiAppEvent, AiAppEventType, AiAppFeedback, Prisma, PushNotificationCategory } from '@prisma/client';
+import {
+  AiApp,
+  AiAppEvent,
+  AiAppEventType,
+  AiAppFeedback,
+  AiAppFeedbackStatus,
+  Prisma,
+  PushNotificationCategory,
+} from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { isDirectoryAdmin } from '../utils/constants';
 import { AwsService } from '../utils/aws/aws.service';
 import { AI_APPS_PERMISSIONS } from '../access-control-v2/access-control-v2.constants';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
+import { AnalyticsService } from '../analytics/service/analytics.service';
 import { DeployAppDto } from './dto/deploy-app.dto';
 import { RegisterDraftDto } from './dto/register-draft.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
 import {
   AiAppLogPhase,
+  AI_APP_ANON_ID_REGEX,
+  AI_APPS_APP_DOMAIN,
   AI_APPS_DEPLOY_STUCK_MINUTES,
   AI_APPS_DEPLOY_STUCK_MS,
   AI_APPS_HELM_LOCK_RETRIES,
@@ -43,6 +54,8 @@ import {
   AI_APPS_S3_BUCKET,
   AI_APPS_PRD_S3_BUCKET,
   AI_APPS_STARTER_KIT_VERSION,
+  AI_APPS_TRACK_MAX_BATCH_EVENTS,
+  AI_APPS_TRACK_MAX_PROPERTIES_BYTES,
   AI_APPS_VERIFY_ATTEMPTS,
   AI_APPS_VERIFY_INTERVAL_MS,
   aiAppDetailPath,
@@ -57,6 +70,7 @@ import {
   buildRunnerLogsUrl,
   buildRunnerMetricsUrl,
   buildRunnerSecretsUrl,
+  normalizeAiAppEventName,
 } from './ai-apps.constants';
 
 /**
@@ -133,7 +147,8 @@ export class AiAppsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly awsService: AwsService,
-    private readonly pushNotifications: PushNotificationsService
+    private readonly pushNotifications: PushNotificationsService,
+    private readonly analyticsService: AnalyticsService
   ) {}
 
   private async withMember<T extends { memberUid: string }>(records: T[]): Promise<Array<WithMember<T>>> {
@@ -211,6 +226,161 @@ export class AiAppsService {
         })),
       },
     };
+  }
+
+  /**
+   * Custom event ingestion from a deployed AI App (`POST /v1/ai-apps/track`).
+   * Guests count — auth is optional and never rejecting. Attribution
+   * (`source`, `appId`, `appUid`, `appName`, `memberUid`) is always resolved
+   * server-side from the request and overwrites anything client-sent. Every
+   * drop path (unknown origin, no usable identity, oversized payload, batch
+   * limit) is silent — the controller always answers 204, so a scripted
+   * caller gets no signal about which check it hit.
+   */
+  async trackAppEvent(params: {
+    origin: string | undefined;
+    token: string | undefined;
+    anonId: string | undefined;
+    event: string | undefined;
+    properties: Record<string, unknown> | undefined;
+    events: Array<{ event?: string; properties?: Record<string, unknown> }> | undefined;
+  }): Promise<void> {
+    const app = await this.resolveAppFromOrigin(params.origin);
+    if (!app) {
+      return;
+    }
+
+    const items = params.events?.length
+      ? params.events
+      : params.event
+      ? [{ event: params.event, properties: params.properties }]
+      : [];
+    if (!items.length || items.length > AI_APPS_TRACK_MAX_BATCH_EVENTS) {
+      return;
+    }
+
+    const memberUid = await this.resolveOptionalMemberUid(params.token);
+    const distinctId = memberUid ?? (params.anonId && AI_APP_ANON_ID_REGEX.test(params.anonId) ? params.anonId : null);
+    if (!distinctId) {
+      return;
+    }
+
+    const attribution: Record<string, unknown> = {
+      source: 'ai-app',
+      appId: app.appId,
+      appUid: app.uid,
+      appName: app.name,
+    };
+    if (memberUid) {
+      attribution.memberUid = memberUid;
+    }
+
+    await Promise.all(
+      items.map(async (item) => {
+        if (typeof item.event !== 'string' || !item.event.trim()) {
+          return;
+        }
+        const properties = this.sanitizeTrackProperties(item.properties);
+        if (properties === null) {
+          return;
+        }
+        await this.analyticsService.trackEvent({
+          name: normalizeAiAppEventName(item.event),
+          distinctId,
+          properties: { ...properties, ...attribution },
+        });
+      })
+    );
+  }
+
+  /**
+   * Resolve the live (non-`DELETED`) app for a track request's `Origin`
+   * header host (`<appId>.<AI_APPS_APP_DOMAIN>`). `appId` is only unique
+   * per-member, so a global hostname can match several rows — pick the most
+   * recently deployed one and log rather than guess.
+   */
+  private async resolveAppFromOrigin(origin: string | undefined): Promise<AiApp | null> {
+    if (!origin) {
+      return null;
+    }
+    let hostname: string;
+    try {
+      hostname = new URL(origin).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+    const suffix = `.${AI_APPS_APP_DOMAIN}`;
+    if (!hostname.endsWith(suffix)) {
+      return null;
+    }
+    const appId = hostname.slice(0, -suffix.length);
+    if (!appId) {
+      return null;
+    }
+
+    const candidates = await this.prisma.aiApp.findMany({ where: { appId, status: { not: 'DELETED' } } });
+    if (!candidates.length) {
+      return null;
+    }
+    if (candidates.length === 1) {
+      return candidates[0];
+    }
+    this.logger.warn(`Multiple live AiApp rows found for appId=${appId}; using the most recently deployed`);
+    return candidates.reduce((latest, candidate) => {
+      const latestTime = (latest.lastDeployedAt ?? latest.updatedAt).getTime();
+      const candidateTime = (candidate.lastDeployedAt ?? candidate.updatedAt).getTime();
+      return candidateTime > latestTime ? candidate : latest;
+    });
+  }
+
+  /**
+   * Optional identity check for `trackAppEvent`: a valid Bearer/cookie token
+   * resolves to a memberUid; a missing/invalid/expired token (or an
+   * introspection failure) resolves to `null` — this must never throw, guest
+   * usage has to keep counting.
+   */
+  private async resolveOptionalMemberUid(token: string | undefined): Promise<string | null> {
+    if (!token) {
+      return null;
+    }
+    try {
+      const { data } = await axios.post(`${process.env.AUTH_API_URL}/auth/introspect`, { token });
+      if (!data?.active || !data?.email) {
+        return null;
+      }
+      const member = await this.prisma.member.findFirst({
+        where: { email: { equals: data.email, mode: 'insensitive' } },
+        select: { uid: true },
+      });
+      return member?.uid ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Strips PostHog-reserved (`$…`), PII-shaped (`email`/`name`), and
+   * attribution-shaped (`memberUid`) keys from an app's event properties,
+   * then enforces the per-event size cap. `memberUid` is stripped even for
+   * guests — otherwise a spoofed value would survive attribution stamping
+   * (which only sets `memberUid` when identity was actually verified) and
+   * let an app attach events to an arbitrary member's profile. Returns
+   * `null` when the cleaned payload is still oversized — the caller drops
+   * the whole event rather than truncating it.
+   */
+  private sanitizeTrackProperties(raw: unknown): Record<string, unknown> | null {
+    const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(source)) {
+      if (key.startsWith('$')) continue;
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === 'email' || lowerKey === 'name' || lowerKey === 'memberuid') continue;
+      cleaned[key] = value;
+    }
+    if (Buffer.byteLength(JSON.stringify(cleaned)) > AI_APPS_TRACK_MAX_PROPERTIES_BYTES) {
+      return null;
+    }
+    return cleaned;
   }
 
   /**
@@ -891,6 +1061,60 @@ export class AiAppsService {
       orderBy: { createdAt: 'desc' },
     });
     return this.withMember(feedback);
+  }
+
+  /**
+   * All feedback the requester can review, newest first, tagged with `appName`.
+   * Directory admins see every non-deleted app; everyone else only apps they
+   * created. Skips deleted apps so the list matches the dashboard catalog.
+   */
+  async listAccessibleFeedback(
+    requesterUid: string
+  ): Promise<Array<WithMember<AiAppFeedback> & { appName: string }>> {
+    const isAdmin = await this.isRequesterDirectoryAdmin(requesterUid);
+    const apps = await this.prisma.aiApp.findMany({
+      where: isAdmin ? { status: { not: 'DELETED' } } : { memberUid: requesterUid, status: { not: 'DELETED' } },
+      select: { uid: true, name: true },
+    });
+    if (apps.length === 0) {
+      return [];
+    }
+    const appNameByUid = new Map(apps.map((app) => [app.uid, app.name]));
+    const feedback = await this.prisma.aiAppFeedback.findMany({
+      where: { appUid: { in: apps.map((app) => app.uid) } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const withMembers = await this.withMember(feedback);
+    return withMembers.map((row) => ({ ...row, appName: appNameByUid.get(row.appUid) ?? '' }));
+  }
+
+  /**
+   * Sets the shared review status on one feedback row. Any of NEW / VIEWED /
+   * IMPLEMENTED is always allowed (skips and backwards moves included). Restricted
+   * to the app's creator and directory admins; no notification is sent.
+   */
+  async updateFeedbackStatus(
+    requesterUid: string,
+    appUid: string,
+    feedbackUid: string,
+    status: AiAppFeedbackStatus
+  ): Promise<WithMember<AiAppFeedback>> {
+    const app = await this.prisma.aiApp.findUnique({ where: { uid: appUid } });
+    if (!app) {
+      throw new NotFoundException(`AI App not found: ${appUid}`);
+    }
+    if (!(await this.isCreatorOrDirectoryAdmin(requesterUid, app))) {
+      throw new ForbiddenException('Only the app creator or a directory admin can update feedback status');
+    }
+    const feedback = await this.prisma.aiAppFeedback.findUnique({ where: { uid: feedbackUid } });
+    if (!feedback || feedback.appUid !== app.uid) {
+      throw new NotFoundException(`AI App feedback not found: ${feedbackUid}`);
+    }
+    const updated = await this.prisma.aiAppFeedback.update({
+      where: { uid: feedbackUid },
+      data: { status },
+    });
+    return (await this.withMember([updated]))[0];
   }
 
   /** True when the requester created the app or is a directory admin. */

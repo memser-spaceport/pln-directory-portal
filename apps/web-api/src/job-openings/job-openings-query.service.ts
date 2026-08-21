@@ -3,6 +3,7 @@ import { JobOpeningStatus, Prisma } from '@prisma/client';
 import type { JobsListQuery } from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
 import { buildJobOpeningDateWhere } from './job-opening-date.where';
+import { pinProtocolLabsThenPage } from './pin-protocol-labs-team';
 
 const TOP_LEVEL_FOCUS_AREAS = [
   'Digital Human Rights',
@@ -42,6 +43,13 @@ export class JobOpeningsQueryService {
 
   private buildWhere(query: JobsListQuery, overrides: FacetOverrides = {}): Prisma.JobOpeningWhereInput {
     const and: Prisma.JobOpeningWhereInput[] = [];
+
+    // Pushed into `and` rather than set alongside the returned `teamUid: { not: null }`,
+    // which a second top-level key would overwrite. Not subject to a FacetOverride: the
+    // team scope isn't a facet, so it must survive even when counting facets.
+    if (query.teamUid) {
+      and.push({ teamUid: query.teamUid });
+    }
 
     if (!overrides.dropQ && query.q) {
       and.push({
@@ -95,7 +103,6 @@ export class JobOpeningsQueryService {
   private async queryPagedTeamGroups(query: JobsListQuery) {
     const page = query.page;
     const limit = query.limit;
-    const skip = (page - 1) * limit;
     const where = this.buildWhere(query);
     const [totalGroups, totalRoles] = await Promise.all([
       this.prisma.team.count({
@@ -127,18 +134,21 @@ export class JobOpeningsQueryService {
     if (['company_az', 'company_za'].includes(sort)) {
       const orderBy = sort === 'company_az' ? 'asc' : 'desc';
 
-      const teamsPage = await this.prisma.team.findMany({
+      const teams = await this.prisma.team.findMany({
         where: {
           jobOpenings: {
             some: where,
           },
         },
-        select: { uid: true },
+        select: { uid: true, name: true },
         orderBy: [{ name: orderBy }, { uid: 'asc' }],
-        skip,
-        take: limit,
       });
-      const pageTeamUids = teamsPage.map((team) => team.uid);
+      const pagedTeams = pinProtocolLabsThenPage(
+        teams.map((team) => ({ teamUid: team.uid, name: team.name })),
+        page,
+        limit
+      );
+      const pageTeamUids = pagedTeams.map((team) => team.teamUid);
 
       if (pageTeamUids.length > 0) {
         const counts = await groupByTeamUid({
@@ -202,7 +212,7 @@ export class JobOpeningsQueryService {
         return byName !== 0 ? byName : a.teamUid.localeCompare(b.teamUid);
       });
 
-      pageRows = teamEntries.slice(skip, skip + limit).map((entry) => ({
+      pageRows = pinProtocolLabsThenPage(teamEntries, page, limit).map((entry) => ({
         teamUid: entry.teamUid,
         roleCount: entry.dates.length,
       }));

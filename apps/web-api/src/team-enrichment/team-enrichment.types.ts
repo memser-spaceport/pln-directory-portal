@@ -78,6 +78,10 @@ export const ENRICHABLE_TEAM_FIELDS = [
   'twitterHandler',
   'linkedinHandler',
   'telegramHandler',
+  'blueskyHandler',
+  'crunchbaseHandler',
+  'teamSize',
+  'location',
   'shortDescription',
   'longDescription',
   'moreDetails',
@@ -94,8 +98,13 @@ export type EnrichableField = EnrichableTeamField | EnrichableRelationField;
  * Keys tracked in `dataEnrichment.fieldsMeta`. `logo` is included because the
  * enrichment pipeline records provenance for it, even though it isn't filled
  * by the AI text response (it comes from OG scraping or ScrapingDog).
+ *
+ * `dateFounded` is also bespoke: it's an `Int` on `Team`, not a string scalar,
+ * so it can't ride the generic `ENRICHABLE_TEAM_FIELDS` write/promotion loop
+ * (which assumes string values) — it gets its own dedicated handling
+ * throughout the pipeline, same as `logo`.
  */
-export type FieldMetaKey = EnrichableField | 'logo';
+export type FieldMetaKey = EnrichableField | 'logo' | 'dateFounded';
 
 export type ForceEnrichmentMode = 'all' | 'cannotEnrich';
 
@@ -257,6 +266,8 @@ export interface WebsiteSignals {
   twitterHandler?: string | null;
   linkedinHandler?: string | null;
   telegramHandler?: string | null;
+  blueskyHandler?: string | null;
+  crunchbaseHandler?: string | null;
   contactEmail?: string | null;
   jsonLdOrgName?: string | null;
   ogSiteName?: string | null;
@@ -309,6 +320,11 @@ export interface AITeamEnrichmentResponse {
   linkedinHandler: string | null;
   twitterHandler: string | null;
   telegramHandler: string | null;
+  blueskyHandler: string | null;
+  crunchbaseHandler: string | null;
+  dateFounded: number | null;
+  teamSize: string | null;
+  location: string | null;
   shortDescription: string | null;
   longDescription: string | null;
   moreDetails: string | null;

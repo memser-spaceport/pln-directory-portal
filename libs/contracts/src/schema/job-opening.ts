@@ -16,6 +16,12 @@ const ListParam = z
   .transform((v) => toStringArray(v));
 
 export const JobsListQueryParams = z.object({
+  // Scopes the list to a single team. Used by the team profile's "Open roles"
+  // section, which needs one team's postings rather than the whole board — and
+  // reuses this endpoint so the two surfaces can't disagree about what "open"
+  // means. Note `limit` pages TEAMS, not roles, so a scoped query returns all of
+  // that team's roles in a single group.
+  teamUid: z.string().optional(),
   roleCategory: ListParam,
   seniority: ListParam,
   focus: ListParam,

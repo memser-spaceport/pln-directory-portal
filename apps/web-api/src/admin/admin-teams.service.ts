@@ -4,6 +4,7 @@ import { parse } from 'csv-parse/sync';
 import * as iconv from 'iconv-lite';
 import { Prisma } from '@prisma/client';
 import { ParticipantsRequest } from '../teams/dto/members.dto';
+import { normalizeBlueskyHandler, normalizeCrunchbaseHandler } from '../teams/team-handle-normalizer';
 
 type ImportParams = {
   csvBuffer: Buffer;
@@ -229,6 +230,11 @@ export class AdminTeamsService {
         linkedinHandler: true,
         shortDescription: true,
         longDescription: true,
+        blueskyHandler: true,
+        crunchbaseHandler: true,
+        dateFounded: true,
+        teamSize: true,
+        location: true,
         logo: { select: { url: true } },
       },
     });
@@ -245,16 +251,25 @@ export class AdminTeamsService {
         throw new NotFoundException('Team not found');
       }
 
-      const synced = syncTierPriorityOnWrite(
+      const synced: any = syncTierPriorityOnWrite(
         data,
         (m) => this.logger.log(m),
         (m) => this.logger.warn(m)
       );
 
+      if (typeof synced.blueskyHandler === 'string') {
+        synced.blueskyHandler = normalizeBlueskyHandler(synced.blueskyHandler) ?? null;
+      }
+      if (typeof synced.crunchbaseHandler === 'string') {
+        synced.crunchbaseHandler = normalizeCrunchbaseHandler(synced.crunchbaseHandler) ?? null;
+      }
+      if (synced.teamSize !== undefined && synced.teamSize !== null) {
+        synced.teamSize = String(synced.teamSize);
+      }
+
       await tx.team.update({ where: { uid }, data: synced });
     });
   }
-
 
   /**
    * Normalize CSV rows:

@@ -191,6 +191,22 @@ export const RecordTeamNewsImpressionsResponseSchema = z.object({
   success: z.literal(true),
 });
 
+// POST /v1/team-news/counts — how many news items each of these teams published
+// in the last TEAM_NEWS_COUNT_WINDOW_DAYS. Unauthenticated: the number is the
+// same for every viewer, signed-in or not. Powers the "N new posts" chip on the
+// teams grid and the job board. Batch size capped at 200, matching
+// POST /v1/feed/comments/counts.
+export const TeamNewsCountsRequestSchema = z.object({
+  teamUids: z.array(z.string()).min(1).max(200),
+});
+
+// Keyed by team uid. A uid ABSENT from `counts` means zero — groupBy returns no
+// row for a team with nothing recent, and zero-filling would cost a second query
+// to tell "published nothing" from "not a team". Both render the same: no chip.
+export const TeamNewsCountsResponseSchema = z.object({
+  counts: z.record(z.string(), z.number().int().min(0)),
+});
+
 export const TeamNewsListResponseSchema = z.object({
   page: z.number().int(),
   limit: z.number().int(),
@@ -213,6 +229,8 @@ export const TeamNewsGroupedResponseSchema = z.object({
   groups: z.array(TeamNewsFocusGroupSchema),
   /** News from allowlisted teams with no focus-area group; home "All" tab only. */
   allTabExtraItems: z.array(TeamNewsItemSchema).default([]),
+  /** Memberships ∪ follows ∪ Teams-to-follow matches; empty for anonymous. */
+  forYouTeamUids: z.array(z.string()).default([]),
 });
 
 export const TeamNewsFacetItemSchema = z.object({
@@ -415,5 +433,7 @@ export type TeamNewsFollowSuggestionsResponse = z.infer<typeof TeamNewsFollowSug
 export type TeamNewsPopularQuery = z.infer<typeof TeamNewsPopularQueryParams>;
 export type TeamNewsPopularItem = z.infer<typeof TeamNewsPopularItemSchema>;
 export type TeamNewsPopularResponse = z.infer<typeof TeamNewsPopularResponseSchema>;
+export type TeamNewsCountsRequest = z.infer<typeof TeamNewsCountsRequestSchema>;
+export type TeamNewsCountsResponse = z.infer<typeof TeamNewsCountsResponseSchema>;
 export type SeedTeamNewsTrendingDto = z.infer<typeof SeedTeamNewsTrendingDtoSchema>;
 export type SeedTeamNewsTrendingResponse = z.infer<typeof SeedTeamNewsTrendingResponseSchema>;

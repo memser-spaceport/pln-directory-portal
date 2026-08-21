@@ -214,6 +214,11 @@ type TeamWithEnrichment = {
   twitterHandler: string | null;
   linkedinHandler: string | null;
   telegramHandler: string | null;
+  blueskyHandler: string | null;
+  crunchbaseHandler: string | null;
+  dateFounded: number | null;
+  teamSize: string | null;
+  location: string | null;
   shortDescription: string | null;
   longDescription: string | null;
   moreDetails: string | null;
@@ -246,6 +251,11 @@ type TeamEnrichmentRow = {
   twitterHandler: string | null;
   linkedinHandler: string | null;
   telegramHandler: string | null;
+  blueskyHandler: string | null;
+  crunchbaseHandler: string | null;
+  dateFounded: number | null;
+  teamSize: string | null;
+  location: string | null;
   shortDescription: string | null;
   longDescription: string | null;
   moreDetails: string | null;
@@ -264,6 +274,11 @@ const TEAM_WITH_ENRICHMENT_SELECT = {
   twitterHandler: true,
   linkedinHandler: true,
   telegramHandler: true,
+  blueskyHandler: true,
+  crunchbaseHandler: true,
+  dateFounded: true,
+  teamSize: true,
+  location: true,
   shortDescription: true,
   longDescription: true,
   moreDetails: true,
@@ -305,6 +320,11 @@ const TEAM_WITH_ENRICHMENT_SELECT = {
       twitterHandler: true,
       linkedinHandler: true,
       telegramHandler: true,
+      blueskyHandler: true,
+      crunchbaseHandler: true,
+      dateFounded: true,
+      teamSize: true,
+      location: true,
       shortDescription: true,
       longDescription: true,
       moreDetails: true,
@@ -366,6 +386,15 @@ export class TeamEnrichmentService {
               { linkedinHandler: '' },
               { telegramHandler: null },
               { telegramHandler: '' },
+              { blueskyHandler: null },
+              { blueskyHandler: '' },
+              { crunchbaseHandler: null },
+              { crunchbaseHandler: '' },
+              { dateFounded: null },
+              { teamSize: null },
+              { teamSize: '' },
+              { location: null },
+              { location: '' },
               { shortDescription: null },
               { shortDescription: '' },
               { longDescription: null },
@@ -917,6 +946,8 @@ export class TeamEnrichmentService {
             ['twitterHandler', signals.twitterHandler],
             ['linkedinHandler', signals.linkedinHandler],
             ['telegramHandler', signals.telegramHandler],
+            ['blueskyHandler', signals.blueskyHandler],
+            ['crunchbaseHandler', signals.crunchbaseHandler],
             ['contactMethod', signals.contactEmail],
           ];
           for (const [field, value] of backfillMap) {
@@ -948,6 +979,8 @@ export class TeamEnrichmentService {
             ...(signals.twitterHandler ? { twitterHandler: signals.twitterHandler } : {}),
             ...(signals.linkedinHandler ? { linkedinHandler: signals.linkedinHandler } : {}),
             ...(signals.telegramHandler ? { telegramHandler: signals.telegramHandler } : {}),
+            ...(signals.blueskyHandler ? { blueskyHandler: signals.blueskyHandler } : {}),
+            ...(signals.crunchbaseHandler ? { crunchbaseHandler: signals.crunchbaseHandler } : {}),
             ...(signals.contactEmail ? { contactEmail: signals.contactEmail } : {}),
             ...(signals.jsonLdOrgName ? { jsonLdOrgName: signals.jsonLdOrgName } : {}),
             ...(signals.ogSiteName ? { ogSiteName: signals.ogSiteName } : {}),
@@ -1197,6 +1230,35 @@ export class TeamEnrichmentService {
         }
       }
 
+      // dateFounded — an Int on Team, so it can't ride the generic ENRICHABLE_TEAM_FIELDS
+      // string loop (`.trim()` would throw). Same four-layer check as the scalar loop,
+      // just typed for a number.
+      {
+        const dateFoundedStatus = existingFieldsMeta.dateFounded?.status;
+        const teamHasDateFounded = typeof team.dateFounded === 'number';
+
+        if (dateFoundedStatus === FieldEnrichmentStatus.ChangedByUser) {
+          // user-controlled — skip
+        } else if (teamHasDateFounded && dateFoundedStatus !== FieldEnrichmentStatus.Enriched) {
+          newFieldsMeta.dateFounded = {
+            ...existingFieldsMeta.dateFounded,
+            status: FieldEnrichmentStatus.ChangedByUser,
+          };
+        } else if (!forceOverwrite && dateFoundedStatus === FieldEnrichmentStatus.Enriched) {
+          // standard mode, already enriched — skip
+        } else if (aiResponse.dateFounded !== null) {
+          (enrichmentUpdate as any).dateFounded = aiResponse.dateFounded;
+          newFieldsMeta.dateFounded = {
+            status: FieldEnrichmentStatus.Enriched,
+            confidence: toConfidence(aiResponse.confidence?.dateFounded),
+            source: EnrichmentSource.AI,
+          };
+          fieldsUpdatedCount++;
+        } else if (!teamHasDateFounded) {
+          newFieldsMeta.dateFounded = { status: FieldEnrichmentStatus.CannotEnrich };
+        }
+      }
+
       // Logo via OG tag scraping — written to TeamEnrichment.logoUid, never directly to Team.
       const effectiveWebsite = team.website || aiResponse.website || null;
       const logoIsUserOwned =
@@ -1426,11 +1488,18 @@ export class TeamEnrichmentService {
     if (!meta || !meta.isAIGenerated) return;
     if (!meta.fieldsMeta) meta.fieldsMeta = {};
 
-    const trackedFields = new Set<FieldMetaKey>([...ENRICHABLE_TEAM_FIELDS, 'industryTags', 'investmentFocus', 'logo']);
+    const trackedFields = new Set<FieldMetaKey>([
+      ...ENRICHABLE_TEAM_FIELDS,
+      'industryTags',
+      'investmentFocus',
+      'logo',
+      'dateFounded',
+    ]);
 
     const isNonEmpty = (value: unknown): boolean => {
       if (Array.isArray(value)) return value.length > 0;
       if (typeof value === 'string') return value.trim() !== '';
+      if (typeof value === 'number') return true;
       return false;
     };
 
@@ -1541,6 +1610,11 @@ export class TeamEnrichmentService {
             twitterHandler: true,
             linkedinHandler: true,
             telegramHandler: true,
+            blueskyHandler: true,
+            crunchbaseHandler: true,
+            dateFounded: true,
+            teamSize: true,
+            location: true,
             shortDescription: true,
             longDescription: true,
           },
@@ -1551,6 +1625,11 @@ export class TeamEnrichmentService {
         twitterHandler: true,
         linkedinHandler: true,
         telegramHandler: true,
+        blueskyHandler: true,
+        crunchbaseHandler: true,
+        dateFounded: true,
+        teamSize: true,
+        location: true,
         shortDescription: true,
         longDescription: true,
         logoUid: true,
@@ -1749,8 +1828,12 @@ export class TeamEnrichmentService {
           alternative = { content: otherSide, fromSide: otherSideSide };
         }
 
+        // `dateFounded` is the only non-string candidate (an Int on Team/TeamEnrichment) —
+        // coerce to a string here so it matches EnrichmentReviewFieldEntry.content's shape.
+        const contentForDisplay = typeof candidate === 'number' ? String(candidate) : candidate;
+
         fields[keyStr] = {
-          content: candidate,
+          content: contentForDisplay,
           metadata: {
             status: fieldMeta.status,
             source: fieldMeta.source,
@@ -2068,6 +2151,17 @@ export class TeamEnrichmentService {
       if (r.key === 'logo') {
         const logoUid = Array.isArray(r.write) ? r.write[0] : r.write;
         teamUpdate.logo = { connect: { uid: logoUid } };
+        continue;
+      }
+      if (r.key === 'dateFounded') {
+        // `Team.dateFounded` is an Int — the admin-provided path sends it as a string
+        // (ApproveEnrichmentFieldInput.content is string | string[]); the candidate-side
+        // path already carries a number straight from TeamEnrichment.dateFounded.
+        const raw = Array.isArray(r.write) ? r.write[0] : r.write;
+        const parsed = typeof raw === 'number' ? raw : Number.parseInt(String(raw), 10);
+        if (Number.isInteger(parsed)) {
+          teamUpdate.dateFounded = parsed;
+        }
         continue;
       }
       // scalar

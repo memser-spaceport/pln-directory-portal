@@ -4,6 +4,8 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Patch,
@@ -19,10 +21,11 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes } from '@nestjs/swagger';
 import { ZodValidationPipe } from '@abitia/zod-dto';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { NoCache } from '../decorators/no-cache.decorator';
 import { UserTokenCheckGuard } from '../guards/user-token-check.guard';
 import { UserAccessTokenValidateGuard } from '../guards/user-access-token-validate.guard';
+import { extractTokenFromRequest } from '../utils/auth';
 import { RequirePermissions } from '../rbac/rbac.decorator';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RbacService } from '../rbac/rbac.service';
@@ -37,7 +40,9 @@ import { DeployDraftDto } from './dto/deploy-draft.dto';
 import { StartConnectDto } from './dto/start-connect.dto';
 import { PollConnectDto } from './dto/poll-connect.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
+import { UpdateFeedbackStatusDto } from './dto/update-feedback-status.dto';
 import { UpdateAppMetadataDto } from './dto/update-app-metadata.dto';
+import { TrackEventDto } from './dto/track-event.dto';
 import { AI_APPS_MAX_PRD_BYTES, AI_APPS_MAX_ZIP_BYTES, AI_APPS_STARTER_KIT_VERSION } from './ai-apps.constants';
 
 const READ = { anyOf: [AI_APPS_PERMISSIONS.READ, AI_APPS_PERMISSIONS.WRITE] };
@@ -127,6 +132,20 @@ export class AiAppsController {
   }
 
   /**
+   * All reviewable feedback for the caller, newest first, tagged with `appName`.
+   * Directory admins get every app; everyone else only apps they created.
+   * Declared before `:uid` so the literal path wins over the param route.
+   */
+  @NoCache()
+  @Get('feedback')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  async listAccessibleFeedback(@Req() req: any) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.listAccessibleFeedback(memberUid);
+  }
+
+  /**
    * Identity of the signed-in member ("member context"), consumed by deployed
    * AI apps for personalization. Unlike the other dashboard reads, the guard
    * here also accepts the LabOS `authToken` cookie — it is scoped to the parent
@@ -142,6 +161,30 @@ export class AiAppsController {
   async getMemberContext(@Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.aiAppsService.getMemberContext(memberUid);
+  }
+
+  /**
+   * Custom event ingestion from a deployed AI App (button clicks, feature
+   * usage), forwarded to the Directory PostHog project. No auth required —
+   * guest usage counts too, and the short-lived deploy token is never
+   * involved here. Always responds 204, including every drop path (unknown
+   * origin, no usable identity, oversized payload, batch limit) — a scripted
+   * caller gets no signal about which check it hit. Declared before `:uid` so
+   * the literal path wins.
+   */
+  @NoCache()
+  @Post('track')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UsePipes(ZodValidationPipe)
+  async trackEvent(@Body() body: TrackEventDto, @Req() req: Request) {
+    await this.aiAppsService.trackAppEvent({
+      origin: req.headers.origin,
+      token: extractTokenFromRequest(req),
+      anonId: body.anonId,
+      event: body.event,
+      properties: body.properties as Record<string, unknown> | undefined,
+      events: body.events as Array<{ event?: string; properties?: Record<string, unknown> }> | undefined,
+    });
   }
 
   /** Single AI App detail (includes `canManage` for the requesting member). */
@@ -357,6 +400,26 @@ export class AiAppsController {
   async listFeedback(@Param('uid') uid: string, @Req() req: any) {
     const memberUid = await this.resolveMemberUid(req);
     return this.aiAppsService.listFeedback(memberUid, uid);
+  }
+
+  /**
+   * Set the shared review status on one feedback row. Restricted to the app's
+   * creator and directory admins (checked in the service). Any of NEW / VIEWED /
+   * IMPLEMENTED is always allowed.
+   */
+  @NoCache()
+  @Patch(':uid/feedback/:feedbackUid')
+  @UseGuards(UserTokenCheckGuard, RbacGuard)
+  @RequirePermissions(READ)
+  @UsePipes(ZodValidationPipe)
+  async updateFeedbackStatus(
+    @Param('uid') uid: string,
+    @Param('feedbackUid') feedbackUid: string,
+    @Body() body: UpdateFeedbackStatusDto,
+    @Req() req: any
+  ) {
+    const memberUid = await this.resolveMemberUid(req);
+    return this.aiAppsService.updateFeedbackStatus(memberUid, uid, feedbackUid, body.status);
   }
 
   /**

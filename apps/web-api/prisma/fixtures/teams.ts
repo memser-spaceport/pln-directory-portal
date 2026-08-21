@@ -61,6 +61,12 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) =
     isFund: faker.datatype.boolean(),
     accessLevel: 'L1',
     accessLevelUpdatedAt: faker.date.past(),
+    blueskyHandler: faker.helpers.arrayElement([null, faker.name.firstName()]),
+    crunchbaseHandler: faker.helpers.arrayElement([null, faker.helpers.slugify(companyName.toLowerCase())]),
+    dateFounded: faker.helpers.arrayElement([null, faker.datatype.number({ min: 1990, max: 2024 })]),
+    teamSize: faker.helpers.arrayElement([null, String(faker.datatype.number({ min: 1, max: 500 }))]),
+    location: faker.helpers.arrayElement([null, faker.address.city()]),
+    status: 'ACTIVE',
     // Keep tier/priority in sync in fixtures.
     ...((): { tier: number; priority: number } => {
       const tier = randTier();

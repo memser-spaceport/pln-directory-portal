@@ -67,6 +67,13 @@ export const CODE_AGENT_SESSIONS_PERMISSIONS = {
 /** Fine-grained grants that `code_agent_sessions.admin` expands into. */
 export const CODE_AGENT_SESSIONS_ADMIN_GRANTS = [CODE_AGENT_SESSIONS_PERMISSIONS.VIEW] as const;
 
+// ── MCP ──────────────────────────────────────────────────────────────────
+
+export const MCP_PERMISSIONS = {
+  /** Authorize an AI agent to act as the member via LabOS MCP */
+  CONNECT: 'mcp.connect',
+} as const;
+
 // ── Members ─────────────────────────────────────────────────────────────
 
 export const MEMBER_PERMISSIONS = {
@@ -141,6 +148,13 @@ export const TEAM_MEMBERSHIP_PERMISSIONS = {
 } as const;
 
 export const MEMBERSHIP_PERMISSIONS = TEAM_MEMBERSHIP_PERMISSIONS;
+
+// ── PLAA ─────────────────────────────────────────────────────────────────
+
+export const PLAA_PERMISSIONS = {
+  /** Access to PLAA */
+  ACCESS: 'plaa.access',
+} as const;
 
 // ── PL Advisors ───────────────────────────────────────────────────────────
 
@@ -232,6 +246,9 @@ export const ALL_PERMISSION_CODES = [
   CODE_AGENT_SESSIONS_PERMISSIONS.VIEW,
   CODE_AGENT_SESSIONS_PERMISSIONS.ADMIN,
 
+  // MCP
+  MCP_PERMISSIONS.CONNECT,
+
   // Demo Day
   DEMODAY_PERMISSIONS.REPORT_LINK_READ,
   DEMODAY_PERMISSIONS.ADMIN_ALL,
@@ -276,6 +293,9 @@ export const ALL_PERMISSION_CODES = [
   // Membership
   TEAM_MEMBERSHIP_PERMISSIONS.SOURCE_READ,
   TEAM_MEMBERSHIP_PERMISSIONS.SOURCE_READ_LEGACY,
+
+  // PLAA
+  PLAA_PERMISSIONS.ACCESS,
 
   // PL Advisors
   PL_ADVISORS_PERMISSIONS.ACCESS,

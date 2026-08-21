@@ -1,11 +1,22 @@
-import { Body, Controller, ForbiddenException, Logger, Param, Req, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Logger,
+  Param,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Api, initNestServer } from '@ts-rest/nest';
 import { Request } from 'express';
+import { ZodError, ZodType } from 'zod';
 import { apiTeamNews } from 'libs/contracts/src/lib/contract-team-news';
 import {
   CreateTeamNewsDiscussionRequestSchema,
   RecordTeamNewsImpressionsRequestSchema,
   TeamNewsByTeamQueryParams,
+  TeamNewsCountsRequestSchema,
   TeamNewsFollowSuggestionsQueryParams,
   TeamNewsListQueryParams,
   TeamNewsPopularQueryParams,
@@ -172,9 +183,39 @@ export class TeamNewsController {
   // count. Abuse protection is the existing app-wide ThrottlerGuard only.
   @Api(server.route.recordTeamNewsImpressions)
   async recordTeamNewsImpressions(@Body() body: unknown) {
-    const { newsItemUids } = RecordTeamNewsImpressionsRequestSchema.parse(body);
+    const { newsItemUids } = this.parse(RecordTeamNewsImpressionsRequestSchema, body);
     await this.teamNewsImpressionsService.recordImpressions(newsItemUids);
     return { success: true as const };
+  }
+
+  // Intentionally unauthenticated, for the same reason the counts are batched
+  // rather than personalised: the number is identical for every viewer, signed
+  // in or not. Abuse protection is the app-wide ThrottlerGuard only.
+  //
+  // @NoCache is a no-op on a POST — the cache interceptor short-circuits on
+  // non-GET — but it is carried for consistency with POST /v1/feed/comments/counts,
+  // whose shape this route mirrors. A GET would be CDN-cacheable; 200 uids do
+  // not fit in a query string.
+  @Api(server.route.getTeamNewsCounts)
+  @NoCache()
+  async getTeamNewsCounts(@Body() body: unknown) {
+    const { teamUids } = this.parse(TeamNewsCountsRequestSchema, body);
+    return this.teamNewsQueryService.getRecentCountsByTeam(teamUids);
+  }
+
+  // ts-rest hands the raw ZodError to Nest's default filter, which doesn't
+  // recognise it as an HttpException and falls through to a 500 rather than a
+  // 400. Route every contract-schema parse through here so an oversized batch
+  // reads as the client error it is. Mirrors FeedController.parse.
+  private parse<T>(schema: ZodType<T, any, any>, data: unknown): T {
+    try {
+      return schema.parse(data);
+    } catch (err) {
+      if (err instanceof ZodError) {
+        throw new BadRequestException(err.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; '));
+      }
+      throw err;
+    }
   }
 
   private async resolveViewerContext(userEmail?: string): Promise<{ followed: Set<string>; memberUid?: string }> {

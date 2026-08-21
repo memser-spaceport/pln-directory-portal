@@ -16,6 +16,7 @@ describe('member-contact-sanitizer', () => {
     telegramUid: '123',
     twitterHandler: 'ada_x',
     linkedinHandler: 'ada-li',
+    blueskyHandler: 'ada.bsky.social',
     bio: 'public bio',
     officeHours: 'https://cal.com/ada',
     preferences: { showEmail: true },

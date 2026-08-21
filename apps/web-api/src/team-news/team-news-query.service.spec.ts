@@ -1,6 +1,10 @@
 import { NotFoundException } from '@nestjs/common';
 import { TeamNewsQueryService } from './team-news-query.service';
 import { PrismaService } from '../shared/prisma.service';
+// Imported rather than restated: the assertion's job is "the exclusion is
+// applied", not "the list currently holds these four names". Restating them
+// would turn every editorial change to the list into a failing unit test.
+import { TEAM_NEWS_EXCLUDED_TEAM_NAMES } from './team-news-public-list.config';
 
 describe('TeamNewsQueryService.listTeamNewsByTeam', () => {
   let service: TeamNewsQueryService;
@@ -477,5 +481,104 @@ describe('TeamNewsQueryService.listGroupedByFocusArea', () => {
         items: [expect.objectContaining({ uid: 'editorial-focused', editorialRank: 1 })],
       }),
     ]);
+    expect(result.forYouTeamUids).toEqual([]);
+  });
+
+  it('attaches forYouTeamUids from suggestions when the viewer is known', async () => {
+    teamNewsItemFindMany.mockResolvedValue([]);
+    const getForYouTeamUids = jest.fn().mockResolvedValue(['seed-team', 'cand-1']);
+    service = new TeamNewsQueryService(
+      {
+        teamNewsItem: { findMany: teamNewsItemFindMany },
+        focusArea: { findMany: focusAreaFindMany },
+        teamNewsForumLink: { findMany: teamNewsForumLinkFindMany },
+        teamNewsUpvote: { groupBy: teamNewsUpvoteGroupBy, findMany: teamNewsUpvoteFindMany },
+      } as unknown as PrismaService,
+      { getForYouTeamUids } as never
+    );
+
+    const result = await service.listGroupedByFocusArea(query, new Set(), 'member-1');
+
+    expect(getForYouTeamUids).toHaveBeenCalledWith('member-1');
+    expect(result.forYouTeamUids).toEqual(['seed-team', 'cand-1']);
+  });
+});
+
+describe('TeamNewsQueryService.getRecentCountsByTeam', () => {
+  let service: TeamNewsQueryService;
+
+  const teamNewsItemGroupBy = jest.fn();
+
+  const prismaMock = {
+    teamNewsItem: { groupBy: teamNewsItemGroupBy },
+  } as unknown as PrismaService;
+
+  // Frozen so the 7-day cutoff is an exact, assertable Date rather than a
+  // moving target — same trick team-news-event-date.where.spec.ts plays with
+  // its NOW constant.
+  const NOW = new Date('2026-08-18T12:00:00.000Z').getTime();
+  const CUTOFF = new Date(NOW - 7 * 24 * 60 * 60 * 1000);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    teamNewsItemGroupBy.mockResolvedValue([]);
+    service = new TeamNewsQueryService(prismaMock);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('returns an empty map without touching the database when given no teams', async () => {
+    const result = await service.getRecentCountsByTeam([]);
+
+    expect(result).toEqual({ counts: {} });
+    expect(teamNewsItemGroupBy).not.toHaveBeenCalled();
+  });
+
+  it('groups by team over the 7-day window, excluding the public-list teams', async () => {
+    await service.getRecentCountsByTeam(['team-1', 'team-2']);
+
+    expect(teamNewsItemGroupBy).toHaveBeenCalledWith({
+      by: ['teamUid'],
+      where: {
+        AND: [
+          { teamUid: { in: ['team-1', 'team-2'] } },
+          { eventDate: { gte: CUTOFF } },
+          {
+            NOT: {
+              OR: TEAM_NEWS_EXCLUDED_TEAM_NAMES.map((name) => ({
+                team: { name: { equals: name, mode: 'insensitive' } },
+              })),
+            },
+          },
+        ],
+      },
+      _count: { _all: true },
+    });
+  });
+
+  it('maps grouped rows to a uid-keyed count map', async () => {
+    teamNewsItemGroupBy.mockResolvedValue([
+      { teamUid: 'team-1', _count: { _all: 3 } },
+      { teamUid: 'team-2', _count: { _all: 1 } },
+    ]);
+
+    const result = await service.getRecentCountsByTeam(['team-1', 'team-2']);
+
+    expect(result).toEqual({ counts: { 'team-1': 3, 'team-2': 1 } });
+  });
+
+  it('omits teams with nothing recent rather than zero-filling them', async () => {
+    // groupBy returns no row for a team with no matching items. The contract
+    // says absent means zero, so the chip renders nothing either way — but the
+    // response must not invent a `0` the query never produced.
+    teamNewsItemGroupBy.mockResolvedValue([{ teamUid: 'team-1', _count: { _all: 2 } }]);
+
+    const result = await service.getRecentCountsByTeam(['team-1', 'quiet-team']);
+
+    expect(result).toEqual({ counts: { 'team-1': 2 } });
+    expect(result.counts).not.toHaveProperty('quiet-team');
   });
 });

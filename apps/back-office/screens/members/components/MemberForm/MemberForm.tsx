@@ -59,6 +59,7 @@ export const MemberForm = ({
     officeHours: '',
     telegram: '',
     twitter: '',
+    bluesky: '',
     investorProfile: {
       investmentFocus: [],
       typicalCheckSize: null,

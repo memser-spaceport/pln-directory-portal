@@ -86,6 +86,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
           linkedinHandler: string;
           discordHandler: string;
           twitterHandler: string;
+          blueskyHandler: string;
           telegramHandler: string;
           officeHours: string;
           githubHandler: string;
@@ -121,6 +122,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
           linkedinHandler: formData.linkedin,
           discordHandler: formData.discord,
           twitterHandler: formData.twitter,
+          blueskyHandler: formData.bluesky,
           telegramHandler: formData.telegram,
           officeHours: formData.officeHours,
           githubHandler: formData.github,
@@ -240,6 +242,7 @@ export const EditMember = ({ className, member, authToken, showRbacSection = fal
       officeHours: data.officeHours ?? '',
       telegram: data.telegramHandler ?? '',
       twitter: data.twitterHandler ?? '',
+      bluesky: data.blueskyHandler ?? '',
       investorProfile: data.investorProfile
         ? {
             investmentFocus: (data.investorProfile?.investmentFocus ?? []).map((focus: string) => ({

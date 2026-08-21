@@ -10,6 +10,11 @@ import { buildMemberEnrichmentEligibilityFilter } from './member-enrichment-elig
 import { matchTeamFromCompanyName } from './member-enrichment-team-match.util';
 import { buildMemberExperienceInputs, selectMissingExperiences } from './member-enrichment-experience.util';
 import {
+  MEMBER_SOCIAL_HANDLE_FIELDS,
+  MemberEnrichmentAiService,
+  MemberSocialHandleField,
+} from './member-enrichment-ai.service';
+import {
   EnrichmentStatus,
   FieldEnrichmentStatus,
   EnrichmentSource,
@@ -31,6 +36,7 @@ const MEMBER_ENRICHMENT_SELECT: Prisma.MemberSelect = {
   githubHandler: true,
   discordHandler: true,
   telegramHandler: true,
+  blueskyHandler: true,
   isInvestor: true,
   skills: { select: { uid: true, title: true } },
   teamMemberRoles: {
@@ -54,6 +60,7 @@ type MemberForEnrichment = Prisma.MemberGetPayload<{
     githubHandler: true;
     discordHandler: true;
     telegramHandler: true;
+    blueskyHandler: true;
     isInvestor: true;
     skills: { select: { uid: true; title: true } };
     teamMemberRoles: {
@@ -97,7 +104,8 @@ export class MemberEnrichmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scrapingDog: MemberScrapingDogService,
-    private readonly huskyGeneration: HuskyGenerationService
+    private readonly huskyGeneration: HuskyGenerationService,
+    private readonly memberEnrichmentAi: MemberEnrichmentAiService
   ) {}
 
   async markMemberForEnrichment(memberUid: string): Promise<void> {
@@ -289,8 +297,33 @@ export class MemberEnrichmentService {
     let scrapingDogSource: 'linkedin' | 'x' | null = null;
 
     try {
+      // 0. Social handles (linkedin/twitter/github/telegram/bluesky) — filled BEFORE the
+      // ScrapingDog fetch below so a newly-discovered LinkedIn/X handle can also drive
+      // that fetch (and therefore bio/work-history/primaryTeamRole) in this same run.
+      // `discordHandler` is out of scope — no crawlable public profile to search.
+      const missingHandleFields = MEMBER_SOCIAL_HANDLE_FIELDS.filter((field) => !member[field]);
+      for (const field of MEMBER_SOCIAL_HANDLE_FIELDS) {
+        if (!missingHandleFields.includes(field)) stampPreexisting(field);
+      }
+      if (missingHandleFields.length > 0) {
+        const found = await this.memberEnrichmentAi.findMissingSocialHandles(member, missingHandleFields);
+        const foundFields = Object.keys(found) as MemberSocialHandleField[];
+        if (foundFields.length > 0) {
+          await this.prisma.member.update({ where: { uid: memberUid }, data: found });
+          for (const field of foundFields) {
+            (member as any)[field] = found[field];
+            stamp(field, FieldEnrichmentStatus.Enriched, EnrichmentSource.AI);
+          }
+        }
+        for (const field of missingHandleFields) {
+          if (!foundFields.includes(field)) {
+            stamp(field, FieldEnrichmentStatus.CannotEnrich, undefined, 'no handle found');
+          }
+        }
+      }
+
       // 1. Fetch ScrapingDog once — LinkedIn preferred, X fallback — reused across the
-      // primaryTeamRole match and the bio context below.
+      // primaryTeamRole match and the bio context below. May use a handle found in step 0.
       let personProfile: ScrapingDogPersonProfile | null = null;
       let scrapedContext: string | null = null;
 

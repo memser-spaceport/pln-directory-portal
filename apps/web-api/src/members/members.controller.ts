@@ -53,6 +53,11 @@ import {
   sanitizeMemberContactsForViewer,
   sanitizeMembersContactsForViewer,
 } from './member-contact-sanitizer';
+import {
+  assignJobSearchStatusFromInput,
+  omitJobSearchStatus,
+  presentJobSearchStatusForViewer,
+} from './job-search-status';
 
 const server = initNestServer(apiMembers);
 type RouteShape = typeof server.routeShapes;
@@ -81,6 +86,7 @@ export class MemberController {
   @NoCache()
   async findAll(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
+    delete (queryableFields as { jobSearchStatus?: unknown }).jobSearchStatus;
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
@@ -145,6 +151,7 @@ export class MemberController {
   @NoCache()
   async getMemberRoleFilters(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
+    delete (queryableFields as { jobSearchStatus?: unknown }).jobSearchStatus;
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
@@ -181,6 +188,7 @@ export class MemberController {
   @NoCache()
   async getMembersFilter(@Req() request: Request) {
     const queryableFields = prismaQueryableFieldsFromZod(ResponseMemberWithRelationsSchema);
+    delete (queryableFields as { jobSearchStatus?: unknown }).jobSearchStatus;
     const queryParams = request.query;
     const builder = new PrismaQueryBuilder(queryableFields);
     const builtQuery = builder.build(queryParams);
@@ -233,7 +241,11 @@ export class MemberController {
       throw new NotFoundException('Member not found');
     }
 
-    return sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any));
+    return this.withJobSearchStatusVisibility(
+      sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any)),
+      request as Request & { userEmail?: string },
+      uid
+    );
   }
 
   /**
@@ -316,6 +328,22 @@ export class MemberController {
     if (!isEmpty(body.isVerified) && !this.membersService.checkIfAdminUser(requestor)) {
       throw new ForbiddenException(`Member isn't authorized to verify a member`);
     }
+    /**
+     * `updateMemberByUid` hands its body straight to `prisma.member.update`, so
+     * anything arriving on the wire has to already speak Prisma. Every other
+     * field on this route is a scalar and needs no translation; the job search
+     * status is an enum, and the values the API documents and returns
+     * ("open-to-right-role") are not the values the column stores
+     * (OPEN_TO_RIGHT_ROLE). Without this the write fails Prisma validation,
+     * even though the read path maps the other way perfectly — so the field
+     * could be read but never set.
+     *
+     * Mapped here rather than in the service because the service method is
+     * also called internally with values that are already Prisma enums, and
+     * `toPrismaJobSearchStatus` accepts only wire values. This is the wire
+     * boundary; that one isn't.
+     */
+    assignJobSearchStatusFromInput(body, body);
     return await this.membersService.updateMemberByUid(uid, body);
   }
 
@@ -487,7 +515,11 @@ export class MemberController {
       throw new NotFoundException('Member not found');
     }
 
-    return sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any));
+    return this.withJobSearchStatusVisibility(
+      sanitizeMemberContactsForViewer(member, isRequestAuthenticated(request as any)),
+      request as Request & { userEmail?: string },
+      member.uid
+    );
   }
 
   /**
@@ -612,5 +644,19 @@ export class MemberController {
     }
 
     return await this.membersService.getMemberInvestorSetting(uid);
+  }
+
+  private async withJobSearchStatusVisibility<T extends Record<string, unknown>>(
+    member: T,
+    request: Request & { userEmail?: string },
+    memberUid: string
+  ): Promise<T> {
+    const email = request.userEmail;
+    if (!email) {
+      return omitJobSearchStatus({ ...member });
+    }
+    const requestor = await this.membersService.findMemberByEmail(email);
+    const canSee = requestor?.uid === memberUid || requestor?.isDirectoryAdmin === true;
+    return presentJobSearchStatusForViewer({ ...member }, canSee);
   }
 }

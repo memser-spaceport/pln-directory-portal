@@ -10,7 +10,12 @@ export type FieldKey =
   | 'contactMethod'
   | 'twitterHandler'
   | 'linkedinHandler'
-  | 'blog';
+  | 'blog'
+  | 'blueskyHandler'
+  | 'crunchbaseHandler'
+  | 'dateFounded'
+  | 'teamSize'
+  | 'location';
 
 // Mirrors EnrichmentSource and FieldEnrichmentStatus enums from backend
 export type FieldMetadataSource = 'ai' | 'open-graph' | 'scrapingdog';
