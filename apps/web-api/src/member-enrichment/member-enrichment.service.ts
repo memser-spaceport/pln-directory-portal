@@ -50,7 +50,7 @@ const MEMBER_ENRICHMENT_SELECT: Prisma.MemberSelect = {
       mainTeam: true,
       role: true,
       teamLead: true,
-      team: { select: { uid: true, name: true, isFund: true, priority: true } },
+      team: { select: { uid: true, name: true, isFund: true } },
     },
   },
   projectContributions: { include: { project: true } },
@@ -81,7 +81,7 @@ type MemberForEnrichment = Prisma.MemberGetPayload<{
         mainTeam: true;
         role: true;
         teamLead: true;
-        team: { select: { uid: true; name: true; isFund: true; priority: true } };
+        team: { select: { uid: true; name: true; isFund: true } };
       };
     };
     projectContributions: { include: { project: true } };
@@ -479,9 +479,9 @@ export class MemberEnrichmentService {
       // `source` param): `'scrapingdog'` skips Coresignal outright, `'coresignal'` always
       // attempts it, and the default `'auto'` (or absent, e.g. members marked by the regular
       // eligibility cron) defers to `isHighValueMemberForCoresignal` — Coresignal by default for
-      // high-value members (accessLevel L5/L6, team lead, founder, fund team, high-priority
-      // team), ScrapingDog by default for everyone else. Whichever provider is skipped or fails
-      // still has the other as a safety net — see the fallback logic below.
+      // high-value members (accessLevel L5/L6, team lead, founder, fund team), ScrapingDog by
+      // default for everyone else. Whichever provider is skipped or fails still has the other as
+      // a safety net — see the fallback logic below.
       let personProfile: ScrapingDogPersonProfile | null = null;
       let scrapedContext: string | null = null;
 

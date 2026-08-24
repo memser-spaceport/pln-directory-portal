@@ -1197,7 +1197,7 @@ describe('MemberEnrichmentService', () => {
             mainTeam: true,
             role: 'Engineer',
             teamLead: false,
-            team: { uid: 't1', name: 'Acme', isFund: false, priority: 99 },
+            team: { uid: 't1', name: 'Acme', isFund: false },
           },
         ],
       });
@@ -1234,7 +1234,7 @@ describe('MemberEnrichmentService', () => {
             mainTeam: true,
             role: 'Engineer',
             teamLead: true,
-            team: { uid: 't1', name: 'Acme', isFund: false, priority: 99 },
+            team: { uid: 't1', name: 'Acme', isFund: false },
           },
         ],
       });
