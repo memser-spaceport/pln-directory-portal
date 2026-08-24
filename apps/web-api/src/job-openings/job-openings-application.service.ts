@@ -73,6 +73,8 @@ export class JobOpeningsApplicationService {
     const companyName = this.resolveCompanyName(applicant);
     const profileSnapshot = this.buildProfileSnapshot(applicant, companyName);
     const coverLetterHtml = noteToHtml(input.coverLetter);
+    const primaryExperience = this.primaryExperience(applicant.experiences);
+    const webBase = (process.env.WEB_UI_BASE_URL || '').replace(/\/+$/, '');
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
@@ -86,13 +88,18 @@ export class JobOpeningsApplicationService {
       deliveryPayload: {
         body: {
           applicantName: applicant.name,
-          applicantRole: applicant.role,
-          applicantCompany: companyName ?? '',
+          applicantFirstName: this.firstName(applicant.name),
+          applicantRole: applicant.role?.trim() ?? '',
+          applicantCompany: primaryExperience?.company.trim() || companyName || '',
+          applicantWorkDuration: primaryExperience ? this.formatExperienceDates(primaryExperience) : '',
+          applicantLocation: this.formatLocation(applicant.location),
+          applicantSkills: applicant.skills.map((skill) => skill.title).filter(Boolean),
           roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
           coverLetterHtml,
-          profileUrl: `${process.env.WEB_UI_BASE_URL}/members/${applicant.uid}`,
+          profileUrl: `${webBase}/members/${applicant.uid}`,
           applyUrl: jobOpening.sourceLink || null,
+          preferencesUrl: `${webBase}/settings/email`,
         },
       },
       entityType: 'JOB_OPENING',
@@ -267,6 +274,31 @@ export class JobOpeningsApplicationService {
     }
     const [to, ...cc] = unique;
     return { to, cc };
+  }
+
+  private firstName(name: string) {
+    return name.trim().split(/\s+/)[0] || name;
+  }
+
+  private primaryExperience(experiences: Applicant['experiences']) {
+    const current = experiences.find((experience) => experience.isCurrent);
+    if (current) return current;
+    return [...experiences].sort((a, b) => b.startDate.getTime() - a.startDate.getTime())[0] ?? null;
+  }
+
+  private formatExperienceDates(experience: Applicant['experiences'][number]) {
+    const start = this.formatMonthYear(experience.startDate);
+    const end = experience.isCurrent || !experience.endDate ? 'Present' : this.formatMonthYear(experience.endDate);
+    return [start, end].filter(Boolean).join(' — ');
+  }
+
+  private formatMonthYear(date: Date) {
+    return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date);
+  }
+
+  private formatLocation(location: Applicant['location']) {
+    if (!location) return '';
+    return [location.city, location.country].filter(Boolean).join(', ');
   }
 
   private resolveCompanyName(applicant: Applicant): string | null {

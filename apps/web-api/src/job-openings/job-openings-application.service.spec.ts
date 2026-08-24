@@ -85,10 +85,7 @@ describe('JobOpeningsApplicationService', () => {
   beforeEach(() => {
     prisma = buildPrismaMock();
     notificationServiceClient = { sendNotification: jest.fn().mockResolvedValue({}) };
-    service = new JobOpeningsApplicationService(
-      prisma as unknown as PrismaService,
-      notificationServiceClient as never
-    );
+    service = new JobOpeningsApplicationService(prisma as unknown as PrismaService, notificationServiceClient as never);
     process.env.WEB_UI_BASE_URL = 'https://directory.test';
   });
 
@@ -124,6 +121,22 @@ describe('JobOpeningsApplicationService', () => {
           cc: ['lead2@airship.com'],
           replyTo: 'ada@example.com',
         },
+        deliveryPayload: {
+          body: expect.objectContaining({
+            applicantName: 'Ada Lovelace',
+            applicantFirstName: 'Ada',
+            applicantRole: 'Engineer',
+            applicantCompany: 'Analytical Engine',
+            applicantWorkDuration: 'January 2020 — Present',
+            applicantLocation: 'London, UK',
+            applicantSkills: ['TypeScript'],
+            roleTitle: 'Staff Engineer',
+            teamName: 'Airship',
+            profileUrl: 'https://directory.test/members/member-1',
+            applyUrl: 'https://jobs.example/role',
+            preferencesUrl: 'https://directory.test/settings/email',
+          }),
+        },
       })
     );
     const snapshot = prisma.jobApplication.create.mock.calls[0][0].data.profileSnapshot;
@@ -132,22 +145,21 @@ describe('JobOpeningsApplicationService', () => {
     expect(snapshot.role).toBe('Engineer');
   });
 
-  it.each([
-    MemberApprovalState.PENDING,
-    MemberApprovalState.VERIFIED,
-    MemberApprovalState.REJECTED,
-  ])('rejects %s members without emailing', async (state) => {
-    prisma.member.findUnique.mockResolvedValue({
-      ...applicant,
-      memberApproval: { state },
-    });
+  it.each([MemberApprovalState.PENDING, MemberApprovalState.VERIFIED, MemberApprovalState.REJECTED])(
+    'rejects %s members without emailing',
+    async (state) => {
+      prisma.member.findUnique.mockResolvedValue({
+        ...applicant,
+        memberApproval: { state },
+      });
 
-    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
-      ForbiddenException
-    );
-    expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
-    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
-  });
+      await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
+        ForbiddenException
+      );
+      expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+      expect(prisma.jobApplication.create).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects missing role or missing status', async () => {
     prisma.member.findUnique.mockResolvedValue({ ...applicant, role: '  ' });
@@ -225,9 +237,7 @@ describe('JobOpeningsApplicationService', () => {
     expect(prisma.jobApplication.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { memberUid: 'member-1' } })
     );
-    expect(result.applications).toEqual([
-      { uid: 'app-1', jobUid: 'job-1', appliedAt: '2026-08-19T12:00:00.000Z' },
-    ]);
+    expect(result.applications).toEqual([{ uid: 'app-1', jobUid: 'job-1', appliedAt: '2026-08-19T12:00:00.000Z' }]);
   });
 
   it('rejects empty or overlong cover letters at the contract boundary', () => {
