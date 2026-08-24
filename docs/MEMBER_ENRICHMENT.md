@@ -112,6 +112,9 @@ through `TeamMemberRole` since `priority`/`isFund` live on `Team`, not `Member`)
 Unlike the team-enrichment version, both defaults are pre-populated (not opt-in), since
 the request is investors + fund + P1-P3 members out of the box.
 
+Rejected (soft-deleted) members are always excluded (`deletedAt: null`), regardless of which
+of the above criteria they'd otherwise match.
+
 **Founders/team-leads first.** The marking job runs two passes against the same
 eligibility + "has a gap" + "no `MemberEnrichment` row yet" filter — pass 1 additionally
 requires a `TeamMemberRole` with `teamLead: true` or a `role` containing "founder", pass 2

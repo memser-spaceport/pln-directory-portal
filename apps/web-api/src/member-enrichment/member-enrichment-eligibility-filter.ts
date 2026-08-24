@@ -19,6 +19,8 @@ import { Prisma } from '@prisma/client';
  * Unlike the team version, both defaults are pre-populated (not opt-in) because
  * the request explicitly wants investors + fund + P1-P3 members enrolled out of
  * the box.
+ *
+ * Rejected (soft-deleted) members are always excluded via `deletedAt: null`.
  */
 function parseEligibilityEnv(): { priorities: number[]; includeFundTeamMembers: boolean } {
   const priorityRaw = (process.env.MEMBER_ENRICHMENT_FILTER_PRIORITY ?? '1,2,3').trim();
@@ -46,5 +48,5 @@ export function buildMemberEnrichmentEligibilityFilter(): Prisma.MemberWhereInpu
     clauses.push({ teamMemberRoles: { some: { team: { priority: { in: priorities } } } } });
   }
 
-  return { OR: clauses };
+  return { AND: [{ deletedAt: null }, { OR: clauses }] };
 }
