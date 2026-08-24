@@ -976,7 +976,7 @@ describe('MemberEnrichmentService', () => {
       expect(scrapingDog.fetchPersonProfile).toHaveBeenCalledTimes(1);
     });
 
-    it('uses Coresignal for any member with a linkedinHandler when enabled — no separate subset gate', async () => {
+    it('uses Coresignal for a high-value member with a linkedinHandler when enabled', async () => {
       process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
       const member = coresignalCandidateMember({ experiences: [] });
       const prisma = buildPrismaMock(member);

@@ -2,20 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CoresignalEmployeeProfile, CoresignalFetchResult } from './coresignal.types';
 
 /**
- * Shared Coresignal client — usable by any enrichment pipeline (member
- * enrichment today, team enrichment potentially in the future; see
- * openspec/changes/add-coresignal-member-enrichment/design.md).
+ * Shared Coresignal client — usable by any enrichment pipeline (member and,
+ * potentially, team enrichment).
  *
- * Uses the Clean Employee API (not Multi-source): GET
+ * Uses the Clean Employee API (10 credits/call, half of Multi-source's 20 —
+ * Multi-source's extra "AI-enriched" cross-source aggregation isn't worth the
+ * cost since this pipeline already runs its own AI enrichment/judgment): GET
  * https://api.coresignal.com/cdapi/v2/employee_clean/collect/<linkedin
- * shorthand name or URL>, `apikey` header. A successful (200) call costs 10
- * credits (half of Multi-source's 20) — deliberately chosen over Multi-source
- * because this pipeline already runs its own AI enrichment/judgment on top of
- * whatever a provider returns, so Multi-source's extra "AI-enriched"
- * cross-source aggregation isn't worth double the cost. Coresignal's
- * `/search/*` endpoints are free but only return a preview subset (no full
- * experience), so this client never calls them — callers must already know
- * the person's LinkedIn identifier.
+ * shorthand name or URL>, `apikey` header. `/search/*` endpoints are free but
+ * only return a preview subset (no full experience), so this client never
+ * calls them — callers must already know the person's LinkedIn identifier.
  */
 const CORESIGNAL_DEFAULT_TIMEOUT_MS = 15000;
 

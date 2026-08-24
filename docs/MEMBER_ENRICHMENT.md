@@ -7,8 +7,8 @@ Automated, periodic gap-filling for Directory member profiles: **social handles*
 **bio**, **email**, and **skills**. Sourced from the member's own LinkedIn (or, when no
 LinkedIn handle is on file, X/Twitter) profile via ScrapingDog — or, when enabled, Coresignal's
 Clean Employee API instead, by default for high-value members (accessLevel `L5`/`L6`, team lead,
-founder, fund team, or a high-priority team) and ScrapingDog by default for everyone else, always
-overridable per-member/per-list via an admin's explicit `source` param — falling back to
+founder, or fund team) and ScrapingDog by default for everyone else, always overridable
+per-member/per-list via an admin's explicit `source` param — falling back to
 ScrapingDog when Coresignal has nothing usable, and vice versa when Coresignal is disabled or
 unconfigured (see [Coresignal source](#coresignal-source) below) — a free CRM lookup for email,
 and — only for social handles neither provider can source — a narrow, identity-gated AI web
@@ -226,11 +226,15 @@ no explicit choice has been made for that member:
 
 - **High-value → Coresignal by default**: `accessLevel` is `L5` or `L6` (investor tiers — see
   `docs/ACCESS_LEVEL_PERMISSIONS.md`), a `TeamMemberRole.teamLead`, a `role` containing "founder",
-  a fund team (`Team.isFund`), or a team whose `priority` is in
-  `MEMBER_ENRICHMENT_CORESIGNAL_VALUE_PRIORITY` (default `1,2,3`, independently tunable from the
-  general `MEMBER_ENRICHMENT_FILTER_PRIORITY` eligibility filter — one controls who gets enrolled
-  into enrichment at all, the other controls which enrolled members prefer the pricier provider).
+  or a fund team (`Team.isFund`).
 - **Everyone else → ScrapingDog by default.**
+
+> A `Team.priority`-based criterion (any team in `MEMBER_ENRICHMENT_FILTER_PRIORITY`'s tier) was
+> evaluated and deliberately left out: against real production data
+> (`docs/tickets/coresignal-value-tier-member-counts.sql`) it was the loosest/broadest of the
+> criteria and pushed the high-value population to ~46.5% of all members — far more than "the
+> highest-value slice" this heuristic is meant to select. The remaining four criteria are all
+> narrower, more clearly "this specific person is high-value" signals.
 
 An admin can override this default per-member or per-list via the `source` param on
 `trigger-force-profile-enrichment`/`trigger-force-profile-enrichment-bulk`
@@ -247,8 +251,8 @@ member — there's no way for a stale preference from an old call to linger.
 [Eligibility & ordering](#eligibility--ordering) — or an admin's explicit bulk-trigger pick), and,
 within that enrolled population, which ones default to or are explicitly forced onto the pricier
 provider. A Clean Employee API `/collect` call still costs more than a ScrapingDog person-profile
-call, so tune `MEMBER_ENRICHMENT_CORESIGNAL_VALUE_PRIORITY` (or use `source` deliberately) if spend
-needs bounding further — see the "Cost overrun" risks in this change's `design.md` for more detail.
+call, so use `source` deliberately for large bulk-trigger lists if spend needs bounding further —
+see the "Cost overrun" risks in this change's `design.md` for more detail.
 
 **Fallback is bidirectional.** If Coresignal returns not-found, an error (including an expired or
 invalid API key), or a profile with no experience entries, the pipeline falls through to the
@@ -312,7 +316,6 @@ repeated uid in the list is deduped so it's only marked (and counted) once.
 | `MEMBER_ENRICHMENT_CORESIGNAL_ENABLED` | `false` | global kill switch for Coresignal usage — see [Coresignal source](#coresignal-source). Independent of `IS_MEMBER_ENRICHMENT_ENABLED` |
 | `CORESIGNAL_API_KEY` | — | Coresignal API key. When unset, Coresignal is skipped entirely (same as ScrapingDog-unset behavior) |
 | `CORESIGNAL_TIMEOUT_MS` | `15000` | Coresignal request timeout |
-| `MEMBER_ENRICHMENT_CORESIGNAL_VALUE_PRIORITY` | `1,2,3` | value-tier default — team priorities that default a member to Coresignal (see [Coresignal source](#coresignal-source)). Empty string disables this criterion |
 | `HUSKY_GENERATION_AI_PROVIDER` | `gemini` | provider for the step-0 social-handle AI search — shared with bio generation, no dedicated env var |
 
 ## Admin endpoints

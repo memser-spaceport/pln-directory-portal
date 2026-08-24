@@ -73,16 +73,10 @@ export interface MemberEnrichmentUsageEntry {
 }
 
 /**
- * Which profile provider a member's fetch step should prefer.
- * - `auto` (default): decided by `isHighValueMemberForCoresignal` — Coresignal for
- *   high-value members (accessLevel L5/L6, team lead, founder, fund team, or a
- *   high-priority team), ScrapingDog for everyone else.
- * - `coresignal`: always attempt Coresignal first regardless of value tier — still
- *   falls back to ScrapingDog if Coresignal has nothing usable.
- * - `scrapingdog`: always use ScrapingDog only — Coresignal is never attempted for
- *   this member, regardless of value tier.
- * Set via `trigger-force-profile-enrichment(-bulk)`'s `source` param; absent (undefined)
- * on members marked by the regular eligibility-marking cron, which is treated as `auto`.
+ * Which profile provider a member's fetch step should prefer. `auto` defers to
+ * `isHighValueMemberForCoresignal`; `coresignal`/`scrapingdog` force that provider
+ * regardless of value tier. Set via `trigger-force-profile-enrichment(-bulk)`'s
+ * `source` param; absent (undefined) is treated as `auto`.
  */
 export type MemberEnrichmentSourcePreference = 'auto' | 'coresignal' | 'scrapingdog';
 

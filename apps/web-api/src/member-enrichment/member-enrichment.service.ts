@@ -479,9 +479,9 @@ export class MemberEnrichmentService {
       // `source` param): `'scrapingdog'` skips Coresignal outright, `'coresignal'` always
       // attempts it, and the default `'auto'` (or absent, e.g. members marked by the regular
       // eligibility cron) defers to `isHighValueMemberForCoresignal` — Coresignal by default for
-      // high-value members (accessLevel L5/L6, team lead, founder, fund team), ScrapingDog by
-      // default for everyone else. Whichever provider is skipped or fails still has the other as
-      // a safety net — see the fallback logic below.
+      // high-value members (accessLevel L5/L6, team lead, fund team), ScrapingDog by default for
+      // everyone else. Whichever provider is skipped or fails still has the other as a safety
+      // net — see the fallback logic below.
       let personProfile: ScrapingDogPersonProfile | null = null;
       let scrapedContext: string | null = null;
 

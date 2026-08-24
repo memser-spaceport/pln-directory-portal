@@ -22,33 +22,19 @@ describe('isHighValueMemberForCoresignal', () => {
 
   it('is high-value when a TeamMemberRole has teamLead: true', () => {
     expect(
-      isHighValueMemberForCoresignal(
-        member({ teamMemberRoles: [{ role: 'Engineer', teamLead: true, team: { isFund: false } }] })
-      )
-    ).toBe(true);
-  });
-
-  it('is high-value when a role contains "founder" (case-insensitive)', () => {
-    expect(
-      isHighValueMemberForCoresignal(
-        member({ teamMemberRoles: [{ role: 'Co-Founder', teamLead: false, team: { isFund: false } }] })
-      )
+      isHighValueMemberForCoresignal(member({ teamMemberRoles: [{ teamLead: true, team: { isFund: false } }] }))
     ).toBe(true);
   });
 
   it('is high-value when on a fund team', () => {
     expect(
-      isHighValueMemberForCoresignal(
-        member({ teamMemberRoles: [{ role: 'Engineer', teamLead: false, team: { isFund: true } }] })
-      )
+      isHighValueMemberForCoresignal(member({ teamMemberRoles: [{ teamLead: false, team: { isFund: true } }] }))
     ).toBe(true);
   });
 
   it('is not high-value for an ordinary member on a non-fund team', () => {
     expect(
-      isHighValueMemberForCoresignal(
-        member({ teamMemberRoles: [{ role: 'Engineer', teamLead: false, team: { isFund: false } }] })
-      )
+      isHighValueMemberForCoresignal(member({ teamMemberRoles: [{ teamLead: false, team: { isFund: false } }] }))
     ).toBe(false);
   });
 
