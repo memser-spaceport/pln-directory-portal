@@ -7,7 +7,7 @@ Automated, periodic gap-filling for Directory member profiles: **social handles*
 **bio**, **email**, and **skills**. Sourced from the member's own LinkedIn (or, when no
 LinkedIn handle is on file, X/Twitter) profile via ScrapingDog — or, when enabled, Coresignal's
 Clean Employee API instead, by default for high-value members (accessLevel `L5`/`L6`, team lead,
-founder, or fund team) and ScrapingDog by default for everyone else, always overridable
+or fund team) and ScrapingDog by default for everyone else, always overridable
 per-member/per-list via an admin's explicit `source` param — falling back to
 ScrapingDog when Coresignal has nothing usable, and vice versa when Coresignal is disabled or
 unconfigured (see [Coresignal source](#coresignal-source) below) — a free CRM lookup for email,
@@ -225,16 +225,8 @@ that blocks a member from it outright. Instead, `isHighValueMemberForCoresignal`
 no explicit choice has been made for that member:
 
 - **High-value → Coresignal by default**: `accessLevel` is `L5` or `L6` (investor tiers — see
-  `docs/ACCESS_LEVEL_PERMISSIONS.md`), a `TeamMemberRole.teamLead`, a `role` containing "founder",
-  or a fund team (`Team.isFund`).
+  `docs/ACCESS_LEVEL_PERMISSIONS.md`), a `TeamMemberRole.teamLead`, or a fund team (`Team.isFund`).
 - **Everyone else → ScrapingDog by default.**
-
-> A `Team.priority`-based criterion (any team in `MEMBER_ENRICHMENT_FILTER_PRIORITY`'s tier) was
-> evaluated and deliberately left out: against real production data
-> (`docs/tickets/coresignal-value-tier-member-counts.sql`) it was the loosest/broadest of the
-> criteria and pushed the high-value population to ~46.5% of all members — far more than "the
-> highest-value slice" this heuristic is meant to select. The remaining four criteria are all
-> narrower, more clearly "this specific person is high-value" signals.
 
 An admin can override this default per-member or per-list via the `source` param on
 `trigger-force-profile-enrichment`/`trigger-force-profile-enrichment-bulk`
