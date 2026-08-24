@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { RoadmapStage } from '@prisma/client';
 
 jest.mock('../analytics/service/analytics.service', () => ({
@@ -55,7 +55,8 @@ describe('RoadmapPinsService', () => {
   let roadmapService: ReturnType<typeof buildRoadmapServiceMock>;
   let analytics: { trackEvent: jest.Mock };
 
-  const pinnableItem = { uid: 'item-1', stage: RoadmapStage.IDEA };
+  // Authored by someone other than the 'member-1' actor used throughout — self-pins are rejected.
+  const pinnableItem = { uid: 'item-1', stage: RoadmapStage.IDEA, createdByUid: 'author-1' };
 
   beforeEach(() => {
     prisma = buildPrismaMock();
@@ -110,8 +111,35 @@ describe('RoadmapPinsService', () => {
       });
     });
 
+    it('rejects boosting an item the actor authored', async () => {
+      prisma.roadmapItem.findFirst.mockResolvedValue({ ...pinnableItem, createdByUid: 'member-1' });
+
+      await expect(service.pinItem('item-1', { impact: 3 }, 'member-1')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.roadmapItemPin.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a self-boost regardless of role — curators author items too', async () => {
+      roadmapService.getMemberAccess.mockResolvedValue({ canEditOwn: true, canCurate: true, canTransition: true });
+      prisma.roadmapItem.findFirst.mockResolvedValue({ ...pinnableItem, createdByUid: 'curator-1' });
+
+      await expect(service.pinItem('item-1', { impact: 5 }, 'curator-1')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.roadmapItemPin.create).not.toHaveBeenCalled();
+    });
+
+    it('does not let an author update their legacy self-pin through the create path', async () => {
+      prisma.roadmapItem.findFirst.mockResolvedValue({ ...pinnableItem, createdByUid: 'member-1' });
+      prisma.roadmapItemPin.findFirst.mockResolvedValue({ uid: 'pin-1' });
+
+      await expect(service.pinItem('item-1', { impact: 5 }, 'member-1')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.roadmapItemPin.update).not.toHaveBeenCalled();
+    });
+
     it('rejects pinning items in frozen stages', async () => {
-      prisma.roadmapItem.findFirst.mockResolvedValue({ uid: 'item-1', stage: RoadmapStage.IN_PROGRESS });
+      prisma.roadmapItem.findFirst.mockResolvedValue({
+        uid: 'item-1',
+        stage: RoadmapStage.IN_PROGRESS,
+        createdByUid: 'author-1',
+      });
 
       await expect(service.pinItem('item-1', { impact: 2 }, 'member-1')).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.roadmapItemPin.create).not.toHaveBeenCalled();
@@ -150,6 +178,19 @@ describe('RoadmapPinsService', () => {
   });
 
   describe('unpinItem', () => {
+    // The self-boost guard is on creation only: authors who pinned their own item before the
+    // guard existed must still be able to release it, which is what heals the data.
+    it('lets an author release a legacy self-pin', async () => {
+      prisma.roadmapItem.findFirst.mockResolvedValue({ ...pinnableItem, createdByUid: 'member-1' });
+      prisma.roadmapItemPin.deleteMany.mockResolvedValue({ count: 1 });
+      prisma.roadmapItemPin.count.mockResolvedValue(0);
+
+      await expect(service.unpinItem('item-1', 'member-1')).resolves.toBeDefined();
+      expect(prisma.roadmapItemPin.deleteMany).toHaveBeenCalledWith({
+        where: { itemUid: 'item-1', memberUid: 'member-1', releasedAt: null },
+      });
+    });
+
     it('throws NotFound when there is no active pin', async () => {
       prisma.roadmapItemPin.deleteMany.mockResolvedValue({ count: 0 });
       await expect(service.unpinItem('item-1', 'member-1')).rejects.toBeInstanceOf(NotFoundException);
