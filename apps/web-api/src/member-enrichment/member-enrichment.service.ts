@@ -1,12 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import pLimit from 'p-limit';
 import { PrismaService } from '../shared/prisma.service';
 import { MemberScrapingDogService, ScrapingDogPersonProfile } from '../husky/member-scrapingdog.service';
 import { generateMemberBioText, resolveMemberPronouns } from '../husky/member-bio.util';
 import { formatPersonContext, formatTwitterContext } from '../husky/member-bio-refresh.util';
 import { HuskyGenerationService } from '../husky/husky-generation.service';
+import { CoresignalService } from '../coresignal/coresignal.service';
 import { HUSKY_BIO_DISCLAIMER } from '../utils/ai-prompts';
 import { buildMemberEnrichmentEligibilityFilter } from './member-enrichment-eligibility-filter';
+import { isHighValueMemberForCoresignal } from './member-enrichment-coresignal-value-tier.util';
 import { matchTeamFromCompanyName } from './member-enrichment-team-match.util';
 import { buildMemberExperienceInputs, selectMissingExperiences } from './member-enrichment-experience.util';
 import {
@@ -21,6 +24,7 @@ import {
   MemberDataEnrichment,
   MemberFieldEnrichmentMeta,
   MemberEnrichableField,
+  MemberEnrichmentSourcePreference,
 } from './member-enrichment.types';
 
 /** Fields needed by generateMemberBioText / resolveMemberPronouns / generateMemberSkills's prompt, plus our own gap checks. */
@@ -38,9 +42,16 @@ const MEMBER_ENRICHMENT_SELECT: Prisma.MemberSelect = {
   telegramHandler: true,
   blueskyHandler: true,
   isInvestor: true,
+  accessLevel: true,
   skills: { select: { uid: true, title: true } },
   teamMemberRoles: {
-    select: { teamUid: true, mainTeam: true, role: true, teamLead: true, team: { select: { uid: true, name: true } } },
+    select: {
+      teamUid: true,
+      mainTeam: true,
+      role: true,
+      teamLead: true,
+      team: { select: { uid: true, name: true, isFund: true } },
+    },
   },
   projectContributions: { include: { project: true } },
   experiences: true,
@@ -62,6 +73,7 @@ type MemberForEnrichment = Prisma.MemberGetPayload<{
     telegramHandler: true;
     blueskyHandler: true;
     isInvestor: true;
+    accessLevel: true;
     skills: { select: { uid: true; title: true } };
     teamMemberRoles: {
       select: {
@@ -69,7 +81,7 @@ type MemberForEnrichment = Prisma.MemberGetPayload<{
         mainTeam: true;
         role: true;
         teamLead: true;
-        team: { select: { uid: true; name: true } };
+        team: { select: { uid: true; name: true; isFund: true } };
       };
     };
     projectContributions: { include: { project: true } };
@@ -105,7 +117,8 @@ export class MemberEnrichmentService {
     private readonly prisma: PrismaService,
     private readonly scrapingDog: MemberScrapingDogService,
     private readonly huskyGeneration: HuskyGenerationService,
-    private readonly memberEnrichmentAi: MemberEnrichmentAiService
+    private readonly memberEnrichmentAi: MemberEnrichmentAiService,
+    private readonly coresignal: CoresignalService
   ) {}
 
   async markMemberForEnrichment(memberUid: string): Promise<void> {
@@ -175,6 +188,136 @@ export class MemberEnrichmentService {
     });
   }
 
+  /**
+   * Max concurrent enrichment pipelines (each a live ScrapingDog/Coresignal/AI call chain) the
+   * bulk processing paths (cron + "trigger all pending") will run at once. Without this cap, a
+   * batch of N pending members fires N concurrent outbound calls simultaneously — the same class
+   * of problem `TEAM_ENRICHMENT_JUDGE_CONCURRENCY` fixed for team judgment (PR #3361).
+   */
+  private getEnrichmentConcurrency(): number {
+    const raw = process.env.MEMBER_ENRICHMENT_CONCURRENCY?.trim();
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 5;
+  }
+
+  /**
+   * Marks every still-pending member `InProgress` up front (fast, DB-only), returning the
+   * prepared list plus a count of members already `InProgress` (skipped, not double-marked).
+   */
+  private async prepareEnrichmentBatch(memberUids: string[]): Promise<{ prepared: string[]; skipped: number }> {
+    const prepared: string[] = [];
+    let skipped = 0;
+
+    for (const memberUid of memberUids) {
+      const meta = await this.readEnrichmentMeta(memberUid);
+      if (meta?.status === EnrichmentStatus.InProgress) {
+        skipped++;
+        continue;
+      }
+      await this.updateEnrichmentStatus(memberUid, meta, EnrichmentStatus.InProgress);
+      prepared.push(memberUid);
+    }
+
+    return { prepared, skipped };
+  }
+
+  /**
+   * Runs `doEnrichMember` for every prepared uid, at most `getEnrichmentConcurrency()` at a
+   * time. Re-checks each member is still `InProgress` immediately before running it — a member
+   * queued behind many others in a throttled batch may not get its turn for a while, and another
+   * process (a stale-InProgress reset, a separate trigger) could have changed its state meanwhile.
+   */
+  private async runEnrichmentBatchThrottled(memberUids: string[], enrichedBy: string): Promise<void> {
+    const limit = pLimit(this.getEnrichmentConcurrency());
+    await Promise.all(
+      memberUids.map((memberUid) =>
+        limit(async () => {
+          const meta = await this.readEnrichmentMeta(memberUid);
+          if (meta?.status !== EnrichmentStatus.InProgress) return;
+          await this.doEnrichMember(memberUid, enrichedBy).catch((err) => {
+            this.logger.error(`Background enrichment failed for member ${memberUid}: ${err.message}`, err.stack);
+          });
+        })
+      )
+    );
+  }
+
+  /**
+   * Awaited batch entry point — prepares then runs the throttled batch to completion, so the
+   * caller's "is a batch currently running" state reflects genuine duration. Used by the hourly
+   * cron (`MemberEnrichmentJob.runEnrichment`), unlike `triggerEnrichmentForAllPending`, which
+   * dispatches the throttled run detached so an HTTP caller doesn't block on it.
+   */
+  async runEnrichmentBatch(
+    memberUids: string[],
+    enrichedBy = 'system-cron'
+  ): Promise<{ started: number; skipped: number }> {
+    const { prepared, skipped } = await this.prepareEnrichmentBatch(memberUids);
+    await this.runEnrichmentBatchThrottled(prepared, enrichedBy);
+    return { started: prepared.length, skipped };
+  }
+
+  private buildForceEnrichmentUpdate(
+    existing: MemberDataEnrichment | null,
+    source: MemberEnrichmentSourcePreference = 'auto'
+  ): MemberDataEnrichment {
+    return {
+      ...(existing ?? {}),
+      shouldEnrich: true,
+      status: EnrichmentStatus.PendingEnrichment,
+      fieldsMeta: existing?.fieldsMeta ?? {},
+      // Always set explicitly (not merged) so a re-trigger's requested source fully replaces
+      // any prior override rather than leaving stale state from an earlier force-trigger call.
+      preferredSource: source,
+    };
+  }
+
+  /**
+   * Marks an explicit list of member uids for force re-enrichment (same semantics as
+   * `forceEnrichMember`, applied per-uid) WITHOUT running the pipeline itself — the existing
+   * hourly enrichment cron (concurrency-bounded via `runEnrichmentBatch`) picks these up on its
+   * normal schedule. Lets an admin hand-pick a list of "valuable" members to re-enrich without
+   * waiting on the daily eligibility-marking cron to rediscover them.
+   *
+   * `source` lets the caller force a specific provider for this list (`'coresignal'` or
+   * `'scrapingdog'`), overriding the `isHighValueMemberForCoresignal` default; `'auto'`
+   * (the default) defers to that heuristic per-member, same as the regular pipeline.
+   */
+  async markMembersForForceEnrichment(
+    memberUids: string[],
+    source: MemberEnrichmentSourcePreference = 'auto'
+  ): Promise<{ total: number; marked: number; skipped: number; notFound: string[] }> {
+    // Dedupe defensively regardless of caller — a repeated uid must not be marked (and
+    // counted) twice.
+    const uniqueUids = Array.from(new Set(memberUids));
+    const notFound: string[] = [];
+    let marked = 0;
+    let skipped = 0;
+
+    for (const memberUid of uniqueUids) {
+      const member = await this.prisma.member.findUnique({ where: { uid: memberUid }, select: { uid: true } });
+      if (!member) {
+        notFound.push(memberUid);
+        continue;
+      }
+
+      const existing = await this.readEnrichmentMeta(memberUid);
+      if (existing?.status === EnrichmentStatus.InProgress) {
+        this.logger.warn(`Bulk force-enrichment: member ${memberUid} already in progress, leaving untouched`);
+        skipped++;
+        continue;
+      }
+
+      await this.upsertEnrichmentRow(memberUid, this.buildForceEnrichmentUpdate(existing, source));
+      marked++;
+    }
+
+    this.logger.log(
+      `Bulk force-enrichment: marked ${marked}/${uniqueUids.length} member(s) (source=${source}, ${skipped} already in progress, ${notFound.length} not found)`
+    );
+    return { total: uniqueUids.length, marked, skipped, notFound };
+  }
+
   async enrichMember(memberUid: string, enrichedBy = 'system-cron'): Promise<{ status: 'started' | 'in_progress' }> {
     const meta = await this.readEnrichmentMeta(memberUid);
     if (meta?.status === EnrichmentStatus.InProgress) {
@@ -197,10 +340,15 @@ export class MemberEnrichmentService {
    * field's current DB emptiness and fill whatever is still a gap. There is no separate
    * "cannotEnrich-only" mode to offer — an unfilled field IS empty in the DB by
    * definition, so it is always retried; a filled field is never overwritten, force or not.
+   *
+   * `source` forces a specific provider (`'coresignal'` or `'scrapingdog'`) for this member,
+   * overriding the `isHighValueMemberForCoresignal` default; `'auto'` (the default) defers to
+   * that heuristic.
    */
   async forceEnrichMember(
     memberUid: string,
-    enrichedBy = 'manually'
+    enrichedBy = 'manually',
+    source: MemberEnrichmentSourcePreference = 'auto'
   ): Promise<{ status: 'started' | 'in_progress' | 'not_found' }> {
     const member = await this.prisma.member.findUnique({ where: { uid: memberUid }, select: { uid: true } });
     if (!member) return { status: 'not_found' };
@@ -211,14 +359,8 @@ export class MemberEnrichmentService {
       return { status: 'in_progress' };
     }
 
-    const enrichment: MemberDataEnrichment = {
-      ...(existing ?? {}),
-      shouldEnrich: true,
-      status: EnrichmentStatus.PendingEnrichment,
-      fieldsMeta: existing?.fieldsMeta ?? {},
-    };
-    await this.upsertEnrichmentRow(memberUid, enrichment);
-    this.logger.log(`Force-enrichment queued for member ${memberUid}`);
+    await this.upsertEnrichmentRow(memberUid, this.buildForceEnrichmentUpdate(existing, source));
+    this.logger.log(`Force-enrichment queued for member ${memberUid} (source=${source})`);
 
     this.doEnrichMember(memberUid, enrichedBy).catch((err) => {
       this.logger.error(`Background force-enrichment failed for member ${memberUid}: ${err.message}`, err.stack);
@@ -227,20 +369,25 @@ export class MemberEnrichmentService {
     return { status: 'started' };
   }
 
+  /**
+   * Marks the whole pending queue `InProgress` synchronously, then dispatches the throttled
+   * enrichment batch as a detached background run (not awaited) — matching
+   * `team-enrichment-judge.service.ts`'s `prepareAndRunJudgmentBatch` shape, so an HTTP caller
+   * gets an immediate response instead of blocking on however long the (concurrency-bounded)
+   * batch takes.
+   */
   async triggerEnrichmentForAllPending(
     enrichedBy = 'system-cron'
   ): Promise<{ total: number; started: number; skipped: number }> {
     const members = await this.findMembersPendingEnrichment();
     this.logger.log(`Trigger all: found ${members.length} members pending enrichment`);
 
-    let started = 0;
-    let skipped = 0;
-    for (const member of members) {
-      const { status } = await this.enrichMember(member.uid, enrichedBy);
-      if (status === 'started') started++;
-      else skipped++;
-    }
-    return { total: members.length, started, skipped };
+    const { prepared, skipped } = await this.prepareEnrichmentBatch(members.map((m) => m.uid));
+    this.runEnrichmentBatchThrottled(prepared, enrichedBy).catch((err) => {
+      this.logger.error(`Enrichment batch failed: ${err.message}`, err.stack);
+    });
+
+    return { total: members.length, started: prepared.length, skipped };
   }
 
   async getEnrichmentCounts(): Promise<{ pending: number; inProgress: number; enriched: number }> {
@@ -295,6 +442,8 @@ export class MemberEnrichmentService {
     };
 
     let scrapingDogSource: 'linkedin' | 'x' | null = null;
+    let coresignalUsed = false;
+    let coresignalAttempted = false;
 
     try {
       // 0. Social handles (linkedin/twitter/github/telegram/bluesky) — filled BEFORE the
@@ -322,12 +471,37 @@ export class MemberEnrichmentService {
         }
       }
 
-      // 1. Fetch ScrapingDog once — LinkedIn preferred, X fallback — reused across the
-      // primaryTeamRole match and the bio context below. May use a handle found in step 0.
+      // 1. Fetch a profile once — Coresignal first (when MEMBER_ENRICHMENT_CORESIGNAL_ENABLED),
+      // ScrapingDog otherwise or as a fallback when Coresignal has nothing usable — reused
+      // across the primaryTeamRole match and the bio context below. May use a handle found in
+      // step 0. Whether Coresignal is even attempted for this member is decided by
+      // `preferredSource` (set on `dataEnrichment` by trigger-force-profile-enrichment(-bulk)'s
+      // `source` param): `'scrapingdog'` skips Coresignal outright, `'coresignal'` always
+      // attempts it, and the default `'auto'` (or absent, e.g. members marked by the regular
+      // eligibility cron) defers to `isHighValueMemberForCoresignal` — Coresignal by default for
+      // high-value members (accessLevel L5/L6, team lead, fund team), ScrapingDog by default for
+      // everyone else. Whichever provider is skipped or fails still has the other as a safety
+      // net — see the fallback logic below.
       let personProfile: ScrapingDogPersonProfile | null = null;
       let scrapedContext: string | null = null;
 
-      if (this.scrapingDog.isConfigured()) {
+      const coresignalEnabled = (process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED?.toLowerCase() ?? 'false') === 'true';
+      const preferredSource: MemberEnrichmentSourcePreference = existingMeta?.preferredSource ?? 'auto';
+      const shouldTryCoresignal =
+        preferredSource !== 'scrapingdog' &&
+        (preferredSource === 'coresignal' || isHighValueMemberForCoresignal(member));
+
+      if (coresignalEnabled && shouldTryCoresignal && member.linkedinHandler && this.coresignal.isConfigured()) {
+        coresignalAttempted = true;
+        const result = await this.coresignal.fetchEmployeeProfile(member.linkedinHandler);
+        if (result.kind === 'ok' && result.profile.experiences.length > 0) {
+          personProfile = result.profile;
+          coresignalUsed = true;
+          scrapedContext = formatPersonContext(result.profile);
+        }
+      }
+
+      if (!personProfile && this.scrapingDog.isConfigured()) {
         if (member.linkedinHandler) {
           const result = await this.scrapingDog.fetchPersonProfile(member.linkedinHandler);
           if (result.kind === 'ok') {
@@ -359,8 +533,10 @@ export class MemberEnrichmentService {
         stampPreexisting('email');
       }
 
-      // 3. primaryTeamRole — LinkedIn experience[0] matched to an existing Team. Never
-      // creates a team; a miss (or no LinkedIn data at all) leaves the field CannotEnrich.
+      // 3. primaryTeamRole — LinkedIn/Coresignal experience[0] matched to an existing Team.
+      // Never creates a team; a miss (or no experience data at all) leaves the field
+      // CannotEnrich. `experienceSource` reflects whichever provider actually answered step 1.
+      const experienceSource = coresignalUsed ? EnrichmentSource.Coresignal : EnrichmentSource.LinkedinExperience;
       const hasMainTeam = member.teamMemberRoles.some((r) => r.mainTeam);
       if (!hasMainTeam) {
         const experience = personProfile?.experiences?.[0];
@@ -368,7 +544,7 @@ export class MemberEnrichmentService {
           const matchedTeam = await matchTeamFromCompanyName(this.prisma, experience.company);
           if (matchedTeam) {
             await this.applyPrimaryTeamRole(member, matchedTeam.uid, experience.title);
-            stamp('primaryTeamRole', FieldEnrichmentStatus.Enriched, EnrichmentSource.LinkedinExperience);
+            stamp('primaryTeamRole', FieldEnrichmentStatus.Enriched, experienceSource);
           } else {
             stamp('primaryTeamRole', FieldEnrichmentStatus.CannotEnrich, undefined, 'no matching team in directory');
           }
@@ -392,19 +568,34 @@ export class MemberEnrichmentService {
         : [];
       const experienceInputs = buildMemberExperienceInputs(missingExperiences, member.uid);
       if (experienceInputs.length > 0) {
+        let insertedCount = 0;
         for (const input of experienceInputs) {
           try {
             await this.prisma.memberExperience.create({ data: input });
+            insertedCount++;
           } catch (error) {
-            this.logger.warn(`Failed to insert MemberExperience for ${member.uid} (${input.company}): ${error.message}`);
+            this.logger.warn(
+              `Failed to insert MemberExperience for ${member.uid} (${input.company}): ${error.message}`
+            );
           }
         }
-        stamp(
-          'workHistory',
-          FieldEnrichmentStatus.Enriched,
-          EnrichmentSource.LinkedinExperience,
-          `added ${experienceInputs.length} new position(s) from LinkedIn`
-        );
+        // Note reports what was actually inserted, not the candidate count — a per-row
+        // create() failure (e.g. a constraint violation) must not overstate what landed.
+        if (insertedCount > 0) {
+          stamp(
+            'workHistory',
+            FieldEnrichmentStatus.Enriched,
+            experienceSource,
+            `added ${insertedCount} new position(s) from ${coresignalUsed ? 'Coresignal' : 'LinkedIn'}`
+          );
+        } else {
+          stamp(
+            'workHistory',
+            FieldEnrichmentStatus.CannotEnrich,
+            undefined,
+            'all candidate position(s) failed to insert'
+          );
+        }
       } else if (member.experiences.length > 0) {
         stampPreexisting('workHistory');
       } else {
@@ -461,6 +652,11 @@ export class MemberEnrichmentService {
           used: scrapingDogSource !== null,
           fetchedAt: scrapingDogSource ? nowIso() : undefined,
           source: scrapingDogSource ?? undefined,
+        },
+        coresignal: {
+          used: coresignalUsed,
+          fetchedAt: coresignalUsed ? nowIso() : undefined,
+          fellBackToScrapingDog: coresignalAttempted && !coresignalUsed,
         },
       };
       await this.upsertEnrichmentRow(memberUid, finalMeta);
