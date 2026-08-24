@@ -97,9 +97,9 @@ const SOURCE_TRUST_RULE: JudgeRule = {
   name: 'source-trust',
   costTier: JudgeCostTier.SOURCE_TRUST,
   appliesTo: '*',
-  description: 'Promote values previously written by a trusted deterministic source (scrapingdog, open-graph) at high confidence. Vetoes on definitive website unreachability for the website field.',
-  run: ({ field, source, enrichmentConfidence }, ctx) =>
-    corroborateBySource(source, enrichmentConfidence, field, ctx),
+  description:
+    'Promote values previously written by a trusted deterministic source (scrapingdog, open-graph) at high confidence. Vetoes on definitive website unreachability for the website field.',
+  run: ({ field, source, enrichmentConfidence }, ctx) => corroborateBySource(source, enrichmentConfidence, field, ctx),
 };
 
 const CONTACT_METHOD_RULE: JudgeRule = {
@@ -115,7 +115,8 @@ const TWITTER_RULE: JudgeRule = {
   name: 'twitterHandler corroboration',
   costTier: JudgeCostTier.DETERMINISTIC,
   appliesTo: ['twitterHandler'],
-  description: 'Verify against website-declared twitter handle, handle prefix-matches a substantive team token, or user-trusted fallback.',
+  description:
+    'Verify against website-declared twitter handle, handle prefix-matches a substantive team token, or user-trusted fallback.',
   run: ({ value, isUserOwned }, ctx) => corroborateTwitterHandler(value, ctx, { isUserOwned }),
 };
 
@@ -123,7 +124,8 @@ const LINKEDIN_RULE: JudgeRule = {
   name: 'linkedinHandler corroboration',
   costTier: JudgeCostTier.DETERMINISTIC,
   appliesTo: ['linkedinHandler'],
-  description: 'Verify against website-declared LinkedIn slug, slug prefix-matches a substantive team token, or user-trusted fallback.',
+  description:
+    'Verify against website-declared LinkedIn slug, slug prefix-matches a substantive team token, or user-trusted fallback.',
   run: ({ value, isUserOwned }, ctx) => corroborateLinkedinHandler(value, ctx, { isUserOwned }),
 };
 
@@ -131,7 +133,8 @@ const TELEGRAM_RULE: JudgeRule = {
   name: 'telegramHandler corroboration',
   costTier: JudgeCostTier.DETERMINISTIC,
   appliesTo: ['telegramHandler'],
-  description: 'Verify against website-declared Telegram handle, handle prefix-matches a substantive team token, or user-trusted fallback.',
+  description:
+    'Verify against website-declared Telegram handle, handle prefix-matches a substantive team token, or user-trusted fallback.',
   run: ({ value, isUserOwned }, ctx) => corroborateTelegramHandler(value, ctx, { isUserOwned }),
 };
 
@@ -139,7 +142,8 @@ const BLOG_RULE: JudgeRule = {
   name: 'blog corroboration',
   costTier: JudgeCostTier.DETERMINISTIC,
   appliesTo: ['blog'],
-  description: 'Verify blog URL shares host (or subdomain-of) the website, platform handle matches team token, host first-label matches team token, or user-trusted fallback (custom domain only).',
+  description:
+    'Verify blog URL shares host (or subdomain-of) the website, platform handle matches team token, host first-label matches team token, or user-trusted fallback (custom domain only).',
   run: ({ value, isUserOwned }, ctx) => corroborateBlog(value, ctx, { isUserOwned }),
 };
 
@@ -147,7 +151,8 @@ const WEBSITE_RULE: JudgeRule = {
   name: 'website corroboration',
   costTier: JudgeCostTier.DETERMINISTIC,
   appliesTo: ['website'],
-  description: 'Verify host first-label / og:site_name / jsonld Organization.name / ScrapingDog profile host matches the team name (or user-trusted fallback) AND the site is not a definitive 4xx/5xx.',
+  description:
+    'Verify host first-label / og:site_name / jsonld Organization.name / ScrapingDog profile host matches the team name (or user-trusted fallback) AND the site is not a definitive 4xx/5xx.',
   run: ({ value, isUserOwned }, ctx) => corroborateWebsite(value, ctx, { isUserOwned }),
 };
 
@@ -218,9 +223,18 @@ export const runCorroboration = runStage15Rules;
 export const STAGE_1_DESCRIPTOR = {
   name: 'scrapingdog linkedin',
   costTier: JudgeCostTier.SCRAPING_API,
-  appliesTo: ['linkedinHandler', 'shortDescription', 'longDescription', 'industryTags', 'moreDetails'] as const,
+  appliesTo: [
+    'linkedinHandler',
+    'shortDescription',
+    'longDescription',
+    'industryTags',
+    'moreDetails',
+    'dateFounded',
+    'location',
+    'teamSize',
+  ] as const,
   description:
-    'Fetch the LinkedIn company profile and run deterministic field comparators (name match, tagline overlap, about sentence overlap, industry set intersection, founded/HQ contains).',
+    'Fetch the LinkedIn company profile and run deterministic field comparators (name match, tagline overlap, about sentence overlap, industry set intersection, founded/HQ contains, founded-year equality, headquarters token overlap, headcount range overlap).',
 };
 
 export const WEBSITE_PROBE_DESCRIPTOR = {

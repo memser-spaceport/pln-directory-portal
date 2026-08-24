@@ -132,8 +132,7 @@ const DESCRIPTION_FIELD_KEYS: readonly FieldMetaKey[] = ['shortDescription', 'lo
  */
 const IDENTITY_ANCHOR_FIELDS: readonly FieldMetaKey[] = ['website', 'linkedinHandler', 'twitterHandler'];
 
-export type JudgeTeamResult =
-  | { status: 'started' | 'already_judged' | 'in_progress' | 'not_found' | 'not_eligible' };
+export type JudgeTeamResult = { status: 'started' | 'already_judged' | 'in_progress' | 'not_found' | 'not_eligible' };
 
 const TEAM_RECORD_SELECT = {
   uid: true,
@@ -561,6 +560,9 @@ export class TeamEnrichmentJudgeService {
             longDescription: this.preferEnrichmentValue(team, 'longDescription'),
             moreDetails: this.preferEnrichmentValue(team, 'moreDetails'),
             industryTags: this.preferEnrichmentIndustryTags(team).map((title) => ({ title })),
+            dateFounded: this.preferEnrichmentDateFounded(team),
+            teamSize: this.preferEnrichmentValue(team, 'teamSize'),
+            location: this.preferEnrichmentValue(team, 'location'),
           };
           if (nameMatch !== 'none') {
             stage1Verdicts = this.scrapingDogService.compareProfileToTeam(teamSnapshot, profile, nameMatch);
@@ -588,13 +590,7 @@ export class TeamEnrichmentJudgeService {
         }
       }
 
-      const stage15Verdicts = this.runStage15(
-        team,
-        existingMeta,
-        judgableKeys,
-        scrapingDogMeta,
-        websiteReachable
-      );
+      const stage15Verdicts = this.runStage15(team, existingMeta, judgableKeys, scrapingDogMeta, websiteReachable);
 
       // Stage 1.5 and Stage 1 verdicts merge before the resolved set is computed.
       // The merge is **confidence-aware** rather than positional:
@@ -655,7 +651,8 @@ export class TeamEnrichmentJudgeService {
           scrapingDog: scrapingDogMeta,
           websiteSignals: existingMeta.websiteSignals ?? null,
           corroboratedFields: Object.keys(mergedStage1Verdicts).filter(
-            (k) => mergedStage1Verdicts[k as FieldMetaKey]?.verdict === JudgmentVerdict.Agrees &&
+            (k) =>
+              mergedStage1Verdicts[k as FieldMetaKey]?.verdict === JudgmentVerdict.Agrees &&
               mergedStage1Verdicts[k as FieldMetaKey]?.confidence === 'high'
           ),
         };
@@ -851,7 +848,8 @@ export class TeamEnrichmentJudgeService {
         if (mergedFieldsMeta[field]?.status !== FieldEnrichmentStatus.ChangedByUser) continue;
         const thisRunEvent = recovery.events.find((e) => e.field === field);
         const thisRunFailed =
-          !!thisRunEvent && (thisRunEvent.outcome === 'no-better-candidate' || thisRunEvent.outcome === 'verify-failed');
+          !!thisRunEvent &&
+          (thisRunEvent.outcome === 'no-better-candidate' || thisRunEvent.outcome === 'verify-failed');
         const stuckFromPrior = recoveryWasAlreadyAttempted && !thisRunEvent && triggerStillFires(field);
         if (!thisRunFailed && !stuckFromPrior) continue;
         reviewSuppressedFields.add(field);
@@ -861,7 +859,11 @@ export class TeamEnrichmentJudgeService {
       }
       if (recoverySuppressed.length > 0) {
         this.logger.log(
-          `Recovery: team ${team.uid} (${team.name}) suppressing fields from review (no actionable signal for admin): [${recoverySuppressed.join(',')}] — AI verdicts preserved on fieldsMeta`
+          `Recovery: team ${team.uid} (${
+            team.name
+          }) suppressing fields from review (no actionable signal for admin): [${recoverySuppressed.join(
+            ','
+          )}] — AI verdicts preserved on fieldsMeta`
         );
       }
 
@@ -906,7 +908,11 @@ export class TeamEnrichmentJudgeService {
         }
         if (userTrustTransferDropped.length > 0) {
           this.logger.log(
-            `Trust-transfer: team ${team.uid} (${team.name}) user-supplied website verified agrees+high — suppressing other ChangedByUser fields from review: [${userTrustTransferDropped.join(',')}] — AI verdicts preserved on fieldsMeta`
+            `Trust-transfer: team ${team.uid} (${
+              team.name
+            }) user-supplied website verified agrees+high — suppressing other ChangedByUser fields from review: [${userTrustTransferDropped.join(
+              ','
+            )}] — AI verdicts preserved on fieldsMeta`
           );
         }
       }
@@ -940,15 +946,12 @@ export class TeamEnrichmentJudgeService {
         // this point — both when we actively did recovery and when the
         // prior run already attempted it. Prevents the next cron tick from
         // re-firing the AI re-discovery against the same broken value.
-        staleUserRecoveryAttempted:
-          recovery.attempted || existingMeta.judgment?.staleUserRecoveryAttempted === true,
+        staleUserRecoveryAttempted: recovery.attempted || existingMeta.judgment?.staleUserRecoveryAttempted === true,
         ...(recovery.events.length > 0 ? { staleUserRecovery: recovery.events } : {}),
         ...(userTrustTransferDropped.length > 0
           ? { userTrustTransfer: { basis: 'website', droppedFields: userTrustTransferDropped } }
           : {}),
-        ...(reviewSuppressedFields.size > 0
-          ? { reviewSuppressedFields: Array.from(reviewSuppressedFields) }
-          : {}),
+        ...(reviewSuppressedFields.size > 0 ? { reviewSuppressedFields: Array.from(reviewSuppressedFields) } : {}),
       };
 
       const baseUsage = (refreshedMeta ?? existingMeta).usage;
@@ -1002,9 +1005,9 @@ export class TeamEnrichmentJudgeService {
         } stage2=${Object.keys(stage2Verdicts).length} recovered=[${recovery.events
           .filter((e) => e.outcome === 'recovered')
           .map((e) => e.field)
-          .join(',')}] promoted=[${promotion.promotedFields.join(
+          .join(',')}] promoted=[${promotion.promotedFields.join(',')}] fieldsForReview=[${fieldsForReview.join(
           ','
-        )}] fieldsForReview=[${fieldsForReview.join(',')}] thinEvidence=${quality.thinEvidence}`
+        )}] thinEvidence=${quality.thinEvidence}`
       );
       if (mergedJudgeUsage) {
         this.logger.log(
@@ -1224,7 +1227,11 @@ export class TeamEnrichmentJudgeService {
                 note: `${sup.pattern} -> @${canonical}`.slice(0, 80),
               });
               this.logger.log(
-                `Recovery: team ${team.uid} (${team.name}) twitterHandler "${userHandle}" superseded by "@${canonical}" via "${sup.pattern}" + [${verification.anchors.join(', ')}]`
+                `Recovery: team ${team.uid} (${
+                  team.name
+                }) twitterHandler "${userHandle}" superseded by "@${canonical}" via "${
+                  sup.pattern
+                }" + [${verification.anchors.join(', ')}]`
               );
             } else {
               events.push({
@@ -1269,9 +1276,7 @@ export class TeamEnrichmentJudgeService {
       !!team.website &&
       websiteReachable === false;
     const blogNeedsRecovery =
-      fieldsMeta.blog?.status === FieldEnrichmentStatus.ChangedByUser &&
-      !!team.blog &&
-      blogReachable === false;
+      fieldsMeta.blog?.status === FieldEnrichmentStatus.ChangedByUser && !!team.blog && blogReachable === false;
     const linkedinNeedsRecovery =
       fieldsMeta.linkedinHandler?.status === FieldEnrichmentStatus.ChangedByUser &&
       !!team.linkedinHandler &&
@@ -1281,12 +1286,7 @@ export class TeamEnrichmentJudgeService {
       !!team.contactMethod &&
       isLikelyPersonalContactEmail(team.contactMethod, teamLeadEmailSet);
 
-    if (
-      websiteNeedsRecovery ||
-      blogNeedsRecovery ||
-      linkedinNeedsRecovery ||
-      contactMethodNeedsRecovery
-    ) {
+    if (websiteNeedsRecovery || blogNeedsRecovery || linkedinNeedsRecovery || contactMethodNeedsRecovery) {
       // Build the AI payload — null for fields needing recovery (so the
       // prompt says "Unknown" and the model rediscovers); team values
       // otherwise. Twitter uses whatever recovery wrote this turn (if any).
@@ -1300,17 +1300,10 @@ export class TeamEnrichmentJudgeService {
         longDescription: team.longDescription ?? undefined,
         userConfirmedIdentityHints: {
           shortDescription:
-            fieldsMeta.shortDescription?.status === FieldEnrichmentStatus.ChangedByUser
-              ? team.shortDescription
-              : null,
+            fieldsMeta.shortDescription?.status === FieldEnrichmentStatus.ChangedByUser ? team.shortDescription : null,
           longDescription:
-            fieldsMeta.longDescription?.status === FieldEnrichmentStatus.ChangedByUser
-              ? team.longDescription
-              : null,
-          moreDetails:
-            fieldsMeta.moreDetails?.status === FieldEnrichmentStatus.ChangedByUser
-              ? team.moreDetails
-              : null,
+            fieldsMeta.longDescription?.status === FieldEnrichmentStatus.ChangedByUser ? team.longDescription : null,
+          moreDetails: fieldsMeta.moreDetails?.status === FieldEnrichmentStatus.ChangedByUser ? team.moreDetails : null,
         },
       });
       recoveryUsage = aiOut.usage;
@@ -1360,8 +1353,7 @@ export class TeamEnrichmentJudgeService {
                 website: candidate,
                 websiteReachable: newReachable,
                 teamOwnedChannels: {
-                  twitterHandler:
-                    candidateWrites.twitterHandler ?? this.preferEnrichmentValue(team, 'twitterHandler'),
+                  twitterHandler: candidateWrites.twitterHandler ?? this.preferEnrichmentValue(team, 'twitterHandler'),
                   telegramHandler: this.preferEnrichmentValue(team, 'telegramHandler'),
                   linkedinHandler: this.preferEnrichmentValue(team, 'linkedinHandler'),
                   blog: this.preferEnrichmentValue(team, 'blog'),
@@ -1428,8 +1420,7 @@ export class TeamEnrichmentJudgeService {
                 website: this.preferEnrichmentValue(team, 'website'),
                 websiteReachable,
                 teamOwnedChannels: {
-                  twitterHandler:
-                    candidateWrites.twitterHandler ?? this.preferEnrichmentValue(team, 'twitterHandler'),
+                  twitterHandler: candidateWrites.twitterHandler ?? this.preferEnrichmentValue(team, 'twitterHandler'),
                   telegramHandler: this.preferEnrichmentValue(team, 'telegramHandler'),
                   linkedinHandler: this.preferEnrichmentValue(team, 'linkedinHandler'),
                   blog: candidate,
@@ -1564,11 +1555,9 @@ export class TeamEnrichmentJudgeService {
               website: this.preferEnrichmentValue(team, 'website'),
               websiteReachable,
               teamOwnedChannels: {
-                twitterHandler:
-                  candidateWrites.twitterHandler ?? this.preferEnrichmentValue(team, 'twitterHandler'),
+                twitterHandler: candidateWrites.twitterHandler ?? this.preferEnrichmentValue(team, 'twitterHandler'),
                 telegramHandler: this.preferEnrichmentValue(team, 'telegramHandler'),
-                linkedinHandler:
-                  candidateWrites.linkedinHandler ?? this.preferEnrichmentValue(team, 'linkedinHandler'),
+                linkedinHandler: candidateWrites.linkedinHandler ?? this.preferEnrichmentValue(team, 'linkedinHandler'),
                 blog: candidateWrites.blog ?? this.preferEnrichmentValue(team, 'blog'),
               },
             }
@@ -1622,10 +1611,7 @@ export class TeamEnrichmentJudgeService {
    * better than the dead/personal one we had, but no deterministic anchor
    * fired, so it isn't promotable in this run.
    */
-  private recoveryFinalVerdict(
-    corroborated: FieldJudgment | undefined,
-    fallbackNote: string
-  ): FieldJudgment {
+  private recoveryFinalVerdict(corroborated: FieldJudgment | undefined, fallbackNote: string): FieldJudgment {
     if (corroborated && corroborated.verdict === JudgmentVerdict.Agrees) return corroborated;
     return {
       verdict: JudgmentVerdict.Uncertain,
@@ -1833,6 +1819,12 @@ export class TeamEnrichmentJudgeService {
     return typeof teamVal === 'string' ? teamVal : null;
   }
 
+  /** Same "prefer the enrichment candidate when present" rule as `preferEnrichmentValue`, for the one number-typed field. */
+  private preferEnrichmentDateFounded(team: TeamRecord): number | null {
+    const enrichmentVal = team.teamEnrichment?.dateFounded;
+    return typeof enrichmentVal === 'number' ? enrichmentVal : team.dateFounded;
+  }
+
   private preferEnrichmentIndustryTags(team: TeamRecord): string[] {
     if (team.teamEnrichment?.industryTags?.length) {
       return team.teamEnrichment.industryTags;
@@ -1948,7 +1940,9 @@ export class TeamEnrichmentJudgeService {
    *     `corroborateWebsite` rule allows null-reachability when a strong
    *     deterministic name anchor matches; the AI judge is told not to infer.
    */
-  private async probeWebsiteReachable(url: string): Promise<{ reachable: boolean | null; finalHost: string | null } | null> {
+  private async probeWebsiteReachable(
+    url: string
+  ): Promise<{ reachable: boolean | null; finalHost: string | null } | null> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), WEBSITE_PROBE_TIMEOUT_MS);
     try {

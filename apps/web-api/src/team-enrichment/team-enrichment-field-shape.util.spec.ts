@@ -101,9 +101,7 @@ describe('isLikelyValueForField', () => {
     });
 
     it('accepts full linkedin URLs', () => {
-      expect(
-        isLikelyValueForField('linkedinHandler', 'https://www.linkedin.com/company/eon-systems-pbc/')
-      ).toBe(true);
+      expect(isLikelyValueForField('linkedinHandler', 'https://www.linkedin.com/company/eon-systems-pbc/')).toBe(true);
     });
 
     it('accepts bare slug', () => {
@@ -183,6 +181,10 @@ describe('isLikelyValueForField', () => {
       expect(isLikelyValueForField('teamSize', '11–50')).toBe(true);
     });
 
+    it("accepts an open-ended band (LinkedIn's top company-size bracket)", () => {
+      expect(isLikelyValueForField('teamSize', '10001+')).toBe(true);
+    });
+
     it('rejects free-text placeholders', () => {
       expect(isLikelyValueForField('teamSize', 'Coming soon!')).toBe(false);
       expect(isLikelyValueForField('teamSize', 'n/a')).toBe(false);
@@ -212,7 +214,10 @@ describe('isLikelyValueForField', () => {
         isLikelyValueForField('shortDescription', 'Its embedded wallets are widely used across consumer crypto apps.')
       ).toBe(true);
       expect(
-        isLikelyValueForField('longDescription', 'A non-profit library of millions of free books, movies, and websites.')
+        isLikelyValueForField(
+          'longDescription',
+          'A non-profit library of millions of free books, movies, and websites.'
+        )
       ).toBe(true);
     });
 
@@ -223,10 +228,12 @@ describe('isLikelyValueForField', () => {
           'No specific investment fund named "Angel Fund" was found that exactly matches the provided name. The term "angel fund" is widely used generically to describe a type of early-stage investment vehicle.'
         )
       ).toBe(false);
-      expect(isLikelyValueForField('longDescription', 'I could not find any information about this company.')).toBe(false);
-      expect(isLikelyValueForField('moreDetails', 'Unfortunately, no official website was found for this entity.')).toBe(
+      expect(isLikelyValueForField('longDescription', 'I could not find any information about this company.')).toBe(
         false
       );
+      expect(
+        isLikelyValueForField('moreDetails', 'Unfortunately, no official website was found for this entity.')
+      ).toBe(false);
     });
 
     it('rejects empty values uniformly', () => {

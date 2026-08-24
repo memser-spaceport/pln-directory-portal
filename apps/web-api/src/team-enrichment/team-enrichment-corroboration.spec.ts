@@ -708,11 +708,7 @@ describe('team-enrichment-corroboration', () => {
     });
 
     it('user-supplied telegram handle that no deterministic anchor matches → user trusted', () => {
-      const verdict = corroborateTelegramHandler(
-        'somecommunity',
-        { teamName: 'Acme' },
-        { isUserOwned: true }
-      );
+      const verdict = corroborateTelegramHandler('somecommunity', { teamName: 'Acme' }, { isUserOwned: true });
       expect(verdict?.note).toBe('user trusted');
       expect(verdict?.confidence).toBe(FieldConfidence.High);
     });
@@ -751,13 +747,10 @@ describe('team-enrichment-corroboration', () => {
     // the blog host IS the identity proof, same as `name in website host` for
     // the website rule.
     it('custom-domain blog whose host first-label matches team token → name in blog host', () => {
-      const verdict = corroborateBlog(
-        'https://near.org/blog/?_gl=1*4ltauw*_up*MQ..*_ga*MTg5MzA0MDM1OS4xNjY4NjMxOTE5',
-        {
-          teamName: 'Near',
-          website: 'https://near.foundation/',
-        }
-      );
+      const verdict = corroborateBlog('https://near.org/blog/?_gl=1*4ltauw*_up*MQ..*_ga*MTg5MzA0MDM1OS4xNjY4NjMxOTE5', {
+        teamName: 'Near',
+        website: 'https://near.foundation/',
+      });
       expect(verdict).not.toBeNull();
       expect(verdict?.verdict).toBe(JudgmentVerdict.Agrees);
       expect(verdict?.confidence).toBe(FieldConfidence.High);
@@ -1119,6 +1112,8 @@ describe('team-enrichment-corroboration', () => {
           founded: null,
           headquarters: null,
           linkedinInternalId: null,
+          companySize: null,
+          employeeCount: null,
         },
       });
       expect(verdict?.note).toContain('sd website host match');

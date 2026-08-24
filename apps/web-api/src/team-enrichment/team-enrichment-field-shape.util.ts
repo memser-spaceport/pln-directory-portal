@@ -30,8 +30,9 @@ const BLUESKY_HANDLE_BARE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,251}[A-Za-z0-9])?$/
 // Crunchbase organization slug — lowercase-alnum-hyphen, matches normalizeCrunchbaseHandler's output shape.
 const CRUNCHBASE_SLUG = /^[A-Za-z0-9-]{1,255}$/;
 
-// Bare headcount ("50") or a range label ("11-50", "11–50").
-const TEAM_SIZE_SHAPE = /^\d{1,7}$|^\d{1,7}\s*[-–]\s*\d{1,7}$/;
+// Bare headcount ("50"), a range label ("11-50", "11–50"), or an open-ended
+// band ("10001+" — LinkedIn's top company-size bracket has no upper bound).
+const TEAM_SIZE_SHAPE = /^\d{1,7}$|^\d{1,7}\s*[-–]\s*\d{1,7}$|^\d{1,7}\+$/;
 
 // Free-text fields where the AI is supposed to return PROSE about the team.
 const FREE_TEXT_FIELDS = new Set<FieldMetaKey>(['shortDescription', 'longDescription', 'moreDetails']);

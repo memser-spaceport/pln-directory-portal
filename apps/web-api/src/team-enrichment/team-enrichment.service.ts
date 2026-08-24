@@ -6,6 +6,9 @@ import { TeamEnrichmentAiService } from './team-enrichment-ai.service';
 import { buildTeamEnrichmentEligibilityFilter } from './team-enrichment-eligibility-filter';
 import { formatUsageLog, mergeUsageEntries } from './team-enrichment-cost';
 import {
+  normalizeTeamSizeFromProfile,
+  parseFoundedYear,
+  parseHeadquartersLocation,
   ScrapingDogCompanyProfile,
   TeamEnrichmentScrapingDogService,
   verifyTwitterProfileMatchesTeam,
@@ -1090,10 +1093,7 @@ export class TeamEnrichmentService {
         // in review. Admins who actually want to refresh a stale promoted
         // value should edit `Team.<field>` directly (which flips status
         // to ChangedByUser and lets enrichment re-evaluate naturally).
-        if (
-          fieldStatus === FieldEnrichmentStatus.Enriched &&
-          !teamSlotIsEmpty
-        ) {
+        if (fieldStatus === FieldEnrichmentStatus.Enriched && !teamSlotIsEmpty) {
           skipReasons.alreadyPromoted.push(field);
           continue;
         }
@@ -1720,8 +1720,7 @@ export class TeamEnrichmentService {
       const logoApprovedByAdmin =
         logoFieldMeta?.judgment?.verdict === JudgmentVerdict.Agrees &&
         logoFieldMeta?.judgment?.confidence === FieldConfidence.High;
-      const logoApprovedByVLM =
-        latestLogoVerif?.verdict === 'verified' && latestLogoVerif?.confidence === 'high';
+      const logoApprovedByVLM = latestLogoVerif?.verdict === 'verified' && latestLogoVerif?.confidence === 'high';
       // The AI-suggested logo (TeamEnrichment.logo) is pointless to review when
       // it's the same image as the one already on the team (Team.logo) — the
       // admin would see "Current" and "AI suggestion" rendering identically.
@@ -1730,8 +1729,7 @@ export class TeamEnrichmentService {
       // timestamp, so they always differ); the byte-identical content is only
       // detectable via the stored size/type/dimensions. See `isSameStoredImage`.
       const logoMatchesCurrent = this.isSameStoredImage(row.logo, row.team.logo);
-      const hasUnapprovedLogo =
-        !!row.logoUid && !logoApprovedByAdmin && !logoApprovedByVLM && !logoMatchesCurrent;
+      const hasUnapprovedLogo = !!row.logoUid && !logoApprovedByAdmin && !logoApprovedByVLM && !logoMatchesCurrent;
       if (!hasUnapprovedField && !hasUnapprovedLogo && !hasJunkUserValueWithAiAlt) continue;
 
       const fields: EnrichmentReviewItem['fields'] = {};
@@ -1916,9 +1914,7 @@ export class TeamEnrichmentService {
     if (!a || !b) return false;
     if (a.uid === b.uid) return true;
     if (a.url === b.url) return true;
-    return (
-      a.size === b.size && a.type === b.type && a.width === b.width && a.height === b.height
-    );
+    return a.size === b.size && a.type === b.type && a.width === b.width && a.height === b.height;
   }
 
   /**
@@ -2308,21 +2304,58 @@ export class TeamEnrichmentService {
       team.industryTags.length === 0 &&
       !(enrichmentUpdate as any).industryTags;
 
+    // dateFounded / location / teamSize: unlike the gaps above (which only fill
+    // when NOTHING has been written yet, including this run's own AI candidate),
+    // LinkedIn is treated as the more authoritative source for these three —
+    // see the ticket's "actual fix" design. So the gap here is "not settled"
+    // (not user-owned, not already judge-promoted) rather than "totally empty",
+    // which lets ScrapingDog override an AI candidate the earlier scalar loop
+    // just wrote to `enrichmentUpdate` this same run.
+    //
+    // "Settled" reuses `isFieldUserOwned`'s convention (real value + no meta
+    // entry at all counts as pre-enrichment user data) rather than checking
+    // `existingFieldsMeta` status alone — the earlier per-field blocks in this
+    // same function already stamp a fresh `ChangedByUser` onto `newFieldsMeta`
+    // for exactly that legacy-data case, but `existingFieldsMeta` (this
+    // function's pre-run snapshot) never reflects that in-flight write.
+    const isScalarFieldSettled = (field: 'location' | 'teamSize', teamValue: string | null): boolean => {
+      if (isFieldUserOwned(existingFieldsMeta, field, teamValue)) return true;
+      const status = existingFieldsMeta[field]?.status;
+      return (
+        status === FieldEnrichmentStatus.Enriched &&
+        !!teamValue &&
+        teamValue.trim() !== '' &&
+        isLikelyValueForField(field, teamValue)
+      );
+    };
+    const dateFoundedStatus = existingFieldsMeta.dateFounded?.status;
+    const dateFoundedHasRealValue = typeof team.dateFounded === 'number';
+    const dateFoundedIsSettled =
+      dateFoundedHasRealValue &&
+      (dateFoundedStatus === FieldEnrichmentStatus.ChangedByUser ||
+        dateFoundedStatus === FieldEnrichmentStatus.Enriched ||
+        !existingFieldsMeta.dateFounded);
+    const hasDateFoundedGap = !dateFoundedIsSettled;
+    const hasLocationGap = !isScalarFieldSettled('location', team.location);
+    const hasTeamSizeGap = !isScalarFieldSettled('teamSize', team.teamSize);
+
     if (
       !hasLogoGap &&
       !hasWebsiteGap &&
       !hasShortDescGap &&
       !hasLongDescGap &&
       !hasMoreDetailsGap &&
-      !hasIndustryTagsGap
+      !hasIndustryTagsGap &&
+      !hasDateFoundedGap &&
+      !hasLocationGap &&
+      !hasTeamSizeGap
     ) {
       this.logger.debug(`Team ${teamUid}: no gaps remain, skipping ScrapingDog`);
       return null;
     }
 
     const usingUserOwnedHandle =
-      handle === team.linkedinHandler &&
-      isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', team.linkedinHandler);
+      handle === team.linkedinHandler && isFieldUserOwned(existingFieldsMeta, 'linkedinHandler', team.linkedinHandler);
 
     this.logger.log(
       `Team ${teamUid} (${team.name}): invoking ScrapingDog for handle "${handle}"${
@@ -2407,6 +2440,33 @@ export class TeamEnrichmentService {
       }
     }
 
+    if (hasDateFoundedGap && profile.founded) {
+      const foundedYear = parseFoundedYear(profile.founded);
+      if (foundedYear !== null) {
+        (enrichmentUpdate as any).dateFounded = foundedYear;
+        markSdField('dateFounded');
+        filledFields.push('dateFounded');
+      }
+    }
+
+    if (hasLocationGap && profile.headquarters) {
+      const location = parseHeadquartersLocation(profile.headquarters);
+      if (location) {
+        (enrichmentUpdate as any).location = location;
+        markSdField('location');
+        filledFields.push('location');
+      }
+    }
+
+    if (hasTeamSizeGap) {
+      const teamSize = normalizeTeamSizeFromProfile(profile.companySize, profile.employeeCount);
+      if (teamSize) {
+        (enrichmentUpdate as any).teamSize = teamSize;
+        markSdField('teamSize');
+        filledFields.push('teamSize');
+      }
+    }
+
     if (hasIndustryTagsGap) {
       const candidates = [...profile.industries, ...profile.specialties];
       if (candidates.length > 0) {
@@ -2450,6 +2510,9 @@ export class TeamEnrichmentService {
       longDescription: ((enrichmentUpdate as any).longDescription as string | null | undefined) ?? team.longDescription,
       moreDetails: ((enrichmentUpdate as any).moreDetails as string | null | undefined) ?? team.moreDetails,
       industryTags: team.industryTags.map((t) => ({ title: t.title })),
+      dateFounded: ((enrichmentUpdate as any).dateFounded as number | null | undefined) ?? team.dateFounded,
+      teamSize: ((enrichmentUpdate as any).teamSize as string | null | undefined) ?? team.teamSize,
+      location: ((enrichmentUpdate as any).location as string | null | undefined) ?? team.location,
     };
     const verdicts = this.scrapingDogService.compareProfileToTeam(postRunTeam, profile, nameMatch);
     for (const [field, verdict] of Object.entries(verdicts) as Array<[FieldMetaKey, FieldJudgment | undefined]>) {
@@ -2567,7 +2630,9 @@ export class TeamEnrichmentService {
     if (!verification.verified) {
       this.logger.log(
         `Team ${teamUid} (${team.name}): X profile fetched for "${candidate}" but no identity anchor fired ` +
-          `(profile.name="${result.profile.name ?? ''}" website="${result.profile.website ?? ''}" verifiedType="${result.profile.verifiedType ?? ''}")`
+          `(profile.name="${result.profile.name ?? ''}" website="${result.profile.website ?? ''}" verifiedType="${
+            result.profile.verifiedType ?? ''
+          }")`
       );
       return;
     }
@@ -2583,10 +2648,11 @@ export class TeamEnrichmentService {
       source: EnrichmentSource.ScrapingDog,
     };
     this.logger.log(
-      `Team ${teamUid} (${team.name}): X profile verified twitterHandler="${canonicalHandle}" via [${verification.anchors.join(', ')}]`
+      `Team ${teamUid} (${
+        team.name
+      }): X profile verified twitterHandler="${canonicalHandle}" via [${verification.anchors.join(', ')}]`
     );
   }
-
 
   parseEnrichmentMeta(raw: any): TeamDataEnrichment | null {
     if (!raw) return null;
