@@ -121,6 +121,23 @@ export class MemberController {
   }
 
   /**
+   * Marks an explicit list of member uids for force re-enrichment — e.g. a hand-picked list of
+   * newly-important fund/team-lead members. Only marks; it does not run the pipeline itself. The
+   * marked members are picked up and processed (concurrency-bounded) by the existing hourly
+   * enrichment cron, same as a single-member force-trigger.
+   */
+  @Post('trigger-force-profile-enrichment-bulk')
+  @UseGuards(AdminAuthGuard)
+  @NoCache()
+  async triggerForceProfileEnrichmentBulk(@Body() body: { uids?: string[] }) {
+    const uids = Array.isArray(body?.uids) ? body.uids.filter((u) => typeof u === 'string' && u.trim().length > 0) : [];
+    if (uids.length === 0) {
+      throw new BadRequestException('uids must be a non-empty array of member uids');
+    }
+    return this.memberEnrichmentService.markMembersForForceEnrichment(uids);
+  }
+
+  /**
    * Re-runs profile enrichment for a member even if already enriched. There is no
    * candidate-column staging in this pipeline (unlike TeamEnrichment), so force always
    * means the same thing: re-check each field's current DB emptiness and fill gaps —

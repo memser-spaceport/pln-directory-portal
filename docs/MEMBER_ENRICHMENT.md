@@ -5,10 +5,13 @@
 Automated, periodic gap-filling for Directory member profiles: **social handles**
 (LinkedIn, Twitter/X, GitHub, Telegram, Bluesky), **primary team/role**, **work history**,
 **bio**, **email**, and **skills**. Sourced from the member's own LinkedIn (or, when no
-LinkedIn handle is on file, X/Twitter) profile via ScrapingDog, a free CRM lookup for
-email, and — only for social handles ScrapingDog can't source — a narrow, identity-gated
-AI web search. A daily marking cron finds newly-eligible members; an hourly cron processes
-the pending queue.
+LinkedIn handle is on file, X/Twitter) profile via ScrapingDog — or, for a Coresignal-eligible
+subset of high-value members, Coresignal's Clean Employee API instead, falling back to
+ScrapingDog when Coresignal has nothing usable (see [Coresignal source](#coresignal-source)
+below) — a free CRM lookup for email, and — only for social handles neither provider can source
+— a narrow, identity-gated AI web search. A daily marking cron finds newly-eligible members; an
+hourly cron processes the pending queue, at most `MEMBER_ENRICHMENT_CONCURRENCY` members at a
+time (see [Bulk processing](#bulk-processing--concurrency) below).
 
 **Fill-gaps-only, no exceptions.** Every field is only written when it is currently empty.
 A pre-existing value — set by the member, an admin, or a prior import — is never
@@ -75,11 +78,12 @@ interface MemberDataEnrichment {
     | 'linkedinHandler' | 'twitterHandler' | 'githubHandler' | 'telegramHandler' | 'blueskyHandler',
   {
     status: 'Enriched' | 'ChangedByUser' | 'CannotEnrich';
-    source?: 'linkedin-experience' | 'linkedin-profile' | 'x-profile' | 'affinity-crm' | 'ai';
+    source?: 'linkedin-experience' | 'linkedin-profile' | 'x-profile' | 'affinity-crm' | 'ai' | 'coresignal';
     lastModifiedAt?: string;  // ISO
     note?: string;            // short reason, populated on CannotEnrich
   }>>;
   scrapingDog?: { used: boolean; fetchedAt?: string; source?: 'linkedin' | 'x' };
+  coresignal?: { used: boolean; fetchedAt?: string; fellBackToScrapingDog?: boolean };
 }
 ```
 
@@ -127,9 +131,13 @@ Per member, **at most one** ScrapingDog call and **at most one** AI social-handl
    search safely; per field, a result is only accepted at `confidence: 'high'` — anything
    else is `CannotEnrich`. `discordHandler` is never requested (no crawlable public profile
    to verify a match against).
-1. **Fetch** — `MemberScrapingDogService.fetchPersonProfile(linkedinHandler)` if the member
-   has a LinkedIn handle (possibly one step 0 just found), else `fetchXProfile(...)` if they
-   have an X/Twitter handle, else skip (no source data at all).
+1. **Fetch** — for a [Coresignal-eligible](#coresignal-source) member (when
+   `MEMBER_ENRICHMENT_CORESIGNAL_ENABLED`), `CoresignalService.fetchEmployeeProfile(linkedinHandler)`
+   is tried first; if it returns a profile with at least one experience entry, that profile is
+   used and ScrapingDog is skipped entirely. Otherwise (not Coresignal-eligible, disabled, or
+   Coresignal had nothing usable) — `MemberScrapingDogService.fetchPersonProfile(linkedinHandler)`
+   if the member has a LinkedIn handle (possibly one step 0 just found), else `fetchXProfile(...)`
+   if they have an X/Twitter handle, else skip (no source data at all).
 2. **email** (resolved first — skills needs it) — if empty, look up
    `AffinityPerson.primaryEmail` via `MasterProfile` (same join `resolveMemberPronouns`'s
    CRM branch already uses for gender, just a different field). Skipped if that email is
@@ -168,6 +176,66 @@ Per member, **at most one** ScrapingDog call and **at most one** AI social-handl
 > than widen that shared, already-tested normalizer, primary-team matching uses the
 > company **name** instead — see step 3 above.
 
+## Coresignal source
+
+`apps/web-api/src/coresignal/` is a standalone module (no dependency on `member-enrichment/` or
+`husky/`) so a future Team Enrichment change can adopt it too. `CoresignalService.fetchEmployeeProfile`
+calls Coresignal's **Clean Employee API** `/collect` endpoint directly by LinkedIn shorthand
+name/URL — never `/search` — since `/collect` costs 10 credits per successful call while
+`/search` is free but only returns a preview subset (no full experience), so calling `/collect`
+directly (skipping search) is the lowest-cost correct usage when the caller already has the
+person's LinkedIn identifier, which member-enrichment always does. Clean was chosen over
+Coresignal's pricier Multi-source Employee API (20 credits) deliberately: Multi-source's extra
+value is an "AI-enriched" cross-source aggregation layer, and this pipeline already runs its own
+AI enrichment/judgment on top of whatever a provider returns, so that extra aggregation isn't
+worth double the cost. The raw Coresignal response (Clean's `experience[]` entries use `title` +
+`date_from_year`/`date_from_month` + an `is_current` flag) is normalized into the exact same shape
+`MemberScrapingDogService.fetchPersonProfile` already returns (a single "Mon YYYY" `startsAt`/
+`endsAt` string pair), so `member-enrichment-team-match.util.ts` and
+`member-enrichment-experience.util.ts` need no provider-specific branching.
+
+**Coresignal-eligible subset.** Only members who belong to a fund team (`Team.isFund: true`) or
+are a team lead/founder (`TeamMemberRole.teamLead: true` or a `role` containing "founder" — the
+same predicate the marking job uses to order founders/leads first) are ever looked up via
+Coresignal — everyone else stays ScrapingDog-only, unchanged
+(`member-enrichment-coresignal-eligibility.util.ts`). This bounds Coresignal spend to a small,
+high-value slice of the population; a Clean Employee API `/collect` call still costs more than a
+ScrapingDog person-profile call.
+
+**Fallback.** If Coresignal returns not-found, an error, or a profile with no experience entries,
+the pipeline falls through to the existing ScrapingDog fetch for that member in the same run — a
+member is never left unenriched purely because Coresignal had no data for them. At most one
+Coresignal call and, only on fallback, at most one ScrapingDog call happen per member per run —
+never both unconditionally.
+
+Field-level provenance is unaffected by which provider actually answered: `fieldsMeta[field].source`
+is stamped `'coresignal'` when a Coresignal-sourced profile filled that field, or the existing
+ScrapingDog/CRM/AI source values otherwise — so a member whose work history came from Coresignal
+but whose primary team/role came from an earlier ScrapingDog run keeps both attributions
+independently. The `coresignal` snapshot (`used`, `fetchedAt`, `fellBackToScrapingDog`) records
+whether Coresignal was attempted for a given member and whether it fell back.
+
+## Bulk processing & concurrency
+
+Bulk enrichment paths — the hourly cron and the `trigger-profile-enrichment` "all pending" admin
+endpoint — run at most `MEMBER_ENRICHMENT_CONCURRENCY` enrichment pipelines concurrently (default
+`5`), using the same `p-limit`-throttled-batch pattern `TEAM_ENRICHMENT_JUDGE_CONCURRENCY` already
+uses for team judgment: without a cap, a batch of N pending members would fire N concurrent
+outbound ScrapingDog/Coresignal/AI calls at once, risking the same connection-pool starvation PR
+#3361 fixed on the team-judgment side. The hourly cron awaits the whole throttled batch before its
+tick ends (so its running/idle state is honest); the "all pending" admin endpoint dispatches the
+throttled batch detached and returns immediately, so the HTTP call doesn't block on however long a
+large batch takes.
+
+`POST /v1/admin/members/trigger-force-profile-enrichment-bulk` accepts an explicit list of member
+uids (`{ uids: string[] }`) and marks each for force re-enrichment — the same "force" semantics as
+the single-member force-trigger endpoint, applied per-uid. It only marks; it does not run the
+pipeline itself. The marked members are picked up and processed (concurrency-bounded, as above) by
+the existing hourly enrichment cron on its normal schedule. Use this to re-enrich a hand-picked
+list (e.g. newly-important fund/team-lead members) without waiting for the daily marking cron's
+eligibility filter to notice them. A supplied uid that doesn't match an existing member is
+reported back rather than silently ignored; a member already `InProgress` is left untouched.
+
 ## Cron & environment variables
 
 | Variable | Default | Purpose |
@@ -179,7 +247,11 @@ Per member, **at most one** ScrapingDog call and **at most one** AI social-handl
 | `MEMBER_ENRICHMENT_STUCK_TTL_MINUTES` | `180` | stale-`InProgress` self-heal (pod killed mid-run), same mechanism as `TEAM_ENRICHMENT_STUCK_TTL_MINUTES` |
 | `MEMBER_ENRICHMENT_FILTER_PRIORITY` | `1,2,3` | eligibility — see above |
 | `MEMBER_ENRICHMENT_FILTER_IS_FUND` | `true` | eligibility — see above |
+| `MEMBER_ENRICHMENT_CONCURRENCY` | `5` | max concurrent enrichment pipelines for bulk processing paths — see [Bulk processing](#bulk-processing--concurrency) |
 | `SCRAPINGDOG_API_KEY` | — | shared with team enrichment / bio generation. When unset, ScrapingDog is skipped and only the email/skills-from-CRM paths can still fill gaps |
+| `MEMBER_ENRICHMENT_CORESIGNAL_ENABLED` | `false` | gates Coresignal for Coresignal-eligible members — see [Coresignal source](#coresignal-source). Independent of `IS_MEMBER_ENRICHMENT_ENABLED` |
+| `CORESIGNAL_API_KEY` | — | Coresignal API key. When unset, Coresignal is skipped entirely (same as ScrapingDog-unset behavior) |
+| `CORESIGNAL_TIMEOUT_MS` | `15000` | Coresignal request timeout |
 | `HUSKY_GENERATION_AI_PROVIDER` | `gemini` | provider for the step-0 social-handle AI search — shared with bio generation, no dedicated env var |
 
 ## Admin endpoints
@@ -189,6 +261,7 @@ GET  /v1/admin/members/profile-enrichment/status
 POST /v1/admin/members/:uid/trigger-profile-enrichment
 POST /v1/admin/members/trigger-profile-enrichment
 POST /v1/admin/members/:uid/trigger-force-profile-enrichment
+POST /v1/admin/members/trigger-force-profile-enrichment-bulk
 ```
 
 All guarded by `AdminAuthGuard`. Automation via cron is the primary interface (per the
@@ -207,6 +280,10 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$WEB_API_BASE_URL/v1/admin/members/uid-directoryadmin/trigger-force-profile-enrichment"
+
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"uids": ["uid-directoryadmin", "uid-anothermember"]}' \
+  "$WEB_API_BASE_URL/v1/admin/members/trigger-force-profile-enrichment-bulk"
 ```
 
 ## Module structure
@@ -214,13 +291,19 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
 ```
 apps/web-api/src/member-enrichment/
   member-enrichment.types.ts                    # EnrichmentStatus, FieldEnrichmentStatus, EnrichmentSource, MemberDataEnrichment
-  member-enrichment-eligibility-filter.ts        # investor / fund-team / priority-team OR filter
-  member-enrichment-team-match.util.ts           # LinkedIn-experience company name → existing Team
-  member-enrichment-experience.util.ts           # LinkedIn experience[] → missing-vs-existing diff → MemberExperience create inputs
+  member-enrichment-eligibility-filter.ts        # investor / fund-team / priority-team OR filter (general enrichment eligibility)
+  member-enrichment-coresignal-eligibility.util.ts # fund-team / team-lead / founder check (Coresignal-eligible subset)
+  member-enrichment-team-match.util.ts           # LinkedIn/Coresignal-experience company name → existing Team
+  member-enrichment-experience.util.ts           # LinkedIn/Coresignal experience[] → missing-vs-existing diff → MemberExperience create inputs
   member-enrichment-ai.service.ts                # identity-gated AI web search for missing social handles (step 0)
-  member-enrichment.service.ts                   # marking, pending-queue, the enrichment pipeline itself
+  member-enrichment.service.ts                   # marking, pending-queue, the enrichment pipeline itself, bulk/throttled-batch helpers
   member-enrichment.job.ts                       # marking + enrichment @Cron jobs
-  member-enrichment.module.ts                    # imports HuskyModule for MemberScrapingDogService / HuskyGenerationService (AiProviderService comes from the global SharedModule)
+  member-enrichment.module.ts                    # imports HuskyModule (MemberScrapingDogService / HuskyGenerationService) and CoresignalModule
+
+apps/web-api/src/coresignal/
+  coresignal.types.ts                            # CoresignalEmployeeProfile (= ScrapingDogPersonProfile shape), CoresignalFetchResult
+  coresignal.service.ts                          # Clean Employee API /collect client + normalization
+  coresignal.module.ts                           # standalone — no member-enrichment-specific coupling, reusable by a future Team Enrichment change
 ```
 
 Reused as-is from the Husky bio/skills pipeline (see `MEMBER_BIO_GENERATION.md`):
@@ -230,17 +313,27 @@ Reused as-is from the Husky bio/skills pipeline (see `MEMBER_BIO_GENERATION.md`)
 
 ## Testing
 
-Unit specs cover the pure/mockable logic (eligibility filter, team-name matching, the
-per-field pipeline orchestration) with no real network calls:
+Unit specs cover the pure/mockable logic (eligibility filters, team-name matching, the
+per-field pipeline orchestration, Coresignal client normalization, bulk/throttled-batch
+behavior) with no real network calls:
 
 ```bash
 yarn nx run web-api:test --testFile=apps/web-api/src/member-enrichment/member-enrichment-eligibility-filter.spec.ts
+yarn nx run web-api:test --testFile=apps/web-api/src/member-enrichment/member-enrichment-coresignal-eligibility.util.spec.ts
 yarn nx run web-api:test --testFile=apps/web-api/src/member-enrichment/member-enrichment-team-match.util.spec.ts
 yarn nx run web-api:test --testFile=apps/web-api/src/member-enrichment/member-enrichment-experience.util.spec.ts
 yarn nx run web-api:test --testFile=apps/web-api/src/member-enrichment/member-enrichment.service.spec.ts
+yarn nx run web-api:test --testFile=apps/web-api/src/coresignal/coresignal.service.spec.ts
 ```
 
-ScrapingDog is a paid, real API — there is no CI-run end-to-end test against it, same
-precedent as team-enrichment's `bench-judge.ts`. Verify manually via the admin trigger
-endpoints against a real member, and check ScrapingDog spend stays within expectations
-(one call per member per run).
+ScrapingDog and Coresignal are both paid, real APIs — there is no CI-run end-to-end test against
+either, same precedent as team-enrichment's `bench-judge.ts`. Verify manually via the admin
+trigger endpoints against a real member, and check spend stays within expectations (at most one
+ScrapingDog call and, for Coresignal-eligible members, at most one Coresignal call per member per
+run).
+
+`apps/web-api/src/admin/member.controller.ts` has no unit spec: it transitively imports
+ESM-only packages (`axios`, `ai`/`@ai-sdk/*`) this repo's Jest config can't parse, matching the
+existing zero-controller-spec precedent across `apps/web-api/src/admin/*`. Its thin
+validation-then-delegate endpoints are covered via the service-level specs above plus manual
+verification.

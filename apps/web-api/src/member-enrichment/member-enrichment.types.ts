@@ -22,6 +22,7 @@ export enum EnrichmentSource {
   XProfile = 'x-profile',
   AffinityCrm = 'affinity-crm',
   AI = 'ai',
+  Coresignal = 'coresignal',
 }
 
 /** The gap-fillable member fields this pipeline can enrich. */
@@ -54,6 +55,18 @@ export interface MemberScrapingDogUsage {
   source?: 'linkedin' | 'x';
 }
 
+/**
+ * Coresignal usage snapshot, mirroring `MemberScrapingDogUsage`'s shape.
+ * `fellBackToScrapingDog` is only meaningful when `used` is true — it records
+ * whether the Coresignal lookup came back empty/erroring and the pipeline
+ * fell through to ScrapingDog for this member in the same run.
+ */
+export interface MemberCoresignalUsage {
+  used: boolean;
+  fetchedAt?: string;
+  fellBackToScrapingDog?: boolean;
+}
+
 export interface MemberEnrichmentUsageEntry {
   runs: number;
   lastRunAt: string;
@@ -68,6 +81,7 @@ export interface MemberDataEnrichment {
   errorMessage?: string;
   fieldsMeta: Partial<Record<MemberEnrichableField, MemberFieldEnrichmentMeta>>;
   scrapingDog?: MemberScrapingDogUsage;
+  coresignal?: MemberCoresignalUsage;
   usage?: {
     bio?: MemberEnrichmentUsageEntry;
     skills?: MemberEnrichmentUsageEntry;
