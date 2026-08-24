@@ -9,7 +9,7 @@ import { HuskyGenerationService } from '../husky/husky-generation.service';
 import { CoresignalService } from '../coresignal/coresignal.service';
 import { HUSKY_BIO_DISCLAIMER } from '../utils/ai-prompts';
 import { buildMemberEnrichmentEligibilityFilter } from './member-enrichment-eligibility-filter';
-import { isCoresignalEligibleMember } from './member-enrichment-coresignal-eligibility.util';
+import { isHighValueMemberForCoresignal } from './member-enrichment-coresignal-value-tier.util';
 import { matchTeamFromCompanyName } from './member-enrichment-team-match.util';
 import { buildMemberExperienceInputs, selectMissingExperiences } from './member-enrichment-experience.util';
 import {
@@ -24,6 +24,7 @@ import {
   MemberDataEnrichment,
   MemberFieldEnrichmentMeta,
   MemberEnrichableField,
+  MemberEnrichmentSourcePreference,
 } from './member-enrichment.types';
 
 /** Fields needed by generateMemberBioText / resolveMemberPronouns / generateMemberSkills's prompt, plus our own gap checks. */
@@ -41,6 +42,7 @@ const MEMBER_ENRICHMENT_SELECT: Prisma.MemberSelect = {
   telegramHandler: true,
   blueskyHandler: true,
   isInvestor: true,
+  accessLevel: true,
   skills: { select: { uid: true, title: true } },
   teamMemberRoles: {
     select: {
@@ -48,7 +50,7 @@ const MEMBER_ENRICHMENT_SELECT: Prisma.MemberSelect = {
       mainTeam: true,
       role: true,
       teamLead: true,
-      team: { select: { uid: true, name: true, isFund: true } },
+      team: { select: { uid: true, name: true, isFund: true, priority: true } },
     },
   },
   projectContributions: { include: { project: true } },
@@ -71,6 +73,7 @@ type MemberForEnrichment = Prisma.MemberGetPayload<{
     telegramHandler: true;
     blueskyHandler: true;
     isInvestor: true;
+    accessLevel: true;
     skills: { select: { uid: true; title: true } };
     teamMemberRoles: {
       select: {
@@ -78,7 +81,7 @@ type MemberForEnrichment = Prisma.MemberGetPayload<{
         mainTeam: true;
         role: true;
         teamLead: true;
-        team: { select: { uid: true; name: true; isFund: true } };
+        team: { select: { uid: true; name: true; isFund: true; priority: true } };
       };
     };
     projectContributions: { include: { project: true } };
@@ -254,12 +257,18 @@ export class MemberEnrichmentService {
     return { started: prepared.length, skipped };
   }
 
-  private buildForceEnrichmentUpdate(existing: MemberDataEnrichment | null): MemberDataEnrichment {
+  private buildForceEnrichmentUpdate(
+    existing: MemberDataEnrichment | null,
+    source: MemberEnrichmentSourcePreference = 'auto'
+  ): MemberDataEnrichment {
     return {
       ...(existing ?? {}),
       shouldEnrich: true,
       status: EnrichmentStatus.PendingEnrichment,
       fieldsMeta: existing?.fieldsMeta ?? {},
+      // Always set explicitly (not merged) so a re-trigger's requested source fully replaces
+      // any prior override rather than leaving stale state from an earlier force-trigger call.
+      preferredSource: source,
     };
   }
 
@@ -269,15 +278,23 @@ export class MemberEnrichmentService {
    * hourly enrichment cron (concurrency-bounded via `runEnrichmentBatch`) picks these up on its
    * normal schedule. Lets an admin hand-pick a list of "valuable" members to re-enrich without
    * waiting on the daily eligibility-marking cron to rediscover them.
+   *
+   * `source` lets the caller force a specific provider for this list (`'coresignal'` or
+   * `'scrapingdog'`), overriding the `isHighValueMemberForCoresignal` default; `'auto'`
+   * (the default) defers to that heuristic per-member, same as the regular pipeline.
    */
   async markMembersForForceEnrichment(
-    memberUids: string[]
+    memberUids: string[],
+    source: MemberEnrichmentSourcePreference = 'auto'
   ): Promise<{ total: number; marked: number; skipped: number; notFound: string[] }> {
+    // Dedupe defensively regardless of caller — a repeated uid must not be marked (and
+    // counted) twice.
+    const uniqueUids = Array.from(new Set(memberUids));
     const notFound: string[] = [];
     let marked = 0;
     let skipped = 0;
 
-    for (const memberUid of memberUids) {
+    for (const memberUid of uniqueUids) {
       const member = await this.prisma.member.findUnique({ where: { uid: memberUid }, select: { uid: true } });
       if (!member) {
         notFound.push(memberUid);
@@ -291,14 +308,14 @@ export class MemberEnrichmentService {
         continue;
       }
 
-      await this.upsertEnrichmentRow(memberUid, this.buildForceEnrichmentUpdate(existing));
+      await this.upsertEnrichmentRow(memberUid, this.buildForceEnrichmentUpdate(existing, source));
       marked++;
     }
 
     this.logger.log(
-      `Bulk force-enrichment: marked ${marked}/${memberUids.length} member(s) (${skipped} already in progress, ${notFound.length} not found)`
+      `Bulk force-enrichment: marked ${marked}/${uniqueUids.length} member(s) (source=${source}, ${skipped} already in progress, ${notFound.length} not found)`
     );
-    return { total: memberUids.length, marked, skipped, notFound };
+    return { total: uniqueUids.length, marked, skipped, notFound };
   }
 
   async enrichMember(memberUid: string, enrichedBy = 'system-cron'): Promise<{ status: 'started' | 'in_progress' }> {
@@ -323,10 +340,15 @@ export class MemberEnrichmentService {
    * field's current DB emptiness and fill whatever is still a gap. There is no separate
    * "cannotEnrich-only" mode to offer — an unfilled field IS empty in the DB by
    * definition, so it is always retried; a filled field is never overwritten, force or not.
+   *
+   * `source` forces a specific provider (`'coresignal'` or `'scrapingdog'`) for this member,
+   * overriding the `isHighValueMemberForCoresignal` default; `'auto'` (the default) defers to
+   * that heuristic.
    */
   async forceEnrichMember(
     memberUid: string,
-    enrichedBy = 'manually'
+    enrichedBy = 'manually',
+    source: MemberEnrichmentSourcePreference = 'auto'
   ): Promise<{ status: 'started' | 'in_progress' | 'not_found' }> {
     const member = await this.prisma.member.findUnique({ where: { uid: memberUid }, select: { uid: true } });
     if (!member) return { status: 'not_found' };
@@ -337,8 +359,8 @@ export class MemberEnrichmentService {
       return { status: 'in_progress' };
     }
 
-    await this.upsertEnrichmentRow(memberUid, this.buildForceEnrichmentUpdate(existing));
-    this.logger.log(`Force-enrichment queued for member ${memberUid}`);
+    await this.upsertEnrichmentRow(memberUid, this.buildForceEnrichmentUpdate(existing, source));
+    this.logger.log(`Force-enrichment queued for member ${memberUid} (source=${source})`);
 
     this.doEnrichMember(memberUid, enrichedBy).catch((err) => {
       this.logger.error(`Background force-enrichment failed for member ${memberUid}: ${err.message}`, err.stack);
@@ -449,20 +471,27 @@ export class MemberEnrichmentService {
         }
       }
 
-      // 1. Fetch a profile once — Coresignal first for Coresignal-eligible members (fund-team
-      // or team-lead/founder, when MEMBER_ENRICHMENT_CORESIGNAL_ENABLED), ScrapingDog
-      // otherwise or as a fallback when Coresignal has nothing usable — reused across the
-      // primaryTeamRole match and the bio context below. May use a handle found in step 0.
+      // 1. Fetch a profile once — Coresignal first (when MEMBER_ENRICHMENT_CORESIGNAL_ENABLED),
+      // ScrapingDog otherwise or as a fallback when Coresignal has nothing usable — reused
+      // across the primaryTeamRole match and the bio context below. May use a handle found in
+      // step 0. Whether Coresignal is even attempted for this member is decided by
+      // `preferredSource` (set on `dataEnrichment` by trigger-force-profile-enrichment(-bulk)'s
+      // `source` param): `'scrapingdog'` skips Coresignal outright, `'coresignal'` always
+      // attempts it, and the default `'auto'` (or absent, e.g. members marked by the regular
+      // eligibility cron) defers to `isHighValueMemberForCoresignal` — Coresignal by default for
+      // high-value members (accessLevel L5/L6, team lead, founder, fund team, high-priority
+      // team), ScrapingDog by default for everyone else. Whichever provider is skipped or fails
+      // still has the other as a safety net — see the fallback logic below.
       let personProfile: ScrapingDogPersonProfile | null = null;
       let scrapedContext: string | null = null;
 
       const coresignalEnabled = (process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED?.toLowerCase() ?? 'false') === 'true';
-      if (
-        coresignalEnabled &&
-        member.linkedinHandler &&
-        isCoresignalEligibleMember(member) &&
-        this.coresignal.isConfigured()
-      ) {
+      const preferredSource: MemberEnrichmentSourcePreference = existingMeta?.preferredSource ?? 'auto';
+      const shouldTryCoresignal =
+        preferredSource !== 'scrapingdog' &&
+        (preferredSource === 'coresignal' || isHighValueMemberForCoresignal(member));
+
+      if (coresignalEnabled && shouldTryCoresignal && member.linkedinHandler && this.coresignal.isConfigured()) {
         coresignalAttempted = true;
         const result = await this.coresignal.fetchEmployeeProfile(member.linkedinHandler);
         if (result.kind === 'ok' && result.profile.experiences.length > 0) {
@@ -539,21 +568,34 @@ export class MemberEnrichmentService {
         : [];
       const experienceInputs = buildMemberExperienceInputs(missingExperiences, member.uid);
       if (experienceInputs.length > 0) {
+        let insertedCount = 0;
         for (const input of experienceInputs) {
           try {
             await this.prisma.memberExperience.create({ data: input });
+            insertedCount++;
           } catch (error) {
             this.logger.warn(
               `Failed to insert MemberExperience for ${member.uid} (${input.company}): ${error.message}`
             );
           }
         }
-        stamp(
-          'workHistory',
-          FieldEnrichmentStatus.Enriched,
-          experienceSource,
-          `added ${experienceInputs.length} new position(s) from ${coresignalUsed ? 'Coresignal' : 'LinkedIn'}`
-        );
+        // Note reports what was actually inserted, not the candidate count — a per-row
+        // create() failure (e.g. a constraint violation) must not overstate what landed.
+        if (insertedCount > 0) {
+          stamp(
+            'workHistory',
+            FieldEnrichmentStatus.Enriched,
+            experienceSource,
+            `added ${insertedCount} new position(s) from ${coresignalUsed ? 'Coresignal' : 'LinkedIn'}`
+          );
+        } else {
+          stamp(
+            'workHistory',
+            FieldEnrichmentStatus.CannotEnrich,
+            undefined,
+            'all candidate position(s) failed to insert'
+          );
+        }
       } else if (member.experiences.length > 0) {
         stampPreexisting('workHistory');
       } else {

@@ -82,6 +82,7 @@ function buildMember(overrides: Partial<any> = {}) {
     telegramHandler: null,
     blueskyHandler: null,
     isInvestor: true,
+    accessLevel: null,
     skills: [],
     teamMemberRoles: [],
     projectContributions: [],
@@ -428,6 +429,116 @@ describe('MemberEnrichmentService', () => {
       expect(savedMeta.update.dataEnrichment.fieldsMeta.workHistory.status).toBe(FieldEnrichmentStatus.Enriched);
     });
 
+    it('reports the actual inserted count (not the candidate count) when a MemberExperience create fails partway', async () => {
+      const member = buildMember({
+        linkedinHandler: 'jane-doe',
+        bio: 'existing bio',
+        email: 'jane@example.com',
+        skills: [{ uid: 's1', title: 'X' }],
+        experiences: [],
+      });
+      const prisma = buildPrismaMock(member);
+      prisma.memberExperience.create = jest
+        .fn()
+        .mockResolvedValueOnce({})
+        .mockRejectedValueOnce(new Error('constraint violation'));
+      const scrapingDog = buildScrapingDogMock({
+        fetchPersonProfile: jest.fn().mockResolvedValue({
+          kind: 'ok',
+          profile: {
+            fullName: 'Jane Doe',
+            headline: null,
+            about: null,
+            location: null,
+            education: [],
+            experiences: [
+              {
+                title: 'CTO',
+                company: 'Acme Robotics',
+                location: null,
+                duration: null,
+                summary: null,
+                startsAt: 'Oct 2024',
+                endsAt: 'Present',
+              },
+              {
+                title: 'Engineer',
+                company: 'Beta Corp',
+                location: null,
+                duration: null,
+                summary: null,
+                startsAt: 'Jan 2018',
+                endsAt: 'Dec 2020',
+              },
+            ],
+          },
+        }),
+      });
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        scrapingDog as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService,
+        buildCoresignalMock() as unknown as CoresignalService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(prisma.memberExperience.create).toHaveBeenCalledTimes(2);
+      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.workHistory).toMatchObject({
+        status: FieldEnrichmentStatus.Enriched,
+        note: 'added 1 new position(s) from LinkedIn',
+      });
+    });
+
+    it('marks workHistory CannotEnrich (not Enriched) when every candidate MemberExperience insert fails', async () => {
+      const member = buildMember({
+        linkedinHandler: 'jane-doe',
+        bio: 'existing bio',
+        email: 'jane@example.com',
+        skills: [{ uid: 's1', title: 'X' }],
+        experiences: [],
+      });
+      const prisma = buildPrismaMock(member);
+      prisma.memberExperience.create = jest.fn().mockRejectedValue(new Error('db down'));
+      const scrapingDog = buildScrapingDogMock({
+        fetchPersonProfile: jest.fn().mockResolvedValue({
+          kind: 'ok',
+          profile: {
+            fullName: 'Jane Doe',
+            headline: null,
+            about: null,
+            location: null,
+            education: [],
+            experiences: [
+              {
+                title: 'CTO',
+                company: 'Acme Robotics',
+                location: null,
+                duration: null,
+                summary: null,
+                startsAt: 'Oct 2024',
+                endsAt: 'Present',
+              },
+            ],
+          },
+        }),
+      });
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        scrapingDog as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService,
+        buildCoresignalMock() as unknown as CoresignalService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      const [savedMeta] = prisma.memberEnrichment.upsert.mock.calls.at(-1);
+      expect(savedMeta.update.dataEnrichment.fieldsMeta.workHistory.status).toBe(FieldEnrichmentStatus.CannotEnrich);
+    });
+
     it('adds only the LinkedIn positions missing from an existing partial history, leaving the existing row untouched', async () => {
       const member = buildMember({
         linkedinHandler: 'jane-doe',
@@ -741,21 +852,17 @@ describe('MemberEnrichmentService', () => {
       else process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = ORIGINAL_CORESIGNAL_ENABLED;
     });
 
-    const fundEligibleMember = (overrides: Partial<any> = {}) =>
+    // High-value by default (accessLevel L5) so these fetch/fallback-mechanics tests exercise
+    // Coresignal via the 'auto' default without needing to also test the value-tier heuristic
+    // here — that heuristic has its own dedicated spec
+    // (member-enrichment-coresignal-value-tier.util.spec.ts).
+    const coresignalCandidateMember = (overrides: Partial<any> = {}) =>
       buildMember({
         linkedinHandler: 'jane-doe',
         bio: 'existing bio',
         email: 'jane@example.com',
         skills: [{ uid: 's1', title: 'X' }],
-        teamMemberRoles: [
-          {
-            teamUid: 'team-1',
-            mainTeam: true,
-            role: 'Engineer',
-            teamLead: false,
-            team: { uid: 'team-1', name: 'Acme', isFund: true },
-          },
-        ],
+        accessLevel: 'L5',
         ...overrides,
       });
 
@@ -783,7 +890,7 @@ describe('MemberEnrichmentService', () => {
 
     it('does not attempt Coresignal when MEMBER_ENRICHMENT_CORESIGNAL_ENABLED is unset (default off)', async () => {
       delete process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED;
-      const member = fundEligibleMember({ experiences: [] });
+      const member = coresignalCandidateMember({ experiences: [] });
       const prisma = buildPrismaMock(member);
       const scrapingDog = buildScrapingDogMock({
         fetchPersonProfile: jest.fn().mockResolvedValue({
@@ -819,24 +926,27 @@ describe('MemberEnrichmentService', () => {
       });
     });
 
-    it('does not attempt Coresignal for a member who is neither fund-team nor lead/founder, even when enabled', async () => {
+    it('does not attempt Coresignal when the member has no linkedinHandler, even when enabled', async () => {
       process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
-      const member = buildMember({
-        linkedinHandler: 'jane-doe',
-        bio: 'existing bio',
-        email: 'jane@example.com',
-        skills: [{ uid: 's1', title: 'X' }],
-        experiences: [],
-        teamMemberRoles: [
-          {
-            teamUid: 'team-1',
-            mainTeam: true,
-            role: 'Engineer',
-            teamLead: false,
-            team: { uid: 'team-1', name: 'Acme', isFund: false },
-          },
-        ],
-      });
+      const member = coresignalCandidateMember({ linkedinHandler: null, experiences: [] });
+      const prisma = buildPrismaMock(member);
+      const coresignal = buildCoresignalMock();
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        buildScrapingDogMock() as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService,
+        coresignal as unknown as CoresignalService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(coresignal.fetchEmployeeProfile).not.toHaveBeenCalled();
+    });
+
+    it('does not attempt Coresignal when it is not configured, even when enabled', async () => {
+      process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
+      const member = coresignalCandidateMember({ experiences: [] });
       const prisma = buildPrismaMock(member);
       const scrapingDog = buildScrapingDogMock({
         fetchPersonProfile: jest.fn().mockResolvedValue({
@@ -851,7 +961,7 @@ describe('MemberEnrichmentService', () => {
           },
         }),
       });
-      const coresignal = buildCoresignalMock();
+      const coresignal = buildCoresignalMock({ isConfigured: jest.fn().mockReturnValue(false) });
       const service = new MemberEnrichmentService(
         prisma as unknown as PrismaService,
         scrapingDog as unknown as MemberScrapingDogService,
@@ -866,9 +976,9 @@ describe('MemberEnrichmentService', () => {
       expect(scrapingDog.fetchPersonProfile).toHaveBeenCalledTimes(1);
     });
 
-    it('uses Coresignal for a fund-team-eligible member and skips ScrapingDog when Coresignal succeeds', async () => {
+    it('uses Coresignal for any member with a linkedinHandler when enabled — no separate subset gate', async () => {
       process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
-      const member = fundEligibleMember({ experiences: [] });
+      const member = coresignalCandidateMember({ experiences: [] });
       const prisma = buildPrismaMock(member);
       const scrapingDog = buildScrapingDogMock();
       const coresignal = buildCoresignalMock({ fetchEmployeeProfile: jest.fn().mockResolvedValue(coresignalOkResult) });
@@ -897,42 +1007,9 @@ describe('MemberEnrichmentService', () => {
       });
     });
 
-    it('is also eligible via team-lead status alone (no fund team required)', async () => {
-      process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
-      const member = buildMember({
-        linkedinHandler: 'jane-doe',
-        bio: 'existing bio',
-        email: 'jane@example.com',
-        skills: [{ uid: 's1', title: 'X' }],
-        experiences: [],
-        teamMemberRoles: [
-          {
-            teamUid: 'team-1',
-            mainTeam: true,
-            role: 'Engineer',
-            teamLead: true,
-            team: { uid: 'team-1', name: 'Acme', isFund: false },
-          },
-        ],
-      });
-      const prisma = buildPrismaMock(member);
-      const coresignal = buildCoresignalMock({ fetchEmployeeProfile: jest.fn().mockResolvedValue(coresignalOkResult) });
-      const service = new MemberEnrichmentService(
-        prisma as unknown as PrismaService,
-        buildScrapingDogMock() as unknown as MemberScrapingDogService,
-        buildHuskyMock() as unknown as HuskyGenerationService,
-        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService,
-        coresignal as unknown as CoresignalService
-      );
-
-      await (service as any).doEnrichMember(member.uid, 'test');
-
-      expect(coresignal.fetchEmployeeProfile).toHaveBeenCalledWith('jane-doe');
-    });
-
     it('falls back to ScrapingDog when Coresignal reports not-found, and does not mark FailedToEnrich', async () => {
       process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
-      const member = fundEligibleMember({ experiences: [] });
+      const member = coresignalCandidateMember({ experiences: [] });
       const prisma = buildPrismaMock(member);
       const scrapingDog = buildScrapingDogMock({
         fetchPersonProfile: jest.fn().mockResolvedValue({
@@ -984,7 +1061,7 @@ describe('MemberEnrichmentService', () => {
 
     it('falls back to ScrapingDog when Coresignal errors, and does not mark FailedToEnrich', async () => {
       process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
-      const member = fundEligibleMember({ experiences: [] });
+      const member = coresignalCandidateMember({ experiences: [] });
       const prisma = buildPrismaMock(member);
       const scrapingDog = buildScrapingDogMock({
         fetchPersonProfile: jest.fn().mockResolvedValue({
@@ -1020,7 +1097,7 @@ describe('MemberEnrichmentService', () => {
 
     it('falls back to ScrapingDog when Coresignal returns a profile with no experience entries', async () => {
       process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
-      const member = fundEligibleMember({ experiences: [] });
+      const member = coresignalCandidateMember({ experiences: [] });
       const prisma = buildPrismaMock(member);
       const scrapingDog = buildScrapingDogMock({
         fetchPersonProfile: jest.fn().mockResolvedValue({
@@ -1065,6 +1142,178 @@ describe('MemberEnrichmentService', () => {
         fetchedAt: undefined,
         fellBackToScrapingDog: true,
       });
+    });
+  });
+
+  describe('doEnrichMember: smart default + source override (value tier)', () => {
+    const ORIGINAL_CORESIGNAL_ENABLED = process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED;
+    afterEach(() => {
+      if (ORIGINAL_CORESIGNAL_ENABLED === undefined) delete process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED;
+      else process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = ORIGINAL_CORESIGNAL_ENABLED;
+    });
+
+    const okCoresignalResult = {
+      kind: 'ok',
+      profile: {
+        fullName: 'Jane Doe',
+        headline: null,
+        about: null,
+        location: null,
+        education: [],
+        experiences: [
+          {
+            title: 'CTO',
+            company: 'Acme Robotics',
+            location: null,
+            duration: null,
+            summary: null,
+            startsAt: 'Oct 2024',
+            endsAt: 'Present',
+          },
+        ],
+      },
+    };
+    const okScrapingDogProfile = {
+      fullName: 'Jane Doe',
+      headline: null,
+      about: null,
+      location: null,
+      experiences: [],
+      education: [],
+    };
+
+    it('"auto" (no preferredSource set): does not attempt Coresignal for an ordinary low-value member', async () => {
+      process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
+      const member = buildMember({
+        linkedinHandler: 'jane-doe',
+        bio: 'existing bio',
+        email: 'jane@example.com',
+        skills: [{ uid: 's1', title: 'X' }],
+        experiences: [],
+        accessLevel: 'L2',
+        teamMemberRoles: [
+          {
+            teamUid: 't1',
+            mainTeam: true,
+            role: 'Engineer',
+            teamLead: false,
+            team: { uid: 't1', name: 'Acme', isFund: false, priority: 99 },
+          },
+        ],
+      });
+      const prisma = buildPrismaMock(member);
+      const scrapingDog = buildScrapingDogMock({
+        fetchPersonProfile: jest.fn().mockResolvedValue({ kind: 'ok', profile: okScrapingDogProfile }),
+      });
+      const coresignal = buildCoresignalMock({ fetchEmployeeProfile: jest.fn().mockResolvedValue(okCoresignalResult) });
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        scrapingDog as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService,
+        coresignal as unknown as CoresignalService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(coresignal.fetchEmployeeProfile).not.toHaveBeenCalled();
+      expect(scrapingDog.fetchPersonProfile).toHaveBeenCalledTimes(1);
+    });
+
+    it('"auto": attempts Coresignal for a high-value member (team lead)', async () => {
+      process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
+      const member = buildMember({
+        linkedinHandler: 'jane-doe',
+        bio: 'existing bio',
+        email: 'jane@example.com',
+        skills: [{ uid: 's1', title: 'X' }],
+        experiences: [],
+        teamMemberRoles: [
+          {
+            teamUid: 't1',
+            mainTeam: true,
+            role: 'Engineer',
+            teamLead: true,
+            team: { uid: 't1', name: 'Acme', isFund: false, priority: 99 },
+          },
+        ],
+      });
+      const prisma = buildPrismaMock(member);
+      const scrapingDog = buildScrapingDogMock();
+      const coresignal = buildCoresignalMock({ fetchEmployeeProfile: jest.fn().mockResolvedValue(okCoresignalResult) });
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        scrapingDog as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService,
+        coresignal as unknown as CoresignalService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(coresignal.fetchEmployeeProfile).toHaveBeenCalledWith('jane-doe');
+      expect(scrapingDog.fetchPersonProfile).not.toHaveBeenCalled();
+    });
+
+    it('source="coresignal" override forces Coresignal even for an ordinary low-value member', async () => {
+      process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
+      const member = buildMember({
+        linkedinHandler: 'jane-doe',
+        bio: 'existing bio',
+        email: 'jane@example.com',
+        skills: [{ uid: 's1', title: 'X' }],
+        experiences: [],
+      });
+      const prisma = buildPrismaMock(member);
+      prisma.memberEnrichment.findUnique.mockResolvedValue({
+        dataEnrichment: { status: EnrichmentStatus.PendingEnrichment, fieldsMeta: {}, preferredSource: 'coresignal' },
+      });
+      const scrapingDog = buildScrapingDogMock();
+      const coresignal = buildCoresignalMock({ fetchEmployeeProfile: jest.fn().mockResolvedValue(okCoresignalResult) });
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        scrapingDog as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService,
+        coresignal as unknown as CoresignalService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(coresignal.fetchEmployeeProfile).toHaveBeenCalledWith('jane-doe');
+      expect(scrapingDog.fetchPersonProfile).not.toHaveBeenCalled();
+    });
+
+    it('source="scrapingdog" override skips Coresignal even for a high-value member', async () => {
+      process.env.MEMBER_ENRICHMENT_CORESIGNAL_ENABLED = 'true';
+      const member = buildMember({
+        linkedinHandler: 'jane-doe',
+        bio: 'existing bio',
+        email: 'jane@example.com',
+        skills: [{ uid: 's1', title: 'X' }],
+        experiences: [],
+        accessLevel: 'L6',
+      });
+      const prisma = buildPrismaMock(member);
+      prisma.memberEnrichment.findUnique.mockResolvedValue({
+        dataEnrichment: { status: EnrichmentStatus.PendingEnrichment, fieldsMeta: {}, preferredSource: 'scrapingdog' },
+      });
+      const scrapingDog = buildScrapingDogMock({
+        fetchPersonProfile: jest.fn().mockResolvedValue({ kind: 'ok', profile: okScrapingDogProfile }),
+      });
+      const coresignal = buildCoresignalMock();
+      const service = new MemberEnrichmentService(
+        prisma as unknown as PrismaService,
+        scrapingDog as unknown as MemberScrapingDogService,
+        buildHuskyMock() as unknown as HuskyGenerationService,
+        buildMemberEnrichmentAiMock() as unknown as MemberEnrichmentAiService,
+        coresignal as unknown as CoresignalService
+      );
+
+      await (service as any).doEnrichMember(member.uid, 'test');
+
+      expect(coresignal.fetchEmployeeProfile).not.toHaveBeenCalled();
+      expect(scrapingDog.fetchPersonProfile).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1258,6 +1507,67 @@ describe('MemberEnrichmentService', () => {
         expect(prisma.memberEnrichment.upsert).toHaveBeenCalledWith(
           expect.objectContaining({ where: { memberUid: 'm1' } })
         );
+      });
+
+      it('dedupes a repeated uid so it is only marked (and counted) once', async () => {
+        const prisma = {
+          member: { findUnique: jest.fn().mockResolvedValue({ uid: 'm1' }) },
+          memberEnrichment: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            upsert: jest.fn().mockResolvedValue({}),
+          },
+        };
+        const service = buildService(prisma);
+
+        const result = await service.markMembersForForceEnrichment(['m1', 'm1', 'm1']);
+
+        expect(result).toEqual({ total: 1, marked: 1, skipped: 0, notFound: [] });
+        expect(prisma.memberEnrichment.upsert).toHaveBeenCalledTimes(1);
+      });
+
+      it('persists the requested source ("coresignal") onto dataEnrichment.preferredSource', async () => {
+        const prisma = {
+          member: { findUnique: jest.fn().mockResolvedValue({ uid: 'm1' }) },
+          memberEnrichment: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            upsert: jest.fn().mockResolvedValue({}),
+          },
+        };
+        const service = buildService(prisma);
+
+        await service.markMembersForForceEnrichment(['m1'], 'coresignal');
+
+        const [call] = prisma.memberEnrichment.upsert.mock.calls;
+        expect(call[0].update.dataEnrichment.preferredSource).toBe('coresignal');
+      });
+
+      it('defaults preferredSource to "auto" when source is not specified', async () => {
+        const prisma = {
+          member: { findUnique: jest.fn().mockResolvedValue({ uid: 'm1' }) },
+          memberEnrichment: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            upsert: jest.fn().mockResolvedValue({}),
+          },
+        };
+        const service = buildService(prisma);
+
+        await service.markMembersForForceEnrichment(['m1']);
+
+        const [call] = prisma.memberEnrichment.upsert.mock.calls;
+        expect(call[0].update.dataEnrichment.preferredSource).toBe('auto');
+      });
+    });
+
+    describe('forceEnrichMember', () => {
+      it('persists the requested source ("scrapingdog") onto dataEnrichment.preferredSource', async () => {
+        const member = buildMember();
+        const prisma = buildPrismaMock(member);
+        const service = buildService(prisma);
+
+        await service.forceEnrichMember(member.uid, 'manually', 'scrapingdog');
+
+        const [call] = prisma.memberEnrichment.upsert.mock.calls;
+        expect(call[0].update.dataEnrichment.preferredSource).toBe('scrapingdog');
       });
     });
   });

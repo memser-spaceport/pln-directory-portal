@@ -27,6 +27,17 @@ import { UpdateMemberRolesAndHostsDto } from './dto/update-member-roles-and-host
 import { MemberBioRefreshService } from '../husky/member-bio-refresh.service';
 import { MemberEnrichmentService } from '../member-enrichment/member-enrichment.service';
 import { MemberEnrichmentJob } from '../member-enrichment/member-enrichment.job';
+import { MemberEnrichmentSourcePreference } from '../member-enrichment/member-enrichment.types';
+
+const MEMBER_ENRICHMENT_SOURCE_VALUES: MemberEnrichmentSourcePreference[] = ['auto', 'coresignal', 'scrapingdog'];
+
+function parseEnrichmentSource(raw: unknown): MemberEnrichmentSourcePreference {
+  if (raw === undefined || raw === null) return 'auto';
+  if (typeof raw === 'string' && (MEMBER_ENRICHMENT_SOURCE_VALUES as string[]).includes(raw)) {
+    return raw as MemberEnrichmentSourcePreference;
+  }
+  throw new BadRequestException(`source must be one of: ${MEMBER_ENRICHMENT_SOURCE_VALUES.join(', ')}`);
+}
 
 @Controller('v1/admin/members')
 export class MemberController {
@@ -125,16 +136,24 @@ export class MemberController {
    * newly-important fund/team-lead members. Only marks; it does not run the pipeline itself. The
    * marked members are picked up and processed (concurrency-bounded) by the existing hourly
    * enrichment cron, same as a single-member force-trigger.
+   *
+   * `source` optionally forces which provider to use for every member in this list:
+   * `'coresignal'` (always try Coresignal first, still falling back to ScrapingDog on failure),
+   * `'scrapingdog'` (never attempt Coresignal for these members), or the default `'auto'`
+   * (per-member value-tier heuristic — see docs/MEMBER_ENRICHMENT.md).
    */
   @Post('trigger-force-profile-enrichment-bulk')
   @UseGuards(AdminAuthGuard)
   @NoCache()
-  async triggerForceProfileEnrichmentBulk(@Body() body: { uids?: string[] }) {
-    const uids = Array.isArray(body?.uids) ? body.uids.filter((u) => typeof u === 'string' && u.trim().length > 0) : [];
+  async triggerForceProfileEnrichmentBulk(@Body() body: { uids?: string[]; source?: string }) {
+    const uids = Array.isArray(body?.uids)
+      ? body.uids.filter((u) => typeof u === 'string' && u.trim().length > 0).map((u) => u.trim())
+      : [];
     if (uids.length === 0) {
       throw new BadRequestException('uids must be a non-empty array of member uids');
     }
-    return this.memberEnrichmentService.markMembersForForceEnrichment(uids);
+    const source = parseEnrichmentSource(body?.source);
+    return this.memberEnrichmentService.markMembersForForceEnrichment(uids, source);
   }
 
   /**
@@ -142,12 +161,16 @@ export class MemberController {
    * candidate-column staging in this pipeline (unlike TeamEnrichment), so force always
    * means the same thing: re-check each field's current DB emptiness and fill gaps —
    * fields that already have a value are never overwritten, force or not.
+   *
+   * `source` optionally forces which provider to use for this member — see
+   * `trigger-force-profile-enrichment-bulk` above for the accepted values.
    */
   @Post(':uid/trigger-force-profile-enrichment')
   @UseGuards(AdminAuthGuard)
   @NoCache()
-  async triggerForceProfileEnrichment(@Param('uid') uid: string) {
-    return this.memberEnrichmentService.forceEnrichMember(uid, 'manually');
+  async triggerForceProfileEnrichment(@Param('uid') uid: string, @Body() body?: { source?: string }) {
+    const source = parseEnrichmentSource(body?.source);
+    return this.memberEnrichmentService.forceEnrichMember(uid, 'manually', source);
   }
 
   @Get(':uid')
