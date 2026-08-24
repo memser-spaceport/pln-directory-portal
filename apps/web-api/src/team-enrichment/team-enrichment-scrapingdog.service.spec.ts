@@ -1,5 +1,8 @@
 import {
   extractSupersedingTwitterHandle,
+  normalizeTeamSizeFromProfile,
+  parseFoundedYear,
+  parseHeadquartersLocation,
   ScrapingDogCompanyProfile,
   ScrapingDogTwitterProfile,
   TeamEnrichmentScrapingDogService,
@@ -24,11 +27,12 @@ describe('TeamEnrichmentScrapingDogService — X/Twitter profile', () => {
 
   // Access the private methods we want to drive in isolation. The class isn't
   // designed for direct unit-testing of the normalize step, so we cast.
-  const asAny = () => service as unknown as {
-    extractTwitterHandle(handle: string): string | null;
-    normalizeTwitterProfile(raw: Record<string, unknown>): ScrapingDogTwitterProfile;
-    isNotFoundBody(raw: unknown): boolean;
-  };
+  const asAny = () =>
+    service as unknown as {
+      extractTwitterHandle(handle: string): string | null;
+      normalizeTwitterProfile(raw: Record<string, unknown>): ScrapingDogTwitterProfile;
+      isNotFoundBody(raw: unknown): boolean;
+    };
 
   describe('extractTwitterHandle', () => {
     it('strips @ from bare handle', () => {
@@ -127,10 +131,7 @@ describe('verifyTwitterProfileMatchesTeam', () => {
   // `twitterHandler = "ScienceCorp_"` flagged uncertain by the AI judge. With X
   // profile data on hand: website host == team.website host → auto-promoted.
   it('ScienceCorp_ canonical case: website host match → verified, single anchor', () => {
-    const v = verifyTwitterProfileMatchesTeam(
-      { name: 'Science', website: 'https://science.xyz' },
-      mkProfile()
-    );
+    const v = verifyTwitterProfileMatchesTeam({ name: 'Science', website: 'https://science.xyz' }, mkProfile());
     expect(v.verified).toBe(true);
     expect(v.anchors).toEqual(['website host match']);
   });
@@ -234,9 +235,10 @@ describe('extractSupersedingTwitterHandle', () => {
   // (human.tech, by Holonym). The user-supplied handle @0xHolonym still resolves
   // on X, but the X bio explicitly identifies the successor account.
   it('extracts handle from "old handle of @X" — the canonical Holonym case', () => {
-    expect(
-      extractSupersedingTwitterHandle('This is the old handle of @humntech', '0xHolonym')
-    ).toEqual({ newHandle: 'humntech', pattern: 'old handle of' });
+    expect(extractSupersedingTwitterHandle('This is the old handle of @humntech', '0xHolonym')).toEqual({
+      newHandle: 'humntech',
+      pattern: 'old handle of',
+    });
   });
 
   it('handles "old account of"', () => {
@@ -328,9 +330,7 @@ describe('extractSupersedingTwitterHandle', () => {
     // X handles are alphanumeric + underscore; the regex stops at the first
     // non-handle char so "@oldco-team" extracts "oldco" but the equality
     // guard against the current handle drops it.
-    expect(
-      extractSupersedingTwitterHandle('Old handle of @oldco-team', 'oldco')
-    ).toBeNull();
+    expect(extractSupersedingTwitterHandle('Old handle of @oldco-team', 'oldco')).toBeNull();
   });
 });
 
@@ -349,6 +349,8 @@ describe('compareProfileToTeam — description fields are positive-only', () => 
     founded: null,
     headquarters: null,
     linkedinInternalId: null,
+    companySize: null,
+    employeeCount: null,
     ...over,
   });
   const team = (over: Partial<TeamSnapshotForCompare> = {}): TeamSnapshotForCompare => ({ name: 'Acme', ...over });
@@ -396,5 +398,179 @@ describe('compareProfileToTeam — description fields are positive-only', () => 
       'exact'
     );
     expect(miss.moreDetails).toBeUndefined();
+  });
+
+  describe('dateFounded', () => {
+    it('emits agrees+high when the LinkedIn founded year matches', () => {
+      const r = service.compareProfileToTeam(
+        team({ dateFounded: 2019 }),
+        baseProfile({ founded: 'Founded in 2019' }),
+        'exact'
+      );
+      expect(r.dateFounded?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(r.dateFounded?.confidence).toBe(FieldConfidence.High);
+    });
+
+    it('emits uncertain+medium when the LinkedIn founded year differs — a real two-source conflict', () => {
+      const r = service.compareProfileToTeam(team({ dateFounded: 2015 }), baseProfile({ founded: '2019' }), 'exact');
+      expect(r.dateFounded?.verdict).toBe(JudgmentVerdict.Uncertain);
+      expect(r.dateFounded?.confidence).toBe(FieldConfidence.Medium);
+    });
+
+    it('emits no verdict when the profile has no founded data', () => {
+      const r = service.compareProfileToTeam(team({ dateFounded: 2019 }), baseProfile(), 'exact');
+      expect(r.dateFounded).toBeUndefined();
+    });
+
+    it('emits no verdict when the team has no dateFounded', () => {
+      const r = service.compareProfileToTeam(team({}), baseProfile({ founded: '2019' }), 'exact');
+      expect(r.dateFounded).toBeUndefined();
+    });
+  });
+
+  describe('location', () => {
+    it('emits agrees+medium when a location token matches LinkedIn headquarters', () => {
+      const r = service.compareProfileToTeam(
+        team({ location: 'San Francisco' }),
+        baseProfile({ headquarters: 'San Francisco, California, United States' }),
+        'exact'
+      );
+      expect(r.location?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(r.location?.confidence).toBe(FieldConfidence.Medium);
+    });
+
+    it('emits uncertain+medium when the location shares no token with headquarters', () => {
+      const r = service.compareProfileToTeam(
+        team({ location: 'Berlin' }),
+        baseProfile({ headquarters: 'San Francisco, California, United States' }),
+        'exact'
+      );
+      expect(r.location?.verdict).toBe(JudgmentVerdict.Uncertain);
+      expect(r.location?.confidence).toBe(FieldConfidence.Medium);
+    });
+
+    it('emits no verdict when the profile has no headquarters data', () => {
+      const r = service.compareProfileToTeam(team({ location: 'Berlin' }), baseProfile(), 'exact');
+      expect(r.location).toBeUndefined();
+    });
+  });
+
+  describe('teamSize — range/band overlap', () => {
+    it('emits agrees+medium when a bare team headcount falls inside the LinkedIn band', () => {
+      const r = service.compareProfileToTeam(
+        team({ teamSize: '30' }),
+        baseProfile({ companySize: '11-50 employees' }),
+        'exact'
+      );
+      expect(r.teamSize?.verdict).toBe(JudgmentVerdict.Agrees);
+      expect(r.teamSize?.confidence).toBe(FieldConfidence.Medium);
+    });
+
+    it('emits agrees+medium when the team range overlaps the LinkedIn band', () => {
+      const r = service.compareProfileToTeam(
+        team({ teamSize: '40-100' }),
+        baseProfile({ companySize: '11-50 employees' }),
+        'exact'
+      );
+      expect(r.teamSize?.verdict).toBe(JudgmentVerdict.Agrees);
+    });
+
+    it('emits uncertain+medium when the team range does not overlap the LinkedIn band', () => {
+      const r = service.compareProfileToTeam(
+        team({ teamSize: '501-1000' }),
+        baseProfile({ companySize: '11-50 employees' }),
+        'exact'
+      );
+      expect(r.teamSize?.verdict).toBe(JudgmentVerdict.Uncertain);
+      expect(r.teamSize?.confidence).toBe(FieldConfidence.Medium);
+    });
+
+    it('prefers the precise employeeCount over a conflicting companySize band', () => {
+      // companySize (501-1000) and employeeCount (50) deliberately disagree with
+      // each other here so the verdict proves which one the comparator actually
+      // used: team.teamSize=50 only overlaps employeeCount, not the band.
+      const r = service.compareProfileToTeam(
+        team({ teamSize: '50' }),
+        baseProfile({ companySize: '501-1000 employees', employeeCount: '50' }),
+        'exact'
+      );
+      expect(r.teamSize?.verdict).toBe(JudgmentVerdict.Agrees);
+    });
+
+    it('handles LinkedIn\'s open-ended top band ("10001+")', () => {
+      const r = service.compareProfileToTeam(
+        team({ teamSize: '50000' }),
+        baseProfile({ companySize: '10,001+ employees' }),
+        'exact'
+      );
+      expect(r.teamSize?.verdict).toBe(JudgmentVerdict.Agrees);
+    });
+
+    it('emits no verdict when the profile has neither companySize nor employeeCount', () => {
+      const r = service.compareProfileToTeam(team({ teamSize: '30' }), baseProfile(), 'exact');
+      expect(r.teamSize).toBeUndefined();
+    });
+  });
+});
+
+describe('normalizeTeamSizeFromProfile — company_size band parsing', () => {
+  it('prefers a precise employeeCount over a companySize band', () => {
+    expect(normalizeTeamSizeFromProfile('11-50 employees', '631,745')).toBe('631745');
+  });
+
+  it('normalizes a mid-range band, stripping the "employees" suffix and commas', () => {
+    expect(normalizeTeamSizeFromProfile('11-50 employees', null)).toBe('11-50');
+  });
+
+  it('normalizes a comma-thousands range band', () => {
+    expect(normalizeTeamSizeFromProfile('5,001-10,000 employees', null)).toBe('5001-10000');
+  });
+
+  it('normalizes the open-ended top band to an "N+" shape', () => {
+    expect(normalizeTeamSizeFromProfile('10,001+ employees', null)).toBe('10001+');
+  });
+
+  it('normalizes a single-value band ("1-10 employees")', () => {
+    expect(normalizeTeamSizeFromProfile('1-10 employees', null)).toBe('1-10');
+  });
+
+  it('returns null when neither field is present', () => {
+    expect(normalizeTeamSizeFromProfile(null, null)).toBeNull();
+  });
+
+  it('returns null on an unparseable companySize band', () => {
+    expect(normalizeTeamSizeFromProfile('a lot of people', null)).toBeNull();
+  });
+});
+
+describe('parseFoundedYear', () => {
+  it('extracts a bare year', () => {
+    expect(parseFoundedYear('2019')).toBe(2019);
+  });
+
+  it('extracts a year from narrative text', () => {
+    expect(parseFoundedYear('Founded in 2015')).toBe(2015);
+  });
+
+  it('returns null when no year is present', () => {
+    expect(parseFoundedYear('unknown')).toBeNull();
+  });
+
+  it('returns null for null input', () => {
+    expect(parseFoundedYear(null)).toBeNull();
+  });
+});
+
+describe('parseHeadquartersLocation', () => {
+  it('takes the city (first segment) from a "City, State, Country" value', () => {
+    expect(parseHeadquartersLocation('San Francisco, California, United States')).toBe('San Francisco');
+  });
+
+  it('falls back to the whole value when there is no comma (country-only)', () => {
+    expect(parseHeadquartersLocation('Argentina')).toBe('Argentina');
+  });
+
+  it('returns null for null input', () => {
+    expect(parseHeadquartersLocation(null)).toBeNull();
   });
 });

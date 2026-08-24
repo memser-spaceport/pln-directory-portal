@@ -762,7 +762,7 @@ A secondary, high-confidence enrichment source that queries LinkedIn company pro
 
 - `SCRAPINGDOG_API_KEY` is set.
 - The team has a `linkedinHandler` (either existing or discovered by the AI pass).
-- After the primary pass, at least one of these gaps remains: logo, website, shortDescription, longDescription, moreDetails, industryTags.
+- After the primary pass, at least one of these gaps remains: logo, website, shortDescription, longDescription, moreDetails, industryTags, dateFounded, location, teamSize.
 
 ### What it populates (all as `FieldEnrichmentStatus.Enriched`, written to `TeamEnrichment`)
 
@@ -774,6 +774,14 @@ A secondary, high-confidence enrichment source that queries LinkedIn company pro
 | `longDescription`    | `about` (truncated to 1000 chars)                                               |
 | `moreDetails`        | concatenation of `founded`, `headquarters`, `industries`, `specialties`         |
 | `industryTags`       | `industries` + `specialties` matched against `IndustryTag` records, persisted as `TEXT[]` of titles |
+| `dateFounded`        | year parsed out of `founded` (best-effort regex scan for a 4-digit year) |
+| `location`           | first comma-separated segment of `headquarters` (city, or country/region when that's all there is) |
+| `teamSize`           | `employeeCount` (precise headcount) when present, else `companySize` normalized into the field's existing `"N"` / `"N-N"` / `"N+"` shape |
+
+`dateFounded` / `location` / `teamSize` are treated differently from the rows above: LinkedIn is the more
+authoritative source for these three, so the gap check for them is "not settled" (not user-owned, not already judge-promoted onto `Team`)
+rather than "completely empty" — ScrapingDog overrides an AI candidate the primary pass just wrote this same run,
+not only a blank field. As with every other ScrapingDog write, a `ChangedByUser` value is never touched.
 
 ### Entity verification
 

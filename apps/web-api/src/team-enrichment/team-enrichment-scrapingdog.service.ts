@@ -32,6 +32,94 @@ export interface ScrapingDogCompanyProfile {
   founded: string | null;
   headquarters: string | null;
   linkedinInternalId: string | null;
+  /** Self-reported headcount band, e.g. `"10,001+ employees"`. */
+  companySize: string | null;
+  /** Precise headcount, e.g. `"631745"`. More precise than `companySize` when both are present. */
+  employeeCount: string | null;
+}
+
+/** A 4-digit year, e.g. `2015`, first alone or as `"Founded in 2015"`. */
+const FOUNDED_YEAR_RE = /\b(1[89]\d{2}|20\d{2})\b/;
+
+/**
+ * Extracts a founding year from ScrapingDog's free-text `founded` field. Pure,
+ * best-effort — the real-world format of this field hasn't been sampled at
+ * scale yet (see the ticket's open question), so this is deliberately a
+ * permissive "first 4-digit year in range" scan rather than a strict pattern.
+ */
+export function parseFoundedYear(raw: string | null): number | null {
+  if (!raw) return null;
+  const match = raw.match(FOUNDED_YEAR_RE);
+  return match ? parseInt(match[0], 10) : null;
+}
+
+/**
+ * Extracts a location value from ScrapingDog's `headquarters` field (typically
+ * `"City, State, Country"` or just `"Country"`). Takes the first comma-
+ * separated segment — the city when one is present, otherwise whatever's
+ * there (country/region) — matching the `location` field's free-text shape.
+ */
+export function parseHeadquartersLocation(raw: string | null): string | null {
+  if (!raw) return null;
+  const [first] = raw
+    .trim()
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return first || null;
+}
+
+/**
+ * Parses a headcount value (bare number, `"N-N"` range, or `"N+"` open band)
+ * into `{ min, max }`. Shared by `normalizeTeamSizeFromProfile` (enrichment-time
+ * backfill) and `compareProfileToTeam`'s teamSize overlap check.
+ */
+function parseSizeRange(raw: string): { min: number; max: number } | null {
+  const cleaned = raw.trim();
+  const plusMatch = cleaned.match(/^(\d{1,7})\+$/);
+  if (plusMatch) return { min: parseInt(plusMatch[1], 10), max: Number.POSITIVE_INFINITY };
+  const rangeMatch = cleaned.match(/^(\d{1,7})\s*[-–]\s*(\d{1,7})$/);
+  if (rangeMatch) return { min: parseInt(rangeMatch[1], 10), max: parseInt(rangeMatch[2], 10) };
+  const bareMatch = cleaned.match(/^(\d{1,7})$/);
+  if (bareMatch) {
+    const n = parseInt(bareMatch[1], 10);
+    return { min: n, max: n };
+  }
+  return null;
+}
+
+function sizeRangesOverlap(a: { min: number; max: number }, b: { min: number; max: number }): boolean {
+  return a.min <= b.max && b.min <= a.max;
+}
+
+/**
+ * Normalizes ScrapingDog's raw `company_size` band (e.g. `"10,001+ employees"`,
+ * `"11-50 employees"`) into the `teamSize` field's existing shape (bare number,
+ * `"N-N"`, or `"N+"`). Returns `null` when the text doesn't match any of those
+ * shapes — LinkedIn's own bands need confirming against more real samples
+ * (see the ticket's open question), so this deliberately doesn't guess.
+ */
+function parseCompanySizeBand(raw: string | null): string | null {
+  if (!raw) return null;
+  const cleaned = raw
+    .replace(/employees?/i, '')
+    .replace(/,/g, '')
+    .trim();
+  if (!cleaned) return null;
+  return parseSizeRange(cleaned) ? cleaned.replace(/\s*[-–]\s*/, '-') : null;
+}
+
+/**
+ * Resolves the best available `teamSize` candidate from a ScrapingDog profile.
+ * Prefers `employeeCount` (a precise headcount) over `companySize` (a band)
+ * when both are present — see the ticket's Proposed approach.
+ */
+export function normalizeTeamSizeFromProfile(companySize: string | null, employeeCount: string | null): string | null {
+  if (employeeCount) {
+    const cleaned = employeeCount.replace(/[,\s]/g, '');
+    if (/^\d+$/.test(cleaned)) return cleaned;
+  }
+  return parseCompanySizeBand(companySize);
 }
 
 /**
@@ -102,9 +190,7 @@ export function extractSupersedingTwitterHandle(
   currentHandle: string | null | undefined
 ): { newHandle: string; pattern: string } | null {
   if (!description) return null;
-  const normalizedCurrent = currentHandle
-    ? currentHandle.trim().replace(/^@/, '').toLowerCase()
-    : '';
+  const normalizedCurrent = currentHandle ? currentHandle.trim().replace(/^@/, '').toLowerCase() : '';
   for (const { re, label } of SUPERSEDING_HANDLE_PATTERNS) {
     const m = description.match(re);
     if (!m) continue;
@@ -159,6 +245,9 @@ export interface TeamSnapshotForCompare {
   longDescription?: string | null;
   moreDetails?: string | null;
   industryTags?: Array<{ title: string }>;
+  dateFounded?: number | null;
+  teamSize?: string | null;
+  location?: string | null;
 }
 
 @Injectable()
@@ -299,8 +388,7 @@ export class TeamEnrichmentScrapingDogService {
       // X endpoint nests data under `profile`. Defensive: also accept the
       // top-level shape in case the API ever flattens it.
       const r = raw as Record<string, unknown>;
-      const profileBlock =
-        r.profile && typeof r.profile === 'object' ? (r.profile as Record<string, unknown>) : r;
+      const profileBlock = r.profile && typeof r.profile === 'object' ? (r.profile as Record<string, unknown>) : r;
 
       const profile = this.normalizeTwitterProfile(profileBlock);
 
@@ -365,21 +453,13 @@ export class TeamEnrichmentScrapingDogService {
       // Partial-name-match downshift: demote High to Medium unless the website
       // host corroborates (ARIA case: team "ARIA" ↔ profile "Advanced Research
       // + Invention Agency (ARIA)" with shared website `aria.org.uk`).
-      if (
-        nameMatch === 'partial' &&
-        finalConfidence === FieldConfidence.High &&
-        !websiteCorroborates
-      ) {
+      if (nameMatch === 'partial' && finalConfidence === FieldConfidence.High && !websiteCorroborates) {
         finalConfidence = FieldConfidence.Medium;
       }
       // Website-corroborated upshift: fuzzy text-overlap comparators start at
       // Medium even on a clean match; the website anchor lifts identity-
       // verified data to High.
-      if (
-        websiteCorroborates &&
-        verdict === JudgmentVerdict.Agrees &&
-        finalConfidence === FieldConfidence.Medium
-      ) {
+      if (websiteCorroborates && verdict === JudgmentVerdict.Agrees && finalConfidence === FieldConfidence.Medium) {
         finalConfidence = FieldConfidence.High;
       }
       return makeJudgment(finalConfidence, verdict, score, note, JudgmentSource.ScrapingDog);
@@ -463,6 +543,42 @@ export class TeamEnrichmentScrapingDogService {
       // the negative to the AI judge rather than emitting `uncertain`.
       if (foundedHit || hqHit) {
         result.moreDetails = mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Agrees, 70, 'details match');
+      }
+    }
+
+    // dateFounded / location / teamSize: unlike the free-text fields above,
+    // these compare two structured single-value fields against each other —
+    // a mismatch is a real disagreement signal, not just a missed substring.
+    // So (unlike moreDetails/descriptions) we DO emit a verdict on mismatch —
+    // `uncertain` rather than a hard `disagrees`, so the AI judge (or admin)
+    // makes the final call on a genuine two-source conflict instead of this
+    // comparator silently overwriting or hard-rejecting either side.
+
+    if (team.dateFounded != null && profile.founded) {
+      const linkedinYear = parseFoundedYear(profile.founded);
+      if (linkedinYear !== null) {
+        result.dateFounded =
+          linkedinYear === team.dateFounded
+            ? mkVerdict(FieldConfidence.High, JudgmentVerdict.Agrees, 90, 'linkedin founded year matches')
+            : mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 40, 'linkedin founded year differs');
+      }
+    }
+
+    if (team.location && profile.headquarters) {
+      const hqMatches = namesShareSubstantiveToken(team.location, profile.headquarters);
+      result.location = hqMatches
+        ? mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Agrees, 75, 'linkedin headquarters matches')
+        : mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 35, 'linkedin headquarters differs');
+    }
+
+    if (team.teamSize) {
+      const profileSize = normalizeTeamSizeFromProfile(profile.companySize, profile.employeeCount);
+      const profileRange = profileSize ? parseSizeRange(profileSize) : null;
+      const teamRange = parseSizeRange(team.teamSize);
+      if (profileRange && teamRange) {
+        result.teamSize = sizeRangesOverlap(teamRange, profileRange)
+          ? mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Agrees, 70, 'linkedin headcount overlaps')
+          : mkVerdict(FieldConfidence.Medium, JudgmentVerdict.Uncertain, 35, 'linkedin headcount no overlap');
       }
     }
 
@@ -556,6 +672,8 @@ export class TeamEnrichmentScrapingDogService {
       founded: nonEmpty(raw.founded),
       headquarters: nonEmpty(raw.headquarters),
       linkedinInternalId: nonEmpty(raw.linkedin_internal_id),
+      companySize: nonEmpty(raw.company_size),
+      employeeCount: nonEmpty(raw.employee_count),
     };
   }
 
