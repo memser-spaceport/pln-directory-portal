@@ -141,7 +141,7 @@ jobs:
         run: |
           CERT_ARN=$(aws ssm get-parameter \
             --region us-west-1 \
-            --name "/pln/acm/config" \
+            --name "/pln/dev/acm/config" \
             --with-decryption \
             --query "Parameter.Value" \
             --output text)
@@ -168,7 +168,7 @@ jobs:
             --set nodeSelector.allocationtags=pln-dev-k8s \
             --set ingress.grpname=dev-pln-internal \
             --set ingress.healthcheck_path=/health \
-            --set ingress.host=dev-directory.plnetwork.io \
+            --set ingress.host=dev-directory.os.pl.xyz \
             --set service.port=3000 \
             --set ingress.acm_arn=$CERT_ARN \
             --set serviceAccount.create=true \
