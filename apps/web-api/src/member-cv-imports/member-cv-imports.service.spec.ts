@@ -378,17 +378,62 @@ describe('MemberCvImportsService', () => {
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it('rejects an empty start date on apply', async () => {
+    it('skips experiences that are missing a start date', async () => {
+      const result = await service.apply(
+        'member-1',
+        {
+          ...applyBody,
+          experiences: [{ ...applyBody.experiences[0], startDate: '' }],
+        },
+        'owner@example.com'
+      );
+
+      expect(experienceCreate).not.toHaveBeenCalled();
+      expect(result.experiencesAdded).toBe(0);
+    });
+
+    it('applies when optional fields are omitted or null', async () => {
+      const result = await service.apply(
+        'member-1',
+        { importUid: 'import-1', location: null, skills: null, experiences: null },
+        'owner@example.com'
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          uid: 'member-1',
+          locationApplied: false,
+          skillsAdded: [],
+          experiencesAdded: 0,
+        })
+      );
+    });
+
+    it('accepts null location and description after empty-string-to-null', async () => {
       await expect(
         service.apply(
           'member-1',
           {
             ...applyBody,
-            experiences: [{ ...applyBody.experiences[0], startDate: '' }],
+            location: null,
+            experiences: [{ ...applyBody.experiences[0], location: null, description: null }],
           },
           'owner@example.com'
         )
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).resolves.toEqual(
+        expect.objectContaining({
+          uid: 'member-1',
+          experiencesAdded: 1,
+        })
+      );
+      expect(experienceCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            location: null,
+            description: null,
+          }),
+        })
+      );
     });
   });
 

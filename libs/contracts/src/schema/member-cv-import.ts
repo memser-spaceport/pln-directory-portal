@@ -5,6 +5,22 @@ export const MemberCvImportStatusSchema = z.enum(['PROCESSING', 'SUCCEEDED', 'NO
 
 export const YEAR_MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
 
+const optionalText = z
+  .string()
+  .nullish()
+  .transform((value) => value ?? '');
+
+const optionalYearMonth = z
+  .string()
+  .nullish()
+  .transform((value) => value ?? '')
+  .refine((value) => value === '' || YEAR_MONTH_REGEX.test(value), 'must be YYYY-MM');
+
+const optionalStringList = z
+  .array(z.string().nullish())
+  .nullish()
+  .transform((values) => (values ?? []).flatMap((value) => (value?.trim() ? [value.trim()] : [])));
+
 export const ParsedCvExperienceSchema = z.object({
   key: z.string(),
   title: z.string(),
@@ -42,21 +58,27 @@ export const MemberCvImportLatestSchema = z.object({
 });
 
 export const ApplyCvExperienceSchema = z.object({
-  title: z.string().min(1),
-  company: z.string().min(1),
-  description: z.string(),
-  startDate: z.string().regex(YEAR_MONTH_REGEX, 'startDate must be YYYY-MM'),
-  endDate: z.string().regex(YEAR_MONTH_REGEX, 'endDate must be YYYY-MM').nullable(),
-  isCurrent: z.boolean(),
-  location: z.string(),
+  title: optionalText,
+  company: optionalText,
+  description: optionalText,
+  startDate: optionalYearMonth,
+  endDate: optionalYearMonth,
+  isCurrent: z
+    .boolean()
+    .nullish()
+    .transform((value) => value ?? false),
+  location: optionalText,
 });
 
 export const ApplyMemberCvImportSchema = z.object({
   importUid: z.string().min(1),
-  role: z.string(),
-  location: z.string(),
-  skills: z.array(z.string()),
-  experiences: z.array(ApplyCvExperienceSchema),
+  role: optionalText,
+  location: optionalText,
+  skills: optionalStringList,
+  experiences: z
+    .array(ApplyCvExperienceSchema)
+    .nullish()
+    .transform((value) => value ?? []),
 });
 
 export const ApplyMemberCvImportResponseSchema = z.object({
