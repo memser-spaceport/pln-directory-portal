@@ -27,6 +27,7 @@ export const ALLOWED_CORS_ORIGINS = {
     /dev-analytics.plnetwork.io/,
     /staging-admin.plnetwork.io/,
     /protocol-ai-git-fix-home-page-polaris-01.vercel.app/,
+    /\.os\.pl\.xyz$/,
     // Feature/preview frontend deployments.
     // Required because feature frontends run on random Vercel preview hosts
     // while APIs run on feature backends such as directory-fe-pr-123.plnetwork.io.
