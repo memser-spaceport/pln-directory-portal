@@ -167,6 +167,9 @@ export class MemberCvImportsService {
     const shouldFillLocation = !member.locationUid && !!selection.location.trim();
     const skillsAdded: string[] = [];
     let locationApplied = false;
+    const experiencesToCreate = selection.experiences.filter(
+      (experience) => experience.title.trim() && experience.company.trim() && YEAR_MONTH_REGEX.test(experience.startDate)
+    );
 
     await this.prisma.$transaction(async (tx) => {
       const skillConnect = await this.unionSkills(tx, member.skills, selection.skills);
@@ -191,7 +194,7 @@ export class MemberCvImportsService {
         await tx.member.update({ where: { uid: memberUid }, data: memberUpdate });
       }
 
-      for (const experience of selection.experiences) {
+      for (const experience of experiencesToCreate) {
         await tx.memberExperience.create({
           data: {
             title: experience.title.trim(),
@@ -221,7 +224,7 @@ export class MemberCvImportsService {
       role: updated?.role ?? null,
       locationApplied,
       skillsAdded,
-      experiencesAdded: selection.experiences.length,
+      experiencesAdded: experiencesToCreate.length,
     });
   }
 
@@ -304,10 +307,6 @@ export class MemberCvImportsService {
       return ApplyMemberCvImportSchema.parse(body);
     } catch (error) {
       if (error instanceof ZodError) {
-        const startDateIssue = error.issues.find((issue) => issue.path.includes('startDate'));
-        if (startDateIssue) {
-          throw new BadRequestException('Each experience must have a start date (YYYY-MM)');
-        }
         throw new BadRequestException(error.issues.map((issue) => issue.message).join('; '));
       }
       throw error;
