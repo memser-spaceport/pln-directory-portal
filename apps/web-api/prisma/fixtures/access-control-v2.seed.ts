@@ -393,6 +393,14 @@ const policies: PolicySeed[] = [
       'forum.write',
     ],
   },
+  {
+    code: 'job_aspirant',
+    name: 'Job Aspirant / Job Board',
+    description: 'Members who signed up through the Job Board. Marker only — no extra permissions.',
+    role: 'Job Aspirant',
+    group: 'Job Board',
+    permissions: [],
+  },
 ];
 
 export async function seedAccessControlV2() {

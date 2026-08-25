@@ -310,6 +310,11 @@ export const ALL_PERMISSION_CODES = [
   ROADMAP_PERMISSIONS.ITEM_TRANSITION,
 ] as const;
 
+// ── Policies ─────────────────────────────────────────────────────────────
+
+/** Marker assigned on Job Board sign-up, including unapproved members. */
+export const JOB_ASPIRANT_POLICY_CODE = 'job_aspirant';
+
 // ── Type Exports ─────────────────────────────────────────────────────────
 
 /** Type representing any valid permission code */
