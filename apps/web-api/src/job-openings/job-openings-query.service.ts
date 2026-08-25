@@ -262,6 +262,7 @@ export class JobOpeningsQueryService {
         select: {
           uid: true,
           name: true,
+          jobReferEmail: true,
           logo: { select: { url: true } },
           jobOpenings: {
             where,
@@ -328,6 +329,7 @@ export class JobOpeningsQueryService {
             logoUrl: team.logo?.url ?? null,
             focusAreas,
             subFocusAreas,
+            jobReferEmail: team.jobReferEmail?.trim() || null,
           },
           totalRoles: roleCountByTeamUid.get(group.teamUid) ?? teamRoles.length,
           roles: teamRoles.map((role) => ({

@@ -9,7 +9,7 @@ export type ResolvedJobOpening = {
   sourceLink: string | null;
   status: JobOpeningStatus;
   teamUid: string | null;
-  team: { uid: string; name: string };
+  team: { uid: string; name: string; jobReferEmail: string | null };
 };
 
 export async function resolveVisibleJobOpening(prisma: PrismaService, jobUid: string): Promise<ResolvedJobOpening> {
@@ -21,7 +21,7 @@ export async function resolveVisibleJobOpening(prisma: PrismaService, jobUid: st
       sourceLink: true,
       status: true,
       teamUid: true,
-      team: { select: { uid: true, name: true } },
+      team: { select: { uid: true, name: true, jobReferEmail: true } },
     },
   });
   if (!jobOpening || !jobOpening.team || HIDDEN_JOB_OPENING_STATUSES.includes(jobOpening.status)) {

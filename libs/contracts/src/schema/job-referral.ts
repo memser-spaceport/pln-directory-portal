@@ -12,7 +12,7 @@ export const JobReferralRecipientSchema = z
 
 export const CreateJobReferralSchema = z.object({
   referredMemberUid: z.string().min(1),
-  recipients: z.array(JobReferralRecipientSchema).min(1).max(20),
+  recipients: z.array(JobReferralRecipientSchema).max(20).optional().default([]),
   note: z.string().min(1).max(5000),
 });
 

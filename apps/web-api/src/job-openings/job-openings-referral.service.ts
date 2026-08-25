@@ -30,7 +30,10 @@ export class JobOpeningsReferralService {
       throw new BadRequestException('Referred member not found');
     }
 
-    const recipients = await this.resolveRecipients(input.recipients);
+    const jobReferEmail = jobOpening.team.jobReferEmail?.trim() || null;
+    const recipients = jobReferEmail
+      ? [{ email: jobReferEmail, name: jobOpening.team.name }]
+      : await this.resolveMemberRecipients(input.recipients);
     const { to, cc } = this.buildToAndCc(recipients, [
       { email: referrer.email, name: referrer.name },
       { email: referred.email, name: referred.name },
@@ -184,7 +187,13 @@ export class JobOpeningsReferralService {
     return { uid: member.uid, name: member.name, email: member.email };
   }
 
-  private async resolveRecipients(recipients: CreateJobReferralInput['recipients']): Promise<ResolvedRecipient[]> {
+  private async resolveMemberRecipients(
+    recipients: CreateJobReferralInput['recipients']
+  ): Promise<ResolvedRecipient[]> {
+    if (!recipients?.length) {
+      throw new BadRequestException('At least one recipient is required');
+    }
+
     const memberUids = recipients.map((recipient) => recipient.memberUid).filter((uid): uid is string => Boolean(uid));
 
     const members = memberUids.length

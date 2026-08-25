@@ -68,6 +68,7 @@ export const JobTeamSchema = z.object({
   logoUrl: z.string().nullable(),
   focusAreas: z.array(z.string()),
   subFocusAreas: z.array(z.string()),
+  jobReferEmail: z.string().email().nullable(),
 });
 
 export const JobTeamGroupSchema = z.object({

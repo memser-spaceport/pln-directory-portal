@@ -523,6 +523,7 @@ export class TeamsService {
       'name',
       'blog',
       'contactMethod',
+      'jobReferEmail',
       'twitterHandler',
       'linkedinHandler',
       'telegramHandler',
@@ -545,6 +546,9 @@ export class TeamsService {
     ];
     copyObj(teamData, team, directFields);
 
+    if (team.jobReferEmail !== undefined) {
+      team.jobReferEmail = this.normalizeJobReferEmail(team.jobReferEmail);
+    }
     if (team.blueskyHandler !== undefined) {
       team.blueskyHandler = normalizeBlueskyHandler(team.blueskyHandler) ?? null;
     }
@@ -620,6 +624,17 @@ export class TeamsService {
     }
 
     return { team, investorProfileData };
+  }
+
+  private normalizeJobReferEmail(value: string | null): string | null {
+    if (value == null) return null;
+    const trimmed = String(value).trim().toLowerCase();
+    if (!trimmed) return null;
+    const parsed = z.string().email().safeParse(trimmed);
+    if (!parsed.success) {
+      throw new BadRequestException('Invalid job refer email');
+    }
+    return parsed.data;
   }
 
   /**

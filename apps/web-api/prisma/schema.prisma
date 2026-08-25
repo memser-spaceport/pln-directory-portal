@@ -30,6 +30,7 @@ model Team {
   officeHours                  String?
   website                      String?
   contactMethod                String?
+  jobReferEmail                String?
   twitterHandler               String?
   linkedinHandler              String?
   telegramHandler              String?
