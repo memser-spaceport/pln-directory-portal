@@ -47,6 +47,7 @@ import { MemberSubscriptionsModule } from './member-subscriptions/member-subscri
 import { NotificationsModule } from './notifications/notifications.module';
 import { AskModule } from './asks/asks.module';
 import { MemberExperiencesModule } from './member-experiences/member-experiences.module';
+import { MemberCvImportsModule } from './member-cv-imports/member-cv-imports.module';
 import { EventsModule } from './events/events.module';
 import { SearchModule } from './search/search.module';
 import { OpenSearchModule } from './opensearch/opensearch.module';
@@ -158,6 +159,7 @@ import { McpModule } from './mcp/mcp.module';
     AskModule,
     EventsModule,
     MemberExperiencesModule,
+    MemberCvImportsModule,
     SearchModule,
     OpenSearchModule,
     RecommendationsModule,
@@ -250,6 +252,7 @@ export class AppModule {
         { path: 'v1/team-pitches/:slugOrUid/profile/one-pager', method: RequestMethod.PUT },
         { path: 'v1/team-pitches/:slugOrUid/profile/one-pager/preview', method: RequestMethod.POST },
         { path: 'v1/team-pitches/:slugOrUid/profile/video', method: RequestMethod.PUT },
+        { path: 'v1/members/:uid/cv-imports', method: RequestMethod.POST },
         { path: 'oauth/token', method: RequestMethod.POST },
         { path: 'oauth/revoke', method: RequestMethod.POST },
         { path: 'register', method: RequestMethod.POST },

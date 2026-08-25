@@ -90,10 +90,7 @@ export class AwsService {
   }
 
   async uploadFileToS3(file, bucketName, fileName: string) {
-    if (
-      process.env.ENVIRONMENT === 'development' &&
-      (!bucketName || !CONFIG.region)
-    ) {
+    if (process.env.ENVIRONMENT === 'development' && (!bucketName || !CONFIG.region)) {
       return {
         Location: '',
       };
@@ -131,7 +128,7 @@ export class AwsService {
     });
   }
 
-  async generatePresignedPutUrl(bucket: string, key: string, contentType: string, expiresInSeconds: number = 900) {
+  async generatePresignedPutUrl(bucket: string, key: string, contentType: string, expiresInSeconds = 900) {
     const s3 = new AWS.S3(CONFIG);
     return s3.getSignedUrlPromise('putObject', {
       Bucket: bucket,
@@ -153,10 +150,18 @@ export class AwsService {
       throw error;
     }
   }
-  
+
+  async deleteObjectFromS3(bucketName: string, key: string) {
+    if (process.env.ENVIRONMENT === 'development' && (!bucketName || !CONFIG.region)) {
+      return;
+    }
+    const s3 = new AWS.S3(CONFIG);
+    await s3.deleteObject({ Bucket: bucketName, Key: key }).promise();
+  }
+
   /**
    * Updates an record in DynamoDB table
-   * 
+   *
    * @param params - DynamoDB update parameters
    * @returns Promise with the update result
    */

@@ -32,6 +32,7 @@ export * from './participants-request';
 export * from './member-subscription';
 export * from './ask';
 export * from './member-experience';
+export * from './member-cv-import';
 export * from './forum';
 export * from './demo-day';
 export * from './team-pitch';
