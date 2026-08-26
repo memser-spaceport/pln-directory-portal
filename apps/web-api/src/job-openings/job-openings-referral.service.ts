@@ -51,8 +51,6 @@ export class JobOpeningsReferralService {
 
     const note = input.note.trim();
     const applyUrl = jobOpening.sourceLink || null;
-    const referrerProfileUrl = `${process.env.WEB_UI_BASE_URL}/members/${referrer.uid}`;
-    const referredProfileUrl = `${process.env.WEB_UI_BASE_URL}/members/${referred.uid}`;
 
     const [referrerHeadline, referredHeadline] = await Promise.all([
       this.resolveHeadline(referrer.uid),
@@ -69,21 +67,13 @@ export class JobOpeningsReferralService {
       },
       deliveryPayload: {
         body: {
-          referrerName: referrer.name,
-          referredName: referred.name,
+          referrer: this.buildMemberCard(referrer, referrerHeadline),
+          referred: this.buildMemberCard(referred, referredHeadline),
           roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
           noteHtml: noteToHtml(note),
           applyUrl,
-          referrerProfileUrl,
-          referredProfileUrl,
           recipientGreetingName,
-          referrerHeadline: this.formatHeadline(referrerHeadline),
-          referredHeadline: this.formatHeadline(referredHeadline),
-          referrerLocation: this.formatLocation(referrer.location),
-          referredLocation: this.formatLocation(referred.location),
-          referrerSkills: referrer.skills.map((skill) => skill.title).slice(0, PROFILE_CARD_SKILLS_LIMIT),
-          referredSkills: referred.skills.map((skill) => skill.title).slice(0, PROFILE_CARD_SKILLS_LIMIT),
         },
       },
       entityType: 'JOB_OPENING',
@@ -235,6 +225,20 @@ export class JobOpeningsReferralService {
   private formatLocation(location: MemberLocation): string | null {
     if (!location) return null;
     return [location.city, location.country].filter(Boolean).join(', ') || null;
+  }
+
+  // Shape consumed by the `memberCard` partial in the JOB_BOARD_REFERRAL_EMAIL template.
+  private buildMemberCard(
+    member: { uid: string; name: string | null; location: MemberLocation; skills: { title: string }[] },
+    headline: MemberHeadline
+  ) {
+    return {
+      name: member.name,
+      profileUrl: `${process.env.WEB_UI_BASE_URL}/members/${member.uid}`,
+      headline: this.formatHeadline(headline),
+      location: this.formatLocation(member.location),
+      skills: member.skills.map((skill) => skill.title).slice(0, PROFILE_CARD_SKILLS_LIMIT),
+    };
   }
 
   private async resolveMemberRecipients(
