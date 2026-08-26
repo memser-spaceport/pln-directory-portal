@@ -98,6 +98,10 @@ export class TeamsController {
       delete builtQuery.where?.isHost;
       delete builtQuery.where?.isSponsor;
     }
+    // Status filtering (active/inactive/all) is admin-gated below, so discard whatever
+    // the generic query builder derived from a raw `status` query param.
+    delete builtQuery.where?.status;
+    const statusFilter = await this.resolveTeamStatusFilter(request);
     builtQuery.where = {
       AND: [
         builtQuery.where ? builtQuery.where : {},
@@ -153,7 +157,7 @@ export class TeamsController {
       builtQuery.include = { investorProfile: true, logo: { select: { url: true } } };
     }
 
-    const result = await this.teamsService.findAll(builtQuery);
+    const result = await this.teamsService.findAll(builtQuery, statusFilter);
     // Stamp `isFollowed` per team for the authenticated caller (false for all
     // when anonymous). Optional auth via UserTokenCheckGuard keeps this public.
     await this.stampIsFollowed(result.teams, request['userEmail']);
@@ -191,6 +195,24 @@ export class TeamsController {
     for (const team of teams) {
       team.isFollowed = team?.uid ? followed.has(team.uid) : false;
     }
+  }
+
+  /**
+   * Resolves the effective team status filter for GET /v1/teams and GET /v1/teams-search.
+   * Only a Directory Admin may request INACTIVE or ALL; everyone else is
+   * always scoped to active teams, regardless of what `status` was passed.
+   */
+  private async resolveTeamStatusFilter(request: Request): Promise<'ACTIVE' | 'INACTIVE' | 'ALL'> {
+    const userEmail = request['userEmail'];
+    if (!userEmail) {
+      return 'ACTIVE';
+    }
+    const requestor = await this.membersService.findMemberByEmail(userEmail);
+    if (!requestor || !this.membersService.checkIfAdminUser(requestor)) {
+      return 'ACTIVE';
+    }
+    const rawStatus = typeof request.query.status === 'string' ? request.query.status.toUpperCase() : undefined;
+    return rawStatus === 'ALL' || rawStatus === 'INACTIVE' ? rawStatus : 'ACTIVE';
   }
 
   @Api(server.route.getTeam)
@@ -291,9 +313,11 @@ export class TeamsController {
       restrictToTeamUids = followedTeamUids ?? [];
     }
 
+    const statusFilter = await this.resolveTeamStatusFilter(request);
     const result = await this.teamsService.searchTeams(params || {}, {
       restrictToTeamUids,
       followedTeamUids,
+      statusFilter,
     });
     await this.stampIsFollowed(result.teams, request['userEmail']);
     return result;
