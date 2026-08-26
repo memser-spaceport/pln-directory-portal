@@ -10,6 +10,8 @@ const JOB_BOARD_REFERRAL_TEMPLATE = 'JOB_BOARD_REFERRAL_EMAIL';
 
 type ResolvedRecipient = { email: string; name: string | null };
 type MemberHeadline = { title: string | null; companyName: string | null };
+type MemberLocation = { city: string | null; country: string } | null;
+const PROFILE_CARD_SKILLS_LIMIT = 3;
 
 @Injectable()
 export class JobOpeningsReferralService {
@@ -24,7 +26,14 @@ export class JobOpeningsReferralService {
 
     const referred = await this.prisma.member.findUnique({
       where: { uid: input.referredMemberUid },
-      select: { uid: true, name: true, email: true, deletedAt: true },
+      select: {
+        uid: true,
+        name: true,
+        email: true,
+        deletedAt: true,
+        location: { select: { city: true, country: true } },
+        skills: { select: { title: true } },
+      },
     });
     if (!referred || referred.deletedAt || !referred.email) {
       throw new BadRequestException('Referred member not found');
@@ -38,9 +47,15 @@ export class JobOpeningsReferralService {
       { email: referrer.email, name: referrer.name },
       { email: referred.email, name: referred.name },
     ]);
+    const recipientGreetingName = jobReferEmail ? `${jobOpening.team.name} team` : recipients[0]?.name || 'there';
 
     const note = input.note.trim();
     const applyUrl = jobOpening.sourceLink || null;
+
+    const [referrerHeadline, referredHeadline] = await Promise.all([
+      this.resolveHeadline(referrer.uid),
+      this.resolveHeadline(referred.uid),
+    ]);
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
@@ -52,12 +67,13 @@ export class JobOpeningsReferralService {
       },
       deliveryPayload: {
         body: {
-          referrerName: referrer.name,
-          referredName: referred.name,
+          referrer: this.buildMemberCard(referrer, referrerHeadline),
+          referred: this.buildMemberCard(referred, referredHeadline),
           roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
           noteHtml: noteToHtml(note),
           applyUrl,
+          recipientGreetingName,
         },
       },
       entityType: 'JOB_OPENING',
@@ -179,12 +195,50 @@ export class JobOpeningsReferralService {
     }
     const member = await this.prisma.member.findUnique({
       where: { email },
-      select: { uid: true, name: true, email: true, deletedAt: true },
+      select: {
+        uid: true,
+        name: true,
+        email: true,
+        deletedAt: true,
+        location: { select: { city: true, country: true } },
+        skills: { select: { title: true } },
+      },
     });
     if (!member || member.deletedAt || !member.email) {
       throw new UnauthorizedException('Member not found');
     }
-    return { uid: member.uid, name: member.name, email: member.email };
+    return {
+      uid: member.uid,
+      name: member.name,
+      email: member.email,
+      location: member.location,
+      skills: member.skills,
+    };
+  }
+
+  // "Title, Company" for a profile card, e.g. "Staff Engineer, Filecoin Foundation".
+  private formatHeadline(headline: MemberHeadline): string | null {
+    if (headline.title && headline.companyName) return `${headline.title}, ${headline.companyName}`;
+    return headline.title ?? null;
+  }
+
+  private formatLocation(location: MemberLocation): string | null {
+    if (!location) return null;
+    return [location.city, location.country].filter(Boolean).join(', ') || null;
+  }
+
+  // Shape consumed by the `memberCard` partial in the JOB_BOARD_REFERRAL_EMAIL template.
+  private buildMemberCard(
+    member: { uid: string; name: string | null; location: MemberLocation; skills: { title: string }[] },
+    headline: MemberHeadline
+  ) {
+    return {
+      name: member.name,
+      profileUrl: `${process.env.WEB_UI_BASE_URL}/members/${member.uid}`,
+      headline: this.formatHeadline(headline),
+      location: this.formatLocation(member.location),
+      skills: member.skills.map((skill) => skill.title).slice(0, PROFILE_CARD_SKILLS_LIMIT),
+    };
   }
 
   private async resolveMemberRecipients(
