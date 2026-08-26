@@ -70,6 +70,7 @@ export const JobTeamSchema = z.object({
   focusAreas: z.array(z.string()),
   subFocusAreas: z.array(z.string()),
   jobReferEmail: z.string().email().nullable(),
+  inAppApplyAvailable: z.boolean(),
 });
 
 export const JobTeamGroupSchema = z.object({

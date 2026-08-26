@@ -1,7 +1,9 @@
 import { JobOpeningStatus } from '@prisma/client';
-import { JobsListQueryParams } from 'libs/contracts/src/schema/job-opening';
+import { JobTeamSchema, JobsListQueryParams } from 'libs/contracts/src/schema/job-opening';
 import type { PrismaService } from '../shared/prisma.service';
+import { PROTOCOL_LABS_TEAM_UID } from '../team-news/team-news-public-list.config';
 import { HIDDEN_JOB_OPENING_STATUSES, JobOpeningsQueryService } from './job-openings-query.service';
+import { isInAppApplyAvailable } from './pin-protocol-labs-team';
 
 /**
  * `buildWhere` is private and every public method around it fans out into a dozen
@@ -54,5 +56,35 @@ describe('JobOpeningsQueryService.buildWhere', () => {
 
     expect(where.AND).toContainEqual({ teamUid: 'team-1' });
     expect(where.AND).not.toContainEqual({ seniority: { in: ['senior'] } });
+  });
+});
+
+describe('JobTeamSchema inAppApplyAvailable', () => {
+  const team = {
+    uid: 'team-1',
+    name: 'Airship',
+    logoUrl: null,
+    focusAreas: [],
+    subFocusAreas: [],
+    jobReferEmail: null as string | null,
+  };
+
+  it('requires inAppApplyAvailable on the jobs-list team', () => {
+    expect(JobTeamSchema.safeParse(team).success).toBe(false);
+    expect(JobTeamSchema.safeParse({ ...team, inAppApplyAvailable: true }).success).toBe(true);
+  });
+
+  it('maps Protocol Labs availability from the job-refer email', () => {
+    expect(isInAppApplyAvailable({ teamUid: PROTOCOL_LABS_TEAM_UID, name: 'Protocol Labs', jobReferEmail: null })).toBe(
+      false
+    );
+    expect(
+      isInAppApplyAvailable({
+        teamUid: PROTOCOL_LABS_TEAM_UID,
+        name: 'Protocol Labs',
+        jobReferEmail: 'jobs@protocol.ai',
+      })
+    ).toBe(true);
+    expect(isInAppApplyAvailable({ teamUid: team.uid, name: team.name, jobReferEmail: null })).toBe(true);
   });
 });

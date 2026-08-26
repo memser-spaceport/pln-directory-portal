@@ -3,7 +3,7 @@ import { JobOpeningStatus, Prisma } from '@prisma/client';
 import type { JobsListQuery } from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
 import { buildJobOpeningDateWhere } from './job-opening-date.where';
-import { pinProtocolLabsThenPage } from './pin-protocol-labs-team';
+import { isInAppApplyAvailable, pinProtocolLabsThenPage } from './pin-protocol-labs-team';
 
 const TOP_LEVEL_FOCUS_AREAS = [
   'Digital Human Rights',
@@ -331,6 +331,11 @@ export class JobOpeningsQueryService {
             focusAreas,
             subFocusAreas,
             jobReferEmail: team.jobReferEmail?.trim() || null,
+            inAppApplyAvailable: isInAppApplyAvailable({
+              teamUid: team.uid,
+              name: team.name,
+              jobReferEmail: team.jobReferEmail,
+            }),
           },
           totalRoles: roleCountByTeamUid.get(group.teamUid) ?? teamRoles.length,
           roles: teamRoles.map((role) => ({
