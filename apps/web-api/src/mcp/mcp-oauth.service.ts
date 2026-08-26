@@ -13,7 +13,7 @@ import {
   mcpResourceUrl,
 } from './mcp.constants';
 import { generateSecret, hashSecret, verifyPkceS256 } from './mcp.crypto';
-import { isLoopbackRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
+import { isAllowedRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
 
 export type McpTokenActor = {
   authorizationUid: string;
@@ -98,8 +98,8 @@ export class McpOAuthService {
 
   async registerClient(body: RegisterBody) {
     const redirectUris = (body.redirect_uris ?? []).filter(Boolean);
-    if (!redirectUris.length || !redirectUris.every(isLoopbackRedirectUri)) {
-      throw new BadRequestException('redirect_uris must be localhost or 127.0.0.1');
+    if (!redirectUris.length || !redirectUris.every(isAllowedRedirectUri)) {
+      throw new BadRequestException('redirect_uris must be loopback, https, or a private-use URI scheme');
     }
 
     const clientId = generateSecret(MCP_TOKEN_PREFIX.client);
