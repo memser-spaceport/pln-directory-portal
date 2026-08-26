@@ -5,6 +5,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { JobOpeningStatus, Prisma } from '@prisma/client';
 import { JobOpeningIngestItem, IngestJobOpeningsResponse } from './dto/ingest-job-openings.dto';
 import { JOB_INGEST_COMPLETED, JobIngestCompletedPayload } from '../job-alerts/job-alerts.events';
+import { sanitizeJobDescriptionHtml } from './job-description-html.util';
 
 @Injectable()
 export class JobOpeningsService {
@@ -106,6 +107,7 @@ export class JobOpeningsService {
       select: { closedAt: true },
     });
     const closedAt = this.resolveClosedAt(item, status, existing);
+    const descriptionHtml = sanitizeJobDescriptionHtml(item.descriptionHtml);
 
     const data: Prisma.JobOpeningUncheckedCreateInput = {
       status,
@@ -117,6 +119,7 @@ export class JobOpeningsService {
       seniority: item.seniority ?? null,
       urgency: item.urgency ?? null,
       summary: item.summary ?? null,
+      descriptionHtml,
       location,
       workMode: item.workMode ?? null,
       ws4AskId: item.ws4AskId ?? null,
@@ -153,6 +156,7 @@ export class JobOpeningsService {
         workMode: data.workMode,
         lastSeenLive: data.lastSeenLive,
         detectionDate: data.detectionDate,
+        ...(descriptionHtml ? { descriptionHtml } : {}),
         ...(closedAt !== undefined ? { closedAt } : {}),
         updatedAt: new Date(),
       },

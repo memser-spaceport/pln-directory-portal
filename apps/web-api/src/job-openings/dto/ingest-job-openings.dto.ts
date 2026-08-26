@@ -8,6 +8,7 @@ export interface JobOpeningIngestItem {
   seniority?: string;
   urgency?: string;
   summary?: string;
+  descriptionHtml?: string;
   locations?: string[];
   location?: string | string[];
   workMode?: string;
