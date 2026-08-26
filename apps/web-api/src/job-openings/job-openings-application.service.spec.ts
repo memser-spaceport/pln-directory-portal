@@ -12,6 +12,7 @@ import {
 import { JobOpeningStatus, MemberApprovalState, JobSearchStatus } from '@prisma/client';
 import { CreateJobApplicationSchema } from 'libs/contracts/src/schema/job-application';
 import type { PrismaService } from '../shared/prisma.service';
+import { PROTOCOL_LABS_TEAM_UID } from '../team-news/team-news-public-list.config';
 import { JobOpeningsApplicationService } from './job-openings-application.service';
 
 type PrismaMock = {
@@ -72,7 +73,7 @@ const jobOpening = {
   sourceLink: 'https://jobs.example/role',
   status: JobOpeningStatus.CONFIRMED,
   teamUid: 'team-1',
-  team: { uid: 'team-1', name: 'Airship' },
+  team: { uid: 'team-1', name: 'Airship', jobReferEmail: null as string | null },
 };
 
 const lead = { member: { uid: 'lead-1', name: 'Lead', email: 'lead@airship.com' } };
@@ -89,10 +90,10 @@ describe('JobOpeningsApplicationService', () => {
     process.env.WEB_UI_BASE_URL = 'https://directory.test';
   });
 
-  function mockHappyPath() {
+  function mockHappyPath(team = jobOpening.team) {
     prisma.member.findUnique.mockResolvedValue(applicant);
     prisma.jobApplication.findUnique.mockResolvedValue(null);
-    prisma.jobOpening.findUnique.mockResolvedValue(jobOpening);
+    prisma.jobOpening.findUnique.mockResolvedValue({ ...jobOpening, teamUid: team.uid, team });
     prisma.teamMemberRole.findMany.mockResolvedValue([
       lead,
       { member: { uid: 'lead-2', name: 'Lead Two', email: 'lead2@airship.com' } },
@@ -219,6 +220,94 @@ describe('JobOpeningsApplicationService', () => {
       BadRequestException
     );
     expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+  });
+
+  it('sends only to the Protocol Labs job-refer email and does not load team leads', async () => {
+    mockHappyPath({
+      uid: PROTOCOL_LABS_TEAM_UID,
+      name: 'Protocol Labs',
+      jobReferEmail: 'jobs@protocol.ai',
+    });
+
+    await service.apply('job-1', 'ada@example.com', { coverLetter: 'I would like this role.' });
+
+    expect(notificationServiceClient.sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientsInfo: {
+          to: ['jobs@protocol.ai'],
+          cc: [],
+          replyTo: 'ada@example.com',
+        },
+        targetMeta: {
+          emailId: 'jobs@protocol.ai',
+          userId: PROTOCOL_LABS_TEAM_UID,
+          userName: 'Protocol Labs',
+        },
+      })
+    );
+    expect(prisma.teamMemberRole.findMany).not.toHaveBeenCalled();
+    expect(prisma.jobApplication.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toEmail: 'jobs@protocol.ai',
+          ccEmails: [],
+        }),
+      })
+    );
+  });
+
+  it('rejects a Protocol Labs apply when the job-refer email is missing', async () => {
+    mockHappyPath({
+      uid: PROTOCOL_LABS_TEAM_UID,
+      name: 'Protocol Labs',
+      jobReferEmail: null,
+    });
+
+    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
+      BadRequestException
+    );
+    expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
+    expect(prisma.teamMemberRole.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Protocol Labs apply when the job-refer email is blank', async () => {
+    mockHappyPath({
+      uid: PROTOCOL_LABS_TEAM_UID,
+      name: 'Protocol Labs',
+      jobReferEmail: '   ',
+    });
+
+    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toMatchObject({
+      message: 'This job is not accepting in-app applications',
+    });
+    expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
+  });
+
+  it('still emails team leads for a non-Protocol Labs team that has a job-refer email', async () => {
+    mockHappyPath({ ...jobOpening.team, jobReferEmail: 'jobs@airship.com' });
+
+    await service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' });
+
+    expect(notificationServiceClient.sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientsInfo: {
+          to: ['lead@airship.com'],
+          cc: ['lead2@airship.com'],
+          replyTo: 'ada@example.com',
+        },
+      })
+    );
+    expect(prisma.teamMemberRole.findMany).toHaveBeenCalled();
+    expect(prisma.jobApplication.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toEmail: 'lead@airship.com',
+          ccEmails: ['lead2@airship.com'],
+        }),
+      })
+    );
   });
 
   it('requires an authenticated email', async () => {

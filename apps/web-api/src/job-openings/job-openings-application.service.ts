@@ -10,7 +10,8 @@ import type { CreateJobApplicationInput } from 'libs/contracts/src/schema/job-ap
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { noteToHtml } from './job-openings-email-html';
-import { resolveVisibleJobOpening } from './job-openings-resolve';
+import { resolveVisibleJobOpening, type ResolvedJobOpening } from './job-openings-resolve';
+import { isProtocolLabsTeam } from './pin-protocol-labs-team';
 
 const JOB_BOARD_APPLICATION_TEMPLATE = 'JOB_BOARD_APPLICATION_EMAIL';
 
@@ -67,8 +68,7 @@ export class JobOpeningsApplicationService {
     }
 
     const jobOpening = await resolveVisibleJobOpening(this.prisma, jobUid);
-    const leads = await this.resolveTeamLeads(jobOpening.team.uid);
-    const { to, cc } = this.buildToAndCc(leads);
+    const { to, cc } = await this.resolveApplicationRecipients(jobOpening);
 
     const companyName = this.resolveCompanyName(applicant);
     const profileSnapshot = this.buildProfileSnapshot(applicant, companyName);
@@ -239,6 +239,22 @@ export class JobOpeningsApplicationService {
     if (!applicant.jobSearchStatus) {
       throw new BadRequestException('Job search status is required before applying');
     }
+  }
+
+  private async resolveApplicationRecipients(jobOpening: ResolvedJobOpening) {
+    if (isProtocolLabsTeam({ teamUid: jobOpening.team.uid, name: jobOpening.team.name })) {
+      const jobReferEmail = jobOpening.team.jobReferEmail?.trim() || null;
+      if (!jobReferEmail) {
+        throw new BadRequestException('This job is not accepting in-app applications');
+      }
+      return {
+        to: { uid: jobOpening.team.uid, name: jobOpening.team.name, email: jobReferEmail },
+        cc: [] as Array<{ uid: string; name: string; email: string }>,
+      };
+    }
+
+    const leads = await this.resolveTeamLeads(jobOpening.team.uid);
+    return this.buildToAndCc(leads);
   }
 
   private async resolveTeamLeads(teamUid: string): Promise<Array<{ uid: string; name: string; email: string }>> {

@@ -1,5 +1,5 @@
 import { PROTOCOL_LABS_TEAM_UID } from '../team-news/team-news-public-list.config';
-import { isProtocolLabsTeam, pinProtocolLabsThenPage } from './pin-protocol-labs-team';
+import { isInAppApplyAvailable, isProtocolLabsTeam, pinProtocolLabsThenPage } from './pin-protocol-labs-team';
 
 describe('isProtocolLabsTeam', () => {
   it('matches the canonical Protocol Labs uid', () => {
@@ -13,6 +13,33 @@ describe('isProtocolLabsTeam', () => {
 
   it('does not match similarly named teams', () => {
     expect(isProtocolLabsTeam({ teamUid: 'other', name: 'Protocol Labs Research' })).toBe(false);
+  });
+});
+
+describe('isInAppApplyAvailable', () => {
+  it('is false for Protocol Labs without a job-refer email', () => {
+    expect(isInAppApplyAvailable({ teamUid: PROTOCOL_LABS_TEAM_UID, name: 'Protocol Labs' })).toBe(false);
+    expect(isInAppApplyAvailable({ teamUid: PROTOCOL_LABS_TEAM_UID, name: 'Protocol Labs', jobReferEmail: null })).toBe(
+      false
+    );
+    expect(isInAppApplyAvailable({ teamUid: PROTOCOL_LABS_TEAM_UID, name: 'Protocol Labs', jobReferEmail: '  ' })).toBe(
+      false
+    );
+  });
+
+  it('is true for Protocol Labs once a job-refer email is set', () => {
+    expect(
+      isInAppApplyAvailable({
+        teamUid: PROTOCOL_LABS_TEAM_UID,
+        name: 'Protocol Labs',
+        jobReferEmail: 'jobs@protocol.ai',
+      })
+    ).toBe(true);
+  });
+
+  it('is true for every other team, including those with a job-refer email', () => {
+    expect(isInAppApplyAvailable({ teamUid: 'other', name: 'Airship' })).toBe(true);
+    expect(isInAppApplyAvailable({ teamUid: 'other', name: 'Airship', jobReferEmail: 'jobs@airship.com' })).toBe(true);
   });
 });
 
@@ -42,9 +69,6 @@ describe('pinProtocolLabsThenPage', () => {
       { teamUid: PROTOCOL_LABS_TEAM_UID, name: 'Protocol Labs' },
       { teamUid: 'a', name: 'Alpha' },
     ];
-    expect(pinProtocolLabsThenPage(alreadyFirst, 1, 2).map((r) => r.teamUid)).toEqual([
-      PROTOCOL_LABS_TEAM_UID,
-      'a',
-    ]);
+    expect(pinProtocolLabsThenPage(alreadyFirst, 1, 2).map((r) => r.teamUid)).toEqual([PROTOCOL_LABS_TEAM_UID, 'a']);
   });
 });
