@@ -67,11 +67,25 @@ describe('McpOAuthService', () => {
     expect(prisma.mcpOAuthClient.create).toHaveBeenCalled();
   });
 
-  it('rejects non-loopback redirect URIs at registration', async () => {
+  it('registers Cursor-style loopback, https, and private-use redirect URIs', async () => {
+    const { service, prisma } = buildService();
+    const result = await service.registerClient({
+      client_name: 'Cursor',
+      redirect_uris: [
+        'http://localhost:8787/callback',
+        'https://www.cursor.com/agents/mcp/oauth/callback',
+        'cursor://anysphere.cursor-mcp/oauth/callback',
+      ],
+    });
+    expect(result.client_id).toMatch(/^mcp_client_/);
+    expect(prisma.mcpOAuthClient.create).toHaveBeenCalled();
+  });
+
+  it('rejects cleartext non-loopback redirect URIs at registration', async () => {
     const { service } = buildService();
     await expect(
-      service.registerClient({ client_name: 'Evil', redirect_uris: ['https://evil.example/callback'] })
-    ).rejects.toThrow('localhost');
+      service.registerClient({ client_name: 'Evil', redirect_uris: ['http://evil.example/callback'] })
+    ).rejects.toThrow('redirect_uris');
   });
 
   it('refuses approve without mcp.connect', async () => {

@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { isLoopbackRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
+import { isAllowedRedirectUri, isLoopbackRedirectUri, isRegisteredRedirectUri } from './mcp-redirect';
 import { pkceS256Challenge, verifyPkceS256 } from './mcp.crypto';
 import {
   compactMasterProfile,
@@ -21,16 +21,36 @@ import { MasterProfileService } from '../master-profile/master-profile.service';
 import { WarmIntrosV2Service } from '../warm-intros-v2/warm-intros-v2.service';
 
 describe('mcp-redirect', () => {
-  it('allows localhost and 127.0.0.1 only', () => {
+  it('treats localhost, 127.0.0.1, and ::1 as loopback', () => {
     expect(isLoopbackRedirectUri('http://127.0.0.1:9/cb')).toBe(true);
     expect(isLoopbackRedirectUri('http://localhost:9/cb')).toBe(true);
+    expect(isLoopbackRedirectUri('http://[::1]:9/cb')).toBe(true);
     expect(isLoopbackRedirectUri('https://labos.example/cb')).toBe(false);
   });
 
-  it('requires the URI to be registered', () => {
-    const registered = ['http://127.0.0.1:9/cb'];
+  it('allows loopback, https, and private-use schemes', () => {
+    expect(isAllowedRedirectUri('http://127.0.0.1:8787/callback')).toBe(true);
+    expect(isAllowedRedirectUri('https://www.cursor.com/agents/mcp/oauth/callback')).toBe(true);
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/abc')).toBe(true);
+    expect(isAllowedRedirectUri('cursor://anysphere.cursor-mcp/oauth/callback')).toBe(true);
+    expect(isAllowedRedirectUri('vscode://vscode.github-authentication/did-authenticate')).toBe(true);
+    expect(isAllowedRedirectUri('http://evil.example/callback')).toBe(false);
+    expect(isAllowedRedirectUri('javascript:alert(1)')).toBe(false);
+    expect(isAllowedRedirectUri('https://user:pass@evil.example/cb')).toBe(false);
+  });
+
+  it('matches registered URIs and ignores loopback port', () => {
+    const registered = [
+      'http://127.0.0.1:9/cb',
+      'https://www.cursor.com/agents/mcp/oauth/callback',
+      'cursor://anysphere.cursor-mcp/oauth/callback',
+    ];
     expect(isRegisteredRedirectUri('http://127.0.0.1:9/cb', registered)).toBe(true);
-    expect(isRegisteredRedirectUri('http://127.0.0.1:8/cb', registered)).toBe(false);
+    expect(isRegisteredRedirectUri('http://127.0.0.1:8/cb', registered)).toBe(true);
+    expect(isRegisteredRedirectUri('https://www.cursor.com/agents/mcp/oauth/callback', registered)).toBe(true);
+    expect(isRegisteredRedirectUri('cursor://anysphere.cursor-mcp/oauth/callback', registered)).toBe(true);
+    expect(isRegisteredRedirectUri('https://evil.example/callback', registered)).toBe(false);
+    expect(isRegisteredRedirectUri('http://127.0.0.1:9/other', registered)).toBe(false);
   });
 });
 
