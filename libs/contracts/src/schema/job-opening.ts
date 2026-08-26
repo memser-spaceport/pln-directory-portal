@@ -57,6 +57,7 @@ export const JobRoleSchema = z.object({
   location: z.array(z.string()),
   workMode: z.string().nullable(),
   applyUrl: z.string().nullable(),
+  descriptionHtml: z.string().nullable(),
   lastUpdated: z.string(),
   postedDate: z.string().nullable(),
   detectionDate: z.string(),
