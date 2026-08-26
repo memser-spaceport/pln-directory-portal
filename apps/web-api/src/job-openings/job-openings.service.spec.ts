@@ -76,4 +76,41 @@ describe('JobOpeningsService descriptionHtml ingest', () => {
     const { create } = prisma.jobOpening.upsert.mock.calls[0][0];
     expect(create.descriptionHtml).toBeNull();
   });
+
+  it('does not wipe summary or workMode on HTML-only updates', async () => {
+    prisma.jobOpening.findUnique.mockResolvedValue({
+      closedAt: null,
+      id: 1,
+      createdAt: new Date('2026-01-01'),
+    });
+    await service.ingestJobOpenings([baseItem({ descriptionHtml: '<p>Backfill</p>' })]);
+    const { update } = prisma.jobOpening.upsert.mock.calls[0][0];
+    expect(update.descriptionHtml).toBe('<p>Backfill</p>');
+    expect(update).not.toHaveProperty('summary');
+    expect(update).not.toHaveProperty('workMode');
+  });
+
+  it('preserves CONFIRMED status when the payload sends the enum value', async () => {
+    prisma.jobOpening.findUnique.mockResolvedValue({
+      closedAt: null,
+      id: 1,
+      createdAt: new Date('2026-01-01'),
+    });
+    await service.ingestJobOpenings([baseItem({ status: 'CONFIRMED', descriptionHtml: '<p>Getro</p>' })]);
+    const { update } = prisma.jobOpening.upsert.mock.calls[0][0];
+    expect(update.status).toBe('CONFIRMED');
+  });
+
+  it('does not change status when the payload sends an unknown value', async () => {
+    prisma.jobOpening.findUnique.mockResolvedValue({
+      closedAt: null,
+      id: 1,
+      createdAt: new Date('2026-01-01'),
+    });
+    await service.ingestJobOpenings([baseItem({ status: 'SOMETHING_ELSE' })]);
+    const { update } = prisma.jobOpening.upsert.mock.calls[0][0];
+    expect(update).not.toHaveProperty('status');
+    const { create } = prisma.jobOpening.upsert.mock.calls[0][0];
+    expect(create.status).toBe('NEW');
+  });
 });

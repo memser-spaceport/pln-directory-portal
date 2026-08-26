@@ -107,6 +107,8 @@ describe('JobOpeningsEnrichmentService', () => {
           postedDate: new Date('2025-09-16T17:04:06.000Z'),
           lastSeenLive,
           status: JobOpeningStatus.NEW,
+          summary: 'Coordinate strategy across teams',
+          descriptionHtml: '<p>Full posting body</p>',
           detectionDate,
           updatedAt,
         },
@@ -125,6 +127,8 @@ describe('JobOpeningsEnrichmentService', () => {
         roleTitle: 'Strategy Coordinator',
         lastSeenLive: lastSeenLive.toISOString(),
         status: JobOpeningStatus.NEW,
+        summary: 'Coordinate strategy across teams',
+        descriptionHtml: '<p>Full posting body</p>',
       });
     });
 
