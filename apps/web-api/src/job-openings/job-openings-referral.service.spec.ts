@@ -12,12 +12,14 @@ type PrismaMock = {
   member: { findUnique: jest.Mock; findMany: jest.Mock };
   jobOpening: { findUnique: jest.Mock };
   jobReferral: { create: jest.Mock };
+  teamMemberRole: { findFirst: jest.Mock };
 };
 
 const buildPrismaMock = (): PrismaMock => ({
   member: { findUnique: jest.fn(), findMany: jest.fn() },
   jobOpening: { findUnique: jest.fn() },
   jobReferral: { create: jest.fn() },
+  teamMemberRole: { findFirst: jest.fn().mockResolvedValue(null) },
 });
 
 const referrer = {
@@ -25,6 +27,8 @@ const referrer = {
   name: 'Ada Lovelace',
   email: 'ada@example.com',
   deletedAt: null,
+  location: { city: 'London', country: 'United Kingdom' },
+  skills: [{ title: 'Mathematics' }],
 };
 
 const referred = {
@@ -32,6 +36,8 @@ const referred = {
   name: 'Grace Hopper',
   email: 'grace@example.com',
   deletedAt: null,
+  location: { city: 'Arlington', country: 'United States' },
+  skills: [{ title: 'Compilers' }],
 };
 
 const lead = { uid: 'lead-1', name: 'Lead One', email: 'lead@airship.com', deletedAt: null };
