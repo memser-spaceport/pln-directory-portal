@@ -2,14 +2,8 @@ jest.mock('../notifications/notification-service.client', () => ({
   NotificationServiceClient: class NotificationServiceClient {},
 }));
 
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { JobOpeningStatus, MemberApprovalState, JobSearchStatus } from '@prisma/client';
+import { BadRequestException, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { JobOpeningStatus, JobSearchStatus } from '@prisma/client';
 import { CreateJobApplicationSchema } from 'libs/contracts/src/schema/job-application';
 import type { PrismaService } from '../shared/prisma.service';
 import { PROTOCOL_LABS_TEAM_UID } from '../team-news/team-news-public-list.config';
@@ -40,7 +34,6 @@ const applicant = {
   githubHandler: 'ada',
   linkedinHandler: 'ada-li',
   deletedAt: null,
-  memberApproval: { state: MemberApprovalState.APPROVED },
   location: { city: 'London', country: 'UK', region: 'England' },
   skills: [{ title: 'TypeScript' }],
   experiences: [
@@ -104,7 +97,7 @@ describe('JobOpeningsApplicationService', () => {
     });
   }
 
-  it('applies when approved with role, status, and cover letter', async () => {
+  it('applies with role, status, and cover letter', async () => {
     mockHappyPath();
 
     const result = await service.apply('job-1', 'ada@example.com', { coverLetter: 'I would like this role.' });
@@ -146,21 +139,39 @@ describe('JobOpeningsApplicationService', () => {
     expect(snapshot.role).toBe('Engineer');
   });
 
-  it.each([MemberApprovalState.PENDING, MemberApprovalState.VERIFIED, MemberApprovalState.REJECTED])(
-    'rejects %s members without emailing',
-    async (state) => {
-      prisma.member.findUnique.mockResolvedValue({
-        ...applicant,
-        memberApproval: { state },
-      });
+  /* Approval used to gate this — PENDING, VERIFIED and REJECTED all got a 403
+     and no email. The review still runs, but it no longer holds up applying, so
+     the account's approval state is not consulted here at all: it is neither
+     selected nor read. This asserts the application actually goes out for a
+     member the old rule would have refused. */
+  it('sends the application without consulting approval state', async () => {
+    mockHappyPath();
 
-      await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
-        ForbiddenException
-      );
-      expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
-      expect(prisma.jobApplication.create).not.toHaveBeenCalled();
-    }
-  );
+    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).resolves.toMatchObject({
+      jobUid: 'job-1',
+    });
+
+    expect(notificationServiceClient.sendNotification).toHaveBeenCalledTimes(1);
+    expect(prisma.jobApplication.create).toHaveBeenCalledTimes(1);
+
+    // The gate is gone at the source, not just unenforced: nothing asks the
+    // database for it any more.
+    expect(prisma.member.findUnique.mock.calls[0][0].select).not.toHaveProperty('memberApproval');
+  });
+
+  /* The one account state that still cannot apply, and it never went through
+     the approval check: a rejected member is soft-deleted, so `resolveApplicant`
+     refuses them before `assertCanApply` is reached. Worth pinning now that the
+     approval branch above is gone — otherwise nothing covers it. */
+  it('refuses a soft-deleted member without emailing', async () => {
+    prisma.member.findUnique.mockResolvedValue({ ...applicant, deletedAt: new Date('2026-01-01') });
+
+    await expect(service.apply('job-1', 'ada@example.com', { coverLetter: 'Hi' })).rejects.toBeInstanceOf(
+      UnauthorizedException
+    );
+    expect(notificationServiceClient.sendNotification).not.toHaveBeenCalled();
+    expect(prisma.jobApplication.create).not.toHaveBeenCalled();
+  });
 
   it('rejects missing role or missing status', async () => {
     prisma.member.findUnique.mockResolvedValue({ ...applicant, role: '  ' });
