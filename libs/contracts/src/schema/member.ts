@@ -7,8 +7,12 @@ import { ResponseSkillSchema } from './skill';
 import { ResponseTeamMemberRoleSchema } from './team-member-role';
 import { ProjectContributionSchema, ResponseProjectContributionSchema } from './project-contribution';
 import { ResponseMemberExperienceSchema } from './member-experience';
+import { JobSearchStatusWireSchema } from './job-search-status';
 
-export const JobSearchStatusWireSchema = z.enum(['actively-looking', 'open-to-right-role', 'not-looking']);
+/* Defined in `./job-search-status` so contracts that cannot afford this file's
+   import graph can still share the one definition — see the note there.
+   Re-exported here because this is where every existing consumer looks for it. */
+export { JobSearchStatusWireSchema };
 
 export const GitHubRepositorySchema = z.object({
   name: z.string(),
