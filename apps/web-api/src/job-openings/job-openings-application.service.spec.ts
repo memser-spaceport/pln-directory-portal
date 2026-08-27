@@ -19,7 +19,12 @@ type PrismaMock = {
 const buildPrismaMock = (): PrismaMock => ({
   member: { findUnique: jest.fn() },
   jobOpening: { findUnique: jest.fn() },
-  jobApplication: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), count: jest.fn().mockResolvedValue(8) },
+  jobApplication: {
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    count: jest.fn().mockResolvedValue(8),
+  },
   teamMemberRole: { findMany: jest.fn() },
 });
 
@@ -57,7 +62,7 @@ const applicant = {
       project: { name: 'Difference Engine' },
     },
   ],
-  teamMemberRoles: [{ mainTeam: true, team: { name: 'LabOS' } }],
+  teamMemberRoles: [{ mainTeam: true, role: null, team: { name: 'LabOS' } }],
 };
 
 const jobOpening = {
@@ -117,20 +122,16 @@ describe('JobOpeningsApplicationService', () => {
         },
         deliveryPayload: {
           body: expect.objectContaining({
-            applicantName: 'Ada Lovelace',
-            applicantFirstName: 'Ada',
-            applicantRole: 'Engineer',
-            applicantCompany: 'Analytical Engine',
-            applicantWorkDuration: 'January 2020 — Present',
-            applicantLocation: 'London, UK',
-            applicantSkills: ['TypeScript'],
+            applicant: {
+              name: 'Ada Lovelace',
+              profileUrl: 'https://directory.test/members/member-1',
+              headline: 'Engineer, LabOS',
+              location: 'London, UK',
+              skills: ['TypeScript'],
+            },
             roleTitle: 'Staff Engineer',
             teamName: 'Airship',
-            profileUrl: 'https://directory.test/members/member-1',
             applyUrl: 'https://directory.test/jobs?job=job-1',
-            preferencesUrl: 'https://directory.test/settings/email',
-            applicantCount: 9,
-            allApplicantsUrl: 'https://directory.test/jobs?job=job-1',
           }),
         },
       })
@@ -139,7 +140,7 @@ describe('JobOpeningsApplicationService', () => {
     expect(snapshot.jobSearchStatus).toBeUndefined();
     expect(snapshot.currentCompany).toBe('LabOS');
     expect(snapshot.role).toBe('Engineer');
-    expect(prisma.jobApplication.count).toHaveBeenCalledWith({ where: { jobOpeningUid: 'job-1' } });
+    expect(prisma.jobApplication.count).not.toHaveBeenCalled();
   });
 
   /* Approval used to gate this — PENDING, VERIFIED and REJECTED all got a 403

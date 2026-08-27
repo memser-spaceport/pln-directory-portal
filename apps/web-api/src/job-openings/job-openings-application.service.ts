@@ -9,6 +9,10 @@ import { isProtocolLabsTeam } from './pin-protocol-labs-team';
 import { jobBoardDetailUrl } from './job-openings-url';
 
 const JOB_BOARD_APPLICATION_TEMPLATE = 'JOB_BOARD_APPLICATION_EMAIL';
+const PROFILE_CARD_SKILLS_LIMIT = 3;
+
+type ApplicantLocation = { city: string | null; country: string; region: string | null } | null;
+type MemberHeadline = { title: string | null; companyName: string | null };
 
 type Applicant = {
   uid: string;
@@ -20,7 +24,7 @@ type Applicant = {
   bio: string | null;
   githubHandler: string | null;
   linkedinHandler: string | null;
-  location: { city: string | null; country: string; region: string | null } | null;
+  location: ApplicantLocation;
   skills: Array<{ title: string }>;
   experiences: Array<{
     title: string;
@@ -39,7 +43,7 @@ type Applicant = {
     endDate: Date | null;
     project: { name: string } | null;
   }>;
-  teamMemberRoles: Array<{ mainTeam: boolean; team: { name: string } }>;
+  teamMemberRoles: Array<{ mainTeam: boolean; role: string | null; team: { name: string } }>;
 };
 
 @Injectable()
@@ -67,12 +71,6 @@ export class JobOpeningsApplicationService {
     const companyName = this.resolveCompanyName(applicant);
     const profileSnapshot = this.buildProfileSnapshot(applicant, companyName);
     const coverLetterHtml = noteToHtml(input.coverLetter);
-    const primaryExperience = this.primaryExperience(applicant.experiences);
-    const webBase = (process.env.WEB_UI_BASE_URL || '').replace(/\/+$/, '');
-    const existingApplicantCount = await this.prisma.jobApplication.count({
-      where: { jobOpeningUid: jobOpening.uid },
-    });
-    const applicantCount = existingApplicantCount + 1;
     const jobBoardUrl = jobBoardDetailUrl(jobOpening.uid);
 
     await this.notificationServiceClient.sendNotification({
@@ -86,21 +84,11 @@ export class JobOpeningsApplicationService {
       },
       deliveryPayload: {
         body: {
-          applicantName: applicant.name,
-          applicantFirstName: this.firstName(applicant.name),
-          applicantRole: applicant.role?.trim() ?? '',
-          applicantCompany: primaryExperience?.company.trim() || companyName || '',
-          applicantWorkDuration: primaryExperience ? this.formatExperienceDates(primaryExperience) : '',
-          applicantLocation: this.formatLocation(applicant.location),
-          applicantSkills: applicant.skills.map((skill) => skill.title).filter(Boolean),
+          applicant: this.buildMemberCard(applicant),
           roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
           coverLetterHtml,
-          profileUrl: `${webBase}/members/${applicant.uid}`,
           applyUrl: jobBoardUrl,
-          preferencesUrl: `${webBase}/settings/email`,
-          applicantCount,
-          allApplicantsUrl: jobBoardUrl,
         },
       },
       entityType: 'JOB_OPENING',
@@ -202,7 +190,7 @@ export class JobOpeningsApplicationService {
         },
         teamMemberRoles: {
           orderBy: { mainTeam: 'desc' },
-          select: { mainTeam: true, team: { select: { name: true } } },
+          select: { mainTeam: true, role: true, team: { select: { name: true } } },
         },
       },
     });
@@ -305,29 +293,36 @@ export class JobOpeningsApplicationService {
     return { to, cc };
   }
 
-  private firstName(name: string) {
-    return name.trim().split(/\s+/)[0] || name;
+  private resolveHeadline(applicant: Applicant): MemberHeadline {
+    const teamRole = applicant.teamMemberRoles.find((role) => role.mainTeam) ?? applicant.teamMemberRoles[0];
+    if (teamRole) {
+      return { title: teamRole.role ?? applicant.role?.trim() ?? null, companyName: teamRole.team.name };
+    }
+    return { title: applicant.role?.trim() ?? null, companyName: applicant.currentCompany?.trim() || null };
   }
 
-  private primaryExperience(experiences: Applicant['experiences']) {
-    const current = experiences.find((experience) => experience.isCurrent);
-    if (current) return current;
-    return [...experiences].sort((a, b) => b.startDate.getTime() - a.startDate.getTime())[0] ?? null;
+  private formatHeadline(headline: MemberHeadline): string | null {
+    if (headline.title && headline.companyName) return `${headline.title}, ${headline.companyName}`;
+    return headline.title ?? null;
   }
 
-  private formatExperienceDates(experience: Applicant['experiences'][number]) {
-    const start = this.formatMonthYear(experience.startDate);
-    const end = experience.isCurrent || !experience.endDate ? 'Present' : this.formatMonthYear(experience.endDate);
-    return [start, end].filter(Boolean).join(' — ');
+  private formatLocation(location: ApplicantLocation): string | null {
+    if (!location) return null;
+    return [location.city, location.country].filter(Boolean).join(', ') || null;
   }
 
-  private formatMonthYear(date: Date) {
-    return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date);
-  }
-
-  private formatLocation(location: Applicant['location']) {
-    if (!location) return '';
-    return [location.city, location.country].filter(Boolean).join(', ');
+  // Shape consumed by the `memberCard` partial in the JOB_BOARD_APPLICATION_EMAIL template.
+  private buildMemberCard(applicant: Applicant) {
+    return {
+      name: applicant.name,
+      profileUrl: `${process.env.WEB_UI_BASE_URL}/members/${applicant.uid}`,
+      headline: this.formatHeadline(this.resolveHeadline(applicant)),
+      location: this.formatLocation(applicant.location),
+      skills: applicant.skills
+        .map((skill) => skill.title)
+        .filter(Boolean)
+        .slice(0, PROFILE_CARD_SKILLS_LIMIT),
+    };
   }
 
   private resolveCompanyName(applicant: Applicant): string | null {
