@@ -3795,6 +3795,7 @@ export class MembersService {
     signUpDto: any,
     options: {
       role?: string;
+      teamEmail?: string;
       team?: { uid?: string; name?: string; website?: string } | string;
       isTeamNew?: boolean;
       website?: string | null;
@@ -3805,13 +3806,26 @@ export class MembersService {
     // create a new member with accessLevel=L0 (existing flow)
     const member = await this.createMemberFromSignUpData(signUpDto);
 
-    // in one txn — persist Member.role (if provided) and handle team + role
+    // in one txn — persist Member.role / Member.teamEmail (if provided) and
+    // handle team + role
     await this.prisma.$transaction(async (tx) => {
-      // persist Member.role from request (even if no team is provided)
+      // persist Member.role and Member.teamEmail from request, both of which
+      // stand even if no team is provided. teamEmail lands on Member rather
+      // than on the TeamMemberRole it describes precisely because the company
+      // it refers to is optional: on TeamMemberRole there would be no row to
+      // write it to when someone gives the address but skips the select, and
+      // the answer would be dropped.
+      const memberUpdate: Prisma.MemberUpdateInput = {};
       if (options?.role) {
+        memberUpdate.role = options.role.trim();
+      }
+      if (options?.teamEmail) {
+        memberUpdate.teamEmail = options.teamEmail.trim();
+      }
+      if (Object.keys(memberUpdate).length > 0) {
         await tx.member.update({
           where: { uid: member.uid },
-          data: { role: options.role.trim() },
+          data: memberUpdate,
         });
       }
 
