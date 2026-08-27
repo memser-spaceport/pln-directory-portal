@@ -1,11 +1,5 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { MemberApprovalState, Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { CreateJobApplicationInput } from 'libs/contracts/src/schema/job-application';
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
@@ -24,7 +18,6 @@ type Applicant = {
   bio: string | null;
   githubHandler: string | null;
   linkedinHandler: string | null;
-  approvalState: MemberApprovalState | null;
   location: { city: string | null; country: string; region: string | null } | null;
   skills: Array<{ title: string }>;
   experiences: Array<{
@@ -176,7 +169,6 @@ export class JobOpeningsApplicationService {
         githubHandler: true,
         linkedinHandler: true,
         deletedAt: true,
-        memberApproval: { select: { state: true } },
         location: { select: { city: true, country: true, region: true } },
         skills: { select: { title: true } },
         experiences: {
@@ -220,7 +212,6 @@ export class JobOpeningsApplicationService {
       bio: member.bio,
       githubHandler: member.githubHandler,
       linkedinHandler: member.linkedinHandler,
-      approvalState: member.memberApproval?.state ?? null,
       location: member.location,
       skills: member.skills,
       experiences: member.experiences,
@@ -229,10 +220,24 @@ export class JobOpeningsApplicationService {
     };
   }
 
+  /**
+   * What an application needs, which is no longer an approved account.
+   *
+   * Approval used to gate this: an unapproved member got a 403 and the board
+   * sent them to the team's own posting instead. The review is still real and
+   * still runs, but it no longer holds up applying — it is a fact about the
+   * account rather than a condition on this button. Someone who signs up to
+   * apply for a job can now do the thing they came to do, and the PL team's
+   * review happens alongside it.
+   *
+   * Rejection is not handled here and never was: a rejected member is
+   * soft-deleted, so they do not reach this method at all.
+   *
+   * What survives are the two checks about the *application* rather than the
+   * account — a role and a job-search status, both of which travel to the
+   * hiring team and neither of which anyone else can supply.
+   */
   private assertCanApply(applicant: Applicant) {
-    if (applicant.approvalState !== MemberApprovalState.APPROVED) {
-      throw new ForbiddenException('Account must be approved before applying');
-    }
     if (!applicant.role?.trim()) {
       throw new BadRequestException('Current role is required before applying');
     }
