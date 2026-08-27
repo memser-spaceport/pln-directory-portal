@@ -34,6 +34,10 @@ const membersFactory = Factory.define<Omit<Member, 'id'>>(({ sequence, onCreate 
     uid: faker.helpers.slugify(`uid-${name.toLowerCase()}`),
     name,
     email: faker.internet.email(),
+    // Null, not a second faked address: it is only ever set by a job-board
+    // sign-up, and seeding one would make every fixture member look like they
+    // had made a claim about where they work.
+    teamEmail: null,
     imageUid: '',
     githubHandler: faker.internet.userName(name),
     discordHandler: faker.internet.userName(name),

@@ -105,6 +105,54 @@ describe('JobOpeningsSignUpService', () => {
     });
   });
 
+  /* The address is optional, and so is the company it refers to — so it has to
+     survive on its own. It rides in `options` beside `role` rather than in the
+     member payload, which is where `createMemberAndAttach` writes it to the
+     Member row. */
+  it('passes teamEmail through, with or without a team', async () => {
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@personal.com',
+      role: 'Engineer',
+      teamEmail: 'ada@newco.xyz',
+      team: { uid: 'team-1' },
+    });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][1]).toMatchObject({
+      teamEmail: 'ada@newco.xyz',
+      team: { uid: 'team-1' },
+    });
+
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@personal.com',
+      role: 'Engineer',
+      teamEmail: 'ada@newco.xyz',
+    });
+
+    expect(membersService.createMemberAndAttach.mock.calls[1][1]).toMatchObject({
+      teamEmail: 'ada@newco.xyz',
+      team: undefined,
+    });
+  });
+
+  it('leaves teamEmail undefined when it was not given', async () => {
+    await service.signUp({ name: 'Ada', email: 'ada@example.com', role: 'Engineer' });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][1].teamEmail).toBeUndefined();
+  });
+
+  /* It is an address or it is absent — a half-typed one must not reach the
+     Member row, because the whole point of the field is that a reviewer can
+     act on it. */
+  it('rejects a malformed teamEmail and accepts its absence', () => {
+    const base = { name: 'Ada', email: 'ada@example.com', role: 'Engineer' };
+
+    expect(JobBoardSignUpSchema.safeParse({ ...base, teamEmail: 'not-an-email' }).success).toBe(false);
+    expect(JobBoardSignUpSchema.safeParse({ ...base, teamEmail: '' }).success).toBe(false);
+    expect(JobBoardSignUpSchema.safeParse(base).success).toBe(true);
+  });
+
   it('creates a new team when isTeamNew is true', async () => {
     await service.signUp({
       name: 'Ada',

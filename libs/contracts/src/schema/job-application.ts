@@ -26,6 +26,12 @@ export const JobBoardSignUpSchema = z
   .object({
     name: z.string().trim().min(1).max(200),
     email: z.string().trim().email(),
+    /* The address at the company named in `team` — evidence for that claim, so
+       the PL team reviewing the account can see where the person works. Never a
+       second identity: `email` above is the one address the account is created
+       on. Optional independently of `team`, because the company select is
+       optional too and an answer given without one is still an answer. */
+    teamEmail: z.string().trim().email().max(200).optional(),
     linkedinHandler: z.string().trim().min(1).max(200).optional(),
     role: z.string().trim().min(1).max(200),
     isTeamNew: z.boolean().optional(),
