@@ -43,7 +43,15 @@ export const JobBoardSignUpSchema = z
        it. A third would be a third chance to drift. */
     jobSearchStatus: JobSearchStatusWireSchema.optional(),
     linkedinHandler: z.string().trim().min(1).max(200).optional(),
-    role: z.string().trim().min(1).max(200).optional(),
+    /* Optional at sign-up: the form lets someone skip current role and fill it
+       on the profile step before applying. Blank is the same as omitted — a
+       skipped field, not a failed one. */
+    role: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .transform((value) => (value ? value : undefined)),
     isTeamNew: z.boolean().optional(),
     team: JobBoardSignUpTeamSchema.optional(),
   })

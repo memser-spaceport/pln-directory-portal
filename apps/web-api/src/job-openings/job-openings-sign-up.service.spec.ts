@@ -253,8 +253,20 @@ describe('JobOpeningsSignUpService', () => {
     expect(prisma).not.toHaveProperty('jobApplication');
   });
 
-  it('accepts a sign-up with no role', () => {
-    expect(JobBoardSignUpSchema.safeParse({ name: 'Ada', email: 'ada@example.com' }).success).toBe(true);
+  it('creates a member when role is omitted', async () => {
+    await service.signUp({ name: 'Ada', email: 'ada@example.com' });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][1].role).toBeUndefined();
+  });
+
+  it('treats a blank role as omitted', () => {
+    const base = { name: 'Ada', email: 'ada@example.com' };
+
+    expect(JobBoardSignUpSchema.parse(base).role).toBeUndefined();
+    expect(JobBoardSignUpSchema.parse({ ...base, role: '' }).role).toBeUndefined();
+    expect(JobBoardSignUpSchema.parse({ ...base, role: '   ' }).role).toBeUndefined();
+    expect(JobBoardSignUpSchema.parse({ ...base, role: 'Engineer' }).role).toBe('Engineer');
+    expect(JobBoardSignUpSchema.safeParse({ ...base, role: 'x'.repeat(201) }).success).toBe(false);
   });
 
   it('requires team.name when isTeamNew is true', () => {
