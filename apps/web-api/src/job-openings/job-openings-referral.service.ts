@@ -5,6 +5,7 @@ import { NotificationServiceClient } from '../notifications/notification-service
 import { noteToHtml } from './job-openings-email-html';
 import { resolveVisibleJobOpening } from './job-openings-resolve';
 import { deriveReferralBlurb } from './job-openings-referral-blurb';
+import { jobBoardDetailUrl } from './job-openings-url';
 
 const JOB_BOARD_REFERRAL_TEMPLATE = 'JOB_BOARD_REFERRAL_EMAIL';
 
@@ -50,7 +51,7 @@ export class JobOpeningsReferralService {
     const recipientGreetingName = jobReferEmail ? `${jobOpening.team.name} team` : recipients[0]?.name || 'there';
 
     const note = input.note.trim();
-    const applyUrl = jobOpening.sourceLink || null;
+    const applyUrl = jobBoardDetailUrl(jobOpening.uid);
 
     const [referrerHeadline, referredHeadline] = await Promise.all([
       this.resolveHeadline(referrer.uid),
@@ -132,7 +133,7 @@ export class JobOpeningsReferralService {
       this.resolveHeadline(referred.uid),
     ]);
 
-    const applyUrl = jobOpening.sourceLink || null;
+    const applyUrl = jobBoardDetailUrl(jobOpening.uid);
     const blurb = deriveReferralBlurb(referred.bio);
 
     // A bio's own leading sentence already restates "X is TITLE at COMPANY"

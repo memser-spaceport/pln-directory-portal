@@ -12,6 +12,7 @@ import { NotificationServiceClient } from '../notifications/notification-service
 import { noteToHtml } from './job-openings-email-html';
 import { resolveVisibleJobOpening, type ResolvedJobOpening } from './job-openings-resolve';
 import { isProtocolLabsTeam } from './pin-protocol-labs-team';
+import { jobBoardDetailUrl } from './job-openings-url';
 
 const JOB_BOARD_APPLICATION_TEMPLATE = 'JOB_BOARD_APPLICATION_EMAIL';
 
@@ -98,7 +99,7 @@ export class JobOpeningsApplicationService {
           teamName: jobOpening.team.name,
           coverLetterHtml,
           profileUrl: `${webBase}/members/${applicant.uid}`,
-          applyUrl: jobOpening.sourceLink || null,
+          applyUrl: jobBoardDetailUrl(jobOpening.uid),
           preferencesUrl: `${webBase}/settings/email`,
         },
       },

@@ -72,6 +72,7 @@ describe('JobOpeningsReferralService', () => {
     prisma = buildPrismaMock();
     notificationServiceClient = { sendNotification: jest.fn().mockResolvedValue({}) };
     service = new JobOpeningsReferralService(prisma as unknown as PrismaService, notificationServiceClient as never);
+    process.env.WEB_UI_BASE_URL = 'https://directory.test';
   });
 
   function mockMembers() {
@@ -110,6 +111,13 @@ describe('JobOpeningsReferralService', () => {
         recipientsInfo: {
           to: [lead.email],
           cc: [leadTwo.email, referrer.email, referred.email],
+        },
+        deliveryPayload: {
+          body: expect.objectContaining({
+            applyUrl: 'https://directory.test/jobs?job=job-1',
+            roleTitle: 'Staff Engineer',
+            teamName: 'Airship',
+          }),
         },
       })
     );

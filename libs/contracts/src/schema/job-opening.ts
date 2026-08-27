@@ -22,6 +22,10 @@ export const JobsListQueryParams = z.object({
   // means. Note `limit` pages TEAMS, not roles, so a scoped query returns all of
   // that team's roles in a single group.
   teamUid: z.string().optional(),
+  // One job opening. The board's `?job=` deep link fetches the role even when
+  // it is not on the first page of the current filters, so the drawer can open
+  // from a shared or emailed link.
+  jobUid: z.string().optional(),
   roleCategory: ListParam,
   seniority: ListParam,
   focus: ListParam,

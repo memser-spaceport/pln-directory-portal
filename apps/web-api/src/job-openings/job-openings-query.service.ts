@@ -51,6 +51,12 @@ export class JobOpeningsQueryService {
       and.push({ teamUid: query.teamUid });
     }
 
+    // Same as teamUid: not a facet, so it survives count-overrides. Used by
+    // the board's `?job=` deep link to load one role without paging the list.
+    if (query.jobUid) {
+      and.push({ uid: query.jobUid });
+    }
+
     if (!overrides.dropQ && query.q) {
       and.push({
         OR: [

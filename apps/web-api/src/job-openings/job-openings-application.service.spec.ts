@@ -134,7 +134,7 @@ describe('JobOpeningsApplicationService', () => {
             roleTitle: 'Staff Engineer',
             teamName: 'Airship',
             profileUrl: 'https://directory.test/members/member-1',
-            applyUrl: 'https://jobs.example/role',
+            applyUrl: 'https://directory.test/jobs?job=job-1',
             preferencesUrl: 'https://directory.test/settings/email',
           }),
         },
