@@ -16,6 +16,16 @@ export class JobOpeningsSignUpService {
         name: input.name,
         email: input.email,
         linkedinHandler: input.linkedinHandler,
+        /* On the dto rather than in `options` beside `teamEmail`, and the
+           asymmetry is deliberate. `teamEmail` has no entry in the member
+           create path's `directFields` whitelist, so it has nowhere to go but
+           the follow-up update `options` drives. This one does have a route:
+           `prepareMemberFromParticipantRequest` already calls
+           `assignJobSearchStatusFromInput`, which is how every other writer of
+           this column (the members controller, the admin service) sets it and
+           which owns the wire→enum mapping. So it lands in the same insert that
+           creates the member, and no new code writes it. */
+        jobSearchStatus: input.jobSearchStatus,
         signUpSource: JOB_BOARD_SIGN_UP_SOURCE,
       },
       {

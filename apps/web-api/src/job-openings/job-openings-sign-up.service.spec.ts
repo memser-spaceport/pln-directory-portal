@@ -153,6 +153,45 @@ describe('JobOpeningsSignUpService', () => {
     expect(JobBoardSignUpSchema.safeParse(base).success).toBe(true);
   });
 
+  /* Unlike `teamEmail` one block up, this rides in the member payload rather
+     than in `options` — `prepareMemberFromParticipantRequest` already maps and
+     writes it on the create path, so it needs no follow-up update and no new
+     code. Guarding the argument position is the point of this test: moving it
+     to `options` would be silently ignored, since nothing there reads it. */
+  it('passes jobSearchStatus through on the member payload', async () => {
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@example.com',
+      role: 'Engineer',
+      jobSearchStatus: 'actively-looking',
+    });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][0]).toMatchObject({
+      jobSearchStatus: 'actively-looking',
+    });
+    expect(membersService.createMemberAndAttach.mock.calls[0][1].jobSearchStatus).toBeUndefined();
+  });
+
+  it('leaves jobSearchStatus undefined when it was not given', async () => {
+    await service.signUp({ name: 'Ada', email: 'ada@example.com', role: 'Engineer' });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][0].jobSearchStatus).toBeUndefined();
+  });
+
+  /* The three wire values and nothing else. They have to match the
+     `JobSearchStatus` Prisma enum, and the schema is the only thing standing
+     between a typo and a 500 from `toPrismaJobSearchStatus` further in. */
+  it('accepts the three job search statuses and refuses anything else', () => {
+    const base = { name: 'Ada', email: 'ada@example.com', role: 'Engineer' };
+
+    for (const status of ['actively-looking', 'open-to-right-role', 'not-looking']) {
+      expect(JobBoardSignUpSchema.safeParse({ ...base, jobSearchStatus: status }).success).toBe(true);
+    }
+    expect(JobBoardSignUpSchema.safeParse({ ...base, jobSearchStatus: 'ACTIVELY_LOOKING' }).success).toBe(false);
+    expect(JobBoardSignUpSchema.safeParse({ ...base, jobSearchStatus: '' }).success).toBe(false);
+    expect(JobBoardSignUpSchema.safeParse(base).success).toBe(true);
+  });
+
   it('creates a new team when isTeamNew is true', async () => {
     await service.signUp({
       name: 'Ada',
