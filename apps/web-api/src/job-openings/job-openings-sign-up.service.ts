@@ -11,6 +11,11 @@ export class JobOpeningsSignUpService {
   constructor(private readonly membersService: MembersService, private readonly prisma: PrismaService) {}
 
   async signUp(input: JobBoardSignUpInput) {
+    /* A selected team is a regular network member. Job Aspirant is only for
+       the no-team apply-only path — and `signUpSource: job-board` is the same
+       marker on the login cookie, which omits policies. */
+    const hasSelectedTeam = Boolean(input.team?.uid || input.team?.name);
+
     const member = await this.membersService.createMemberAndAttach(
       {
         name: input.name,
@@ -26,7 +31,7 @@ export class JobOpeningsSignUpService {
            which owns the wire→enum mapping. So it lands in the same insert that
            creates the member, and no new code writes it. */
         jobSearchStatus: input.jobSearchStatus,
-        signUpSource: JOB_BOARD_SIGN_UP_SOURCE,
+        signUpSource: hasSelectedTeam ? undefined : JOB_BOARD_SIGN_UP_SOURCE,
       },
       {
         role: input.role,
@@ -37,7 +42,9 @@ export class JobOpeningsSignUpService {
       }
     );
 
-    await this.assignJobAspirantPolicy(member.uid);
+    if (!hasSelectedTeam) {
+      await this.assignJobAspirantPolicy(member.uid);
+    }
     return member;
   }
 

@@ -59,7 +59,7 @@ describe('JobOpeningsSignUpService', () => {
     );
   });
 
-  it('assigns the Job Aspirant policy after creating the member', async () => {
+  it('assigns the Job Aspirant policy after creating a member with no team', async () => {
     await service.signUp({ name: 'Ada', email: 'ada@example.com', role: 'Engineer' });
 
     expect(prisma.policy.findUnique).toHaveBeenCalledWith({
@@ -79,6 +79,33 @@ describe('JobOpeningsSignUpService', () => {
         policyUid: 'policy-job-aspirant',
       },
     });
+  });
+
+  it('does not assign Job Aspirant or job-board signUpSource when an existing team is selected', async () => {
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@example.com',
+      role: 'Engineer',
+      team: { uid: 'team-1' },
+    });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][0].signUpSource).toBeUndefined();
+    expect(prisma.policy.findUnique).not.toHaveBeenCalled();
+    expect(prisma.policyAssignment.upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not assign Job Aspirant or job-board signUpSource when creating a new team', async () => {
+    await service.signUp({
+      name: 'Ada',
+      email: 'ada@example.com',
+      role: 'Engineer',
+      isTeamNew: true,
+      team: { name: 'New Co', website: 'https://new.co' },
+    });
+
+    expect(membersService.createMemberAndAttach.mock.calls[0][0].signUpSource).toBeUndefined();
+    expect(prisma.policy.findUnique).not.toHaveBeenCalled();
+    expect(prisma.policyAssignment.upsert).not.toHaveBeenCalled();
   });
 
   it('throws when the Job Aspirant policy is missing', async () => {
@@ -224,6 +251,10 @@ describe('JobOpeningsSignUpService', () => {
     await service.signUp({ name: 'Ada', email: 'ada@example.com', role: 'Engineer' });
     expect(Object.keys(membersService)).toEqual(['createMemberAndAttach']);
     expect(prisma).not.toHaveProperty('jobApplication');
+  });
+
+  it('accepts a sign-up with no role', () => {
+    expect(JobBoardSignUpSchema.safeParse({ name: 'Ada', email: 'ada@example.com' }).success).toBe(true);
   });
 
   it('requires team.name when isTeamNew is true', () => {

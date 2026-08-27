@@ -43,7 +43,7 @@ export const JobBoardSignUpSchema = z
        it. A third would be a third chance to drift. */
     jobSearchStatus: JobSearchStatusWireSchema.optional(),
     linkedinHandler: z.string().trim().min(1).max(200).optional(),
-    role: z.string().trim().min(1).max(200),
+    role: z.string().trim().min(1).max(200).optional(),
     isTeamNew: z.boolean().optional(),
     team: JobBoardSignUpTeamSchema.optional(),
   })
