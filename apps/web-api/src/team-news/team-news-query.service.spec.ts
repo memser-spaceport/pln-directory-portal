@@ -582,3 +582,194 @@ describe('TeamNewsQueryService.getRecentCountsByTeam', () => {
     expect(result.counts).not.toHaveProperty('quiet-team');
   });
 });
+
+describe('TeamNewsQueryService.getDigestNewsPicks', () => {
+  let service: TeamNewsQueryService;
+
+  const teamNewsItemFindMany = jest.fn();
+  const teamNewsForumLinkFindMany = jest.fn();
+  const teamNewsUpvoteGroupBy = jest.fn();
+  const teamNewsUpvoteFindMany = jest.fn();
+  const getForYouTeamUidsForMembers = jest.fn();
+
+  const makeRow = (overrides: Record<string, unknown> = {}) => ({
+    uid: 'news-1',
+    teamUid: 'team-1',
+    eventType: 'FUNDING',
+    eventDate: new Date('2026-08-20T00:00:00.000Z'),
+    title: 'Raised Series A',
+    summary: 'Funding round closed',
+    contentHtml: null,
+    sourceUrl: 'https://example.com/news',
+    sourceUrls: ['https://example.com/news'],
+    sourceDomain: 'example.com',
+    tags: ['funding'],
+    editorialRank: null,
+    viewCount: 0,
+    createdAt: new Date('2026-08-21T00:00:00.000Z'),
+    team: {
+      uid: 'team-1',
+      name: 'Acme Labs',
+      logo: { url: 'https://example.com/logo.png' },
+      teamFocusAreas: [
+        {
+          focusArea: { title: 'Neurotech', parentUid: null },
+          ancestorArea: { title: 'Neurotech' },
+        },
+      ],
+    },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    teamNewsItemFindMany.mockResolvedValue([]);
+    teamNewsForumLinkFindMany.mockResolvedValue([]);
+    teamNewsUpvoteGroupBy.mockResolvedValue([]);
+    teamNewsUpvoteFindMany.mockResolvedValue([]);
+    getForYouTeamUidsForMembers.mockResolvedValue(new Map());
+    service = new TeamNewsQueryService(
+      {
+        teamNewsItem: { findMany: teamNewsItemFindMany },
+        teamNewsForumLink: { findMany: teamNewsForumLinkFindMany },
+        teamNewsUpvote: { groupBy: teamNewsUpvoteGroupBy, findMany: teamNewsUpvoteFindMany },
+      } as unknown as PrismaService,
+      { getForYouTeamUidsForMembers } as never
+    );
+  });
+
+  const since = new Date('2026-08-20T00:00:00.000Z');
+  const until = new Date('2026-08-21T00:00:00.000Z');
+
+  it('selects up to 3 For You items, latest per team', async () => {
+    teamNewsItemFindMany.mockResolvedValue([
+      makeRow({
+        uid: 'newer-a',
+        teamUid: 'team-a',
+        eventDate: new Date('2026-08-20T18:00:00.000Z'),
+        createdAt: new Date('2026-08-20T18:00:00.000Z'),
+        team: { uid: 'team-a', name: 'A', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'older-a',
+        teamUid: 'team-a',
+        eventDate: new Date('2026-08-20T10:00:00.000Z'),
+        createdAt: new Date('2026-08-20T10:00:00.000Z'),
+        team: { uid: 'team-a', name: 'A', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'b',
+        teamUid: 'team-b',
+        eventDate: new Date('2026-08-20T16:00:00.000Z'),
+        createdAt: new Date('2026-08-20T16:00:00.000Z'),
+        team: { uid: 'team-b', name: 'B', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'c',
+        teamUid: 'team-c',
+        eventDate: new Date('2026-08-20T14:00:00.000Z'),
+        createdAt: new Date('2026-08-20T14:00:00.000Z'),
+        team: { uid: 'team-c', name: 'C', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'd',
+        teamUid: 'team-d',
+        eventDate: new Date('2026-08-20T12:00:00.000Z'),
+        createdAt: new Date('2026-08-20T12:00:00.000Z'),
+        team: { uid: 'team-d', name: 'D', logo: null, teamFocusAreas: [] },
+      }),
+    ]);
+    getForYouTeamUidsForMembers.mockResolvedValue(new Map([['member-1', ['team-a', 'team-b', 'team-c', 'team-d']]]));
+
+    const result = await service.getDigestNewsPicks({
+      memberUids: ['member-1'],
+      sinceCreatedAt: since,
+      untilCreatedAt: until,
+    });
+
+    expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['newer-a', 'b', 'c']);
+    expect(result.windowCount).toBe(5);
+  });
+
+  it('does not pad a 1-item For You list with global items', async () => {
+    teamNewsItemFindMany.mockResolvedValue([
+      makeRow({
+        uid: 'global-newest',
+        teamUid: 'other',
+        eventDate: new Date('2026-08-20T20:00:00.000Z'),
+        team: { uid: 'other', name: 'Other', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'for-you',
+        teamUid: 'team-keep',
+        eventDate: new Date('2026-08-20T10:00:00.000Z'),
+        team: { uid: 'team-keep', name: 'Keep', logo: null, teamFocusAreas: [] },
+      }),
+    ]);
+    getForYouTeamUidsForMembers.mockResolvedValue(new Map([['member-1', ['team-keep']]]));
+
+    const result = await service.getDigestNewsPicks({
+      memberUids: ['member-1'],
+      sinceCreatedAt: since,
+      untilCreatedAt: until,
+    });
+
+    expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['for-you']);
+  });
+
+  it('falls back to global newest-3 when For You is empty', async () => {
+    teamNewsItemFindMany.mockResolvedValue([
+      makeRow({
+        uid: 'n1',
+        teamUid: 't1',
+        eventDate: new Date('2026-08-20T03:00:00.000Z'),
+        team: { uid: 't1', name: 'T1', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'n2',
+        teamUid: 't2',
+        eventDate: new Date('2026-08-20T02:00:00.000Z'),
+        team: { uid: 't2', name: 'T2', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'n3',
+        teamUid: 't3',
+        eventDate: new Date('2026-08-20T01:00:00.000Z'),
+        team: { uid: 't3', name: 'T3', logo: null, teamFocusAreas: [] },
+      }),
+      makeRow({
+        uid: 'n4',
+        teamUid: 't4',
+        eventDate: new Date('2026-08-20T00:00:00.000Z'),
+        team: { uid: 't4', name: 'T4', logo: null, teamFocusAreas: [] },
+      }),
+    ]);
+    getForYouTeamUidsForMembers.mockResolvedValue(new Map([['member-1', []]]));
+
+    const result = await service.getDigestNewsPicks({
+      memberUids: ['member-1'],
+      sinceCreatedAt: since,
+      untilCreatedAt: until,
+    });
+
+    expect(result.picks['member-1'].map((i) => i.uid)).toEqual(['n1', 'n2', 'n3']);
+  });
+
+  it('queries the watermark createdAt window without a 50-item cap', async () => {
+    await service.getDigestNewsPicks({
+      memberUids: ['member-1'],
+      sinceCreatedAt: since,
+      untilCreatedAt: until,
+    });
+
+    expect(teamNewsItemFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          createdAt: { gt: since, lte: until },
+        }),
+        orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
+      })
+    );
+    expect(teamNewsItemFindMany.mock.calls[0][0].take).toBeUndefined();
+  });
+});

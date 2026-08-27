@@ -15,6 +15,7 @@ import type {
   TeamNewsLatestResponse,
   TeamNewsPopularResponse,
   TeamNewsRecentResponse,
+  TeamNewsDigestPicksResponse,
 } from 'libs/contracts/src/schema/team-news';
 import { buildTeamNewsEventDateWhere } from './team-news-event-date.where';
 import {
@@ -22,6 +23,7 @@ import {
   TEAM_NEWS_EXCLUDED_TEAM_NAMES,
 } from './team-news-public-list.config';
 import { TeamNewsSuggestionsService } from './team-news-suggestions.service';
+import { selectForYouNewsItems } from './select-for-you-news-items';
 
 const EMPTY_DISCUSSION: TeamNewsDiscussion = { count: 0, latestTopicUrl: null };
 const POPULAR_WINDOW_DAYS = 14;
@@ -470,8 +472,57 @@ export class TeamNewsQueryService {
   }): Promise<TeamNewsRecentResponse> {
     const until = opts.untilCreatedAt ?? new Date();
     const since = opts.sinceCreatedAt ?? new Date(until.getTime() - 24 * 60 * 60 * 1000);
-    const limit = opts.limit ?? 50;
+    const { items } = await this.loadWatermarkWindow(since, until, opts.limit ?? 50);
 
+    return {
+      generatedAt: new Date().toISOString(),
+      since: since.toISOString(),
+      until: until.toISOString(),
+      items,
+    };
+  }
+
+  /**
+   * Per-member digest news: For You ranking over the watermark window, falling
+   * back to the global newest-N when a member has no matching For You items.
+   * Consumed by the notification service. Does not cap the window load — a
+   * busy weekly ingest must not drop a member's teams behind a 50-item cut.
+   */
+  async getDigestNewsPicks(opts: {
+    memberUids: string[];
+    sinceCreatedAt?: Date;
+    untilCreatedAt?: Date;
+    limit?: number;
+  }): Promise<TeamNewsDigestPicksResponse> {
+    const until = opts.untilCreatedAt ?? new Date();
+    const since = opts.sinceCreatedAt ?? new Date(until.getTime() - 24 * 60 * 60 * 1000);
+    const limit = opts.limit ?? 3;
+
+    const { items } = await this.loadWatermarkWindow(since, until);
+    const fallback = items.slice(0, limit);
+    const uniqueMemberUids = [...new Set(opts.memberUids)];
+
+    const forYouByMember =
+      uniqueMemberUids.length > 0 && this.suggestionsService
+        ? await this.suggestionsService.getForYouTeamUidsForMembers(uniqueMemberUids)
+        : new Map<string, string[]>();
+
+    const picks: Record<string, TeamNewsItemDto[]> = {};
+    for (const memberUid of uniqueMemberUids) {
+      const forYouItems = selectForYouNewsItems(items, new Set(forYouByMember.get(memberUid) ?? [])).slice(0, limit);
+      picks[memberUid] = forYouItems.length > 0 ? forYouItems : fallback;
+    }
+
+    return {
+      generatedAt: new Date().toISOString(),
+      since: since.toISOString(),
+      until: until.toISOString(),
+      windowCount: items.length,
+      picks,
+    };
+  }
+
+  private async loadWatermarkWindow(since: Date, until: Date, limit?: number): Promise<{ items: TeamNewsItemDto[] }> {
     const excluded = this.excludedTeamsWhere();
     const where: Prisma.TeamNewsItemWhereInput = {
       createdAt: { gt: since, lte: until },
@@ -481,7 +532,7 @@ export class TeamNewsQueryService {
     const rows = await this.prisma.teamNewsItem.findMany({
       where,
       orderBy: [{ eventDate: 'desc' }, { createdAt: 'desc' }],
-      take: limit,
+      ...(limit !== undefined ? { take: limit } : {}),
       include: {
         team: {
           select: {
@@ -498,9 +549,6 @@ export class TeamNewsQueryService {
     const [discussions, upvotes] = await Promise.all([this.loadDiscussions(itemUids), this.loadUpvotes(itemUids)]);
 
     return {
-      generatedAt: new Date().toISOString(),
-      since: since.toISOString(),
-      until: until.toISOString(),
       items: rows.map((row) => this.toDto(row, discussions.get(row.uid), new Set(), upvotes)),
     };
   }

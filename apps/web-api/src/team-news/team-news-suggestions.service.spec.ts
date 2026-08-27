@@ -17,11 +17,19 @@ describe('TeamNewsSuggestionsService', () => {
   const teamMemberRoleFindMany = jest.fn();
   const teamFindMany = jest.fn();
   const getFollowedTeamUids = jest.fn();
+  const getFollowedTeamUidsByMembers = jest.fn();
   const countFollowersByTeam = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
     getFollowedTeamUids.mockResolvedValue(new Set());
+    getFollowedTeamUidsByMembers.mockImplementation(async (uids: string[]) => {
+      const map = new Map<string, Set<string>>();
+      for (const uid of uids) {
+        map.set(uid, await getFollowedTeamUids(uid));
+      }
+      return map;
+    });
     countFollowersByTeam.mockResolvedValue(new Map());
     teamMemberRoleFindMany.mockResolvedValue([]);
     teamFindMany.mockResolvedValue([]);
@@ -33,6 +41,7 @@ describe('TeamNewsSuggestionsService', () => {
       } as unknown as PrismaService,
       {
         getFollowedTeamUids,
+        getFollowedTeamUidsByMembers,
         countFollowersByTeam,
       } as unknown as FollowsService
     );
@@ -256,7 +265,7 @@ describe('TeamNewsSuggestionsService', () => {
     });
 
     it('includes memberships even when those teams are not followed', async () => {
-      teamMemberRoleFindMany.mockResolvedValue([{ teamUid: 'seed-team' }]);
+      teamMemberRoleFindMany.mockResolvedValue([{ memberUid: 'member-1', teamUid: 'seed-team' }]);
       getFollowedTeamUids.mockResolvedValue(new Set());
       teamFindMany.mockResolvedValueOnce([seedTeam]).mockResolvedValueOnce([]);
 
@@ -264,7 +273,7 @@ describe('TeamNewsSuggestionsService', () => {
     });
 
     it('unions memberships, follows, and matching candidates without a display cap', async () => {
-      teamMemberRoleFindMany.mockResolvedValue([{ teamUid: 'seed-team' }]);
+      teamMemberRoleFindMany.mockResolvedValue([{ memberUid: 'member-1', teamUid: 'seed-team' }]);
       getFollowedTeamUids.mockResolvedValue(new Set(['followed-team']));
 
       const candidates = Array.from({ length: 25 }, (_, i) => makeCandidate(`cand-${i}`, `Cand ${i}`));
@@ -287,7 +296,7 @@ describe('TeamNewsSuggestionsService', () => {
     });
 
     it('still returns seed teams when they have no matching attributes', async () => {
-      teamMemberRoleFindMany.mockResolvedValue([{ teamUid: 'bare-team' }]);
+      teamMemberRoleFindMany.mockResolvedValue([{ memberUid: 'member-1', teamUid: 'bare-team' }]);
       getFollowedTeamUids.mockResolvedValue(new Set());
       teamFindMany.mockResolvedValueOnce([
         {
@@ -300,6 +309,108 @@ describe('TeamNewsSuggestionsService', () => {
 
       await expect(service.getForYouTeamUids('member-1')).resolves.toEqual(['bare-team']);
       expect(teamFindMany).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getForYouTeamUidsForMembers', () => {
+    const seedTeam = {
+      uid: 'seed-team',
+      teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+      communityAffiliations: [],
+      industryTags: [],
+    };
+
+    it('returns empty lists when no member has a team or follow', async () => {
+      const byMember = await service.getForYouTeamUidsForMembers(['member-1', 'member-2']);
+
+      expect([...byMember.entries()]).toEqual([
+        ['member-1', []],
+        ['member-2', []],
+      ]);
+      expect(teamFindMany).not.toHaveBeenCalled();
+    });
+
+    it('unions memberships, follows, and matching candidates per member', async () => {
+      teamMemberRoleFindMany.mockResolvedValue([
+        { memberUid: 'member-1', teamUid: 'seed-team' },
+        { memberUid: 'member-2', teamUid: 'seed-team' },
+      ]);
+      getFollowedTeamUidsByMembers.mockResolvedValue(
+        new Map([
+          ['member-1', new Set(['followed-team'])],
+          ['member-2', new Set()],
+        ])
+      );
+      teamFindMany
+        .mockResolvedValueOnce([
+          seedTeam,
+          {
+            uid: 'followed-team',
+            teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+            communityAffiliations: [],
+            industryTags: [],
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            uid: 'cand-1',
+            name: 'Cand 1',
+            shortDescription: null,
+            logo: null,
+            teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+            communityAffiliations: [],
+            industryTags: [],
+          },
+        ]);
+
+      const byMember = await service.getForYouTeamUidsForMembers(['member-1', 'member-2']);
+
+      expect(byMember.get('member-1')).toEqual(expect.arrayContaining(['seed-team', 'followed-team', 'cand-1']));
+      expect(byMember.get('member-1')).toHaveLength(3);
+      expect(byMember.get('member-2')).toEqual(expect.arrayContaining(['seed-team', 'cand-1']));
+      expect(byMember.get('member-2')).toHaveLength(2);
+    });
+
+    it('matches getForYouTeamUids for the same member', async () => {
+      teamMemberRoleFindMany.mockResolvedValue([{ memberUid: 'member-1', teamUid: 'seed-team' }]);
+      getFollowedTeamUids.mockResolvedValue(new Set(['followed-team']));
+      const candidates = [
+        {
+          uid: 'cand-1',
+          name: 'Cand 1',
+          shortDescription: null,
+          logo: null,
+          teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+          communityAffiliations: [],
+          industryTags: [],
+        },
+      ];
+      teamFindMany
+        .mockResolvedValueOnce([
+          seedTeam,
+          {
+            uid: 'followed-team',
+            teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+            communityAffiliations: [],
+            industryTags: [],
+          },
+        ])
+        .mockResolvedValueOnce(candidates)
+        .mockResolvedValueOnce([
+          seedTeam,
+          {
+            uid: 'followed-team',
+            teamFocusAreas: [{ ancestorArea: { title: 'Storage' } }],
+            communityAffiliations: [],
+            industryTags: [],
+          },
+        ])
+        .mockResolvedValueOnce(candidates);
+
+      const single = await service.getForYouTeamUids('member-1');
+      const batched = await service.getForYouTeamUidsForMembers(['member-1']);
+
+      expect(batched.get('member-1')).toEqual(single);
     });
   });
 });

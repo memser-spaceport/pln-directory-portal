@@ -385,6 +385,24 @@ export const TeamNewsRecentResponseSchema = z.object({
   items: z.array(TeamNewsItemSchema),
 });
 
+// POST /v1/team-news/digest-picks — per-member For You ranking over the same
+// watermark window as GET /recent. Service-auth only (notification digest job).
+// Empty For You for a member falls back to the global newest `limit` items.
+export const TeamNewsDigestPicksRequestSchema = z.object({
+  memberUids: z.array(z.string()).min(1).max(200),
+  sinceCreatedAt: z.string().optional(),
+  untilCreatedAt: z.string().optional(),
+  limit: z.number().int().min(1).max(3).optional().default(3),
+});
+
+export const TeamNewsDigestPicksResponseSchema = z.object({
+  generatedAt: z.string(),
+  since: z.string(),
+  until: z.string(),
+  windowCount: z.number().int().min(0),
+  picks: z.record(z.string(), z.array(TeamNewsItemSchema)),
+});
+
 // GET /v1/team-news/latest — ingestion time of the newest news item the public
 // feed would show, and nothing else. Powers the "new news" dot on the app
 // header's Home button: the client compares this against the last time it
@@ -421,6 +439,8 @@ export type TeamNewsByTeamQuery = z.infer<typeof TeamNewsByTeamQueryParams>;
 export type TeamNewsByTeamResponse = z.infer<typeof TeamNewsByTeamResponseSchema>;
 export type TeamNewsRecentQuery = z.infer<typeof TeamNewsRecentQueryParams>;
 export type TeamNewsRecentResponse = z.infer<typeof TeamNewsRecentResponseSchema>;
+export type TeamNewsDigestPicksRequest = z.infer<typeof TeamNewsDigestPicksRequestSchema>;
+export type TeamNewsDigestPicksResponse = z.infer<typeof TeamNewsDigestPicksResponseSchema>;
 export type TeamNewsLatestResponse = z.infer<typeof TeamNewsLatestResponseSchema>;
 export type TeamNewsDiscussion = z.infer<typeof TeamNewsDiscussionSchema>;
 export type CreateTeamNewsDiscussionRequest = z.infer<typeof CreateTeamNewsDiscussionRequestSchema>;
