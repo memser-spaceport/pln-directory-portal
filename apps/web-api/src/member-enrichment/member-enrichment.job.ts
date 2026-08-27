@@ -47,21 +47,13 @@ export class MemberEnrichmentJob {
 
       if (members.length === 0) return;
 
-      let enriched = 0;
-      let failed = 0;
-
-      for (const member of members) {
-        try {
-          await this.memberEnrichmentService.enrichMember(member.uid);
-          enriched++;
-        } catch (error) {
-          this.logger.error(`Failed to enrich member ${member.uid}: ${error.message}`, error.stack);
-          failed++;
-        }
-      }
+      const { started, skipped } = await this.memberEnrichmentService.runEnrichmentBatch(
+        members.map((m) => m.uid),
+        'system-cron'
+      );
 
       this.logger.log(
-        `Member enrichment job completed: ${enriched} enriched, ${failed} failed out of ${members.length} total`
+        `Member enrichment job completed: ${started} started, ${skipped} skipped out of ${members.length} total`
       );
     } finally {
       this.isEnrichmentRunning = false;

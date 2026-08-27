@@ -3,7 +3,7 @@ import { JobOpeningStatus, Prisma } from '@prisma/client';
 import type { JobsListQuery } from 'libs/contracts/src/schema/job-opening';
 import { PrismaService } from '../shared/prisma.service';
 import { buildJobOpeningDateWhere } from './job-opening-date.where';
-import { pinProtocolLabsThenPage } from './pin-protocol-labs-team';
+import { isInAppApplyAvailable, pinProtocolLabsThenPage } from './pin-protocol-labs-team';
 
 const TOP_LEVEL_FOCUS_AREAS = [
   'Digital Human Rights',
@@ -262,6 +262,7 @@ export class JobOpeningsQueryService {
         select: {
           uid: true,
           name: true,
+          jobReferEmail: true,
           logo: { select: { url: true } },
           jobOpenings: {
             where,
@@ -274,6 +275,7 @@ export class JobOpeningsQueryService {
               location: true,
               workMode: true,
               sourceLink: true,
+              descriptionHtml: true,
               postedDate: true,
               detectionDate: true,
               updatedAt: true,
@@ -328,6 +330,12 @@ export class JobOpeningsQueryService {
             logoUrl: team.logo?.url ?? null,
             focusAreas,
             subFocusAreas,
+            jobReferEmail: team.jobReferEmail?.trim() || null,
+            inAppApplyAvailable: isInAppApplyAvailable({
+              teamUid: team.uid,
+              name: team.name,
+              jobReferEmail: team.jobReferEmail,
+            }),
           },
           totalRoles: roleCountByTeamUid.get(group.teamUid) ?? teamRoles.length,
           roles: teamRoles.map((role) => ({
@@ -338,6 +346,7 @@ export class JobOpeningsQueryService {
             location: role.location,
             workMode: role.workMode,
             applyUrl: role.sourceLink,
+            descriptionHtml: role.descriptionHtml ?? null,
             lastUpdated: role.updatedAt.toISOString(),
             postedDate: role.postedDate ? role.postedDate.toISOString() : null,
             detectionDate: role.detectionDate.toISOString(),

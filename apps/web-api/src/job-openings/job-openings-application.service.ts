@@ -10,7 +10,8 @@ import type { CreateJobApplicationInput } from 'libs/contracts/src/schema/job-ap
 import { PrismaService } from '../shared/prisma.service';
 import { NotificationServiceClient } from '../notifications/notification-service.client';
 import { noteToHtml } from './job-openings-email-html';
-import { resolveVisibleJobOpening } from './job-openings-resolve';
+import { resolveVisibleJobOpening, type ResolvedJobOpening } from './job-openings-resolve';
+import { isProtocolLabsTeam } from './pin-protocol-labs-team';
 
 const JOB_BOARD_APPLICATION_TEMPLATE = 'JOB_BOARD_APPLICATION_EMAIL';
 
@@ -67,12 +68,13 @@ export class JobOpeningsApplicationService {
     }
 
     const jobOpening = await resolveVisibleJobOpening(this.prisma, jobUid);
-    const leads = await this.resolveTeamLeads(jobOpening.team.uid);
-    const { to, cc } = this.buildToAndCc(leads);
+    const { to, cc } = await this.resolveApplicationRecipients(jobOpening);
 
     const companyName = this.resolveCompanyName(applicant);
     const profileSnapshot = this.buildProfileSnapshot(applicant, companyName);
     const coverLetterHtml = noteToHtml(input.coverLetter);
+    const primaryExperience = this.primaryExperience(applicant.experiences);
+    const webBase = (process.env.WEB_UI_BASE_URL || '').replace(/\/+$/, '');
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
@@ -86,13 +88,18 @@ export class JobOpeningsApplicationService {
       deliveryPayload: {
         body: {
           applicantName: applicant.name,
-          applicantRole: applicant.role,
-          applicantCompany: companyName ?? '',
+          applicantFirstName: this.firstName(applicant.name),
+          applicantRole: applicant.role?.trim() ?? '',
+          applicantCompany: primaryExperience?.company.trim() || companyName || '',
+          applicantWorkDuration: primaryExperience ? this.formatExperienceDates(primaryExperience) : '',
+          applicantLocation: this.formatLocation(applicant.location),
+          applicantSkills: applicant.skills.map((skill) => skill.title).filter(Boolean),
           roleTitle: jobOpening.roleTitle,
           teamName: jobOpening.team.name,
           coverLetterHtml,
-          profileUrl: `${process.env.WEB_UI_BASE_URL}/members/${applicant.uid}`,
+          profileUrl: `${webBase}/members/${applicant.uid}`,
           applyUrl: jobOpening.sourceLink || null,
+          preferencesUrl: `${webBase}/settings/email`,
         },
       },
       entityType: 'JOB_OPENING',
@@ -234,6 +241,22 @@ export class JobOpeningsApplicationService {
     }
   }
 
+  private async resolveApplicationRecipients(jobOpening: ResolvedJobOpening) {
+    if (isProtocolLabsTeam({ teamUid: jobOpening.team.uid, name: jobOpening.team.name })) {
+      const jobReferEmail = jobOpening.team.jobReferEmail?.trim() || null;
+      if (!jobReferEmail) {
+        throw new BadRequestException('This job is not accepting in-app applications');
+      }
+      return {
+        to: { uid: jobOpening.team.uid, name: jobOpening.team.name, email: jobReferEmail },
+        cc: [] as Array<{ uid: string; name: string; email: string }>,
+      };
+    }
+
+    const leads = await this.resolveTeamLeads(jobOpening.team.uid);
+    return this.buildToAndCc(leads);
+  }
+
   private async resolveTeamLeads(teamUid: string): Promise<Array<{ uid: string; name: string; email: string }>> {
     const roles = await this.prisma.teamMemberRole.findMany({
       where: {
@@ -267,6 +290,31 @@ export class JobOpeningsApplicationService {
     }
     const [to, ...cc] = unique;
     return { to, cc };
+  }
+
+  private firstName(name: string) {
+    return name.trim().split(/\s+/)[0] || name;
+  }
+
+  private primaryExperience(experiences: Applicant['experiences']) {
+    const current = experiences.find((experience) => experience.isCurrent);
+    if (current) return current;
+    return [...experiences].sort((a, b) => b.startDate.getTime() - a.startDate.getTime())[0] ?? null;
+  }
+
+  private formatExperienceDates(experience: Applicant['experiences'][number]) {
+    const start = this.formatMonthYear(experience.startDate);
+    const end = experience.isCurrent || !experience.endDate ? 'Present' : this.formatMonthYear(experience.endDate);
+    return [start, end].filter(Boolean).join(' — ');
+  }
+
+  private formatMonthYear(date: Date) {
+    return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date);
+  }
+
+  private formatLocation(location: Applicant['location']) {
+    if (!location) return '';
+    return [location.city, location.country].filter(Boolean).join(', ');
   }
 
   private resolveCompanyName(applicant: Applicant): string | null {

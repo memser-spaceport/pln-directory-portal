@@ -27,9 +27,9 @@ const tierToPriority = (tier: number) => {
 
 const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) => {
   onCreate(async (team) => {
-    const fundingStageUids = (await getUidsFrom(Prisma.ModelName.FundingStage)).map(r => r.uid);
+    const fundingStageUids = (await getUidsFrom(Prisma.ModelName.FundingStage)).map((r) => r.uid);
     team.fundingStageUid = sample(fundingStageUids) || '';
-    const imageUids = (await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })).map(r => r.uid);
+    const imageUids = (await getUidsFrom(Prisma.ModelName.Image, { thumbnailToUid: null })).map((r) => r.uid);
     team.logoUid = sample(imageUids) || '';
     return team;
   });
@@ -43,6 +43,7 @@ const teamsFactory = Factory.define<Omit<Team, 'id'>>(({ sequence, onCreate }) =
     blog: faker.internet.url(),
     website: faker.internet.url(),
     contactMethod: faker.helpers.arrayElement([null, faker.internet.url(), faker.internet.email()]),
+    jobReferEmail: faker.helpers.arrayElement([null, faker.internet.email()]),
     twitterHandler: faker.name.firstName(),
     officeHours: faker.name.firstName(),
     linkedinHandler: faker.name.firstName(),

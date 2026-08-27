@@ -14,10 +14,15 @@ describe('buildMemberEnrichmentEligibilityFilter', () => {
     const filter = buildMemberEnrichmentEligibilityFilter();
 
     expect(filter).toEqual({
-      OR: [
-        { isInvestor: true },
-        { teamMemberRoles: { some: { team: { isFund: true } } } },
-        { teamMemberRoles: { some: { team: { priority: { in: [1, 2, 3] } } } } },
+      AND: [
+        { deletedAt: null },
+        {
+          OR: [
+            { isInvestor: true },
+            { teamMemberRoles: { some: { team: { isFund: true } } } },
+            { teamMemberRoles: { some: { team: { priority: { in: [1, 2, 3] } } } } },
+          ],
+        },
       ],
     });
   });
@@ -29,7 +34,10 @@ describe('buildMemberEnrichmentEligibilityFilter', () => {
     const filter = buildMemberEnrichmentEligibilityFilter();
 
     expect(filter).toEqual({
-      OR: [{ isInvestor: true }, { teamMemberRoles: { some: { team: { priority: { in: [1, 2, 3] } } } } }],
+      AND: [
+        { deletedAt: null },
+        { OR: [{ isInvestor: true }, { teamMemberRoles: { some: { team: { priority: { in: [1, 2, 3] } } } } }] },
+      ],
     });
   });
 
@@ -40,7 +48,10 @@ describe('buildMemberEnrichmentEligibilityFilter', () => {
     const filter = buildMemberEnrichmentEligibilityFilter();
 
     expect(filter).toEqual({
-      OR: [{ isInvestor: true }, { teamMemberRoles: { some: { team: { isFund: true } } } }],
+      AND: [
+        { deletedAt: null },
+        { OR: [{ isInvestor: true }, { teamMemberRoles: { some: { team: { isFund: true } } } }] },
+      ],
     });
   });
 
@@ -51,7 +62,10 @@ describe('buildMemberEnrichmentEligibilityFilter', () => {
     const filter = buildMemberEnrichmentEligibilityFilter();
 
     expect(filter).toEqual({
-      OR: [{ isInvestor: true }, { teamMemberRoles: { some: { team: { priority: { in: [1] } } } } }],
+      AND: [
+        { deletedAt: null },
+        { OR: [{ isInvestor: true }, { teamMemberRoles: { some: { team: { priority: { in: [1] } } } } }] },
+      ],
     });
   });
 
@@ -62,10 +76,15 @@ describe('buildMemberEnrichmentEligibilityFilter', () => {
     const filter = buildMemberEnrichmentEligibilityFilter();
 
     expect(filter).toEqual({
-      OR: [
-        { isInvestor: true },
-        { teamMemberRoles: { some: { team: { isFund: true } } } },
-        { teamMemberRoles: { some: { team: { priority: { in: [1, 3] } } } } },
+      AND: [
+        { deletedAt: null },
+        {
+          OR: [
+            { isInvestor: true },
+            { teamMemberRoles: { some: { team: { isFund: true } } } },
+            { teamMemberRoles: { some: { team: { priority: { in: [1, 3] } } } } },
+          ],
+        },
       ],
     });
   });
@@ -76,6 +95,12 @@ describe('buildMemberEnrichmentEligibilityFilter', () => {
 
     const filter = buildMemberEnrichmentEligibilityFilter();
 
-    expect(filter).toEqual({ OR: [{ isInvestor: true }] });
+    expect(filter).toEqual({ AND: [{ deletedAt: null }, { OR: [{ isInvestor: true }] }] });
+  });
+
+  it('excludes rejected (soft-deleted) members regardless of which env vars are set', () => {
+    const filter = buildMemberEnrichmentEligibilityFilter();
+
+    expect(filter.AND).toContainEqual({ deletedAt: null });
   });
 });

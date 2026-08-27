@@ -57,6 +57,7 @@ export const JobRoleSchema = z.object({
   location: z.array(z.string()),
   workMode: z.string().nullable(),
   applyUrl: z.string().nullable(),
+  descriptionHtml: z.string().nullable(),
   lastUpdated: z.string(),
   postedDate: z.string().nullable(),
   detectionDate: z.string(),
@@ -68,6 +69,8 @@ export const JobTeamSchema = z.object({
   logoUrl: z.string().nullable(),
   focusAreas: z.array(z.string()),
   subFocusAreas: z.array(z.string()),
+  jobReferEmail: z.string().email().nullable(),
+  inAppApplyAvailable: z.boolean(),
 });
 
 export const JobTeamGroupSchema = z.object({

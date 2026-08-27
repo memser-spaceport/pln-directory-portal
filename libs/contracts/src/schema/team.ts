@@ -18,6 +18,7 @@ export const TeamSchema = z.object({
   blog: z.string().nullish(),
   website: z.string().nullish(),
   contactMethod: z.string().nullish(),
+  jobReferEmail: z.string().email().nullish(),
   twitterHandler: z.string().nullish(),
   shortDescription: z.string().nullish(),
   longDescription: z.string().nullish(),
@@ -69,6 +70,7 @@ export const CreateTeamSchema = TeamSchema.pick({
   blog: true,
   website: true,
   contactMethod: true,
+  jobReferEmail: true,
   twitterHandler: true,
   shortDescription: true,
   longDescription: true,
@@ -145,6 +147,12 @@ export const TeamFilterQueryParams = z.object({
     .preprocess((v) => v === 'true' || v === true, z.boolean())
     .optional()
     .default(false),
+  /**
+   * Directory Admin only. ACTIVE (default) excludes inactive teams; INACTIVE returns
+   * only inactive teams; ALL applies no status filter. Ignored for non-admin callers,
+   * who are always scoped to active teams.
+   */
+  status: z.enum(['ACTIVE', 'INACTIVE', 'ALL']).optional(),
 });
 
 export class TeamDto extends createZodDto(TeamSchema) {}

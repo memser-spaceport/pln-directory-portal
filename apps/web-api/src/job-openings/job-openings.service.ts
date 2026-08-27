@@ -5,6 +5,7 @@ import { PrismaService } from '../shared/prisma.service';
 import { JobOpeningStatus, Prisma } from '@prisma/client';
 import { JobOpeningIngestItem, IngestJobOpeningsResponse } from './dto/ingest-job-openings.dto';
 import { JOB_INGEST_COMPLETED, JobIngestCompletedPayload } from '../job-alerts/job-alerts.events';
+import { sanitizeJobDescriptionHtml } from './job-description-html.util';
 
 @Injectable()
 export class JobOpeningsService {
@@ -99,13 +100,15 @@ export class JobOpeningsService {
   }
 
   private async upsertJobOpening(item: JobOpeningIngestItem): Promise<void> {
-    const status = this.mapStatus(item.status);
+    const mappedStatus = this.mapStatus(item.status);
+    const status = mappedStatus ?? JobOpeningStatus.NEW;
     const location = this.resolveIngestLocations(item);
     const existing = await this.prisma.jobOpening.findUnique({
       where: { dedupKey: item.dedupKey },
       select: { closedAt: true },
     });
     const closedAt = this.resolveClosedAt(item, status, existing);
+    const descriptionHtml = sanitizeJobDescriptionHtml(item.descriptionHtml);
 
     const data: Prisma.JobOpeningUncheckedCreateInput = {
       status,
@@ -117,6 +120,7 @@ export class JobOpeningsService {
       seniority: item.seniority ?? null,
       urgency: item.urgency ?? null,
       summary: item.summary ?? null,
+      descriptionHtml,
       location,
       workMode: item.workMode ?? null,
       ws4AskId: item.ws4AskId ?? null,
@@ -145,33 +149,42 @@ export class JobOpeningsService {
       where: { dedupKey: item.dedupKey },
       create: data,
       update: {
-        status,
         sourceLink: data.sourceLink,
         canonicalKey: data.canonicalKey,
-        summary: data.summary,
         location: data.location,
-        workMode: data.workMode,
         lastSeenLive: data.lastSeenLive,
         detectionDate: data.detectionDate,
+        ...(mappedStatus ? { status: mappedStatus } : {}),
+        ...(item.summary !== undefined ? { summary: data.summary } : {}),
+        ...(item.workMode !== undefined ? { workMode: data.workMode } : {}),
+        ...(descriptionHtml ? { descriptionHtml } : {}),
         ...(closedAt !== undefined ? { closedAt } : {}),
         updatedAt: new Date(),
       },
     });
   }
 
-  private mapStatus(status: string): JobOpeningStatus {
+  private mapStatus(status: string): JobOpeningStatus | undefined {
     const statusMap: Record<string, JobOpeningStatus> = {
       New: JobOpeningStatus.NEW,
+      NEW: JobOpeningStatus.NEW,
       Confirmed: JobOpeningStatus.CONFIRMED,
+      CONFIRMED: JobOpeningStatus.CONFIRMED,
       'Routed to WS4': JobOpeningStatus.ROUTED_TO_WS4,
+      ROUTED_TO_WS4: JobOpeningStatus.ROUTED_TO_WS4,
       Stale: JobOpeningStatus.STALE,
+      STALE: JobOpeningStatus.STALE,
       Closed: JobOpeningStatus.STALE,
       'Closed - Duplicate': JobOpeningStatus.CLOSED_DUPLICATE,
+      CLOSED_DUPLICATE: JobOpeningStatus.CLOSED_DUPLICATE,
       'Closed - Incorrect Signal': JobOpeningStatus.CLOSED_INCORRECT_SIGNAL,
+      CLOSED_INCORRECT_SIGNAL: JobOpeningStatus.CLOSED_INCORRECT_SIGNAL,
       'Closed - Not a Hiring Signal': JobOpeningStatus.CLOSED_NOT_HIRING_SIGNAL,
+      CLOSED_NOT_HIRING_SIGNAL: JobOpeningStatus.CLOSED_NOT_HIRING_SIGNAL,
       'Closed - Role Filled': JobOpeningStatus.CLOSED_ROLE_FILLED,
+      CLOSED_ROLE_FILLED: JobOpeningStatus.CLOSED_ROLE_FILLED,
     };
 
-    return statusMap[status] ?? JobOpeningStatus.NEW;
+    return statusMap[status];
   }
 }

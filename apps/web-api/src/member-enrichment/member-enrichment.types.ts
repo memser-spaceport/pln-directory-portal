@@ -22,6 +22,7 @@ export enum EnrichmentSource {
   XProfile = 'x-profile',
   AffinityCrm = 'affinity-crm',
   AI = 'ai',
+  Coresignal = 'coresignal',
 }
 
 /** The gap-fillable member fields this pipeline can enrich. */
@@ -54,10 +55,30 @@ export interface MemberScrapingDogUsage {
   source?: 'linkedin' | 'x';
 }
 
+/**
+ * Coresignal usage snapshot, mirroring `MemberScrapingDogUsage`'s shape.
+ * `fellBackToScrapingDog` is only meaningful when `used` is true — it records
+ * whether the Coresignal lookup came back empty/erroring and the pipeline
+ * fell through to ScrapingDog for this member in the same run.
+ */
+export interface MemberCoresignalUsage {
+  used: boolean;
+  fetchedAt?: string;
+  fellBackToScrapingDog?: boolean;
+}
+
 export interface MemberEnrichmentUsageEntry {
   runs: number;
   lastRunAt: string;
 }
+
+/**
+ * Which profile provider a member's fetch step should prefer. `auto` defers to
+ * `isHighValueMemberForCoresignal`; `coresignal`/`scrapingdog` force that provider
+ * regardless of value tier. Set via `trigger-force-profile-enrichment(-bulk)`'s
+ * `source` param; absent (undefined) is treated as `auto`.
+ */
+export type MemberEnrichmentSourcePreference = 'auto' | 'coresignal' | 'scrapingdog';
 
 export interface MemberDataEnrichment {
   shouldEnrich: boolean;
@@ -68,6 +89,8 @@ export interface MemberDataEnrichment {
   errorMessage?: string;
   fieldsMeta: Partial<Record<MemberEnrichableField, MemberFieldEnrichmentMeta>>;
   scrapingDog?: MemberScrapingDogUsage;
+  coresignal?: MemberCoresignalUsage;
+  preferredSource?: MemberEnrichmentSourcePreference;
   usage?: {
     bio?: MemberEnrichmentUsageEntry;
     skills?: MemberEnrichmentUsageEntry;

@@ -30,6 +30,7 @@ model Team {
   officeHours                  String?
   website                      String?
   contactMethod                String?
+  jobReferEmail                String?
   twitterHandler               String?
   linkedinHandler              String?
   telegramHandler              String?
@@ -273,6 +274,7 @@ model Member {
 
   memberEnrichment  MemberEnrichment?
   mcpAuthorizations McpAuthorization[]
+  cvImport          MemberCvImport?
 }
 
 model MemberApproval {
@@ -959,6 +961,29 @@ model MemberExperience {
   updatedAt        DateTime  @updatedAt
   memberUid        String
   member           Member    @relation(fields: [memberUid], references: [uid])
+}
+
+enum MemberCvImportStatus {
+  PROCESSING
+  SUCCEEDED
+  NOTHING_FOUND
+  FAILED
+}
+
+model MemberCvImport {
+  id               Int                  @id @default(autoincrement())
+  uid              String               @unique @default(uuid())
+  memberUid        String               @unique
+  member           Member               @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  status           MemberCvImportStatus @default(PROCESSING)
+  originalFilename String
+  s3Bucket         String
+  s3Key            String
+  payload          Json?
+  errorCode        String?
+  errorMessage     String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 }
 
 enum RecommendationRunStatus {
@@ -2105,20 +2130,20 @@ model TeamEnrichment {
   team    Team   @relation(fields: [teamUid], references: [uid], onDelete: Cascade)
 
   // Enriched scalar candidates — mirror Team's enrichable columns.
-  website          String?
-  blog             String?
-  contactMethod    String?
-  twitterHandler   String?
-  linkedinHandler  String?
-  telegramHandler  String?
+  website           String?
+  blog              String?
+  contactMethod     String?
+  twitterHandler    String?
+  linkedinHandler   String?
+  telegramHandler   String?
   blueskyHandler    String?
   crunchbaseHandler String?
   dateFounded       Int?
   teamSize          String?
   location          String?
-  shortDescription String?
-  longDescription  String?
-  moreDetails      String?
+  shortDescription  String?
+  longDescription   String?
+  moreDetails       String?
 
   // Enriched logo candidate (promoted to Team.logoUid on high-confidence judgment).
   logo    Image?  @relation(fields: [logoUid], references: [uid])
@@ -2253,6 +2278,7 @@ model JobOpening {
   seniority       String?
   urgency         String?
   summary         String?
+  descriptionHtml String?
   location        String[]         @default([])
   workMode        String?
   ws4AskId        String?
@@ -2323,17 +2349,17 @@ enum JobSearchStatus {
 }
 
 model JobApplication {
-  id            Int        @id @default(autoincrement())
-  uid           String     @unique @default(cuid())
-  jobOpeningUid String
-  jobOpening    JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
-  memberUid     String
-  member        Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
-  coverLetter   String
+  id              Int        @id @default(autoincrement())
+  uid             String     @unique @default(cuid())
+  jobOpeningUid   String
+  jobOpening      JobOpening @relation(fields: [jobOpeningUid], references: [uid], onDelete: Cascade)
+  memberUid       String
+  member          Member     @relation(fields: [memberUid], references: [uid], onDelete: Cascade)
+  coverLetter     String
   profileSnapshot Json
-  toEmail       String
-  ccEmails      String[]   @default([])
-  createdAt     DateTime   @default(now())
+  toEmail         String
+  ccEmails        String[]   @default([])
+  createdAt       DateTime   @default(now())
 
   @@unique([jobOpeningUid, memberUid])
   @@index([memberUid])

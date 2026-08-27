@@ -70,10 +70,15 @@ const newDataTeamSchema = z.object({
   website: z.string().optional().nullable(),
   project: z
     .object({
-      projectUid: z.string().optional().nullable()
+      projectUid: z.string().optional().nullable(),
     })
     .optional(),
   contactMethod: z.string().optional().nullable(),
+  jobReferEmail: z.preprocess((value) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    return trimmed === '' ? null : trimmed.toLowerCase();
+  }, z.string().email().nullable().optional()),
   industryTags: z.array(industrTagsMappingSchema).default([]),
   fundingStage: fundingStageMappingSchema.nullable().optional(),
   technologies: z.array(TechnologiesMappingSchema).default([]),
@@ -144,6 +149,6 @@ const ProcessBulkRequest = z.object({
   participantType: participantTypeEnum,
   isVerified: z.boolean(),
 });
-export class ProcessBulkParticipantRequest extends createZodDto(ProcessBulkRequest) { }
-export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) { }
-export class FindUniqueIdentiferDto extends createZodDto(FindUniqueIdentiferSchema) { }
+export class ProcessBulkParticipantRequest extends createZodDto(ProcessBulkRequest) {}
+export class ProcessParticipantReqDto extends createZodDto(ProcessParticipantRequest) {}
+export class FindUniqueIdentiferDto extends createZodDto(FindUniqueIdentiferSchema) {}

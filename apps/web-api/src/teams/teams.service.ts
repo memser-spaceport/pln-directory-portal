@@ -67,18 +67,29 @@ export class TeamsService {
    *
    * @param queryOptions - Prisma query options to customize the result set
    *   (filter, pagination, sorting, etc.)
+   * @param statusFilter - ACTIVE (default) excludes inactive teams; INACTIVE returns only
+   *   inactive teams; ALL applies no status filter. Callers must gate INACTIVE/ALL to
+   *   Directory Admins themselves — this method does not check the caller's role.
    * @returns A list of teams that match the query options
    */
-  async findAll(queryOptions: Prisma.TeamFindManyArgs): Promise<{ count: number; teams: Team[] }> {
+  async findAll(
+    queryOptions: Prisma.TeamFindManyArgs,
+    statusFilter: 'ACTIVE' | 'INACTIVE' | 'ALL' = 'ACTIVE'
+  ): Promise<{ count: number; teams: Team[] }> {
     try {
+      const statusWhere =
+        statusFilter === 'ALL'
+          ? {}
+          : statusFilter === 'INACTIVE'
+          ? { status: TeamStatus.INACTIVE }
+          : { status: { not: TeamStatus.INACTIVE } };
+
       const whereClause = {
         ...queryOptions.where,
         // accessLevel: {
         //   not: 'L0',
         // },
-        status: {
-          not: TeamStatus.INACTIVE,
-        },
+        ...statusWhere,
       };
 
       const [teams, teamsCount] = await Promise.all([
@@ -523,6 +534,7 @@ export class TeamsService {
       'name',
       'blog',
       'contactMethod',
+      'jobReferEmail',
       'twitterHandler',
       'linkedinHandler',
       'telegramHandler',
@@ -545,6 +557,9 @@ export class TeamsService {
     ];
     copyObj(teamData, team, directFields);
 
+    if (team.jobReferEmail !== undefined) {
+      team.jobReferEmail = this.normalizeJobReferEmail(team.jobReferEmail);
+    }
     if (team.blueskyHandler !== undefined) {
       team.blueskyHandler = normalizeBlueskyHandler(team.blueskyHandler) ?? null;
     }
@@ -620,6 +635,17 @@ export class TeamsService {
     }
 
     return { team, investorProfileData };
+  }
+
+  private normalizeJobReferEmail(value: string | null): string | null {
+    if (value == null) return null;
+    const trimmed = String(value).trim().toLowerCase();
+    if (!trimmed) return null;
+    const parsed = z.string().email().safeParse(trimmed);
+    if (!parsed.success) {
+      throw new BadRequestException('Invalid job refer email');
+    }
+    return parsed.data;
   }
 
   /**
@@ -1720,20 +1746,32 @@ export class TeamsService {
     options?: {
       restrictToTeamUids?: string[];
       followedTeamUids?: string[];
+      /**
+       * ACTIVE (default) excludes inactive teams; INACTIVE returns only inactive teams;
+       * ALL applies no status filter. Callers must gate INACTIVE/ALL to Directory Admins
+       * themselves — this method does not check the caller's role.
+       */
+      statusFilter?: 'ACTIVE' | 'INACTIVE' | 'ALL';
     }
   ) {
     const page = Number(filters.page) || 1;
     const limit = Math.min(Number(filters.limit) || 20, 100);
     const skip = (page - 1) * limit;
 
+    const statusFilter = options?.statusFilter ?? 'ACTIVE';
+    const statusWhere =
+      statusFilter === 'ALL'
+        ? {}
+        : statusFilter === 'INACTIVE'
+        ? { status: TeamStatus.INACTIVE }
+        : { status: { not: TeamStatus.INACTIVE } };
+
     // Base where clause excluding L0 access level and inactive teams
     const baseWhere: Prisma.TeamWhereInput = {
       accessLevel: {
         not: 'L0',
       },
-      status: {
-        not: TeamStatus.INACTIVE,
-      },
+      ...statusWhere,
     };
 
     const whereConditions: Prisma.TeamWhereInput[] = [baseWhere];
