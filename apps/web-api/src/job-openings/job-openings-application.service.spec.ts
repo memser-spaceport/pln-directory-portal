@@ -12,14 +12,14 @@ import { JobOpeningsApplicationService } from './job-openings-application.servic
 type PrismaMock = {
   member: { findUnique: jest.Mock };
   jobOpening: { findUnique: jest.Mock };
-  jobApplication: { findUnique: jest.Mock; findMany: jest.Mock; create: jest.Mock };
+  jobApplication: { findUnique: jest.Mock; findMany: jest.Mock; create: jest.Mock; count: jest.Mock };
   teamMemberRole: { findMany: jest.Mock };
 };
 
 const buildPrismaMock = (): PrismaMock => ({
   member: { findUnique: jest.fn() },
   jobOpening: { findUnique: jest.fn() },
-  jobApplication: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn() },
+  jobApplication: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), count: jest.fn().mockResolvedValue(8) },
   teamMemberRole: { findMany: jest.fn() },
 });
 
@@ -129,6 +129,8 @@ describe('JobOpeningsApplicationService', () => {
             profileUrl: 'https://directory.test/members/member-1',
             applyUrl: 'https://directory.test/jobs?job=job-1',
             preferencesUrl: 'https://directory.test/settings/email',
+            applicantCount: 9,
+            allApplicantsUrl: 'https://directory.test/jobs?job=job-1',
           }),
         },
       })
@@ -137,6 +139,7 @@ describe('JobOpeningsApplicationService', () => {
     expect(snapshot.jobSearchStatus).toBeUndefined();
     expect(snapshot.currentCompany).toBe('LabOS');
     expect(snapshot.role).toBe('Engineer');
+    expect(prisma.jobApplication.count).toHaveBeenCalledWith({ where: { jobOpeningUid: 'job-1' } });
   });
 
   /* Approval used to gate this — PENDING, VERIFIED and REJECTED all got a 403

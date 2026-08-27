@@ -69,6 +69,11 @@ export class JobOpeningsApplicationService {
     const coverLetterHtml = noteToHtml(input.coverLetter);
     const primaryExperience = this.primaryExperience(applicant.experiences);
     const webBase = (process.env.WEB_UI_BASE_URL || '').replace(/\/+$/, '');
+    const existingApplicantCount = await this.prisma.jobApplication.count({
+      where: { jobOpeningUid: jobOpening.uid },
+    });
+    const applicantCount = existingApplicantCount + 1;
+    const jobBoardUrl = jobBoardDetailUrl(jobOpening.uid);
 
     await this.notificationServiceClient.sendNotification({
       isPriority: true,
@@ -92,8 +97,10 @@ export class JobOpeningsApplicationService {
           teamName: jobOpening.team.name,
           coverLetterHtml,
           profileUrl: `${webBase}/members/${applicant.uid}`,
-          applyUrl: jobBoardDetailUrl(jobOpening.uid),
+          applyUrl: jobBoardUrl,
           preferencesUrl: `${webBase}/settings/email`,
+          applicantCount,
+          allApplicantsUrl: jobBoardUrl,
         },
       },
       entityType: 'JOB_OPENING',
